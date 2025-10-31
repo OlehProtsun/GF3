@@ -1,4 +1,5 @@
-﻿using DataAccessLayer.Models.DataBaseContext;
+﻿using BusinessLogicLayer;
+using DataAccessLayer.Models.DataBaseContext;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace WinFormsApp
@@ -18,9 +19,10 @@ namespace WinFormsApp
             var services = new ServiceCollection();
 
             var dbPath = Path.Combine(AppContext.BaseDirectory, "DB", "SQLite.db");
-            services.AddDataAccess($"Data Source={dbPath}");
 
-            // форму реєструємо в DI
+            services.AddDataAccess($"Data Source={dbPath}");
+            services.AddBusinessLogicLayer();
+
             services.AddTransient<Form1>();
 
             Services = services.BuildServiceProvider();
