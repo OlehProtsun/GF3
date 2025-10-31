@@ -7,5 +7,8 @@ using System.Threading.Tasks;
 
 namespace BusinessLogicLayer.Services.Abstractions
 {
-    public interface IEmployeeService : IBaseService<EmployeeModel> { }
+    public interface IEmployeeService : IBaseService<EmployeeModel> 
+    {
+        Task<List<EmployeeModel>> GetByValueAsync(string value, CancellationToken ct = default);
+    }
 }
