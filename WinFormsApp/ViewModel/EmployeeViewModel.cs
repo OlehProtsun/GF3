@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace WinFormsApp.View.Employee
+namespace WinFormsApp.ViewModel
 {
-    public enum EmployeeViewMode { List, Edit, Profile }
+    public enum EmployeeViewModel { List, Edit, Profile }
 }

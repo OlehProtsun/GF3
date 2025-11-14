@@ -23,8 +23,8 @@ namespace DataAccessLayer.Repositories
         public async Task<TEntity?> GetByIdAsync(int id, CancellationToken ct = default)
             => await _set.FindAsync(new object?[] { id }, ct);
 
-        public Task<List<TEntity>> GetAllAsync(CancellationToken ct = default)
-            => _set.AsNoTracking().ToListAsync(ct);
+        public virtual async Task<List<TEntity>> GetAllAsync(CancellationToken ct = default)
+            => await _set.AsNoTracking().ToListAsync(ct);
 
         public async Task<TEntity> AddAsync(TEntity entity, CancellationToken ct = default)
         {

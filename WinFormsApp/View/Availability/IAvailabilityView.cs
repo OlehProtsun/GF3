@@ -6,22 +6,22 @@ using System.Text;
 using System.Threading.Tasks;
 using WinFormsApp.ViewModel;
 
-namespace WinFormsApp.View.Employee
+namespace WinFormsApp.View.Availability
 {
-    public interface IEmployeeView
+    public interface IAvailabilityView
     {
-        EmployeeViewModel Mode { get; set; }
-        EmployeeViewModel CancelTarget { get; set; }
-        int Id { get; set; }
-        string FirstName { get; set; }
-        string LastName { get; set; }
-        string? Phone { get; set; }
-        string? Email { get; set; }
+        int AvailabilityMonthId { get; set; }
+        int EmployeeId { get; set; }
+        string AvailabilityMonthName { get; set; }
+        int Year { get; set; }
+        int Month { get; set; } 
 
-        string SearchValue { get; set; }
+        AvailabilityViewModel Mode { get; set; }
+        AvailabilityViewModel CancelTarget { get; set; }
         bool IsEdit { get; set; }
         bool IsSuccessful { get; set; }
         string Message { get; set; }
+        string SearchValue { get; set; }
 
         event Func<CancellationToken, Task>? SearchEvent;
         event Func<CancellationToken, Task>? AddEvent;
@@ -31,16 +31,18 @@ namespace WinFormsApp.View.Employee
         event Func<CancellationToken, Task>? CancelEvent;
         event Func<CancellationToken, Task>? OpenProfileEvent;
 
-        void SetEmployeeListBindingSource(BindingSource employeeList);
+        void SetListBindingSource(BindingSource days);
         void SwitchToEditMode();
         void SwitchToListMode();
         void ClearInputs();
-        void ClearValidationErrors();
-        void SetValidationErrors(IReadOnlyDictionary<string, string> errors);
         void ShowInfo(string text);
         void ShowError(string text);
         bool Confirm(string text, string? caption = null);
+        void SetEmployeeList(IEnumerable<EmployeeModel> employees);
+        void SetValidationErrors(IDictionary<string, string> errors);
+        void ClearValidationErrors();
+        void SetProfile(AvailabilityMonthModel model);
         void SwitchToProfileMode();
-        void SetProfile(EmployeeModel model);
+
     }
 }

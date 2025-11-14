@@ -121,7 +121,7 @@
   <data name="btnAdd.Image" type="System.Drawing.Bitmap, System.Drawing" mimetype="application/x-microsoft.net.object.bytearray.base64">
     <value>
         iVBORw0KGgoAAAANSUhEUgAAAgAAAAIACAYAAAD0eNT6AAAABGdBTUEAALGPC/xhBQAAAAlwSFlzAAAN
-        1AAADdQB75G6FQAAABl0RVh0U29mdHdhcmUAd3d3Lmlua3NjYXBlLm9yZ5vuPBoAAEKxSURBVHhe7d17
+        0AAADdABEGw9BwAAABl0RVh0U29mdHdhcmUAd3d3Lmlua3NjYXBlLm9yZ5vuPBoAAEKxSURBVHhe7d17
         0GVVeefx003TCC3aiEA1JFAqI4iKgAqmIiJSA6J/IBYiEmWiDjWM8UoF5aKMCKYKJiWRkimluERIWZSo
         USwTiJRFKUomFjEQQBkGBCJBBxFvCCKS+f2a9cLq/T7d/V7O5Vl7f5+qTxU87/ues9baaz179zn7MvqP
         //gPAMkpnia7yN5ysBwlJ8hp8gn5rHxBvipXy7VyvdwgN8vtcrf8WB6Uh+Sxwv/tnH/m3/Hv+m/8t34N
@@ -412,7 +412,7 @@
   <data name="btnSearch.Image" type="System.Drawing.Bitmap, System.Drawing" mimetype="application/x-microsoft.net.object.bytearray.base64">
     <value>
         iVBORw0KGgoAAAANSUhEUgAAAgAAAAIACAYAAAD0eNT6AAAABGdBTUEAALGPC/xhBQAAAAlwSFlzAAAL
-        kQAAC5EBWlfTAgAAABl0RVh0U29mdHdhcmUAd3d3Lmlua3NjYXBlLm9yZ5vuPBoAADwdSURBVHhe7d0J
+        jwAAC48Bt8qPNgAAABl0RVh0U29mdHdhcmUAd3d3Lmlua3NjYXBlLm9yZ5vuPBoAADwdSURBVHhe7d0J
         /G3V/P/xc4fG2zxIRQOaaJLK1GCsCD8hUxEiEUk/IYpfhsz++CGZh0QZy1Ci6KeJEkUUSRo1IxqV//vj
         7ttdd9/3vX3P+Z5z1lr7vN6Px/M+6vP4/fRZ++y99rnn7LNW79///jcw8ZQZspI8ULaVJ8me8hp5m3xM
         viInyo/lDDlHfi0XyaVyldwgN8sdcrfcJn+X6+RKuUQulPPkbDlNTpHvy1HyYXmL7CfPlSfKVrKuLOd6
@@ -672,10 +672,10 @@
         5HaJNwdnyzfl1fIg9//v/bv3/wFnaQEpbG0ZDAAAAABJRU5ErkJggg==
 </value>
   </data>
-  <metadata name="errorProvider.TrayLocation" type="System.Drawing.Point, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a">
+  <metadata name="MessageDialog.TrayLocation" type="System.Drawing.Point, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a">
     <value>17, 17</value>
   </metadata>
-  <metadata name="MessageDialog.TrayLocation" type="System.Drawing.Point, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a">
-    <value>140, 17</value>
+  <metadata name="errorProvider.TrayLocation" type="System.Drawing.Point, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a">
+    <value>151, 17</value>
   </metadata>
 </root>

@@ -8,6 +8,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
+using WinFormsApp.ViewModel;
 
 namespace WinFormsApp.View.Employee
 {
@@ -25,11 +26,11 @@ namespace WinFormsApp.View.Employee
         }
 
         [DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
-        public EmployeeViewMode Mode { get; set; }
+        public EmployeeViewModel Mode { get; set; }
 
         [DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
 
-        public EmployeeViewMode CancelTarget { get; set; } = EmployeeViewMode.List;
+        public EmployeeViewModel CancelTarget { get; set; } = EmployeeViewModel.List;
 
         [DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
         public int Id
@@ -130,13 +131,13 @@ namespace WinFormsApp.View.Employee
         public void SwitchToEditMode()
         {
             tabControl.SelectedTab = tabEditAdnCreate;
-            Mode = EmployeeViewMode.Edit;
+            Mode = EmployeeViewModel.Edit;
         }
 
         public void SwitchToListMode()
         {
             tabControl.SelectedTab = tabList;
-            Mode = EmployeeViewMode.List;
+            Mode = EmployeeViewModel.List;
         }
 
         public void ClearInputs()
@@ -244,7 +245,7 @@ namespace WinFormsApp.View.Employee
         public void SwitchToProfileMode()
         {
             tabControl.SelectedTab = tabProfile;
-            Mode = EmployeeViewMode.Profile;
+            Mode = EmployeeViewModel.Profile;
         }
 
         public void SetProfile(EmployeeModel m)

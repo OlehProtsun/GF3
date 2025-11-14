@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using WinFormsApp.View.Availability;
 using WinFormsApp.View.Employee;
 using WinFormsApp.View.Main;
 
@@ -16,6 +17,7 @@ namespace WinFormsApp.Presenter
         private readonly IServiceProvider _sp;
 
         private EmployeeView? _employeeView; // один екземпляр на життєвий цикл presenter-а
+        private AvailabilityView? _availabilityView;
 
         public MainPresenter(IMainView mainView, IServiceProvider sp)
         {
@@ -23,6 +25,27 @@ namespace WinFormsApp.Presenter
             _sp = sp;
 
             _mainView.ShowEmployeeView += OnShowEmployeeViewAsync;
+            _mainView.ShowAvailabilityView += OnShowAvailabilityViewAsync;
+        }
+
+        private Task OnShowAvailabilityViewAsync(CancellationToken token)
+        {
+            if (_availabilityView == null || _availabilityView.IsDisposed)
+            {
+                _availabilityView = _sp.GetRequiredService<AvailabilityView>();
+                if (_mainView is Form mdiParent)
+                {
+                    _availabilityView.MdiParent = mdiParent;
+                    _availabilityView.Dock = DockStyle.Fill;
+                }
+            }
+
+            if (_availabilityView.WindowState == FormWindowState.Minimized)
+                _availabilityView.WindowState = FormWindowState.Normal;
+
+            _availabilityView.BringToFront();
+            _availabilityView.Show();
+            return Task.CompletedTask;
         }
 
         private Task OnShowEmployeeViewAsync(CancellationToken ct)

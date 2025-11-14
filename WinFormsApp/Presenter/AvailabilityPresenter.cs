@@ -1,26 +1,34 @@
-﻿using BusinessLogicLayer.Services.Abstractions;
+﻿using BusinessLogicLayer.Services;
+using BusinessLogicLayer.Services.Abstractions;
 using DataAccessLayer.Models;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
-using System.Text.RegularExpressions;
 using System.Threading.Tasks;
+using WinFormsApp.View.Availability;
 using WinFormsApp.View.Employee;
 using WinFormsApp.ViewModel;
 
 namespace WinFormsApp.Presenter
 {
-    public class EmployeePresenter
+    public class AvailabilityPresenter
     {
-        private readonly IEmployeeView _view;
-        private readonly IEmployeeService _service;
+        private readonly IAvailabilityView _view;
+        private readonly IAvailabilityMonthService _service;
+        private readonly IEmployeeService _employeeService; 
         private readonly BindingSource _bindingSource = new();
 
-        public EmployeePresenter(IEmployeeView view, IEmployeeService service)
+        public AvailabilityPresenter
+            (
+                IAvailabilityView view,
+                IAvailabilityMonthService service,
+                IEmployeeService employeeService
+            )
         {
             _view = view;
             _service = service;
+            _employeeService = employeeService;
 
             _view.SearchEvent += OnSearchEventAsync;
             _view.AddEvent += OnAddEventAsync;
@@ -30,44 +38,57 @@ namespace WinFormsApp.Presenter
             _view.CancelEvent += OnCancelEventAsync;
             _view.OpenProfileEvent += OnOpenProfileAsync;
 
-            _view.SetEmployeeListBindingSource(_bindingSource);
+            _view.SetListBindingSource(_bindingSource);
         }
 
-        public async Task InitializeAsync() => await LoadAllEmployeeList();
+        public async Task InitializeAsync() {
 
-        private async Task LoadAllEmployeeList()
+            await LoadAllAvailabilityMonthList();
+            await LoadEmployees();
+        }
+
+        private async Task LoadAllAvailabilityMonthList()
         {
             _bindingSource.DataSource = await _service.GetAllAsync();
         }
 
+        private async Task LoadEmployees()
+        {
+            var employees = await _employeeService.GetAllAsync();
+            _view.SetEmployeeList(employees);
+        }
+
         private Task OnAddEventAsync(CancellationToken ct)
         {
-            _view.ClearValidationErrors();
             _view.ClearInputs();
+            _view.ClearValidationErrors();
             _view.IsEdit = false;
             _view.Message = "Fill the form and press Save.";
-            _view.CancelTarget = EmployeeViewModel.List;
+            _view.CancelTarget = AvailabilityViewModel.List;
             _view.SwitchToEditMode();
             return Task.CompletedTask;
         }
 
         private Task OnEditEventAsync(CancellationToken ct)
         {
-            var employee = (EmployeeModel?)_bindingSource.Current;
-            if (employee is null) return Task.CompletedTask;
+
+            var availabilityMonth = (AvailabilityMonthModel?)_bindingSource.Current;
+            if (availabilityMonth is null) return Task.CompletedTask;
 
             _view.ClearValidationErrors();
-            _view.Id = employee.Id;
-            _view.FirstName = employee.FirstName;
-            _view.LastName = employee.LastName;
-            _view.Email = employee.Email;
-            _view.Phone = employee.Phone;
+            _view.AvailabilityMonthId = availabilityMonth.Id;
+            _view.EmployeeId = availabilityMonth.EmployeeId;
+            _view.Year = availabilityMonth.Year;
+            _view.Month = availabilityMonth.Month;
+            _view.AvailabilityMonthName = availabilityMonth.Name;
             _view.IsEdit = true;
             _view.Message = "Edit the data and press Save.";
 
-            _view.CancelTarget = (_view.Mode == EmployeeViewModel.Profile)
-                ? EmployeeViewModel.Profile
-                : EmployeeViewModel.List;
+            _view.CancelTarget = (_view.Mode == AvailabilityViewModel.Profile)
+                ? AvailabilityViewModel.Profile
+                : AvailabilityViewModel.List;
+
+
 
             _view.SwitchToEditMode();
             return Task.CompletedTask;
@@ -77,13 +98,14 @@ namespace WinFormsApp.Presenter
         {
             try
             {
-                var model = new EmployeeModel
+                var model = new AvailabilityMonthModel
                 {
-                    Id = _view.Id,
-                    FirstName = _view.FirstName,
-                    LastName = _view.LastName,
-                    Email = _view.Email,
-                    Phone = _view.Phone
+                    Id = _view.AvailabilityMonthId,
+                    Year = _view.Year,
+                    Month = _view.Month,
+                    EmployeeId = _view.EmployeeId,
+                    Name = _view.AvailabilityMonthName,
+
                 };
 
                 // VALIDATION
@@ -93,31 +115,33 @@ namespace WinFormsApp.Presenter
                     _view.SetValidationErrors(errors);
                     _view.IsSuccessful = false;
                     _view.Message = "Please fix the highlighted fields.";
-                    return; // не зберігаємо
+                    return;
                 }
 
                 if (_view.IsEdit)
                 {
                     await _service.UpdateAsync(model);
-                    _view.ShowInfo("Employee updated successfully.");
+                    _view.ShowInfo("Availability Month updated successfully.");
                 }
                 else
                 {
                     await _service.CreateAsync(model);
-                    _view.ShowInfo("Employee added successfully.");
+                    _view.ShowInfo("Availability Month added successfully.");
                 }
 
                 _view.IsSuccessful = true;
 
-                await LoadAllEmployeeList();
-                if (_view.CancelTarget == EmployeeViewModel.Profile)
+                await LoadAllAvailabilityMonthList();
+
+                if (_view.CancelTarget == AvailabilityViewModel.Profile)
                     _view.SwitchToProfileMode();
                 else
                     _view.SwitchToListMode();
+
             }
             catch (Exception ex)
             {
-                _view.ShowError(ex.Message);
+                _view.ShowError(ex.GetBaseException().Message);
             }
         }
 
@@ -125,16 +149,16 @@ namespace WinFormsApp.Presenter
         {
             try
             {
-                var employee = (EmployeeModel?)_bindingSource.Current;
-                if (employee == null) return;
+                var model = (AvailabilityMonthModel?)_bindingSource.Current;
+                if (model == null) return;
 
-                if (!_view.Confirm($"Delete {employee.FirstName} {employee.LastName}?"))
+                if (!_view.Confirm($"Delete {model.Name} ?"))
                     return;
 
-                await _service.DeleteAsync(employee.Id);
+                await _service.DeleteAsync(model.Id);
                 _view.IsSuccessful = true;
-                _view.ShowInfo("Employee deleted successfully.");
-                await LoadAllEmployeeList();
+                _view.ShowInfo("Availability Month deleted successfully.");
+                await LoadAllAvailabilityMonthList();
                 _view.SwitchToListMode();
             }
             catch (Exception ex)
@@ -147,19 +171,19 @@ namespace WinFormsApp.Presenter
         {
             _view.ClearValidationErrors();
 
-            if (_view.Mode == EmployeeViewModel.Edit)
+            if (_view.Mode == AvailabilityViewModel.Edit)
             {
-                // В Edit повертаємось туди, звідки зайшли
-                if (_view.CancelTarget == EmployeeViewModel.Profile)
+
+                if (_view.CancelTarget == AvailabilityViewModel.Profile)
                     _view.SwitchToProfileMode();
                 else
                     _view.SwitchToListMode();
             }
             else
             {
-                // З інших режимів — завжди в List (твоє правило для профілю)
                 _view.SwitchToListMode();
             }
+
 
             return Task.CompletedTask;
         }
@@ -179,45 +203,34 @@ namespace WinFormsApp.Presenter
             }
         }
 
-        private static Dictionary<string, string> Validate(EmployeeModel m)
+        private Dictionary<string, string> Validate(AvailabilityMonthModel model)
         {
-            var map = new Dictionary<string, string>();
+            var errors = new Dictionary<string, string>();
 
-            if (string.IsNullOrWhiteSpace(m.FirstName))
-                map[nameof(m.FirstName)] = "First name is required.";
+            if (model.EmployeeId <= 0)
+                errors[nameof(model.EmployeeId)] = "Select an employee.";
 
-            if (string.IsNullOrWhiteSpace(m.LastName))
-                map[nameof(m.LastName)] = "Last name is required.";
+            if (string.IsNullOrWhiteSpace(model.Name))
+                errors[nameof(model.Name)] = "Indicate the name of the month of availability.";
 
-            if (!string.IsNullOrWhiteSpace(m.Email))
-            {
-                // Дуже простий патерн для прикладу
-                var emailOk = System.Text.RegularExpressions.Regex.IsMatch(
-                    m.Email, @"^\S+@\S+\.\S+$", RegexOptions.IgnoreCase);
-                if (!emailOk)
-                    map[nameof(m.Email)] = "Invalid email format.";
-            }
+            if (model.Month < 1 || model.Month > 12)
+                errors[nameof(model.Month)] = "The month must be between 1 and 12.";
 
-            if (!string.IsNullOrWhiteSpace(m.Phone))
-            {
-                var phoneOk = System.Text.RegularExpressions.Regex.IsMatch(
-                    m.Phone, @"^[0-9+\-\s()]{5,}$");
-                if (!phoneOk)
-                    map[nameof(m.Phone)] = "Invalid phone number.";
-            }
+            if (model.Year < DateTime.Today.Year - 1 || model.Year > DateTime.Today.Year + 5)
+                errors[nameof(model.Year)] = "Invalid year.";
 
-            return map;
+            return errors;
         }
 
         private Task OnOpenProfileAsync(CancellationToken ct)
         {
-            var employee = (EmployeeModel?)_bindingSource.Current;
+            var employee = (AvailabilityMonthModel?)_bindingSource.Current;
             if (employee is null)
                 return Task.CompletedTask;
 
-             _view.SetProfile(employee);
+            _view.SetProfile(employee);
 
-            _view.CancelTarget = EmployeeViewModel.List;
+            _view.CancelTarget = AvailabilityViewModel.List;
             _view.SwitchToProfileMode();
             return Task.CompletedTask;
         }

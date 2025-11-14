@@ -19,24 +19,29 @@ namespace DataAccessLayer.Models
         [Column("id")]
         public int Id { get; set; }
 
+        [Required]
+        [Column("name")]
+        public string Name { get; set; }
 
         [Required]
         [Column("employee_id")]
         public int EmployeeId { get; set; }
 
-
         public EmployeeModel Employee { get; set; } = null!;
-
 
         [Required]
         [Column("year")]
         public int Year { get; set; }
 
-
         [Required]
         [Column("month")]
         public int Month { get; set; }
 
+        [NotMapped]
+        public string EmployeeFullName =>
+            Employee is null
+                ? string.Empty
+                : $"{Employee.FirstName} {Employee.LastName}";
 
         public ICollection<AvailabilityDayModel> Days { get; set; } = new List<AvailabilityDayModel>();
     }

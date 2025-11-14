@@ -2,6 +2,7 @@
 using DataAccessLayer.Models.DataBaseContext;
 using Microsoft.Extensions.DependencyInjection;
 using WinFormsApp.Presenter;
+using WinFormsApp.View.Availability;
 using WinFormsApp.View.Employee;
 using WinFormsApp.View.Main;
 
@@ -41,6 +42,17 @@ namespace WinFormsApp
             {
                 var view = new EmployeeView();
                 var presenter = ActivatorUtilities.CreateInstance<EmployeePresenter>(sp, view);
+                // Стартове завантаження асинхронно (без блокування UI)
+                _ = presenter.InitializeAsync();
+                return view;
+            });
+
+            // Availability
+            services.AddTransient<AvailabilityPresenter>();
+            services.AddTransient<AvailabilityView>(sp =>
+            {
+                var view = new AvailabilityView();
+                var presenter = ActivatorUtilities.CreateInstance<AvailabilityPresenter>(sp, view);
                 // Стартове завантаження асинхронно (без блокування UI)
                 _ = presenter.InitializeAsync();
                 return view;

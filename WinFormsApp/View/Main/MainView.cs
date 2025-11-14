@@ -21,9 +21,16 @@ namespace WinFormsApp.View.Main
                 if (ShowEmployeeView is not null)
                     await ShowEmployeeView(CancellationToken.None);
             };
+
+            btnAvailability.Click += async (_, __) =>
+            {
+                if (ShowAvailabilityView is not null)
+                    await ShowAvailabilityView(CancellationToken.None);
+            };
         }
 
         public event Func<CancellationToken, Task>? ShowEmployeeView;
+        public event Func<CancellationToken, Task>? ShowAvailabilityView;
 
     }
 }

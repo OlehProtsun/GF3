@@ -9,5 +9,6 @@ namespace WinFormsApp.View.Main
     public interface IMainView
     {
         event Func<CancellationToken, Task>? ShowEmployeeView;
+        event Func<CancellationToken, Task>? ShowAvailabilityView;
     }
 }
