@@ -11,6 +11,15 @@ namespace BusinessLogicLayer.Services
 {
     public class AvailabilityMonthService : GenericService<AvailabilityMonthModel>, IAvailabilityMonthService
     {
-        public AvailabilityMonthService(IAvailabilityMonthRepository repo) : base(repo) { }
+        private readonly IAvailabilityMonthRepository _repo;
+        public AvailabilityMonthService(IAvailabilityMonthRepository repo) : base(repo) 
+        {
+            _repo = repo;
+        }
+
+        public async Task<List<AvailabilityMonthModel>> GetByValueAsync(string value, CancellationToken ct = default)
+        {
+            return await _repo.GetByValueAsync(value, ct);
+        }
     }
 }

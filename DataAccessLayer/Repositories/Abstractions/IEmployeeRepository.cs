@@ -7,5 +7,9 @@ using System.Threading.Tasks;
 
 namespace DataAccessLayer.Repositories.Abstractions
 {
-    public interface IEmployeeRepository : IBaseRepository<EmployeeModel> { }
+    public interface IEmployeeRepository : IBaseRepository<EmployeeModel> 
+    {
+        Task<List<EmployeeModel>> GetByValueAsync(string value, CancellationToken ct = default);
+    }
+
 }
