@@ -1,27 +1,16 @@
 ﻿using DataAccessLayer.Models;
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Text;
-using System.Threading.Tasks;
-using WinFormsApp.ViewModel;
 
-namespace WinFormsApp.View.Availability
+namespace WinFormsApp.View.Shedule
 {
-    public interface IAvailabilityView
+    public interface IShopView
     {
-        int AvailabilityMonthId { get; set; }
-        int EmployeeId { get; set; }
-        string AvailabilityMonthName { get; set; }
-        int Year { get; set; }
-        int Month { get; set; } 
-        AvailabilityViewModel Mode { get; set; }
-        AvailabilityViewModel CancelTarget { get; set; }
-        bool IsEdit { get; set; }
-        bool IsSuccessful { get; set; }
-        string Message { get; set; }
-        string SearchValue { get; set; }
-        IList<AvailabilityDayRow> AvailabilityDays { get; set; }
+        int ShopId { get; set; }
+        string ShopName { get; set; }
+        string? ShopDescription { get; set; }
+        ICollection<ScheduleModel> Schedules { get; set; }
 
         event Func<CancellationToken, Task>? SearchEvent;
         event Func<CancellationToken, Task>? AddEvent;
@@ -38,11 +27,9 @@ namespace WinFormsApp.View.Availability
         void ShowInfo(string text);
         void ShowError(string text);
         bool Confirm(string text, string? caption = null);
-        void SetEmployeeList(IEnumerable<EmployeeModel> employees);
         void SetValidationErrors(IDictionary<string, string> errors);
         void ClearValidationErrors();
-        void SetProfile(AvailabilityMonthModel model);
+        void SetProfile(ShopModel model);
         void SwitchToProfileMode();
-
     }
 }

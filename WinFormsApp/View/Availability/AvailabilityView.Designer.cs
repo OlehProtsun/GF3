@@ -66,6 +66,10 @@
             Guna.UI2.WinForms.Suite.CustomizableEdges customizableEdges26 = new Guna.UI2.WinForms.Suite.CustomizableEdges();
             Guna.UI2.WinForms.Suite.CustomizableEdges customizableEdges27 = new Guna.UI2.WinForms.Suite.CustomizableEdges();
             Guna.UI2.WinForms.Suite.CustomizableEdges customizableEdges28 = new Guna.UI2.WinForms.Suite.CustomizableEdges();
+            DataGridViewCellStyle dataGridViewCellStyle9 = new DataGridViewCellStyle();
+            DataGridViewCellStyle dataGridViewCellStyle10 = new DataGridViewCellStyle();
+            DataGridViewCellStyle dataGridViewCellStyle11 = new DataGridViewCellStyle();
+            DataGridViewCellStyle dataGridViewCellStyle12 = new DataGridViewCellStyle();
             tabControl = new Guna.UI2.WinForms.Guna2TabControl();
             tabList = new TabPage();
             btnAdd = new Guna.UI2.WinForms.Guna2Button();
@@ -98,6 +102,7 @@
             labelAvailabilityMonthName = new Label();
             MessageDialog = new Guna.UI2.WinForms.Guna2MessageDialog();
             errorProvider = new ErrorProvider(components);
+            dataGridAvailabilityMonthProfile = new Guna.UI2.WinForms.Guna2DataGridView();
             tabControl.SuspendLayout();
             tabList.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)dataGrid).BeginInit();
@@ -107,6 +112,7 @@
             ((System.ComponentModel.ISupportInitialize)numberEmployeeId).BeginInit();
             tabProfile.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)errorProvider).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)dataGridAvailabilityMonthProfile).BeginInit();
             SuspendLayout();
             // 
             // tabControl
@@ -479,7 +485,7 @@
             dataGridViewCellStyle7.WrapMode = DataGridViewTriState.True;
             dataGridAvailabilityDays.DefaultCellStyle = dataGridViewCellStyle7;
             dataGridAvailabilityDays.GridColor = Color.Gainsboro;
-            dataGridAvailabilityDays.Location = new Point(6, 275);
+            dataGridAvailabilityDays.Location = new Point(6, 124);
             dataGridAvailabilityDays.Name = "dataGridAvailabilityDays";
             dataGridViewCellStyle8.Alignment = DataGridViewContentAlignment.MiddleLeft;
             dataGridViewCellStyle8.BackColor = SystemColors.Control;
@@ -490,7 +496,7 @@
             dataGridViewCellStyle8.WrapMode = DataGridViewTriState.True;
             dataGridAvailabilityDays.RowHeadersDefaultCellStyle = dataGridViewCellStyle8;
             dataGridAvailabilityDays.RowHeadersVisible = false;
-            dataGridAvailabilityDays.Size = new Size(898, 153);
+            dataGridAvailabilityDays.Size = new Size(898, 357);
             dataGridAvailabilityDays.TabIndex = 12;
             dataGridAvailabilityDays.ThemeStyle.AlternatingRowsStyle.BackColor = Color.White;
             dataGridAvailabilityDays.ThemeStyle.AlternatingRowsStyle.Font = null;
@@ -575,6 +581,7 @@
             // 
             // tabProfile
             // 
+            tabProfile.Controls.Add(dataGridAvailabilityMonthProfile);
             tabProfile.Controls.Add(labelEmployeeFullName);
             tabProfile.Controls.Add(labelId);
             tabProfile.Controls.Add(btnCancelProfile);
@@ -679,6 +686,65 @@
             // 
             errorProvider.ContainerControl = this;
             // 
+            // dataGridAvailabilityMonthProfile
+            // 
+            dataGridViewCellStyle9.BackColor = Color.White;
+            dataGridAvailabilityMonthProfile.AlternatingRowsDefaultCellStyle = dataGridViewCellStyle9;
+            dataGridAvailabilityMonthProfile.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
+            dataGridViewCellStyle10.Alignment = DataGridViewContentAlignment.MiddleLeft;
+            dataGridViewCellStyle10.BackColor = Color.White;
+            dataGridViewCellStyle10.Font = new Font("Segoe UI", 9F);
+            dataGridViewCellStyle10.ForeColor = Color.Black;
+            dataGridViewCellStyle10.SelectionBackColor = SystemColors.Control;
+            dataGridViewCellStyle10.SelectionForeColor = SystemColors.HighlightText;
+            dataGridViewCellStyle10.WrapMode = DataGridViewTriState.True;
+            dataGridAvailabilityMonthProfile.ColumnHeadersDefaultCellStyle = dataGridViewCellStyle10;
+            dataGridAvailabilityMonthProfile.ColumnHeadersHeight = 4;
+            dataGridAvailabilityMonthProfile.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.EnableResizing;
+            dataGridViewCellStyle11.Alignment = DataGridViewContentAlignment.MiddleLeft;
+            dataGridViewCellStyle11.BackColor = Color.White;
+            dataGridViewCellStyle11.Font = new Font("Segoe UI", 9F);
+            dataGridViewCellStyle11.ForeColor = SystemColors.ControlText;
+            dataGridViewCellStyle11.SelectionBackColor = Color.Gray;
+            dataGridViewCellStyle11.SelectionForeColor = Color.White;
+            dataGridViewCellStyle11.WrapMode = DataGridViewTriState.True;
+            dataGridAvailabilityMonthProfile.DefaultCellStyle = dataGridViewCellStyle11;
+            dataGridAvailabilityMonthProfile.GridColor = Color.Gainsboro;
+            dataGridAvailabilityMonthProfile.Location = new Point(63, 129);
+            dataGridAvailabilityMonthProfile.Name = "dataGridAvailabilityMonthProfile";
+            dataGridViewCellStyle12.Alignment = DataGridViewContentAlignment.MiddleLeft;
+            dataGridViewCellStyle12.BackColor = SystemColors.Control;
+            dataGridViewCellStyle12.Font = new Font("Segoe UI", 9F);
+            dataGridViewCellStyle12.ForeColor = SystemColors.WindowText;
+            dataGridViewCellStyle12.SelectionBackColor = SystemColors.Highlight;
+            dataGridViewCellStyle12.SelectionForeColor = SystemColors.HighlightText;
+            dataGridViewCellStyle12.WrapMode = DataGridViewTriState.True;
+            dataGridAvailabilityMonthProfile.RowHeadersDefaultCellStyle = dataGridViewCellStyle12;
+            dataGridAvailabilityMonthProfile.RowHeadersVisible = false;
+            dataGridAvailabilityMonthProfile.Size = new Size(577, 357);
+            dataGridAvailabilityMonthProfile.TabIndex = 13;
+            dataGridAvailabilityMonthProfile.ThemeStyle.AlternatingRowsStyle.BackColor = Color.White;
+            dataGridAvailabilityMonthProfile.ThemeStyle.AlternatingRowsStyle.Font = null;
+            dataGridAvailabilityMonthProfile.ThemeStyle.AlternatingRowsStyle.ForeColor = Color.Empty;
+            dataGridAvailabilityMonthProfile.ThemeStyle.AlternatingRowsStyle.SelectionBackColor = Color.Empty;
+            dataGridAvailabilityMonthProfile.ThemeStyle.AlternatingRowsStyle.SelectionForeColor = Color.Empty;
+            dataGridAvailabilityMonthProfile.ThemeStyle.BackColor = Color.White;
+            dataGridAvailabilityMonthProfile.ThemeStyle.GridColor = Color.Gainsboro;
+            dataGridAvailabilityMonthProfile.ThemeStyle.HeaderStyle.BackColor = Color.FromArgb(100, 88, 255);
+            dataGridAvailabilityMonthProfile.ThemeStyle.HeaderStyle.BorderStyle = DataGridViewHeaderBorderStyle.None;
+            dataGridAvailabilityMonthProfile.ThemeStyle.HeaderStyle.Font = new Font("Segoe UI", 9F);
+            dataGridAvailabilityMonthProfile.ThemeStyle.HeaderStyle.ForeColor = Color.White;
+            dataGridAvailabilityMonthProfile.ThemeStyle.HeaderStyle.HeaightSizeMode = DataGridViewColumnHeadersHeightSizeMode.EnableResizing;
+            dataGridAvailabilityMonthProfile.ThemeStyle.HeaderStyle.Height = 4;
+            dataGridAvailabilityMonthProfile.ThemeStyle.ReadOnly = false;
+            dataGridAvailabilityMonthProfile.ThemeStyle.RowsStyle.BackColor = Color.White;
+            dataGridAvailabilityMonthProfile.ThemeStyle.RowsStyle.BorderStyle = DataGridViewCellBorderStyle.SingleHorizontal;
+            dataGridAvailabilityMonthProfile.ThemeStyle.RowsStyle.Font = new Font("Segoe UI", 9F);
+            dataGridAvailabilityMonthProfile.ThemeStyle.RowsStyle.ForeColor = Color.FromArgb(71, 69, 94);
+            dataGridAvailabilityMonthProfile.ThemeStyle.RowsStyle.Height = 25;
+            dataGridAvailabilityMonthProfile.ThemeStyle.RowsStyle.SelectionBackColor = Color.FromArgb(231, 229, 255);
+            dataGridAvailabilityMonthProfile.ThemeStyle.RowsStyle.SelectionForeColor = Color.FromArgb(71, 69, 94);
+            // 
             // AvailabilityView
             // 
             AutoScaleDimensions = new SizeF(7F, 15F);
@@ -700,6 +766,7 @@
             tabProfile.ResumeLayout(false);
             tabProfile.PerformLayout();
             ((System.ComponentModel.ISupportInitialize)errorProvider).EndInit();
+            ((System.ComponentModel.ISupportInitialize)dataGridAvailabilityMonthProfile).EndInit();
             ResumeLayout(false);
         }
 
@@ -745,5 +812,6 @@
         private Guna.UI2.WinForms.Guna2DateTimePicker timepickerMonth;
         private ErrorProvider errorProvider;
         private Label labelEmployeeFullName;
+        private Guna.UI2.WinForms.Guna2DataGridView dataGridAvailabilityMonthProfile;
     }
 }
