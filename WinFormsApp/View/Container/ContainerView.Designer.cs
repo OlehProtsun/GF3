@@ -1,3 +1,4 @@
+using Guna.UI2.WinForms;
 using System.ComponentModel;
 using System.Drawing;
 using System.Windows.Forms;
@@ -29,70 +30,70 @@ namespace WinFormsApp.View.Container
         private void InitializeComponent()
         {
             components = new System.ComponentModel.Container();
-            tabControl = new TabControl();
+            tabControl = new Guna.UI2.WinForms.Guna2TabControl();
             tabList = new TabPage();
-            btnDelete = new Button();
-            btnEdit = new Button();
-            btnAdd = new Button();
-            btnSearch = new Button();
-            inputSearch = new TextBox();
-            containerGrid = new DataGridView();
+            btnDelete = new Guna.UI2.WinForms.Guna2Button();
+            btnEdit = new Guna.UI2.WinForms.Guna2Button();
+            btnAdd = new Guna.UI2.WinForms.Guna2Button();
+            btnSearch = new Guna.UI2.WinForms.Guna2Button();
+            inputSearch = new Guna.UI2.WinForms.Guna2TextBox();
+            containerGrid = new Guna.UI2.WinForms.Guna2DataGridView();
             tabEdit = new TabPage();
-            btnCancel = new Button();
-            btnSave = new Button();
-            inputContainerNote = new TextBox();
+            btnCancel = new Guna.UI2.WinForms.Guna2Button();
+            btnSave = new Guna.UI2.WinForms.Guna2Button();
+            inputContainerNote = new Guna.UI2.WinForms.Guna2TextBox();
             label3 = new Label();
-            inputContainerName = new TextBox();
+            inputContainerName = new Guna.UI2.WinForms.Guna2TextBox();
             label2 = new Label();
-            numberContainerId = new NumericUpDown();
+            numberContainerId = new Guna.UI2.WinForms.Guna2NumericUpDown();
             label1 = new Label();
             tabProfile = new TabPage();
-            btnOpenScheduleProfile = new Button();
-            btnScheduleDelete = new Button();
-            btnScheduleEdit = new Button();
-            btnScheduleAdd = new Button();
-            btnScheduleSearch = new Button();
-            inputScheduleSearch = new TextBox();
-            scheduleGrid = new DataGridView();
+            btnOpenScheduleProfile = new Guna.UI2.WinForms.Guna2Button();
+            btnScheduleDelete = new Guna.UI2.WinForms.Guna2Button();
+            btnScheduleEdit = new Guna.UI2.WinForms.Guna2Button();
+            btnScheduleAdd = new Guna.UI2.WinForms.Guna2Button();
+            btnScheduleSearch = new Guna.UI2.WinForms.Guna2Button();
+            inputScheduleSearch = new Guna.UI2.WinForms.Guna2TextBox();
+            scheduleGrid = new Guna.UI2.WinForms.Guna2DataGridView();
             label5 = new Label();
             label4 = new Label();
             lblContainerNote = new Label();
             lblContainerName = new Label();
             tabScheduleEdit = new TabPage();
-            btnScheduleCancel = new Button();
-            btnScheduleSave = new Button();
-            slotGrid = new DataGridView();
-            btnGenerate = new Button();
-            checkedAvailabilities = new CheckedListBox();
-            comboStatus = new ComboBox();
+            btnScheduleCancel = new Guna.UI2.WinForms.Guna2Button();
+            btnScheduleSave = new Guna.UI2.WinForms.Guna2Button();
+            slotGrid = new Guna.UI2.WinForms.Guna2DataGridView();
+            btnGenerate = new Guna.UI2.WinForms.Guna2Button();
+            checkedAvailabilities = new Guna.UI2.WinForms.Guna2CheckedListBox();
+            comboStatus = new Guna.UI2.WinForms.Guna2ComboBox();
             label21 = new Label();
-            comboShop = new ComboBox();
-            inputScheduleComment = new TextBox();
+            comboShop = new Guna.UI2.WinForms.Guna2ComboBox();
+            inputScheduleComment = new Guna.UI2.WinForms.Guna2TextBox();
             label20 = new Label();
-            inputMaxFull = new NumericUpDown();
+            inputMaxFull = new Guna.UI2.WinForms.Guna2NumericUpDown();
             label19 = new Label();
-            inputMaxConsecutiveFull = new NumericUpDown();
+            inputMaxConsecutiveFull = new Guna.UI2.WinForms.Guna2NumericUpDown();
             label18 = new Label();
-            inputMaxConsecutiveDays = new NumericUpDown();
+            inputMaxConsecutiveDays = new Guna.UI2.WinForms.Guna2NumericUpDown();
             label17 = new Label();
-            inputMaxHours = new NumericUpDown();
+            inputMaxHours = new Guna.UI2.WinForms.Guna2NumericUpDown();
             label16 = new Label();
-            inputShift2 = new TextBox();
+            inputShift2 = new Guna.UI2.WinForms.Guna2TextBox();
             label15 = new Label();
-            inputShift1 = new TextBox();
+            inputShift1 = new Guna.UI2.WinForms.Guna2TextBox();
             label14 = new Label();
-            inputPeoplePerShift = new NumericUpDown();
+            inputPeoplePerShift = new Guna.UI2.WinForms.Guna2NumericUpDown();
             label13 = new Label();
-            inputMonth = new NumericUpDown();
+            inputMonth = new Guna.UI2.WinForms.Guna2NumericUpDown();
             label12 = new Label();
-            inputYear = new NumericUpDown();
+            inputYear = new Guna.UI2.WinForms.Guna2NumericUpDown();
             label11 = new Label();
-            inputScheduleName = new TextBox();
+            inputScheduleName = new Guna.UI2.WinForms.Guna2TextBox();
             label10 = new Label();
-            numberScheduleId = new NumericUpDown();
+            numberScheduleId = new Guna.UI2.WinForms.Guna2NumericUpDown();
             label9 = new Label();
             tabScheduleProfile = new TabPage();
-            scheduleSlotProfileGrid = new DataGridView();
+            scheduleSlotProfileGrid = new Guna.UI2.WinForms.Guna2DataGridView();
             lblScheduleSummary = new Label();
             errorProviderContainer = new ErrorProvider(components);
             errorProviderSchedule = new ErrorProvider(components);
@@ -126,12 +127,32 @@ namespace WinFormsApp.View.Container
             tabControl.Controls.Add(tabProfile);
             tabControl.Controls.Add(tabScheduleEdit);
             tabControl.Controls.Add(tabScheduleProfile);
+            tabControl.Alignment = TabAlignment.Left;
             tabControl.Dock = DockStyle.Fill;
+            tabControl.ItemSize = new Size(180, 40);
             tabControl.Location = new Point(0, 0);
             tabControl.Name = "tabControl";
             tabControl.SelectedIndex = 0;
             tabControl.Size = new Size(1024, 640);
+            tabControl.TabButtonHoverState.BorderColor = Color.Empty;
+            tabControl.TabButtonHoverState.FillColor = Color.FromArgb(40, 52, 70);
+            tabControl.TabButtonHoverState.Font = new Font("Segoe UI Semibold", 10F, FontStyle.Regular, GraphicsUnit.Point);
+            tabControl.TabButtonHoverState.ForeColor = Color.White;
+            tabControl.TabButtonHoverState.InnerColor = Color.FromArgb(40, 52, 70);
+            tabControl.TabButtonIdleState.BorderColor = Color.Empty;
+            tabControl.TabButtonIdleState.FillColor = Color.FromArgb(33, 42, 57);
+            tabControl.TabButtonIdleState.Font = new Font("Segoe UI Semibold", 10F, FontStyle.Regular, GraphicsUnit.Point);
+            tabControl.TabButtonIdleState.ForeColor = Color.FromArgb(156, 160, 167);
+            tabControl.TabButtonIdleState.InnerColor = Color.FromArgb(33, 42, 57);
+            tabControl.TabButtonSelectedState.BorderColor = Color.Empty;
+            tabControl.TabButtonSelectedState.FillColor = Color.FromArgb(76, 132, 255);
+            tabControl.TabButtonSelectedState.Font = new Font("Segoe UI Semibold", 10F, FontStyle.Regular, GraphicsUnit.Point);
+            tabControl.TabButtonSelectedState.ForeColor = Color.White;
+            tabControl.TabButtonSelectedState.InnerColor = Color.FromArgb(76, 132, 255);
+            tabControl.TabButtonSize = new Size(180, 40);
             tabControl.TabIndex = 0;
+            tabControl.TabMenuBackColor = Color.FromArgb(33, 42, 57);
+            tabControl.TabMenuOrientation = TabMenuOrientation.VerticalLeft;
             // 
             // tabList
             // 
@@ -151,54 +172,72 @@ namespace WinFormsApp.View.Container
             // 
             // btnDelete
             // 
+            btnDelete.BorderRadius = 8;
+            btnDelete.FillColor = Color.FromArgb(231, 76, 60);
+            btnDelete.Font = new Font("Segoe UI", 9F, FontStyle.Bold, GraphicsUnit.Point);
+            btnDelete.ForeColor = Color.White;
             btnDelete.Location = new Point(374, 16);
             btnDelete.Name = "btnDelete";
-            btnDelete.Size = new Size(75, 23);
+            btnDelete.Size = new Size(90, 30);
             btnDelete.TabIndex = 5;
             btnDelete.Text = "Delete";
-            btnDelete.UseVisualStyleBackColor = true;
-            // 
+            //
             // btnEdit
-            // 
-            btnEdit.Location = new Point(293, 16);
+            //
+            btnEdit.BorderRadius = 8;
+            btnEdit.FillColor = Color.FromArgb(51, 152, 219);
+            btnEdit.Font = new Font("Segoe UI", 9F, FontStyle.Bold, GraphicsUnit.Point);
+            btnEdit.ForeColor = Color.White;
+            btnEdit.Location = new Point(278, 16);
             btnEdit.Name = "btnEdit";
-            btnEdit.Size = new Size(75, 23);
+            btnEdit.Size = new Size(90, 30);
             btnEdit.TabIndex = 4;
             btnEdit.Text = "Edit";
-            btnEdit.UseVisualStyleBackColor = true;
-            // 
+            //
             // btnAdd
-            // 
-            btnAdd.Location = new Point(212, 16);
+            //
+            btnAdd.BorderRadius = 8;
+            btnAdd.FillColor = Color.FromArgb(46, 204, 113);
+            btnAdd.Font = new Font("Segoe UI", 9F, FontStyle.Bold, GraphicsUnit.Point);
+            btnAdd.ForeColor = Color.White;
+            btnAdd.Location = new Point(182, 16);
             btnAdd.Name = "btnAdd";
-            btnAdd.Size = new Size(75, 23);
+            btnAdd.Size = new Size(90, 30);
             btnAdd.TabIndex = 3;
             btnAdd.Text = "Add";
-            btnAdd.UseVisualStyleBackColor = true;
-            // 
+            //
             // btnSearch
-            // 
-            btnSearch.Location = new Point(131, 16);
+            //
+            btnSearch.BorderRadius = 8;
+            btnSearch.FillColor = Color.FromArgb(76, 132, 255);
+            btnSearch.Font = new Font("Segoe UI", 9F, FontStyle.Bold, GraphicsUnit.Point);
+            btnSearch.ForeColor = Color.White;
+            btnSearch.Location = new Point(86, 16);
             btnSearch.Name = "btnSearch";
-            btnSearch.Size = new Size(75, 23);
+            btnSearch.Size = new Size(90, 30);
             btnSearch.TabIndex = 2;
             btnSearch.Text = "Search";
-            btnSearch.UseVisualStyleBackColor = true;
-            // 
+            //
             // inputSearch
-            // 
+            //
+            inputSearch.BorderRadius = 8;
             inputSearch.Location = new Point(8, 16);
             inputSearch.Name = "inputSearch";
-            inputSearch.Size = new Size(117, 23);
+            inputSearch.Size = new Size(172, 30);
             inputSearch.TabIndex = 1;
             // 
             // containerGrid
             // 
             containerGrid.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
-            containerGrid.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize;
+            containerGrid.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
+            containerGrid.BackgroundColor = Color.White;
+            containerGrid.BorderStyle = BorderStyle.None;
+            containerGrid.ColumnHeadersHeight = 32;
+            containerGrid.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.DisableResizing;
             containerGrid.Location = new Point(8, 56);
             containerGrid.MultiSelect = false;
             containerGrid.Name = "containerGrid";
+            containerGrid.RowHeadersVisible = false;
             containerGrid.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
             containerGrid.Size = new Size(1000, 548);
             containerGrid.TabIndex = 0;
@@ -223,24 +262,31 @@ namespace WinFormsApp.View.Container
             // 
             // btnCancel
             // 
+            btnCancel.BorderRadius = 8;
+            btnCancel.FillColor = Color.FromArgb(231, 76, 60);
+            btnCancel.Font = new Font("Segoe UI", 9F, FontStyle.Bold, GraphicsUnit.Point);
+            btnCancel.ForeColor = Color.White;
             btnCancel.Location = new Point(104, 200);
             btnCancel.Name = "btnCancel";
-            btnCancel.Size = new Size(75, 23);
+            btnCancel.Size = new Size(90, 30);
             btnCancel.TabIndex = 7;
             btnCancel.Text = "Cancel";
-            btnCancel.UseVisualStyleBackColor = true;
-            // 
+            //
             // btnSave
-            // 
+            //
+            btnSave.BorderRadius = 8;
+            btnSave.FillColor = Color.FromArgb(46, 204, 113);
+            btnSave.Font = new Font("Segoe UI", 9F, FontStyle.Bold, GraphicsUnit.Point);
+            btnSave.ForeColor = Color.White;
             btnSave.Location = new Point(23, 200);
             btnSave.Name = "btnSave";
-            btnSave.Size = new Size(75, 23);
+            btnSave.Size = new Size(90, 30);
             btnSave.TabIndex = 6;
             btnSave.Text = "Save";
-            btnSave.UseVisualStyleBackColor = true;
             // 
             // inputContainerNote
             // 
+            inputContainerNote.BorderRadius = 8;
             inputContainerNote.Location = new Point(23, 122);
             inputContainerNote.Multiline = true;
             inputContainerNote.Name = "inputContainerNote";
@@ -258,9 +304,10 @@ namespace WinFormsApp.View.Container
             // 
             // inputContainerName
             // 
+            inputContainerName.BorderRadius = 8;
             inputContainerName.Location = new Point(23, 78);
             inputContainerName.Name = "inputContainerName";
-            inputContainerName.Size = new Size(312, 23);
+            inputContainerName.Size = new Size(312, 30);
             inputContainerName.TabIndex = 3;
             // 
             // label2
@@ -274,10 +321,11 @@ namespace WinFormsApp.View.Container
             // 
             // numberContainerId
             // 
+            numberContainerId.BorderRadius = 6;
             numberContainerId.Location = new Point(23, 34);
             numberContainerId.Maximum = new decimal(new int[] { 1000000, 0, 0, 0 });
             numberContainerId.Name = "numberContainerId";
-            numberContainerId.Size = new Size(120, 23);
+            numberContainerId.Size = new Size(120, 30);
             numberContainerId.TabIndex = 1;
             // 
             // label1
@@ -312,63 +360,84 @@ namespace WinFormsApp.View.Container
             // 
             // btnOpenScheduleProfile
             // 
+            btnOpenScheduleProfile.BorderRadius = 8;
+            btnOpenScheduleProfile.FillColor = Color.FromArgb(76, 132, 255);
+            btnOpenScheduleProfile.Font = new Font("Segoe UI", 9F, FontStyle.Bold, GraphicsUnit.Point);
+            btnOpenScheduleProfile.ForeColor = Color.White;
             btnOpenScheduleProfile.Location = new Point(775, 40);
             btnOpenScheduleProfile.Name = "btnOpenScheduleProfile";
-            btnOpenScheduleProfile.Size = new Size(104, 23);
+            btnOpenScheduleProfile.Size = new Size(120, 30);
             btnOpenScheduleProfile.TabIndex = 10;
             btnOpenScheduleProfile.Text = "Open profile";
-            btnOpenScheduleProfile.UseVisualStyleBackColor = true;
-            // 
+            //
             // btnScheduleDelete
-            // 
+            //
+            btnScheduleDelete.BorderRadius = 8;
+            btnScheduleDelete.FillColor = Color.FromArgb(231, 76, 60);
+            btnScheduleDelete.Font = new Font("Segoe UI", 9F, FontStyle.Bold, GraphicsUnit.Point);
+            btnScheduleDelete.ForeColor = Color.White;
             btnScheduleDelete.Location = new Point(694, 40);
             btnScheduleDelete.Name = "btnScheduleDelete";
-            btnScheduleDelete.Size = new Size(75, 23);
+            btnScheduleDelete.Size = new Size(90, 30);
             btnScheduleDelete.TabIndex = 9;
             btnScheduleDelete.Text = "Delete";
-            btnScheduleDelete.UseVisualStyleBackColor = true;
-            // 
+            //
             // btnScheduleEdit
-            // 
-            btnScheduleEdit.Location = new Point(613, 40);
+            //
+            btnScheduleEdit.BorderRadius = 8;
+            btnScheduleEdit.FillColor = Color.FromArgb(51, 152, 219);
+            btnScheduleEdit.Font = new Font("Segoe UI", 9F, FontStyle.Bold, GraphicsUnit.Point);
+            btnScheduleEdit.ForeColor = Color.White;
+            btnScheduleEdit.Location = new Point(598, 40);
             btnScheduleEdit.Name = "btnScheduleEdit";
-            btnScheduleEdit.Size = new Size(75, 23);
+            btnScheduleEdit.Size = new Size(90, 30);
             btnScheduleEdit.TabIndex = 8;
             btnScheduleEdit.Text = "Edit";
-            btnScheduleEdit.UseVisualStyleBackColor = true;
-            // 
+            //
             // btnScheduleAdd
-            // 
-            btnScheduleAdd.Location = new Point(532, 40);
+            //
+            btnScheduleAdd.BorderRadius = 8;
+            btnScheduleAdd.FillColor = Color.FromArgb(46, 204, 113);
+            btnScheduleAdd.Font = new Font("Segoe UI", 9F, FontStyle.Bold, GraphicsUnit.Point);
+            btnScheduleAdd.ForeColor = Color.White;
+            btnScheduleAdd.Location = new Point(502, 40);
             btnScheduleAdd.Name = "btnScheduleAdd";
-            btnScheduleAdd.Size = new Size(75, 23);
+            btnScheduleAdd.Size = new Size(90, 30);
             btnScheduleAdd.TabIndex = 7;
             btnScheduleAdd.Text = "Add";
-            btnScheduleAdd.UseVisualStyleBackColor = true;
-            // 
+            //
             // btnScheduleSearch
-            // 
-            btnScheduleSearch.Location = new Point(451, 40);
+            //
+            btnScheduleSearch.BorderRadius = 8;
+            btnScheduleSearch.FillColor = Color.FromArgb(76, 132, 255);
+            btnScheduleSearch.Font = new Font("Segoe UI", 9F, FontStyle.Bold, GraphicsUnit.Point);
+            btnScheduleSearch.ForeColor = Color.White;
+            btnScheduleSearch.Location = new Point(406, 40);
             btnScheduleSearch.Name = "btnScheduleSearch";
-            btnScheduleSearch.Size = new Size(75, 23);
+            btnScheduleSearch.Size = new Size(90, 30);
             btnScheduleSearch.TabIndex = 6;
             btnScheduleSearch.Text = "Search";
-            btnScheduleSearch.UseVisualStyleBackColor = true;
-            // 
+            //
             // inputScheduleSearch
-            // 
+            //
+            inputScheduleSearch.BorderRadius = 8;
             inputScheduleSearch.Location = new Point(328, 40);
             inputScheduleSearch.Name = "inputScheduleSearch";
-            inputScheduleSearch.Size = new Size(117, 23);
+            inputScheduleSearch.Size = new Size(172, 30);
             inputScheduleSearch.TabIndex = 5;
             // 
             // scheduleGrid
             // 
             scheduleGrid.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
-            scheduleGrid.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize;
+            scheduleGrid.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
+            scheduleGrid.BackgroundColor = Color.White;
+            scheduleGrid.BorderStyle = BorderStyle.None;
+            scheduleGrid.ColumnHeadersHeight = 32;
+            scheduleGrid.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.DisableResizing;
             scheduleGrid.Location = new Point(19, 80);
             scheduleGrid.MultiSelect = false;
             scheduleGrid.Name = "scheduleGrid";
+            scheduleGrid.RowHeadersVisible = false;
             scheduleGrid.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
             scheduleGrid.Size = new Size(977, 510);
             scheduleGrid.TabIndex = 4;
@@ -453,64 +522,96 @@ namespace WinFormsApp.View.Container
             // 
             // btnScheduleCancel
             // 
+            btnScheduleCancel.BorderRadius = 8;
+            btnScheduleCancel.FillColor = Color.FromArgb(231, 76, 60);
+            btnScheduleCancel.Font = new Font("Segoe UI", 9F, FontStyle.Bold, GraphicsUnit.Point);
+            btnScheduleCancel.ForeColor = Color.White;
             btnScheduleCancel.Location = new Point(114, 566);
             btnScheduleCancel.Name = "btnScheduleCancel";
-            btnScheduleCancel.Size = new Size(75, 23);
+            btnScheduleCancel.Size = new Size(90, 30);
             btnScheduleCancel.TabIndex = 29;
             btnScheduleCancel.Text = "Cancel";
-            btnScheduleCancel.UseVisualStyleBackColor = true;
-            // 
+            //
             // btnScheduleSave
-            // 
+            //
+            btnScheduleSave.BorderRadius = 8;
+            btnScheduleSave.FillColor = Color.FromArgb(46, 204, 113);
+            btnScheduleSave.Font = new Font("Segoe UI", 9F, FontStyle.Bold, GraphicsUnit.Point);
+            btnScheduleSave.ForeColor = Color.White;
             btnScheduleSave.Location = new Point(33, 566);
             btnScheduleSave.Name = "btnScheduleSave";
-            btnScheduleSave.Size = new Size(75, 23);
+            btnScheduleSave.Size = new Size(90, 30);
             btnScheduleSave.TabIndex = 28;
             btnScheduleSave.Text = "Save";
-            btnScheduleSave.UseVisualStyleBackColor = true;
             // 
             // slotGrid
             // 
             slotGrid.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
-            slotGrid.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize;
+            slotGrid.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
+            slotGrid.BackgroundColor = Color.White;
+            slotGrid.BorderStyle = BorderStyle.None;
+            slotGrid.ColumnHeadersHeight = 32;
+            slotGrid.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.DisableResizing;
             slotGrid.Location = new Point(368, 16);
             slotGrid.Name = "slotGrid";
+            slotGrid.RowHeadersVisible = false;
+            slotGrid.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
             slotGrid.Size = new Size(630, 536);
             slotGrid.TabIndex = 27;
             // 
             // btnGenerate
             // 
+            btnGenerate.BorderRadius = 8;
+            btnGenerate.FillColor = Color.FromArgb(76, 132, 255);
+            btnGenerate.Font = new Font("Segoe UI", 9F, FontStyle.Bold, GraphicsUnit.Point);
+            btnGenerate.ForeColor = Color.White;
             btnGenerate.Location = new Point(287, 509);
             btnGenerate.Name = "btnGenerate";
-            btnGenerate.Size = new Size(75, 23);
+            btnGenerate.Size = new Size(90, 30);
             btnGenerate.TabIndex = 26;
             btnGenerate.Text = "Generate";
-            btnGenerate.UseVisualStyleBackColor = true;
             // 
             // checkedAvailabilities
             // 
-            checkedAvailabilities.FormattingEnabled = true;
+            checkedAvailabilities.BorderStyle = BorderStyle.FixedSingle;
+            checkedAvailabilities.CheckOnClick = true;
+            checkedAvailabilities.Font = new Font("Segoe UI", 9F, FontStyle.Regular, GraphicsUnit.Point);
+            checkedAvailabilities.ItemHeight = 20;
             checkedAvailabilities.Location = new Point(17, 356);
             checkedAvailabilities.Name = "checkedAvailabilities";
-            checkedAvailabilities.Size = new Size(345, 148);
+            checkedAvailabilities.Size = new Size(345, 144);
             checkedAvailabilities.TabIndex = 25;
             // 
             // comboStatus
             // 
+            comboStatus.BackColor = Color.Transparent;
+            comboStatus.BorderRadius = 6;
+            comboStatus.DrawMode = DrawMode.OwnerDrawFixed;
             comboStatus.DropDownStyle = ComboBoxStyle.DropDownList;
-            comboStatus.FormattingEnabled = true;
+            comboStatus.FocusedColor = Color.FromArgb(94, 148, 255);
+            comboStatus.FocusedState.BorderColor = Color.FromArgb(94, 148, 255);
+            comboStatus.Font = new Font("Segoe UI", 9F, FontStyle.Regular, GraphicsUnit.Point);
+            comboStatus.ForeColor = Color.FromArgb(68, 88, 112);
+            comboStatus.ItemHeight = 30;
             comboStatus.Location = new Point(127, 327);
             comboStatus.Name = "comboStatus";
-            comboStatus.Size = new Size(235, 23);
+            comboStatus.Size = new Size(235, 36);
             comboStatus.TabIndex = 24;
             // 
             // comboShop
             //
+            comboShop.BackColor = Color.Transparent;
+            comboShop.BorderRadius = 6;
+            comboShop.DrawMode = DrawMode.OwnerDrawFixed;
             comboShop.DropDownStyle = ComboBoxStyle.DropDownList;
-            comboShop.FormattingEnabled = true;
+            comboShop.FocusedColor = Color.FromArgb(94, 148, 255);
+            comboShop.FocusedState.BorderColor = Color.FromArgb(94, 148, 255);
+            comboShop.Font = new Font("Segoe UI", 9F, FontStyle.Regular, GraphicsUnit.Point);
+            comboShop.ForeColor = Color.FromArgb(68, 88, 112);
+            comboShop.ItemHeight = 30;
             comboShop.Location = new Point(127, 113);
             comboShop.Name = "comboShop";
-            comboShop.Size = new Size(235, 23);
+            comboShop.Size = new Size(235, 36);
             comboShop.TabIndex = 8;
             // 
             // label21
@@ -524,9 +625,10 @@ namespace WinFormsApp.View.Container
             // 
             // inputScheduleComment
             // 
+            inputScheduleComment.BorderRadius = 8;
             inputScheduleComment.Location = new Point(127, 487);
             inputScheduleComment.Name = "inputScheduleComment";
-            inputScheduleComment.Size = new Size(235, 23);
+            inputScheduleComment.Size = new Size(235, 30);
             inputScheduleComment.TabIndex = 23;
             // 
             // label20
@@ -540,10 +642,11 @@ namespace WinFormsApp.View.Container
             // 
             // inputMaxFull
             // 
+            inputMaxFull.BorderRadius = 6;
             inputMaxFull.Location = new Point(127, 442);
             inputMaxFull.Maximum = new decimal(new int[] { 1000, 0, 0, 0 });
             inputMaxFull.Name = "inputMaxFull";
-            inputMaxFull.Size = new Size(120, 23);
+            inputMaxFull.Size = new Size(120, 30);
             inputMaxFull.TabIndex = 21;
             // 
             // label19
@@ -557,10 +660,11 @@ namespace WinFormsApp.View.Container
             // 
             // inputMaxConsecutiveFull
             // 
+            inputMaxConsecutiveFull.BorderRadius = 6;
             inputMaxConsecutiveFull.Location = new Point(127, 395);
             inputMaxConsecutiveFull.Maximum = new decimal(new int[] { 1000, 0, 0, 0 });
             inputMaxConsecutiveFull.Name = "inputMaxConsecutiveFull";
-            inputMaxConsecutiveFull.Size = new Size(120, 23);
+            inputMaxConsecutiveFull.Size = new Size(120, 30);
             inputMaxConsecutiveFull.TabIndex = 19;
             // 
             // label18
@@ -574,10 +678,11 @@ namespace WinFormsApp.View.Container
             // 
             // inputMaxConsecutiveDays
             // 
+            inputMaxConsecutiveDays.BorderRadius = 6;
             inputMaxConsecutiveDays.Location = new Point(127, 348);
             inputMaxConsecutiveDays.Maximum = new decimal(new int[] { 1000, 0, 0, 0 });
             inputMaxConsecutiveDays.Name = "inputMaxConsecutiveDays";
-            inputMaxConsecutiveDays.Size = new Size(120, 23);
+            inputMaxConsecutiveDays.Size = new Size(120, 30);
             inputMaxConsecutiveDays.TabIndex = 17;
             // 
             // label17
@@ -591,10 +696,11 @@ namespace WinFormsApp.View.Container
             // 
             // inputMaxHours
             // 
+            inputMaxHours.BorderRadius = 6;
             inputMaxHours.Location = new Point(127, 301);
             inputMaxHours.Maximum = new decimal(new int[] { 1000, 0, 0, 0 });
             inputMaxHours.Name = "inputMaxHours";
-            inputMaxHours.Size = new Size(120, 23);
+            inputMaxHours.Size = new Size(120, 30);
             inputMaxHours.TabIndex = 15;
             // 
             // label16
@@ -608,9 +714,10 @@ namespace WinFormsApp.View.Container
             // 
             // inputShift2
             // 
+            inputShift2.BorderRadius = 8;
             inputShift2.Location = new Point(127, 254);
             inputShift2.Name = "inputShift2";
-            inputShift2.Size = new Size(235, 23);
+            inputShift2.Size = new Size(235, 30);
             inputShift2.TabIndex = 13;
             // 
             // label15
@@ -624,9 +731,10 @@ namespace WinFormsApp.View.Container
             // 
             // inputShift1
             // 
+            inputShift1.BorderRadius = 8;
             inputShift1.Location = new Point(127, 207);
             inputShift1.Name = "inputShift1";
-            inputShift1.Size = new Size(235, 23);
+            inputShift1.Size = new Size(235, 30);
             inputShift1.TabIndex = 11;
             // 
             // label14
@@ -640,10 +748,11 @@ namespace WinFormsApp.View.Container
             // 
             // inputPeoplePerShift
             // 
+            inputPeoplePerShift.BorderRadius = 6;
             inputPeoplePerShift.Location = new Point(127, 160);
             inputPeoplePerShift.Maximum = new decimal(new int[] { 1000, 0, 0, 0 });
             inputPeoplePerShift.Name = "inputPeoplePerShift";
-            inputPeoplePerShift.Size = new Size(120, 23);
+            inputPeoplePerShift.Size = new Size(120, 30);
             inputPeoplePerShift.TabIndex = 9;
             // 
             // label13
@@ -657,11 +766,12 @@ namespace WinFormsApp.View.Container
             // 
             // inputMonth
             // 
+            inputMonth.BorderRadius = 6;
             inputMonth.Location = new Point(289, 64);
             inputMonth.Maximum = new decimal(new int[] { 12, 0, 0, 0 });
             inputMonth.Minimum = new decimal(new int[] { 1, 0, 0, 0 });
             inputMonth.Name = "inputMonth";
-            inputMonth.Size = new Size(73, 23);
+            inputMonth.Size = new Size(73, 30);
             inputMonth.TabIndex = 7;
             inputMonth.Value = new decimal(new int[] { 1, 0, 0, 0 });
             // 
@@ -676,11 +786,12 @@ namespace WinFormsApp.View.Container
             // 
             // inputYear
             // 
+            inputYear.BorderRadius = 6;
             inputYear.Location = new Point(127, 64);
             inputYear.Maximum = new decimal(new int[] { 4000, 0, 0, 0 });
             inputYear.Minimum = new decimal(new int[] { 1900, 0, 0, 0 });
             inputYear.Name = "inputYear";
-            inputYear.Size = new Size(108, 23);
+            inputYear.Size = new Size(108, 30);
             inputYear.TabIndex = 5;
             inputYear.Value = new decimal(new int[] { 2024, 0, 0, 0 });
             // 
@@ -695,9 +806,10 @@ namespace WinFormsApp.View.Container
             // 
             // inputScheduleName
             // 
+            inputScheduleName.BorderRadius = 8;
             inputScheduleName.Location = new Point(127, 35);
             inputScheduleName.Name = "inputScheduleName";
-            inputScheduleName.Size = new Size(235, 23);
+            inputScheduleName.Size = new Size(235, 30);
             inputScheduleName.TabIndex = 3;
             // 
             // label10
@@ -711,10 +823,11 @@ namespace WinFormsApp.View.Container
             // 
             // numberScheduleId
             // 
+            numberScheduleId.BorderRadius = 6;
             numberScheduleId.Location = new Point(127, 6);
             numberScheduleId.Maximum = new decimal(new int[] { 1000000, 0, 0, 0 });
             numberScheduleId.Name = "numberScheduleId";
-            numberScheduleId.Size = new Size(120, 23);
+            numberScheduleId.Size = new Size(120, 30);
             numberScheduleId.TabIndex = 1;
             // 
             // label9
@@ -741,9 +854,15 @@ namespace WinFormsApp.View.Container
             // scheduleSlotProfileGrid
             // 
             scheduleSlotProfileGrid.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
-            scheduleSlotProfileGrid.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize;
+            scheduleSlotProfileGrid.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
+            scheduleSlotProfileGrid.BackgroundColor = Color.White;
+            scheduleSlotProfileGrid.BorderStyle = BorderStyle.None;
+            scheduleSlotProfileGrid.ColumnHeadersHeight = 32;
+            scheduleSlotProfileGrid.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.DisableResizing;
             scheduleSlotProfileGrid.Location = new Point(18, 42);
             scheduleSlotProfileGrid.Name = "scheduleSlotProfileGrid";
+            scheduleSlotProfileGrid.RowHeadersVisible = false;
+            scheduleSlotProfileGrid.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
             scheduleSlotProfileGrid.Size = new Size(978, 552);
             scheduleSlotProfileGrid.TabIndex = 1;
             // 
@@ -803,71 +922,71 @@ namespace WinFormsApp.View.Container
 
         #endregion
 
-        private TabControl tabControl;
+        private Guna.UI2.WinForms.Guna2TabControl tabControl;
         private TabPage tabList;
         private TabPage tabEdit;
         private TabPage tabProfile;
         private TabPage tabScheduleEdit;
         private TabPage tabScheduleProfile;
-        private DataGridView containerGrid;
-        private Button btnDelete;
-        private Button btnEdit;
-        private Button btnAdd;
-        private Button btnSearch;
-        private TextBox inputSearch;
-        private Button btnCancel;
-        private Button btnSave;
-        private TextBox inputContainerNote;
+        private Guna.UI2.WinForms.Guna2DataGridView containerGrid;
+        private Guna.UI2.WinForms.Guna2Button btnDelete;
+        private Guna.UI2.WinForms.Guna2Button btnEdit;
+        private Guna.UI2.WinForms.Guna2Button btnAdd;
+        private Guna.UI2.WinForms.Guna2Button btnSearch;
+        private Guna.UI2.WinForms.Guna2TextBox inputSearch;
+        private Guna.UI2.WinForms.Guna2Button btnCancel;
+        private Guna.UI2.WinForms.Guna2Button btnSave;
+        private Guna.UI2.WinForms.Guna2TextBox inputContainerNote;
         private Label label3;
-        private TextBox inputContainerName;
+        private Guna.UI2.WinForms.Guna2TextBox inputContainerName;
         private Label label2;
-        private NumericUpDown numberContainerId;
+        private Guna.UI2.WinForms.Guna2NumericUpDown numberContainerId;
         private Label label1;
         private Label lblContainerNote;
         private Label lblContainerName;
         private Label label5;
         private Label label4;
-        private DataGridView scheduleGrid;
-        private TextBox inputScheduleSearch;
-        private Button btnScheduleSearch;
-        private Button btnScheduleAdd;
-        private Button btnScheduleDelete;
-        private Button btnScheduleEdit;
-        private Button btnOpenScheduleProfile;
+        private Guna.UI2.WinForms.Guna2DataGridView scheduleGrid;
+        private Guna.UI2.WinForms.Guna2TextBox inputScheduleSearch;
+        private Guna.UI2.WinForms.Guna2Button btnScheduleSearch;
+        private Guna.UI2.WinForms.Guna2Button btnScheduleAdd;
+        private Guna.UI2.WinForms.Guna2Button btnScheduleDelete;
+        private Guna.UI2.WinForms.Guna2Button btnScheduleEdit;
+        private Guna.UI2.WinForms.Guna2Button btnOpenScheduleProfile;
         private Label label9;
-        private NumericUpDown numberScheduleId;
-        private TextBox inputScheduleName;
+        private Guna.UI2.WinForms.Guna2NumericUpDown numberScheduleId;
+        private Guna.UI2.WinForms.Guna2TextBox inputScheduleName;
         private Label label10;
-        private NumericUpDown inputYear;
+        private Guna.UI2.WinForms.Guna2NumericUpDown inputYear;
         private Label label11;
-        private NumericUpDown inputMonth;
+        private Guna.UI2.WinForms.Guna2NumericUpDown inputMonth;
         private Label label12;
-        private NumericUpDown inputPeoplePerShift;
+        private Guna.UI2.WinForms.Guna2NumericUpDown inputPeoplePerShift;
         private Label label13;
         private Label label21;
-        private TextBox inputShift1;
+        private Guna.UI2.WinForms.Guna2TextBox inputShift1;
         private Label label14;
-        private TextBox inputShift2;
+        private Guna.UI2.WinForms.Guna2TextBox inputShift2;
         private Label label15;
-        private NumericUpDown inputMaxHours;
+        private Guna.UI2.WinForms.Guna2NumericUpDown inputMaxHours;
         private Label label16;
-        private NumericUpDown inputMaxConsecutiveDays;
+        private Guna.UI2.WinForms.Guna2NumericUpDown inputMaxConsecutiveDays;
         private Label label17;
-        private NumericUpDown inputMaxConsecutiveFull;
+        private Guna.UI2.WinForms.Guna2NumericUpDown inputMaxConsecutiveFull;
         private Label label18;
-        private NumericUpDown inputMaxFull;
+        private Guna.UI2.WinForms.Guna2NumericUpDown inputMaxFull;
         private Label label19;
-        private TextBox inputScheduleComment;
+        private Guna.UI2.WinForms.Guna2TextBox inputScheduleComment;
         private Label label20;
-        private ComboBox comboShop;
-        private ComboBox comboStatus;
-        private CheckedListBox checkedAvailabilities;
-        private Button btnGenerate;
-        private DataGridView slotGrid;
-        private Button btnScheduleSave;
-        private Button btnScheduleCancel;
+        private Guna.UI2.WinForms.Guna2ComboBox comboShop;
+        private Guna.UI2.WinForms.Guna2ComboBox comboStatus;
+        private Guna.UI2.WinForms.Guna2CheckedListBox checkedAvailabilities;
+        private Guna.UI2.WinForms.Guna2Button btnGenerate;
+        private Guna.UI2.WinForms.Guna2DataGridView slotGrid;
+        private Guna.UI2.WinForms.Guna2Button btnScheduleSave;
+        private Guna.UI2.WinForms.Guna2Button btnScheduleCancel;
         private Label lblScheduleSummary;
-        private DataGridView scheduleSlotProfileGrid;
+        private Guna.UI2.WinForms.Guna2DataGridView scheduleSlotProfileGrid;
         private ErrorProvider errorProviderContainer;
         private ErrorProvider errorProviderSchedule;
     }
