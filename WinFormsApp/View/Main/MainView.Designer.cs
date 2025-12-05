@@ -11,6 +11,7 @@
         private Guna.UI2.WinForms.Guna2GradientButton btnEmployee;
         private Guna.UI2.WinForms.Guna2GradientButton btnAvailability;
         private Guna.UI2.WinForms.Guna2GradientButton btnShop;
+        private Guna.UI2.WinForms.Guna2GradientButton btnContainer;
         private System.Windows.Forms.Panel leftBar;
         private Guna.UI2.WinForms.Guna2ShadowPanel navShadowPanel;
         #endregion
@@ -43,8 +44,11 @@
             Guna.UI2.WinForms.Suite.CustomizableEdges customizableEdges4 = new Guna.UI2.WinForms.Suite.CustomizableEdges();
             Guna.UI2.WinForms.Suite.CustomizableEdges customizableEdges5 = new Guna.UI2.WinForms.Suite.CustomizableEdges();
             Guna.UI2.WinForms.Suite.CustomizableEdges customizableEdges6 = new Guna.UI2.WinForms.Suite.CustomizableEdges();
+            Guna.UI2.WinForms.Suite.CustomizableEdges customizableEdges7 = new Guna.UI2.WinForms.Suite.CustomizableEdges();
+            Guna.UI2.WinForms.Suite.CustomizableEdges customizableEdges8 = new Guna.UI2.WinForms.Suite.CustomizableEdges();
             leftBar = new Panel();
             navShadowPanel = new Guna.UI2.WinForms.Guna2ShadowPanel();
+            btnContainer = new Guna.UI2.WinForms.Guna2GradientButton();
             btnShop = new Guna.UI2.WinForms.Guna2GradientButton();
             btnAvailability = new Guna.UI2.WinForms.Guna2GradientButton();
             btnEmployee = new Guna.UI2.WinForms.Guna2GradientButton();
@@ -65,6 +69,7 @@
             // navShadowPanel
             // 
             navShadowPanel.BackColor = Color.Transparent;
+            navShadowPanel.Controls.Add(btnContainer);
             navShadowPanel.Controls.Add(btnShop);
             navShadowPanel.Controls.Add(btnAvailability);
             navShadowPanel.Controls.Add(btnEmployee);
@@ -171,6 +176,37 @@
             btnEmployee.TabIndex = 1;
             btnEmployee.Text = "Employee";
             btnEmployee.UseTransparentBackground = true;
+            //
+            // btnContainer
+            //
+            btnContainer.AccessibleName = "btnContainer";
+            btnContainer.AutoRoundedCorners = true;
+            btnContainer.BackColor = Color.Transparent;
+            btnContainer.BorderRadius = 20;
+            btnContainer.CustomizableEdges = customizableEdges7;
+            btnContainer.DisabledState.BorderColor = Color.DarkGray;
+            btnContainer.DisabledState.CustomBorderColor = Color.DarkGray;
+            btnContainer.DisabledState.FillColor = Color.FromArgb(169, 169, 169);
+            btnContainer.DisabledState.FillColor2 = Color.FromArgb(141, 141, 141);
+            btnContainer.DisabledState.ForeColor = Color.FromArgb(141, 141, 141);
+            btnContainer.FillColor = Color.FromArgb(108, 122, 234);
+            btnContainer.FillColor2 = Color.FromArgb(52, 152, 219);
+            btnContainer.Font = new Font("Segoe UI Semibold", 9F, FontStyle.Bold);
+            btnContainer.ForeColor = Color.White;
+            btnContainer.HoverState.FillColor = Color.FromArgb(92, 108, 210);
+            btnContainer.HoverState.FillColor2 = Color.FromArgb(46, 134, 193);
+            btnContainer.ImageAlign = HorizontalAlignment.Left;
+            btnContainer.ImageSize = new Size(18, 18);
+            btnContainer.Location = new Point(10, 178);
+            btnContainer.Name = "btnContainer";
+            btnContainer.ShadowDecoration.BorderRadius = 20;
+            btnContainer.ShadowDecoration.CustomizableEdges = customizableEdges8;
+            btnContainer.ShadowDecoration.Depth = 6;
+            btnContainer.ShadowDecoration.Enabled = true;
+            btnContainer.Size = new Size(70, 42);
+            btnContainer.TabIndex = 4;
+            btnContainer.Text = "Container";
+            btnContainer.UseTransparentBackground = true;
             // 
             // MainView
             // 
