@@ -10,5 +10,7 @@ namespace WinFormsApp.View.Main
     {
         event Func<CancellationToken, Task>? ShowEmployeeView;
         event Func<CancellationToken, Task>? ShowAvailabilityView;
+        event Func<CancellationToken, Task>? ShowShopView;
+        event Func<CancellationToken, Task>? ShowContainerView;
     }
 }
