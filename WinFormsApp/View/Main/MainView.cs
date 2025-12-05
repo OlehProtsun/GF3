@@ -27,10 +27,17 @@ namespace WinFormsApp.View.Main
                 if (ShowAvailabilityView is not null)
                     await ShowAvailabilityView(CancellationToken.None);
             };
+
+            btnShop.Click += async (_, __) =>
+            {
+                if (ShowShopView is not null)
+                    await ShowShopView(CancellationToken.None);
+            };
         }
 
         public event Func<CancellationToken, Task>? ShowEmployeeView;
         public event Func<CancellationToken, Task>? ShowAvailabilityView;
+        public event Func<CancellationToken, Task>? ShowShopView;
 
     }
 }
