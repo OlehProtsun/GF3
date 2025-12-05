@@ -135,6 +135,8 @@ namespace WinFormsApp.View.Container
 
         private IList<ScheduleSlotModel> _slots = new List<ScheduleSlotModel>();
 
+        private IList<ScheduleSlotModel> _slots = new List<ScheduleSlotModel>();
+
         public IList<ScheduleSlotModel> ScheduleSlots
         {
             get => _slots;
@@ -490,6 +492,69 @@ namespace WinFormsApp.View.Container
                     AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill
                 });
             }
+        }
+
+        private void SlotGrid_CellPainting(object? sender, DataGridViewCellPaintingEventArgs e)
+        {
+            if (e.RowIndex < 0 || e.ColumnIndex != 0) return;
+            if (slotGrid.Rows[e.RowIndex].DataBoundItem is not DayScheduleRow row || !row.HasConflict) return;
+
+            e.Handled = true;
+            e.PaintBackground(e.ClipBounds, true);
+            e.PaintContent(e.ClipBounds);
+
+            var diameter = Math.Min(e.CellBounds.Width, e.CellBounds.Height) - 6;
+            var rect = new Rectangle(
+                e.CellBounds.Left + (e.CellBounds.Width - diameter) / 2,
+                e.CellBounds.Top + (e.CellBounds.Height - diameter) / 2,
+                diameter,
+                diameter);
+
+            using var pen = new Pen(Color.Red, 2);
+            e.Graphics.DrawEllipse(pen, rect);
+        }
+
+        private IList<DayScheduleRow> BuildScheduleRows(IList<ScheduleSlotModel> slots)
+        {
+            var rows = new List<DayScheduleRow>();
+            if (slots.Count == 0) return rows;
+
+            var maxDay = slots.Max(s => s.DayOfMonth);
+            for (var day = 1; day <= maxDay; day++)
+            {
+                var daySlots = slots.Where(s => s.DayOfMonth == day).ToList();
+                var row = new DayScheduleRow
+                {
+                    Day = day,
+                    Shift1 = BuildShiftText(daySlots, 1),
+                    Shift2 = BuildShiftText(daySlots, 2),
+                    HasConflict = daySlots.Any(s => s.EmployeeId is null)
+                };
+                rows.Add(row);
+            }
+
+            return rows;
+        }
+
+        private static string BuildShiftText(IEnumerable<ScheduleSlotModel> slots, int shift)
+        {
+            var shiftSlots = slots.Where(s => s.ShiftNo == shift).ToList();
+            if (shiftSlots.Count == 0) return "-";
+
+            var assignments = shiftSlots
+                .OrderBy(s => s.SlotNo)
+                .Select(s => s.EmployeeId?.ToString() ?? "-")
+                .ToList();
+
+            return assignments.Count == 0 ? "-" : string.Join(", ", assignments);
+        }
+
+        private class DayScheduleRow
+        {
+            public int Day { get; set; }
+            public string Shift1 { get; set; } = string.Empty;
+            public string Shift2 { get; set; } = string.Empty;
+            public bool HasConflict { get; set; }
         }
 
         public void SwitchToEditMode()
