@@ -7,5 +7,8 @@ using System.Threading.Tasks;
 
 namespace DataAccessLayer.Repositories.Abstractions
 {
-    public interface IShopRepository : IBaseRepository<ShopModel> { }
+    public interface IShopRepository : IBaseRepository<ShopModel>
+    {
+        Task<List<ShopModel>> GetByValueAsync(string value, CancellationToken ct = default);
+    }
 }
