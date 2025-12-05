@@ -1,11 +1,12 @@
-﻿using DataAccessLayer.Models;
-using System;
+using DataAccessLayer.Models;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace BusinessLogicLayer.Services.Abstractions
 {
-    public interface IContainerService : IBaseService<ContainerModel> { }
+    public interface IContainerService : IBaseService<ContainerModel>
+    {
+        Task<List<ContainerModel>> GetByValueAsync(string value, CancellationToken ct = default);
+    }
 }

@@ -11,6 +11,19 @@ namespace BusinessLogicLayer.Services
 {
     public class ShopService : GenericService<ShopModel>, IShopService
     {
-        public ShopService(IShopRepository repo) : base(repo) { }
+        private readonly IShopRepository _repo;
+
+        public ShopService(IShopRepository repo) : base(repo)
+            => _repo = repo;
+
+        public override Task<ShopModel> CreateAsync(ShopModel entity, CancellationToken ct = default)
+        {
+            entity.Name = (entity.Name ?? string.Empty).Trim();
+            entity.Description = entity.Description?.Trim();
+            return base.CreateAsync(entity, ct);
+        }
+
+        public Task<List<ShopModel>> GetByValueAsync(string value, CancellationToken ct = default)
+            => _repo.GetByValueAsync(value, ct);
     }
 }

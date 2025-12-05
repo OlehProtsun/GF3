@@ -1,10 +1,12 @@
-﻿using BusinessLogicLayer;
+using BusinessLogicLayer;
 using DataAccessLayer.Models.DataBaseContext;
 using Microsoft.Extensions.DependencyInjection;
 using WinFormsApp.Presenter;
 using WinFormsApp.View.Availability;
+using WinFormsApp.View.Container;
 using WinFormsApp.View.Employee;
 using WinFormsApp.View.Main;
+using WinFormsApp.View.Shop;
 
 namespace WinFormsApp
 {
@@ -25,6 +27,7 @@ namespace WinFormsApp
             var dbPath = Path.Combine(AppContext.BaseDirectory, "DB", "SQLite.db");
             services.AddDataAccess($"Data Source={dbPath}");
             services.AddBusinessLogicLayer();
+            services.AddSingleton<BusinessLogicLayer.Generators.IScheduleGenerator, BusinessLogicLayer.Generators.ScheduleGenerator>();
 
             // Main
             services.AddTransient<MainPresenter>();
@@ -54,6 +57,27 @@ namespace WinFormsApp
                 var view = new AvailabilityView();
                 var presenter = ActivatorUtilities.CreateInstance<AvailabilityPresenter>(sp, view);
                 // Стартове завантаження асинхронно (без блокування UI)
+                _ = presenter.InitializeAsync();
+                return view;
+            });
+
+
+            // Shop
+            services.AddTransient<ShopPresenter>();
+            services.AddTransient<ShopView>(sp =>
+            {
+                var view = new ShopView();
+                var presenter = ActivatorUtilities.CreateInstance<ShopPresenter>(sp, view);
+                _ = presenter.InitializeAsync();
+                return view;
+            });
+
+            // Container
+            services.AddTransient<ContainerPresenter>();
+            services.AddTransient<ContainerView>(sp =>
+            {
+                var view = new ContainerView();
+                var presenter = ActivatorUtilities.CreateInstance<ContainerPresenter>(sp, view);
                 _ = presenter.InitializeAsync();
                 return view;
             });
