@@ -1,16 +1,22 @@
-﻿using BusinessLogicLayer.Services.Abstractions;
+using BusinessLogicLayer.Services.Abstractions;
 using DataAccessLayer.Models;
 using DataAccessLayer.Repositories.Abstractions;
-using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace BusinessLogicLayer.Services
 {
     public class ContainerService : GenericService<ContainerModel>, IContainerService
     {
-        public ContainerService(IContainerRepository repo) : base(repo) { }
+        private readonly IContainerRepository _repo;
+
+        public ContainerService(IContainerRepository repo) : base(repo)
+        {
+            _repo = repo;
+        }
+
+        public Task<List<ContainerModel>> GetByValueAsync(string value, CancellationToken ct = default)
+            => _repo.GetByValueAsync(value, ct);
     }
 }

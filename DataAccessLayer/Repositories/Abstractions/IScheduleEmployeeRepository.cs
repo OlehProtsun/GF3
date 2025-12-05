@@ -1,11 +1,12 @@
-﻿using DataAccessLayer.Models;
-using System;
+using DataAccessLayer.Models;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace DataAccessLayer.Repositories.Abstractions
 {
-    public interface IScheduleEmployeeRepository : IBaseRepository<ScheduleEmployeeModel> { }
+    public interface IScheduleEmployeeRepository : IBaseRepository<ScheduleEmployeeModel>
+    {
+        Task<List<ScheduleEmployeeModel>> GetByScheduleAsync(int scheduleId, CancellationToken ct = default);
+    }
 }
