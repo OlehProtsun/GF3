@@ -188,7 +188,10 @@ namespace WinFormsApp.Presenter
         private Task OnCancelAsync(CancellationToken ct)
         {
             _view.ClearValidationErrors();
-            _view.SwitchToListMode();
+            if (_view.CancelTarget == ContainerViewModel.Profile)
+                _view.SwitchToProfileMode();
+            else
+                _view.SwitchToListMode();
             return Task.CompletedTask;
         }
 
@@ -301,7 +304,8 @@ namespace WinFormsApp.Presenter
                     .Where(a => selectedIds.Contains(a.Id))
                     .Select(a => new ScheduleEmployeeModel
                     {
-                        EmployeeId = a.EmployeeId
+                        EmployeeId = a.EmployeeId,
+                        Employee = a.Employee
                     })
                     .GroupBy(e => e.EmployeeId)
                     .Select(g => g.First())
@@ -349,7 +353,10 @@ namespace WinFormsApp.Presenter
         private Task OnScheduleCancelAsync(CancellationToken ct)
         {
             _view.ClearScheduleValidationErrors();
-            _view.SwitchToScheduleListMode();
+            if (_view.ScheduleCancelTarget == ScheduleViewModel.Profile)
+                _view.SwitchToScheduleProfileMode();
+            else
+                _view.SwitchToScheduleListMode();
             return Task.CompletedTask;
         }
 
@@ -391,12 +398,13 @@ namespace WinFormsApp.Presenter
             var selectedIds = _view.SelectedAvailabilityIds;
             var employees = selectedAvailabilities
                 .Where(a => selectedIds.Contains(a.Id))
-                .Select(a => new ScheduleEmployeeModel { EmployeeId = a.EmployeeId })
+                .Select(a => new ScheduleEmployeeModel { EmployeeId = a.EmployeeId, Employee = a.Employee })
                 .GroupBy(e => e.EmployeeId)
                 .Select(g => g.First())
                 .ToList();
 
             var slots = await _generator.GenerateAsync(model, selectedAvailabilities.Where(a => selectedIds.Contains(a.Id)), employees, ct);
+            _view.ScheduleEmployees = employees;
             _view.ScheduleSlots = slots.ToList();
             _view.ShowInfo("Slots generated. Review before saving.");
         }

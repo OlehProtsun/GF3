@@ -105,6 +105,8 @@ namespace WinFormsApp.View.Container
             Guna.UI2.WinForms.Suite.CustomizableEdges customizableEdges64 = new Guna.UI2.WinForms.Suite.CustomizableEdges();
             Guna.UI2.WinForms.Suite.CustomizableEdges customizableEdges65 = new Guna.UI2.WinForms.Suite.CustomizableEdges();
             Guna.UI2.WinForms.Suite.CustomizableEdges customizableEdges66 = new Guna.UI2.WinForms.Suite.CustomizableEdges();
+            Guna.UI2.WinForms.Suite.CustomizableEdges customizableEdges67 = new Guna.UI2.WinForms.Suite.CustomizableEdges();
+            Guna.UI2.WinForms.Suite.CustomizableEdges customizableEdges68 = new Guna.UI2.WinForms.Suite.CustomizableEdges();
             DataGridViewCellStyle dataGridViewCellStyle10 = new DataGridViewCellStyle();
             DataGridViewCellStyle dataGridViewCellStyle11 = new DataGridViewCellStyle();
             DataGridViewCellStyle dataGridViewCellStyle12 = new DataGridViewCellStyle();
@@ -126,6 +128,7 @@ namespace WinFormsApp.View.Container
             numberContainerId = new Guna2NumericUpDown();
             label1 = new Label();
             tabProfile = new TabPage();
+            btnCancelProfile = new Guna2Button();
             btnOpenScheduleProfile = new Guna2Button();
             btnScheduleDelete = new Guna2Button();
             btnScheduleEdit = new Guna2Button();
@@ -171,6 +174,7 @@ namespace WinFormsApp.View.Container
             numberScheduleId = new Guna2NumericUpDown();
             label9 = new Label();
             tabScheduleProfile = new TabPage();
+            btnScheduleProfileCancel = new Guna2Button();
             scheduleSlotProfileGrid = new Guna2DataGridView();
             lblScheduleSummary = new Label();
             errorProviderContainer = new ErrorProvider(components);
@@ -233,8 +237,6 @@ namespace WinFormsApp.View.Container
             // 
             // tabList
             // 
-            tabList.Controls.Add(btnDelete);
-            tabList.Controls.Add(btnEdit);
             tabList.Controls.Add(btnAdd);
             tabList.Controls.Add(btnSearch);
             tabList.Controls.Add(inputSearch);
@@ -254,7 +256,7 @@ namespace WinFormsApp.View.Container
             btnDelete.FillColor = Color.FromArgb(231, 76, 60);
             btnDelete.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
             btnDelete.ForeColor = Color.White;
-            btnDelete.Location = new Point(741, 16);
+            btnDelete.Location = new Point(845, 6);
             btnDelete.Name = "btnDelete";
             btnDelete.ShadowDecoration.CustomizableEdges = customizableEdges2;
             btnDelete.Size = new Size(90, 30);
@@ -268,7 +270,7 @@ namespace WinFormsApp.View.Container
             btnEdit.FillColor = Color.FromArgb(51, 152, 219);
             btnEdit.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
             btnEdit.ForeColor = Color.White;
-            btnEdit.Location = new Point(645, 16);
+            btnEdit.Location = new Point(749, 6);
             btnEdit.Name = "btnEdit";
             btnEdit.ShadowDecoration.CustomizableEdges = customizableEdges4;
             btnEdit.Size = new Size(90, 30);
@@ -485,6 +487,9 @@ namespace WinFormsApp.View.Container
             // 
             // tabProfile
             // 
+            tabProfile.Controls.Add(btnCancelProfile);
+            tabProfile.Controls.Add(btnDelete);
+            tabProfile.Controls.Add(btnEdit);
             tabProfile.Controls.Add(btnOpenScheduleProfile);
             tabProfile.Controls.Add(btnScheduleDelete);
             tabProfile.Controls.Add(btnScheduleEdit);
@@ -503,45 +508,59 @@ namespace WinFormsApp.View.Container
             tabProfile.TabIndex = 2;
             tabProfile.Text = "Profile";
             tabProfile.UseVisualStyleBackColor = true;
-            // 
+            //
+            // btnCancelProfile
+            //
+            btnCancelProfile.BorderRadius = 8;
+            btnCancelProfile.CustomizableEdges = customizableEdges21;
+            btnCancelProfile.FillColor = Color.FromArgb(231, 76, 60);
+            btnCancelProfile.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
+            btnCancelProfile.ForeColor = Color.White;
+            btnCancelProfile.Location = new Point(23, 40);
+            btnCancelProfile.Name = "btnCancelProfile";
+            btnCancelProfile.ShadowDecoration.CustomizableEdges = customizableEdges22;
+            btnCancelProfile.Size = new Size(90, 30);
+            btnCancelProfile.TabIndex = 11;
+            btnCancelProfile.Text = "Back";
+            //
             // btnOpenScheduleProfile
-            // 
+            //
             btnOpenScheduleProfile.BorderRadius = 8;
-            btnOpenScheduleProfile.CustomizableEdges = customizableEdges21;
+            btnOpenScheduleProfile.CustomizableEdges = customizableEdges23;
             btnOpenScheduleProfile.FillColor = Color.FromArgb(76, 132, 255);
             btnOpenScheduleProfile.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
             btnOpenScheduleProfile.ForeColor = Color.White;
-            btnOpenScheduleProfile.Location = new Point(845, 40);
+            btnOpenScheduleProfile.Location = new Point(845, 76);
             btnOpenScheduleProfile.Name = "btnOpenScheduleProfile";
-            btnOpenScheduleProfile.ShadowDecoration.CustomizableEdges = customizableEdges22;
+            btnOpenScheduleProfile.ShadowDecoration.CustomizableEdges = customizableEdges24;
             btnOpenScheduleProfile.Size = new Size(120, 30);
             btnOpenScheduleProfile.TabIndex = 10;
             btnOpenScheduleProfile.Text = "Open profile";
-            // 
+            //
             // btnScheduleDelete
-            // 
+            //
             btnScheduleDelete.BorderRadius = 8;
-            btnScheduleDelete.CustomizableEdges = customizableEdges23;
+            btnScheduleDelete.CustomizableEdges = customizableEdges25;
             btnScheduleDelete.FillColor = Color.FromArgb(231, 76, 60);
             btnScheduleDelete.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
             btnScheduleDelete.ForeColor = Color.White;
-            btnScheduleDelete.Location = new Point(749, 40);
+            btnScheduleDelete.Location = new Point(749, 76);
             btnScheduleDelete.Name = "btnScheduleDelete";
-            btnScheduleDelete.ShadowDecoration.CustomizableEdges = customizableEdges24;
+            btnScheduleDelete.ShadowDecoration.CustomizableEdges = customizableEdges26;
             btnScheduleDelete.Size = new Size(90, 30);
             btnScheduleDelete.TabIndex = 9;
             btnScheduleDelete.Text = "Delete";
-            // 
+            //
             // btnScheduleEdit
-            // 
+            //
             btnScheduleEdit.BorderRadius = 8;
-            btnScheduleEdit.CustomizableEdges = customizableEdges25;
+            btnScheduleEdit.CustomizableEdges = customizableEdges27;
             btnScheduleEdit.FillColor = Color.FromArgb(51, 152, 219);
             btnScheduleEdit.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
             btnScheduleEdit.ForeColor = Color.White;
-            btnScheduleEdit.Location = new Point(653, 40);
+            btnScheduleEdit.Location = new Point(653, 76);
             btnScheduleEdit.Name = "btnScheduleEdit";
-            btnScheduleEdit.ShadowDecoration.CustomizableEdges = customizableEdges26;
+            btnScheduleEdit.ShadowDecoration.CustomizableEdges = customizableEdges28;
             btnScheduleEdit.Size = new Size(90, 30);
             btnScheduleEdit.TabIndex = 8;
             btnScheduleEdit.Text = "Edit";
@@ -1139,6 +1158,7 @@ namespace WinFormsApp.View.Container
             // 
             // tabScheduleProfile
             // 
+            tabScheduleProfile.Controls.Add(btnScheduleProfileCancel);
             tabScheduleProfile.Controls.Add(scheduleSlotProfileGrid);
             tabScheduleProfile.Controls.Add(lblScheduleSummary);
             tabScheduleProfile.Location = new Point(4, 44);
@@ -1148,9 +1168,23 @@ namespace WinFormsApp.View.Container
             tabScheduleProfile.TabIndex = 4;
             tabScheduleProfile.Text = "Schedule Profile";
             tabScheduleProfile.UseVisualStyleBackColor = true;
-            // 
+            //
+            // btnScheduleProfileCancel
+            //
+            btnScheduleProfileCancel.BorderRadius = 8;
+            btnScheduleProfileCancel.CustomizableEdges = customizableEdges67;
+            btnScheduleProfileCancel.FillColor = Color.FromArgb(231, 76, 60);
+            btnScheduleProfileCancel.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
+            btnScheduleProfileCancel.ForeColor = Color.White;
+            btnScheduleProfileCancel.Location = new Point(37, 16);
+            btnScheduleProfileCancel.Name = "btnScheduleProfileCancel";
+            btnScheduleProfileCancel.ShadowDecoration.CustomizableEdges = customizableEdges68;
+            btnScheduleProfileCancel.Size = new Size(90, 30);
+            btnScheduleProfileCancel.TabIndex = 2;
+            btnScheduleProfileCancel.Text = "Back";
+            //
             // scheduleSlotProfileGrid
-            // 
+            //
             dataGridViewCellStyle10.BackColor = Color.White;
             scheduleSlotProfileGrid.AlternatingRowsDefaultCellStyle = dataGridViewCellStyle10;
             scheduleSlotProfileGrid.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
@@ -1202,7 +1236,7 @@ namespace WinFormsApp.View.Container
             // lblScheduleSummary
             // 
             lblScheduleSummary.AutoSize = true;
-            lblScheduleSummary.Location = new Point(18, 15);
+            lblScheduleSummary.Location = new Point(150, 22);
             lblScheduleSummary.Name = "lblScheduleSummary";
             lblScheduleSummary.Size = new Size(108, 15);
             lblScheduleSummary.TabIndex = 0;
@@ -1285,6 +1319,7 @@ namespace WinFormsApp.View.Container
         private Guna.UI2.WinForms.Guna2Button btnScheduleDelete;
         private Guna.UI2.WinForms.Guna2Button btnScheduleEdit;
         private Guna.UI2.WinForms.Guna2Button btnOpenScheduleProfile;
+        private Guna.UI2.WinForms.Guna2Button btnCancelProfile;
         private Label label9;
         private Guna.UI2.WinForms.Guna2NumericUpDown numberScheduleId;
         private Guna.UI2.WinForms.Guna2TextBox inputScheduleName;
@@ -1319,6 +1354,7 @@ namespace WinFormsApp.View.Container
         private Guna.UI2.WinForms.Guna2Button btnScheduleCancel;
         private Label lblScheduleSummary;
         private Guna.UI2.WinForms.Guna2DataGridView scheduleSlotProfileGrid;
+        private Guna.UI2.WinForms.Guna2Button btnScheduleProfileCancel;
         private ErrorProvider errorProviderContainer;
         private ErrorProvider errorProviderSchedule;
     }

@@ -36,6 +36,7 @@ namespace WinFormsApp.View.Container
         ScheduleStatus ScheduleStatus { get; set; }
         string ScheduleSearch { get; set; }
         IList<int> SelectedAvailabilityIds { get; }
+        IList<ScheduleEmployeeModel> ScheduleEmployees { get; set; }
         IList<ScheduleSlotModel> ScheduleSlots { get; set; }
 
         bool IsEdit { get; set; }
