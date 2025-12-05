@@ -1,16 +1,21 @@
 ﻿using DataAccessLayer.Models;
-using System;
-using System.Collections.Generic;
-using System.Text;
+using System.Windows.Forms;
+using WinFormsApp.ViewModel;
 
-namespace WinFormsApp.View.Shedule
+namespace WinFormsApp.View.Shop
 {
     public interface IShopView
     {
+        ShopViewModel Mode { get; set; }
+        ShopViewModel CancelTarget { get; set; }
+
         int ShopId { get; set; }
         string ShopName { get; set; }
         string? ShopDescription { get; set; }
-        ICollection<ScheduleModel> Schedules { get; set; }
+        string SearchValue { get; set; }
+        bool IsEdit { get; set; }
+        bool IsSuccessful { get; set; }
+        string Message { get; set; }
 
         event Func<CancellationToken, Task>? SearchEvent;
         event Func<CancellationToken, Task>? AddEvent;
@@ -20,14 +25,14 @@ namespace WinFormsApp.View.Shedule
         event Func<CancellationToken, Task>? CancelEvent;
         event Func<CancellationToken, Task>? OpenProfileEvent;
 
-        void SetListBindingSource(BindingSource days);
+        void SetListBindingSource(BindingSource shops);
         void SwitchToEditMode();
         void SwitchToListMode();
         void ClearInputs();
         void ShowInfo(string text);
         void ShowError(string text);
         bool Confirm(string text, string? caption = null);
-        void SetValidationErrors(IDictionary<string, string> errors);
+        void SetValidationErrors(IReadOnlyDictionary<string, string> errors);
         void ClearValidationErrors();
         void SetProfile(ShopModel model);
         void SwitchToProfileMode();
