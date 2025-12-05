@@ -28,41 +28,95 @@ namespace WinFormsApp.View.Container
         }
 
         #region Container properties
+        [DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
         public ContainerViewModel Mode { get; set; }
+        [DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
+
         public ContainerViewModel CancelTarget { get; set; } = ContainerViewModel.List;
+        [DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
 
         public int ContainerId { get => (int)numberContainerId.Value; set => numberContainerId.Value = value; }
+        [DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
+
         public string ContainerName { get => inputContainerName.Text; set => inputContainerName.Text = value; }
+        [DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
+
         public string? ContainerNote { get => inputContainerNote.Text; set => inputContainerNote.Text = value; }
+        [DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
+
         public string SearchValue { get => inputSearch.Text; set => inputSearch.Text = value; }
+        [DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
+
         public bool IsEdit { get => isEdit; set => isEdit = value; }
+        [DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
+
         public bool IsSuccessful { get => isSuccessful; set => isSuccessful = value; }
+        [DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
+
         public string Message { get => message; set => message = value; }
         #endregion
 
         #region Schedule properties
+        [DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
+
         public ScheduleViewModel ScheduleMode { get; set; }
+        [DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
+
         public ScheduleViewModel ScheduleCancelTarget { get; set; } = ScheduleViewModel.List;
+        [DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
+
         public int ScheduleId { get => (int)numberScheduleId.Value; set => numberScheduleId.Value = value; }
+        [DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
+
         public int ScheduleContainerId { get; set; }
+        [DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
+
         public int ScheduleShopId { get => comboShop.SelectedValue is int v ? v : 0; set => comboShop.SelectedValue = value; }
+        [DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
+
         public string ScheduleName { get => inputScheduleName.Text; set => inputScheduleName.Text = value; }
+        [DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
+
         public int ScheduleYear { get => (int)inputYear.Value; set => inputYear.Value = value; }
+        [DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
+
         public int ScheduleMonth { get => (int)inputMonth.Value; set => inputMonth.Value = value; }
+        [DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
+
         public int SchedulePeoplePerShift { get => (int)inputPeoplePerShift.Value; set => inputPeoplePerShift.Value = value; }
+        [DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
+
         public string ScheduleShift1 { get => inputShift1.Text; set => inputShift1.Text = value; }
+        [DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
+
         public string ScheduleShift2 { get => inputShift2.Text; set => inputShift2.Text = value; }
+        [DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
+
         public int ScheduleMaxHoursPerEmp { get => (int)inputMaxHours.Value; set => inputMaxHours.Value = value; }
+        [DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
+
         public int ScheduleMaxConsecutiveDays { get => (int)inputMaxConsecutiveDays.Value; set => inputMaxConsecutiveDays.Value = value; }
+        [DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
+
         public int ScheduleMaxConsecutiveFull { get => (int)inputMaxConsecutiveFull.Value; set => inputMaxConsecutiveFull.Value = value; }
+        [DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
+
         public int ScheduleMaxFullPerMonth { get => (int)inputMaxFull.Value; set => inputMaxFull.Value = value; }
+        [DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
+
         public string? ScheduleComment { get => inputScheduleComment.Text; set => inputScheduleComment.Text = value; }
+        [DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
+
         public ScheduleStatus ScheduleStatus { get => (ScheduleStatus)comboStatus.SelectedItem!; set => comboStatus.SelectedItem = value; }
+        [DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
+
         public string ScheduleSearch { get => inputScheduleSearch.Text; set => inputScheduleSearch.Text = value; }
         public IList<int> SelectedAvailabilityIds => checkedAvailabilities.CheckedItems
             .OfType<AvailabilityMonthModel>()
             .Select(a => a.Id)
             .ToList();
+
+        [DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
 
         public IList<ScheduleSlotModel> ScheduleSlots
         {
@@ -336,6 +390,11 @@ namespace WinFormsApp.View.Container
         {
             lblScheduleSummary.Text = $"{model.Name} ({model.Year}/{model.Month}) - {model.Shop?.Name}";
             scheduleSlotProfileGrid.DataSource = new BindingSource { DataSource = model.Slots.ToList() };
+        }
+
+        private void inputMaxFull_ValueChanged(object sender, EventArgs e)
+        {
+
         }
     }
 }
