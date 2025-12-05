@@ -16,6 +16,7 @@ namespace WinFormsApp.View.Availability
 {
     public partial class AvailabilityView : Form, IAvailabilityView
     {
+        private readonly BindingSource availabilityDaysBindingSource = new();
         private bool isEdit;
         private bool isSuccessful;
         private string message;
@@ -25,7 +26,9 @@ namespace WinFormsApp.View.Availability
             InitializeComponent();
             AssociateAndRaiseViewEvents();
             ConfigureGrid();
+            ConfigureAvailabilityDaysGrid();
             WireNewControls();
+            RegenerateDays();
         }
 
 
@@ -106,6 +109,17 @@ namespace WinFormsApp.View.Availability
 
         [DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
         public string SearchValue { get => inputSearch.Text; set => inputSearch.Text = value; }
+
+        [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+        public IList<AvailabilityDayRow> AvailabilityDays
+        {
+            get => availabilityDaysBindingSource.List
+                .Cast<AvailabilityDayRow>()
+                .ToList();
+
+            set => availabilityDaysBindingSource.DataSource =
+                value ?? new List<AvailabilityDayRow>();
+        }
 
         public event Func<CancellationToken, Task>? SearchEvent;
         public event Func<CancellationToken, Task>? AddEvent;
@@ -206,26 +220,32 @@ namespace WinFormsApp.View.Availability
 
         private void ConfigureGrid()
         {
-            dataGrid.AutoGenerateColumns = false;
-            dataGrid.Columns.Clear();
+            ConfigureMonthGrid(dataGrid);                // вкладка List – список місяців
+            ConfigureProfileAvailabilityDaysGrid();      // вкладка Profile – дні місяця
+        }
 
-            dataGrid.ReadOnly = true;
-            dataGrid.RowHeadersVisible = false;
-            dataGrid.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
-            dataGrid.MultiSelect = false;
-            dataGrid.AllowUserToAddRows = false;
-            dataGrid.AllowUserToDeleteRows = false;
-            dataGrid.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
+        private void ConfigureMonthGrid(DataGridView grid)
+        {
+            grid.AutoGenerateColumns = false;
+            grid.Columns.Clear();
 
-            dataGrid.Columns.Add(new DataGridViewTextBoxColumn
+            grid.ReadOnly = true;
+            grid.RowHeadersVisible = false;
+            grid.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
+            grid.MultiSelect = false;
+            grid.AllowUserToAddRows = false;
+            grid.AllowUserToDeleteRows = false;
+            grid.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
+
+            grid.Columns.Add(new DataGridViewTextBoxColumn
             {
                 Name = "colAvaialbilityMonthName",
                 HeaderText = "Availability Name",
-                DataPropertyName = nameof(DataAccessLayer.Models.AvailabilityMonthModel.Name),
+                DataPropertyName = nameof(AvailabilityMonthModel.Name),
                 FillWeight = 50
             });
 
-            dataGrid.Columns.Add(new DataGridViewTextBoxColumn
+            grid.Columns.Add(new DataGridViewTextBoxColumn
             {
                 Name = "colAvailabilityEmployeeId",
                 HeaderText = "Employee FullName",
@@ -233,12 +253,46 @@ namespace WinFormsApp.View.Availability
                 FillWeight = 50
             });
 
-            dataGrid.RowTemplate.DividerHeight = 6;
-            dataGrid.RowTemplate.Height = 36;
-            dataGrid.ThemeStyle.RowsStyle.Height = 36;
+            grid.RowTemplate.DividerHeight = 6;
+            grid.RowTemplate.Height = 36;
 
-            dataGrid.DefaultCellStyle.Padding = new Padding(8, 6, 8, 6);
-            dataGrid.ColumnHeadersHeight = 36;
+            grid.DefaultCellStyle.Padding = new Padding(8, 6, 8, 6);
+            grid.ColumnHeadersHeight = 36;
+        }
+
+        private void ConfigureProfileAvailabilityDaysGrid()
+        {
+            dataGridAvailabilityMonthProfile.AutoGenerateColumns = false;
+            dataGridAvailabilityMonthProfile.Columns.Clear();
+
+            dataGridAvailabilityMonthProfile.ReadOnly = true;
+            dataGridAvailabilityMonthProfile.RowHeadersVisible = false;
+            dataGridAvailabilityMonthProfile.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
+            dataGridAvailabilityMonthProfile.MultiSelect = false;
+            dataGridAvailabilityMonthProfile.AllowUserToAddRows = false;
+            dataGridAvailabilityMonthProfile.AllowUserToDeleteRows = false;
+            dataGridAvailabilityMonthProfile.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
+
+            dataGridAvailabilityMonthProfile.Columns.Add(new DataGridViewTextBoxColumn
+            {
+                Name = "colDayProfile",
+                HeaderText = "Day",
+                DataPropertyName = nameof(AvailabilityDayRow.DayOfMonth),
+                FillWeight = 30,
+                ReadOnly = true
+            });
+
+            dataGridAvailabilityMonthProfile.Columns.Add(new DataGridViewTextBoxColumn
+            {
+                Name = "colValueProfile",
+                HeaderText = "Availability (+ / - / HH:mm - HH:mm)",
+                DataPropertyName = nameof(AvailabilityDayRow.Value),
+                FillWeight = 70,
+                ReadOnly = true
+            });
+
+            // ВАЖЛИВО: той самий BindingSource, що й для Edit-гріда
+            dataGridAvailabilityMonthProfile.DataSource = availabilityDaysBindingSource;
         }
 
         private void WireNewControls()
@@ -256,11 +310,13 @@ namespace WinFormsApp.View.Availability
             timepickerMonth.ValueChanged += (_, __) =>
             {
                 Month = timepickerMonth.Value.Month;
+                RegenerateDays();
             };
 
             timepickerYear.ValueChanged += (_, __) =>
             {
                 Year = timepickerYear.Value.Year;
+                RegenerateDays();
             };
         }
 
@@ -321,5 +377,71 @@ namespace WinFormsApp.View.Availability
             tabControl.SelectedTab = tabProfile;
             Mode = AvailabilityViewModel.Profile;
         }
+
+        private void ConfigureAvailabilityDaysGrid()
+        {
+            dataGridAvailabilityDays.AutoGenerateColumns = false;
+            dataGridAvailabilityDays.Columns.Clear();
+
+            dataGridAvailabilityDays.ReadOnly = false;
+            dataGridAvailabilityDays.RowHeadersVisible = false;
+            dataGridAvailabilityDays.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
+            dataGridAvailabilityDays.MultiSelect = false;
+            dataGridAvailabilityDays.AllowUserToAddRows = false;
+            dataGridAvailabilityDays.AllowUserToDeleteRows = false;
+            dataGridAvailabilityDays.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
+
+            dataGridAvailabilityDays.Columns.Add(new DataGridViewTextBoxColumn
+            {
+                Name = "colDay",
+                HeaderText = "Day",
+                DataPropertyName = nameof(AvailabilityDayRow.DayOfMonth),
+                ReadOnly = true,
+                FillWeight = 30
+            });
+
+            dataGridAvailabilityDays.Columns.Add(new DataGridViewTextBoxColumn
+            {
+                Name = "colValue",
+                HeaderText = "Availability (+ / - / HH:mm - HH:mm)",
+                DataPropertyName = nameof(AvailabilityDayRow.Value),
+                FillWeight = 70
+            });
+
+            dataGridAvailabilityDays.DataSource = availabilityDaysBindingSource;
+        }
+
+        private void RegenerateDays()
+        {
+            var year = Year;
+            var month = Month;
+
+            if (year <= 0 || month <= 0)
+                return;
+
+            int daysInMonth = DateTime.DaysInMonth(year, month);
+
+            // Зберігаємо те, що вже ввів користувач, щоб не губити
+            var old = availabilityDaysBindingSource.List
+                .Cast<AvailabilityDayRow>()
+                .ToDictionary(r => r.DayOfMonth, r => r.Value);
+
+            var rows = new List<AvailabilityDayRow>();
+
+            for (int day = 1; day <= daysInMonth; day++)
+            {
+                old.TryGetValue(day, out var val);
+
+                rows.Add(new AvailabilityDayRow
+                {
+                    DayOfMonth = day,
+                    Value = val ?? string.Empty
+                });
+            }
+
+            availabilityDaysBindingSource.DataSource = rows;
+        }
+
+
     }
 }

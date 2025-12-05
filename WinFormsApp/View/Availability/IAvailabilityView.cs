@@ -15,13 +15,13 @@ namespace WinFormsApp.View.Availability
         string AvailabilityMonthName { get; set; }
         int Year { get; set; }
         int Month { get; set; } 
-
         AvailabilityViewModel Mode { get; set; }
         AvailabilityViewModel CancelTarget { get; set; }
         bool IsEdit { get; set; }
         bool IsSuccessful { get; set; }
         string Message { get; set; }
         string SearchValue { get; set; }
+        IList<AvailabilityDayRow> AvailabilityDays { get; set; }
 
         event Func<CancellationToken, Task>? SearchEvent;
         event Func<CancellationToken, Task>? AddEvent;

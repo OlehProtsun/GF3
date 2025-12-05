@@ -1,6 +1,7 @@
 ﻿using BusinessLogicLayer.Services;
 using BusinessLogicLayer.Services.Abstractions;
 using DataAccessLayer.Models;
+using DataAccessLayer.Models.Enums;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -69,11 +70,10 @@ namespace WinFormsApp.Presenter
             return Task.CompletedTask;
         }
 
-        private Task OnEditEventAsync(CancellationToken ct)
+        private async Task OnEditEventAsync(CancellationToken ct)
         {
-
             var availabilityMonth = (AvailabilityMonthModel?)_bindingSource.Current;
-            if (availabilityMonth is null) return Task.CompletedTask;
+            if (availabilityMonth is null) return;
 
             _view.ClearValidationErrors();
             _view.AvailabilityMonthId = availabilityMonth.Id;
@@ -88,28 +88,56 @@ namespace WinFormsApp.Presenter
                 ? AvailabilityViewModel.Profile
                 : AvailabilityViewModel.List;
 
+            // Нове: дістаємо дні з сервісу
+            var days = await _service.GetDaysForMonthAsync(availabilityMonth.Id, ct);
 
+            var daysDict = days.ToDictionary(d => d.DayOfMonth);
+            var rows = new List<AvailabilityDayRow>();
+
+            int daysInMonth = DateTime.DaysInMonth(availabilityMonth.Year, availabilityMonth.Month);
+
+            for (int day = 1; day <= daysInMonth; day++)
+            {
+                string value = string.Empty;
+
+                if (daysDict.TryGetValue(day, out var d))
+                {
+                    value = d.Kind switch
+                    {
+                        AvailabilityKind.ANY => "+",
+                        AvailabilityKind.NONE => "-",
+                        AvailabilityKind.INT => d.IntervalStr ?? string.Empty,
+                        _ => string.Empty
+                    };
+                }
+
+                rows.Add(new AvailabilityDayRow
+                {
+                    DayOfMonth = day,
+                    Value = value
+                });
+            }
+
+            _view.AvailabilityDays = rows;
 
             _view.SwitchToEditMode();
-            return Task.CompletedTask;
         }
 
         private async Task OnSaveEventAsync(CancellationToken ct)
         {
             try
             {
-                var model = new AvailabilityMonthModel
+                var month = new AvailabilityMonthModel
                 {
                     Id = _view.AvailabilityMonthId,
                     Year = _view.Year,
                     Month = _view.Month,
                     EmployeeId = _view.EmployeeId,
                     Name = _view.AvailabilityMonthName,
-
                 };
 
-                // VALIDATION
-                var errors = Validate(model);
+                // 1) Валідація місяця
+                var errors = Validate(month);
                 if (errors.Count > 0)
                 {
                     _view.SetValidationErrors(errors);
@@ -118,18 +146,35 @@ namespace WinFormsApp.Presenter
                     return;
                 }
 
-                if (_view.IsEdit)
+                // 2) Читаємо дні з гріда і парсимо код (+ / - / HH:mm - HH:mm)
+                var dayRows = _view.AvailabilityDays;
+                var dayEntities = new List<AvailabilityDayModel>();
+
+                foreach (var row in dayRows)
                 {
-                    await _service.UpdateAsync(model);
-                    _view.ShowInfo("Availability Month updated successfully.");
-                }
-                else
-                {
-                    await _service.CreateAsync(model);
-                    _view.ShowInfo("Availability Month added successfully.");
+                    if (!TryParseAvailabilityCode(row.Value, out var kind, out var intervalStr))
+                    {
+                        _view.ShowError($"Невірний інтервал у дні {row.DayOfMonth}.");
+                        return;
+                    }
+
+                    dayEntities.Add(new AvailabilityDayModel
+                    {
+                        // Id не чіпаємо – EF заповнить сам
+                        AvailabilityMonthId = month.Id, // у сервісі все одно буде перезаписано
+                        DayOfMonth = row.DayOfMonth,
+                        Kind = kind,
+                        IntervalStr = intervalStr
+                    });
                 }
 
+                // 3) Один виклик у BLL, який всередині зробить create/update + заміну днів
+                await _service.SaveWithDaysAsync(month, dayEntities, ct);
+
                 _view.IsSuccessful = true;
+                _view.ShowInfo(_view.IsEdit
+                    ? "Availability Month updated successfully."
+                    : "Availability Month added successfully.");
 
                 await LoadAllAvailabilityMonthList();
 
@@ -137,7 +182,6 @@ namespace WinFormsApp.Presenter
                     _view.SwitchToProfileMode();
                 else
                     _view.SwitchToListMode();
-
             }
             catch (Exception ex)
             {
@@ -222,17 +266,108 @@ namespace WinFormsApp.Presenter
             return errors;
         }
 
-        private Task OnOpenProfileAsync(CancellationToken ct)
+        private async Task OnOpenProfileAsync(CancellationToken ct)
         {
-            var employee = (AvailabilityMonthModel?)_bindingSource.Current;
-            if (employee is null)
-                return Task.CompletedTask;
+            var availabilityMonth = (AvailabilityMonthModel?)_bindingSource.Current;
+            if (availabilityMonth is null)
+                return;
 
-            _view.SetProfile(employee);
+            // Заголовки профілю (назва, працівник, Id)
+            _view.SetProfile(availabilityMonth);
+
+            // Дні – копія логіки з OnEditEventAsync
+            var days = await _service.GetDaysForMonthAsync(availabilityMonth.Id, ct);
+
+            var daysDict = days.ToDictionary(d => d.DayOfMonth);
+            var rows = new List<AvailabilityDayRow>();
+
+            int daysInMonth = DateTime.DaysInMonth(availabilityMonth.Year, availabilityMonth.Month);
+
+            for (int day = 1; day <= daysInMonth; day++)
+            {
+                string value = string.Empty;
+
+                if (daysDict.TryGetValue(day, out var d))
+                {
+                    value = d.Kind switch
+                    {
+                        AvailabilityKind.ANY => "+",
+                        AvailabilityKind.NONE => "-",
+                        AvailabilityKind.INT => d.IntervalStr ?? string.Empty,
+                        _ => string.Empty
+                    };
+                }
+
+                rows.Add(new AvailabilityDayRow
+                {
+                    DayOfMonth = day,
+                    Value = value
+                });
+            }
+
+            // Це оновить і edit-грід, і profile-грід
+            _view.AvailabilityDays = rows;
 
             _view.CancelTarget = AvailabilityViewModel.List;
             _view.SwitchToProfileMode();
-            return Task.CompletedTask;
         }
-    }
+
+
+        //HELPERS
+
+        private bool TryParseAvailabilityCode(
+            string code,
+            out AvailabilityKind kind,
+            out string? intervalStr)
+            {
+                code = (code ?? string.Empty).Trim();
+                intervalStr = null;
+
+                if (string.IsNullOrEmpty(code) || code == "-")
+                {
+                    kind = AvailabilityKind.NONE;
+                    return true;
+                }
+
+                if (code == "+")
+                {
+                    kind = AvailabilityKind.ANY;
+                    return true;
+                }
+
+                // решта – пробуємо трактувати як інтервал
+                if (!TryNormalizeInterval(code, out var normalized))
+                {
+                    kind = default;
+                    return false;
+                }
+
+                kind = AvailabilityKind.INT;
+                intervalStr = normalized;
+                return true;
+            }
+
+        private bool TryNormalizeInterval(string input, out string normalized)
+        {
+            normalized = string.Empty;
+
+            if (string.IsNullOrWhiteSpace(input))
+                return false;
+
+            var parts = input.Split('-', StringSplitOptions.TrimEntries);
+            if (parts.Length != 2)
+                return false;
+
+            if (!TimeSpan.TryParse(parts[0], out var start) ||
+                !TimeSpan.TryParse(parts[1], out var end))
+                return false;
+
+            if (end <= start)
+                return false;
+
+            normalized = $"{start:hh\\:mm} - {end:hh\\:mm}";
+            return true;
+        }
+
+}
 }
