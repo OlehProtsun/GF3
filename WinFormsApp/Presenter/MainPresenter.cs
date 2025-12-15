@@ -24,6 +24,10 @@ namespace WinFormsApp.Presenter
         private ShopView? _shopView;
         private ContainerView? _containerView;
 
+        private bool isDragging = false;
+        private Point lastCursor;
+        private Point lastForm;
+
         public MainPresenter(IMainView mainView, IServiceProvider sp)
         {
             _mainView = mainView;
@@ -33,7 +37,30 @@ namespace WinFormsApp.Presenter
             _mainView.ShowAvailabilityView += OnShowAvailabilityViewAsync;
             _mainView.ShowShopView += OnShowShopViewAsync;
             _mainView.ShowContainerView += OnShowContainerViewAsync;
+            _mainView.ProgramMouseDown += OnProgramMouseDown;
+            _mainView.ProgramMouseMove += OnProgramMouseMove;
+            _mainView.ProgramMouseUp += OnProgramMouseUp;
+
         }
+
+        private void OnProgramMouseDown(object? sender, MouseEventArgs e)
+        {
+            if (e.Button == MouseButtons.Left)
+                _mainView.BeginWindowDrag();
+        }
+
+        private void OnProgramMouseMove(object? sender, MouseEventArgs e)
+        {
+            if (e.Button == MouseButtons.Left)
+                _mainView.BeginWindowDrag();
+        }
+
+        private void OnProgramMouseUp(object? sender, MouseEventArgs e)
+        {
+            if (e.Button == MouseButtons.Left)
+                _mainView.BeginWindowDrag();
+        }
+
 
         private Task OnShowContainerViewAsync(CancellationToken ct)
         {

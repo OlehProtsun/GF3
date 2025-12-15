@@ -1,4 +1,4 @@
-using BusinessLogicLayer.Services.Abstractions;
+﻿using BusinessLogicLayer.Services.Abstractions;
 using DataAccessLayer.Models;
 using DataAccessLayer.Repositories.Abstractions;
 using System.Collections.Generic;
@@ -42,6 +42,17 @@ namespace BusinessLogicLayer.Services
 
             var scheduleId = schedule.Id;
 
+            // ВАЖЛИВО: не даємо EF інсертити Employee ще раз
+            foreach (var e in employees)
+            {
+                e.Employee = null!; // навігація не потрібна при збереженні
+            }
+
+            foreach (var s in slots)
+            {
+                s.Employee = null;
+            }
+
             // replace employees
             var existingEmployees = await _employeeRepo.GetByScheduleAsync(scheduleId, ct);
             foreach (var e in existingEmployees)
@@ -67,7 +78,19 @@ namespace BusinessLogicLayer.Services
             }
         }
 
-        public Task<ScheduleModel?> GetDetailedAsync(int id, CancellationToken ct = default)
-            => _scheduleRepo.GetDetailedAsync(id, ct);
+
+        public async Task<ScheduleModel?> GetDetailedAsync(int id, CancellationToken ct = default)
+        {
+            // Беремо сам графік (з Shop/Container, якщо репозиторій це вміє)
+            var schedule = await _scheduleRepo.GetDetailedAsync(id, ct);
+            if (schedule is null)
+                return null;
+
+            // А тепер дочірні дані – працівники та слоти
+            schedule.Employees = (await _employeeRepo.GetByScheduleAsync(id, ct)).ToList();
+            schedule.Slots = (await _slotRepo.GetByScheduleAsync(id, ct)).ToList();
+
+            return schedule;
+        }
     }
 }

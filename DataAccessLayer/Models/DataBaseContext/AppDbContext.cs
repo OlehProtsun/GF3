@@ -149,31 +149,40 @@ namespace DataAccessLayer.Models.DataBaseContext
                  .HasForeignKey(sl => sl.EmployeeId)
                  .OnDelete(DeleteBehavior.SetNull);
 
-                // enum <-> TEXT
                 e.Property(sl => sl.Status)
                  .HasConversion<string>()
                  .HasDefaultValue(SlotStatus.UNFURNISHED);
 
-                e.HasIndex(sl => new { sl.ScheduleId, sl.DayOfMonth, sl.ShiftNo, sl.SlotNo })
+                e.Property(sl => sl.FromTime).IsRequired();
+                e.Property(sl => sl.ToTime).IsRequired();
+
+                e.HasIndex(sl => new { sl.ScheduleId, sl.DayOfMonth, sl.FromTime, sl.ToTime, sl.SlotNo })
                  .IsUnique();
 
-                // partial unique index: один співробітник не може двічі бути на тій самій зміні дня
-                e.HasIndex(sl => new { sl.ScheduleId, sl.DayOfMonth, sl.ShiftNo, sl.EmployeeId })
+                e.HasIndex(sl => new { sl.ScheduleId, sl.DayOfMonth, sl.FromTime, sl.ToTime, sl.EmployeeId })
                  .IsUnique()
-                 .HasDatabaseName("ux_slot_unique_emp_per_shift")
+                 .HasDatabaseName("ux_slot_unique_emp_per_time")
                  .HasFilter("employee_id IS NOT NULL");
 
                 e.ToTable(t =>
                 {
                     t.HasCheckConstraint("ck_schedule_slot_dom", "day_of_month BETWEEN 1 AND 31");
-                    t.HasCheckConstraint("ck_schedule_slot_shift_no", "shift_no IN (1,2)");
                     t.HasCheckConstraint("ck_schedule_slot_slot_no", "slot_no >= 1");
                     t.HasCheckConstraint(
                         "ck_schedule_slot_status_pair",
                         "((status='UNFURNISHED' AND employee_id IS NULL) OR (status='ASSIGNED' AND employee_id IS NOT NULL))"
                     );
+                    t.HasCheckConstraint(
+                        "ck_schedule_slot_time_format",
+                        "from_time LIKE '__:__' AND to_time LIKE '__:__'"
+                    );
+                    t.HasCheckConstraint(
+                        "ck_schedule_slot_time_order",
+                        "from_time < to_time"
+                    );
                 });
             });
+
         }
     }
 }
