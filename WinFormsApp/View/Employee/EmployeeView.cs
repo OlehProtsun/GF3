@@ -40,7 +40,7 @@ namespace WinFormsApp.View.Employee
         }
 
         [DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
-        public string FirstName 
+        public string FirstName
         {
             get => inputFirstName.Text;
             set => inputFirstName.Text = value;
@@ -56,7 +56,7 @@ namespace WinFormsApp.View.Employee
 
         [DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
 
-        public string? Email         
+        public string? Email
         {
             get => inputEmail.Text;
             set => inputEmail.Text = value;
@@ -64,7 +64,7 @@ namespace WinFormsApp.View.Employee
 
         [DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
 
-        public string? Phone         
+        public string? Phone
         {
             get => inputPhone.Text;
             set => inputPhone.Text = value;
@@ -125,6 +125,18 @@ namespace WinFormsApp.View.Employee
             {
                 if (OpenProfileEvent is not null)
                     await OpenProfileEvent(CancellationToken.None);
+            };
+
+            btnBackToEmployeeList.Click += async (_, __) =>
+            {
+                if (CancelEvent != null)
+                    await CancelEvent(CancellationToken.None);
+            };
+
+            btnBackToEmployeeListFromProfile.Click += async (_, __) =>
+            {
+                if (CancelEvent != null)
+                    await CancelEvent(CancellationToken.None);
             };
         }
 
@@ -254,6 +266,11 @@ namespace WinFormsApp.View.Employee
             labelEmail.Text = string.IsNullOrWhiteSpace(m.Email) ? "—" : m.Email;
             labelPhone.Text = string.IsNullOrWhiteSpace(m.Phone) ? "—" : m.Phone;
             labelId.Text = m.Id.ToString();
+        }
+
+        private void dataGrid_CellContentClick(object sender, DataGridViewCellEventArgs e)
+        {
+
         }
     }
 }

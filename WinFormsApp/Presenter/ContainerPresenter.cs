@@ -1,4 +1,4 @@
-using BusinessLogicLayer.Generators;
+﻿using BusinessLogicLayer.Generators;
 using BusinessLogicLayer.Services.Abstractions;
 using DataAccessLayer.Models;
 using DataAccessLayer.Models.Enums;
@@ -188,7 +188,10 @@ namespace WinFormsApp.Presenter
         private Task OnCancelAsync(CancellationToken ct)
         {
             _view.ClearValidationErrors();
-            _view.SwitchToListMode();
+            if (_view.CancelTarget == ContainerViewModel.Profile)
+                _view.SwitchToProfileMode();
+            else
+                _view.SwitchToListMode();
             return Task.CompletedTask;
         }
 
@@ -216,14 +219,17 @@ namespace WinFormsApp.Presenter
             await LoadSchedules(container.Id, _view.ScheduleSearch, ct);
         }
 
-        private Task OnScheduleAddAsync(CancellationToken ct)
+        private async Task OnScheduleAddAsync(CancellationToken ct)
         {
             var container = (ContainerModel?)_containerBinding.Current;
             if (container is null)
             {
                 _view.ShowError("Select a container first.");
-                return Task.CompletedTask;
+                return;
             }
+
+            // перезавантажити магазини та availability з БЛ/БД
+            await LoadLookups();
 
             _view.ClearScheduleValidationErrors();
             _view.ClearScheduleInputs();
@@ -231,14 +237,29 @@ namespace WinFormsApp.Presenter
             _view.ScheduleContainerId = container.Id;
             _view.ScheduleCancelTarget = ScheduleViewModel.List;
             _view.SwitchToScheduleEditMode();
-            return Task.CompletedTask;
         }
 
-        private Task OnScheduleEditAsync(CancellationToken ct)
+        private async Task OnScheduleEditAsync(CancellationToken ct)
         {
             var schedule = (ScheduleModel?)_scheduleBinding.Current;
-            if (schedule is null) return Task.CompletedTask;
+            if (schedule is null) return;
 
+            await LoadLookups();
+
+            // Підтягуємо повний графік з БД: працівники + слоти
+            var detailed = await _scheduleService.GetDetailedAsync(schedule.Id, ct);
+            if (detailed != null)
+            {
+                _view.ScheduleEmployees = detailed.Employees?.ToList() ?? new List<ScheduleEmployeeModel>();
+                _view.ScheduleSlots = detailed.Slots?.ToList() ?? new List<ScheduleSlotModel>();
+            }
+            else
+            {
+                _view.ScheduleEmployees = new List<ScheduleEmployeeModel>();
+                _view.ScheduleSlots = new List<ScheduleSlotModel>();
+            }
+
+            // Заповнюємо хедер форми, як було
             _view.ClearScheduleValidationErrors();
             _view.ScheduleId = schedule.Id;
             _view.ScheduleContainerId = schedule.ContainerId;
@@ -255,36 +276,48 @@ namespace WinFormsApp.Presenter
             _view.ScheduleMaxFullPerMonth = schedule.MaxFullPerMonth;
             _view.ScheduleComment = schedule.Comment;
             _view.ScheduleStatus = schedule.Status;
+
             _view.IsEdit = true;
             _view.ScheduleCancelTarget = (_view.ScheduleMode == ScheduleViewModel.Profile)
                 ? ScheduleViewModel.Profile
                 : ScheduleViewModel.List;
+
             _view.SwitchToScheduleEditMode();
-            return Task.CompletedTask;
+
         }
 
         private async Task OnScheduleSaveAsync(CancellationToken ct)
         {
             try
             {
-                var model = new ScheduleModel
+                // 1. Беремо існуючу сутність при редагуванні, або нову при створенні
+                ScheduleModel model;
+                if (_view.IsEdit && _view.ScheduleId != 0)
                 {
-                    Id = _view.ScheduleId,
-                    ContainerId = _view.ScheduleContainerId,
-                    ShopId = _view.ScheduleShopId,
-                    Name = _view.ScheduleName,
-                    Year = _view.ScheduleYear,
-                    Month = _view.ScheduleMonth,
-                    PeoplePerShift = _view.SchedulePeoplePerShift,
-                    Shift1Time = _view.ScheduleShift1,
-                    Shift2Time = _view.ScheduleShift2,
-                    MaxHoursPerEmpMonth = _view.ScheduleMaxHoursPerEmp,
-                    MaxConsecutiveDays = _view.ScheduleMaxConsecutiveDays,
-                    MaxConsecutiveFull = _view.ScheduleMaxConsecutiveFull,
-                    MaxFullPerMonth = _view.ScheduleMaxFullPerMonth,
-                    Comment = _view.ScheduleComment,
-                    Status = _view.ScheduleStatus
-                };
+                    // EF вже трекає цей об’єкт, ми просто міняємо йому поля
+                    model = (ScheduleModel?)_scheduleBinding.Current
+                            ?? new ScheduleModel { Id = _view.ScheduleId };
+                }
+                else
+                {
+                    model = new ScheduleModel();
+                }
+
+                // 2. Копіюємо значення з форми в модель
+                model.ContainerId = _view.ScheduleContainerId;
+                model.ShopId = _view.ScheduleShopId;
+                model.Name = _view.ScheduleName;
+                model.Year = _view.ScheduleYear;
+                model.Month = _view.ScheduleMonth;
+                model.PeoplePerShift = _view.SchedulePeoplePerShift;
+                model.Shift1Time = _view.ScheduleShift1;
+                model.Shift2Time = _view.ScheduleShift2;
+                model.MaxHoursPerEmpMonth = _view.ScheduleMaxHoursPerEmp;
+                model.MaxConsecutiveDays = _view.ScheduleMaxConsecutiveDays;
+                model.MaxConsecutiveFull = _view.ScheduleMaxConsecutiveFull;
+                model.MaxFullPerMonth = _view.ScheduleMaxFullPerMonth;
+                model.Comment = _view.ScheduleComment;
+                model.Status = _view.ScheduleStatus;
 
                 var errors = ValidateSchedule(model);
                 if (errors.Count > 0)
@@ -295,25 +328,27 @@ namespace WinFormsApp.Presenter
                     return;
                 }
 
-                var selectedAvailabilities = await _availabilityService.GetAllAsync(ct);
-                var selectedIds = _view.SelectedAvailabilityIds;
-                var employees = selectedAvailabilities
-                    .Where(a => selectedIds.Contains(a.Id))
-                    .Select(a => new ScheduleEmployeeModel
-                    {
-                        EmployeeId = a.EmployeeId
-                    })
+                // 3. Працівники – беремо з того, що в гріді / після генерації,
+                //    без навігації Employee (щоб EF не намагався інсертити employee ще раз)
+                var employees = _view.ScheduleEmployees
                     .GroupBy(e => e.EmployeeId)
-                    .Select(g => g.First())
+                    .Select(g => new ScheduleEmployeeModel
+                    {
+                        EmployeeId = g.Key,
+                        MinHoursMonth = g.First().MinHoursMonth
+                    })
                     .ToList();
 
+                // 4. Слоти – просто зі view
                 var slots = _view.ScheduleSlots;
 
                 await _scheduleService.SaveWithDetailsAsync(model, employees, slots, ct);
+
                 _view.ShowInfo(_view.IsEdit ? "Schedule updated successfully." : "Schedule added successfully.");
                 _view.IsSuccessful = true;
 
                 await LoadSchedules(model.ContainerId, null, ct);
+
                 if (_view.ScheduleCancelTarget == ScheduleViewModel.Profile)
                     _view.SwitchToScheduleProfileMode();
                 else
@@ -321,9 +356,11 @@ namespace WinFormsApp.Presenter
             }
             catch (Exception ex)
             {
-                _view.ShowError(ex.Message);
+                var msg = ex.InnerException?.Message ?? ex.Message;
+                _view.ShowError(msg);
             }
         }
+
 
         private async Task OnScheduleDeleteAsync(CancellationToken ct)
         {
@@ -349,7 +386,10 @@ namespace WinFormsApp.Presenter
         private Task OnScheduleCancelAsync(CancellationToken ct)
         {
             _view.ClearScheduleValidationErrors();
-            _view.SwitchToScheduleListMode();
+            if (_view.ScheduleCancelTarget == ScheduleViewModel.Profile)
+                _view.SwitchToScheduleProfileMode();
+            else
+                _view.SwitchToScheduleListMode();
             return Task.CompletedTask;
         }
 
@@ -360,6 +400,10 @@ namespace WinFormsApp.Presenter
 
             var detailed = await _scheduleService.GetDetailedAsync(schedule.Id, ct);
             if (detailed is null) return;
+
+            // Заповнюємо internal-списки у View (щоб при переході в Edit вони вже були)
+            _view.ScheduleEmployees = detailed.Employees?.ToList() ?? new List<ScheduleEmployeeModel>();
+            _view.ScheduleSlots = detailed.Slots?.ToList() ?? new List<ScheduleSlotModel>();
 
             _view.SetScheduleProfile(detailed);
             _view.ScheduleCancelTarget = ScheduleViewModel.List;
@@ -391,12 +435,13 @@ namespace WinFormsApp.Presenter
             var selectedIds = _view.SelectedAvailabilityIds;
             var employees = selectedAvailabilities
                 .Where(a => selectedIds.Contains(a.Id))
-                .Select(a => new ScheduleEmployeeModel { EmployeeId = a.EmployeeId })
+                .Select(a => new ScheduleEmployeeModel { EmployeeId = a.EmployeeId, Employee = a.Employee })
                 .GroupBy(e => e.EmployeeId)
                 .Select(g => g.First())
                 .ToList();
 
             var slots = await _generator.GenerateAsync(model, selectedAvailabilities.Where(a => selectedIds.Contains(a.Id)), employees, ct);
+            _view.ScheduleEmployees = employees;
             _view.ScheduleSlots = slots.ToList();
             _view.ShowInfo("Slots generated. Review before saving.");
         }

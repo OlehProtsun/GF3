@@ -1,12 +1,8 @@
-using DataAccessLayer.Models;
+﻿using DataAccessLayer.Models;
 using DataAccessLayer.Models.Enums;
-using System;
-using System.Collections.Generic;
 using System.ComponentModel;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
-using System.Windows.Forms;
+using System.Data;
+using System.Globalization;
 using WinFormsApp.ViewModel;
 
 namespace WinFormsApp.View.Container
@@ -16,6 +12,9 @@ namespace WinFormsApp.View.Container
         private bool isEdit;
         private bool isSuccessful;
         private string message = string.Empty;
+        private DataTable? _scheduleTable;
+        private Dictionary<string, int> _colNameToEmpId = new();
+        private object? _oldCellValue;
 
         public ContainerView()
         {
@@ -117,11 +116,31 @@ namespace WinFormsApp.View.Container
             .ToList();
 
         [DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
+        private IList<ScheduleSlotModel> _slots = new List<ScheduleSlotModel>();
 
+        [DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
+        private IList<ScheduleEmployeeModel> _employees = new List<ScheduleEmployeeModel>();
+
+        [DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
         public IList<ScheduleSlotModel> ScheduleSlots
         {
-            get => (slotGrid.DataSource as BindingSource)?.List.Cast<ScheduleSlotModel>().ToList() ?? new List<ScheduleSlotModel>();
-            set => slotGrid.DataSource = new BindingSource { DataSource = value };
+            get => _slots;
+            set
+            {
+                _slots = value ?? new List<ScheduleSlotModel>();
+                RefreshScheduleGrid();
+            }
+        }
+
+        [DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
+        public IList<ScheduleEmployeeModel> ScheduleEmployees
+        {
+            get => _employees;
+            set
+            {
+                _employees = value ?? new List<ScheduleEmployeeModel>();
+                RefreshScheduleGrid();
+            }
         }
         #endregion
 
@@ -144,6 +163,141 @@ namespace WinFormsApp.View.Container
         public event Func<CancellationToken, Task>? ScheduleGenerateEvent;
         #endregion
 
+        private void RefreshScheduleGrid()
+        {
+            if (_slots == null || _slots.Count == 0 || _employees == null || _employees.Count == 0)
+            {
+                slotGrid.DataSource = null;
+                return;
+            }
+
+            _scheduleTable = BuildScheduleTable(_slots, _employees, out _colNameToEmpId);
+
+            slotGrid.AutoGenerateColumns = true;
+            slotGrid.DataSource = _scheduleTable;
+
+            if (slotGrid.Columns.Contains("HasConflict"))
+                slotGrid.Columns["HasConflict"].Visible = false;
+
+            if (slotGrid.Columns.Contains("Day"))
+                slotGrid.Columns["Day"].ReadOnly = true;
+        }
+
+
+        private DataTable BuildScheduleTable(
+            IList<ScheduleSlotModel> slots,
+            IList<ScheduleEmployeeModel> employees,
+            out Dictionary<string, int> colNameToEmpId)
+        {
+            colNameToEmpId = new Dictionary<string, int>();
+
+            var table = new DataTable();
+            table.Columns.Add("Day", typeof(int));
+            table.Columns.Add("HasConflict", typeof(bool));
+
+            foreach (var emp in employees)
+            {
+                var displayName = $"{emp.Employee.FirstName} {emp.Employee.LastName}";
+                var columnName = displayName;
+                var suffix = 1;
+
+                while (table.Columns.Contains(columnName))
+                {
+                    suffix++;
+                    columnName = $"{displayName} ({suffix})";
+                }
+
+                table.Columns.Add(columnName, typeof(string));
+
+                colNameToEmpId[columnName] = emp.EmployeeId; // 👈 ключове
+            }
+
+            if (slots == null || slots.Count == 0)
+                return table;
+
+            var days = slots.Select(s => s.DayOfMonth).Distinct().OrderBy(d => d);
+
+            foreach (var day in days)
+            {
+                var daySlots = slots.Where(s => s.DayOfMonth == day).ToList();
+                var row = table.NewRow();
+
+                row["Day"] = day;
+                row["HasConflict"] = daySlots.Any(s => s.EmployeeId == null);
+
+                foreach (var kvp in colNameToEmpId)
+                {
+                    var columnName = kvp.Key;
+                    var empId = kvp.Value;
+
+                    var empSlots = daySlots.Where(s => s.EmployeeId == empId).ToList();
+
+                    if (empSlots.Count == 0)
+                    {
+                        row[columnName] = "-";
+                    }
+                    else
+                    {
+                        var mergedIntervals = MergeIntervalsForDisplay(empSlots);
+
+                        row[columnName] = mergedIntervals.Count == 0
+                            ? "-"
+                            : string.Join(", ", mergedIntervals.Select(i => $"{i.from} - {i.to}"));
+                    }
+                }
+
+                table.Rows.Add(row);
+            }
+
+            return table;
+        }
+
+        private static List<(string from, string to)> MergeIntervalsForDisplay(IEnumerable<ScheduleSlotModel> slots)
+        {
+            // парсимо час + сортуємо
+            var list = slots
+                .Select(s =>
+                {
+                    if (!TryParseTime(s.FromTime, out var f) || !TryParseTime(s.ToTime, out var t))
+                        return (ok: false, from: default(TimeSpan), to: default(TimeSpan));
+                    return (ok: true, from: f, to: t);
+                })
+                .Where(x => x.ok)
+                .Select(x => (x.from, x.to))
+                .Distinct()
+                .OrderBy(x => x.from)
+                .ToList();
+
+            if (list.Count == 0) return new();
+
+            var merged = new List<(TimeSpan from, TimeSpan to)>();
+            foreach (var cur in list)
+            {
+                if (merged.Count == 0)
+                {
+                    merged.Add(cur);
+                    continue;
+                }
+
+                var last = merged[^1];
+
+                // якщо перекривається або "впритик" (15:00 == 15:00) → зливаємо
+                if (cur.from <= last.to)
+                {
+                    var newTo = cur.to > last.to ? cur.to : last.to;
+                    merged[^1] = (last.from, newTo);
+                }
+                else
+                {
+                    merged.Add(cur);
+                }
+            }
+
+            return merged
+                .Select(x => (x.from.ToString(@"hh\:mm"), x.to.ToString(@"hh\:mm")))
+                .ToList();
+        }
+
         private void AssociateAndRaiseEvents()
         {
             btnSearch.Click += async (_, __) => { if (SearchEvent != null) await SearchEvent(CancellationToken.None); };
@@ -159,11 +313,29 @@ namespace WinFormsApp.View.Container
             btnScheduleAdd.Click += async (_, __) => { if (ScheduleAddEvent != null) await ScheduleAddEvent(CancellationToken.None); };
             btnScheduleEdit.Click += async (_, __) => { if (ScheduleEditEvent != null) await ScheduleEditEvent(CancellationToken.None); };
             btnScheduleDelete.Click += async (_, __) => { if (ScheduleDeleteEvent != null) await ScheduleDeleteEvent(CancellationToken.None); };
-            btnScheduleSave.Click += async (_, __) => { if (ScheduleSaveEvent != null) await ScheduleSaveEvent(CancellationToken.None); };
+            btnScheduleSave.Click += async (_, __) =>
+            {
+                slotGrid.EndEdit(); // 👈 комітимо редагування клітинки
+                if (ScheduleSaveEvent != null)
+                    await ScheduleSaveEvent(CancellationToken.None);
+            };
             btnScheduleCancel.Click += async (_, __) => { if (ScheduleCancelEvent != null) await ScheduleCancelEvent(CancellationToken.None); };
             btnGenerate.Click += async (_, __) => { if (ScheduleGenerateEvent != null) await ScheduleGenerateEvent(CancellationToken.None); };
-            btnOpenScheduleProfile.Click += async (_, __) => { if (ScheduleOpenProfileEvent != null) await ScheduleOpenProfileEvent(CancellationToken.None); };
             scheduleGrid.CellDoubleClick += async (_, __) => { if (ScheduleOpenProfileEvent != null) await ScheduleOpenProfileEvent(CancellationToken.None); };
+
+            btnCancelProfile.Click += async (_, __) =>
+            {
+                CancelTarget = ContainerViewModel.List; // 👈 примусово
+                if (CancelEvent != null)
+                    await CancelEvent(CancellationToken.None);
+            };
+
+
+            btnScheduleProfileCancel.Click += async (_, __) =>
+            {
+                if (ScheduleCancelEvent != null)
+                    await ScheduleCancelEvent(CancellationToken.None);
+            };
         }
 
         public void SetContainerBindingSource(BindingSource containers)
@@ -254,18 +426,44 @@ namespace WinFormsApp.View.Container
 
         private void ConfigureSlotGrid()
         {
-            slotGrid.AutoGenerateColumns = false;
+            slotGrid.AutoGenerateColumns = true;
             slotGrid.Columns.Clear();
             slotGrid.AllowUserToAddRows = false;
             slotGrid.AllowUserToDeleteRows = false;
-            slotGrid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Day", DataPropertyName = nameof(ScheduleSlotModel.DayOfMonth) });
-            slotGrid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Shift", DataPropertyName = nameof(ScheduleSlotModel.ShiftNo) });
-            slotGrid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Slot", DataPropertyName = nameof(ScheduleSlotModel.SlotNo) });
-            slotGrid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Employee", DataPropertyName = nameof(ScheduleSlotModel.EmployeeId) });
 
-            scheduleSlotProfileGrid.AutoGenerateColumns = false;
+            slotGrid.CellPainting += SlotGrid_CellPainting;
+
+            slotGrid.CellBeginEdit += SlotGrid_CellBeginEdit;
+            slotGrid.CellValidating += SlotGrid_CellValidating;
+            slotGrid.CellEndEdit += SlotGrid_CellEndEdit;
+
+            scheduleSlotProfileGrid.AutoGenerateColumns = true;
             scheduleSlotProfileGrid.Columns.Clear();
-            scheduleSlotProfileGrid.Columns.AddRange(slotGrid.Columns.Cast<DataGridViewColumn>().Select(c => (DataGridViewColumn)c.Clone()).ToArray());
+        }
+
+        private void SlotGrid_CellPainting(object? sender, DataGridViewCellPaintingEventArgs e)
+        {
+            if (e.RowIndex < 0 || e.ColumnIndex != 0) return;
+
+            if (slotGrid.Rows[e.RowIndex].DataBoundItem is not DataRowView rowView)
+                return;
+
+            if (rowView["HasConflict"] is not bool hasConflict || !hasConflict)
+                return;
+
+            e.Handled = true;
+            e.PaintBackground(e.ClipBounds, true);
+            e.PaintContent(e.ClipBounds);
+
+            var diameter = Math.Min(e.CellBounds.Width, e.CellBounds.Height) - 6;
+            var rect = new Rectangle(
+                e.CellBounds.Left + (e.CellBounds.Width - diameter) / 2,
+                e.CellBounds.Top + (e.CellBounds.Height - diameter) / 2,
+                diameter,
+                diameter);
+
+            using var pen = new Pen(Color.Red, 2);
+            e.Graphics.DrawEllipse(pen, rect);
         }
 
         public void SwitchToEditMode()
@@ -302,6 +500,7 @@ namespace WinFormsApp.View.Container
         {
             tabControl.SelectedTab = tabScheduleProfile;
             ScheduleMode = ScheduleViewModel.Profile;
+            ScheduleCancelTarget = ScheduleViewModel.List;
         }
 
         public void ClearInputs()
@@ -325,7 +524,7 @@ namespace WinFormsApp.View.Container
             ScheduleMaxConsecutiveFull = 1;
             ScheduleMaxFullPerMonth = 1;
             ScheduleComment = string.Empty;
-            foreach (int i in checkedAvailabilities.CheckedIndices)
+            foreach (int i in checkedAvailabilities.CheckedIndices.Cast<int>().ToList())
                 checkedAvailabilities.SetItemChecked(i, false);
             ScheduleSlots = new List<ScheduleSlotModel>();
         }
@@ -389,12 +588,178 @@ namespace WinFormsApp.View.Container
         public void SetScheduleProfile(ScheduleModel model)
         {
             lblScheduleSummary.Text = $"{model.Name} ({model.Year}/{model.Month}) - {model.Shop?.Name}";
-            scheduleSlotProfileGrid.DataSource = new BindingSource { DataSource = model.Slots.ToList() };
+
+            // бажано брати дані, які точно актуальні
+            var slots = _slots ?? model.Slots?.ToList() ?? new List<ScheduleSlotModel>();
+            var employees = _employees ?? new List<ScheduleEmployeeModel>();
+
+            if (slots.Count > 0 && employees.Count > 0)
+            {
+                var table = BuildScheduleTable(slots, employees, out _); // 👈 ось тут
+
+                scheduleSlotProfileGrid.AutoGenerateColumns = true;
+                scheduleSlotProfileGrid.DataSource = table;
+                scheduleSlotProfileGrid.ReadOnly = true;
+
+                if (scheduleSlotProfileGrid.Columns.Contains("HasConflict"))
+                    scheduleSlotProfileGrid.Columns["HasConflict"].Visible = false;
+            }
+            else
+            {
+                scheduleSlotProfileGrid.DataSource = new BindingSource { DataSource = slots };
+            }
         }
 
-        private void inputMaxFull_ValueChanged(object sender, EventArgs e)
+        private void SlotGrid_CellBeginEdit(object? sender, DataGridViewCellCancelEventArgs e)
         {
-
+            _oldCellValue = slotGrid[e.ColumnIndex, e.RowIndex].Value;
         }
+
+        private void SlotGrid_CellValidating(object? sender, DataGridViewCellValidatingEventArgs e)
+        {
+            if (e.RowIndex < 0 || e.ColumnIndex < 0) return;
+
+            var colName = slotGrid.Columns[e.ColumnIndex].Name;
+            if (colName == "Day" || colName == "HasConflict") return;
+
+            var text = (e.FormattedValue?.ToString() ?? "").Trim();
+
+            if (!TryParseIntervals(text, out _, out var error))
+            {
+                e.Cancel = true;
+                ShowError(error ?? "Invalid format. Use: HH:mm - HH:mm");
+            }
+        }
+
+        private void SlotGrid_CellEndEdit(object? sender, DataGridViewCellEventArgs e)
+        {
+            if (e.RowIndex < 0 || e.ColumnIndex < 0) return;
+
+            if (slotGrid.Rows[e.RowIndex].DataBoundItem is not DataRowView rowView)
+                return;
+
+            var colName = slotGrid.Columns[e.ColumnIndex].Name;
+            if (colName == "Day" || colName == "HasConflict") return;
+
+            if (!_colNameToEmpId.TryGetValue(colName, out var empId))
+                return;
+
+            var day = (int)rowView["Day"];
+            var raw = (rowView[colName]?.ToString() ?? "-").Trim();
+
+            if (!TryParseIntervals(raw, out var intervals, out var error))
+            {
+                rowView[colName] = _oldCellValue?.ToString() ?? "-";
+                ShowError(error ?? "Invalid format.");
+                return;
+            }
+
+            ApplyIntervalsToSlots(day, empId, intervals);
+
+            // нормалізуємо відображення
+            rowView[colName] = intervals.Count == 0
+                ? "-"
+                : string.Join(", ", intervals.Select(i => $"{i.from} - {i.to}"));
+
+            rowView["HasConflict"] = _slots.Any(s => s.DayOfMonth == day && s.EmployeeId == null);
+        }
+
+        private static bool TryParseIntervals(
+            string? text,
+            out List<(string from, string to)> intervals,
+            out string? error)
+        {
+            intervals = new();
+            error = null;
+
+            text = (text ?? "").Trim();
+            if (string.IsNullOrWhiteSpace(text) || text == "-")
+                return true;
+
+            var parts = text.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+            foreach (var p in parts)
+            {
+                var dash = p.Split('-', 2, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+                if (dash.Length != 2)
+                {
+                    error = "Format: HH:mm - HH:mm (можна кілька через кому)";
+                    return false;
+                }
+
+                if (!TryParseTime(dash[0], out var from) || !TryParseTime(dash[1], out var to))
+                {
+                    error = "Time must be HH:mm (наприклад 09:00 - 14:30)";
+                    return false;
+                }
+
+                if (from >= to)
+                {
+                    error = "From must be earlier than To";
+                    return false;
+                }
+
+                intervals.Add((from.ToString(@"hh\:mm"), to.ToString(@"hh\:mm")));
+            }
+
+            // прибираємо дублікати
+            intervals = intervals.Distinct().ToList();
+            return true;
+        }
+
+        private static bool TryParseTime(string s, out TimeSpan t)
+        {
+            return TimeSpan.TryParseExact(
+                s.Trim(),
+                new[] { @"h\:mm", @"hh\:mm" },
+                CultureInfo.InvariantCulture,
+                out t);
+        }
+
+        private void ApplyIntervalsToSlots(int day, int empId, List<(string from, string to)> intervals)
+        {
+            // гарантуємо, що це mutable List
+            var list = _slots as List<ScheduleSlotModel>;
+            if (list == null)
+            {
+                list = _slots.ToList();
+                _slots = list;
+            }
+
+            var removed = list.Where(s => s.DayOfMonth == day && s.EmployeeId == empId).ToList();
+            var preservedStatus = removed.FirstOrDefault()?.Status ?? SlotStatus.UNFURNISHED;
+
+            foreach (var r in removed)
+                list.Remove(r);
+
+            foreach (var (from, to) in intervals)
+            {
+                var slotNo = NextFreeSlotNo(list, day, from, to);
+
+                list.Add(new ScheduleSlotModel
+                {
+                    ScheduleId = ScheduleId,   // при збереженні сервіс все одно перепише ScheduleId :contentReference[oaicite:4]{index=4}
+                    DayOfMonth = day,
+                    EmployeeId = empId,
+                    FromTime = from,
+                    ToTime = to,
+                    SlotNo = slotNo,
+                    Status = preservedStatus
+                });
+            }
+        }
+
+        private static int NextFreeSlotNo(List<ScheduleSlotModel> list, int day, string from, string to)
+        {
+            var used = list
+                .Where(s => s.DayOfMonth == day && s.FromTime == from && s.ToTime == to)
+                .Select(s => s.SlotNo)
+                .ToHashSet();
+
+            var n = 1;
+            while (used.Contains(n)) n++;
+            return n;
+        }
+
     }
 }

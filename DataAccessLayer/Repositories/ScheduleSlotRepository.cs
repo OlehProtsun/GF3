@@ -20,7 +20,6 @@ namespace DataAccessLayer.Repositories
                 .Include(ss => ss.Employee)
                 .Where(ss => ss.ScheduleId == scheduleId)
                 .OrderBy(ss => ss.DayOfMonth)
-                .ThenBy(ss => ss.ShiftNo)
                 .ThenBy(ss => ss.SlotNo)
                 .ToListAsync(ct);
         }
