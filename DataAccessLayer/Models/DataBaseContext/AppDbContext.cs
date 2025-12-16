@@ -20,6 +20,8 @@ namespace DataAccessLayer.Models.DataBaseContext
         public DbSet<ScheduleModel> Schedules => Set<ScheduleModel>();
         public DbSet<ScheduleEmployeeModel> ScheduleEmployees => Set<ScheduleEmployeeModel>();
         public DbSet<ScheduleSlotModel> ScheduleSlots => Set<ScheduleSlotModel>();
+        public DbSet<BindModel> AvailabilityBinds => Set<BindModel>();
+
 
         protected override void OnModelCreating(ModelBuilder modelBuilder) 
         {
@@ -182,6 +184,15 @@ namespace DataAccessLayer.Models.DataBaseContext
                     );
                 });
             });
+
+            // ----- AvailabilityBind
+            modelBuilder.Entity<BindModel>(e =>
+            {
+                e.Property(x => x.Key).IsRequired();
+                e.Property(x => x.Value).IsRequired();
+                e.HasIndex(x => x.Key).IsUnique();   // щоб не було двох однакових хоткеїв
+            });
+
 
         }
     }

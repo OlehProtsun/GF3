@@ -26,6 +26,8 @@ namespace WinFormsApp.View.Main
         {
             InitializeComponent();
 
+            this.WindowState = FormWindowState.Maximized;
+
             btnEmployee.Click += async (_, __) =>
             {
                 if (ShowEmployeeView is not null)
@@ -50,18 +52,9 @@ namespace WinFormsApp.View.Main
                     await ShowContainerView(CancellationToken.None);
             };
 
-            topPanel.MouseDown += (_, e) => ProgramMouseDown?.Invoke(this, e);
-            topPanel.MouseMove += (_, e) => ProgramMouseMove?.Invoke(this, e);
-            topPanel.MouseUp += (_, e) => ProgramMouseUp?.Invoke(this, e);
-
             btnCloseProgram.Click += async (_, __) =>
             {
                 Environment.Exit(0);
-            };
-
-            btnProgramScale.Click += async (_, __) =>
-            {
-                this.WindowState = this.WindowState == FormWindowState.Maximized ? FormWindowState.Normal : FormWindowState.Maximized;
             };
 
             btnProgramMinimalize.Click += (_, __) =>
@@ -75,9 +68,7 @@ namespace WinFormsApp.View.Main
         public event Func<CancellationToken, Task>? ShowAvailabilityView;
         public event Func<CancellationToken, Task>? ShowShopView;
         public event Func<CancellationToken, Task>? ShowContainerView;
-        public event EventHandler<MouseEventArgs>? ProgramMouseUp;
-        public event EventHandler<MouseEventArgs>? ProgramMouseDown;
-        public event EventHandler<MouseEventArgs>? ProgramMouseMove;
+
 
         public void BeginWindowDrag()
         {

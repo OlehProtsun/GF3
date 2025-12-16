@@ -14,9 +14,6 @@
         private Guna.UI2.WinForms.Guna2Button btnShop;
         private Guna.UI2.WinForms.Guna2Button btnContainer;
         private System.Windows.Forms.Panel leftBar;
-
-        // Added missing fields referenced in InitializeComponent
-        private Guna.UI2.WinForms.Guna2Button btnProgramScale;
         private Guna.UI2.WinForms.Guna2Button btnProgramMinimalize;
         #endregion
 
@@ -53,16 +50,14 @@
             Guna.UI2.WinForms.Suite.CustomizableEdges customizableEdges8 = new Guna.UI2.WinForms.Suite.CustomizableEdges();
             Guna.UI2.WinForms.Suite.CustomizableEdges customizableEdges9 = new Guna.UI2.WinForms.Suite.CustomizableEdges();
             Guna.UI2.WinForms.Suite.CustomizableEdges customizableEdges10 = new Guna.UI2.WinForms.Suite.CustomizableEdges();
-            Guna.UI2.WinForms.Suite.CustomizableEdges customizableEdges19 = new Guna.UI2.WinForms.Suite.CustomizableEdges();
-            Guna.UI2.WinForms.Suite.CustomizableEdges customizableEdges20 = new Guna.UI2.WinForms.Suite.CustomizableEdges();
-            Guna.UI2.WinForms.Suite.CustomizableEdges customizableEdges11 = new Guna.UI2.WinForms.Suite.CustomizableEdges();
-            Guna.UI2.WinForms.Suite.CustomizableEdges customizableEdges12 = new Guna.UI2.WinForms.Suite.CustomizableEdges();
-            Guna.UI2.WinForms.Suite.CustomizableEdges customizableEdges15 = new Guna.UI2.WinForms.Suite.CustomizableEdges();
-            Guna.UI2.WinForms.Suite.CustomizableEdges customizableEdges16 = new Guna.UI2.WinForms.Suite.CustomizableEdges();
-            Guna.UI2.WinForms.Suite.CustomizableEdges customizableEdges13 = new Guna.UI2.WinForms.Suite.CustomizableEdges();
-            Guna.UI2.WinForms.Suite.CustomizableEdges customizableEdges14 = new Guna.UI2.WinForms.Suite.CustomizableEdges();
             Guna.UI2.WinForms.Suite.CustomizableEdges customizableEdges17 = new Guna.UI2.WinForms.Suite.CustomizableEdges();
             Guna.UI2.WinForms.Suite.CustomizableEdges customizableEdges18 = new Guna.UI2.WinForms.Suite.CustomizableEdges();
+            Guna.UI2.WinForms.Suite.CustomizableEdges customizableEdges15 = new Guna.UI2.WinForms.Suite.CustomizableEdges();
+            Guna.UI2.WinForms.Suite.CustomizableEdges customizableEdges16 = new Guna.UI2.WinForms.Suite.CustomizableEdges();
+            Guna.UI2.WinForms.Suite.CustomizableEdges customizableEdges11 = new Guna.UI2.WinForms.Suite.CustomizableEdges();
+            Guna.UI2.WinForms.Suite.CustomizableEdges customizableEdges12 = new Guna.UI2.WinForms.Suite.CustomizableEdges();
+            Guna.UI2.WinForms.Suite.CustomizableEdges customizableEdges13 = new Guna.UI2.WinForms.Suite.CustomizableEdges();
+            Guna.UI2.WinForms.Suite.CustomizableEdges customizableEdges14 = new Guna.UI2.WinForms.Suite.CustomizableEdges();
             leftBar = new Panel();
             btnContainer = new Guna.UI2.WinForms.Guna2Button();
             btnShop = new Guna.UI2.WinForms.Guna2Button();
@@ -70,10 +65,9 @@
             btnEmployee = new Guna.UI2.WinForms.Guna2Button();
             guna2Button1 = new Guna.UI2.WinForms.Guna2Button();
             topPanel = new Guna.UI2.WinForms.Guna2Panel();
-            btnProgramScale = new Guna.UI2.WinForms.Guna2Button();
-            btnProgramMinimalize = new Guna.UI2.WinForms.Guna2Button();
-            btnCloseProgram = new Guna.UI2.WinForms.Guna2Button();
             guna2CustomGradientPanel1 = new Guna.UI2.WinForms.Guna2CustomGradientPanel();
+            btnCloseProgram = new Guna.UI2.WinForms.Guna2Button();
+            btnProgramMinimalize = new Guna.UI2.WinForms.Guna2Button();
             leftBar.SuspendLayout();
             topPanel.SuspendLayout();
             guna2CustomGradientPanel1.SuspendLayout();
@@ -195,52 +189,30 @@
             // topPanel
             // 
             topPanel.Controls.Add(guna2CustomGradientPanel1);
-            topPanel.CustomizableEdges = customizableEdges19;
+            topPanel.CustomizableEdges = customizableEdges17;
             topPanel.Dock = DockStyle.Top;
             topPanel.Location = new Point(121, 0);
             topPanel.Name = "topPanel";
-            topPanel.ShadowDecoration.CustomizableEdges = customizableEdges20;
+            topPanel.ShadowDecoration.CustomizableEdges = customizableEdges18;
             topPanel.Size = new Size(1033, 33);
             topPanel.TabIndex = 4;
             // 
-            // btnProgramScale
+            // guna2CustomGradientPanel1
             // 
-            btnProgramScale.BorderRadius = 6;
-            btnProgramScale.CustomizableEdges = customizableEdges11;
-            btnProgramScale.DisabledState.BorderColor = Color.DarkGray;
-            btnProgramScale.DisabledState.CustomBorderColor = Color.DarkGray;
-            btnProgramScale.DisabledState.FillColor = Color.FromArgb(169, 169, 169);
-            btnProgramScale.DisabledState.ForeColor = Color.FromArgb(141, 141, 141);
-            btnProgramScale.FillColor = Color.Gray;
-            btnProgramScale.Font = new Font("Segoe UI", 9F);
-            btnProgramScale.ForeColor = Color.White;
-            btnProgramScale.Location = new Point(33, 3);
-            btnProgramScale.Name = "btnProgramScale";
-            btnProgramScale.ShadowDecoration.CustomizableEdges = customizableEdges12;
-            btnProgramScale.Size = new Size(25, 25);
-            btnProgramScale.TabIndex = 2;
-            // 
-            // btnProgramMinimalize
-            // 
-            btnProgramMinimalize.BorderRadius = 6;
-            btnProgramMinimalize.CustomizableEdges = customizableEdges15;
-            btnProgramMinimalize.DisabledState.BorderColor = Color.DarkGray;
-            btnProgramMinimalize.DisabledState.CustomBorderColor = Color.DarkGray;
-            btnProgramMinimalize.DisabledState.FillColor = Color.FromArgb(169, 169, 169);
-            btnProgramMinimalize.DisabledState.ForeColor = Color.FromArgb(141, 141, 141);
-            btnProgramMinimalize.FillColor = Color.FromArgb(115, 101, 0);
-            btnProgramMinimalize.Font = new Font("Segoe UI", 9F);
-            btnProgramMinimalize.ForeColor = Color.White;
-            btnProgramMinimalize.Location = new Point(2, 3);
-            btnProgramMinimalize.Name = "btnProgramMinimalize";
-            btnProgramMinimalize.ShadowDecoration.CustomizableEdges = customizableEdges16;
-            btnProgramMinimalize.Size = new Size(25, 25);
-            btnProgramMinimalize.TabIndex = 1;
+            guna2CustomGradientPanel1.Controls.Add(btnCloseProgram);
+            guna2CustomGradientPanel1.Controls.Add(btnProgramMinimalize);
+            guna2CustomGradientPanel1.CustomizableEdges = customizableEdges15;
+            guna2CustomGradientPanel1.Dock = DockStyle.Right;
+            guna2CustomGradientPanel1.Location = new Point(968, 0);
+            guna2CustomGradientPanel1.Name = "guna2CustomGradientPanel1";
+            guna2CustomGradientPanel1.ShadowDecoration.CustomizableEdges = customizableEdges16;
+            guna2CustomGradientPanel1.Size = new Size(65, 33);
+            guna2CustomGradientPanel1.TabIndex = 3;
             // 
             // btnCloseProgram
             // 
             btnCloseProgram.BorderRadius = 6;
-            btnCloseProgram.CustomizableEdges = customizableEdges13;
+            btnCloseProgram.CustomizableEdges = customizableEdges11;
             btnCloseProgram.DisabledState.BorderColor = Color.DarkGray;
             btnCloseProgram.DisabledState.CustomBorderColor = Color.DarkGray;
             btnCloseProgram.DisabledState.FillColor = Color.FromArgb(169, 169, 169);
@@ -249,24 +221,28 @@
             btnCloseProgram.Font = new Font("Segoe UI", 9F);
             btnCloseProgram.ForeColor = Color.White;
             btnCloseProgram.ImageSize = new Size(6, 6);
-            btnCloseProgram.Location = new Point(64, 3);
+            btnCloseProgram.Location = new Point(34, 4);
             btnCloseProgram.Name = "btnCloseProgram";
-            btnCloseProgram.ShadowDecoration.CustomizableEdges = customizableEdges14;
+            btnCloseProgram.ShadowDecoration.CustomizableEdges = customizableEdges12;
             btnCloseProgram.Size = new Size(25, 25);
             btnCloseProgram.TabIndex = 0;
             // 
-            // guna2CustomGradientPanel1
+            // btnProgramMinimalize
             // 
-            guna2CustomGradientPanel1.Controls.Add(btnProgramScale);
-            guna2CustomGradientPanel1.Controls.Add(btnCloseProgram);
-            guna2CustomGradientPanel1.Controls.Add(btnProgramMinimalize);
-            guna2CustomGradientPanel1.CustomizableEdges = customizableEdges17;
-            guna2CustomGradientPanel1.Dock = DockStyle.Right;
-            guna2CustomGradientPanel1.Location = new Point(942, 0);
-            guna2CustomGradientPanel1.Name = "guna2CustomGradientPanel1";
-            guna2CustomGradientPanel1.ShadowDecoration.CustomizableEdges = customizableEdges18;
-            guna2CustomGradientPanel1.Size = new Size(91, 33);
-            guna2CustomGradientPanel1.TabIndex = 3;
+            btnProgramMinimalize.BorderRadius = 6;
+            btnProgramMinimalize.CustomizableEdges = customizableEdges13;
+            btnProgramMinimalize.DisabledState.BorderColor = Color.DarkGray;
+            btnProgramMinimalize.DisabledState.CustomBorderColor = Color.DarkGray;
+            btnProgramMinimalize.DisabledState.FillColor = Color.FromArgb(169, 169, 169);
+            btnProgramMinimalize.DisabledState.ForeColor = Color.FromArgb(141, 141, 141);
+            btnProgramMinimalize.FillColor = Color.FromArgb(115, 101, 0);
+            btnProgramMinimalize.Font = new Font("Segoe UI", 9F);
+            btnProgramMinimalize.ForeColor = Color.White;
+            btnProgramMinimalize.Location = new Point(3, 4);
+            btnProgramMinimalize.Name = "btnProgramMinimalize";
+            btnProgramMinimalize.ShadowDecoration.CustomizableEdges = customizableEdges14;
+            btnProgramMinimalize.Size = new Size(25, 25);
+            btnProgramMinimalize.TabIndex = 1;
             // 
             // MainView
             // 

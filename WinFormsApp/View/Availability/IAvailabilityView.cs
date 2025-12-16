@@ -30,6 +30,9 @@ namespace WinFormsApp.View.Availability
         event Func<CancellationToken, Task>? SaveEvent;
         event Func<CancellationToken, Task>? CancelEvent;
         event Func<CancellationToken, Task>? OpenProfileEvent;
+        event Func<CancellationToken, Task>? AddBindEvent;
+        event Func<BindModel, CancellationToken, Task>? UpsertBindEvent;
+        event Func<BindModel, CancellationToken, Task>? DeleteBindEvent;
 
         void SetListBindingSource(BindingSource days);
         void SwitchToEditMode();
@@ -43,6 +46,7 @@ namespace WinFormsApp.View.Availability
         void ClearValidationErrors();
         void SetProfile(AvailabilityMonthModel model);
         void SwitchToProfileMode();
+        void SetBindsBindingSource(BindingSource binds);
 
     }
 }
