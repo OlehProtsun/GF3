@@ -17,19 +17,23 @@ namespace WinFormsApp.Presenter
     {
         private readonly IAvailabilityView _view;
         private readonly IAvailabilityMonthService _service;
-        private readonly IEmployeeService _employeeService; 
+        private readonly IEmployeeService _employeeService;
+        private readonly IBindService _bindService;
+        private readonly BindingSource _bindsSource = new();
         private readonly BindingSource _bindingSource = new();
 
         public AvailabilityPresenter
             (
                 IAvailabilityView view,
                 IAvailabilityMonthService service,
-                IEmployeeService employeeService
+                IEmployeeService employeeService,
+                IBindService bindService 
             )
         {
             _view = view;
             _service = service;
             _employeeService = employeeService;
+            _bindService = bindService;
 
             _view.SearchEvent += OnSearchEventAsync;
             _view.AddEvent += OnAddEventAsync;
@@ -38,14 +42,101 @@ namespace WinFormsApp.Presenter
             _view.SaveEvent += OnSaveEventAsync;
             _view.CancelEvent += OnCancelEventAsync;
             _view.OpenProfileEvent += OnOpenProfileAsync;
+            _view.AddBindEvent += OnAddBindAsync;
+            _view.UpsertBindEvent += OnUpsertBindAsync;
+            _view.DeleteBindEvent += OnDeleteBindAsync;
 
             _view.SetListBindingSource(_bindingSource);
+            _view.SetBindsBindingSource(_bindsSource);
         }
+
+        private Task OnAddBindAsync(CancellationToken ct)
+        {
+            _bindsSource.Add(new BindModel { IsActive = true });
+            return Task.CompletedTask;
+        }
+
+        private async Task OnDeleteBindAsync(BindModel bind, CancellationToken ct)
+        {
+            if (bind is null) return;
+
+            if (bind.Id == 0)
+            {
+                _bindsSource.Remove(bind);
+                return;
+            }
+
+            await _bindService.DeleteAsync(bind.Id, ct);
+            await LoadBinds(ct);
+        }
+
+        private async Task OnUpsertBindAsync(BindModel bind, CancellationToken ct)
+        {
+            if (bind is null) return;
+
+            // якщо рядок порожній - не чіпаємо
+            if (string.IsNullOrWhiteSpace(bind.Key) && string.IsNullOrWhiteSpace(bind.Value))
+                return;
+
+            if (string.IsNullOrWhiteSpace(bind.Key) || string.IsNullOrWhiteSpace(bind.Value))
+            {
+                _view.ShowError("Bind має містити і Key, і Value.");
+                return;
+            }
+
+            if (!TryNormalizeKey(bind.Key, out var normalizedKey))
+            {
+                _view.ShowError("Невірний формат хоткею (спробуй натиснути комбінацію в полі Key).");
+                return;
+            }
+
+            bind.Key = normalizedKey;
+
+            try
+            {
+                if (bind.Id == 0)
+                    await _bindService.CreateAsync(bind, ct);
+                else
+                    await _bindService.UpdateAsync(bind, ct);
+
+                // щоб одразу бачити відсортовано + з нормалізованим ключем
+                await LoadBinds(ct);
+            }
+            catch (Exception ex)
+            {
+                _view.ShowError(ex.GetBaseException().Message);
+            }
+        }
+
+        private static bool TryNormalizeKey(string raw, out string normalized)
+        {
+            normalized = string.Empty;
+            if (string.IsNullOrWhiteSpace(raw)) return false;
+
+            try
+            {
+                var conv = new KeysConverter();
+                var keys = (Keys)conv.ConvertFromString(raw.Trim())!;
+                normalized = conv.ConvertToString(keys) ?? raw.Trim();
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
 
         public async Task InitializeAsync() {
 
             await LoadAllAvailabilityMonthList();
             await LoadEmployees();
+            await LoadBinds();
+        }
+
+        private async Task LoadBinds(CancellationToken ct = default)
+        {
+            _bindsSource.DataSource = await _bindService.GetAllAsync(ct);
         }
 
         private async Task LoadAllAvailabilityMonthList()

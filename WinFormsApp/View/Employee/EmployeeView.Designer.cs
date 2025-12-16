@@ -184,10 +184,10 @@
             tabList.BackColor = Color.White;
             tabList.Controls.Add(dataGrid);
             tabList.Controls.Add(guna2GroupBox1);
-            tabList.Location = new Point(4, 5);
+            tabList.Location = new Point(4, 44);
             tabList.Name = "tabList";
             tabList.Padding = new Padding(3);
-            tabList.Size = new Size(782, 706);
+            tabList.Size = new Size(782, 667);
             tabList.TabIndex = 0;
             tabList.Text = "List";
             // 
@@ -227,7 +227,7 @@
             dataGridViewCellStyle4.WrapMode = DataGridViewTriState.True;
             dataGrid.RowHeadersDefaultCellStyle = dataGridViewCellStyle4;
             dataGrid.RowHeadersVisible = false;
-            dataGrid.Size = new Size(764, 534);
+            dataGrid.Size = new Size(764, 495);
             dataGrid.TabIndex = 6;
             dataGrid.ThemeStyle.AlternatingRowsStyle.BackColor = Color.White;
             dataGrid.ThemeStyle.AlternatingRowsStyle.Font = null;
@@ -376,10 +376,10 @@
             tabEditAdnCreate.BackColor = Color.White;
             tabEditAdnCreate.Controls.Add(guna2GroupBox3);
             tabEditAdnCreate.Controls.Add(guna2GroupBox2);
-            tabEditAdnCreate.Location = new Point(4, 5);
+            tabEditAdnCreate.Location = new Point(4, 44);
             tabEditAdnCreate.Name = "tabEditAdnCreate";
             tabEditAdnCreate.Padding = new Padding(3);
-            tabEditAdnCreate.Size = new Size(782, 706);
+            tabEditAdnCreate.Size = new Size(782, 667);
             tabEditAdnCreate.TabIndex = 1;
             tabEditAdnCreate.Text = "Edit/Create";
             // 
