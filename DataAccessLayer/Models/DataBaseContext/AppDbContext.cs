@@ -101,9 +101,6 @@ namespace DataAccessLayer.Models.DataBaseContext
                  .HasForeignKey(s => s.ShopId)
                  .OnDelete(DeleteBehavior.Cascade);
 
-                // enum <-> TEXT
-                e.Property(s => s.Status).HasConversion<string>();
-
                 e.HasIndex(s => s.ContainerId).HasDatabaseName("ix_sched_container");
                 e.HasIndex(s => new { s.ShopId, s.Year, s.Month }).HasDatabaseName("ix_sched_shop_month");
                 e.HasIndex(s => new { s.ContainerId, s.ShopId }).HasDatabaseName("ix_sched_container_shop");

@@ -214,6 +214,8 @@ namespace WinFormsApp.View.Availability
                     await CancelEvent(CancellationToken.None);
             };
 
+
+
             inputSearch.KeyDown += async (s, e) =>
             {
                 if (e.KeyCode == Keys.Enter && SearchEvent != null)

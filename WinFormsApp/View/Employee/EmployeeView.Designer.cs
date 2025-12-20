@@ -177,7 +177,6 @@
             tabControl.TabIndex = 0;
             tabControl.TabMenuBackColor = Color.FromArgb(33, 42, 57);
             tabControl.TabMenuOrientation = Guna.UI2.WinForms.TabMenuOrientation.HorizontalTop;
-            tabControl.TabMenuVisible = false;
             // 
             // tabList
             // 
@@ -227,7 +226,7 @@
             dataGridViewCellStyle4.WrapMode = DataGridViewTriState.True;
             dataGrid.RowHeadersDefaultCellStyle = dataGridViewCellStyle4;
             dataGrid.RowHeadersVisible = false;
-            dataGrid.Size = new Size(764, 495);
+            dataGrid.Size = new Size(764, 532);
             dataGrid.TabIndex = 6;
             dataGrid.ThemeStyle.AlternatingRowsStyle.BackColor = Color.White;
             dataGrid.ThemeStyle.AlternatingRowsStyle.Font = null;
@@ -250,7 +249,6 @@
             dataGrid.ThemeStyle.RowsStyle.Height = 25;
             dataGrid.ThemeStyle.RowsStyle.SelectionBackColor = Color.FromArgb(231, 229, 255);
             dataGrid.ThemeStyle.RowsStyle.SelectionForeColor = Color.FromArgb(71, 69, 94);
-            dataGrid.CellContentClick += dataGrid_CellContentClick;
             // 
             // guna2GroupBox1
             // 
@@ -385,6 +383,7 @@
             // 
             // guna2GroupBox3
             // 
+            guna2GroupBox3.Anchor = AnchorStyles.Top;
             guna2GroupBox3.BackColor = Color.Transparent;
             guna2GroupBox3.BorderColor = Color.White;
             guna2GroupBox3.BorderRadius = 15;
@@ -405,7 +404,7 @@
             guna2GroupBox3.CustomizableEdges = customizableEdges25;
             guna2GroupBox3.Font = new Font("Segoe UI", 9F);
             guna2GroupBox3.ForeColor = Color.White;
-            guna2GroupBox3.Location = new Point(6, 117);
+            guna2GroupBox3.Location = new Point(182, 114);
             guna2GroupBox3.Name = "guna2GroupBox3";
             guna2GroupBox3.ShadowDecoration.BorderRadius = 20;
             guna2GroupBox3.ShadowDecoration.CustomizableEdges = customizableEdges26;
@@ -685,9 +684,9 @@
             btnBackToEmployeeList.Location = new Point(6, 7);
             btnBackToEmployeeList.Name = "btnBackToEmployeeList";
             btnBackToEmployeeList.ShadowDecoration.CustomizableEdges = customizableEdges28;
-            btnBackToEmployeeList.Size = new Size(168, 33);
+            btnBackToEmployeeList.Size = new Size(74, 33);
             btnBackToEmployeeList.TabIndex = 14;
-            btnBackToEmployeeList.Text = "Back to Employee List";
+            btnBackToEmployeeList.Text = "Back ";
             // 
             // label7
             // 
@@ -737,15 +736,16 @@
             // 
             tabProfile.Controls.Add(guna2GroupBox5);
             tabProfile.Controls.Add(guna2GroupBox4);
-            tabProfile.Location = new Point(4, 5);
+            tabProfile.Location = new Point(4, 44);
             tabProfile.Name = "tabProfile";
-            tabProfile.Size = new Size(782, 706);
+            tabProfile.Size = new Size(782, 667);
             tabProfile.TabIndex = 2;
             tabProfile.Text = "Profile";
             tabProfile.UseVisualStyleBackColor = true;
             // 
             // guna2GroupBox5
             // 
+            guna2GroupBox5.Anchor = AnchorStyles.Top;
             guna2GroupBox5.BackColor = Color.Transparent;
             guna2GroupBox5.BorderColor = Color.White;
             guna2GroupBox5.BorderRadius = 17;
@@ -766,7 +766,7 @@
             guna2GroupBox5.CustomizableEdges = customizableEdges41;
             guna2GroupBox5.Font = new Font("Segoe UI", 9F);
             guna2GroupBox5.ForeColor = Color.White;
-            guna2GroupBox5.Location = new Point(8, 121);
+            guna2GroupBox5.Location = new Point(200, 121);
             guna2GroupBox5.Name = "guna2GroupBox5";
             guna2GroupBox5.ShadowDecoration.BorderRadius = 20;
             guna2GroupBox5.ShadowDecoration.CustomizableEdges = customizableEdges42;
@@ -980,9 +980,9 @@
             btnBackToEmployeeListFromProfile.Location = new Point(6, 7);
             btnBackToEmployeeListFromProfile.Name = "btnBackToEmployeeListFromProfile";
             btnBackToEmployeeListFromProfile.ShadowDecoration.CustomizableEdges = customizableEdges44;
-            btnBackToEmployeeListFromProfile.Size = new Size(168, 33);
+            btnBackToEmployeeListFromProfile.Size = new Size(72, 33);
             btnBackToEmployeeListFromProfile.TabIndex = 14;
-            btnBackToEmployeeListFromProfile.Text = "Back to Employee List";
+            btnBackToEmployeeListFromProfile.Text = "Back";
             // 
             // label1
             // 

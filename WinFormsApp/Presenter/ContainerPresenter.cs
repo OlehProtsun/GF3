@@ -10,6 +10,8 @@ using System.Threading.Tasks;
 using System.Windows.Forms;
 using WinFormsApp.View.Container;
 using WinFormsApp.ViewModel;
+using System.Globalization;
+
 
 namespace WinFormsApp.Presenter
 {
@@ -274,8 +276,6 @@ namespace WinFormsApp.Presenter
             _view.ScheduleMaxConsecutiveDays = schedule.MaxConsecutiveDays;
             _view.ScheduleMaxConsecutiveFull = schedule.MaxConsecutiveFull;
             _view.ScheduleMaxFullPerMonth = schedule.MaxFullPerMonth;
-            _view.ScheduleComment = schedule.Comment;
-            _view.ScheduleStatus = schedule.Status;
 
             _view.IsEdit = true;
             _view.ScheduleCancelTarget = (_view.ScheduleMode == ScheduleViewModel.Profile)
@@ -316,8 +316,6 @@ namespace WinFormsApp.Presenter
                 model.MaxConsecutiveDays = _view.ScheduleMaxConsecutiveDays;
                 model.MaxConsecutiveFull = _view.ScheduleMaxConsecutiveFull;
                 model.MaxFullPerMonth = _view.ScheduleMaxFullPerMonth;
-                model.Comment = _view.ScheduleComment;
-                model.Status = _view.ScheduleStatus;
 
                 var errors = ValidateSchedule(model);
                 if (errors.Count > 0)
@@ -360,7 +358,6 @@ namespace WinFormsApp.Presenter
                 _view.ShowError(msg);
             }
         }
-
 
         private async Task OnScheduleDeleteAsync(CancellationToken ct)
         {
@@ -427,10 +424,15 @@ namespace WinFormsApp.Presenter
                 MaxConsecutiveDays = _view.ScheduleMaxConsecutiveDays,
                 MaxConsecutiveFull = _view.ScheduleMaxConsecutiveFull,
                 MaxFullPerMonth = _view.ScheduleMaxFullPerMonth,
-                Comment = _view.ScheduleComment,
-                Status = _view.ScheduleStatus
             };
 
+            var errors = ValidateSchedule(model);
+            if (errors.Count > 0)
+            {
+                _view.SetScheduleValidationErrors(errors);
+                _view.ShowError("Please fix the highlighted fields.");
+                return;
+            }
             var selectedAvailabilities = await _availabilityService.GetAllAsync(ct);
             var selectedIds = _view.SelectedAvailabilityIds;
             var employees = selectedAvailabilities
@@ -441,6 +443,8 @@ namespace WinFormsApp.Presenter
                 .ToList();
 
             var slots = await _generator.GenerateAsync(model, selectedAvailabilities.Where(a => selectedIds.Contains(a.Id)), employees, ct);
+            _view.ScheduleShift1 = model.Shift1Time;
+            _view.ScheduleShift2 = model.Shift2Time;
             _view.ScheduleEmployees = employees;
             _view.ScheduleSlots = slots.ToList();
             _view.ShowInfo("Slots generated. Review before saving.");
@@ -470,12 +474,79 @@ namespace WinFormsApp.Presenter
             if (model.PeoplePerShift <= 0)
                 errors[nameof(IContainerView.SchedulePeoplePerShift)] = "People per shift must be greater than zero.";
             if (string.IsNullOrWhiteSpace(model.Shift1Time))
+            {
                 errors[nameof(IContainerView.ScheduleShift1)] = "Shift1 is required.";
+            }
+            else if (!TryNormalizeShiftRange(model.Shift1Time, out var s1, out var err1))
+            {
+                errors[nameof(IContainerView.ScheduleShift1)] = err1 ?? "Invalid shift1 format.";
+            }
+            else
+            {
+                model.Shift1Time = s1; // 👈 нормалізували
+            }
+
             if (string.IsNullOrWhiteSpace(model.Shift2Time))
+            {
                 errors[nameof(IContainerView.ScheduleShift2)] = "Shift2 is required.";
+            }
+            else if (!TryNormalizeShiftRange(model.Shift2Time, out var s2, out var err2))
+            {
+                errors[nameof(IContainerView.ScheduleShift2)] = err2 ?? "Invalid shift2 format.";
+            }
+            else
+            {
+                model.Shift2Time = s2; // 👈 нормалізували
+            }
             if (model.MaxHoursPerEmpMonth <= 0)
                 errors[nameof(IContainerView.ScheduleMaxHoursPerEmp)] = "Max hours per employee must be greater than zero.";
             return errors;
         }
+
+        private static bool TryParseTime(string s, out TimeSpan t)
+        {
+            return TimeSpan.TryParseExact(
+                (s ?? "").Trim(),
+                new[] { @"h\:mm", @"hh\:mm" },
+                CultureInfo.InvariantCulture,
+                out t);
+        }
+
+        private static bool TryNormalizeShiftRange(string? input, out string normalized, out string? error)
+        {
+            normalized = "";
+            error = null;
+
+            input = (input ?? "").Trim();
+            if (string.IsNullOrWhiteSpace(input))
+            {
+                error = "Shift is required.";
+                return false;
+            }
+
+            // дозволяє: "09:00-15:00", "9:00-15:00", "09:00 - 15:00" і т.д.
+            var parts = input.Split('-', 2, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            if (parts.Length != 2)
+            {
+                error = "Format: HH:mm-HH:mm (пробіли не важливі)";
+                return false;
+            }
+
+            if (!TryParseTime(parts[0], out var from) || !TryParseTime(parts[1], out var to))
+            {
+                error = "Time must be H:mm або HH:mm (наприклад 9:00-15:00)";
+                return false;
+            }
+
+            if (from >= to)
+            {
+                error = "From must be earlier than To";
+                return false;
+            }
+
+            normalized = $"{from:hh\\:mm} - {to:hh\\:mm}";
+            return true;
+        }
+
     }
 }

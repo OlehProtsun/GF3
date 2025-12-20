@@ -84,7 +84,19 @@ namespace WinFormsApp.View.Shop
                     await CancelEvent(CancellationToken.None);
             };
 
+            btnBackToShopList.Click += async (_, __) =>
+            {
+                if (CancelEvent != null)
+                    await CancelEvent(CancellationToken.None);
+            };
+
             btnCancelProfile.Click += async (_, __) =>
+            {
+                if (CancelEvent != null)
+                    await CancelEvent(CancellationToken.None);
+            };
+
+            btnBackToShopListFromProfile.Click += async (_, __) =>
             {
                 if (CancelEvent != null)
                     await CancelEvent(CancellationToken.None);
@@ -221,7 +233,6 @@ namespace WinFormsApp.View.Shop
             labelName.Text = m.Name;
             labelDescription.Text = string.IsNullOrWhiteSpace(m.Description) ? "—" : m.Description;
             labelId.Text = m.Id.ToString();
-            labelSchedulePlaceholder.Text = "Schedule will be displayed here.";
         }
     }
 }

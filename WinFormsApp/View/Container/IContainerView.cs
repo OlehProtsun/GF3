@@ -32,8 +32,6 @@ namespace WinFormsApp.View.Container
         int ScheduleMaxConsecutiveDays { get; set; }
         int ScheduleMaxConsecutiveFull { get; set; }
         int ScheduleMaxFullPerMonth { get; set; }
-        string? ScheduleComment { get; set; }
-        ScheduleStatus ScheduleStatus { get; set; }
         string ScheduleSearch { get; set; }
         IList<int> SelectedAvailabilityIds { get; }
         IList<ScheduleEmployeeModel> ScheduleEmployees { get; set; }
