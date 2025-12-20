@@ -37,7 +37,6 @@ namespace DataAccessLayer.Repositories
 
                 query = query.Where(s =>
                     s.Name.ToLower().Contains(value) ||
-                    (s.Comment != null && s.Comment.ToLower().Contains(value)) ||
                     s.Shop.Name.ToLower().Contains(value) ||
                     (hasInt && (s.Year == intVal || s.Month == intVal)));
             }
@@ -61,7 +60,6 @@ namespace DataAccessLayer.Repositories
                     s.Name.ToLower().Contains(value) ||
                     s.Container.Name.ToLower().Contains(value) ||
                     s.Shop.Name.ToLower().Contains(value) ||
-                    (s.Comment != null && s.Comment.ToLower().Contains(value)) ||
                     (hasInt && (s.Year == intVal || s.Month == intVal)))
                 .ToListAsync(ct);
         }

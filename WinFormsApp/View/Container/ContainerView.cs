@@ -23,10 +23,8 @@ namespace WinFormsApp.View.Container
             ConfigureScheduleGrid();
             ConfigureSlotGrid();
             AssociateAndRaiseEvents();
-            comboStatus.DataSource = Enum.GetValues(typeof(ScheduleStatus));
         }
 
-        #region Container properties
         [DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
         public ContainerViewModel Mode { get; set; }
         [DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
@@ -53,9 +51,7 @@ namespace WinFormsApp.View.Container
         [DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
 
         public string Message { get => message; set => message = value; }
-        #endregion
 
-        #region Schedule properties
         [DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
 
         public ScheduleViewModel ScheduleMode { get; set; }
@@ -103,12 +99,6 @@ namespace WinFormsApp.View.Container
         public int ScheduleMaxFullPerMonth { get => (int)inputMaxFull.Value; set => inputMaxFull.Value = value; }
         [DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
 
-        public string? ScheduleComment { get => inputScheduleComment.Text; set => inputScheduleComment.Text = value; }
-        [DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
-
-        public ScheduleStatus ScheduleStatus { get => (ScheduleStatus)comboStatus.SelectedItem!; set => comboStatus.SelectedItem = value; }
-        [DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
-
         public string ScheduleSearch { get => inputScheduleSearch.Text; set => inputScheduleSearch.Text = value; }
         public IList<int> SelectedAvailabilityIds => checkedAvailabilities.CheckedItems
             .OfType<AvailabilityMonthModel>()
@@ -142,9 +132,7 @@ namespace WinFormsApp.View.Container
                 RefreshScheduleGrid();
             }
         }
-        #endregion
 
-        #region Events
         public event Func<CancellationToken, Task>? SearchEvent;
         public event Func<CancellationToken, Task>? AddEvent;
         public event Func<CancellationToken, Task>? EditEvent;
@@ -161,7 +149,6 @@ namespace WinFormsApp.View.Container
         public event Func<CancellationToken, Task>? ScheduleCancelEvent;
         public event Func<CancellationToken, Task>? ScheduleOpenProfileEvent;
         public event Func<CancellationToken, Task>? ScheduleGenerateEvent;
-        #endregion
 
         private void RefreshScheduleGrid()
         {
@@ -175,6 +162,7 @@ namespace WinFormsApp.View.Container
 
             slotGrid.AutoGenerateColumns = true;
             slotGrid.DataSource = _scheduleTable;
+            ApplySlotGridColumnsStyle();
 
             if (slotGrid.Columns.Contains("HasConflict"))
                 slotGrid.Columns["HasConflict"].Visible = false;
@@ -182,7 +170,6 @@ namespace WinFormsApp.View.Container
             if (slotGrid.Columns.Contains("Day"))
                 slotGrid.Columns["Day"].ReadOnly = true;
         }
-
 
         private DataTable BuildScheduleTable(
             IList<ScheduleSlotModel> slots,
@@ -306,6 +293,7 @@ namespace WinFormsApp.View.Container
             btnDelete.Click += async (_, __) => { if (DeleteEvent != null) await DeleteEvent(CancellationToken.None); };
             btnSave.Click += async (_, __) => { if (SaveEvent != null) await SaveEvent(CancellationToken.None); };
             btnCancel.Click += async (_, __) => { if (CancelEvent != null) await CancelEvent(CancellationToken.None); };
+            btnBackToContainerList.Click += async (_, __) => { if (CancelEvent != null) await CancelEvent(CancellationToken.None); };
             containerGrid.CellDoubleClick += async (_, __) => { if (OpenProfileEvent != null) await OpenProfileEvent(CancellationToken.None); };
             inputSearch.KeyDown += async (_, e) => { if (e.KeyCode == Keys.Enter && SearchEvent != null) await SearchEvent(CancellationToken.None); };
 
@@ -320,10 +308,17 @@ namespace WinFormsApp.View.Container
                     await ScheduleSaveEvent(CancellationToken.None);
             };
             btnScheduleCancel.Click += async (_, __) => { if (ScheduleCancelEvent != null) await ScheduleCancelEvent(CancellationToken.None); };
+            btnBackToScheduleList.Click += async (_, __) => { if (ScheduleCancelEvent != null) await ScheduleCancelEvent(CancellationToken.None); };
             btnGenerate.Click += async (_, __) => { if (ScheduleGenerateEvent != null) await ScheduleGenerateEvent(CancellationToken.None); };
             scheduleGrid.CellDoubleClick += async (_, __) => { if (ScheduleOpenProfileEvent != null) await ScheduleOpenProfileEvent(CancellationToken.None); };
-
             btnCancelProfile.Click += async (_, __) =>
+            {
+                CancelTarget = ContainerViewModel.List; // 👈 примусово
+                if (CancelEvent != null)
+                    await CancelEvent(CancellationToken.None);
+            };
+
+            btnBackToContainerListFromProfile.Click += async (_, __) =>
             {
                 CancelTarget = ContainerViewModel.List; // 👈 примусово
                 if (CancelEvent != null)
@@ -332,6 +327,12 @@ namespace WinFormsApp.View.Container
 
 
             btnScheduleProfileCancel.Click += async (_, __) =>
+            {
+                if (ScheduleCancelEvent != null)
+                    await ScheduleCancelEvent(CancellationToken.None);
+            };
+
+            btnBackToContainerProfileFromSheduleProfile.Click += async (_, __) =>
             {
                 if (ScheduleCancelEvent != null)
                     await ScheduleCancelEvent(CancellationToken.None);
@@ -376,96 +377,219 @@ namespace WinFormsApp.View.Container
         {
             containerGrid.AutoGenerateColumns = false;
             containerGrid.Columns.Clear();
+
             containerGrid.ReadOnly = true;
+            containerGrid.RowHeadersVisible = false;
+            containerGrid.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
+            containerGrid.MultiSelect = false;
             containerGrid.AllowUserToAddRows = false;
             containerGrid.AllowUserToDeleteRows = false;
+            containerGrid.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
+
             containerGrid.Columns.Add(new DataGridViewTextBoxColumn
             {
                 HeaderText = "Name",
                 DataPropertyName = nameof(ContainerModel.Name),
-                AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill
+                FillWeight = 50
             });
+
             containerGrid.Columns.Add(new DataGridViewTextBoxColumn
             {
                 HeaderText = "Note",
                 DataPropertyName = nameof(ContainerModel.Note),
-                AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill
+                FillWeight = 50
             });
+
+            containerGrid.RowTemplate.DividerHeight = 6;      // скільки пікселів відступу під кожним рядком
+            containerGrid.RowTemplate.Height = 36;            // сам рядок трохи вищий
+            containerGrid.ThemeStyle.RowsStyle.Height = 36;
+
+            // Трохи внутрішнього паддінгу в комірках
+            containerGrid.DefaultCellStyle.Padding = new Padding(8, 6, 8, 6);
+            containerGrid.ColumnHeadersHeight = 36;
         }
 
         private void ConfigureScheduleGrid()
         {
             scheduleGrid.AutoGenerateColumns = false;
             scheduleGrid.Columns.Clear();
+
             scheduleGrid.ReadOnly = true;
+            scheduleGrid.RowHeadersVisible = false;
+            scheduleGrid.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
+            scheduleGrid.MultiSelect = false;
             scheduleGrid.AllowUserToAddRows = false;
             scheduleGrid.AllowUserToDeleteRows = false;
+            scheduleGrid.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
+
             scheduleGrid.Columns.Add(new DataGridViewTextBoxColumn
             {
                 HeaderText = "Name",
                 DataPropertyName = nameof(ScheduleModel.Name),
-                AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill
+                FillWeight = 50
             });
+
             scheduleGrid.Columns.Add(new DataGridViewTextBoxColumn
             {
                 HeaderText = "Shop",
                 DataPropertyName = nameof(ScheduleModel.ShopId),
-                AutoSizeMode = DataGridViewAutoSizeColumnMode.DisplayedCells
+                FillWeight = 50
             });
+
             scheduleGrid.Columns.Add(new DataGridViewTextBoxColumn
             {
                 HeaderText = "Year",
-                DataPropertyName = nameof(ScheduleModel.Year)
+                DataPropertyName = nameof(ScheduleModel.Year),
+                FillWeight = 50
             });
+
             scheduleGrid.Columns.Add(new DataGridViewTextBoxColumn
             {
                 HeaderText = "Month",
-                DataPropertyName = nameof(ScheduleModel.Month)
+                DataPropertyName = nameof(ScheduleModel.Month),
+                FillWeight = 50
             });
+
+            scheduleGrid.RowTemplate.DividerHeight = 6;      // скільки пікселів відступу під кожним рядком
+            scheduleGrid.RowTemplate.Height = 36;            // сам рядок трохи вищий
+            scheduleGrid.ThemeStyle.RowsStyle.Height = 36;
+
+            // Трохи внутрішнього паддінгу в комірках
+            scheduleGrid.DefaultCellStyle.Padding = new Padding(8, 6, 8, 6);
+            scheduleGrid.ColumnHeadersHeight = 36;
+
         }
 
         private void ConfigureSlotGrid()
         {
+            slotGrid.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
+            slotGrid.ColumnHeadersDefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
+            slotGrid.CellBorderStyle = DataGridViewCellBorderStyle.None;
+            slotGrid.GridColor = Color.Gainsboro; // або як у Availability
+
             slotGrid.AutoGenerateColumns = true;
             slotGrid.Columns.Clear();
             slotGrid.AllowUserToAddRows = false;
             slotGrid.AllowUserToDeleteRows = false;
 
             slotGrid.CellPainting += SlotGrid_CellPainting;
-
             slotGrid.CellBeginEdit += SlotGrid_CellBeginEdit;
             slotGrid.CellValidating += SlotGrid_CellValidating;
             slotGrid.CellEndEdit += SlotGrid_CellEndEdit;
 
+            ApplyAvailabilityGridLook(slotGrid);
+
             scheduleSlotProfileGrid.AutoGenerateColumns = true;
             scheduleSlotProfileGrid.Columns.Clear();
+
+            scheduleSlotProfileGrid.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
+            scheduleSlotProfileGrid.ColumnHeadersDefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
+            scheduleSlotProfileGrid.CellBorderStyle = DataGridViewCellBorderStyle.None;
+            scheduleSlotProfileGrid.GridColor = Color.Gainsboro;
+
+            scheduleSlotProfileGrid.AutoGenerateColumns = true;
+            scheduleSlotProfileGrid.Columns.Clear();
+            scheduleSlotProfileGrid.AllowUserToAddRows = false;
+            scheduleSlotProfileGrid.AllowUserToDeleteRows = false;
+
+            // readonly (важливо + для Guna теж)
+            scheduleSlotProfileGrid.ReadOnly = true;
+            scheduleSlotProfileGrid.ThemeStyle.ReadOnly = true;
+            scheduleSlotProfileGrid.EditMode = DataGridViewEditMode.EditProgrammatically;
+
+            // якщо хочеш абсолютно такий самий “рендерінг” ліній і кружечка конфлікту:
+            scheduleSlotProfileGrid.CellPainting += SlotGrid_CellPainting;
+
+            ApplyAvailabilityGridLook(scheduleSlotProfileGrid);
+        }
+
+        private static void ApplyAvailabilityGridLook(Guna.UI2.WinForms.Guna2DataGridView grid)
+        {
+            // --- фон + лінії як в availabilityDays ---
+            grid.BackgroundColor = Color.LightGray;
+            grid.GridColor = Color.Gainsboro;
+
+            // --- хедер як в Availability (білий, чорний текст) ---
+            grid.EnableHeadersVisualStyles = false;
+            grid.ColumnHeadersHeight = 36;
+            grid.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.DisableResizing;
+
+            grid.ColumnHeadersDefaultCellStyle.BackColor = Color.White;
+            grid.ColumnHeadersDefaultCellStyle.ForeColor = Color.Black;
+            grid.ColumnHeadersDefaultCellStyle.SelectionBackColor = SystemColors.Control;
+            grid.ColumnHeadersDefaultCellStyle.SelectionForeColor = SystemColors.HighlightText;
+
+            // --- виділення (selection) як в availability ---
+            grid.DefaultCellStyle.ForeColor = Color.Black;
+            grid.DefaultCellStyle.SelectionBackColor = Color.Gray;
+            grid.DefaultCellStyle.SelectionForeColor = Color.White;
+
+            // IMPORTANT: дублюємо в ThemeStyle, щоб Guna не “перебила”
+            grid.ThemeStyle.BackColor = Color.LightGray;
+            grid.ThemeStyle.GridColor = Color.Gainsboro;
+
+            grid.ThemeStyle.HeaderStyle.BackColor = Color.White;
+            grid.ThemeStyle.HeaderStyle.ForeColor = Color.Black;
+            grid.ThemeStyle.HeaderStyle.Height = 36;
+
+            grid.ThemeStyle.RowsStyle.SelectionBackColor = Color.Gray;
+            grid.ThemeStyle.RowsStyle.SelectionForeColor = Color.White;
         }
 
         private void SlotGrid_CellPainting(object? sender, DataGridViewCellPaintingEventArgs e)
         {
-            if (e.RowIndex < 0 || e.ColumnIndex != 0) return;
+            if (sender is not DataGridView grid) return;
+            if (e.ColumnIndex < 0) return;
 
-            if (slotGrid.Rows[e.RowIndex].DataBoundItem is not DataRowView rowView)
-                return;
+            // малюємо все, але без бордерів
+            var parts = e.PaintParts & ~DataGridViewPaintParts.Border;
+            e.Paint(e.CellBounds, parts);
 
-            if (rowView["HasConflict"] is not bool hasConflict || !hasConflict)
-                return;
+            // --- вертикальні внутрішні (якщо треба) ---
+            if (e.ColumnIndex < grid.ColumnCount - 1)
+            {
+                using var vPen = new Pen(Color.Gainsboro, 1); // або твій колір
+                int x = e.CellBounds.Right - 1;
+                e.Graphics.DrawLine(vPen, x, e.CellBounds.Top, x, e.CellBounds.Bottom - 1);
+            }
+
+            // --- горизонтальні внутрішні: робимо менш насиченими ---
+            // малюємо нижню лінію для всіх рядків/хедера, окрім “останнього” (щоб не було зовнішньої рамки)
+            bool isLastRow =
+                (e.RowIndex >= 0 && e.RowIndex == grid.Rows.Count - 1); // AllowUserToAddRows=false у тебе, тож ок
+
+            if (!isLastRow)
+            {
+                var softH = Color.FromArgb(70, Color.Gray);   // <-- 70 = “ніжність” (40..120 підкрути)
+                using var hPen = new Pen(softH, 1);
+
+                int y = e.CellBounds.Bottom - 1;
+                e.Graphics.DrawLine(hPen, e.CellBounds.Left, y, e.CellBounds.Right - 1, y);
+            }
+
+            // --- маленьке червоне коло (якщо ти його вже малюєш) ---
+            if (e.RowIndex >= 0 &&
+                grid.Columns.Contains("Day") &&
+                e.ColumnIndex == grid.Columns["Day"].Index &&
+                grid.Rows[e.RowIndex].DataBoundItem is DataRowView rowView &&
+                rowView["HasConflict"] is bool hasConflict &&
+                hasConflict)
+            {
+                const int diameter = 3;
+                const int leftPadding = 6;   // відступ від лівого краю (підкрути 4..10)
+
+                var rect = new Rectangle(
+                    e.CellBounds.Left + leftPadding,
+                    e.CellBounds.Top + (e.CellBounds.Height - diameter) / 2,
+                    diameter,
+                    diameter);
+
+                using var pen = new Pen(Color.Red, 2);
+                e.Graphics.DrawEllipse(pen, rect);
+            }
 
             e.Handled = true;
-            e.PaintBackground(e.ClipBounds, true);
-            e.PaintContent(e.ClipBounds);
-
-            var diameter = Math.Min(e.CellBounds.Width, e.CellBounds.Height) - 6;
-            var rect = new Rectangle(
-                e.CellBounds.Left + (e.CellBounds.Width - diameter) / 2,
-                e.CellBounds.Top + (e.CellBounds.Height - diameter) / 2,
-                diameter,
-                diameter);
-
-            using var pen = new Pen(Color.Red, 2);
-            e.Graphics.DrawEllipse(pen, rect);
         }
-
         public void SwitchToEditMode()
         {
             tabControl.SelectedTab = tabEdit;
@@ -523,7 +647,6 @@ namespace WinFormsApp.View.Container
             ScheduleMaxConsecutiveDays = 1;
             ScheduleMaxConsecutiveFull = 1;
             ScheduleMaxFullPerMonth = 1;
-            ScheduleComment = string.Empty;
             foreach (int i in checkedAvailabilities.CheckedIndices.Cast<int>().ToList())
                 checkedAvailabilities.SetItemChecked(i, false);
             ScheduleSlots = new List<ScheduleSlotModel>();
@@ -581,32 +704,61 @@ namespace WinFormsApp.View.Container
 
         public void SetProfile(ContainerModel model)
         {
-            lblContainerName.Text = $"Name: {model.Name}";
-            lblContainerNote.Text = $"Note: {model.Note}";
+            lblContainerName.Text = model.Name;
+            lblContainerNote.Text = model.Note;
+            labelId.Text = $"{model.Id}";
         }
 
         public void SetScheduleProfile(ScheduleModel model)
         {
-            lblScheduleSummary.Text = $"{model.Name} ({model.Year}/{model.Month}) - {model.Shop?.Name}";
+            lblScheduleId.Text = $"{model.Id}";
+            labelName.Text = model.Name;
+            lblScheduleFromContainer.Text = model.Container?.Name;
+            lblScheduleYear.Text = $"{model.Year}";
+            lblScheduleMonth.Text = $"{model.Month}";
 
-            // бажано брати дані, які точно актуальні
+            // беремо найбільш актуальні дані
             var slots = _slots ?? model.Slots?.ToList() ?? new List<ScheduleSlotModel>();
             var employees = _employees ?? new List<ScheduleEmployeeModel>();
 
-            if (slots.Count > 0 && employees.Count > 0)
+            // базові налаштування гріда (readonly 100%)
+            scheduleSlotProfileGrid.AutoGenerateColumns = true;
+            scheduleSlotProfileGrid.ReadOnly = true;
+            scheduleSlotProfileGrid.ThemeStyle.ReadOnly = true; // важливо для Guna (в дизайнері false) :contentReference[oaicite:4]{index=4}
+            scheduleSlotProfileGrid.EditMode = DataGridViewEditMode.EditProgrammatically;
+            scheduleSlotProfileGrid.AllowUserToAddRows = false;
+            scheduleSlotProfileGrid.AllowUserToDeleteRows = false;
+
+            if (employees.Count > 0)
             {
-                var table = BuildScheduleTable(slots, employees, out _); // 👈 ось тут
+                // навіть якщо slots пустий — таблиця з колонками все одно згенерується :contentReference[oaicite:5]{index=5}
+                var table = BuildScheduleTable(slots, employees, out _);
 
-                scheduleSlotProfileGrid.AutoGenerateColumns = true;
                 scheduleSlotProfileGrid.DataSource = table;
-                scheduleSlotProfileGrid.ReadOnly = true;
 
-                if (scheduleSlotProfileGrid.Columns.Contains("HasConflict"))
-                    scheduleSlotProfileGrid.Columns["HasConflict"].Visible = false;
+                ApplyScheduleSlotProfileGridColumnsStyle();
             }
             else
             {
-                scheduleSlotProfileGrid.DataSource = new BindingSource { DataSource = slots };
+                // якщо взагалі немає працівників - просто очищаємо
+                scheduleSlotProfileGrid.DataSource = null;
+            }
+        }
+
+        private void ApplyScheduleSlotProfileGridColumnsStyle()
+        {
+            if (scheduleSlotProfileGrid.Columns.Contains("HasConflict"))
+                scheduleSlotProfileGrid.Columns["HasConflict"].Visible = false;
+
+            if (scheduleSlotProfileGrid.Columns.Contains("Day"))
+            {
+                var colDay = scheduleSlotProfileGrid.Columns["Day"];
+                colDay.ReadOnly = true;
+
+                colDay.AutoSizeMode = DataGridViewAutoSizeColumnMode.None;
+                colDay.Width = 40;
+                colDay.MinimumWidth = 40;
+                colDay.Resizable = DataGridViewTriState.False;
             }
         }
 
@@ -759,6 +911,23 @@ namespace WinFormsApp.View.Container
             var n = 1;
             while (used.Contains(n)) n++;
             return n;
+        }
+
+        private void ApplySlotGridColumnsStyle()
+        {
+            if (slotGrid.Columns.Contains("HasConflict"))
+                slotGrid.Columns["HasConflict"].Visible = false;
+
+            if (slotGrid.Columns.Contains("Day"))
+            {
+                var colDay = slotGrid.Columns["Day"];
+                colDay.ReadOnly = true;
+
+                colDay.AutoSizeMode = DataGridViewAutoSizeColumnMode.None;
+                colDay.Width = 40;
+                colDay.MinimumWidth = 40;
+                colDay.Resizable = DataGridViewTriState.False;
+            }
         }
 
     }

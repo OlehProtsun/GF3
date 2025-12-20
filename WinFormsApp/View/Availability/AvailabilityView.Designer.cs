@@ -242,7 +242,6 @@
             tabControl.TabIndex = 1;
             tabControl.TabMenuBackColor = Color.FromArgb(33, 42, 57);
             tabControl.TabMenuOrientation = Guna.UI2.WinForms.TabMenuOrientation.HorizontalTop;
-            tabControl.TabMenuVisible = false;
             // 
             // tabList
             // 
@@ -411,7 +410,7 @@
             dataGridViewCellStyle4.WrapMode = DataGridViewTriState.True;
             dataGrid.RowHeadersDefaultCellStyle = dataGridViewCellStyle4;
             dataGrid.RowHeadersVisible = false;
-            dataGrid.Size = new Size(825, 690);
+            dataGrid.Size = new Size(825, 651);
             dataGrid.TabIndex = 6;
             dataGrid.ThemeStyle.AlternatingRowsStyle.BackColor = Color.White;
             dataGrid.ThemeStyle.AlternatingRowsStyle.Font = null;
@@ -434,7 +433,6 @@
             dataGrid.ThemeStyle.RowsStyle.Height = 25;
             dataGrid.ThemeStyle.RowsStyle.SelectionBackColor = Color.FromArgb(231, 229, 255);
             dataGrid.ThemeStyle.RowsStyle.SelectionForeColor = Color.FromArgb(71, 69, 94);
-            dataGrid.CellContentClick += dataGrid_CellContentClick;
             // 
             // tabEditAdnCreate
             // 
@@ -452,6 +450,7 @@
             // 
             // guna2GroupBox5
             // 
+            guna2GroupBox5.Anchor = AnchorStyles.Top;
             guna2GroupBox5.BackColor = Color.Transparent;
             guna2GroupBox5.BorderColor = Color.Black;
             guna2GroupBox5.BorderRadius = 15;
@@ -465,7 +464,7 @@
             guna2GroupBox5.CustomizableEdges = customizableEdges17;
             guna2GroupBox5.Font = new Font("Segoe UI", 9F);
             guna2GroupBox5.ForeColor = Color.White;
-            guna2GroupBox5.Location = new Point(9, 473);
+            guna2GroupBox5.Location = new Point(39, 459);
             guna2GroupBox5.Name = "guna2GroupBox5";
             guna2GroupBox5.ShadowDecoration.BorderRadius = 20;
             guna2GroupBox5.ShadowDecoration.CustomizableEdges = customizableEdges18;
@@ -617,7 +616,7 @@
             // 
             // guna2GroupBox4
             // 
-            guna2GroupBox4.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left;
+            guna2GroupBox4.Anchor = AnchorStyles.Top | AnchorStyles.Bottom;
             guna2GroupBox4.BackColor = Color.Transparent;
             guna2GroupBox4.BorderColor = Color.White;
             guna2GroupBox4.BorderRadius = 15;
@@ -629,13 +628,13 @@
             guna2GroupBox4.CustomizableEdges = customizableEdges25;
             guna2GroupBox4.Font = new Font("Segoe UI", 9F);
             guna2GroupBox4.ForeColor = Color.Black;
-            guna2GroupBox4.Location = new Point(406, 119);
+            guna2GroupBox4.Location = new Point(451, 119);
             guna2GroupBox4.Name = "guna2GroupBox4";
             guna2GroupBox4.ShadowDecoration.BorderRadius = 20;
             guna2GroupBox4.ShadowDecoration.CustomizableEdges = customizableEdges26;
             guna2GroupBox4.ShadowDecoration.Depth = 7;
             guna2GroupBox4.ShadowDecoration.Enabled = true;
-            guna2GroupBox4.Size = new Size(365, 699);
+            guna2GroupBox4.Size = new Size(365, 660);
             guna2GroupBox4.TabIndex = 25;
             // 
             // guna2Button6
@@ -698,7 +697,7 @@
             dataGridViewCellStyle12.WrapMode = DataGridViewTriState.True;
             dataGridAvailabilityDays.RowHeadersDefaultCellStyle = dataGridViewCellStyle12;
             dataGridAvailabilityDays.RowHeadersVisible = false;
-            dataGridAvailabilityDays.Size = new Size(337, 602);
+            dataGridAvailabilityDays.Size = new Size(337, 563);
             dataGridAvailabilityDays.TabIndex = 12;
             dataGridAvailabilityDays.ThemeStyle.AlternatingRowsStyle.BackColor = Color.White;
             dataGridAvailabilityDays.ThemeStyle.AlternatingRowsStyle.Font = null;
@@ -734,7 +733,7 @@
             btnSave.FillColor = Color.FromArgb(51, 71, 255);
             btnSave.Font = new Font("Segoe UI", 9F);
             btnSave.ForeColor = Color.White;
-            btnSave.Location = new Point(246, 661);
+            btnSave.Location = new Point(246, 622);
             btnSave.Name = "btnSave";
             btnSave.ShadowDecoration.CustomizableEdges = customizableEdges22;
             btnSave.Size = new Size(114, 33);
@@ -754,7 +753,7 @@
             btnCancel.FillColor = Color.FromArgb(224, 224, 224);
             btnCancel.Font = new Font("Segoe UI", 9F);
             btnCancel.ForeColor = Color.Gray;
-            btnCancel.Location = new Point(5, 661);
+            btnCancel.Location = new Point(5, 622);
             btnCancel.Name = "btnCancel";
             btnCancel.ShadowDecoration.CustomizableEdges = customizableEdges24;
             btnCancel.Size = new Size(84, 33);
@@ -763,6 +762,7 @@
             // 
             // guna2GroupBox3
             // 
+            guna2GroupBox3.Anchor = AnchorStyles.Top;
             guna2GroupBox3.BackColor = Color.Transparent;
             guna2GroupBox3.BorderColor = Color.White;
             guna2GroupBox3.BorderRadius = 15;
@@ -784,7 +784,7 @@
             guna2GroupBox3.CustomizableEdges = customizableEdges43;
             guna2GroupBox3.Font = new Font("Segoe UI", 9F);
             guna2GroupBox3.ForeColor = Color.White;
-            guna2GroupBox3.Location = new Point(9, 119);
+            guna2GroupBox3.Location = new Point(39, 119);
             guna2GroupBox3.Name = "guna2GroupBox3";
             guna2GroupBox3.ShadowDecoration.BorderRadius = 20;
             guna2GroupBox3.ShadowDecoration.CustomizableEdges = customizableEdges44;
@@ -1056,9 +1056,9 @@
             btnBackToAvailabilityList.Location = new Point(6, 7);
             btnBackToAvailabilityList.Name = "btnBackToAvailabilityList";
             btnBackToAvailabilityList.ShadowDecoration.CustomizableEdges = customizableEdges46;
-            btnBackToAvailabilityList.Size = new Size(168, 33);
+            btnBackToAvailabilityList.Size = new Size(72, 33);
             btnBackToAvailabilityList.TabIndex = 14;
-            btnBackToAvailabilityList.Text = "Back to Availability List";
+            btnBackToAvailabilityList.Text = "Back";
             // 
             // label5
             // 
@@ -1110,15 +1110,15 @@
             tabProfile.Controls.Add(guna2GroupBox8);
             tabProfile.Controls.Add(guna2GroupBox6);
             tabProfile.Controls.Add(guna2GroupBox7);
-            tabProfile.Location = new Point(4, 5);
+            tabProfile.Location = new Point(4, 44);
             tabProfile.Name = "tabProfile";
-            tabProfile.Size = new Size(852, 869);
+            tabProfile.Size = new Size(852, 830);
             tabProfile.TabIndex = 2;
             tabProfile.Text = "Profile";
             // 
             // guna2GroupBox8
             // 
-            guna2GroupBox8.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left;
+            guna2GroupBox8.Anchor = AnchorStyles.Top | AnchorStyles.Bottom;
             guna2GroupBox8.BackColor = Color.Transparent;
             guna2GroupBox8.BorderColor = Color.White;
             guna2GroupBox8.BorderRadius = 15;
@@ -1132,13 +1132,13 @@
             guna2GroupBox8.CustomizableEdges = customizableEdges61;
             guna2GroupBox8.Font = new Font("Segoe UI", 9F);
             guna2GroupBox8.ForeColor = Color.Black;
-            guna2GroupBox8.Location = new Point(382, 122);
+            guna2GroupBox8.Location = new Point(423, 122);
             guna2GroupBox8.Name = "guna2GroupBox8";
             guna2GroupBox8.ShadowDecoration.BorderRadius = 20;
             guna2GroupBox8.ShadowDecoration.CustomizableEdges = customizableEdges62;
             guna2GroupBox8.ShadowDecoration.Depth = 7;
             guna2GroupBox8.ShadowDecoration.Enabled = true;
-            guna2GroupBox8.Size = new Size(365, 738);
+            guna2GroupBox8.Size = new Size(365, 699);
             guna2GroupBox8.TabIndex = 26;
             // 
             // btnCancelProfile2
@@ -1153,7 +1153,7 @@
             btnCancelProfile2.FillColor = Color.FromArgb(224, 224, 224);
             btnCancelProfile2.Font = new Font("Segoe UI", 9F);
             btnCancelProfile2.ForeColor = Color.Silver;
-            btnCancelProfile2.Location = new Point(5, 700);
+            btnCancelProfile2.Location = new Point(5, 661);
             btnCancelProfile2.Name = "btnCancelProfile2";
             btnCancelProfile2.ShadowDecoration.CustomizableEdges = customizableEdges52;
             btnCancelProfile2.Size = new Size(65, 33);
@@ -1196,7 +1196,7 @@
             guna2Button5.FillColor = Color.FromArgb(51, 71, 255);
             guna2Button5.Font = new Font("Segoe UI", 9F);
             guna2Button5.ForeColor = Color.White;
-            guna2Button5.Location = new Point(311, 1199);
+            guna2Button5.Location = new Point(311, 1160);
             guna2Button5.Name = "guna2Button5";
             guna2Button5.ShadowDecoration.CustomizableEdges = customizableEdges56;
             guna2Button5.Size = new Size(114, 33);
@@ -1216,7 +1216,7 @@
             guna2Button7.FillColor = Color.FromArgb(224, 224, 224);
             guna2Button7.Font = new Font("Segoe UI", 9F);
             guna2Button7.ForeColor = Color.Gray;
-            guna2Button7.Location = new Point(5, 1199);
+            guna2Button7.Location = new Point(5, 1160);
             guna2Button7.Name = "guna2Button7";
             guna2Button7.ShadowDecoration.CustomizableEdges = customizableEdges58;
             guna2Button7.Size = new Size(84, 33);
@@ -1259,7 +1259,7 @@
             dataGridViewCellStyle16.WrapMode = DataGridViewTriState.True;
             dataGridAvailabilityMonthProfile.RowHeadersDefaultCellStyle = dataGridViewCellStyle16;
             dataGridAvailabilityMonthProfile.RowHeadersVisible = false;
-            dataGridAvailabilityMonthProfile.Size = new Size(317, 621);
+            dataGridAvailabilityMonthProfile.Size = new Size(317, 582);
             dataGridAvailabilityMonthProfile.TabIndex = 13;
             dataGridAvailabilityMonthProfile.ThemeStyle.AlternatingRowsStyle.BackColor = Color.White;
             dataGridAvailabilityMonthProfile.ThemeStyle.AlternatingRowsStyle.Font = null;
@@ -1295,7 +1295,7 @@
             btnEdit.FillColor = Color.FromArgb(51, 71, 255);
             btnEdit.Font = new Font("Segoe UI", 9F);
             btnEdit.ForeColor = Color.White;
-            btnEdit.Location = new Point(287, 700);
+            btnEdit.Location = new Point(287, 661);
             btnEdit.Name = "btnEdit";
             btnEdit.ShadowDecoration.CustomizableEdges = customizableEdges60;
             btnEdit.Size = new Size(73, 33);
@@ -1304,6 +1304,7 @@
             // 
             // guna2GroupBox6
             // 
+            guna2GroupBox6.Anchor = AnchorStyles.Top;
             guna2GroupBox6.BackColor = Color.Transparent;
             guna2GroupBox6.BorderColor = Color.White;
             guna2GroupBox6.BorderRadius = 17;
@@ -1321,7 +1322,7 @@
             guna2GroupBox6.CustomizableEdges = customizableEdges69;
             guna2GroupBox6.Font = new Font("Segoe UI", 9F);
             guna2GroupBox6.ForeColor = Color.White;
-            guna2GroupBox6.Location = new Point(9, 122);
+            guna2GroupBox6.Location = new Point(50, 122);
             guna2GroupBox6.Name = "guna2GroupBox6";
             guna2GroupBox6.ShadowDecoration.BorderRadius = 20;
             guna2GroupBox6.ShadowDecoration.CustomizableEdges = customizableEdges70;
@@ -1496,9 +1497,9 @@
             btnBackToAvailabilityListFromProfile.Location = new Point(6, 7);
             btnBackToAvailabilityListFromProfile.Name = "btnBackToAvailabilityListFromProfile";
             btnBackToAvailabilityListFromProfile.ShadowDecoration.CustomizableEdges = customizableEdges72;
-            btnBackToAvailabilityListFromProfile.Size = new Size(168, 33);
+            btnBackToAvailabilityListFromProfile.Size = new Size(77, 33);
             btnBackToAvailabilityListFromProfile.TabIndex = 14;
-            btnBackToAvailabilityListFromProfile.Text = "Back to Availability List";
+            btnBackToAvailabilityListFromProfile.Text = "Back";
             // 
             // label16
             // 
