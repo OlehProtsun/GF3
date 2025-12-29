@@ -2,6 +2,7 @@
 using DataAccessLayer.Models.DataBaseContext;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -9,12 +10,57 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace DataAccessLayer.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20251220111829_AddAvailabilityGroups")]
+    partial class AddAvailabilityGroups
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "10.0.0");
+
+            modelBuilder.Entity("DataAccessLayer.Models.AvailabilityDayModel", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("id");
+
+                    b.Property<int>("AvailabilityMonthId")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("availability_month_id");
+
+                    b.Property<int>("DayOfMonth")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("day_of_month");
+
+                    b.Property<string>("IntervalStr")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("interval_str");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasColumnType("TEXT")
+                        .HasColumnName("kind");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AvailabilityMonthId", "DayOfMonth")
+                        .IsUnique()
+                        .HasDatabaseName("ux_availability_day_month_day");
+
+                    b.HasIndex(new[] { "AvailabilityMonthId", "DayOfMonth" }, "ix_avail_day_month");
+
+                    b.HasIndex(new[] { "AvailabilityMonthId", "DayOfMonth" }, "ux_availability_day_month_day")
+                        .IsUnique();
+
+                    b.ToTable("availability_day", t =>
+                        {
+                            t.HasCheckConstraint("ck_availability_day_dom", "day_of_month BETWEEN 1 AND 31");
+
+                            t.HasCheckConstraint("ck_availability_day_kind_interval", "((kind = 'INT' AND interval_str IS NOT NULL AND length(trim(interval_str)) >= 11) OR (kind IN ('ANY','NONE') AND interval_str IS NULL))");
+                        });
+                });
 
             modelBuilder.Entity("DataAccessLayer.Models.AvailabilityGroupDayModel", b =>
                 {
@@ -113,6 +159,47 @@ namespace DataAccessLayer.Migrations
                     b.ToTable("availability_group", t =>
                         {
                             t.HasCheckConstraint("ck_availability_group_month", "month BETWEEN 1 AND 12");
+                        });
+                });
+
+            modelBuilder.Entity("DataAccessLayer.Models.AvailabilityMonthModel", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("id");
+
+                    b.Property<int>("EmployeeId")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("employee_id");
+
+                    b.Property<int>("Month")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("month");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("TEXT")
+                        .HasColumnName("name");
+
+                    b.Property<int>("Year")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("year");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EmployeeId", "Year", "Month")
+                        .IsUnique()
+                        .HasDatabaseName("ux_availability_month_emp_year_month");
+
+                    b.HasIndex(new[] { "EmployeeId", "Year", "Month" }, "ix_avail_month_emp");
+
+                    b.HasIndex(new[] { "EmployeeId", "Year", "Month" }, "ux_availability_month_emp_year_month")
+                        .IsUnique();
+
+                    b.ToTable("availability_month", t =>
+                        {
+                            t.HasCheckConstraint("ck_availability_month_month", "month BETWEEN 1 AND 12");
                         });
                 });
 
@@ -389,6 +476,38 @@ namespace DataAccessLayer.Migrations
                         });
                 });
 
+            modelBuilder.Entity("DataAccessLayer.Models.ShopModel", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Description")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("description");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("TEXT")
+                        .HasColumnName("name");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("shop");
+                });
+
+            modelBuilder.Entity("DataAccessLayer.Models.AvailabilityDayModel", b =>
+                {
+                    b.HasOne("DataAccessLayer.Models.AvailabilityMonthModel", "AvailabilityMonth")
+                        .WithMany("Days")
+                        .HasForeignKey("AvailabilityMonthId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("AvailabilityMonth");
+                });
+
             modelBuilder.Entity("DataAccessLayer.Models.AvailabilityGroupDayModel", b =>
                 {
                     b.HasOne("DataAccessLayer.Models.AvailabilityGroupMemberModel", "AvailabilityGroupMember")
@@ -415,6 +534,17 @@ namespace DataAccessLayer.Migrations
                         .IsRequired();
 
                     b.Navigation("AvailabilityGroup");
+
+                    b.Navigation("Employee");
+                });
+
+            modelBuilder.Entity("DataAccessLayer.Models.AvailabilityMonthModel", b =>
+                {
+                    b.HasOne("DataAccessLayer.Models.EmployeeModel", "Employee")
+                        .WithMany("AvailabilityMonths")
+                        .HasForeignKey("EmployeeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
 
                     b.Navigation("Employee");
                 });
@@ -446,7 +576,15 @@ namespace DataAccessLayer.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.HasOne("DataAccessLayer.Models.ShopModel", "Shop")
+                        .WithMany("Schedules")
+                        .HasForeignKey("ShopId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
                     b.Navigation("Container");
+
+                    b.Navigation("Shop");
                 });
 
             modelBuilder.Entity("DataAccessLayer.Models.ScheduleSlotModel", b =>
@@ -477,6 +615,11 @@ namespace DataAccessLayer.Migrations
                     b.Navigation("Members");
                 });
 
+            modelBuilder.Entity("DataAccessLayer.Models.AvailabilityMonthModel", b =>
+                {
+                    b.Navigation("Days");
+                });
+
             modelBuilder.Entity("DataAccessLayer.Models.ContainerModel", b =>
                 {
                     b.Navigation("Schedules");
@@ -484,6 +627,8 @@ namespace DataAccessLayer.Migrations
 
             modelBuilder.Entity("DataAccessLayer.Models.EmployeeModel", b =>
                 {
+                    b.Navigation("AvailabilityMonths");
+
                     b.Navigation("ScheduleEmployees");
 
                     b.Navigation("ScheduleSlots");
@@ -494,6 +639,11 @@ namespace DataAccessLayer.Migrations
                     b.Navigation("Employees");
 
                     b.Navigation("Slots");
+                });
+
+            modelBuilder.Entity("DataAccessLayer.Models.ShopModel", b =>
+                {
+                    b.Navigation("Schedules");
                 });
 #pragma warning restore 612, 618
         }

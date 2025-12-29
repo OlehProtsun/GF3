@@ -1,6 +1,9 @@
 using DataAccessLayer.Models;
 using DataAccessLayer.Models.Enums;
+using System;
 using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
 using System.Windows.Forms;
 using WinFormsApp.ViewModel;
 
@@ -21,7 +24,6 @@ namespace WinFormsApp.View.Container
         ScheduleViewModel ScheduleCancelTarget { get; set; }
         int ScheduleId { get; set; }
         int ScheduleContainerId { get; set; }
-        int ScheduleShopId { get; set; }
         string ScheduleName { get; set; }
         int ScheduleYear { get; set; }
         int ScheduleMonth { get; set; }
@@ -33,7 +35,9 @@ namespace WinFormsApp.View.Container
         int ScheduleMaxConsecutiveFull { get; set; }
         int ScheduleMaxFullPerMonth { get; set; }
         string ScheduleSearch { get; set; }
-        IList<int> SelectedAvailabilityIds { get; }
+
+        // AvailabilityGroup selection
+        IList<int> SelectedAvailabilityGroupIds { get; }
         IList<ScheduleEmployeeModel> ScheduleEmployees { get; set; }
         IList<ScheduleSlotModel> ScheduleSlots { get; set; }
 
@@ -62,8 +66,9 @@ namespace WinFormsApp.View.Container
         void SetContainerBindingSource(BindingSource containers);
         void SetScheduleBindingSource(BindingSource schedules);
         void SetSlotBindingSource(BindingSource slots);
-        void SetShopList(IEnumerable<ShopModel> shops);
-        void SetAvailabilityList(IEnumerable<AvailabilityMonthModel> availabilities);
+
+        // lookup
+        void SetAvailabilityGroupList(IEnumerable<AvailabilityGroupModel> groups);
 
         void SwitchToEditMode();
         void SwitchToListMode();
@@ -78,10 +83,12 @@ namespace WinFormsApp.View.Container
         void ShowInfo(string text);
         void ShowError(string text);
         bool Confirm(string text, string? caption = null);
+
         void SetValidationErrors(IReadOnlyDictionary<string, string> errors);
         void SetScheduleValidationErrors(IReadOnlyDictionary<string, string> errors);
         void ClearValidationErrors();
         void ClearScheduleValidationErrors();
+
         void SetProfile(ContainerModel model);
         void SetScheduleProfile(ScheduleModel model);
     }

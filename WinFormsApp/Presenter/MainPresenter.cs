@@ -10,7 +10,6 @@ using WinFormsApp.View.Availability;
 using WinFormsApp.View.Employee;
 using WinFormsApp.View.Main;
 using WinFormsApp.View.Container;
-using WinFormsApp.View.Shop;
 
 namespace WinFormsApp.Presenter
 {
@@ -21,7 +20,6 @@ namespace WinFormsApp.Presenter
 
         private EmployeeView? _employeeView; // один екземпляр на життєвий цикл presenter-а
         private AvailabilityView? _availabilityView;
-        private ShopView? _shopView;
         private ContainerView? _containerView;
 
 
@@ -32,7 +30,6 @@ namespace WinFormsApp.Presenter
 
             _mainView.ShowEmployeeView += OnShowEmployeeViewAsync;
             _mainView.ShowAvailabilityView += OnShowAvailabilityViewAsync;
-            _mainView.ShowShopView += OnShowShopViewAsync;
             _mainView.ShowContainerView += OnShowContainerViewAsync;
 
         }
@@ -56,26 +53,6 @@ namespace WinFormsApp.Presenter
 
             _containerView.BringToFront();
             _containerView.Show();
-            return Task.CompletedTask;
-        }
-
-        private Task OnShowShopViewAsync(CancellationToken ct)
-        {
-            if (_shopView == null || _shopView.IsDisposed)
-            {
-                _shopView = _sp.GetRequiredService<ShopView>();
-                if (_mainView is Form mdiParent)
-                {
-                    _shopView.MdiParent = mdiParent;
-                    _shopView.Dock = DockStyle.Fill;
-                }
-            }
-
-            if (_shopView.WindowState == FormWindowState.Minimized)
-                _shopView.WindowState = FormWindowState.Normal;
-
-            _shopView.BringToFront();
-            _shopView.Show();
             return Task.CompletedTask;
         }
 
