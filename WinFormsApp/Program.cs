@@ -2,11 +2,12 @@ using BusinessLogicLayer;
 using DataAccessLayer.Models.DataBaseContext;
 using Microsoft.Extensions.DependencyInjection;
 using WinFormsApp.Presenter;
+using WinFormsApp.Presenter.Availability;
+using WinFormsApp.Presenter.Container;
 using WinFormsApp.View.Availability;
 using WinFormsApp.View.Container;
 using WinFormsApp.View.Employee;
 using WinFormsApp.View.Main;
-using WinFormsApp.View.Shop;
 
 namespace WinFormsApp
 {
@@ -57,17 +58,6 @@ namespace WinFormsApp
                 var view = new AvailabilityView();
                 var presenter = ActivatorUtilities.CreateInstance<AvailabilityPresenter>(sp, view);
                 // Стартове завантаження асинхронно (без блокування UI)
-                _ = presenter.InitializeAsync();
-                return view;
-            });
-
-
-            // Shop
-            services.AddTransient<ShopPresenter>();
-            services.AddTransient<ShopView>(sp =>
-            {
-                var view = new ShopView();
-                var presenter = ActivatorUtilities.CreateInstance<ShopPresenter>(sp, view);
                 _ = presenter.InitializeAsync();
                 return view;
             });

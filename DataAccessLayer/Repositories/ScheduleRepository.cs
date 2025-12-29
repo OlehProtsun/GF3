@@ -18,7 +18,6 @@ namespace DataAccessLayer.Repositories
             return await _set
                 .AsNoTracking()
                 .Include(s => s.Container)
-                .Include(s => s.Shop)
                 .ToListAsync(ct);
         }
 
@@ -26,7 +25,6 @@ namespace DataAccessLayer.Repositories
         {
             var query = _set
                 .AsNoTracking()
-                .Include(s => s.Shop)
                 .Include(s => s.Container)
                 .Where(s => s.ContainerId == containerId);
 
@@ -37,7 +35,6 @@ namespace DataAccessLayer.Repositories
 
                 query = query.Where(s =>
                     s.Name.ToLower().Contains(value) ||
-                    s.Shop.Name.ToLower().Contains(value) ||
                     (hasInt && (s.Year == intVal || s.Month == intVal)));
             }
 
@@ -55,11 +52,9 @@ namespace DataAccessLayer.Repositories
             return await _set
                 .AsNoTracking()
                 .Include(s => s.Container)
-                .Include(s => s.Shop)
                 .Where(s =>
                     s.Name.ToLower().Contains(value) ||
                     s.Container.Name.ToLower().Contains(value) ||
-                    s.Shop.Name.ToLower().Contains(value) ||
                     (hasInt && (s.Year == intVal || s.Month == intVal)))
                 .ToListAsync(ct);
         }
@@ -68,7 +63,6 @@ namespace DataAccessLayer.Repositories
         {
             return await _set
                 .AsNoTracking()
-                .Include(s => s.Shop)
                 .Include(s => s.Container)
                 .Include(s => s.Slots)
                 .Include(s => s.Employees)

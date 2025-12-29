@@ -40,12 +40,6 @@ namespace WinFormsApp.View.Main
                     await ShowAvailabilityView(CancellationToken.None);
             };
 
-            btnShop.Click += async (_, __) =>
-            {
-                if (ShowShopView is not null)
-                    await ShowShopView(CancellationToken.None);
-            };
-
             btnContainer.Click += async (_, __) =>
             {
                 if (ShowContainerView is not null)
@@ -66,7 +60,6 @@ namespace WinFormsApp.View.Main
 
         public event Func<CancellationToken, Task>? ShowEmployeeView;
         public event Func<CancellationToken, Task>? ShowAvailabilityView;
-        public event Func<CancellationToken, Task>? ShowShopView;
         public event Func<CancellationToken, Task>? ShowContainerView;
 
 

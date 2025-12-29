@@ -32,8 +32,6 @@ namespace DataAccessLayer.Models
         [Column("shop_id")]
         public int ShopId { get; set; }
 
-        public ShopModel Shop { get; set; } = null!;
-
         [Required]
         [Column("name")]
         public string Name { get; set; } = null!;

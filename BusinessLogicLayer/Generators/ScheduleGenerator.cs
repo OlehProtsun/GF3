@@ -1,32 +1,19 @@
 ﻿using DataAccessLayer.Models;
 using DataAccessLayer.Models.Enums;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
 
 namespace BusinessLogicLayer.Generators
 {
+
     public interface IScheduleGenerator
     {
         Task<IList<ScheduleSlotModel>> GenerateAsync(
             ScheduleModel schedule,
-            IEnumerable<AvailabilityMonthModel> availabilities,
+            IEnumerable<AvailabilityGroupModel> availabilities,
             IEnumerable<ScheduleEmployeeModel> employees,
             CancellationToken ct = default);
     }
 
-    /// <summary>
-    /// Генератор, який враховує:
-    /// - місячну availability
-    /// - MaxHoursPerEmpMonth
-    /// - MaxConsecutiveDays
-    /// - MaxConsecutiveFull
-    /// - MaxFullPerMonth
-    /// і роздає зміни по колу.
-    /// Тепер кожен слот зберігає FromTime / ToTime.
-    /// </summary>
+
     public class ScheduleGenerator : IScheduleGenerator
     {
         private sealed class EmployeeStats
@@ -58,7 +45,7 @@ namespace BusinessLogicLayer.Generators
 
         public Task<IList<ScheduleSlotModel>> GenerateAsync(
             ScheduleModel schedule,
-            IEnumerable<AvailabilityMonthModel> availabilities,
+            IEnumerable<AvailabilityGroupModel> availabilities,
             IEnumerable<ScheduleEmployeeModel> employees,
             CancellationToken ct = default)
         {
@@ -86,15 +73,25 @@ namespace BusinessLogicLayer.Generators
 
             var daysInMonth = DateTime.DaysInMonth(schedule.Year, schedule.Month);
 
+            var employeeIdSet = employeeIds.ToHashSet();
+            var availabilityIndex = BuildAvailabilityIndex(availabilities, schedule.Year, schedule.Month);
+
+
             for (var day = 1; day <= daysInMonth; day++)
             {
                 ct.ThrowIfCancellationRequested();
 
                 // хто в принципі може працювати в цей день
-                var availableToday = GetAvailableEmployees(availabilities, schedule.Year, schedule.Month, day)
-                    .Where(employeeQueue.Contains)
-                    .Distinct()
+                var availableToday = employeeIdSet
+                    .Where(id =>
+                        !availabilityIndex.TryGetValue(id, out var dayMap) ||
+                        !dayMap.TryGetValue(day, out var kind) ||
+                        kind != AvailabilityKind.NONE)
                     .ToList();
+
+                var availableTodaySet = availableToday.ToHashSet();
+
+
 
                 // скільки змін (0/1/2...) людина вже працює цього дня
                 var shiftsToday = employeeIds.ToDictionary(id => id, _ => 0);
@@ -115,15 +112,8 @@ namespace BusinessLogicLayer.Generators
                             Status = SlotStatus.UNFURNISHED
                         };
 
-                        var emp = GetNextEmployee(
-                            employeeQueue,
-                            availableToday,
-                            assignedThisShift,
-                            day,
-                            schedule,
-                            stats,
-                            shiftsToday,
-                            shift.Hours);
+                        var emp = GetNextEmployee(employeeQueue, availableTodaySet, assignedThisShift, day, schedule, stats, shiftsToday, shift.Hours);
+
 
                         if (emp.HasValue)
                         {
@@ -146,29 +136,60 @@ namespace BusinessLogicLayer.Generators
             return Task.FromResult<IList<ScheduleSlotModel>>(result);
         }
 
-        /// <summary>
-        /// Хто доступний в цей день (поки що: будь-який Kind, крім NONE).
-        /// </summary>
-        private static IEnumerable<int> GetAvailableEmployees(
-            IEnumerable<AvailabilityMonthModel> availabilities,
-            int year, int month, int day)
+
+        private static Dictionary<int, Dictionary<int, AvailabilityKind>> BuildAvailabilityIndex(
+            IEnumerable<AvailabilityGroupModel> groups,
+            int year,
+            int month)
         {
-            var byDate = availabilities.Where(a => a.Year == year && a.Month == month);
-            foreach (var availability in byDate)
+            var index = new Dictionary<int, Dictionary<int, AvailabilityKind>>();
+
+            foreach (var g in groups.Where(x => x.Year == year && x.Month == month))
             {
-                var dayInfo = availability.Days.FirstOrDefault(d => d.DayOfMonth == day);
-                // поточна логіка: будь-який Kind, окрім NONE, означає, що людина може працювати
-                if (dayInfo is null || dayInfo.Kind != AvailabilityKind.NONE)
-                    yield return availability.EmployeeId;
+                foreach (var m in g.Members ?? Enumerable.Empty<AvailabilityGroupMemberModel>())
+                {
+                    if (!index.TryGetValue(m.EmployeeId, out var dayMap))
+                    {
+                        dayMap = new Dictionary<int, AvailabilityKind>();
+                        index[m.EmployeeId] = dayMap;
+                    }
+
+                    foreach (var d in m.Days ?? Enumerable.Empty<AvailabilityGroupDayModel>())
+                    {
+                        // якщо є дублікати — NONE має пріоритет (найжорсткіше правило)
+                        if (dayMap.TryGetValue(d.DayOfMonth, out var existing))
+                        {
+                            if (existing == AvailabilityKind.NONE) continue;
+                            if (d.Kind == AvailabilityKind.NONE) dayMap[d.DayOfMonth] = AvailabilityKind.NONE;
+                            else dayMap[d.DayOfMonth] = d.Kind;
+                        }
+                        else
+                        {
+                            dayMap[d.DayOfMonth] = d.Kind;
+                        }
+                    }
+                }
+            }
+
+            return index;
+        }
+
+        private static IEnumerable<int> GetAvailableEmployees(
+            IReadOnlyDictionary<int, Dictionary<int, AvailabilityKind>> availabilityIndex,
+            int day)
+        {
+            // стара логіка: якщо дня немає -> доступний; якщо Kind != NONE -> доступний
+            foreach (var (employeeId, dayMap) in availabilityIndex)
+            {
+                if (!dayMap.TryGetValue(day, out var kind) || kind != AvailabilityKind.NONE)
+                    yield return employeeId;
             }
         }
 
-        /// <summary>
-        /// Обрати наступного працівника з черги з урахуванням availability та лімітів.
-        /// </summary>
+
         private static int? GetNextEmployee(
             Queue<int> queue,
-            IList<int> allowedToday,
+            ISet<int> allowedToday,
             HashSet<int> assignedThisShift,
             int day,
             ScheduleModel schedule,
@@ -368,3 +389,4 @@ namespace BusinessLogicLayer.Generators
         }
     }
 }
+

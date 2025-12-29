@@ -16,14 +16,15 @@ namespace DataAccessLayer.Models.DataBaseContext
         public static IServiceCollection AddDataAccess(this IServiceCollection serviceCollection, string connectionString)
         {
             serviceCollection.AddScoped<IContainerRepository, ContainerRepository>();
-            serviceCollection.AddScoped<IShopRepository, ShopRepository>();
             serviceCollection.AddScoped<IEmployeeRepository, EmployeeRepository>();
-            serviceCollection.AddScoped<IAvailabilityMonthRepository, AvailabilityMonthRepository>();
-            serviceCollection.AddScoped<IAvailabilityDayRepository, AvailabilityDayRepository>();
             serviceCollection.AddScoped<IScheduleRepository, ScheduleRepository>();
             serviceCollection.AddScoped<IScheduleEmployeeRepository, ScheduleEmployeeRepository>();
             serviceCollection.AddScoped<IScheduleSlotRepository, ScheduleSlotRepository>();
             serviceCollection.AddScoped<IBindRepository, BindRepository>();
+            serviceCollection.AddScoped<IAvailabilityGroupRepository, AvailabilityGroupRepository>();
+            serviceCollection.AddScoped<IAvailabilityGroupMemberRepository, AvailabilityGroupMemberRepository>();
+            serviceCollection.AddScoped<IAvailabilityGroupDayRepository, AvailabilityGroupDayRepository>();
+
 
 
             serviceCollection.AddDbContext<AppDbContext>(x =>

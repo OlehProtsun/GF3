@@ -34,7 +34,6 @@ namespace DataAccessLayer.Models
         public string? Email { get; set; }
 
 
-        public ICollection<AvailabilityMonthModel> AvailabilityMonths { get; set; } = new List<AvailabilityMonthModel>();
         public ICollection<ScheduleEmployeeModel> ScheduleEmployees { get; set; } = new List<ScheduleEmployeeModel>();
         public ICollection<ScheduleSlotModel> ScheduleSlots { get; set; } = new List<ScheduleSlotModel>();
     }

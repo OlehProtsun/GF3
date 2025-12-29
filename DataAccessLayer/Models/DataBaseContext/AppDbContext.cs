@@ -13,14 +13,15 @@ namespace DataAccessLayer.Models.DataBaseContext
     public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(options)
     {
         public DbSet<ContainerModel> Containers => Set<ContainerModel>();
-        public DbSet<ShopModel> Shops => Set<ShopModel>();
         public DbSet<EmployeeModel> Employees => Set<EmployeeModel>();
-        public DbSet<AvailabilityMonthModel> AvailabilityMonths => Set<AvailabilityMonthModel>();
-        public DbSet<AvailabilityDayModel> AvailabilityDays => Set<AvailabilityDayModel>();
         public DbSet<ScheduleModel> Schedules => Set<ScheduleModel>();
         public DbSet<ScheduleEmployeeModel> ScheduleEmployees => Set<ScheduleEmployeeModel>();
         public DbSet<ScheduleSlotModel> ScheduleSlots => Set<ScheduleSlotModel>();
         public DbSet<BindModel> AvailabilityBinds => Set<BindModel>();
+        public DbSet<AvailabilityGroupModel> AvailabilityGroups => Set<AvailabilityGroupModel>();
+        public DbSet<AvailabilityGroupMemberModel> AvailabilityGroupMembers => Set<AvailabilityGroupMemberModel>();
+        public DbSet<AvailabilityGroupDayModel> AvailabilityGroupDays => Set<AvailabilityGroupDayModel>();
+
 
 
         protected override void OnModelCreating(ModelBuilder modelBuilder) 
@@ -32,60 +33,11 @@ namespace DataAccessLayer.Models.DataBaseContext
                 e.HasIndex(p => p.Name).IsUnique();
             });
 
-            // ----- Shop
-            modelBuilder.Entity<ShopModel>(e =>
-            {
-                e.Property(p => p.Name).IsRequired();
-            });
-
             // ----- Employee
             modelBuilder.Entity<EmployeeModel>(e =>
             {
                 e.Property(p => p.FirstName).IsRequired();
                 e.Property(p => p.LastName).IsRequired();
-            });
-
-            // ----- AvailabilityMonth
-            modelBuilder.Entity<AvailabilityMonthModel>(e =>
-            {
-                e.HasOne(m => m.Employee)
-                 .WithMany(emp => emp.AvailabilityMonths)
-                 .HasForeignKey(m => m.EmployeeId)
-                 .OnDelete(DeleteBehavior.Cascade);
-
-                e.HasIndex(m => new { m.EmployeeId, m.Year, m.Month })
-                 .IsUnique()
-                 .HasDatabaseName("ux_availability_month_emp_year_month");
-
-                e.ToTable(t =>
-                {
-                    t.HasCheckConstraint("ck_availability_month_month", "month BETWEEN 1 AND 12");
-                });                    
-            });
-
-            // ----- AvailabilityDay
-            modelBuilder.Entity<AvailabilityDayModel>(e =>
-            {
-                e.HasOne(d => d.AvailabilityMonth)
-                 .WithMany(m => m.Days)
-                 .HasForeignKey(d => d.AvailabilityMonthId)
-                 .OnDelete(DeleteBehavior.Cascade);
-
-                // enum <-> TEXT
-                e.Property(d => d.Kind).HasConversion<string>();
-
-                e.HasIndex(d => new { d.AvailabilityMonthId, d.DayOfMonth })
-                 .IsUnique()
-                 .HasDatabaseName("ux_availability_day_month_day");
-
-                e.ToTable(t =>
-                {
-                    t.HasCheckConstraint("ck_availability_day_dom", "day_of_month BETWEEN 1 AND 31");
-                    t.HasCheckConstraint(
-                        "ck_availability_day_kind_interval",
-                        "((kind = 'INT' AND interval_str IS NOT NULL AND length(trim(interval_str)) >= 11) OR (kind IN ('ANY','NONE') AND interval_str IS NULL))"
-                    );
-                });
             });
 
             // ----- Schedule
@@ -95,11 +47,6 @@ namespace DataAccessLayer.Models.DataBaseContext
                  .WithMany(c => c.Schedules)
                  .HasForeignKey(s => s.ContainerId)
                  .OnDelete(DeleteBehavior.Restrict);
-
-                e.HasOne(s => s.Shop)
-                 .WithMany(sh => sh.Schedules)
-                 .HasForeignKey(s => s.ShopId)
-                 .OnDelete(DeleteBehavior.Cascade);
 
                 e.HasIndex(s => s.ContainerId).HasDatabaseName("ix_sched_container");
                 e.HasIndex(s => new { s.ShopId, s.Year, s.Month }).HasDatabaseName("ix_sched_shop_month");
@@ -190,6 +137,58 @@ namespace DataAccessLayer.Models.DataBaseContext
                 e.HasIndex(x => x.Key).IsUnique();   // щоб не було двох однакових хоткеїв
             });
 
+            // ----- AvailabilityGroup
+            modelBuilder.Entity<AvailabilityGroupModel>(e =>
+            {
+                e.Property(x => x.Name).IsRequired();
+
+                e.ToTable(t =>
+                {
+                    t.HasCheckConstraint("ck_availability_group_month", "month BETWEEN 1 AND 12");
+                });
+            });
+
+            // ----- AvailabilityGroupMember
+            modelBuilder.Entity<AvailabilityGroupMemberModel>(e =>
+            {
+                e.HasOne(m => m.AvailabilityGroup)
+                 .WithMany(g => g.Members)
+                 .HasForeignKey(m => m.AvailabilityGroupId)
+                 .OnDelete(DeleteBehavior.Cascade);
+
+                e.HasOne(m => m.Employee)
+                 .WithMany() // або зробиш Employee.AvailabilityGroupMembers
+                 .HasForeignKey(m => m.EmployeeId)
+                 .OnDelete(DeleteBehavior.Cascade);
+
+                e.HasIndex(m => new { m.AvailabilityGroupId, m.EmployeeId })
+                 .IsUnique()
+                 .HasDatabaseName("ux_avail_group_member_group_emp");
+            });
+
+            // ----- AvailabilityGroupDay
+            modelBuilder.Entity<AvailabilityGroupDayModel>(e =>
+            {
+                e.HasOne(d => d.AvailabilityGroupMember)
+                 .WithMany(m => m.Days)
+                 .HasForeignKey(d => d.AvailabilityGroupMemberId)
+                 .OnDelete(DeleteBehavior.Cascade);
+
+                e.Property(d => d.Kind).HasConversion<string>();
+
+                e.HasIndex(d => new { d.AvailabilityGroupMemberId, d.DayOfMonth })
+                 .IsUnique()
+                 .HasDatabaseName("ux_avail_group_day_member_dom");
+
+                e.ToTable(t =>
+                {
+                    t.HasCheckConstraint("ck_avail_group_day_dom", "day_of_month BETWEEN 1 AND 31");
+                    t.HasCheckConstraint(
+                        "ck_avail_group_day_kind_interval",
+                        "((kind = 'INT' AND interval_str IS NOT NULL AND length(trim(interval_str)) >= 11) OR (kind IN ('ANY','NONE') AND interval_str IS NULL))"
+                    );
+                });
+            });
 
         }
     }
