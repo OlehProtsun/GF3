@@ -185,5 +185,49 @@
 		</Compile>
 	</ItemGroup>
 
+	<ItemGroup>
+		<!-- Якщо раптом VS згенерує resx для partial-файлів EmployeeView - не вбудовувати їх у збірку -->
+		<EmbeddedResource Remove="View\Employee\EmployeeView.State.resx" />
+		<EmbeddedResource Remove="View\Employee\EmployeeView.Events.resx" />
+		<EmbeddedResource Remove="View\Employee\EmployeeView.Grid.resx" />
+		<EmbeddedResource Remove="View\Employee\EmployeeView.Validation.resx" />
+		<EmbeddedResource Remove="View\Employee\EmployeeView.Dialogs.resx" />
+		<EmbeddedResource Remove="View\Employee\EmployeeView.Navigation.resx" />
+		<EmbeddedResource Remove="View\Employee\EmployeeView.*.resx" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<!-- Робимо partial-файли EmployeeView "звичайним кодом" і підв'язуємо їх під основну форму (для краси) -->
+		<Compile Update="View\Employee\EmployeeView.State.cs">
+			<DependentUpon>EmployeeView.cs</DependentUpon>
+			<SubType>Code</SubType>
+		</Compile>
+
+		<Compile Update="View\Employee\EmployeeView.Events.cs">
+			<DependentUpon>EmployeeView.cs</DependentUpon>
+			<SubType>Code</SubType>
+		</Compile>
+
+		<Compile Update="View\Employee\EmployeeView.Grid.cs">
+			<DependentUpon>EmployeeView.cs</DependentUpon>
+			<SubType>Code</SubType>
+		</Compile>
+
+		<Compile Update="View\Employee\EmployeeView.Validation.cs">
+			<DependentUpon>EmployeeView.cs</DependentUpon>
+			<SubType>Code</SubType>
+		</Compile>
+
+		<Compile Update="View\Employee\EmployeeView.Dialogs.cs">
+			<DependentUpon>EmployeeView.cs</DependentUpon>
+			<SubType>Code</SubType>
+		</Compile>
+
+		<Compile Update="View\Employee\EmployeeView.Navigation.cs">
+			<DependentUpon>EmployeeView.cs</DependentUpon>
+			<SubType>Code</SubType>
+		</Compile>
+	</ItemGroup>
+
 
 </Project>

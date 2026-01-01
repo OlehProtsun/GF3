@@ -7,9 +7,10 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using WinFormsApp.View.Availability;
+using WinFormsApp.View.Container;
 using WinFormsApp.View.Employee;
 using WinFormsApp.View.Main;
-using WinFormsApp.View.Container;
+using WinFormsApp.ViewModel;
 
 namespace WinFormsApp.Presenter
 {
@@ -18,83 +19,76 @@ namespace WinFormsApp.Presenter
         private readonly IMainView _mainView;
         private readonly IServiceProvider _sp;
 
-        private EmployeeView? _employeeView; // один екземпляр на життєвий цикл presenter-а
+        private EmployeeView? _employeeView;
         private AvailabilityView? _availabilityView;
         private ContainerView? _containerView;
-
 
         public MainPresenter(IMainView mainView, IServiceProvider sp)
         {
             _mainView = mainView;
             _sp = sp;
 
-            _mainView.ShowEmployeeView += OnShowEmployeeViewAsync;
-            _mainView.ShowAvailabilityView += OnShowAvailabilityViewAsync;
-            _mainView.ShowContainerView += OnShowContainerViewAsync;
+            _mainView.ShowEmployeeView += ct =>
+                NavigateAsync(ct, () => _employeeView, v => _employeeView = v, NavPage.Employee, "Opening Employee...");
 
+            _mainView.ShowAvailabilityView += ct =>
+                NavigateAsync(ct, () => _availabilityView, v => _availabilityView = v, NavPage.Availability, "Opening Availability...");
+
+            _mainView.ShowContainerView += ct =>
+                NavigateAsync(ct, () => _containerView, v => _containerView = v, NavPage.Container, "Opening Container...");
+        }
+
+        private Task NavigateAsync<TView>(
+            CancellationToken ct,
+            Func<TView?> getView,
+            Action<TView> setView,
+            NavPage page,
+            string busyText)
+            where TView : Form
+        {
+            return _mainView.RunBusyAsync(innerCt =>
+            {
+                _mainView.SetActivePage(page);
+
+                var view = getView();
+                view = ShowMdi(getOrCreate: () => view, set: setView, innerCt);
+
+                // на випадок, якщо створили нову — зафіксуємо
+                setView(view);
+
+                return Task.CompletedTask;
+            }, ct, busyText);
         }
 
 
-
-        private Task OnShowContainerViewAsync(CancellationToken ct)
+        private TView ShowMdi<TView>(Func<TView?> getOrCreate, Action<TView> set, CancellationToken ct)
+            where TView : Form
         {
-            if (_containerView == null || _containerView.IsDisposed)
+            if (ct.IsCancellationRequested)
+                return getOrCreate() ?? throw new OperationCanceledException(ct);
+
+            var view = getOrCreate();
+            if (view is null || view.IsDisposed)
             {
-                _containerView = _sp.GetRequiredService<ContainerView>();
+                view = _sp.GetRequiredService<TView>();
+
                 if (_mainView is Form mdiParent)
                 {
-                    _containerView.MdiParent = mdiParent;
-                    _containerView.Dock = DockStyle.Fill;
+                    view.MdiParent = mdiParent;
+                    view.Dock = DockStyle.Fill;
                 }
+
+                set(view);
             }
 
-            if (_containerView.WindowState == FormWindowState.Minimized)
-                _containerView.WindowState = FormWindowState.Normal;
+            if (view.WindowState == FormWindowState.Minimized)
+                view.WindowState = FormWindowState.Normal;
 
-            _containerView.BringToFront();
-            _containerView.Show();
-            return Task.CompletedTask;
-        }
+            view.BringToFront();
+            view.Show();
 
-        private Task OnShowAvailabilityViewAsync(CancellationToken token)
-        {
-            if (_availabilityView == null || _availabilityView.IsDisposed)
-            {
-                _availabilityView = _sp.GetRequiredService<AvailabilityView>();
-                if (_mainView is Form mdiParent)
-                {
-                    _availabilityView.MdiParent = mdiParent;
-                    _availabilityView.Dock = DockStyle.Fill;
-                }
-            }
-
-            if (_availabilityView.WindowState == FormWindowState.Minimized)
-                _availabilityView.WindowState = FormWindowState.Normal;
-
-            _availabilityView.BringToFront();
-            _availabilityView.Show();
-            return Task.CompletedTask;
-        }
-
-        private Task OnShowEmployeeViewAsync(CancellationToken ct)
-        {
-            // колишній вміст ShowEmployeeView(object?, EventArgs)
-            if (_employeeView == null || _employeeView.IsDisposed)
-            {
-                _employeeView = _sp.GetRequiredService<EmployeeView>();
-                if (_mainView is Form mdiParent)
-                {
-                    _employeeView.MdiParent = mdiParent;
-                    _employeeView.Dock = DockStyle.Fill;
-                }
-            }
-
-            if (_employeeView.WindowState == FormWindowState.Minimized)
-                _employeeView.WindowState = FormWindowState.Normal;
-
-            _employeeView.BringToFront();
-            _employeeView.Show();
-            return Task.CompletedTask;
+            return view;
         }
     }
+
 }
