@@ -15,7 +15,8 @@ namespace DataAccessLayer.Repositories
         public override async Task<List<BindModel>> GetAllAsync(CancellationToken ct = default)
             => await _set.AsNoTracking()
                          .OrderBy(x => x.Key)
-                         .ToListAsync(ct);
+                         .ToListAsync(ct)
+                         .ConfigureAwait(false);
 
         public Task<BindModel?> GetByKeyAsync(string key, CancellationToken ct = default)
         {
@@ -44,26 +45,28 @@ namespace DataAccessLayer.Repositories
             if (model.Id > 0)
             {
                 bool keyTaken = await _set.AsNoTracking()
-                    .AnyAsync(x => x.Key == model.Key && x.Id != model.Id, ct);
+                    .AnyAsync(x => x.Key == model.Key && x.Id != model.Id, ct)
+                    .ConfigureAwait(false);
 
                 if (keyTaken)
                     throw new InvalidOperationException($"Key '{model.Key}' already exists.");
 
-                await UpdateAsync(model, ct);
+                await UpdateAsync(model, ct).ConfigureAwait(false);
                 return model;
             }
 
             // створюємо/оновлюємо по Key
             var existing = await _set.AsNoTracking()
-                .FirstOrDefaultAsync(x => x.Key == model.Key, ct);
+                .FirstOrDefaultAsync(x => x.Key == model.Key, ct)
+                .ConfigureAwait(false);
 
             if (existing is null)
             {
-                return await AddAsync(model, ct);
+                return await AddAsync(model, ct).ConfigureAwait(false);
             }
 
             model.Id = existing.Id;
-            await UpdateAsync(model, ct);
+            await UpdateAsync(model, ct).ConfigureAwait(false);
             return model;
         }
     }

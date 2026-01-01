@@ -57,6 +57,7 @@ namespace WinFormsApp.Presenter.Container
 
         private async Task OnSaveCoreAsync(CancellationToken ct)
         {
+            _view.ClearValidationErrors();
             var model = new ContainerModel
             {
                 Id = _view.ContainerId,

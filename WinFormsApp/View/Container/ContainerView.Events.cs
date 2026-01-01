@@ -10,10 +10,10 @@ namespace WinFormsApp.View.Container
     {
         private void AssociateAndRaiseEvents()
         {
-            async Task Raise(Func<CancellationToken, Task>? ev, CancellationToken ct = default)
+            async Task Raise(Func<CancellationToken, Task>? ev)
             {
                 if (ev == null) return;
-                try { await ev(ct); }
+                try { await ev(_lifetimeCts.Token); }
                 catch (Exception ex) { ShowError(ex.Message); }
             }
 

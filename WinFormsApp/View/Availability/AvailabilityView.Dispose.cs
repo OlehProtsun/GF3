@@ -6,15 +6,15 @@ namespace WinFormsApp.View.Availability
 {
     public partial class AvailabilityView
     {
-        //protected override void Dispose(bool disposing)
-        //{
-        //    if (disposing)
-        //    {
-        //        components?.Dispose();
-        //        _matrixVPen.Dispose();
-        //        _matrixHPen.Dispose();
-        //    }
-        //    base.Dispose(disposing);
-        //}
+        protected override void OnFormClosed(FormClosedEventArgs e)
+        {
+            try { _lifetimeCts.Cancel(); } catch { /* ignore */ }
+            _lifetimeCts.Dispose();
+
+            _matrixVPen.Dispose();
+            _matrixHPen.Dispose();
+
+            base.OnFormClosed(e);
+        }
     }
 }

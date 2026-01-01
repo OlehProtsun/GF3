@@ -122,13 +122,15 @@ namespace WinFormsApp.View.Availability
 
         public void SetEmployeeList(IEnumerable<EmployeeModel> employees)
         {
-            var list = employees
-                .Select(e => new
+            var list = new List<EmployeeListItem>();
+            foreach (var employee in employees)
+            {
+                list.Add(new EmployeeListItem
                 {
-                    e.Id,
-                    FullName = $"{e.FirstName} {e.LastName}"
-                })
-                .ToList();
+                    Id = employee.Id,
+                    FullName = $"{employee.FirstName} {employee.LastName}"
+                });
+            }
 
             comboboxEmployee.DisplayMember = "FullName";
             comboboxEmployee.ValueMember = "Id";
@@ -142,6 +144,8 @@ namespace WinFormsApp.View.Availability
 
         public void SetValidationErrors(IReadOnlyDictionary<string, string> errors)
         {
+            ClearValidationErrors();
+
             foreach (var kv in errors)
             {
                 switch (kv.Key)

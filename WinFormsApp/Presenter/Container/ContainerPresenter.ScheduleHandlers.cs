@@ -82,6 +82,7 @@ namespace WinFormsApp.Presenter.Container
 
         private async Task OnScheduleSaveCoreAsync(CancellationToken ct)
         {
+            _view.ClearScheduleValidationErrors();
             var model = BuildScheduleFromView();
 
             var errors = ValidateAndNormalizeSchedule(model, out var normalizedShift1, out var normalizedShift2);
