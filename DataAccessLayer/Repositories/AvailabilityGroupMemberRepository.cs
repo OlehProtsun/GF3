@@ -19,7 +19,8 @@ namespace DataAccessLayer.Repositories
                 .AsNoTracking()
                 .Include(m => m.Employee)
                 .Include(m => m.AvailabilityGroup)
-                .ToListAsync(ct);
+                .ToListAsync(ct)
+                .ConfigureAwait(false);
         }
 
         public async Task<List<AvailabilityGroupMemberModel>> GetByGroupIdAsync(int groupId, CancellationToken ct = default)
@@ -28,7 +29,8 @@ namespace DataAccessLayer.Repositories
                 .AsNoTracking()
                 .Include(m => m.Employee)
                 .Where(m => m.AvailabilityGroupId == groupId)
-                .ToListAsync(ct);
+                .ToListAsync(ct)
+                .ConfigureAwait(false);
         }
 
         public async Task<AvailabilityGroupMemberModel?> GetByGroupAndEmployeeAsync(int groupId, int employeeId, CancellationToken ct = default)
@@ -37,7 +39,8 @@ namespace DataAccessLayer.Repositories
                 .AsNoTracking()
                 .SingleOrDefaultAsync(m =>
                     m.AvailabilityGroupId == groupId &&
-                    m.EmployeeId == employeeId, ct);
+                    m.EmployeeId == employeeId, ct)
+                .ConfigureAwait(false);
         }
     }
 }

@@ -47,6 +47,7 @@ namespace WinFormsApp.Presenter.Employee
         private Task OnSaveEventAsync(CancellationToken ct) =>
             RunSafeAsync(async () =>
             {
+                _view.ClearValidationErrors();
                 var model = BuildModelFromView();
 
                 var errors = Validate(model);

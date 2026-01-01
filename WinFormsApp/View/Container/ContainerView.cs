@@ -22,5 +22,17 @@ namespace WinFormsApp.View.Container
             ConfigureSlotGrid();
             AssociateAndRaiseEvents();
         }
+
+        protected override void OnFormClosed(FormClosedEventArgs e)
+        {
+            try { _lifetimeCts.Cancel(); } catch { /* ignore */ }
+            _lifetimeCts.Dispose();
+
+            _gridVPen.Dispose();
+            _gridHPen.Dispose();
+            _conflictPen.Dispose();
+
+            base.OnFormClosed(e);
+        }
     }
 }

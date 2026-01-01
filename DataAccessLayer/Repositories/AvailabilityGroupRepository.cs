@@ -19,13 +19,14 @@ namespace DataAccessLayer.Repositories
                 .AsNoTracking()
                 .Include(g => g.Members)
                     .ThenInclude(m => m.Employee)
-                .ToListAsync(ct);
+                .ToListAsync(ct)
+                .ConfigureAwait(false);
         }
 
         public async Task<List<AvailabilityGroupModel>> GetByValueAsync(string value, CancellationToken ct = default)
         {
             if (string.IsNullOrWhiteSpace(value))
-                return await GetAllAsync(ct);
+                return await GetAllAsync(ct).ConfigureAwait(false);
 
             value = value.ToLower().Trim();
             bool hasInt = int.TryParse(value, out var intValue);
@@ -43,7 +44,7 @@ namespace DataAccessLayer.Repositories
                     (hasInt && (g.Year == intValue || g.Month == intValue || g.Id == intValue))
                 );
 
-            return await query.ToListAsync(ct);
+            return await query.ToListAsync(ct).ConfigureAwait(false);
         }
 
         public async Task<AvailabilityGroupModel?> GetFullByIdAsync(int id, CancellationToken ct = default)
@@ -52,7 +53,8 @@ namespace DataAccessLayer.Repositories
                 .AsNoTracking()
                 .Include(g => g.Members).ThenInclude(m => m.Employee)
                 .Include(g => g.Members).ThenInclude(m => m.Days)
-                .SingleOrDefaultAsync(g => g.Id == id, ct);
+                .SingleOrDefaultAsync(g => g.Id == id, ct)
+                .ConfigureAwait(false);
         }
     }
 }

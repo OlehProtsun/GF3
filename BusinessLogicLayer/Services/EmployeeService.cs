@@ -29,12 +29,12 @@ namespace BusinessLogicLayer.Services
             if (entity.FirstName.Length > 100 || entity.LastName.Length > 100)
                 throw new ValidationException("Ім'я/прізвище занадто довгі.");
 
-            return await base.CreateAsync(entity, ct);
+            return await base.CreateAsync(entity, ct).ConfigureAwait(false);
         }
 
         public async Task<List<EmployeeModel>> GetByValueAsync(string value, CancellationToken ct = default)
         {
-            return await _repo.GetByValueAsync(value, ct);
+            return await _repo.GetByValueAsync(value, ct).ConfigureAwait(false);
         }
 
     }

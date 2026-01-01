@@ -21,7 +21,8 @@ namespace DataAccessLayer.Repositories
                 .Where(ss => ss.ScheduleId == scheduleId)
                 .OrderBy(ss => ss.DayOfMonth)
                 .ThenBy(ss => ss.SlotNo)
-                .ToListAsync(ct);
+                .ToListAsync(ct)
+                .ConfigureAwait(false);
         }
     }
 }

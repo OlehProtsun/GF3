@@ -17,7 +17,7 @@ namespace DataAccessLayer.Repositories
         public async Task<List<EmployeeModel>> GetByValueAsync(string value, CancellationToken ct = default)
         {
             if (string.IsNullOrWhiteSpace(value))
-                return await _set.AsNoTracking().ToListAsync(ct);
+                return await _set.AsNoTracking().ToListAsync(ct).ConfigureAwait(false);
 
             value = value.ToLower().Trim();
 
@@ -28,7 +28,8 @@ namespace DataAccessLayer.Repositories
                     emp.LastName.ToLower().Contains(value) ||
                     (emp.Email != null && emp.Email.ToLower().Contains(value)) ||
                     (emp.Phone != null && emp.Phone.ToLower().Contains(value)))
-                .ToListAsync(ct);
+                .ToListAsync(ct)
+                .ConfigureAwait(false);
         }
     }
 }

@@ -3,11 +3,13 @@ using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Text;
+using System.Threading;
 
 namespace WinFormsApp.View.Container
 {
     public partial class ContainerView
     {
+        private readonly CancellationTokenSource _lifetimeCts = new();
         private bool isEdit;
         private bool isSuccessful;
         private string message = string.Empty;

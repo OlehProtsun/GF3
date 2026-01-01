@@ -62,6 +62,11 @@ namespace WinFormsApp.View.Employee
                 if (e.RowIndex < 0) return;
                 await RaiseAsync(OpenProfileEvent);
             };
+
+            inputFirstName.TextChanged += (_, __) => errorProvider.SetError(inputFirstName, "");
+            inputLastName.TextChanged += (_, __) => errorProvider.SetError(inputLastName, "");
+            inputEmail.TextChanged += (_, __) => errorProvider.SetError(inputEmail, "");
+            inputPhone.TextChanged += (_, __) => errorProvider.SetError(inputPhone, "");
         }
     }
 }

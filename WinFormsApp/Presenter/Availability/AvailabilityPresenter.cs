@@ -191,6 +191,7 @@ namespace WinFormsApp.Presenter.Availability
         private Task OnSaveEventAsync(CancellationToken ct)
             => RunSafe(async () =>
             {
+                _view.ClearValidationErrors();
                 var group = new AvailabilityGroupModel
                 {
                     Id = _view.AvailabilityMonthId,

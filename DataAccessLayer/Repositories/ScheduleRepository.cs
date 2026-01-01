@@ -18,7 +18,8 @@ namespace DataAccessLayer.Repositories
             return await _set
                 .AsNoTracking()
                 .Include(s => s.Container)
-                .ToListAsync(ct);
+                .ToListAsync(ct)
+                .ConfigureAwait(false);
         }
 
         public async Task<List<ScheduleModel>> GetByContainerAsync(int containerId, string? value = null, CancellationToken ct = default)
@@ -38,13 +39,13 @@ namespace DataAccessLayer.Repositories
                     (hasInt && (s.Year == intVal || s.Month == intVal)));
             }
 
-            return await query.ToListAsync(ct);
+            return await query.ToListAsync(ct).ConfigureAwait(false);
         }
 
         public async Task<List<ScheduleModel>> GetByValueAsync(string value, CancellationToken ct = default)
         {
             if (string.IsNullOrWhiteSpace(value))
-                return await GetAllAsync(ct);
+                return await GetAllAsync(ct).ConfigureAwait(false);
 
             value = value.Trim().ToLower();
             bool hasInt = int.TryParse(value, out var intVal);
@@ -56,7 +57,8 @@ namespace DataAccessLayer.Repositories
                     s.Name.ToLower().Contains(value) ||
                     s.Container.Name.ToLower().Contains(value) ||
                     (hasInt && (s.Year == intVal || s.Month == intVal)))
-                .ToListAsync(ct);
+                .ToListAsync(ct)
+                .ConfigureAwait(false);
         }
 
         public async Task<ScheduleModel?> GetDetailedAsync(int id, CancellationToken ct = default)
@@ -67,7 +69,8 @@ namespace DataAccessLayer.Repositories
                 .Include(s => s.Slots)
                 .Include(s => s.Employees)
                 .ThenInclude(e => e.Employee)
-                .FirstOrDefaultAsync(s => s.Id == id, ct);
+                .FirstOrDefaultAsync(s => s.Id == id, ct)
+                .ConfigureAwait(false);
         }
     }
 }
