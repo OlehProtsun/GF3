@@ -6,10 +6,11 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using WinFormsApp.ViewModel;
+using WinFormsApp.View.Shared;
 
 namespace WinFormsApp.View.Container
 {
-    public interface IContainerView
+    public interface IContainerView : IBusyView
     {
         ContainerViewModel Mode { get; set; }
         ContainerViewModel CancelTarget { get; set; }

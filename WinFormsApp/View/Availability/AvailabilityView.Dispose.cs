@@ -11,6 +11,7 @@ namespace WinFormsApp.View.Availability
             try { _lifetimeCts.Cancel(); } catch { /* ignore */ }
             _lifetimeCts.Dispose();
 
+            _busyController.Dispose();
             _matrixVPen.Dispose();
             _matrixHPen.Dispose();
 

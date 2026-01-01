@@ -84,12 +84,20 @@ namespace WinFormsApp.View.Availability
         private async Task RaiseSafeAsync(Func<CancellationToken, Task>? ev)
         {
             try { await (ev?.Invoke(_lifetimeCts.Token) ?? Task.CompletedTask); }
+            catch (OperationCanceledException)
+            {
+                // нормальна ситуація при закритті форми/скасуванні
+            }
             catch (Exception ex) { ShowError(ex.Message); }
         }
 
         private async Task RaiseSafeAsync<T>(Func<T, CancellationToken, Task>? ev, T arg)
         {
             try { await (ev?.Invoke(arg, _lifetimeCts.Token) ?? Task.CompletedTask); }
+            catch (OperationCanceledException)
+            {
+                // нормальна ситуація при закритті форми/скасуванні
+            }
             catch (Exception ex) { ShowError(ex.Message); }
         }
     }

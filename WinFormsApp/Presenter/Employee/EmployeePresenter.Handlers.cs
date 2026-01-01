@@ -45,7 +45,7 @@ namespace WinFormsApp.Presenter.Employee
         }
 
         private Task OnSaveEventAsync(CancellationToken ct) =>
-            RunSafeAsync(async () =>
+            RunBusySafeAsync(async innerCt =>
             {
                 _view.ClearValidationErrors();
                 var model = BuildModelFromView();
@@ -61,23 +61,23 @@ namespace WinFormsApp.Presenter.Employee
 
                 if (_view.IsEdit)
                 {
-                    await _service.UpdateAsync(model, ct);
+                    await _service.UpdateAsync(model, innerCt);
                     _view.ShowInfo("Employee updated successfully.");
                 }
                 else
                 {
-                    await _service.CreateAsync(model, ct);
+                    await _service.CreateAsync(model, innerCt);
                     _view.ShowInfo("Employee added successfully.");
                 }
 
                 _view.IsSuccessful = true;
 
-                await LoadEmployeesAsync(ct2 => _service.GetAllAsync(ct2), ct, selectId: model.Id);
+                await LoadEmployeesAsync(ct2 => _service.GetAllAsync(ct2), innerCt, selectId: model.Id);
                 SwitchToTargetAfterSaveOrCancel();
-            });
+            }, ct, "Saving employee...");
 
         private Task OnDeleteEventAsync(CancellationToken ct) =>
-            RunSafeAsync(async () =>
+            RunBusySafeAsync(async innerCt =>
             {
                 var employee = CurrentEmployee();
                 if (employee is null) return;
@@ -85,14 +85,14 @@ namespace WinFormsApp.Presenter.Employee
                 if (!_view.Confirm($"Delete {employee.FirstName} {employee.LastName}?"))
                     return;
 
-                await _service.DeleteAsync(employee.Id, ct);
+                await _service.DeleteAsync(employee.Id, innerCt);
 
                 _view.IsSuccessful = true;
                 _view.ShowInfo("Employee deleted successfully.");
 
-                await LoadEmployeesAsync(ct2 => _service.GetAllAsync(ct2), ct, selectId: null);
+                await LoadEmployeesAsync(ct2 => _service.GetAllAsync(ct2), innerCt, selectId: null);
                 _view.SwitchToListMode();
-            });
+            }, ct, "Deleting employee...");
 
         private Task OnCancelEventAsync(CancellationToken ct)
         {
@@ -117,18 +117,18 @@ namespace WinFormsApp.Presenter.Employee
         }
 
         private Task OnSearchEventAsync(CancellationToken ct) =>
-            RunSafeAsync(async () =>
+            RunBusySafeAsync(async innerCt =>
             {
                 var term = _view.SearchValue;
 
                 if (string.IsNullOrWhiteSpace(term))
                 {
-                    await LoadEmployeesAsync(ct2 => _service.GetAllAsync(ct2), ct, selectId: null);
+                    await LoadEmployeesAsync(ct2 => _service.GetAllAsync(ct2), innerCt, selectId: null);
                     return;
                 }
 
-                await LoadEmployeesAsync(ct2 => _service.GetByValueAsync(term, ct2), ct, selectId: null);
-            });
+                await LoadEmployeesAsync(ct2 => _service.GetByValueAsync(term, ct2), innerCt, selectId: null);
+            }, ct, "Searching employees...");
 
         private Task OnOpenProfileAsync(CancellationToken ct)
         {

@@ -4,6 +4,7 @@ using System.ComponentModel;
 using System.Data;
 using System.Globalization;
 using WinFormsApp.ViewModel;
+using WinFormsApp.View.Shared;
 
 namespace WinFormsApp.View.Container
 {
@@ -12,6 +13,7 @@ namespace WinFormsApp.View.Container
         public ContainerView()
         {
             InitializeComponent();
+            _busyController = new BusyOverlayController(this);
             WireAutoClearValidation();
 
             _containerErrorMap = CreateContainerErrorMap();
@@ -28,6 +30,7 @@ namespace WinFormsApp.View.Container
             try { _lifetimeCts.Cancel(); } catch { /* ignore */ }
             _lifetimeCts.Dispose();
 
+            _busyController.Dispose();
             _gridVPen.Dispose();
             _gridHPen.Dispose();
             _conflictPen.Dispose();

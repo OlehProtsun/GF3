@@ -3,6 +3,7 @@ using Guna.UI2.WinForms;
 using System.ComponentModel;
 using System.Data;
 using WinFormsApp.ViewModel;
+using WinFormsApp.View.Shared;
 
 namespace WinFormsApp.View.Availability
 {
@@ -11,6 +12,7 @@ namespace WinFormsApp.View.Availability
         public AvailabilityView()
         {
             InitializeComponent();
+            _busyController = new BusyOverlayController(this);
             AssociateAndRaiseViewEvents();
             ConfigureGrid();
             ConfigureAvailabilityGroupGrid();

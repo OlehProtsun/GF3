@@ -86,6 +86,7 @@ namespace WinFormsApp.View.Employee
         {
             try { _lifetimeCts.Cancel(); } catch { /* ignore */ }
             _lifetimeCts.Dispose();
+            _busyController.Dispose();
             base.OnFormClosed(e);
         }
     }
