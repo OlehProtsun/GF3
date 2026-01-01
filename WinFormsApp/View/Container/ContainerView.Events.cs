@@ -14,6 +14,10 @@ namespace WinFormsApp.View.Container
             {
                 if (ev == null) return;
                 try { await ev(_lifetimeCts.Token); }
+                catch (OperationCanceledException)
+                {
+                    // нормальна ситуація при закритті форми/скасуванні
+                }
                 catch (Exception ex) { ShowError(ex.Message); }
             }
 

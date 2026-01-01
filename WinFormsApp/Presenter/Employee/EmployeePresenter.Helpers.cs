@@ -1,25 +1,30 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace WinFormsApp.Presenter.Employee
 {
     public partial class EmployeePresenter
     {
-        private async Task RunSafeAsync(Func<Task> action)
+        private Task RunBusySafeAsync(Func<CancellationToken, Task> action, CancellationToken ct, string? busyText)
         {
-            try
+            return _view.RunBusyAsync(async innerCt =>
             {
-                await action();
-            }
-            catch (OperationCanceledException)
-            {
-                // нормальна ситуація при швидких пошуках/перемиканні
-            }
-            catch (Exception ex)
-            {
-                _view.ShowError(ex.Message);
-            }
+                try
+                {
+                    await action(innerCt);
+                }
+                catch (OperationCanceledException)
+                {
+                    // нормальна ситуація при швидких пошуках/перемиканні
+                }
+                catch (Exception ex)
+                {
+                    _view.ShowError(ex.Message);
+                }
+            }, ct, busyText);
         }
     }
 }

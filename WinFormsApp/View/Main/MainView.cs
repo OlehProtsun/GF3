@@ -10,6 +10,7 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using WinFormsApp.ViewModel;
+using WinFormsApp.View.Shared;
 
 namespace WinFormsApp.View.Main
 {
@@ -26,11 +27,7 @@ namespace WinFormsApp.View.Main
 
         private readonly CancellationTokenSource _navCts = new();
 
-        private Panel? _busyOverlay;
-        private Guna.UI2.WinForms.Guna2GroupBox? _busyBox;
-        private Guna.UI2.WinForms.Guna2CircleProgressBar? _busyCircle;
-        private Label? _busyText;
-        private System.Windows.Forms.Timer? _busyTimer;
+        private readonly BusyOverlayController _busyController;
 
 
         private NavPage _activePage = NavPage.None;
@@ -43,6 +40,7 @@ namespace WinFormsApp.View.Main
         {
             InitializeComponent();
             WindowState = FormWindowState.Maximized;
+            _busyController = new BusyOverlayController(this);
 
             btnEmployee.Click += async (_, __) => await InvokeNavAsync(ShowEmployeeView);
             btnAvailability.Click += async (_, __) => await InvokeNavAsync(ShowAvailabilityView);
@@ -92,125 +90,15 @@ namespace WinFormsApp.View.Main
             ReleaseCapture();
             SendMessage(this.Handle, WM_NCLBUTTONDOWN, HTCAPTION, 0);
         }
+
+        public CancellationToken LifetimeToken => _navCts.Token;
+
         public void ShowBusy(string? text = null)
-        {
-            if (_busyOverlay == null)
-            {
-                _busyOverlay = new Panel
-                {
-                    Dock = DockStyle.Fill,
-                    BackColor = Color.White,
-                    Visible = false
-                };
-
-                _busyCircle = new Guna.UI2.WinForms.Guna2CircleProgressBar
-                {
-                    FillColor = Color.FromArgb(200, 213, 218, 223),
-                    Font = new Font("Segoe UI", 12F),
-                    ForeColor = Color.White,
-                    Location = new Point(8, 11),
-                    Minimum = 0,
-                    Maximum = 100,
-                    Value = 0,
-                    Name = "busyCircle",
-                    Size = new Size(32, 32),
-                };
-                _busyCircle.ShadowDecoration.Mode = Guna.UI2.WinForms.Enums.ShadowMode.Circle;
-
-                _busyText = new Label
-                {
-                    AutoSize = true,
-                    Font = new Font("Segoe UI", 14.25F, FontStyle.Regular, GraphicsUnit.Point, 0),
-                    ForeColor = Color.Black,
-                    Location = new Point(42, 14),
-                    Name = "busyLabel",
-                    Text = ""
-                };
-
-                _busyBox = new Guna.UI2.WinForms.Guna2GroupBox
-                {
-                    BackColor = Color.Transparent,
-                    BorderColor = Color.White,
-                    BorderRadius = 25,
-                    BorderThickness = 0,
-                    CustomBorderColor = Color.White,
-                    Font = new Font("Segoe UI", 9F),
-                    ForeColor = Color.White,
-                    Name = "busyBox",
-                    Size = new Size(250, 53),
-                    Text = "" // важливо: щоб не було заголовка groupbox
-                };
-
-                _busyBox.ShadowDecoration.BorderRadius = 25;
-                _busyBox.ShadowDecoration.Depth = 3;
-                _busyBox.ShadowDecoration.Enabled = true;
-
-                _busyBox.Controls.Add(_busyText);
-                _busyBox.Controls.Add(_busyCircle);
-
-                _busyOverlay.Controls.Add(_busyBox);
-
-                // Центрування box по overlay
-                void CenterBox()
-                {
-                    if (_busyOverlay == null || _busyBox == null) return;
-                    _busyBox.Location = new Point(
-                        (_busyOverlay.ClientSize.Width - _busyBox.Width) / 2,
-                        (_busyOverlay.ClientSize.Height - _busyBox.Height) / 2
-                    );
-                }
-
-                _busyOverlay.Resize += (_, __) => CenterBox();
-                CenterBox();
-
-                Controls.Add(_busyOverlay);
-                _busyOverlay.BringToFront();
-
-                // Анімація "кручення" для circle progress
-                _busyTimer = new System.Windows.Forms.Timer { Interval = 20 };
-                _busyTimer.Tick += (_, __) =>
-                {
-                    if (_busyCircle == null) return;
-                    int v = _busyCircle.Value + 2;
-                    _busyCircle.Value = (v >= _busyCircle.Maximum) ? 0 : v;
-                };
-            }
-
-            _busyText!.Text = string.IsNullOrWhiteSpace(text) ? "Loading..." : text;
-
-            Cursor = Cursors.WaitCursor;
-
-            _busyOverlay!.Visible = true;
-            _busyOverlay.BringToFront();
-
-            _busyCircle!.Value = 0;
-            _busyTimer!.Start();
-
-            // Без DoEvents — просто форсуємо перемалювання
-            _busyOverlay.Update();
-        }
+            => _busyController.ShowBusy(text);
         public void HideBusy()
-        {
-            _busyTimer?.Stop();
-
-            if (_busyOverlay != null)
-                _busyOverlay.Visible = false;
-
-            Cursor = Cursors.Default;
-        }
+            => _busyController.HideBusy();
         public async Task RunBusyAsync(Func<CancellationToken, Task> action, CancellationToken ct, string? text = null)
-        {
-            ShowBusy(text);
-            try
-            {
-                await Task.Yield(); // UI встигає намалювати overlay
-                await action(ct);
-            }
-            finally
-            {
-                HideBusy();
-            }
-        }
+            => await _busyController.RunBusyAsync(action, ct, text, SetNavButtonsEnabled);
         public void SetActivePage(NavPage page)
         {
             _activePage = page;
@@ -241,15 +129,7 @@ namespace WinFormsApp.View.Main
             try { _navCts.Cancel(); } catch { /* ignore */ }
             _navCts.Dispose();
 
-            try { _busyTimer?.Stop(); } catch { /* ignore */ }
-            _busyTimer?.Dispose();
-
-            // overlay/контроли — теж прибираємо
-            _busyOverlay?.Dispose();
-            _busyOverlay = null;
-            _busyBox = null;
-            _busyCircle = null;
-            _busyText = null;
+            _busyController.Dispose();
 
             base.OnFormClosed(e);
         }

@@ -51,9 +51,12 @@ namespace WinFormsApp.Presenter.Availability
 
         public async Task InitializeAsync()
         {
-            await LoadAllGroups();
-            await LoadEmployees();
-            await LoadBinds();
+            await _view.RunBusyAsync(async ct =>
+            {
+                await LoadAllGroups(ct);
+                await LoadEmployees(ct);
+                await LoadBinds(ct);
+            }, _view.LifetimeToken, "Loading availability...");
         }
 
         private async Task LoadAllGroups(CancellationToken ct = default)
@@ -118,78 +121,79 @@ namespace WinFormsApp.Presenter.Availability
             return Task.CompletedTask;
         }
 
-        private async Task OnEditEventAsync(CancellationToken ct)
-        {
-            var current = _bindingSource.Current as AvailabilityGroupModel;
-            if (current is null) return;
-
-            _view.ClearValidationErrors();
-            _view.ResetGroupMatrix();
-
-            var (group, members, days) = await _service.LoadFullAsync(current.Id, ct);
-
-            _view.AvailabilityMonthId = group.Id;
-            _view.AvailabilityMonthName = group.Name;
-            _view.Year = group.Year;
-            _view.Month = group.Month;
-
-            // 1) add columns
-            foreach (var m in members)
+        private Task OnEditEventAsync(CancellationToken ct)
+            => RunBusySafeAsync(async innerCt =>
             {
-                var empId = m.EmployeeId;
-                var header = m.Employee is null
-                    ? (_employeeNames.TryGetValue(empId, out var n) ? n : $"Employee #{empId}")
-                    : $"{m.Employee.FirstName} {m.Employee.LastName}";
+                var current = _bindingSource.Current as AvailabilityGroupModel;
+                if (current is null) return;
 
-                _view.TryAddEmployeeColumn(empId, header);
-            }
+                _view.ClearValidationErrors();
+                _view.ResetGroupMatrix();
 
-            // 2) fill codes per employee
-            int dim = DateTime.DaysInMonth(group.Year, group.Month);
+                var (group, members, days) = await _service.LoadFullAsync(current.Id, innerCt);
 
-            // один lookup на всі days
-            var dayLookup = days
-                .GroupBy(d => (d.AvailabilityGroupMemberId, d.DayOfMonth))
-                .ToDictionary(g => g.Key, g => g.Last()); // або LastOrDefault/OrderBy якщо треба
+                _view.AvailabilityMonthId = group.Id;
+                _view.AvailabilityMonthName = group.Name;
+                _view.Year = group.Year;
+                _view.Month = group.Month;
 
-            foreach (var mb in members)
-            {
-                var codes = new List<(int day, string code)>(capacity: dim);
-
-                for (int day = 1; day <= dim; day++)
+                // 1) add columns
+                foreach (var m in members)
                 {
-                    if (!dayLookup.TryGetValue((mb.Id, day), out var d))
-                    {
-                        codes.Add((day, "-"));
-                        continue;
-                    }
+                    var empId = m.EmployeeId;
+                    var header = m.Employee is null
+                        ? (_employeeNames.TryGetValue(empId, out var n) ? n : $"Employee #{empId}")
+                        : $"{m.Employee.FirstName} {m.Employee.LastName}";
 
-                    var code = d.Kind switch
-                    {
-                        AvailabilityKind.ANY => "+",
-                        AvailabilityKind.NONE => "-",
-                        AvailabilityKind.INT => d.IntervalStr ?? "",
-                        _ => "-"
-                    };
-
-                    codes.Add((day, code));
+                    _view.TryAddEmployeeColumn(empId, header);
                 }
 
-                _view.SetEmployeeCodes(mb.EmployeeId, codes);
-            }
+                // 2) fill codes per employee
+                int dim = DateTime.DaysInMonth(group.Year, group.Month);
+
+                // один lookup на всі days
+                var dayLookup = days
+                    .GroupBy(d => (d.AvailabilityGroupMemberId, d.DayOfMonth))
+                    .ToDictionary(g => g.Key, g => g.Last()); // або LastOrDefault/OrderBy якщо треба
+
+                foreach (var mb in members)
+                {
+                    var codes = new List<(int day, string code)>(capacity: dim);
+
+                    for (int day = 1; day <= dim; day++)
+                    {
+                        if (!dayLookup.TryGetValue((mb.Id, day), out var d))
+                        {
+                            codes.Add((day, "-"));
+                            continue;
+                        }
+
+                        var code = d.Kind switch
+                        {
+                            AvailabilityKind.ANY => "+",
+                            AvailabilityKind.NONE => "-",
+                            AvailabilityKind.INT => d.IntervalStr ?? "",
+                            _ => "-"
+                        };
+
+                        codes.Add((day, code));
+                    }
+
+                    _view.SetEmployeeCodes(mb.EmployeeId, codes);
+                }
 
 
-            _view.IsEdit = true;
-            _view.Message = "Edit data and press Save.";
-            _view.CancelTarget = (_view.Mode == AvailabilityViewModel.Profile)
-                ? AvailabilityViewModel.Profile
-                : AvailabilityViewModel.List;
+                _view.IsEdit = true;
+                _view.Message = "Edit data and press Save.";
+                _view.CancelTarget = (_view.Mode == AvailabilityViewModel.Profile)
+                    ? AvailabilityViewModel.Profile
+                    : AvailabilityViewModel.List;
 
-            _view.SwitchToEditMode();
-        }
+                _view.SwitchToEditMode();
+            }, ct, "Loading availability...");
 
         private Task OnSaveEventAsync(CancellationToken ct)
-            => RunSafe(async () =>
+            => RunBusySafeAsync(async innerCt =>
             {
                 _view.ClearValidationErrors();
                 var group = new AvailabilityGroupModel
@@ -228,7 +232,7 @@ namespace WinFormsApp.Presenter.Availability
 
                 var isNew = group.Id == 0;
 
-                await _service.SaveGroupAsync(group, payload, ct);
+                await _service.SaveGroupAsync(group, payload, innerCt);
 
                 _view.IsSuccessful = true;
                 _view.ShowInfo(isNew
@@ -236,14 +240,14 @@ namespace WinFormsApp.Presenter.Availability
                     : "Availability Group updated successfully.");
 
 
-                await LoadAllGroups(ct);
+                await LoadAllGroups(innerCt);
 
                 if (_view.CancelTarget == AvailabilityViewModel.Profile)
                 {
                     var profileId = _openedProfileGroupId ?? group.Id;
                     if (profileId > 0)
                     {
-                        var (g, members, days) = await _service.LoadFullAsync(profileId, ct);
+                        var (g, members, days) = await _service.LoadFullAsync(profileId, innerCt);
                         _view.SetProfile(g, members, days);
                     }
 
@@ -253,10 +257,10 @@ namespace WinFormsApp.Presenter.Availability
                 {
                     _view.SwitchToListMode();
                 }
-            });
+            }, ct, "Saving availability...");
 
         private Task OnDeleteEventAsync(CancellationToken ct)
-            => RunSafe(async () =>
+            => RunBusySafeAsync(async innerCt =>
             {
                 var current = _bindingSource.Current as AvailabilityGroupModel;
                 if (current is null) return;
@@ -264,11 +268,11 @@ namespace WinFormsApp.Presenter.Availability
                 if (!_view.Confirm($"Delete '{current.Name}' ?"))
                     return;
 
-                await _service.DeleteAsync(current.Id, ct);
+                await _service.DeleteAsync(current.Id, innerCt);
                 _view.ShowInfo("Availability Group deleted successfully.");
-                await LoadAllGroups(ct);
+                await LoadAllGroups(innerCt);
                 _view.SwitchToListMode();
-            });
+            }, ct, "Deleting availability...");
 
         private Task OnCancelEventAsync(CancellationToken ct)
         {
@@ -290,28 +294,28 @@ namespace WinFormsApp.Presenter.Availability
         }
 
         private Task OnSearchEventAsync(CancellationToken ct)
-            => RunSafe(async () =>
+            => RunBusySafeAsync(async innerCt =>
             {
                 var term = _view.SearchValue;
                 _bindingSource.DataSource = string.IsNullOrWhiteSpace(term)
-                    ? await _service.GetAllAsync(ct)
-                    : await _service.GetByValueAsync(term, ct);
-            });
+                    ? await _service.GetAllAsync(innerCt)
+                    : await _service.GetByValueAsync(term, innerCt);
+            }, ct, "Searching availability...");
 
         private Task OnOpenProfileAsync(CancellationToken ct)
-            => RunSafe(async () =>
+            => RunBusySafeAsync(async innerCt =>
             {
                 var current = _bindingSource.Current as AvailabilityGroupModel;
                 if (current is null) return;
 
                 _openedProfileGroupId = current.Id;
 
-                var (group, members, days) = await _service.LoadFullAsync(current.Id, ct);
+                var (group, members, days) = await _service.LoadFullAsync(current.Id, innerCt);
 
                 _view.SetProfile(group, members, days);
                 _view.CancelTarget = AvailabilityViewModel.List;
                 _view.SwitchToProfileMode();
-            });
+            }, ct, "Loading profile...");
 
         private Task OnAddBindAsync(CancellationToken ct)
         {
@@ -320,7 +324,7 @@ namespace WinFormsApp.Presenter.Availability
         }
 
         private Task OnDeleteBindAsync(BindModel bind, CancellationToken ct)
-            => RunSafe(async () =>
+            => RunBusySafeAsync(async innerCt =>
             {
                 if (bind is null) return;
 
@@ -330,12 +334,12 @@ namespace WinFormsApp.Presenter.Availability
                     return;
                 }
 
-                await _bindService.DeleteAsync(bind.Id, ct);
-                await LoadBinds(ct);
-            });
+                await _bindService.DeleteAsync(bind.Id, innerCt);
+                await LoadBinds(innerCt);
+            }, ct, "Deleting bind...");
 
         private Task OnUpsertBindAsync(BindModel bind, CancellationToken ct)
-            => RunSafe(async () =>
+            => RunBusySafeAsync(async innerCt =>
             {
                 if (bind is null) return;
 
@@ -357,12 +361,12 @@ namespace WinFormsApp.Presenter.Availability
                 bind.Key = normalizedKey;
 
                 if (bind.Id == 0)
-                    await _bindService.CreateAsync(bind, ct);
+                    await _bindService.CreateAsync(bind, innerCt);
                 else
-                    await _bindService.UpdateAsync(bind, ct);
+                    await _bindService.UpdateAsync(bind, innerCt);
 
-                await LoadBinds(ct);
-            });
+                await LoadBinds(innerCt);
+            }, ct, "Saving bind...");
 
         private static bool TryNormalizeKey(string raw, out string normalized)
         {
@@ -381,21 +385,22 @@ namespace WinFormsApp.Presenter.Availability
             }
         }
 
-        private async Task RunSafe(Func<Task> action)
-        {
-            try
+        private Task RunBusySafeAsync(Func<CancellationToken, Task> action, CancellationToken ct, string? busyText)
+            => _view.RunBusyAsync(async innerCt =>
             {
-                await action();
-            }
-            catch (OperationCanceledException)
-            {
-                // опційно ігноруємо
-            }
-            catch (Exception ex)
-            {
-                _view.ShowError(ex.GetBaseException().Message);
-            }
-        }
+                try
+                {
+                    await action(innerCt);
+                }
+                catch (OperationCanceledException)
+                {
+                    // опційно ігноруємо
+                }
+                catch (Exception ex)
+                {
+                    _view.ShowError(ex.GetBaseException().Message);
+                }
+            }, ct, busyText);
 
     }
 }

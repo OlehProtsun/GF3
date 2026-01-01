@@ -5,10 +5,11 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using WinFormsApp.ViewModel;
+using WinFormsApp.View.Shared;
 
 namespace WinFormsApp.View.Employee
 {
-    public interface IEmployeeView
+    public interface IEmployeeView : IBusyView
     {
         EmployeeViewModel Mode { get; set; }
         EmployeeViewModel CancelTarget { get; set; }

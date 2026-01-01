@@ -34,6 +34,9 @@ namespace WinFormsApp.Presenter.Employee
         }
 
         public Task InitializeAsync() =>
-            LoadEmployeesAsync(ct => _service.GetAllAsync(ct), CancellationToken.None, selectId: null);
+            _view.RunBusyAsync(
+                ct => LoadEmployeesAsync(innerCt => _service.GetAllAsync(innerCt), ct, selectId: null),
+                _view.LifetimeToken,
+                "Loading employees...");
     }
 }
