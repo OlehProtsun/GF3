@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Text;
+using WinFormsApp.ViewModel;
+
 
 namespace WinFormsApp.View.Container
 {
@@ -29,12 +31,47 @@ namespace WinFormsApp.View.Container
             BindClick(btnDelete, () => DeleteEvent);
             BindClick(btnSave, () => SaveEvent);
 
-            BindClick(btnCancel, () => CancelEvent);
-            BindClick(btnBackToContainerList, () => CancelEvent);
+            // Cancel/back — явно кажемо “куди”
+            BindClick(
+                btnCancel,
+                () => CancelEvent,
+                before: () =>
+                {
+                    CancelTarget = WinFormsApp.ViewModel.ContainerViewModel.List;
+                    ClearValidationErrors();
+                });
 
-            BindClick(btnBackToContainerListFromProfile, () => CancelEvent);
-            BindClick(btnCancelProfile, () => CancelEvent);
-            BindClick(btnCancelProfile2, () => CancelEvent);
+            BindClick(
+                btnBackToContainerList,
+                () => CancelEvent,
+                before: () =>
+                {
+                    CancelTarget = ContainerViewModel.List;
+                });
+
+            BindClick(
+                btnBackToContainerListFromProfile,
+                () => CancelEvent,
+                before: () =>
+                {
+                    CancelTarget = ContainerViewModel.List;
+                });
+
+            BindClick(
+                btnCancelProfile,
+                () => CancelEvent,
+                before: () =>
+                {
+                    CancelTarget = ContainerViewModel.List;
+                });
+
+            BindClick(
+                btnCancelProfile2,
+                () => CancelEvent,
+                before: () =>
+                {
+                    CancelTarget = ContainerViewModel.List;
+                });
 
             containerGrid.CellDoubleClick += async (_, __) => await Raise(OpenProfileEvent);
 
@@ -49,14 +86,49 @@ namespace WinFormsApp.View.Container
             BindClick(btnScheduleEdit, () => ScheduleEditEvent, cancelEdit);
             BindClick(btnScheduleDelete, () => ScheduleDeleteEvent, cancelEdit);
 
-            BindClick(btnBackToContainerProfileFromSheduleProfile, () => ScheduleCancelEvent, cancelEdit);
 
-            BindClick(btnGenerate, () => ScheduleGenerateEvent, cancelEdit);
-            BindClick(btnScheduleCancel, () => ScheduleCancelEvent, cancelEdit);
-            BindClick(btnBackToScheduleList, () => ScheduleCancelEvent, cancelEdit);
+            BindClick(
+                btnGenerate,
+                () => ScheduleGenerateEvent,
+                before: () =>
+                {
+                    cancelEdit();
+                    ClearScheduleValidationErrors();   // ✅ прибирає старі хрестики
+                });
+
+            BindClick(
+                btnBackToContainerProfileFromSheduleProfile,
+                () => ScheduleCancelEvent,
+                before: () =>
+                {
+                    cancelEdit();
+                    ScheduleCancelTarget = ScheduleViewModel.List;
+                });
+
+            BindClick(
+                btnScheduleCancel,
+                () => ScheduleCancelEvent,
+                before: () =>
+                {
+                    cancelEdit();
+                    ScheduleCancelTarget = ScheduleViewModel.List;
+                    ClearScheduleValidationErrors();
+                });
+
+            BindClick(
+                btnBackToScheduleList,
+                () => ScheduleCancelEvent,
+                before: () =>
+                {
+                    cancelEdit();
+                    ScheduleCancelTarget = ScheduleViewModel.List;
+                });
 
             btnScheduleSave.Click += async (_, __) =>
             {
+                cancelEdit();
+                ClearScheduleValidationErrors(); // ✅ очищає старі значки
+
                 var ok = true;
                 try { ok = slotGrid.EndEdit(); } catch { ok = false; }
                 if (!ok || slotGrid.IsCurrentCellInEditMode) return;

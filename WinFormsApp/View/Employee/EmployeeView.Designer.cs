@@ -177,16 +177,17 @@
             tabControl.TabIndex = 0;
             tabControl.TabMenuBackColor = Color.FromArgb(33, 42, 57);
             tabControl.TabMenuOrientation = Guna.UI2.WinForms.TabMenuOrientation.HorizontalTop;
+            tabControl.TabMenuVisible = false;
             // 
             // tabList
             // 
             tabList.BackColor = Color.White;
             tabList.Controls.Add(dataGrid);
             tabList.Controls.Add(guna2GroupBox1);
-            tabList.Location = new Point(4, 44);
+            tabList.Location = new Point(4, 5);
             tabList.Name = "tabList";
             tabList.Padding = new Padding(3);
-            tabList.Size = new Size(782, 667);
+            tabList.Size = new Size(782, 706);
             tabList.TabIndex = 0;
             tabList.Text = "List";
             // 
@@ -226,7 +227,7 @@
             dataGridViewCellStyle4.WrapMode = DataGridViewTriState.True;
             dataGrid.RowHeadersDefaultCellStyle = dataGridViewCellStyle4;
             dataGrid.RowHeadersVisible = false;
-            dataGrid.Size = new Size(764, 532);
+            dataGrid.Size = new Size(764, 571);
             dataGrid.TabIndex = 6;
             dataGrid.ThemeStyle.AlternatingRowsStyle.BackColor = Color.White;
             dataGrid.ThemeStyle.AlternatingRowsStyle.Font = null;

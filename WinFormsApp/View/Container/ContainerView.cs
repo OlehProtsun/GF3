@@ -12,6 +12,7 @@ namespace WinFormsApp.View.Container
         public ContainerView()
         {
             InitializeComponent();
+            WireAutoClearValidation();
 
             _containerErrorMap = CreateContainerErrorMap();
             _scheduleErrorMap = CreateScheduleErrorMap();

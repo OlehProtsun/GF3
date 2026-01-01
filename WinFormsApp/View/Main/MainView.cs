@@ -36,12 +36,8 @@ namespace WinFormsApp.View.Main
         private NavPage _activePage = NavPage.None;
         public NavPage ActivePage => _activePage;
 
-        private readonly Color _navActiveFill = Color.RoyalBlue;
-        private readonly Color _navActiveFore = Color.White;
-
-        private readonly Color _navNormalFill = Color.DarkGray;
-        private readonly Color _navNormalFore = Color.Black;
-        //private readonly Color _navNormalBorder = Color.FromArgb(220, 220, 220);
+        private readonly Color _navActiveFill = Color.DarkGray;
+        private readonly Color _navNormalFill = Color.White;
 
         public MainView()
         {
@@ -231,18 +227,13 @@ namespace WinFormsApp.View.Main
             if (isActive)
             {
                 btn.FillColor = _navActiveFill;
-                btn.ForeColor = _navActiveFore;
 
                 // щоб DisabledState не робив сірою, коли ми вимкнемо кнопку в іншому місці
                 btn.DisabledState.FillColor = _navActiveFill;
-                btn.DisabledState.ForeColor = _navActiveFore;
-                btn.DisabledState.BorderColor = _navActiveFill;
-                btn.DisabledState.CustomBorderColor = _navActiveFill;
             }
             else
             {
                 btn.FillColor = _navNormalFill;
-                btn.ForeColor = _navNormalFore;
             }
         }
         protected override void OnFormClosed(FormClosedEventArgs e)

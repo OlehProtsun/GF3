@@ -54,5 +54,28 @@ namespace WinFormsApp.View.Container
         {
             return MessageBox.Show(text, caption ?? "Confirm", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes;
         }
+
+        private void WireAutoClearValidation()
+        {
+            // container
+            inputContainerName.TextChanged += (_, __) => errorProviderContainer.SetError(inputContainerName, "");
+            inputContainerNote.TextChanged += (_, __) => errorProviderContainer.SetError(inputContainerNote, "");
+
+            // schedule (textbox)
+            inputScheduleName.TextChanged += (_, __) => errorProviderSchedule.SetError(inputScheduleName, "");
+            inputShift1.TextChanged += (_, __) => errorProviderSchedule.SetError(inputShift1, "");
+            inputShift2.TextChanged += (_, __) => errorProviderSchedule.SetError(inputShift2, "");
+
+            // schedule (numeric)
+            inputYear.ValueChanged += (_, __) => errorProviderSchedule.SetError(inputYear, "");
+            inputMonth.ValueChanged += (_, __) => errorProviderSchedule.SetError(inputMonth, "");
+            inputPeoplePerShift.ValueChanged += (_, __) => errorProviderSchedule.SetError(inputPeoplePerShift, "");
+
+            inputMaxHours.ValueChanged += (_, __) => errorProviderSchedule.SetError(inputMaxHours, "");
+            inputMaxConsecutiveDays.ValueChanged += (_, __) => errorProviderSchedule.SetError(inputMaxConsecutiveDays, "");
+            inputMaxConsecutiveFull.ValueChanged += (_, __) => errorProviderSchedule.SetError(inputMaxConsecutiveFull, "");
+            inputMaxFull.ValueChanged += (_, __) => errorProviderSchedule.SetError(inputMaxFull, "");
+        }
+
     }
 }
