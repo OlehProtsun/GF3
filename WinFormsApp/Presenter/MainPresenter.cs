@@ -1,14 +1,6 @@
-﻿using BusinessLogicLayer.Services.Abstractions;
-using Microsoft.Extensions.DependencyInjection;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
+﻿using System;
 using System.Threading.Tasks;
 using System.Windows.Forms;
-using WinFormsApp.View.Availability;
-using WinFormsApp.View.Container;
-using WinFormsApp.View.Employee;
 using WinFormsApp.View.Main;
 using WinFormsApp.ViewModel;
 
@@ -17,41 +9,41 @@ namespace WinFormsApp.Presenter
     public class MainPresenter
     {
         private readonly IMainView _mainView;
-        private readonly IServiceProvider _sp;
+        private readonly IMdiViewFactory _viewFactory;
 
-        private EmployeeView? _employeeView;
-        private AvailabilityView? _availabilityView;
-        private ContainerView? _containerView;
+        private Form? _employeeView;
+        private Form? _availabilityView;
+        private Form? _containerView;
 
-        public MainPresenter(IMainView mainView, IServiceProvider sp)
+        public MainPresenter(IMainView mainView, IMdiViewFactory viewFactory)
         {
             _mainView = mainView;
-            _sp = sp;
+            _viewFactory = viewFactory;
 
             _mainView.ShowEmployeeView += ct =>
-                NavigateAsync(ct, () => _employeeView, v => _employeeView = v, NavPage.Employee, "Opening Employee...");
+                NavigateAsync(ct, () => _employeeView, v => _employeeView = v, _viewFactory.CreateEmployeeView, NavPage.Employee, "Opening Employee...");
 
             _mainView.ShowAvailabilityView += ct =>
-                NavigateAsync(ct, () => _availabilityView, v => _availabilityView = v, NavPage.Availability, "Opening Availability...");
+                NavigateAsync(ct, () => _availabilityView, v => _availabilityView = v, _viewFactory.CreateAvailabilityView, NavPage.Availability, "Opening Availability...");
 
             _mainView.ShowContainerView += ct =>
-                NavigateAsync(ct, () => _containerView, v => _containerView = v, NavPage.Container, "Opening Container...");
+                NavigateAsync(ct, () => _containerView, v => _containerView = v, _viewFactory.CreateContainerView, NavPage.Container, "Opening Container...");
         }
 
-        private Task NavigateAsync<TView>(
+        private Task NavigateAsync(
             CancellationToken ct,
-            Func<TView?> getView,
-            Action<TView> setView,
+            Func<Form?> getView,
+            Action<Form> setView,
+            Func<Form> createView,
             NavPage page,
             string busyText)
-            where TView : Form
         {
             return _mainView.RunBusyAsync(innerCt =>
             {
                 _mainView.SetActivePage(page);
 
                 var view = getView();
-                view = ShowMdi(getOrCreate: () => view, set: setView, innerCt);
+                view = ShowMdi(getOrCreate: () => view, createView, setView, innerCt);
 
                 // на випадок, якщо створили нову — зафіксуємо
                 setView(view);
@@ -61,8 +53,7 @@ namespace WinFormsApp.Presenter
         }
 
 
-        private TView ShowMdi<TView>(Func<TView?> getOrCreate, Action<TView> set, CancellationToken ct)
-            where TView : Form
+        private Form ShowMdi(Func<Form?> getOrCreate, Func<Form> createView, Action<Form> set, CancellationToken ct)
         {
             if (ct.IsCancellationRequested)
                 return getOrCreate() ?? throw new OperationCanceledException(ct);
@@ -70,7 +61,7 @@ namespace WinFormsApp.Presenter
             var view = getOrCreate();
             if (view is null || view.IsDisposed)
             {
-                view = _sp.GetRequiredService<TView>();
+                view = createView();
 
                 if (_mainView is Form mdiParent)
                 {

@@ -30,6 +30,7 @@ namespace WinFormsApp
             services.AddDataAccess($"Data Source={dbPath}");
             services.AddBusinessLogicLayer();
             services.AddSingleton<BusinessLogicLayer.Generators.IScheduleGenerator, BusinessLogicLayer.Generators.ScheduleGenerator>();
+            services.AddSingleton<WinFormsApp.Presenter.IMdiViewFactory, WinFormsApp.Presenter.MdiViewFactory>();
 
             // Main
             services.AddTransient<MainPresenter>();
