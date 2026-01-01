@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using WinFormsApp.Presenter;
 using WinFormsApp.Presenter.Availability;
 using WinFormsApp.Presenter.Container;
+using WinFormsApp.Presenter.Employee;
 using WinFormsApp.View.Availability;
 using WinFormsApp.View.Container;
 using WinFormsApp.View.Employee;
