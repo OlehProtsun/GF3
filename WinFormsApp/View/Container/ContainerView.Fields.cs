@@ -36,5 +36,11 @@ namespace WinFormsApp.View.Container
 
         private readonly List<ScheduleSlotModel> _slots = new();
         private readonly List<ScheduleEmployeeModel> _employees = new();
+
+        // Schedule info (guna2GroupBox5) collapse/expand
+        private bool _scheduleInfoExpanded = true;
+        private int _scheduleInfoExpandedHeight;
+        private const int ScheduleInfoCollapsedHeight = 43;
+
     }
 }

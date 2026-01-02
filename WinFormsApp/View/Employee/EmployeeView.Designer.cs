@@ -157,7 +157,7 @@
             tabControl.Location = new Point(0, 0);
             tabControl.Name = "tabControl";
             tabControl.SelectedIndex = 0;
-            tabControl.Size = new Size(790, 715);
+            tabControl.Size = new Size(790, 649);
             tabControl.TabButtonHoverState.BorderColor = Color.Empty;
             tabControl.TabButtonHoverState.FillColor = Color.FromArgb(40, 52, 70);
             tabControl.TabButtonHoverState.Font = new Font("Segoe UI Semibold", 10F);
@@ -187,7 +187,7 @@
             tabList.Location = new Point(4, 5);
             tabList.Name = "tabList";
             tabList.Padding = new Padding(3);
-            tabList.Size = new Size(782, 706);
+            tabList.Size = new Size(782, 640);
             tabList.TabIndex = 0;
             tabList.Text = "List";
             // 
@@ -227,7 +227,7 @@
             dataGridViewCellStyle4.WrapMode = DataGridViewTriState.True;
             dataGrid.RowHeadersDefaultCellStyle = dataGridViewCellStyle4;
             dataGrid.RowHeadersVisible = false;
-            dataGrid.Size = new Size(764, 571);
+            dataGrid.Size = new Size(764, 505);
             dataGrid.TabIndex = 6;
             dataGrid.ThemeStyle.AlternatingRowsStyle.BackColor = Color.White;
             dataGrid.ThemeStyle.AlternatingRowsStyle.Font = null;
@@ -375,10 +375,10 @@
             tabEditAdnCreate.BackColor = Color.White;
             tabEditAdnCreate.Controls.Add(guna2GroupBox3);
             tabEditAdnCreate.Controls.Add(guna2GroupBox2);
-            tabEditAdnCreate.Location = new Point(4, 44);
+            tabEditAdnCreate.Location = new Point(4, 5);
             tabEditAdnCreate.Name = "tabEditAdnCreate";
             tabEditAdnCreate.Padding = new Padding(3);
-            tabEditAdnCreate.Size = new Size(782, 667);
+            tabEditAdnCreate.Size = new Size(782, 250);
             tabEditAdnCreate.TabIndex = 1;
             tabEditAdnCreate.Text = "Edit/Create";
             // 
@@ -737,9 +737,9 @@
             // 
             tabProfile.Controls.Add(guna2GroupBox5);
             tabProfile.Controls.Add(guna2GroupBox4);
-            tabProfile.Location = new Point(4, 44);
+            tabProfile.Location = new Point(4, 5);
             tabProfile.Name = "tabProfile";
-            tabProfile.Size = new Size(782, 667);
+            tabProfile.Size = new Size(782, 250);
             tabProfile.TabIndex = 2;
             tabProfile.Text = "Profile";
             tabProfile.UseVisualStyleBackColor = true;
@@ -1052,7 +1052,7 @@
             AutoScaleDimensions = new SizeF(7F, 15F);
             AutoScaleMode = AutoScaleMode.Font;
             BackColor = Color.White;
-            ClientSize = new Size(790, 715);
+            ClientSize = new Size(790, 649);
             Controls.Add(tabControl);
             FormBorderStyle = FormBorderStyle.None;
             Name = "EmployeeView";

@@ -6,6 +6,7 @@ using Moq;
 using WinFormsApp.Presenter.Availability;
 using WinFormsApp.Presentation.Tests.Helpers;
 using WinFormsApp.ViewModel;
+using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace WinFormsApp.Presentation.Tests;
 

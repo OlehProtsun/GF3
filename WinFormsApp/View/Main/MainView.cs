@@ -33,6 +33,8 @@ namespace WinFormsApp.View.Main
         private NavPage _activePage = NavPage.None;
         public NavPage ActivePage => _activePage;
 
+        public Control ContentHost => PanelContentMain;
+
         private readonly Color _navActiveFill = Color.DarkGray;
         private readonly Color _navNormalFill = Color.White;
 
@@ -134,5 +136,9 @@ namespace WinFormsApp.View.Main
             base.OnFormClosed(e);
         }
 
+        private void btnAvailability_Click(object sender, EventArgs e)
+        {
+
+        }
     }
 }

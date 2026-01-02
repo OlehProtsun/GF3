@@ -58,6 +58,9 @@ namespace WinFormsApp.Presenter.Container
             _view.ScheduleOpenProfileEvent += ct => RunBusySafeAsync(OnScheduleOpenProfileCoreAsync, ct, "Loading schedule...");
             _view.ScheduleGenerateEvent += ct => RunBusySafeAsync(OnScheduleGenerateCoreAsync, ct, "Generating schedule...");
 
+            _view.AvailabilitySelectionChangedEvent += ct => SafeAsync(OnAvailabilitySelectionChangedCoreAsync, ct);
+
+
             _view.SetContainerBindingSource(_containerBinding);
             _view.SetScheduleBindingSource(_scheduleBinding);
             _view.SetSlotBindingSource(_slotBinding);

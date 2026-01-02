@@ -14,7 +14,7 @@ namespace WinFormsApp.View.Shared
         private Guna2GroupBox? _busyBox;
         private Guna2CircleProgressBar? _busyCircle;
         private Label? _busyText;
-        private Timer? _busyTimer;
+        private System.Windows.Forms.Timer? _busyTimer;
         private bool _disposed;
 
         public BusyOverlayController(Form host)
@@ -180,7 +180,7 @@ namespace WinFormsApp.View.Shared
             _host.Controls.Add(_busyOverlay);
             _busyOverlay.BringToFront();
 
-            _busyTimer = new Timer { Interval = 20 };
+            _busyTimer = new System.Windows.Forms.Timer { Interval = 20 };
             _busyTimer.Tick += (_, __) =>
             {
                 if (_busyCircle == null) return;

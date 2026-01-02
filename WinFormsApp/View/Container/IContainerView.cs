@@ -1,4 +1,4 @@
-using DataAccessLayer.Models;
+﻿using DataAccessLayer.Models;
 using DataAccessLayer.Models.Enums;
 using System;
 using System.Collections.Generic;
@@ -64,6 +64,9 @@ namespace WinFormsApp.View.Container
         event Func<CancellationToken, Task>? ScheduleOpenProfileEvent;
         event Func<CancellationToken, Task>? ScheduleGenerateEvent;
 
+        event Func<CancellationToken, Task>? AvailabilitySelectionChangedEvent;
+
+
         void SetContainerBindingSource(BindingSource containers);
         void SetScheduleBindingSource(BindingSource schedules);
         void SetSlotBindingSource(BindingSource slots);
@@ -92,5 +95,16 @@ namespace WinFormsApp.View.Container
 
         void SetProfile(ContainerModel model);
         void SetScheduleProfile(ScheduleModel model);
+
+
+        void SetCheckedAvailabilityGroupIds(IEnumerable<int> groupIds, bool fireEvent = true);
+
+        void SetAvailabilityPreviewMatrix(
+            int year,
+            int month,
+            IList<ScheduleSlotModel> slots,
+            IList<ScheduleEmployeeModel> employees);
+
+        void ClearAvailabilityPreviewMatrix();
     }
 }

@@ -7,12 +7,13 @@ internal sealed class FakeForm : Form
     public int ShowCalls { get; private set; }
     public int BringToFrontCalls { get; private set; }
 
-    public override void Show()
+    // Use 'new' to hide the inherited non-virtual method
+    public new void Show()
     {
         ShowCalls++;
     }
 
-    public override void BringToFront()
+    public new void BringToFront()
     {
         BringToFrontCalls++;
     }

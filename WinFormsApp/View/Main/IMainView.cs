@@ -11,6 +11,7 @@ namespace WinFormsApp.View.Main
     {
         NavPage ActivePage { get; }
 
+        Control ContentHost { get; }
 
         event Func<CancellationToken, Task>? ShowEmployeeView;
         event Func<CancellationToken, Task>? ShowAvailabilityView;

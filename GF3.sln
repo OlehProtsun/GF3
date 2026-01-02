@@ -1,15 +1,13 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio Version 17
-VisualStudioVersion = 17.13.35825.156
+# Visual Studio Version 18
+VisualStudioVersion = 18.0.11205.157 d18.0
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DataAccessLayer", "DataAccessLayer\DataAccessLayer.csproj", "{E44D7D55-0232-4F1D-99AA-238399E90114}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WinFormsApp", "WinFormsApp\WinFormsApp.csproj", "{514815E3-E8FE-4CE0-91BD-0FEC49948C2B}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BusinessLogicLayer", "BusinessLogicLayer\BusinessLogicLayer.csproj", "{54FADDCB-6233-431C-8432-F31D103977FB}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WinFormsApp.Presentation.Tests", "WinFormsApp.Presentation.Tests\WinFormsApp.Presentation.Tests.csproj", "{D4DBF374-60EF-44C7-AB78-9D046BB27C73}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -29,10 +27,6 @@ Global
 		{54FADDCB-6233-431C-8432-F31D103977FB}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{54FADDCB-6233-431C-8432-F31D103977FB}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{54FADDCB-6233-431C-8432-F31D103977FB}.Release|Any CPU.Build.0 = Release|Any CPU
-		{D4DBF374-60EF-44C7-AB78-9D046BB27C73}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{D4DBF374-60EF-44C7-AB78-9D046BB27C73}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{D4DBF374-60EF-44C7-AB78-9D046BB27C73}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{D4DBF374-60EF-44C7-AB78-9D046BB27C73}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

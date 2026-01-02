@@ -35,6 +35,7 @@ namespace WinFormsApp.View.Container
         public void SwitchToScheduleListMode()
         {
             tabControl.SelectedTab = tabProfile;
+            Mode = ContainerViewModel.Profile;     // ✅ щоб стан відповідав табу
             ScheduleMode = ScheduleViewModel.List;
         }
 

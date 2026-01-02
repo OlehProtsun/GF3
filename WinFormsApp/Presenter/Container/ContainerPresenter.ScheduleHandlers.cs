@@ -1,17 +1,22 @@
 ﻿using DataAccessLayer.Models;
+using DataAccessLayer.Models.Enums;
 using System;
 using System.Collections.Generic;
 using System.Text;
+using WinFormsApp.Presenter.Availability;
 using WinFormsApp.ViewModel;
+using WinFormsApp.Presenter.Availability;
+using DataAccessLayer.Models.Enums;
 
 namespace WinFormsApp.Presenter.Container
 {
     public sealed partial class ContainerPresenter
     {
-        private async Task LoadLookupsAsync(CancellationToken ct)
+        private async Task<IList<AvailabilityGroupModel>> LoadLookupsAsync(CancellationToken ct)
         {
-            var groups = await _availabilityGroupService.GetAllAsync(ct);
+            var groups = (await _availabilityGroupService.GetAllAsync(ct)).ToList();
             _view.SetAvailabilityGroupList(groups);
+            return groups;
         }
 
         private async Task LoadSchedulesAsync(int containerId, string? search, CancellationToken ct)
@@ -41,13 +46,16 @@ namespace WinFormsApp.Presenter.Container
             _view.IsEdit = false;
             _view.ScheduleContainerId = container.Id;
             _view.ScheduleCancelTarget = ScheduleViewModel.List;
-
             _view.SwitchToScheduleEditMode();
+            _view.ClearAvailabilityPreviewMatrix();
+            await UpdateAvailabilityPreviewCoreAsync(ct);
         }
 
         private async Task OnScheduleEditCoreAsync(CancellationToken ct)
         {
             var schedule = CurrentSchedule;
+            var groups = await LoadLookupsAsync(ct);
+
             if (schedule is null) return;
 
             await LoadLookupsAsync(ct);
@@ -77,7 +85,17 @@ namespace WinFormsApp.Presenter.Container
                 ? ScheduleViewModel.Profile
                 : ScheduleViewModel.List;
 
+            var idsToCheck = groups
+                .Where(g => g.Year == _view.ScheduleYear && g.Month == _view.ScheduleMonth)
+                .Select(g => g.Id)
+                .ToList();
+
+            _view.SetCheckedAvailabilityGroupIds(idsToCheck);
+
             _view.SwitchToScheduleEditMode();
+
+            _view.ClearAvailabilityPreviewMatrix();
+            await UpdateAvailabilityPreviewCoreAsync(ct);
         }
 
         private async Task OnScheduleSaveCoreAsync(CancellationToken ct)
@@ -233,5 +251,130 @@ namespace WinFormsApp.Presenter.Container
 
             _view.ShowInfo("Slots generated. Review before saving.");
         }
+
+        private Task OnAvailabilitySelectionChangedCoreAsync(CancellationToken ct)
+            => UpdateAvailabilityPreviewCoreAsync(ct);
+
+        private async Task UpdateAvailabilityPreviewCoreAsync(CancellationToken ct)
+        {
+            var year = _view.ScheduleYear;
+            var month = _view.ScheduleMonth;
+
+            var selectedGroupIds = _view.SelectedAvailabilityGroupIds;
+            if (selectedGroupIds is null || selectedGroupIds.Count == 0)
+            {
+                _view.ClearAvailabilityPreviewMatrix();
+                return;
+            }
+
+            // 1) Підготуємо shift1/shift2 як (from,to), щоб показувати ANY
+            (string from, string to)? shift1 = TrySplitShift(_view.ScheduleShift1);
+            (string from, string to)? shift2 = TrySplitShift(_view.ScheduleShift2);
+
+            var employees = new List<ScheduleEmployeeModel>();
+            var slots = new List<ScheduleSlotModel>();
+            var seenEmp = new HashSet<int>();
+            var seenSlot = new HashSet<string>(); // щоб не дублювати інтервали між групами
+
+            foreach (var groupId in selectedGroupIds.Distinct())
+            {
+                ct.ThrowIfCancellationRequested();
+
+                var (group, members, days) = await _availabilityGroupService.LoadFullAsync(groupId, ct);
+
+                // тільки потрібний місяць/рік
+                if (group.Year != year || group.Month != month)
+                    continue;
+
+                var daysByMember = days
+                    .GroupBy(d => d.AvailabilityGroupMemberId)
+                    .ToDictionary(g => g.Key, g => g.ToList());
+
+                foreach (var m in members)
+                {
+                    // employees для заголовків колонок (важливо щоб Employee був підвантажений, бо BuildScheduleTable бере FirstName/LastName)
+                    if (seenEmp.Add(m.EmployeeId))
+                    {
+                        employees.Add(new ScheduleEmployeeModel
+                        {
+                            EmployeeId = m.EmployeeId,
+                            Employee = m.Employee
+                        });
+                    }
+
+                    if (!daysByMember.TryGetValue(m.Id, out var mdays) || mdays.Count == 0)
+                        continue;
+
+                    foreach (var d in mdays)
+                    {
+                        // NONE -> пусто
+                        if (d.Kind == AvailabilityKind.NONE)
+                            continue;
+
+                        // INT -> 1 інтервал з IntervalStr
+                        if (d.Kind == AvailabilityKind.INT)
+                        {
+                            if (string.IsNullOrWhiteSpace(d.IntervalStr))
+                                continue;
+
+                            // на всякий випадок проганяємо нормалізацію
+                            if (!AvailabilityCodeParser.TryNormalizeInterval(d.IntervalStr, out var normalized))
+                                continue;
+
+                            if (TrySplitInterval(normalized, out var from, out var to))
+                                AddSlotUnique(m.EmployeeId, d.DayOfMonth, from, to);
+
+                            continue;
+                        }
+
+                        // ANY -> показуємо shift1 + shift2 (якщо вони валідні)
+                        if (d.Kind == AvailabilityKind.ANY)
+                        {
+                            if (shift1 != null) AddSlotUnique(m.EmployeeId, d.DayOfMonth, shift1.Value.from, shift1.Value.to);
+                            if (shift2 != null) AddSlotUnique(m.EmployeeId, d.DayOfMonth, shift2.Value.from, shift2.Value.to);
+                        }
+                    }
+                }
+            }
+
+            _view.SetAvailabilityPreviewMatrix(year, month, slots, employees);
+
+            // ---------- local helpers ----------
+            void AddSlotUnique(int empId, int day, string from, string to)
+            {
+                var key = $"{empId}|{day}|{from}|{to}";
+                if (!seenSlot.Add(key)) return;
+
+                slots.Add(new ScheduleSlotModel
+                {
+                    EmployeeId = empId,
+                    DayOfMonth = day,
+                    FromTime = from,
+                    ToTime = to,
+                    SlotNo = 1,
+                    Status = SlotStatus.UNFURNISHED
+                });
+            }
+
+            static bool TrySplitInterval(string normalized, out string from, out string to)
+            {
+                from = to = "";
+                var parts = normalized.Split('-', 2, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+                if (parts.Length != 2) return false;
+                from = parts[0];
+                to = parts[1];
+                return true;
+            }
+
+            // Використовує твою ж логіку нормалізації shift-ів з ContainerPresenter.Validation :contentReference[oaicite:8]{index=8}
+            (string from, string to)? TrySplitShift(string rawShift)
+            {
+                if (!TryNormalizeShiftRange(rawShift, out var normalized, out _))
+                    return null;
+
+                return TrySplitInterval(normalized, out var f, out var t) ? (f, t) : null;
+            }
+        }
+
     }
 }

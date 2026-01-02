@@ -3,6 +3,7 @@ using Moq;
 using WinFormsApp.Presenter;
 using WinFormsApp.Presentation.Tests.Helpers;
 using WinFormsApp.ViewModel;
+using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace WinFormsApp.Presentation.Tests;
 

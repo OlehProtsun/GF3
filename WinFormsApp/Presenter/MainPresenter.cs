@@ -43,7 +43,7 @@ namespace WinFormsApp.Presenter
                 _mainView.SetActivePage(page);
 
                 var view = getView();
-                view = ShowMdi(getOrCreate: () => view, createView, setView, innerCt);
+                view = ShowInPanel(getOrCreate: () => view, createView, setView, innerCt);
 
                 // на випадок, якщо створили нову — зафіксуємо
                 setView(view);
@@ -53,7 +53,11 @@ namespace WinFormsApp.Presenter
         }
 
 
-        private Form ShowMdi(Func<Form?> getOrCreate, Func<Form> createView, Action<Form> set, CancellationToken ct)
+        private Form ShowInPanel(
+            Func<Form?> getOrCreate,
+            Func<Form> createView,
+            Action<Form> set,
+            CancellationToken ct)
         {
             if (ct.IsCancellationRequested)
                 return getOrCreate() ?? throw new OperationCanceledException(ct);
@@ -63,23 +67,25 @@ namespace WinFormsApp.Presenter
             {
                 view = createView();
 
-                if (_mainView is Form mdiParent)
-                {
-                    view.MdiParent = mdiParent;
-                    view.Dock = DockStyle.Fill;
-                }
+                // КЛЮЧОВЕ: вбудовуємо Form як Control у Panel
+                view.TopLevel = false;
+                view.FormBorderStyle = FormBorderStyle.None;
+                view.Dock = DockStyle.Fill;
 
+                _mainView.ContentHost.Controls.Add(view);
                 set(view);
             }
 
-            if (view.WindowState == FormWindowState.Minimized)
-                view.WindowState = FormWindowState.Normal;
+            // Сховати всі інші форми в хості (щоб не нашаровувались)
+            foreach (Control c in _mainView.ContentHost.Controls)
+                if (c is Form f && f != view) f.Hide();
 
-            view.BringToFront();
             view.Show();
+            view.BringToFront();
 
             return view;
         }
+
     }
 
 }
