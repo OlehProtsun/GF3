@@ -72,6 +72,9 @@ namespace DataAccessLayer.Models
         [Column("max_full_per_month")]
         public int MaxFullPerMonth { get; set; }
 
+        [Column("note")]
+        public string? Note { get; set; }
+
         public ICollection<ScheduleEmployeeModel> Employees { get; set; } = new List<ScheduleEmployeeModel>();
         public ICollection<ScheduleSlotModel> Slots { get; set; } = new List<ScheduleSlotModel>();
     }

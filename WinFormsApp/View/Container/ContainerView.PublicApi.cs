@@ -79,6 +79,9 @@ namespace WinFormsApp.View.Container
         public int ScheduleMaxFullPerMonth { get => (int)inputMaxFull.Value; set => inputMaxFull.Value = value; }
 
         [DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
+        public string ScheduleNote { get => inputScheduleNote.Text; set => inputScheduleNote.Text = value; }
+
+        [DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
         public string ScheduleSearch { get => inputScheduleSearch.Text; set => inputScheduleSearch.Text = value; }
 
         public IList<int> SelectedAvailabilityGroupIds => checkedAvailabilities.CheckedItems

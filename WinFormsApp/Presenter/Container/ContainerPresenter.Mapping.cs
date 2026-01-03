@@ -23,6 +23,7 @@ namespace WinFormsApp.Presenter.Container
                 MaxConsecutiveDays = _view.ScheduleMaxConsecutiveDays,
                 MaxConsecutiveFull = _view.ScheduleMaxConsecutiveFull,
                 MaxFullPerMonth = _view.ScheduleMaxFullPerMonth,
+                Note = _view.ScheduleNote,
             };
         }
     }

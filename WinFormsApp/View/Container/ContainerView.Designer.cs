@@ -142,6 +142,8 @@ namespace WinFormsApp.View.Container
             Guna.UI2.WinForms.Suite.CustomizableEdges customizableEdges92 = new Guna.UI2.WinForms.Suite.CustomizableEdges();
             Guna.UI2.WinForms.Suite.CustomizableEdges customizableEdges93 = new Guna.UI2.WinForms.Suite.CustomizableEdges();
             Guna.UI2.WinForms.Suite.CustomizableEdges customizableEdges94 = new Guna.UI2.WinForms.Suite.CustomizableEdges();
+            Guna.UI2.WinForms.Suite.CustomizableEdges customizableEdges149 = new Guna.UI2.WinForms.Suite.CustomizableEdges();
+            Guna.UI2.WinForms.Suite.CustomizableEdges customizableEdges150 = new Guna.UI2.WinForms.Suite.CustomizableEdges();
             Guna.UI2.WinForms.Suite.CustomizableEdges customizableEdges95 = new Guna.UI2.WinForms.Suite.CustomizableEdges();
             Guna.UI2.WinForms.Suite.CustomizableEdges customizableEdges96 = new Guna.UI2.WinForms.Suite.CustomizableEdges();
             Guna.UI2.WinForms.Suite.CustomizableEdges customizableEdges97 = new Guna.UI2.WinForms.Suite.CustomizableEdges();
@@ -286,6 +288,7 @@ namespace WinFormsApp.View.Container
             btnScheduleCancel = new Guna2Button();
             label14 = new Label();
             inputScheduleName = new Guna2TextBox();
+            inputScheduleNote = new Guna2TextBox();
             label31 = new Label();
             btnGenerate = new Guna2Button();
             label13 = new Label();
@@ -318,6 +321,8 @@ namespace WinFormsApp.View.Container
             guna2GroupBox14 = new Guna2GroupBox();
             lblScheduleMonth = new Label();
             label20 = new Label();
+            labelScheduleNoteTitle = new Label();
+            lblScheduleNote = new Label();
             lblScheduleYear = new Label();
             btnScheduleDelete = new Guna2Button();
             lblScheduleFromContainer = new Label();
@@ -330,6 +335,7 @@ namespace WinFormsApp.View.Container
             label35 = new Label();
             guna2Button24 = new Guna2Button();
             labelName = new Label();
+            labelScheduleNoteEdit = new Label();
             guna2GroupBox12 = new Guna2GroupBox();
             guna2Button15 = new Guna2Button();
             guna2Button16 = new Guna2Button();
@@ -1733,6 +1739,8 @@ namespace WinFormsApp.View.Container
             guna2GroupBox5.Controls.Add(btnScheduleCancel);
             guna2GroupBox5.Controls.Add(label14);
             guna2GroupBox5.Controls.Add(inputScheduleName);
+            guna2GroupBox5.Controls.Add(labelScheduleNoteEdit);
+            guna2GroupBox5.Controls.Add(inputScheduleNote);
             guna2GroupBox5.Controls.Add(label31);
             guna2GroupBox5.Controls.Add(btnGenerate);
             guna2GroupBox5.Controls.Add(label13);
@@ -1867,6 +1875,32 @@ namespace WinFormsApp.View.Container
             inputScheduleName.ShadowDecoration.CustomizableEdges = customizableEdges92;
             inputScheduleName.Size = new Size(153, 36);
             inputScheduleName.TabIndex = 3;
+            // 
+            // labelScheduleNoteEdit
+            // 
+            labelScheduleNoteEdit.AutoSize = true;
+            labelScheduleNoteEdit.Font = new Font("Segoe UI", 9.75F, FontStyle.Regular, GraphicsUnit.Point, 0);
+            labelScheduleNoteEdit.ForeColor = Color.Black;
+            labelScheduleNoteEdit.Location = new Point(194, 352);
+            labelScheduleNoteEdit.Name = "labelScheduleNoteEdit";
+            labelScheduleNoteEdit.Size = new Size(36, 17);
+            labelScheduleNoteEdit.TabIndex = 34;
+            labelScheduleNoteEdit.Text = "Note";
+            // 
+            // inputScheduleNote
+            // 
+            inputScheduleNote.BorderRadius = 10;
+            inputScheduleNote.CustomizableEdges = customizableEdges149;
+            inputScheduleNote.DefaultText = "";
+            inputScheduleNote.Font = new Font("Segoe UI", 9F);
+            inputScheduleNote.ForeColor = Color.Black;
+            inputScheduleNote.Location = new Point(194, 370);
+            inputScheduleNote.Name = "inputScheduleNote";
+            inputScheduleNote.PlaceholderText = "Optional";
+            inputScheduleNote.SelectedText = "";
+            inputScheduleNote.ShadowDecoration.CustomizableEdges = customizableEdges150;
+            inputScheduleNote.Size = new Size(153, 36);
+            inputScheduleNote.TabIndex = 12;
             // 
             // label31
             // 
@@ -2346,6 +2380,8 @@ namespace WinFormsApp.View.Container
             guna2GroupBox14.BorderThickness = 0;
             guna2GroupBox14.Controls.Add(lblScheduleMonth);
             guna2GroupBox14.Controls.Add(label20);
+            guna2GroupBox14.Controls.Add(labelScheduleNoteTitle);
+            guna2GroupBox14.Controls.Add(lblScheduleNote);
             guna2GroupBox14.Controls.Add(lblScheduleYear);
             guna2GroupBox14.Controls.Add(btnScheduleDelete);
             guna2GroupBox14.Controls.Add(lblScheduleFromContainer);
@@ -2368,7 +2404,7 @@ namespace WinFormsApp.View.Container
             guna2GroupBox14.ShadowDecoration.CustomizableEdges = customizableEdges138;
             guna2GroupBox14.ShadowDecoration.Depth = 7;
             guna2GroupBox14.ShadowDecoration.Enabled = true;
-            guna2GroupBox14.Size = new Size(353, 206);
+            guna2GroupBox14.Size = new Size(353, 230);
             guna2GroupBox14.TabIndex = 35;
             // 
             // lblScheduleMonth
@@ -2376,7 +2412,7 @@ namespace WinFormsApp.View.Container
             lblScheduleMonth.AutoSize = true;
             lblScheduleMonth.Font = new Font("Segoe UI", 15.75F, FontStyle.Regular, GraphicsUnit.Point, 0);
             lblScheduleMonth.ForeColor = Color.Black;
-            lblScheduleMonth.Location = new Point(169, 121);
+            lblScheduleMonth.Location = new Point(169, 141);
             lblScheduleMonth.Name = "lblScheduleMonth";
             lblScheduleMonth.Size = new Size(35, 30);
             lblScheduleMonth.TabIndex = 14;
@@ -2386,18 +2422,39 @@ namespace WinFormsApp.View.Container
             // 
             label20.AutoSize = true;
             label20.ForeColor = Color.Gray;
-            label20.Location = new Point(166, 106);
+            label20.Location = new Point(166, 126);
             label20.Name = "label20";
             label20.Size = new Size(97, 15);
             label20.TabIndex = 13;
             label20.Text = "Schedule Month:";
+            // 
+            // labelScheduleNoteTitle
+            // 
+            labelScheduleNoteTitle.AutoSize = true;
+            labelScheduleNoteTitle.ForeColor = Color.Gray;
+            labelScheduleNoteTitle.Location = new Point(12, 86);
+            labelScheduleNoteTitle.Name = "labelScheduleNoteTitle";
+            labelScheduleNoteTitle.Size = new Size(83, 15);
+            labelScheduleNoteTitle.TabIndex = 15;
+            labelScheduleNoteTitle.Text = "Schedule Note:";
+            // 
+            // lblScheduleNote
+            // 
+            lblScheduleNote.AutoSize = true;
+            lblScheduleNote.Font = new Font("Segoe UI", 9F, FontStyle.Regular, GraphicsUnit.Point, 0);
+            lblScheduleNote.ForeColor = Color.Black;
+            lblScheduleNote.Location = new Point(12, 101);
+            lblScheduleNote.Name = "lblScheduleNote";
+            lblScheduleNote.Size = new Size(23, 15);
+            lblScheduleNote.TabIndex = 16;
+            lblScheduleNote.Text = "---";
             // 
             // lblScheduleYear
             // 
             lblScheduleYear.AutoSize = true;
             lblScheduleYear.Font = new Font("Segoe UI", 15.75F, FontStyle.Regular, GraphicsUnit.Point, 0);
             lblScheduleYear.ForeColor = Color.Black;
-            lblScheduleYear.Location = new Point(15, 121);
+            lblScheduleYear.Location = new Point(15, 141);
             lblScheduleYear.Name = "lblScheduleYear";
             lblScheduleYear.Size = new Size(57, 30);
             lblScheduleYear.TabIndex = 12;
@@ -2410,7 +2467,7 @@ namespace WinFormsApp.View.Container
             btnScheduleDelete.FillColor = Color.FromArgb(255, 94, 98);
             btnScheduleDelete.Font = new Font("Segoe UI", 9F, FontStyle.Regular, GraphicsUnit.Point, 0);
             btnScheduleDelete.ForeColor = Color.White;
-            btnScheduleDelete.Location = new Point(196, 165);
+            btnScheduleDelete.Location = new Point(196, 185);
             btnScheduleDelete.Name = "btnScheduleDelete";
             btnScheduleDelete.ShadowDecoration.CustomizableEdges = customizableEdges130;
             btnScheduleDelete.Size = new Size(72, 33);
@@ -2436,7 +2493,7 @@ namespace WinFormsApp.View.Container
             btnScheduleEdit.Font = new Font("Segoe UI", 9F, FontStyle.Regular, GraphicsUnit.Point, 0);
             btnScheduleEdit.ForeColor = Color.White;
             btnScheduleEdit.ImageAlign = HorizontalAlignment.Left;
-            btnScheduleEdit.Location = new Point(273, 165);
+            btnScheduleEdit.Location = new Point(273, 185);
             btnScheduleEdit.Name = "btnScheduleEdit";
             btnScheduleEdit.ShadowDecoration.CustomizableEdges = customizableEdges132;
             btnScheduleEdit.Size = new Size(73, 33);
@@ -2460,7 +2517,7 @@ namespace WinFormsApp.View.Container
             btnScheduleProfileCancel.FillColor = Color.FromArgb(224, 224, 224);
             btnScheduleProfileCancel.Font = new Font("Segoe UI", 9F, FontStyle.Regular, GraphicsUnit.Point, 0);
             btnScheduleProfileCancel.ForeColor = Color.DarkGray;
-            btnScheduleProfileCancel.Location = new Point(8, 165);
+            btnScheduleProfileCancel.Location = new Point(8, 185);
             btnScheduleProfileCancel.Name = "btnScheduleProfileCancel";
             btnScheduleProfileCancel.ShadowDecoration.CustomizableEdges = customizableEdges134;
             btnScheduleProfileCancel.Size = new Size(67, 33);
@@ -2471,7 +2528,7 @@ namespace WinFormsApp.View.Container
             // 
             label19.AutoSize = true;
             label19.ForeColor = Color.Gray;
-            label19.Location = new Point(12, 106);
+            label19.Location = new Point(12, 126);
             label19.Name = "label19";
             label19.Size = new Size(83, 15);
             label19.TabIndex = 6;
@@ -2917,6 +2974,7 @@ namespace WinFormsApp.View.Container
         private Guna.UI2.WinForms.Guna2Button btnCancelProfile;
         private Guna.UI2.WinForms.Guna2NumericUpDown numberScheduleId;
         private Guna.UI2.WinForms.Guna2TextBox inputScheduleName;
+        private Guna.UI2.WinForms.Guna2TextBox inputScheduleNote;
         private Guna.UI2.WinForms.Guna2NumericUpDown inputYear;
         private Guna.UI2.WinForms.Guna2NumericUpDown inputMonth;
         private Guna.UI2.WinForms.Guna2NumericUpDown inputPeoplePerShift;
@@ -2991,6 +3049,7 @@ namespace WinFormsApp.View.Container
         private Label label13;
         private Guna2GroupBox guna2GroupBox10;
         private Label label14;
+        private Label labelScheduleNoteEdit;
         private Label label15;
         private Guna2GroupBox guna2GroupBox11;
         private Guna2Button guna2Button12;
@@ -3021,6 +3080,8 @@ namespace WinFormsApp.View.Container
         private Label lblScheduleYear;
         private Label lblScheduleMonth;
         private Label label20;
+        private Label labelScheduleNoteTitle;
+        private Label lblScheduleNote;
         private Guna2Elipse guna2Elipse4;
         private Panel panel1;
         private Panel panel2;
