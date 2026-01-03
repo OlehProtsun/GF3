@@ -36,6 +36,7 @@ namespace DataAccessLayer.Repositories
 
                 query = query.Where(s =>
                     s.Name.ToLower().Contains(value) ||
+                    (s.Note != null && s.Note.ToLower().Contains(value)) ||
                     (hasInt && (s.Year == intVal || s.Month == intVal)));
             }
 
@@ -55,6 +56,7 @@ namespace DataAccessLayer.Repositories
                 .Include(s => s.Container)
                 .Where(s =>
                     s.Name.ToLower().Contains(value) ||
+                    (s.Note != null && s.Note.ToLower().Contains(value)) ||
                     s.Container.Name.ToLower().Contains(value) ||
                     (hasInt && (s.Year == intVal || s.Month == intVal)))
                 .ToListAsync(ct)

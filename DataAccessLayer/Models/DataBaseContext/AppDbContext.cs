@@ -52,6 +52,8 @@ namespace DataAccessLayer.Models.DataBaseContext
                 e.HasIndex(s => new { s.ShopId, s.Year, s.Month }).HasDatabaseName("ix_sched_shop_month");
                 e.HasIndex(s => new { s.ContainerId, s.ShopId }).HasDatabaseName("ix_sched_container_shop");
 
+                e.Property(s => s.Note).IsRequired(false);
+
                 e.ToTable(t =>
                 {
                     t.HasCheckConstraint("ck_schedule_month", "month BETWEEN 1 AND 12");

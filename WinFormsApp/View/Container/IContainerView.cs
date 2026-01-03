@@ -35,6 +35,7 @@ namespace WinFormsApp.View.Container
         int ScheduleMaxConsecutiveDays { get; set; }
         int ScheduleMaxConsecutiveFull { get; set; }
         int ScheduleMaxFullPerMonth { get; set; }
+        string ScheduleNote { get; set; }
         string ScheduleSearch { get; set; }
 
         // AvailabilityGroup selection

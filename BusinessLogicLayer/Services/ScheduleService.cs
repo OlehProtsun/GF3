@@ -29,12 +29,26 @@ namespace BusinessLogicLayer.Services
         public Task<List<ScheduleModel>> GetByValueAsync(string value, CancellationToken ct = default)
             => _scheduleRepo.GetByValueAsync(value, ct);
 
+        public override Task<ScheduleModel> CreateAsync(ScheduleModel entity, CancellationToken ct = default)
+        {
+            NormalizeSchedule(entity);
+            return base.CreateAsync(entity, ct);
+        }
+
+        public override Task UpdateAsync(ScheduleModel entity, CancellationToken ct = default)
+        {
+            NormalizeSchedule(entity);
+            return base.UpdateAsync(entity, ct);
+        }
+
         public async Task SaveWithDetailsAsync(
             ScheduleModel schedule,
             IEnumerable<ScheduleEmployeeModel> employees,
             IEnumerable<ScheduleSlotModel> slots,
             CancellationToken ct = default)
         {
+            NormalizeSchedule(schedule);
+
             if (schedule.Id == 0)
                 schedule = await _scheduleRepo.AddAsync(schedule, ct).ConfigureAwait(false);
             else
@@ -91,6 +105,16 @@ namespace BusinessLogicLayer.Services
             schedule.Slots = (await _slotRepo.GetByScheduleAsync(id, ct).ConfigureAwait(false)).ToList();
 
             return schedule;
+        }
+
+        private static void NormalizeSchedule(ScheduleModel schedule)
+        {
+            if (schedule is null)
+                return;
+
+            schedule.Note = string.IsNullOrWhiteSpace(schedule.Note)
+                ? null
+                : schedule.Note.Trim();
         }
     }
 }

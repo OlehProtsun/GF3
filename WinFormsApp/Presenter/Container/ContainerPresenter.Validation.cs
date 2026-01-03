@@ -49,6 +49,8 @@ namespace WinFormsApp.Presenter.Container
                 errors[nameof(IContainerView.ScheduleShift2)] = err2 ?? "Invalid shift2 format.";
             }
 
+            model.Note = string.IsNullOrWhiteSpace(model.Note) ? null : model.Note.Trim();
+
             return errors;
         }
 

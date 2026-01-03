@@ -79,6 +79,7 @@ namespace WinFormsApp.Presenter.Container
             _view.ScheduleMaxConsecutiveDays = schedule.MaxConsecutiveDays;
             _view.ScheduleMaxConsecutiveFull = schedule.MaxConsecutiveFull;
             _view.ScheduleMaxFullPerMonth = schedule.MaxFullPerMonth;
+            _view.ScheduleNote = schedule.Note ?? string.Empty;
 
             _view.IsEdit = true;
             _view.ScheduleCancelTarget = (_view.ScheduleMode == ScheduleViewModel.Profile)
