@@ -178,7 +178,6 @@ namespace WinFormsApp.View.Container
                 _ = Raise(AvailabilitySelectionChangedEvent);
             };
 
-            btnShowHideInfo.Click += (_, __) => ToggleScheduleInfo();
 
             checkedAvailabilities.ItemCheck += (_, __) =>
             {
@@ -196,6 +195,8 @@ namespace WinFormsApp.View.Container
                     cancelEdit();
                     ScheduleCancelTarget = ScheduleViewModel.List; // зі schedule profile назад у schedule list (tabProfile)
                 });
+
+            EnsureScheduleEditTogglesInitialized();
 
         }
 

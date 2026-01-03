@@ -17,10 +17,6 @@ namespace WinFormsApp.View.Container
 
             this.DoubleBuffered = true;
 
-            _scheduleInfoExpandedHeight = guna2GroupBox5.Height; // зараз 626 :contentReference[oaicite:4]{index=4}
-            ApplyScheduleInfoState(expanded: true);
-
-
             // Для panel1 (бо в Panel DoubleBuffered protected)
             EnableDoubleBuffer(panel1);
 

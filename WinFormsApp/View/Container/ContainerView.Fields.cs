@@ -38,9 +38,21 @@ namespace WinFormsApp.View.Container
         private readonly List<ScheduleEmployeeModel> _employees = new();
 
         // Schedule info (guna2GroupBox5) collapse/expand
-        private bool _scheduleInfoExpanded = true;
+        private bool _scheduleInfoExpanded = false;
         private int _scheduleInfoExpandedHeight;
         private const int ScheduleInfoCollapsedHeight = 43;
+
+        private bool _scheduleNoteExpanded = false;
+        private int _scheduleNoteExpandedHeight;
+        private int _scheduleNoteCollapsedHeight;
+
+        // для “стека” зліва
+        private int _scheduleLeftColumnTop;
+        private int _scheduleLeftColumnGap;
+
+        private bool _scheduleEditTogglesInitialized;
+
+
 
     }
 }

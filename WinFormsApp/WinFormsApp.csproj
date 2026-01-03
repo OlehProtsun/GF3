@@ -238,7 +238,6 @@
 
 		<Compile Update="View\Container\ContainerView.UiToggles.cs">
 			<DependentUpon>ContainerView.cs</DependentUpon>
-			<SubType>Code</SubType>
 		</Compile>
 	</ItemGroup>
 

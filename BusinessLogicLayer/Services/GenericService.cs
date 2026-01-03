@@ -23,7 +23,7 @@ namespace BusinessLogicLayer.Services
         public virtual Task<TEntity> CreateAsync(TEntity entity, CancellationToken ct = default)
             => _repo.AddAsync(entity, ct); // repo зберігає одразу
 
-        public Task UpdateAsync(TEntity entity, CancellationToken ct = default)
+        public virtual Task UpdateAsync(TEntity entity, CancellationToken ct = default)
             => _repo.UpdateAsync(entity, ct);
 
         public Task DeleteAsync(int id, CancellationToken ct = default)
