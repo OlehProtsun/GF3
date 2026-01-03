@@ -219,12 +219,17 @@ namespace WinFormsApp.View.Availability
             if (e.RowIndex >= 0) dirtyBindRows.Add(e.RowIndex);
         }
 
-        private async void DataGridBinds_RowValidated(object? sender, DataGridViewCellEventArgs e)
+        private void DataGridBinds_RowValidated(object? sender, DataGridViewCellEventArgs e)
         {
-            if (e.RowIndex < 0) return;
-            if (!dirtyBindRows.Remove(e.RowIndex)) return;
+            _ = HandleBindRowValidatedAsync(e.RowIndex);
+        }
 
-            var model = dataGridBinds.Rows[e.RowIndex].DataBoundItem as BindModel;
+        private async Task HandleBindRowValidatedAsync(int rowIndex)
+        {
+            if (rowIndex < 0) return;
+            if (!dirtyBindRows.Remove(rowIndex)) return;
+
+            var model = dataGridBinds.Rows[rowIndex].DataBoundItem as BindModel;
             if (model is null) return;
 
             await RaiseSafeAsync(UpsertBindEvent, model);

@@ -19,17 +19,20 @@ namespace DataAccessLayer.Repositories
                 .AsNoTracking()
                 .Where(d => d.AvailabilityGroupMemberId == memberId)
                 .OrderBy(d => d.DayOfMonth)
-                .ToListAsync(ct);
+                .ToListAsync(ct)
+                .ConfigureAwait(false);
         }
 
         public async Task DeleteByMemberIdAsync(int memberId, CancellationToken ct = default)
         {
             // швидко і без GetAllAsync:
-            var rows = await _set.Where(d => d.AvailabilityGroupMemberId == memberId).ToListAsync(ct);
+            var rows = await _set.Where(d => d.AvailabilityGroupMemberId == memberId)
+                .ToListAsync(ct)
+                .ConfigureAwait(false);
             if (rows.Count == 0) return;
 
             _set.RemoveRange(rows);
-            await _db.SaveChangesAsync(ct);
+            await _db.SaveChangesAsync(ct).ConfigureAwait(false);
         }
 
         public async Task<List<AvailabilityGroupDayModel>> GetByGroupIdAsync(int groupId, CancellationToken ct = default)
@@ -43,13 +46,14 @@ namespace DataAccessLayer.Repositories
                 where m.AvailabilityGroupId == groupId
                 orderby m.EmployeeId, d.DayOfMonth
                 select d
-            ).ToListAsync(ct);
+            ).ToListAsync(ct)
+            .ConfigureAwait(false);
         }
 
         public async Task AddRangeAsync(IEnumerable<AvailabilityGroupDayModel> days, CancellationToken ct = default)
         {
-            await _set.AddRangeAsync(days, ct);
-            await _db.SaveChangesAsync(ct);
+            await _set.AddRangeAsync(days, ct).ConfigureAwait(false);
+            await _db.SaveChangesAsync(ct).ConfigureAwait(false);
         }
 
 

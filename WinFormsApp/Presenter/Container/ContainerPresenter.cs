@@ -40,34 +40,38 @@ namespace WinFormsApp.Presenter.Container
             _generator = generator ?? throw new ArgumentNullException(nameof(generator));
 
             // Container
-            _view.SearchEvent += ct => SafeAsync(OnSearchCoreAsync, ct);
+            _view.SearchEvent += ct => RunBusySafeAsync(OnSearchCoreAsync, ct, "Searching containers...");
             _view.AddEvent += ct => SafeAsync(OnAddCoreAsync, ct);
             _view.EditEvent += ct => SafeAsync(OnEditCoreAsync, ct);
-            _view.DeleteEvent += ct => SafeAsync(OnDeleteCoreAsync, ct);
-            _view.SaveEvent += ct => SafeAsync(OnSaveCoreAsync, ct);
+            _view.DeleteEvent += ct => RunBusySafeAsync(OnDeleteCoreAsync, ct, "Deleting container...");
+            _view.SaveEvent += ct => RunBusySafeAsync(OnSaveCoreAsync, ct, "Saving container...");
             _view.CancelEvent += ct => SafeAsync(OnCancelCoreAsync, ct);
-            _view.OpenProfileEvent += ct => SafeAsync(OnOpenProfileCoreAsync, ct);
+            _view.OpenProfileEvent += ct => RunBusySafeAsync(OnOpenProfileCoreAsync, ct, "Loading container...");
 
             // Schedule
-            _view.ScheduleSearchEvent += ct => SafeAsync(OnScheduleSearchCoreAsync, ct);
-            _view.ScheduleAddEvent += ct => SafeAsync(OnScheduleAddCoreAsync, ct);
-            _view.ScheduleEditEvent += ct => SafeAsync(OnScheduleEditCoreAsync, ct);
-            _view.ScheduleDeleteEvent += ct => SafeAsync(OnScheduleDeleteCoreAsync, ct);
-            _view.ScheduleSaveEvent += ct => SafeAsync(OnScheduleSaveCoreAsync, ct);
+            _view.ScheduleSearchEvent += ct => RunBusySafeAsync(OnScheduleSearchCoreAsync, ct, "Searching schedules...");
+            _view.ScheduleAddEvent += ct => RunBusySafeAsync(OnScheduleAddCoreAsync, ct, "Loading schedule...");
+            _view.ScheduleEditEvent += ct => RunBusySafeAsync(OnScheduleEditCoreAsync, ct, "Loading schedule...");
+            _view.ScheduleDeleteEvent += ct => RunBusySafeAsync(OnScheduleDeleteCoreAsync, ct, "Deleting schedule...");
+            _view.ScheduleSaveEvent += ct => RunBusySafeAsync(OnScheduleSaveCoreAsync, ct, "Saving schedule...");
             _view.ScheduleCancelEvent += ct => SafeAsync(OnScheduleCancelCoreAsync, ct);
-            _view.ScheduleOpenProfileEvent += ct => SafeAsync(OnScheduleOpenProfileCoreAsync, ct);
-            _view.ScheduleGenerateEvent += ct => SafeAsync(OnScheduleGenerateCoreAsync, ct);
+            _view.ScheduleOpenProfileEvent += ct => RunBusySafeAsync(OnScheduleOpenProfileCoreAsync, ct, "Loading schedule...");
+            _view.ScheduleGenerateEvent += ct => RunBusySafeAsync(OnScheduleGenerateCoreAsync, ct, "Generating schedule...");
+
+            _view.AvailabilitySelectionChangedEvent += ct => SafeAsync(OnAvailabilitySelectionChangedCoreAsync, ct);
+
 
             _view.SetContainerBindingSource(_containerBinding);
             _view.SetScheduleBindingSource(_scheduleBinding);
             _view.SetSlotBindingSource(_slotBinding);
         }
 
-        public async Task InitializeAsync()
-        {
-            await LoadContainersAsync(CancellationToken.None);
-            await LoadLookupsAsync(CancellationToken.None);
-        }
+        public Task InitializeAsync()
+            => _view.RunBusyAsync(async ct =>
+            {
+                await LoadContainersAsync(ct);
+                await LoadLookupsAsync(ct);
+            }, _view.LifetimeToken, "Loading containers...");
 
         // -------------------------
         // Shared infrastructure
@@ -89,6 +93,24 @@ namespace WinFormsApp.Presenter.Container
                 _view.ShowError(msg);
             }
         }
+
+        private Task RunBusySafeAsync(Func<CancellationToken, Task> action, CancellationToken ct, string? busyText)
+            => _view.RunBusyAsync(async innerCt =>
+            {
+                try
+                {
+                    await action(innerCt);
+                }
+                catch (OperationCanceledException)
+                {
+                    // ignore
+                }
+                catch (Exception ex)
+                {
+                    var msg = ex.InnerException?.Message ?? ex.Message;
+                    _view.ShowError(msg);
+                }
+            }, ct, busyText);
 
         private ContainerModel? CurrentContainer => _containerBinding.Current as ContainerModel;
         private ScheduleModel? CurrentSchedule => _scheduleBinding.Current as ScheduleModel;

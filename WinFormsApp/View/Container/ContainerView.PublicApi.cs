@@ -79,6 +79,9 @@ namespace WinFormsApp.View.Container
         public int ScheduleMaxFullPerMonth { get => (int)inputMaxFull.Value; set => inputMaxFull.Value = value; }
 
         [DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
+        public string ScheduleNote { get => inputScheduleNote.Text; set => inputScheduleNote.Text = value; }
+
+        [DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
         public string ScheduleSearch { get => inputScheduleSearch.Text; set => inputScheduleSearch.Text = value; }
 
         public IList<int> SelectedAvailabilityGroupIds => checkedAvailabilities.CheckedItems
@@ -112,6 +115,8 @@ namespace WinFormsApp.View.Container
             }
         }
 
+        private bool _suppressAvailabilitySelectionChanged;
+
         public event Func<CancellationToken, Task>? SearchEvent;
         public event Func<CancellationToken, Task>? AddEvent;
         public event Func<CancellationToken, Task>? EditEvent;
@@ -128,6 +133,9 @@ namespace WinFormsApp.View.Container
         public event Func<CancellationToken, Task>? ScheduleCancelEvent;
         public event Func<CancellationToken, Task>? ScheduleOpenProfileEvent;
         public event Func<CancellationToken, Task>? ScheduleGenerateEvent;
+
+        public event Func<CancellationToken, Task>? AvailabilitySelectionChangedEvent;
+
 
         public void SetContainerBindingSource(BindingSource containers)
         {
@@ -163,5 +171,29 @@ namespace WinFormsApp.View.Container
                 checkedAvailabilities.EndUpdate();
             }
         }
+
+        public void SetCheckedAvailabilityGroupIds(IEnumerable<int> groupIds, bool fireEvent = true)
+        {
+            var set = new HashSet<int>(groupIds ?? Array.Empty<int>());
+
+            checkedAvailabilities.BeginUpdate();
+            try
+            {
+                for (int i = 0; i < checkedAvailabilities.Items.Count; i++)
+                {
+                    if (checkedAvailabilities.Items[i] is AvailabilityGroupModel g)
+                        checkedAvailabilities.SetItemChecked(i, set.Contains(g.Id));
+                }
+            }
+            finally
+            {
+                checkedAvailabilities.EndUpdate();
+            }
+
+            if (fireEvent)
+                BeginInvoke(new Action(async () =>
+                    await SafeRaiseAsync(AvailabilitySelectionChangedEvent)));
+        }
+
     }
 }

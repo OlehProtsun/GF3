@@ -7,10 +7,11 @@ using WinFormsApp.ViewModel;
 
 namespace WinFormsApp.View.Main
 {
-    public interface IMainView
+    public interface IMainView : WinFormsApp.View.Shared.IBusyView
     {
         NavPage ActivePage { get; }
 
+        Control ContentHost { get; }
 
         event Func<CancellationToken, Task>? ShowEmployeeView;
         event Func<CancellationToken, Task>? ShowAvailabilityView;
@@ -18,9 +19,5 @@ namespace WinFormsApp.View.Main
        
         void SetActivePage(NavPage page);
         void BeginWindowDrag();
-        void ShowBusy(string? text = null);
-        void HideBusy();
-        Task RunBusyAsync(Func<CancellationToken, Task> action, CancellationToken ct, string? text = null);
     }
 }
-

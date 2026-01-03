@@ -3,11 +3,13 @@ using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Text;
+using System.Threading;
 
 namespace WinFormsApp.View.Container
 {
     public partial class ContainerView
     {
+        private readonly CancellationTokenSource _lifetimeCts = new();
         private bool isEdit;
         private bool isSuccessful;
         private string message = string.Empty;
@@ -34,5 +36,23 @@ namespace WinFormsApp.View.Container
 
         private readonly List<ScheduleSlotModel> _slots = new();
         private readonly List<ScheduleEmployeeModel> _employees = new();
+
+        // Schedule info (guna2GroupBox5) collapse/expand
+        private bool _scheduleInfoExpanded = false;
+        private int _scheduleInfoExpandedHeight;
+        private const int ScheduleInfoCollapsedHeight = 43;
+
+        private bool _scheduleNoteExpanded = false;
+        private int _scheduleNoteExpandedHeight;
+        private int _scheduleNoteCollapsedHeight;
+
+        // для “стека” зліва
+        private int _scheduleLeftColumnTop;
+        private int _scheduleLeftColumnGap;
+
+        private bool _scheduleEditTogglesInitialized;
+
+
+
     }
 }

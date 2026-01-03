@@ -58,8 +58,10 @@ namespace WinFormsApp.View.Container
         {
             ConfigureMatrixGrid(slotGrid, readOnly: false);
             ConfigureMatrixGrid(scheduleSlotProfileGrid, readOnly: true);
-        }
 
+            // ✅ Availability preview (readonly) — той самий стиль
+            ConfigureMatrixGrid(dataGridAvailabilityOnScheduleEdit, readOnly: true);
+        }
         private void ConfigureMatrixGrid(Guna2DataGridView grid, bool readOnly) 
         {
 
@@ -96,7 +98,6 @@ namespace WinFormsApp.View.Container
             ApplyAvailabilityGridLook(grid);
 
         }
-
         private static void ApplyAvailabilityGridLook(Guna2DataGridView grid) 
         {
             grid.BackgroundColor = Color.LightGray;
@@ -154,7 +155,6 @@ namespace WinFormsApp.View.Container
             grid.ColumnHeadersHeight = 36;
 
         }
-
         private void SlotGrid_DataError(object? sender, DataGridViewDataErrorEventArgs e) 
         {
             // Не даємо гріду падати через DataError

@@ -31,14 +31,14 @@ namespace BusinessLogicLayer.Services
             string value,
             CancellationToken ct = default)
         {
-            return await _groupRepo.GetByValueAsync(value, ct);
+            return await _groupRepo.GetByValueAsync(value, ct).ConfigureAwait(false);
         }
 
         public async Task<(AvailabilityGroupModel group, List<AvailabilityGroupMemberModel> members, List<AvailabilityGroupDayModel> days)>
             LoadFullAsync(int groupId, CancellationToken ct = default)
         {
             // Якщо ти додав GetFullByIdAsync у репозиторій — це найзручніше:
-            var full = await _groupRepo.GetFullByIdAsync(groupId, ct);
+            var full = await _groupRepo.GetFullByIdAsync(groupId, ct).ConfigureAwait(false);
             if (full is null)
                 throw new InvalidOperationException($"AvailabilityGroup with Id={groupId} not found.");
 
@@ -46,7 +46,7 @@ namespace BusinessLogicLayer.Services
 
             // days можуть бути вже включені (якщо ти include-ив їх у GetFullByIdAsync)
             // але якщо ні — доберемо через dayRepo:
-            var days = await _dayRepo.GetByGroupIdAsync(groupId, ct);
+            var days = await _dayRepo.GetByGroupIdAsync(groupId, ct).ConfigureAwait(false);
             return (full, members, days);
         }
 
@@ -62,19 +62,19 @@ namespace BusinessLogicLayer.Services
             // 1) Save group (важливо: гарантуємо, що group.Id оновиться у того ж інстансу)
             if (group.Id == 0)
             {
-                var created = await _groupRepo.AddAsync(group, ct);
+                var created = await _groupRepo.AddAsync(group, ct).ConfigureAwait(false);
                 group.Id = created.Id; // <-- ключовий рядок
             }
             else
             {
-                await _groupRepo.UpdateAsync(group, ct);
+                await _groupRepo.UpdateAsync(group, ct).ConfigureAwait(false);
             }
 
             var groupId = group.Id;
 
 
             // 2) Поточні members групи (1 запит)
-            var existingMembers = await _memberRepo.GetByGroupIdAsync(groupId, ct);
+            var existingMembers = await _memberRepo.GetByGroupIdAsync(groupId, ct).ConfigureAwait(false);
 
             // Будуємо lookup employeeId -> member
             var memberByEmployee = existingMembers.ToDictionary(m => m.EmployeeId);
@@ -86,7 +86,7 @@ namespace BusinessLogicLayer.Services
             foreach (var m in existingMembers)
             {
                 if (!desiredEmployeeIds.Contains(m.EmployeeId))
-                    await _memberRepo.DeleteAsync(m.Id, ct);
+                    await _memberRepo.DeleteAsync(m.Id, ct).ConfigureAwait(false);
             }
 
             // 5) Upsert member + replace days
@@ -100,7 +100,7 @@ namespace BusinessLogicLayer.Services
                         Id = 0,
                         AvailabilityGroupId = groupId,
                         EmployeeId = employeeId
-                    }, ct);
+                    }, ct).ConfigureAwait(false);
 
                     memberByEmployee[employeeId] = member;
                 }
@@ -108,7 +108,7 @@ namespace BusinessLogicLayer.Services
                 var memberId = member.Id;
 
                 // 5.2) Replace days
-                await _dayRepo.DeleteByMemberIdAsync(memberId, ct);
+                await _dayRepo.DeleteByMemberIdAsync(memberId, ct).ConfigureAwait(false);
 
                 foreach (var d in days)
                 {
@@ -119,7 +119,7 @@ namespace BusinessLogicLayer.Services
                         d.IntervalStr = null;
                 }
 
-                await _dayRepo.AddRangeAsync(days, ct);
+                await _dayRepo.AddRangeAsync(days, ct).ConfigureAwait(false);
 
             }
         }

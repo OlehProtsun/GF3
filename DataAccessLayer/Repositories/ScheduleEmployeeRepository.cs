@@ -19,7 +19,8 @@ namespace DataAccessLayer.Repositories
                 .AsNoTracking()
                 .Include(se => se.Employee)
                 .Where(se => se.ScheduleId == scheduleId)
-                .ToListAsync(ct);
+                .ToListAsync(ct)
+                .ConfigureAwait(false);
         }
     }
 }

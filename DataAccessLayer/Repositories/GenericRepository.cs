@@ -21,15 +21,15 @@ namespace DataAccessLayer.Repositories
         }
 
         public async Task<TEntity?> GetByIdAsync(int id, CancellationToken ct = default)
-            => await _set.FindAsync(new object?[] { id }, ct);
+            => await _set.FindAsync(new object?[] { id }, ct).ConfigureAwait(false);
 
         public virtual async Task<List<TEntity>> GetAllAsync(CancellationToken ct = default)
-            => await _set.AsNoTracking().ToListAsync(ct);
+            => await _set.AsNoTracking().ToListAsync(ct).ConfigureAwait(false);
 
         public async Task<TEntity> AddAsync(TEntity entity, CancellationToken ct = default)
         {
-            await _set.AddAsync(entity, ct);
-            await _db.SaveChangesAsync(ct);
+            await _set.AddAsync(entity, ct).ConfigureAwait(false);
+            await _db.SaveChangesAsync(ct).ConfigureAwait(false);
 
             // Щоб контекст не тримав створену сутність у трекері
             _db.Entry(entity).State = EntityState.Detached;
@@ -44,7 +44,7 @@ namespace DataAccessLayer.Repositories
             var keyValues = pk.Properties.Select(p => p.PropertyInfo!.GetValue(entity)).ToArray();
 
             // 2) Пробуємо знайти вже відстежуваний екземпляр (FindAsync спершу дивиться в Local)
-            var tracked = await _set.FindAsync(keyValues, ct);
+            var tracked = await _set.FindAsync(keyValues, ct).ConfigureAwait(false);
 
             if (tracked is not null)
             {
@@ -58,7 +58,7 @@ namespace DataAccessLayer.Repositories
                 _db.Entry(entity).State = EntityState.Modified;
             }
 
-            await _db.SaveChangesAsync(ct);
+            await _db.SaveChangesAsync(ct).ConfigureAwait(false);
 
             // (опційно) Відчепити, щоб контекст не набирав «боргів» трекінгу на WinForms-життєвому циклі
             //_db.Entry(tracked ?? entity).State = EntityState.Detached;
@@ -66,10 +66,10 @@ namespace DataAccessLayer.Repositories
 
         public async Task DeleteAsync(int id, CancellationToken ct = default)
         {
-            var entity = await GetByIdAsync(id, ct);
+            var entity = await GetByIdAsync(id, ct).ConfigureAwait(false);
             if (entity is null) return;
             _set.Remove(entity);
-            await _db.SaveChangesAsync(ct);
+            await _db.SaveChangesAsync(ct).ConfigureAwait(false);
         }
     }
 }

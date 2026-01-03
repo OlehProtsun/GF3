@@ -11,6 +11,7 @@ namespace WinFormsApp.View.Container
 {
     public partial class ContainerView
     {
+        private bool _availabilityPreviewGridConfigured;
         private void RequestScheduleGridRefresh() 
         {
             if (IsDisposed) return;
@@ -403,6 +404,31 @@ namespace WinFormsApp.View.Container
             while (used.Contains(n)) n++;
             return n;
 
+        }
+
+        public void SetAvailabilityPreviewMatrix(int year, int month,
+            IList<ScheduleSlotModel> slots,
+            IList<ScheduleEmployeeModel> employees)
+        {
+            // bind у dataGridAvailabilityOnScheduleEdit (readonly)
+            BindScheduleMatrix(
+                grid: dataGridAvailabilityOnScheduleEdit,
+                year: year,
+                month: month,
+                slots: slots ?? new List<ScheduleSlotModel>(),
+                employees: employees ?? new List<ScheduleEmployeeModel>(),
+                readOnly: true,
+                configureGrid: !_availabilityPreviewGridConfigured
+            );
+
+            _availabilityPreviewGridConfigured = true;
+        }
+
+        public void ClearAvailabilityPreviewMatrix()
+        {
+            SetAvailabilityPreviewMatrix(ScheduleYear, ScheduleMonth,
+                new List<ScheduleSlotModel>(),
+                new List<ScheduleEmployeeModel>());
         }
     }
 }

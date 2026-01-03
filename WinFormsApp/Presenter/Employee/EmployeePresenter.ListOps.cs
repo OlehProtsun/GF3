@@ -29,8 +29,13 @@ namespace WinFormsApp.Presenter.Employee
 
                     if (selectId.HasValue)
                     {
-                        var idx = list.Select((e, i) => (e, i))
-                                      .FirstOrDefault(x => x.e.Id == selectId.Value).i;
+                        var idx = -1;
+                        for (var i = 0; i < list.Count; i++)
+                        {
+                            if (list[i].Id != selectId.Value) continue;
+                            idx = i;
+                            break;
+                        }
 
                         if (idx >= 0 && idx < _bindingSource.Count)
                             _bindingSource.Position = idx;

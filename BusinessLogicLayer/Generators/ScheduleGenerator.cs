@@ -52,10 +52,13 @@ namespace BusinessLogicLayer.Generators
             var result = new List<ScheduleSlotModel>();
 
             // з кого взагалі можна будувати графік
-            var employeeIds = employees
-                .Select(e => e.EmployeeId)
-                .Distinct()
-                .ToList();
+            var employeeIds = new List<int>();
+            var employeeIdSet = new HashSet<int>();
+            foreach (var employee in employees)
+            {
+                if (!employeeIdSet.Add(employee.EmployeeId)) continue;
+                employeeIds.Add(employee.EmployeeId);
+            }
 
             if (employeeIds.Count == 0)
                 return Task.FromResult<IList<ScheduleSlotModel>>(result);
@@ -69,11 +72,12 @@ namespace BusinessLogicLayer.Generators
             var employeeQueue = new Queue<int>(employeeIds);
 
             // статистика по кожному співробітнику
-            var stats = employeeIds.ToDictionary(id => id, _ => new EmployeeStats());
+            var stats = new Dictionary<int, EmployeeStats>(employeeIds.Count);
+            foreach (var id in employeeIds)
+                stats[id] = new EmployeeStats();
 
             var daysInMonth = DateTime.DaysInMonth(schedule.Year, schedule.Month);
 
-            var employeeIdSet = employeeIds.ToHashSet();
             var availabilityIndex = BuildAvailabilityIndex(availabilities, schedule.Year, schedule.Month);
 
 
@@ -82,19 +86,25 @@ namespace BusinessLogicLayer.Generators
                 ct.ThrowIfCancellationRequested();
 
                 // хто в принципі може працювати в цей день
-                var availableToday = employeeIdSet
-                    .Where(id =>
-                        !availabilityIndex.TryGetValue(id, out var dayMap) ||
+                var availableToday = new List<int>(employeeIds.Count);
+                foreach (var id in employeeIds)
+                {
+                    if (!availabilityIndex.TryGetValue(id, out var dayMap) ||
                         !dayMap.TryGetValue(day, out var kind) ||
                         kind != AvailabilityKind.NONE)
-                    .ToList();
+                    {
+                        availableToday.Add(id);
+                    }
+                }
 
-                var availableTodaySet = availableToday.ToHashSet();
+                var availableTodaySet = new HashSet<int>(availableToday);
 
 
 
                 // скільки змін (0/1/2...) людина вже працює цього дня
-                var shiftsToday = employeeIds.ToDictionary(id => id, _ => 0);
+                var shiftsToday = new Dictionary<int, int>(employeeIds.Count);
+                foreach (var id in employeeIds)
+                    shiftsToday[id] = 0;
 
                 foreach (var shift in shiftTemplates)
                 {
@@ -144,9 +154,14 @@ namespace BusinessLogicLayer.Generators
         {
             var index = new Dictionary<int, Dictionary<int, AvailabilityKind>>();
 
-            foreach (var g in groups.Where(x => x.Year == year && x.Month == month))
+            foreach (var g in groups)
             {
-                foreach (var m in g.Members ?? Enumerable.Empty<AvailabilityGroupMemberModel>())
+                if (g.Year != year || g.Month != month) continue;
+
+                var members = g.Members;
+                if (members is null) continue;
+
+                foreach (var m in members)
                 {
                     if (!index.TryGetValue(m.EmployeeId, out var dayMap))
                     {
@@ -154,7 +169,10 @@ namespace BusinessLogicLayer.Generators
                         index[m.EmployeeId] = dayMap;
                     }
 
-                    foreach (var d in m.Days ?? Enumerable.Empty<AvailabilityGroupDayModel>())
+                    var days = m.Days;
+                    if (days is null) continue;
+
+                    foreach (var d in days)
                     {
                         // якщо є дублікати — NONE має пріоритет (найжорсткіше правило)
                         if (dayMap.TryGetValue(d.DayOfMonth, out var existing))
@@ -389,4 +407,3 @@ namespace BusinessLogicLayer.Generators
         }
     }
 }
-

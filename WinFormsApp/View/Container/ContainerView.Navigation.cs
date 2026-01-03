@@ -35,6 +35,7 @@ namespace WinFormsApp.View.Container
         public void SwitchToScheduleListMode()
         {
             tabControl.SelectedTab = tabProfile;
+            Mode = ContainerViewModel.Profile;     // ✅ щоб стан відповідав табу
             ScheduleMode = ScheduleViewModel.List;
         }
 
@@ -67,6 +68,7 @@ namespace WinFormsApp.View.Container
             ScheduleMaxConsecutiveDays = 1;
             ScheduleMaxConsecutiveFull = 1;
             ScheduleMaxFullPerMonth = 1;
+            ScheduleNote = string.Empty;
 
             checkedAvailabilities.BeginUpdate();
             try
@@ -102,6 +104,7 @@ namespace WinFormsApp.View.Container
             lblScheduleFromContainer.Text = model.Container?.Name;
             lblScheduleYear.Text = $"{model.Year}";
             lblScheduleMonth.Text = $"{model.Month}";
+            lblScheduleNote.Text = string.IsNullOrWhiteSpace(model.Note) ? "---" : model.Note;
 
             IList<ScheduleSlotModel> slots =
                 _slots.Count > 0 ? _slots :

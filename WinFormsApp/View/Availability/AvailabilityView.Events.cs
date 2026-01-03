@@ -68,19 +68,36 @@ namespace WinFormsApp.View.Availability
                 EmployeeId = comboboxEmployee.SelectedValue is int id ? id : 0;
             };
 
-            NumbAvailabilityMonth.ValueChanged += (_, __) => RegenerateGroupDays();
-            NumbAvailabilityYear.ValueChanged += (_, __) => RegenerateGroupDays();
+            inputAvailabilityMonthName.TextChanged += (_, __) => errorProvider.SetError(inputAvailabilityMonthName, "");
+            NumbAvailabilityMonth.ValueChanged += (_, __) =>
+            {
+                errorProvider.SetError(NumbAvailabilityMonth, "");
+                RegenerateGroupDays();
+            };
+            NumbAvailabilityYear.ValueChanged += (_, __) =>
+            {
+                errorProvider.SetError(NumbAvailabilityYear, "");
+                RegenerateGroupDays();
+            };
         }
 
-        private async Task RaiseSafeAsync(Func<CancellationToken, Task>? ev, CancellationToken ct = default)
+        private async Task RaiseSafeAsync(Func<CancellationToken, Task>? ev)
         {
-            try { await (ev?.Invoke(ct) ?? Task.CompletedTask); }
+            try { await (ev?.Invoke(_lifetimeCts.Token) ?? Task.CompletedTask); }
+            catch (OperationCanceledException)
+            {
+                // нормальна ситуація при закритті форми/скасуванні
+            }
             catch (Exception ex) { ShowError(ex.Message); }
         }
 
-        private async Task RaiseSafeAsync<T>(Func<T, CancellationToken, Task>? ev, T arg, CancellationToken ct = default)
+        private async Task RaiseSafeAsync<T>(Func<T, CancellationToken, Task>? ev, T arg)
         {
-            try { await (ev?.Invoke(arg, ct) ?? Task.CompletedTask); }
+            try { await (ev?.Invoke(arg, _lifetimeCts.Token) ?? Task.CompletedTask); }
+            catch (OperationCanceledException)
+            {
+                // нормальна ситуація при закритті форми/скасуванні
+            }
             catch (Exception ex) { ShowError(ex.Message); }
         }
     }

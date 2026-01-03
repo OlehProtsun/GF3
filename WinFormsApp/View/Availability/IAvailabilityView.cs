@@ -5,10 +5,11 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using WinFormsApp.ViewModel;
+using WinFormsApp.View.Shared;
 
 namespace WinFormsApp.View.Availability
 {
-    public interface IAvailabilityView
+    public interface IAvailabilityView : IBusyView
     {
         AvailabilityViewModel Mode { get; set; }
         AvailabilityViewModel CancelTarget { get; set; }

@@ -419,7 +419,7 @@
             dataGridViewCellStyle4.WrapMode = DataGridViewTriState.True;
             dataGrid.RowHeadersDefaultCellStyle = dataGridViewCellStyle4;
             dataGrid.RowHeadersVisible = false;
-            dataGrid.Size = new Size(825, 651);
+            dataGrid.Size = new Size(825, 690);
             dataGrid.TabIndex = 6;
             dataGrid.ThemeStyle.AlternatingRowsStyle.BackColor = Color.White;
             dataGrid.ThemeStyle.AlternatingRowsStyle.Font = null;
@@ -450,10 +450,10 @@
             tabEditAdnCreate.Controls.Add(guna2GroupBox4);
             tabEditAdnCreate.Controls.Add(guna2GroupBox3);
             tabEditAdnCreate.Controls.Add(guna2GroupBox2);
-            tabEditAdnCreate.Location = new Point(4, 5);
+            tabEditAdnCreate.Location = new Point(4, 44);
             tabEditAdnCreate.Name = "tabEditAdnCreate";
             tabEditAdnCreate.Padding = new Padding(3);
-            tabEditAdnCreate.Size = new Size(852, 869);
+            tabEditAdnCreate.Size = new Size(852, 830);
             tabEditAdnCreate.TabIndex = 1;
             tabEditAdnCreate.Text = "Edit/Create";
             // 
@@ -642,7 +642,7 @@
             guna2GroupBox4.ShadowDecoration.CustomizableEdges = customizableEdges26;
             guna2GroupBox4.ShadowDecoration.Depth = 7;
             guna2GroupBox4.ShadowDecoration.Enabled = true;
-            guna2GroupBox4.Size = new Size(393, 742);
+            guna2GroupBox4.Size = new Size(393, 703);
             guna2GroupBox4.TabIndex = 25;
             // 
             // guna2Button6
@@ -705,7 +705,7 @@
             dataGridViewCellStyle12.WrapMode = DataGridViewTriState.True;
             dataGridAvailabilityDays.RowHeadersDefaultCellStyle = dataGridViewCellStyle12;
             dataGridAvailabilityDays.RowHeadersVisible = false;
-            dataGridAvailabilityDays.Size = new Size(365, 645);
+            dataGridAvailabilityDays.Size = new Size(365, 606);
             dataGridAvailabilityDays.TabIndex = 12;
             dataGridAvailabilityDays.ThemeStyle.AlternatingRowsStyle.BackColor = Color.White;
             dataGridAvailabilityDays.ThemeStyle.AlternatingRowsStyle.Font = null;
@@ -741,7 +741,7 @@
             btnSave.FillColor = Color.FromArgb(51, 71, 255);
             btnSave.Font = new Font("Segoe UI", 9F);
             btnSave.ForeColor = Color.White;
-            btnSave.Location = new Point(274, 704);
+            btnSave.Location = new Point(274, 665);
             btnSave.Name = "btnSave";
             btnSave.ShadowDecoration.CustomizableEdges = customizableEdges22;
             btnSave.Size = new Size(114, 33);
@@ -761,7 +761,7 @@
             btnCancel.FillColor = Color.FromArgb(224, 224, 224);
             btnCancel.Font = new Font("Segoe UI", 9F);
             btnCancel.ForeColor = Color.Gray;
-            btnCancel.Location = new Point(5, 704);
+            btnCancel.Location = new Point(5, 665);
             btnCancel.Name = "btnCancel";
             btnCancel.ShadowDecoration.CustomizableEdges = customizableEdges24;
             btnCancel.Size = new Size(84, 33);
@@ -1144,9 +1144,9 @@
             tabProfile.Controls.Add(guna2GroupBox8);
             tabProfile.Controls.Add(guna2GroupBox6);
             tabProfile.Controls.Add(guna2GroupBox7);
-            tabProfile.Location = new Point(4, 44);
+            tabProfile.Location = new Point(4, 5);
             tabProfile.Name = "tabProfile";
-            tabProfile.Size = new Size(852, 830);
+            tabProfile.Size = new Size(852, 869);
             tabProfile.TabIndex = 2;
             tabProfile.Text = "Profile";
             // 
@@ -1172,7 +1172,7 @@
             guna2GroupBox8.ShadowDecoration.CustomizableEdges = customizableEdges64;
             guna2GroupBox8.ShadowDecoration.Depth = 7;
             guna2GroupBox8.ShadowDecoration.Enabled = true;
-            guna2GroupBox8.Size = new Size(446, 660);
+            guna2GroupBox8.Size = new Size(446, 699);
             guna2GroupBox8.TabIndex = 26;
             // 
             // btnCancelProfile2
@@ -1187,7 +1187,7 @@
             btnCancelProfile2.FillColor = Color.FromArgb(224, 224, 224);
             btnCancelProfile2.Font = new Font("Segoe UI", 9F);
             btnCancelProfile2.ForeColor = Color.Silver;
-            btnCancelProfile2.Location = new Point(5, 622);
+            btnCancelProfile2.Location = new Point(5, 661);
             btnCancelProfile2.Name = "btnCancelProfile2";
             btnCancelProfile2.ShadowDecoration.CustomizableEdges = customizableEdges54;
             btnCancelProfile2.Size = new Size(65, 33);
@@ -1230,7 +1230,7 @@
             guna2Button5.FillColor = Color.FromArgb(51, 71, 255);
             guna2Button5.Font = new Font("Segoe UI", 9F);
             guna2Button5.ForeColor = Color.White;
-            guna2Button5.Location = new Point(392, 1121);
+            guna2Button5.Location = new Point(392, 1160);
             guna2Button5.Name = "guna2Button5";
             guna2Button5.ShadowDecoration.CustomizableEdges = customizableEdges58;
             guna2Button5.Size = new Size(114, 33);
@@ -1250,7 +1250,7 @@
             guna2Button7.FillColor = Color.FromArgb(224, 224, 224);
             guna2Button7.Font = new Font("Segoe UI", 9F);
             guna2Button7.ForeColor = Color.Gray;
-            guna2Button7.Location = new Point(5, 1121);
+            guna2Button7.Location = new Point(5, 1160);
             guna2Button7.Name = "guna2Button7";
             guna2Button7.ShadowDecoration.CustomizableEdges = customizableEdges60;
             guna2Button7.Size = new Size(84, 33);
@@ -1293,7 +1293,7 @@
             dataGridViewCellStyle16.WrapMode = DataGridViewTriState.True;
             dataGridAvailabilityMonthProfile.RowHeadersDefaultCellStyle = dataGridViewCellStyle16;
             dataGridAvailabilityMonthProfile.RowHeadersVisible = false;
-            dataGridAvailabilityMonthProfile.Size = new Size(404, 543);
+            dataGridAvailabilityMonthProfile.Size = new Size(404, 582);
             dataGridAvailabilityMonthProfile.TabIndex = 13;
             dataGridAvailabilityMonthProfile.ThemeStyle.AlternatingRowsStyle.BackColor = Color.White;
             dataGridAvailabilityMonthProfile.ThemeStyle.AlternatingRowsStyle.Font = null;
@@ -1329,7 +1329,7 @@
             btnEdit.FillColor = Color.FromArgb(51, 71, 255);
             btnEdit.Font = new Font("Segoe UI", 9F);
             btnEdit.ForeColor = Color.White;
-            btnEdit.Location = new Point(368, 622);
+            btnEdit.Location = new Point(368, 661);
             btnEdit.Name = "btnEdit";
             btnEdit.ShadowDecoration.CustomizableEdges = customizableEdges62;
             btnEdit.Size = new Size(73, 33);

@@ -194,6 +194,9 @@
 		<EmbeddedResource Remove="View\Employee\EmployeeView.Dialogs.resx" />
 		<EmbeddedResource Remove="View\Employee\EmployeeView.Navigation.resx" />
 		<EmbeddedResource Remove="View\Employee\EmployeeView.*.resx" />
+		<EmbeddedResource Remove="View\Container\ContainerView.Busy.resx" />
+		<EmbeddedResource Remove="View\Container\ContainerView.UiToggles.resx" />
+
 	</ItemGroup>
 
 	<ItemGroup>
@@ -226,6 +229,15 @@
 		<Compile Update="View\Employee\EmployeeView.Navigation.cs">
 			<DependentUpon>EmployeeView.cs</DependentUpon>
 			<SubType>Code</SubType>
+		</Compile>
+
+		<Compile Update="View\Container\ContainerView.Busy.cs">
+			<DependentUpon>ContainerView.cs</DependentUpon>
+			<SubType>Code</SubType>
+		</Compile>
+
+		<Compile Update="View\Container\ContainerView.UiToggles.cs">
+			<DependentUpon>ContainerView.cs</DependentUpon>
 		</Compile>
 	</ItemGroup>
 

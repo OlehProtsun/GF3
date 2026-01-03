@@ -18,13 +18,14 @@ namespace DataAccessLayer.Repositories
             return await _set
                 .AsNoTracking()
                 .Include(c => c.Schedules)
-                .ToListAsync(ct);
+                .ToListAsync(ct)
+                .ConfigureAwait(false);
         }
 
         public async Task<List<ContainerModel>> GetByValueAsync(string value, CancellationToken ct = default)
         {
             if (string.IsNullOrWhiteSpace(value))
-                return await GetAllAsync(ct);
+                return await GetAllAsync(ct).ConfigureAwait(false);
 
             value = value.Trim().ToLower();
             return await _set
@@ -33,7 +34,8 @@ namespace DataAccessLayer.Repositories
                 .Where(c =>
                     c.Name.ToLower().Contains(value) ||
                     (c.Note != null && c.Note.ToLower().Contains(value)))
-                .ToListAsync(ct);
+                .ToListAsync(ct)
+                .ConfigureAwait(false);
         }
     }
 }

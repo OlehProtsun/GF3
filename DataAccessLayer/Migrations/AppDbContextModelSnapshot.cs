@@ -260,6 +260,10 @@ namespace DataAccessLayer.Migrations
                         .HasColumnType("TEXT")
                         .HasColumnName("name");
 
+                    b.Property<string>("Note")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("note");
+
                     b.Property<int>("PeoplePerShift")
                         .HasColumnType("INTEGER")
                         .HasColumnName("people_per_shift");

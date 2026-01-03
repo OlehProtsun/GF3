@@ -10,6 +10,7 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using WinFormsApp.ViewModel;
+using WinFormsApp.View.Shared;
 
 namespace WinFormsApp.View.Employee
 {
@@ -18,6 +19,7 @@ namespace WinFormsApp.View.Employee
         public EmployeeView()
         {
             InitializeComponent();
+            _busyController = new BusyOverlayController(this);
             ConfigureGrid();
             AssociateAndRaiseViewEvents();
         }

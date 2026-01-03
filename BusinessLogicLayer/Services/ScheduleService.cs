@@ -29,16 +29,30 @@ namespace BusinessLogicLayer.Services
         public Task<List<ScheduleModel>> GetByValueAsync(string value, CancellationToken ct = default)
             => _scheduleRepo.GetByValueAsync(value, ct);
 
+        public override Task<ScheduleModel> CreateAsync(ScheduleModel entity, CancellationToken ct = default)
+        {
+            NormalizeSchedule(entity);
+            return base.CreateAsync(entity, ct);
+        }
+
+        public override Task UpdateAsync(ScheduleModel entity, CancellationToken ct = default)
+        {
+            NormalizeSchedule(entity);
+            return base.UpdateAsync(entity, ct);
+        }
+
         public async Task SaveWithDetailsAsync(
             ScheduleModel schedule,
             IEnumerable<ScheduleEmployeeModel> employees,
             IEnumerable<ScheduleSlotModel> slots,
             CancellationToken ct = default)
         {
+            NormalizeSchedule(schedule);
+
             if (schedule.Id == 0)
-                schedule = await _scheduleRepo.AddAsync(schedule, ct);
+                schedule = await _scheduleRepo.AddAsync(schedule, ct).ConfigureAwait(false);
             else
-                await _scheduleRepo.UpdateAsync(schedule, ct);
+                await _scheduleRepo.UpdateAsync(schedule, ct).ConfigureAwait(false);
 
             var scheduleId = schedule.Id;
 
@@ -54,27 +68,27 @@ namespace BusinessLogicLayer.Services
             }
 
             // replace employees
-            var existingEmployees = await _employeeRepo.GetByScheduleAsync(scheduleId, ct);
+            var existingEmployees = await _employeeRepo.GetByScheduleAsync(scheduleId, ct).ConfigureAwait(false);
             foreach (var e in existingEmployees)
-                await _employeeRepo.DeleteAsync(e.Id, ct);
+                await _employeeRepo.DeleteAsync(e.Id, ct).ConfigureAwait(false);
 
             foreach (var e in employees)
             {
                 e.Id = 0;
                 e.ScheduleId = scheduleId;
-                await _employeeRepo.AddAsync(e, ct);
+                await _employeeRepo.AddAsync(e, ct).ConfigureAwait(false);
             }
 
             // replace slots
-            var existingSlots = await _slotRepo.GetByScheduleAsync(scheduleId, ct);
+            var existingSlots = await _slotRepo.GetByScheduleAsync(scheduleId, ct).ConfigureAwait(false);
             foreach (var s in existingSlots)
-                await _slotRepo.DeleteAsync(s.Id, ct);
+                await _slotRepo.DeleteAsync(s.Id, ct).ConfigureAwait(false);
 
             foreach (var s in slots)
             {
                 s.Id = 0;
                 s.ScheduleId = scheduleId;
-                await _slotRepo.AddAsync(s, ct);
+                await _slotRepo.AddAsync(s, ct).ConfigureAwait(false);
             }
         }
 
@@ -82,15 +96,25 @@ namespace BusinessLogicLayer.Services
         public async Task<ScheduleModel?> GetDetailedAsync(int id, CancellationToken ct = default)
         {
             // Беремо сам графік (з Shop/Container, якщо репозиторій це вміє)
-            var schedule = await _scheduleRepo.GetDetailedAsync(id, ct);
+            var schedule = await _scheduleRepo.GetDetailedAsync(id, ct).ConfigureAwait(false);
             if (schedule is null)
                 return null;
 
             // А тепер дочірні дані – працівники та слоти
-            schedule.Employees = (await _employeeRepo.GetByScheduleAsync(id, ct)).ToList();
-            schedule.Slots = (await _slotRepo.GetByScheduleAsync(id, ct)).ToList();
+            schedule.Employees = (await _employeeRepo.GetByScheduleAsync(id, ct).ConfigureAwait(false)).ToList();
+            schedule.Slots = (await _slotRepo.GetByScheduleAsync(id, ct).ConfigureAwait(false)).ToList();
 
             return schedule;
+        }
+
+        private static void NormalizeSchedule(ScheduleModel schedule)
+        {
+            if (schedule is null)
+                return;
+
+            schedule.Note = string.IsNullOrWhiteSpace(schedule.Note)
+                ? null
+                : schedule.Note.Trim();
         }
     }
 }
