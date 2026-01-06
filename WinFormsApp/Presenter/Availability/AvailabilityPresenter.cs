@@ -18,6 +18,7 @@ namespace WinFormsApp.Presenter.Availability
         private readonly BindingSource _bindingSource = new();
         private int? _openedProfileGroupId;
         private readonly Dictionary<int, string> _employeeNames = new();
+        private readonly List<EmployeeModel> _allEmployees = new();
 
         public AvailabilityPresenter(
             IAvailabilityView view,
@@ -44,6 +45,7 @@ namespace WinFormsApp.Presenter.Availability
 
             _view.AddEmployeeToGroupEvent += OnAddEmployeeToGroupAsync;
             _view.RemoveEmployeeFromGroupEvent += OnRemoveEmployeeFromGroupAsync;
+            _view.SearchEmployeeEvent += OnSearchEmployeeAsync;
 
             _view.SetListBindingSource(_bindingSource);
             _view.SetBindsBindingSource(_bindsSource);
@@ -66,11 +68,13 @@ namespace WinFormsApp.Presenter.Availability
         {
             var employees = await _employeeService.GetAllAsync(ct);
             _employeeNames.Clear();
+            _allEmployees.Clear();
+            _allEmployees.AddRange(employees);
 
             foreach (var e in employees)
                 _employeeNames[e.Id] = $"{e.FirstName} {e.LastName}";
 
-            _view.SetEmployeeList(employees);
+            _view.SetEmployeeList(_allEmployees);
         }
 
         private async Task LoadBinds(CancellationToken ct = default)
@@ -277,6 +281,7 @@ namespace WinFormsApp.Presenter.Availability
         private Task OnCancelEventAsync(CancellationToken ct)
         {
             _view.ClearValidationErrors();
+            ResetEmployeeSearch();
 
             if (_view.Mode == AvailabilityViewModel.Edit)
             {
@@ -290,6 +295,12 @@ namespace WinFormsApp.Presenter.Availability
                 _view.SwitchToListMode();
             }
 
+            return Task.CompletedTask;
+        }
+
+        private Task OnSearchEmployeeAsync(CancellationToken ct)
+        {
+            ApplyEmployeeFilter(_view.EmployeeSearchValue);
             return Task.CompletedTask;
         }
 
@@ -402,5 +413,29 @@ namespace WinFormsApp.Presenter.Availability
                 }
             }, ct, busyText);
 
+        private void ApplyEmployeeFilter(string? raw)
+        {
+            var term = raw?.Trim() ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(term))
+            {
+                _view.SetEmployeeList(_allEmployees);
+                return;
+            }
+
+            var filtered = _allEmployees
+                .Where(e => ContainsIgnoreCase(e.FirstName, term) || ContainsIgnoreCase(e.LastName, term))
+                .ToList();
+
+            _view.SetEmployeeList(filtered);
+        }
+
+        private void ResetEmployeeSearch()
+        {
+            _view.EmployeeSearchValue = string.Empty;
+            _view.SetEmployeeList(_allEmployees);
+        }
+
+        private static bool ContainsIgnoreCase(string? source, string value)
+            => (source ?? string.Empty).Contains(value, StringComparison.OrdinalIgnoreCase);
     }
 }
