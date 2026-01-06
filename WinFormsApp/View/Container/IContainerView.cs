@@ -25,6 +25,7 @@ namespace WinFormsApp.View.Container
         ScheduleViewModel ScheduleCancelTarget { get; set; }
         int ScheduleId { get; set; }
         int ScheduleContainerId { get; set; }
+        int ScheduleShopId { get; set; }
         string ScheduleName { get; set; }
         int ScheduleYear { get; set; }
         int ScheduleMonth { get; set; }
@@ -37,9 +38,13 @@ namespace WinFormsApp.View.Container
         int ScheduleMaxFullPerMonth { get; set; }
         string ScheduleNote { get; set; }
         string ScheduleSearch { get; set; }
+        string ScheduleShopSearchValue { get; set; }
+        string ScheduleAvailabilitySearchValue { get; set; }
+        string ScheduleEmployeeSearchValue { get; set; }
 
-        // AvailabilityGroup selection
-        IList<int> SelectedAvailabilityGroupIds { get; }
+        int SelectedAvailabilityGroupId { get; set; }
+        int ScheduleEmployeeId { get; set; }
+
         IList<ScheduleEmployeeModel> ScheduleEmployees { get; set; }
         IList<ScheduleSlotModel> ScheduleSlots { get; set; }
 
@@ -64,6 +69,11 @@ namespace WinFormsApp.View.Container
         event Func<CancellationToken, Task>? ScheduleCancelEvent;
         event Func<CancellationToken, Task>? ScheduleOpenProfileEvent;
         event Func<CancellationToken, Task>? ScheduleGenerateEvent;
+        event Func<CancellationToken, Task>? ScheduleSearchShopEvent;
+        event Func<CancellationToken, Task>? ScheduleSearchAvailabilityEvent;
+        event Func<CancellationToken, Task>? ScheduleSearchEmployeeEvent;
+        event Func<CancellationToken, Task>? ScheduleAddEmployeeToGroupEvent;
+        event Func<CancellationToken, Task>? ScheduleRemoveEmployeeFromGroupEvent;
 
         event Func<CancellationToken, Task>? AvailabilitySelectionChangedEvent;
 
@@ -74,6 +84,8 @@ namespace WinFormsApp.View.Container
 
         // lookup
         void SetAvailabilityGroupList(IEnumerable<AvailabilityGroupModel> groups);
+        void SetShopList(IEnumerable<ShopModel> shops);
+        void SetEmployeeList(IEnumerable<EmployeeModel> employees);
 
         void SwitchToEditMode();
         void SwitchToListMode();
@@ -98,7 +110,7 @@ namespace WinFormsApp.View.Container
         void SetScheduleProfile(ScheduleModel model);
 
 
-        void SetCheckedAvailabilityGroupIds(IEnumerable<int> groupIds, bool fireEvent = true);
+        void SetSelectedAvailabilityGroupId(int groupId, bool fireEvent = true);
 
         void SetAvailabilityPreviewMatrix(
             int year,

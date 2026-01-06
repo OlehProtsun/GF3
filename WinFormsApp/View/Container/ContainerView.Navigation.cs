@@ -59,6 +59,7 @@ namespace WinFormsApp.View.Container
         {
             ScheduleId = 0;
             ScheduleName = string.Empty;
+            ScheduleShopId = 0;
             ScheduleYear = DateTime.Today.Year;
             ScheduleMonth = DateTime.Today.Month;
             SchedulePeoplePerShift = 1;
@@ -70,17 +71,15 @@ namespace WinFormsApp.View.Container
             ScheduleMaxFullPerMonth = 1;
             ScheduleNote = string.Empty;
 
-            checkedAvailabilities.BeginUpdate();
-            try
-            {
-                for (int i = 0; i < checkedAvailabilities.Items.Count; i++)
-                    checkedAvailabilities.SetItemChecked(i, false);
-            }
-            finally
-            {
-                checkedAvailabilities.EndUpdate();
-            }
+            SelectedAvailabilityGroupId = 0;
 
+            // ✅ ГОЛОВНЕ: щоб новий графік був "пустий"
+            ScheduleEmployees = new List<ScheduleEmployeeModel>();
+
+            // ✅ теж логічно скидати, щоб не висів старий вибір
+            ScheduleEmployeeId = 0;
+
+            // slots теж чистимо
             ScheduleSlots = new List<ScheduleSlotModel>();
         }
 

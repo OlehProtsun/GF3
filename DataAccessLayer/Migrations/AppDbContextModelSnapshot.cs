@@ -393,6 +393,32 @@ namespace DataAccessLayer.Migrations
                         });
                 });
 
+            modelBuilder.Entity("DataAccessLayer.Models.ShopModel", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Address")
+                        .IsRequired()
+                        .HasColumnType("TEXT")
+                        .HasColumnName("address");
+
+                    b.Property<string>("Description")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("description");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("TEXT")
+                        .HasColumnName("name");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("shop");
+                });
+
             modelBuilder.Entity("DataAccessLayer.Models.AvailabilityGroupDayModel", b =>
                 {
                     b.HasOne("DataAccessLayer.Models.AvailabilityGroupMemberModel", "AvailabilityGroupMember")
@@ -450,7 +476,15 @@ namespace DataAccessLayer.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.HasOne("DataAccessLayer.Models.ShopModel", "Shop")
+                        .WithMany("Schedules")
+                        .HasForeignKey("ShopId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.Navigation("Container");
+
+                    b.Navigation("Shop");
                 });
 
             modelBuilder.Entity("DataAccessLayer.Models.ScheduleSlotModel", b =>
@@ -498,6 +532,11 @@ namespace DataAccessLayer.Migrations
                     b.Navigation("Employees");
 
                     b.Navigation("Slots");
+                });
+
+            modelBuilder.Entity("DataAccessLayer.Models.ShopModel", b =>
+                {
+                    b.Navigation("Schedules");
                 });
 #pragma warning restore 612, 618
         }

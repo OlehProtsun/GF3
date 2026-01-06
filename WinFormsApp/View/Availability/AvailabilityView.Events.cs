@@ -22,9 +22,11 @@ namespace WinFormsApp.View.Availability
             btnCancelProfile2.Click += async (_, __) => await RaiseSafeAsync(CancelEvent);
             btnCacnelAvailabilityEdit2.Click += async (_, __) => await RaiseSafeAsync(CancelEvent);
             btnCacnelAvailabilityEdit3.Click += async (_, __) => await RaiseSafeAsync(CancelEvent);
+            btnCancelInEmployeeBox.Click += async (_, __) => await RaiseSafeAsync(CancelEvent);
 
             btnAddEmployeeToGroup.Click += async (_, __) => await RaiseSafeAsync(AddEmployeeToGroupEvent);
             btnRemoveEmployeeFromGroup.Click += async (_, __) => await RaiseSafeAsync(RemoveEmployeeFromGroupEvent);
+            btnSearchEmployeeInAvailabilityEdit.Click += async (_, __) => await RaiseSafeAsync(SearchEmployeeEvent);
 
             btnAddNewBind.Click += async (_, __) =>
             {
@@ -51,6 +53,12 @@ namespace WinFormsApp.View.Availability
             {
                 if (e.KeyCode == Keys.Enter)
                     await RaiseSafeAsync(SearchEvent);
+            };
+
+            textBoxSearchValueFromAvailabilityEdit.KeyDown += async (_, e) =>
+            {
+                if (e.KeyCode == Keys.Enter)
+                    await RaiseSafeAsync(SearchEmployeeEvent);
             };
 
             dataGrid.CellDoubleClick += async (_, e) =>

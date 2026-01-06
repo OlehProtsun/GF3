@@ -20,23 +20,32 @@ namespace WinFormsApp.Presenter.Container
         private readonly IContainerService _containerService;
         private readonly IScheduleService _scheduleService;
         private readonly IAvailabilityGroupService _availabilityGroupService;
+        private readonly IShopService _shopService;
+        private readonly IEmployeeService _employeeService;
         private readonly IScheduleGenerator _generator;
 
         private readonly BindingSource _containerBinding = new();
         private readonly BindingSource _scheduleBinding = new();
         private readonly BindingSource _slotBinding = new();
+        private readonly List<ShopModel> _allShops = new();
+        private readonly List<AvailabilityGroupModel> _allAvailabilityGroups = new();
+        private readonly List<EmployeeModel> _allEmployees = new();
 
         public ContainerPresenter(
             IContainerView view,
             IContainerService containerService,
             IScheduleService scheduleService,
             IAvailabilityGroupService availabilityGroupService,
+            IShopService shopService,
+            IEmployeeService employeeService,
             IScheduleGenerator generator)
         {
             _view = view ?? throw new ArgumentNullException(nameof(view));
             _containerService = containerService ?? throw new ArgumentNullException(nameof(containerService));
             _scheduleService = scheduleService ?? throw new ArgumentNullException(nameof(scheduleService));
             _availabilityGroupService = availabilityGroupService ?? throw new ArgumentNullException(nameof(availabilityGroupService));
+            _shopService = shopService ?? throw new ArgumentNullException(nameof(shopService));
+            _employeeService = employeeService ?? throw new ArgumentNullException(nameof(employeeService));
             _generator = generator ?? throw new ArgumentNullException(nameof(generator));
 
             // Container
@@ -57,6 +66,11 @@ namespace WinFormsApp.Presenter.Container
             _view.ScheduleCancelEvent += ct => SafeAsync(OnScheduleCancelCoreAsync, ct);
             _view.ScheduleOpenProfileEvent += ct => RunBusySafeAsync(OnScheduleOpenProfileCoreAsync, ct, "Loading schedule...");
             _view.ScheduleGenerateEvent += ct => RunBusySafeAsync(OnScheduleGenerateCoreAsync, ct, "Generating schedule...");
+            _view.ScheduleSearchShopEvent += ct => SafeAsync(OnScheduleShopSearchCoreAsync, ct);
+            _view.ScheduleSearchAvailabilityEvent += ct => SafeAsync(OnScheduleAvailabilitySearchCoreAsync, ct);
+            _view.ScheduleSearchEmployeeEvent += ct => SafeAsync(OnScheduleEmployeeSearchCoreAsync, ct);
+            _view.ScheduleAddEmployeeToGroupEvent += ct => SafeAsync(OnScheduleAddEmployeeToGroupCoreAsync, ct);
+            _view.ScheduleRemoveEmployeeFromGroupEvent += ct => SafeAsync(OnScheduleRemoveEmployeeFromGroupCoreAsync, ct);
 
             _view.AvailabilitySelectionChangedEvent += ct => SafeAsync(OnAvailabilitySelectionChangedCoreAsync, ct);
 

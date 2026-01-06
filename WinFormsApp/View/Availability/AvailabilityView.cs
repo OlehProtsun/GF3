@@ -88,6 +88,13 @@ namespace WinFormsApp.View.Availability
         [DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
         public string SearchValue { get => inputSearch.Text; set => inputSearch.Text = value; }
 
+        [DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
+        public string EmployeeSearchValue
+        {
+            get => textBoxSearchValueFromAvailabilityEdit.Text;
+            set => textBoxSearchValueFromAvailabilityEdit.Text = value;
+        }
+
         public event Func<CancellationToken, Task>? SearchEvent;
         public event Func<CancellationToken, Task>? AddEvent;
         public event Func<CancellationToken, Task>? EditEvent;
@@ -100,6 +107,7 @@ namespace WinFormsApp.View.Availability
         public event Func<BindModel, CancellationToken, Task>? DeleteBindEvent;
         public event Func<CancellationToken, Task>? AddEmployeeToGroupEvent;
         public event Func<CancellationToken, Task>? RemoveEmployeeFromGroupEvent; 
+        public event Func<CancellationToken, Task>? SearchEmployeeEvent;
 
         public void SwitchToEditMode()
         {

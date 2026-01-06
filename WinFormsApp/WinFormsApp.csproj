@@ -241,5 +241,58 @@
 		</Compile>
 	</ItemGroup>
 
+	<!-- ShopView: якщо раптом VS згенерує resx для partial-файлів - не вбудовувати їх у збірку -->
+	<ItemGroup>
+		<EmbeddedResource Remove="View\Shop\ShopView.Busy.resx" />
+		<EmbeddedResource Remove="View\Shop\ShopView.Dialogs.resx" />
+		<EmbeddedResource Remove="View\Shop\ShopView.Events.resx" />
+		<EmbeddedResource Remove="View\Shop\ShopView.Grid.resx" />
+		<EmbeddedResource Remove="View\Shop\ShopView.Navigation.resx" />
+		<EmbeddedResource Remove="View\Shop\ShopView.State.resx" />
+		<EmbeddedResource Remove="View\Shop\ShopView.Validation.resx" />
+
+		<!-- На всякий випадок: будь-які інші варіації ShopView.*.resx -->
+		<EmbeddedResource Remove="View\Shop\ShopView.*.resx" />
+	</ItemGroup>
+
+	<!-- ShopView: робимо partial-файли "звичайним кодом" і підв'язуємо їх під основну форму -->
+	<ItemGroup>
+		<Compile Update="View\Shop\ShopView.Busy.cs">
+			<DependentUpon>ShopView.cs</DependentUpon>
+			<SubType>Code</SubType>
+		</Compile>
+
+		<Compile Update="View\Shop\ShopView.Dialogs.cs">
+			<DependentUpon>ShopView.cs</DependentUpon>
+			<SubType>Code</SubType>
+		</Compile>
+
+		<Compile Update="View\Shop\ShopView.Events.cs">
+			<DependentUpon>ShopView.cs</DependentUpon>
+			<SubType>Code</SubType>
+		</Compile>
+
+		<Compile Update="View\Shop\ShopView.Grid.cs">
+			<DependentUpon>ShopView.cs</DependentUpon>
+			<SubType>Code</SubType>
+		</Compile>
+
+		<Compile Update="View\Shop\ShopView.Navigation.cs">
+			<DependentUpon>ShopView.cs</DependentUpon>
+			<SubType>Code</SubType>
+		</Compile>
+
+		<Compile Update="View\Shop\ShopView.State.cs">
+			<DependentUpon>ShopView.cs</DependentUpon>
+			<SubType>Code</SubType>
+		</Compile>
+
+		<Compile Update="View\Shop\ShopView.Validation.cs">
+			<DependentUpon>ShopView.cs</DependentUpon>
+			<SubType>Code</SubType>
+		</Compile>
+	</ItemGroup>
+
+
 
 </Project>

@@ -14,6 +14,7 @@ namespace WinFormsApp.View.Main
         Control ContentHost { get; }
 
         event Func<CancellationToken, Task>? ShowEmployeeView;
+        event Func<CancellationToken, Task>? ShowShopView;
         event Func<CancellationToken, Task>? ShowAvailabilityView;
         event Func<CancellationToken, Task>? ShowContainerView;
        
