@@ -21,9 +21,17 @@ namespace WinFormsApp.View.Shop
             }
             catch (Exception ex)
             {
-                ShowError(ex.Message);
+                ShowError(RootMessage(ex));
             }
         }
+
+        private static string RootMessage(Exception ex)
+        {
+            var root = ex;
+            while (root.InnerException != null) root = root.InnerException;
+            return root.Message;
+        }
+
 
         private void BindClick(Control control, Func<Func<CancellationToken, Task>?> handlerFactory, Action? before = null)
         {

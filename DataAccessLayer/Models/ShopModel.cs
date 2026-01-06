@@ -12,6 +12,7 @@ namespace DataAccessLayer.Models
     public class ShopModel
     {
         [Key]
+        [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
         [Column("id")]
         public int Id { get; set; }
 

@@ -22,9 +22,16 @@ namespace WinFormsApp.Presenter.Shop
                 }
                 catch (Exception ex)
                 {
-                    _view.ShowError(ex.Message);
+                    _view.ShowError(RootMessage(ex));
                 }
             }, ct, busyText);
+        }
+
+        private static string RootMessage(Exception ex)
+        {
+            var root = ex;
+            while (root.InnerException != null) root = root.InnerException;
+            return root.Message;
         }
     }
 }
