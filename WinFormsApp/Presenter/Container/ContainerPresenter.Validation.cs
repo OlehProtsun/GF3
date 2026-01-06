@@ -20,6 +20,8 @@ namespace WinFormsApp.Presenter.Container
 
             if (model.ContainerId <= 0)
                 errors[nameof(IContainerView.ScheduleContainerId)] = "Select a container.";
+            if (model.ShopId <= 0)
+                errors[nameof(IContainerView.ScheduleShopId)] = "Select a shop.";
             if (string.IsNullOrWhiteSpace(model.Name))
                 errors[nameof(IContainerView.ScheduleName)] = "Name is required.";
             if (model.Year < 1900)

@@ -12,6 +12,7 @@ namespace WinFormsApp.Presenter
         private readonly IMdiViewFactory _viewFactory;
 
         private Form? _employeeView;
+        private Form? _shopView;
         private Form? _availabilityView;
         private Form? _containerView;
 
@@ -22,6 +23,9 @@ namespace WinFormsApp.Presenter
 
             _mainView.ShowEmployeeView += ct =>
                 NavigateAsync(ct, () => _employeeView, v => _employeeView = v, _viewFactory.CreateEmployeeView, NavPage.Employee, "Opening Employee...");
+
+            _mainView.ShowShopView += ct =>
+                NavigateAsync(ct, () => _shopView, v => _shopView = v, _viewFactory.CreateShopView, NavPage.Shop, "Opening Shop...");
 
             _mainView.ShowAvailabilityView += ct =>
                 NavigateAsync(ct, () => _availabilityView, v => _availabilityView = v, _viewFactory.CreateAvailabilityView, NavPage.Availability, "Opening Availability...");

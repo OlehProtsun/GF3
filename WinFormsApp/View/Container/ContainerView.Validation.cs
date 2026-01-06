@@ -15,6 +15,7 @@ namespace WinFormsApp.View.Container
         private Dictionary<string, Control> CreateScheduleErrorMap() => new()
         {
             [nameof(ScheduleName)] = inputScheduleName,
+            [nameof(ScheduleShopId)] = comboScheduleShop,
             [nameof(ScheduleYear)] = inputYear,
             [nameof(ScheduleMonth)] = inputMonth,
             [nameof(SchedulePeoplePerShift)] = inputPeoplePerShift,
@@ -70,6 +71,7 @@ namespace WinFormsApp.View.Container
             inputYear.ValueChanged += (_, __) => errorProviderSchedule.SetError(inputYear, "");
             inputMonth.ValueChanged += (_, __) => errorProviderSchedule.SetError(inputMonth, "");
             inputPeoplePerShift.ValueChanged += (_, __) => errorProviderSchedule.SetError(inputPeoplePerShift, "");
+            comboScheduleShop.SelectedIndexChanged += (_, __) => errorProviderSchedule.SetError(comboScheduleShop, "");
 
             inputMaxHours.ValueChanged += (_, __) => errorProviderSchedule.SetError(inputMaxHours, "");
             inputMaxConsecutiveDays.ValueChanged += (_, __) => errorProviderSchedule.SetError(inputMaxConsecutiveDays, "");

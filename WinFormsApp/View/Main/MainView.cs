@@ -45,6 +45,7 @@ namespace WinFormsApp.View.Main
             _busyController = new BusyOverlayController(this);
 
             btnEmployee.Click += async (_, __) => await InvokeNavAsync(ShowEmployeeView);
+            btnShop.Click += async (_, __) => await InvokeNavAsync(ShowShopView);
             btnAvailability.Click += async (_, __) => await InvokeNavAsync(ShowAvailabilityView);
             btnContainer.Click += async (_, __) => await InvokeNavAsync(ShowContainerView);
 
@@ -53,6 +54,7 @@ namespace WinFormsApp.View.Main
         }
 
         public event Func<CancellationToken, Task>? ShowEmployeeView;
+        public event Func<CancellationToken, Task>? ShowShopView;
         public event Func<CancellationToken, Task>? ShowAvailabilityView;
         public event Func<CancellationToken, Task>? ShowContainerView;
 
@@ -77,6 +79,7 @@ namespace WinFormsApp.View.Main
             if (!enabled)
             {
                 btnEmployee.Enabled = false;
+                btnShop.Enabled = false;
                 btnAvailability.Enabled = false;
                 btnContainer.Enabled = false;
                 return;
@@ -84,6 +87,7 @@ namespace WinFormsApp.View.Main
 
             // Увімкнути все, крім активної сторінки
             btnEmployee.Enabled = _activePage != NavPage.Employee;
+            btnShop.Enabled = _activePage != NavPage.Shop;
             btnAvailability.Enabled = _activePage != NavPage.Availability;
             btnContainer.Enabled = _activePage != NavPage.Container;
         }
@@ -106,6 +110,7 @@ namespace WinFormsApp.View.Main
             _activePage = page;
 
             ApplyNavStyle(btnEmployee, page == NavPage.Employee);
+            ApplyNavStyle(btnShop, page == NavPage.Shop);
             ApplyNavStyle(btnAvailability, page == NavPage.Availability);
             ApplyNavStyle(btnContainer, page == NavPage.Container);
 

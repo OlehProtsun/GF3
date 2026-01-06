@@ -20,6 +20,7 @@ namespace WinFormsApp.Presenter.Container
         private readonly IContainerService _containerService;
         private readonly IScheduleService _scheduleService;
         private readonly IAvailabilityGroupService _availabilityGroupService;
+        private readonly IShopService _shopService;
         private readonly IScheduleGenerator _generator;
 
         private readonly BindingSource _containerBinding = new();
@@ -31,12 +32,14 @@ namespace WinFormsApp.Presenter.Container
             IContainerService containerService,
             IScheduleService scheduleService,
             IAvailabilityGroupService availabilityGroupService,
+            IShopService shopService,
             IScheduleGenerator generator)
         {
             _view = view ?? throw new ArgumentNullException(nameof(view));
             _containerService = containerService ?? throw new ArgumentNullException(nameof(containerService));
             _scheduleService = scheduleService ?? throw new ArgumentNullException(nameof(scheduleService));
             _availabilityGroupService = availabilityGroupService ?? throw new ArgumentNullException(nameof(availabilityGroupService));
+            _shopService = shopService ?? throw new ArgumentNullException(nameof(shopService));
             _generator = generator ?? throw new ArgumentNullException(nameof(generator));
 
             // Container

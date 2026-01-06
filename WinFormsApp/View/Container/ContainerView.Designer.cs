@@ -288,6 +288,8 @@ namespace WinFormsApp.View.Container
             label14 = new Label();
             inputScheduleName = new Guna2TextBox();
             label31 = new Label();
+            labelScheduleShop = new Label();
+            comboScheduleShop = new Guna2ComboBox();
             btnGenerate = new Guna2Button();
             label13 = new Label();
             inputMaxFull = new Guna2NumericUpDown();
@@ -1564,8 +1566,10 @@ namespace WinFormsApp.View.Container
             guna2GroupBox5.Controls.Add(guna2GroupBox10);
             guna2GroupBox5.Controls.Add(btnScheduleCancel);
             guna2GroupBox5.Controls.Add(label14);
+            guna2GroupBox5.Controls.Add(comboScheduleShop);
             guna2GroupBox5.Controls.Add(inputScheduleName);
             guna2GroupBox5.Controls.Add(label31);
+            guna2GroupBox5.Controls.Add(labelScheduleShop);
             guna2GroupBox5.Controls.Add(btnGenerate);
             guna2GroupBox5.Controls.Add(label13);
             guna2GroupBox5.Controls.Add(inputMaxFull);
@@ -1697,7 +1701,7 @@ namespace WinFormsApp.View.Container
             inputScheduleName.PlaceholderText = "Write here...";
             inputScheduleName.SelectedText = "";
             inputScheduleName.ShadowDecoration.CustomizableEdges = customizableEdges84;
-            inputScheduleName.Size = new Size(345, 36);
+            inputScheduleName.Size = new Size(153, 36);
             inputScheduleName.TabIndex = 3;
             // 
             // label31
@@ -1710,6 +1714,35 @@ namespace WinFormsApp.View.Container
             label31.Size = new Size(99, 17);
             label31.TabIndex = 7;
             label31.Text = "Schedule Name";
+            // 
+            // labelScheduleShop
+            // 
+            labelScheduleShop.AutoSize = true;
+            labelScheduleShop.Font = new Font("Segoe UI", 9.75F, FontStyle.Regular, GraphicsUnit.Point, 0);
+            labelScheduleShop.ForeColor = Color.Black;
+            labelScheduleShop.Location = new Point(197, 284);
+            labelScheduleShop.Name = "labelScheduleShop";
+            labelScheduleShop.Size = new Size(37, 17);
+            labelScheduleShop.TabIndex = 34;
+            labelScheduleShop.Text = "Shop";
+            // 
+            // comboScheduleShop
+            // 
+            comboScheduleShop.BackColor = Color.Transparent;
+            comboScheduleShop.BorderRadius = 10;
+            comboScheduleShop.CustomizableEdges = customizableEdges83;
+            comboScheduleShop.DrawMode = DrawMode.OwnerDrawFixed;
+            comboScheduleShop.DropDownStyle = ComboBoxStyle.DropDownList;
+            comboScheduleShop.FocusedColor = Color.FromArgb(94, 148, 255);
+            comboScheduleShop.FocusedState.BorderColor = Color.FromArgb(94, 148, 255);
+            comboScheduleShop.Font = new Font("Segoe UI", 9F);
+            comboScheduleShop.ForeColor = Color.FromArgb(68, 88, 112);
+            comboScheduleShop.ItemHeight = 30;
+            comboScheduleShop.Location = new Point(197, 304);
+            comboScheduleShop.Name = "comboScheduleShop";
+            comboScheduleShop.ShadowDecoration.CustomizableEdges = customizableEdges84;
+            comboScheduleShop.Size = new Size(153, 36);
+            comboScheduleShop.TabIndex = 4;
             // 
             // btnGenerate
             // 
@@ -3063,6 +3096,7 @@ namespace WinFormsApp.View.Container
         private Guna.UI2.WinForms.Guna2Button btnCancelProfile;
         private Guna.UI2.WinForms.Guna2NumericUpDown numberScheduleId;
         private Guna.UI2.WinForms.Guna2TextBox inputScheduleName;
+        private Guna.UI2.WinForms.Guna2ComboBox comboScheduleShop;
         private Guna.UI2.WinForms.Guna2TextBox inputScheduleNote;
         private Guna.UI2.WinForms.Guna2NumericUpDown inputYear;
         private Guna.UI2.WinForms.Guna2NumericUpDown inputMonth;
@@ -3124,6 +3158,7 @@ namespace WinFormsApp.View.Container
         private Label label28;
         private Label label30;
         private Label label31;
+        private Label labelScheduleShop;
         private Guna2Button guna2Button6;
         private Label label32;
         private Guna2GroupBox guna2GroupBox9;

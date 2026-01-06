@@ -59,6 +59,7 @@ namespace WinFormsApp.View.Container
         {
             ScheduleId = 0;
             ScheduleName = string.Empty;
+            ScheduleShopId = 0;
             ScheduleYear = DateTime.Today.Year;
             ScheduleMonth = DateTime.Today.Month;
             SchedulePeoplePerShift = 1;

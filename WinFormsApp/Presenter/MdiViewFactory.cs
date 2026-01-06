@@ -4,12 +4,14 @@ using System.Windows.Forms;
 using WinFormsApp.View.Availability;
 using WinFormsApp.View.Container;
 using WinFormsApp.View.Employee;
+using WinFormsApp.View.Shop;
 
 namespace WinFormsApp.Presenter
 {
     public interface IMdiViewFactory
     {
         Form CreateEmployeeView();
+        Form CreateShopView();
         Form CreateAvailabilityView();
         Form CreateContainerView();
     }
@@ -24,6 +26,8 @@ namespace WinFormsApp.Presenter
         }
 
         public Form CreateEmployeeView() => _serviceProvider.GetRequiredService<EmployeeView>();
+
+        public Form CreateShopView() => _serviceProvider.GetRequiredService<ShopView>();
 
         public Form CreateAvailabilityView() => _serviceProvider.GetRequiredService<AvailabilityView>();
 

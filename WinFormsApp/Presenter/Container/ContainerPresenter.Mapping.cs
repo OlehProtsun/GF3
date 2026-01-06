@@ -13,6 +13,7 @@ namespace WinFormsApp.Presenter.Container
             {
                 Id = _view.ScheduleId,
                 ContainerId = _view.ScheduleContainerId,
+                ShopId = _view.ScheduleShopId,
                 Name = _view.ScheduleName,
                 Year = _view.ScheduleYear,
                 Month = _view.ScheduleMonth,

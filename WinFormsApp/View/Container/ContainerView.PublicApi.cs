@@ -49,6 +49,19 @@ namespace WinFormsApp.View.Container
         public int ScheduleContainerId { get; set; }
 
         [DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
+        public int ScheduleShopId
+        {
+            get => comboScheduleShop.SelectedValue is int id ? id : 0;
+            set
+            {
+                if (value > 0)
+                    comboScheduleShop.SelectedValue = value;
+                else
+                    comboScheduleShop.SelectedIndex = -1;
+            }
+        }
+
+        [DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
         public string ScheduleName { get => inputScheduleName.Text; set => inputScheduleName.Text = value; }
 
         [DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
@@ -169,6 +182,23 @@ namespace WinFormsApp.View.Container
             finally
             {
                 checkedAvailabilities.EndUpdate();
+            }
+        }
+
+        public void SetShopList(IEnumerable<ShopModel> shops)
+        {
+            comboScheduleShop.BeginUpdate();
+            try
+            {
+                comboScheduleShop.DataSource = null;
+                comboScheduleShop.DisplayMember = nameof(ShopModel.Name);
+                comboScheduleShop.ValueMember = nameof(ShopModel.Id);
+                comboScheduleShop.DataSource = (shops ?? Array.Empty<ShopModel>()).ToList();
+                comboScheduleShop.SelectedIndex = comboScheduleShop.Items.Count > 0 ? 0 : -1;
+            }
+            finally
+            {
+                comboScheduleShop.EndUpdate();
             }
         }
 

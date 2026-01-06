@@ -14,6 +14,7 @@ namespace DataAccessLayer.Models.DataBaseContext
     {
         public DbSet<ContainerModel> Containers => Set<ContainerModel>();
         public DbSet<EmployeeModel> Employees => Set<EmployeeModel>();
+        public DbSet<ShopModel> Shops => Set<ShopModel>();
         public DbSet<ScheduleModel> Schedules => Set<ScheduleModel>();
         public DbSet<ScheduleEmployeeModel> ScheduleEmployees => Set<ScheduleEmployeeModel>();
         public DbSet<ScheduleSlotModel> ScheduleSlots => Set<ScheduleSlotModel>();
@@ -40,12 +41,25 @@ namespace DataAccessLayer.Models.DataBaseContext
                 e.Property(p => p.LastName).IsRequired();
             });
 
+            // ----- Shop
+            modelBuilder.Entity<ShopModel>(e =>
+            {
+                e.Property(p => p.Name).IsRequired();
+                e.Property(p => p.Address).IsRequired();
+                e.Property(p => p.Description).IsRequired(false);
+            });
+
             // ----- Schedule
             modelBuilder.Entity<ScheduleModel>(e =>
             {
                 e.HasOne(s => s.Container)
                  .WithMany(c => c.Schedules)
                  .HasForeignKey(s => s.ContainerId)
+                 .OnDelete(DeleteBehavior.Restrict);
+
+                e.HasOne(s => s.Shop)
+                 .WithMany(c => c.Schedules)
+                 .HasForeignKey(s => s.ShopId)
                  .OnDelete(DeleteBehavior.Restrict);
 
                 e.HasIndex(s => s.ContainerId).HasDatabaseName("ix_sched_container");

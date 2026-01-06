@@ -25,6 +25,7 @@ namespace WinFormsApp.View.Container
         ScheduleViewModel ScheduleCancelTarget { get; set; }
         int ScheduleId { get; set; }
         int ScheduleContainerId { get; set; }
+        int ScheduleShopId { get; set; }
         string ScheduleName { get; set; }
         int ScheduleYear { get; set; }
         int ScheduleMonth { get; set; }
@@ -74,6 +75,7 @@ namespace WinFormsApp.View.Container
 
         // lookup
         void SetAvailabilityGroupList(IEnumerable<AvailabilityGroupModel> groups);
+        void SetShopList(IEnumerable<ShopModel> shops);
 
         void SwitchToEditMode();
         void SwitchToListMode();
