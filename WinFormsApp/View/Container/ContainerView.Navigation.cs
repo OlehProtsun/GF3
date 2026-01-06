@@ -71,16 +71,7 @@ namespace WinFormsApp.View.Container
             ScheduleMaxFullPerMonth = 1;
             ScheduleNote = string.Empty;
 
-            checkedAvailabilities.BeginUpdate();
-            try
-            {
-                for (int i = 0; i < checkedAvailabilities.Items.Count; i++)
-                    checkedAvailabilities.SetItemChecked(i, false);
-            }
-            finally
-            {
-                checkedAvailabilities.EndUpdate();
-            }
+            SelectedAvailabilityGroupId = 0;
 
             ScheduleSlots = new List<ScheduleSlotModel>();
         }

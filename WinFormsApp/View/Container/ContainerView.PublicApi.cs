@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Text;
+using System.Linq;
 using WinFormsApp.ViewModel;
 
 namespace WinFormsApp.View.Container
@@ -58,6 +59,8 @@ namespace WinFormsApp.View.Container
                     comboScheduleShop.SelectedValue = value;
                 else
                     comboScheduleShop.SelectedIndex = -1;
+
+                UpdateShopIdLabel();
             }
         }
 
@@ -97,10 +100,48 @@ namespace WinFormsApp.View.Container
         [DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
         public string ScheduleSearch { get => inputScheduleSearch.Text; set => inputScheduleSearch.Text = value; }
 
-        public IList<int> SelectedAvailabilityGroupIds => checkedAvailabilities.CheckedItems
-            .OfType<AvailabilityGroupModel>()
-            .Select(g => g.Id)
-            .ToList();
+        [DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
+        public string ScheduleShopSearchValue
+        {
+            get => textBoxSearchValueFromScheduleEdit.Text;
+            set => textBoxSearchValueFromScheduleEdit.Text = value;
+        }
+
+        [DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
+        public string ScheduleAvailabilitySearchValue
+        {
+            get => textBoxSearchValue2FromScheduleEdit.Text;
+            set => textBoxSearchValue2FromScheduleEdit.Text = value;
+        }
+
+        [DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
+        public string ScheduleEmployeeSearchValue
+        {
+            get => textBoxSearchValue3FromScheduleEdit.Text;
+            set => textBoxSearchValue3FromScheduleEdit.Text = value;
+        }
+
+        [DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
+        public int SelectedAvailabilityGroupId
+        {
+            get => comboScheduleAvailability.SelectedValue is int id ? id : 0;
+            set
+            {
+                if (value > 0)
+                    comboScheduleAvailability.SelectedValue = value;
+                else
+                    comboScheduleAvailability.SelectedIndex = -1;
+
+                UpdateAvailabilityIdLabel();
+            }
+        }
+
+        [DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
+        public int ScheduleEmployeeId
+        {
+            get => int.TryParse(lblEmployeeId.Text, out var id) ? id : 0;
+            set => lblEmployeeId.Text = value > 0 ? value.ToString() : string.Empty;
+        }
 
         [DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
         public IList<ScheduleSlotModel> ScheduleSlots
@@ -146,6 +187,11 @@ namespace WinFormsApp.View.Container
         public event Func<CancellationToken, Task>? ScheduleCancelEvent;
         public event Func<CancellationToken, Task>? ScheduleOpenProfileEvent;
         public event Func<CancellationToken, Task>? ScheduleGenerateEvent;
+        public event Func<CancellationToken, Task>? ScheduleSearchShopEvent;
+        public event Func<CancellationToken, Task>? ScheduleSearchAvailabilityEvent;
+        public event Func<CancellationToken, Task>? ScheduleSearchEmployeeEvent;
+        public event Func<CancellationToken, Task>? ScheduleAddEmployeeToGroupEvent;
+        public event Func<CancellationToken, Task>? ScheduleRemoveEmployeeFromGroupEvent;
 
         public event Func<CancellationToken, Task>? AvailabilitySelectionChangedEvent;
 
@@ -170,23 +216,34 @@ namespace WinFormsApp.View.Container
 
         public void SetAvailabilityGroupList(IEnumerable<AvailabilityGroupModel> groups)
         {
-            checkedAvailabilities.BeginUpdate();
+            var list = (groups ?? Array.Empty<AvailabilityGroupModel>()).ToList();
+            var selectedId = SelectedAvailabilityGroupId;
+
+            comboScheduleAvailability.BeginUpdate();
             try
             {
-                checkedAvailabilities.Items.Clear();
-                checkedAvailabilities.DisplayMember = nameof(AvailabilityGroupModel.Name);
+                comboScheduleAvailability.DataSource = null;
+                comboScheduleAvailability.DisplayMember = nameof(AvailabilityGroupModel.Name);
+                comboScheduleAvailability.ValueMember = nameof(AvailabilityGroupModel.Id);
+                comboScheduleAvailability.DataSource = list;
 
-                foreach (var g in groups)
-                    checkedAvailabilities.Items.Add(g, false);
+                if (selectedId > 0 && list.Any(g => g.Id == selectedId))
+                    comboScheduleAvailability.SelectedValue = selectedId;
+                else
+                    comboScheduleAvailability.SelectedIndex = list.Count > 0 ? 0 : -1;
             }
             finally
             {
-                checkedAvailabilities.EndUpdate();
+                comboScheduleAvailability.EndUpdate();
             }
+
+            UpdateAvailabilityIdLabel();
         }
 
         public void SetShopList(IEnumerable<ShopModel> shops)
         {
+            var selectedId = ScheduleShopId;
+
             comboScheduleShop.BeginUpdate();
             try
             {
@@ -194,35 +251,80 @@ namespace WinFormsApp.View.Container
                 comboScheduleShop.DisplayMember = nameof(ShopModel.Name);
                 comboScheduleShop.ValueMember = nameof(ShopModel.Id);
                 comboScheduleShop.DataSource = (shops ?? Array.Empty<ShopModel>()).ToList();
-                comboScheduleShop.SelectedIndex = comboScheduleShop.Items.Count > 0 ? 0 : -1;
+
+                if (selectedId > 0 && comboScheduleShop.Items.Count > 0)
+                    comboScheduleShop.SelectedValue = selectedId;
+                else
+                    comboScheduleShop.SelectedIndex = comboScheduleShop.Items.Count > 0 ? 0 : -1;
             }
             finally
             {
                 comboScheduleShop.EndUpdate();
             }
+
+            UpdateShopIdLabel();
         }
 
-        public void SetCheckedAvailabilityGroupIds(IEnumerable<int> groupIds, bool fireEvent = true)
+        public void SetEmployeeList(IEnumerable<EmployeeModel> employees)
         {
-            var set = new HashSet<int>(groupIds ?? Array.Empty<int>());
+            var list = new List<EmployeeListItem>();
+            foreach (var employee in employees ?? Array.Empty<EmployeeModel>())
+            {
+                list.Add(new EmployeeListItem
+                {
+                    Id = employee.Id,
+                    FullName = $"{employee.FirstName} {employee.LastName}"
+                });
+            }
 
-            checkedAvailabilities.BeginUpdate();
+            var selectedId = ScheduleEmployeeId;
+
+            comboboxEmployee.BeginUpdate();
             try
             {
-                for (int i = 0; i < checkedAvailabilities.Items.Count; i++)
-                {
-                    if (checkedAvailabilities.Items[i] is AvailabilityGroupModel g)
-                        checkedAvailabilities.SetItemChecked(i, set.Contains(g.Id));
-                }
+                comboboxEmployee.DataSource = null;
+                comboboxEmployee.DisplayMember = nameof(EmployeeListItem.FullName);
+                comboboxEmployee.ValueMember = nameof(EmployeeListItem.Id);
+                comboboxEmployee.DataSource = list;
+
+                if (selectedId > 0 && list.Any(e => e.Id == selectedId))
+                    comboboxEmployee.SelectedValue = selectedId;
+                else
+                    comboboxEmployee.SelectedIndex = list.Count > 0 ? 0 : -1;
             }
             finally
             {
-                checkedAvailabilities.EndUpdate();
+                comboboxEmployee.EndUpdate();
             }
+
+            UpdateEmployeeIdLabel();
+        }
+
+        public void SetSelectedAvailabilityGroupId(int groupId, bool fireEvent = true)
+        {
+            SelectedAvailabilityGroupId = groupId;
 
             if (fireEvent)
                 BeginInvoke(new Action(async () =>
                     await SafeRaiseAsync(AvailabilitySelectionChangedEvent)));
+        }
+
+        private void UpdateShopIdLabel()
+        {
+            lbShopId.Text = ScheduleShopId > 0 ? ScheduleShopId.ToString() : string.Empty;
+        }
+
+        private void UpdateAvailabilityIdLabel()
+        {
+            lblAvailabilityID.Text = SelectedAvailabilityGroupId > 0
+                ? SelectedAvailabilityGroupId.ToString()
+                : string.Empty;
+        }
+
+        private void UpdateEmployeeIdLabel()
+        {
+            var id = comboboxEmployee.SelectedValue is int value ? value : 0;
+            ScheduleEmployeeId = id;
         }
 
     }

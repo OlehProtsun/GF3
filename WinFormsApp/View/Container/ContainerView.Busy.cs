@@ -61,6 +61,12 @@ namespace WinFormsApp.View.Container
             yield return btnBackToScheduleList;
             yield return btnBackToContainerProfileFromSheduleProfile;
             yield return btnGenerate;
+            yield return btnSearchShopFromScheduleEdit;
+            yield return btnSearchAvailabilityFromScheduleEdit;
+            yield return btnSearchEmployeeInAvailabilityEdit;
+            yield return btnAddEmployeeToGroup;
+            yield return btnRemoveEmployeeFromGroup;
+            yield return guna2Button30;
         }
     }
 }

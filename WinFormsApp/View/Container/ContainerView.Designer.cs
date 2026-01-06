@@ -335,7 +335,7 @@ namespace WinFormsApp.View.Container
             textBoxSearchValue2FromScheduleEdit = new Guna2TextBox();
             label15 = new Label();
             guna2GroupBox10 = new Guna2GroupBox();
-            checkedAvailabilities = new CheckedListBox();
+            comboScheduleAvailability = new Guna2ComboBox();
             guna2GroupBox17 = new Guna2GroupBox();
             guna2Button23 = new Guna2Button();
             comboScheduleShop = new Guna2ComboBox();
@@ -2009,7 +2009,7 @@ namespace WinFormsApp.View.Container
             // guna2GroupBox10
             // 
             guna2GroupBox10.BorderRadius = 10;
-            guna2GroupBox10.Controls.Add(checkedAvailabilities);
+            guna2GroupBox10.Controls.Add(comboScheduleAvailability);
             guna2GroupBox10.CustomBorderThickness = new Padding(0, 1, 0, 0);
             guna2GroupBox10.CustomizableEdges = customizableEdges101;
             guna2GroupBox10.Font = new Font("Segoe UI", 9F);
@@ -2020,16 +2020,23 @@ namespace WinFormsApp.View.Container
             guna2GroupBox10.Size = new Size(363, 142);
             guna2GroupBox10.TabIndex = 32;
             // 
-            // checkedAvailabilities
+            // comboScheduleAvailability
             // 
-            checkedAvailabilities.BackColor = Color.White;
-            checkedAvailabilities.BorderStyle = BorderStyle.None;
-            checkedAvailabilities.CheckOnClick = true;
-            checkedAvailabilities.Font = new Font("Segoe UI", 9F);
-            checkedAvailabilities.Location = new Point(5, 6);
-            checkedAvailabilities.Name = "checkedAvailabilities";
-            checkedAvailabilities.Size = new Size(351, 126);
-            checkedAvailabilities.TabIndex = 25;
+            comboScheduleAvailability.BackColor = Color.Transparent;
+            comboScheduleAvailability.BorderRadius = 10;
+            comboScheduleAvailability.CustomizableEdges = customizableEdges101;
+            comboScheduleAvailability.DrawMode = DrawMode.OwnerDrawFixed;
+            comboScheduleAvailability.DropDownStyle = ComboBoxStyle.DropDownList;
+            comboScheduleAvailability.FocusedColor = Color.FromArgb(94, 148, 255);
+            comboScheduleAvailability.FocusedState.BorderColor = Color.FromArgb(94, 148, 255);
+            comboScheduleAvailability.Font = new Font("Segoe UI", 10F);
+            comboScheduleAvailability.ForeColor = Color.FromArgb(68, 88, 112);
+            comboScheduleAvailability.ItemHeight = 30;
+            comboScheduleAvailability.Location = new Point(5, 6);
+            comboScheduleAvailability.Name = "comboScheduleAvailability";
+            comboScheduleAvailability.ShadowDecoration.CustomizableEdges = customizableEdges102;
+            comboScheduleAvailability.Size = new Size(351, 36);
+            comboScheduleAvailability.TabIndex = 25;
             // 
             // guna2GroupBox17
             // 
@@ -3641,7 +3648,7 @@ namespace WinFormsApp.View.Container
         private Guna.UI2.WinForms.Guna2NumericUpDown inputMaxConsecutiveDays;
         private Guna.UI2.WinForms.Guna2NumericUpDown inputMaxConsecutiveFull;
         private Guna.UI2.WinForms.Guna2NumericUpDown inputMaxFull;
-        private CheckedListBox checkedAvailabilities;
+        private Guna2ComboBox comboScheduleAvailability;
         private Guna.UI2.WinForms.Guna2Button btnGenerate;
         private Guna.UI2.WinForms.Guna2DataGridView slotGrid;
         private Guna.UI2.WinForms.Guna2Button btnScheduleSave;
