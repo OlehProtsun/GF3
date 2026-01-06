@@ -8,6 +8,7 @@ namespace WinFormsApp.ViewModel
     {
         None,
         Employee,
+        Shop,
         Availability,
         Container
     }

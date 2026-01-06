@@ -9,6 +9,7 @@
 
         #region Designer fields
         private Guna.UI2.WinForms.Guna2Button btnEmployee;
+        private Guna.UI2.WinForms.Guna2Button btnShop;
         private Guna.UI2.WinForms.Guna2Button btnAvailability;
         private Guna.UI2.WinForms.Guna2Button btnContainer;
         private System.Windows.Forms.Panel leftBar;
@@ -53,6 +54,8 @@
             Guna.UI2.WinForms.Suite.CustomizableEdges customizableEdges12 = new Guna.UI2.WinForms.Suite.CustomizableEdges();
             Guna.UI2.WinForms.Suite.CustomizableEdges customizableEdges13 = new Guna.UI2.WinForms.Suite.CustomizableEdges();
             Guna.UI2.WinForms.Suite.CustomizableEdges customizableEdges14 = new Guna.UI2.WinForms.Suite.CustomizableEdges();
+            Guna.UI2.WinForms.Suite.CustomizableEdges customizableEdges17 = new Guna.UI2.WinForms.Suite.CustomizableEdges();
+            Guna.UI2.WinForms.Suite.CustomizableEdges customizableEdges18 = new Guna.UI2.WinForms.Suite.CustomizableEdges();
             leftBar = new Panel();
             guna2GroupBox1 = new Guna.UI2.WinForms.Guna2GroupBox();
             label8 = new Label();
@@ -69,7 +72,9 @@
             label5 = new Label();
             guna2Shapes1 = new Guna.UI2.WinForms.Guna2Shapes();
             label4 = new Label();
+            labelShop = new Label();
             label3 = new Label();
+            btnShop = new Guna.UI2.WinForms.Guna2Button();
             btnEmployee = new Guna.UI2.WinForms.Guna2Button();
             PanelContentMain = new Panel();
             leftBar.SuspendLayout();
@@ -102,10 +107,12 @@
             guna2GroupBox1.Controls.Add(btnCloseProgram);
             guna2GroupBox1.Controls.Add(btnAvailability);
             guna2GroupBox1.Controls.Add(label6);
+            guna2GroupBox1.Controls.Add(btnShop);
             guna2GroupBox1.Controls.Add(btnContainer);
             guna2GroupBox1.Controls.Add(label5);
             guna2GroupBox1.Controls.Add(guna2Shapes1);
             guna2GroupBox1.Controls.Add(label4);
+            guna2GroupBox1.Controls.Add(labelShop);
             guna2GroupBox1.Controls.Add(label3);
             guna2GroupBox1.Controls.Add(btnEmployee);
             guna2GroupBox1.CustomBorderColor = Color.FromArgb(224, 224, 224);
@@ -270,7 +277,7 @@
             btnAvailability.Font = new Font("Segoe UI", 9F, FontStyle.Bold, GraphicsUnit.Point, 0);
             btnAvailability.ForeColor = Color.Black;
             btnAvailability.Image = (Image)resources.GetObject("btnAvailability.Image");
-            btnAvailability.Location = new Point(12, 182);
+            btnAvailability.Location = new Point(12, 254);
             btnAvailability.Name = "btnAvailability";
             btnAvailability.ShadowDecoration.BorderRadius = 15;
             btnAvailability.ShadowDecoration.CustomizableEdges = customizableEdges9;
@@ -306,7 +313,7 @@
             btnContainer.Font = new Font("Segoe UI", 9F, FontStyle.Bold, GraphicsUnit.Point, 0);
             btnContainer.ForeColor = Color.Black;
             btnContainer.Image = (Image)resources.GetObject("btnContainer.Image");
-            btnContainer.Location = new Point(12, 257);
+            btnContainer.Location = new Point(12, 326);
             btnContainer.Name = "btnContainer";
             btnContainer.ShadowDecoration.BorderRadius = 15;
             btnContainer.ShadowDecoration.CustomizableEdges = customizableEdges11;
@@ -321,7 +328,7 @@
             label5.AutoSize = true;
             label5.Font = new Font("Corbel", 8.25F, FontStyle.Bold, GraphicsUnit.Point, 0);
             label5.ForeColor = Color.Black;
-            label5.Location = new Point(4, 299);
+            label5.Location = new Point(4, 371);
             label5.Name = "label5";
             label5.Size = new Size(54, 13);
             label5.TabIndex = 22;
@@ -350,11 +357,22 @@
             label4.AutoSize = true;
             label4.Font = new Font("Corbel", 8.25F, FontStyle.Bold, GraphicsUnit.Point, 0);
             label4.ForeColor = Color.Black;
-            label4.Location = new Point(0, 224);
+            label4.Location = new Point(0, 296);
             label4.Name = "label4";
             label4.Size = new Size(62, 13);
             label4.TabIndex = 21;
             label4.Text = "Availability";
+            // 
+            // labelShop
+            // 
+            labelShop.AutoSize = true;
+            labelShop.Font = new Font("Corbel", 8.25F, FontStyle.Bold, GraphicsUnit.Point, 0);
+            labelShop.ForeColor = Color.Black;
+            labelShop.Location = new Point(9, 224);
+            labelShop.Name = "labelShop";
+            labelShop.Size = new Size(32, 13);
+            labelShop.TabIndex = 34;
+            labelShop.Text = "Shop";
             // 
             // label3
             // 
@@ -389,6 +407,29 @@
             btnEmployee.ShadowDecoration.Shadow = new Padding(8);
             btnEmployee.Size = new Size(39, 39);
             btnEmployee.TabIndex = 12;
+            // 
+            // btnShop
+            // 
+            btnShop.BackColor = Color.Transparent;
+            btnShop.BorderRadius = 10;
+            btnShop.CustomizableEdges = customizableEdges17;
+            btnShop.DisabledState.BorderColor = Color.DarkGray;
+            btnShop.DisabledState.CustomBorderColor = Color.DarkGray;
+            btnShop.DisabledState.FillColor = Color.FromArgb(169, 169, 169);
+            btnShop.DisabledState.ForeColor = Color.FromArgb(141, 141, 141);
+            btnShop.FillColor = Color.White;
+            btnShop.Font = new Font("Segoe UI", 9F, FontStyle.Bold, GraphicsUnit.Point, 0);
+            btnShop.ForeColor = Color.Black;
+            btnShop.Image = (Image)resources.GetObject("btnShop.Image");
+            btnShop.Location = new Point(12, 182);
+            btnShop.Name = "btnShop";
+            btnShop.ShadowDecoration.BorderRadius = 15;
+            btnShop.ShadowDecoration.CustomizableEdges = customizableEdges18;
+            btnShop.ShadowDecoration.Depth = 3;
+            btnShop.ShadowDecoration.Enabled = true;
+            btnShop.ShadowDecoration.Shadow = new Padding(8);
+            btnShop.Size = new Size(39, 39);
+            btnShop.TabIndex = 33;
             // 
             // PanelContentMain
             // 
@@ -425,6 +466,7 @@
         private Label label3;
         private Label label5;
         private Label label4;
+        private Label labelShop;
         private Label label2;
         private Guna.UI2.WinForms.Guna2Button guna2Button1;
         private Guna.UI2.WinForms.Guna2GroupBox guna2GroupBox1;

@@ -15,6 +15,7 @@ namespace BusinessLogicLayer
         {
             serviceCollection.AddScoped<IContainerService, ContainerService>();
             serviceCollection.AddScoped<IEmployeeService, EmployeeService>();
+            serviceCollection.AddScoped<IShopService, ShopService>();
             serviceCollection.AddScoped<IScheduleService, ScheduleService>();
             serviceCollection.AddScoped<IScheduleEmployeeService, ScheduleEmployeeService>();
             serviceCollection.AddScoped<IScheduleSlotService, ScheduleSlotService>();

@@ -15,7 +15,11 @@ namespace WinFormsApp.Presenter.Container
         private async Task<IList<AvailabilityGroupModel>> LoadLookupsAsync(CancellationToken ct)
         {
             var groups = (await _availabilityGroupService.GetAllAsync(ct)).ToList();
+            var shops = await _shopService.GetAllAsync(ct);
+
             _view.SetAvailabilityGroupList(groups);
+            _view.SetShopList(shops);
+
             return groups;
         }
 
@@ -69,6 +73,7 @@ namespace WinFormsApp.Presenter.Container
 
             _view.ScheduleId = schedule.Id;
             _view.ScheduleContainerId = schedule.ContainerId;
+            _view.ScheduleShopId = schedule.ShopId;
             _view.ScheduleName = schedule.Name;
             _view.ScheduleYear = schedule.Year;
             _view.ScheduleMonth = schedule.Month;

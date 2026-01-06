@@ -17,6 +17,7 @@ namespace DataAccessLayer.Models.DataBaseContext
         {
             serviceCollection.AddScoped<IContainerRepository, ContainerRepository>();
             serviceCollection.AddScoped<IEmployeeRepository, EmployeeRepository>();
+            serviceCollection.AddScoped<IShopRepository, ShopRepository>();
             serviceCollection.AddScoped<IScheduleRepository, ScheduleRepository>();
             serviceCollection.AddScoped<IScheduleEmployeeRepository, ScheduleEmployeeRepository>();
             serviceCollection.AddScoped<IScheduleSlotRepository, ScheduleSlotRepository>();
