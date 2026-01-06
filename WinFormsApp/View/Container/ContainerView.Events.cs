@@ -147,6 +147,15 @@ namespace WinFormsApp.View.Container
                 });
 
             BindClick(
+                guna2Button30,
+                () => ScheduleCancelEvent,
+                before: () =>
+                {
+                    cancelEdit();
+                    ClearScheduleValidationErrors();
+                });
+
+            BindClick(
                 btnBackToScheduleList,
                 () => ScheduleCancelEvent,
                 before: () =>
@@ -178,14 +187,14 @@ namespace WinFormsApp.View.Container
                 _ = Raise(AvailabilitySelectionChangedEvent);
             };
 
-
-            checkedAvailabilities.ItemCheck += (_, __) =>
+            comboScheduleAvailability.SelectedIndexChanged += (_, __) =>
             {
-                // ItemCheck спрацьовує ДО того, як CheckedItems реально оновився.
-                // Тому відкладемо в message loop:
-                BeginInvoke(new Action(async () =>
-                    await SafeRaiseAsync(AvailabilitySelectionChangedEvent)));
+                UpdateAvailabilityIdLabel();
+                _ = SafeRaiseAsync(AvailabilitySelectionChangedEvent);
             };
+
+            comboScheduleShop.SelectedIndexChanged += (_, __) => UpdateShopIdLabel();
+            comboboxEmployee.SelectedIndexChanged += (_, __) => UpdateEmployeeIdLabel();
 
             BindClick(
                 btnScheduleProfileCancel,
@@ -197,6 +206,12 @@ namespace WinFormsApp.View.Container
                 });
 
             EnsureScheduleEditTogglesInitialized();
+
+            BindClick(btnSearchShopFromScheduleEdit, () => ScheduleSearchShopEvent);
+            BindClick(btnSearchAvailabilityFromScheduleEdit, () => ScheduleSearchAvailabilityEvent);
+            BindClick(btnSearchEmployeeInAvailabilityEdit, () => ScheduleSearchEmployeeEvent);
+            BindClick(btnAddEmployeeToGroup, () => ScheduleAddEmployeeToGroupEvent);
+            BindClick(btnRemoveEmployeeFromGroup, () => ScheduleRemoveEmployeeFromGroupEvent);
 
         }
 

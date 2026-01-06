@@ -46,12 +46,21 @@ namespace WinFormsApp.View.Container
         private int _scheduleNoteExpandedHeight;
         private int _scheduleNoteCollapsedHeight;
 
+        private bool _scheduleEmployeeExpanded = false;
+        private int _scheduleEmployeeExpandedHeight;
+
         // для “стека” зліва
         private int _scheduleLeftColumnTop;
         private int _scheduleLeftColumnGap;
+        private int _scheduleEmployeeColumnGap;
 
         private bool _scheduleEditTogglesInitialized;
 
+        private sealed class EmployeeListItem
+        {
+            public int Id { get; init; }
+            public string FullName { get; init; } = string.Empty;
+        }
 
 
     }
