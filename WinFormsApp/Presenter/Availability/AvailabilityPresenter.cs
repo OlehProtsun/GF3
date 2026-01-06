@@ -111,23 +111,29 @@ namespace WinFormsApp.Presenter.Availability
             return Task.CompletedTask;
         }
 
-        private Task OnAddEventAsync(CancellationToken ct)
+        private async Task OnAddEventAsync(CancellationToken ct)
         {
-            _view.ClearInputs();
-            _view.ClearValidationErrors();
-            _view.ResetGroupMatrix();
+            await RunBusySafeAsync(async innerCt =>
+            {
+                await LoadEmployees(innerCt);   // <-- щоб бачити нових працівників одразу
+                ResetEmployeeSearch();          // <-- щоб скинути фільтр, якщо був
 
-            _view.IsEdit = false;
-            _view.Message = "Fill the form, add employees, set codes and press Save.";
-            _view.CancelTarget = AvailabilityViewModel.List;
-            _view.SwitchToEditMode();
+                _view.ClearInputs();
+                _view.ClearValidationErrors();
+                _view.ResetGroupMatrix();
 
-            return Task.CompletedTask;
+                _view.IsEdit = false;
+                _view.Message = "Fill the form, add employees, set codes and press Save.";
+                _view.CancelTarget = AvailabilityViewModel.List;
+                _view.SwitchToEditMode();
+            }, ct, "Loading employees...");
         }
 
         private Task OnEditEventAsync(CancellationToken ct)
             => RunBusySafeAsync(async innerCt =>
             {
+                await LoadEmployees(innerCt);
+
                 var current = _bindingSource.Current as AvailabilityGroupModel;
                 if (current is null) return;
 
@@ -200,10 +206,21 @@ namespace WinFormsApp.Presenter.Availability
             => RunBusySafeAsync(async innerCt =>
             {
                 _view.ClearValidationErrors();
+
+                var rawName = _view.AvailabilityMonthName?.Trim() ?? "";
+                var isNew2 = _view.AvailabilityMonthId == 0;
+
+                // якщо хочеш 01.2026 замість 1.2026 — залишай :D2
+                var suffix = $"{_view.Month:D2}.{_view.Year}";
+
+                var finalName = isNew2
+                    ? $"{rawName} : {suffix}"
+                    : rawName;
+
                 var group = new AvailabilityGroupModel
                 {
                     Id = _view.AvailabilityMonthId,
-                    Name = _view.AvailabilityMonthName?.Trim() ?? "",
+                    Name = finalName,
                     Year = _view.Year,
                     Month = _view.Month
                 };

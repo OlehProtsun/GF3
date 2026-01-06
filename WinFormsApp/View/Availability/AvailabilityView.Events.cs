@@ -22,7 +22,7 @@ namespace WinFormsApp.View.Availability
             btnCancelProfile2.Click += async (_, __) => await RaiseSafeAsync(CancelEvent);
             btnCacnelAvailabilityEdit2.Click += async (_, __) => await RaiseSafeAsync(CancelEvent);
             btnCacnelAvailabilityEdit3.Click += async (_, __) => await RaiseSafeAsync(CancelEvent);
-            guna2Button11.Click += async (_, __) => await RaiseSafeAsync(CancelEvent);
+            btnCancelInEmployeeBox.Click += async (_, __) => await RaiseSafeAsync(CancelEvent);
 
             btnAddEmployeeToGroup.Click += async (_, __) => await RaiseSafeAsync(AddEmployeeToGroupEvent);
             btnRemoveEmployeeFromGroup.Click += async (_, __) => await RaiseSafeAsync(RemoveEmployeeFromGroupEvent);

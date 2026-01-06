@@ -147,7 +147,7 @@
             dataGrid = new Guna.UI2.WinForms.Guna2DataGridView();
             tabEditAdnCreate = new TabPage();
             guna2GroupBox9 = new Guna.UI2.WinForms.Guna2GroupBox();
-            guna2Button11 = new Guna.UI2.WinForms.Guna2Button();
+            btnCancelInEmployeeBox = new Guna.UI2.WinForms.Guna2Button();
             btnSearchEmployeeInAvailabilityEdit = new Guna.UI2.WinForms.Guna2Button();
             textBoxSearchValueFromAvailabilityEdit = new Guna.UI2.WinForms.Guna2TextBox();
             guna2Button13 = new Guna.UI2.WinForms.Guna2Button();
@@ -478,7 +478,7 @@
             guna2GroupBox9.BackColor = Color.Transparent;
             guna2GroupBox9.BorderColor = Color.White;
             guna2GroupBox9.BorderRadius = 15;
-            guna2GroupBox9.Controls.Add(guna2Button11);
+            guna2GroupBox9.Controls.Add(btnCancelInEmployeeBox);
             guna2GroupBox9.Controls.Add(btnSearchEmployeeInAvailabilityEdit);
             guna2GroupBox9.Controls.Add(textBoxSearchValueFromAvailabilityEdit);
             guna2GroupBox9.Controls.Add(guna2Button13);
@@ -501,24 +501,24 @@
             guna2GroupBox9.Size = new Size(409, 186);
             guna2GroupBox9.TabIndex = 29;
             // 
-            // guna2Button11
+            // btnCancelInEmployeeBox
             // 
-            guna2Button11.Animated = true;
-            guna2Button11.BorderRadius = 12;
-            guna2Button11.CustomizableEdges = customizableEdges9;
-            guna2Button11.DisabledState.BorderColor = Color.DarkGray;
-            guna2Button11.DisabledState.CustomBorderColor = Color.DarkGray;
-            guna2Button11.DisabledState.FillColor = Color.FromArgb(169, 169, 169);
-            guna2Button11.DisabledState.ForeColor = Color.FromArgb(141, 141, 141);
-            guna2Button11.FillColor = Color.FromArgb(224, 224, 224);
-            guna2Button11.Font = new Font("Segoe UI", 9F);
-            guna2Button11.ForeColor = Color.Gray;
-            guna2Button11.Location = new Point(8, 144);
-            guna2Button11.Name = "guna2Button11";
-            guna2Button11.ShadowDecoration.CustomizableEdges = customizableEdges10;
-            guna2Button11.Size = new Size(84, 33);
-            guna2Button11.TabIndex = 27;
-            guna2Button11.Text = "Cancel";
+            btnCancelInEmployeeBox.Animated = true;
+            btnCancelInEmployeeBox.BorderRadius = 12;
+            btnCancelInEmployeeBox.CustomizableEdges = customizableEdges9;
+            btnCancelInEmployeeBox.DisabledState.BorderColor = Color.DarkGray;
+            btnCancelInEmployeeBox.DisabledState.CustomBorderColor = Color.DarkGray;
+            btnCancelInEmployeeBox.DisabledState.FillColor = Color.FromArgb(169, 169, 169);
+            btnCancelInEmployeeBox.DisabledState.ForeColor = Color.FromArgb(141, 141, 141);
+            btnCancelInEmployeeBox.FillColor = Color.FromArgb(224, 224, 224);
+            btnCancelInEmployeeBox.Font = new Font("Segoe UI", 9F);
+            btnCancelInEmployeeBox.ForeColor = Color.Gray;
+            btnCancelInEmployeeBox.Location = new Point(8, 144);
+            btnCancelInEmployeeBox.Name = "btnCancelInEmployeeBox";
+            btnCancelInEmployeeBox.ShadowDecoration.CustomizableEdges = customizableEdges10;
+            btnCancelInEmployeeBox.Size = new Size(84, 33);
+            btnCancelInEmployeeBox.TabIndex = 27;
+            btnCancelInEmployeeBox.Text = "Cancel";
             // 
             // btnSearchEmployeeInAvailabilityEdit
             // 
@@ -856,13 +856,13 @@
             guna2GroupBox4.CustomizableEdges = customizableEdges41;
             guna2GroupBox4.Font = new Font("Segoe UI", 9F);
             guna2GroupBox4.ForeColor = Color.Black;
-            guna2GroupBox4.Location = new Point(451, 119);
+            guna2GroupBox4.Location = new Point(437, 119);
             guna2GroupBox4.Name = "guna2GroupBox4";
             guna2GroupBox4.ShadowDecoration.BorderRadius = 20;
             guna2GroupBox4.ShadowDecoration.CustomizableEdges = customizableEdges42;
             guna2GroupBox4.ShadowDecoration.Depth = 7;
             guna2GroupBox4.ShadowDecoration.Enabled = true;
-            guna2GroupBox4.Size = new Size(393, 664);
+            guna2GroupBox4.Size = new Size(407, 703);
             guna2GroupBox4.TabIndex = 25;
             // 
             // guna2Button6
@@ -925,7 +925,7 @@
             dataGridViewCellStyle12.WrapMode = DataGridViewTriState.True;
             dataGridAvailabilityDays.RowHeadersDefaultCellStyle = dataGridViewCellStyle12;
             dataGridAvailabilityDays.RowHeadersVisible = false;
-            dataGridAvailabilityDays.Size = new Size(365, 567);
+            dataGridAvailabilityDays.Size = new Size(379, 606);
             dataGridAvailabilityDays.TabIndex = 12;
             dataGridAvailabilityDays.ThemeStyle.AlternatingRowsStyle.BackColor = Color.White;
             dataGridAvailabilityDays.ThemeStyle.AlternatingRowsStyle.Font = null;
@@ -961,7 +961,7 @@
             btnSave.FillColor = Color.FromArgb(51, 71, 255);
             btnSave.Font = new Font("Segoe UI", 9F);
             btnSave.ForeColor = Color.White;
-            btnSave.Location = new Point(274, 626);
+            btnSave.Location = new Point(288, 665);
             btnSave.Name = "btnSave";
             btnSave.ShadowDecoration.CustomizableEdges = customizableEdges38;
             btnSave.Size = new Size(114, 33);
@@ -981,7 +981,7 @@
             btnCancel.FillColor = Color.FromArgb(224, 224, 224);
             btnCancel.Font = new Font("Segoe UI", 9F);
             btnCancel.ForeColor = Color.Gray;
-            btnCancel.Location = new Point(5, 626);
+            btnCancel.Location = new Point(5, 665);
             btnCancel.Name = "btnCancel";
             btnCancel.ShadowDecoration.CustomizableEdges = customizableEdges40;
             btnCancel.Size = new Size(84, 33);
@@ -1856,6 +1856,6 @@
         private Guna.UI2.WinForms.Guna2GroupBox guna2GroupBox9;
         private Guna.UI2.WinForms.Guna2Button guna2Button13;
         private Guna.UI2.WinForms.Guna2Button btnSearchEmployeeInAvailabilityEdit;
-        private Guna.UI2.WinForms.Guna2Button guna2Button11;
+        private Guna.UI2.WinForms.Guna2Button btnCancelInEmployeeBox;
     }
 }
