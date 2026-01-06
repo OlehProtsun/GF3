@@ -20,6 +20,7 @@ namespace WinFormsApp.View.Availability
         int Year { get; set; }
         int Month { get; set; }
         string SearchValue { get; set; }
+        string EmployeeSearchValue { get; set; }
 
         bool IsEdit { get; set; }
         bool IsSuccessful { get; set; }
@@ -40,6 +41,7 @@ namespace WinFormsApp.View.Availability
 
         event Func<CancellationToken, Task>? AddEmployeeToGroupEvent;
         event Func<CancellationToken, Task>? RemoveEmployeeFromGroupEvent;
+        event Func<CancellationToken, Task>? SearchEmployeeEvent;
 
         // LIST BINDINGS
         void SetListBindingSource(BindingSource availabilityList);
