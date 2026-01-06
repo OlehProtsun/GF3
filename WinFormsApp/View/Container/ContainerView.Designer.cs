@@ -2,6 +2,7 @@
 using System.ComponentModel;
 using System.Drawing;
 using System.Windows.Forms;
+using WinFormsApp.View.Container.Helpers;
 
 namespace WinFormsApp.View.Container
 {
@@ -310,7 +311,7 @@ namespace WinFormsApp.View.Container
             guna2Button10 = new Guna2Button();
             label23 = new Label();
             tabScheduleEdit = new TabPage();
-            panel3 = new Panel();
+            panel3 = new NoFocusScrollPanel();
             guna2GroupBox19 = new Guna2GroupBox();
             label37 = new Label();
             guna2Button30 = new Guna2Button();
@@ -330,12 +331,13 @@ namespace WinFormsApp.View.Container
             guna2Button29 = new Guna2Button();
             guna2GroupBox5 = new Guna2GroupBox();
             guna2GroupBox18 = new Guna2GroupBox();
+            comboScheduleAvailability = new Guna2ComboBox();
+            lblAvailabilityID = new Label();
             btnSearchAvailabilityFromScheduleEdit = new Guna2Button();
+            label39 = new Label();
             guna2Button26 = new Guna2Button();
             textBoxSearchValue2FromScheduleEdit = new Guna2TextBox();
             label15 = new Label();
-            guna2GroupBox10 = new Guna2GroupBox();
-            comboScheduleAvailability = new Guna2ComboBox();
             guna2GroupBox17 = new Guna2GroupBox();
             guna2Button23 = new Guna2Button();
             comboScheduleShop = new Guna2ComboBox();
@@ -426,8 +428,6 @@ namespace WinFormsApp.View.Container
             guna2Elipse3 = new Guna2Elipse(components);
             guna2Elipse4 = new Guna2Elipse(components);
             guna2Elipse5 = new Guna2Elipse(components);
-            lblAvailabilityID = new Label();
-            label39 = new Label();
             tabControl.SuspendLayout();
             tabList.SuspendLayout();
             guna2GroupBox1.SuspendLayout();
@@ -448,7 +448,6 @@ namespace WinFormsApp.View.Container
             guna2GroupBox16.SuspendLayout();
             guna2GroupBox5.SuspendLayout();
             guna2GroupBox18.SuspendLayout();
-            guna2GroupBox10.SuspendLayout();
             guna2GroupBox17.SuspendLayout();
             ((ISupportInitialize)inputMaxFull).BeginInit();
             ((ISupportInitialize)inputMaxConsecutiveFull).BeginInit();
@@ -1533,6 +1532,7 @@ namespace WinFormsApp.View.Container
             panel3.Controls.Add(guna2GroupBox5);
             panel3.Dock = DockStyle.Left;
             panel3.Location = new Point(3, 118);
+            panel3.MaximumSize = new Size(417, 931);
             panel3.Name = "panel3";
             panel3.Size = new Size(417, 931);
             panel3.TabIndex = 35;
@@ -1558,7 +1558,7 @@ namespace WinFormsApp.View.Container
             guna2GroupBox19.CustomizableEdges = customizableEdges85;
             guna2GroupBox19.Font = new Font("Segoe UI", 9F);
             guna2GroupBox19.ForeColor = Color.White;
-            guna2GroupBox19.Location = new Point(6, 806);
+            guna2GroupBox19.Location = new Point(6, 703);
             guna2GroupBox19.Name = "guna2GroupBox19";
             guna2GroupBox19.ShadowDecoration.BorderRadius = 20;
             guna2GroupBox19.ShadowDecoration.CustomizableEdges = customizableEdges86;
@@ -1784,7 +1784,7 @@ namespace WinFormsApp.View.Container
             guna2GroupBox16.CustomizableEdges = customizableEdges93;
             guna2GroupBox16.Font = new Font("Segoe UI", 9F);
             guna2GroupBox16.ForeColor = Color.White;
-            guna2GroupBox16.Location = new Point(6, 1045);
+            guna2GroupBox16.Location = new Point(6, 936);
             guna2GroupBox16.Name = "guna2GroupBox16";
             guna2GroupBox16.ShadowDecoration.BorderRadius = 20;
             guna2GroupBox16.ShadowDecoration.CustomizableEdges = customizableEdges94;
@@ -1899,7 +1899,7 @@ namespace WinFormsApp.View.Container
             guna2GroupBox5.ShadowDecoration.CustomizableEdges = customizableEdges146;
             guna2GroupBox5.ShadowDecoration.Depth = 7;
             guna2GroupBox5.ShadowDecoration.Enabled = true;
-            guna2GroupBox5.Size = new Size(379, 780);
+            guna2GroupBox5.Size = new Size(379, 678);
             guna2GroupBox5.TabIndex = 31;
             // 
             // guna2GroupBox18
@@ -1907,13 +1907,13 @@ namespace WinFormsApp.View.Container
             guna2GroupBox18.BackColor = Color.Transparent;
             guna2GroupBox18.BorderColor = Color.White;
             guna2GroupBox18.BorderRadius = 20;
+            guna2GroupBox18.Controls.Add(comboScheduleAvailability);
             guna2GroupBox18.Controls.Add(lblAvailabilityID);
             guna2GroupBox18.Controls.Add(btnSearchAvailabilityFromScheduleEdit);
             guna2GroupBox18.Controls.Add(label39);
             guna2GroupBox18.Controls.Add(guna2Button26);
             guna2GroupBox18.Controls.Add(textBoxSearchValue2FromScheduleEdit);
             guna2GroupBox18.Controls.Add(label15);
-            guna2GroupBox18.Controls.Add(guna2GroupBox10);
             guna2GroupBox18.CustomBorderColor = Color.White;
             guna2GroupBox18.CustomizableEdges = customizableEdges103;
             guna2GroupBox18.Font = new Font("Segoe UI", 9F);
@@ -1924,15 +1924,44 @@ namespace WinFormsApp.View.Container
             guna2GroupBox18.ShadowDecoration.CustomizableEdges = customizableEdges104;
             guna2GroupBox18.ShadowDecoration.Depth = 7;
             guna2GroupBox18.ShadowDecoration.Enabled = true;
-            guna2GroupBox18.Size = new Size(379, 224);
+            guna2GroupBox18.Size = new Size(379, 120);
             guna2GroupBox18.TabIndex = 40;
+            // 
+            // comboScheduleAvailability
+            // 
+            comboScheduleAvailability.BackColor = Color.Transparent;
+            comboScheduleAvailability.BorderRadius = 10;
+            comboScheduleAvailability.CustomizableEdges = customizableEdges95;
+            comboScheduleAvailability.DrawMode = DrawMode.OwnerDrawFixed;
+            comboScheduleAvailability.DropDownStyle = ComboBoxStyle.DropDownList;
+            comboScheduleAvailability.FocusedColor = Color.FromArgb(94, 148, 255);
+            comboScheduleAvailability.FocusedState.BorderColor = Color.FromArgb(94, 148, 255);
+            comboScheduleAvailability.Font = new Font("Segoe UI", 10F);
+            comboScheduleAvailability.ForeColor = Color.FromArgb(68, 88, 112);
+            comboScheduleAvailability.ItemHeight = 30;
+            comboScheduleAvailability.Location = new Point(9, 74);
+            comboScheduleAvailability.Name = "comboScheduleAvailability";
+            comboScheduleAvailability.ShadowDecoration.CustomizableEdges = customizableEdges96;
+            comboScheduleAvailability.Size = new Size(351, 36);
+            comboScheduleAvailability.TabIndex = 25;
+            // 
+            // lblAvailabilityID
+            // 
+            lblAvailabilityID.AutoSize = true;
+            lblAvailabilityID.Font = new Font("Segoe UI", 8.25F, FontStyle.Regular, GraphicsUnit.Point, 0);
+            lblAvailabilityID.ForeColor = Color.Black;
+            lblAvailabilityID.Location = new Point(348, 58);
+            lblAvailabilityID.Name = "lblAvailabilityID";
+            lblAvailabilityID.Size = new Size(13, 13);
+            lblAvailabilityID.TabIndex = 44;
+            lblAvailabilityID.Text = "0";
             // 
             // btnSearchAvailabilityFromScheduleEdit
             // 
             btnSearchAvailabilityFromScheduleEdit.Animated = true;
             btnSearchAvailabilityFromScheduleEdit.BackColor = Color.Transparent;
             btnSearchAvailabilityFromScheduleEdit.BorderRadius = 12;
-            btnSearchAvailabilityFromScheduleEdit.CustomizableEdges = customizableEdges95;
+            btnSearchAvailabilityFromScheduleEdit.CustomizableEdges = customizableEdges97;
             btnSearchAvailabilityFromScheduleEdit.DisabledState.BorderColor = Color.DarkGray;
             btnSearchAvailabilityFromScheduleEdit.DisabledState.CustomBorderColor = Color.DarkGray;
             btnSearchAvailabilityFromScheduleEdit.DisabledState.FillColor = Color.FromArgb(169, 169, 169);
@@ -1944,15 +1973,26 @@ namespace WinFormsApp.View.Container
             btnSearchAvailabilityFromScheduleEdit.ImageSize = new Size(15, 15);
             btnSearchAvailabilityFromScheduleEdit.Location = new Point(336, 7);
             btnSearchAvailabilityFromScheduleEdit.Name = "btnSearchAvailabilityFromScheduleEdit";
-            btnSearchAvailabilityFromScheduleEdit.ShadowDecoration.CustomizableEdges = customizableEdges96;
+            btnSearchAvailabilityFromScheduleEdit.ShadowDecoration.CustomizableEdges = customizableEdges98;
             btnSearchAvailabilityFromScheduleEdit.Size = new Size(37, 37);
             btnSearchAvailabilityFromScheduleEdit.TabIndex = 40;
+            // 
+            // label39
+            // 
+            label39.AutoSize = true;
+            label39.Font = new Font("Segoe UI", 8.25F, FontStyle.Regular, GraphicsUnit.Point, 0);
+            label39.ForeColor = Color.Gray;
+            label39.Location = new Point(275, 58);
+            label39.Name = "label39";
+            label39.Size = new Size(79, 13);
+            label39.TabIndex = 43;
+            label39.Text = "Availability ID:";
             // 
             // guna2Button26
             // 
             guna2Button26.BackColor = Color.White;
             guna2Button26.BorderRadius = 15;
-            guna2Button26.CustomizableEdges = customizableEdges97;
+            guna2Button26.CustomizableEdges = customizableEdges99;
             guna2Button26.DisabledState.BorderColor = Color.DarkGray;
             guna2Button26.DisabledState.CustomBorderColor = Color.DarkGray;
             guna2Button26.DisabledState.FillColor = Color.FromArgb(169, 169, 169);
@@ -1966,7 +2006,7 @@ namespace WinFormsApp.View.Container
             guna2Button26.Location = new Point(7, 7);
             guna2Button26.Name = "guna2Button26";
             guna2Button26.PressedColor = Color.White;
-            guna2Button26.ShadowDecoration.CustomizableEdges = customizableEdges98;
+            guna2Button26.ShadowDecoration.CustomizableEdges = customizableEdges100;
             guna2Button26.Size = new Size(132, 35);
             guna2Button26.TabIndex = 39;
             guna2Button26.Tag = "Information";
@@ -1977,7 +2017,7 @@ namespace WinFormsApp.View.Container
             textBoxSearchValue2FromScheduleEdit.Animated = true;
             textBoxSearchValue2FromScheduleEdit.BorderColor = Color.FromArgb(224, 224, 224);
             textBoxSearchValue2FromScheduleEdit.BorderRadius = 10;
-            textBoxSearchValue2FromScheduleEdit.CustomizableEdges = customizableEdges99;
+            textBoxSearchValue2FromScheduleEdit.CustomizableEdges = customizableEdges101;
             textBoxSearchValue2FromScheduleEdit.DefaultText = "";
             textBoxSearchValue2FromScheduleEdit.DisabledState.BorderColor = Color.FromArgb(208, 208, 208);
             textBoxSearchValue2FromScheduleEdit.DisabledState.FillColor = Color.FromArgb(226, 226, 226);
@@ -1991,7 +2031,7 @@ namespace WinFormsApp.View.Container
             textBoxSearchValue2FromScheduleEdit.Name = "textBoxSearchValue2FromScheduleEdit";
             textBoxSearchValue2FromScheduleEdit.PlaceholderText = "Write search value...";
             textBoxSearchValue2FromScheduleEdit.SelectedText = "";
-            textBoxSearchValue2FromScheduleEdit.ShadowDecoration.CustomizableEdges = customizableEdges100;
+            textBoxSearchValue2FromScheduleEdit.ShadowDecoration.CustomizableEdges = customizableEdges102;
             textBoxSearchValue2FromScheduleEdit.Size = new Size(189, 37);
             textBoxSearchValue2FromScheduleEdit.TabIndex = 37;
             // 
@@ -2005,38 +2045,6 @@ namespace WinFormsApp.View.Container
             label15.Size = new Size(132, 17);
             label15.TabIndex = 33;
             label15.Text = "Selected Availabilities";
-            // 
-            // guna2GroupBox10
-            // 
-            guna2GroupBox10.BorderRadius = 10;
-            guna2GroupBox10.Controls.Add(comboScheduleAvailability);
-            guna2GroupBox10.CustomBorderThickness = new Padding(0, 1, 0, 0);
-            guna2GroupBox10.CustomizableEdges = customizableEdges101;
-            guna2GroupBox10.Font = new Font("Segoe UI", 9F);
-            guna2GroupBox10.ForeColor = Color.White;
-            guna2GroupBox10.Location = new Point(7, 74);
-            guna2GroupBox10.Name = "guna2GroupBox10";
-            guna2GroupBox10.ShadowDecoration.CustomizableEdges = customizableEdges102;
-            guna2GroupBox10.Size = new Size(363, 142);
-            guna2GroupBox10.TabIndex = 32;
-            // 
-            // comboScheduleAvailability
-            // 
-            comboScheduleAvailability.BackColor = Color.Transparent;
-            comboScheduleAvailability.BorderRadius = 10;
-            comboScheduleAvailability.CustomizableEdges = customizableEdges101;
-            comboScheduleAvailability.DrawMode = DrawMode.OwnerDrawFixed;
-            comboScheduleAvailability.DropDownStyle = ComboBoxStyle.DropDownList;
-            comboScheduleAvailability.FocusedColor = Color.FromArgb(94, 148, 255);
-            comboScheduleAvailability.FocusedState.BorderColor = Color.FromArgb(94, 148, 255);
-            comboScheduleAvailability.Font = new Font("Segoe UI", 10F);
-            comboScheduleAvailability.ForeColor = Color.FromArgb(68, 88, 112);
-            comboScheduleAvailability.ItemHeight = 30;
-            comboScheduleAvailability.Location = new Point(5, 6);
-            comboScheduleAvailability.Name = "comboScheduleAvailability";
-            comboScheduleAvailability.ShadowDecoration.CustomizableEdges = customizableEdges102;
-            comboScheduleAvailability.Size = new Size(351, 36);
-            comboScheduleAvailability.TabIndex = 25;
             // 
             // guna2GroupBox17
             // 
@@ -2212,7 +2220,7 @@ namespace WinFormsApp.View.Container
             btnScheduleCancel.FillColor = Color.FromArgb(224, 224, 224);
             btnScheduleCancel.Font = new Font("Segoe UI", 9F, FontStyle.Regular, GraphicsUnit.Point, 0);
             btnScheduleCancel.ForeColor = Color.Gray;
-            btnScheduleCancel.Location = new Point(5, 740);
+            btnScheduleCancel.Location = new Point(5, 637);
             btnScheduleCancel.Name = "btnScheduleCancel";
             btnScheduleCancel.ShadowDecoration.CustomizableEdges = customizableEdges118;
             btnScheduleCancel.Size = new Size(84, 33);
@@ -2265,7 +2273,7 @@ namespace WinFormsApp.View.Container
             btnGenerate.FillColor = Color.FromArgb(51, 71, 255);
             btnGenerate.Font = new Font("Segoe UI", 9F, FontStyle.Regular, GraphicsUnit.Point, 0);
             btnGenerate.ForeColor = Color.White;
-            btnGenerate.Location = new Point(284, 740);
+            btnGenerate.Location = new Point(284, 637);
             btnGenerate.Name = "btnGenerate";
             btnGenerate.ShadowDecoration.CustomizableEdges = customizableEdges122;
             btnGenerate.Size = new Size(90, 33);
@@ -2701,7 +2709,7 @@ namespace WinFormsApp.View.Container
             guna2GroupBox15.ShadowDecoration.CustomizableEdges = customizableEdges164;
             guna2GroupBox15.ShadowDecoration.Depth = 7;
             guna2GroupBox15.ShadowDecoration.Enabled = true;
-            guna2GroupBox15.Size = new Size(537, 819);
+            guna2GroupBox15.Size = new Size(483, 819);
             guna2GroupBox15.TabIndex = 33;
             // 
             // guna2Button19
@@ -2740,7 +2748,7 @@ namespace WinFormsApp.View.Container
             guna2Button21.FillColor = Color.FromArgb(51, 71, 255);
             guna2Button21.Font = new Font("Segoe UI", 9F);
             guna2Button21.ForeColor = Color.White;
-            guna2Button21.Location = new Point(873, 1835);
+            guna2Button21.Location = new Point(785, 1835);
             guna2Button21.Name = "guna2Button21";
             guna2Button21.ShadowDecoration.CustomizableEdges = customizableEdges158;
             guna2Button21.Size = new Size(114, 33);
@@ -2775,7 +2783,7 @@ namespace WinFormsApp.View.Container
             guna2Button25.FillColor = Color.FromArgb(51, 71, 255);
             guna2Button25.Font = new Font("Segoe UI", 9F, FontStyle.Regular, GraphicsUnit.Point, 0);
             guna2Button25.ForeColor = Color.White;
-            guna2Button25.Location = new Point(792, 1374);
+            guna2Button25.Location = new Point(704, 1374);
             guna2Button25.Name = "guna2Button25";
             guna2Button25.ShadowDecoration.CustomizableEdges = customizableEdges162;
             guna2Button25.Size = new Size(129, 33);
@@ -2817,7 +2825,7 @@ namespace WinFormsApp.View.Container
             dataGridViewCellStyle12.WrapMode = DataGridViewTriState.True;
             dataGridAvailabilityOnScheduleEdit.RowHeadersDefaultCellStyle = dataGridViewCellStyle12;
             dataGridAvailabilityOnScheduleEdit.RowHeadersVisible = false;
-            dataGridAvailabilityOnScheduleEdit.Size = new Size(509, 751);
+            dataGridAvailabilityOnScheduleEdit.Size = new Size(456, 751);
             dataGridAvailabilityOnScheduleEdit.TabIndex = 27;
             dataGridAvailabilityOnScheduleEdit.ThemeStyle.AlternatingRowsStyle.BackColor = Color.White;
             dataGridAvailabilityOnScheduleEdit.ThemeStyle.AlternatingRowsStyle.Font = null;
@@ -2855,13 +2863,13 @@ namespace WinFormsApp.View.Container
             guna2GroupBox11.CustomizableEdges = customizableEdges171;
             guna2GroupBox11.Font = new Font("Segoe UI", 9F);
             guna2GroupBox11.ForeColor = Color.Black;
-            guna2GroupBox11.Location = new Point(432, 121);
+            guna2GroupBox11.Location = new Point(432, 120);
             guna2GroupBox11.Name = "guna2GroupBox11";
             guna2GroupBox11.ShadowDecoration.BorderRadius = 20;
             guna2GroupBox11.ShadowDecoration.CustomizableEdges = customizableEdges172;
             guna2GroupBox11.ShadowDecoration.Depth = 7;
             guna2GroupBox11.ShadowDecoration.Enabled = true;
-            guna2GroupBox11.Size = new Size(537, 794);
+            guna2GroupBox11.Size = new Size(483, 794);
             guna2GroupBox11.TabIndex = 32;
             // 
             // guna2Button12
@@ -2900,7 +2908,7 @@ namespace WinFormsApp.View.Container
             guna2Button13.FillColor = Color.FromArgb(51, 71, 255);
             guna2Button13.Font = new Font("Segoe UI", 9F);
             guna2Button13.ForeColor = Color.White;
-            guna2Button13.Location = new Point(483, 1216);
+            guna2Button13.Location = new Point(395, 1216);
             guna2Button13.Name = "guna2Button13";
             guna2Button13.ShadowDecoration.CustomizableEdges = customizableEdges168;
             guna2Button13.Size = new Size(114, 33);
@@ -2962,7 +2970,7 @@ namespace WinFormsApp.View.Container
             dataGridViewCellStyle16.WrapMode = DataGridViewTriState.True;
             slotGrid.RowHeadersDefaultCellStyle = dataGridViewCellStyle16;
             slotGrid.RowHeadersVisible = false;
-            slotGrid.Size = new Size(512, 732);
+            slotGrid.Size = new Size(456, 732);
             slotGrid.TabIndex = 27;
             slotGrid.ThemeStyle.AlternatingRowsStyle.BackColor = Color.White;
             slotGrid.ThemeStyle.AlternatingRowsStyle.Font = null;
@@ -3518,28 +3526,6 @@ namespace WinFormsApp.View.Container
             guna2Elipse5.BorderRadius = 20;
             guna2Elipse5.TargetControl = dataGridAvailabilityOnScheduleEdit;
             // 
-            // lblAvailabilityID
-            // 
-            lblAvailabilityID.AutoSize = true;
-            lblAvailabilityID.Font = new Font("Segoe UI", 8.25F, FontStyle.Regular, GraphicsUnit.Point, 0);
-            lblAvailabilityID.ForeColor = Color.Black;
-            lblAvailabilityID.Location = new Point(348, 58);
-            lblAvailabilityID.Name = "lblAvailabilityID";
-            lblAvailabilityID.Size = new Size(13, 13);
-            lblAvailabilityID.TabIndex = 44;
-            lblAvailabilityID.Text = "0";
-            // 
-            // label39
-            // 
-            label39.AutoSize = true;
-            label39.Font = new Font("Segoe UI", 8.25F, FontStyle.Regular, GraphicsUnit.Point, 0);
-            label39.ForeColor = Color.Gray;
-            label39.Location = new Point(275, 58);
-            label39.Name = "label39";
-            label39.Size = new Size(79, 13);
-            label39.TabIndex = 43;
-            label39.Text = "Availability ID:";
-            // 
             // ContainerView
             // 
             AutoScaleDimensions = new SizeF(7F, 15F);
@@ -3578,7 +3564,6 @@ namespace WinFormsApp.View.Container
             guna2GroupBox5.PerformLayout();
             guna2GroupBox18.ResumeLayout(false);
             guna2GroupBox18.PerformLayout();
-            guna2GroupBox10.ResumeLayout(false);
             guna2GroupBox17.ResumeLayout(false);
             guna2GroupBox17.PerformLayout();
             ((ISupportInitialize)inputMaxFull).EndInit();
@@ -3712,7 +3697,6 @@ namespace WinFormsApp.View.Container
         private Label label11;
         private Label label10;
         private Label label13;
-        private Guna2GroupBox guna2GroupBox10;
         private Label label14;
         private Label labelScheduleNoteEdit;
         private Label label15;
@@ -3762,7 +3746,7 @@ namespace WinFormsApp.View.Container
         private Guna2Button btnShowHideNote;
         private Guna2Button guna2Button29;
         private Guna2TextBox lblScheduleNote;
-        private Panel panel3;
+        private NoFocusScrollPanel panel3;
         private Guna2GroupBox guna2GroupBox17;
         private Label label21;
         private Label lbShopId;

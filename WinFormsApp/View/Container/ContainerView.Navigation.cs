@@ -73,6 +73,13 @@ namespace WinFormsApp.View.Container
 
             SelectedAvailabilityGroupId = 0;
 
+            // ✅ ГОЛОВНЕ: щоб новий графік був "пустий"
+            ScheduleEmployees = new List<ScheduleEmployeeModel>();
+
+            // ✅ теж логічно скидати, щоб не висів старий вибір
+            ScheduleEmployeeId = 0;
+
+            // slots теж чистимо
             ScheduleSlots = new List<ScheduleSlotModel>();
         }
 
