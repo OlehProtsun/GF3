@@ -110,6 +110,7 @@ namespace WinFormsApp.View.Container
                 (model.Slots?.ToList() ?? new List<ScheduleSlotModel>());
 
             BindScheduleMatrix(
+                block: null,
                 grid: scheduleSlotProfileGrid,
                 year: model.Year,
                 month: model.Month,
@@ -138,6 +139,7 @@ namespace WinFormsApp.View.Container
                 (_scheduleProfileModel?.Slots?.ToList() ?? new List<ScheduleSlotModel>());
 
             BindScheduleMatrix(
+                block: null,
                 grid: scheduleSlotProfileGrid,
                 year: year,
                 month: month,

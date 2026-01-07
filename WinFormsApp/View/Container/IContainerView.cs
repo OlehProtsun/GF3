@@ -74,6 +74,9 @@ namespace WinFormsApp.View.Container
         event Func<CancellationToken, Task>? ScheduleSearchEmployeeEvent;
         event Func<CancellationToken, Task>? ScheduleAddEmployeeToGroupEvent;
         event Func<CancellationToken, Task>? ScheduleRemoveEmployeeFromGroupEvent;
+        event Func<CancellationToken, Task>? ScheduleAddNewBlockEvent;
+        event Func<Guid, CancellationToken, Task>? ScheduleBlockSelectEvent;
+        event Func<Guid, CancellationToken, Task>? ScheduleBlockCloseEvent;
 
         event Func<CancellationToken, Task>? AvailabilitySelectionChangedEvent;
 
@@ -119,5 +122,13 @@ namespace WinFormsApp.View.Container
             IList<ScheduleEmployeeModel> employees);
 
         void ClearAvailabilityPreviewMatrix();
+
+        void InitializeScheduleBlocks();
+        void AddScheduleBlock(Guid blockId);
+        void RemoveScheduleBlock(Guid blockId);
+        void ClearScheduleBlocks();
+        void SetSelectedScheduleBlock(Guid blockId);
+        void ClearSelectedScheduleBlock();
+        void SetAddNewScheduleEnabled(bool enabled);
     }
 }
