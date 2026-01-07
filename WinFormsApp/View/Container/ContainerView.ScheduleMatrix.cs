@@ -11,61 +11,61 @@ namespace WinFormsApp.View.Container
 {
     public partial class ContainerView
     {
-        private bool _availabilityPreviewGridConfigured;
-        private void RequestScheduleGridRefresh() 
+        private void RequestScheduleGridRefresh(ScheduleBlockUi? block)
         {
-            if (IsDisposed) return;
+            if (IsDisposed || block == null) return;
 
             // ✅ future-proof: якщо прилетить з background thread
             if (InvokeRequired)
             {
-                BeginInvoke(new Action(RequestScheduleGridRefresh));
+                BeginInvoke(new Action(() => RequestScheduleGridRefresh(block)));
                 return;
             }
 
             if (!IsHandleCreated)
             {
-                RefreshScheduleGridCore();
+                RefreshScheduleGridCore(block);
                 return;
             }
 
-            if (_scheduleRefreshPending) return;
-            _scheduleRefreshPending = true;
+            if (block.RefreshPending) return;
+            block.RefreshPending = true;
 
             BeginInvoke(new Action(() =>
             {
-                _scheduleRefreshPending = false;
-                RefreshScheduleGridCore();
+                block.RefreshPending = false;
+                RefreshScheduleGridCore(block);
             }));
 
         }
-        private void RefreshScheduleGridCore() 
+        private void RefreshScheduleGridCore(ScheduleBlockUi block)
         {
             // 1) спробувати вийти з редагування
-            CancelGridEditSafely(slotGrid);
+            CancelGridEditSafely(block.SlotGrid);
 
             // 2) якщо все ще не можемо вийти — відкласти (1-2 рази)
-            if (slotGrid.IsCurrentCellInEditMode || slotGrid.IsCurrentRowDirty)
+            if (block.SlotGrid.IsCurrentCellInEditMode || block.SlotGrid.IsCurrentRowDirty)
             {
-                if (_rebindRetry++ < 2)
+                if (block.RebindRetry++ < 2)
                 {
-                    BeginInvoke(new Action(RefreshScheduleGridCore));
+                    BeginInvoke(new Action(() => RefreshScheduleGridCore(block)));
                     return;
                 }
 
-                _rebindRetry = 0;
+                block.RebindRetry = 0;
                 return;
             }
 
-            _rebindRetry = 0;
+            block.RebindRetry = 0;
 
             // ✅ один-єдиний binding
-            _scheduleTable = BindScheduleMatrix(
-                grid: slotGrid,
+            BindScheduleMatrix(
+                block,
+                grid: block.SlotGrid,
                 year: ScheduleYear,
                 month: ScheduleMonth,
-                slots: _slots,
-                employees: _employees,
+                slots: block.Slots,
+                employees: block.Employees,
                 readOnly: false,
                 configureGrid: false
             );
@@ -73,6 +73,7 @@ namespace WinFormsApp.View.Container
         }
 
         private DataTable BindScheduleMatrix(
+            ScheduleBlockUi? block,
             Guna2DataGridView grid,
             int year,
             int month,
@@ -84,8 +85,12 @@ namespace WinFormsApp.View.Container
             var table = BuildScheduleTable(year, month, slots, employees, out var map);
 
             // map потрібний тільки для editable grid (slotGrid)
-            if (!readOnly)
-                _colNameToEmpId = map;
+            if (!readOnly && block != null)
+                block.ColNameToEmpId.Clear();
+
+            if (!readOnly && block != null)
+                foreach (var pair in map)
+                    block.ColNameToEmpId[pair.Key] = pair.Value;
 
             grid.SuspendLayout();
             try
@@ -267,27 +272,29 @@ namespace WinFormsApp.View.Container
 
         }
 
-        private void SlotGrid_CellBeginEdit(object? sender, DataGridViewCellCancelEventArgs e) 
+        private void SlotGrid_CellBeginEdit(object? sender, DataGridViewCellCancelEventArgs e)
         {
-            _oldCellValue = slotGrid[e.ColumnIndex, e.RowIndex].Value;
+            if (!TryGetBlockFromGrid(sender, out var block)) return;
+            block.OldCellValue = block.SlotGrid[e.ColumnIndex, e.RowIndex].Value;
         }
-        private void SlotGrid_CellValidating(object? sender, DataGridViewCellValidatingEventArgs e) 
+        private void SlotGrid_CellValidating(object? sender, DataGridViewCellValidatingEventArgs e)
         {
             // Ми не робимо ніякого Cancel тут взагалі.
             // Вся логіка парсингу/відкату — в CellEndEdit (як у тебе і задумано).
             return;
         }
-        private void SlotGrid_CellEndEdit(object? sender, DataGridViewCellEventArgs e) 
+        private void SlotGrid_CellEndEdit(object? sender, DataGridViewCellEventArgs e)
         {
+            if (!TryGetBlockFromGrid(sender, out var block)) return;
             if (e.RowIndex < 0 || e.ColumnIndex < 0) return;
 
-            if (slotGrid.Rows[e.RowIndex].DataBoundItem is not DataRowView rowView)
+            if (block.SlotGrid.Rows[e.RowIndex].DataBoundItem is not DataRowView rowView)
                 return;
 
-            var colName = slotGrid.Columns[e.ColumnIndex].Name;
+            var colName = block.SlotGrid.Columns[e.ColumnIndex].Name;
             if (colName == DayCol || colName == ConflictCol) return;
 
-            if (!_colNameToEmpId.TryGetValue(colName, out var empId))
+            if (!block.ColNameToEmpId.TryGetValue(colName, out var empId))
                 return;
 
             var day = (int)rowView[DayCol];
@@ -295,12 +302,12 @@ namespace WinFormsApp.View.Container
 
             if (!TryParseIntervals(raw, out var intervals, out var error))
             {
-                rowView[colName] = (_oldCellValue?.ToString() ?? EmptyMark).Trim();
+                rowView[colName] = (block.OldCellValue?.ToString() ?? EmptyMark).Trim();
                 ShowError(error ?? "Invalid format.");
                 return;
             }
 
-            ApplyIntervalsToSlots(day, empId, intervals);
+            ApplyIntervalsToSlots(block, day, empId, intervals);
 
             rowView[colName] = intervals.Count == 0
                 ? EmptyMark
@@ -369,26 +376,32 @@ namespace WinFormsApp.View.Container
             out t);
         }
 
-        private void ApplyIntervalsToSlots(int day, int empId, List<(string from, string to)> intervals)
+        private void ApplyIntervalsToSlots(ScheduleBlockUi block, int day, int empId, List<(string from, string to)> intervals)
         {
             var preservedStatus =
-            _slots.FirstOrDefault(s => s.DayOfMonth == day && s.EmployeeId == empId)?.Status
+            block.Slots.FirstOrDefault(s => s.DayOfMonth == day && s.EmployeeId == empId)?.Status
             ?? SlotStatus.UNFURNISHED;
 
-            _slots.RemoveAll(s => s.DayOfMonth == day && s.EmployeeId == empId);
+            block.Slots.RemoveAll(s => s.DayOfMonth == day && s.EmployeeId == empId);
 
             foreach (var (from, to) in intervals)
             {
-                _slots.Add(new ScheduleSlotModel
+                block.Slots.Add(new ScheduleSlotModel
                 {
-                    ScheduleId = ScheduleId,
+                    ScheduleId = block.ScheduleId,
                     DayOfMonth = day,
                     EmployeeId = empId,
                     FromTime = from,
                     ToTime = to,
-                    SlotNo = NextFreeSlotNo(_slots, day, from, to),
+                    SlotNo = NextFreeSlotNo(block.Slots, day, from, to),
                     Status = preservedStatus
                 });
+            }
+
+            if (ReferenceEquals(block, GetSelectedScheduleBlock()))
+            {
+                _slots.Clear();
+                _slots.AddRange(block.Slots);
             }
 
         }
@@ -410,18 +423,21 @@ namespace WinFormsApp.View.Container
             IList<ScheduleSlotModel> slots,
             IList<ScheduleEmployeeModel> employees)
         {
+            var block = GetSelectedScheduleBlock();
+            if (block == null) return;
             // bind у dataGridAvailabilityOnScheduleEdit (readonly)
             BindScheduleMatrix(
-                grid: dataGridAvailabilityOnScheduleEdit,
+                block,
+                grid: block.AvailabilityGrid,
                 year: year,
                 month: month,
                 slots: slots ?? new List<ScheduleSlotModel>(),
                 employees: employees ?? new List<ScheduleEmployeeModel>(),
                 readOnly: true,
-                configureGrid: !_availabilityPreviewGridConfigured
+                configureGrid: !block.AvailabilityPreviewGridConfigured
             );
 
-            _availabilityPreviewGridConfigured = true;
+            block.AvailabilityPreviewGridConfigured = true;
         }
 
         public void ClearAvailabilityPreviewMatrix()

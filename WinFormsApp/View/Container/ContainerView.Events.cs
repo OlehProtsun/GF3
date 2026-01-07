@@ -94,7 +94,7 @@ namespace WinFormsApp.View.Container
             containerGrid.CellDoubleClick += async (_, __) => await Raise(OpenProfileEvent);
 
             // Schedule
-            Action cancelEdit = () => CancelGridEditSafely(slotGrid);
+            Action cancelEdit = () => CancelGridEditSafely(GetSelectedScheduleBlock()?.SlotGrid);
 
             BindClick(btnScheduleSearch, () => ScheduleSearchEvent, cancelEdit);
             BindClick(
@@ -168,22 +168,26 @@ namespace WinFormsApp.View.Container
                 cancelEdit();
                 ClearScheduleValidationErrors(); // ✅ очищає старі значки
 
-                var ok = true;
-                try { ok = slotGrid.EndEdit(); } catch { ok = false; }
-                if (!ok || slotGrid.IsCurrentCellInEditMode) return;
+                var selectedGrid = GetSelectedScheduleBlock()?.SlotGrid;
+                if (selectedGrid != null)
+                {
+                    var ok = true;
+                    try { ok = selectedGrid.EndEdit(); } catch { ok = false; }
+                    if (!ok || selectedGrid.IsCurrentCellInEditMode) return;
+                }
 
                 await Raise(ScheduleSaveEvent);
             };
 
             inputYear.ValueChanged += (_, __) =>
             {
-                RequestScheduleGridRefresh();
+                RequestScheduleGridRefresh(GetSelectedScheduleBlock());
                 _ = Raise(AvailabilitySelectionChangedEvent);
             };
 
             inputMonth.ValueChanged += (_, __) =>
             {
-                RequestScheduleGridRefresh();
+                RequestScheduleGridRefresh(GetSelectedScheduleBlock());
                 _ = Raise(AvailabilitySelectionChangedEvent);
             };
 
@@ -212,6 +216,7 @@ namespace WinFormsApp.View.Container
             BindClick(btnSearchEmployeeInAvailabilityEdit, () => ScheduleSearchEmployeeEvent);
             BindClick(btnAddEmployeeToGroup, () => ScheduleAddEmployeeToGroupEvent);
             BindClick(btnRemoveEmployeeFromGroup, () => ScheduleRemoveEmployeeFromGroupEvent);
+            BindClick(btnAddNewSchedule, () => ScheduleAddNewBlockEvent);
 
         }
 

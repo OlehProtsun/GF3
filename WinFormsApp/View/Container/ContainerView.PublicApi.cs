@@ -44,7 +44,17 @@ namespace WinFormsApp.View.Container
         public ScheduleViewModel ScheduleCancelTarget { get; set; } = ScheduleViewModel.List;
 
         [DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
-        public int ScheduleId { get => (int)numberScheduleId.Value; set => numberScheduleId.Value = value; }
+        public int ScheduleId
+        {
+            get => (int)numberScheduleId.Value;
+            set
+            {
+                numberScheduleId.Value = value;
+                var block = GetSelectedScheduleBlock();
+                if (block != null)
+                    block.ScheduleId = value;
+            }
+        }
 
         [DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
         public int ScheduleContainerId { get; set; }
@@ -146,12 +156,19 @@ namespace WinFormsApp.View.Container
         [DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
         public IList<ScheduleSlotModel> ScheduleSlots
         {
-            get => _slots;
+            get => GetSelectedScheduleBlock()?.Slots ?? _slots;
             set
             {
                 _slots.Clear();
                 if (value != null) _slots.AddRange(value);
-                RequestScheduleGridRefresh();
+                var block = GetSelectedScheduleBlock();
+                if (block != null)
+                {
+                    block.Slots.Clear();
+                    if (value != null) block.Slots.AddRange(value);
+                }
+
+                RequestScheduleGridRefresh(block);
                 RefreshScheduleProfileIfOpened();
             }
         }
@@ -159,12 +176,19 @@ namespace WinFormsApp.View.Container
         [DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
         public IList<ScheduleEmployeeModel> ScheduleEmployees
         {
-            get => _employees;
+            get => GetSelectedScheduleBlock()?.Employees ?? _employees;
             set
             {
                 _employees.Clear();
                 if (value != null) _employees.AddRange(value);
-                RequestScheduleGridRefresh();
+                var block = GetSelectedScheduleBlock();
+                if (block != null)
+                {
+                    block.Employees.Clear();
+                    if (value != null) block.Employees.AddRange(value);
+                }
+
+                RequestScheduleGridRefresh(block);
                 RefreshScheduleProfileIfOpened();
             }
         }
@@ -192,6 +216,9 @@ namespace WinFormsApp.View.Container
         public event Func<CancellationToken, Task>? ScheduleSearchEmployeeEvent;
         public event Func<CancellationToken, Task>? ScheduleAddEmployeeToGroupEvent;
         public event Func<CancellationToken, Task>? ScheduleRemoveEmployeeFromGroupEvent;
+        public event Func<CancellationToken, Task>? ScheduleAddNewBlockEvent;
+        public event Func<Guid, CancellationToken, Task>? ScheduleBlockSelectEvent;
+        public event Func<Guid, CancellationToken, Task>? ScheduleBlockCloseEvent;
 
         public event Func<CancellationToken, Task>? AvailabilitySelectionChangedEvent;
 

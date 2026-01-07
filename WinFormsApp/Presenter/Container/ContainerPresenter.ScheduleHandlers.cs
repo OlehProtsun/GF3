@@ -62,8 +62,17 @@ namespace WinFormsApp.Presenter.Container
             _view.ScheduleContainerId = container.Id;
             _view.ScheduleCancelTarget = ScheduleViewModel.List;
             _view.SwitchToScheduleEditMode();
+            _view.SetAddNewScheduleEnabled(true);
+            ResetScheduleBlocks();
+            _view.InitializeScheduleBlocks();
+
+            var block = CreateDefaultBlock(container.Id);
+            _scheduleBlocks.Add(block);
+            _selectedScheduleBlockId = block.Id;
+            _view.AddScheduleBlock(block.Id);
+            _view.SetSelectedScheduleBlock(block.Id);
+            ApplyBlockToView(block);
             _view.ClearAvailabilityPreviewMatrix();
-            SetDefaultAvailabilitySelection();
             await UpdateAvailabilityPreviewCoreAsync(ct);
         }
 
@@ -79,39 +88,34 @@ namespace WinFormsApp.Presenter.Container
 
             var detailed = await _scheduleService.GetDetailedAsync(schedule.Id, ct);
 
-            _view.ScheduleEmployees = detailed?.Employees?.ToList() ?? new List<ScheduleEmployeeModel>();
-            _view.ScheduleSlots = detailed?.Slots?.ToList() ?? new List<ScheduleSlotModel>();
-
             _view.ClearScheduleValidationErrors();
-
-            _view.ScheduleId = schedule.Id;
-            _view.ScheduleContainerId = schedule.ContainerId;
-            _view.ScheduleShopId = schedule.ShopId;
-            _view.ScheduleName = schedule.Name;
-            _view.ScheduleYear = schedule.Year;
-            _view.ScheduleMonth = schedule.Month;
-            _view.SchedulePeoplePerShift = schedule.PeoplePerShift;
-            _view.ScheduleShift1 = schedule.Shift1Time;
-            _view.ScheduleShift2 = schedule.Shift2Time;
-            _view.ScheduleMaxHoursPerEmp = schedule.MaxHoursPerEmpMonth;
-            _view.ScheduleMaxConsecutiveDays = schedule.MaxConsecutiveDays;
-            _view.ScheduleMaxConsecutiveFull = schedule.MaxConsecutiveFull;
-            _view.ScheduleMaxFullPerMonth = schedule.MaxFullPerMonth;
-            _view.ScheduleNote = schedule.Note ?? string.Empty;
 
             _view.IsEdit = true;
             _view.ScheduleCancelTarget = (_view.ScheduleMode == ScheduleViewModel.Profile)
                 ? ScheduleViewModel.Profile
                 : ScheduleViewModel.List;
 
+            _view.SwitchToScheduleEditMode();
+            _view.SetAddNewScheduleEnabled(false);
+            ResetScheduleBlocks();
+            _view.InitializeScheduleBlocks();
+
+            var block = CreateBlockFromSchedule(schedule,
+                detailed?.Employees?.ToList() ?? new List<ScheduleEmployeeModel>(),
+                detailed?.Slots?.ToList() ?? new List<ScheduleSlotModel>());
+
             var availabilityId = groups
-                .Where(g => g.Year == _view.ScheduleYear && g.Month == _view.ScheduleMonth)
+                .Where(g => g.Year == block.Model.Year && g.Month == block.Model.Month)
                 .Select(g => g.Id)
                 .FirstOrDefault();
 
-            _view.SetSelectedAvailabilityGroupId(availabilityId);
+            block.SelectedAvailabilityGroupId = availabilityId;
 
-            _view.SwitchToScheduleEditMode();
+            _scheduleBlocks.Add(block);
+            _selectedScheduleBlockId = block.Id;
+            _view.AddScheduleBlock(block.Id);
+            _view.SetSelectedScheduleBlock(block.Id);
+            ApplyBlockToView(block);
 
             _view.ClearAvailabilityPreviewMatrix();
             await UpdateAvailabilityPreviewCoreAsync(ct);
@@ -119,39 +123,77 @@ namespace WinFormsApp.Presenter.Container
 
         private async Task OnScheduleSaveCoreAsync(CancellationToken ct)
         {
+            CaptureSelectedBlockFromView();
             _view.ClearScheduleValidationErrors();
-            var model = BuildScheduleFromView();
-
-            var errors = ValidateAndNormalizeSchedule(model, out var normalizedShift1, out var normalizedShift2);
-            if (errors.Count > 0)
+            if (_scheduleBlocks.Count == 0)
             {
-                _view.SetScheduleValidationErrors(errors);
+                _view.ShowError("Add at least one schedule first.");
+                return;
+            }
+            var invalidBlocks = new List<ScheduleBlockState>();
+
+            foreach (var block in _scheduleBlocks)
+            {
+                var errors = ValidateAndNormalizeSchedule(block.Model, out var normalizedShift1, out var normalizedShift2);
+                block.ValidationErrors = errors;
+
+                if (errors.Count > 0)
+                {
+                    invalidBlocks.Add(block);
+                    continue;
+                }
+
+                block.Model.Shift1Time = normalizedShift1!;
+                block.Model.Shift2Time = normalizedShift2!;
+            }
+
+            if (invalidBlocks.Count > 0)
+            {
+                var first = invalidBlocks.First();
+                _selectedScheduleBlockId = first.Id;
+                _view.SetSelectedScheduleBlock(first.Id);
+                ApplyBlockToView(first);
+                _view.SetScheduleValidationErrors(first.ValidationErrors);
                 _view.IsSuccessful = false;
                 _view.Message = "Please fix the highlighted fields.";
                 return;
             }
 
-            model.Shift1Time = normalizedShift1!;
-            model.Shift2Time = normalizedShift2!;
-
-            var employees = (_view.ScheduleEmployees ?? new List<ScheduleEmployeeModel>())
-                .GroupBy(e => e.EmployeeId)
-                .Select(g => new ScheduleEmployeeModel
+            var names = _scheduleBlocks
+                .Select((block, index) =>
                 {
-                    EmployeeId = g.Key,
-                    MinHoursMonth = g.First().MinHoursMonth
+                    var name = string.IsNullOrWhiteSpace(block.Model.Name)
+                        ? $"Schedule {index + 1}"
+                        : block.Model.Name;
+                    return $"- {name}";
                 })
                 .ToList();
 
-            var slots = _view.ScheduleSlots ?? new List<ScheduleSlotModel>();
+            var confirmMessage = $"Do you want to save these schedules?{Environment.NewLine}{string.Join(Environment.NewLine, names)}";
+            if (!_view.Confirm(confirmMessage))
+                return;
 
-            await _scheduleService.SaveWithDetailsAsync(model, employees, slots, ct);
+            foreach (var block in _scheduleBlocks)
+            {
+                var employees = (block.Employees ?? new List<ScheduleEmployeeModel>())
+                    .GroupBy(e => e.EmployeeId)
+                    .Select(g => new ScheduleEmployeeModel
+                    {
+                        EmployeeId = g.Key,
+                        MinHoursMonth = g.First().MinHoursMonth
+                    })
+                    .ToList();
 
-            _view.ShowInfo(_view.IsEdit ? "Schedule updated successfully." : "Schedule added successfully.");
+                var slots = block.Slots ?? new List<ScheduleSlotModel>();
+
+                await _scheduleService.SaveWithDetailsAsync(block.Model, employees, slots, ct);
+            }
+
+            var containerId = _scheduleBlocks.FirstOrDefault()?.Model.ContainerId ?? _view.ScheduleContainerId;
+            await LoadSchedulesAsync(containerId, search: null, ct);
+
+            _view.ShowInfo("Schedules saved successfully.");
             _view.IsSuccessful = true;
-
-            await LoadSchedulesAsync(model.ContainerId, search: null, ct);
-            SwitchBackFromScheduleEdit();
         }
 
         private async Task OnScheduleDeleteCoreAsync(CancellationToken ct)
@@ -173,6 +215,7 @@ namespace WinFormsApp.Presenter.Container
         private Task OnScheduleCancelCoreAsync(CancellationToken ct)
         {
             ResetScheduleEditFilters();
+            ResetScheduleBlocks();
             SwitchBackFromScheduleEdit();
             return Task.CompletedTask;
         }
@@ -225,6 +268,7 @@ namespace WinFormsApp.Presenter.Container
             });
 
             _view.ScheduleEmployees = employees;
+            CaptureSelectedBlockFromView();
             return Task.CompletedTask;
         }
 
@@ -249,6 +293,7 @@ namespace WinFormsApp.Presenter.Container
 
             _view.ScheduleEmployees = employees;
             _view.ScheduleSlots = slots;
+            CaptureSelectedBlockFromView();
             return Task.CompletedTask;
         }
 
@@ -343,12 +388,16 @@ namespace WinFormsApp.Presenter.Container
             _view.ScheduleShift2 = model.Shift2Time;
             _view.ScheduleEmployees = employees;
             _view.ScheduleSlots = slots.ToList();
+            CaptureSelectedBlockFromView();
 
             _view.ShowInfo("Slots generated. Review before saving.");
         }
 
         private Task OnAvailabilitySelectionChangedCoreAsync(CancellationToken ct)
-            => UpdateAvailabilityPreviewCoreAsync(ct);
+        {
+            CaptureSelectedBlockFromView();
+            return UpdateAvailabilityPreviewCoreAsync(ct);
+        }
 
         private async Task UpdateAvailabilityPreviewCoreAsync(CancellationToken ct)
         {
@@ -528,16 +577,6 @@ namespace WinFormsApp.Presenter.Container
             _view.SetShopList(_allShops);
             _view.SetAvailabilityGroupList(_allAvailabilityGroups);
             _view.SetEmployeeList(_allEmployees);
-        }
-
-        private void SetDefaultAvailabilitySelection()
-        {
-            var availabilityId = _allAvailabilityGroups
-                .Where(g => g.Year == _view.ScheduleYear && g.Month == _view.ScheduleMonth)
-                .Select(g => g.Id)
-                .FirstOrDefault();
-
-            _view.SetSelectedAvailabilityGroupId(availabilityId);
         }
 
         private static bool ContainsIgnoreCase(string? source, string value)

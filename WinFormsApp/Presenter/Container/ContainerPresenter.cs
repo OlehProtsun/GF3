@@ -71,6 +71,9 @@ namespace WinFormsApp.Presenter.Container
             _view.ScheduleSearchEmployeeEvent += ct => SafeAsync(OnScheduleEmployeeSearchCoreAsync, ct);
             _view.ScheduleAddEmployeeToGroupEvent += ct => SafeAsync(OnScheduleAddEmployeeToGroupCoreAsync, ct);
             _view.ScheduleRemoveEmployeeFromGroupEvent += ct => SafeAsync(OnScheduleRemoveEmployeeFromGroupCoreAsync, ct);
+            _view.ScheduleAddNewBlockEvent += ct => SafeAsync(OnScheduleAddNewBlockCoreAsync, ct);
+            _view.ScheduleBlockSelectEvent += (blockId, ct) => SafeAsync(innerCt => OnScheduleBlockSelectCoreAsync(blockId, innerCt), ct);
+            _view.ScheduleBlockCloseEvent += (blockId, ct) => SafeAsync(innerCt => OnScheduleBlockCloseCoreAsync(blockId, innerCt), ct);
 
             _view.AvailabilitySelectionChangedEvent += ct => SafeAsync(OnAvailabilitySelectionChangedCoreAsync, ct);
 

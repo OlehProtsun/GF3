@@ -1,9 +1,12 @@
 ﻿using DataAccessLayer.Models;
+using Guna.UI2.WinForms;
 using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Text;
 using System.Threading;
+using System.Drawing;
+using System.Windows.Forms;
 
 namespace WinFormsApp.View.Container
 {
@@ -13,10 +16,6 @@ namespace WinFormsApp.View.Container
         private bool isEdit;
         private bool isSuccessful;
         private string message = string.Empty;
-
-        private DataTable? _scheduleTable;
-        private Dictionary<string, int> _colNameToEmpId = new();
-        private object? _oldCellValue;
 
         private readonly Pen _gridVPen = new(Color.Gainsboro, 1);
         private readonly Pen _gridHPen = new(Color.FromArgb(70, Color.Gray), 1);
@@ -28,9 +27,6 @@ namespace WinFormsApp.View.Container
 
         private readonly Dictionary<string, Control> _containerErrorMap;
         private readonly Dictionary<string, Control> _scheduleErrorMap;
-
-        private bool _scheduleRefreshPending;
-        private int _rebindRetry;
 
         private ScheduleModel? _scheduleProfileModel;
 
@@ -62,6 +58,43 @@ namespace WinFormsApp.View.Container
             public string FullName { get; init; } = string.Empty;
         }
 
+        private sealed class ScheduleBlockUi
+        {
+            public Guid Id { get; init; }
+            public Panel HostPanel { get; init; } = null!;
+            public Guna2GroupBox ScheduleGroupBox { get; init; } = null!;
+            public Guna2GroupBox AvailabilityGroupBox { get; init; } = null!;
+            public Guna2DataGridView SlotGrid { get; init; } = null!;
+            public Guna2DataGridView AvailabilityGrid { get; init; } = null!;
+            public Guna2Button HideShowButton { get; init; } = null!;
+            public Guna2Button CloseButton { get; init; } = null!;
+            public Guna2Button SelectButton { get; init; } = null!;
+            public Guna2Button? TitleButton { get; init; }
+            public Dictionary<string, int> ColNameToEmpId { get; } = new();
+            public List<ScheduleSlotModel> Slots { get; } = new();
+            public List<ScheduleEmployeeModel> Employees { get; } = new();
+            public object? OldCellValue { get; set; }
+            public bool AvailabilityPreviewGridConfigured { get; set; }
+            public bool RefreshPending { get; set; }
+            public int RebindRetry { get; set; }
+            public int ExpandedWidth { get; set; }
+            public int ExpandedHeight { get; set; }
+            public int CollapsedWidth { get; set; }
+            public bool IsCollapsed { get; set; }
+            public Color DefaultBorderColor { get; set; }
+            public Color DefaultCustomBorderColor { get; set; }
+            public int ScheduleId { get; set; }
+        }
+
+        private readonly Dictionary<Guid, ScheduleBlockUi> _scheduleBlocks = new();
+        private readonly List<Guid> _scheduleBlockOrder = new();
+        private readonly Dictionary<Guna2DataGridView, ScheduleBlockUi> _scheduleBlocksByGrid = new();
+        private Guid? _selectedScheduleBlockId;
+        private bool _scheduleBlocksInitialized;
+        private const int ScheduleBlockGap = 18;
+        private const int ScheduleBlockStartX = 10;
+        private const int ScheduleBlockStartY = 10;
+        private readonly Color _scheduleBlockHighlightColor = Color.FromArgb(51, 71, 255);
 
     }
 }
