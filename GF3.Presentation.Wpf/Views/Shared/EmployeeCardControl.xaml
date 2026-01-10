@@ -1,0 +1,11 @@
+<UserControl x:Class="GF3.Presentation.Wpf.Views.Shared.EmployeeCardControl"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Border Style="{StaticResource CardStyle}">
+        <StackPanel>
+            <TextBlock Text="{Binding Header, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                       Style="{StaticResource TitleTextStyle}" />
+            <ContentPresenter Margin="0,12,0,0" />
+        </StackPanel>
+    </Border>
+</UserControl>
