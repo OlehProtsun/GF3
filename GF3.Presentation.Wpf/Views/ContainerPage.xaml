@@ -1,0 +1,79 @@
+<UserControl x:Class="GF3.Presentation.Wpf.Views.ContainerPage"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d">
+    <Grid Margin="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="2*" />
+            <ColumnDefinition Width="3*" />
+        </Grid.ColumnDefinitions>
+
+        <Border Style="{StaticResource CardStyle}" Margin="0,0,12,12">
+            <DockPanel>
+                <TextBlock Text="Containers" Style="{StaticResource TitleTextStyle}" DockPanel.Dock="Top" />
+                <ListView Margin="0,12,0,0"
+                          ItemsSource="{Binding Containers}"
+                          SelectedItem="{Binding SelectedContainer}">
+                    <ListView.View>
+                        <GridView>
+                            <GridViewColumn Header="Name" DisplayMemberBinding="{Binding Name}" />
+                            <GridViewColumn Header="Note" DisplayMemberBinding="{Binding Note}" />
+                        </GridView>
+                    </ListView.View>
+                </ListView>
+            </DockPanel>
+        </Border>
+
+        <Border Grid.Column="1" Style="{StaticResource CardStyle}" Margin="0,0,0,12">
+            <StackPanel>
+                <TextBlock Text="Container Details" Style="{StaticResource TitleTextStyle}" />
+                <TextBlock Text="Name" Margin="0,12,0,0" />
+                <TextBox Text="{Binding SelectedContainer.Name, UpdateSourceTrigger=PropertyChanged}" />
+                <TextBlock Text="Note" Margin="0,12,0,0" />
+                <TextBox Text="{Binding SelectedContainer.Note, UpdateSourceTrigger=PropertyChanged}" />
+
+                <StackPanel Orientation="Horizontal" Margin="0,16,0,0" HorizontalAlignment="Left">
+                    <Button Content="Add" Command="{Binding AddCommand}" Margin="0,0,8,0" />
+                    <Button Content="Edit" Command="{Binding EditCommand}" Margin="0,0,8,0" />
+                    <Button Content="Save" Command="{Binding SaveCommand}" Margin="0,0,8,0" />
+                    <Button Content="Cancel" Command="{Binding CancelCommand}" />
+                </StackPanel>
+            </StackPanel>
+        </Border>
+
+        <Border Grid.Row="1" Style="{StaticResource CardStyle}" Margin="0,0,12,0">
+            <DockPanel>
+                <TextBlock Text="Schedules" Style="{StaticResource TitleTextStyle}" DockPanel.Dock="Top" />
+                <ListView Margin="0,12,0,0"
+                          ItemsSource="{Binding Schedules}"
+                          SelectedItem="{Binding SelectedSchedule}">
+                    <ListView.View>
+                        <GridView>
+                            <GridViewColumn Header="Name" DisplayMemberBinding="{Binding Name}" />
+                            <GridViewColumn Header="Year" DisplayMemberBinding="{Binding Year}" />
+                            <GridViewColumn Header="Month" DisplayMemberBinding="{Binding Month}" />
+                        </GridView>
+                    </ListView.View>
+                </ListView>
+            </DockPanel>
+        </Border>
+
+        <Border Grid.Row="1" Grid.Column="1" Style="{StaticResource CardStyle}">
+            <StackPanel>
+                <TextBlock Text="Schedule Lookups" Style="{StaticResource TitleTextStyle}" />
+                <TextBlock Text="Shops" Margin="0,12,0,0" />
+                <ListBox ItemsSource="{Binding Shops}" DisplayMemberPath="Name" Height="80" />
+                <TextBlock Text="Availability Groups" Margin="0,12,0,0" />
+                <ListBox ItemsSource="{Binding AvailabilityGroups}" DisplayMemberPath="Name" Height="80" />
+                <TextBlock Text="Employees" Margin="0,12,0,0" />
+                <ListBox ItemsSource="{Binding Employees}" DisplayMemberPath="FirstName" Height="80" />
+            </StackPanel>
+        </Border>
+    </Grid>
+</UserControl>

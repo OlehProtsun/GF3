@@ -1,0 +1,53 @@
+<UserControl x:Class="GF3.Presentation.Wpf.Views.AvailabilityPage"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d">
+    <Grid Margin="16">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="2*" />
+            <ColumnDefinition Width="3*" />
+        </Grid.ColumnDefinitions>
+
+        <Border Style="{StaticResource CardStyle}" Margin="0,0,12,0">
+            <DockPanel>
+                <TextBlock Text="Availability Groups" Style="{StaticResource TitleTextStyle}" DockPanel.Dock="Top" />
+                <ListView Margin="0,12,0,0"
+                          ItemsSource="{Binding Groups}"
+                          SelectedItem="{Binding SelectedGroup}">
+                    <ListView.View>
+                        <GridView>
+                            <GridViewColumn Header="Name" DisplayMemberBinding="{Binding Name}" />
+                            <GridViewColumn Header="Year" DisplayMemberBinding="{Binding Year}" />
+                            <GridViewColumn Header="Month" DisplayMemberBinding="{Binding Month}" />
+                        </GridView>
+                    </ListView.View>
+                </ListView>
+            </DockPanel>
+        </Border>
+
+        <Border Grid.Column="1" Style="{StaticResource CardStyle}">
+            <StackPanel>
+                <TextBlock Text="Group Details" Style="{StaticResource TitleTextStyle}" />
+                <TextBlock Text="Name" Margin="0,12,0,0" />
+                <TextBox Text="{Binding SelectedGroup.Name, UpdateSourceTrigger=PropertyChanged}" />
+                <TextBlock Text="Year" Margin="0,12,0,0" />
+                <TextBox Text="{Binding SelectedGroup.Year, UpdateSourceTrigger=PropertyChanged}" />
+                <TextBlock Text="Month" Margin="0,12,0,0" />
+                <TextBox Text="{Binding SelectedGroup.Month, UpdateSourceTrigger=PropertyChanged}" />
+
+                <TextBlock Text="Employees" Style="{StaticResource TitleTextStyle}" Margin="0,16,0,0" />
+                <ListBox ItemsSource="{Binding Employees}" DisplayMemberPath="FirstName" Height="120" />
+
+                <StackPanel Orientation="Horizontal" Margin="0,16,0,0" HorizontalAlignment="Left">
+                    <Button Content="Add" Command="{Binding AddCommand}" Margin="0,0,8,0" />
+                    <Button Content="Edit" Command="{Binding EditCommand}" Margin="0,0,8,0" />
+                    <Button Content="Delete" Command="{Binding DeleteCommand}" Margin="0,0,8,0" />
+                    <Button Content="Save" Command="{Binding SaveCommand}" Margin="0,0,8,0" />
+                    <Button Content="Cancel" Command="{Binding CancelCommand}" />
+                </StackPanel>
+            </StackPanel>
+        </Border>
+    </Grid>
+</UserControl>
