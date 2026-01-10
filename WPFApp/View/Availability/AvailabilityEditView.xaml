@@ -156,7 +156,8 @@
                             Style="{StaticResource RoundedButtonStyle}"
                             Height="33"
                             Background="#FFE0E0E0"
-                            Foreground="Gray">
+                            Foreground="Gray"
+                            Command="{Binding CancelCommand}">
                         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                             <TextBlock Text="←" FontSize="14" Margin="0,0,6,0"/>
                             <TextBlock Text="Back" FontSize="12"/>
@@ -255,7 +256,7 @@
                                              Style="{StaticResource RoundedTextBoxStyle}"
                                              Height="33"
                                              Width="84"
-                                             Text="{Binding AvailabilityMonth}"/>
+                                             Text="{Binding AvailabilityMonth, UpdateSourceTrigger=PropertyChanged, ValidatesOnNotifyDataErrors=True, ValidatesOnExceptions=True}"/>
                                 </StackPanel>
 
                                 <StackPanel Grid.Column="4">
@@ -268,7 +269,7 @@
                                              Style="{StaticResource RoundedTextBoxStyle}"
                                              Height="33"
                                              Width="84"
-                                             Text="{Binding AvailabilityYear}"/>
+                                             Text="{Binding AvailabilityYear, UpdateSourceTrigger=PropertyChanged, ValidatesOnNotifyDataErrors=True, ValidatesOnExceptions=True}"/>
                                 </StackPanel>
                             </Grid>
 
@@ -281,7 +282,7 @@
                                 <TextBox x:Name="inputAvailabilityMonthName"
                                          Style="{StaticResource RoundedTextBoxStyle}"
                                          Height="36"
-                                         Text="{Binding AvailabilityName}"/>
+                                         Text="{Binding AvailabilityName, UpdateSourceTrigger=PropertyChanged, ValidatesOnNotifyDataErrors=True}"/>
                             </StackPanel>
 
                             <Button x:Name="btnCacnelAvailabilityEdit2"
@@ -338,11 +339,12 @@
                                 <TextBox Grid.Column="2"
                                          x:Name="textBoxSearchValueFromAvailabilityEdit"
                                          Style="{StaticResource RoundedTextBoxStyle}"
-                                         Text="{Binding EmployeeSearchText}"/>
+                                         Text="{Binding EmployeeSearchText, UpdateSourceTrigger=PropertyChanged}"/>
 
                                 <Button Grid.Column="4"
                                         x:Name="btnSearchEmployeeInAvailabilityEdit"
-                                        Style="{StaticResource IconButtonStyle}">
+                                        Style="{StaticResource IconButtonStyle}"
+                                        Command="{Binding SearchEmployeeCommand}">
                                     <Viewbox Width="15" Height="15">
                                         <Canvas Width="24" Height="24">
                                             <Ellipse Width="14" Height="14"
@@ -373,6 +375,7 @@
                                               Margin="0,6,0,0"
                                               Height="36"
                                               ItemsSource="{Binding Employees}"
+                                              DisplayMemberPath="FullName"
                                               SelectedItem="{Binding SelectedEmployee}"/>
                                 </StackPanel>
 
@@ -462,10 +465,10 @@
                                     Background="Gainsboro"
                                     CornerRadius="20"
                                     ClipToBounds="True">
-                                <DataGrid x:Name="dataGridBinds"
-                                          Style="{StaticResource AvailabilityListGridStyle}"
-                                          ItemsSource="{Binding Binds}"
-                                          SelectedItem="{Binding SelectedBind}"/>
+                                        <DataGrid x:Name="dataGridBinds"
+                                                  Style="{StaticResource AvailabilityListGridStyle}"
+                                                  ItemsSource="{Binding Binds}"
+                                                  SelectedItem="{Binding SelectedBind}"/>
                             </Border>
 
                             <Grid Grid.Row="2">
@@ -542,6 +545,7 @@
                             ClipToBounds="True">
                         <DataGrid x:Name="dataGridAvailabilityDays"
                                   Style="{StaticResource AvailabilityListGridStyle}"
+                                  AutoGenerateColumns="False"
                                   ItemsSource="{Binding AvailabilityDays}"
                                   SelectedItem="{Binding SelectedAvailabilityDay}"/>
                     </Border>

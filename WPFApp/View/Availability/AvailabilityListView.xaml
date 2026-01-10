@@ -228,6 +228,10 @@
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="6"/>
                         <ColumnDefinition Width="100"/>
+                        <ColumnDefinition Width="6"/>
+                        <ColumnDefinition Width="86"/>
+                        <ColumnDefinition Width="6"/>
+                        <ColumnDefinition Width="86"/>
                     </Grid.ColumnDefinitions>
 
                     <Button Grid.Column="0"
@@ -247,7 +251,8 @@
                         </Viewbox>
                     </Button>
 
-                    <TextBox Grid.Column="2"
+                    <TextBox x:Name="inputSearch"
+                             Grid.Column="2"
                              Style="{StaticResource RoundedTextBoxStyle}"
                              Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"/>
 
@@ -259,6 +264,20 @@
                             <TextBlock Text="Add New" FontSize="12"/>
                         </StackPanel>
                     </Button>
+
+                    <Button Grid.Column="6"
+                            Style="{StaticResource RoundedButtonStyle}"
+                            Background="#FF3347FF"
+                            Command="{Binding EditCommand}">
+                        <TextBlock Text="Edit" FontSize="12"/>
+                    </Button>
+
+                    <Button Grid.Column="8"
+                            Style="{StaticResource RoundedButtonStyle}"
+                            Background="Firebrick"
+                            Command="{Binding DeleteCommand}">
+                        <TextBlock Text="Delete" FontSize="12"/>
+                    </Button>
                 </Grid>
             </Grid>
         </Border>
@@ -269,7 +288,8 @@
                 CornerRadius="20"
                 Background="Gainsboro"
                 ClipToBounds="True">
-            <DataGrid Style="{StaticResource AvailabilityListGridStyle}"
+            <DataGrid x:Name="dataGridAvailabilityList"
+                      Style="{StaticResource AvailabilityListGridStyle}"
                       ItemsSource="{Binding Items}"
                       SelectedItem="{Binding SelectedItem}">
                 <!-- WinForms: 1 колонка -->

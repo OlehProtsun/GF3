@@ -121,9 +121,11 @@ namespace WPFApp.ViewModel
                 ct.ThrowIfCancellationRequested();
 
                 ActivePage = page;
-                CurrentViewModel = getOrCreateVm();
+                var viewModel = getOrCreateVm();
+                CurrentViewModel = viewModel;
 
-                await Task.CompletedTask;
+                if (viewModel is AvailabilityViewModel availabilityVm)
+                    await availabilityVm.EnsureInitializedAsync(ct);
             }, busyText);
         }
 
