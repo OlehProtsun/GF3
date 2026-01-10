@@ -1,0 +1,372 @@
+﻿<Window x:Class="WPFApp.View.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Main"
+        Width="1154" Height="718"
+        WindowState="Maximized"
+        WindowStyle="None"
+        ResizeMode="CanResize"
+        Background="White">
+
+    <Window.Resources>
+
+        <!-- Тінь як у Guna groupbox -->
+        <DropShadowEffect x:Key="CardShadow"
+                          BlurRadius="18"
+                          ShadowDepth="4"
+                          Opacity="0.25"/>
+
+        <DropShadowEffect x:Key="ButtonShadow"
+                  BlurRadius="4"
+                  ShadowDepth="1"
+                  Opacity="0.12"/>
+
+        <!-- Стиль квадратної ікон-кнопки 39x39 з радіусом 10 і тінню -->
+        <Style x:Key="IconButton39" TargetType="Button">
+            <Setter Property="Width" Value="39"/>
+            <Setter Property="Height" Value="39"/>
+            <Setter Property="Background" Value="White"/>
+            <Setter Property="BorderBrush" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="10">
+                            <Border.Effect>
+                                <StaticResource ResourceKey="ButtonShadow"/>
+                            </Border.Effect>
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"/>
+                        </Border>
+
+                        <ControlTemplate.Triggers>
+                            <!-- hover дуже легкий -->
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Background" Value="#cccccc"/>
+                            </Trigger>
+
+                            <!-- як у disabled Guna (стає сіріше) -->
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.55"/>
+                                <Setter Property="Background" Value="#808080"/>
+                            </Trigger>
+
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter Property="Background" Value="#bfbfbf"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Текст під кнопками (Corbel 8.25 Bold) -->
+        <Style x:Key="NavLabel" TargetType="TextBlock">
+            <Setter Property="FontFamily" Value="Corbel"/>
+            <Setter Property="FontSize" Value="11"/>
+            <!-- WPF ≈ 8.25 WinForms -->
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Foreground" Value="Black"/>
+            <Setter Property="HorizontalAlignment" Value="Center"/>
+            <Setter Property="Margin" Value="0,3,0,0"/>
+        </Style>
+
+        <!-- Сірий заголовок "Views" / "Settings" -->
+        <Style x:Key="GrayCaption" TargetType="TextBlock">
+            <Setter Property="FontFamily" Value="Segoe UI"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Foreground" Value="Gray"/>
+            <Setter Property="HorizontalAlignment" Value="Center"/>
+        </Style>
+
+        <!-- Лінія як Guna2Shapes Line -->
+        <Style x:Key="ThinLine" TargetType="Separator">
+            <Setter Property="Height" Value="1"/>
+            <Setter Property="Margin" Value="0,4,0,4"/>
+            <Setter Property="Background" Value="Gray"/>
+            <Setter Property="Opacity" Value="0.8"/>
+        </Style>
+
+    </Window.Resources>
+
+    <Grid MouseLeftButtonDown="Root_MouseLeftButtonDown">
+        <Grid.ColumnDefinitions>
+            <!-- leftBar = 79 -->
+            <ColumnDefinition Width="79"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+
+        <!-- LEFT BAR (як Panel leftBar) -->
+        <Border Grid.Column="0" Background="White">
+            <!-- Всередині "groupbox" 65 ширина, margin 7,6 як у Designer -->
+            <Border Width="65"
+                    Margin="7,6,7,6"
+                    CornerRadius="15"
+                    Background="Transparent"
+                    BorderBrush="#FFE0E0E0"
+                    BorderThickness="1"
+                    Effect="{StaticResource CardShadow}"
+                    HorizontalAlignment="Left"
+                    VerticalAlignment="Stretch">
+
+                <!-- Внутрішня розкладка -->
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <!-- TOP: кнопка + Home/Views + line -->
+                    <StackPanel Grid.Row="0" Margin="0,10,0,0">
+                        <!-- top icon (guna2Button1: 12,15) -->
+                        <Button Style="{StaticResource IconButton39}"
+                                BorderBrush="White" BorderThickness="1"
+                                Margin="0,5,0,0">
+                            
+                            <Viewbox Width="18" Height="18">
+                                <Viewbox.RenderTransform>
+                                    <ScaleTransform ScaleY="-1"/>
+                                </Viewbox.RenderTransform>
+                                <Viewbox.RenderTransformOrigin>0.5,0.5</Viewbox.RenderTransformOrigin>
+                                <Path Fill="Black"
+                                    Data="M2443 5105 c-130 -36 -94 -3 -1246 -1153 -598 -598 -1101 -1107 -1117 -1131 -124 -185 -99 -433 59 -592 92 -91 209 -139 343 -139 l68 0 0 -800 c0 -541 4 -816 11 -852 38 -182 185 -347 367 -410 66 -23 71 -23 554 -23 476 0 487 0 514 21 15 11 37 33 48 48 21 27 21 40 26 695 l5 668 30 49 c38 61 115 110 189 119 28 4 168 5 311 3 l260 -3 53 -29 c50 -28 82 -61 113 -116 11 -21 15 -144 19 -692 5 -654 5 -667 26 -694 11 -15 33 -37 48 -48 27 -21 38 -21 514 -21 483 0 488 0 554 23 182 63 329 228 367 410 7 36 11 311 11 852 l0 800 68 0 c240 0 434 163 474 398 15 92 0 190 -43 282 -29 60 -116 150 -1118 1153 -597 598 -1107 1101 -1133 1118 -26 17 -71 40 -100 51 -70 27 -204 33 -275 13z"/>
+                            </Viewbox>
+                            
+                        </Button>
+
+                        <!-- Home (label2 y=57) -->
+                        <TextBlock Text="Home"
+                                   FontFamily="Corbel"
+                                   FontSize="11"
+                                   FontWeight="Bold"
+                                   Foreground="Black"
+                                   HorizontalAlignment="Center"
+                                   Margin="0,10,0,0"/>
+
+                        <!-- Views (label1 y=78) -->
+                        <TextBlock Text="Views"
+                                   Style="{StaticResource GrayCaption}"
+                                   Margin="0,5,0,0"/>
+
+                        <!-- line (guna2Shapes1 y=85) -->
+                        <Separator Style="{StaticResource ThinLine}"
+                                   Margin="5,6,5,5"/>
+                    </StackPanel>
+
+                    <!-- NAV кнопки: Employee/Shop/Availability/Container -->
+                    <StackPanel Grid.Row="1" Margin="0,6,0,0">
+
+                        <!-- Employee: btn at y=110, label y=152 -->
+                        <StackPanel Margin="0,0,0,20">
+                            <Button Style="{StaticResource IconButton39}"
+                                    Command="{Binding ShowEmployeeCommand}"
+                                    IsEnabled="{Binding IsEmployeeEnabled}">
+
+                                <Viewbox Width="18"
+                                     Height="18"
+                                     Stretch="Uniform"
+                                     RenderTransformOrigin="0.5,0.5">
+                                    <Viewbox.RenderTransform>
+                                        <ScaleTransform ScaleY="-1"/>
+                                    </Viewbox.RenderTransform>
+
+                                    <Grid>
+                                        <Path Fill="Black"
+                                            Data="M2380 4775 c-421 -94 -710 -470 -687 -895 15 -285 157 -530 400 -688 163 -106 372 -156 560 -132 433 54 751 390 774 820 15 288 -116 569 -346 739 -77 58 -206 121 -296 146 -84 24 -319 29 -405 10z"/>
+
+                                        <Path Fill="Black"
+                                            Data="M661 4135 c-80 -23 -129 -47 -196 -98 -260 -197 -287 -585 -55 -817 109 -109 238 -163 390 -163 257 0 476 173 535 426 62 264 -92 546 -350 638 -79 28 -247 35 -324 14z"/>
+
+                                        <Path Fill="Black"
+                                            Data="M4181 4135 c-80 -23 -129 -47 -196 -98 -260 -197 -287 -585 -55 -817 109 -109 238 -163 390 -163 257 0 476 173 535 426 62 264 -92 546 -350 638 -79 28 -247 35 -324 14z"/>
+
+                                        <Path Fill="Black"
+                                            Data="M2345 2714 c-297 -43 -470 -108 -655 -248 -203 -153 -337 -336 -410 -563 -69 -213 -86 -444 -74 -953 l9 -355 28 -57 c37 -75 98 -134 177 -172 l65 -31 1025 0 c1084 0 1116 1 1221 46 59 26 112 83 148 158 l26 56 3 491 c3 537 -2 610 -54 774 -132 421 -503 760 -914 836 -73 14 -531 27 -595 18z"/>
+
+                                        <Path Fill="Black"
+                                            Data="M515 2694 c-218 -53 -409 -231 -481 -450 l-29 -89 0 -645 0 -645 23 -42 c35 -66 79 -110 140 -140 l57 -28 319 -3 c175 -2 329 -1 342 2 l24 6 -2 428 c-2 444 5 556 42 739 54 258 178 503 348 685 l45 48 -24 20 c-44 37 -183 100 -254 115 -96 20 -465 19 -550 -1z"/>
+
+                                        <Path Fill="Black"
+                                            Data="M4051 2694 c-75 -16 -192 -69 -238 -108 l-33 -28 60 -66 c170 -191 278 -407 330 -661 35 -174 42 -302 41 -743 l-1 -428 24 -6 c13 -3 165 -4 337 -2 296 3 317 4 360 24 64 30 125 88 157 148 l27 51 0 640 0 640 -29 89 c-73 221 -265 399 -486 451 -87 20 -456 20 -549 -1z"/>
+                                    </Grid>
+                                </Viewbox>
+
+                            </Button>
+                            <TextBlock Text="Employee" Style="{StaticResource NavLabel}"/>
+                        </StackPanel>
+
+                        <!-- Shop -->
+                        <StackPanel Margin="0,0,0,20">
+                            <Button Style="{StaticResource IconButton39}"
+                                    Command="{Binding ShowShopCommand}"
+                                    IsEnabled="{Binding IsShopEnabled}">
+
+                                <Viewbox Width="18"
+                                     Height="18"
+                                     Stretch="Uniform"
+                                     RenderTransformOrigin="0.5,0.5">
+                                    <Viewbox.RenderTransform>
+                                        <ScaleTransform ScaleY="-1"/>
+                                    </Viewbox.RenderTransform>
+
+                                    <Grid>
+                                        <Path Fill="Black"
+                                            Data="M1395 4469 c-159 -21 -275 -68 -352 -145 -66 -67 -113 -177 -263 -624 -128 -377 -133 -398 -138 -492 -6 -121 14 -211 69 -318 74 -143 191 -244 344 -297 71 -24 94 -27 210 -27 112 0 140 4 207 26 161 53 289 151 378 286 27 42 50 82 50 89 0 27 17 11 42 -39 80 -159 249 -292 438 -344 89 -25 271 -25 360 0 191 52 367 193 446 359 18 37 34 49 34 24 0 -7 23 -47 50 -89 88 -134 219 -233 375 -285 70 -23 96 -27 210 -27 114 0 140 3 212 27 151 50 266 150 343 297 71 138 89 293 51 441 -31 118 -269 808 -304 878 -76 155 -206 231 -447 261 -105 12 -2213 12 -2315 -1z" Margin="-467,0,467,0"/>
+
+                                        <Path Fill="Black"
+                                            Data="M1870 2434 c-163 -117 -406 -194 -611 -194 -101 0 -230 23 -329 59 l-80 30 0 -603 c0 -506 2 -611 15 -661 50 -197 213 -362 401 -409 77 -20 107 -21 502 -18 317 2 333 3 352 22 19 19 20 34 20 398 0 217 5 396 11 421 34 150 157 278 301 317 203 54 407 -46 501 -244 l32 -67 5 -402 c5 -386 6 -403 25 -422 19 -19 35 -20 400 -21 420 -1 442 1 559 62 83 44 192 155 233 238 63 127 63 123 63 786 l0 603 -81 -30 c-288 -105 -626 -63 -898 111 -45 29 -84 50 -88 48 -5 -1 -41 -25 -82 -52 -143 -94 -325 -153 -507 -163 -224 -12 -451 52 -643 181 -29 20 -56 36 -60 36 -3 -1 -22 -12 -41 -26z" Margin="-436,0,436,0"/>
+                                    </Grid>
+                                </Viewbox>
+
+                            </Button>
+                            <TextBlock Text="Shop" Style="{StaticResource NavLabel}"/>
+                        </StackPanel>
+
+                        <!-- Availability -->
+                        <StackPanel Margin="0,0,0,20">
+                            <Button Style="{StaticResource IconButton39}"
+                                    Command="{Binding ShowAvailabilityCommand}"
+                                    IsEnabled="{Binding IsAvailabilityEnabled}">
+
+                                <Viewbox Width="18" Height="18">
+                                    <Viewbox.RenderTransform>
+                                        <ScaleTransform ScaleY="-1"/>
+                                    </Viewbox.RenderTransform>
+                                    <Viewbox.RenderTransformOrigin>0.5,0.5</Viewbox.RenderTransformOrigin>
+                                    <Path Fill="Black"
+                                    Data="M2375 4899 c-782 -64 -1478 -510 -1864 -1196 -324 -576 -385 -1281 -167 -1912 116 -334 288 -611 540 -869 705 -723 1792 -913 2701 -472 491 239 898 659 1115 1150 358 809 242 1724 -306 2422 -129 164 -385 396 -564 510 -199 127 -446 236 -665 293 -166 44 -277 62 -445 75 -150 11 -199 11 -345 -1z m299 -879 c20 -14 49 -43 64 -64 l27 -39 3 -631 2 -630 309 -311 c337 -338 337 -339 329 -445 -5 -68 -33 -116 -92 -158 -35 -24 -49 -27 -116 -27 -67 0 -82 3 -116 27 -22 15 -191 180 -376 365 -278 279 -338 345 -347 378 -9 29 -11 231 -9 737 l3 696 30 43 c45 64 104 91 186 87 50 -3 75 -10 103 -28z"/>
+                                </Viewbox>
+
+                            </Button>
+                            <TextBlock Text="Availability" Style="{StaticResource NavLabel}"/>
+                        </StackPanel>
+
+                        <!-- Container -->
+                        <StackPanel Margin="0,0,0,20">
+                            <Button Style="{StaticResource IconButton39}"
+                                    Command="{Binding ShowContainerCommand}"
+                                    IsEnabled="{Binding IsContainerEnabled}">
+                                
+                                <Viewbox Width="18"
+                                     Height="18"
+                                     Stretch="Uniform"
+                                     RenderTransformOrigin="0.5,0.5">
+                                    <Viewbox.RenderTransform>
+                                        <ScaleTransform ScaleY="-1"/>
+                                    </Viewbox.RenderTransform>
+                                    <Grid>
+                                        <Path Fill="Black"
+                                            Data="M1283 4612 c-700 -262 -1273 -479 -1273 -482 0 -3 574 -220 1275 -482 l1275 -478 477 179 478 179 -55 25 c-30 13 -245 102 -478 198 -398 163 -422 175 -395 186 15 6 160 67 321 136 l293 125 478 -214 479 -215 476 178 c262 98 476 180 476 183 0 4 -2503 944 -2545 956 -5 2 -583 -212 -1282 -474z"/>
+                                        <Path Fill="Black"
+                                            Data="M2 2369 l3 -1441 1195 -448 1195 -448 3 1436 c1 790 -1 1439 -5 1442 -5 4 -516 197 -1138 430 -621 233 -1158 434 -1193 446 l-62 24 2 -1441z m958 -988 l315 -118 3 -171 c1 -95 1 -172 0 -172 -2 0 -145 53 -318 119 l-315 118 -3 171 c-1 95 -1 172 0 172 2 0 145 -53 318 -119z"/>
+                                        <Path Fill="Black"
+                                            Data="M4640 3630 l-475 -178 -5 -403 -5 -402 -315 -118 c-173 -66 -316 -119 -317 -119 -2 0 -4 180 -5 399 l-3 399 -395 -148 -395 -148 -3 -1441 -2 -1441 62 24 c35 12 572 213 1193 446 622 233 1133 426 1138 430 4 3 6 652 5 1442 l-3 1436 -475 -178z"/>
+                                    </Grid>
+                                </Viewbox>
+
+
+
+                            </Button>
+                            <TextBlock Text="Container" Style="{StaticResource NavLabel}"/>
+                        </StackPanel>
+
+                    </StackPanel>
+
+                    <!-- spacer -->
+                    <Grid Grid.Row="2"/>
+
+                    <!-- BOTTOM: Settings line + Database + Resize + Power Off -->
+                    <StackPanel Grid.Row="3" Margin="0,0,0,10">
+
+                        <!-- Settings label8 y=447 + line y=455 -->
+                        <TextBlock Text="Settings"
+                                   Style="{StaticResource GrayCaption}"
+                                   HorizontalAlignment="Center"
+                                   Margin="0,0,0,0"/>
+                        <Separator Style="{StaticResource ThinLine}"
+                                   Margin="5,6,5,10"/>
+
+                        <!-- DataBase (label9 + button2) -->
+                        <TextBlock Text="DataBase" Style="{StaticResource NavLabel}" Margin="0,0,0,4"/>
+                        <Button Style="{StaticResource IconButton39}" Margin="0,0,0,12">
+
+                            <Viewbox Width="18"
+                                     Height="18"
+                                     Stretch="Uniform"
+                                     RenderTransformOrigin="0.5,0.5">
+                                <Viewbox.RenderTransform>
+                                    <ScaleTransform ScaleY="-1"/>
+                                </Viewbox.RenderTransform>
+                                <Grid>
+                                    <Path Fill="Black"
+                                            Data="M2895 5114 c-451 -33 -731 -79 -1001 -165 -246 -79 -402 -159 -515 -267 -144 -136 -189 -273 -138 -424 106 -317 637 -540 1474 -620 174 -17 732 -16 910 0 462 44 854 137 1110 264 295 147 436 370 365 577 -27 82 -62 132 -144 209 -213 199 -670 346 -1266 407 -145 15 -676 28 -795 19z"/>
+                                    <Path Fill="Black"
+                                            Data="M1220 3442 l0 -347 193 -1 c167 0 208 -4 318 -27 451 -95 839 -355 1082 -727 31 -47 63 -94 70 -105 14 -19 26 -20 313 -19 384 0 669 27 964 90 502 107 817 278 923 501 l32 68 3 457 3 458 -83 -57 c-800 -547 -2913 -549 -3728 -4 l-90 60 0 -347z"/>
+                                    <Path Fill="Black"
+                                            Data="M1230 2790 c-315 -44 -571 -167 -792 -379 -217 -208 -344 -434 -409 -732 -34 -150 -34 -408 0 -558 65 -298 192 -525 408 -731 196 -188 415 -303 686 -362 146 -31 408 -31 554 0 294 64 527 193 733 409 188 196 303 415 362 686 18 83 22 135 22 277 0 142 -4 194 -22 277 -64 294 -193 526 -410 734 -194 187 -415 303 -680 359 -111 24 -350 34 -452 20z m283 -676 c241 -53 442 -234 531 -478 6 -18 9 -17 39 11 44 42 69 53 120 53 104 0 174 -108 133 -203 -8 -18 -90 -108 -183 -200 -248 -247 -239 -247 -495 10 -183 184 -195 203 -185 270 12 74 70 123 147 123 l45 1 -35 31 c-127 111 -337 129 -487 41 -64 -37 -148 -134 -174 -200 -19 -47 -23 -77 -24 -163 0 -98 2 -110 32 -172 56 -118 115 -169 286 -242 49 -21 61 -32 77 -68 25 -55 25 -89 -1 -139 -25 -50 -92 -84 -148 -76 -95 12 -242 92 -333 180 -142 139 -218 317 -218 518 0 333 217 614 541 698 92 25 234 27 332 5z"/>
+                                    <Path Fill="Black"
+                                            Data="M5045 2328 c-355 -252 -1096 -418 -1861 -418 l-160 0 23 -92 c30 -119 53 -296 53 -409 0 -174 -34 -389 -85 -540 l-25 -72 273 6 c547 13 946 77 1302 209 274 101 443 227 518 385 l32 68 3 355 c2 195 2 400 0 456 l-3 101 -70 -49z"/>
+                                </Grid>
+                            </Viewbox>
+                        </Button>
+
+                        <!-- Resize (label7 + btnProgramMinimalize) -->
+                        <TextBlock Text="Resize" Style="{StaticResource NavLabel}" Margin="0,0,0,4"/>
+                        <Button Style="{StaticResource IconButton39}"
+                                Command="{Binding MinimizeCommand}"
+                                Margin="0,0,0,12">
+                            <Viewbox Width="18"
+                                     Height="18"
+                                     Stretch="Uniform"
+                                     RenderTransformOrigin="0.5,0.5">
+                                <Viewbox.RenderTransform>
+                                    <ScaleTransform ScaleY="-1"/>
+                                </Viewbox.RenderTransform>
+                                <Grid>
+                                    <Path Fill="Black"
+                                            Data="M827 5104 c-258 -47 -505 -204 -646 -413 -63 -92 -127 -233 -153 -337 l-23 -89 0 -1705 0 -1705 23 -89 c24 -97 90 -245 143 -323 134 -198 358 -355 594 -415 l90 -23 1700 0 c1619 0 1704 1 1780 19 399 92 701 411 770 814 13 77 15 301 12 1763 l-2 1674 -23 85 c-27 100 -93 243 -153 331 -127 188 -344 337 -584 402 l-80 22 -1685 1 c-1414 2 -1697 0 -1763 -12z m1471 -1059 c75 -32 114 -90 116 -170 1 -68 -36 -131 -96 -165 -43 -25 -46 -25 -327 -28 l-284 -4 984 -984 c541 -541 987 -984 991 -984 5 0 8 129 8 286 0 278 1 287 22 326 59 105 214 124 295 36 53 -56 53 -57 53 -615 0 -311 -4 -532 -10 -552 -13 -46 -75 -109 -120 -121 -21 -6 -245 -10 -555 -10 -486 0 -523 2 -561 19 -60 27 -96 80 -102 146 -6 71 2 97 40 140 56 65 57 65 373 65 157 0 285 3 285 7 0 10 -1963 1973 -1972 1973 -5 0 -8 -128 -8 -285 0 -265 -1 -289 -20 -325 -68 -134 -268 -126 -331 15 -17 37 -19 77 -19 560 0 310 4 534 10 555 12 42 75 107 116 120 16 4 264 9 552 9 450 1 528 -1 560 -14z"/>
+                                </Grid>
+                            </Viewbox>
+                        </Button>
+
+                        <!-- Power Off (label6 + btnCloseProgram) -->
+                        <TextBlock Text="Power Off" Style="{StaticResource NavLabel}" Margin="0,0,0,4"/>
+                        <Button Style="{StaticResource IconButton39}"
+                                Command="{Binding CloseCommand}">
+                            <Viewbox Width="18"
+                                     Height="18"
+                                     Stretch="Uniform"
+                                     RenderTransformOrigin="0.5,0.5">
+                                <Viewbox.RenderTransform>
+                                    <ScaleTransform ScaleY="-1"/>
+                                </Viewbox.RenderTransform>
+                                <Grid>
+                                    <Path Fill="Black"
+                                            Data="M2370 5113 c-371 -35 -653 -114 -961 -269 -245 -122 -444 -268 -655 -478 -224 -225 -366 -423 -500 -701 -158 -326 -237 -650 -251 -1020 -15 -426 73 -832 263 -1214 133 -269 271 -459 488 -677 221 -220 412 -357 681 -489 188 -92 309 -137 500 -185 500 -126 1002 -102 1490 71 149 53 407 182 540 271 299 199 573 480 769 788 72 113 188 353 235 486 235 662 194 1372 -115 1993 -124 250 -263 447 -458 648 -216 224 -428 378 -711 518 -296 146 -572 225 -900 255 -102 9 -333 11 -415 3z m274 -1055 c55 -16 138 -99 154 -154 17 -58 17 -1359 0 -1415 -15 -51 -69 -114 -122 -141 -58 -31 -155 -31 -215 1 -54 28 -88 64 -112 116 -17 38 -19 81 -19 731 l0 690 26 52 c53 107 169 155 288 120z m-974 -288 c82 -43 134 -125 133 -215 0 -79 -18 -118 -93 -201 -162 -179 -262 -378 -301 -604 -17 -97 -17 -294 0 -390 121 -686 811 -1116 1481 -923 310 89 582 324 725 626 193 407 128 904 -161 1238 -104 120 -122 147 -133 200 -24 113 37 230 144 275 58 24 142 22 199 -5 133 -65 370 -416 460 -681 67 -200 80 -288 80 -535 0 -243 -12 -329 -75 -517 -269 -801 -1096 -1275 -1916 -1097 -606 131 -1099 603 -1252 1200 -43 167 -55 284 -48 477 11 322 98 593 275 858 74 110 198 254 245 283 70 43 165 48 237 11z"/>
+                                </Grid>
+                            </Viewbox>                        </Button>
+
+                    </StackPanel>
+
+                </Grid>
+            </Border>
+        </Border>
+
+        <!-- CONTENT HOST (як PanelContentMain AutoScroll = true) -->
+        <Grid Grid.Column="1" Background="White">
+            <ScrollViewer VerticalScrollBarVisibility="Auto"
+                          HorizontalScrollBarVisibility="Disabled">
+                <ContentControl Content="{Binding CurrentViewModel}"/>
+            </ScrollViewer>
+        </Grid>
+
+    </Grid>
+</Window>
