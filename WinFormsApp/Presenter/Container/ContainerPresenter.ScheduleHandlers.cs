@@ -1,10 +1,10 @@
-﻿using DataAccessLayer.Models;
+﻿using BusinessLogicLayer.Availability;
+using DataAccessLayer.Models;
 using DataAccessLayer.Models.Enums;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
-using WinFormsApp.Presenter.Availability;
 using WinFormsApp.ViewModel;
 
 namespace WinFormsApp.Presenter.Container

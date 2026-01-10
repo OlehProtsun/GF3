@@ -325,6 +325,7 @@
                             ClipToBounds="True">
                         <DataGrid x:Name="dataGridAvailabilityMonthProfile"
                                   Style="{StaticResource AvailabilityListGridStyle}"
+                                  AutoGenerateColumns="False"
                                   ItemsSource="{Binding ProfileAvailabilityMonths}"
                                   SelectedItem="{Binding SelectedProfileMonth}"/>
                     </Border>

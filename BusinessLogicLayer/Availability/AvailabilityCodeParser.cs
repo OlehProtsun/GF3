@@ -1,12 +1,9 @@
 ﻿using DataAccessLayer.Models.Enums;
-using System;
-using System.Collections.Generic;
 using System.Globalization;
-using System.Text;
 
-namespace WinFormsApp.Presenter.Availability
+namespace BusinessLogicLayer.Availability
 {
-    internal static class AvailabilityCodeParser
+    public static class AvailabilityCodeParser
     {
         public static bool TryParse(string code, out AvailabilityKind kind, out string? intervalStr)
         {

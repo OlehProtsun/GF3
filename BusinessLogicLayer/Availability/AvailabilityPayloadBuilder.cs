@@ -1,11 +1,8 @@
 ﻿using DataAccessLayer.Models;
-using System;
-using System.Collections.Generic;
-using System.Text;
 
-namespace WinFormsApp.Presenter.Availability
+namespace BusinessLogicLayer.Availability
 {
-    internal static class AvailabilityPayloadBuilder
+    public static class AvailabilityPayloadBuilder
     {
         public static bool TryBuild(
             IEnumerable<(int employeeId, IList<(int day, string code)> codes)> raw,

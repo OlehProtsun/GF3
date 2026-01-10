@@ -1,9 +1,6 @@
 ﻿using DataAccessLayer.Models;
-using System;
-using System.Collections.Generic;
-using System.Text;
 
-namespace WinFormsApp.Presenter.Availability
+namespace BusinessLogicLayer.Availability
 {
     public static class AvailabilityGroupValidator
     {
