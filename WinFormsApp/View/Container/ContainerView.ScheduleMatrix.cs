@@ -109,6 +109,11 @@ namespace WinFormsApp.View.Container
                 grid.ResumeLayout();
             }
 
+            if (block != null)
+            {
+                BeginInvoke(new Action(() => AutoSizeScheduleBlock(block)));
+            }
+
             return table;
 
         }

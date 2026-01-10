@@ -11,6 +11,10 @@ namespace WinFormsApp.View.Container
 {
     public partial class ContainerView
     {
+        private bool _scheduleBlockMetricsInit;
+        private int _minScheduleGroupW, _minScheduleGroupH, _scheduleSidePad, _scheduleBottomPad;
+        private int _minAvailGroupW, _minAvailGroupH, _availSidePad, _availBottomPad;
+
         public void InitializeScheduleBlocks()
         {
             _scheduleBlocksInitialized = true;
@@ -139,9 +143,8 @@ namespace WinFormsApp.View.Container
             var hideShowButton = CloneHeaderButton(btnHideShowScheduleTable);
             var closeButton = CloneHeaderButton(btnCloseScheduleTable);
 
-            var selectButton = CloneHeaderButton(btnHideShowScheduleTable);
-            selectButton.Text = "Select";
-            selectButton.Image = null;
+            // стало (як в дизайнері)
+            var selectButton = CloneHeaderButton(guna2Button27);
 
             scheduleGroup.Controls.Add(slotGridControl);
             scheduleGroup.Controls.Add(hideShowButton);
@@ -217,11 +220,19 @@ namespace WinFormsApp.View.Container
                     if (!_scheduleBlocks.TryGetValue(id, out var block))
                         continue;
 
+                    // ✅ завжди беремо актуальні розміри
+                    block.ExpandedWidth = block.ScheduleGroupBox.Width;
+
+                    var expandedHeight =
+                        block.ScheduleGroupBox.Height +
+                        (block.AvailabilityGroupBox.Visible ? block.AvailabilityGroupBox.Height + ScheduleBlockGap : 0);
+
                     block.HostPanel.Location = new Point(x, ScheduleBlockStartY);
                     block.HostPanel.Width = block.IsCollapsed ? block.CollapsedWidth : block.ExpandedWidth;
-                    block.HostPanel.Height = block.IsCollapsed
-                        ? block.ScheduleGroupBox.Height
-                        : block.ExpandedHeight;
+                    block.HostPanel.Height = block.IsCollapsed ? block.ScheduleGroupBox.Height : expandedHeight;
+
+                    // availability завжди під schedule
+                    block.AvailabilityGroupBox.Location = new Point(0, block.ScheduleGroupBox.Bottom + ScheduleBlockGap);
 
                     x += block.HostPanel.Width + ScheduleBlockGap;
                     maxHeight = Math.Max(maxHeight, block.HostPanel.Bottom);
@@ -382,37 +393,52 @@ namespace WinFormsApp.View.Container
 
         private Guna2Button CloneHeaderButton(Guna2Button source)
         {
-            return new Guna2Button
+            var btn = new Guna2Button
             {
+                Anchor = source.Anchor,
                 Animated = source.Animated,
                 AutoRoundedCorners = source.AutoRoundedCorners,
+                BackColor = source.BackColor,
                 BorderColor = source.BorderColor,
                 BorderRadius = source.BorderRadius,
+                BorderThickness = source.BorderThickness,
+                Cursor = source.Cursor,
+                CustomizableEdges = source.CustomizableEdges,
+
                 FillColor = source.FillColor,
+                FocusedColor = source.FocusedColor,
                 Font = source.Font,
                 ForeColor = source.ForeColor,
+
                 Image = source.Image,
+                ImageAlign = source.ImageAlign,
+                ImageOffset = source.ImageOffset,
                 ImageSize = source.ImageSize,
-                Size = source.Size,
+
+                Text = source.Text,
+                TextAlign = source.TextAlign,
+                TextOffset = source.TextOffset,
+
                 Location = source.Location,
-                Anchor = source.Anchor,
-                ShadowDecoration =
-                {
-                    BorderRadius = source.ShadowDecoration.BorderRadius,
-                    Depth = source.ShadowDecoration.Depth,
-                    Enabled = source.ShadowDecoration.Enabled,
-                    Shadow = source.ShadowDecoration.Shadow
-                },
-                DisabledState =
-                {
-                    BorderColor = source.DisabledState.BorderColor,
-                    CustomBorderColor = source.DisabledState.CustomBorderColor,
-                    FillColor = source.DisabledState.FillColor,
-                    ForeColor = source.DisabledState.ForeColor
-                },
-                Text = source.Text
+                Size = source.Size,
+                Name = $"{source.Name}_{Guid.NewGuid():N}",
+                UseTransparentBackground = source.UseTransparentBackground,
             };
+
+            btn.DisabledState.BorderColor = source.DisabledState.BorderColor;
+            btn.DisabledState.CustomBorderColor = source.DisabledState.CustomBorderColor;
+            btn.DisabledState.FillColor = source.DisabledState.FillColor;
+            btn.DisabledState.ForeColor = source.DisabledState.ForeColor;
+
+            btn.ShadowDecoration.BorderRadius = source.ShadowDecoration.BorderRadius;
+            btn.ShadowDecoration.Depth = source.ShadowDecoration.Depth;
+            btn.ShadowDecoration.Enabled = source.ShadowDecoration.Enabled;
+            btn.ShadowDecoration.Shadow = source.ShadowDecoration.Shadow;
+            btn.ShadowDecoration.CustomizableEdges = source.ShadowDecoration.CustomizableEdges;
+
+            return btn;
         }
+
 
         private Guna2Button CloneTitleButton()
         {
@@ -467,5 +493,91 @@ namespace WinFormsApp.View.Container
                 right -= 5;
             }
         }
+
+        private void EnsureScheduleBlockMetrics()
+        {
+            if (_scheduleBlockMetricsInit) return;
+            _scheduleBlockMetricsInit = true;
+
+            // ✅ мінімум — як у дизайнері
+            _minScheduleGroupW = guna2GroupBox11.Width;
+            _minScheduleGroupH = guna2GroupBox11.Height;
+            _scheduleSidePad = guna2GroupBox11.Width - slotGrid.Width;
+            _scheduleBottomPad = guna2GroupBox11.Height - slotGrid.Bottom;
+
+            _minAvailGroupW = guna2GroupBox15.Width;
+            _minAvailGroupH = guna2GroupBox15.Height;
+            _availSidePad = guna2GroupBox15.Width - dataGridAvailabilityOnScheduleEdit.Width;
+            _availBottomPad = guna2GroupBox15.Height - dataGridAvailabilityOnScheduleEdit.Bottom;
+        }
+
+        private static int CalcGridContentWidth(DataGridView grid)
+        {
+            int w = 0;
+
+            // всі видимі колонки
+            foreach (DataGridViewColumn c in grid.Columns)
+                if (c.Visible) w += c.Width;
+
+            if (grid.RowHeadersVisible)
+                w += grid.RowHeadersWidth;
+
+            // якщо є вертикальний скрол — він “з’їдає” частину ширини клієнт-області
+            var vScroll = grid.Controls.OfType<VScrollBar>().FirstOrDefault();
+            if (vScroll?.Visible == true)
+                w += SystemInformation.VerticalScrollBarWidth;
+
+            return w;
+        }
+
+        private static int CalcGridContentHeight(DataGridView grid)
+        {
+            int h = (grid.ColumnHeadersVisible ? grid.ColumnHeadersHeight : 0);
+
+            // висота всіх видимих рядків
+            h += grid.Rows.GetRowsHeight(DataGridViewElementStates.Visible);
+
+            // якщо є горизонтальний скрол — він “з’їдає” частину висоти
+            var hScroll = grid.Controls.OfType<HScrollBar>().FirstOrDefault();
+            if (hScroll?.Visible == true)
+                h += SystemInformation.HorizontalScrollBarHeight;
+
+            return h;
+        }
+
+        private void AutoSizeScheduleBlock(ScheduleBlockUi block)
+        {
+            if (block == null || IsDisposed) return;
+            if (InvokeRequired) { BeginInvoke(new Action(() => AutoSizeScheduleBlock(block))); return; }
+
+            EnsureScheduleBlockMetrics();
+
+            // --- Schedule group ---
+            var scheduleGridW = CalcGridContentWidth(block.SlotGrid);
+            var scheduleGridH = CalcGridContentHeight(block.SlotGrid);
+
+            var newScheduleW = Math.Max(_minScheduleGroupW, scheduleGridW + _scheduleSidePad);
+            var newScheduleH = Math.Max(_minScheduleGroupH, block.SlotGrid.Top + scheduleGridH + _scheduleBottomPad);
+
+            block.ScheduleGroupBox.Width = newScheduleW;
+            block.ScheduleGroupBox.Height = newScheduleH;
+
+            // --- Availability group ---
+            var availGridW = CalcGridContentWidth(block.AvailabilityGrid);
+            var availGridH = CalcGridContentHeight(block.AvailabilityGrid);
+
+            var newAvailW = Math.Max(_minAvailGroupW, availGridW + _availSidePad);
+            var newAvailH = Math.Max(_minAvailGroupH, block.AvailabilityGrid.Top + availGridH + _availBottomPad);
+
+            block.AvailabilityGroupBox.Width = Math.Max(newScheduleW, newAvailW); // ✅ щоб обидві карти мали однакову ширину
+            block.AvailabilityGroupBox.Height = newAvailH;
+
+            // ✅ хедер-кнопки треба перепозиціонувати після зміни ширини
+            PositionHeaderButtons(block.ScheduleGroupBox, block.HideShowButton, block.CloseButton, block.SelectButton);
+
+            LayoutScheduleBlocks();
+        }
+
+
     }
 }

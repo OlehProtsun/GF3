@@ -196,6 +196,7 @@
 		<EmbeddedResource Remove="View\Employee\EmployeeView.*.resx" />
 		<EmbeddedResource Remove="View\Container\ContainerView.Busy.resx" />
 		<EmbeddedResource Remove="View\Container\ContainerView.UiToggles.resx" />
+		<EmbeddedResource Remove="View\Container\ContainerView.ScheduleBlocks.resx" />
 
 	</ItemGroup>
 
@@ -237,6 +238,10 @@
 		</Compile>
 
 		<Compile Update="View\Container\ContainerView.UiToggles.cs">
+			<DependentUpon>ContainerView.cs</DependentUpon>
+		</Compile>
+
+		<Compile Update="View\Container\ContainerView.ScheduleBlocks.cs">
 			<DependentUpon>ContainerView.cs</DependentUpon>
 		</Compile>
 	</ItemGroup>

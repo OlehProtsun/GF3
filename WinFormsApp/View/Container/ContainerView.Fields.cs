@@ -92,8 +92,9 @@ namespace WinFormsApp.View.Container
         private Guid? _selectedScheduleBlockId;
         private bool _scheduleBlocksInitialized;
         private const int ScheduleBlockGap = 18;
-        private const int ScheduleBlockStartX = 10;
-        private const int ScheduleBlockStartY = 10;
+        // стартуємо там, де стоїть шаблон у Designer (щоб не “заїжджало” під ліві панелі)
+        private int ScheduleBlockStartX => guna2GroupBox11.Left; // 432 у дизайнера
+        private int ScheduleBlockStartY => guna2GroupBox11.Top;  // 120 у дизайнера
         private readonly Color _scheduleBlockHighlightColor = Color.FromArgb(51, 71, 255);
 
     }
