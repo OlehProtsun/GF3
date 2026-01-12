@@ -8,7 +8,11 @@ using BusinessLogicLayer;
 using DataAccessLayer.Models.DataBaseContext;
 using WPFApp.View;
 using WPFApp.View.Availability;
+using WPFApp.View.Employee;
+using WPFApp.View.Shop;
 using WPFApp.ViewModel.Availability;
+using WPFApp.ViewModel.Employee;
+using WPFApp.ViewModel.Shop;
 
 namespace WPFApp
 {
@@ -39,16 +43,16 @@ namespace WPFApp
 
             // 2) Реєстрація ViewModels
             services.AddSingleton<WPFApp.ViewModel.MainViewModel>();
-            services.AddTransient<WPFApp.ViewModel.EmployeeViewModel>();
+            services.AddTransient<EmployeeViewModel>();
             services.AddTransient<AvailabilityViewModel>();
-            services.AddTransient<WPFApp.ViewModel.ShopViewModel>();
+            services.AddTransient<ShopViewModel>();
             services.AddTransient<WPFApp.ViewModel.ContainerViewModel>();
 
             // 3) Реєстрація Views (Windows/UserControls)
             services.AddSingleton<MainWindow>();
 
             // Якщо робиш навігацію через UserControl-и:
-            services.AddTransient<View.EmployeeView>();
+            services.AddTransient<EmployeeView>();
             services.AddTransient<AvailabilityView>();
             services.AddTransient<ShopView>();
             services.AddTransient<ContainerView>();

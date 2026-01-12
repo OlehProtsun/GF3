@@ -2,14 +2,18 @@
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
                     xmlns:vm="clr-namespace:WPFApp.ViewModel"
                     xmlns:avm="clr-namespace:WPFApp.ViewModel.Availability"
+                    xmlns:evm="clr-namespace:WPFApp.ViewModel.Employee"
+                    xmlns:svm="clr-namespace:WPFApp.ViewModel.Shop"
                     xmlns:v="clr-namespace:WPFApp.View"
-                    xmlns:av="clr-namespace:WPFApp.View.Availability">
-    <DataTemplate DataType="{x:Type vm:EmployeeViewModel}">
-        <v:EmployeeView />
+                    xmlns:av="clr-namespace:WPFApp.View.Availability"
+                    xmlns:ev="clr-namespace:WPFApp.View.Employee"
+                    xmlns:sv="clr-namespace:WPFApp.View.Shop">
+    <DataTemplate DataType="{x:Type evm:EmployeeViewModel}">
+        <ev:EmployeeView />
     </DataTemplate>
 
-    <DataTemplate DataType="{x:Type vm:ShopViewModel}">
-        <v:ShopView />
+    <DataTemplate DataType="{x:Type svm:ShopViewModel}">
+        <sv:ShopView />
     </DataTemplate>
 
     <DataTemplate DataType="{x:Type avm:AvailabilityViewModel}">
@@ -18,6 +22,30 @@
 
     <DataTemplate DataType="{x:Type vm:ContainerViewModel}">
         <v:ContainerView />
+    </DataTemplate>
+
+    <DataTemplate DataType="{x:Type evm:EmployeeListViewModel}">
+        <ev:EmployeeListView />
+    </DataTemplate>
+
+    <DataTemplate DataType="{x:Type evm:EmployeeEditViewModel}">
+        <ev:EmployeeEditView />
+    </DataTemplate>
+
+    <DataTemplate DataType="{x:Type evm:EmployeeProfileViewModel}">
+        <ev:EmployeeProfileView />
+    </DataTemplate>
+
+    <DataTemplate DataType="{x:Type svm:ShopListViewModel}">
+        <sv:ShopListView />
+    </DataTemplate>
+
+    <DataTemplate DataType="{x:Type svm:ShopEditViewModel}">
+        <sv:ShopEditView />
+    </DataTemplate>
+
+    <DataTemplate DataType="{x:Type svm:ShopProfileViewModel}">
+        <sv:ShopProfileView />
     </DataTemplate>
 
     <DataTemplate DataType="{x:Type avm:AvailabilityListViewModel}">
