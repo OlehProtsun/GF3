@@ -3,25 +3,12 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
-             xmlns:local="clr-namespace:WPFApp.View.Availability"
-             xmlns:avm="clr-namespace:WPFApp.ViewModel.Availability"
              mc:Ignorable="d" 
              d:DesignHeight="450" d:DesignWidth="800">
-    <UserControl.Resources>
-        <DataTemplate DataType="{x:Type avm:AvailabilityListViewModel}">
-            <local:AvailabilityListView/>
-        </DataTemplate>
-        <DataTemplate DataType="{x:Type avm:AvailabilityEditViewModel}">
-            <local:AvailabilityEditView/>
-        </DataTemplate>
-        <DataTemplate DataType="{x:Type avm:AvailabilityProfileViewModel}">
-            <local:AvailabilityProfileView/>
-        </DataTemplate>
-    </UserControl.Resources>
     <Grid>
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
         </Grid.RowDefinitions>
         <ContentControl Grid.Row="1" Content="{Binding CurrentSection}" />
     </Grid>

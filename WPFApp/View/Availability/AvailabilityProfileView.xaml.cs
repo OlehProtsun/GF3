@@ -54,11 +54,7 @@ namespace WPFApp.View.Availability
             // як в Edit: перша колонка "заморожена"
             grid.FrozenColumnCount = 1;
 
-            // стиль відображення (центр) — як в Edit
-            var tbStyle = new Style(typeof(TextBlock));
-            tbStyle.Setters.Add(new Setter(TextBlock.TextAlignmentProperty, TextAlignment.Center));
-            tbStyle.Setters.Add(new Setter(FrameworkElement.VerticalAlignmentProperty, VerticalAlignment.Center));
-            tbStyle.Setters.Add(new Setter(FrameworkElement.HorizontalAlignmentProperty, HorizontalAlignment.Center));
+            var tbStyle = (Style)Application.Current.FindResource("MatrixCellTextBlockStyle");
 
             foreach (DataColumn column in table.Columns)
             {

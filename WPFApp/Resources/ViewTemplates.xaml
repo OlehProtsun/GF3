@@ -1,0 +1,34 @@
+﻿<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:vm="clr-namespace:WPFApp.ViewModel"
+                    xmlns:avm="clr-namespace:WPFApp.ViewModel.Availability"
+                    xmlns:v="clr-namespace:WPFApp.View"
+                    xmlns:av="clr-namespace:WPFApp.View.Availability">
+    <DataTemplate DataType="{x:Type vm:EmployeeViewModel}">
+        <v:EmployeeView />
+    </DataTemplate>
+
+    <DataTemplate DataType="{x:Type vm:ShopViewModel}">
+        <v:ShopView />
+    </DataTemplate>
+
+    <DataTemplate DataType="{x:Type avm:AvailabilityViewModel}">
+        <av:AvailabilityView />
+    </DataTemplate>
+
+    <DataTemplate DataType="{x:Type vm:ContainerViewModel}">
+        <v:ContainerView />
+    </DataTemplate>
+
+    <DataTemplate DataType="{x:Type avm:AvailabilityListViewModel}">
+        <av:AvailabilityListView />
+    </DataTemplate>
+
+    <DataTemplate DataType="{x:Type avm:AvailabilityEditViewModel}">
+        <av:AvailabilityEditView />
+    </DataTemplate>
+
+    <DataTemplate DataType="{x:Type avm:AvailabilityProfileViewModel}">
+        <av:AvailabilityProfileView />
+    </DataTemplate>
+</ResourceDictionary>

@@ -7,291 +7,51 @@
              mc:Ignorable="d"
              d:DesignHeight="830" d:DesignWidth="852"
              d:DataContext="{d:DesignInstance Type=dt:AvailabilityListViewDesignVM, IsDesignTimeCreatable=True}"
-             Background="#cfd0d1">
+             Background="{StaticResource PageBackgroundBrush}">
 
     <UserControl.Resources>
-
-        <Style x:Key="AnimatedButtonBaseStyle" TargetType="Button">
-            <Setter Property="Cursor" Value="Hand"/>
-            <Setter Property="BorderThickness" Value="0"/>
-            <Setter Property="RenderTransformOrigin" Value="0.5,0.5"/>
-            <Setter Property="RenderTransform">
-                <Setter.Value>
-                    <ScaleTransform ScaleX="1" ScaleY="1"/>
-                </Setter.Value>
-            </Setter>
-
-            <Style.Triggers>
-                <Trigger Property="IsMouseOver" Value="True">
-                    <Trigger.EnterActions>
-                        <BeginStoryboard>
-                            <Storyboard>
-                                <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)"
-                                         To="1.04" Duration="0:0:0.10"/>
-                                <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)"
-                                         To="1.04" Duration="0:0:0.10"/>
-                                <DoubleAnimation Storyboard.TargetProperty="Opacity"
-                                         To="0.96" Duration="0:0:0.10"/>
-                            </Storyboard>
-                        </BeginStoryboard>
-                    </Trigger.EnterActions>
-                    <Trigger.ExitActions>
-                        <BeginStoryboard>
-                            <Storyboard>
-                                <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)"
-                                         To="1" Duration="0:0:0.12"/>
-                                <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)"
-                                         To="1" Duration="0:0:0.12"/>
-                                <DoubleAnimation Storyboard.TargetProperty="Opacity"
-                                         To="1" Duration="0:0:0.12"/>
-                            </Storyboard>
-                        </BeginStoryboard>
-                    </Trigger.ExitActions>
-                </Trigger>
-
-                <Trigger Property="IsPressed" Value="True">
-                    <Setter Property="Opacity" Value="0.92"/>
-                    <Setter Property="RenderTransform">
-                        <Setter.Value>
-                            <ScaleTransform ScaleX="0.96" ScaleY="0.96"/>
-                        </Setter.Value>
-                    </Setter>
-                </Trigger>
-
-                <Trigger Property="IsEnabled" Value="False">
-                    <Setter Property="Opacity" Value="0.5"/>
-                </Trigger>
-            </Style.Triggers>
-        </Style>
-
-
-        <Style x:Key="RoundedButtonStyle"
-       TargetType="Button"
-       BasedOn="{StaticResource AnimatedButtonBaseStyle}">
-            <Setter Property="Height" Value="37"/>
-            <Setter Property="Padding" Value="10,0"/>
-            <Setter Property="FontFamily" Value="Segoe UI"/>
-            <Setter Property="FontSize" Value="12"/>
-            <Setter Property="Foreground" Value="White"/>
-            <Setter Property="Background" Value="#FF3347FF"/>
-
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Border Background="{TemplateBinding Background}" CornerRadius="12">
-                            <ContentPresenter HorizontalAlignment="Center"
-                                      VerticalAlignment="Center"/>
-                        </Border>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
-
-        <!-- Icon button (btnSearch: 37x37, LightGray, radius 12) -->
-        <Style x:Key="IconButtonStyle"
-       TargetType="Button"
-       BasedOn="{StaticResource AnimatedButtonBaseStyle}">
-            <Setter Property="Width" Value="37"/>
-            <Setter Property="Height" Value="37"/>
-            <Setter Property="Background" Value="#e6e6e6"/>
-
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Grid x:Name="Root" SnapsToDevicePixels="True">
-                            <Border x:Name="Bd"
-                            Background="{TemplateBinding Background}"
-                            CornerRadius="14"/>
-
-                            <Border x:Name="HoverOverlay"
-                            Background="#FFFFFF"
-                            Opacity="0"
-                            CornerRadius="14"/>
-
-                            <Border x:Name="PressedOverlay"
-                            Background="#000000"
-                            Opacity="0"
-                            CornerRadius="14"/>
-
-                            <ContentPresenter HorizontalAlignment="Center"
-                                      VerticalAlignment="Center"/>
-                        </Grid>
-
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Trigger.EnterActions>
-                                    <BeginStoryboard>
-                                        <Storyboard>
-                                            <DoubleAnimation Storyboard.TargetName="HoverOverlay"
-                                                     Storyboard.TargetProperty="Opacity"
-                                                     To="0.12" Duration="0:0:0.12"/>
-                                        </Storyboard>
-                                    </BeginStoryboard>
-                                </Trigger.EnterActions>
-                                <Trigger.ExitActions>
-                                    <BeginStoryboard>
-                                        <Storyboard>
-                                            <DoubleAnimation Storyboard.TargetName="HoverOverlay"
-                                                     Storyboard.TargetProperty="Opacity"
-                                                     To="0" Duration="0:0:0.12"/>
-                                        </Storyboard>
-                                    </BeginStoryboard>
-                                </Trigger.ExitActions>
-                            </Trigger>
-
-                            <Trigger Property="IsPressed" Value="True">
-                                <Trigger.EnterActions>
-                                    <BeginStoryboard>
-                                        <Storyboard>
-                                            <DoubleAnimation Storyboard.TargetName="PressedOverlay"
-                                                     Storyboard.TargetProperty="Opacity"
-                                                     To="0.18" Duration="0:0:0.06"/>
-                                        </Storyboard>
-                                    </BeginStoryboard>
-                                </Trigger.EnterActions>
-                                <Trigger.ExitActions>
-                                    <BeginStoryboard>
-                                        <Storyboard>
-                                            <DoubleAnimation Storyboard.TargetName="PressedOverlay"
-                                                     Storyboard.TargetProperty="Opacity"
-                                                     To="0" Duration="0:0:0.10"/>
-                                        </Storyboard>
-                                    </BeginStoryboard>
-                                </Trigger.ExitActions>
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
-        <!-- Rounded TextBox + watermark -->
-        <Style x:Key="RoundedTextBoxStyle" TargetType="TextBox">
-            <Setter Property="Height" Value="37"/>
-            <Setter Property="FontFamily" Value="Segoe UI"/>
-            <Setter Property="FontSize" Value="12"/>
-            <Setter Property="Foreground" Value="Black"/>
-            <Setter Property="Background" Value="White"/>
-            <Setter Property="BorderBrush" Value="Silver"/>
-            <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="Padding" Value="5,0"/>
-            <Setter Property="VerticalContentAlignment" Value="Center"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="TextBox">
-                        <Grid>
-                            <Border CornerRadius="12"
-                                    Background="{TemplateBinding Background}"
-                                    BorderBrush="{TemplateBinding BorderBrush}"
-                                    BorderThickness="{TemplateBinding BorderThickness}"/>
-                            <ScrollViewer x:Name="PART_ContentHost"
-                                          Margin="{TemplateBinding Padding}"/>
-
-                            <TextBlock x:Name="Watermark"
-                                       Text="Enter search value"
-                                       Foreground="LightGray"
-                                       Margin="14,0,0,0"
-                                       VerticalAlignment="Center"
-                                       IsHitTestVisible="False"
-                                       Visibility="Collapsed"/>
-                        </Grid>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="Text" Value="">
-                                <Setter TargetName="Watermark" Property="Visibility" Value="Visible"/>
-                            </Trigger>
-                            <Trigger Property="IsKeyboardFocused" Value="True">
-                                <Setter Property="BorderBrush" Value="#FF5E94FF"/>
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
-        <!-- DataGrid style: як ConfigureMonthGrid -->
-        <Style x:Key="AvailabilityListGridStyle" TargetType="DataGrid">
-            <Setter Property="AutoGenerateColumns" Value="False"/>
-            <Setter Property="FontSize" Value="14"/>
-            <Setter Property="FontFamily" Value="Segoe UI"/>
-            <Setter Property="IsReadOnly" Value="True"/>
-            <Setter Property="SelectionUnit" Value="FullRow"/>
-            <Setter Property="SelectionMode" Value="Single"/>
-            <Setter Property="HeadersVisibility" Value="Column"/>
-            <Setter Property="RowHeaderWidth" Value="0"/>
-
-            <Setter Property="CanUserAddRows" Value="False"/>
-            <Setter Property="CanUserDeleteRows" Value="False"/>
-            <Setter Property="CanUserResizeRows" Value="False"/>
-
-            <!-- Білий фон -->
-            <Setter Property="Background" Value="White"/>
-            <Setter Property="BorderThickness" Value="0"/>
-            <Setter Property="GridLinesVisibility" Value="None"/>
-
-            <!-- Менше шансів, що ScrollViewer буде кліпати тінь -->
-            <Setter Property="ScrollViewer.CanContentScroll" Value="False"/>
-            <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Disabled"/>
-            <Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Auto"/>
-
-            <!-- Внутрішній відступ, щоб картки + тінь мали місце -->
-            <!-- Внутрішній відступ DataGrid, щоб тінь мала місце по краях -->
-            <Setter Property="Padding" Value="16,10,16,10"/>
-
-            <Setter Property="ColumnHeaderHeight" Value="36"/>
-            <Setter Property="ColumnHeaderStyle">
-                <Setter.Value>
-                    <Style TargetType="DataGridColumnHeader">
-                        <Setter Property="Background" Value="White"/>
-                        <Setter Property="Foreground" Value="Black"/>
-                        <Setter Property="BorderThickness" Value="0"/>
-                        <Setter Property="Padding" Value="10,0,10,0"/>
-                        <Setter Property="VerticalContentAlignment" Value="Center"/>
-                    </Style>
-                </Setter.Value>
-            </Setter>
-
-            <!-- Картка-рядок з боковими відступами + тінь не обрізається -->
+        <Style x:Key="AvailabilityListCardGridStyle"
+               TargetType="DataGrid"
+               BasedOn="{StaticResource AvailabilityListCardGridBaseStyle}">
             <Setter Property="RowStyle">
                 <Setter.Value>
                     <Style TargetType="DataGridRow">
-                        <Setter Property="Height" Value="44"/>
-                        <Setter Property="Margin" Value="0,8,0,12"/>
-                        <Setter Property="Background" Value="White"/>
-                        <Setter Property="SnapsToDevicePixels" Value="True"/>
-                        <Setter Property="BorderThickness" Value="0"/>
+                        <Setter Property="Height" Value="44" />
+                        <Setter Property="Margin" Value="0,8,0,12" />
+                        <Setter Property="Background" Value="{StaticResource SurfaceBrush}" />
+                        <Setter Property="SnapsToDevicePixels" Value="True" />
+                        <Setter Property="BorderThickness" Value="0" />
 
                         <Setter Property="Template">
                             <Setter.Value>
                                 <ControlTemplate TargetType="DataGridRow">
-                                    <!-- ВАЖЛИВО: Transparent щоб клік ловився по всій ширині -->
                                     <Border Background="Transparent"
-                                Margin="6,0,6,0"
-                                MouseLeftButtonDown="RowHitArea_MouseLeftButtonDown">
+                                            Margin="6,0,6,0"
+                                            MouseLeftButtonDown="RowHitArea_MouseLeftButtonDown">
 
                                         <Border x:Name="RowCard"
-                                    Background="{TemplateBinding Background}"
-                                    CornerRadius="12"
-                                    Padding="18,0,12,0"
-                                    SnapsToDevicePixels="True">
+                                                Background="{TemplateBinding Background}"
+                                                CornerRadius="{StaticResource Cr12}"
+                                                Padding="18,0,12,0"
+                                                SnapsToDevicePixels="True">
                                             <Border.Effect>
                                                 <DropShadowEffect BlurRadius="16"
-                                                      ShadowDepth="0"
-                                                      Opacity="0.18"/>
+                                                                  ShadowDepth="0"
+                                                                  Opacity="0.18" />
                                             </Border.Effect>
 
-                                            <DataGridCellsPresenter/>
+                                            <DataGridCellsPresenter />
                                         </Border>
                                     </Border>
 
                                     <ControlTemplate.Triggers>
                                         <Trigger Property="IsSelected" Value="True">
-                                            <Setter TargetName="RowCard" Property="Background" Value="#FF3347FF"/>
-                                            <Setter Property="Foreground" Value="White"/>
+                                            <Setter TargetName="RowCard" Property="Background" Value="{StaticResource PrimaryBrush}" />
+                                            <Setter Property="Foreground" Value="White" />
                                         </Trigger>
 
                                         <Trigger Property="IsMouseOver" Value="True">
-                                            <Setter TargetName="RowCard" Property="Opacity" Value="0.97"/>
+                                            <Setter TargetName="RowCard" Property="Opacity" Value="0.97" />
                                         </Trigger>
                                     </ControlTemplate.Triggers>
                                 </ControlTemplate>
@@ -300,202 +60,166 @@
                     </Style>
                 </Setter.Value>
             </Setter>
-
-            <!-- Відступ тексту зліва: збільшуємо Left padding -->
-            <Setter Property="CellStyle">
-                <Setter.Value>
-                    <Style TargetType="DataGridCell">
-                        <Setter Property="BorderThickness" Value="0"/>
-                        <Setter Property="Background" Value="Transparent"/>
-                        <!-- Було 12,8,12,8 -> робимо більше зліва -->
-                        <Setter Property="Padding" Value="28,8,12,8"/>
-                        <Setter Property="VerticalAlignment" Value="Center"/>
-                    </Style>
-                </Setter.Value>
-            </Setter>
         </Style>
-
-        <GeometryGroup x:Key="IconAvailability">
-            <PathGeometry Figures="M1405 5109 c-45 -13 -105 -67 -126 -113 -16 -36 -19 -69 -19 -262 l0 -221 -127 -6 c-255 -11 -456 -104 -629 -289 -148 -159 -244 -396 -244 -604 l0 -54 2302 0 2301 0 -6 93 c-16 240 -114 447 -290 613 -170 161 -381 244 -619 244 l-88 0 0 223 c0 215 -1 226 -23 268 -83 156 -305 156 -384 -1 -22 -42 -23 -56 -23 -267 l0 -223 -870 0 -870 0 0 223 c0 252 -6 278 -76 335 -59 49 -134 63 -209 41z"/>
-            <PathGeometry Figures="M262 1943 l3 -1178 22 -80 c32 -114 111 -268 180 -350 125 -148 299 -259 483 -308 l85 -22 1525 0 1525 0 85 23 c92 24 224 83 295 132 171 118 308 313 367 525 l23 80 3 1178 3 1177 -2301 0 -2301 0 3 -1177z m3310 543 c129 -38 192 -166 139 -281 -26 -56 -1268 -1290 -1325 -1316 -56 -25 -130 -24 -188 4 -65 30 -773 723 -799 782 -20 43 -25 129 -10 168 16 40 73 99 116 118 49 23 123 24 173 4 24 -11 134 -113 322 -300 l285 -285 530 530 c292 292 535 530 541 530 6 0 17 7 24 15 13 16 91 43 126 44 11 1 41 -5 66 -13z"/>
-        </GeometryGroup>
-
-        <GeometryGroup x:Key="SearchIcon">
-            <PathGeometry Figures="M2890 5114 c-404 -30 -820 -192 -1140 -445 -149 -117 -344 -332 -448 -494 -323 -499 -413 -1077 -258 -1659 33 -125 94 -277 167 -414 35 -68 59 -126 59 -145 0 -28 -60 -92 -568 -602 -472 -472 -576 -582 -611 -641 -82 -140 -107 -265 -77 -383 20 -77 44 -119 109 -188 159 -170 361 -187 591 -52 59 35 169 139 641 611 510 508 574 568 602 568 19 0 77 -24 145 -59 290 -153 566 -227 883 -238 440 -15 823 91 1190 329 162 104 377 299 494 448 230 291 376 637 432 1025 19 127 16 443 -5 574 -62 393 -216 735 -464 1031 -321 385 -778 639 -1282 715 -104 16 -360 26 -460 19z m405 -559 c230 -36 463 -134 657 -276 105 -78 266 -241 342 -347 383 -538 373 -1282 -24 -1810 -300 -399 -793 -632 -1284 -609 -402 19 -748 170 -1026 447 -603 604 -599 1579 11 2177 353 346 826 495 1324 418z"/>
-            <PathGeometry Figures="M2987 4279 c-463 -51 -866 -340 -1071 -769 -55 -114 -48 -205 22 -276 62 -62 169 -82 240 -44 62 33 78 51 137 159 71 131 128 205 215 280 267 230 614 289 953 163 94 -35 170 -25 234 31 88 77 98 222 20 305 -45 48 -194 105 -354 136 -106 20 -287 27 -396 15z"/>
-        </GeometryGroup>
-
-        
-
     </UserControl.Resources>
 
     <Grid>
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
         <!-- Top card -->
-        <Border Grid.Row="0"
-        Margin="7,0,7,0"
-        Background="White"
-        CornerRadius="20"
-        Padding="10,10,10,12">
-            <Border.Effect>
-                <DropShadowEffect BlurRadius="18" ShadowDepth="2" Opacity="0.22"/>
-            </Border.Effect>
-
+        <Border Grid.Row="0" Style="{StaticResource TopCardStyle}">
             <Grid>
                 <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
 
                 <TextBlock Grid.Row="0"
-                   Text="Availability List"
-                   FontFamily="Segoe UI"
-                   FontSize="25"
-                   Foreground="Black"/>
+                           Text="Availability List"
+                           FontFamily="{StaticResource DefaultFontFamily}"
+                           FontSize="{StaticResource FontSizePageTitle}"
+                           Foreground="Black" />
 
                 <TextBlock Grid.Row="1"
-                   Margin="0,6,0,10"
-                   Text="Here you will see a list of all existing availability"
-                   FontFamily="Segoe UI"
-                   FontSize="17"
-                   Foreground="Silver"/>
+                           Margin="0,6,0,10"
+                           Text="Here you will see a list of all existing availability"
+                           FontFamily="{StaticResource DefaultFontFamily}"
+                           FontSize="17"
+                           Foreground="{StaticResource SecondaryTextBrush}" />
 
                 <!-- Search row -->
                 <Grid Grid.Row="2" Height="37">
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="37"/>
-                        <ColumnDefinition Width="8"/>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="8"/>
-                        <ColumnDefinition Width="100"/>
+                        <ColumnDefinition Width="37" />
+                        <ColumnDefinition Width="8" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="8" />
+                        <ColumnDefinition Width="100" />
                     </Grid.ColumnDefinitions>
 
                     <Button Grid.Column="0"
-                    Style="{StaticResource IconButtonStyle}"
-                    ToolTip="Search"
-                    Command="{Binding SearchCommand}">
+                            Style="{StaticResource IconButtonStyle}"
+                            ToolTip="Search"
+                            Command="{Binding SearchCommand}">
                         <Viewbox Width="15" Height="15">
                             <Path Data="{StaticResource SearchIcon}"
-                                                  Fill="Black"
-                                                  Stretch="Uniform"
-                                                  RenderTransformOrigin="0.5,0.5">
+                                  Fill="Black"
+                                  Stretch="Uniform"
+                                  RenderTransformOrigin="0.5,0.5">
                                 <Path.RenderTransform>
-                                    <ScaleTransform ScaleX="1" ScaleY="-1"/>
+                                    <ScaleTransform ScaleX="1" ScaleY="-1" />
                                 </Path.RenderTransform>
                             </Path>
                         </Viewbox>
                     </Button>
 
                     <TextBox Grid.Column="2"
-                     Style="{StaticResource RoundedTextBoxStyle}"
-                     Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}">
+                             Style="{StaticResource CompactRoundedTextBoxWithPlaceholderStyle}"
+                             Tag="Enter search value"
+                             Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}">
                         <TextBox.InputBindings>
                             <KeyBinding Key="Enter" Command="{Binding SearchCommand}" />
                         </TextBox.InputBindings>
                     </TextBox>
 
                     <Button Grid.Column="4"
-                    Style="{StaticResource RoundedButtonStyle}"
-                    Command="{Binding AddNewCommand}">
+                            Style="{StaticResource RoundedButtonStyle}"
+                            Height="37"
+                            Padding="10,0"
+                            Command="{Binding AddNewCommand}">
                         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                            <TextBlock Text="＋" FontSize="14" Margin="0,0,6,0"/>
-                            <TextBlock Text="Add New" FontSize="12"/>
+                            <TextBlock Text="＋" FontSize="14" Margin="0,0,6,0" />
+                            <TextBlock Text="Add New" FontSize="12" />
                         </StackPanel>
                     </Button>
                 </Grid>
             </Grid>
         </Border>
 
-
         <!-- Availability card (header + grid like in EditView) -->
         <Border Grid.Row="1"
-        Margin="7,21,7,7"
-        Background="White"
-        CornerRadius="20"
-        ClipToBounds="False">
+                Margin="7,21,7,7"
+                Background="{StaticResource SurfaceBrush}"
+                CornerRadius="{StaticResource Cr20}"
+                ClipToBounds="False">
 
             <Border.Effect>
-                <DropShadowEffect BlurRadius="18" ShadowDepth="2" Opacity="0.22"/>
+                <DropShadowEffect BlurRadius="18" ShadowDepth="2" Opacity="0.22" />
             </Border.Effect>
 
             <Grid Margin="15">
                 <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
                 </Grid.RowDefinitions>
 
                 <!-- HEADER -->
                 <Grid Grid.Row="0" Margin="0,0,0,12">
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
 
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                         <Viewbox Width="20" Height="20" Margin="0,0,8,0">
                             <Path Data="{StaticResource IconAvailability}"
-                          Fill="Black"
-                          Stretch="Uniform"
-                          RenderTransformOrigin="0.5,0.5">
-                                <!-- як у тебе: інколи іконки перевернуті -->
+                                  Fill="Black"
+                                  Stretch="Uniform"
+                                  RenderTransformOrigin="0.5,0.5">
                                 <Path.RenderTransform>
-                                    <ScaleTransform ScaleX="1" ScaleY="-1"/>
+                                    <ScaleTransform ScaleX="1" ScaleY="-1" />
                                 </Path.RenderTransform>
                             </Path>
                         </Viewbox>
 
                         <TextBlock Text="Availability"
-                           FontFamily="Segoe UI"
-                           FontSize="20"
-                           FontWeight="Bold"
-                           Foreground="Black"
-                           VerticalAlignment="Center"/>
+                                   FontFamily="{StaticResource DefaultFontFamily}"
+                                   FontSize="{StaticResource FontSizeTitle}"
+                                   FontWeight="Bold"
+                                   Foreground="Black"
+                                   VerticalAlignment="Center" />
                     </StackPanel>
 
-                    <!-- маленький бейдж справа (опційно) -->
                     <Border Grid.Column="1"
-                    Background="#dedede"
-                    CornerRadius="10"
-                    Padding="10,4"
-                    VerticalAlignment="Center">
-                        <TextBlock FontFamily="Segoe UI"
-                           FontSize="12"
-                           Foreground="Gray"
-                           Text="{Binding Items.Count, StringFormat=Total: {0}}"/>
+                            Background="{StaticResource BadgeBackgroundBrush}"
+                            CornerRadius="{StaticResource Cr10}"
+                            Padding="10,4"
+                            VerticalAlignment="Center">
+                        <TextBlock FontFamily="{StaticResource DefaultFontFamily}"
+                                   FontSize="12"
+                                   Foreground="{StaticResource MutedTextBrush}"
+                                   Text="{Binding Items.Count, StringFormat=Total: {0}}" />
                     </Border>
                 </Grid>
 
                 <!-- GRID CONTAINER -->
                 <Border Grid.Row="1"
-                Background="White"
-                BorderBrush="#E2E2E2"
-                BorderThickness="2"
-                CornerRadius="20"
-                Padding="6"
-                ClipToBounds="True">
+                        Background="{StaticResource SurfaceBrush}"
+                        BorderBrush="{StaticResource CardBorderBrush}"
+                        BorderThickness="2"
+                        CornerRadius="{StaticResource Cr20}"
+                        Padding="6"
+                        ClipToBounds="True">
 
                     <DataGrid x:Name="dataGridAvailabilityList"
-                      Style="{StaticResource AvailabilityListGridStyle}"
-                      Background="Transparent"
-                      BorderThickness="0"
-                      ItemsSource="{Binding Items}"
-                      SelectedItem="{Binding SelectedItem}">
+                              Style="{StaticResource AvailabilityListCardGridStyle}"
+                              Background="Transparent"
+                              BorderThickness="0"
+                              ItemsSource="{Binding Items}"
+                              SelectedItem="{Binding SelectedItem}">
                         <DataGrid.Columns>
                             <DataGridTextColumn Header="Availability Name"
-                                        Binding="{Binding Name}"
-                                        Width="*"/>
+                                                Binding="{Binding Name}"
+                                                Width="*" />
                         </DataGrid.Columns>
                     </DataGrid>
 
                 </Border>
             </Grid>
         </Border>
-
-
     </Grid>
 </UserControl>
