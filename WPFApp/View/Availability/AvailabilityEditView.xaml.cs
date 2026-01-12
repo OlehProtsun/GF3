@@ -1,4 +1,5 @@
 ﻿using System.Data;
+using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
@@ -18,6 +19,10 @@ namespace WPFApp.View.Availability
     public partial class AvailabilityEditView : UserControl
     {
         private AvailabilityEditViewModel? _vm;
+
+        private static readonly Regex _digitsOnly = new Regex("^[0-9]+$");
+
+
 
         public AvailabilityEditView()
         {
@@ -58,21 +63,50 @@ namespace WPFApp.View.Availability
             grid.AutoGenerateColumns = false;
             grid.Columns.Clear();
 
+            // Day "заморожена"
+            grid.FrozenColumnCount = 1;
+
             foreach (DataColumn column in table.Columns)
             {
                 var header = string.IsNullOrWhiteSpace(column.Caption) ? column.ColumnName : column.Caption;
+
+                var b = new Binding($"[{column.ColumnName}]")
+                {
+                    UpdateSourceTrigger = UpdateSourceTrigger.PropertyChanged,
+                    ValidatesOnDataErrors = true,
+                    NotifyOnValidationError = true
+                };
+
                 var col = new DataGridTextColumn
                 {
                     Header = header,
-                    Binding = new Binding($"[{column.ColumnName}]"),
+                    Binding = b,
                     IsReadOnly = column.ReadOnly
                 };
 
+                // Day column
                 if (column.ColumnName == "DayOfMonth")
                 {
                     col.Width = 60;
                     col.IsReadOnly = true;
                 }
+                else
+                {
+                    col.Width = new DataGridLength(1, DataGridLengthUnitType.Star);
+                }
+
+                // центр
+                var tbStyle = new Style(typeof(TextBlock));
+                tbStyle.Setters.Add(new Setter(TextBlock.TextAlignmentProperty, TextAlignment.Center));
+                tbStyle.Setters.Add(new Setter(FrameworkElement.VerticalAlignmentProperty, VerticalAlignment.Center));
+                tbStyle.Setters.Add(new Setter(FrameworkElement.HorizontalAlignmentProperty, HorizontalAlignment.Center));
+                col.ElementStyle = tbStyle;
+
+                var editStyle = new Style(typeof(TextBox));
+                editStyle.Setters.Add(new Setter(TextBox.TextAlignmentProperty, TextAlignment.Center));
+                editStyle.Setters.Add(new Setter(Control.VerticalContentAlignmentProperty, VerticalAlignment.Center));
+                editStyle.Setters.Add(new Setter(Control.PaddingProperty, new Thickness(0)));
+                col.EditingElementStyle = editStyle;
 
                 grid.Columns.Add(col);
             }
@@ -103,18 +137,73 @@ namespace WPFApp.View.Availability
         private void DataGridBinds_PreviewKeyDown(object sender, KeyEventArgs e)
         {
             if (_vm is null) return;
-            if (dataGridBinds.CurrentColumn is not DataGridBoundColumn boundColumn) return;
 
+            // ENTER: комітимо клітинку+рядок (RowEditEnding викличе Upsert)
+            if (e.Key == Key.Enter)
+            {
+                dataGridBinds.CommitEdit(DataGridEditingUnit.Cell, true);
+                dataGridBinds.CommitEdit(DataGridEditingUnit.Row, true);
+                e.Handled = true;
+                return;
+            }
+
+            // Якщо зараз редагуємо TextBox — даємо вводити вручну
+            if (IsCurrentCellEditing(dataGridBinds))
+                return;
+
+            if (dataGridBinds.CurrentColumn is not DataGridBoundColumn boundColumn) return;
             var binding = boundColumn.Binding as Binding;
             if (binding?.Path?.Path != nameof(BindRow.Key)) return;
 
-            var keyText = _vm.FormatKeyGesture(e.Key == Key.System ? e.SystemKey : e.Key, Keyboard.Modifiers);
+            // Якщо хочеш "запис хоткея" тільки з модифікаторами:
+            if (Keyboard.Modifiers == ModifierKeys.None)
+                return;
+
+            // ігноруємо навігацію
+            switch (e.Key)
+            {
+                case Key.Up:
+                case Key.Down:
+                case Key.Left:
+                case Key.Right:
+                case Key.Tab:
+                case Key.Escape:
+                    return;
+            }
+
+            var key = (e.Key == Key.System) ? e.SystemKey : e.Key;
+            var keyText = _vm.FormatKeyGesture(key, Keyboard.Modifiers);
             if (string.IsNullOrWhiteSpace(keyText)) return;
 
             if (dataGridBinds.CurrentItem is BindRow row)
+            {
                 row.Key = keyText;
+                dataGridBinds.CommitEdit(DataGridEditingUnit.Cell, true);
+            }
 
             e.Handled = true;
+        }
+
+
+        private static T? FindParent<T>(DependencyObject? child) where T : DependencyObject
+        {
+            while (child != null)
+            {
+                if (child is T typed) return typed;
+                child = VisualTreeHelper.GetParent(child);
+            }
+            return null;
+        }
+
+        private bool IsCurrentCellEditing(DataGrid grid)
+        {
+            if (grid.CurrentItem == null || grid.CurrentColumn == null) return false;
+
+            var content = grid.CurrentColumn.GetCellContent(grid.CurrentItem);
+            if (content == null) return false;
+
+            var cell = FindParent<DataGridCell>(content);
+            return cell?.IsEditing == true;
         }
 
         private void DataGridAvailabilityDays_PreviewKeyDown(object sender, KeyEventArgs e)
@@ -125,23 +214,147 @@ namespace WPFApp.View.Availability
             var binding = boundColumn.Binding as Binding;
             var columnName = binding?.Path?.Path?.Trim('[', ']') ?? string.Empty;
             if (string.IsNullOrWhiteSpace(columnName)) return;
+            if (columnName == "DayOfMonth") return;
 
-            var keyText = _vm.FormatKeyGesture(e.Key == Key.System ? e.SystemKey : e.Key, Keyboard.Modifiers);
-            if (string.IsNullOrWhiteSpace(keyText)) return;
+            // Навігацію не чіпаємо
+            switch (e.Key)
+            {
+                case Key.Up:
+                case Key.Down:
+                case Key.Left:
+                case Key.Right:
+                case Key.Tab:
+                case Key.Enter:
+                case Key.Escape:
+                    return;
+            }
 
-            if (!_vm.TryGetBindValue(keyText, out var bindValue)) return;
+            var key = (e.Key == Key.System) ? e.SystemKey : e.Key;
+            var keyText = _vm.FormatKeyGesture(key, Keyboard.Modifiers);
+
+            // Якщо FormatKeyGesture повернув null для одиночних клавіш (modifiers==None),
+            // беремо "символьний" варіант: 1 / M / A ...
+            if (string.IsNullOrWhiteSpace(keyText))
+                keyText = key.ToString();
+
+            // Якщо немає бінда — дозволяємо звичайний ввод (не чіпаємо)
+            if (!_vm.TryGetBindValue(keyText, out var bindValue))
+                return;
+
+            // Якщо клітинка редагується — зупиняємо редагування, щоб символ не вставився
+            if (IsCurrentCellEditing(dataGridAvailabilityDays))
+                dataGridAvailabilityDays.CommitEdit(DataGridEditingUnit.Cell, true);
 
             var rowIndex = dataGridAvailabilityDays.Items.IndexOf(dataGridAvailabilityDays.CurrentItem);
             if (!_vm.TryApplyBindToCell(columnName, rowIndex, bindValue, out var nextRowIndex))
                 return;
 
-            if (nextRowIndex.HasValue && nextRowIndex.Value < dataGridAvailabilityDays.Items.Count)
+            dataGridAvailabilityDays.CommitEdit(DataGridEditingUnit.Cell, true);
+            dataGridAvailabilityDays.CommitEdit(DataGridEditingUnit.Row, true);
+
+            if (nextRowIndex is int next && next >= 0 && next < dataGridAvailabilityDays.Items.Count)
             {
-                dataGridAvailabilityDays.CurrentCell = new DataGridCellInfo(dataGridAvailabilityDays.Items[nextRowIndex.Value], boundColumn);
-                dataGridAvailabilityDays.BeginEdit();
+                var nextItem = dataGridAvailabilityDays.Items[next];
+
+                dataGridAvailabilityDays.ScrollIntoView(nextItem, boundColumn);
+                dataGridAvailabilityDays.CurrentCell = new DataGridCellInfo(nextItem, boundColumn);
+
+                // Замість SelectedItem (рядок) — вибираємо клітинку
+                dataGridAvailabilityDays.SelectedCells.Clear();
+                dataGridAvailabilityDays.SelectedCells.Add(new DataGridCellInfo(nextItem, boundColumn));
+
+                // Краще почати редагування через Dispatcher, щоб не ловити "invalid state"
+                dataGridAvailabilityDays.Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    dataGridAvailabilityDays.Focus();
+                    dataGridAvailabilityDays.BeginEdit();
+                }), System.Windows.Threading.DispatcherPriority.Background);
             }
+
 
             e.Handled = true;
         }
+
+        private void NumberOnly_PreviewTextInput(object sender, TextCompositionEventArgs e)
+        {
+            e.Handled = !_digitsOnly.IsMatch(e.Text);
+        }
+
+        private void NumberOnly_Pasting(object sender, DataObjectPastingEventArgs e)
+        {
+            if (!e.SourceDataObject.GetDataPresent(DataFormats.Text, true))
+            {
+                e.CancelCommand();
+                return;
+            }
+
+            var text = e.SourceDataObject.GetData(DataFormats.Text) as string ?? "";
+            if (!_digitsOnly.IsMatch(text))
+                e.CancelCommand();
+        }
+
+        // Month: 1..12
+        private void Month_LostFocus(object sender, RoutedEventArgs e)
+        {
+            if (sender is not TextBox tb) return;
+
+            if (!int.TryParse(tb.Text, out int value))
+            {
+                tb.Text = "1";
+                return;
+            }
+
+            if (value < 1) tb.Text = "1";
+            else if (value > 12) tb.Text = "12";
+        }
+
+        // Year: 2000..3000
+        private void Year_LostFocus(object sender, RoutedEventArgs e)
+        {
+            if (sender is not TextBox tb) return;
+
+            if (!int.TryParse(tb.Text, out int value))
+            {
+                tb.Text = "2000";
+                return;
+            }
+
+            if (value < 2000) tb.Text = "2000";
+            else if (value > 3000) tb.Text = "3000";
+        }
+
+        private void AvailabilityGrid_AutoGeneratingColumn(object sender, DataGridAutoGeneratingColumnEventArgs e)
+        {
+            if (sender is not DataGrid grid)
+                return;
+
+            // DataView -> DataTable -> DataColumn
+            if (grid.ItemsSource is not DataView dv || dv.Table == null)
+                return;
+
+            if (!dv.Table.Columns.Contains(e.PropertyName))
+                return;
+
+            var dc = dv.Table.Columns[e.PropertyName];
+
+            // Header з Caption (у тебе Caption = "Day" і ПІБ працівника)
+            e.Column.Header = dc.Caption;
+
+            // 1) Day колонка фіксована і ReadOnly
+            if (dc.ColumnName == "DayOfMonth")
+            {
+                e.Column.Width = new DataGridLength(70);
+                e.Column.MinWidth = 70;
+                e.Column.IsReadOnly = true;
+                return;
+            }
+
+            // 2) Employee колонки: ділять простір, але не менше MinWidth (скрол з’явиться автоматично)
+            e.Column.Width = new DataGridLength(1, DataGridLengthUnitType.Star);
+            e.Column.MinWidth = 140; // або інше число
+        }
+
+
+
     }
 }

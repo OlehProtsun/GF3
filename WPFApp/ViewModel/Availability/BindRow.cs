@@ -3,7 +3,7 @@ using WPFApp.Infrastructure;
 
 namespace WPFApp.ViewModel.Availability
 {
-    internal sealed class BindRow : ObservableObject
+    public sealed class BindRow : ObservableObject
     {
         private int _id;
         public int Id

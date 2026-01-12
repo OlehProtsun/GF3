@@ -6,110 +6,61 @@ using System.Windows.Input;
 
 namespace WPFApp.View.Availability.DesignTime
 {
-    public sealed class AvailabilityProfileMonthItem
-    {
-        public int Month { get; set; }
-        public int Year { get; set; }
-        public string Name { get; set; } = "";
-        public int DaysCount { get; set; }
-        public int AvailableDays { get; set; }
-
-        // щоб в AutoGenerateColumns були приємні значення
-        public string MonthYear => $"{Month:D2}/{Year}";
-    }
-
     public sealed class AvailabilityProfileViewDesignVM : INotifyPropertyChanged
     {
-        // --- Profile fields ---
-        private int _availabilityId;
-        public int AvailabilityId
-        {
-            get => _availabilityId;
-            set { _availabilityId = value; OnPropertyChanged(); }
-        }
+        public event PropertyChangedEventHandler? PropertyChanged;
 
-        private string _availabilityName = "";
-        public string AvailabilityName
-        {
-            get => _availabilityName;
-            set { _availabilityName = value; OnPropertyChanged(); }
-        }
+        public int AvailabilityId { get; set; } = 101;
+        public string AvailabilityName { get; set; } = "Default Availability";
+        public string AvailabilityMonthYear { get; set; } = "January 2026";
 
-        private string _availabilityMonthYear = "";
-        public string AvailabilityMonthYear
-        {
-            get => _availabilityMonthYear;
-            set { _availabilityMonthYear = value; OnPropertyChanged(); }
-        }
+        public ObservableCollection<AvailabilityProfileRow> ProfileAvailabilityMonths { get; set; }
 
-        // --- Table ---
-        public ObservableCollection<AvailabilityProfileMonthItem> ProfileAvailabilityMonths { get; } = new();
-
-        private AvailabilityProfileMonthItem? _selectedProfileMonth;
-        public AvailabilityProfileMonthItem? SelectedProfileMonth
+        private AvailabilityProfileRow? _selectedProfileMonth;
+        public AvailabilityProfileRow? SelectedProfileMonth
         {
             get => _selectedProfileMonth;
             set { _selectedProfileMonth = value; OnPropertyChanged(); }
         }
 
-        // --- Commands (design-time stubs) ---
+        // Команди (щоб дизайнер не лаявся на bindings)
         public ICommand BackCommand { get; } = new DesignCommand();
-        public ICommand AddNewCommand { get; } = new DesignCommand();
-
         public ICommand CancelProfileCommand { get; } = new DesignCommand();
         public ICommand DeleteCommand { get; } = new DesignCommand();
-
         public ICommand CancelTableCommand { get; } = new DesignCommand();
         public ICommand EditCommand { get; } = new DesignCommand();
 
         public AvailabilityProfileViewDesignVM()
         {
-            // sample data for designer
-            AvailabilityId = 12;
-            AvailabilityName = "January Availability - Main Team";
-            AvailabilityMonthYear = "01-2026";
-
-            ProfileAvailabilityMonths.Add(new AvailabilityProfileMonthItem
+            ProfileAvailabilityMonths = new ObservableCollection<AvailabilityProfileRow>
             {
-                Month = 1,
-                Year = 2026,
-                Name = "January Availability - Main Team",
-                DaysCount = 31,
-                AvailableDays = 22
-            });
-
-            ProfileAvailabilityMonths.Add(new AvailabilityProfileMonthItem
-            {
-                Month = 12,
-                Year = 2025,
-                Name = "December Availability - Main Team",
-                DaysCount = 31,
-                AvailableDays = 19
-            });
-
-            ProfileAvailabilityMonths.Add(new AvailabilityProfileMonthItem
-            {
-                Month = 11,
-                Year = 2025,
-                Name = "November Availability - Main Team",
-                DaysCount = 30,
-                AvailableDays = 20
-            });
+                new AvailabilityProfileRow { Month = "January",  Week1="✔", Week2="✔", Week3="—", Week4="✔", Notes="Good" },
+                new AvailabilityProfileRow { Month = "February", Week1="—", Week2="✔", Week3="✔", Week4="—", Notes="Busy" },
+                new AvailabilityProfileRow { Month = "March",    Week1="✔", Week2="—", Week3="—", Week4="✔", Notes="OK" },
+                new AvailabilityProfileRow { Month = "April",    Week1="✔", Week2="✔", Week3="✔", Week4="✔", Notes="Free" },
+            };
 
             SelectedProfileMonth = ProfileAvailabilityMonths[0];
         }
 
-        // ===== INotifyPropertyChanged =====
-        public event PropertyChangedEventHandler? PropertyChanged;
-        private void OnPropertyChanged([CallerMemberName] string? name = null)
-            => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
+        private void OnPropertyChanged([CallerMemberName] string? prop = null)
+            => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(prop));
+    }
 
-        // ===== Simple design-time ICommand =====
-        private sealed class DesignCommand : ICommand
-        {
-            public bool CanExecute(object? parameter) => true;
-            public void Execute(object? parameter) { }
-            public event EventHandler? CanExecuteChanged { add { } remove { } }
-        }
+    public sealed class AvailabilityProfileRow
+    {
+        public string Month { get; set; } = "";
+        public string Week1 { get; set; } = "";
+        public string Week2 { get; set; } = "";
+        public string Week3 { get; set; } = "";
+        public string Week4 { get; set; } = "";
+        public string Notes { get; set; } = "";
+    }
+
+    internal sealed class DesignCommand : ICommand
+    {
+        public bool CanExecute(object? parameter) => true;
+        public void Execute(object? parameter) { }
+        public event EventHandler? CanExecuteChanged;
     }
 }

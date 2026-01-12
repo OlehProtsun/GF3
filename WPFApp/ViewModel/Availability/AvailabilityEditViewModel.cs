@@ -7,6 +7,7 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Data;
 using System.Linq;
+using System.Text.RegularExpressions;
 using System.Windows.Input;
 using WPFApp.Infrastructure;
 
@@ -27,6 +28,10 @@ namespace WPFApp.ViewModel.Availability
 
         public ObservableCollection<EmployeeListItem> Employees { get; } = new();
         public ObservableCollection<BindRow> Binds { get; } = new();
+
+        private static readonly Regex Interval = new(
+            @"^(?<h1>[01]?\d|2[0-3]):(?<m1>[0-5]\d)\s*-\s*(?<h2>[01]?\d|2[0-3]):(?<m2>[0-5]\d)$",
+            RegexOptions.Compiled);
 
         private EmployeeListItem? _selectedEmployee;
         public EmployeeListItem? SelectedEmployee
@@ -73,6 +78,7 @@ namespace WPFApp.ViewModel.Availability
                 if (SetProperty(ref _availabilityMonth, value))
                 {
                     ClearValidationErrors(nameof(AvailabilityMonth));
+                    ValidateMonth();
                     RegenerateGroupDays();
                 }
             }
@@ -87,6 +93,7 @@ namespace WPFApp.ViewModel.Availability
                 if (SetProperty(ref _availabilityYear, value))
                 {
                     ClearValidationErrors(nameof(AvailabilityYear));
+                    ValidateYear();
                     RegenerateGroupDays();
                 }
             }
@@ -99,7 +106,10 @@ namespace WPFApp.ViewModel.Availability
             set
             {
                 if (SetProperty(ref _availabilityName, value))
+                {
                     ClearValidationErrors(nameof(AvailabilityName));
+                    ValidateAvailabilityName();
+                }
             }
         }
 
@@ -140,6 +150,7 @@ namespace WPFApp.ViewModel.Availability
             DeleteBindCommand = new AsyncRelayCommand(() => _owner.DeleteBindAsync());
 
             EnsureDayColumn();
+            _groupTable.ColumnChanged += GroupTable_ColumnChanged;
         }
 
         public bool HasErrors => _errors.Count > 0;
@@ -441,7 +452,7 @@ namespace WPFApp.ViewModel.Availability
                 _groupTable.Rows.Add(row);
             }
 
-            MatrixChanged?.Invoke(this, EventArgs.Empty);
+            NotifyMatrixChanged();
         }
 
         private bool TryAddEmployeeColumn(int employeeId, string header)
@@ -463,7 +474,7 @@ namespace WPFApp.ViewModel.Availability
             foreach (DataRow r in _groupTable.Rows)
                 r[colName] = string.Empty;
 
-            MatrixChanged?.Invoke(this, EventArgs.Empty);
+            NotifyMatrixChanged();
             return true;
         }
 
@@ -477,7 +488,7 @@ namespace WPFApp.ViewModel.Availability
             if (_groupTable.Columns.Contains(colName))
                 _groupTable.Columns.Remove(colName);
 
-            MatrixChanged?.Invoke(this, EventArgs.Empty);
+            NotifyMatrixChanged();
             return true;
         }
 
@@ -505,5 +516,91 @@ namespace WPFApp.ViewModel.Availability
                 OnPropertyChanged(nameof(HasErrors));
             }
         }
+
+        private void NotifyMatrixChanged()
+        {
+            MatrixChanged?.Invoke(this, EventArgs.Empty);
+            OnPropertyChanged(nameof(AvailabilityDays)); // <-- головне для WPF
+        }
+
+        private void ValidateAvailabilityName()
+        {
+            var name = (AvailabilityName ?? string.Empty).Trim();
+            if (string.IsNullOrWhiteSpace(name))
+                AddError(nameof(AvailabilityName), "Name is required.");
+            else if (name.Length < 2)
+                AddError(nameof(AvailabilityName), "Name is too short (min 2 chars).");
+        }
+
+        private void ValidateMonth()
+        {
+            if (AvailabilityMonth < 1 || AvailabilityMonth > 12)
+                AddError(nameof(AvailabilityMonth), "Month must be in range 1..12.");
+        }
+
+        private void ValidateYear()
+        {
+            if (AvailabilityYear < 2000 || AvailabilityYear > 3000)
+                AddError(nameof(AvailabilityYear), "Year must be in range 2000..3000.");
+        }
+
+        private void ValidateInfo()
+        {
+            ClearValidationErrors(nameof(AvailabilityName));
+            ClearValidationErrors(nameof(AvailabilityMonth));
+            ClearValidationErrors(nameof(AvailabilityYear));
+
+            ValidateAvailabilityName();
+            ValidateMonth();
+            ValidateYear();
+        }
+
+        private void GroupTable_ColumnChanged(object? sender, DataColumnChangeEventArgs e)
+        {
+            if (e.Column.ColumnName == DayColumn) return;
+
+            var raw = (e.ProposedValue?.ToString() ?? string.Empty).Trim();
+
+            // якщо пусте у тебе допустиме — залишай так (в тебе воно вже було)
+            if (raw.Length == 0)
+            {
+                e.Row.SetColumnError(e.Column, string.Empty);
+                return;
+            }
+
+            if (raw == "+" || raw == "-")
+            {
+                e.Row.SetColumnError(e.Column, string.Empty);
+                return;
+            }
+
+            if (TryParseInterval(raw, out _, out _))
+            {
+                e.Row.SetColumnError(e.Column, string.Empty);
+                return;
+            }
+
+            e.Row.SetColumnError(e.Column, "Allowed: +, -, hh:mm-hh:mm or hh:mm - hh:mm (e.g., 09:00-18:00).");
+        }
+
+        private static bool TryParseInterval(string raw, out TimeSpan start, out TimeSpan end)
+        {
+            start = default;
+            end = default;
+
+            var m = Interval.Match(raw);
+            if (!m.Success) return false;
+
+            var h1 = int.Parse(m.Groups["h1"].Value);
+            var m1 = int.Parse(m.Groups["m1"].Value);
+            var h2 = int.Parse(m.Groups["h2"].Value);
+            var m2 = int.Parse(m.Groups["m2"].Value);
+
+            start = new TimeSpan(h1, m1, 0);
+            end = new TimeSpan(h2, m2, 0);
+
+            return start < end; // якщо дозволяєш “нічні” інтервали — скажи, зміню логіку
+        }
+
     }
 }

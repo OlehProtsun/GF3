@@ -51,21 +51,48 @@ namespace WPFApp.View.Availability
             grid.AutoGenerateColumns = false;
             grid.Columns.Clear();
 
+            // як в Edit: перша колонка "заморожена"
+            grid.FrozenColumnCount = 1;
+
+            // стиль відображення (центр) — як в Edit
+            var tbStyle = new Style(typeof(TextBlock));
+            tbStyle.Setters.Add(new Setter(TextBlock.TextAlignmentProperty, TextAlignment.Center));
+            tbStyle.Setters.Add(new Setter(FrameworkElement.VerticalAlignmentProperty, VerticalAlignment.Center));
+            tbStyle.Setters.Add(new Setter(FrameworkElement.HorizontalAlignmentProperty, HorizontalAlignment.Center));
+
             foreach (DataColumn column in table.Columns)
             {
-                var header = string.IsNullOrWhiteSpace(column.Caption) ? column.ColumnName : column.Caption;
+                var header = string.IsNullOrWhiteSpace(column.Caption)
+                    ? column.ColumnName
+                    : column.Caption;
+
+                // ReadOnly: робимо OneWay, бо редагування не потрібне
+                var b = new Binding($"[{column.ColumnName}]")
+                {
+                    Mode = BindingMode.OneWay
+                };
+
                 var col = new DataGridTextColumn
                 {
                     Header = header,
-                    Binding = new Binding($"[{column.ColumnName}]"),
-                    IsReadOnly = true
+                    Binding = b,
+                    IsReadOnly = true,
+                    ElementStyle = tbStyle
                 };
 
                 if (column.ColumnName == "DayOfMonth")
+                {
                     col.Width = 60;
+                }
+                else
+                {
+                    col.Width = new DataGridLength(1, DataGridLengthUnitType.Star);
+                    col.MinWidth = 140; // щоб нормально працював горизонтальний скрол
+                }
 
                 grid.Columns.Add(col);
             }
         }
+
     }
 }

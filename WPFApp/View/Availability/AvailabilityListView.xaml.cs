@@ -19,7 +19,6 @@ namespace WPFApp.View.Availability
         public AvailabilityListView()
         {
             InitializeComponent();
-            inputSearch.KeyDown += InputSearch_KeyDown;
             dataGridAvailabilityList.MouseDoubleClick += DataGridAvailabilityList_MouseDoubleClick;
         }
 
@@ -35,5 +34,35 @@ namespace WPFApp.View.Availability
             if (DataContext is AvailabilityListViewModel vm && vm.OpenProfileCommand.CanExecute(null))
                 vm.OpenProfileCommand.Execute(null);
         }
+
+        private void DataGridRow_MouseDoubleClick(object sender, MouseButtonEventArgs e)
+        {
+            if (DataContext is AvailabilityListViewModel vm)
+            {
+                // якщо ти відкриваєш профіль через команду:
+                if (vm.OpenProfileCommand?.CanExecute(null) == true)
+                    vm.OpenProfileCommand.Execute(null);
+
+                // або якщо в тебе інша команда/метод — підстав сюди
+            }
+        }
+
+        private void RowHitArea_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            // Знаходимо DataGridRow, в якому був клік
+            var dep = (DependencyObject)sender;
+            while (dep != null && dep is not DataGridRow)
+                dep = VisualTreeHelper.GetParent(dep);
+
+            if (dep is DataGridRow row)
+            {
+                row.IsSelected = true;
+                row.Focus();
+
+                // щоб DataGrid не намагався робити "редагування/фокус в клітинку"
+                e.Handled = true;
+            }
+        }
+
     }
 }

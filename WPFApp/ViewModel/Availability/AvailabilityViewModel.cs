@@ -5,6 +5,8 @@ using System.Globalization;
 using System.Windows;
 using System.Windows.Input;
 using WPFApp.Infrastructure;
+using WPFApp.Service;
+using WPFApp.ViewModel.Dialogs;
 
 namespace WPFApp.ViewModel.Availability
 {
@@ -244,13 +246,33 @@ namespace WPFApp.ViewModel.Availability
             EditVm.SetEmployees(filtered, _employeeNames);
         }
 
-        internal async Task AddBindAsync()
+        internal async Task AddBindAsync(CancellationToken ct = default)
         {
-            var row = new BindRow { IsActive = true };
-            EditVm.Binds.Add(row);
-            EditVm.SelectedBind = row;
-            await Task.CompletedTask;
+            // Унікальний маркер, щоб знайти щойно створений рядок після reload
+            var draftKey = $"__draft__{Guid.NewGuid():N}";
+
+            // Створюємо "чернетку" в БД одразу -> отримаємо реальний Id через LoadBindsAsync
+            var draft = new BindModel
+            {
+                Key = draftKey,
+                Value = string.Empty,   // якщо БД не дозволяє пусте — постав "__draft__"
+                IsActive = false        // щоб чернетка не впливала на роботу хоткеїв
+            };
+
+            await _bindService.CreateAsync(draft, ct);
+            await LoadBindsAsync(ct);
+
+            // Знайти її в колекції й зробити вигляд "порожній Key/Value" для юзера
+            var row = EditVm.Binds.FirstOrDefault(b => b.Key == draftKey);
+            if (row != null)
+            {
+                row.Key = string.Empty;
+                row.Value = string.Empty;
+                row.IsActive = true; // або лишай false, якщо хочеш активувати тільки після валідного save
+                EditVm.SelectedBind = row;
+            }
         }
+
 
         internal async Task DeleteBindAsync(CancellationToken ct = default)
         {
@@ -277,11 +299,10 @@ namespace WPFApp.ViewModel.Availability
             if (string.IsNullOrWhiteSpace(bind.Key) && string.IsNullOrWhiteSpace(bind.Value))
                 return;
 
+            // Поки рядок не заповнений повністю — просто не зберігаємо і не показуємо помилку
             if (string.IsNullOrWhiteSpace(bind.Key) || string.IsNullOrWhiteSpace(bind.Value))
-            {
-                ShowError("Bind must contain both Key and Value.");
                 return;
-            }
+
 
             if (!TryNormalizeKey(bind.Key, out var normalizedKey))
             {
@@ -303,44 +324,56 @@ namespace WPFApp.ViewModel.Availability
 
         internal string? FormatKeyGesture(Key key, ModifierKeys modifiers)
         {
-            if (key is Key.LeftCtrl or Key.RightCtrl or Key.LeftShift or Key.RightShift or Key.LeftAlt or Key.RightAlt or Key.LWin or Key.RWin)
+            if (key is Key.LeftCtrl or Key.RightCtrl
+                or Key.LeftShift or Key.RightShift
+                or Key.LeftAlt or Key.RightAlt
+                or Key.LWin or Key.RWin)
                 return null;
 
-            var converter = new KeyConverter();
-            var keyString = converter.ConvertToString(key);
-            if (string.IsNullOrWhiteSpace(keyString)) return null;
-
-            var parts = new List<string>();
-            if (modifiers.HasFlag(ModifierKeys.Control)) parts.Add("Ctrl");
-            if (modifiers.HasFlag(ModifierKeys.Shift)) parts.Add("Shift");
-            if (modifiers.HasFlag(ModifierKeys.Alt)) parts.Add("Alt");
-            if (modifiers.HasFlag(ModifierKeys.Windows)) parts.Add("Win");
-
-            parts.Add(keyString);
-            return string.Join("+", parts);
-        }
-
-        internal bool TryNormalizeKey(string raw, out string normalized)
-        {
-            normalized = string.Empty;
-            if (string.IsNullOrWhiteSpace(raw)) return false;
-
-            var converter = new KeyGestureConverter();
             try
             {
-                if (converter.ConvertFromString(raw.Trim()) is KeyGesture gesture)
-                {
-                    normalized = gesture.GetDisplayStringForCulture(CultureInfo.InvariantCulture);
-                    return true;
-                }
+                var gesture = new KeyGesture(key, modifiers);
+                return gesture.GetDisplayStringForCulture(CultureInfo.InvariantCulture);
             }
             catch
             {
-                return false;
+                return null;
             }
-
-            return false;
         }
+
+
+internal bool TryNormalizeKey(string raw, out string normalized)
+{
+    normalized = string.Empty;
+    if (string.IsNullOrWhiteSpace(raw)) return false;
+
+    raw = raw.Trim();
+
+    // 1) Якщо юзер ввів просто 1 / m / M -> приймаємо як є (в одному регістрі)
+    if (!raw.Contains('+'))
+    {
+        normalized = raw.ToUpperInvariant(); // або ToLowerInvariant(), але будь послідовним
+        return true;
+    }
+
+    // 2) Якщо це комбінація типу Ctrl+M -> пробуємо стандартний KeyGestureConverter
+    var converter = new KeyGestureConverter();
+    try
+    {
+        if (converter.ConvertFromString(raw) is KeyGesture gesture)
+        {
+            normalized = gesture.GetDisplayStringForCulture(CultureInfo.InvariantCulture);
+            return true;
+        }
+    }
+    catch
+    {
+        return false;
+    }
+
+    return false;
+}
+
 
         private async Task LoadAllGroupsAsync(CancellationToken ct = default)
         {
@@ -398,12 +431,17 @@ namespace WPFApp.ViewModel.Availability
             => (source ?? string.Empty).Contains(value, StringComparison.OrdinalIgnoreCase);
 
         internal void ShowInfo(string text)
-            => MessageBox.Show(text, "Info", MessageBoxButton.OK, MessageBoxImage.Information);
+            => CustomMessageBox.Show("Info", text, CustomMessageBoxIcon.Info, okText: "OK");
 
         internal void ShowError(string text)
-            => MessageBox.Show(text, "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            => CustomMessageBox.Show("Error", text, CustomMessageBoxIcon.Error, okText: "OK");
 
         private bool Confirm(string text, string? caption = null)
-            => MessageBox.Show(text, caption ?? "Confirm", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes;
+            => CustomMessageBox.Show(
+                caption ?? "Confirm",
+                text,
+                CustomMessageBoxIcon.Warning,   // або Info, якщо не хочеш warning-іконку
+                okText: "Yes",
+                cancelText: "No");
     }
 }

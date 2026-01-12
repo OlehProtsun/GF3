@@ -1,162 +1,150 @@
 ﻿using System;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.Data;
 using System.Runtime.CompilerServices;
 using System.Windows.Input;
+using WPFApp.ViewModel.Availability; // EmployeeListItem, BindRow
 
 namespace WPFApp.View.Availability.DesignTime
 {
-    // ========== Design-time models ==========
-    public sealed class EmployeeItem
-    {
-        public int Id { get; set; }
-        public string FullName { get; set; } = "";
-        public override string ToString() => FullName; // щоб ComboBox красиво показував ім'я
-    }
-
-    public sealed class BindItem
-    {
-        public int Id { get; set; }
-        public string Type { get; set; } = "";
-        public string Value { get; set; } = "";
-    }
-
-    public sealed class AvailabilityDayItem
-    {
-        public string Day { get; set; } = "";
-        public string Start { get; set; } = "";
-        public string End { get; set; } = "";
-        public bool IsAvailable { get; set; }
-    }
-
-    // ========== Design-time VM ==========
     public sealed class AvailabilityEditViewDesignVM : INotifyPropertyChanged
     {
-        // --- Information ---
+        private const string DayColumn = "DayOfMonth";
+
+        private readonly DataTable _groupTable = new();
+
+        public DataView AvailabilityDays => _groupTable.DefaultView;
+
+        public ObservableCollection<EmployeeListItem> Employees { get; } = new();
+        public ObservableCollection<BindRow> Binds { get; } = new();
+
+        public ICommand SaveCommand { get; }
+        public ICommand CancelCommand { get; }
+        public ICommand CancelInformationCommand { get; }
+        public ICommand CancelEmployeeCommand { get; }
+        public ICommand CancelBindCommand { get; }
+        public ICommand AddEmployeeCommand { get; }
+        public ICommand RemoveEmployeeCommand { get; }
+        public ICommand SearchEmployeeCommand { get; }
+        public ICommand AddBindCommand { get; }
+        public ICommand DeleteBindCommand { get; }
+
         private int _availabilityId;
-        public int AvailabilityId
-        {
-            get => _availabilityId;
-            set { _availabilityId = value; OnPropertyChanged(); }
-        }
+        public int AvailabilityId { get => _availabilityId; set => Set(ref _availabilityId, value); }
 
         private int _availabilityMonth;
-        public int AvailabilityMonth
-        {
-            get => _availabilityMonth;
-            set { _availabilityMonth = value; OnPropertyChanged(); }
-        }
+        public int AvailabilityMonth { get => _availabilityMonth; set => Set(ref _availabilityMonth, value); }
 
         private int _availabilityYear;
-        public int AvailabilityYear
-        {
-            get => _availabilityYear;
-            set { _availabilityYear = value; OnPropertyChanged(); }
-        }
+        public int AvailabilityYear { get => _availabilityYear; set => Set(ref _availabilityYear, value); }
 
         private string _availabilityName = "";
-        public string AvailabilityName
-        {
-            get => _availabilityName;
-            set { _availabilityName = value; OnPropertyChanged(); }
-        }
+        public string AvailabilityName { get => _availabilityName; set => Set(ref _availabilityName, value); }
 
-        // --- Employee ---
         private string _employeeSearchText = "";
-        public string EmployeeSearchText
-        {
-            get => _employeeSearchText;
-            set { _employeeSearchText = value; OnPropertyChanged(); }
-        }
+        public string EmployeeSearchText { get => _employeeSearchText; set => Set(ref _employeeSearchText, value); }
 
-        public ObservableCollection<EmployeeItem> Employees { get; } = new();
+        private EmployeeListItem? _selectedEmployee;
+        public EmployeeListItem? SelectedEmployee { get => _selectedEmployee; set => Set(ref _selectedEmployee, value); }
 
-        private EmployeeItem? _selectedEmployee;
-        public EmployeeItem? SelectedEmployee
-        {
-            get => _selectedEmployee;
-            set
-            {
-                _selectedEmployee = value;
-                OnPropertyChanged();
-                OnPropertyChanged(nameof(SelectedEmployeeId));
-            }
-        }
+        public string SelectedEmployeeId => SelectedEmployee?.Id > 0 ? SelectedEmployee.Id.ToString() : string.Empty;
 
-        public int SelectedEmployeeId => SelectedEmployee?.Id ?? 0;
+        private BindRow? _selectedBind;
+        public BindRow? SelectedBind { get => _selectedBind; set => Set(ref _selectedBind, value); }
 
-        // --- Binds ---
-        public ObservableCollection<BindItem> Binds { get; } = new();
+        private object? _selectedAvailabilityDay;
+        public object? SelectedAvailabilityDay { get => _selectedAvailabilityDay; set => Set(ref _selectedAvailabilityDay, value); }
 
-        private BindItem? _selectedBind;
-        public BindItem? SelectedBind
-        {
-            get => _selectedBind;
-            set { _selectedBind = value; OnPropertyChanged(); }
-        }
-
-        // --- Availability table ---
-        public ObservableCollection<AvailabilityDayItem> AvailabilityDays { get; } = new();
-
-        private AvailabilityDayItem? _selectedAvailabilityDay;
-        public AvailabilityDayItem? SelectedAvailabilityDay
-        {
-            get => _selectedAvailabilityDay;
-            set { _selectedAvailabilityDay = value; OnPropertyChanged(); }
-        }
-
-        // --- Commands (design-time stubs) ---
-        public ICommand CancelInformationCommand { get; } = new DesignCommand();
-        public ICommand CancelEmployeeCommand { get; } = new DesignCommand();
-        public ICommand RemoveEmployeeCommand { get; } = new DesignCommand();
-        public ICommand AddEmployeeCommand { get; } = new DesignCommand();
-
-        public ICommand CancelBindCommand { get; } = new DesignCommand();
-        public ICommand DeleteBindCommand { get; } = new DesignCommand();
-        public ICommand AddBindCommand { get; } = new DesignCommand();
-
-        public ICommand CancelCommand { get; } = new DesignCommand();
-        public ICommand SaveCommand { get; } = new DesignCommand();
+        // Якщо у тебе у View є підписка на MatrixChanged (у code-behind) — залишимо івент
+        public event EventHandler? MatrixChanged;
 
         public AvailabilityEditViewDesignVM()
         {
-            // Sample values for designer
+            // dummy commands (в дизайнері вони не потрібні)
+            var cmd = new DummyCommand();
+            SaveCommand = cmd;
+            CancelCommand = cmd;
+            CancelInformationCommand = cmd;
+            CancelEmployeeCommand = cmd;
+            CancelBindCommand = cmd;
+            AddEmployeeCommand = cmd;
+            RemoveEmployeeCommand = cmd;
+            SearchEmployeeCommand = cmd;
+            AddBindCommand = cmd;
+            DeleteBindCommand = cmd;
+
+            // demo header fields
             AvailabilityId = 12;
-            AvailabilityMonth = 1;
-            AvailabilityYear = 2026;
-            AvailabilityName = "January Availability - Main Team";
+            AvailabilityMonth = DateTime.Today.Month;
+            AvailabilityYear = DateTime.Today.Year;
+            AvailabilityName = "Availability (Design Preview)";
 
-            EmployeeSearchText = "an";
+            // demo employees (ліва карта)
+            Employees.Add(new EmployeeListItem { Id = 1, FullName = "Іван Петренко" });
+            Employees.Add(new EmployeeListItem { Id = 2, FullName = "Олена Шевченко" });
+            Employees.Add(new EmployeeListItem { Id = 3, FullName = "Андрій Коваль" });
+            SelectedEmployee = Employees[0];
 
-            Employees.Add(new EmployeeItem { Id = 101, FullName = "Anna Kowalska" });
-            Employees.Add(new EmployeeItem { Id = 102, FullName = "Andrii Shevchenko" });
-            Employees.Add(new EmployeeItem { Id = 103, FullName = "Oleh Petrenko" });
-            SelectedEmployee = Employees[1];
-
-            Binds.Add(new BindItem { Id = 1, Type = "Project", Value = "Retail App" });
-            Binds.Add(new BindItem { Id = 2, Type = "Location", Value = "Warsaw" });
-            Binds.Add(new BindItem { Id = 3, Type = "Role", Value = "Support" });
+            // demo binds
+            Binds.Add(new BindRow { Id = 1, Key = "CTRL+1", Value = "+", IsActive = true });
+            Binds.Add(new BindRow { Id = 2, Key = "CTRL+2", Value = "-", IsActive = true });
+            Binds.Add(new BindRow { Id = 3, Key = "CTRL+3", Value = "09:00-17:00", IsActive = false });
             SelectedBind = Binds[0];
 
-            AvailabilityDays.Add(new AvailabilityDayItem { Day = "Mon", Start = "09:00", End = "17:00", IsAvailable = true });
-            AvailabilityDays.Add(new AvailabilityDayItem { Day = "Tue", Start = "10:00", End = "18:00", IsAvailable = true });
-            AvailabilityDays.Add(new AvailabilityDayItem { Day = "Wed", Start = "—", End = "—", IsAvailable = false });
-            AvailabilityDays.Add(new AvailabilityDayItem { Day = "Thu", Start = "12:00", End = "20:00", IsAvailable = true });
-            AvailabilityDays.Add(new AvailabilityDayItem { Day = "Fri", Start = "09:00", End = "15:00", IsAvailable = true });
-            AvailabilityDays.Add(new AvailabilityDayItem { Day = "Sat", Start = "—", End = "—", IsAvailable = false });
-            AvailabilityDays.Add(new AvailabilityDayItem { Day = "Sun", Start = "—", End = "—", IsAvailable = false });
-            SelectedAvailabilityDay = AvailabilityDays[0];
+            BuildScheduleTable();
         }
 
-        // ===== INotifyPropertyChanged =====
+        private void BuildScheduleTable()
+        {
+            _groupTable.Clear();
+            _groupTable.Columns.Clear();
+
+            // Day
+            _groupTable.Columns.Add(new DataColumn(DayColumn, typeof(int))
+            {
+                Caption = "Day",
+                ReadOnly = true
+            });
+
+            // Employee columns (як у твоєму runtime: emp_{id})
+            var c1 = new DataColumn("emp_1", typeof(string)) { Caption = "Іван Петренко" };
+            var c2 = new DataColumn("emp_2", typeof(string)) { Caption = "Олена Шевченко" };
+            _groupTable.Columns.Add(c1);
+            _groupTable.Columns.Add(c2);
+
+            int days = 31;
+            for (int d = 1; d <= days; d++)
+            {
+                var row = _groupTable.NewRow();
+                row[DayColumn] = d;
+
+                // трохи “живих” прикладів
+                row["emp_1"] = (d % 2 == 0) ? "+" : "-";
+                row["emp_2"] = (d % 3 == 0) ? "09:00-17:00" : "-";
+
+                _groupTable.Rows.Add(row);
+            }
+
+            MatrixChanged?.Invoke(this, EventArgs.Empty);
+            OnPropertyChanged(nameof(AvailabilityDays));
+        }
+
         public event PropertyChangedEventHandler? PropertyChanged;
         private void OnPropertyChanged([CallerMemberName] string? name = null)
             => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
 
-        // ===== Simple design-time ICommand =====
-        private sealed class DesignCommand : ICommand
+        private void Set<T>(ref T field, T value, [CallerMemberName] string? name = null)
         {
-            public bool CanExecute(object? parameter) => true;
+            if (Equals(field, value)) return;
+            field = value;
+            OnPropertyChanged(name);
+            if (name == nameof(SelectedEmployee)) OnPropertyChanged(nameof(SelectedEmployeeId));
+        }
+
+        private sealed class DummyCommand : ICommand
+        {
+            public bool CanExecute(object? parameter) => false;
             public void Execute(object? parameter) { }
             public event EventHandler? CanExecuteChanged { add { } remove { } }
         }

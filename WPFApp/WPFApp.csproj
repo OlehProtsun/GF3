@@ -9,21 +9,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <None Remove="Assets\Icons\availability.png" />
-    <None Remove="Assets\Icons\database.png" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <Resource Include="Assets\Icons\availability.png" />
-    <Resource Include="Assets\Icons\container.png" />
-    <Resource Include="Assets\Icons\home.png" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <Folder Include="Service\" />
-  </ItemGroup>
-
-  <ItemGroup>
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.1" />
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.1" />
@@ -32,18 +17,6 @@
   <ItemGroup>
     <ProjectReference Include="..\BusinessLogicLayer\BusinessLogicLayer.csproj" />
     <ProjectReference Include="..\DataAccessLayer\DataAccessLayer.csproj" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <Resource Include="Assets\Icons\database.png" />
-    <Resource Include="Assets\Icons\power.png" />
-    <Resource Include="Assets\Icons\resize.png" />
-    <Resource Include="Assets\Icons\shop.png">
-      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
-    </Resource>
-    <Resource Include="Assets\Icons\employee.png">
-      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
-    </Resource>
   </ItemGroup>
 
 </Project>

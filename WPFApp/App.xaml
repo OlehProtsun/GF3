@@ -23,5 +23,18 @@
         <DataTemplate DataType="{x:Type vm:ContainerViewModel}">
             <v:ContainerView/>
         </DataTemplate>
+
+        <Geometry x:Key="IconInfo">
+            M12,2A10,10 0 1 0 22,12A10,10 0 0 0 12,2ZM11,10H13V18H11ZM11,6H13V8H11Z
+        </Geometry>
+
+        <Geometry x:Key="IconWarn">
+            M1,21H23L12,2L1,21ZM11,16H13V18H11ZM11,10H13V14H11Z
+        </Geometry>
+
+        <Geometry x:Key="IconError">
+            M12,2A10,10 0 1 0 22,12A10,10 0 0 0 12,2ZM9,9L15,15M15,9L9,15
+        </Geometry>
+
     </Application.Resources>
 </Application>
