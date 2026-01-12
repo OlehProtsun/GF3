@@ -8,6 +8,7 @@
                     xmlns:av="clr-namespace:WPFApp.View.Availability"
                     xmlns:ev="clr-namespace:WPFApp.View.Employee"
                     xmlns:sv="clr-namespace:WPFApp.View.Shop">
+    
     <DataTemplate DataType="{x:Type evm:EmployeeViewModel}">
         <ev:EmployeeView />
     </DataTemplate>
@@ -59,4 +60,5 @@
     <DataTemplate DataType="{x:Type avm:AvailabilityProfileViewModel}">
         <av:AvailabilityProfileView />
     </DataTemplate>
+    
 </ResourceDictionary>

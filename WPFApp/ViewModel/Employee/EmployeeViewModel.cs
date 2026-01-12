@@ -7,6 +7,7 @@ using BusinessLogicLayer.Services.Abstractions;
 using DataAccessLayer.Models;
 using WPFApp.Infrastructure;
 using WPFApp.Service;
+using WPFApp.ViewModel.Dialogs;
 
 namespace WPFApp.ViewModel.Employee
 {

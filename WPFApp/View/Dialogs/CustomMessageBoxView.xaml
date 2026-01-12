@@ -12,6 +12,7 @@
 
     <Window.Resources>
 
+        <BooleanToVisibilityConverter x:Key="BoolToVis" />
         <!-- =========================================
              BUTTON BASE (Hover + Press animations)
              ========================================= -->
@@ -291,7 +292,8 @@
                                 Width="110"
                                 Content="{Binding CancelText}"
                                 Command="{Binding CancelCommand}"
-                                Visibility="{Binding IsCancelVisible}"/>
+                                Visibility="{Binding IsCancelVisible, Converter={StaticResource BoolToVis}}"
+/>
 
                         <Button Grid.Column="3"
                                 Style="{StaticResource RoundedButtonStyle}"

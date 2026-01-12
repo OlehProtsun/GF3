@@ -22,6 +22,13 @@ namespace WPFApp.View
             _vm = vm;
             DataContext = vm;
 
+            Loaded += (_, __) =>
+            {
+                // Якщо ще нічого не відкрито — відкриваємо Employee як стартову сторінку
+                if (_vm.CurrentViewModel == null)
+                    _vm.ShowEmployeeCommand.Execute(null);
+            };
+
             Closed += (_, __) => _vm.Dispose();
         }
 

@@ -193,20 +193,6 @@
                                        Foreground="{StaticResource MutedTextBrush}"
                                        Text="{Binding Items.Count, StringFormat=Total: {0}}" />
                         </Border>
-
-                        <Button Width="72"
-                                Height="33"
-                                Margin="0,0,8,0"
-                                Style="{StaticResource RoundedButtonStyle}"
-                                Content="Edit"
-                                Command="{Binding EditCommand}" />
-
-                        <Button Width="72"
-                                Height="33"
-                                Style="{StaticResource RoundedButtonStyle}"
-                                Background="{StaticResource DangerBrush}"
-                                Content="Delete"
-                                Command="{Binding DeleteCommand}" />
                     </StackPanel>
                 </Grid>
 
