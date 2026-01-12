@@ -2,10 +2,12 @@
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
                     xmlns:vm="clr-namespace:WPFApp.ViewModel"
                     xmlns:avm="clr-namespace:WPFApp.ViewModel.Availability"
+                    xmlns:cvm="clr-namespace:WPFApp.ViewModel.Container"
                     xmlns:evm="clr-namespace:WPFApp.ViewModel.Employee"
                     xmlns:svm="clr-namespace:WPFApp.ViewModel.Shop"
                     xmlns:v="clr-namespace:WPFApp.View"
                     xmlns:av="clr-namespace:WPFApp.View.Availability"
+                    xmlns:cv="clr-namespace:WPFApp.View.Container"
                     xmlns:ev="clr-namespace:WPFApp.View.Employee"
                     xmlns:sv="clr-namespace:WPFApp.View.Shop">
     
@@ -21,7 +23,7 @@
         <av:AvailabilityView />
     </DataTemplate>
 
-    <DataTemplate DataType="{x:Type vm:ContainerViewModel}">
+    <DataTemplate DataType="{x:Type cvm:ContainerViewModel}">
         <v:ContainerView />
     </DataTemplate>
 
@@ -59,6 +61,26 @@
 
     <DataTemplate DataType="{x:Type avm:AvailabilityProfileViewModel}">
         <av:AvailabilityProfileView />
+    </DataTemplate>
+
+    <DataTemplate DataType="{x:Type cvm:ContainerListViewModel}">
+        <cv:ContainerListView />
+    </DataTemplate>
+
+    <DataTemplate DataType="{x:Type cvm:ContainerEditViewModel}">
+        <cv:ContainerEditView />
+    </DataTemplate>
+
+    <DataTemplate DataType="{x:Type cvm:ContainerProfileViewModel}">
+        <cv:ContainerProfileView />
+    </DataTemplate>
+
+    <DataTemplate DataType="{x:Type cvm:ContainerScheduleEditViewModel}">
+        <cv:ContainerScheduleEditView />
+    </DataTemplate>
+
+    <DataTemplate DataType="{x:Type cvm:ContainerScheduleProfileViewModel}">
+        <cv:ContainerScheduleProfileView />
     </DataTemplate>
     
 </ResourceDictionary>

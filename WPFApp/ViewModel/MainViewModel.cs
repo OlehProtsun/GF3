@@ -5,6 +5,7 @@ using System.Windows;
 using Microsoft.Extensions.DependencyInjection;
 using WPFApp.Infrastructure;
 using WPFApp.ViewModel.Availability;
+using WPFApp.ViewModel.Container;
 using WPFApp.ViewModel.Employee;
 using WPFApp.ViewModel.Shop;
 
@@ -136,6 +137,9 @@ namespace WPFApp.ViewModel
                         break;
                     case ShopViewModel shopVm:
                         await shopVm.EnsureInitializedAsync(ct);
+                        break;
+                    case ContainerViewModel containerVm:
+                        await containerVm.EnsureInitializedAsync(ct);
                         break;
                 }
             }, busyText);

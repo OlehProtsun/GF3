@@ -11,6 +11,7 @@ using WPFApp.View.Availability;
 using WPFApp.View.Employee;
 using WPFApp.View.Shop;
 using WPFApp.ViewModel.Availability;
+using WPFApp.ViewModel.Container;
 using WPFApp.ViewModel.Employee;
 using WPFApp.ViewModel.Shop;
 
@@ -46,7 +47,7 @@ namespace WPFApp
             services.AddTransient<EmployeeViewModel>();
             services.AddTransient<AvailabilityViewModel>();
             services.AddTransient<ShopViewModel>();
-            services.AddTransient<WPFApp.ViewModel.ContainerViewModel>();
+            services.AddTransient<ContainerViewModel>();
 
             // 3) Реєстрація Views (Windows/UserControls)
             services.AddSingleton<MainWindow>();
