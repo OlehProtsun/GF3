@@ -95,17 +95,10 @@ namespace WPFApp.View.Availability
                     col.Width = new DataGridLength(1, DataGridLengthUnitType.Star);
                 }
 
-                // центр
-                var tbStyle = new Style(typeof(TextBlock));
-                tbStyle.Setters.Add(new Setter(TextBlock.TextAlignmentProperty, TextAlignment.Center));
-                tbStyle.Setters.Add(new Setter(FrameworkElement.VerticalAlignmentProperty, VerticalAlignment.Center));
-                tbStyle.Setters.Add(new Setter(FrameworkElement.HorizontalAlignmentProperty, HorizontalAlignment.Center));
+                var tbStyle = (Style)Application.Current.FindResource("MatrixCellTextBlockStyle");
                 col.ElementStyle = tbStyle;
 
-                var editStyle = new Style(typeof(TextBox));
-                editStyle.Setters.Add(new Setter(TextBox.TextAlignmentProperty, TextAlignment.Center));
-                editStyle.Setters.Add(new Setter(Control.VerticalContentAlignmentProperty, VerticalAlignment.Center));
-                editStyle.Setters.Add(new Setter(Control.PaddingProperty, new Thickness(0)));
+                var editStyle = (Style)Application.Current.FindResource("MatrixCellTextBoxStyle");
                 col.EditingElementStyle = editStyle;
 
                 grid.Columns.Add(col);

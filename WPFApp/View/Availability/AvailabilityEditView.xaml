@@ -8,1072 +8,71 @@
              mc:Ignorable="d"
              d:DesignHeight="1200" d:DesignWidth="852"
              d:DataContext="{d:DesignInstance Type=dt:AvailabilityEditViewDesignVM, IsDesignTimeCreatable=True}"
-             Background="#cfd0d1">
-
-    <!-- Ті ж самі стилі, як в AvailabilityListView.xaml -->
-    <UserControl.Resources>
-
-        <Style x:Key="AnimatedToggleBaseStyle" TargetType="ToggleButton">
-            <Setter Property="Cursor" Value="Hand"/>
-            <Setter Property="BorderThickness" Value="0"/>
-            <Setter Property="RenderTransformOrigin" Value="0.5,0.5"/>
-            <Setter Property="RenderTransform">
-                <Setter.Value>
-                    <ScaleTransform ScaleX="1" ScaleY="1"/>
-                </Setter.Value>
-            </Setter>
-
-            <Style.Triggers>
-                <Trigger Property="IsMouseOver" Value="True">
-                    <Trigger.EnterActions>
-                        <BeginStoryboard>
-                            <Storyboard>
-                                <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)"
-                                         To="1.04" Duration="0:0:0.10"/>
-                                <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)"
-                                         To="1.04" Duration="0:0:0.10"/>
-                                <DoubleAnimation Storyboard.TargetProperty="Opacity"
-                                         To="0.96" Duration="0:0:0.10"/>
-                            </Storyboard>
-                        </BeginStoryboard>
-                    </Trigger.EnterActions>
-                    <Trigger.ExitActions>
-                        <BeginStoryboard>
-                            <Storyboard>
-                                <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)"
-                                         To="1" Duration="0:0:0.12"/>
-                                <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)"
-                                         To="1" Duration="0:0:0.12"/>
-                                <DoubleAnimation Storyboard.TargetProperty="Opacity"
-                                         To="1" Duration="0:0:0.12"/>
-                            </Storyboard>
-                        </BeginStoryboard>
-                    </Trigger.ExitActions>
-                </Trigger>
-
-                <Trigger Property="IsPressed" Value="True">
-                    <Trigger.EnterActions>
-                        <BeginStoryboard>
-                            <Storyboard>
-                                <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)"
-                                         To="0.96" Duration="0:0:0.06"/>
-                                <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)"
-                                         To="0.96" Duration="0:0:0.06"/>
-                                <DoubleAnimation Storyboard.TargetProperty="Opacity"
-                                         To="0.92" Duration="0:0:0.06"/>
-                            </Storyboard>
-                        </BeginStoryboard>
-                    </Trigger.EnterActions>
-                    <Trigger.ExitActions>
-                        <BeginStoryboard>
-                            <Storyboard>
-                                <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)"
-                                         To="1.04" Duration="0:0:0.06"/>
-                                <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)"
-                                         To="1.04" Duration="0:0:0.06"/>
-                                <DoubleAnimation Storyboard.TargetProperty="Opacity"
-                                         To="0.96" Duration="0:0:0.06"/>
-                            </Storyboard>
-                        </BeginStoryboard>
-                    </Trigger.ExitActions>
-                </Trigger>
-
-                <Trigger Property="IsEnabled" Value="False">
-                    <Setter Property="Opacity" Value="0.5"/>
-                </Trigger>
-            </Style.Triggers>
-        </Style>
-
-
-        <Style x:Key="AnimatedButtonBaseStyle" TargetType="Button">
-            <Setter Property="Cursor" Value="Hand"/>
-            <Setter Property="BorderThickness" Value="0"/>
-            <Setter Property="RenderTransformOrigin" Value="0.5,0.5"/>
-            <Setter Property="RenderTransform">
-                <Setter.Value>
-                    <ScaleTransform ScaleX="1" ScaleY="1"/>
-                </Setter.Value>
-            </Setter>
-
-            <Style.Triggers>
-                <!-- HOVER -->
-                <Trigger Property="IsMouseOver" Value="True">
-                    <Trigger.EnterActions>
-                        <BeginStoryboard>
-                            <Storyboard>
-                                <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)"
-                                         To="1.04" Duration="0:0:0.10"/>
-                                <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)"
-                                         To="1.04" Duration="0:0:0.10"/>
-                                <DoubleAnimation Storyboard.TargetProperty="Opacity"
-                                         To="0.96" Duration="0:0:0.10"/>
-                            </Storyboard>
-                        </BeginStoryboard>
-                    </Trigger.EnterActions>
-                    <Trigger.ExitActions>
-                        <BeginStoryboard>
-                            <Storyboard>
-                                <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)"
-                                         To="1" Duration="0:0:0.12"/>
-                                <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)"
-                                         To="1" Duration="0:0:0.12"/>
-                                <DoubleAnimation Storyboard.TargetProperty="Opacity"
-                                         To="1" Duration="0:0:0.12"/>
-                            </Storyboard>
-                        </BeginStoryboard>
-                    </Trigger.ExitActions>
-                </Trigger>
-
-                <!-- PRESSED -->
-                <Trigger Property="IsPressed" Value="True">
-                    <Trigger.EnterActions>
-                        <BeginStoryboard>
-                            <Storyboard>
-                                <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)"
-                                         To="0.96" Duration="0:0:0.06"/>
-                                <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)"
-                                         To="0.96" Duration="0:0:0.06"/>
-                                <DoubleAnimation Storyboard.TargetProperty="Opacity"
-                                         To="0.92" Duration="0:0:0.06"/>
-                            </Storyboard>
-                        </BeginStoryboard>
-                    </Trigger.EnterActions>
-                    <Trigger.ExitActions>
-                        <BeginStoryboard>
-                            <Storyboard>
-                                <!-- повертаємось у hover-стан (1.04), як у файлі -->
-                                <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)"
-                                         To="1.04" Duration="0:0:0.06"/>
-                                <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)"
-                                         To="1.04" Duration="0:0:0.06"/>
-                                <DoubleAnimation Storyboard.TargetProperty="Opacity"
-                                         To="0.96" Duration="0:0:0.06"/>
-                            </Storyboard>
-                        </BeginStoryboard>
-                    </Trigger.ExitActions>
-                </Trigger>
-
-                <!-- DISABLED -->
-                <Trigger Property="IsEnabled" Value="False">
-                    <Setter Property="Opacity" Value="0.5"/>
-                </Trigger>
-            </Style.Triggers>
-        </Style>
-        <!-- Rounded button (аналог Guna2Button BorderRadius=12) -->
-        <Style x:Key="RoundedButtonStyle"
-           TargetType="Button"
-           BasedOn="{StaticResource AnimatedButtonBaseStyle}">
-            <Setter Property="Height" Value="42"/>
-            <Setter Property="Padding" Value="14,0"/>
-            <Setter Property="FontFamily" Value="Segoe UI"/>
-            <Setter Property="FontSize" Value="13"/>
-            <Setter Property="Foreground" Value="White"/>
-            <Setter Property="BorderThickness" Value="0"/>
-            <Setter Property="Background" Value="#FF3347FF"/>
-            <Setter Property="Cursor" Value="Hand"/>
-            <Setter Property="RenderTransformOrigin" Value="0.5,0.5"/>
-
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Grid x:Name="Root" SnapsToDevicePixels="True" RenderTransformOrigin="0.5,0.5">
-
-                            <!-- Base -->
-                            <Border x:Name="Bd"
-                            Background="{TemplateBinding Background}"
-                            CornerRadius="14"/>
-
-                            <!-- Hover overlay (працює з будь-яким Background) -->
-                            <Border x:Name="HoverOverlay"
-                            Background="#FFFFFF"
-                            Opacity="0"
-                            CornerRadius="14"/>
-
-                            <!-- Pressed overlay -->
-                            <Border x:Name="PressedOverlay"
-                            Background="#000000"
-                            Opacity="0"
-                            CornerRadius="14"/>
-
-                            <ContentPresenter HorizontalAlignment="Center"
-                                      VerticalAlignment="Center"
-                                      Margin="{TemplateBinding Padding}"/>
-                        </Grid>
-
-                        <ControlTemplate.Triggers>
-                            <!-- DISABLED -->
-                            <Trigger Property="IsEnabled" Value="False">
-                                <Setter TargetName="Root" Property="Opacity" Value="0.5"/>
-                            </Trigger>
-
-                            <!-- HOVER animation -->
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Trigger.EnterActions>
-                                    <BeginStoryboard>
-                                        <Storyboard>
-                                            <DoubleAnimation Storyboard.TargetName="HoverOverlay"
-                                                     Storyboard.TargetProperty="Opacity"
-                                                     To="0.12" Duration="0:0:0.12"/>
-                                        </Storyboard>
-                                    </BeginStoryboard>
-                                </Trigger.EnterActions>
-                                <Trigger.ExitActions>
-                                    <BeginStoryboard>
-                                        <Storyboard>
-                                            <DoubleAnimation Storyboard.TargetName="HoverOverlay"
-                                                     Storyboard.TargetProperty="Opacity"
-                                                     To="0" Duration="0:0:0.12"/>
-                                        </Storyboard>
-                                    </BeginStoryboard>
-                                </Trigger.ExitActions>
-                            </Trigger>
-
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
-        <!-- Icon button (37x37, LightGray) -->
-        <Style x:Key="IconButtonStyle" TargetType="Button" BasedOn="{StaticResource AnimatedButtonBaseStyle}">
-            <Setter Property="Width" Value="37"/>
-            <Setter Property="Height" Value="37"/>
-            <Setter Property="BorderThickness" Value="0"/>
-            <Setter Property="Background" Value="#e6e6e6"/>
-            <Setter Property="Cursor" Value="Hand"/>
-            <Setter Property="RenderTransformOrigin" Value="0.5,0.5"/>
-
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Grid x:Name="Root" SnapsToDevicePixels="True" RenderTransformOrigin="0.5,0.5">
-
-                            <Border x:Name="Bd"
-                            Background="{TemplateBinding Background}"
-                            CornerRadius="14"/>
-
-                            <Border x:Name="HoverOverlay"
-                            Background="#FFFFFF"
-                            Opacity="0"
-                            CornerRadius="14"/>
-
-                            <Border x:Name="PressedOverlay"
-                            Background="#000000"
-                            Opacity="0"
-                            CornerRadius="14"/>
-
-                            <ContentPresenter HorizontalAlignment="Center"
-                                      VerticalAlignment="Center"/>
-                        </Grid>
-
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsEnabled" Value="False">
-                                <Setter TargetName="Root" Property="Opacity" Value="0.5"/>
-                            </Trigger>
-
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Trigger.EnterActions>
-                                    <BeginStoryboard>
-                                        <Storyboard>
-                                            <DoubleAnimation Storyboard.TargetName="HoverOverlay"
-                                                     Storyboard.TargetProperty="Opacity"
-                                                     To="0.12" Duration="0:0:0.12"/>
-                                        </Storyboard>
-                                    </BeginStoryboard>
-                                </Trigger.EnterActions>
-                                <Trigger.ExitActions>
-                                    <BeginStoryboard>
-                                        <Storyboard>
-                                            <DoubleAnimation Storyboard.TargetName="HoverOverlay"
-                                                     Storyboard.TargetProperty="Opacity"
-                                                     To="0" Duration="0:0:0.12"/>
-                                        </Storyboard>
-                                    </BeginStoryboard>
-                                </Trigger.ExitActions>
-                            </Trigger>
-
-                            <Trigger Property="IsPressed" Value="True">
-                                <Trigger.EnterActions>
-                                    <BeginStoryboard>
-                                        <Storyboard>
-                                            <DoubleAnimation Storyboard.TargetName="PressedOverlay"
-                                                     Storyboard.TargetProperty="Opacity"
-                                                     To="0.18" Duration="0:0:0.06"/>
-                                            <DoubleAnimation Storyboard.TargetName="Scale"
-                                                     Storyboard.TargetProperty="ScaleX"
-                                                     To="0.97" Duration="0:0:0.06"/>
-                                            <DoubleAnimation Storyboard.TargetName="Scale"
-                                                     Storyboard.TargetProperty="ScaleY"
-                                                     To="0.97" Duration="0:0:0.06"/>
-                                        </Storyboard>
-                                    </BeginStoryboard>
-                                </Trigger.EnterActions>
-
-                                <Trigger.ExitActions>
-                                    <BeginStoryboard>
-                                        <Storyboard>
-                                            <DoubleAnimation Storyboard.TargetName="PressedOverlay"
-                                                     Storyboard.TargetProperty="Opacity"
-                                                     To="0" Duration="0:0:0.10"/>
-                                            <DoubleAnimation Storyboard.TargetName="Scale"
-                                                     Storyboard.TargetProperty="ScaleX"
-                                                     To="1" Duration="0:0:0.10"/>
-                                            <DoubleAnimation Storyboard.TargetName="Scale"
-                                                     Storyboard.TargetProperty="ScaleY"
-                                                     To="1" Duration="0:0:0.10"/>
-                                        </Storyboard>
-                                    </BeginStoryboard>
-                                </Trigger.ExitActions>
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
-
-        <!-- Rounded TextBox -->
-        <Style x:Key="RoundedTextBoxStyle" TargetType="TextBox">
-            <Setter Property="Height" Value="42"/>
-            <Setter Property="Padding" Value="12,0"/>
-            <Setter Property="FontFamily" Value="Segoe UI"/>
-            <Setter Property="FontSize" Value="13"/>
-            <Setter Property="Foreground" Value="Black"/>
-            <Setter Property="Background" Value="White"/>
-            <Setter Property="BorderBrush" Value="Silver"/>
-            <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="TextBox">
-                        <Border Background="{TemplateBinding Background}"
-                        BorderBrush="{TemplateBinding BorderBrush}"
-                        BorderThickness="{TemplateBinding BorderThickness}"
-                        CornerRadius="14">
-                            <ScrollViewer x:Name="PART_ContentHost"/>
-                        </Border>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
-        <!-- DataGrid style (можна використовувати для всіх грідів) -->
-        <Style x:Key="AvailabilityListGridStyle" TargetType="DataGrid">
-            <!-- поведінка -->
-            <Setter Property="AutoGenerateColumns" Value="True"/>
-            <Setter Property="IsReadOnly" Value="False"/>
-            <Setter Property="SelectionUnit" Value="FullRow"/>
-            <Setter Property="SelectionMode" Value="Single"/>
-            <Setter Property="CanUserAddRows" Value="False"/>
-            <Setter Property="CanUserDeleteRows" Value="False"/>
-            <Setter Property="CanUserResizeRows" Value="False"/>
-
-            <!-- вигляд -->
-            <Setter Property="BorderThickness" Value="0"/>
-            <Setter Property="GridLinesVisibility" Value="None"/>
-            <Setter Property="Background" Value="Gainsboro"/>
-
-            <!-- Column headers -->
-            <Setter Property="ColumnHeaderHeight" Value="36"/>
-            <Setter Property="ColumnHeaderStyle">
-                <Setter.Value>
-                    <Style TargetType="DataGridColumnHeader">
-                        <Setter Property="Background" Value="White"/>
-                        <Setter Property="Foreground" Value="Black"/>
-                        <Setter Property="FontFamily" Value="Segoe UI"/>
-                        <Setter Property="FontSize" Value="12"/>
-                        <Setter Property="BorderThickness" Value="0"/>
-                    </Style>
-                </Setter.Value>
-            </Setter>
-
-            <!-- Row style -->
-            <Setter Property="RowStyle">
-                <Setter.Value>
-                    <Style TargetType="DataGridRow">
-                        <Setter Property="Background" Value="White"/>
-                        <Setter Property="BorderThickness" Value="0"/>
-                        <Setter Property="SnapsToDevicePixels" Value="True"/>
-                    </Style>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
-        <!-- Small gray back button -->
-        <Style x:Key="BackButtonSmallStyle" TargetType="Button" BasedOn="{StaticResource AnimatedButtonBaseStyle}">
-            <Setter Property="Height" Value="34"/>
-            <Setter Property="Padding" Value="12,0"/>
-            <Setter Property="FontFamily" Value="Segoe UI"/>
-            <Setter Property="FontSize" Value="13"/>
-            <Setter Property="Foreground" Value="#FF444444"/>
-            <Setter Property="Background" Value="#FFEAEAEA"/>
-            <Setter Property="BorderThickness" Value="0"/>
-            <Setter Property="Cursor" Value="Hand"/>
-            <Setter Property="HorizontalContentAlignment" Value="Center"/>
-            <Setter Property="VerticalContentAlignment" Value="Center"/>
-
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Border x:Name="Bd"
-                        Background="{TemplateBinding Background}"
-                        CornerRadius="12">
-                            <ContentPresenter HorizontalAlignment="Center"
-                                      VerticalAlignment="Center"/>
-                        </Border>
-
-                        <ControlTemplate.Triggers>
-                            <!-- HOVER -->
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Bd" Property="Background" Value="#FF3347FF"/>
-                                <Setter Property="Foreground" Value="White"/>
-                            </Trigger>
-
-                            <!-- PRESSED -->
-                            <Trigger Property="IsPressed" Value="True">
-                                <Setter TargetName="Bd" Property="Background" Value="#FF2234CC"/>
-                                <Setter Property="Foreground" Value="White"/>
-                            </Trigger>
-
-                            <!-- DISABLED -->
-                            <Trigger Property="IsEnabled" Value="False">
-                                <Setter Property="Opacity" Value="0.5"/>
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
-        <Geometry x:Key="BackSvgIconGeometry">
-            M1160 4458 c-50 -18 -90 -55 -421 -387 -418 -417 -414 -412 -414 -551 0 -138 -3 -134 409 -547 316 -317 368 -365 421 -389 255 -117 540 164 423 417 -15 32 -54 87 -93 128 l-68 72 969 -4 c966 -3 969 -3 1053 -25 412 -110 692 -452 718 -878 28 -459 -271 -870 -718 -985 -78 -21 -116 -23 -529 -28 -441 -6 -445 -6 -498 -30 -71 -32 -147 -115 -167 -183 -19 -66 -19 -150 0 -216 20 -68 96 -151 167 -183 52 -24 57 -24 443 -27 423 -4 553 4 713 43 748 181 1265 866 1229 1627 -32 661 -465 1234 -1093 1444 -58 20 -149 45 -202 57 -94 20 -125 21 -1090 24 l-994 4 66 69 c89 94 108 135 114 236 4 73 1 88 -23 143 -34 76 -113 152 -181 175 -66 22 -166 20 -234 -6z</Geometry>
-
-        <Geometry x:Key="IconInformation">
-            M0 0 C1.45108658 0.00273422 1.45108658 0.00273422 2.93148804 0.00552368 C17.26440977 0.05095174 31.21023917 0.55983928 45.3125 3.3125 C46.65803955 3.55395752 46.65803955 3.55395752 48.03076172 3.80029297 C107.84088904 14.62287989 165.35495829 48.68064457 202.3125 97.3125 C202.72918945 97.85277832 203.14587891 98.39305664 203.57519531 98.94970703 C211.2584873 108.9447116 218.00092968 119.40459036 224.3125 130.3125 C224.70679199 130.98974121 225.10108398 131.66698242 225.50732422 132.36474609 C238.68961173 155.2833756 247.29510918 180.85822563 252.625 206.6875 C252.77243652 207.39817627 252.91987305 208.10885254 253.07177734 208.84106445 C256.05713787 224.48358366 256.6873098 240.11919606 256.625 256 C256.62226578 257.45108658 256.62226578 257.45108658 256.61947632 258.93148804 C256.57404826 273.26440977 256.06516072 287.21023917 253.3125 301.3125 C253.15152832 302.20952637 252.99055664 303.10655273 252.82470703 304.03076172 C242.00212011 363.84088904 207.94435543 421.35495829 159.3125 458.3125 C158.77222168 458.72918945 158.23194336 459.14587891 157.67529297 459.57519531 C147.6802884 467.2584873 137.22040964 474.00092968 126.3125 480.3125 C125.63525879 480.70679199 124.95801758 481.10108398 124.26025391 481.50732422 C101.3416244 494.68961173 75.76677437 503.29510918 49.9375 508.625 C49.22682373 508.77243652 48.51614746 508.91987305 47.78393555 509.07177734 C32.14141634 512.05713787 16.50580394 512.6873098 0.625 512.625 C-0.34239105 512.62317719 -1.3097821 512.62135437 -2.30648804 512.61947632 C-16.63940977 512.57404826 -30.58523917 512.06516072 -44.6875 509.3125 C-45.58452637 509.15152832 -46.48155273 508.99055664 -47.40576172 508.82470703 C-107.21588904 498.00212011 -164.72995829 463.94435543 -201.6875 415.3125 C-202.10418945 414.77222168 -202.52087891 414.23194336 -202.95019531 413.67529297 C-210.6334873 403.6802884 -217.37592968 393.22040964 -223.6875 382.3125 C-224.08179199 381.63525879 -224.47608398 380.95801758 -224.88232422 380.26025391 C-238.06461173 357.3416244 -246.67010918 331.76677437 -252 305.9375 C-252.14743652 305.22682373 -252.29487305 304.51614746 -252.44677734 303.78393555 C-255.43213787 288.14141634 -256.0623098 272.50580394 -256 256.625 C-255.99817719 255.65760895 -255.99635437 254.6902179 -255.99447632 253.69351196 C-255.94904826 239.36059023 -255.44016072 225.41476083 -252.6875 211.3125 C-252.44604248 209.96696045 -252.44604248 209.96696045 -252.19970703 208.59423828 C-241.37712011 148.78411096 -207.31935543 91.27004171 -158.6875 54.3125 C-158.14722168 53.89581055 -157.60694336 53.47912109 -157.05029297 53.04980469 C-147.0552884 45.3665127 -136.59540964 38.62407032 -125.6875 32.3125 C-125.01025879 31.91820801 -124.33301758 31.52391602 -123.63525391 31.11767578 C-100.7166244 17.93538827 -75.14177437 9.32989082 -49.3125 4 C-48.60182373 3.85256348 -47.89114746 3.70512695 -47.15893555 3.55322266 C-31.51641634 0.56786213 -15.88080394 -0.0623098 0 0 Z M-8 113.6875 C-14.34068881 121.49006984 -16.45176089 130.46202626 -15.6875 140.3125 C-14.39576499 147.58124614 -11.51840042 152.80031876 -6.6875 158.3125 C-5.57375 159.611875 -5.57375 159.611875 -4.4375 160.9375 C4.95675669 169.05072169 14.19796355 171.8194848 26.5234375 171.625 C36.95058604 170.76502899 46.58789931 165.66071801 53.625 157.9375 C60.92299885 148.81500143 61.97759887 139.69044135 61.3125 128.3125 C60.2043672 122.98368491 57.50901962 118.67139039 54.3125 114.3125 C53.755625 113.4875 53.19875 112.6625 52.625 111.8125 C45.99893032 104.64918142 36.48502955 99.98047603 26.75390625 99.07421875 C12.40494564 98.70429982 1.72278216 103.2633231 -8 113.6875 Z M-62.6875 217.3125 C-63.5851709 217.61873291 -64.4828418 217.92496582 -65.40771484 218.24047852 C-69.64709988 219.83930551 -71.27709931 220.54456683 -73.4765625 224.66015625 C-73.75242188 225.88605469 -74.02828125 227.11195313 -74.3125 228.375 C-74.76496094 230.21771484 -74.76496094 230.21771484 -75.2265625 232.09765625 C-75.93347169 235.32070151 -75.93347169 235.32070151 -74.6875 238.3125 C-73.86507812 238.03535156 -73.04265625 237.75820312 -72.1953125 237.47265625 C-60.35927581 233.63209469 -49.96498728 231.99952724 -37.6875 235.3125 C-34.45210364 237.28993806 -32.99387234 238.64853806 -31.40234375 242.09765625 C-29.13452461 252.29664615 -30.44823966 262.56845988 -32.70703125 272.6328125 C-32.92467133 273.61665421 -33.1423114 274.60049591 -33.36654663 275.614151 C-36.29886477 288.47494381 -40.0871805 301.1016533 -43.8125 313.75 C-56.37824954 351.37345631 -56.37824954 351.37345631 -51.625 389.5 C-45.55552242 400.44610985 -35.50405714 407.32973636 -23.6394043 410.93481445 C-17.59741554 412.45086804 -11.70639942 412.64586886 -5.5 412.625 C-4.09137695 412.64916992 -4.09137695 412.64916992 -2.65429688 412.67382812 C10.61191747 412.68280999 22.68015179 408.80087333 34.93066406 404.12402344 C37.09687589 403.29941417 39.27041414 402.49669309 41.4453125 401.6953125 C42.83381058 401.17314228 44.22185045 400.64975163 45.609375 400.125 C46.2550946 399.88740967 46.90081421 399.64981934 47.56610107 399.4050293 C50.99370055 398.07884506 52.20780945 397.46953582 54.3125 394.3125 C54.91671492 391.93167147 55.4515323 389.53274906 55.9375 387.125 C56.19789063 385.85269531 56.45828125 384.58039063 56.7265625 383.26953125 C56.91992188 382.29371094 57.11328125 381.31789063 57.3125 380.3125 C55.73275391 380.745625 55.73275391 380.745625 54.12109375 381.1875 C41.78162935 384.42434059 26.17196068 387.85642087 14.3125 381.3125 C13.08203125 378.88671875 13.08203125 378.88671875 12.3125 376.3125 C11.9825 375.3225 11.6525 374.3325 11.3125 373.3125 C10.53862761 363.62803975 11.17954826 354.44732259 13.328125 344.9765625 C13.65500809 343.50653275 13.65500809 343.50653275 13.98849487 342.00680542 C17.25064532 327.74720004 21.45544975 313.72938963 25.52490234 299.68457031 C33.1969697 274.25439333 33.1969697 274.25439333 35.75 247.9375 C35.74242676 247.09735352 35.73485352 246.25720703 35.72705078 245.39160156 C35.39798265 232.97348291 30.50636303 224.19701855 21.75 215.625 C12.88731396 208.25904841 1.48524111 206.29712345 -9.6875 205.3125 C-10.44160156 205.2403125 -11.19570312 205.168125 -11.97265625 205.09375 C-29.28584854 204.29313995 -46.77701361 211.46982016 -62.6875 217.3125 Z
-        </Geometry>
-
-        <Style x:Key="CardStyle" TargetType="Border">
-            <Setter Property="Background" Value="White"/>
-            <Setter Property="CornerRadius" Value="20"/>
-
-            <!-- як у TOP CARD: по 7 зліва/справа + відступ між картами -->
-            <Setter Property="Margin" Value="7,0,7,16"/>
-
-            <!-- рівномірна тінь по колу -->
-            <Setter Property="Effect">
-                <Setter.Value>
-                    <DropShadowEffect BlurRadius="18" ShadowDepth="0" Opacity="0.12"/>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
-        <Style x:Key="RoundedTextBoxWithPlaceholderStyle"
-               TargetType="TextBox"
-               BasedOn="{StaticResource RoundedTextBoxStyle}">
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="TextBox">
-                        <Border Background="{TemplateBinding Background}"
-                        BorderBrush="{TemplateBinding BorderBrush}"
-                        BorderThickness="{TemplateBinding BorderThickness}"
-                        CornerRadius="14">
-
-                            <Grid>
-                                <!-- сам текст -->
-                                <ScrollViewer x:Name="PART_ContentHost"/>
-
-                                <!-- placeholder -->
-                                <TextBlock x:Name="Placeholder"
-                                   Text="{TemplateBinding Tag}"
-                                   Foreground="Silver"
-                                   Margin="12,0,0,0"
-                                   VerticalAlignment="Center"
-                                   IsHitTestVisible="False"
-                                   Visibility="Collapsed"/>
-                            </Grid>
-                        </Border>
-
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="Text" Value="">
-                                <Setter TargetName="Placeholder" Property="Visibility" Value="Visible"/>
-                            </Trigger>
-                            <Trigger Property="IsKeyboardFocused" Value="True">
-                                <Setter TargetName="Placeholder" Property="Visibility" Value="Collapsed"/>
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
-        <BooleanToVisibilityConverter x:Key="BoolToVis"/>
-        
-        <!-- SHOW icon (eye) -->
-        <GeometryGroup x:Key="IconEye">
-            <PathGeometry Figures="M2393 3989 c-854 -54 -1638 -535 -2071 -1269 -46 -78 -57 -105 -60 -150 -4 -65 16 -109 133 -285 195 -292 446 -541 745 -738 130 -85 410 -224 550 -272 686 -236 1400 -192 2032 125 451 227 819 570 1079 1004 43 74 54 100 57 145 4 65 -15 106 -125 274 -397 604 -1027 1014 -1746 1137 -97 16 -411 43 -457 38 -8 0 -70 -4 -137 -9z m274 -410 c360 -40 664 -256 818 -580 239 -506 33 -1104 -467 -1355 -504 -253 -1119 -48 -1374 458 -199 396 -121 872 194 1184 163 161 380 267 603 293 106 12 119 12 226 0z"/>
-            <PathGeometry Figures="M2415 3234 c-38 -8 -112 -36 -164 -61 -78 -37 -109 -59 -176 -127 -215 -214 -264 -519 -128 -796 134 -275 447 -427 751 -364 267 55 481 269 536 536 32 156 13 296 -62 448 -38 77 -61 109 -128 177 -68 67 -99 90 -176 127 -151 73 -299 92 -453 60z"/>
-        </GeometryGroup>
-
-        <!-- HIDE icon (eye-off) -->
-        <GeometryGroup x:Key="IconEyeOffGroupGeo">
-            <PathGeometry Figures="M382 4627 c-78 -78 -142 -147 -142 -152 0 -6 141 -151 314 -324 l314 -314 -87 -72 c-310 -261 -600 -653 -751 -1015 l-31 -76 54 -120 c138 -308 317 -565 566 -815 153 -152 255 -237 416 -344 412 -274 849 -421 1357 -457 352 -25 783 36 1094 155 l89 34 390 -388 390 -389 148 148 147 147 -2063 2063 -2062 2062 -143 -143z m1320 -1624 l176 -178 -10 -60 c-19 -115 7 -273 63 -390 93 -189 260 -324 469 -376 72 -18 103 -21 201 -16 l115 6 178 -178 177 -178 -78 -31 c-244 -96 -488 -114 -718 -53 -439 116 -764 459 -855 901 -29 140 -24 371 9 495 27 94 80 235 89 235 4 0 87 -80 184 -177z"/>
-            <PathGeometry Figures="M2265 4405 c-66 -7 -177 -25 -246 -39 -125 -25 -357 -91 -371 -104 -4 -4 104 -119 240 -255 l249 -248 62 20 c405 137 869 29 1173 -273 221 -219 333 -473 345 -781 6 -155 -8 -265 -50 -398 l-24 -75 342 -342 342 -342 150 149 c269 265 463 544 603 864 l41 95 -41 95 c-254 579 -716 1068 -1280 1353 -275 140 -543 224 -864 272 -144 21 -520 27 -671 9z"/>
-        </GeometryGroup>
-
-        <Style x:Key="HideShowToggleStyle" TargetType="ToggleButton"  BasedOn="{StaticResource AnimatedToggleBaseStyle}">
-            <Setter Property="Height" Value="34"/>
-            <Setter Property="MinWidth" Value="70"/>
-            <Setter Property="Padding" Value="10,0"/>
-            <Setter Property="FontFamily" Value="Segoe UI"/>
-            <Setter Property="FontSize" Value="13"/>
-            <Setter Property="Foreground" Value="#FF444444"/>
-            <Setter Property="Background" Value="#FFEAEAEA"/>
-            <Setter Property="BorderThickness" Value="0"/>
-            <Setter Property="Cursor" Value="Hand"/>
-            <Setter Property="HorizontalContentAlignment" Value="Center"/>
-            <Setter Property="VerticalContentAlignment" Value="Center"/>
-
-            <!-- Optional: default state -->
-            <Setter Property="IsChecked" Value="True"/>
-
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="ToggleButton">
-                        <Border x:Name="Bd"
-                        Background="{TemplateBinding Background}"
-                        CornerRadius="12"
-                        Padding="{TemplateBinding Padding}">
-                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                <Viewbox Width="14" Height="14" Margin="0,0,6,0">
-                                    <Path x:Name="IconPath"
-                                  Data="{StaticResource IconEyeOffGroupGeo}"
-                                  Fill="{TemplateBinding Foreground}"
-                                  Stretch="Uniform"/>
-                                </Viewbox>
-
-                                <TextBlock x:Name="BtnText"
-                                   Text="Hide"
-                                   Foreground="{TemplateBinding Foreground}"/>
-                            </StackPanel>
-                        </Border>
-
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Bd" Property="Background" Value="#FF3347FF"/>
-                                <Setter Property="Foreground" Value="White"/>
-                            </Trigger>
-
-                            <Trigger Property="IsPressed" Value="True">
-                                <Setter TargetName="Bd" Property="Background" Value="#FF2234CC"/>
-                                <Setter Property="Foreground" Value="White"/>
-                            </Trigger>
-
-                            <Trigger Property="IsEnabled" Value="False">
-                                <Setter Property="Opacity" Value="0.5"/>
-                            </Trigger>
-
-                            <!-- When collapsed -> Show + eye -->
-                            <Trigger Property="IsChecked" Value="False">
-                                <Setter TargetName="BtnText" Property="Text" Value="Show"/>
-                                <Setter TargetName="IconPath" Property="Data" Value="{StaticResource IconEye}"/>
-                            </Trigger>
-
-                            <!-- When expanded -> Hide + eye-off -->
-                            <Trigger Property="IsChecked" Value="True">
-                                <Setter TargetName="BtnText" Property="Text" Value="Hide"/>
-                                <Setter TargetName="IconPath" Property="Data" Value="{StaticResource IconEyeOffGroupGeo}"/>
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
-        <GeometryGroup x:Key="IconEmployee">
-            <PathGeometry Figures="M1427 2639 c-452 -48 -766 -372 -912 -944 -97 -381 -122 -839 -60 -1090 51 -201 218 -405 411 -503 87 -44 212 -80 317 -92 62 -8 534 -10 1437 -8 l1345 3 85 24 c316 86 532 298 611 596 41 155 36 525 -12 817 -105 650 -371 1040 -792 1162 -96 28 -268 49 -319 39 -49 -9 -117 -45 -271 -144 -164 -106 -187 -118 -310 -164 -142 -53 -259 -76 -396 -76 -140 0 -248 20 -390 70 -134 48 -140 51 -350 184 -110 70 -192 115 -224 124 -56 14 -56 14 -170 2z"/>
-            <PathGeometry Figures="M2335 5105 c-273 -42 -517 -172 -708 -375 -210 -223 -319 -481 -334 -790 -21 -432 191 -845 557 -1084 180 -118 353 -178 563 -195 389 -30 721 92 989 365 213 216 321 452 347 753 36 402 -116 776 -419 1038 -196 168 -376 252 -625 288 -120 17 -260 18 -370 0z"/>
-        </GeometryGroup>
-
-        <Style x:Key="RoundedComboBoxStyle" TargetType="ComboBox">
-            <Setter Property="Height" Value="36"/>
-            <Setter Property="Padding" Value="12,0"/>
-            <Setter Property="Background" Value="White"/>
-            <Setter Property="BorderBrush" Value="Silver"/>
-            <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
-
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="ComboBox">
-                        <Grid>
-                            <!-- Base rounded border -->
-                            <Border x:Name="Bd"
-                            CornerRadius="14"
-                            Background="{TemplateBinding Background}"
-                            BorderBrush="{TemplateBinding BorderBrush}"
-                            BorderThickness="{TemplateBinding BorderThickness}"/>
-
-                            <!-- Click + hover/pressed on whole area -->
-                            <ToggleButton x:Name="WholeClick"
-                                  Focusable="False"
-                                  Background="Transparent"
-                                  BorderThickness="0"
-                                  IsChecked="{Binding IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}">
-                                <ToggleButton.Template>
-                                    <ControlTemplate TargetType="ToggleButton">
-                                        <Border x:Name="Hit"
-                                        Background="Transparent"
-                                        CornerRadius="14"/>
-                                        <ControlTemplate.Triggers>
-                                            <Trigger Property="IsMouseOver" Value="True">
-                                                <Setter TargetName="Hit" Property="Background" Value="LightGray"/>
-                                            </Trigger>
-                                            <Trigger Property="IsPressed" Value="True">
-                                                <Setter TargetName="Hit" Property="Background" Value="LightGray"/>
-                                            </Trigger>
-                                            <Trigger Property="IsEnabled" Value="False">
-                                                <Setter TargetName="Hit" Property="Opacity" Value="0.5"/>
-                                            </Trigger>
-                                        </ControlTemplate.Triggers>
-                                    </ControlTemplate>
-                                </ToggleButton.Template>
-                            </ToggleButton>
-
-                            <!-- Selected text -->
-                            <ContentPresenter x:Name="SelectedContent"
-                                      Margin="{TemplateBinding Padding}"
-                                      VerticalAlignment="Center"
-                                      HorizontalAlignment="Left"
-                                      IsHitTestVisible="False"
-                                      Content="{TemplateBinding SelectionBoxItem}"
-                                      ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"
-                                      ContentTemplateSelector="{TemplateBinding ItemTemplateSelector}"/>
-
-                            <!-- PLACEHOLDER -->
-                            <TextBlock x:Name="Placeholder"
-                               Margin="{TemplateBinding Padding}"
-                               VerticalAlignment="Center"
-                               HorizontalAlignment="Left"
-                               Foreground="Silver"
-                               Text="{TemplateBinding Tag}"
-                               IsHitTestVisible="False"
-                               Visibility="Collapsed"/>
-
-                            <!-- Arrow -->
-                            <Path Data="M 0 0 L 4 4 L 8 0 Z"
-                          Fill="Gray"
-                          Stretch="Uniform"
-                          Width="10"
-                          Height="6"
-                          HorizontalAlignment="Right"
-                          VerticalAlignment="Center"
-                          Margin="0,0,12,0"
-                          IsHitTestVisible="False"/>
-
-                            <!-- Popup width == ComboBox width -->
-                            <Popup IsOpen="{TemplateBinding IsDropDownOpen}"
-                           Placement="Bottom"
-                           AllowsTransparency="True"
-                           Focusable="False"
-                           PopupAnimation="Fade"
-                           PlacementTarget="{Binding RelativeSource={RelativeSource TemplatedParent}}"
-                           MinWidth="{Binding ActualWidth, RelativeSource={RelativeSource TemplatedParent}}">
-                                <Border Margin="0,6,0,0"
-                                Background="White"
-                                BorderBrush="Silver"
-                                BorderThickness="1"
-                                CornerRadius="14"
-                                SnapsToDevicePixels="True">
-                                    <ScrollViewer Margin="4"
-                                          SnapsToDevicePixels="True"
-                                          MaxHeight="260">
-                                        <ItemsPresenter/>
-                                    </ScrollViewer>
-                                </Border>
-                            </Popup>
-                        </Grid>
-
-                        <!-- TRIGGERS for placeholder -->
-                        <ControlTemplate.Triggers>
-                            <!-- Show placeholder when nothing selected -->
-                            <Trigger Property="SelectedItem" Value="{x:Null}">
-                                <Setter TargetName="Placeholder" Property="Visibility" Value="Visible"/>
-                            </Trigger>
-
-                            <!-- Hide placeholder when dropdown open -->
-                            <Trigger Property="IsDropDownOpen" Value="True">
-                                <Setter TargetName="Placeholder" Property="Visibility" Value="Collapsed"/>
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
-        <Style x:Key="RoundedComboBoxItemStyle" TargetType="ComboBoxItem">
-            <Setter Property="Padding" Value="10,6"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="ComboBoxItem">
-                        <Border x:Name="ItemBd"
-                        CornerRadius="10"
-                        Background="Transparent"
-                        Margin="2">
-                            <ContentPresenter/>
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsHighlighted" Value="True">
-                                <Setter TargetName="ItemBd" Property="Background" Value="LightGray"/>
-                            </Trigger>
-                            <Trigger Property="IsSelected" Value="True">
-                                <Setter TargetName="ItemBd" Property="Background" Value="LightGray"/>
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
-        <GeometryGroup x:Key="SearchIcon">
-            <PathGeometry Figures="M2890 5114 c-404 -30 -820 -192 -1140 -445 -149 -117 -344 -332 -448 -494 -323 -499 -413 -1077 -258 -1659 33 -125 94 -277 167 -414 35 -68 59 -126 59 -145 0 -28 -60 -92 -568 -602 -472 -472 -576 -582 -611 -641 -82 -140 -107 -265 -77 -383 20 -77 44 -119 109 -188 159 -170 361 -187 591 -52 59 35 169 139 641 611 510 508 574 568 602 568 19 0 77 -24 145 -59 290 -153 566 -227 883 -238 440 -15 823 91 1190 329 162 104 377 299 494 448 230 291 376 637 432 1025 19 127 16 443 -5 574 -62 393 -216 735 -464 1031 -321 385 -778 639 -1282 715 -104 16 -360 26 -460 19z m405 -559 c230 -36 463 -134 657 -276 105 -78 266 -241 342 -347 383 -538 373 -1282 -24 -1810 -300 -399 -793 -632 -1284 -609 -402 19 -748 170 -1026 447 -603 604 -599 1579 11 2177 353 346 826 495 1324 418z"/>
-            <PathGeometry Figures="M2987 4279 c-463 -51 -866 -340 -1071 -769 -55 -114 -48 -205 22 -276 62 -62 169 -82 240 -44 62 33 78 51 137 159 71 131 128 205 215 280 267 230 614 289 953 163 94 -35 170 -25 234 31 88 77 98 222 20 305 -45 48 -194 105 -354 136 -106 20 -287 27 -396 15z"/>
-        </GeometryGroup>
-
-        <Geometry x:Key="IconBind">
-            M693 4030 c-224 -59 -397 -232 -460 -461 -17 -59 -18 -135 -18 -1014 l0 -950 23 -75 c37 -119 79 -187 167 -275 59 -59 100 -90 155 -118 158 -78 -10 -72 2000 -72 2010 0 1842 -6 2000 72 55 28 96 59 155 118 88 88 130 156 167 275 l23 75 0 950 c0 879 -1 955 -18 1014 -63 231 -237 404 -464 462 -74 18 -127 19 -1867 18 -1718 0 -1794 -1 -1863 -19z m722 -758 c68 -33 127 -92 158 -161 34 -72 31 -188 -6 -263 -16 -33 -49 -76 -78 -102 -154 -139 -403 -88 -496 102 -24 48 -28 69 -28 137 0 131 59 226 177 285 52 25 73 30 137 30 63 0 86 -5 136 -28z m831 11 c67 -23 164 -120 187 -187 21 -61 22 -160 2 -215 -76 -215 -345 -284 -518 -132 -20 18 -51 62 -69 99 -27 55 -32 77 -32 137 0 131 79 249 198 294 64 25 166 27 232 4z m892 -18 c105 -57 166 -161 166 -281 1 -174 -139 -316 -312 -316 -178 0 -311 124 -320 299 -6 106 16 163 92 239 78 78 122 95 236 91 72 -3 93 -7 138 -32z m837 7 c68 -33 127 -92 158 -161 34 -72 31 -188 -6 -263 -16 -33 -49 -76 -78 -102 -154 -139 -403 -88 -496 102 -24 48 -28 69 -28 137 0 131 59 226 177 285 52 25 73 30 137 30 63 0 86 -5 136 -28z m-2563 -850 c59 -26 126 -93 158 -157 20 -41 25 -65 24 -135 0 -72 -4 -93 -27 -137 -60 -116 -160 -178 -287 -178 -60 0 -86 5 -130 26 -181 86 -244 301 -135 466 38 57 105 109 169 129 57 19 170 12 228 -14z m2560 0 c59 -26 126 -93 158 -157 20 -41 25 -65 24 -135 0 -72 -4 -93 -27 -137 -60 -116 -160 -178 -287 -178 -60 0 -86 5 -130 26 -181 86 -244 301 -135 466 38 57 105 109 169 129 57 19 170 12 228 -14z m-909 -91 c40 -16 99 -73 118 -116 47 -102 -2 -229 -106 -276 -37 -17 -77 -19 -515 -19 -438 0 -478 2 -515 19 -135 61 -166 243 -59 343 64 60 46 58 571 58 274 0 492 -4 506 -9z
-        </Geometry>
-
-        <!-- Binds grid: borders/gridlines як у Availability -->
-        <Style x:Key="BindsGridStyle"
-           TargetType="DataGrid"
-           BasedOn="{StaticResource AvailabilityListGridStyle}">
-
-            <!-- поведінка -->
-            <Setter Property="AutoGenerateColumns" Value="False"/>
-            <Setter Property="HeadersVisibility" Value="Column"/>
-            <Setter Property="RowHeaderWidth" Value="0"/>
-            <Setter Property="CanUserReorderColumns" Value="False"/>
-            <Setter Property="CanUserResizeColumns" Value="True"/>
-            <Setter Property="CanUserSortColumns" Value="True"/>
-
-            <!-- розміри -->
-            <Setter Property="RowHeight" Value="35"/>
-            <Setter Property="ColumnHeaderHeight" Value="45"/>
-            <Setter Property="FontSize" Value="14"/>
-
-            <!-- вигляд -->
-            <Setter Property="Background" Value="Transparent"/>
-            <Setter Property="BorderThickness" Value="0"/>
-
-            <!-- ОЦЕ ГОЛОВНЕ: лінії як у Availability -->
-            <Setter Property="GridLinesVisibility" Value="All"/>
-            <Setter Property="HorizontalGridLinesBrush" Value="Gainsboro"/>
-            <Setter Property="VerticalGridLinesBrush" Value="Gainsboro"/>
-
-            <!-- ХЕДЕРИ -->
-            <Setter Property="ColumnHeaderStyle">
-                <Setter.Value>
-                    <Style TargetType="DataGridColumnHeader">
-                        <Setter Property="Background" Value="White"/>
-                        <Setter Property="Foreground" Value="Black"/>
-                        <Setter Property="BorderThickness" Value="0"/>
-                        <Setter Property="HorizontalContentAlignment" Value="Left"/>
-                        <Setter Property="VerticalContentAlignment" Value="Center"/>
-                        <Setter Property="FontFamily" Value="Segoe UI"/>
-                        <Setter Property="FontSize" Value="14"/>
-                        <Setter Property="Padding" Value="10,0"/>
-                    </Style>
-                </Setter.Value>
-            </Setter>
-
-            <!-- КЛІТИНКИ -->
-            <Setter Property="CellStyle">
-                <Setter.Value>
-                    <Style TargetType="DataGridCell">
-                        <Setter Property="BorderThickness" Value="0"/>
-                        <Setter Property="Padding" Value="10,0"/>
-                        <Setter Property="VerticalContentAlignment" Value="Center"/>
-                        <Style.Triggers>
-                            <Trigger Property="IsSelected" Value="True">
-                                <Setter Property="Background" Value="#e0e0e0"/>
-                                <Setter Property="Foreground" Value="Black"/>
-                            </Trigger>
-                        </Style.Triggers>
-                    </Style>
-                </Setter.Value>
-            </Setter>
-
-            <!-- РЯДКИ -->
-            <Setter Property="AlternationCount" Value="2"/>
-            <Setter Property="AlternatingRowBackground" Value="#FFF7F7F7"/>
-            <Setter Property="RowStyle">
-                <Setter.Value>
-                    <Style TargetType="DataGridRow">
-                        <Setter Property="Background" Value="White"/>
-                        <Setter Property="BorderThickness" Value="0"/>
-                        <Setter Property="SnapsToDevicePixels" Value="True"/>
-                        <Style.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter Property="Background" Value="#e0e0e0"/>
-                            </Trigger>
-                            <Trigger Property="IsSelected" Value="True">
-                                <Setter Property="Background" Value="#e0e0e0"/>
-                            </Trigger>
-                        </Style.Triggers>
-                    </Style>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
-        <!-- для центрування чекбокса в колонці Active -->
-        <Style x:Key="CenterCheckBoxStyle" TargetType="CheckBox">
-            <Setter Property="HorizontalAlignment" Value="Center"/>
-            <Setter Property="VerticalAlignment" Value="Center"/>
-        </Style>
-
-        <Style x:Key="RoundedCheckBoxStyle" TargetType="CheckBox">
-            <Setter Property="HorizontalAlignment" Value="Center"/>
-            <Setter Property="VerticalAlignment" Value="Center"/>
-            <Setter Property="Width" Value="18"/>
-            <Setter Property="Height" Value="18"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="CheckBox">
-                        <Grid Width="{TemplateBinding Width}" Height="{TemplateBinding Height}">
-                            <Border x:Name="Box"
-                            CornerRadius="5"
-                            Background="White"
-                            BorderBrush="#BDBDBD"
-                            BorderThickness="1"/>
-
-                            <!-- галочка -->
-                            <Path x:Name="Tick"
-                          Data="M 3 9 L 7 13 L 15 4"
-                          Stroke="#3347FF"
-                          StrokeThickness="2"
-                          StrokeStartLineCap="Round"
-                          StrokeEndLineCap="Round"
-                          StrokeLineJoin="Round"
-                          Visibility="Collapsed"/>
-                        </Grid>
-
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsChecked" Value="True">
-                                <Setter TargetName="Tick" Property="Visibility" Value="Visible"/>
-                                <Setter TargetName="Box" Property="BorderBrush" Value="#3347FF"/>
-                                <Setter TargetName="Box" Property="Background" Value="#EEF1FF"/>
-                            </Trigger>
-
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Box" Property="BorderBrush" Value="#3347FF"/>
-                            </Trigger>
-
-                            <Trigger Property="IsEnabled" Value="False">
-                                <Setter Property="Opacity" Value="0.45"/>
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
-        <Style x:Key="ScheduleMatrixGridStyle"
-           TargetType="DataGrid"
-           BasedOn="{StaticResource AvailabilityListGridStyle}">
-
-            <!-- поведінка -->
-            <Setter Property="AutoGenerateColumns" Value="True"/>
-            <Setter Property="HeadersVisibility" Value="Column"/>
-            <Setter Property="RowHeaderWidth" Value="0"/>
-            <Setter Property="SelectionUnit" Value="Cell"/>
-            <Setter Property="SelectionMode" Value="Single"/>
-            <Setter Property="CanUserAddRows" Value="False"/>
-            <Setter Property="CanUserDeleteRows" Value="False"/>
-            <Setter Property="CanUserResizeRows" Value="False"/>
-            <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Auto"/>
-            <Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Auto"/>
-            <Setter Property="ColumnWidth" Value="*"/>
-            <Setter Property="MinColumnWidth" Value="140"/>
-            <Setter Property="FrozenColumnCount" Value="1"/>
-
-
-            <!-- РОЗМІРИ -->
-            <Setter Property="RowHeight" Value="35"/>
-            <!-- висота клітинки -->
-            <Setter Property="ColumnHeaderHeight" Value="45"/>
-            <!-- висота хедера -->
-            <Setter Property="FontSize" Value="16"/>
-            <!-- шрифт в клітинках -->
-            <Setter Property="ColumnWidth" Value="*"/>
-
-            <!-- вигляд -->
-            <Setter Property="GridLinesVisibility" Value="All"/>
-            <Setter Property="HorizontalGridLinesBrush" Value="Gainsboro"/>
-            <Setter Property="VerticalGridLinesBrush" Value="Gainsboro"/>
-            <Setter Property="Background" Value="Transparent"/>
-            <Setter Property="BorderThickness" Value="0"/>
-
-            <!-- КЛІТИНКИ: центр + padding -->
-            <Setter Property="CellStyle">
-                <Setter.Value>
-                    <Style TargetType="DataGridCell">
-                        <Setter Property="BorderThickness" Value="0"/>
-                        <Setter Property="Padding" Value="10,0"/>
-                        <Setter Property="HorizontalContentAlignment" Value="Center"/>
-                        <Setter Property="VerticalContentAlignment" Value="Center"/>
-                    </Style>
-                </Setter.Value>
-            </Setter>
-
-            <!-- ХЕДЕРИ: центр + більший шрифт -->
-            <Setter Property="ColumnHeaderStyle">
-                <Setter.Value>
-                    <Style TargetType="DataGridColumnHeader">
-                        <Setter Property="Background" Value="White"/>
-                        <Setter Property="Foreground" Value="Black"/>
-                        <Setter Property="BorderThickness" Value="0"/>
-                        <Setter Property="HorizontalContentAlignment" Value="Center"/>
-                        <Setter Property="VerticalContentAlignment" Value="Center"/>
-                        <Setter Property="FontFamily" Value="Segoe UI"/>
-                        <Setter Property="FontSize" Value="14"/>
-                        <Setter Property="Padding" Value="6,0"/>
-                    </Style>
-                </Setter.Value>
-            </Setter>
-
-            <!-- РЯДКИ: центр на випадок якщо контент — TextBlock -->
-            <Setter Property="RowStyle">
-                <Setter.Value>
-                    <Style TargetType="DataGridRow">
-                        <Setter Property="Background" Value="White"/>
-                        <Setter Property="HorizontalContentAlignment" Value="Center"/>
-                        <Setter Property="VerticalContentAlignment" Value="Center"/>
-                        <Setter Property="SnapsToDevicePixels" Value="True"/>
-                    </Style>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
-        <!-- Текст в matrix клітинках (для автоген колонок теж норм) -->
-        <Style x:Key="MatrixTextBlockStyle" TargetType="TextBlock">
-            <Setter Property="HorizontalAlignment" Value="Center"/>
-            <Setter Property="VerticalAlignment" Value="Center"/>
-            <Setter Property="TextAlignment" Value="Center"/>
-        </Style>
-
-        <GeometryGroup x:Key="IconAvailability">
-            <PathGeometry Figures="M1405 5109 c-45 -13 -105 -67 -126 -113 -16 -36 -19 -69 -19 -262 l0 -221 -127 -6 c-255 -11 -456 -104 -629 -289 -148 -159 -244 -396 -244 -604 l0 -54 2302 0 2301 0 -6 93 c-16 240 -114 447 -290 613 -170 161 -381 244 -619 244 l-88 0 0 223 c0 215 -1 226 -23 268 -83 156 -305 156 -384 -1 -22 -42 -23 -56 -23 -267 l0 -223 -870 0 -870 0 0 223 c0 252 -6 278 -76 335 -59 49 -134 63 -209 41z"/>
-            <PathGeometry Figures="M262 1943 l3 -1178 22 -80 c32 -114 111 -268 180 -350 125 -148 299 -259 483 -308 l85 -22 1525 0 1525 0 85 23 c92 24 224 83 295 132 171 118 308 313 367 525 l23 80 3 1178 3 1177 -2301 0 -2301 0 3 -1177z m3310 543 c129 -38 192 -166 139 -281 -26 -56 -1268 -1290 -1325 -1316 -56 -25 -130 -24 -188 4 -65 30 -773 723 -799 782 -20 43 -25 129 -10 168 16 40 73 99 116 118 49 23 123 24 173 4 24 -11 134 -113 322 -300 l285 -285 530 530 c292 292 535 530 541 530 6 0 17 7 24 15 13 16 91 43 126 44 11 1 41 -5 66 -13z"/>
-        </GeometryGroup>
-
-        <!-- Підсвітка для TextBox при Validation.HasError -->
-        <Style x:Key="ValidatedRoundedTextBoxStyle"
-           TargetType="TextBox"
-           BasedOn="{StaticResource RoundedTextBoxWithPlaceholderStyle}">
-            <Style.Triggers>
-                <Trigger Property="Validation.HasError" Value="True">
-                    <Setter Property="BorderBrush" Value="#E53935"/>
-                    <Setter Property="Background" Value="#FFFFEBEE"/>
-                    <Setter Property="ToolTip"
-                    Value="{Binding RelativeSource={RelativeSource Self},
-                                    Path=(Validation.Errors)[0].ErrorContent}"/>
-                </Trigger>
-            </Style.Triggers>
-        </Style>
-
-        <!-- Підсвітка клітинки DataGrid при Validation.HasError -->
-        <Style x:Key="ValidatedDataGridCellStyle" TargetType="DataGridCell">
-            <Style.Triggers>
-                <Trigger Property="Validation.HasError" Value="True">
-                    <Setter Property="BorderBrush" Value="#E53935"/>
-                    <Setter Property="BorderThickness" Value="1"/>
-                    <Setter Property="Background" Value="#FFFFEBEE"/>
-                    <Setter Property="ToolTip"
-                    Value="{Binding RelativeSource={RelativeSource Self},
-                                    Path=(Validation.Errors)[0].ErrorContent}"/>
-                </Trigger>
-            </Style.Triggers>
-        </Style>
-
-
-
-    </UserControl.Resources>
+             Background="{StaticResource PageBackgroundBrush}">
 
     <Grid ClipToBounds="False">
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
-        <!-- TOP CARD (як в ListView) -->
         <!-- TOP CARD (як в AvailabilityListView, але тільки Back + текст) -->
-        <Border Grid.Row="0"
-        Margin="7,0,7,0"
-        Background="White"
-        CornerRadius="20"
-        Padding="10,10,10,12">
-            <Border.Effect>
-                <DropShadowEffect BlurRadius="18" ShadowDepth="2" Opacity="0.22"/>
-            </Border.Effect>
-
+        <Border Grid.Row="0" Style="{StaticResource TopCardStyle}">
             <Grid>
                 <Grid.RowDefinitions>
-                    <!-- Back -->
-                    <RowDefinition Height="Auto"/>
-                    <!-- Title -->
-                    <RowDefinition Height="Auto"/>
-                    <!-- Subtitle -->
-                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
 
                 <!-- Back button (зверху над текстом) -->
                 <Button Grid.Row="0"
-                    HorizontalAlignment="Left"
-                    Style="{StaticResource BackButtonSmallStyle}"
-                    Command="{Binding CancelCommand}" Width="62">
+                        HorizontalAlignment="Left"
+                        Style="{StaticResource BackButtonSmallStyle}"
+                        Command="{Binding CancelCommand}" Width="62">
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                         <Viewbox Width="14" Height="14" Margin="0,0,6,0">
                             <Path Data="{StaticResource BackSvgIconGeometry}"
-                              Stretch="Uniform"
-                              Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+                                  Stretch="Uniform"
+                                  Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
                         </Viewbox>
 
                         <TextBlock Text="Back"
-                   Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+                                   Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
                     </StackPanel>
                 </Button>
                 <!-- Title -->
                 <TextBlock Grid.Row="1"
-                   Margin="0,10,0,0"
-                   Text="Availability Edit"
-                   FontFamily="Segoe UI"
-                   FontSize="25"
-                   Foreground="Black"/>
+                           Margin="0,10,0,0"
+                           Text="Availability Edit"
+                           FontFamily="{StaticResource DefaultFontFamily}"
+                           FontSize="{StaticResource FontSizePageTitle}"
+                           Foreground="Black" />
 
                 <!-- Subtitle -->
                 <TextBlock Grid.Row="2"
-                   Margin="0,6,0,0"
-                   Text="Here you can change or provide information about availability"
-                   FontFamily="Segoe UI"
-                   FontSize="17"
-                   Foreground="Silver"/>
+                           Margin="0,6,0,0"
+                           Text="Here you can change or provide information about availability"
+                           FontFamily="{StaticResource DefaultFontFamily}"
+                           FontSize="17"
+                           Foreground="{StaticResource SecondaryTextBrush}" />
             </Grid>
         </Border>
-
 
         <!-- CONTENT -->
         <Grid Grid.Row="1" Margin="9,10,9,10">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="409"/>
-                <ColumnDefinition Width="18"/>
-                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="409" />
+                <ColumnDefinition Width="18" />
+                <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
 
             <!-- LEFT SIDE (scroll) -->
             <ScrollViewer Grid.Column="0"
-              VerticalScrollBarVisibility="Auto"
-              HorizontalScrollBarVisibility="Disabled"
-              Padding="0,12,0,12"
-              ClipToBounds="False">
+                          VerticalScrollBarVisibility="Auto"
+                          HorizontalScrollBarVisibility="Disabled"
+                          Padding="0,12,0,12"
+                          ClipToBounds="False">
 
                 <StackPanel ClipToBounds="False">
 
@@ -1081,156 +80,154 @@
                     <Border Height="6" Background="Transparent" />
 
                     <!-- INFORMATION CARD -->
-                    <Border Style="{StaticResource CardStyle}">
+                    <Border Style="{StaticResource CardStyle}" Margin="7,0,7,16">
                         <Grid>
                             <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
                             </Grid.RowDefinitions>
 
                             <!-- HEADER: зліва назва, справа Hide/Show -->
                             <Grid Grid.Row="0" Margin="15,10,10,10">
                                 <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
 
                                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                                     <Viewbox Width="20" Height="20" Margin="0,0,8,0">
                                         <Path Data="{StaticResource IconInformation}"
-                                          Fill="Black"
-                                          Stretch="Uniform"/>
+                                              Fill="Black"
+                                              Stretch="Uniform" />
                                     </Viewbox>
 
                                     <TextBlock Text="Information"
-                           FontFamily="Segoe UI"
-                           FontSize="20"
-                           FontWeight="Bold"
-                           Foreground="Black"
-                           VerticalAlignment="Center"/>
+                                               FontFamily="{StaticResource DefaultFontFamily}"
+                                               FontSize="{StaticResource FontSizeTitle}"
+                                               FontWeight="Bold"
+                                               Foreground="Black"
+                                               VerticalAlignment="Center" />
                                 </StackPanel>
 
                                 <ToggleButton x:Name="InfoToggle"
-                                  Grid.Column="1"
-                                  Style="{StaticResource HideShowToggleStyle}"
-                                  IsChecked="True"/>
-                                
-                                
+                                              Grid.Column="1"
+                                              Style="{StaticResource HideShowToggleStyle}"
+                                              IsChecked="True" />
                             </Grid>
 
                             <!-- BODY: все, що має ховатись -->
                             <Grid x:Name="InfoBody"
-              Grid.Row="1"
-              Margin="10,0,10,10"
-              Visibility="{Binding IsChecked, ElementName=InfoToggle, Converter={StaticResource BoolToVis}}">
+                                  Grid.Row="1"
+                                  Margin="10,0,10,10"
+                                  Visibility="{Binding IsChecked, ElementName=InfoToggle, Converter={StaticResource BoolToVis}}">
 
                                 <Grid.RowDefinitions>
-                                    <RowDefinition Height="Auto"/>
-                                    <RowDefinition Height="Auto"/>
-                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
                                 </Grid.RowDefinitions>
 
                                 <!-- ТВОЇ 3 поля (ID / Month / Year) -->
                                 <Grid Grid.Row="0" Margin="0,0,0,0">
                                     <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="Auto"/>
-                                        <ColumnDefinition Width="12"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                        <ColumnDefinition Width="8"/>
-                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="12" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="8" />
+                                        <ColumnDefinition Width="Auto" />
                                     </Grid.ColumnDefinitions>
 
                                     <StackPanel>
                                         <TextBlock Text="Availability ID"
-                               FontFamily="Segoe UI"
-                               FontSize="15"
-                               Foreground="Black"/>
+                                                   FontFamily="{StaticResource DefaultFontFamily}"
+                                                   FontSize="15"
+                                                   Foreground="Black" />
                                         <TextBox Margin="5"
-                             Style="{StaticResource RoundedTextBoxStyle}"
-                             Height="33"
-                             Width="45"
-                             Background="#FFF5F5F5"
-                             IsReadOnly="True"
-                             VerticalContentAlignment="Center"
-                             HorizontalContentAlignment="Center"
-                             Text="{Binding AvailabilityId}"/>
+                                                 Style="{StaticResource RoundedTextBoxStyle}"
+                                                 Height="33"
+                                                 Width="45"
+                                                 Background="#FFF5F5F5"
+                                                 IsReadOnly="True"
+                                                 VerticalContentAlignment="Center"
+                                                 HorizontalContentAlignment="Center"
+                                                 Text="{Binding AvailabilityId}" />
                                     </StackPanel>
 
                                     <StackPanel Grid.Column="2">
                                         <TextBlock Text="Availability Month"
-                               FontFamily="Segoe UI"
-                               FontSize="15"
-                               Foreground="Black"/>
+                                                   FontFamily="{StaticResource DefaultFontFamily}"
+                                                   FontSize="15"
+                                                   Foreground="Black" />
                                         <controls:NumericUpDown Minimum="1"
-                                            Margin="5"
-                                            Maximum="12"
-                                            Step="1"
-                                            Height="33"
-                                            Width="100"
-                                            Value="{Binding AvailabilityMonth, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                                                                Margin="5"
+                                                                Maximum="12"
+                                                                Step="1"
+                                                                Height="33"
+                                                                Width="100"
+                                                                Value="{Binding AvailabilityMonth, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                                     </StackPanel>
 
                                     <StackPanel Grid.Column="4">
                                         <TextBlock Text="Availability Year"
-                                           TextAlignment="Center"
-                                           FontFamily="Segoe UI"
-                                           FontSize="15"
-                                           Foreground="Black"/>
+                                                   TextAlignment="Center"
+                                                   FontFamily="{StaticResource DefaultFontFamily}"
+                                                   FontSize="15"
+                                                   Foreground="Black" />
                                         <controls:NumericUpDown Height="33"
-                                            Margin="5"
-                                            Width="120"
-                                            Minimum="2000"
-                                            Maximum="3000"
-                                            Step="1"
-                                            Value="{Binding AvailabilityYear, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                                                                Margin="5"
+                                                                Width="120"
+                                                                Minimum="2000"
+                                                                Maximum="3000"
+                                                                Step="1"
+                                                                Value="{Binding AvailabilityYear, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                                     </StackPanel>
                                 </Grid>
 
                                 <!-- Availability Name -->
                                 <StackPanel Grid.Row="1" Margin="0,12,0,0">
                                     <TextBlock Text="Availability Name"
-                                       FontFamily="Segoe UI"
-                                       FontSize="15"
-                                       Foreground="Black"/>
+                                               FontFamily="{StaticResource DefaultFontFamily}"
+                                               FontSize="15"
+                                               Foreground="Black" />
                                     <TextBox x:Name="inputAvailabilityMonthName"
-                                         Margin="5"
-                                         Style="{StaticResource ValidatedRoundedTextBoxStyle}"
-                                         Tag="Write availability name..."
-                                         Height="36"
-                                         VerticalContentAlignment="Center"
-                                         HorizontalContentAlignment="Left"
-                                         Text="{Binding AvailabilityName, UpdateSourceTrigger=PropertyChanged, ValidatesOnNotifyDataErrors=True,  NotifyOnValidationError=True}"/>
+                                             Margin="5"
+                                             Style="{StaticResource ValidatedRoundedTextBoxStyle}"
+                                             Tag="Write availability name..."
+                                             Height="36"
+                                             VerticalContentAlignment="Center"
+                                             HorizontalContentAlignment="Left"
+                                             Text="{Binding AvailabilityName, UpdateSourceTrigger=PropertyChanged, ValidatesOnNotifyDataErrors=True,  NotifyOnValidationError=True}" />
 
                                 </StackPanel>
 
                                 <!-- Cancel -->
                                 <Button Grid.Row="2"
-                    Margin="0,14,0,0"
-                    HorizontalAlignment="Left"
-                    Style="{StaticResource RoundedButtonStyle}"
-                    Height="33"
-                    Width="84"
-                    Background="#FFE0E0E0"
-                    Foreground="Gray"
-                    Content="Cancel"
-                    Command="{Binding CancelInformationCommand}"/>
+                                        Margin="0,14,0,0"
+                                        HorizontalAlignment="Left"
+                                        Style="{StaticResource RoundedButtonStyle}"
+                                        Height="33"
+                                        Width="84"
+                                        Background="{StaticResource CancelButtonBackgroundBrush}"
+                                        Foreground="{StaticResource MutedTextBrush}"
+                                        Content="Cancel"
+                                        Command="{Binding CancelInformationCommand}" />
                             </Grid>
                         </Grid>
                     </Border>
 
                     <!-- EMPLOYEE CARD (same style as Information card) -->
-                    <Border Style="{StaticResource CardStyle}">
+                    <Border Style="{StaticResource CardStyle}" Margin="7,0,7,16">
                         <Grid>
                             <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
                             </Grid.RowDefinitions>
 
                             <!-- HEADER: left icon + title, right Hide/Show -->
                             <Grid Grid.Row="0" Margin="15,10,10,10">
                                 <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
 
                                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
@@ -1240,57 +237,57 @@
                                               Stretch="Uniform"
                                               RenderTransformOrigin="0.5,0.5">
                                             <Path.RenderTransform>
-                                                <ScaleTransform ScaleX="1" ScaleY="-1"/>
+                                                <ScaleTransform ScaleX="1" ScaleY="-1" />
                                             </Path.RenderTransform>
                                         </Path>
                                     </Viewbox>
 
                                     <TextBlock Text="Employee"
-                           FontFamily="Segoe UI"
-                           FontSize="20"
-                           FontWeight="Bold"
-                           Foreground="Black"
-                           VerticalAlignment="Center"/>
+                                               FontFamily="{StaticResource DefaultFontFamily}"
+                                               FontSize="{StaticResource FontSizeTitle}"
+                                               FontWeight="Bold"
+                                               Foreground="Black"
+                                               VerticalAlignment="Center" />
                                 </StackPanel>
 
                                 <ToggleButton x:Name="EmployeeToggle"
-                          Grid.Column="1"
-                          Style="{StaticResource HideShowToggleStyle}"
-                          IsChecked="True"/>
+                                              Grid.Column="1"
+                                              Style="{StaticResource HideShowToggleStyle}"
+                                              IsChecked="True" />
                             </Grid>
 
                             <!-- BODY: collapsible -->
                             <Grid x:Name="EmployeeBody"
-              Grid.Row="1"
-              Margin="10,0,10,10"
-              Visibility="{Binding IsChecked, ElementName=EmployeeToggle, Converter={StaticResource BoolToVis}}">
+                                  Grid.Row="1"
+                                  Margin="10,0,10,10"
+                                  Visibility="{Binding IsChecked, ElementName=EmployeeToggle, Converter={StaticResource BoolToVis}}">
 
                                 <Grid.RowDefinitions>
-                                    <RowDefinition Height="Auto"/>
-                                    <RowDefinition Height="Auto"/>
-                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
                                 </Grid.RowDefinitions>
 
                                 <!-- Search row -->
                                 <Grid Grid.Row="0">
                                     <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="12"/>
-                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="12" />
+                                        <ColumnDefinition Width="Auto" />
                                     </Grid.ColumnDefinitions>
 
                                     <StackPanel>
                                         <TextBlock Text="Search employee"
-                                           FontFamily="Segoe UI"
-                                           FontSize="15"
-                                           Foreground="Black"/>
+                                                   FontFamily="{StaticResource DefaultFontFamily}"
+                                                   FontSize="15"
+                                                   Foreground="Black" />
                                         <TextBox x:Name="textBoxSearchValueFromAvailabilityEdit"
-                                             Margin="5,6,0,0"
-                                             Style="{StaticResource RoundedTextBoxWithPlaceholderStyle}"
-                                             Tag="Write search value..."
-                                             Height="36"
-                                             VerticalContentAlignment="Center"
-                                             Text="{Binding EmployeeSearchText, UpdateSourceTrigger=PropertyChanged}"/>
+                                                 Margin="5,6,0,0"
+                                                 Style="{StaticResource RoundedTextBoxWithPlaceholderStyle}"
+                                                 Tag="Write search value..."
+                                                 Height="36"
+                                                 VerticalContentAlignment="Center"
+                                                 Text="{Binding EmployeeSearchText, UpdateSourceTrigger=PropertyChanged}" />
                                     </StackPanel>
 
                                     <Button Grid.Column="2"
@@ -1304,7 +301,7 @@
                                                   Stretch="Uniform"
                                                   RenderTransformOrigin="0.5,0.5">
                                                 <Path.RenderTransform>
-                                                    <ScaleTransform ScaleX="1" ScaleY="-1"/>
+                                                    <ScaleTransform ScaleX="1" ScaleY="-1" />
                                                 </Path.RenderTransform>
                                             </Path>
                                         </Viewbox>
@@ -1315,173 +312,173 @@
                                 <!-- Selected employee -->
                                 <Grid Grid.Row="1" Margin="0,12,0,0">
                                     <Grid.RowDefinitions>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
                                     </Grid.RowDefinitions>
 
                                     <!-- Row 0: label + ID (on the same line) -->
                                     <Grid Grid.Row="0">
                                         <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="auto"/>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="auto" />
                                         </Grid.ColumnDefinitions>
 
                                         <TextBlock Text="Selected Employee"
-                                               FontFamily="Segoe UI"
-                                               FontSize="15"
-                                               Foreground="Black"/>
+                                                   FontFamily="{StaticResource DefaultFontFamily}"
+                                                   FontSize="15"
+                                                   Foreground="Black" />
 
                                         <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,0,15,0">
-                                            
+
                                             <TextBlock Text="Employee ID: "
-                                               FontFamily="Segoe UI"
-                                               FontSize="11"
-                                               Foreground="Gray"/>
+                                                       FontFamily="{StaticResource DefaultFontFamily}"
+                                                       FontSize="11"
+                                                       Foreground="{StaticResource MutedTextBrush}" />
                                             <TextBlock Text="{Binding SelectedEmployeeId}"
-                                               FontFamily="Segoe UI"
-                                               FontSize="11"
-                                               Foreground="Black"/>
+                                                       FontFamily="{StaticResource DefaultFontFamily}"
+                                                       FontSize="11"
+                                                       Foreground="Black" />
                                         </StackPanel>
                                     </Grid>
 
                                     <!-- Row 1: ComboBox stretches максимально вправо -->
                                     <ComboBox Grid.Row="1"
-                                      x:Name="comboboxEmployee"
-                                      Style="{StaticResource RoundedComboBoxStyle}"
-                                      ItemContainerStyle="{StaticResource RoundedComboBoxItemStyle}"
-                                      Tag="Select employee..."
-                                      Margin="5,6,5,0"
-                                      HorizontalAlignment="Stretch"
-                                      HorizontalContentAlignment="Stretch"
-                                      ItemsSource="{Binding Employees}"
-                                      DisplayMemberPath="FullName"
-                                      SelectedItem="{Binding SelectedEmployee}"/>
+                                              x:Name="comboboxEmployee"
+                                              Style="{StaticResource RoundedComboBoxStyle}"
+                                              ItemContainerStyle="{StaticResource RoundedComboBoxItemStyle}"
+                                              Tag="Select employee..."
+                                              Margin="5,6,5,0"
+                                              HorizontalAlignment="Stretch"
+                                              HorizontalContentAlignment="Stretch"
+                                              ItemsSource="{Binding Employees}"
+                                              DisplayMemberPath="FullName"
+                                              SelectedItem="{Binding SelectedEmployee}" />
                                 </Grid>
                                 <!-- Buttons -->
                                 <Grid Grid.Row="2" Margin="0,14,0,0">
                                     <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="Auto"/>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                        <ColumnDefinition Width="12"/>
-                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="12" />
+                                        <ColumnDefinition Width="Auto" />
                                     </Grid.ColumnDefinitions>
 
                                     <Button x:Name="btnCancelInEmployeeBox"
-                                        Style="{StaticResource RoundedButtonStyle}"
-                                        Height="33"
-                                        Width="84"
-                                        Background="#FFE0E0E0"
-                                        Foreground="Gray"
-                                        Content="Cancel"
-                                        Command="{Binding CancelEmployeeCommand}"/>
+                                            Style="{StaticResource RoundedButtonStyle}"
+                                            Height="33"
+                                            Width="84"
+                                            Background="{StaticResource CancelButtonBackgroundBrush}"
+                                            Foreground="{StaticResource MutedTextBrush}"
+                                            Content="Cancel"
+                                            Command="{Binding CancelEmployeeCommand}" />
 
                                     <Button x:Name="btnRemoveEmployeeFromGroup"
-                                        Grid.Column="2"
-                                        Style="{StaticResource RoundedButtonStyle}"
-                                        Height="33"
-                                        Width="90"
-                                        Background="#ff0000"
-                                        Content="Remove"
-                                        Foreground="White"
-                                        Command="{Binding RemoveEmployeeCommand}"/>
+                                            Grid.Column="2"
+                                            Style="{StaticResource RoundedButtonStyle}"
+                                            Height="33"
+                                            Width="90"
+                                            Background="{StaticResource DangerBrush}"
+                                            Content="Remove"
+                                            Foreground="White"
+                                            Command="{Binding RemoveEmployeeCommand}" />
 
                                     <Button x:Name="btnAddEmployeeToGroup"
-                                        Grid.Column="4"
-                                        Style="{StaticResource RoundedButtonStyle}"
-                                        Height="33"
-                                        Width="60"
-                                        Content="Add"
-                                        Command="{Binding AddEmployeeCommand}"/>
+                                            Grid.Column="4"
+                                            Style="{StaticResource RoundedButtonStyle}"
+                                            Height="33"
+                                            Width="60"
+                                            Content="Add"
+                                            Command="{Binding AddEmployeeCommand}" />
                                 </Grid>
                             </Grid>
                         </Grid>
                     </Border>
 
                     <!-- BIND INFORMATION CARD (same style as others) -->
-                    <Border Style="{StaticResource CardStyle}">
+                    <Border Style="{StaticResource CardStyle}" Margin="7,0,7,16">
                         <Grid>
                             <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
                             </Grid.RowDefinitions>
 
                             <!-- HEADER: icon + title, Hide/Show -->
                             <Grid Grid.Row="0" Margin="15,10,10,10">
                                 <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
 
                                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                                     <Viewbox Width="20" Height="20" Margin="0,0,8,0">
                                         <Path Data="{StaticResource IconBind}"
-                          Fill="Black"
-                          Stretch="Uniform"/>
+                                              Fill="Black"
+                                              Stretch="Uniform" />
                                     </Viewbox>
 
                                     <TextBlock Text="Bind Information"
-                           FontFamily="Segoe UI"
-                           FontSize="20"
-                           FontWeight="Bold"
-                           Foreground="Black"
-                           VerticalAlignment="Center"/>
+                                               FontFamily="{StaticResource DefaultFontFamily}"
+                                               FontSize="{StaticResource FontSizeTitle}"
+                                               FontWeight="Bold"
+                                               Foreground="Black"
+                                               VerticalAlignment="Center" />
                                 </StackPanel>
 
                                 <ToggleButton x:Name="BindToggle"
-                          Grid.Column="1"
-                          Style="{StaticResource HideShowToggleStyle}"
-                          IsChecked="True"/>
+                                              Grid.Column="1"
+                                              Style="{StaticResource HideShowToggleStyle}"
+                                              IsChecked="True" />
                             </Grid>
 
                             <!-- BODY -->
                             <Grid Grid.Row="1"
-              Margin="10,0,10,10"
-              Visibility="{Binding IsChecked, ElementName=BindToggle, Converter={StaticResource BoolToVis}}">
+                                  Margin="10,0,10,10"
+                                  Visibility="{Binding IsChecked, ElementName=BindToggle, Converter={StaticResource BoolToVis}}">
 
                                 <Grid.RowDefinitions>
-                                    <RowDefinition Height="*"/>
-                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="*" />
+                                    <RowDefinition Height="Auto" />
                                 </Grid.RowDefinitions>
 
                                 <!-- DataGrid container -->
                                 <Border Grid.Row="0"
-                                    Margin="0,6,0,10"
-                                    Background="White"
-                                    BorderBrush="#E2E2E2"
-                                    BorderThickness="2"
-                                    CornerRadius="20"
-                                    Padding="5"
-                                    ClipToBounds="True">
+                                        Margin="0,6,0,10"
+                                        Background="{StaticResource SurfaceBrush}"
+                                        BorderBrush="{StaticResource CardBorderBrush}"
+                                        BorderThickness="2"
+                                        CornerRadius="{StaticResource Cr20}"
+                                        Padding="5"
+                                        ClipToBounds="True">
 
                                     <DataGrid x:Name="dataGridBinds"
-                                          Style="{StaticResource BindsGridStyle}"
-                                          Background="Transparent"
-                                          BorderThickness="0"
-                                          ItemsSource="{Binding Binds}"
-                                          SelectedItem="{Binding SelectedBind}">
+                                              Style="{StaticResource BindsGridStyle}"
+                                              Background="Transparent"
+                                              BorderThickness="0"
+                                              ItemsSource="{Binding Binds}"
+                                              SelectedItem="{Binding SelectedBind}">
 
-                                    <DataGrid.Columns>
+                                        <DataGrid.Columns>
                                             <DataGridTextColumn Header="Id"
-                                                Binding="{Binding Id}"
-                                                Width="40"
-                                                IsReadOnly="True"/>
+                                                                Binding="{Binding Id}"
+                                                                Width="40"
+                                                                IsReadOnly="True" />
 
                                             <DataGridTextColumn Header="Key"
-                                                Binding="{Binding Key, UpdateSourceTrigger=PropertyChanged}"
-                                                Width="130"/>
+                                                                Binding="{Binding Key, UpdateSourceTrigger=PropertyChanged}"
+                                                                Width="130" />
 
 
                                             <DataGridTextColumn Header="Value"
-                                                Binding="{Binding Value, UpdateSourceTrigger=PropertyChanged}"
-                                                Width="*"/>
+                                                                Binding="{Binding Value, UpdateSourceTrigger=PropertyChanged}"
+                                                                Width="*" />
 
                                             <DataGridTemplateColumn Header="Active" Width="60">
                                                 <DataGridTemplateColumn.CellTemplate>
                                                     <DataTemplate>
                                                         <CheckBox IsChecked="{Binding IsActive, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                                            Style="{StaticResource RoundedCheckBoxStyle}"/>
+                                                                  Style="{StaticResource RoundedCheckBoxStyle}" />
                                                     </DataTemplate>
                                                 </DataGridTemplateColumn.CellTemplate>
                                             </DataGridTemplateColumn>
@@ -1493,38 +490,38 @@
                                 <!-- Buttons -->
                                 <Grid Grid.Row="1">
                                     <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="Auto"/>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                        <ColumnDefinition Width="12"/>
-                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="12" />
+                                        <ColumnDefinition Width="Auto" />
                                     </Grid.ColumnDefinitions>
 
                                     <Button x:Name="btnCacnelAvailabilityEdit3"
-                        Style="{StaticResource RoundedButtonStyle}"
-                        Height="33"
-                        Width="84"
-                        Background="#FFE0E0E0"
-                        Foreground="Gray"
-                        Content="Cancel"
-                        Command="{Binding CancelBindCommand}"/>
+                                            Style="{StaticResource RoundedButtonStyle}"
+                                            Height="33"
+                                            Width="84"
+                                            Background="{StaticResource CancelButtonBackgroundBrush}"
+                                            Foreground="{StaticResource MutedTextBrush}"
+                                            Content="Cancel"
+                                            Command="{Binding CancelBindCommand}" />
 
                                     <Button x:Name="btnDeleteBind"
-                        Grid.Column="2"
-                        Style="{StaticResource RoundedButtonStyle}"
-                        Height="33"
-                        Width="86"
-                        Background="#ff0000"
-                        Content="Delete"
-                        Command="{Binding DeleteBindCommand}"/>
+                                            Grid.Column="2"
+                                            Style="{StaticResource RoundedButtonStyle}"
+                                            Height="33"
+                                            Width="86"
+                                            Background="{StaticResource DangerBrush}"
+                                            Content="Delete"
+                                            Command="{Binding DeleteBindCommand}" />
 
                                     <Button x:Name="btnAddNewBind"
-                        Grid.Column="4"
-                        Style="{StaticResource RoundedButtonStyle}"
-                        Height="33"
-                        Width="60"
-                        Content="Add"
-                        Command="{Binding AddBindCommand}"/>
+                                            Grid.Column="4"
+                                            Style="{StaticResource RoundedButtonStyle}"
+                                            Height="33"
+                                            Width="60"
+                                            Content="Add"
+                                            Command="{Binding AddBindCommand}" />
                                 </Grid>
                             </Grid>
                         </Grid>
@@ -1535,63 +532,63 @@
 
             <!-- RIGHT SIDE: Availability Schedule (card style like others) -->
             <Border Grid.Column="2"
-                Style="{StaticResource CardStyle}"
-                Margin="7,17,7,0">
+                    Style="{StaticResource CardStyle}"
+                    Margin="7,17,7,0">
 
                 <Grid Margin="15">
                     <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="*"/>
-                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
 
                     <!-- Header -->
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                         <Viewbox Width="20" Height="20" Margin="0,0,8,0">
                             <Path Data="{StaticResource IconAvailability}"
-                                              Fill="Black"
-                                              Stretch="Uniform"
-                                              RenderTransformOrigin="0.5,0.5">
+                                  Fill="Black"
+                                  Stretch="Uniform"
+                                  RenderTransformOrigin="0.5,0.5">
                                 <Path.RenderTransform>
-                                    <ScaleTransform ScaleX="1" ScaleY="-1"/>
+                                    <ScaleTransform ScaleX="1" ScaleY="-1" />
                                 </Path.RenderTransform>
                             </Path>
                         </Viewbox>
 
                         <TextBlock Text="Availability Schedule"
-                               FontFamily="Segoe UI"
-                               FontSize="20"
-                               FontWeight="Bold"
-                               Foreground="Black"
-                               VerticalAlignment="Center"/>
+                                   FontFamily="{StaticResource DefaultFontFamily}"
+                                   FontSize="{StaticResource FontSizeTitle}"
+                                   FontWeight="Bold"
+                                   Foreground="Black"
+                                   VerticalAlignment="Center" />
                     </StackPanel>
 
 
                     <!-- Grid container (rounded like your binds) -->
                     <Border Grid.Row="1"
-                Margin="0,12,0,12"
-                Background="White"
-                BorderBrush="#E2E2E2"
-                BorderThickness="2"
-                CornerRadius="20"
-                Padding="6"
-                ClipToBounds="True">
+                            Margin="0,12,0,12"
+                            Background="{StaticResource SurfaceBrush}"
+                            BorderBrush="{StaticResource CardBorderBrush}"
+                            BorderThickness="2"
+                            CornerRadius="{StaticResource Cr20}"
+                            Padding="6"
+                            ClipToBounds="True">
 
                         <DataGrid x:Name="dataGridAvailabilityDays"
-                              Style="{StaticResource ScheduleMatrixGridStyle}"
-                              Background="Transparent"
-                              BorderThickness="0"
-                              ItemsSource="{Binding AvailabilityDays}"
-                              SelectedItem="{Binding SelectedAvailabilityDay}"
+                                  Style="{StaticResource ScheduleMatrixGridStyle}"
+                                  Background="Transparent"
+                                  BorderThickness="0"
+                                  ItemsSource="{Binding AvailabilityDays}"
+                                  SelectedItem="{Binding SelectedAvailabilityDay}"
 
-                              ScrollViewer.HorizontalScrollBarVisibility="Auto"
-                              ScrollViewer.VerticalScrollBarVisibility="Auto"
-                              ScrollViewer.CanContentScroll="True"
+                                  ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                                  ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                  ScrollViewer.CanContentScroll="True"
 
-                              ColumnWidth="*" 
-                              MinColumnWidth="140"
-                              FrozenColumnCount="1"
-                              AutoGeneratingColumn="AvailabilityGrid_AutoGeneratingColumn">
+                                  ColumnWidth="*" 
+                                  MinColumnWidth="140"
+                                  FrozenColumnCount="1"
+                                  AutoGeneratingColumn="AvailabilityGrid_AutoGeneratingColumn">
                         </DataGrid>
 
                     </Border>
@@ -1599,27 +596,27 @@
                     <!-- Buttons -->
                     <Grid Grid.Row="2">
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
 
                         <Button x:Name="btnCancel"
-                    Style="{StaticResource RoundedButtonStyle}"
-                    Height="33"
-                    Width="84"
-                    Background="#FFE0E0E0"
-                    Foreground="Gray"
-                    Content="Cancel"
-                    Command="{Binding CancelCommand}"/>
+                                Style="{StaticResource RoundedButtonStyle}"
+                                Height="33"
+                                Width="84"
+                                Background="{StaticResource CancelButtonBackgroundBrush}"
+                                Foreground="{StaticResource MutedTextBrush}"
+                                Content="Cancel"
+                                Command="{Binding CancelCommand}" />
 
                         <Button x:Name="btnSave"
-                    Grid.Column="2"
-                    Style="{StaticResource RoundedButtonStyle}"
-                    Height="33"
-                    Width="114"
-                    Content="Save Changes"
-                    Command="{Binding SaveCommand}"/>
+                                Grid.Column="2"
+                                Style="{StaticResource RoundedButtonStyle}"
+                                Height="33"
+                                Width="114"
+                                Content="Save Changes"
+                                Command="{Binding SaveCommand}" />
                     </Grid>
                 </Grid>
             </Border>
