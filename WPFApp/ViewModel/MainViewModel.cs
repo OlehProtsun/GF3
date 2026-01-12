@@ -5,6 +5,8 @@ using System.Windows;
 using Microsoft.Extensions.DependencyInjection;
 using WPFApp.Infrastructure;
 using WPFApp.ViewModel.Availability;
+using WPFApp.ViewModel.Employee;
+using WPFApp.ViewModel.Shop;
 
 namespace WPFApp.ViewModel
 {
@@ -124,8 +126,18 @@ namespace WPFApp.ViewModel
                 var viewModel = getOrCreateVm();
                 CurrentViewModel = viewModel;
 
-                if (viewModel is AvailabilityViewModel availabilityVm)
-                    await availabilityVm.EnsureInitializedAsync(ct);
+                switch (viewModel)
+                {
+                    case AvailabilityViewModel availabilityVm:
+                        await availabilityVm.EnsureInitializedAsync(ct);
+                        break;
+                    case EmployeeViewModel employeeVm:
+                        await employeeVm.EnsureInitializedAsync(ct);
+                        break;
+                    case ShopViewModel shopVm:
+                        await shopVm.EnsureInitializedAsync(ct);
+                        break;
+                }
             }, busyText);
         }
 
