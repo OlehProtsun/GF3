@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using BusinessLogicLayer.Availability;
@@ -358,6 +359,7 @@ namespace WPFApp.ViewModel.Container
                 var first = invalidBlocks.First();
                 ScheduleEditVm.SelectedBlock = first;
                 ScheduleEditVm.SetValidationErrors(first.ValidationErrors);
+                ShowError(BuildScheduleValidationSummary(invalidBlocks));
                 return;
             }
 
@@ -409,6 +411,28 @@ namespace WPFApp.ViewModel.Container
                 await LoadSchedulesAsync(containerId, search: null, ct);
 
             ShowInfo("Schedules saved successfully.");
+
+            if (ScheduleEditVm.IsEdit)
+            {
+                var savedBlock = ScheduleEditVm.Blocks.FirstOrDefault();
+                if (savedBlock != null)
+                {
+                    var detailed = await _scheduleService.GetDetailedAsync(savedBlock.Model.Id, ct);
+                    if (detailed != null)
+                    {
+                        var employees = detailed.Employees?.ToList() ?? new List<ScheduleEmployeeModel>();
+                        var slots = detailed.Slots?.ToList() ?? new List<ScheduleSlotModel>();
+                        ScheduleProfileVm.SetProfile(detailed, employees, slots);
+                        ProfileVm.ScheduleListVm.SelectedItem = detailed;
+                    }
+                }
+
+                ScheduleCancelTarget = ContainerSection.Profile;
+                await SwitchToScheduleProfileAsync();
+                return;
+            }
+
+            await SwitchToProfileAsync();
         }
 
         internal async Task DeleteSelectedScheduleAsync(CancellationToken ct = default)
@@ -1086,6 +1110,47 @@ namespace WPFApp.ViewModel.Container
             model.Note = string.IsNullOrWhiteSpace(model.Note) ? null : model.Note.Trim();
 
             return errors;
+        }
+
+        private string BuildScheduleValidationSummary(IReadOnlyCollection<ScheduleBlockViewModel> invalidBlocks)
+        {
+            var sb = new StringBuilder();
+            sb.AppendLine("Fix the following schedule errors before saving:");
+
+            foreach (var block in invalidBlocks)
+            {
+                var index = ScheduleEditVm.Blocks.IndexOf(block);
+                var displayIndex = index >= 0 ? index + 1 : 0;
+                var header = displayIndex > 0 ? $"Schedule #{displayIndex}" : "Schedule";
+                var name = string.IsNullOrWhiteSpace(block.Model.Name) ? null : block.Model.Name.Trim();
+                if (!string.IsNullOrWhiteSpace(name))
+                    header = $"{header} \"{name}\"";
+
+                foreach (var (field, message) in block.ValidationErrors)
+                {
+                    var label = GetScheduleFieldLabel(field);
+                    sb.AppendLine($"- {header}: {label} — {message}");
+                }
+            }
+
+            return sb.ToString().TrimEnd();
+        }
+
+        private static string GetScheduleFieldLabel(string propertyName)
+        {
+            return propertyName switch
+            {
+                nameof(ContainerScheduleEditViewModel.ScheduleContainerId) => "Container",
+                nameof(ContainerScheduleEditViewModel.ScheduleShopId) => "Shop",
+                nameof(ContainerScheduleEditViewModel.ScheduleName) => "Name",
+                nameof(ContainerScheduleEditViewModel.ScheduleYear) => "Year",
+                nameof(ContainerScheduleEditViewModel.ScheduleMonth) => "Month",
+                nameof(ContainerScheduleEditViewModel.SchedulePeoplePerShift) => "People per shift",
+                nameof(ContainerScheduleEditViewModel.ScheduleMaxHoursPerEmp) => "Max hours per employee",
+                nameof(ContainerScheduleEditViewModel.ScheduleShift1) => "Shift 1",
+                nameof(ContainerScheduleEditViewModel.ScheduleShift2) => "Shift 2",
+                _ => propertyName
+            };
         }
 
         private static bool TryParseTime(string s, out TimeSpan t)
