@@ -56,7 +56,7 @@ namespace WPFApp.ViewModel.Container
                         nameof(SelectedAvailabilityGroup));
 
                     SyncSelectionFromBlock();
-                    ClearMatricesOnly();
+                    RestoreMatricesForSelection();
                 }
             }
         }
@@ -452,21 +452,21 @@ namespace WPFApp.ViewModel.Container
         {
             SetOptions(AvailabilityGroups, groups);
 
-            if (SelectedBlock != null)
-            {
-                _suppressAvailabilityGroupUpdate = true;
-                SelectedAvailabilityGroup = AvailabilityGroups
-                    .FirstOrDefault(g => g.Id == SelectedBlock.SelectedAvailabilityGroupId);
-                _suppressAvailabilityGroupUpdate = false;
+                if (SelectedBlock != null)
+                {
+                    _suppressAvailabilityGroupUpdate = true;
+                    SelectedAvailabilityGroup = AvailabilityGroups
+                        .FirstOrDefault(g => g.Id == SelectedBlock.SelectedAvailabilityGroupId);
+                    _suppressAvailabilityGroupUpdate = false;
 
-                // <-- замість LoadAvailabilityPreviewAsync()
-                var groupId = SelectedBlock.SelectedAvailabilityGroupId;
-                if (groupId > 0)
-                    _ = _owner.SyncEmployeesFromAvailabilityGroupAsync(groupId);
+                    // <-- замість LoadAvailabilityPreviewAsync()
+                    var groupId = SelectedBlock.SelectedAvailabilityGroupId;
+                    if (groupId > 0)
+                        _ = _owner.SyncEmployeesFromAvailabilityGroupAsync(groupId);
 
-                ClearMatricesOnly();
+                    RestoreMatricesForSelection();
 
-            }
+                }
         }
 
         // ContainerScheduleEditViewModel.cs
@@ -832,11 +832,10 @@ namespace WPFApp.ViewModel.Container
 
 
         // 1) просто очистити відображення (НЕ чіпаючи Slots) — для вибору блоку
-        internal void ClearMatricesOnly()
+        private void RestoreMatricesForSelection()
         {
-            ScheduleMatrix = new DataView();
             AvailabilityPreviewMatrix = new DataView();
-            MatrixChanged?.Invoke(this, EventArgs.Empty);
+            RefreshScheduleMatrix();
         }
 
         // 2) коли змінили параметри — скинути результат генерації + очистити відображення
