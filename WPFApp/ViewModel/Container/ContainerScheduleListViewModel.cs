@@ -1,5 +1,6 @@
 ﻿using DataAccessLayer.Models;
 using System.Collections.ObjectModel;
+using System.Linq;
 using System.Windows.Input;
 using WPFApp.Infrastructure;
 using WPFApp.ViewModel.Dialogs;
@@ -77,14 +78,14 @@ namespace WPFApp.ViewModel.Container
                         it.IsChecked = false;
                 }
 
-                ((RelayCommand)MultiOpenCommand).RaiseCanExecuteChanged();
+                MultiOpenCommand.RaiseCanExecuteChanged();
             }
         }
 
 
 
         public ICommand ToggleMultiOpenCommand { get; }
-        public ICommand MultiOpenCommand { get; }
+        public AsyncRelayCommand MultiOpenCommand { get; }
 
         public AsyncRelayCommand SearchCommand { get; }
         public AsyncRelayCommand AddNewCommand { get; }
@@ -107,17 +108,29 @@ namespace WPFApp.ViewModel.Container
                 IsMultiOpenEnabled = !IsMultiOpenEnabled;
             });
 
-            MultiOpenCommand = new RelayCommand(
-                execute: () =>
+            MultiOpenCommand = new AsyncRelayCommand(
+                async () =>
                 {
                     var selectedModels = Items
                         .Where(x => x.IsChecked)
                         .Select(x => x.Model)
                         .ToList();
 
-                    var ids = string.Join(", ", selectedModels.Select(x => x.Id));
-                    _owner.ShowInfo(
-                        $"MultiOpen placeholder: {selectedModels.Count} schedule(s) would be opened. IDs: {ids}");
+                    if (selectedModels.Count == 0)
+                        return;
+
+                    var names = selectedModels
+                        .Select((model, index) => FormatScheduleName(model, index + 1))
+                        .Select(name => $"'{name}'")
+                        .ToList();
+
+                    var noun = selectedModels.Count == 1 ? "schedule" : "schedules";
+                    var message = $"Open {selectedModels.Count} {noun}: {string.Join(", ", names)}";
+
+                    if (!_owner.Confirm(message))
+                        return;
+
+                    await _owner.MultiOpenSchedulesAsync(selectedModels);
                 },
                 canExecute: () =>
                     IsMultiOpenEnabled && Items.Any(x => x.IsChecked)
@@ -134,7 +147,7 @@ namespace WPFApp.ViewModel.Container
                 Items.Add(new ScheduleRowVm(schedule));
 
             WireMultiSelectHooks();
-            ((RelayCommand)MultiOpenCommand).RaiseCanExecuteChanged();
+            MultiOpenCommand.RaiseCanExecuteChanged();
         }
 
 
@@ -151,9 +164,25 @@ namespace WPFApp.ViewModel.Container
             {
                 it.MultiSelectedChanged = () =>
                 {
-                    ((RelayCommand)MultiOpenCommand).RaiseCanExecuteChanged();
+                    MultiOpenCommand.RaiseCanExecuteChanged();
                 };
             }
+        }
+
+        public void ToggleRowSelection(ScheduleRowVm row)
+        {
+            if (!IsMultiOpenEnabled)
+                return;
+
+            row.IsChecked = !row.IsChecked;
+        }
+
+        private static string FormatScheduleName(ScheduleModel model, int index)
+        {
+            if (!string.IsNullOrWhiteSpace(model.Name))
+                return model.Name;
+
+            return $"(Unnamed schedule #{index})";
         }
 
     }

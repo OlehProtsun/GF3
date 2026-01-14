@@ -31,18 +31,23 @@ namespace WPFApp.View.Container
 
         private void RowHitArea_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
-            if (dataGridSchedules?.DataContext is ContainerScheduleListViewModel vm && vm.IsMultiOpenEnabled && e.ClickCount >= 2)
-            {
-                e.Handled = true;
-                return;
-            }
-
             var dep = (DependencyObject)sender;
             while (dep != null && dep is not DataGridRow)
                 dep = VisualTreeHelper.GetParent(dep);
 
             if (dep is DataGridRow row)
             {
+                if (dataGridSchedules?.DataContext is ContainerScheduleListViewModel vm && vm.IsMultiOpenEnabled)
+                {
+                    if (row.DataContext is ScheduleRowVm scheduleRow)
+                        vm.ToggleRowSelection(scheduleRow);
+
+                    row.IsSelected = true;
+                    row.Focus();
+                    e.Handled = true;
+                    return;
+                }
+
                 row.IsSelected = true;
                 row.Focus();
                 e.Handled = true;

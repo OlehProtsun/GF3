@@ -298,8 +298,8 @@
 
                                 <!-- твій ListBox -->
                                 <ListBox Grid.Column="0"
-                     ItemsSource="{Binding Blocks}"
-                     SelectedItem="{Binding SelectedBlock}"
+                     ItemsSource="{Binding OpenedSchedules}"
+                     SelectedItem="{Binding ActiveSchedule}"
                      BorderThickness="0"
                      Background="Transparent"
                      ScrollViewer.HorizontalScrollBarVisibility="Auto"

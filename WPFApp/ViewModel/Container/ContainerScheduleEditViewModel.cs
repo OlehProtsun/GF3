@@ -29,6 +29,8 @@ namespace WPFApp.ViewModel.Container
 
         public ObservableCollection<ScheduleBlockViewModel> Blocks { get; } = new();
 
+        public ObservableCollection<ScheduleBlockViewModel> OpenedSchedules => Blocks;
+
         private ScheduleBlockViewModel? _selectedBlock;
         public ScheduleBlockViewModel? SelectedBlock
         {
@@ -55,10 +57,18 @@ namespace WPFApp.ViewModel.Container
                         nameof(ScheduleEmployees),
                         nameof(SelectedAvailabilityGroup));
 
+                    OnPropertyChanged(nameof(ActiveSchedule));
+
                     SyncSelectionFromBlock();
                     RestoreMatricesForSelection();
                 }
             }
+        }
+
+        public ScheduleBlockViewModel? ActiveSchedule
+        {
+            get => SelectedBlock;
+            set => SelectedBlock = value;
         }
 
         private bool _isEdit;
