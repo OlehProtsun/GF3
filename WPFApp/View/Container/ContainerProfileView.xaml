@@ -399,9 +399,8 @@
 
                         <!-- ON/OFF MultiOpen -->
                         <Button Grid.Column="6"
-            Height="37"
-            Style="{StaticResource RoundedButtonStyle}"
-            Command="{Binding ToggleMultiOpenCommand}">
+                            Height="37"
+                            Command="{Binding ToggleMultiOpenCommand}">
                             <Button.Style>
                                 <Style TargetType="Button" BasedOn="{StaticResource RoundedButtonStyle}">
                                     <Setter Property="Content" Value="MultiOpen: OFF" />
