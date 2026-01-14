@@ -28,6 +28,8 @@ namespace WPFApp.View.Availability
         {
             InitializeComponent();
             DataContextChanged += AvailabilityEditView_DataContextChanged;
+            Loaded += AvailabilityEditView_Loaded;
+            Unloaded += AvailabilityEditView_Unloaded;
 
             dataGridAvailabilityDays.PreviewKeyDown += DataGridAvailabilityDays_PreviewKeyDown;
             dataGridBinds.AutoGeneratingColumn += DataGridBinds_AutoGeneratingColumn;
@@ -38,16 +40,37 @@ namespace WPFApp.View.Availability
 
         private void AvailabilityEditView_DataContextChanged(object sender, DependencyPropertyChangedEventArgs e)
         {
+            AttachViewModel(DataContext as AvailabilityEditViewModel);
+        }
+
+        private void AvailabilityEditView_Loaded(object sender, RoutedEventArgs e)
+        {
+            AttachViewModel(DataContext as AvailabilityEditViewModel);
+        }
+
+        private void AvailabilityEditView_Unloaded(object sender, RoutedEventArgs e)
+        {
+            DetachViewModel();
+        }
+
+        private void AttachViewModel(AvailabilityEditViewModel? viewModel)
+        {
             if (_vm != null)
                 _vm.MatrixChanged -= VmOnMatrixChanged;
 
-            _vm = DataContext as AvailabilityEditViewModel;
+            _vm = viewModel;
 
             if (_vm != null)
             {
                 _vm.MatrixChanged += VmOnMatrixChanged;
                 BuildMatrixColumns(_vm.AvailabilityDays.Table, dataGridAvailabilityDays);
             }
+        }
+
+        private void DetachViewModel()
+        {
+            if (_vm == null) return;
+            _vm.MatrixChanged -= VmOnMatrixChanged;
         }
 
         private void VmOnMatrixChanged(object? sender, EventArgs e)
@@ -112,13 +135,13 @@ namespace WPFApp.View.Availability
                 vm.SearchEmployeeCommand.Execute(null);
         }
 
-        private void DataGridBinds_RowEditEnding(object? sender, DataGridRowEditEndingEventArgs e)
+        private async void DataGridBinds_RowEditEnding(object? sender, DataGridRowEditEndingEventArgs e)
         {
             if (e.EditAction != DataGridEditAction.Commit) return;
             if (_vm is null) return;
 
             var row = e.Row.Item as BindRow;
-            _ = _vm.UpsertBindAsync(row);
+            await _vm.UpsertBindAsync(row);
         }
 
         private void DataGridBinds_AutoGeneratingColumn(object? sender, DataGridAutoGeneratingColumnEventArgs e)

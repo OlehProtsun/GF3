@@ -21,24 +21,33 @@ namespace WPFApp.View.Container
         public ContainerScheduleEditView()
         {
             InitializeComponent();
-            Loaded += (_, __) =>
-            {
-                if (DataContext is ContainerScheduleEditViewModel _vm)
-                {
-                    BuildMatrixColumns(_vm.ScheduleMatrix.Table, dataGridScheduleMatrix, isReadOnly: false);
-                    BuildMatrixColumns(_vm.AvailabilityPreviewMatrix.Table, dataGridAvailabilityPreview, isReadOnly: true);
-                }
-            };
+            Loaded += ContainerScheduleEditView_Loaded;
+            Unloaded += ContainerScheduleEditView_Unloaded;
             DataContextChanged += ContainerScheduleEditView_DataContextChanged;
             dataGridScheduleMatrix.PreparingCellForEdit += ScheduleMatrix_PreparingCellForEdit;
         }
 
         private void ContainerScheduleEditView_DataContextChanged(object sender, DependencyPropertyChangedEventArgs e)
         {
+            AttachViewModel(DataContext as ContainerScheduleEditViewModel);
+        }
+
+        private void ContainerScheduleEditView_Loaded(object sender, RoutedEventArgs e)
+        {
+            AttachViewModel(DataContext as ContainerScheduleEditViewModel);
+        }
+
+        private void ContainerScheduleEditView_Unloaded(object sender, RoutedEventArgs e)
+        {
+            DetachViewModel();
+        }
+
+        private void AttachViewModel(ContainerScheduleEditViewModel? viewModel)
+        {
             if (_vm != null)
                 _vm.MatrixChanged -= VmOnMatrixChanged;
 
-            _vm = DataContext as ContainerScheduleEditViewModel;
+            _vm = viewModel;
 
             if (_vm != null)
             {
@@ -46,6 +55,12 @@ namespace WPFApp.View.Container
                 BuildMatrixColumns(_vm.ScheduleMatrix.Table, dataGridScheduleMatrix, isReadOnly: false);
                 BuildMatrixColumns(_vm.AvailabilityPreviewMatrix.Table, dataGridAvailabilityPreview, isReadOnly: true);
             }
+        }
+
+        private void DetachViewModel()
+        {
+            if (_vm == null) return;
+            _vm.MatrixChanged -= VmOnMatrixChanged;
         }
 
         private void VmOnMatrixChanged(object? sender, System.EventArgs e)

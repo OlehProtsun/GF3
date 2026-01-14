@@ -14,7 +14,11 @@ namespace WPFApp.ViewModel.Container
         public ScheduleModel? SelectedItem
         {
             get => _selectedItem;
-            set => SetProperty(ref _selectedItem, value);
+            set
+            {
+                if (SetProperty(ref _selectedItem, value))
+                    UpdateSelectionCommands();
+            }
         }
 
         private string _searchText = string.Empty;
@@ -36,9 +40,9 @@ namespace WPFApp.ViewModel.Container
 
             SearchCommand = new AsyncRelayCommand(() => _owner.SearchScheduleAsync());
             AddNewCommand = new AsyncRelayCommand(() => _owner.StartScheduleAddAsync());
-            EditCommand = new AsyncRelayCommand(() => _owner.EditSelectedScheduleAsync());
-            DeleteCommand = new AsyncRelayCommand(() => _owner.DeleteSelectedScheduleAsync());
-            OpenProfileCommand = new AsyncRelayCommand(() => _owner.OpenScheduleProfileAsync());
+            EditCommand = new AsyncRelayCommand(() => _owner.EditSelectedScheduleAsync(), () => SelectedItem != null);
+            DeleteCommand = new AsyncRelayCommand(() => _owner.DeleteSelectedScheduleAsync(), () => SelectedItem != null);
+            OpenProfileCommand = new AsyncRelayCommand(() => _owner.OpenScheduleProfileAsync(), () => SelectedItem != null);
         }
 
         public void SetItems(IEnumerable<ScheduleModel> schedules)
@@ -46,6 +50,13 @@ namespace WPFApp.ViewModel.Container
             Items.Clear();
             foreach (var schedule in schedules)
                 Items.Add(schedule);
+        }
+
+        private void UpdateSelectionCommands()
+        {
+            EditCommand.RaiseCanExecuteChanged();
+            DeleteCommand.RaiseCanExecuteChanged();
+            OpenProfileCommand.RaiseCanExecuteChanged();
         }
     }
 }

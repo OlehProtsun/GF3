@@ -62,26 +62,41 @@ namespace WPFApp
             //services.AddSingleton<Service.NavigationService>();
         }
 
-        protected override async void OnStartup(StartupEventArgs e)
+        protected override void OnStartup(StartupEventArgs e)
         {
             base.OnStartup(e);
 
-            await _host!.StartAsync();
+            try
+            {
+                _host!.StartAsync().GetAwaiter().GetResult();
 
-            // Відкриваємо головне вікно через DI
-            var mainWindow = _host.Services.GetRequiredService<View.MainWindow>();
-            mainWindow.Show();
-
-            // Якщо треба — можна викликати async init у VM
-            // (приклад нижче, як це робити красиво)
+                // Відкриваємо головне вікно через DI
+                var mainWindow = _host.Services.GetRequiredService<View.MainWindow>();
+                mainWindow.Show();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(
+                    ex.Message,
+                    "Startup error",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+                Shutdown(-1);
+            }
         }
 
-        protected override async void OnExit(ExitEventArgs e)
+        protected override void OnExit(ExitEventArgs e)
         {
             if (_host != null)
             {
-                await _host.StopAsync();
-                _host.Dispose();
+                try
+                {
+                    _host.StopAsync().GetAwaiter().GetResult();
+                }
+                finally
+                {
+                    _host.Dispose();
+                }
             }
 
             base.OnExit(e);
