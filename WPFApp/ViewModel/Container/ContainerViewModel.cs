@@ -323,6 +323,64 @@ namespace WPFApp.ViewModel.Container
             await SwitchToScheduleEditAsync();
         }
 
+        internal async Task MultiOpenSchedulesAsync(IReadOnlyList<ScheduleModel> schedules, CancellationToken ct = default)
+        {
+            if (schedules.Count == 0)
+                return;
+
+            await LoadLookupsAsync(ct);
+            ResetScheduleFilters();
+
+            ScheduleEditVm.ClearValidationErrors();
+
+            var keepExisting = Mode == ContainerSection.ScheduleEdit && ScheduleEditVm.IsEdit;
+            if (!keepExisting)
+                ScheduleEditVm.ResetForNew();
+
+            ScheduleEditVm.IsEdit = true;
+
+            var openedBlocks = new List<ScheduleBlockViewModel>();
+
+            foreach (var schedule in schedules)
+            {
+                var existing = ScheduleEditVm.Blocks.FirstOrDefault(b => b.Model.Id == schedule.Id);
+                if (existing != null)
+                {
+                    openedBlocks.Add(existing);
+                    continue;
+                }
+
+                var detailed = await _scheduleService.GetDetailedAsync(schedule.Id, ct);
+                if (detailed is null)
+                    continue;
+
+                var block = CreateBlockFromSchedule(detailed,
+                    detailed.Employees?.ToList() ?? new List<ScheduleEmployeeModel>(),
+                    detailed.Slots?.ToList() ?? new List<ScheduleSlotModel>());
+
+                block.SelectedAvailabilityGroupId = (int)detailed.AvailabilityGroupId;
+
+                ScheduleEditVm.Blocks.Add(block);
+                openedBlocks.Add(block);
+            }
+
+            if (openedBlocks.Count == 0)
+            {
+                ShowError("Selected schedules could not be loaded.");
+                return;
+            }
+
+            ScheduleEditVm.SelectedBlock = openedBlocks.First();
+            ScheduleEditVm.RefreshScheduleMatrix();
+
+            ScheduleCancelTarget = Mode == ContainerSection.ScheduleProfile
+                ? ContainerSection.ScheduleProfile
+                : ContainerSection.Profile;
+
+            await UpdateAvailabilityPreviewAsync(ct);
+            await SwitchToScheduleEditAsync();
+        }
+
         internal async Task SaveScheduleAsync(CancellationToken ct = default)
         {
             ScheduleEditVm.ClearValidationErrors();
