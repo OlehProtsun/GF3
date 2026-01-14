@@ -14,7 +14,11 @@ namespace WPFApp.ViewModel.Shop
         public ShopModel? SelectedItem
         {
             get => _selectedItem;
-            set => SetProperty(ref _selectedItem, value);
+            set
+            {
+                if (SetProperty(ref _selectedItem, value))
+                    UpdateSelectionCommands();
+            }
         }
 
         private string _searchText = string.Empty;
@@ -36,9 +40,9 @@ namespace WPFApp.ViewModel.Shop
 
             SearchCommand = new AsyncRelayCommand(() => _owner.SearchAsync());
             AddNewCommand = new AsyncRelayCommand(() => _owner.StartAddAsync());
-            EditCommand = new AsyncRelayCommand(() => _owner.EditSelectedAsync());
-            DeleteCommand = new AsyncRelayCommand(() => _owner.DeleteSelectedAsync());
-            OpenProfileCommand = new AsyncRelayCommand(() => _owner.OpenProfileAsync());
+            EditCommand = new AsyncRelayCommand(() => _owner.EditSelectedAsync(), () => SelectedItem != null);
+            DeleteCommand = new AsyncRelayCommand(() => _owner.DeleteSelectedAsync(), () => SelectedItem != null);
+            OpenProfileCommand = new AsyncRelayCommand(() => _owner.OpenProfileAsync(), () => SelectedItem != null);
         }
 
         public void SetItems(IEnumerable<ShopModel> shops)
@@ -46,6 +50,13 @@ namespace WPFApp.ViewModel.Shop
             Items.Clear();
             foreach (var shop in shops)
                 Items.Add(shop);
+        }
+
+        private void UpdateSelectionCommands()
+        {
+            EditCommand.RaiseCanExecuteChanged();
+            DeleteCommand.RaiseCanExecuteChanged();
+            OpenProfileCommand.RaiseCanExecuteChanged();
         }
     }
 }

@@ -150,7 +150,7 @@ namespace WPFApp.ViewModel.Availability
             var selectedEmployees = EditVm.GetSelectedEmployeeIds();
             if (selectedEmployees.Count == 0)
             {
-            ShowError("Add at least 1 employee to the group.");
+                ShowError("Add at least 1 employee to the group.");
                 return;
             }
 
@@ -159,11 +159,19 @@ namespace WPFApp.ViewModel.Availability
 
             if (!AvailabilityPayloadBuilder.TryBuild(raw, out var payload, out var err))
             {
-            ShowError(err ?? "Invalid availability codes.");
+                ShowError(err ?? "Invalid availability codes.");
                 return;
             }
 
-            await _availabilityService.SaveGroupAsync(group, payload, ct);
+            try
+            {
+                await _availabilityService.SaveGroupAsync(group, payload, ct);
+            }
+            catch (Exception ex)
+            {
+                ShowError(ex.Message);
+                return;
+            }
             ShowInfo(isNew
                 ? "Availability Group added successfully."
                 : "Availability Group updated successfully.");
@@ -195,7 +203,16 @@ namespace WPFApp.ViewModel.Availability
             if (!Confirm($"Delete '{current.Name}' ?"))
                 return;
 
-            await _availabilityService.DeleteAsync(current.Id, ct);
+            try
+            {
+                await _availabilityService.DeleteAsync(current.Id, ct);
+            }
+            catch (Exception ex)
+            {
+                ShowError(ex.Message);
+                return;
+            }
+
             ShowInfo("Availability Group deleted successfully.");
 
             await LoadAllGroupsAsync(ct);
@@ -259,8 +276,16 @@ namespace WPFApp.ViewModel.Availability
                 IsActive = false        // щоб чернетка не впливала на роботу хоткеїв
             };
 
-            await _bindService.CreateAsync(draft, ct);
-            await LoadBindsAsync(ct);
+            try
+            {
+                await _bindService.CreateAsync(draft, ct);
+                await LoadBindsAsync(ct);
+            }
+            catch (Exception ex)
+            {
+                ShowError(ex.Message);
+                return;
+            }
 
             // Знайти її в колекції й зробити вигляд "порожній Key/Value" для юзера
             var row = EditVm.Binds.FirstOrDefault(b => b.Key == draftKey);
@@ -288,8 +313,15 @@ namespace WPFApp.ViewModel.Availability
                 return;
             }
 
-            await _bindService.DeleteAsync(bind.Id, ct);
-            await LoadBindsAsync(ct);
+            try
+            {
+                await _bindService.DeleteAsync(bind.Id, ct);
+                await LoadBindsAsync(ct);
+            }
+            catch (Exception ex)
+            {
+                ShowError(ex.Message);
+            }
         }
 
         internal async Task UpsertBindAsync(BindRow? bind, CancellationToken ct = default)
@@ -314,12 +346,19 @@ namespace WPFApp.ViewModel.Availability
 
             var model = bind.ToModel();
 
-            if (bind.Id == 0)
-                await _bindService.CreateAsync(model, ct);
-            else
-                await _bindService.UpdateAsync(model, ct);
+            try
+            {
+                if (bind.Id == 0)
+                    await _bindService.CreateAsync(model, ct);
+                else
+                    await _bindService.UpdateAsync(model, ct);
 
-            await LoadBindsAsync(ct);
+                await LoadBindsAsync(ct);
+            }
+            catch (Exception ex)
+            {
+                ShowError(ex.Message);
+            }
         }
 
         internal string? FormatKeyGesture(Key key, ModifierKeys modifiers)
@@ -342,37 +381,37 @@ namespace WPFApp.ViewModel.Availability
         }
 
 
-internal bool TryNormalizeKey(string raw, out string normalized)
-{
-    normalized = string.Empty;
-    if (string.IsNullOrWhiteSpace(raw)) return false;
-
-    raw = raw.Trim();
-
-    // 1) Якщо юзер ввів просто 1 / m / M -> приймаємо як є (в одному регістрі)
-    if (!raw.Contains('+'))
-    {
-        normalized = raw.ToUpperInvariant(); // або ToLowerInvariant(), але будь послідовним
-        return true;
-    }
-
-    // 2) Якщо це комбінація типу Ctrl+M -> пробуємо стандартний KeyGestureConverter
-    var converter = new KeyGestureConverter();
-    try
-    {
-        if (converter.ConvertFromString(raw) is KeyGesture gesture)
+        internal bool TryNormalizeKey(string raw, out string normalized)
         {
-            normalized = gesture.GetDisplayStringForCulture(CultureInfo.InvariantCulture);
-            return true;
-        }
-    }
-    catch
-    {
-        return false;
-    }
+            normalized = string.Empty;
+            if (string.IsNullOrWhiteSpace(raw)) return false;
 
-    return false;
-}
+            raw = raw.Trim();
+
+            // 1) Якщо юзер ввів просто 1 / m / M -> приймаємо як є (в одному регістрі)
+            if (!raw.Contains('+'))
+            {
+                normalized = raw.ToUpperInvariant(); // або ToLowerInvariant(), але будь послідовним
+                return true;
+            }
+
+            // 2) Якщо це комбінація типу Ctrl+M -> пробуємо стандартний KeyGestureConverter
+            var converter = new KeyGestureConverter();
+            try
+            {
+                if (converter.ConvertFromString(raw) is KeyGesture gesture)
+                {
+                    normalized = gesture.GetDisplayStringForCulture(CultureInfo.InvariantCulture);
+                    return true;
+                }
+            }
+            catch
+            {
+                return false;
+            }
+
+            return false;
+        }
 
 
         private async Task LoadAllGroupsAsync(CancellationToken ct = default)

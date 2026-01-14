@@ -23,19 +23,42 @@ namespace WPFApp.View.Availability
         {
             InitializeComponent();
             DataContextChanged += AvailabilityProfileView_DataContextChanged;
+            Loaded += AvailabilityProfileView_Loaded;
+            Unloaded += AvailabilityProfileView_Unloaded;
         }
 
         private void AvailabilityProfileView_DataContextChanged(object sender, DependencyPropertyChangedEventArgs e)
         {
+            AttachViewModel(DataContext as AvailabilityProfileViewModel);
+        }
+
+        private void AvailabilityProfileView_Loaded(object sender, RoutedEventArgs e)
+        {
+            AttachViewModel(DataContext as AvailabilityProfileViewModel);
+        }
+
+        private void AvailabilityProfileView_Unloaded(object sender, RoutedEventArgs e)
+        {
+            DetachViewModel();
+        }
+
+        private void AttachViewModel(AvailabilityProfileViewModel? viewModel)
+        {
             if (_vm != null)
                 _vm.MatrixChanged -= VmOnMatrixChanged;
 
-            _vm = DataContext as AvailabilityProfileViewModel;
+            _vm = viewModel;
             if (_vm != null)
             {
                 _vm.MatrixChanged += VmOnMatrixChanged;
                 BuildMatrixColumns(_vm.ProfileAvailabilityMonths.Table, dataGridAvailabilityMonthProfile);
             }
+        }
+
+        private void DetachViewModel()
+        {
+            if (_vm == null) return;
+            _vm.MatrixChanged -= VmOnMatrixChanged;
         }
 
         private void VmOnMatrixChanged(object? sender, EventArgs e)

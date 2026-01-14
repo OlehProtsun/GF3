@@ -18,19 +18,42 @@ namespace WPFApp.View.Container
         {
             InitializeComponent();
             DataContextChanged += ContainerScheduleProfileView_DataContextChanged;
+            Loaded += ContainerScheduleProfileView_Loaded;
+            Unloaded += ContainerScheduleProfileView_Unloaded;
         }
 
         private void ContainerScheduleProfileView_DataContextChanged(object sender, DependencyPropertyChangedEventArgs e)
         {
+            AttachViewModel(DataContext as ContainerScheduleProfileViewModel);
+        }
+
+        private void ContainerScheduleProfileView_Loaded(object sender, RoutedEventArgs e)
+        {
+            AttachViewModel(DataContext as ContainerScheduleProfileViewModel);
+        }
+
+        private void ContainerScheduleProfileView_Unloaded(object sender, RoutedEventArgs e)
+        {
+            DetachViewModel();
+        }
+
+        private void AttachViewModel(ContainerScheduleProfileViewModel? viewModel)
+        {
             if (_vm != null)
                 _vm.MatrixChanged -= VmOnMatrixChanged;
 
-            _vm = DataContext as ContainerScheduleProfileViewModel;
+            _vm = viewModel;
             if (_vm != null)
             {
                 _vm.MatrixChanged += VmOnMatrixChanged;
                 BuildMatrixColumns(_vm.ScheduleMatrix.Table, dataGridScheduleProfile);
             }
+        }
+
+        private void DetachViewModel()
+        {
+            if (_vm == null) return;
+            _vm.MatrixChanged -= VmOnMatrixChanged;
         }
 
         private void VmOnMatrixChanged(object? sender, System.EventArgs e)
