@@ -21,13 +21,13 @@ namespace WPFApp.ViewModel.Container
         public int Month => Model.Month;
         public ShopModel? Shop => Model.Shop;
 
-        private bool _isMultiSelected;
-        public bool IsMultiSelected
+        private bool _isChecked;
+        public bool IsChecked
         {
-            get => _isMultiSelected;
+            get => _isChecked;
             set
             {
-                if (SetProperty(ref _isMultiSelected, value))
+                if (SetProperty(ref _isChecked, value))
                     MultiSelectedChanged?.Invoke();
             }
         }
@@ -74,7 +74,7 @@ namespace WPFApp.ViewModel.Container
                 if (!_isMultiOpenEnabled)
                 {
                     foreach (var it in Items)
-                        it.IsMultiSelected = false;
+                        it.IsChecked = false;
                 }
 
                 ((RelayCommand)MultiOpenCommand).RaiseCanExecuteChanged();
@@ -111,14 +111,16 @@ namespace WPFApp.ViewModel.Container
                 execute: () =>
                 {
                     var selectedModels = Items
-                        .Where(x => x.IsMultiSelected)
+                        .Where(x => x.IsChecked)
                         .Select(x => x.Model)
                         .ToList();
 
-                    // TODO: тут потім твоя логіка MultiOpen(selectedModels)
+                    var ids = string.Join(", ", selectedModels.Select(x => x.Id));
+                    _owner.ShowInfo(
+                        $"MultiOpen placeholder: {selectedModels.Count} schedule(s) would be opened. IDs: {ids}");
                 },
                 canExecute: () =>
-                    IsMultiOpenEnabled && Items.Any(x => x.IsMultiSelected)
+                    IsMultiOpenEnabled && Items.Any(x => x.IsChecked)
             );
 
 

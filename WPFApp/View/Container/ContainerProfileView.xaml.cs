@@ -20,6 +20,11 @@ namespace WPFApp.View.Container
         private void DataGridSchedules_MouseDoubleClick(object sender, MouseButtonEventArgs e)
         {
             if (DataContext is not ContainerProfileViewModel vm) return;
+            if (vm.ScheduleListVm.IsMultiOpenEnabled)
+            {
+                e.Handled = true;
+                return;
+            }
             if (vm.ScheduleListVm.OpenProfileCommand.CanExecute(null))
                 vm.ScheduleListVm.OpenProfileCommand.Execute(null);
         }

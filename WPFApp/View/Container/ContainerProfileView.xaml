@@ -92,7 +92,7 @@
                                     <ControlTemplate.Triggers>
 
                                         <!-- MULTIOPEN: підсвітка коли чекбокс вибраний -->
-                                        <DataTrigger Binding="{Binding IsMultiSelected}" Value="True">
+                                        <DataTrigger Binding="{Binding IsChecked}" Value="True">
                                             <Setter TargetName="RowCard" Property="Background" Value="{StaticResource PrimaryBrush}" />
                                             <Setter Property="Foreground" Value="White" />
                                         </DataTrigger>
@@ -471,7 +471,7 @@
                                     <DataGridTemplateColumn.CellTemplate>
                                         <DataTemplate>
                                             <CheckBox Style="{StaticResource RoundCheckBoxStyle}"
-                              IsChecked="{Binding IsMultiSelected, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                              IsChecked="{Binding IsChecked, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                               VerticalAlignment="Center"
                               HorizontalAlignment="Center"
                               Margin="0,0,10,0" />
