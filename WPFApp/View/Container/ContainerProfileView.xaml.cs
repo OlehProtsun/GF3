@@ -1,4 +1,4 @@
-using System.Windows;
+﻿using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
@@ -26,6 +26,12 @@ namespace WPFApp.View.Container
 
         private void RowHitArea_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
+            if (dataGridSchedules?.DataContext is ContainerScheduleListViewModel vm && vm.IsMultiOpenEnabled && e.ClickCount >= 2)
+            {
+                e.Handled = true;
+                return;
+            }
+
             var dep = (DependencyObject)sender;
             while (dep != null && dep is not DataGridRow)
                 dep = VisualTreeHelper.GetParent(dep);
@@ -37,5 +43,14 @@ namespace WPFApp.View.Container
                 e.Handled = true;
             }
         }
+
+        private void DataGridSchedules_PreviewMouseDoubleClick(object sender, MouseButtonEventArgs e)
+        {
+            if (dataGridSchedules?.DataContext is ContainerScheduleListViewModel vm && vm.IsMultiOpenEnabled)
+            {
+                e.Handled = true; // В MULTIOPEN подвійний клік НІЧОГО не робить
+            }
+        }
+
     }
 }

@@ -290,7 +290,7 @@ namespace WPFApp.ViewModel.Container
 
         internal async Task EditSelectedScheduleAsync(CancellationToken ct = default)
         {
-            var schedule = ProfileVm.ScheduleListVm.SelectedItem;
+            var schedule = ProfileVm.ScheduleListVm.SelectedItem?.Model;
             if (schedule is null) return;
 
             await LoadLookupsAsync(ct);
@@ -423,7 +423,9 @@ namespace WPFApp.ViewModel.Container
                         var employees = detailed.Employees?.ToList() ?? new List<ScheduleEmployeeModel>();
                         var slots = detailed.Slots?.ToList() ?? new List<ScheduleSlotModel>();
                         ScheduleProfileVm.SetProfile(detailed, employees, slots);
-                        ProfileVm.ScheduleListVm.SelectedItem = detailed;
+                        ProfileVm.ScheduleListVm.SelectedItem =
+                            ProfileVm.ScheduleListVm.Items.FirstOrDefault(x => x.Model.Id == detailed.Id);
+
                     }
                 }
 
@@ -437,7 +439,7 @@ namespace WPFApp.ViewModel.Container
 
         internal async Task DeleteSelectedScheduleAsync(CancellationToken ct = default)
         {
-            var schedule = ProfileVm.ScheduleListVm.SelectedItem;
+            var schedule = ProfileVm.ScheduleListVm.SelectedItem?.Model;
             if (schedule is null) return;
 
             if (!Confirm($"Delete schedule {schedule.Name}?"))
@@ -453,7 +455,7 @@ namespace WPFApp.ViewModel.Container
 
         internal async Task OpenScheduleProfileAsync(CancellationToken ct = default)
         {
-            var schedule = ProfileVm.ScheduleListVm.SelectedItem;
+            var schedule = ProfileVm.ScheduleListVm.SelectedItem?.Model;
             if (schedule is null) return;
 
             var detailed = await _scheduleService.GetDetailedAsync(schedule.Id, ct);
@@ -463,7 +465,9 @@ namespace WPFApp.ViewModel.Container
             var slots = detailed.Slots?.ToList() ?? new List<ScheduleSlotModel>();
 
             ScheduleProfileVm.SetProfile(detailed, employees, slots);
-            ProfileVm.ScheduleListVm.SelectedItem = detailed;
+            ProfileVm.ScheduleListVm.SelectedItem =
+                ProfileVm.ScheduleListVm.Items.FirstOrDefault(x => x.Model.Id == detailed.Id);
+
 
             ScheduleCancelTarget = ContainerSection.Profile;
             await SwitchToScheduleProfileAsync();

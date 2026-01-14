@@ -1,17 +1,49 @@
+﻿using DataAccessLayer.Models;
 using System.Collections.ObjectModel;
-using DataAccessLayer.Models;
+using System.Windows.Input;
 using WPFApp.Infrastructure;
+using WPFApp.ViewModel.Dialogs;
 
 namespace WPFApp.ViewModel.Container
 {
+    public sealed class ScheduleRowVm : ViewModelBase
+    {
+        public ScheduleModel Model { get; }
+
+        public ScheduleRowVm(ScheduleModel model)
+        {
+            Model = model;
+        }
+
+        // прокидаємо поля для DataGrid, щоб XAML майже не міняти
+        public string Name => Model.Name;
+        public int Year => Model.Year;
+        public int Month => Model.Month;
+        public ShopModel? Shop => Model.Shop;
+
+        private bool _isMultiSelected;
+        public bool IsMultiSelected
+        {
+            get => _isMultiSelected;
+            set
+            {
+                if (SetProperty(ref _isMultiSelected, value))
+                    MultiSelectedChanged?.Invoke();
+            }
+        }
+
+        public Action? MultiSelectedChanged { get; set; }
+    }
+
+
     public sealed class ContainerScheduleListViewModel : ViewModelBase
     {
         private readonly ContainerViewModel _owner;
 
-        public ObservableCollection<ScheduleModel> Items { get; } = new();
+        public ObservableCollection<ScheduleRowVm> Items { get; } = new();
 
-        private ScheduleModel? _selectedItem;
-        public ScheduleModel? SelectedItem
+        private ScheduleRowVm? _selectedItem;
+        public ScheduleRowVm? SelectedItem
         {
             get => _selectedItem;
             set
@@ -28,6 +60,32 @@ namespace WPFApp.ViewModel.Container
             set => SetProperty(ref _searchText, value);
         }
 
+
+        private bool _isMultiOpenEnabled;
+        public bool IsMultiOpenEnabled
+        {
+            get => _isMultiOpenEnabled;
+            set
+            {
+                if (_isMultiOpenEnabled == value) return;
+                _isMultiOpenEnabled = value;
+                OnPropertyChanged(nameof(IsMultiOpenEnabled));
+
+                if (!_isMultiOpenEnabled)
+                {
+                    foreach (var it in Items)
+                        it.IsMultiSelected = false;
+                }
+
+                ((RelayCommand)MultiOpenCommand).RaiseCanExecuteChanged();
+            }
+        }
+
+
+
+        public ICommand ToggleMultiOpenCommand { get; }
+        public ICommand MultiOpenCommand { get; }
+
         public AsyncRelayCommand SearchCommand { get; }
         public AsyncRelayCommand AddNewCommand { get; }
         public AsyncRelayCommand EditCommand { get; }
@@ -43,14 +101,40 @@ namespace WPFApp.ViewModel.Container
             EditCommand = new AsyncRelayCommand(() => _owner.EditSelectedScheduleAsync(), () => SelectedItem != null);
             DeleteCommand = new AsyncRelayCommand(() => _owner.DeleteSelectedScheduleAsync(), () => SelectedItem != null);
             OpenProfileCommand = new AsyncRelayCommand(() => _owner.OpenScheduleProfileAsync(), () => SelectedItem != null);
+
+            ToggleMultiOpenCommand = new RelayCommand(() =>
+            {
+                IsMultiOpenEnabled = !IsMultiOpenEnabled;
+            });
+
+            MultiOpenCommand = new RelayCommand(
+                execute: () =>
+                {
+                    var selectedModels = Items
+                        .Where(x => x.IsMultiSelected)
+                        .Select(x => x.Model)
+                        .ToList();
+
+                    // TODO: тут потім твоя логіка MultiOpen(selectedModels)
+                },
+                canExecute: () =>
+                    IsMultiOpenEnabled && Items.Any(x => x.IsMultiSelected)
+            );
+
+
+
         }
 
         public void SetItems(IEnumerable<ScheduleModel> schedules)
         {
             Items.Clear();
             foreach (var schedule in schedules)
-                Items.Add(schedule);
+                Items.Add(new ScheduleRowVm(schedule));
+
+            WireMultiSelectHooks();
+            ((RelayCommand)MultiOpenCommand).RaiseCanExecuteChanged();
         }
+
 
         private void UpdateSelectionCommands()
         {
@@ -58,5 +142,17 @@ namespace WPFApp.ViewModel.Container
             DeleteCommand.RaiseCanExecuteChanged();
             OpenProfileCommand.RaiseCanExecuteChanged();
         }
+
+        private void WireMultiSelectHooks()
+        {
+            foreach (var it in Items)
+            {
+                it.MultiSelectedChanged = () =>
+                {
+                    ((RelayCommand)MultiOpenCommand).RaiseCanExecuteChanged();
+                };
+            }
+        }
+
     }
 }
