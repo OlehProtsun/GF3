@@ -1,4 +1,4 @@
-<UserControl x:Class="WPFApp.View.Container.ContainerEditView"
+﻿<UserControl x:Class="WPFApp.View.Container.ContainerEditView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
@@ -121,7 +121,7 @@
                                    FontSize="12"
                                    Foreground="{StaticResource MutedTextBrush}" />
                         <TextBox Style="{StaticResource ValidatedRoundedTextBoxStyle}"
-                                 Height="90"
+                                 Height="190"
                                  AcceptsReturn="True"
                                  TextWrapping="Wrap"
                                  Text="{Binding Note, UpdateSourceTrigger=PropertyChanged, ValidatesOnNotifyDataErrors=True}" />

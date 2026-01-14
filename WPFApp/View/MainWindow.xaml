@@ -23,6 +23,7 @@
 
 
         <!-- Стиль квадратної ікон-кнопки 39x39 з радіусом 10 і тінню -->
+        <!-- Анімований стиль для твоїх ікон-кнопок -->
         <Style x:Key="IconButton39" TargetType="Button">
             <Setter Property="Width" Value="52"/>
             <Setter Property="Height" Value="52"/>
@@ -32,35 +33,145 @@
             <Setter Property="Padding" Value="0"/>
             <Setter Property="HorizontalContentAlignment" Value="Center"/>
             <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="RenderTransformOrigin" Value="0.5,0.5"/>
+
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
-                        <Border Background="{TemplateBinding Background}"
-                                BorderBrush="{TemplateBinding BorderBrush}"
-                                BorderThickness="{TemplateBinding BorderThickness}"
-                                CornerRadius="14">
+                        <Border x:Name="Root"
+                        CornerRadius="14"
+                        BorderBrush="{TemplateBinding BorderBrush}"
+                        BorderThickness="{TemplateBinding BorderThickness}"
+                        RenderTransformOrigin="0.5,0.5">
+
+                            <!-- ВАЖЛИВО: SolidColorBrush прямо тут, щоб його можна було анімувати -->
+                            <Border.Background>
+                                <SolidColorBrush Color="White"/>
+                            </Border.Background>
+
                             <Border.Effect>
-                                <StaticResource ResourceKey="ButtonShadow"/>
+                                <DropShadowEffect BlurRadius="10"
+                                          ShadowDepth="2"
+                                          Opacity="0.30"/>
                             </Border.Effect>
+
+                            <Border.RenderTransform>
+                                <ScaleTransform ScaleX="1" ScaleY="1"/>
+                            </Border.RenderTransform>
+
                             <ContentPresenter HorizontalAlignment="Center"
-                                              VerticalAlignment="Center"/>
+                                      VerticalAlignment="Center"/>
                         </Border>
 
                         <ControlTemplate.Triggers>
-                            <!-- hover дуже легкий -->
+
+                            <!-- HOVER -->
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter Property="Background" Value="#cccccc"/>
+                                <Trigger.EnterActions>
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <ColorAnimation Storyboard.TargetName="Root"
+                                                    Storyboard.TargetProperty="(Border.Background).(SolidColorBrush.Color)"
+                                                    To="#FFE6E6E6"
+                                                    Duration="0:0:0.12"/>
+
+                                            <DoubleAnimation Storyboard.TargetName="Root"
+                                                     Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)"
+                                                     To="1.06"
+                                                     Duration="0:0:0.12"/>
+                                            <DoubleAnimation Storyboard.TargetName="Root"
+                                                     Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)"
+                                                     To="1.06"
+                                                     Duration="0:0:0.12"/>
+
+                                            <DoubleAnimation Storyboard.TargetName="Root"
+                                                     Storyboard.TargetProperty="(UIElement.Effect).(DropShadowEffect.Opacity)"
+                                                     To="0.45"
+                                                     Duration="0:0:0.12"/>
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </Trigger.EnterActions>
+
+                                <Trigger.ExitActions>
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <ColorAnimation Storyboard.TargetName="Root"
+                                                    Storyboard.TargetProperty="(Border.Background).(SolidColorBrush.Color)"
+                                                    To="White"
+                                                    Duration="0:0:0.12"/>
+
+                                            <DoubleAnimation Storyboard.TargetName="Root"
+                                                     Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)"
+                                                     To="1"
+                                                     Duration="0:0:0.12"/>
+                                            <DoubleAnimation Storyboard.TargetName="Root"
+                                                     Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)"
+                                                     To="1"
+                                                     Duration="0:0:0.12"/>
+
+                                            <DoubleAnimation Storyboard.TargetName="Root"
+                                                     Storyboard.TargetProperty="(UIElement.Effect).(DropShadowEffect.Opacity)"
+                                                     To="0.30"
+                                                     Duration="0:0:0.12"/>
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </Trigger.ExitActions>
                             </Trigger>
 
-                            <!-- як у disabled Guna (стає сіріше) -->
+                            <!-- PRESSED -->
+                            <Trigger Property="IsPressed" Value="True">
+                                <Trigger.EnterActions>
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <ColorAnimation Storyboard.TargetName="Root"
+                                                    Storyboard.TargetProperty="(Border.Background).(SolidColorBrush.Color)"
+                                                    To="#FFBFBFBF"
+                                                    Duration="0:0:0.06"/>
+
+                                            <DoubleAnimation Storyboard.TargetName="Root"
+                                                     Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)"
+                                                     To="0.95"
+                                                     Duration="0:0:0.06"/>
+                                            <DoubleAnimation Storyboard.TargetName="Root"
+                                                     Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)"
+                                                     To="0.95"
+                                                     Duration="0:0:0.06"/>
+
+                                            <DoubleAnimation Storyboard.TargetName="Root"
+                                                     Storyboard.TargetProperty="(UIElement.Effect).(DropShadowEffect.Opacity)"
+                                                     To="0.18"
+                                                     Duration="0:0:0.06"/>
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </Trigger.EnterActions>
+
+                                <Trigger.ExitActions>
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <DoubleAnimation Storyboard.TargetName="Root"
+                                                     Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)"
+                                                     To="1"
+                                                     Duration="0:0:0.10"/>
+                                            <DoubleAnimation Storyboard.TargetName="Root"
+                                                     Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)"
+                                                     To="1"
+                                                     Duration="0:0:0.10"/>
+
+                                            <DoubleAnimation Storyboard.TargetName="Root"
+                                                     Storyboard.TargetProperty="(UIElement.Effect).(DropShadowEffect.Opacity)"
+                                                     To="0.30"
+                                                     Duration="0:0:0.10"/>
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </Trigger.ExitActions>
+                            </Trigger>
+
+                            <!-- DISABLED -->
                             <Trigger Property="IsEnabled" Value="False">
                                 <Setter Property="Opacity" Value="0.55"/>
-                                <Setter Property="Background" Value="#808080"/>
+                                <Setter TargetName="Root" Property="Background" Value="#FF808080"/>
                             </Trigger>
 
-                            <Trigger Property="IsPressed" Value="True">
-                                <Setter Property="Background" Value="#bfbfbf"/>
-                            </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
                 </Setter.Value>

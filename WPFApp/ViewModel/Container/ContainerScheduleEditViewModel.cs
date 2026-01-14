@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -18,6 +18,8 @@ namespace WPFApp.ViewModel.Container
         public const string DayColumnName = "DayOfMonth";
         public const string ConflictColumnName = "Conflict";
         public const string EmptyMark = "-";
+
+        private CancellationTokenSource? _availabilityPreviewCts;
 
         private readonly ContainerViewModel _owner;
         private readonly Dictionary<string, List<string>> _errors = new();
@@ -54,7 +56,7 @@ namespace WPFApp.ViewModel.Container
                         nameof(SelectedAvailabilityGroup));
 
                     SyncSelectionFromBlock();
-                    RefreshScheduleMatrix();
+                    ClearMatricesOnly();
                 }
             }
         }
@@ -138,8 +140,7 @@ namespace WPFApp.ViewModel.Container
                 SelectedBlock.Model.Year = value;
                 OnPropertyChanged();
                 ClearValidationErrors(nameof(ScheduleYear));
-                RefreshScheduleMatrix();
-                _ = _owner.UpdateAvailabilityPreviewAsync();
+                InvalidateGeneratedScheduleAndClearMatrices();
             }
         }
 
@@ -153,10 +154,12 @@ namespace WPFApp.ViewModel.Container
                 SelectedBlock.Model.Month = value;
                 OnPropertyChanged();
                 ClearValidationErrors(nameof(ScheduleMonth));
-                RefreshScheduleMatrix();
-                _ = _owner.UpdateAvailabilityPreviewAsync();
+
+                InvalidateGeneratedScheduleAndClearMatrices(); // очищає і schedule і preview
+                _ = LoadAvailabilityPreviewForSelectedGroupAsync(); // ✅ підвантажити заново під новий місяць
             }
         }
+
 
         public int SchedulePeoplePerShift
         {
@@ -181,7 +184,8 @@ namespace WPFApp.ViewModel.Container
                 SelectedBlock.Model.Shift1Time = value;
                 OnPropertyChanged();
                 ClearValidationErrors(nameof(ScheduleShift1));
-                _ = _owner.UpdateAvailabilityPreviewAsync();
+                InvalidateGeneratedScheduleAndClearMatrices();
+
             }
         }
 
@@ -195,7 +199,8 @@ namespace WPFApp.ViewModel.Container
                 SelectedBlock.Model.Shift2Time = value;
                 OnPropertyChanged();
                 ClearValidationErrors(nameof(ScheduleShift2));
-                _ = _owner.UpdateAvailabilityPreviewAsync();
+                InvalidateGeneratedScheduleAndClearMatrices();
+
             }
         }
 
@@ -282,20 +287,37 @@ namespace WPFApp.ViewModel.Container
                 }
             }
         }
-
         private AvailabilityGroupModel? _selectedAvailabilityGroup;
         public AvailabilityGroupModel? SelectedAvailabilityGroup
         {
             get => _selectedAvailabilityGroup;
             set
             {
-                if (SetProperty(ref _selectedAvailabilityGroup, value))
-                {
-                    if (_suppressAvailabilityGroupUpdate) return;
-                    if (SelectedBlock != null)
-                        SelectedBlock.SelectedAvailabilityGroupId = value?.Id ?? 0;
-                    _ = _owner.UpdateAvailabilityPreviewAsync();
-                }
+                if (!SetProperty(ref _selectedAvailabilityGroup, value))
+                    return;
+
+                if (_suppressAvailabilityGroupUpdate)
+                    return;
+
+                // записати вибір у блок
+                if (SelectedBlock != null)
+                    SelectedBlock.SelectedAvailabilityGroupId = value?.Id ?? 0;
+
+                var groupId = value?.Id ?? 0;
+
+                // 1) підтягнути працівників в MinHours
+                if (groupId > 0)
+                    _ = _owner.SyncEmployeesFromAvailabilityGroupAsync(groupId);
+
+                // 2) Availability grid — завантажити одразу
+                _ = LoadAvailabilityPreviewForSelectedGroupAsync();
+
+                // 3) Schedule grid результат стає невалідним (але Availability preview НЕ чіпаємо)
+                if (SelectedBlock?.Slots.Count > 0)
+                    SelectedBlock.Slots.Clear();
+
+                ScheduleMatrix = new DataView();
+                MatrixChanged?.Invoke(this, EventArgs.Empty);
             }
         }
 
@@ -429,13 +451,39 @@ namespace WPFApp.ViewModel.Container
         public void SetAvailabilityGroups(IEnumerable<AvailabilityGroupModel> groups)
         {
             SetOptions(AvailabilityGroups, groups);
+
             if (SelectedBlock != null)
             {
                 _suppressAvailabilityGroupUpdate = true;
-                SelectedAvailabilityGroup = AvailabilityGroups.FirstOrDefault(g => g.Id == SelectedBlock.SelectedAvailabilityGroupId);
+                SelectedAvailabilityGroup = AvailabilityGroups
+                    .FirstOrDefault(g => g.Id == SelectedBlock.SelectedAvailabilityGroupId);
                 _suppressAvailabilityGroupUpdate = false;
+
+                // <-- замість LoadAvailabilityPreviewAsync()
+                var groupId = SelectedBlock.SelectedAvailabilityGroupId;
+                if (groupId > 0)
+                    _ = _owner.SyncEmployeesFromAvailabilityGroupAsync(groupId);
+
+                ClearMatricesOnly();
+
             }
         }
+
+        // ContainerScheduleEditViewModel.cs
+
+        private void InvalidateGeneratedSchedule()
+        {
+            if (SelectedBlock is null) return;
+
+            // якщо вже було згенеровано — скинемо результат
+            if (SelectedBlock.Slots.Count > 0)
+                SelectedBlock.Slots.Clear();
+
+            // очищаємо відображення (без BuildScheduleTable)
+            ScheduleMatrix = new DataView();
+            MatrixChanged?.Invoke(this, EventArgs.Empty);
+        }
+
 
         public void SetEmployees(IEnumerable<EmployeeModel> employees)
             => SetOptions(Employees, employees);
@@ -779,5 +827,153 @@ namespace WPFApp.ViewModel.Container
             while (used.Contains(n)) n++;
             return n;
         }
+
+        // ContainerScheduleEditViewModel.cs
+
+
+        // 1) просто очистити відображення (НЕ чіпаючи Slots) — для вибору блоку
+        internal void ClearMatricesOnly()
+        {
+            ScheduleMatrix = new DataView();
+            AvailabilityPreviewMatrix = new DataView();
+            MatrixChanged?.Invoke(this, EventArgs.Empty);
+        }
+
+        // 2) коли змінили параметри — скинути результат генерації + очистити відображення
+        internal void InvalidateGeneratedScheduleAndClearMatrices()
+        {
+            if (SelectedBlock is null) return;
+
+            // скидаємо вже згенерований результат
+            if (SelectedBlock.Slots.Count > 0)
+                SelectedBlock.Slots.Clear();
+
+            ScheduleMatrix = new DataView();
+            AvailabilityPreviewMatrix = new DataView();
+            MatrixChanged?.Invoke(this, EventArgs.Empty);
+        }
+
+        private async Task LoadAvailabilityPreviewForSelectedGroupAsync()
+        {
+            // debounce + cancel попередніх
+            _availabilityPreviewCts?.Cancel();
+            var cts = _availabilityPreviewCts = new CancellationTokenSource();
+
+            try
+            {
+                await Task.Delay(150, cts.Token); // короткий debounce, щоб не штормило при швидких кліках
+
+                if (SelectedBlock is null)
+                {
+                    AvailabilityPreviewMatrix = new DataView();
+                    MatrixChanged?.Invoke(this, EventArgs.Empty);
+                    return;
+                }
+
+                var groupId = SelectedAvailabilityGroup?.Id ?? 0;
+                if (groupId <= 0)
+                {
+                    AvailabilityPreviewMatrix = new DataView();
+                    MatrixChanged?.Invoke(this, EventArgs.Empty);
+                    return;
+                }
+
+                // тягнемо групу повністю (members + days)
+                var (group, members, days) = await _owner.AvailabilityGroupService_LoadFullAsync(groupId, cts.Token);
+
+                // якщо група не під цей місяць — просто очистити preview
+                if (group.Year != ScheduleYear || group.Month != ScheduleMonth)
+                {
+                    AvailabilityPreviewMatrix = new DataView();
+                    MatrixChanged?.Invoke(this, EventArgs.Empty);
+                    return;
+                }
+
+                // прив'язуємо days до members
+                var daysByMember = days
+                    .GroupBy(d => d.AvailabilityGroupMemberId)
+                    .ToDictionary(g => g.Key, g => (ICollection<AvailabilityGroupDayModel>)g.ToList());
+
+                foreach (var m in members)
+                    m.Days = daysByMember.TryGetValue(m.Id, out var list) ? list : new List<AvailabilityGroupDayModel>();
+
+                // будуємо слоти для preview: беремо всі інтервали availability як "slots"
+                // (ми не чіпаємо Schedule Slots, це окрема візуалізація)
+                var previewSlots = new List<ScheduleSlotModel>();
+                foreach (var m in members)
+                {
+                    foreach (var d in m.Days)
+                    {
+                        // якщо інтервалу нема — нема що показувати
+                        if (string.IsNullOrWhiteSpace(d.IntervalStr))
+                            continue;
+
+                        // Парсимо всі інтервали з IntervalStr (підтримує "HH:mm - HH:mm, HH:mm - HH:mm")
+                        if (!TryParseIntervals(d.IntervalStr, out var intervals, out _))
+                            continue;
+
+                        var slotNo = 1;
+                        foreach (var (from, to) in intervals)
+                        {
+                            previewSlots.Add(new ScheduleSlotModel
+                            {
+                                ScheduleId = 0,              // preview, тому можна 0
+                                DayOfMonth = d.DayOfMonth,
+                                EmployeeId = m.EmployeeId,
+                                SlotNo = slotNo++,
+                                FromTime = from,
+                                ToTime = to
+                            });
+                        }
+                    }
+
+                }
+
+                // employees для колонок: беремо з members
+                var previewEmployees = members
+                    .GroupBy(m => m.EmployeeId)
+                    .Select(g => new ScheduleEmployeeModel { EmployeeId = g.Key, Employee = g.First().Employee })
+                    .ToList();
+
+                RefreshAvailabilityPreviewMatrix(group.Year, group.Month, previewSlots, previewEmployees);
+            }
+            catch (OperationCanceledException) { }
+        }
+
+        private static (TimeSpan? from, TimeSpan? to) ParseFirstInterval(string? intervalStr)
+        {
+            if (string.IsNullOrWhiteSpace(intervalStr))
+                return (null, null);
+
+            // беремо перший інтервал, якщо їх декілька
+            var first = intervalStr.Split(new[] { ';', ',' }, StringSplitOptions.RemoveEmptyEntries)
+                                   .Select(s => s.Trim())
+                                   .FirstOrDefault();
+
+            if (string.IsNullOrWhiteSpace(first))
+                return (null, null);
+
+            // підтримка звичайного "08:00-17:00" і варіантів тире
+            var parts = first.Split(new[] { '-', '–', '—' }, StringSplitOptions.RemoveEmptyEntries)
+                             .Select(s => s.Trim())
+                             .ToArray();
+
+            if (parts.Length != 2)
+                return (null, null);
+
+            // найчастіше це TimeSpan ("HH:mm")
+            if (TimeSpan.TryParse(parts[0], CultureInfo.InvariantCulture, out var from) &&
+                TimeSpan.TryParse(parts[1], CultureInfo.InvariantCulture, out var to))
+                return (from, to);
+
+            // fallback: якщо раптом там DateTime
+            if (DateTime.TryParse(parts[0], CultureInfo.InvariantCulture, DateTimeStyles.None, out var df) &&
+                DateTime.TryParse(parts[1], CultureInfo.InvariantCulture, DateTimeStyles.None, out var dt))
+                return (df.TimeOfDay, dt.TimeOfDay);
+
+            return (null, null);
+        }
+
+
     }
 }

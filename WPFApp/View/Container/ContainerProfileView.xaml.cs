@@ -23,5 +23,19 @@ namespace WPFApp.View.Container
             if (vm.ScheduleListVm.OpenProfileCommand.CanExecute(null))
                 vm.ScheduleListVm.OpenProfileCommand.Execute(null);
         }
+
+        private void RowHitArea_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            var dep = (DependencyObject)sender;
+            while (dep != null && dep is not DataGridRow)
+                dep = VisualTreeHelper.GetParent(dep);
+
+            if (dep is DataGridRow row)
+            {
+                row.IsSelected = true;
+                row.Focus();
+                e.Handled = true;
+            }
+        }
     }
 }

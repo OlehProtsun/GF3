@@ -14,9 +14,8 @@
             <Setter Property="Padding" Value="0"/>
             <Setter Property="FontFamily" Value="Segoe UI"/>
             <Setter Property="FontSize" Value="13"/>
-            <Setter Property="Foreground" Value="Black"/>
-            <Setter Property="VerticalContentAlignment" Value="Center"/>
             <Setter Property="HorizontalContentAlignment" Value="Center"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
             <Setter Property="TextAlignment" Value="Center"/>
         </Style>
 
@@ -52,12 +51,16 @@
         </Style>
 
         <!-- Ліва кнопка "-" (закруглення тільки зліва) -->
-        <Style x:Key="SpinMinusButtonStyle" TargetType="RepeatButton" BasedOn="{StaticResource SpinButtonBaseStyle}">
+        <Style x:Key="SpinMinusButtonStyle"
+               TargetType="RepeatButton"
+               BasedOn="{StaticResource SpinButtonBaseStyle}">
             <Setter Property="Tag" Value="15,0,0,15"/>
         </Style>
 
         <!-- Права кнопка "+" (закруглення тільки справа) -->
-        <Style x:Key="SpinPlusButtonStyle" TargetType="RepeatButton" BasedOn="{StaticResource SpinButtonBaseStyle}">
+        <Style x:Key="SpinPlusButtonStyle"
+               TargetType="RepeatButton"
+               BasedOn="{StaticResource SpinButtonBaseStyle}">
             <Setter Property="Tag" Value="0,15,15,0"/>
         </Style>
 
@@ -82,12 +85,13 @@
                     BorderBrush="#22000000"
                     BorderThickness="0,0,1,0"
                     CornerRadius="12,0,0,12">
-                <RepeatButton Style="{StaticResource SpinMinusButtonStyle}"
+                <RepeatButton x:Name="PART_DownButton"
+                              Style="{StaticResource SpinMinusButtonStyle}"
                               Click="Down_Click">
                     <TextBlock Text="−"
                                FontSize="18"
                                FontWeight="SemiBold"
-                                                              Padding="0,0,0,3"
+                               Padding="0,0,0,3"
                                Foreground="#4f4f4f"
                                VerticalAlignment="Center"
                                HorizontalAlignment="Center"/>
@@ -98,8 +102,11 @@
             <TextBox x:Name="PART_TextBox"
                      Grid.Column="1"
                      Style="{StaticResource InnerNumericTextBoxStyle}"
-                     Text="{Binding Value, ElementName=root, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                     Text="{Binding Value, ElementName=root, Mode=OneWay}"
+                     IsReadOnly="{Binding IsReadOnly, ElementName=root}"
                      PreviewTextInput="TextBox_PreviewTextInput"
+                     PreviewKeyDown="TextBox_PreviewKeyDown"
+                     KeyDown="TextBox_KeyDown"
                      DataObject.Pasting="TextBox_Pasting"
                      LostFocus="TextBox_LostFocus"/>
 
@@ -109,7 +116,8 @@
                     BorderBrush="#22000000"
                     BorderThickness="1,0,0,0"
                     CornerRadius="0,12,12,0">
-                <RepeatButton Style="{StaticResource SpinPlusButtonStyle}"
+                <RepeatButton x:Name="PART_UpButton"
+                              Style="{StaticResource SpinPlusButtonStyle}"
                               Click="Up_Click">
                     <TextBlock Text="+"
                                Padding="0,0,0,3"

@@ -158,13 +158,14 @@
                                                    FontFamily="{StaticResource DefaultFontFamily}"
                                                    FontSize="15"
                                                    Foreground="Black" />
-                                        <controls:NumericUpDown Minimum="1"
-                                                                Margin="5"
-                                                                Maximum="12"
-                                                                Step="1"
-                                                                Height="33"
-                                                                Width="100"
-                                                                Value="{Binding AvailabilityMonth, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                        <controls:NumericUpDown
+                                            Value="{Binding AvailabilityMonth, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"                                            
+                                            Minimum="1"
+                                            Margin="0,7,0,0"
+                                            Width="100"
+                                            Height="33"
+                                            Maximum="12"
+                                            Step="1"/>
                                     </StackPanel>
 
                                     <StackPanel Grid.Column="4">
@@ -173,13 +174,14 @@
                                                    FontFamily="{StaticResource DefaultFontFamily}"
                                                    FontSize="15"
                                                    Foreground="Black" />
-                                        <controls:NumericUpDown Height="33"
-                                                                Margin="5"
-                                                                Width="120"
-                                                                Minimum="2000"
-                                                                Maximum="3000"
-                                                                Step="1"
-                                                                Value="{Binding AvailabilityYear, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                        <controls:NumericUpDown
+                                            Value="{Binding AvailabilityYear, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                            Minimum="2026"
+                                            Margin="0,7,0,0"
+                                            Width="130"
+                                            Height="33"
+                                            Maximum="4000"
+                                            Step="1"/>
                                     </StackPanel>
                                 </Grid>
 

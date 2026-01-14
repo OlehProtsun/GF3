@@ -80,6 +80,16 @@ namespace DataAccessLayer.Models.DataBaseContext
                     t.HasCheckConstraint("ck_schedule_shift2_format", "shift2_time LIKE '__:__ - __:__'");
                 });
                 // тригери в БД додатково перевіряють коректність часу зміни
+
+                // AppDbContext.cs -> modelBuilder.Entity<ScheduleModel>(e => { ... })
+
+                e.HasOne(s => s.AvailabilityGroup)
+                 .WithMany()
+                 .HasForeignKey(s => s.AvailabilityGroupId)
+                 .OnDelete(DeleteBehavior.SetNull);
+
+                e.HasIndex(s => s.AvailabilityGroupId).HasDatabaseName("ix_sched_avail_group");
+
             });
 
             // ----- ScheduleEmployee
@@ -143,6 +153,8 @@ namespace DataAccessLayer.Models.DataBaseContext
                         "from_time < to_time"
                     );
                 });
+
+
             });
 
             // ----- AvailabilityBind
@@ -205,6 +217,8 @@ namespace DataAccessLayer.Models.DataBaseContext
                     );
                 });
             });
+
+
 
         }
     }

@@ -6,6 +6,65 @@
              mc:Ignorable="d"
              d:DesignHeight="830" d:DesignWidth="852"
              Background="{StaticResource PageBackgroundBrush}">
+    <UserControl.Resources>
+        <Style x:Key="ScheduleCardGridStyle"
+           TargetType="DataGrid"
+           BasedOn="{StaticResource AvailabilityListCardGridBaseStyle}">
+
+            <Setter Property="RowStyle">
+                <Setter.Value>
+                    <Style TargetType="DataGridRow">
+                        <Setter Property="Height" Value="44" />
+                        <Setter Property="Margin" Value="0,8,0,12" />
+                        <Setter Property="Background" Value="{StaticResource SurfaceBrush}" />
+                        <Setter Property="SnapsToDevicePixels" Value="True" />
+                        <Setter Property="BorderThickness" Value="0" />
+
+                        <Setter Property="Template">
+                            <Setter.Value>
+                                <ControlTemplate TargetType="DataGridRow">
+                                    <Border Background="Transparent"
+                                        Margin="6,0,6,0"
+                                        MouseLeftButtonDown="RowHitArea_MouseLeftButtonDown">
+
+                                        <Border x:Name="RowCard"
+                                            Background="{TemplateBinding Background}"
+                                            CornerRadius="{StaticResource Cr12}"
+                                            Padding="18,0,12,0"
+                                            SnapsToDevicePixels="True">
+
+                                            <Border.Effect>
+                                                <DropShadowEffect BlurRadius="16"
+                                                              ShadowDepth="0"
+                                                              Opacity="0.18" />
+                                            </Border.Effect>
+
+                                            <DataGridCellsPresenter />
+                                        </Border>
+                                    </Border>
+
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsSelected" Value="True">
+                                            <Setter TargetName="RowCard"
+                                                Property="Background"
+                                                Value="{StaticResource PrimaryBrush}" />
+                                            <Setter Property="Foreground" Value="White" />
+                                        </Trigger>
+
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter TargetName="RowCard"
+                                                Property="Opacity"
+                                                Value="0.97" />
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Setter.Value>
+                        </Setter>
+                    </Style>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </UserControl.Resources>
 
     <Grid ClipToBounds="False">
         <Grid.RowDefinitions>
@@ -54,82 +113,95 @@
         </Border>
 
         <Grid Grid.Row="1" Margin="9,10,9,10">
-            <Grid.RowDefinitions>
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="*" />
-            </Grid.RowDefinitions>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="350" />
+                <ColumnDefinition Width="20" />
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
 
             <Border Style="{StaticResource CardStyle}"
-                    Margin="0,12,0,12"
-                    Grid.Row="0"
-                    VerticalAlignment="Top">
+        Margin="0,12,0,12"
+        Grid.Column="0"
+        VerticalAlignment="Top"
+        MaxHeight="520">
                 <Grid Margin="15">
                     <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto"/>
+                        <!-- header -->
+                        <RowDefinition Height="*"/>
+                        <!-- scrollable content -->
+                        <RowDefinition Height="Auto"/>
+                        <!-- buttons -->
                     </Grid.RowDefinitions>
 
-                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <!-- Header -->
+                    <StackPanel Grid.Row="0" Orientation="Horizontal" VerticalAlignment="Center">
                         <Viewbox Width="20" Height="20" Margin="0,0,8,0">
-                            <Path Data="{StaticResource IconInformation}"
-                                  Fill="Black"
-                                  Stretch="Uniform" />
+                            <Path Data="{StaticResource IconInformation}" Fill="Black" Stretch="Uniform" />
                         </Viewbox>
                         <TextBlock Text="Profile Information"
-                                   FontFamily="{StaticResource DefaultFontFamily}"
-                                   FontSize="{StaticResource FontSizeTitle}"
-                                   FontWeight="Bold"
-                                   Foreground="Black"
-                                   VerticalAlignment="Center" />
+                       FontFamily="{StaticResource DefaultFontFamily}"
+                       FontSize="{StaticResource FontSizeTitle}"
+                       FontWeight="Bold"
+                       Foreground="Black"
+                       VerticalAlignment="Center" />
                     </StackPanel>
 
-                    <Grid Grid.Row="1" Margin="0,14,0,0">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
+                    <!-- Scrollable content -->
+                    <ScrollViewer Grid.Row="1"
+                      Margin="0,14,0,0"
+                      VerticalScrollBarVisibility="Auto"
+                      HorizontalScrollBarVisibility="Disabled">
+                        <StackPanel>
 
-                        <TextBlock Text="Container ID:"
-                                   FontFamily="{StaticResource DefaultFontFamily}"
-                                   FontSize="12"
-                                   Foreground="{StaticResource MutedTextBrush}"
-                                   VerticalAlignment="Center" />
+                            <Grid Margin="0,0,0,10">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
 
-                        <TextBlock Grid.Column="1"
-                                   Text="{Binding ContainerId}"
-                                   FontFamily="{StaticResource DefaultFontFamily}"
-                                   FontSize="12"
-                                   Margin="6,0,0,0"
-                                   Foreground="Black"
-                                   VerticalAlignment="Center" />
-                    </Grid>
+                                <TextBlock Text="Container ID:"
+                               FontFamily="{StaticResource DefaultFontFamily}"
+                               FontSize="12"
+                               Foreground="{StaticResource MutedTextBrush}"
+                               VerticalAlignment="Center" />
 
-                    <StackPanel Grid.Row="2" Margin="0,14,0,0">
-                        <TextBlock Text="Container Name:"
-                                   FontFamily="{StaticResource DefaultFontFamily}"
-                                   FontSize="12"
-                                   Foreground="{StaticResource MutedTextBrush}" />
-                        <TextBlock Text="{Binding Name}"
-                                   Margin="0,4,0,0"
-                                   FontFamily="{StaticResource DefaultFontFamily}"
-                                   FontSize="16"
-                                   Foreground="Black" />
+                                <TextBlock Grid.Column="1"
+                               Text="{Binding ContainerId}"
+                               FontFamily="{StaticResource DefaultFontFamily}"
+                               FontSize="12"
+                               Margin="6,0,0,0"
+                               Foreground="Black"
+                               VerticalAlignment="Center" />
+                            </Grid>
 
-                        <TextBlock Text="Note:"
-                                   Margin="0,12,0,0"
-                                   FontFamily="{StaticResource DefaultFontFamily}"
-                                   FontSize="12"
-                                   Foreground="{StaticResource MutedTextBrush}" />
-                        <TextBlock Text="{Binding Note}"
-                                   Margin="0,4,0,0"
-                                   FontFamily="{StaticResource DefaultFontFamily}"
-                                   FontSize="16"
-                                   Foreground="Black" />
-                    </StackPanel>
+                            <TextBlock Text="Container Name:"
+                           FontFamily="{StaticResource DefaultFontFamily}"
+                           FontSize="12"
+                           Foreground="{StaticResource MutedTextBrush}" />
+                            <TextBlock Text="{Binding Name}"
+                           Margin="0,4,0,0"
+                           FontFamily="{StaticResource DefaultFontFamily}"
+                           FontSize="16"
+                           Foreground="Black"
+                           TextWrapping="Wrap" />
 
-                    <Grid Grid.Row="3" Margin="0,12,0,0">
+                            <TextBlock Text="Note:"
+                           Margin="0,12,0,0"
+                           FontFamily="{StaticResource DefaultFontFamily}"
+                           FontSize="12"
+                           Foreground="{StaticResource MutedTextBrush}" />
+                            <TextBlock Text="{Binding Note}"
+                           Margin="0,4,0,0"
+                           FontFamily="{StaticResource DefaultFontFamily}"
+                           FontSize="16"
+                           Foreground="Black"
+                           TextWrapping="Wrap" />
+                        </StackPanel>
+                    </ScrollViewer>
+
+                    <!-- Buttons -->
+                    <Grid Grid.Row="2" Margin="0,12,0,0">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto" />
                             <ColumnDefinition Width="*" />
@@ -138,33 +210,34 @@
                         </Grid.ColumnDefinitions>
 
                         <Button Width="84"
-                                Height="33"
-                                Style="{StaticResource RoundedButtonStyle}"
-                                Background="{StaticResource CancelButtonBackgroundBrush}"
-                                Foreground="{StaticResource MutedTextBrush}"
-                                Content="Cancel"
-                                Command="{Binding CancelProfileCommand}" />
+                    Height="33"
+                    Style="{StaticResource RoundedButtonStyle}"
+                    Background="{StaticResource CancelButtonBackgroundBrush}"
+                    Foreground="{StaticResource MutedTextBrush}"
+                    Content="Cancel"
+                    Command="{Binding CancelProfileCommand}" />
 
                         <Button Grid.Column="2"
-                                Width="86"
-                                Height="33"
-                                Margin="0,0,8,0"
-                                Style="{StaticResource RoundedButtonStyle}"
-                                Content="Edit"
-                                Command="{Binding EditCommand}" />
+                    Width="86"
+                    Height="33"
+                    Margin="0,0,8,0"
+                    Style="{StaticResource RoundedButtonStyle}"
+                    Content="Edit"
+                    Command="{Binding EditCommand}" />
 
                         <Button Grid.Column="3"
-                                Width="86"
-                                Height="33"
-                                Style="{StaticResource RoundedButtonStyle}"
-                                Background="{StaticResource DangerBrush}"
-                                Content="Delete"
-                                Command="{Binding DeleteCommand}" />
+                    Width="86"
+                    Height="33"
+                    Style="{StaticResource RoundedButtonStyle}"
+                    Background="{StaticResource DangerBrush}"
+                    Content="Delete"
+                    Command="{Binding DeleteCommand}" />
                     </Grid>
                 </Grid>
             </Border>
 
-            <Border Grid.Row="1"
+            <Border Grid.Column="3"
+                    Margin="0,10,0,10"
                     Background="{StaticResource SurfaceBrush}"
                     CornerRadius="{StaticResource Cr20}"
                     ClipToBounds="False">
@@ -189,8 +262,13 @@
                         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                             <Viewbox Width="20" Height="20" Margin="0,0,8,0">
                                 <Path Data="{StaticResource IconAvailability}"
-                                      Fill="Black"
-                                      Stretch="Uniform" />
+                                Fill="Black"
+                                Stretch="Uniform"
+                                RenderTransformOrigin="0.5,0.5">
+                                    <Path.RenderTransform>
+                                        <ScaleTransform ScaleX="1" ScaleY="-1" />
+                                    </Path.RenderTransform>
+                                </Path>
                             </Viewbox>
 
                             <TextBlock Text="Schedules"
@@ -269,7 +347,7 @@
                             ClipToBounds="True">
 
                         <DataGrid x:Name="dataGridSchedules"
-                                  Style="{StaticResource AvailabilityListCardGridBaseStyle}"
+                                  Style="{StaticResource ScheduleCardGridStyle}"
                                   Background="Transparent"
                                   BorderThickness="0"
                                   ItemsSource="{Binding Items}"
@@ -280,10 +358,10 @@
                                                     Width="*" />
                                 <DataGridTextColumn Header="Year"
                                                     Binding="{Binding Year}"
-                                                    Width="80" />
+                                                    Width="*" />
                                 <DataGridTextColumn Header="Month"
                                                     Binding="{Binding Month}"
-                                                    Width="80" />
+                                                    Width="*" />
                                 <DataGridTextColumn Header="Shop"
                                                     Binding="{Binding Shop.Name}"
                                                     Width="*" />
@@ -291,26 +369,7 @@
                         </DataGrid>
                     </Border>
 
-                    <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,12,0,0">
-                        <Button Width="84"
-                                Height="33"
-                                Margin="0,0,8,0"
-                                Style="{StaticResource RoundedButtonStyle}"
-                                Content="Edit"
-                                Command="{Binding EditCommand}" />
-                        <Button Width="84"
-                                Height="33"
-                                Margin="0,0,8,0"
-                                Style="{StaticResource RoundedButtonStyle}"
-                                Content="Profile"
-                                Command="{Binding OpenProfileCommand}" />
-                        <Button Width="84"
-                                Height="33"
-                                Style="{StaticResource RoundedButtonStyle}"
-                                Background="{StaticResource DangerBrush}"
-                                Content="Delete"
-                                Command="{Binding DeleteCommand}" />
-                    </StackPanel>
+                    <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,12,0,0"/>
                 </Grid>
             </Border>
         </Grid>

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
@@ -11,6 +11,7 @@ using DataAccessLayer.Models;
 using DataAccessLayer.Models.Enums;
 using WPFApp.Infrastructure;
 using WPFApp.Service;
+using WPFApp.ViewModel.Dialogs;
 
 namespace WPFApp.ViewModel.Container
 {
@@ -113,10 +114,12 @@ namespace WPFApp.ViewModel.Container
 
         internal async Task EditSelectedAsync(CancellationToken ct = default)
         {
-            var selected = ListVm.SelectedItem;
-            if (selected is null) return;
+            var id = GetCurrentContainerId();
+            if (id <= 0) return;
 
-            var latest = await _containerService.GetAsync(selected.Id, ct) ?? selected;
+            var latest = await _containerService.GetAsync(id, ct);
+            if (latest is null) return;
+
             EditVm.SetContainer(latest);
 
             CancelTarget = Mode == ContainerSection.Profile
@@ -125,6 +128,7 @@ namespace WPFApp.ViewModel.Container
 
             await SwitchToEditAsync();
         }
+
 
         internal async Task SaveAsync(CancellationToken ct = default)
         {
@@ -304,7 +308,7 @@ namespace WPFApp.ViewModel.Container
                 detailed.Employees?.ToList() ?? new List<ScheduleEmployeeModel>(),
                 detailed.Slots?.ToList() ?? new List<ScheduleSlotModel>());
 
-            block.SelectedAvailabilityGroupId = GetDefaultAvailabilityGroupId(block.Model.Year, block.Model.Month);
+            block.SelectedAvailabilityGroupId = (int)detailed.AvailabilityGroupId; // <-- саме група, з якої був генерований графік
 
             ScheduleEditVm.Blocks.Add(block);
             ScheduleEditVm.SelectedBlock = block;
@@ -384,8 +388,21 @@ namespace WPFApp.ViewModel.Container
 
                 var slots = block.Slots.ToList();
 
-                await _scheduleService.SaveWithDetailsAsync(block.Model, employees, slots, ct);
+                block.Model.AvailabilityGroupId = block.SelectedAvailabilityGroupId > 0
+                    ? block.SelectedAvailabilityGroupId
+                    : null;
+
+                try
+                {
+                    await _scheduleService.SaveWithDetailsAsync(block.Model, employees, slots, ct);
+                }
+                catch (Exception ex)
+                {
+                    ShowError(ex.Message);
+                    return;
+                }
             }
+
 
             var containerId = ScheduleEditVm.Blocks.FirstOrDefault()?.Model.ContainerId ?? GetCurrentContainerId();
             if (containerId > 0)
@@ -447,7 +464,8 @@ namespace WPFApp.ViewModel.Container
             if (ScheduleEditVm.SelectedBlock is null)
                 return;
 
-            var model = ScheduleEditVm.SelectedBlock.Model;
+            var block = ScheduleEditVm.SelectedBlock;
+            var model = block.Model;
 
             var errors = ValidateAndNormalizeSchedule(model, out var normalizedShift1, out var normalizedShift2);
             if (errors.Count > 0)
@@ -460,67 +478,88 @@ namespace WPFApp.ViewModel.Container
             model.Shift1Time = normalizedShift1!;
             model.Shift2Time = normalizedShift2!;
 
-            var selectedGroupId = ScheduleEditVm.SelectedBlock.SelectedAvailabilityGroupId;
+            var selectedGroupId = block.SelectedAvailabilityGroupId;
             if (selectedGroupId <= 0)
             {
                 ShowError("Select an availability group.");
                 return;
             }
 
-            await LoadLookupsAsync(ct);
+            // ВАЖЛИВО: зберігаємо групу в моделі (потрібно для Save / Edit)
+            model.AvailabilityGroupId = selectedGroupId;
 
-            var fullGroups = new List<AvailabilityGroupModel>(capacity: 1);
-            var employees = new List<ScheduleEmployeeModel>();
-            var seenEmp = new HashSet<int>();
+            // ✅ 1) Синхронізуємо працівників у блоці з вибраною групою
+            //    (додає/прибирає працівників і НЕ затирає MinHoursMonth)
+            await SyncEmployeesFromAvailabilityGroupAsync(selectedGroupId, ct);
 
+            // ✅ 2) Витягуємо повні дані групи (members + days)
             var (group, members, days) = await _availabilityGroupService.LoadFullAsync(selectedGroupId, ct);
 
-            if (group.Year == model.Year && group.Month == model.Month)
+            if (group.Year != model.Year || group.Month != model.Month)
             {
-                var daysByMember = days
-                    .GroupBy(d => d.AvailabilityGroupMemberId)
-                    .ToDictionary(g => g.Key, g => (ICollection<AvailabilityGroupDayModel>)g.ToList());
-
-                foreach (var m in members)
-                {
-                    m.Days = daysByMember.TryGetValue(m.Id, out var list)
-                        ? list
-                        : new List<AvailabilityGroupDayModel>();
-
-                    if (seenEmp.Add(m.EmployeeId))
-                    {
-                        employees.Add(new ScheduleEmployeeModel
-                        {
-                            EmployeeId = m.EmployeeId,
-                            Employee = m.Employee
-                        });
-                    }
-                }
-
-                group.Members = members;
-                fullGroups.Add(group);
-            }
-
-            if (fullGroups.Count == 0 || employees.Count == 0)
-            {
-                ShowError("No employees/availability found for selected group for this month.");
+                ShowError("Selected availability group is for a different month/year.");
                 return;
             }
 
+            // прив'язуємо days до members
+            var daysByMember = days
+                .GroupBy(d => d.AvailabilityGroupMemberId)
+                .ToDictionary(g => g.Key, g => (ICollection<AvailabilityGroupDayModel>)g.ToList());
+
+            foreach (var m in members)
+            {
+                m.Days = daysByMember.TryGetValue(m.Id, out var list)
+                    ? list
+                    : new List<AvailabilityGroupDayModel>();
+            }
+
+            group.Members = members;
+
+            // ✅ 3) Формуємо employees ДЛЯ генератора з block.Employees (там вже введені MinHoursMonth)
+            //    На всяк випадок фільтруємо по членству в групі.
+            var memberEmpIds = members.Select(m => m.EmployeeId).Distinct().ToHashSet();
+
+            var employees = block.Employees
+                .Where(e => memberEmpIds.Contains(e.EmployeeId))
+                .GroupBy(e => e.EmployeeId)
+                .Select(g =>
+                {
+                    var first = g.First();
+                    return new ScheduleEmployeeModel
+                    {
+                        EmployeeId = first.EmployeeId,
+                        Employee = first.Employee,          // має бути підтягутий в SyncEmployeesFromAvailabilityGroupAsync
+                        MinHoursMonth = first.MinHoursMonth // ✅ головне: не губимо
+                    };
+                })
+                .ToList();
+
+            if (employees.Count == 0)
+            {
+                ShowError("No employees found for selected availability group.");
+                return;
+            }
+
+            var fullGroups = new List<AvailabilityGroupModel>(capacity: 1) { group };
+
+            // ✅ 4) Генерація
             var slots = await _generator.GenerateAsync(model, fullGroups, employees, ct);
 
-            ScheduleEditVm.SelectedBlock.Model = model;
-            ScheduleEditVm.SelectedBlock.Employees.Clear();
-            foreach (var emp in employees)
-                ScheduleEditVm.SelectedBlock.Employees.Add(emp);
-
-            ScheduleEditVm.SelectedBlock.Slots.Clear();
+            // ✅ 5) Оновлюємо слоти. Employees НЕ чіпаємо, щоб не стерти MinHoursMonth в UI
+            block.Slots.Clear();
             foreach (var slot in slots)
-                ScheduleEditVm.SelectedBlock.Slots.Add(slot);
+                block.Slots.Add(slot);
 
             ScheduleEditVm.RefreshScheduleMatrix();
             ShowInfo("Slots generated. Review before saving.");
         }
+
+        internal Task<(AvailabilityGroupModel group, List<AvailabilityGroupMemberModel> members, List<AvailabilityGroupDayModel> days)>
+    AvailabilityGroupService_LoadFullAsync(int groupId, CancellationToken ct)
+        {
+            return _availabilityGroupService.LoadFullAsync(groupId, ct);
+        }
+
 
         internal Task SearchScheduleShopsAsync(CancellationToken ct = default)
         {
@@ -902,13 +941,17 @@ namespace WPFApp.ViewModel.Container
                 MaxConsecutiveFull = model.MaxConsecutiveFull,
                 MaxFullPerMonth = model.MaxFullPerMonth,
                 Note = model.Note,
-                Shop = model.Shop
+                Shop = model.Shop,
+
+                AvailabilityGroupId = model.AvailabilityGroupId // <-- ДОДАТИ
             };
 
             var block = new ScheduleBlockViewModel
             {
                 Model = copy,
-                SelectedAvailabilityGroupId = GetDefaultAvailabilityGroupId(copy.Year, copy.Month)
+                SelectedAvailabilityGroupId =
+                    copy.AvailabilityGroupId
+                    ?? GetDefaultAvailabilityGroupId(copy.Year, copy.Month)
             };
 
             foreach (var emp in employees)
@@ -1102,5 +1145,58 @@ namespace WPFApp.ViewModel.Container
                 CustomMessageBoxIcon.Warning,
                 okText: "Yes",
                 cancelText: "No");
+
+        // ContainerViewModel.cs
+
+        internal async Task SyncEmployeesFromAvailabilityGroupAsync(int groupId, CancellationToken ct = default)
+        {
+            if (ScheduleEditVm.SelectedBlock is null)
+                return;
+
+            var block = ScheduleEditVm.SelectedBlock;
+
+            // витягуємо members, щоб знати список EmployeeId + мати Employee об'єкти
+            var (_, members, _) = await _availabilityGroupService.LoadFullAsync(groupId, ct);
+
+            var groupEmpIds = members
+                .Select(m => m.EmployeeId)
+                .Distinct()
+                .ToHashSet();
+
+            // зберегти вже введені MinHoursMonth
+            var oldMin = block.Employees
+                .GroupBy(e => e.EmployeeId)
+                .ToDictionary(g => g.Key, g => g.First().MinHoursMonth);
+
+            // 1) прибрати тих, кого нема в групі
+            for (int i = block.Employees.Count - 1; i >= 0; i--)
+            {
+                if (!groupEmpIds.Contains(block.Employees[i].EmployeeId))
+                    block.Employees.RemoveAt(i);
+            }
+
+            // 2) додати відсутніх з групи (і підтягнути Employee)
+            foreach (var m in members)
+            {
+                var existing = block.Employees.FirstOrDefault(e => e.EmployeeId == m.EmployeeId);
+                if (existing != null)
+                {
+                    // оновимо Employee reference, якщо раптом null
+                    existing.Employee ??= m.Employee;
+                    continue;
+                }
+
+                block.Employees.Add(new ScheduleEmployeeModel
+                {
+                    EmployeeId = m.EmployeeId,
+                    Employee = m.Employee,
+                    MinHoursMonth = oldMin.TryGetValue(m.EmployeeId, out var min) ? min : 0
+                });
+            }
+
+            // матриця залежить від Employees (колонки по працівниках)
+            ScheduleEditVm.RefreshScheduleMatrix();
+        }
+
     }
 }

@@ -1,10 +1,12 @@
-using System.Data;
+﻿using System.Data;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
+using System.Windows.Shapes;
 using WPFApp.Service;
 using WPFApp.ViewModel.Container;
+using WPFApp.ViewModel.Dialogs;
 
 namespace WPFApp.View.Container
 {
@@ -19,6 +21,14 @@ namespace WPFApp.View.Container
         public ContainerScheduleEditView()
         {
             InitializeComponent();
+            Loaded += (_, __) =>
+            {
+                if (DataContext is ContainerScheduleEditViewModel _vm)
+                {
+                    BuildMatrixColumns(_vm.ScheduleMatrix.Table, dataGridScheduleMatrix, isReadOnly: false);
+                    BuildMatrixColumns(_vm.AvailabilityPreviewMatrix.Table, dataGridAvailabilityPreview, isReadOnly: true);
+                }
+            };
             DataContextChanged += ContainerScheduleEditView_DataContextChanged;
             dataGridScheduleMatrix.PreparingCellForEdit += ScheduleMatrix_PreparingCellForEdit;
         }
@@ -33,31 +43,87 @@ namespace WPFApp.View.Container
             if (_vm != null)
             {
                 _vm.MatrixChanged += VmOnMatrixChanged;
-                BuildMatrixColumns(_vm.ScheduleMatrix.Table, dataGridScheduleMatrix);
-                BuildMatrixColumns(_vm.AvailabilityPreviewMatrix.Table, dataGridAvailabilityPreview);
+                BuildMatrixColumns(_vm.ScheduleMatrix.Table, dataGridScheduleMatrix, isReadOnly: false);
+                BuildMatrixColumns(_vm.AvailabilityPreviewMatrix.Table, dataGridAvailabilityPreview, isReadOnly: true);
             }
         }
 
         private void VmOnMatrixChanged(object? sender, System.EventArgs e)
         {
             if (_vm is null) return;
-            BuildMatrixColumns(_vm.ScheduleMatrix.Table, dataGridScheduleMatrix);
-            BuildMatrixColumns(_vm.AvailabilityPreviewMatrix.Table, dataGridAvailabilityPreview);
+            BuildMatrixColumns(_vm.ScheduleMatrix.Table, dataGridScheduleMatrix, isReadOnly: false);
+            BuildMatrixColumns(_vm.AvailabilityPreviewMatrix.Table, dataGridAvailabilityPreview, isReadOnly: true);
         }
 
-        private static void BuildMatrixColumns(DataTable? table, DataGrid grid)
+        private static void BuildMatrixColumns(DataTable? table, DataGrid grid, bool isReadOnly)
         {
-            if (table is null) return;
+            if (table is null)
+            {
+                grid.ItemsSource = null;
+                grid.Columns.Clear();
+                return;
+            }
+
+            grid.ItemsSource = table.DefaultView;
 
             grid.AutoGenerateColumns = false;
             grid.Columns.Clear();
-
             grid.FrozenColumnCount = 1;
+
+            var dayColName = ContainerScheduleEditViewModel.DayColumnName;
+            var conflictColName = ContainerScheduleEditViewModel.ConflictColumnName;
+
+            var tbStyle = (Style)Application.Current.FindResource("MatrixCellTextBlockStyle");
+            var editStyle = (Style)Application.Current.FindResource("MatrixCellTextBoxStyle");
+            var dangerBrush = (System.Windows.Media.Brush)Application.Current.FindResource("DangerBrush");
+            var boolToVis = new BooleanToVisibilityConverter();
 
             foreach (DataColumn column in table.Columns)
             {
+                // ❌ не показуємо Conflict колонку
+                if (column.ColumnName == conflictColName)
+                    continue;
+
                 var header = string.IsNullOrWhiteSpace(column.Caption) ? column.ColumnName : column.Caption;
 
+                // ✅ Day колонка: текст + червона крапка якщо Conflict==true
+                if (column.ColumnName == dayColName)
+                {
+                    var templateCol = new DataGridTemplateColumn
+                    {
+                        Header = header,
+                        Width = 70,
+                        IsReadOnly = true
+                    };
+
+                    var root = new FrameworkElementFactory(typeof(Grid));
+
+                    var txt = new FrameworkElementFactory(typeof(TextBlock));
+                    txt.SetValue(FrameworkElement.StyleProperty, tbStyle);
+                    txt.SetValue(FrameworkElement.MarginProperty, new Thickness(14, 0, 0, 0)); // щоб був відступ під крапку
+                    txt.SetBinding(TextBlock.TextProperty, new Binding($"[{dayColName}]"));
+                    root.AppendChild(txt);
+
+                    var dot = new FrameworkElementFactory(typeof(Ellipse));
+                    dot.SetValue(FrameworkElement.WidthProperty, 8.0);
+                    dot.SetValue(FrameworkElement.HeightProperty, 8.0);
+                    dot.SetValue(Shape.FillProperty, dangerBrush);
+                    dot.SetValue(FrameworkElement.HorizontalAlignmentProperty, HorizontalAlignment.Left);
+                    dot.SetValue(FrameworkElement.VerticalAlignmentProperty, VerticalAlignment.Center);
+                    dot.SetValue(FrameworkElement.MarginProperty, new Thickness(4, 0, 0, 0));
+                    dot.SetBinding(UIElement.VisibilityProperty, new Binding($"[{conflictColName}]")
+                    {
+                        Converter = boolToVis
+                    });
+                    root.AppendChild(dot);
+
+                    templateCol.CellTemplate = new DataTemplate { VisualTree = root };
+
+                    grid.Columns.Add(templateCol);
+                    continue;
+                }
+
+                // ✅ інші колонки (редаговані або readonly)
                 var binding = new Binding($"[{column.ColumnName}]")
                 {
                     UpdateSourceTrigger = UpdateSourceTrigger.PropertyChanged,
@@ -69,33 +135,16 @@ namespace WPFApp.View.Container
                 {
                     Header = header,
                     Binding = binding,
-                    IsReadOnly = column.ReadOnly
+                    IsReadOnly = isReadOnly || column.ReadOnly,
+                    Width = new DataGridLength(1, DataGridLengthUnitType.Star),
+                    ElementStyle = tbStyle,
+                    EditingElementStyle = editStyle
                 };
-
-                if (column.ColumnName == ContainerScheduleEditViewModel.DayColumnName)
-                {
-                    col.Width = 70;
-                    col.IsReadOnly = true;
-                }
-                else if (column.ColumnName == ContainerScheduleEditViewModel.ConflictColumnName)
-                {
-                    col.Width = 80;
-                    col.IsReadOnly = true;
-                }
-                else
-                {
-                    col.Width = new DataGridLength(1, DataGridLengthUnitType.Star);
-                }
-
-                var tbStyle = (Style)Application.Current.FindResource("MatrixCellTextBlockStyle");
-                col.ElementStyle = tbStyle;
-
-                var editStyle = (Style)Application.Current.FindResource("MatrixCellTextBoxStyle");
-                col.EditingElementStyle = editStyle;
 
                 grid.Columns.Add(col);
             }
         }
+
 
         private void ScheduleMatrix_PreparingCellForEdit(object sender, DataGridPreparingCellForEditEventArgs e)
         {
@@ -150,5 +199,6 @@ namespace WPFApp.View.Container
 
             await _vm.CloseBlockAsync(block);
         }
+
     }
 }
