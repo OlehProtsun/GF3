@@ -12,6 +12,118 @@
 
     <UserControl.Resources>
 
+
+
+        <!-- Rounded vertical ScrollBar -->
+        <Style x:Key="LeftRoundedScrollBarStyle" TargetType="{x:Type ScrollBar}">
+            <Setter Property="Width" Value="10"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type ScrollBar}">
+                        <Grid Background="Transparent">
+                            <!-- Track -->
+                            <Border CornerRadius="6"
+                            Background="#16000000"
+                            Margin="2"/>
+                            <Track x:Name="PART_Track"
+                           IsDirectionReversed="True">
+                                <Track.DecreaseRepeatButton>
+                                    <RepeatButton Command="ScrollBar.LineUpCommand"
+                                          Opacity="0"
+                                          IsHitTestVisible="False"/>
+                                </Track.DecreaseRepeatButton>
+                                <Track.IncreaseRepeatButton>
+                                    <RepeatButton Command="ScrollBar.LineDownCommand"
+                                          Opacity="0"
+                                          IsHitTestVisible="False"/>
+                                </Track.IncreaseRepeatButton>
+
+                                <!-- Thumb -->
+                                <Track.Thumb>
+                                    <Thumb>
+                                        <Thumb.Template>
+                                            <ControlTemplate TargetType="{x:Type Thumb}">
+                                                <Border CornerRadius="6"
+                                                Background="#55000000"
+                                                Margin="2"/>
+                                            </ControlTemplate>
+                                        </Thumb.Template>
+                                    </Thumb>
+                                </Track.Thumb>
+                            </Track>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- ScrollViewer: put VerticalScrollBar on the LEFT -->
+        <Style x:Key="LeftScrollViewerStyle" TargetType="{x:Type ScrollViewer}">
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type ScrollViewer}">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+
+                            <!-- LEFT scrollbar -->
+                            <ScrollBar x:Name="PART_VerticalScrollBar"
+                               Grid.Column="0"
+                               Orientation="Vertical"
+                               Value="{TemplateBinding VerticalOffset}"
+                               Maximum="{TemplateBinding ScrollableHeight}"
+                               ViewportSize="{TemplateBinding ViewportHeight}"
+                               Visibility="{TemplateBinding ComputedVerticalScrollBarVisibility}"
+                               Style="{StaticResource LeftRoundedScrollBarStyle}"
+                               Margin="0,0,8,0"/>
+
+                            <!-- Content -->
+                            <ScrollContentPresenter Grid.Column="1"
+                                            Margin="{TemplateBinding Padding}"
+                                            Content="{TemplateBinding Content}"
+                                            ContentTemplate="{TemplateBinding ContentTemplate}"/>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- ScrollViewer: put VerticalScrollBar on the RIGHT (rounded) -->
+        <Style x:Key="RightScrollViewerStyle" TargetType="{x:Type ScrollViewer}">
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type ScrollViewer}">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+
+                            <!-- Content -->
+                            <ScrollContentPresenter Grid.Column="0"
+                                            Margin="{TemplateBinding Padding}"
+                                            Content="{TemplateBinding Content}"
+                                            ContentTemplate="{TemplateBinding ContentTemplate}"/>
+
+                            <!-- RIGHT scrollbar -->
+                            <ScrollBar x:Name="PART_VerticalScrollBar"
+                               Grid.Column="1"
+                               Orientation="Vertical"
+                               Value="{TemplateBinding VerticalOffset}"
+                               Maximum="{TemplateBinding ScrollableHeight}"
+                               ViewportSize="{TemplateBinding ViewportHeight}"
+                               Visibility="{TemplateBinding ComputedVerticalScrollBarVisibility}"
+                               Style="{StaticResource LeftRoundedScrollBarStyle}"
+                               Margin="8,0,0,0"/>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <!-- Buttons inside Schedule chip: no hover/press visuals -->
         <Style x:Key="ScheduleChipInnerButtonStyle"
        TargetType="Button"
@@ -197,7 +309,7 @@
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
-        <Border Grid.Row="0" Style="{StaticResource TopCardStyle}">
+        <Border Grid.Row="0" Style="{StaticResource TopCardStyle}" Margin="9,8,9,0">
             <Grid>
                 <!-- 1) Ліва фіксована (Auto), права росте (*) -->
                 <Grid.ColumnDefinitions>
@@ -368,10 +480,11 @@
 
                 <!-- LEFT SIDE (scroll) -->
                 <ScrollViewer Grid.Row="0"
-                  VerticalScrollBarVisibility="Auto"
-                  HorizontalScrollBarVisibility="Disabled"
-                  Padding="0,12,0,12"
-                  ClipToBounds="False">
+                      Style="{StaticResource LeftScrollViewerStyle}"
+                      VerticalScrollBarVisibility="Auto"
+                      HorizontalScrollBarVisibility="Disabled"
+                      Padding="0,12,0,12"
+                      ClipToBounds="False">
 
                     <StackPanel ClipToBounds="False">
 
@@ -396,10 +509,10 @@
 
                                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                                         <Viewbox Width="20" Height="20" Margin="0,0,8,0">
-                                            <Path Data="{StaticResource IconAvailability}"
-                                  Fill="Black"
-                                  Stretch="Uniform"
-                                  RenderTransformOrigin="0.5,0.5">
+                                            <Path Data="{StaticResource IconScheduleDetails}"
+                                                  Fill="Black"
+                                                  Stretch="Uniform"
+                                                  RenderTransformOrigin="0.5,0.5">
                                                 <Path.RenderTransform>
                                                     <ScaleTransform ScaleX="1" ScaleY="-1" />
                                                 </Path.RenderTransform>
@@ -888,7 +1001,12 @@
 
                                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                                         <Viewbox Width="20" Height="20" Margin="0,0,8,0">
-                                            <Path Data="{StaticResource IconInformation}" Fill="Black" Stretch="Uniform" />
+                                            <Path Data="{StaticResource IconNote}" Fill="Black" Stretch="Uniform"
+                                                RenderTransformOrigin="0.5,0.5">
+                                                <Path.RenderTransform>
+                                                    <ScaleTransform ScaleX="1" ScaleY="-1" />
+                                                </Path.RenderTransform>
+                                            </Path>
                                         </Viewbox>
                                         <TextBlock Text="Note"
                                        FontFamily="{StaticResource DefaultFontFamily}"
@@ -924,10 +1042,11 @@
             </Grid>
             <Grid Grid.Column="2">
                 <!-- Один вертикальний скрол для двох великих блоків -->
-                <ScrollViewer VerticalScrollBarVisibility="Auto"
-                  HorizontalScrollBarVisibility="Disabled"
-                  Padding="0"
-                  Margin="0">
+                <ScrollViewer Style="{StaticResource RightScrollViewerStyle}"
+                      VerticalScrollBarVisibility="Auto"
+                      HorizontalScrollBarVisibility="Disabled"
+                      Padding="0"
+                      Margin="0">
 
                     <StackPanel>
 
@@ -944,7 +1063,12 @@
 
                                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                                     <Viewbox Width="20" Height="20" Margin="0,0,8,0">
-                                        <Path Data="{StaticResource IconBind}" Fill="Black" Stretch="Uniform" />
+                                        <Path Data="{StaticResource IconSchedule}" Fill="Black" Stretch="Uniform"
+                                             RenderTransformOrigin="0.5,0.5">
+                                            <Path.RenderTransform>
+                                                <ScaleTransform ScaleX="1" ScaleY="-1" />
+                                            </Path.RenderTransform>
+                                        </Path>
                                     </Viewbox>
                                     <TextBlock Text="Schedule Matrix"
                                    FontFamily="{StaticResource DefaultFontFamily}"
@@ -976,7 +1100,12 @@
 
                                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                                     <Viewbox Width="20" Height="20" Margin="0,0,8,0">
-                                        <Path Data="{StaticResource IconAvailability}" Fill="Black" Stretch="Uniform" />
+                                        <Path Data="{StaticResource IconAvailability}" Fill="Black" Stretch="Uniform"
+                                            RenderTransformOrigin="0.5,0.5">
+                                            <Path.RenderTransform>
+                                                <ScaleTransform ScaleX="1" ScaleY="-1" />
+                                            </Path.RenderTransform>
+                                        </Path>
                                     </Viewbox>
                                     <TextBlock Text="Availability Preview"
                                    FontFamily="{StaticResource DefaultFontFamily}"

@@ -16,7 +16,7 @@
         </Grid.RowDefinitions>
 
         <!-- TOP CARD (як в AvailabilityEditView) -->
-        <Border Grid.Row="0" Style="{StaticResource TopCardStyle}">
+        <Border Grid.Row="0" Style="{StaticResource TopCardStyle}" Margin="9,8,9,0">
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
