@@ -6,7 +6,6 @@
              xmlns:dt="clr-namespace:WPFApp.View.Availability.DesignTime"
              mc:Ignorable="d"
              d:DesignHeight="830" d:DesignWidth="852"
-             d:DataContext="{d:DesignInstance Type=dt:AvailabilityListViewDesignVM, IsDesignTimeCreatable=True}"
              Background="{StaticResource PageBackgroundBrush}">
 
     <UserControl.Resources>
