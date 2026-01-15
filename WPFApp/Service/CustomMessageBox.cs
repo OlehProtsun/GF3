@@ -11,12 +11,12 @@ namespace WPFApp.Service
     {
         public static bool Show(string title, string message,
             CustomMessageBoxIcon icon = CustomMessageBoxIcon.Info,
-            string okText = "OK", string cancelText = "")
+            string okText = "OK", string cancelText = "", string? details = null)
         {
             var owner = Application.Current.Windows.OfType<Window>().FirstOrDefault(w => w.IsActive)
                         ?? Application.Current.MainWindow;
 
-            var vm = new CustomMessageBoxViewModel(title, message, icon, okText, cancelText);
+            var vm = new CustomMessageBoxViewModel(title, message, icon, okText, cancelText, details ?? string.Empty);
 
             var wnd = new CustomMessageBoxView
             {

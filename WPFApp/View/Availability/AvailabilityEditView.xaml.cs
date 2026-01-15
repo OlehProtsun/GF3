@@ -21,6 +21,9 @@ namespace WPFApp.View.Availability
         private AvailabilityEditViewModel? _vm;
 
         private static readonly Regex _digitsOnly = new Regex("^[0-9]+$");
+        private static readonly Regex _intervalNoSpace = new Regex(
+            @"^\s*(?<h1>[01]?\d|2[0-3]):(?<m1>[0-5]\d)-(?<h2>[01]?\d|2[0-3]):(?<m2>[0-5]\d)\s*$",
+            RegexOptions.Compiled);
 
 
 
@@ -32,6 +35,7 @@ namespace WPFApp.View.Availability
             Unloaded += AvailabilityEditView_Unloaded;
 
             dataGridAvailabilityDays.PreviewKeyDown += DataGridAvailabilityDays_PreviewKeyDown;
+            dataGridAvailabilityDays.CellEditEnding += DataGridAvailabilityDays_CellEditEnding;
             dataGridBinds.AutoGeneratingColumn += DataGridBinds_AutoGeneratingColumn;
             dataGridBinds.PreviewKeyDown += DataGridBinds_PreviewKeyDown;
             dataGridBinds.RowEditEnding += DataGridBinds_RowEditEnding;
@@ -289,6 +293,47 @@ namespace WPFApp.View.Availability
 
 
             e.Handled = true;
+        }
+
+        private void DataGridAvailabilityDays_CellEditEnding(object sender, DataGridCellEditEndingEventArgs e)
+        {
+            if (e.EditAction != DataGridEditAction.Commit) return;
+            if (e.Column is not DataGridBoundColumn boundColumn) return;
+            if (e.Row.Item is not DataRowView rowView) return;
+
+            var binding = boundColumn.Binding as Binding;
+            var columnName = binding?.Path?.Path?.Trim('[', ']') ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(columnName) || columnName == "DayOfMonth")
+                return;
+
+            var raw = (e.EditingElement as TextBox)?.Text ?? string.Empty;
+            if (!TryNormalizeNoSpaceInterval(raw, out var normalized))
+                return;
+
+            rowView[columnName] = normalized;
+        }
+
+        private static bool TryNormalizeNoSpaceInterval(string raw, out string normalized)
+        {
+            normalized = raw;
+
+            var match = _intervalNoSpace.Match(raw);
+            if (!match.Success)
+                return false;
+
+            var h1 = int.Parse(match.Groups["h1"].Value);
+            var m1 = int.Parse(match.Groups["m1"].Value);
+            var h2 = int.Parse(match.Groups["h2"].Value);
+            var m2 = int.Parse(match.Groups["m2"].Value);
+
+            var start = new TimeSpan(h1, m1, 0);
+            var end = new TimeSpan(h2, m2, 0);
+
+            if (start >= end)
+                return false;
+
+            normalized = $"{start:hh\\:mm} - {end:hh\\:mm}";
+            return true;
         }
 
         private void NumberOnly_PreviewTextInput(object sender, TextCompositionEventArgs e)

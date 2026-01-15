@@ -56,5 +56,16 @@ namespace DataAccessLayer.Repositories
                 .SingleOrDefaultAsync(g => g.Id == id, ct)
                 .ConfigureAwait(false);
         }
+
+        public Task<bool> ExistsByNameAsync(string name, int year, int month, int? excludeId = null, CancellationToken ct = default)
+        {
+            var normalized = (name ?? string.Empty).Trim().ToLower();
+
+            return _set.AsNoTracking().AnyAsync(group =>
+                (excludeId == null || group.Id != excludeId.Value) &&
+                group.Year == year &&
+                group.Month == month &&
+                group.Name.ToLower().Trim() == normalized, ct);
+        }
     }
 }

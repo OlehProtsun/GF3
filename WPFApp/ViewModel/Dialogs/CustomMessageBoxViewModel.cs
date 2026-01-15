@@ -18,9 +18,11 @@ namespace WPFApp.ViewModel.Dialogs
 
         public string Title { get; }
         public string Message { get; }
+        public string Details { get; }
         public string OkText { get; }
         public string CancelText { get; }
         public bool IsCancelVisible => !string.IsNullOrWhiteSpace(CancelText);
+        public bool HasDetails => !string.IsNullOrWhiteSpace(Details);
 
         public Geometry IconGeometry { get; }
 
@@ -28,10 +30,11 @@ namespace WPFApp.ViewModel.Dialogs
         public ICommand CancelCommand { get; }
 
         public CustomMessageBoxViewModel(string title, string message, CustomMessageBoxIcon icon,
-            string okText = "OK", string cancelText = "")
+            string okText = "OK", string cancelText = "", string details = "")
         {
             Title = title;
             Message = message;
+            Details = details;
             OkText = okText;
             CancelText = cancelText;
 

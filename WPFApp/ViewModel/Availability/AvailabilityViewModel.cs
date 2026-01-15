@@ -169,7 +169,7 @@ namespace WPFApp.ViewModel.Availability
             }
             catch (Exception ex)
             {
-                ShowError(ex.Message);
+                ShowError(ex);
                 return;
             }
             ShowInfo(isNew
@@ -209,7 +209,7 @@ namespace WPFApp.ViewModel.Availability
             }
             catch (Exception ex)
             {
-                ShowError(ex.Message);
+                ShowError(ex);
                 return;
             }
 
@@ -283,7 +283,7 @@ namespace WPFApp.ViewModel.Availability
             }
             catch (Exception ex)
             {
-                ShowError(ex.Message);
+                ShowError(ex);
                 return;
             }
 
@@ -320,7 +320,7 @@ namespace WPFApp.ViewModel.Availability
             }
             catch (Exception ex)
             {
-                ShowError(ex.Message);
+                ShowError(ex);
             }
         }
 
@@ -357,7 +357,7 @@ namespace WPFApp.ViewModel.Availability
             }
             catch (Exception ex)
             {
-                ShowError(ex.Message);
+                ShowError(ex);
             }
         }
 
@@ -474,6 +474,12 @@ namespace WPFApp.ViewModel.Availability
 
         internal void ShowError(string text)
             => CustomMessageBox.Show("Error", text, CustomMessageBoxIcon.Error, okText: "OK");
+
+        internal void ShowError(Exception ex)
+        {
+            var (summary, details) = ExceptionMessageBuilder.Build(ex);
+            CustomMessageBox.Show("Error", summary, CustomMessageBoxIcon.Error, okText: "OK", details: details);
+        }
 
         private bool Confirm(string text, string? caption = null)
             => CustomMessageBox.Show(
