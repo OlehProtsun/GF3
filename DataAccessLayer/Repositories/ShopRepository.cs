@@ -29,5 +29,21 @@ namespace DataAccessLayer.Repositories
                 .ToListAsync(ct)
                 .ConfigureAwait(false);
         }
+
+        public Task<bool> ExistsByNameAsync(string name, int? excludeId = null, CancellationToken ct = default)
+        {
+            var normalized = (name ?? string.Empty).Trim().ToLower();
+
+            return _set.AsNoTracking().AnyAsync(shop =>
+                (excludeId == null || shop.Id != excludeId.Value) &&
+                shop.Name.ToLower().Trim() == normalized, ct);
+        }
+
+        public Task<bool> HasScheduleReferencesAsync(int shopId, CancellationToken ct = default)
+        {
+            return _db.Set<ScheduleModel>()
+                .AsNoTracking()
+                .AnyAsync(s => s.ShopId == shopId, ct);
+        }
     }
 }

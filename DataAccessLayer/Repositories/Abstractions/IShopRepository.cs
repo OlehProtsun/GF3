@@ -10,5 +10,7 @@ namespace DataAccessLayer.Repositories.Abstractions
     public interface IShopRepository : IBaseRepository<ShopModel>
     {
         Task<List<ShopModel>> GetByValueAsync(string value, CancellationToken ct = default);
+        Task<bool> ExistsByNameAsync(string name, int? excludeId = null, CancellationToken ct = default);
+        Task<bool> HasScheduleReferencesAsync(int shopId, CancellationToken ct = default);
     }
 }

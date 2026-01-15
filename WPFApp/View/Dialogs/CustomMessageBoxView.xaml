@@ -234,6 +234,7 @@
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
 
                     <!-- HEADER -->
@@ -278,8 +279,24 @@
                                Foreground="#333"
                                TextWrapping="Wrap"/>
 
+                    <!-- DETAILS -->
+                    <Expander Grid.Row="2"
+                              Margin="0,12,0,0"
+                              Header="Details"
+                              Visibility="{Binding HasDetails, Converter={StaticResource BoolToVis}}">
+                        <Border Background="#F5F5F5" CornerRadius="8" Padding="8" BorderBrush="#DDDDDD" BorderThickness="1">
+                            <ScrollViewer MaxHeight="220" VerticalScrollBarVisibility="Auto">
+                                <TextBlock Text="{Binding Details}"
+                                           FontFamily="Consolas"
+                                           FontSize="12"
+                                           Foreground="#333"
+                                           TextWrapping="Wrap"/>
+                            </ScrollViewer>
+                        </Border>
+                    </Expander>
+
                     <!-- BUTTONS -->
-                    <Grid Grid.Row="2" Margin="0,16,0,0">
+                    <Grid Grid.Row="3" Margin="0,16,0,0">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>
