@@ -298,6 +298,11 @@ namespace WPFApp.ViewModel.Container
 
             var detailed = await _scheduleService.GetDetailedAsync(schedule.Id, ct);
             if (detailed is null) return;
+            if (!HasGeneratedContent(detailed))
+            {
+                ShowError("This schedule doesn’t contain generated data and can’t be edited. Please run generation first.");
+                return;
+            }
 
             ScheduleEditVm.ClearValidationErrors();
             ScheduleEditVm.ResetForNew();
@@ -309,7 +314,7 @@ namespace WPFApp.ViewModel.Container
                 detailed.Employees?.ToList() ?? new List<ScheduleEmployeeModel>(),
                 detailed.Slots?.ToList() ?? new List<ScheduleSlotModel>());
 
-            block.SelectedAvailabilityGroupId = (int)detailed.AvailabilityGroupId; // <-- саме група, з якої був генерований графік
+            block.SelectedAvailabilityGroupId = detailed.AvailabilityGroupId!.Value; // <-- саме група, з якої був генерований графік
 
             ScheduleEditVm.Blocks.Add(block);
             ScheduleEditVm.SelectedBlock = block;
@@ -340,6 +345,7 @@ namespace WPFApp.ViewModel.Container
             ScheduleEditVm.IsEdit = true;
 
             var openedBlocks = new List<ScheduleBlockViewModel>();
+            var invalidSchedules = new List<string>();
 
             foreach (var schedule in schedules)
             {
@@ -353,12 +359,17 @@ namespace WPFApp.ViewModel.Container
                 var detailed = await _scheduleService.GetDetailedAsync(schedule.Id, ct);
                 if (detailed is null)
                     continue;
+                if (!HasGeneratedContent(detailed))
+                {
+                    invalidSchedules.Add(string.IsNullOrWhiteSpace(detailed.Name) ? $"Schedule {detailed.Id}" : detailed.Name);
+                    continue;
+                }
 
                 var block = CreateBlockFromSchedule(detailed,
                     detailed.Employees?.ToList() ?? new List<ScheduleEmployeeModel>(),
                     detailed.Slots?.ToList() ?? new List<ScheduleSlotModel>());
 
-                block.SelectedAvailabilityGroupId = (int)detailed.AvailabilityGroupId;
+                block.SelectedAvailabilityGroupId = detailed.AvailabilityGroupId!.Value;
 
                 ScheduleEditVm.Blocks.Add(block);
                 openedBlocks.Add(block);
@@ -369,6 +380,8 @@ namespace WPFApp.ViewModel.Container
                 ShowError("Selected schedules could not be loaded.");
                 return;
             }
+            if (invalidSchedules.Count > 0)
+                ShowError($"Skipped schedules without generated data:{Environment.NewLine}{string.Join(Environment.NewLine, invalidSchedules)}");
 
             ScheduleEditVm.SelectedBlock = openedBlocks.First();
             ScheduleEditVm.RefreshScheduleMatrix();
@@ -418,6 +431,15 @@ namespace WPFApp.ViewModel.Container
                 ScheduleEditVm.SelectedBlock = first;
                 ScheduleEditVm.SetValidationErrors(first.ValidationErrors);
                 ShowError(BuildScheduleValidationSummary(invalidBlocks));
+                return;
+            }
+
+            var missingGenerated = ScheduleEditVm.Blocks.Where(block => !HasGeneratedContent(block)).ToList();
+            if (missingGenerated.Count > 0)
+            {
+                var first = missingGenerated.First();
+                ScheduleEditVm.SelectedBlock = first;
+                ShowError("You can’t save a schedule until something has been generated. Please run generation first.");
                 return;
             }
 
@@ -1047,6 +1069,20 @@ namespace WPFApp.ViewModel.Container
                 block.Slots.Add(slot);
 
             return block;
+        }
+
+        private static bool HasGeneratedContent(ScheduleModel schedule)
+        {
+            return schedule.AvailabilityGroupId is not null
+                && schedule.AvailabilityGroupId > 0
+                && schedule.Slots != null
+                && schedule.Slots.Count > 0;
+        }
+
+        private static bool HasGeneratedContent(ScheduleBlockViewModel block)
+        {
+            return block.SelectedAvailabilityGroupId > 0
+                && block.Slots.Count > 0;
         }
 
         private int GetDefaultAvailabilityGroupId(int year, int month)

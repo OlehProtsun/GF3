@@ -1,7 +1,9 @@
-﻿using BusinessLogicLayer.Services.Abstractions;
+﻿using BusinessLogicLayer.Common;
+using BusinessLogicLayer.Services.Abstractions;
 using DataAccessLayer.Models;
 using DataAccessLayer.Repositories.Abstractions;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -48,6 +50,7 @@ namespace BusinessLogicLayer.Services
             CancellationToken ct = default)
         {
             NormalizeSchedule(schedule);
+            EnsureGenerated(schedule, slots);
 
             if (schedule.Id == 0)
                 schedule = await _scheduleRepo.AddAsync(schedule, ct).ConfigureAwait(false);
@@ -115,6 +118,18 @@ namespace BusinessLogicLayer.Services
             schedule.Note = string.IsNullOrWhiteSpace(schedule.Note)
                 ? null
                 : schedule.Note.Trim();
+        }
+
+        private static void EnsureGenerated(ScheduleModel schedule, IEnumerable<ScheduleSlotModel> slots)
+        {
+            if (schedule is null)
+                throw new ValidationException("Schedule is required.");
+
+            if (schedule.AvailabilityGroupId is null || schedule.AvailabilityGroupId <= 0)
+                throw new ValidationException("You can’t save a schedule until something has been generated. Please run generation first.");
+
+            if (slots == null || !slots.Any())
+                throw new ValidationException("You can’t save a schedule until something has been generated. Please run generation first.");
         }
     }
 }
