@@ -10,10 +10,11 @@ using System.Threading.Tasks;
 using DataAccessLayer.Models;
 using DataAccessLayer.Models.Enums;
 using WPFApp.Infrastructure;
+using System.Windows.Media;
 
 namespace WPFApp.ViewModel.Container
 {
-    public sealed class ContainerScheduleEditViewModel : ViewModelBase, INotifyDataErrorInfo
+    public sealed class ContainerScheduleEditViewModel : ViewModelBase, INotifyDataErrorInfo, IScheduleMatrixStyleProvider
     {
         public const string DayColumnName = "DayOfMonth";
         public const string ConflictColumnName = "Conflict";
@@ -24,6 +25,7 @@ namespace WPFApp.ViewModel.Container
         private readonly ContainerViewModel _owner;
         private readonly Dictionary<string, List<string>> _errors = new();
         private readonly Dictionary<string, int> _colNameToEmpId = new();
+        private readonly Dictionary<(int day, int employeeId), ScheduleCellStyleModel> _cellStyleMap = new();
 
         private bool _suppressAvailabilityGroupUpdate;
 
@@ -61,6 +63,7 @@ namespace WPFApp.ViewModel.Container
 
                     SyncSelectionFromBlock();
                     RestoreMatricesForSelection();
+                    RefreshCellStyleMap();
                 }
             }
         }
@@ -380,6 +383,13 @@ namespace WPFApp.ViewModel.Container
             private set => SetProperty(ref _availabilityPreviewMatrix, value);
         }
 
+        private int _cellStyleRevision;
+        public int CellStyleRevision
+        {
+            get => _cellStyleRevision;
+            private set => SetProperty(ref _cellStyleRevision, value);
+        }
+
         public AsyncRelayCommand SaveCommand { get; }
         public AsyncRelayCommand CancelCommand { get; }
         public AsyncRelayCommand GenerateCommand { get; }
@@ -389,6 +399,9 @@ namespace WPFApp.ViewModel.Container
         public AsyncRelayCommand SearchEmployeeCommand { get; }
         public AsyncRelayCommand AddEmployeeCommand { get; }
         public AsyncRelayCommand RemoveEmployeeCommand { get; }
+        public RelayCommand<ScheduleMatrixCellRef> SetCellBackgroundColorCommand { get; }
+        public RelayCommand<ScheduleMatrixCellRef> SetCellTextColorCommand { get; }
+        public RelayCommand<ScheduleMatrixCellRef> ClearCellFormattingCommand { get; }
 
         public event EventHandler? MatrixChanged;
 
@@ -407,6 +420,10 @@ namespace WPFApp.ViewModel.Container
 
             AddEmployeeCommand = new AsyncRelayCommand(() => _owner.AddScheduleEmployeeAsync());
             RemoveEmployeeCommand = new AsyncRelayCommand(() => _owner.RemoveScheduleEmployeeAsync());
+
+            SetCellBackgroundColorCommand = new RelayCommand<ScheduleMatrixCellRef>(SetCellBackgroundColor);
+            SetCellTextColorCommand = new RelayCommand<ScheduleMatrixCellRef>(SetCellTextColor);
+            ClearCellFormattingCommand = new RelayCommand<ScheduleMatrixCellRef>(ClearCellFormatting);
         }
 
         public Task SelectBlockAsync(ScheduleBlockViewModel block)
@@ -442,6 +459,8 @@ namespace WPFApp.ViewModel.Container
             SelectedScheduleEmployee = null;
             ScheduleMatrix = new DataView();
             AvailabilityPreviewMatrix = new DataView();
+            _cellStyleMap.Clear();
+            CellStyleRevision++;
         }
 
         public void SetLookups(IEnumerable<ShopModel> shops, IEnumerable<AvailabilityGroupModel> groups, IEnumerable<EmployeeModel> employees)
@@ -577,6 +596,142 @@ namespace WPFApp.ViewModel.Container
 
             RefreshScheduleMatrix();
             return true;
+        }
+
+        public bool TryBuildCellReference(object? rowData, string? columnName, out ScheduleMatrixCellRef cellRef)
+        {
+            cellRef = default;
+
+            if (SelectedBlock is null)
+                return false;
+
+            if (string.IsNullOrWhiteSpace(columnName)
+                || columnName == DayColumnName
+                || columnName == ConflictColumnName)
+                return false;
+
+            if (rowData is not DataRowView rowView)
+                return false;
+
+            if (!int.TryParse(rowView[DayColumnName]?.ToString(), out var day))
+                return false;
+
+            if (!_colNameToEmpId.TryGetValue(columnName, out var employeeId))
+                return false;
+
+            cellRef = new ScheduleMatrixCellRef(day, employeeId, columnName);
+            return true;
+        }
+
+        public Brush? GetCellBackgroundBrush(ScheduleMatrixCellRef cellRef)
+        {
+            return TryGetCellStyle(cellRef, out var style) && style.BackgroundColorArgb.HasValue
+                ? ColorHelpers.ToBrush(style.BackgroundColorArgb.Value)
+                : null;
+        }
+
+        public Brush? GetCellForegroundBrush(ScheduleMatrixCellRef cellRef)
+        {
+            return TryGetCellStyle(cellRef, out var style) && style.TextColorArgb.HasValue
+                ? ColorHelpers.ToBrush(style.TextColorArgb.Value)
+                : null;
+        }
+
+        public bool TryGetCellStyle(ScheduleMatrixCellRef cellRef, out ScheduleCellStyleModel style)
+            => _cellStyleMap.TryGetValue((cellRef.DayOfMonth, cellRef.EmployeeId), out style!);
+
+        internal void RemoveCellStylesForEmployee(int employeeId)
+        {
+            if (SelectedBlock is null)
+                return;
+
+            var toRemove = SelectedBlock.CellStyles
+                .Where(style => style.EmployeeId == employeeId)
+                .ToList();
+
+            foreach (var style in toRemove)
+                SelectedBlock.CellStyles.Remove(style);
+
+            RefreshCellStyleMap();
+        }
+
+        private void RefreshCellStyleMap()
+        {
+            _cellStyleMap.Clear();
+
+            if (SelectedBlock != null)
+            {
+                foreach (var style in SelectedBlock.CellStyles)
+                {
+                    _cellStyleMap[(style.DayOfMonth, style.EmployeeId)] = style;
+                }
+            }
+
+            CellStyleRevision++;
+        }
+
+        private void SetCellBackgroundColor(ScheduleMatrixCellRef? cellRef)
+        {
+            if (cellRef is null || SelectedBlock is null)
+                return;
+
+            var style = GetOrCreateCellStyle(cellRef.Value);
+            var initial = style.BackgroundColorArgb.HasValue
+                ? ColorHelpers.FromArgb(style.BackgroundColorArgb.Value)
+                : (Color?)null;
+
+            if (!_owner.TryPickScheduleCellColor(initial, out var selected))
+                return;
+
+            style.BackgroundColorArgb = ColorHelpers.ToArgb(selected);
+            RefreshCellStyleMap();
+        }
+
+        private void SetCellTextColor(ScheduleMatrixCellRef? cellRef)
+        {
+            if (cellRef is null || SelectedBlock is null)
+                return;
+
+            var style = GetOrCreateCellStyle(cellRef.Value);
+            var initial = style.TextColorArgb.HasValue
+                ? ColorHelpers.FromArgb(style.TextColorArgb.Value)
+                : (Color?)null;
+
+            if (!_owner.TryPickScheduleCellColor(initial, out var selected))
+                return;
+
+            style.TextColorArgb = ColorHelpers.ToArgb(selected);
+            RefreshCellStyleMap();
+        }
+
+        private void ClearCellFormatting(ScheduleMatrixCellRef? cellRef)
+        {
+            if (cellRef is null || SelectedBlock is null)
+                return;
+
+            if (!_cellStyleMap.TryGetValue((cellRef.Value.DayOfMonth, cellRef.Value.EmployeeId), out var existing))
+                return;
+
+            SelectedBlock.CellStyles.Remove(existing);
+            _cellStyleMap.Remove((cellRef.Value.DayOfMonth, cellRef.Value.EmployeeId));
+            CellStyleRevision++;
+        }
+
+        private ScheduleCellStyleModel GetOrCreateCellStyle(ScheduleMatrixCellRef cellRef)
+        {
+            if (_cellStyleMap.TryGetValue((cellRef.DayOfMonth, cellRef.EmployeeId), out var existing))
+                return existing;
+
+            var style = new ScheduleCellStyleModel
+            {
+                ScheduleId = SelectedBlock?.Model.Id ?? 0,
+                DayOfMonth = cellRef.DayOfMonth,
+                EmployeeId = cellRef.EmployeeId
+            };
+
+            SelectedBlock?.CellStyles.Add(style);
+            _cellStyleMap[(cellRef.DayOfMonth, cellRef.EmployeeId)] = style;
+            return style;
         }
 
         public void SetValidationErrors(IReadOnlyDictionary<string, string> errors)

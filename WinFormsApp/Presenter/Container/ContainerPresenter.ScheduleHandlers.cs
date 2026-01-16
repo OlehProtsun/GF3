@@ -186,7 +186,7 @@ namespace WinFormsApp.Presenter.Container
 
                 var slots = block.Slots ?? new List<ScheduleSlotModel>();
 
-                await _scheduleService.SaveWithDetailsAsync(block.Model, employees, slots, ct);
+                await _scheduleService.SaveWithDetailsAsync(block.Model, employees, slots, new List<ScheduleCellStyleModel>(), ct);
             }
 
             var containerId = _scheduleBlocks.FirstOrDefault()?.Model.ContainerId ?? _view.ScheduleContainerId;

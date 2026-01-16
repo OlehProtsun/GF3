@@ -1080,6 +1080,7 @@
                                 <DataGrid x:Name="dataGridScheduleMatrix"
                                       Grid.Row="1"
                                       Style="{StaticResource ScheduleMatrixCompactGridStyle}"
+                                      CellStyle="{StaticResource ScheduleMatrixCellStyleEditable}"
                                       IsReadOnly="False"
                                       AutoGenerateColumns="False"
                                       CellEditEnding="ScheduleMatrix_CellEditEnding"/>

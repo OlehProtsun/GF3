@@ -1,0 +1,70 @@
+<Window x:Class="WPFApp.View.Dialogs.ColorPickerDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Pick Color"
+        SizeToContent="WidthAndHeight"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="NoResize"
+        Background="{StaticResource PageBackgroundBrush}">
+    <Border Style="{StaticResource CardStyle}" Padding="16" Margin="10">
+        <StackPanel>
+            <TextBlock Text="Select a color"
+                       FontFamily="{StaticResource DefaultFontFamily}"
+                       FontSize="16"
+                       FontWeight="SemiBold"
+                       Foreground="Black" />
+
+            <ItemsControl ItemsSource="{Binding Swatches}" Margin="0,12,0,8">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <UniformGrid Columns="6" />
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Button Width="32"
+                                Height="32"
+                                Margin="4"
+                                Background="{Binding Brush}"
+                                BorderBrush="{StaticResource CardBorderBrush}"
+                                BorderThickness="1"
+                                Click="SwatchButton_Click"
+                                Tag="{Binding Color}">
+                            <ToolTipService.ToolTip>
+                                <TextBlock Text="{Binding Hex}" />
+                            </ToolTipService.ToolTip>
+                        </Button>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+            <TextBlock Text="Custom hex (#RRGGBB or #AARRGGBB)"
+                       FontFamily="{StaticResource DefaultFontFamily}"
+                       FontSize="12"
+                       Foreground="{StaticResource MutedTextBrush}" />
+
+            <DockPanel Margin="0,6,0,12">
+                <TextBox x:Name="CustomHexTextBox"
+                         Width="160"
+                         VerticalContentAlignment="Center"
+                         Margin="0,0,8,0" />
+                <Button Content="Use Custom"
+                        Style="{StaticResource RoundedButtonStyle}"
+                        Width="110"
+                        Height="32"
+                        Click="CustomButton_Click" />
+            </DockPanel>
+
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                <Button Content="Cancel"
+                        Width="90"
+                        Height="32"
+                        Margin="0,0,8,0"
+                        Style="{StaticResource RoundedButtonStyle}"
+                        Background="{StaticResource CancelButtonBackgroundBrush}"
+                        Foreground="{StaticResource MutedTextBrush}"
+                        Click="CancelButton_Click" />
+            </StackPanel>
+        </StackPanel>
+    </Border>
+</Window>
