@@ -34,8 +34,15 @@ namespace WPFApp
         private static void ConfigureServices(IServiceCollection services)
         {
             // 1) DAL/BLL як у WinForms
-            var dbPath = Path.Combine(AppContext.BaseDirectory, "DB", "SQLite.db");
+            var root = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "GF3");
+
+            Directory.CreateDirectory(root);
+
+            var dbPath = Path.Combine(root, "SQLite.db");
             services.AddDataAccess($"Data Source={dbPath}");
+
             services.AddBusinessLogicLayer();
 
             // Те, що ти реєстрував вручну

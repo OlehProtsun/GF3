@@ -5,8 +5,6 @@ VisualStudioVersion = 18.0.11205.157
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DataAccessLayer", "DataAccessLayer\DataAccessLayer.csproj", "{E44D7D55-0232-4F1D-99AA-238399E90114}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WinFormsApp", "WinFormsApp\WinFormsApp.csproj", "{514815E3-E8FE-4CE0-91BD-0FEC49948C2B}"
-EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BusinessLogicLayer", "BusinessLogicLayer\BusinessLogicLayer.csproj", "{54FADDCB-6233-431C-8432-F31D103977FB}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WPFApp", "WPFApp\WPFApp.csproj", "{07681D76-032F-4ABF-81B6-595B7E7FA8CF}"
@@ -21,10 +19,6 @@ Global
 		{E44D7D55-0232-4F1D-99AA-238399E90114}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{E44D7D55-0232-4F1D-99AA-238399E90114}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{E44D7D55-0232-4F1D-99AA-238399E90114}.Release|Any CPU.Build.0 = Release|Any CPU
-		{514815E3-E8FE-4CE0-91BD-0FEC49948C2B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{514815E3-E8FE-4CE0-91BD-0FEC49948C2B}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{514815E3-E8FE-4CE0-91BD-0FEC49948C2B}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{514815E3-E8FE-4CE0-91BD-0FEC49948C2B}.Release|Any CPU.Build.0 = Release|Any CPU
 		{54FADDCB-6233-431C-8432-F31D103977FB}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{54FADDCB-6233-431C-8432-F31D103977FB}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{54FADDCB-6233-431C-8432-F31D103977FB}.Release|Any CPU.ActiveCfg = Release|Any CPU
