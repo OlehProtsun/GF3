@@ -1,8 +1,11 @@
-﻿using System.Data;
+﻿using System;
+using System.Data;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
+using System.Windows.Input;
+using System.Windows.Media;
 using System.Windows.Shapes;
 using WPFApp.Service;
 using WPFApp.ViewModel.Container;
@@ -17,6 +20,8 @@ namespace WPFApp.View.Container
     {
         private ContainerScheduleEditViewModel? _vm;
         private string? _previousCellValue;
+        private bool _isPainting;
+        private ScheduleMatrixCellRef? _lastPaintedCell;
 
         public ContainerScheduleEditView()
         {
@@ -25,6 +30,10 @@ namespace WPFApp.View.Container
             Unloaded += ContainerScheduleEditView_Unloaded;
             DataContextChanged += ContainerScheduleEditView_DataContextChanged;
             dataGridScheduleMatrix.PreparingCellForEdit += ScheduleMatrix_PreparingCellForEdit;
+            dataGridScheduleMatrix.CurrentCellChanged += ScheduleMatrix_CurrentCellChanged;
+            dataGridScheduleMatrix.PreviewMouseLeftButtonDown += ScheduleMatrix_PreviewMouseLeftButtonDown;
+            dataGridScheduleMatrix.MouseMove += ScheduleMatrix_MouseMove;
+            dataGridScheduleMatrix.PreviewMouseLeftButtonUp += ScheduleMatrix_PreviewMouseLeftButtonUp;
         }
 
         private void ContainerScheduleEditView_DataContextChanged(object sender, DependencyPropertyChangedEventArgs e)
@@ -167,6 +176,64 @@ namespace WPFApp.View.Container
                 _previousCellValue = tb.Text;
         }
 
+        private void ScheduleMatrix_CurrentCellChanged(object? sender, EventArgs e)
+        {
+            if (_vm is null) return;
+            if (dataGridScheduleMatrix.CurrentCell.Column is null) return;
+            if (dataGridScheduleMatrix.CurrentCell.Item is null) return;
+
+            if (_vm.TryBuildCellReference(dataGridScheduleMatrix.CurrentCell.Item,
+                    dataGridScheduleMatrix.CurrentCell.Column.Header?.ToString(),
+                    out var cellRef))
+            {
+                _vm.SelectedCellRef = cellRef;
+            }
+            else
+            {
+                _vm.SelectedCellRef = null;
+            }
+        }
+
+        private void ScheduleMatrix_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            if (_vm is null) return;
+
+            var cell = FindParent<DataGridCell>(e.OriginalSource as DependencyObject);
+            if (cell == null) return;
+
+            if (TryGetCellReference(cell, out var cellRef))
+            {
+                _vm.SelectedCellRef = cellRef;
+                ApplyPaint(cellRef);
+                _isPainting = true;
+                _lastPaintedCell = cellRef;
+            }
+        }
+
+        private void ScheduleMatrix_MouseMove(object sender, MouseEventArgs e)
+        {
+            if (!_isPainting || _vm is null || e.LeftButton != MouseButtonState.Pressed)
+                return;
+
+            var cell = FindParent<DataGridCell>(e.OriginalSource as DependencyObject);
+            if (cell == null) return;
+
+            if (TryGetCellReference(cell, out var cellRef))
+            {
+                if (_lastPaintedCell.HasValue && _lastPaintedCell.Value.Equals(cellRef))
+                    return;
+
+                ApplyPaint(cellRef);
+                _lastPaintedCell = cellRef;
+            }
+        }
+
+        private void ScheduleMatrix_PreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+        {
+            _isPainting = false;
+            _lastPaintedCell = null;
+        }
+
         private void ScheduleMatrix_CellEditEnding(object sender, DataGridCellEditEndingEventArgs e)
         {
             if (_vm is null) return;
@@ -213,6 +280,32 @@ namespace WPFApp.View.Container
             if (button.DataContext is not ScheduleBlockViewModel block) return;
 
             await _vm.CloseBlockAsync(block);
+        }
+
+        private void ApplyPaint(ScheduleMatrixCellRef cellRef)
+        {
+            _vm?.ApplyPaintToCell(cellRef);
+        }
+
+        private bool TryGetCellReference(DataGridCell cell, out ScheduleMatrixCellRef cellRef)
+        {
+            cellRef = default;
+            if (_vm is null) return false;
+            if (cell.Column?.Header is null) return false;
+            return _vm.TryBuildCellReference(cell.DataContext, cell.Column.Header.ToString(), out cellRef);
+        }
+
+        private static T? FindParent<T>(DependencyObject? child) where T : DependencyObject
+        {
+            while (child != null)
+            {
+                if (child is T typed)
+                    return typed;
+
+                child = VisualTreeHelper.GetParent(child);
+            }
+
+            return null;
         }
 
     }

@@ -16,6 +16,13 @@ namespace WPFApp.ViewModel.Container
 {
     public sealed class ContainerScheduleEditViewModel : ViewModelBase, INotifyDataErrorInfo, IScheduleMatrixStyleProvider
     {
+        public enum SchedulePaintMode
+        {
+            None,
+            Background,
+            Foreground
+        }
+
         public const string DayColumnName = "DayOfMonth";
         public const string ConflictColumnName = "Conflict";
         public const string EmptyMark = "-";
@@ -28,6 +35,56 @@ namespace WPFApp.ViewModel.Container
         private readonly Dictionary<(int day, int employeeId), ScheduleCellStyleModel> _cellStyleMap = new();
 
         private bool _suppressAvailabilityGroupUpdate;
+
+        private SchedulePaintMode _activePaintMode = SchedulePaintMode.None;
+        public SchedulePaintMode ActivePaintMode
+        {
+            get => _activePaintMode;
+            private set => SetProperty(ref _activePaintMode, value);
+        }
+
+        private int? _lastFillColorArgb;
+        public int? LastFillColorArgb
+        {
+            get => _lastFillColorArgb;
+            private set
+            {
+                if (SetProperty(ref _lastFillColorArgb, value))
+                    LastFillBrush = value.HasValue ? ColorHelpers.ToBrush(value.Value) : null;
+            }
+        }
+
+        private int? _lastTextColorArgb;
+        public int? LastTextColorArgb
+        {
+            get => _lastTextColorArgb;
+            private set
+            {
+                if (SetProperty(ref _lastTextColorArgb, value))
+                    LastTextBrush = value.HasValue ? ColorHelpers.ToBrush(value.Value) : null;
+            }
+        }
+
+        private Brush? _lastFillBrush;
+        public Brush? LastFillBrush
+        {
+            get => _lastFillBrush;
+            private set => SetProperty(ref _lastFillBrush, value);
+        }
+
+        private Brush? _lastTextBrush;
+        public Brush? LastTextBrush
+        {
+            get => _lastTextBrush;
+            private set => SetProperty(ref _lastTextBrush, value);
+        }
+
+        private ScheduleMatrixCellRef? _selectedCellRef;
+        public ScheduleMatrixCellRef? SelectedCellRef
+        {
+            get => _selectedCellRef;
+            set => SetProperty(ref _selectedCellRef, value);
+        }
 
         public ObservableCollection<ScheduleBlockViewModel> Blocks { get; } = new();
 
@@ -64,6 +121,7 @@ namespace WPFApp.ViewModel.Container
                     SyncSelectionFromBlock();
                     RestoreMatricesForSelection();
                     RefreshCellStyleMap();
+                    _ = EnsureAvailabilitySelectionLoadedAsync();
                 }
             }
         }
@@ -402,6 +460,10 @@ namespace WPFApp.ViewModel.Container
         public RelayCommand<ScheduleMatrixCellRef?> SetCellBackgroundColorCommand { get; }
         public RelayCommand<ScheduleMatrixCellRef?> SetCellTextColorCommand { get; }
         public RelayCommand<ScheduleMatrixCellRef?> ClearCellFormattingCommand { get; }
+        public RelayCommand<ScheduleMatrixCellRef?> ApplyLastFillColorCommand { get; }
+        public RelayCommand<ScheduleMatrixCellRef?> ApplyLastTextColorCommand { get; }
+        public RelayCommand PickFillColorCommand { get; }
+        public RelayCommand PickTextColorCommand { get; }
 
         public event EventHandler? MatrixChanged;
 
@@ -424,6 +486,10 @@ namespace WPFApp.ViewModel.Container
             SetCellBackgroundColorCommand = new RelayCommand<ScheduleMatrixCellRef?>(SetCellBackgroundColor);
             SetCellTextColorCommand = new RelayCommand<ScheduleMatrixCellRef?>(SetCellTextColor);
             ClearCellFormattingCommand = new RelayCommand<ScheduleMatrixCellRef?>(ClearCellFormatting);
+            ApplyLastFillColorCommand = new RelayCommand<ScheduleMatrixCellRef?>(ApplyLastFillColor);
+            ApplyLastTextColorCommand = new RelayCommand<ScheduleMatrixCellRef?>(ApplyLastTextColor);
+            PickFillColorCommand = new RelayCommand(PickFillColor);
+            PickTextColorCommand = new RelayCommand(PickTextColor);
         }
 
         public Task SelectBlockAsync(ScheduleBlockViewModel block)
@@ -461,6 +527,8 @@ namespace WPFApp.ViewModel.Container
             AvailabilityPreviewMatrix = new DataView();
             _cellStyleMap.Clear();
             CellStyleRevision++;
+            SelectedCellRef = null;
+            ActivePaintMode = SchedulePaintMode.None;
         }
 
         public void SetLookups(IEnumerable<ShopModel> shops, IEnumerable<AvailabilityGroupModel> groups, IEnumerable<EmployeeModel> employees)
@@ -494,6 +562,7 @@ namespace WPFApp.ViewModel.Container
                         _ = _owner.SyncEmployeesFromAvailabilityGroupAsync(groupId);
 
                     RestoreMatricesForSelection();
+                    _ = LoadAvailabilityPreviewForSelectedGroupAsync();
 
                 }
         }
@@ -640,6 +709,18 @@ namespace WPFApp.ViewModel.Container
         public bool TryGetCellStyle(ScheduleMatrixCellRef cellRef, out ScheduleCellStyleModel style)
             => _cellStyleMap.TryGetValue((cellRef.DayOfMonth, cellRef.EmployeeId), out style!);
 
+        public void ApplyPaintToCell(ScheduleMatrixCellRef cellRef)
+        {
+            if (ActivePaintMode == SchedulePaintMode.Background && LastFillColorArgb.HasValue)
+            {
+                ApplyCellBackgroundColor(cellRef, LastFillColorArgb.Value);
+            }
+            else if (ActivePaintMode == SchedulePaintMode.Foreground && LastTextColorArgb.HasValue)
+            {
+                ApplyCellTextColor(cellRef, LastTextColorArgb.Value);
+            }
+        }
+
         internal void RemoveCellStylesForEmployee(int employeeId)
         {
             if (SelectedBlock is null)
@@ -672,36 +753,82 @@ namespace WPFApp.ViewModel.Container
 
         private void SetCellBackgroundColor(ScheduleMatrixCellRef? cellRef)
         {
-            if (cellRef is null || SelectedBlock is null)
+            if (SelectedBlock is null)
                 return;
 
-            var style = GetOrCreateCellStyle(cellRef.Value);
-            var initial = style.BackgroundColorArgb.HasValue
-                ? ColorHelpers.FromArgb(style.BackgroundColorArgb.Value)
+            var initial = LastFillColorArgb.HasValue
+                ? ColorHelpers.FromArgb(LastFillColorArgb.Value)
                 : (Color?)null;
+
+            if (cellRef.HasValue)
+            {
+                var existing = GetOrCreateCellStyle(cellRef.Value);
+                if (existing.BackgroundColorArgb.HasValue)
+                    initial = ColorHelpers.FromArgb(existing.BackgroundColorArgb.Value);
+            }
 
             if (!_owner.TryPickScheduleCellColor(initial, out var selected))
                 return;
 
-            style.BackgroundColorArgb = ColorHelpers.ToArgb(selected);
-            RefreshCellStyleMap();
+            LastFillColorArgb = ColorHelpers.ToArgb(selected);
+            ActivePaintMode = SchedulePaintMode.Background;
+
+            if (cellRef.HasValue)
+                ApplyCellBackgroundColor(cellRef.Value, LastFillColorArgb.Value);
         }
 
         private void SetCellTextColor(ScheduleMatrixCellRef? cellRef)
         {
-            if (cellRef is null || SelectedBlock is null)
+            if (SelectedBlock is null)
                 return;
 
-            var style = GetOrCreateCellStyle(cellRef.Value);
-            var initial = style.TextColorArgb.HasValue
-                ? ColorHelpers.FromArgb(style.TextColorArgb.Value)
+            var initial = LastTextColorArgb.HasValue
+                ? ColorHelpers.FromArgb(LastTextColorArgb.Value)
                 : (Color?)null;
+
+            if (cellRef.HasValue)
+            {
+                var existing = GetOrCreateCellStyle(cellRef.Value);
+                if (existing.TextColorArgb.HasValue)
+                    initial = ColorHelpers.FromArgb(existing.TextColorArgb.Value);
+            }
 
             if (!_owner.TryPickScheduleCellColor(initial, out var selected))
                 return;
 
-            style.TextColorArgb = ColorHelpers.ToArgb(selected);
-            RefreshCellStyleMap();
+            LastTextColorArgb = ColorHelpers.ToArgb(selected);
+            ActivePaintMode = SchedulePaintMode.Foreground;
+
+            if (cellRef.HasValue)
+                ApplyCellTextColor(cellRef.Value, LastTextColorArgb.Value);
+        }
+
+        private void ApplyLastFillColor(ScheduleMatrixCellRef? cellRef)
+        {
+            if (cellRef is null || !LastFillColorArgb.HasValue)
+                return;
+
+            ActivePaintMode = SchedulePaintMode.Background;
+            ApplyCellBackgroundColor(cellRef.Value, LastFillColorArgb.Value);
+        }
+
+        private void ApplyLastTextColor(ScheduleMatrixCellRef? cellRef)
+        {
+            if (cellRef is null || !LastTextColorArgb.HasValue)
+                return;
+
+            ActivePaintMode = SchedulePaintMode.Foreground;
+            ApplyCellTextColor(cellRef.Value, LastTextColorArgb.Value);
+        }
+
+        private void PickFillColor()
+        {
+            SetCellBackgroundColor(null);
+        }
+
+        private void PickTextColor()
+        {
+            SetCellTextColor(null);
         }
 
         private void ClearCellFormatting(ScheduleMatrixCellRef? cellRef)
@@ -732,6 +859,26 @@ namespace WPFApp.ViewModel.Container
             SelectedBlock?.CellStyles.Add(style);
             _cellStyleMap[(cellRef.DayOfMonth, cellRef.EmployeeId)] = style;
             return style;
+        }
+
+        private void ApplyCellBackgroundColor(ScheduleMatrixCellRef cellRef, int argb)
+        {
+            if (SelectedBlock is null)
+                return;
+
+            var style = GetOrCreateCellStyle(cellRef);
+            style.BackgroundColorArgb = argb;
+            CellStyleRevision++;
+        }
+
+        private void ApplyCellTextColor(ScheduleMatrixCellRef cellRef, int argb)
+        {
+            if (SelectedBlock is null)
+                return;
+
+            var style = GetOrCreateCellStyle(cellRef);
+            style.TextColorArgb = argb;
+            CellStyleRevision++;
         }
 
         public void SetValidationErrors(IReadOnlyDictionary<string, string> errors)
@@ -1102,6 +1249,19 @@ namespace WPFApp.ViewModel.Container
                 RefreshAvailabilityPreviewMatrix(group.Year, group.Month, previewSlots, previewEmployees);
             }
             catch (OperationCanceledException) { }
+        }
+
+        private async Task EnsureAvailabilitySelectionLoadedAsync()
+        {
+            if (SelectedBlock is null)
+                return;
+
+            var groupId = SelectedBlock.SelectedAvailabilityGroupId;
+            if (groupId <= 0)
+                return;
+
+            await _owner.SyncEmployeesFromAvailabilityGroupAsync(groupId);
+            await LoadAvailabilityPreviewForSelectedGroupAsync();
         }
 
         private static (TimeSpan? from, TimeSpan? to) ParseFirstInterval(string? intervalStr)
