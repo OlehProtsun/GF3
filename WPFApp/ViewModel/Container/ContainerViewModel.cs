@@ -5,6 +5,7 @@ using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Windows;
 using BusinessLogicLayer.Availability;
 using BusinessLogicLayer.Generators;
 using BusinessLogicLayer.Services.Abstractions;
@@ -681,6 +682,23 @@ namespace WPFApp.ViewModel.Container
             return _availabilityGroupService.LoadFullAsync(groupId, ct);
         }
 
+        internal Task RunOnUiThreadAsync(Action action)
+        {
+            if (Application.Current?.Dispatcher is null)
+            {
+                action();
+                return Task.CompletedTask;
+            }
+
+            if (Application.Current.Dispatcher.CheckAccess())
+            {
+                action();
+                return Task.CompletedTask;
+            }
+
+            return Application.Current.Dispatcher.InvokeAsync(action).Task;
+        }
+
 
         internal Task SearchScheduleShopsAsync(CancellationToken ct = default)
         {
@@ -1346,46 +1364,52 @@ namespace WPFApp.ViewModel.Container
             var block = ScheduleEditVm.SelectedBlock;
 
             // витягуємо members, щоб знати список EmployeeId + мати Employee об'єкти
-            var (_, members, _) = await _availabilityGroupService.LoadFullAsync(groupId, ct);
+            var (_, members, _) = await _availabilityGroupService.LoadFullAsync(groupId, ct).ConfigureAwait(false);
 
             var groupEmpIds = members
                 .Select(m => m.EmployeeId)
                 .Distinct()
                 .ToHashSet();
 
-            // зберегти вже введені MinHoursMonth
-            var oldMin = block.Employees
-                .GroupBy(e => e.EmployeeId)
-                .ToDictionary(g => g.Key, g => g.First().MinHoursMonth);
+            if (!ScheduleEditVm.Blocks.Contains(block))
+                return;
 
-            // 1) прибрати тих, кого нема в групі
-            for (int i = block.Employees.Count - 1; i >= 0; i--)
+            await RunOnUiThreadAsync(() =>
             {
-                if (!groupEmpIds.Contains(block.Employees[i].EmployeeId))
-                    block.Employees.RemoveAt(i);
-            }
+                // зберегти вже введені MinHoursMonth
+                var oldMin = block.Employees
+                    .GroupBy(e => e.EmployeeId)
+                    .ToDictionary(g => g.Key, g => g.First().MinHoursMonth);
 
-            // 2) додати відсутніх з групи (і підтягнути Employee)
-            foreach (var m in members)
-            {
-                var existing = block.Employees.FirstOrDefault(e => e.EmployeeId == m.EmployeeId);
-                if (existing != null)
+                // 1) прибрати тих, кого нема в групі
+                for (int i = block.Employees.Count - 1; i >= 0; i--)
                 {
-                    // оновимо Employee reference, якщо раптом null
-                    existing.Employee ??= m.Employee;
-                    continue;
+                    if (!groupEmpIds.Contains(block.Employees[i].EmployeeId))
+                        block.Employees.RemoveAt(i);
                 }
 
-                block.Employees.Add(new ScheduleEmployeeModel
+                // 2) додати відсутніх з групи (і підтягнути Employee)
+                foreach (var m in members)
                 {
-                    EmployeeId = m.EmployeeId,
-                    Employee = m.Employee,
-                    MinHoursMonth = oldMin.TryGetValue(m.EmployeeId, out var min) ? min : 0
-                });
-            }
+                    var existing = block.Employees.FirstOrDefault(e => e.EmployeeId == m.EmployeeId);
+                    if (existing != null)
+                    {
+                        // оновимо Employee reference, якщо раптом null
+                        existing.Employee ??= m.Employee;
+                        continue;
+                    }
 
-            // матриця залежить від Employees (колонки по працівниках)
-            ScheduleEditVm.RefreshScheduleMatrix();
+                    block.Employees.Add(new ScheduleEmployeeModel
+                    {
+                        EmployeeId = m.EmployeeId,
+                        Employee = m.Employee,
+                        MinHoursMonth = oldMin.TryGetValue(m.EmployeeId, out var min) ? min : 0
+                    });
+                }
+
+                if (ReferenceEquals(ScheduleEditVm.SelectedBlock, block))
+                    ScheduleEditVm.RefreshScheduleMatrix();
+            }).ConfigureAwait(false);
         }
 
     }

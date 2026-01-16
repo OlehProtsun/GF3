@@ -75,8 +75,21 @@ namespace WPFApp.View.Container
         private void VmOnMatrixChanged(object? sender, System.EventArgs e)
         {
             if (_vm is null) return;
-            BuildMatrixColumns(_vm.ScheduleMatrix.Table, dataGridScheduleMatrix, isReadOnly: false);
-            BuildMatrixColumns(_vm.AvailabilityPreviewMatrix.Table, dataGridAvailabilityPreview, isReadOnly: true);
+
+            void RefreshMatrices()
+            {
+                BuildMatrixColumns(_vm.ScheduleMatrix.Table, dataGridScheduleMatrix, isReadOnly: false);
+                BuildMatrixColumns(_vm.AvailabilityPreviewMatrix.Table, dataGridAvailabilityPreview, isReadOnly: true);
+            }
+
+            if (Dispatcher.CheckAccess())
+            {
+                RefreshMatrices();
+            }
+            else
+            {
+                Dispatcher.Invoke(RefreshMatrices);
+            }
         }
 
         private static void BuildMatrixColumns(DataTable? table, DataGrid grid, bool isReadOnly)
