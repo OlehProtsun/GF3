@@ -1089,14 +1089,67 @@
                         Orientation="Horizontal"
                         VerticalAlignment="Center"
                         HorizontalAlignment="Right">
-                                        <Button Content="Change Color"
-                        Margin="0,0,8,0"
-                        Command="{Binding SetCellBackgroundColorCommand}"
-                        CommandParameter="{Binding SelectedCellRef}" />
+                                        <Grid Margin="0,0,10,0">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto" />
+                                                <ColumnDefinition Width="36" />
+                                            </Grid.ColumnDefinitions>
 
-                                        <Button Content="Change Text"
-                        Command="{Binding SetCellTextColorCommand}"
-                        CommandParameter="{Binding SelectedCellRef}" />
+                                            <Button Grid.Column="0"
+                        Style="{StaticResource RoundedButtonStyle}"
+                        Height="32"
+                        Padding="12,0"
+                        Command="{Binding ApplyLastFillColorCommand}"
+                        CommandParameter="{Binding SelectedCellRef}">
+                                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                    <TextBlock Text="Fill Color" Margin="0,0,8,0" />
+                                                    <Border Width="16" Height="16" CornerRadius="2"
+                                                            BorderBrush="{StaticResource LightBorderBrush}"
+                                                            BorderThickness="1"
+                                                            Background="{Binding LastFillBrush}" />
+                                                </StackPanel>
+                                            </Button>
+
+                                            <Button Grid.Column="1"
+                        Style="{StaticResource IconButtonStyle}"
+                        Width="32"
+                        Height="32"
+                        Command="{Binding PickFillColorCommand}"
+                        ToolTip="Pick fill color">
+                                                <TextBlock Text="⋯" FontSize="16" VerticalAlignment="Center" />
+                                            </Button>
+                                        </Grid>
+
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto" />
+                                                <ColumnDefinition Width="36" />
+                                            </Grid.ColumnDefinitions>
+
+                                            <Button Grid.Column="0"
+                        Style="{StaticResource RoundedButtonStyle}"
+                        Height="32"
+                        Padding="12,0"
+                        Command="{Binding ApplyLastTextColorCommand}"
+                        CommandParameter="{Binding SelectedCellRef}">
+                                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                    <TextBlock Text="Text Color" Margin="0,0,8,0" />
+                                                    <Border Width="16" Height="16" CornerRadius="2"
+                                                            BorderBrush="{StaticResource LightBorderBrush}"
+                                                            BorderThickness="1"
+                                                            Background="{Binding LastTextBrush}" />
+                                                </StackPanel>
+                                            </Button>
+
+                                            <Button Grid.Column="1"
+                        Style="{StaticResource IconButtonStyle}"
+                        Width="32"
+                        Height="32"
+                        Command="{Binding PickTextColorCommand}"
+                        ToolTip="Pick text color">
+                                                <TextBlock Text="⋯" FontSize="16" VerticalAlignment="Center" />
+                                            </Button>
+                                        </Grid>
                                     </StackPanel>
                                 </Grid>
 
