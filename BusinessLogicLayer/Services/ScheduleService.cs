@@ -14,15 +14,18 @@ namespace BusinessLogicLayer.Services
         private readonly IScheduleRepository _scheduleRepo;
         private readonly IScheduleEmployeeRepository _employeeRepo;
         private readonly IScheduleSlotRepository _slotRepo;
+        private readonly IScheduleCellStyleRepository _cellStyleRepo;
 
         public ScheduleService(
             IScheduleRepository scheduleRepo,
             IScheduleEmployeeRepository employeeRepo,
-            IScheduleSlotRepository slotRepo) : base(scheduleRepo)
+            IScheduleSlotRepository slotRepo,
+            IScheduleCellStyleRepository cellStyleRepo) : base(scheduleRepo)
         {
             _scheduleRepo = scheduleRepo;
             _employeeRepo = employeeRepo;
             _slotRepo = slotRepo;
+            _cellStyleRepo = cellStyleRepo;
         }
 
         public Task<List<ScheduleModel>> GetByContainerAsync(int containerId, string? value = null, CancellationToken ct = default)
@@ -47,6 +50,7 @@ namespace BusinessLogicLayer.Services
             ScheduleModel schedule,
             IEnumerable<ScheduleEmployeeModel> employees,
             IEnumerable<ScheduleSlotModel> slots,
+            IEnumerable<ScheduleCellStyleModel> cellStyles,
             CancellationToken ct = default)
         {
             NormalizeSchedule(schedule);
@@ -93,6 +97,27 @@ namespace BusinessLogicLayer.Services
                 s.ScheduleId = scheduleId;
                 await _slotRepo.AddAsync(s, ct).ConfigureAwait(false);
             }
+
+            var normalizedStyles = (cellStyles ?? Enumerable.Empty<ScheduleCellStyleModel>())
+                .Where(cs => cs.BackgroundColorArgb.HasValue || cs.TextColorArgb.HasValue)
+                .ToList();
+
+            foreach (var style in normalizedStyles)
+            {
+                style.Schedule = null!;
+                style.Employee = null!;
+            }
+
+            var existingStyles = await _cellStyleRepo.GetByScheduleAsync(scheduleId, ct).ConfigureAwait(false);
+            foreach (var style in existingStyles)
+                await _cellStyleRepo.DeleteAsync(style.Id, ct).ConfigureAwait(false);
+
+            foreach (var style in normalizedStyles)
+            {
+                style.Id = 0;
+                style.ScheduleId = scheduleId;
+                await _cellStyleRepo.AddAsync(style, ct).ConfigureAwait(false);
+            }
         }
 
 
@@ -106,6 +131,7 @@ namespace BusinessLogicLayer.Services
             // А тепер дочірні дані – працівники та слоти
             schedule.Employees = (await _employeeRepo.GetByScheduleAsync(id, ct).ConfigureAwait(false)).ToList();
             schedule.Slots = (await _slotRepo.GetByScheduleAsync(id, ct).ConfigureAwait(false)).ToList();
+            schedule.CellStyles = (await _cellStyleRepo.GetByScheduleAsync(id, ct).ConfigureAwait(false)).ToList();
 
             return schedule;
         }

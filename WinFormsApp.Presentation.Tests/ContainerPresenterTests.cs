@@ -384,7 +384,7 @@ public class ContainerPresenterTests
         await view.RaiseScheduleSaveAsync();
 
         view.Mock.Verify(v => v.SetScheduleValidationErrors(It.Is<IReadOnlyDictionary<string, string>>(errors => errors.Count > 0)), Times.Once);
-        scheduleService.Verify(s => s.SaveWithDetailsAsync(It.IsAny<ScheduleModel>(), It.IsAny<IEnumerable<ScheduleEmployeeModel>>(), It.IsAny<IEnumerable<ScheduleSlotModel>>(), It.IsAny<CancellationToken>()), Times.Never);
+        scheduleService.Verify(s => s.SaveWithDetailsAsync(It.IsAny<ScheduleModel>(), It.IsAny<IEnumerable<ScheduleEmployeeModel>>(), It.IsAny<IEnumerable<ScheduleSlotModel>>(), It.IsAny<IEnumerable<ScheduleCellStyleModel>>(), It.IsAny<CancellationToken>()), Times.Never);
         view.Mock.Object.IsSuccessful.Should().BeFalse();
     }
 
@@ -443,7 +443,7 @@ public class ContainerPresenterTests
         view.Mock.Object.ScheduleSlots = new List<ScheduleSlotModel> { ModelBuilder.ScheduleSlot() };
         view.Mock.Object.ScheduleCancelTarget = ScheduleViewModel.List;
 
-        scheduleService.Setup(s => s.SaveWithDetailsAsync(It.IsAny<ScheduleModel>(), It.IsAny<IEnumerable<ScheduleEmployeeModel>>(), It.IsAny<IEnumerable<ScheduleSlotModel>>(), It.IsAny<CancellationToken>()))
+        scheduleService.Setup(s => s.SaveWithDetailsAsync(It.IsAny<ScheduleModel>(), It.IsAny<IEnumerable<ScheduleEmployeeModel>>(), It.IsAny<IEnumerable<ScheduleSlotModel>>(), It.IsAny<IEnumerable<ScheduleCellStyleModel>>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
         scheduleService.Setup(s => s.GetByContainerAsync(view.Mock.Object.ScheduleContainerId, null, It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<ScheduleModel>());
@@ -455,6 +455,7 @@ public class ContainerPresenterTests
         scheduleService.Verify(s => s.SaveWithDetailsAsync(It.Is<ScheduleModel>(m => m.Shift1Time == "09:00 - 17:00" && m.Shift2Time == "18:00 - 22:00"),
             It.Is<IEnumerable<ScheduleEmployeeModel>>(emps => emps.Count() == 1),
             It.IsAny<IEnumerable<ScheduleSlotModel>>(),
+            It.IsAny<IEnumerable<ScheduleCellStyleModel>>(),
             It.IsAny<CancellationToken>()), Times.Once);
         view.Mock.Verify(v => v.ShowInfo("Schedule added successfully."), Times.Once);
         view.Mock.Verify(v => v.SwitchToScheduleListMode(), Times.Once);

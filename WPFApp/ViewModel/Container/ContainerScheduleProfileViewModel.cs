@@ -7,9 +7,11 @@ using WPFApp.Infrastructure;
 
 namespace WPFApp.ViewModel.Container
 {
-    public sealed class ContainerScheduleProfileViewModel : ViewModelBase
+    public sealed class ContainerScheduleProfileViewModel : ViewModelBase, IScheduleMatrixStyleProvider
     {
         private readonly ContainerViewModel _owner;
+        private readonly Dictionary<string, int> _colNameToEmpId = new();
+        private readonly Dictionary<(int day, int employeeId), ScheduleCellStyleModel> _cellStyleMap = new();
 
         private int _scheduleId;
         public int ScheduleId
@@ -53,6 +55,13 @@ namespace WPFApp.ViewModel.Container
             private set => SetProperty(ref _scheduleMatrix, value);
         }
 
+        private int _cellStyleRevision;
+        public int CellStyleRevision
+        {
+            get => _cellStyleRevision;
+            private set => SetProperty(ref _cellStyleRevision, value);
+        }
+
         public ObservableCollection<ScheduleEmployeeModel> Employees { get; } = new();
 
         public AsyncRelayCommand BackCommand { get; }
@@ -72,7 +81,11 @@ namespace WPFApp.ViewModel.Container
             DeleteCommand = new AsyncRelayCommand(() => _owner.DeleteSelectedScheduleAsync());
         }
 
-        public void SetProfile(ScheduleModel schedule, IList<ScheduleEmployeeModel> employees, IList<ScheduleSlotModel> slots)
+        public void SetProfile(
+            ScheduleModel schedule,
+            IList<ScheduleEmployeeModel> employees,
+            IList<ScheduleSlotModel> slots,
+            IList<ScheduleCellStyleModel> cellStyles)
         {
             ScheduleId = schedule.Id;
             ScheduleName = schedule.Name;
@@ -89,10 +102,65 @@ namespace WPFApp.ViewModel.Container
                 schedule.Month,
                 slots,
                 employees,
-                out _);
+                out var colMap);
 
             ScheduleMatrix = table.DefaultView;
+            RebuildStyleMaps(colMap, cellStyles);
             MatrixChanged?.Invoke(this, EventArgs.Empty);
+        }
+
+        public bool TryBuildCellReference(object? rowData, string? columnName, out ScheduleMatrixCellRef cellRef)
+        {
+            cellRef = default;
+
+            if (string.IsNullOrWhiteSpace(columnName)
+                || columnName == ContainerScheduleEditViewModel.DayColumnName
+                || columnName == ContainerScheduleEditViewModel.ConflictColumnName)
+                return false;
+
+            if (rowData is not DataRowView rowView)
+                return false;
+
+            if (!int.TryParse(rowView[ContainerScheduleEditViewModel.DayColumnName]?.ToString(), out var day))
+                return false;
+
+            if (!_colNameToEmpId.TryGetValue(columnName, out var employeeId))
+                return false;
+
+            cellRef = new ScheduleMatrixCellRef(day, employeeId, columnName);
+            return true;
+        }
+
+        public System.Windows.Media.Brush? GetCellBackgroundBrush(ScheduleMatrixCellRef cellRef)
+        {
+            return TryGetCellStyle(cellRef, out var style) && style.BackgroundColorArgb.HasValue
+                ? ColorHelpers.ToBrush(style.BackgroundColorArgb.Value)
+                : null;
+        }
+
+        public System.Windows.Media.Brush? GetCellForegroundBrush(ScheduleMatrixCellRef cellRef)
+        {
+            return TryGetCellStyle(cellRef, out var style) && style.TextColorArgb.HasValue
+                ? ColorHelpers.ToBrush(style.TextColorArgb.Value)
+                : null;
+        }
+
+        public bool TryGetCellStyle(ScheduleMatrixCellRef cellRef, out ScheduleCellStyleModel style)
+            => _cellStyleMap.TryGetValue((cellRef.DayOfMonth, cellRef.EmployeeId), out style!);
+
+        private void RebuildStyleMaps(Dictionary<string, int> colMap, IList<ScheduleCellStyleModel> cellStyles)
+        {
+            _colNameToEmpId.Clear();
+            foreach (var pair in colMap)
+                _colNameToEmpId[pair.Key] = pair.Value;
+
+            _cellStyleMap.Clear();
+            foreach (var style in cellStyles)
+            {
+                _cellStyleMap[(style.DayOfMonth, style.EmployeeId)] = style;
+            }
+
+            CellStyleRevision++;
         }
     }
 }

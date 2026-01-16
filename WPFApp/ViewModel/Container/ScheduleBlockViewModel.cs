@@ -19,6 +19,7 @@ namespace WPFApp.ViewModel.Container
 
         public ObservableCollection<ScheduleEmployeeModel> Employees { get; } = new();
         public ObservableCollection<ScheduleSlotModel> Slots { get; } = new();
+        public ObservableCollection<ScheduleCellStyleModel> CellStyles { get; } = new();
 
         private int _selectedAvailabilityGroupId;
         public int SelectedAvailabilityGroupId

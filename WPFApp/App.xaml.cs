@@ -52,6 +52,8 @@ namespace WPFApp
             // 3) Реєстрація Views (Windows/UserControls)
             services.AddSingleton<MainWindow>();
 
+            services.AddSingleton<WPFApp.Service.IColorPickerService, WPFApp.Service.ColorPickerService>();
+
             // Якщо робиш навігацію через UserControl-и:
             services.AddTransient<EmployeeView>();
             services.AddTransient<AvailabilityView>();

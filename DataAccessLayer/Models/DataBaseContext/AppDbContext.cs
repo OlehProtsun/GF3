@@ -18,6 +18,7 @@ namespace DataAccessLayer.Models.DataBaseContext
         public DbSet<ScheduleModel> Schedules => Set<ScheduleModel>();
         public DbSet<ScheduleEmployeeModel> ScheduleEmployees => Set<ScheduleEmployeeModel>();
         public DbSet<ScheduleSlotModel> ScheduleSlots => Set<ScheduleSlotModel>();
+        public DbSet<ScheduleCellStyleModel> ScheduleCellStyles => Set<ScheduleCellStyleModel>();
         public DbSet<BindModel> AvailabilityBinds => Set<BindModel>();
         public DbSet<AvailabilityGroupModel> AvailabilityGroups => Set<AvailabilityGroupModel>();
         public DbSet<AvailabilityGroupMemberModel> AvailabilityGroupMembers => Set<AvailabilityGroupMemberModel>();
@@ -161,6 +162,28 @@ namespace DataAccessLayer.Models.DataBaseContext
                 });
 
 
+            });
+
+            // ----- ScheduleCellStyle
+            modelBuilder.Entity<ScheduleCellStyleModel>(e =>
+            {
+                e.HasOne(cs => cs.Schedule)
+                 .WithMany(s => s.CellStyles)
+                 .HasForeignKey(cs => cs.ScheduleId)
+                 .OnDelete(DeleteBehavior.Cascade);
+
+                e.HasOne(cs => cs.Employee)
+                 .WithMany()
+                 .HasForeignKey(cs => cs.EmployeeId)
+                 .OnDelete(DeleteBehavior.Cascade);
+
+                e.HasIndex(cs => new { cs.ScheduleId, cs.DayOfMonth, cs.EmployeeId })
+                 .IsUnique();
+
+                e.ToTable(t =>
+                {
+                    t.HasCheckConstraint("ck_schedule_cell_style_dom", "day_of_month BETWEEN 1 AND 31");
+                });
             });
 
             // ----- AvailabilityBind

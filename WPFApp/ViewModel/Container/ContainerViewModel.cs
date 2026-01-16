@@ -33,6 +33,7 @@ namespace WPFApp.ViewModel.Container
         private readonly IShopService _shopService;
         private readonly IEmployeeService _employeeService;
         private readonly IScheduleGenerator _generator;
+        private readonly IColorPickerService _colorPickerService;
 
         private readonly List<ShopModel> _allShops = new();
         private readonly List<AvailabilityGroupModel> _allAvailabilityGroups = new();
@@ -70,7 +71,8 @@ namespace WPFApp.ViewModel.Container
             IAvailabilityGroupService availabilityGroupService,
             IShopService shopService,
             IEmployeeService employeeService,
-            IScheduleGenerator generator)
+            IScheduleGenerator generator,
+            IColorPickerService colorPickerService)
         {
             _containerService = containerService;
             _scheduleService = scheduleService;
@@ -78,6 +80,7 @@ namespace WPFApp.ViewModel.Container
             _shopService = shopService;
             _employeeService = employeeService;
             _generator = generator;
+            _colorPickerService = colorPickerService;
 
             ListVm = new ContainerListViewModel(this);
             EditVm = new ContainerEditViewModel(this);
@@ -87,6 +90,9 @@ namespace WPFApp.ViewModel.Container
 
             CurrentSection = ListVm;
         }
+
+        internal bool TryPickScheduleCellColor(System.Windows.Media.Color? initialColor, out System.Windows.Media.Color color)
+            => _colorPickerService.TryPickColor(initialColor, out color);
 
         public async Task EnsureInitializedAsync(CancellationToken ct = default)
         {
@@ -312,7 +318,8 @@ namespace WPFApp.ViewModel.Container
 
             var block = CreateBlockFromSchedule(detailed,
                 detailed.Employees?.ToList() ?? new List<ScheduleEmployeeModel>(),
-                detailed.Slots?.ToList() ?? new List<ScheduleSlotModel>());
+                detailed.Slots?.ToList() ?? new List<ScheduleSlotModel>(),
+                detailed.CellStyles?.ToList());
 
             block.SelectedAvailabilityGroupId = detailed.AvailabilityGroupId!.Value; // <-- саме група, з якої був генерований графік
 
@@ -367,7 +374,8 @@ namespace WPFApp.ViewModel.Container
 
                 var block = CreateBlockFromSchedule(detailed,
                     detailed.Employees?.ToList() ?? new List<ScheduleEmployeeModel>(),
-                    detailed.Slots?.ToList() ?? new List<ScheduleSlotModel>());
+                    detailed.Slots?.ToList() ?? new List<ScheduleSlotModel>(),
+                    detailed.CellStyles?.ToList());
 
                 block.SelectedAvailabilityGroupId = detailed.AvailabilityGroupId!.Value;
 
@@ -469,6 +477,9 @@ namespace WPFApp.ViewModel.Container
                     .ToList();
 
                 var slots = block.Slots.ToList();
+                var cellStyles = block.CellStyles
+                    .Where(cs => cs.BackgroundColorArgb.HasValue || cs.TextColorArgb.HasValue)
+                    .ToList();
 
                 block.Model.AvailabilityGroupId = block.SelectedAvailabilityGroupId > 0
                     ? block.SelectedAvailabilityGroupId
@@ -476,7 +487,7 @@ namespace WPFApp.ViewModel.Container
 
                 try
                 {
-                    await _scheduleService.SaveWithDetailsAsync(block.Model, employees, slots, ct);
+                    await _scheduleService.SaveWithDetailsAsync(block.Model, employees, slots, cellStyles, ct);
                 }
                 catch (Exception ex)
                 {
@@ -502,7 +513,8 @@ namespace WPFApp.ViewModel.Container
                     {
                         var employees = detailed.Employees?.ToList() ?? new List<ScheduleEmployeeModel>();
                         var slots = detailed.Slots?.ToList() ?? new List<ScheduleSlotModel>();
-                        ScheduleProfileVm.SetProfile(detailed, employees, slots);
+                        var cellStyles = detailed.CellStyles?.ToList() ?? new List<ScheduleCellStyleModel>();
+                        ScheduleProfileVm.SetProfile(detailed, employees, slots, cellStyles);
                         ProfileVm.ScheduleListVm.SelectedItem =
                             ProfileVm.ScheduleListVm.Items.FirstOrDefault(x => x.Model.Id == detailed.Id);
 
@@ -543,8 +555,9 @@ namespace WPFApp.ViewModel.Container
 
             var employees = detailed.Employees?.ToList() ?? new List<ScheduleEmployeeModel>();
             var slots = detailed.Slots?.ToList() ?? new List<ScheduleSlotModel>();
+            var cellStyles = detailed.CellStyles?.ToList() ?? new List<ScheduleCellStyleModel>();
 
-            ScheduleProfileVm.SetProfile(detailed, employees, slots);
+            ScheduleProfileVm.SetProfile(detailed, employees, slots, cellStyles);
             ProfileVm.ScheduleListVm.SelectedItem =
                 ProfileVm.ScheduleListVm.Items.FirstOrDefault(x => x.Model.Id == detailed.Id);
 
@@ -742,6 +755,7 @@ namespace WPFApp.ViewModel.Container
             foreach (var slot in slotsToRemove)
                 ScheduleEditVm.SelectedBlock.Slots.Remove(slot);
 
+            ScheduleEditVm.RemoveCellStylesForEmployee(selected.EmployeeId);
             ScheduleEditVm.RefreshScheduleMatrix();
             return UpdateAvailabilityPreviewAsync(ct);
         }
@@ -1031,7 +1045,8 @@ namespace WPFApp.ViewModel.Container
         private ScheduleBlockViewModel CreateBlockFromSchedule(
             ScheduleModel model,
             IList<ScheduleEmployeeModel> employees,
-            IList<ScheduleSlotModel> slots)
+            IList<ScheduleSlotModel> slots,
+            IList<ScheduleCellStyleModel>? cellStyles = null)
         {
             var copy = new ScheduleModel
             {
@@ -1067,6 +1082,12 @@ namespace WPFApp.ViewModel.Container
 
             foreach (var slot in slots)
                 block.Slots.Add(slot);
+
+            if (cellStyles != null)
+            {
+                foreach (var style in cellStyles)
+                    block.CellStyles.Add(style);
+            }
 
             return block;
         }
