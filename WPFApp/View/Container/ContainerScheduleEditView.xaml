@@ -1052,38 +1052,62 @@
 
                         <!-- Schedule Matrix (фіксована висота) -->
                         <Border Style="{StaticResource CardStyle}"
-                    Padding="12"
-                    Height="850"
-                    Margin="0,18,12,10">
+        Padding="12"
+        Height="850"
+        Margin="0,18,12,10">
                             <Grid>
                                 <Grid.RowDefinitions>
                                     <RowDefinition Height="Auto" />
                                     <RowDefinition Height="*" />
                                 </Grid.RowDefinitions>
 
-                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                    <Viewbox Width="20" Height="20" Margin="0,0,8,0">
-                                        <Path Data="{StaticResource IconSchedule}" Fill="Black" Stretch="Uniform"
-                                             RenderTransformOrigin="0.5,0.5">
-                                            <Path.RenderTransform>
-                                                <ScaleTransform ScaleX="1" ScaleY="-1" />
-                                            </Path.RenderTransform>
-                                        </Path>
-                                    </Viewbox>
-                                    <TextBlock Text="Schedule Matrix"
-                                   FontFamily="{StaticResource DefaultFontFamily}"
-                                   FontSize="{StaticResource FontSizeTitle}"
-                                   FontWeight="Bold"
-                                   Foreground="Black" />
-                                </StackPanel>
+                                <!-- TOP ROW: title left + buttons right -->
+                                <Grid Grid.Row="0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
 
+                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                        <Viewbox Width="20" Height="20" Margin="0,0,8,0">
+                                            <Path Data="{StaticResource IconSchedule}" Fill="Black" Stretch="Uniform"
+                          RenderTransformOrigin="0.5,0.5">
+                                                <Path.RenderTransform>
+                                                    <ScaleTransform ScaleX="1" ScaleY="-1" />
+                                                </Path.RenderTransform>
+                                            </Path>
+                                        </Viewbox>
+
+                                        <TextBlock Text="Schedule Matrix"
+                           FontFamily="{StaticResource DefaultFontFamily}"
+                           FontSize="{StaticResource FontSizeTitle}"
+                           FontWeight="Bold"
+                           Foreground="Black" />
+                                    </StackPanel>
+
+                                    <StackPanel Grid.Column="1"
+                        Orientation="Horizontal"
+                        VerticalAlignment="Center"
+                        HorizontalAlignment="Right">
+                                        <Button Content="Change Color"
+                        Margin="0,0,8,0"
+                        Command="{Binding SetCellBackgroundColorCommand}"
+                        CommandParameter="{Binding SelectedCellRef}" />
+
+                                        <Button Content="Change Text"
+                        Command="{Binding SetCellTextColorCommand}"
+                        CommandParameter="{Binding SelectedCellRef}" />
+                                    </StackPanel>
+                                </Grid>
+
+                                <!-- MATRIX -->
                                 <DataGrid x:Name="dataGridScheduleMatrix"
-                                      Grid.Row="1"
-                                      Style="{StaticResource ScheduleMatrixCompactGridStyle}"
-                                      CellStyle="{StaticResource ScheduleMatrixCellStyleEditable}"
-                                      IsReadOnly="False"
-                                      AutoGenerateColumns="False"
-                                      CellEditEnding="ScheduleMatrix_CellEditEnding"/>
+                  Grid.Row="1"
+                  Style="{StaticResource ScheduleMatrixCompactGridStyle}"
+                  CellStyle="{StaticResource ScheduleMatrixCellStyleEditable}"
+                  IsReadOnly="False"
+                  AutoGenerateColumns="False"
+                  CellEditEnding="ScheduleMatrix_CellEditEnding"/>
                             </Grid>
                         </Border>
 

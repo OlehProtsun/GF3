@@ -399,9 +399,9 @@ namespace WPFApp.ViewModel.Container
         public AsyncRelayCommand SearchEmployeeCommand { get; }
         public AsyncRelayCommand AddEmployeeCommand { get; }
         public AsyncRelayCommand RemoveEmployeeCommand { get; }
-        public RelayCommand<ScheduleMatrixCellRef> SetCellBackgroundColorCommand { get; }
-        public RelayCommand<ScheduleMatrixCellRef> SetCellTextColorCommand { get; }
-        public RelayCommand<ScheduleMatrixCellRef> ClearCellFormattingCommand { get; }
+        public RelayCommand<ScheduleMatrixCellRef?> SetCellBackgroundColorCommand { get; }
+        public RelayCommand<ScheduleMatrixCellRef?> SetCellTextColorCommand { get; }
+        public RelayCommand<ScheduleMatrixCellRef?> ClearCellFormattingCommand { get; }
 
         public event EventHandler? MatrixChanged;
 
@@ -421,9 +421,9 @@ namespace WPFApp.ViewModel.Container
             AddEmployeeCommand = new AsyncRelayCommand(() => _owner.AddScheduleEmployeeAsync());
             RemoveEmployeeCommand = new AsyncRelayCommand(() => _owner.RemoveScheduleEmployeeAsync());
 
-            SetCellBackgroundColorCommand = new RelayCommand<ScheduleMatrixCellRef>(SetCellBackgroundColor);
-            SetCellTextColorCommand = new RelayCommand<ScheduleMatrixCellRef>(SetCellTextColor);
-            ClearCellFormattingCommand = new RelayCommand<ScheduleMatrixCellRef>(ClearCellFormatting);
+            SetCellBackgroundColorCommand = new RelayCommand<ScheduleMatrixCellRef?>(SetCellBackgroundColor);
+            SetCellTextColorCommand = new RelayCommand<ScheduleMatrixCellRef?>(SetCellTextColor);
+            ClearCellFormattingCommand = new RelayCommand<ScheduleMatrixCellRef?>(ClearCellFormatting);
         }
 
         public Task SelectBlockAsync(ScheduleBlockViewModel block)

@@ -103,7 +103,7 @@ namespace WPFApp.ViewModel.Container
             DeleteCommand = new AsyncRelayCommand(() => _owner.DeleteSelectedScheduleAsync(), () => SelectedItem != null);
             OpenProfileCommand = new AsyncRelayCommand(() => _owner.OpenScheduleProfileAsync(), () => SelectedItem != null);
 
-            ToggleMultiOpenCommand = new RelayCommand(() =>
+            ToggleMultiOpenCommand = new Infrastructure.RelayCommand(() =>
             {
                 IsMultiOpenEnabled = !IsMultiOpenEnabled;
             });
