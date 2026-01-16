@@ -255,7 +255,6 @@ namespace WPFApp.ViewModel.Container
                 SelectedBlock.Model.Shift1Time = value;
                 OnPropertyChanged();
                 ClearValidationErrors(nameof(ScheduleShift1));
-                InvalidateGeneratedScheduleAndClearMatrices();
 
             }
         }
@@ -270,7 +269,6 @@ namespace WPFApp.ViewModel.Container
                 SelectedBlock.Model.Shift2Time = value;
                 OnPropertyChanged();
                 ClearValidationErrors(nameof(ScheduleShift2));
-                InvalidateGeneratedScheduleAndClearMatrices();
 
             }
         }
@@ -382,13 +380,6 @@ namespace WPFApp.ViewModel.Container
 
                 // 2) Availability grid — завантажити одразу
                 _ = LoadAvailabilityPreviewForSelectedGroupAsync();
-
-                // 3) Schedule grid результат стає невалідним (але Availability preview НЕ чіпаємо)
-                if (SelectedBlock?.Slots.Count > 0)
-                    SelectedBlock.Slots.Clear();
-
-                ScheduleMatrix = new DataView();
-                MatrixChanged?.Invoke(this, EventArgs.Empty);
             }
         }
 
@@ -612,6 +603,13 @@ namespace WPFApp.ViewModel.Container
             }
 
             if (ScheduleYear < 1 || ScheduleMonth < 1 || ScheduleMonth > 12)
+            {
+                ScheduleMatrix = new DataView();
+                MatrixChanged?.Invoke(this, EventArgs.Empty);
+                return;
+            }
+
+            if (SelectedBlock.Slots.Count == 0)
             {
                 ScheduleMatrix = new DataView();
                 MatrixChanged?.Invoke(this, EventArgs.Empty);
@@ -1172,31 +1170,44 @@ namespace WPFApp.ViewModel.Container
 
             try
             {
-                await Task.Delay(150, cts.Token); // короткий debounce, щоб не штормило при швидких кліках
+                await Task.Delay(150, cts.Token).ConfigureAwait(false); // короткий debounce, щоб не штормило при швидких кліках
 
                 if (SelectedBlock is null)
                 {
-                    AvailabilityPreviewMatrix = new DataView();
-                    MatrixChanged?.Invoke(this, EventArgs.Empty);
+                    await _owner.RunOnUiThreadAsync(() =>
+                    {
+                        AvailabilityPreviewMatrix = new DataView();
+                        MatrixChanged?.Invoke(this, EventArgs.Empty);
+                    }).ConfigureAwait(false);
                     return;
                 }
 
                 var groupId = SelectedAvailabilityGroup?.Id ?? 0;
                 if (groupId <= 0)
                 {
-                    AvailabilityPreviewMatrix = new DataView();
-                    MatrixChanged?.Invoke(this, EventArgs.Empty);
+                    await _owner.RunOnUiThreadAsync(() =>
+                    {
+                        AvailabilityPreviewMatrix = new DataView();
+                        MatrixChanged?.Invoke(this, EventArgs.Empty);
+                    }).ConfigureAwait(false);
                     return;
                 }
 
                 // тягнемо групу повністю (members + days)
-                var (group, members, days) = await _owner.AvailabilityGroupService_LoadFullAsync(groupId, cts.Token);
+                var (group, members, days) = await _owner.AvailabilityGroupService_LoadFullAsync(groupId, cts.Token)
+                    .ConfigureAwait(false);
+
+                if (SelectedBlock is null || (SelectedAvailabilityGroup?.Id ?? 0) != groupId)
+                    return;
 
                 // якщо група не під цей місяць — просто очистити preview
                 if (group.Year != ScheduleYear || group.Month != ScheduleMonth)
                 {
-                    AvailabilityPreviewMatrix = new DataView();
-                    MatrixChanged?.Invoke(this, EventArgs.Empty);
+                    await _owner.RunOnUiThreadAsync(() =>
+                    {
+                        AvailabilityPreviewMatrix = new DataView();
+                        MatrixChanged?.Invoke(this, EventArgs.Empty);
+                    }).ConfigureAwait(false);
                     return;
                 }
 
@@ -1246,7 +1257,10 @@ namespace WPFApp.ViewModel.Container
                     .Select(g => new ScheduleEmployeeModel { EmployeeId = g.Key, Employee = g.First().Employee })
                     .ToList();
 
-                RefreshAvailabilityPreviewMatrix(group.Year, group.Month, previewSlots, previewEmployees);
+                await _owner.RunOnUiThreadAsync(() =>
+                {
+                    RefreshAvailabilityPreviewMatrix(group.Year, group.Month, previewSlots, previewEmployees);
+                }).ConfigureAwait(false);
             }
             catch (OperationCanceledException) { }
         }
