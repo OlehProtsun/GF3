@@ -313,8 +313,8 @@
 
                     <Separator />
 
-                    <MenuItem Header="Clear Formatting"
-                          Command="{Binding ClearCellFormattingCommand}">
+                    <MenuItem Header="Clear Selected Cell Style"
+                          Command="{Binding ClearSelectedCellStyleCommand}">
                         <MenuItem.CommandParameter>
                             <MultiBinding Converter="{StaticResource ScheduleMatrixCellReferenceConverter}">
                                 <Binding RelativeSource="{RelativeSource AncestorType=ContextMenu}"

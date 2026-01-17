@@ -11,7 +11,7 @@ namespace WPFApp.ViewModel.Container
     {
         private readonly ContainerViewModel _owner;
         private readonly Dictionary<string, int> _colNameToEmpId = new();
-        private readonly Dictionary<(int day, int employeeId), ScheduleCellStyleModel> _cellStyleMap = new();
+        private readonly ScheduleCellStyleStore _cellStyleStore = new();
 
         private int _scheduleId;
         public int ScheduleId
@@ -146,7 +146,7 @@ namespace WPFApp.ViewModel.Container
         }
 
         public bool TryGetCellStyle(ScheduleMatrixCellRef cellRef, out ScheduleCellStyleModel style)
-            => _cellStyleMap.TryGetValue((cellRef.DayOfMonth, cellRef.EmployeeId), out style!);
+            => _cellStyleStore.TryGetStyle(cellRef, out style);
 
         private void RebuildStyleMaps(Dictionary<string, int> colMap, IList<ScheduleCellStyleModel> cellStyles)
         {
@@ -154,11 +154,7 @@ namespace WPFApp.ViewModel.Container
             foreach (var pair in colMap)
                 _colNameToEmpId[pair.Key] = pair.Value;
 
-            _cellStyleMap.Clear();
-            foreach (var style in cellStyles)
-            {
-                _cellStyleMap[(style.DayOfMonth, style.EmployeeId)] = style;
-            }
+            _cellStyleStore.Load(cellStyles);
 
             CellStyleRevision++;
         }

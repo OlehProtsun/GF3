@@ -1200,6 +1200,23 @@
                                                 <TextBlock Text="⋯" FontSize="16" VerticalAlignment="Center" />
                                             </Button>
                                         </Grid>
+
+                                        <Button Style="{StaticResource RoundedButtonStyle}"
+                        Height="32"
+                        Padding="12,0"
+                        Margin="10,0,0,0"
+                        Command="{Binding ClearSelectedCellStyleCommand}"
+                        CommandParameter="{Binding SelectedCellRef}">
+                                            Clear Selected Cell Style
+                                        </Button>
+
+                                        <Button Style="{StaticResource RoundedButtonStyle}"
+                        Height="32"
+                        Padding="12,0"
+                        Margin="10,0,0,0"
+                        Command="{Binding ClearAllScheduleStylesCommand}">
+                                            Clear Entire Schedule Style
+                                        </Button>
                                     </StackPanel>
                                 </Grid>
 
