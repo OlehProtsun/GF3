@@ -96,6 +96,9 @@ namespace WPFApp.View.Container
                         IsReadOnly = true
                     };
 
+                    templateCol.SortMemberPath = dayColName; // ✅ ключ колонки
+
+
                     var gridFactory = new FrameworkElementFactory(typeof(Grid));
 
                     var textFactory = new FrameworkElementFactory(typeof(TextBlock));
@@ -132,12 +135,14 @@ namespace WPFApp.View.Container
 
                 var col = new DataGridTextColumn
                 {
-                    Header = header,
+                    Header = header, // UI
+                    SortMemberPath = column.ColumnName, // ✅ справжній ключ (ColumnName з DataTable)
                     Binding = binding,
                     IsReadOnly = true,
                     Width = new DataGridLength(1, DataGridLengthUnitType.Star),
                     ElementStyle = tbStyle
                 };
+
 
                 grid.Columns.Add(col);
             }

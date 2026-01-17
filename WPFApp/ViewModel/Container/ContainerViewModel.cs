@@ -1,4 +1,9 @@
-﻿using System;
+﻿using BusinessLogicLayer.Availability;
+using BusinessLogicLayer.Generators;
+using BusinessLogicLayer.Services.Abstractions;
+using DataAccessLayer.Models;
+using DataAccessLayer.Models.Enums;
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
@@ -6,11 +11,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
-using BusinessLogicLayer.Availability;
-using BusinessLogicLayer.Generators;
-using BusinessLogicLayer.Services.Abstractions;
-using DataAccessLayer.Models;
-using DataAccessLayer.Models.Enums;
+using System.Windows.Input;
 using WPFApp.Infrastructure;
 using WPFApp.Service;
 using WPFApp.ViewModel.Dialogs;
@@ -583,6 +584,8 @@ namespace WPFApp.ViewModel.Container
 
         internal async Task GenerateScheduleAsync(CancellationToken ct = default)
         {
+            await RunOnUiThreadAsync(() => Keyboard.ClearFocus());
+
             if (ScheduleEditVm.SelectedBlock is null)
                 return;
 

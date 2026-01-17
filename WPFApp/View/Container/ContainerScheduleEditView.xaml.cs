@@ -10,6 +10,7 @@ using System.Windows.Shapes;
 using WPFApp.Service;
 using WPFApp.ViewModel.Container;
 using WPFApp.ViewModel.Dialogs;
+using static WPFApp.ViewModel.Container.ContainerScheduleEditViewModel;
 
 namespace WPFApp.View.Container
 {
@@ -155,6 +156,7 @@ namespace WPFApp.View.Container
                     root.AppendChild(dot);
 
                     templateCol.CellTemplate = new DataTemplate { VisualTree = root };
+                    templateCol.SortMemberPath = dayColName; // <- ДОДАТИ
 
                     grid.Columns.Add(templateCol);
                     continue;
@@ -171,6 +173,7 @@ namespace WPFApp.View.Container
                 var col = new DataGridTextColumn
                 {
                     Header = header,
+                    SortMemberPath = column.ColumnName,   // <- ДОДАТИ
                     Binding = binding,
                     IsReadOnly = isReadOnly || column.ReadOnly,
                     Width = new DataGridLength(1, DataGridLengthUnitType.Star),
@@ -211,6 +214,14 @@ namespace WPFApp.View.Container
         {
             if (_vm is null) return;
 
+            // ✅ стандартне виділення — без втручання
+            if (!Keyboard.Modifiers.HasFlag(ModifierKeys.Alt))
+                return;
+
+            // ✅ paint тільки коли реально увімкнено режим фарбування
+            if (_vm.ActivePaintMode == SchedulePaintMode.None)
+                return;
+
             var cell = FindParent<DataGridCell>(e.OriginalSource as DependencyObject);
             if (cell == null) return;
 
@@ -220,8 +231,13 @@ namespace WPFApp.View.Container
                 ApplyPaint(cellRef);
                 _isPainting = true;
                 _lastPaintedCell = cellRef;
+
+                e.Handled = true; // ✅ щоб DataGrid не “смикав” selection під час paint
             }
         }
+
+
+
 
         private void ScheduleMatrix_MouseMove(object sender, MouseEventArgs e)
         {

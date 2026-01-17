@@ -260,8 +260,7 @@
                     <DataGrid x:Name="dataGridScheduleProfile"
                       Grid.Row="1"
                       Style="{StaticResource ScheduleMatrixCompactGridStyle}"
-                      CellStyle="{StaticResource ScheduleMatrixCellStyleBase}"
-                      ItemsSource="{Binding ScheduleMatrix}"
+                      CellStyle="{StaticResource ScheduleMatrixCellStyleEditable}"                      ItemsSource="{Binding ScheduleMatrix}"
                       IsReadOnly="True"
                       AutoGeneratingColumn="ScheduleMatrix_AutoGeneratingColumn" />
 

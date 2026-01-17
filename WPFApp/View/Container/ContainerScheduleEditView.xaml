@@ -5,6 +5,7 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:controls="clr-namespace:WPFApp.Controls"      
              xmlns:dt="clr-namespace:WPFApp.DesignTime"
+             xmlns:conv="clr-namespace:WPFApp.Converters"
              mc:Ignorable="d"
              d:DesignHeight="2000" d:DesignWidth="852"
              d:DataContext="{d:DesignInstance Type=dt:ContainerScheduleEditDesignVM, IsDesignTimeCreatable=True}"
@@ -12,6 +13,55 @@
 
     <UserControl.Resources>
 
+        <!-- Converters -->
+        <conv:ScheduleMatrixCellBrushConverter x:Key="MatrixCellBgBrushConverter" Kind="Background"/>
+        <conv:ScheduleMatrixCellBrushConverter x:Key="MatrixCellFgBrushConverter" Kind="Foreground"/>
+
+        <!-- ✅ КЛЮЧ: стиль клітинки з нормальним selection -->
+        <Style x:Key="ScheduleMatrixCellStyleEditable"
+       TargetType="{x:Type DataGridCell}"
+       BasedOn="{StaticResource {x:Type DataGridCell}}">
+
+            <!-- твоє кастомне фарбування -->
+            <Setter Property="Background">
+                <Setter.Value>
+                    <MultiBinding Converter="{StaticResource MatrixCellBgBrushConverter}">
+                        <!-- IScheduleMatrixStyleProvider (твій VM) -->
+                        <Binding RelativeSource="{RelativeSource AncestorType=DataGrid}" Path="DataContext"/>
+                        <!-- row item -->
+                        <Binding/>
+                        <!-- column header -->
+                        <Binding RelativeSource="{RelativeSource Self}" Path="Column.SortMemberPath"/>
+                        <!-- ✅ тригер перерахунку після CellStyleRevision++ -->
+                        <Binding RelativeSource="{RelativeSource AncestorType=DataGrid}" Path="DataContext.CellStyleRevision"/>
+                    </MultiBinding>
+                </Setter.Value>
+            </Setter>
+
+            <Setter Property="Foreground">
+                <Setter.Value>
+                    <MultiBinding Converter="{StaticResource MatrixCellFgBrushConverter}">
+                        <Binding RelativeSource="{RelativeSource AncestorType=DataGrid}" Path="DataContext"/>
+                        <Binding/>
+                        <Binding RelativeSource="{RelativeSource Self}" Path="Column.SortMemberPath"/>
+                        <Binding RelativeSource="{RelativeSource AncestorType=DataGrid}" Path="DataContext.CellStyleRevision"/>
+                    </MultiBinding>
+                </Setter.Value>
+            </Setter>
+
+            <!-- ✅ повертаємо виділення -->
+            <Style.Triggers>
+                <Trigger Property="IsSelected" Value="True">
+                    <Setter Property="Background"
+                    Value="{DynamicResource {x:Static SystemColors.HighlightBrushKey}}"/>
+                    <Setter Property="Foreground"
+                    Value="{DynamicResource {x:Static SystemColors.HighlightTextBrushKey}}"/>
+                    <Setter Property="BorderBrush"
+                    Value="{DynamicResource {x:Static SystemColors.HighlightBrushKey}}"/>
+                    <Setter Property="BorderThickness" Value="1"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
 
 
         <!-- Rounded vertical ScrollBar -->
@@ -1155,12 +1205,15 @@
 
                                 <!-- MATRIX -->
                                 <DataGrid x:Name="dataGridScheduleMatrix"
-                  Grid.Row="1"
-                  Style="{StaticResource ScheduleMatrixCompactGridStyle}"
-                  CellStyle="{StaticResource ScheduleMatrixCellStyleEditable}"
-                  IsReadOnly="False"
-                  AutoGenerateColumns="False"
-                  CellEditEnding="ScheduleMatrix_CellEditEnding"/>
+                                  Grid.Row="1"
+                                  Style="{StaticResource ScheduleMatrixCompactGridStyle}"
+                                  CellStyle="{StaticResource ScheduleMatrixCellStyleEditable}"
+                                    SelectionUnit="Cell"
+                                    SelectionMode="Extended"
+
+                                  IsReadOnly="False"
+                                  AutoGenerateColumns="False"
+                                  CellEditEnding="ScheduleMatrix_CellEditEnding"/>
                             </Grid>
                         </Border>
 
