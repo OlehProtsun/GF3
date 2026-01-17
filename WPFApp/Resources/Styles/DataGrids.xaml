@@ -248,23 +248,25 @@
                 <MultiBinding Converter="{StaticResource ScheduleMatrixCellBackgroundConverter}">
                     <Binding RelativeSource="{RelativeSource AncestorType=DataGrid}" Path="DataContext" />
                     <Binding Path="." />
-                    <!-- ✅ було Column.Header -->
                     <Binding RelativeSource="{RelativeSource AncestorType=DataGridCell}" Path="Column.SortMemberPath" />
+                    <Binding RelativeSource="{RelativeSource AncestorType=DataGridCell}" Path="Column.Header" />
                     <Binding RelativeSource="{RelativeSource AncestorType=DataGrid}" Path="DataContext.CellStyleRevision" />
                 </MultiBinding>
             </Setter.Value>
         </Setter>
+
         <Setter Property="Foreground">
             <Setter.Value>
                 <MultiBinding Converter="{StaticResource ScheduleMatrixCellForegroundConverter}">
                     <Binding RelativeSource="{RelativeSource AncestorType=DataGrid}" Path="DataContext" />
                     <Binding Path="." />
-                    <!-- ✅ було Column.Header -->
                     <Binding RelativeSource="{RelativeSource AncestorType=DataGridCell}" Path="Column.SortMemberPath" />
+                    <Binding RelativeSource="{RelativeSource AncestorType=DataGridCell}" Path="Column.Header" />
                     <Binding RelativeSource="{RelativeSource AncestorType=DataGrid}" Path="DataContext.CellStyleRevision" />
                 </MultiBinding>
             </Setter.Value>
         </Setter>
+
     </Style>
 
     <Style x:Key="ScheduleMatrixCellStyleEditable"
@@ -280,18 +282,17 @@
                         <MenuItem.CommandParameter>
                             <MultiBinding Converter="{StaticResource ScheduleMatrixCellReferenceConverter}">
                                 <!-- provider / vm -->
-                                <Binding RelativeSource="{RelativeSource AncestorType=ContextMenu}"
-                                     Path="PlacementTarget.Tag" />
+                                <Binding RelativeSource="{RelativeSource AncestorType=ContextMenu}" Path="PlacementTarget.Tag" />
                                 <!-- row item -->
-                                <Binding RelativeSource="{RelativeSource AncestorType=ContextMenu}"
-                                     Path="PlacementTarget.DataContext" />
-                                <!-- ✅ column key -->
-                                <Binding RelativeSource="{RelativeSource AncestorType=ContextMenu}"
-                                     Path="PlacementTarget.Column.SortMemberPath" />
-                                <!-- ✅ rerender trigger -->
-                                <Binding RelativeSource="{RelativeSource AncestorType=ContextMenu}"
-                                     Path="PlacementTarget.Tag.CellStyleRevision" />
+                                <Binding RelativeSource="{RelativeSource AncestorType=ContextMenu}" Path="PlacementTarget.DataContext" />
+                                <!-- column key: SortMemberPath -->
+                                <Binding RelativeSource="{RelativeSource AncestorType=ContextMenu}" Path="PlacementTarget.Column.SortMemberPath" />
+                                <!-- column key fallback: Header -->
+                                <Binding RelativeSource="{RelativeSource AncestorType=ContextMenu}" Path="PlacementTarget.Column.Header" />
+                                <!-- rerender trigger -->
+                                <Binding RelativeSource="{RelativeSource AncestorType=ContextMenu}" Path="PlacementTarget.Tag.CellStyleRevision" />
                             </MultiBinding>
+
                         </MenuItem.CommandParameter>
                     </MenuItem>
 

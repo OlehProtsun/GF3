@@ -19,14 +19,17 @@ namespace WPFApp.Converters
 
         public object Convert(object[] values, Type targetType, object? parameter, CultureInfo culture)
         {
-            // якщо немає провайдера — для фону все одно даємо Transparent (щоб клітинка ловила клік)
-            if (values.Length < 3 || values[0] is not IScheduleMatrixStyleProvider provider)
+            if (values.Length < 4 || values[0] is not IScheduleMatrixStyleProvider provider)
                 return Kind == ScheduleMatrixBrushKind.Background
                     ? Brushes.Transparent
                     : DependencyProperty.UnsetValue;
 
             var row = values[1];
+
+            // 2 = SortMemberPath, 3 = Header (fallback)
             var columnName = values[2]?.ToString();
+            if (string.IsNullOrWhiteSpace(columnName))
+                columnName = values[3]?.ToString();
 
             if (!provider.TryBuildCellReference(row, columnName, out var cellRef))
                 return Kind == ScheduleMatrixBrushKind.Background
@@ -37,9 +40,6 @@ namespace WPFApp.Converters
                 ? provider.GetCellBackgroundBrush(cellRef)
                 : provider.GetCellForegroundBrush(cellRef);
 
-            // ключовий момент:
-            // - Background: якщо немає стилю — Transparent (hit-test по всій клітинці)
-            // - Foreground: якщо немає стилю — UnsetValue (не ламаємо дефолтний колір тексту)
             if (Kind == ScheduleMatrixBrushKind.Background)
                 return brush ?? Brushes.Transparent;
 

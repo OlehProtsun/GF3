@@ -7,7 +7,7 @@
              xmlns:dt="clr-namespace:WPFApp.DesignTime"
              xmlns:conv="clr-namespace:WPFApp.Converters"
              mc:Ignorable="d"
-             d:DesignHeight="2000" d:DesignWidth="852"
+             d:DesignHeight="2000" d:DesignWidth="2000"
              d:DataContext="{d:DesignInstance Type=dt:ContainerScheduleEditDesignVM, IsDesignTimeCreatable=True}"
              Background="{StaticResource PageBackgroundBrush}">
 

@@ -739,9 +739,10 @@ namespace WPFApp.ViewModel.Container
 
         private void RefreshCellStyleMap()
         {
-            _cellStyleStore.Load(SelectedBlock?.CellStyles ?? Array.Empty<ScheduleCellStyleModel>());
+            _cellStyleStore.Load(SelectedBlock?.CellStyles?.ToArray() ?? Array.Empty<ScheduleCellStyleModel>());
             CellStyleRevision++;
         }
+
 
         public void UpdateSelectedCellRefs(IEnumerable<ScheduleMatrixCellRef> cellRefs)
         {
