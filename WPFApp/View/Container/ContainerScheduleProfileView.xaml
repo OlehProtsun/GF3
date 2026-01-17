@@ -7,29 +7,6 @@
              d:DesignHeight="830" d:DesignWidth="852"
              Background="{StaticResource PageBackgroundBrush}">
 
-    <UserControl.Resources>
-        <BooleanToVisibilityConverter x:Key="BoolToVis" />
-
-        <!-- Шаблон клітинки дня: текст + червона крапка справа -->
-        <DataTemplate x:Key="DayCellTemplate">
-            <Grid>
-                <TextBlock Text="{Binding Text}"
-                       TextWrapping="Wrap"
-                       TextAlignment="Center"
-                       VerticalAlignment="Center"
-                       HorizontalAlignment="Center"/>
-
-                <Ellipse Width="8" Height="8"
-                     Fill="{StaticResource DangerBrush}"
-                     HorizontalAlignment="Right"
-                     VerticalAlignment="Center"
-                     Margin="0,0,4,0"
-                     Visibility="{Binding HasConflict, Converter={StaticResource BoolToVis}}"/>
-            </Grid>
-        </DataTemplate>
-    </UserControl.Resources>
-
-
     <Grid ClipToBounds="False">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
@@ -260,9 +237,10 @@
                     <DataGrid x:Name="dataGridScheduleProfile"
                       Grid.Row="1"
                       Style="{StaticResource ScheduleMatrixCompactGridStyle}"
-                      CellStyle="{StaticResource ScheduleMatrixCellStyleEditable}"                      ItemsSource="{Binding ScheduleMatrix}"
+                      CellStyle="{StaticResource ScheduleMatrixCellStyleBase}"
+                      ItemsSource="{Binding ScheduleMatrix}"
                       IsReadOnly="True"
-                      AutoGeneratingColumn="ScheduleMatrix_AutoGeneratingColumn" />
+                      AutoGenerateColumns="False" />
 
                 </Grid>
             </Border>
