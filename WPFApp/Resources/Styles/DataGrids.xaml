@@ -248,8 +248,8 @@
                 <MultiBinding Converter="{StaticResource ScheduleMatrixCellBackgroundConverter}">
                     <Binding RelativeSource="{RelativeSource AncestorType=DataGrid}" Path="DataContext" />
                     <Binding Path="." />
-                    <Binding RelativeSource="{RelativeSource AncestorType=DataGridCell}" Path="Column.SortMemberPath" />
-                    <Binding RelativeSource="{RelativeSource AncestorType=DataGridCell}" Path="Column.Header" />
+                    <Binding RelativeSource="{RelativeSource Self}" Path="Column.SortMemberPath" />
+                    <Binding RelativeSource="{RelativeSource Self}" Path="Column.Header" />
                     <Binding RelativeSource="{RelativeSource AncestorType=DataGrid}" Path="DataContext.CellStyleRevision" />
                 </MultiBinding>
             </Setter.Value>
@@ -260,8 +260,8 @@
                 <MultiBinding Converter="{StaticResource ScheduleMatrixCellForegroundConverter}">
                     <Binding RelativeSource="{RelativeSource AncestorType=DataGrid}" Path="DataContext" />
                     <Binding Path="." />
-                    <Binding RelativeSource="{RelativeSource AncestorType=DataGridCell}" Path="Column.SortMemberPath" />
-                    <Binding RelativeSource="{RelativeSource AncestorType=DataGridCell}" Path="Column.Header" />
+                    <Binding RelativeSource="{RelativeSource Self}" Path="Column.SortMemberPath" />
+                    <Binding RelativeSource="{RelativeSource Self}" Path="Column.Header" />
                     <Binding RelativeSource="{RelativeSource AncestorType=DataGrid}" Path="DataContext.CellStyleRevision" />
                 </MultiBinding>
             </Setter.Value>
@@ -333,6 +333,18 @@
                 </ContextMenu>
             </Setter.Value>
         </Setter>
+
+        <Style.Triggers>
+            <Trigger Property="IsSelected" Value="True">
+                <Setter Property="Background"
+                        Value="{DynamicResource {x:Static SystemColors.HighlightBrushKey}}" />
+                <Setter Property="Foreground"
+                        Value="{DynamicResource {x:Static SystemColors.HighlightTextBrushKey}}" />
+                <Setter Property="BorderBrush"
+                        Value="{DynamicResource {x:Static SystemColors.HighlightBrushKey}}" />
+                <Setter Property="BorderThickness" Value="1" />
+            </Trigger>
+        </Style.Triggers>
     </Style>
 
     <Style x:Key="MatrixTextBlockStyle" TargetType="TextBlock">
