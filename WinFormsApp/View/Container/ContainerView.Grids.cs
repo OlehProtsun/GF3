@@ -168,6 +168,8 @@ namespace WinFormsApp.View.Container
             if (sender is not DataGridView grid) return;
             if (e.ColumnIndex < 0) return;
 
+            ApplyScheduleCellStyle(grid, e.RowIndex, e.ColumnIndex, e.CellStyle);
+
             var parts = e.PaintParts & ~DataGridViewPaintParts.Border;
             e.Paint(e.CellBounds, parts);
 
