@@ -1,12 +1,12 @@
-﻿using System;
-using System.Collections.Generic;
 using System.ComponentModel;
-using System.Text;
+using System.Threading;
+using System.Windows.Forms;
 using WinFormsApp.ViewModel;
+using WinFormsApp.View.Shared;
 
 namespace WinFormsApp.View.Shop
 {
-    public partial class ShopView : Form, IShopView
+    public partial class ShopView : BusyForm, IShopView
     {
         private readonly CancellationTokenSource _lifetimeCts = new();
         private bool _gridConfigured;
@@ -79,7 +79,6 @@ namespace WinFormsApp.View.Shop
         {
             try { _lifetimeCts.Cancel(); } catch { /* ignore */ }
             _lifetimeCts.Dispose();
-            _busyController.Dispose();
             base.OnFormClosed(e);
         }
     }

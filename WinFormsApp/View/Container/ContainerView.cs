@@ -1,15 +1,10 @@
-﻿using DataAccessLayer.Models;
-using DataAccessLayer.Models.Enums;
-using System.ComponentModel;
-using System.Data;
-using System.Globalization;
-using System.Reflection;
+﻿using System.Reflection;
+using System.Windows.Forms;
 using WinFormsApp.View.Shared;
-using WinFormsApp.ViewModel;
 
 namespace WinFormsApp.View.Container
 {
-    public partial class ContainerView : Form, IContainerView
+    public partial class ContainerView : BusyForm, IContainerView
     {
         public ContainerView()
         {
@@ -20,7 +15,6 @@ namespace WinFormsApp.View.Container
             // Для panel1 (бо в Panel DoubleBuffered protected)
             EnableDoubleBuffer(panel1);
 
-            _busyController = new BusyOverlayController(this);
             WireAutoClearValidation();
 
             _containerErrorMap = CreateContainerErrorMap();
@@ -38,7 +32,6 @@ namespace WinFormsApp.View.Container
             try { _lifetimeCts.Cancel(); } catch { /* ignore */ }
             _lifetimeCts.Dispose();
 
-            _busyController.Dispose();
             _gridVPen.Dispose();
             _gridHPen.Dispose();
             _conflictPen.Dispose();

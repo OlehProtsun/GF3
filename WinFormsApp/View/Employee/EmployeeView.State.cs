@@ -1,12 +1,12 @@
-﻿using System;
-using System.Collections.Generic;
 using System.ComponentModel;
-using System.Text;
+using System.Threading;
+using System.Windows.Forms;
 using WinFormsApp.ViewModel;
+using WinFormsApp.View.Shared;
 
 namespace WinFormsApp.View.Employee
 {
-    public partial class EmployeeView : Form, IEmployeeView
+    public partial class EmployeeView : BusyForm, IEmployeeView
     {
         private readonly CancellationTokenSource _lifetimeCts = new();
         private bool _gridConfigured;
@@ -86,7 +86,6 @@ namespace WinFormsApp.View.Employee
         {
             try { _lifetimeCts.Cancel(); } catch { /* ignore */ }
             _lifetimeCts.Dispose();
-            _busyController.Dispose();
             base.OnFormClosed(e);
         }
     }
