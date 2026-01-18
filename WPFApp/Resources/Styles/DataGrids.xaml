@@ -219,6 +219,13 @@
                     <Setter Property="HorizontalContentAlignment" Value="Center" />
                     <Setter Property="VerticalContentAlignment" Value="Center" />
                     <Setter Property="SnapsToDevicePixels" Value="True" />
+
+                    <!-- ✅ ДОДАЙ -->
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding [IsWeekend]}" Value="True">
+                            <Setter Property="Background" Value="#FFEDEDED"/>
+                        </DataTrigger>
+                    </Style.Triggers>
                 </Style>
             </Setter.Value>
         </Setter>

@@ -27,6 +27,9 @@ namespace WPFApp.ViewModel.Container
         public const string ConflictColumnName = "Conflict";
         public const string EmptyMark = "-";
 
+        // ✅ додай
+        public const string WeekendColumnName = "IsWeekend";
+
         private CancellationTokenSource? _availabilityPreviewCts;
 
         private readonly ContainerViewModel _owner;
@@ -971,6 +974,8 @@ namespace WPFApp.ViewModel.Container
 
             table.Columns.Add(DayColumnName, typeof(int));
             table.Columns.Add(ConflictColumnName, typeof(bool));
+            // ✅ ДОДАЙ (прихована технічна колонка для RowStyle)
+            table.Columns.Add(WeekendColumnName, typeof(bool));
 
             foreach (var emp in employees)
             {
@@ -998,6 +1003,10 @@ namespace WPFApp.ViewModel.Container
                 var row = table.NewRow();
                 row[DayColumnName] = day;
                 row[ConflictColumnName] = daySlots?.Any(s => s.EmployeeId == null) ?? false;
+
+                // ✅ ДОДАЙ
+                var dow = new DateTime(year, month, day).DayOfWeek;
+                row[WeekendColumnName] = (dow == DayOfWeek.Saturday || dow == DayOfWeek.Sunday);
 
                 foreach (var (colName, empId) in colNameToEmpId)
                 {

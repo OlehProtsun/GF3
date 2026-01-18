@@ -1,4 +1,4 @@
-using System.Data;
+﻿using System.Data;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
@@ -26,6 +26,9 @@ namespace WPFApp.View.Container
             var dayColName = ContainerScheduleEditViewModel.DayColumnName;
             var conflictColName = ContainerScheduleEditViewModel.ConflictColumnName;
 
+            // ✅ додай
+            var weekendColName = ContainerScheduleEditViewModel.WeekendColumnName;
+
             var tbStyle = (Style)Application.Current.FindResource("MatrixCellTextBlockStyle");
             var editStyle = isReadOnly
                 ? null
@@ -35,7 +38,8 @@ namespace WPFApp.View.Container
 
             foreach (DataColumn column in table.Columns)
             {
-                if (column.ColumnName == conflictColName)
+                // ✅ було: if (column.ColumnName == conflictColName) continue;
+                if (column.ColumnName == conflictColName || column.ColumnName == weekendColName)
                     continue;
 
                 var header = string.IsNullOrWhiteSpace(column.Caption) ? column.ColumnName : column.Caption;
