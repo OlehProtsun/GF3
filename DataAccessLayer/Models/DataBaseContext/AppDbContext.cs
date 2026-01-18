@@ -18,6 +18,7 @@ namespace DataAccessLayer.Models.DataBaseContext
         public DbSet<ScheduleModel> Schedules => Set<ScheduleModel>();
         public DbSet<ScheduleEmployeeModel> ScheduleEmployees => Set<ScheduleEmployeeModel>();
         public DbSet<ScheduleSlotModel> ScheduleSlots => Set<ScheduleSlotModel>();
+        public DbSet<ScheduleCellStyleModel> ScheduleCellStyles => Set<ScheduleCellStyleModel>();
         public DbSet<BindModel> AvailabilityBinds => Set<BindModel>();
         public DbSet<AvailabilityGroupModel> AvailabilityGroups => Set<AvailabilityGroupModel>();
         public DbSet<AvailabilityGroupMemberModel> AvailabilityGroupMembers => Set<AvailabilityGroupMemberModel>();
@@ -143,6 +144,19 @@ namespace DataAccessLayer.Models.DataBaseContext
                         "from_time < to_time"
                     );
                 });
+            });
+
+            // ----- ScheduleCellStyle
+            modelBuilder.Entity<ScheduleCellStyleModel>(e =>
+            {
+                e.HasOne(sc => sc.Schedule)
+                 .WithMany(s => s.CellStyles)
+                 .HasForeignKey(sc => sc.ScheduleId)
+                 .OnDelete(DeleteBehavior.Cascade);
+
+                e.HasIndex(sc => new { sc.ScheduleId, sc.DayOfMonth, sc.EmployeeId })
+                 .IsUnique()
+                 .HasDatabaseName("ux_sched_cell_style");
             });
 
             // ----- AvailabilityBind

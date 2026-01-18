@@ -224,6 +224,42 @@ namespace DataAccessLayer.Migrations
                     b.ToTable("schedule_employee");
                 });
 
+            modelBuilder.Entity("DataAccessLayer.Models.ScheduleCellStyleModel", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("id");
+
+                    b.Property<string>("BackgroundHex")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("background_hex");
+
+                    b.Property<int>("DayOfMonth")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("day_of_month");
+
+                    b.Property<int>("EmployeeId")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("employee_id");
+
+                    b.Property<string>("ForegroundHex")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("foreground_hex");
+
+                    b.Property<int>("ScheduleId")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("schedule_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ScheduleId", "DayOfMonth", "EmployeeId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_sched_cell_style");
+
+                    b.ToTable("schedule_cell_style");
+                });
+
             modelBuilder.Entity("DataAccessLayer.Models.ScheduleModel", b =>
                 {
                     b.Property<int>("Id")
@@ -468,6 +504,17 @@ namespace DataAccessLayer.Migrations
                     b.Navigation("Schedule");
                 });
 
+            modelBuilder.Entity("DataAccessLayer.Models.ScheduleCellStyleModel", b =>
+                {
+                    b.HasOne("DataAccessLayer.Models.ScheduleModel", "Schedule")
+                        .WithMany("CellStyles")
+                        .HasForeignKey("ScheduleId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Schedule");
+                });
+
             modelBuilder.Entity("DataAccessLayer.Models.ScheduleModel", b =>
                 {
                     b.HasOne("DataAccessLayer.Models.ContainerModel", "Container")
@@ -530,6 +577,8 @@ namespace DataAccessLayer.Migrations
             modelBuilder.Entity("DataAccessLayer.Models.ScheduleModel", b =>
                 {
                     b.Navigation("Employees");
+
+                    b.Navigation("CellStyles");
 
                     b.Navigation("Slots");
                 });

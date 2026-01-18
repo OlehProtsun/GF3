@@ -83,9 +83,7 @@ namespace WinFormsApp.View.Container
         {
             var table = BuildScheduleTable(year, month, slots, employees, out var map);
 
-            // map потрібний тільки для editable grid (slotGrid)
-            if (!readOnly)
-                _colNameToEmpId = map;
+            _colNameToEmpId = map;
 
             grid.SuspendLayout();
             try

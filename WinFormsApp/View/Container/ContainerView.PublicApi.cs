@@ -157,6 +157,20 @@ namespace WinFormsApp.View.Container
         }
 
         [DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
+        public IList<ScheduleCellStyleModel> ScheduleCellStyles
+        {
+            get => _cellStyles;
+            set
+            {
+                _cellStyles.Clear();
+                if (value != null) _cellStyles.AddRange(value);
+                RebuildCellStyleLookup();
+                RequestScheduleGridRefresh();
+                RefreshScheduleProfileIfOpened();
+            }
+        }
+
+        [DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
         public IList<ScheduleEmployeeModel> ScheduleEmployees
         {
             get => _employees;

@@ -86,6 +86,9 @@ namespace WinFormsApp.View.Container
             grid.DataError -= SlotGrid_DataError;
             grid.DataError += SlotGrid_DataError;
 
+            grid.CellFormatting -= ScheduleGrid_CellFormatting;
+            grid.CellFormatting += ScheduleGrid_CellFormatting;
+
             if (!readOnly)
             {
                 grid.CellBeginEdit -= SlotGrid_CellBeginEdit;

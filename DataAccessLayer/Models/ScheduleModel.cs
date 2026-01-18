@@ -79,5 +79,6 @@ namespace DataAccessLayer.Models
 
         public ICollection<ScheduleEmployeeModel> Employees { get; set; } = new List<ScheduleEmployeeModel>();
         public ICollection<ScheduleSlotModel> Slots { get; set; } = new List<ScheduleSlotModel>();
+        public ICollection<ScheduleCellStyleModel> CellStyles { get; set; } = new List<ScheduleCellStyleModel>();
     }
 }
