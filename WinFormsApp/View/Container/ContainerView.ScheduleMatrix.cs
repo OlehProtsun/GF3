@@ -83,7 +83,7 @@ namespace WinFormsApp.View.Container
         {
             var table = BuildScheduleTable(year, month, slots, employees, out var map);
 
-            _colNameToEmpId = map;
+            RegisterMatrixGridMetadata(grid, map, year, month);
 
             grid.SuspendLayout();
             try
@@ -133,6 +133,9 @@ namespace WinFormsApp.View.Container
                 table.Columns.Add(columnName, typeof(string));
                 colNameToEmpId[columnName] = emp.EmployeeId;
             }
+
+            if (year <= 0 || month < 1 || month > 12)
+                return table;
 
             // ✅ завжди будуємо всі дні місяця
             var daysInMonth = DateTime.DaysInMonth(year, month);
@@ -191,6 +194,54 @@ namespace WinFormsApp.View.Container
 
             return table;
 
+        }
+
+        private void RegisterMatrixGridMetadata(
+            DataGridView grid,
+            Dictionary<string, int> columnMap,
+            int year,
+            int month)
+        {
+            _gridColumnToEmpId[grid] = columnMap;
+            _gridYearMonth[grid] = (year, month);
+        }
+
+        private bool TryGetColumnMap(DataGridView grid, out Dictionary<string, int> map)
+            => _gridColumnToEmpId.TryGetValue(grid, out map);
+
+        private bool TryGetGridYearMonth(DataGridView grid, out int year, out int month)
+        {
+            if (_gridYearMonth.TryGetValue(grid, out var pair))
+            {
+                year = pair.year;
+                month = pair.month;
+                return true;
+            }
+
+            year = ScheduleYear;
+            month = ScheduleMonth;
+            return year > 0 && month > 0;
+        }
+
+        private bool IsWeekendCached(int year, int month, int day)
+        {
+            if (year <= 0 || month < 1 || month > 12 || day <= 0)
+                return false;
+
+            if (!_weekendDaysCache.TryGetValue((year, month), out var weekendDays))
+            {
+                weekendDays = new HashSet<int>();
+                var daysInMonth = DateTime.DaysInMonth(year, month);
+                for (var d = 1; d <= daysInMonth; d++)
+                {
+                    if (ScheduleCellStyleResolver.IsWeekend(year, month, d))
+                        weekendDays.Add(d);
+                }
+
+                _weekendDaysCache[(year, month)] = weekendDays;
+            }
+
+            return weekendDays.Contains(day);
         }
 
         private static void CancelGridEditSafely(DataGridView grid)
@@ -285,7 +336,7 @@ namespace WinFormsApp.View.Container
             var colName = slotGrid.Columns[e.ColumnIndex].Name;
             if (colName == DayCol || colName == ConflictCol) return;
 
-            if (!_colNameToEmpId.TryGetValue(colName, out var empId))
+            if (!TryGetColumnMap(slotGrid, out var map) || !map.TryGetValue(colName, out var empId))
                 return;
 
             var day = (int)rowView[DayCol];

@@ -129,7 +129,7 @@ namespace WinFormsApp.View.Container
             if (string.IsNullOrWhiteSpace(colName) || colName == DayCol || colName == ConflictCol)
                 return false;
 
-            if (!_colNameToEmpId.TryGetValue(colName, out empId))
+            if (!TryGetColumnMap(slotGrid, out var map) || !map.TryGetValue(colName, out empId))
                 return false;
 
             var rawDay = cell.OwningRow?.Cells[DayCol]?.Value?.ToString();
@@ -212,17 +212,16 @@ namespace WinFormsApp.View.Container
             if (rowView[DayCol] is not int day || day <= 0)
                 return;
 
-            var year = ScheduleYear;
-            var month = ScheduleMonth;
-            if (year <= 0 || month <= 0) return;
+            if (!TryGetGridYearMonth(grid, out var year, out var month))
+                return;
 
-            var isWeekend = ScheduleCellStyleResolver.IsWeekend(year, month, day);
+            var isWeekend = IsWeekendCached(year, month, day);
             var columnName = grid.Columns[columnIndex].Name;
 
             ScheduleCellStyleModel? overrideStyle = null;
             if (!string.IsNullOrWhiteSpace(columnName) && columnName != DayCol && columnName != ConflictCol)
             {
-                if (_colNameToEmpId.TryGetValue(columnName, out var empId))
+                if (TryGetColumnMap(grid, out var map) && map.TryGetValue(columnName, out var empId))
                     overrideStyle = GetOverrideStyle(day, empId);
             }
 

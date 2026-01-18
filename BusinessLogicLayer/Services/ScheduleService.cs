@@ -55,6 +55,10 @@ namespace BusinessLogicLayer.Services
         {
             NormalizeSchedule(schedule);
 
+            var employeeList = employees?.ToList() ?? new List<ScheduleEmployeeModel>();
+            var slotList = slots?.ToList() ?? new List<ScheduleSlotModel>();
+            var cellStyleList = cellStyles?.ToList() ?? new List<ScheduleCellStyleModel>();
+
             if (schedule.Id == 0)
                 schedule = await _scheduleRepo.AddAsync(schedule, ct).ConfigureAwait(false);
             else
@@ -63,17 +67,16 @@ namespace BusinessLogicLayer.Services
             var scheduleId = schedule.Id;
 
             // ВАЖЛИВО: не даємо EF інсертити Employee ще раз
-            foreach (var e in employees)
+            foreach (var e in employeeList)
             {
                 e.Employee = null!; // навігація не потрібна при збереженні
             }
 
-            foreach (var s in slots)
+            foreach (var s in slotList)
             {
                 s.Employee = null;
             }
 
-            var cellStyleList = cellStyles?.ToList() ?? new List<ScheduleCellStyleModel>();
 #if DEBUG
             Debug.WriteLine($"[ScheduleService] Saving {cellStyleList.Count} cell styles for schedule {scheduleId}");
             foreach (var style in cellStyleList.Take(3))
@@ -89,7 +92,7 @@ namespace BusinessLogicLayer.Services
             foreach (var e in existingEmployees)
                 await _employeeRepo.DeleteAsync(e.Id, ct).ConfigureAwait(false);
 
-            foreach (var e in employees)
+            foreach (var e in employeeList)
             {
                 e.Id = 0;
                 e.ScheduleId = scheduleId;
@@ -101,7 +104,7 @@ namespace BusinessLogicLayer.Services
             foreach (var s in existingSlots)
                 await _slotRepo.DeleteAsync(s.Id, ct).ConfigureAwait(false);
 
-            foreach (var s in slots)
+            foreach (var s in slotList)
             {
                 s.Id = 0;
                 s.ScheduleId = scheduleId;
