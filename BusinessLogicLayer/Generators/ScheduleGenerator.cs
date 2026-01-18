@@ -1,5 +1,6 @@
 ﻿using DataAccessLayer.Models;
 using DataAccessLayer.Models.Enums;
+using System.Diagnostics;
 
 namespace BusinessLogicLayer.Generators
 {
@@ -84,6 +85,14 @@ namespace BusinessLogicLayer.Generators
             for (var day = 1; day <= daysInMonth; day++)
             {
                 ct.ThrowIfCancellationRequested();
+#if DEBUG
+                if (day <= 7)
+                {
+                    var date = new DateTime(schedule.Year, schedule.Month, day);
+                    var isWeekend = date.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday;
+                    Debug.WriteLine($"[ScheduleGenerator] {date:yyyy-MM-dd} {date.DayOfWeek} weekend={isWeekend}");
+                }
+#endif
 
                 // хто в принципі може працювати в цей день
                 var availableToday = new List<int>(employeeIds.Count);

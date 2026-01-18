@@ -2,6 +2,8 @@
 using DataAccessLayer.Models;
 using DataAccessLayer.Repositories.Abstractions;
 using System.Collections.Generic;
+using System.Diagnostics;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -71,6 +73,17 @@ namespace BusinessLogicLayer.Services
                 s.Employee = null;
             }
 
+            var cellStyleList = cellStyles?.ToList() ?? new List<ScheduleCellStyleModel>();
+#if DEBUG
+            Debug.WriteLine($"[ScheduleService] Saving {cellStyleList.Count} cell styles for schedule {scheduleId}");
+            foreach (var style in cellStyleList.Take(3))
+            {
+                Debug.WriteLine(
+                    $"[ScheduleService] Style save day={style.DayOfMonth} emp={style.EmployeeId} " +
+                    $"bg={style.BackgroundHex ?? "none"} fg={style.ForegroundHex ?? "none"}");
+            }
+#endif
+
             // replace employees
             var existingEmployees = await _employeeRepo.GetByScheduleAsync(scheduleId, ct).ConfigureAwait(false);
             foreach (var e in existingEmployees)
@@ -100,7 +113,7 @@ namespace BusinessLogicLayer.Services
             foreach (var style in existingStyles)
                 await _cellStyleRepo.DeleteAsync(style.Id, ct).ConfigureAwait(false);
 
-            foreach (var style in cellStyles)
+            foreach (var style in cellStyleList)
             {
                 style.Id = 0;
                 style.ScheduleId = scheduleId;
@@ -121,6 +134,16 @@ namespace BusinessLogicLayer.Services
             schedule.Employees = (await _employeeRepo.GetByScheduleAsync(id, ct).ConfigureAwait(false)).ToList();
             schedule.Slots = (await _slotRepo.GetByScheduleAsync(id, ct).ConfigureAwait(false)).ToList();
             schedule.CellStyles = (await _cellStyleRepo.GetByScheduleAsync(id, ct).ConfigureAwait(false)).ToList();
+
+#if DEBUG
+            Debug.WriteLine($"[ScheduleService] Loaded {schedule.CellStyles.Count} cell styles for schedule {id}");
+            foreach (var style in schedule.CellStyles.Take(3))
+            {
+                Debug.WriteLine(
+                    $"[ScheduleService] Style load day={style.DayOfMonth} emp={style.EmployeeId} " +
+                    $"bg={style.BackgroundHex ?? "none"} fg={style.ForegroundHex ?? "none"}");
+            }
+#endif
 
             return schedule;
         }

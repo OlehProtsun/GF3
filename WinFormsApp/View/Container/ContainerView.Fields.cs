@@ -42,6 +42,9 @@ namespace WinFormsApp.View.Container
         private readonly List<ScheduleSlotModel> _slots = new();
         private readonly List<ScheduleEmployeeModel> _employees = new();
         private readonly List<ScheduleCellStyleModel> _cellStyles = new();
+#if DEBUG
+        private int _weekendStyleLogCount;
+#endif
 
         // Schedule info (guna2GroupBox5) collapse/expand
         private bool _scheduleInfoExpanded = false;
