@@ -14,7 +14,10 @@ namespace WinFormsApp.View.Shared
         private Guna2GroupBox? _busyBox;
         private Guna2CircleProgressBar? _busyCircle;
         private Label? _busyText;
+        private Guna2Button? _busyCancelButton;
         private System.Windows.Forms.Timer? _busyTimer;
+        private CancellationTokenSource? _activeCts;
+        private string _busyTextBase = "Loading...";
         private bool _disposed;
 
         public BusyOverlayController(Form host)
@@ -24,7 +27,7 @@ namespace WinFormsApp.View.Shared
 
         public void ShowBusy(string? text = null)
         {
-            _ = InvokeAsync(() => ShowBusyCore(text));
+            _ = InvokeAsync(() => ShowBusyCore(text, null));
         }
 
         public void HideBusy()
@@ -37,20 +40,30 @@ namespace WinFormsApp.View.Shared
             CancellationToken ct,
             string? text = null,
             Action<bool>? setUiEnabled = null)
+            => await RunBusyAsync((innerCt, _) => action(innerCt), ct, text, setUiEnabled);
+
+        public async Task RunBusyAsync(
+            Func<CancellationToken, IProgress<int>?, Task> action,
+            CancellationToken ct,
+            string? text = null,
+            Action<bool>? setUiEnabled = null)
         {
             if (action is null) throw new ArgumentNullException(nameof(action));
             if (ct.IsCancellationRequested) return;
 
+            using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            var progress = new Progress<int>(value => _ = InvokeAsync(() => SetProgressCore(value)));
+
             await InvokeAsync(() =>
             {
                 setUiEnabled?.Invoke(false);
-                ShowBusyCore(text);
+                ShowBusyCore(text, linkedCts);
             });
 
             try
             {
                 await Task.Yield();
-                await action(ct);
+                await action(linkedCts.Token, progress);
             }
             finally
             {
@@ -75,15 +88,18 @@ namespace WinFormsApp.View.Shared
             _busyBox = null;
             _busyCircle = null;
             _busyText = null;
+            _busyCancelButton = null;
         }
 
-        private void ShowBusyCore(string? text)
+        private void ShowBusyCore(string? text, CancellationTokenSource? cts)
         {
             if (_disposed || _host.IsDisposed || _host.Disposing) return;
 
             EnsureOverlay();
 
-            _busyText!.Text = string.IsNullOrWhiteSpace(text) ? "Loading..." : text;
+            _activeCts = cts;
+            _busyTextBase = string.IsNullOrWhiteSpace(text) ? "Loading..." : text;
+            _busyText!.Text = _busyTextBase;
             _host.Cursor = Cursors.WaitCursor;
 
             _busyOverlay!.Visible = true;
@@ -91,6 +107,7 @@ namespace WinFormsApp.View.Shared
 
             _busyCircle!.Value = 0;
             _busyTimer!.Start();
+            _busyCancelButton!.Visible = cts != null && cts.Token.CanBeCanceled;
 
             _busyOverlay.Update();
         }
@@ -100,11 +117,22 @@ namespace WinFormsApp.View.Shared
             if (_disposed || _host.IsDisposed || _host.Disposing) return;
 
             _busyTimer?.Stop();
+            _activeCts = null;
 
             if (_busyOverlay != null)
                 _busyOverlay.Visible = false;
 
             _host.Cursor = Cursors.Default;
+        }
+
+        private void SetProgressCore(int value)
+        {
+            if (_disposed || _busyCircle == null || _busyText == null) return;
+
+            value = Math.Max(_busyCircle.Minimum, Math.Min(_busyCircle.Maximum, value));
+            _busyTimer?.Stop();
+            _busyCircle.Value = value;
+            _busyText.Text = $"{_busyTextBase} ({value}%)";
         }
 
         private void EnsureOverlay()
@@ -142,6 +170,20 @@ namespace WinFormsApp.View.Shared
                 Text = ""
             };
 
+            _busyCancelButton = new Guna2Button
+            {
+                BorderRadius = 10,
+                FillColor = Color.WhiteSmoke,
+                Font = new Font("Segoe UI", 9F, FontStyle.Bold),
+                ForeColor = Color.Black,
+                Location = new Point(160, 14),
+                Name = "busyCancelButton",
+                Size = new Size(70, 26),
+                Text = "Cancel",
+                Visible = false
+            };
+            _busyCancelButton.Click += (_, __) => _activeCts?.Cancel();
+
             _busyBox = new Guna2GroupBox
             {
                 BackColor = Color.Transparent,
@@ -152,7 +194,7 @@ namespace WinFormsApp.View.Shared
                 Font = new Font("Segoe UI", 9F),
                 ForeColor = Color.White,
                 Name = "busyBox",
-                Size = new Size(250, 53),
+                Size = new Size(260, 60),
                 Text = ""
             };
 
@@ -162,6 +204,7 @@ namespace WinFormsApp.View.Shared
 
             _busyBox.Controls.Add(_busyText);
             _busyBox.Controls.Add(_busyCircle);
+            _busyBox.Controls.Add(_busyCancelButton);
 
             _busyOverlay.Controls.Add(_busyBox);
 

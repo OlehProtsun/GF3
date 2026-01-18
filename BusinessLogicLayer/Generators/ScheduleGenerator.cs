@@ -11,6 +11,7 @@ namespace BusinessLogicLayer.Generators
             ScheduleModel schedule,
             IEnumerable<AvailabilityGroupModel> availabilities,
             IEnumerable<ScheduleEmployeeModel> employees,
+            IProgress<int>? progress = null,
             CancellationToken ct = default);
     }
 
@@ -48,7 +49,16 @@ namespace BusinessLogicLayer.Generators
             ScheduleModel schedule,
             IEnumerable<AvailabilityGroupModel> availabilities,
             IEnumerable<ScheduleEmployeeModel> employees,
+            IProgress<int>? progress = null,
             CancellationToken ct = default)
+            => Task.Run(() => GenerateCore(schedule, availabilities, employees, progress, ct), ct);
+
+        private static IList<ScheduleSlotModel> GenerateCore(
+            ScheduleModel schedule,
+            IEnumerable<AvailabilityGroupModel> availabilities,
+            IEnumerable<ScheduleEmployeeModel> employees,
+            IProgress<int>? progress,
+            CancellationToken ct)
         {
             var result = new List<ScheduleSlotModel>();
 
@@ -62,12 +72,12 @@ namespace BusinessLogicLayer.Generators
             }
 
             if (employeeIds.Count == 0)
-                return Task.FromResult<IList<ScheduleSlotModel>>(result);
+                return result;
 
             // шаблони змін із Schedule.Shift1Time / Shift2Time
             var shiftTemplates = GetShiftTemplates(schedule);
             if (shiftTemplates.Count == 0)
-                return Task.FromResult<IList<ScheduleSlotModel>>(result);
+                return result;
 
             // черга для fair-розподілу
             var employeeQueue = new Queue<int>(employeeIds);
@@ -82,9 +92,18 @@ namespace BusinessLogicLayer.Generators
             var availabilityIndex = BuildAvailabilityIndex(availabilities, schedule.Year, schedule.Month);
 
 
+            progress?.Report(0);
+            var lastPercent = -1;
+
             for (var day = 1; day <= daysInMonth; day++)
             {
                 ct.ThrowIfCancellationRequested();
+                var percent = (int)Math.Round(day * 100d / daysInMonth);
+                if (percent != lastPercent)
+                {
+                    lastPercent = percent;
+                    progress?.Report(percent);
+                }
 #if DEBUG
                 if (day <= 7)
                 {
@@ -152,7 +171,8 @@ namespace BusinessLogicLayer.Generators
                 }
             }
 
-            return Task.FromResult<IList<ScheduleSlotModel>>(result);
+            progress?.Report(100);
+            return result;
         }
 
 

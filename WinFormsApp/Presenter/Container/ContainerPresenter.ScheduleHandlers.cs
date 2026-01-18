@@ -11,8 +11,16 @@ namespace WinFormsApp.Presenter.Container
 {
     public sealed partial class ContainerPresenter
     {
-        private async Task<IList<AvailabilityGroupModel>> LoadLookupsAsync(CancellationToken ct)
+        private async Task<IList<AvailabilityGroupModel>> LoadLookupsAsync(CancellationToken ct, bool forceReload = false)
         {
+            if (_lookupsLoaded && !forceReload)
+            {
+                _view.SetAvailabilityGroupList(_allAvailabilityGroups);
+                _view.SetShopList(_allShops);
+                _view.SetEmployeeList(_allEmployees);
+                return _allAvailabilityGroups;
+            }
+
             var groups = (await _availabilityGroupService.GetAllAsync(ct)).ToList();
             var shops = await _shopService.GetAllAsync(ct);
             var employees = await _employeeService.GetAllAsync(ct);
@@ -29,6 +37,7 @@ namespace WinFormsApp.Presenter.Container
             _view.SetAvailabilityGroupList(groups);
             _view.SetShopList(shops);
             _view.SetEmployeeList(employees);
+            _lookupsLoaded = true;
 
             return groups;
         }
@@ -74,7 +83,6 @@ namespace WinFormsApp.Presenter.Container
 
             if (schedule is null) return;
 
-            await LoadLookupsAsync(ct);
             ResetScheduleEditFilters();
 
             var detailed = await _scheduleService.GetDetailedAsync(schedule.Id, ct);
@@ -271,7 +279,7 @@ namespace WinFormsApp.Presenter.Container
             _view.SwitchToScheduleProfileMode();
         }
 
-        private async Task OnScheduleGenerateCoreAsync(CancellationToken ct)
+        private async Task OnScheduleGenerateCoreAsync(CancellationToken ct, IProgress<int>? progress)
         {
             var model = BuildScheduleFromView();
 
@@ -340,7 +348,7 @@ namespace WinFormsApp.Presenter.Container
                 return;
             }
 
-            var slots = await _generator.GenerateAsync(model, fullGroups, employees, ct);
+            var slots = await _generator.GenerateAsync(model, fullGroups, employees, progress, ct);
 
             _view.ScheduleShift1 = model.Shift1Time;
             _view.ScheduleShift2 = model.Shift2Time;
@@ -370,75 +378,87 @@ namespace WinFormsApp.Presenter.Container
             (string from, string to)? shift1 = TrySplitShift(_view.ScheduleShift1);
             (string from, string to)? shift2 = TrySplitShift(_view.ScheduleShift2);
 
+            var (group, members, days) = await _availabilityGroupService.LoadFullAsync(selectedGroupId, ct);
+            var preview = await Task.Run(() => BuildAvailabilityPreview(
+                year,
+                month,
+                group,
+                members,
+                days,
+                shift1,
+                shift2,
+                ct), ct);
+
+            _view.SetAvailabilityPreviewMatrix(year, month, preview.Slots, preview.Employees);
+        }
+
+        private static AvailabilityPreviewResult BuildAvailabilityPreview(
+            int year,
+            int month,
+            AvailabilityGroupModel group,
+            IList<AvailabilityGroupMemberModel> members,
+            IList<AvailabilityGroupDayModel> days,
+            (string from, string to)? shift1,
+            (string from, string to)? shift2,
+            CancellationToken ct)
+        {
             var employees = new List<ScheduleEmployeeModel>();
             var slots = new List<ScheduleSlotModel>();
             var seenEmp = new HashSet<int>();
-            var seenSlot = new HashSet<string>(); // щоб не дублювати інтервали між групами
+            var seenSlot = new HashSet<string>();
 
-            foreach (var groupId in new[] { selectedGroupId })
+            if (group.Year != year || group.Month != month)
+                return new AvailabilityPreviewResult(employees, slots);
+
+            var daysByMember = days
+                .GroupBy(d => d.AvailabilityGroupMemberId)
+                .ToDictionary(g => g.Key, g => g.ToList());
+
+            foreach (var m in members)
             {
                 ct.ThrowIfCancellationRequested();
 
-                var (group, members, days) = await _availabilityGroupService.LoadFullAsync(groupId, ct);
+                if (seenEmp.Add(m.EmployeeId))
+                {
+                    employees.Add(new ScheduleEmployeeModel
+                    {
+                        EmployeeId = m.EmployeeId,
+                        Employee = m.Employee
+                    });
+                }
 
-                // тільки потрібний місяць/рік
-                if (group.Year != year || group.Month != month)
+                if (!daysByMember.TryGetValue(m.Id, out var mdays) || mdays.Count == 0)
                     continue;
 
-                var daysByMember = days
-                    .GroupBy(d => d.AvailabilityGroupMemberId)
-                    .ToDictionary(g => g.Key, g => g.ToList());
-
-                foreach (var m in members)
+                foreach (var d in mdays)
                 {
-                    // employees для заголовків колонок (важливо щоб Employee був підвантажений, бо BuildScheduleTable бере FirstName/LastName)
-                    if (seenEmp.Add(m.EmployeeId))
-                    {
-                        employees.Add(new ScheduleEmployeeModel
-                        {
-                            EmployeeId = m.EmployeeId,
-                            Employee = m.Employee
-                        });
-                    }
-
-                    if (!daysByMember.TryGetValue(m.Id, out var mdays) || mdays.Count == 0)
+                    if (d.Kind == AvailabilityKind.NONE)
                         continue;
 
-                    foreach (var d in mdays)
+                    if (d.Kind == AvailabilityKind.INT)
                     {
-                        // NONE -> пусто
-                        if (d.Kind == AvailabilityKind.NONE)
+                        if (string.IsNullOrWhiteSpace(d.IntervalStr))
                             continue;
 
-                        // INT -> 1 інтервал з IntervalStr
-                        if (d.Kind == AvailabilityKind.INT)
-                        {
-                            if (string.IsNullOrWhiteSpace(d.IntervalStr))
-                                continue;
-
-                            // на всякий випадок проганяємо нормалізацію
-                            if (!AvailabilityCodeParser.TryNormalizeInterval(d.IntervalStr, out var normalized))
-                                continue;
-
-                            if (TrySplitInterval(normalized, out var from, out var to))
-                                AddSlotUnique(m.EmployeeId, d.DayOfMonth, from, to);
-
+                        if (!AvailabilityCodeParser.TryNormalizeInterval(d.IntervalStr, out var normalized))
                             continue;
-                        }
 
-                        // ANY -> показуємо shift1 + shift2 (якщо вони валідні)
-                        if (d.Kind == AvailabilityKind.ANY)
-                        {
-                            if (shift1 != null) AddSlotUnique(m.EmployeeId, d.DayOfMonth, shift1.Value.from, shift1.Value.to);
-                            if (shift2 != null) AddSlotUnique(m.EmployeeId, d.DayOfMonth, shift2.Value.from, shift2.Value.to);
-                        }
+                        if (TrySplitInterval(normalized, out var from, out var to))
+                            AddSlotUnique(m.EmployeeId, d.DayOfMonth, from, to);
+
+                        continue;
+                    }
+
+                    if (d.Kind == AvailabilityKind.ANY)
+                    {
+                        if (shift1 != null) AddSlotUnique(m.EmployeeId, d.DayOfMonth, shift1.Value.from, shift1.Value.to);
+                        if (shift2 != null) AddSlotUnique(m.EmployeeId, d.DayOfMonth, shift2.Value.from, shift2.Value.to);
                     }
                 }
             }
 
-            _view.SetAvailabilityPreviewMatrix(year, month, slots, employees);
+            return new AvailabilityPreviewResult(employees, slots);
 
-            // ---------- local helpers ----------
             void AddSlotUnique(int empId, int day, string from, string to)
             {
                 var key = $"{empId}|{day}|{from}|{to}";
@@ -454,25 +474,28 @@ namespace WinFormsApp.Presenter.Container
                     Status = SlotStatus.UNFURNISHED
                 });
             }
+        }
 
-            static bool TrySplitInterval(string normalized, out string from, out string to)
-            {
-                from = to = "";
-                var parts = normalized.Split('-', 2, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-                if (parts.Length != 2) return false;
-                from = parts[0];
-                to = parts[1];
-                return true;
-            }
+        private readonly record struct AvailabilityPreviewResult(
+            IList<ScheduleEmployeeModel> Employees,
+            IList<ScheduleSlotModel> Slots);
 
-            // Використовує твою ж логіку нормалізації shift-ів з ContainerPresenter.Validation :contentReference[oaicite:8]{index=8}
-            (string from, string to)? TrySplitShift(string rawShift)
-            {
-                if (!TryNormalizeShiftRange(rawShift, out var normalized, out _))
-                    return null;
+        private static (string from, string to)? TrySplitShift(string rawShift)
+        {
+            if (!TryNormalizeShiftRange(rawShift, out var normalized, out _))
+                return null;
 
-                return TrySplitInterval(normalized, out var f, out var t) ? (f, t) : null;
-            }
+            return TrySplitInterval(normalized, out var from, out var to) ? (from, to) : null;
+        }
+
+        private static bool TrySplitInterval(string normalized, out string from, out string to)
+        {
+            from = to = "";
+            var parts = normalized.Split('-', 2, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            if (parts.Length != 2) return false;
+            from = parts[0];
+            to = parts[1];
+            return true;
         }
 
         private void ApplyShopFilter(string? raw)

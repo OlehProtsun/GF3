@@ -1,14 +1,25 @@
-﻿using DataAccessLayer.Models;
+using DataAccessLayer.Models;
 using Guna.UI2.WinForms;
 using System;
 using System.Collections.Generic;
 using System.Data;
+using System.Reflection;
 using System.Text;
 
 namespace WinFormsApp.View.Container
 {
     public partial class ContainerView
     {
+        private static void EnableDoubleBuffering(DataGridView grid)
+        {
+            typeof(DataGridView).InvokeMember(
+                "DoubleBuffered",
+                BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.SetProperty,
+                null,
+                grid,
+                new object[] { true });
+        }
+
         private void ConfigureContainerGrid() 
         {
             ApplyListGridDefaults(containerGrid);
@@ -64,6 +75,8 @@ namespace WinFormsApp.View.Container
         }
         private void ConfigureMatrixGrid(Guna2DataGridView grid, bool readOnly) 
         {
+
+            EnableDoubleBuffering(grid);
 
             grid.AutoGenerateColumns = true;
             grid.Columns.Clear();
@@ -136,6 +149,8 @@ namespace WinFormsApp.View.Container
         }
         private static void ApplyListGridDefaults(DataGridView grid)
         {
+            EnableDoubleBuffering(grid);
+
             grid.AutoGenerateColumns = false;
             grid.Columns.Clear();
 
