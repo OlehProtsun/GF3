@@ -158,38 +158,12 @@ namespace WinFormsApp.Presenter.Availability
                     _view.TryAddEmployeeColumn(empId, header);
                 }
 
-                // 2) fill codes per employee
-                int dim = DateTime.DaysInMonth(group.Year, group.Month);
-
-                // один lookup на всі days
-                var dayLookup = days
-                    .GroupBy(d => (d.AvailabilityGroupMemberId, d.DayOfMonth))
-                    .ToDictionary(g => g.Key, g => g.Last()); // або LastOrDefault/OrderBy якщо треба
+                var codesByEmployee = await Task.Run(() => BuildEmployeeCodes(members, days, group.Year, group.Month, innerCt), innerCt);
 
                 foreach (var mb in members)
                 {
-                    var codes = new List<(int day, string code)>(capacity: dim);
-
-                    for (int day = 1; day <= dim; day++)
-                    {
-                        if (!dayLookup.TryGetValue((mb.Id, day), out var d))
-                        {
-                            codes.Add((day, "-"));
-                            continue;
-                        }
-
-                        var code = d.Kind switch
-                        {
-                            AvailabilityKind.ANY => "+",
-                            AvailabilityKind.NONE => "-",
-                            AvailabilityKind.INT => d.IntervalStr ?? "",
-                            _ => "-"
-                        };
-
-                        codes.Add((day, code));
-                    }
-
-                    _view.SetEmployeeCodes(mb.EmployeeId, codes);
+                    if (codesByEmployee.TryGetValue(mb.EmployeeId, out var codes))
+                        _view.SetEmployeeCodes(mb.EmployeeId, codes);
                 }
 
 
@@ -429,6 +403,50 @@ namespace WinFormsApp.Presenter.Availability
                     _view.ShowError(ex.GetBaseException().Message);
                 }
             }, ct, busyText);
+
+        private static Dictionary<int, List<(int day, string code)>> BuildEmployeeCodes(
+            IList<AvailabilityGroupMemberModel> members,
+            IList<AvailabilityGroupDayModel> days,
+            int year,
+            int month,
+            CancellationToken ct)
+        {
+            var dim = DateTime.DaysInMonth(year, month);
+            var dayLookup = days
+                .GroupBy(d => (d.AvailabilityGroupMemberId, d.DayOfMonth))
+                .ToDictionary(g => g.Key, g => g.Last());
+
+            var result = new Dictionary<int, List<(int day, string code)>>();
+
+            foreach (var mb in members)
+            {
+                ct.ThrowIfCancellationRequested();
+                var codes = new List<(int day, string code)>(capacity: dim);
+
+                for (int day = 1; day <= dim; day++)
+                {
+                    if (!dayLookup.TryGetValue((mb.Id, day), out var d))
+                    {
+                        codes.Add((day, "-"));
+                        continue;
+                    }
+
+                    var code = d.Kind switch
+                    {
+                        AvailabilityKind.ANY => "+",
+                        AvailabilityKind.NONE => "-",
+                        AvailabilityKind.INT => d.IntervalStr ?? "",
+                        _ => "-"
+                    };
+
+                    codes.Add((day, code));
+                }
+
+                result[mb.EmployeeId] = codes;
+            }
+
+            return result;
+        }
 
         private void ApplyEmployeeFilter(string? raw)
         {

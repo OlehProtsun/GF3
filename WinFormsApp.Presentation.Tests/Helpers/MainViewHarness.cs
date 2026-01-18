@@ -1,4 +1,5 @@
 using Moq;
+using System;
 using System.Threading;
 using WinFormsApp.View.Main;
 using WinFormsApp.ViewModel;
@@ -25,6 +26,18 @@ internal sealed class MainViewHarness
                 try
                 {
                     return action(ct);
+                }
+                catch (OperationCanceledException)
+                {
+                    return Task.CompletedTask;
+                }
+            });
+        Mock.Setup(v => v.RunBusyAsync(It.IsAny<Func<CancellationToken, IProgress<int>?, Task>>(), It.IsAny<CancellationToken>(), It.IsAny<string?>()))
+            .Returns<Func<CancellationToken, IProgress<int>?, Task>, CancellationToken, string?>((action, ct, _) =>
+            {
+                try
+                {
+                    return action(ct, null);
                 }
                 catch (OperationCanceledException)
                 {

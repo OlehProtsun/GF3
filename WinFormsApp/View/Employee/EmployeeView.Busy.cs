@@ -20,6 +20,8 @@ namespace WinFormsApp.View.Employee
 
         public Task RunBusyAsync(Func<CancellationToken, Task> action, CancellationToken ct, string? text = null)
             => _busyController.RunBusyAsync(action, ct, text, SetBusyState);
+        public Task RunBusyAsync(Func<CancellationToken, IProgress<int>?, Task> action, CancellationToken ct, string? text = null)
+            => _busyController.RunBusyAsync(action, ct, text, SetBusyState);
 
         private void SetBusyState(bool enabled)
         {

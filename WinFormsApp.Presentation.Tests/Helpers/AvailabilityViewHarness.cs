@@ -1,5 +1,6 @@
 using DataAccessLayer.Models;
 using Moq;
+using System;
 using System.Threading;
 using System.Windows.Forms;
 using WinFormsApp.View.Availability;
@@ -33,6 +34,9 @@ internal sealed class AvailabilityViewHarness
 
         Mock.Setup(v => v.RunBusyAsync(It.IsAny<Func<CancellationToken, Task>>(), It.IsAny<CancellationToken>(), It.IsAny<string?>()))
             .Returns<Func<CancellationToken, Task>, CancellationToken, string?>((action, ct, _) => action(ct));
+
+        Mock.Setup(v => v.RunBusyAsync(It.IsAny<Func<CancellationToken, IProgress<int>?, Task>>(), It.IsAny<CancellationToken>(), It.IsAny<string?>()))
+            .Returns<Func<CancellationToken, IProgress<int>?, Task>, CancellationToken, string?>((action, ct, _) => action(ct, null));
 
         Mock.Setup(v => v.SetListBindingSource(It.IsAny<BindingSource>()))
             .Callback<BindingSource>(bs => ListBindingSource = bs);

@@ -516,7 +516,7 @@ public class ContainerPresenterTests
 
         view.Mock.Verify(v => v.SetScheduleValidationErrors(It.IsAny<IReadOnlyDictionary<string, string>>()), Times.Once);
         view.Mock.Verify(v => v.ShowError("Please fix the highlighted fields."), Times.Once);
-        generator.Verify(g => g.GenerateAsync(It.IsAny<ScheduleModel>(), It.IsAny<IEnumerable<AvailabilityGroupModel>>(), It.IsAny<IEnumerable<ScheduleEmployeeModel>>(), It.IsAny<CancellationToken>()), Times.Never);
+        generator.Verify(g => g.GenerateAsync(It.IsAny<ScheduleModel>(), It.IsAny<IEnumerable<AvailabilityGroupModel>>(), It.IsAny<IEnumerable<ScheduleEmployeeModel>>(), It.IsAny<IProgress<int>>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [TestMethod]
@@ -537,13 +537,13 @@ public class ContainerPresenterTests
         view.Mock.Object.ScheduleShift2 = "18:00-22:00";
         view.Mock.Object.ScheduleMaxHoursPerEmp = 100;
 
-        view.Mock.SetupGet(v => v.SelectedAvailabilityGroupIds).Returns(Array.Empty<int>());
+        view.Mock.Object.SelectedAvailabilityGroupId = 0;
 
         _ = new ContainerPresenter(view.Mock.Object, containerService.Object, scheduleService.Object, availabilityService.Object, generator.Object);
 
         await view.RaiseScheduleGenerateAsync();
 
-        view.Mock.Verify(v => v.ShowError("Select at least one availability group."), Times.Once);
+        view.Mock.Verify(v => v.ShowError("Select an availability group."), Times.Once);
     }
 
     [TestMethod]
@@ -567,7 +567,7 @@ public class ContainerPresenterTests
         view.Mock.Object.ScheduleMaxConsecutiveFull = 2;
         view.Mock.Object.ScheduleMaxFullPerMonth = 10;
 
-        view.Mock.SetupGet(v => v.SelectedAvailabilityGroupIds).Returns(new List<int> { 1 });
+        view.Mock.Object.SelectedAvailabilityGroupId = 1;
 
         var group = ModelBuilder.AvailabilityGroup(1, "G1", 2024, 1);
         var member = ModelBuilder.AvailabilityMember(1, group.Id, 5);
@@ -578,7 +578,7 @@ public class ContainerPresenterTests
             .ReturnsAsync((group, new List<AvailabilityGroupMemberModel> { member }, new List<AvailabilityGroupDayModel>()));
 
         var slots = new List<ScheduleSlotModel> { ModelBuilder.ScheduleSlot(1, 1) };
-        generator.Setup(g => g.GenerateAsync(It.IsAny<ScheduleModel>(), It.IsAny<IEnumerable<AvailabilityGroupModel>>(), It.IsAny<IEnumerable<ScheduleEmployeeModel>>(), It.IsAny<CancellationToken>()))
+        generator.Setup(g => g.GenerateAsync(It.IsAny<ScheduleModel>(), It.IsAny<IEnumerable<AvailabilityGroupModel>>(), It.IsAny<IEnumerable<ScheduleEmployeeModel>>(), It.IsAny<IProgress<int>>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(slots);
 
         _ = new ContainerPresenter(view.Mock.Object, containerService.Object, scheduleService.Object, availabilityService.Object, generator.Object);

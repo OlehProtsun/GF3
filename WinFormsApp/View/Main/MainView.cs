@@ -25,7 +25,7 @@ namespace WinFormsApp.View.Main
         private const int WM_NCLBUTTONDOWN = 0x00A1;
         private const int HTCAPTION = 0x0002;
 
-        private readonly CancellationTokenSource _navCts = new();
+        private CancellationTokenSource _navCts = new();
 
         private readonly BusyOverlayController _busyController;
 
@@ -62,6 +62,8 @@ namespace WinFormsApp.View.Main
         {
             var h = handler;
             if (h is null) return;
+
+            ResetNavigationToken();
 
             // опційно: захист від “дубль-кліку”
             SetNavButtonsEnabled(false);
@@ -105,6 +107,8 @@ namespace WinFormsApp.View.Main
             => _busyController.HideBusy();
         public async Task RunBusyAsync(Func<CancellationToken, Task> action, CancellationToken ct, string? text = null)
             => await _busyController.RunBusyAsync(action, ct, text, SetNavButtonsEnabled);
+        public async Task RunBusyAsync(Func<CancellationToken, IProgress<int>?, Task> action, CancellationToken ct, string? text = null)
+            => await _busyController.RunBusyAsync(action, ct, text, SetNavButtonsEnabled);
         public void SetActivePage(NavPage page)
         {
             _activePage = page;
@@ -144,6 +148,13 @@ namespace WinFormsApp.View.Main
         private void btnAvailability_Click(object sender, EventArgs e)
         {
 
+        }
+
+        private void ResetNavigationToken()
+        {
+            try { _navCts.Cancel(); } catch { /* ignore */ }
+            _navCts.Dispose();
+            _navCts = new CancellationTokenSource();
         }
     }
 }

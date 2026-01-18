@@ -30,6 +30,7 @@ namespace WinFormsApp.Presenter.Container
         private readonly List<ShopModel> _allShops = new();
         private readonly List<AvailabilityGroupModel> _allAvailabilityGroups = new();
         private readonly List<EmployeeModel> _allEmployees = new();
+        private bool _lookupsLoaded;
 
         public ContainerPresenter(
             IContainerView view,
@@ -114,6 +115,24 @@ namespace WinFormsApp.Presenter.Container
                 try
                 {
                     await action(innerCt);
+                }
+                catch (OperationCanceledException)
+                {
+                    // ignore
+                }
+                catch (Exception ex)
+                {
+                    var msg = ex.InnerException?.Message ?? ex.Message;
+                    _view.ShowError(msg);
+                }
+            }, ct, busyText);
+
+        private Task RunBusySafeAsync(Func<CancellationToken, IProgress<int>?, Task> action, CancellationToken ct, string? busyText)
+            => _view.RunBusyAsync(async (innerCt, progress) =>
+            {
+                try
+                {
+                    await action(innerCt, progress);
                 }
                 catch (OperationCanceledException)
                 {
