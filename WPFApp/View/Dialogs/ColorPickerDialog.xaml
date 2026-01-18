@@ -1,70 +1,341 @@
-<Window x:Class="WPFApp.View.Dialogs.ColorPickerDialog"
+﻿<Window x:Class="WPFApp.View.Dialogs.ColorPickerDialog"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Pick Color"
-        SizeToContent="WidthAndHeight"
         WindowStartupLocation="CenterOwner"
         ResizeMode="NoResize"
-        Background="{StaticResource PageBackgroundBrush}">
-    <Border Style="{StaticResource CardStyle}" Padding="16" Margin="10">
-        <StackPanel>
-            <TextBlock Text="Select a color"
-                       FontFamily="{StaticResource DefaultFontFamily}"
-                       FontSize="16"
-                       FontWeight="SemiBold"
-                       Foreground="Black" />
+        ShowInTaskbar="False"
+        WindowStyle="None"
+        AllowsTransparency="True"
+        Background="Transparent"
+        SizeToContent="WidthAndHeight"
+        Closing="Window_Closing"
+        PreviewKeyDown="Window_PreviewKeyDown">
 
-            <ItemsControl ItemsSource="{Binding Swatches}" Margin="0,12,0,8">
-                <ItemsControl.ItemsPanel>
-                    <ItemsPanelTemplate>
-                        <UniformGrid Columns="6" />
-                    </ItemsPanelTemplate>
-                </ItemsControl.ItemsPanel>
-                <ItemsControl.ItemTemplate>
-                    <DataTemplate>
-                        <Button Width="32"
-                                Height="32"
-                                Margin="4"
-                                Background="{Binding Brush}"
-                                BorderBrush="{StaticResource CardBorderBrush}"
-                                BorderThickness="1"
-                                Click="SwatchButton_Click"
-                                Tag="{Binding Color}">
-                            <ToolTipService.ToolTip>
-                                <TextBlock Text="{Binding Hex}" />
-                            </ToolTipService.ToolTip>
+    <Window.Resources>
+
+        <!-- ====== кольори (біла тема) ====== -->
+        <SolidColorBrush x:Key="OverlayBrush" Color="#80000000"/>
+        <SolidColorBrush x:Key="BackSquareBrush" Color="#CFD0D1"/>
+        <SolidColorBrush x:Key="CardBorderBrushLocal" Color="#E6E6E6"/>
+        <SolidColorBrush x:Key="MutedTextBrushLocal" Color="#6D6D6D"/>
+        <SolidColorBrush x:Key="PrimaryBrushLocal" Color="#3347FF"/>
+
+        <!-- ====== Rounded TextBox ====== -->
+        <Style x:Key="RoundedTextBoxStyle" TargetType="TextBox">
+            <Setter Property="FontFamily" Value="Segoe UI"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="Foreground" Value="#222"/>
+            <Setter Property="Background" Value="#F6F6F6"/>
+            <Setter Property="BorderBrush" Value="#DDDDDD"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="10,6"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TextBox">
+                        <Border x:Name="Bd"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="12">
+                            <ScrollViewer x:Name="PART_ContentHost"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="#BDBDBD"/>
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource PrimaryBrushLocal}"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.55"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- ====== Swatch hover style (без Glow x:Name) ====== -->
+        <Style x:Key="SwatchButtonStyle" TargetType="Button">
+            <Setter Property="Width" Value="34"/>
+            <Setter Property="Height" Value="34"/>
+            <Setter Property="Margin" Value="4"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="BorderBrush" Value="#DDDDDD"/>
+            <Setter Property="RenderTransformOrigin" Value="0.5,0.5"/>
+            <Setter Property="RenderTransform">
+                <Setter.Value>
+                    <ScaleTransform ScaleX="1" ScaleY="1"/>
+                </Setter.Value>
+            </Setter>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd"
+                                CornerRadius="10"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"/>
+                        <ControlTemplate.Triggers>
+
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource PrimaryBrushLocal}"/>
+                                <Setter Property="RenderTransform">
+                                    <Setter.Value>
+                                        <ScaleTransform ScaleX="1.08" ScaleY="1.08"/>
+                                    </Setter.Value>
+                                </Setter>
+                                <Setter TargetName="Bd" Property="Effect">
+                                    <Setter.Value>
+                                        <DropShadowEffect ShadowDepth="0" BlurRadius="14" Opacity="0.22"/>
+                                    </Setter.Value>
+                                </Setter>
+                            </Trigger>
+
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter Property="RenderTransform">
+                                    <Setter.Value>
+                                        <ScaleTransform ScaleX="0.96" ScaleY="0.96"/>
+                                    </Setter.Value>
+                                </Setter>
+                            </Trigger>
+
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.55"/>
+                            </Trigger>
+
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- ====== Primary button ====== -->
+        <Style x:Key="PrimaryButtonStyle" TargetType="Button">
+            <Setter Property="Height" Value="36"/>
+            <Setter Property="Padding" Value="14,0"/>
+            <Setter Property="FontFamily" Value="Segoe UI"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="Background" Value="{StaticResource PrimaryBrushLocal}"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="RenderTransformOrigin" Value="0.5,0.5"/>
+            <Setter Property="RenderTransform">
+                <Setter.Value>
+                    <ScaleTransform ScaleX="1" ScaleY="1"/>
+                </Setter.Value>
+            </Setter>
+
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd"
+                        Background="{TemplateBinding Background}"
+                        CornerRadius="14">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                      VerticalAlignment="Center"/>
+                        </Border>
+
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Opacity" Value="0.92"/>
+                            </Trigger>
+
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter Property="RenderTransform">
+                                    <Setter.Value>
+                                        <ScaleTransform ScaleX="0.98" ScaleY="0.98"/>
+                                    </Setter.Value>
+                                </Setter>
+                            </Trigger>
+
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.55"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- ====== Cancel button ====== -->
+        <Style x:Key="CancelButtonStyle" TargetType="Button" BasedOn="{StaticResource PrimaryButtonStyle}">
+            <Setter Property="Background" Value="#E0E0E0"/>
+            <Setter Property="Foreground" Value="Gray"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd"
+                                Background="{TemplateBinding Background}"
+                                CornerRadius="14"
+                                BorderBrush="#D4D4D4"
+                                BorderThickness="1">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#DADADA"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#CFCFCF"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.55"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- ====== Close (X) button ====== -->
+        <Style x:Key="CloseButtonStyle" TargetType="Button">
+            <Setter Property="Width" Value="34"/>
+            <Setter Property="Height" Value="34"/>
+            <Setter Property="Background" Value="#E6E6E6"/>
+            <Setter Property="Foreground" Value="Black"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd" Background="{TemplateBinding Background}" CornerRadius="12">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{StaticResource PrimaryBrushLocal}"/>
+                                <Setter Property="Foreground" Value="White"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#2234CC"/>
+                                <Setter Property="Foreground" Value="White"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+    </Window.Resources>
+
+    <!-- Overlay -->
+    <Grid Background="{StaticResource OverlayBrush}">
+
+        <!-- СІРИЙ КВАДРАТ ПОЗАДУ (без rounded) -->
+        <Border Background="{StaticResource BackSquareBrush}"
+                Padding="18"
+                CornerRadius="0"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Center">
+
+            <!-- БІЛА КАРТОЧКА -->
+            <Border Background="White"
+                    BorderBrush="{StaticResource CardBorderBrushLocal}"
+                    BorderThickness="1"
+                    CornerRadius="20"
+                    Padding="18"
+                    Width="560"
+                    SnapsToDevicePixels="True">
+
+                <Border.Effect>
+                    <DropShadowEffect BlurRadius="18" ShadowDepth="0" Opacity="0.12"/>
+                </Border.Effect>
+
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <!-- HEADER -->
+                    <Grid Grid.Row="0"
+                          Margin="0,0,0,14"
+                          MouseLeftButtonDown="Header_MouseLeftButtonDown">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+
+                        <TextBlock Text="Pick Color"
+                                   FontFamily="Segoe UI"
+                                   FontSize="28"
+                                   FontWeight="Bold"
+                                   Foreground="Black"
+                                   VerticalAlignment="Center"/>
+
+                        <Button Grid.Column="1"
+                                Style="{StaticResource CloseButtonStyle}"
+                                Click="CancelButton_Click"
+                                Margin="10,0,0,0">
+                            <TextBlock Text="✕" FontSize="16"/>
                         </Button>
-                    </DataTemplate>
-                </ItemsControl.ItemTemplate>
-            </ItemsControl>
+                    </Grid>
 
-            <TextBlock Text="Custom hex (#RRGGBB or #AARRGGBB)"
-                       FontFamily="{StaticResource DefaultFontFamily}"
-                       FontSize="12"
-                       Foreground="{StaticResource MutedTextBrush}" />
+                    <!-- SWATCHES -->
+                    <ItemsControl Grid.Row="1"
+                                  ItemsSource="{Binding Swatches}"
+                                  Margin="0,0,0,14">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <UniformGrid Columns="6"/>
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
 
-            <DockPanel Margin="0,6,0,12">
-                <TextBox x:Name="CustomHexTextBox"
-                         Width="160"
-                         VerticalContentAlignment="Center"
-                         Margin="0,0,8,0" />
-                <Button Content="Use Custom"
-                        Style="{StaticResource RoundedButtonStyle}"
-                        Width="110"
-                        Height="32"
-                        Click="CustomButton_Click" />
-            </DockPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Button Style="{StaticResource SwatchButtonStyle}"
+                                        Background="{Binding Brush}"
+                                        Tag="{Binding Color}"
+                                        Click="SwatchButton_Click">
+                                    <ToolTipService.ToolTip>
+                                        <TextBlock Text="{Binding Hex}"/>
+                                    </ToolTipService.ToolTip>
+                                </Button>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
 
-            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                <Button Content="Cancel"
-                        Width="90"
-                        Height="32"
-                        Margin="0,0,8,0"
-                        Style="{StaticResource RoundedButtonStyle}"
-                        Background="{StaticResource CancelButtonBackgroundBrush}"
-                        Foreground="{StaticResource MutedTextBrush}"
-                        Click="CancelButton_Click" />
-            </StackPanel>
-        </StackPanel>
-    </Border>
+                    <!-- CUSTOM HEX LABEL -->
+                    <TextBlock Grid.Row="2"
+                               Text="Custom hex (#RRGGBB or #AARRGGBB)"
+                               FontFamily="Segoe UI"
+                               FontSize="16"
+                               Foreground="{StaticResource MutedTextBrushLocal}"
+                               Margin="0,0,0,10"/>
+
+                    <!-- INPUT + BUTTONS (Grid щоб не обрізалось) -->
+                    <Grid Grid.Row="3">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="12"/>
+                            <ColumnDefinition Width="160"/>
+                            <ColumnDefinition Width="12"/>
+                            <ColumnDefinition Width="120"/>
+                        </Grid.ColumnDefinitions>
+
+                        <TextBox x:Name="CustomHexTextBox"
+                                 Grid.Column="0"
+                                 Style="{StaticResource RoundedTextBoxStyle}"
+                                 Height="36"
+                                 MinWidth="220"/>
+
+                        <Button Grid.Column="2"
+                                Content="Use Custom"
+                                Style="{StaticResource PrimaryButtonStyle}"
+                                Click="CustomButton_Click"/>
+
+                        <Button Grid.Column="4"
+                                Content="Cancel"
+                                Style="{StaticResource CancelButtonStyle}"
+                                Click="CancelButton_Click"/>
+                    </Grid>
+
+                </Grid>
+            </Border>
+        </Border>
+    </Grid>
 </Window>

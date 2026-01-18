@@ -45,6 +45,7 @@ namespace WPFApp.ViewModel.Container
         private int? _openedProfileContainerId;
 
         private object _currentSection = null!;
+        private const int MaxOpenedSchedules = 20;
         public object CurrentSection
         {
             get => _currentSection;
@@ -355,9 +356,11 @@ namespace WPFApp.ViewModel.Container
 
             var openedBlocks = new List<ScheduleBlockViewModel>();
             var invalidSchedules = new List<string>();
+            var limitSkipped = new List<string>();
 
             foreach (var schedule in schedules)
             {
+                // якщо вже відкритий — просто активуємо
                 var existing = ScheduleEditVm.Blocks.FirstOrDefault(b => b.Model.Id == schedule.Id);
                 if (existing != null)
                 {
@@ -365,9 +368,17 @@ namespace WPFApp.ViewModel.Container
                     continue;
                 }
 
+                // ✅ ЛІМІТ 20
+                if (ScheduleEditVm.Blocks.Count >= MaxOpenedSchedules)
+                {
+                    limitSkipped.Add(string.IsNullOrWhiteSpace(schedule.Name) ? $"Schedule {schedule.Id}" : schedule.Name);
+                    continue;
+                }
+
                 var detailed = await _scheduleService.GetDetailedAsync(schedule.Id, ct);
                 if (detailed is null)
                     continue;
+
                 if (!HasGeneratedContent(detailed))
                 {
                     invalidSchedules.Add(string.IsNullOrWhiteSpace(detailed.Name) ? $"Schedule {detailed.Id}" : detailed.Name);
@@ -387,11 +398,22 @@ namespace WPFApp.ViewModel.Container
 
             if (openedBlocks.Count == 0)
             {
+                // якщо ми нічого не відкрили, але ліміт спрацював — покажемо норм повідомлення
+                if (limitSkipped.Count > 0)
+                {
+                    ShowError($"Max open schedules limit is {MaxOpenedSchedules}. Close some tabs first.");
+                    return;
+                }
+
                 ShowError("Selected schedules could not be loaded.");
                 return;
             }
+
             if (invalidSchedules.Count > 0)
                 ShowError($"Skipped schedules without generated data:{Environment.NewLine}{string.Join(Environment.NewLine, invalidSchedules)}");
+
+            if (limitSkipped.Count > 0)
+                ShowInfo($"Opened only first {MaxOpenedSchedules}. Skipped due to limit:{Environment.NewLine}{string.Join(Environment.NewLine, limitSkipped)}");
 
             ScheduleEditVm.SelectedBlock = openedBlocks.First();
             ScheduleEditVm.RefreshScheduleMatrix();
@@ -403,7 +425,6 @@ namespace WPFApp.ViewModel.Container
             await UpdateAvailabilityPreviewAsync(ct);
             await SwitchToScheduleEditAsync();
         }
-
         internal async Task SaveScheduleAsync(CancellationToken ct = default)
         {
             ScheduleEditVm.ClearValidationErrors();
@@ -781,6 +802,7 @@ namespace WPFApp.ViewModel.Container
             return UpdateAvailabilityPreviewAsync(ct);
         }
 
+        // ContainerViewModel.cs
         internal Task AddScheduleBlockAsync(CancellationToken ct = default)
         {
             if (ScheduleEditVm.IsEdit)
@@ -788,6 +810,12 @@ namespace WPFApp.ViewModel.Container
 
             if (ScheduleEditVm.SelectedBlock is null)
                 return Task.CompletedTask;
+
+            if (ScheduleEditVm.Blocks.Count >= MaxOpenedSchedules)
+            {
+                ShowInfo($"You can open max {MaxOpenedSchedules} schedules.");
+                return Task.CompletedTask;
+            }
 
             var block = CreateDefaultBlock(ScheduleEditVm.SelectedBlock.Model.ContainerId);
             ScheduleEditVm.Blocks.Add(block);

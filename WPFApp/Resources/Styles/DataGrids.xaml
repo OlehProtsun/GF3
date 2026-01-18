@@ -4,6 +4,8 @@
     <conv:ScheduleMatrixCellBrushConverter x:Key="ScheduleMatrixCellBackgroundConverter" Kind="Background" />
     <conv:ScheduleMatrixCellBrushConverter x:Key="ScheduleMatrixCellForegroundConverter" Kind="Foreground" />
     <conv:ScheduleMatrixCellReferenceConverter x:Key="ScheduleMatrixCellReferenceConverter" />
+    <conv:ScheduleMatrixEmployeeTotalHoursConverter x:Key="ScheduleMatrixEmployeeTotalHoursConverter" />
+    
     <Style x:Key="AvailabilityBaseGridStyle" TargetType="DataGrid">
         <Setter Property="AutoGenerateColumns" Value="True" />
         <Setter Property="IsReadOnly" Value="False" />
@@ -208,6 +210,44 @@
                     <Setter Property="FontFamily" Value="{StaticResource DefaultFontFamily}" />
                     <Setter Property="FontSize" Value="14" />
                     <Setter Property="Padding" Value="6,0" />
+
+                    <!-- 2 рядки: ім'я + total hours -->
+                    <Setter Property="ContentTemplate">
+                        <Setter.Value>
+                            <DataTemplate>
+                                <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
+                                    <!-- 1) Ім'я (Header) -->
+                                    <TextBlock Text="{Binding}" TextAlignment="Center" />
+
+                                    <!-- 2) Total hours для цього працівника -->
+                                    <TextBlock FontSize="11"
+                                       Foreground="{StaticResource MutedTextBrush}"
+                                       Margin="0,2,0,0"
+                                       TextAlignment="Center">
+                                        <TextBlock.Text>
+                                            <MultiBinding Converter="{StaticResource ScheduleMatrixEmployeeTotalHoursConverter}">
+                                                <Binding RelativeSource="{RelativeSource AncestorType=DataGrid}" Path="DataContext"/>
+                                                <Binding />
+                                                <!-- це Header (string) -->
+                                                <Binding RelativeSource="{RelativeSource AncestorType=DataGrid}" Path="DataContext.TotalHoursText"/>
+                                            </MultiBinding>
+                                        </TextBlock.Text>
+
+                                <!-- якщо пусто (не employee колонка) — сховати -->
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock">
+                                                <Style.Triggers>
+                                                    <Trigger Property="Text" Value="">
+                                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                                    </Trigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
+                                </StackPanel>
+                            </DataTemplate>
+                        </Setter.Value>
+                    </Setter>
                 </Style>
             </Setter.Value>
         </Setter>

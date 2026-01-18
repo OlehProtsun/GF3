@@ -23,6 +23,9 @@ namespace WPFApp.View.Container
         private string? _previousCellValue;
         private bool _isPainting;
         private ScheduleMatrixCellRef? _lastPaintedCell;
+        private string? _scheduleSchemaSig;
+        private string? _previewSchemaSig;
+
 
         public ContainerScheduleEditView()
         {
@@ -41,6 +44,7 @@ namespace WPFApp.View.Container
         private void ContainerScheduleEditView_DataContextChanged(object sender, DependencyPropertyChangedEventArgs e)
         {
             AttachViewModel(DataContext as ContainerScheduleEditViewModel);
+
         }
 
         private void ContainerScheduleEditView_Loaded(object sender, RoutedEventArgs e)
@@ -65,8 +69,25 @@ namespace WPFApp.View.Container
                 _vm.MatrixChanged += VmOnMatrixChanged;
                 ScheduleMatrixColumnBuilder.BuildScheduleMatrixColumns(_vm.ScheduleMatrix.Table, dataGridScheduleMatrix, isReadOnly: false);
                 ScheduleMatrixColumnBuilder.BuildScheduleMatrixColumns(_vm.AvailabilityPreviewMatrix.Table, dataGridAvailabilityPreview, isReadOnly: true);
+                dataGridScheduleMatrix.ItemsSource = _vm.ScheduleMatrix;
+                dataGridAvailabilityPreview.ItemsSource = _vm.AvailabilityPreviewMatrix;
             }
         }
+
+        private async void OpenedSchedulesListBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (_vm is null) return;
+
+            if (sender is ListBox lb && lb.SelectedItem is ScheduleBlockViewModel block)
+            {
+                // щоб не викликати повторно при тих самих значеннях
+                if (ReferenceEquals(_vm.ActiveSchedule, block))
+                    return;
+
+                await _vm.SelectBlockAsync(block); // це веде в owner.SelectScheduleBlockAsync(...) :contentReference[oaicite:1]{index=1}
+            }
+        }
+
 
         private void DetachViewModel()
         {
@@ -78,20 +99,8 @@ namespace WPFApp.View.Container
         {
             if (_vm is null) return;
 
-            void RefreshMatrices()
-            {
-                ScheduleMatrixColumnBuilder.BuildScheduleMatrixColumns(_vm.ScheduleMatrix.Table, dataGridScheduleMatrix, isReadOnly: false);
-                ScheduleMatrixColumnBuilder.BuildScheduleMatrixColumns(_vm.AvailabilityPreviewMatrix.Table, dataGridAvailabilityPreview, isReadOnly: true);
-            }
-
-            if (Dispatcher.CheckAccess())
-            {
-                RefreshMatrices();
-            }
-            else
-            {
-                Dispatcher.Invoke(RefreshMatrices);
-            }
+            // щоб не блокувати UI (скрол/ввід)
+            Dispatcher.BeginInvoke(new Action(RefreshMatricesSmart), System.Windows.Threading.DispatcherPriority.Background);
         }
 
         private void ScheduleMatrix_PreparingCellForEdit(object sender, DataGridPreparingCellForEditEventArgs e)
@@ -116,6 +125,38 @@ namespace WPFApp.View.Container
             {
                 _vm.SelectedCellRef = null;
             }
+        }
+
+        private void RefreshMatricesSmart()
+        {
+            if (_vm is null) return;
+
+            var scheduleSig = BuildSig(_vm.ScheduleMatrix?.Table);
+            if (scheduleSig != _scheduleSchemaSig)
+            {
+                ScheduleMatrixColumnBuilder.BuildScheduleMatrixColumns(_vm.ScheduleMatrix.Table, dataGridScheduleMatrix, isReadOnly: false);
+                _scheduleSchemaSig = scheduleSig;
+            }
+
+            if (!ReferenceEquals(dataGridScheduleMatrix.ItemsSource, _vm.ScheduleMatrix))
+                dataGridScheduleMatrix.ItemsSource = _vm.ScheduleMatrix;
+
+            var previewSig = BuildSig(_vm.AvailabilityPreviewMatrix?.Table);
+            if (previewSig != _previewSchemaSig)
+            {
+                ScheduleMatrixColumnBuilder.BuildScheduleMatrixColumns(_vm.AvailabilityPreviewMatrix.Table, dataGridAvailabilityPreview, isReadOnly: true);
+                _previewSchemaSig = previewSig;
+            }
+
+            if (!ReferenceEquals(dataGridAvailabilityPreview.ItemsSource, _vm.AvailabilityPreviewMatrix))
+                dataGridAvailabilityPreview.ItemsSource = _vm.AvailabilityPreviewMatrix;
+        }
+
+        private static string BuildSig(DataTable? t)
+        {
+            if (t == null) return "";
+            // тільки імена колонок (можна ще типи додати)
+            return string.Join("|", t.Columns.Cast<DataColumn>().Select(c => c.ColumnName));
         }
 
         private void ScheduleMatrix_SelectedCellsChanged(object sender, SelectedCellsChangedEventArgs e)

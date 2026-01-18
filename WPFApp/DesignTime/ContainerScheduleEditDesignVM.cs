@@ -39,9 +39,29 @@ namespace WPFApp.DesignTime
 
         public bool CanAddBlock { get; set; } = true;
 
-        // Chips (Blocks)
+        // ===================== MULTI OPEN (TABS) =====================
+        // Саме ці назви підходять під твій XAML:
+        // ItemsSource="{Binding OpenedSchedules}"
+        // SelectedItem="{Binding ActiveSchedule}"
+        public ObservableCollection<ScheduleBlockVM> OpenedSchedules { get; } = new();
+
+        private ScheduleBlockVM? _activeSchedule;
+        public ScheduleBlockVM? ActiveSchedule
+        {
+            get => _activeSchedule;
+            set { _activeSchedule = value; Raise(); }
+        }
+
+        // ===================== OLD / LEGACY (щоб нічого не поламалось) =====================
+        // Якщо в якихось місцях ще використовується Blocks/SelectedBlock — залишаємо.
         public ObservableCollection<ScheduleBlockVM> Blocks { get; } = new();
-        public ScheduleBlockVM? SelectedBlock { get; set; }
+
+        private ScheduleBlockVM? _selectedBlock;
+        public ScheduleBlockVM? SelectedBlock
+        {
+            get => _selectedBlock;
+            set { _selectedBlock = value; Raise(); }
+        }
 
         // Shop
         public ObservableCollection<ShopVM> Shops { get; } = new();
@@ -66,15 +86,26 @@ namespace WPFApp.DesignTime
 
         public ContainerScheduleEditDesignVM()
         {
-            // ----- Blocks -----
-            var b1 = new ScheduleBlockVM("A");
-            var b2 = new ScheduleBlockVM("B");
-            var b3 = new ScheduleBlockVM("C");
+            // ===== Multi-open tabs: 5 табів =====
+            var t1 = new ScheduleBlockVM("A • Main");
+            var t2 = new ScheduleBlockVM("B • Weekend");
+            var t3 = new ScheduleBlockVM("C • Holiday");
+            var t4 = new ScheduleBlockVM("D • Staff+");
+            var t5 = new ScheduleBlockVM("E • Test");
 
-            Blocks.Add(b1);
-            Blocks.Add(b2);
-            Blocks.Add(b3);
-            SelectedBlock = b2;
+            OpenedSchedules.Add(t1);
+            OpenedSchedules.Add(t2);
+            OpenedSchedules.Add(t3);
+            OpenedSchedules.Add(t4);
+            OpenedSchedules.Add(t5);
+
+            ActiveSchedule = t3; // активний таб у дизайнері
+
+            // ===== Legacy blocks (можеш видалити якщо точно ніде не юзаються) =====
+            Blocks.Add(t1);
+            Blocks.Add(t2);
+            Blocks.Add(t3);
+            SelectedBlock = t2;
 
             // ----- Shops -----
             Shops.Add(new ShopVM("Shop 01 • Center"));
@@ -160,8 +191,6 @@ namespace WPFApp.DesignTime
         }
     }
 
-    // Простий рядок для DataGrid-матриць (у тебе AutoGenerateColumns=False,
-    // але для дизайн-тайму хоча б список рядків з текстом буде видно, якщо колонки реально задані в стилі)
     public sealed class MatrixRowVM
     {
         public string C0 { get; set; }

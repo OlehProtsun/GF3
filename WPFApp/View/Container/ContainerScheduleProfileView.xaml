@@ -216,23 +216,61 @@
                         <RowDefinition Height="*" />
                     </Grid.RowDefinitions>
 
-                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                        <Viewbox Width="20" Height="20" Margin="0,0,8,0">
-                            <Path Data="{StaticResource IconSchedule}"
-                                  Fill="Black"
-                                  Stretch="Uniform"                                  
-                                RenderTransformOrigin="0.5,0.5">
-                                <Path.RenderTransform>
-                                    <ScaleTransform ScaleX="1" ScaleY="-1" />
-                                </Path.RenderTransform>
-                            </Path>
-                        </Viewbox>
-                        <TextBlock Text="Schedule Matrix"
-                                   FontFamily="{StaticResource DefaultFontFamily}"
-                                   FontSize="{StaticResource FontSizeTitle}"
-                                   FontWeight="Bold"
-                                   Foreground="Black" />
-                    </StackPanel>
+                    <Grid Grid.Row="0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+
+                        <!-- left title -->
+                        <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                            <Viewbox Width="20" Height="20" Margin="0,0,8,0">
+                                <Path Data="{StaticResource IconSchedule}"
+                  Fill="Black"
+                  Stretch="Uniform"
+                  RenderTransformOrigin="0.5,0.5">
+                                    <Path.RenderTransform>
+                                        <ScaleTransform ScaleX="1" ScaleY="-1" />
+                                    </Path.RenderTransform>
+                                </Path>
+                            </Viewbox>
+
+                            <TextBlock Text="Schedule Matrix"
+                   FontFamily="{StaticResource DefaultFontFamily}"
+                   FontSize="{StaticResource FontSizeTitle}"
+                   FontWeight="Bold"
+                   Foreground="Black" />
+                        </StackPanel>
+
+                        <!-- right totals (side by side) -->
+                        <StackPanel Grid.Column="1"
+            Orientation="Horizontal"
+            HorizontalAlignment="Right"
+            VerticalAlignment="Center"
+            Margin="12,0,0,0">
+
+                            <Border Padding="8,2"
+            CornerRadius="10"
+            Background="#14000000"
+            Margin="0,0,8,0">
+                                <TextBlock FontSize="12" Foreground="{StaticResource MutedTextBrush}">
+            <Run Text="Total Employees: "/>
+            <Run Text="{Binding TotalEmployees, Mode=OneWay}"/>
+                                </TextBlock>
+                            </Border>
+
+                            <Border Padding="8,2"
+            CornerRadius="10"
+            Background="#14000000">
+                                <TextBlock FontSize="12" Foreground="{StaticResource MutedTextBrush}">
+            <Run Text="Total Hours: "/>
+            <Run Text="{Binding TotalHoursText, Mode=OneWay}"/>
+                                </TextBlock>
+                            </Border>
+
+                        </StackPanel>
+
+                    </Grid>
 
                     <DataGrid x:Name="dataGridScheduleProfile"
                       Grid.Row="1"

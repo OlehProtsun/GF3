@@ -1,4 +1,6 @@
-﻿using System;
+﻿using DataAccessLayer.Models;
+using DataAccessLayer.Models.Enums;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -6,11 +8,10 @@ using System.ComponentModel;
 using System.Data;
 using System.Globalization;
 using System.Linq;
+using System.Text;
 using System.Threading.Tasks;
-using DataAccessLayer.Models;
-using DataAccessLayer.Models.Enums;
-using WPFApp.Infrastructure;
 using System.Windows.Media;
+using WPFApp.Infrastructure;
 
 namespace WPFApp.ViewModel.Container
 {
@@ -26,6 +27,9 @@ namespace WPFApp.ViewModel.Container
         public const string DayColumnName = "DayOfMonth";
         public const string ConflictColumnName = "Conflict";
         public const string EmptyMark = "-";
+
+        // кеш: EmployeeId -> "Total hours: 12h 30m"
+        private readonly Dictionary<int, string> _employeeTotalHoursText = new();
 
         // ✅ додай
         public const string WeekendColumnName = "IsWeekend";
@@ -88,6 +92,21 @@ namespace WPFApp.ViewModel.Container
             get => _selectedCellRef;
             set => SetProperty(ref _selectedCellRef, value);
         }
+
+        private int _totalEmployees;
+        public int TotalEmployees
+        {
+            get => _totalEmployees;
+            private set => SetProperty(ref _totalEmployees, value);
+        }
+
+        private string _totalHoursText = "0h 0m";
+        public string TotalHoursText
+        {
+            get => _totalHoursText;
+            private set => SetProperty(ref _totalHoursText, value);
+        }
+
 
         public ObservableCollection<ScheduleMatrixCellRef> SelectedCellRefs { get; } = new();
 
@@ -534,6 +553,78 @@ namespace WPFApp.ViewModel.Container
             ActivePaintMode = SchedulePaintMode.None;
         }
 
+        public string GetEmployeeTotalHoursText(string columnName)
+        {
+            // для Day/Conflict/Weekend та ін. — пусто
+            if (SelectedBlock is null) return string.Empty;
+            if (!_colNameToEmpId.TryGetValue(columnName, out var empId)) return string.Empty;
+
+            return _employeeTotalHoursText.TryGetValue(empId, out var text)
+                ? text
+                : "Total hours: 0h 0m";
+        }
+
+        private void RecalculateTotals()
+        {
+            _employeeTotalHoursText.Clear();
+
+            if (SelectedBlock is null)
+            {
+                TotalEmployees = 0;
+                TotalHoursText = "0h 0m";
+                return;
+            }
+
+            // 1) Total employees (distinct)
+            TotalEmployees = SelectedBlock.Employees
+                .Select(e => e.EmployeeId)
+                .Distinct()
+                .Count();
+
+            // 2) Total hours (sum) + per employee totals
+            var total = TimeSpan.Zero;
+            var perEmp = new Dictionary<int, TimeSpan>();
+
+            foreach (var s in SelectedBlock.Slots)
+            {
+                // ✅ EmployeeId nullable
+                if (!s.EmployeeId.HasValue || s.EmployeeId.Value <= 0)
+                    continue;
+
+                var empId = s.EmployeeId.Value;
+
+                if (string.IsNullOrWhiteSpace(s.FromTime) || string.IsNullOrWhiteSpace(s.ToTime))
+                    continue;
+
+                if (!TimeSpan.TryParseExact(s.FromTime.Trim(), @"hh\:mm", CultureInfo.InvariantCulture, out var from))
+                    continue;
+
+                if (!TimeSpan.TryParseExact(s.ToTime.Trim(), @"hh\:mm", CultureInfo.InvariantCulture, out var to))
+                    continue;
+
+                var dur = to - from;
+                if (dur < TimeSpan.Zero)
+                    dur += TimeSpan.FromHours(24);
+
+                total += dur;
+
+                if (!perEmp.TryGetValue(empId, out var cur))
+                    cur = TimeSpan.Zero;
+
+                perEmp[empId] = cur + dur;
+            }
+
+            // кешуємо текст для всіх employees блоку (навіть якщо 0)
+            foreach (var empId in SelectedBlock.Employees.Select(e => e.EmployeeId).Distinct())
+            {
+                perEmp.TryGetValue(empId, out var empTotal);
+                _employeeTotalHoursText[empId] = $"Total hours: {(int)empTotal.TotalHours}h {empTotal.Minutes}m";
+            }
+
+            TotalHoursText = $"{(int)total.TotalHours}h {total.Minutes}m";
+        }
+
+
         public void SetLookups(IEnumerable<ShopModel> shops, IEnumerable<AvailabilityGroupModel> groups, IEnumerable<EmployeeModel> employees)
         {
             SetShops(shops);
@@ -610,6 +701,7 @@ namespace WPFApp.ViewModel.Container
             if (SelectedBlock is null)
             {
                 ScheduleMatrix = new DataView();
+                RecalculateTotals();
                 MatrixChanged?.Invoke(this, EventArgs.Empty);
                 return;
             }
@@ -617,6 +709,7 @@ namespace WPFApp.ViewModel.Container
             if (ScheduleYear < 1 || ScheduleMonth < 1 || ScheduleMonth > 12)
             {
                 ScheduleMatrix = new DataView();
+                RecalculateTotals();
                 MatrixChanged?.Invoke(this, EventArgs.Empty);
                 return;
             }
@@ -624,6 +717,7 @@ namespace WPFApp.ViewModel.Container
             if (SelectedBlock.Slots.Count == 0)
             {
                 ScheduleMatrix = new DataView();
+                RecalculateTotals();
                 MatrixChanged?.Invoke(this, EventArgs.Empty);
                 return;
             }
@@ -636,6 +730,9 @@ namespace WPFApp.ViewModel.Container
                 _colNameToEmpId[pair.Key] = pair.Value;
 
             ScheduleMatrix = table.DefaultView;
+
+            RecalculateTotals(); // ✅ тут теж
+
             MatrixChanged?.Invoke(this, EventArgs.Empty);
         }
 
@@ -974,17 +1071,18 @@ namespace WPFApp.ViewModel.Container
 
             table.Columns.Add(DayColumnName, typeof(int));
             table.Columns.Add(ConflictColumnName, typeof(bool));
-            // ✅ ДОДАЙ (прихована технічна колонка для RowStyle)
-            table.Columns.Add(WeekendColumnName, typeof(bool));
+            table.Columns.Add(WeekendColumnName, typeof(bool)); // технічна колонка під RowStyle
 
+            // 1) Колонки по працівниках
             foreach (var emp in employees)
             {
                 var displayName = $"{emp.Employee.FirstName} {emp.Employee.LastName}".Trim();
-                var columnName = string.IsNullOrWhiteSpace(displayName) ? $"Employee {emp.EmployeeId}" : displayName;
-                var suffix = 1;
+                var baseName = string.IsNullOrWhiteSpace(displayName) ? $"Employee {emp.EmployeeId}" : displayName;
 
+                var columnName = baseName;
+                var suffix = 1;
                 while (table.Columns.Contains(columnName))
-                    columnName = $"{displayName} ({++suffix})";
+                    columnName = $"{baseName} ({++suffix})";
 
                 table.Columns.Add(columnName, typeof(string));
                 colNameToEmpId[columnName] = emp.EmployeeId;
@@ -992,34 +1090,95 @@ namespace WPFApp.ViewModel.Container
 
             var daysInMonth = DateTime.DaysInMonth(year, month);
 
-            var byDay = (slots ?? Array.Empty<ScheduleSlotModel>())
-                .GroupBy(s => s.DayOfMonth)
-                .ToDictionary(g => g.Key, g => g.ToList());
+            // 2) Швидка індексація слотів по днях (без GroupBy)
+            var slotsByDay = new List<ScheduleSlotModel>?[daysInMonth + 1]; // 1..daysInMonth
+            if (slots != null && slots.Count > 0)
+            {
+                for (int i = 0; i < slots.Count; i++)
+                {
+                    var s = slots[i];
+                    var d = s.DayOfMonth;
+                    if ((uint)d > (uint)daysInMonth || d <= 0) continue;
 
+                    var list = slotsByDay[d];
+                    if (list == null)
+                    {
+                        list = new List<ScheduleSlotModel>();
+                        slotsByDay[d] = list;
+                    }
+                    list.Add(s);
+                }
+            }
+
+            // 3) Щоб не ходити по Dictionary-ітератору з tuple-deconstruct
+            var empCols = colNameToEmpId.ToArray(); // KeyValuePair<string,int>[]
+
+            // 4) Форматування інтервалів без LINQ-ланцюжків
+            static string FormatMerged(List<(string from, string to)> merged)
+            {
+                if (merged == null || merged.Count == 0) return EmptyMark;
+
+                var sb = new StringBuilder(capacity: merged.Count * 14);
+                for (int i = 0; i < merged.Count; i++)
+                {
+                    if (i > 0) sb.Append(", ");
+                    sb.Append(merged[i].from).Append(" - ").Append(merged[i].to);
+                }
+                return sb.ToString();
+            }
+
+            // 5) Основний цикл
             for (int day = 1; day <= daysInMonth; day++)
             {
-                byDay.TryGetValue(day, out var daySlots);
+                var daySlots = slotsByDay[day];
 
                 var row = table.NewRow();
                 row[DayColumnName] = day;
-                row[ConflictColumnName] = daySlots?.Any(s => s.EmployeeId == null) ?? false;
 
-                // ✅ ДОДАЙ
                 var dow = new DateTime(year, month, day).DayOfWeek;
                 row[WeekendColumnName] = (dow == DayOfWeek.Saturday || dow == DayOfWeek.Sunday);
 
-                foreach (var (colName, empId) in colNameToEmpId)
+                // Якщо на день немає слотів — заповнюємо рядок “-” і їдемо далі (дешево)
+                if (daySlots == null || daySlots.Count == 0)
                 {
-                    if (daySlots == null || daySlots.Count == 0)
+                    row[ConflictColumnName] = false;
+                    for (int i = 0; i < empCols.Length; i++)
+                        row[empCols[i].Key] = EmptyMark;
+
+                    table.Rows.Add(row);
+                    continue;
+                }
+
+                // 5.1) Один прохід: Conflict + групування по EmployeeId (без GroupBy)
+                bool conflict = false;
+                var byEmp = new Dictionary<int, List<ScheduleSlotModel>>(capacity: Math.Min(employees.Count, 32));
+
+                for (int i = 0; i < daySlots.Count; i++)
+                {
+                    var s = daySlots[i];
+
+                    if (s.EmployeeId == null)
                     {
-                        row[colName] = EmptyMark;
+                        conflict = true;
                         continue;
                     }
 
-                    var byEmp = daySlots
-                        .Where(s => s.EmployeeId != null)
-                        .GroupBy(s => s.EmployeeId!.Value)
-                        .ToDictionary(g => g.Key, g => g.ToList());
+                    int empId = s.EmployeeId.Value;
+                    if (!byEmp.TryGetValue(empId, out var list))
+                    {
+                        list = new List<ScheduleSlotModel>();
+                        byEmp[empId] = list;
+                    }
+                    list.Add(s);
+                }
+
+                row[ConflictColumnName] = conflict;
+
+                // 5.2) Заповнюємо клітинки для кожного працівника
+                for (int i = 0; i < empCols.Length; i++)
+                {
+                    var colName = empCols[i].Key;
+                    var empId = empCols[i].Value;
 
                     if (!byEmp.TryGetValue(empId, out var empSlots) || empSlots.Count == 0)
                     {
@@ -1028,9 +1187,7 @@ namespace WPFApp.ViewModel.Container
                     }
 
                     var merged = MergeIntervalsForDisplay(empSlots);
-                    row[colName] = merged.Count == 0
-                        ? EmptyMark
-                        : string.Join(", ", merged.Select(i => $"{i.from} - {i.to}"));
+                    row[colName] = FormatMerged(merged);
                 }
 
                 table.Rows.Add(row);
@@ -1038,7 +1195,6 @@ namespace WPFApp.ViewModel.Container
 
             return table;
         }
-
         private static List<(string from, string to)> MergeIntervalsForDisplay(IEnumerable<ScheduleSlotModel> slots)
         {
             var list = new List<(TimeSpan from, TimeSpan to)>();

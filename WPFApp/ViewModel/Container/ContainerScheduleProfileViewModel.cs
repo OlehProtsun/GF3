@@ -1,9 +1,11 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Data;
 using System.Linq;
 using DataAccessLayer.Models;
 using WPFApp.Infrastructure;
+using System.Globalization;
+
 
 namespace WPFApp.ViewModel.Container
 {
@@ -12,6 +14,8 @@ namespace WPFApp.ViewModel.Container
         private readonly ContainerViewModel _owner;
         private readonly Dictionary<string, int> _colNameToEmpId = new();
         private readonly ScheduleCellStyleStore _cellStyleStore = new();
+
+        private readonly Dictionary<int, string> _employeeTotalHoursText = new();
 
         private int _scheduleId;
         public int ScheduleId
@@ -62,6 +66,20 @@ namespace WPFApp.ViewModel.Container
             private set => SetProperty(ref _cellStyleRevision, value);
         }
 
+        private int _totalEmployees;
+        public int TotalEmployees
+        {
+            get => _totalEmployees;
+            private set => SetProperty(ref _totalEmployees, value);
+        }
+
+        private string _totalHoursText = "0h 0m";
+        public string TotalHoursText
+        {
+            get => _totalHoursText;
+            private set => SetProperty(ref _totalHoursText, value);
+        }
+
         public ObservableCollection<ScheduleEmployeeModel> Employees { get; } = new();
 
         public AsyncRelayCommand BackCommand { get; }
@@ -104,9 +122,86 @@ namespace WPFApp.ViewModel.Container
                 employees,
                 out var colMap);
 
+
             ScheduleMatrix = table.DefaultView;
+            RecalculateTotals(employees, slots, out var empCount, out var hoursText);
             RebuildStyleMaps(colMap, cellStyles);
+            TotalEmployees = empCount;
+            TotalHoursText = hoursText;
             MatrixChanged?.Invoke(this, EventArgs.Empty);
+        }
+
+        private void RecalculateTotals(
+            IList<ScheduleEmployeeModel> employees,
+            IList<ScheduleSlotModel> slots,
+            out int totalEmployees,
+            out string totalHoursText)
+        {
+            _employeeTotalHoursText.Clear();
+
+            totalEmployees = employees
+                .Select(e => e.EmployeeId)
+                .Distinct()
+                .Count();
+
+            var total = TimeSpan.Zero;
+            var perEmp = new Dictionary<int, TimeSpan>();
+
+            foreach (var s in slots)
+            {
+                if (!s.EmployeeId.HasValue || s.EmployeeId.Value <= 0)
+                    continue;
+
+                if (!TryParseTime(s.FromTime, out var from)) continue;
+                if (!TryParseTime(s.ToTime, out var to)) continue;
+
+                var dur = to - from;
+                if (dur < TimeSpan.Zero)
+                    dur += TimeSpan.FromHours(24);
+
+                total += dur;
+
+                var empId = s.EmployeeId.Value;
+                perEmp.TryGetValue(empId, out var cur);
+                perEmp[empId] = cur + dur;
+            }
+
+            // ✅ пер-employee кеш (НЕ ламає старі total out-параметри)
+            foreach (var empId in employees.Select(e => e.EmployeeId).Distinct())
+            {
+                perEmp.TryGetValue(empId, out var empTotal);
+                _employeeTotalHoursText[empId] = $"Total hours: {(int)empTotal.TotalHours}h {empTotal.Minutes}m";
+            }
+
+            totalHoursText = $"{(int)total.TotalHours}h {total.Minutes}m";
+
+            static bool TryParseTime(string? t, out TimeSpan value)
+            {
+                value = default;
+                t = (t ?? string.Empty).Trim();
+
+                return TimeSpan.TryParseExact(t, @"hh\:mm", CultureInfo.InvariantCulture, out value)
+                    || TimeSpan.TryParse(t, CultureInfo.InvariantCulture, out value);
+            }
+        }
+
+        public string GetEmployeeTotalHoursText(string columnName)
+        {
+            if (string.IsNullOrWhiteSpace(columnName))
+                return string.Empty;
+
+            // пропускаємо технічні колонки
+            if (columnName == ContainerScheduleEditViewModel.DayColumnName
+                || columnName == ContainerScheduleEditViewModel.ConflictColumnName
+                || columnName == ContainerScheduleEditViewModel.WeekendColumnName)
+                return string.Empty;
+
+            if (!_colNameToEmpId.TryGetValue(columnName, out var empId))
+                return string.Empty;
+
+            return _employeeTotalHoursText.TryGetValue(empId, out var text)
+                ? text
+                : "Total hours: 0h 0m";
         }
 
         public bool TryBuildCellReference(object? rowData, string? columnName, out ScheduleMatrixCellRef cellRef)

@@ -1,6 +1,7 @@
-using System.Collections.ObjectModel;
+﻿using System.Collections.ObjectModel;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Media;
 using WPFApp.Infrastructure;
 
@@ -8,6 +9,8 @@ namespace WPFApp.View.Dialogs
 {
     public partial class ColorPickerDialog : Window
     {
+        private bool _allowClose;
+
         public ObservableCollection<ColorSwatch> Swatches { get; } = new();
 
         public Color SelectedColor { get; private set; }
@@ -50,6 +53,8 @@ namespace WPFApp.View.Dialogs
 
         private void SwatchButton_Click(object sender, RoutedEventArgs e)
         {
+            _allowClose = true;
+
             if (sender is not Button button || button.Tag is not Color color)
                 return;
 
@@ -66,14 +71,43 @@ namespace WPFApp.View.Dialogs
                 return;
             }
 
+            _allowClose = true;
             SelectedColor = color;
             DialogResult = true;
         }
 
         private void CancelButton_Click(object sender, RoutedEventArgs e)
         {
+            _allowClose = true;
             DialogResult = false;
         }
+
+        private void Window_Closing(object? sender, System.ComponentModel.CancelEventArgs e)
+        {
+            // Забороняємо Alt+F4 / системне закриття
+            if (!_allowClose)
+                e.Cancel = true;
+        }
+
+        private void Window_PreviewKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
+        {
+            // Escape = Cancel
+            if (e.Key == System.Windows.Input.Key.Escape)
+            {
+                _allowClose = true;
+                DialogResult = false;
+                e.Handled = true;
+            }
+        }
+
+        private void Header_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            if (e.ButtonState == MouseButtonState.Pressed)
+                DragMove();
+        }
+
+
+
     }
 
     public sealed class ColorSwatch
