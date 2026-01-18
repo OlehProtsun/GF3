@@ -81,6 +81,7 @@ namespace WinFormsApp.Presenter.Container
 
             _view.ScheduleEmployees = detailed?.Employees?.ToList() ?? new List<ScheduleEmployeeModel>();
             _view.ScheduleSlots = detailed?.Slots?.ToList() ?? new List<ScheduleSlotModel>();
+            _view.ScheduleCellStyles = detailed?.CellStyles?.ToList() ?? new List<ScheduleCellStyleModel>();
 
             _view.ClearScheduleValidationErrors();
 
@@ -144,8 +145,9 @@ namespace WinFormsApp.Presenter.Container
                 .ToList();
 
             var slots = _view.ScheduleSlots ?? new List<ScheduleSlotModel>();
+            var cellStyles = _view.ScheduleCellStyles ?? new List<ScheduleCellStyleModel>();
 
-            await _scheduleService.SaveWithDetailsAsync(model, employees, slots, ct);
+            await _scheduleService.SaveWithDetailsAsync(model, employees, slots, cellStyles, ct);
 
             _view.ShowInfo(_view.IsEdit ? "Schedule updated successfully." : "Schedule added successfully.");
             _view.IsSuccessful = true;
@@ -262,6 +264,7 @@ namespace WinFormsApp.Presenter.Container
 
             _view.ScheduleEmployees = detailed.Employees?.ToList() ?? new List<ScheduleEmployeeModel>();
             _view.ScheduleSlots = detailed.Slots?.ToList() ?? new List<ScheduleSlotModel>();
+            _view.ScheduleCellStyles = detailed.CellStyles?.ToList() ?? new List<ScheduleCellStyleModel>();
 
             _view.SetScheduleProfile(detailed);
             _view.ScheduleCancelTarget = ScheduleViewModel.List;
@@ -343,6 +346,7 @@ namespace WinFormsApp.Presenter.Container
             _view.ScheduleShift2 = model.Shift2Time;
             _view.ScheduleEmployees = employees;
             _view.ScheduleSlots = slots.ToList();
+            _view.ScheduleCellStyles = new List<ScheduleCellStyleModel>();
 
             _view.ShowInfo("Slots generated. Review before saving.");
         }
