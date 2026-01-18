@@ -29,6 +29,7 @@ namespace WinFormsApp.View.Container
             ConfigureContainerGrid();
             ConfigureScheduleGrid();
             ConfigureSlotGrid();
+            InitializeScheduleStyleMenu();
             AssociateAndRaiseEvents();
         }
 

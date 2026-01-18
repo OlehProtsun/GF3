@@ -21,6 +21,7 @@ namespace DataAccessLayer.Models.DataBaseContext
             serviceCollection.AddScoped<IScheduleRepository, ScheduleRepository>();
             serviceCollection.AddScoped<IScheduleEmployeeRepository, ScheduleEmployeeRepository>();
             serviceCollection.AddScoped<IScheduleSlotRepository, ScheduleSlotRepository>();
+            serviceCollection.AddScoped<IScheduleCellStyleRepository, ScheduleCellStyleRepository>();
             serviceCollection.AddScoped<IBindRepository, BindRepository>();
             serviceCollection.AddScoped<IAvailabilityGroupRepository, AvailabilityGroupRepository>();
             serviceCollection.AddScoped<IAvailabilityGroupMemberRepository, AvailabilityGroupMemberRepository>();

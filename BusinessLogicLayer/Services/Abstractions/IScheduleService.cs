@@ -13,6 +13,7 @@ namespace BusinessLogicLayer.Services.Abstractions
             ScheduleModel schedule,
             IEnumerable<ScheduleEmployeeModel> employees,
             IEnumerable<ScheduleSlotModel> slots,
+            IEnumerable<ScheduleCellStyleModel> cellStyles,
             CancellationToken ct = default);
         Task<ScheduleModel?> GetDetailedAsync(int id, CancellationToken ct = default);
     }

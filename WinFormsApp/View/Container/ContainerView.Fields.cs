@@ -4,6 +4,8 @@ using System.Collections.Generic;
 using System.Data;
 using System.Text;
 using System.Threading;
+using System.Windows.Forms;
+using WinFormsApp.View.Shared;
 
 namespace WinFormsApp.View.Container
 {
@@ -17,6 +19,10 @@ namespace WinFormsApp.View.Container
         private DataTable? _scheduleTable;
         private Dictionary<string, int> _colNameToEmpId = new();
         private object? _oldCellValue;
+        private readonly ScheduleCellStyleResolver _styleResolver = new();
+        private readonly Dictionary<(int day, int empId), ScheduleCellStyleModel> _styleLookup = new();
+        private ContextMenuStrip? _scheduleStyleMenu;
+        private bool _loggedWeekendStyle;
 
         private readonly Pen _gridVPen = new(Color.Gainsboro, 1);
         private readonly Pen _gridHPen = new(Color.FromArgb(70, Color.Gray), 1);
@@ -36,6 +42,7 @@ namespace WinFormsApp.View.Container
 
         private readonly List<ScheduleSlotModel> _slots = new();
         private readonly List<ScheduleEmployeeModel> _employees = new();
+        private readonly List<ScheduleCellStyleModel> _cellStyles = new();
 
         // Schedule info (guna2GroupBox5) collapse/expand
         private bool _scheduleInfoExpanded = false;

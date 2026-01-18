@@ -81,6 +81,8 @@ namespace WinFormsApp.View.Container
 
             // slots теж чистимо
             ScheduleSlots = new List<ScheduleSlotModel>();
+
+            ScheduleCellStyles = new List<ScheduleCellStyleModel>();
         }
 
         public void SetProfile(ContainerModel model)
