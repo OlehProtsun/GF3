@@ -1,7 +1,5 @@
-using System;
 using System.Collections.Generic;
 using System.Threading;
-using System.Threading.Tasks;
 using System.Windows.Forms;
 using WinFormsApp.View.Shared;
 
@@ -9,39 +7,9 @@ namespace WinFormsApp.View.Container
 {
     public partial class ContainerView
     {
-        private readonly BusyOverlayController _busyController = null!;
-        private readonly Dictionary<Control, bool> _busyEnabled = new();
+        public override CancellationToken LifetimeToken => _lifetimeCts.Token;
 
-        public CancellationToken LifetimeToken => _lifetimeCts.Token;
-
-        public void ShowBusy(string? text = null) => _busyController.ShowBusy(text);
-
-        public void HideBusy() => _busyController.HideBusy();
-
-        public Task RunBusyAsync(Func<CancellationToken, Task> action, CancellationToken ct, string? text = null)
-            => _busyController.RunBusyAsync(action, ct, text, SetBusyState);
-        public Task RunBusyAsync(Func<CancellationToken, IProgress<int>?, Task> action, CancellationToken ct, string? text = null)
-            => _busyController.RunBusyAsync(action, ct, text, SetBusyState);
-
-        private void SetBusyState(bool enabled)
-        {
-            if (!enabled)
-            {
-                _busyEnabled.Clear();
-                foreach (var control in BusyControls())
-                {
-                    _busyEnabled[control] = control.Enabled;
-                    control.Enabled = false;
-                }
-                return;
-            }
-
-            foreach (var kvp in _busyEnabled)
-                kvp.Key.Enabled = kvp.Value;
-            _busyEnabled.Clear();
-        }
-
-        private IEnumerable<Control> BusyControls()
+        protected override IEnumerable<Control> BusyControls()
         {
             yield return btnSearch;
             yield return btnAdd;

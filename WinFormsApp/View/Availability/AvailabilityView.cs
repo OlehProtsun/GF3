@@ -1,18 +1,14 @@
-﻿using DataAccessLayer.Models;
-using Guna.UI2.WinForms;
-using System.ComponentModel;
-using System.Data;
-using WinFormsApp.ViewModel;
+﻿using System.ComponentModel;
 using WinFormsApp.View.Shared;
+using WinFormsApp.ViewModel;
 
 namespace WinFormsApp.View.Availability
 {
-    public partial class AvailabilityView : Form, IAvailabilityView
+    public partial class AvailabilityView : BusyForm, IAvailabilityView
     {
         public AvailabilityView()
         {
             InitializeComponent();
-            _busyController = new BusyOverlayController(this);
             AssociateAndRaiseViewEvents();
             ConfigureGrid();
             ConfigureAvailabilityGroupGrid();
