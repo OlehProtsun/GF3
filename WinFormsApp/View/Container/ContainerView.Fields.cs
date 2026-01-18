@@ -17,7 +17,9 @@ namespace WinFormsApp.View.Container
         private string message = string.Empty;
 
         private DataTable? _scheduleTable;
-        private Dictionary<string, int> _colNameToEmpId = new();
+        private readonly Dictionary<DataGridView, Dictionary<string, int>> _gridColumnToEmpId = new();
+        private readonly Dictionary<DataGridView, (int year, int month)> _gridYearMonth = new();
+        private readonly Dictionary<(int year, int month), HashSet<int>> _weekendDaysCache = new();
         private object? _oldCellValue;
         private readonly ScheduleCellStyleResolver _styleResolver = new();
         private readonly Dictionary<(int day, int empId), ScheduleCellStyleModel> _styleLookup = new();
