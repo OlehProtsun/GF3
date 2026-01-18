@@ -22,7 +22,6 @@ namespace WinFormsApp.View.Container
         private readonly ScheduleCellStyleResolver _styleResolver = new();
         private readonly Dictionary<(int day, int empId), ScheduleCellStyleModel> _styleLookup = new();
         private ContextMenuStrip? _scheduleStyleMenu;
-        private bool _loggedWeekendStyle;
 
         private readonly Pen _gridVPen = new(Color.Gainsboro, 1);
         private readonly Pen _gridHPen = new(Color.FromArgb(70, Color.Gray), 1);

@@ -2,7 +2,6 @@
 using System;
 using System.Collections.Generic;
 using System.Data;
-using System.Diagnostics;
 using System.Drawing;
 using System.Linq;
 using System.Windows.Forms;
@@ -195,18 +194,9 @@ namespace WinFormsApp.View.Container
         private void ScheduleGrid_CellFormatting(object? sender, DataGridViewCellFormattingEventArgs e)
         {
             if (sender is not DataGridView grid) return;
-            ApplyScheduleCellStyle(grid, e.RowIndex, e.ColumnIndex, e.CellStyle);
-        }
+            if (e.RowIndex < 0 || e.ColumnIndex < 0) return;
 
-        private void ApplyScheduleCellStyle(
-            DataGridView grid,
-            int rowIndex,
-            int columnIndex,
-            DataGridViewCellStyle cellStyle)
-        {
-            if (rowIndex < 0 || columnIndex < 0) return;
-
-            if (grid.Rows[rowIndex].DataBoundItem is not DataRowView rowView)
+            if (grid.Rows[e.RowIndex].DataBoundItem is not DataRowView rowView)
                 return;
 
             if (rowView[DayCol] is not int day || day <= 0)
@@ -217,7 +207,7 @@ namespace WinFormsApp.View.Container
             if (year <= 0 || month <= 0) return;
 
             var isWeekend = ScheduleCellStyleResolver.IsWeekend(year, month, day);
-            var columnName = grid.Columns[columnIndex].Name;
+            var columnName = grid.Columns[e.ColumnIndex].Name;
 
             ScheduleCellStyleModel? overrideStyle = null;
             if (!string.IsNullOrWhiteSpace(columnName) && columnName != DayCol && columnName != ConflictCol)
@@ -226,14 +216,8 @@ namespace WinFormsApp.View.Container
                     overrideStyle = GetOverrideStyle(day, empId);
             }
 
-            cellStyle.BackColor = _styleResolver.ResolveBackground(overrideStyle, isWeekend);
-            cellStyle.ForeColor = _styleResolver.ResolveForeground(overrideStyle);
-
-            if (!_loggedWeekendStyle && isWeekend)
-            {
-                Debug.WriteLine($"Schedule weekend styling applied: {year}-{month:D2}-{day:D2} ({columnName}).");
-                _loggedWeekendStyle = true;
-            }
+            e.CellStyle.BackColor = _styleResolver.ResolveBackground(overrideStyle, isWeekend);
+            e.CellStyle.ForeColor = _styleResolver.ResolveForeground(overrideStyle);
         }
     }
 }
