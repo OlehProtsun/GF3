@@ -145,6 +145,18 @@ namespace WinFormsApp.Presenter.Container
                 }
             }, ct, busyText);
 
+        private static Task<T> RunServiceAsync<T>(Func<CancellationToken, Task<T>> action, CancellationToken ct)
+        {
+            if (action is null) throw new ArgumentNullException(nameof(action));
+            return Task.Run(() => action(ct), ct).Unwrap();
+        }
+
+        private static Task RunServiceAsync(Func<CancellationToken, Task> action, CancellationToken ct)
+        {
+            if (action is null) throw new ArgumentNullException(nameof(action));
+            return Task.Run(() => action(ct), ct).Unwrap();
+        }
+
         private ContainerModel? CurrentContainer => _containerBinding.Current as ContainerModel;
         private ScheduleModel? CurrentSchedule => _scheduleBinding.Current as ScheduleModel;
 

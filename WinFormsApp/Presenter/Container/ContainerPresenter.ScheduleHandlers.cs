@@ -21,9 +21,9 @@ namespace WinFormsApp.Presenter.Container
                 return _allAvailabilityGroups;
             }
 
-            var groups = (await _availabilityGroupService.GetAllAsync(ct)).ToList();
-            var shops = await _shopService.GetAllAsync(ct);
-            var employees = await _employeeService.GetAllAsync(ct);
+            var groups = (await RunServiceAsync(_availabilityGroupService.GetAllAsync, ct)).ToList();
+            var shops = await RunServiceAsync(_shopService.GetAllAsync, ct);
+            var employees = await RunServiceAsync(_employeeService.GetAllAsync, ct);
 
             _allAvailabilityGroups.Clear();
             _allAvailabilityGroups.AddRange(groups);
@@ -45,7 +45,10 @@ namespace WinFormsApp.Presenter.Container
         private async Task LoadSchedulesAsync(int containerId, string? search, CancellationToken ct)
         {
             _view.ScheduleContainerId = containerId;
-            _scheduleBinding.DataSource = await _scheduleService.GetByContainerAsync(containerId, search, ct);
+            var schedules = await RunServiceAsync(
+                innerCt => _scheduleService.GetByContainerAsync(containerId, search, innerCt),
+                ct);
+            _scheduleBinding.DataSource = schedules;
         }
 
         private async Task OnScheduleSearchCoreAsync(CancellationToken ct)
@@ -85,7 +88,9 @@ namespace WinFormsApp.Presenter.Container
 
             ResetScheduleEditFilters();
 
-            var detailed = await _scheduleService.GetDetailedAsync(schedule.Id, ct);
+            var detailed = await RunServiceAsync(
+                innerCt => _scheduleService.GetDetailedAsync(schedule.Id, innerCt),
+                ct);
 
             _view.ScheduleEmployees = detailed?.Employees?.ToList() ?? new List<ScheduleEmployeeModel>();
             _view.ScheduleSlots = detailed?.Slots?.ToList() ?? new List<ScheduleSlotModel>();
@@ -155,7 +160,9 @@ namespace WinFormsApp.Presenter.Container
             var slots = _view.ScheduleSlots ?? new List<ScheduleSlotModel>();
             var cellStyles = _view.ScheduleCellStyles ?? new List<ScheduleCellStyleModel>();
 
-            await _scheduleService.SaveWithDetailsAsync(model, employees, slots, cellStyles, ct);
+            await RunServiceAsync(
+                innerCt => _scheduleService.SaveWithDetailsAsync(model, employees, slots, cellStyles, innerCt),
+                ct);
 
             _view.ShowInfo(_view.IsEdit ? "Schedule updated successfully." : "Schedule added successfully.");
             _view.IsSuccessful = true;
@@ -172,7 +179,9 @@ namespace WinFormsApp.Presenter.Container
             if (!_view.Confirm($"Delete schedule {schedule.Name}?"))
                 return;
 
-            await _scheduleService.DeleteAsync(schedule.Id, ct);
+            await RunServiceAsync(
+                innerCt => _scheduleService.DeleteAsync(schedule.Id, innerCt),
+                ct);
 
             await LoadSchedulesAsync(schedule.ContainerId, search: null, ct);
 
@@ -267,7 +276,9 @@ namespace WinFormsApp.Presenter.Container
             var schedule = CurrentSchedule;
             if (schedule is null) return;
 
-            var detailed = await _scheduleService.GetDetailedAsync(schedule.Id, ct);
+            var detailed = await RunServiceAsync(
+                innerCt => _scheduleService.GetDetailedAsync(schedule.Id, innerCt),
+                ct);
             if (detailed is null) return;
 
             _view.ScheduleEmployees = detailed.Employees?.ToList() ?? new List<ScheduleEmployeeModel>();
