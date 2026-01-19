@@ -17,6 +17,7 @@ namespace WPFApp.ViewModel.Container
 
         private readonly Dictionary<int, string> _employeeTotalHoursText = new();
         private CancellationTokenSource? _matrixCts;
+        private int _matrixVersion;
 
 
         private int _scheduleId;
@@ -112,6 +113,7 @@ namespace WPFApp.ViewModel.Container
             _matrixCts?.Cancel();
             _matrixCts?.Dispose();
             var localCts = _matrixCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            var version = ++_matrixVersion;
 
             // швидко оновлюємо прості поля (на UI thread)
             await _owner.RunOnUiThreadAsync(() =>
@@ -128,6 +130,7 @@ namespace WPFApp.ViewModel.Container
 
                 // поки будуємо матрицю — можна очистити/залишити стару (я очищаю)
                 ScheduleMatrix = new DataView();
+                MatrixRefreshDiagnostics.RecordMatrixChanged(nameof(ContainerScheduleProfileViewModel));
                 MatrixChanged?.Invoke(this, EventArgs.Empty);
             }).ConfigureAwait(false);
 
@@ -143,8 +146,7 @@ namespace WPFApp.ViewModel.Container
                 // важка побудова — OFF UI thread
                 var built = await Task.Run(() =>
                 {
-                    localCts.Token.ThrowIfCancellationRequested();
-
+                    var sw = System.Diagnostics.Stopwatch.StartNew();
                     var table = ContainerScheduleEditViewModel.BuildScheduleTable(
                         year, month,
                         slotsSnapshot,
@@ -153,17 +155,25 @@ namespace WPFApp.ViewModel.Container
 
                     // totals теж порахуємо тут, щоб UI тільки присвоїв
                     RecalculateTotals(employeesSnapshot, slotsSnapshot, out var empCount, out var hoursText);
-
+                    sw.Stop();
+                    MatrixRefreshDiagnostics.RecordScheduleMatrixBuild(sw.Elapsed, table.Rows.Count, table.Columns.Count);
                     return (View: table.DefaultView, ColMap: colMap, EmpCount: empCount, HoursText: hoursText, Styles: stylesSnapshot);
                 }, localCts.Token).ConfigureAwait(false);
+
+                if (localCts.IsCancellationRequested || version != _matrixVersion)
+                    return;
 
                 // застосування результатів — на UI thread
                 await _owner.RunOnUiThreadAsync(() =>
                 {
+                    if (localCts.IsCancellationRequested || version != _matrixVersion)
+                        return;
+
                     ScheduleMatrix = built.View;
                     RebuildStyleMaps(built.ColMap, built.Styles);
                     TotalEmployees = built.EmpCount;
                     TotalHoursText = built.HoursText;
+                    MatrixRefreshDiagnostics.RecordMatrixChanged(nameof(ContainerScheduleProfileViewModel));
                     MatrixChanged?.Invoke(this, EventArgs.Empty);
                 }).ConfigureAwait(false);
             }

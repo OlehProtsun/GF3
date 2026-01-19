@@ -43,6 +43,9 @@ namespace WPFApp.ViewModel.Container
 
         private bool _initialized;
         private int? _openedProfileContainerId;
+        private CancellationTokenSource? _availabilityPreviewCts;
+        private int _availabilityPreviewVersion;
+        private string? _availabilityPreviewRequestKey;
 
         private object _currentSection = null!;
         private const int MaxOpenedSchedules = 20;
@@ -897,6 +900,8 @@ namespace WPFApp.ViewModel.Container
 
             if (year < 1 || month < 1 || month > 12)
             {
+                CancelAvailabilityPreviewPipeline();
+                _availabilityPreviewRequestKey = null;
                 await ScheduleEditVm.RefreshAvailabilityPreviewMatrixAsync(
                     year, month,
                     new List<ScheduleSlotModel>(),
@@ -910,6 +915,8 @@ namespace WPFApp.ViewModel.Container
             var selectedGroupId = ScheduleEditVm.SelectedBlock.SelectedAvailabilityGroupId;
             if (selectedGroupId <= 0)
             {
+                CancelAvailabilityPreviewPipeline();
+                _availabilityPreviewRequestKey = null;
                 await ScheduleEditVm.RefreshAvailabilityPreviewMatrixAsync(
                     year, month,
                     new List<ScheduleSlotModel>(),
@@ -920,78 +927,138 @@ namespace WPFApp.ViewModel.Container
                 return;
             }
 
-            (string from, string to)? shift1 = TrySplitShift(ScheduleEditVm.ScheduleShift1);
-            (string from, string to)? shift2 = TrySplitShift(ScheduleEditVm.ScheduleShift2);
             var previewKey = $"{selectedGroupId}|{year}|{month}|{ScheduleEditVm.ScheduleShift1}|{ScheduleEditVm.ScheduleShift2}";
-
-            var employees = new List<ScheduleEmployeeModel>();
-            var slots = new List<ScheduleSlotModel>();
-            var seenEmp = new HashSet<int>();
-            var seenSlot = new HashSet<string>();
-
-            var (group, members, days) = await _availabilityGroupService.LoadFullAsync(selectedGroupId, ct);
-
-            if (group.Year != year || group.Month != month)
+            if (ScheduleEditVm.IsAvailabilityPreviewCurrent(previewKey))
             {
-                await ScheduleEditVm.RefreshAvailabilityPreviewMatrixAsync(
-                    year, month,
-                    new List<ScheduleSlotModel>(),
-                    new List<ScheduleEmployeeModel>(),
-                    previewKey: null,
-                    ct
-                );
+                MatrixRefreshDiagnostics.RecordAvailabilityPreviewRequest(previewKey, skipped: true);
+                _availabilityPreviewRequestKey = previewKey;
                 return;
             }
 
-            var daysByMember = days
-                .GroupBy(d => d.AvailabilityGroupMemberId)
-                .ToDictionary(g => g.Key, g => g.ToList());
-
-            foreach (var m in members)
+            if (previewKey == _availabilityPreviewRequestKey && _availabilityPreviewCts != null && !_availabilityPreviewCts.IsCancellationRequested)
             {
-                if (seenEmp.Add(m.EmployeeId))
-                {
-                    employees.Add(new ScheduleEmployeeModel
-                    {
-                        EmployeeId = m.EmployeeId,
-                        Employee = m.Employee
-                    });
-                }
-
-                if (!daysByMember.TryGetValue(m.Id, out var mdays) || mdays.Count == 0)
-                    continue;
-
-                foreach (var d in mdays)
-                {
-                    if (d.Kind == AvailabilityKind.NONE)
-                        continue;
-
-                    if (d.Kind == AvailabilityKind.INT)
-                    {
-                        if (string.IsNullOrWhiteSpace(d.IntervalStr))
-                            continue;
-
-                        if (!AvailabilityCodeParser.TryNormalizeInterval(d.IntervalStr, out var normalized))
-                            continue;
-
-                        if (TrySplitInterval(normalized, out var from, out var to))
-                            AddSlotUnique(m.EmployeeId, d.DayOfMonth, from, to);
-
-                        continue;
-                    }
-
-                    if (d.Kind == AvailabilityKind.ANY)
-                    {
-                        if (shift1 != null) AddSlotUnique(m.EmployeeId, d.DayOfMonth, shift1.Value.from, shift1.Value.to);
-                        if (shift2 != null) AddSlotUnique(m.EmployeeId, d.DayOfMonth, shift2.Value.from, shift2.Value.to);
-                    }
-                }
+                MatrixRefreshDiagnostics.RecordAvailabilityPreviewRequest(previewKey, skipped: true);
+                return;
             }
 
-            // Build matrix off UI thread to keep scrolling smooth.
-            await ScheduleEditVm.RefreshAvailabilityPreviewMatrixAsync(year, month, slots, employees, previewKey, ct);
+            MatrixRefreshDiagnostics.RecordAvailabilityPreviewRequest(previewKey, skipped: false);
+            _availabilityPreviewRequestKey = previewKey;
 
-            void AddSlotUnique(int empId, int day, string from, string to)
+            CancelAvailabilityPreviewPipeline();
+            var localCts = _availabilityPreviewCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            var version = ++_availabilityPreviewVersion;
+
+            try
+            {
+                var (group, members, days) = await _availabilityGroupService.LoadFullAsync(selectedGroupId, localCts.Token);
+
+                if (localCts.IsCancellationRequested || version != _availabilityPreviewVersion)
+                    return;
+
+                if (group.Year != year || group.Month != month)
+                {
+                    await ScheduleEditVm.RefreshAvailabilityPreviewMatrixAsync(
+                        year, month,
+                        new List<ScheduleSlotModel>(),
+                        new List<ScheduleEmployeeModel>(),
+                        previewKey: null,
+                        localCts.Token
+                    );
+                    return;
+                }
+
+                var shift1 = TrySplitShift(ScheduleEditVm.ScheduleShift1);
+                var shift2 = TrySplitShift(ScheduleEditVm.ScheduleShift2);
+
+                var result = await Task.Run(() =>
+                {
+                    var employees = new List<ScheduleEmployeeModel>();
+                    var slots = new List<ScheduleSlotModel>();
+                    var seenEmp = new HashSet<int>();
+                    var seenSlot = new HashSet<string>();
+
+                    var daysByMember = days
+                        .GroupBy(d => d.AvailabilityGroupMemberId)
+                        .ToDictionary(g => g.Key, g => g.ToList());
+
+                    foreach (var m in members)
+                    {
+                        if (seenEmp.Add(m.EmployeeId))
+                        {
+                            employees.Add(new ScheduleEmployeeModel
+                            {
+                                EmployeeId = m.EmployeeId,
+                                Employee = m.Employee
+                            });
+                        }
+
+                        if (!daysByMember.TryGetValue(m.Id, out var mdays) || mdays.Count == 0)
+                            continue;
+
+                        foreach (var d in mdays)
+                        {
+                            if (d.Kind == AvailabilityKind.NONE)
+                                continue;
+
+                            if (d.Kind == AvailabilityKind.INT)
+                            {
+                                if (string.IsNullOrWhiteSpace(d.IntervalStr))
+                                    continue;
+
+                                if (!AvailabilityCodeParser.TryNormalizeInterval(d.IntervalStr, out var normalized))
+                                    continue;
+
+                                if (TrySplitInterval(normalized, out var from, out var to))
+                                    AddSlotUnique(m.EmployeeId, d.DayOfMonth, from, to, slots, seenSlot);
+
+                                continue;
+                            }
+
+                            if (d.Kind == AvailabilityKind.ANY)
+                            {
+                                if (shift1 != null) AddSlotUnique(m.EmployeeId, d.DayOfMonth, shift1.Value.from, shift1.Value.to, slots, seenSlot);
+                                if (shift2 != null) AddSlotUnique(m.EmployeeId, d.DayOfMonth, shift2.Value.from, shift2.Value.to, slots, seenSlot);
+                            }
+                        }
+                    }
+
+                    return (Employees: employees, Slots: slots);
+                }, localCts.Token);
+
+                if (localCts.IsCancellationRequested || version != _availabilityPreviewVersion)
+                    return;
+
+                // Build matrix off UI thread to keep scrolling smooth.
+                await ScheduleEditVm.RefreshAvailabilityPreviewMatrixAsync(
+                    year, month,
+                    result.Slots,
+                    result.Employees,
+                    previewKey,
+                    localCts.Token);
+            }
+            catch (OperationCanceledException) { }
+            catch (Exception ex)
+            {
+                ShowError(ex);
+            }
+
+            static bool TrySplitInterval(string normalized, out string from, out string to)
+            {
+                from = to = string.Empty;
+                var parts = normalized.Split('-', 2, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+                if (parts.Length != 2) return false;
+                from = parts[0];
+                to = parts[1];
+                return true;
+            }
+
+            static void AddSlotUnique(
+                int empId,
+                int day,
+                string from,
+                string to,
+                List<ScheduleSlotModel> slots,
+                HashSet<string> seenSlot)
             {
                 var key = $"{empId}|{day}|{from}|{to}";
                 if (!seenSlot.Add(key)) return;
@@ -1007,16 +1074,6 @@ namespace WPFApp.ViewModel.Container
                 });
             }
 
-            static bool TrySplitInterval(string normalized, out string from, out string to)
-            {
-                from = to = string.Empty;
-                var parts = normalized.Split('-', 2, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-                if (parts.Length != 2) return false;
-                from = parts[0];
-                to = parts[1];
-                return true;
-            }
-
             (string from, string to)? TrySplitShift(string rawShift)
             {
                 if (!TryNormalizeShiftRange(rawShift, out var normalized, out _))
@@ -1024,6 +1081,20 @@ namespace WPFApp.ViewModel.Container
 
                 return TrySplitInterval(normalized, out var f, out var t) ? (f, t) : null;
             }
+        }
+
+        internal void CancelScheduleEditWork()
+        {
+            CancelAvailabilityPreviewPipeline();
+            _availabilityPreviewVersion++;
+            _availabilityPreviewRequestKey = null;
+        }
+
+        private void CancelAvailabilityPreviewPipeline()
+        {
+            _availabilityPreviewCts?.Cancel();
+            _availabilityPreviewCts?.Dispose();
+            _availabilityPreviewCts = null;
         }
 
         private async Task LoadContainersAsync(CancellationToken ct, int? selectId = null)
