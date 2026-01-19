@@ -6,6 +6,10 @@ using System.Collections.Generic;
 using System.Data;
 using System.Globalization;
 using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
+using System.Diagnostics;
+using System.Linq;
 
 namespace WinFormsApp.View.Container
 {
@@ -59,17 +63,78 @@ namespace WinFormsApp.View.Container
 
             _rebindRetry = 0;
 
-            // ✅ один-єдиний binding
-            _scheduleTable = BindScheduleMatrix(
-                grid: slotGrid,
-                year: ScheduleYear,
-                month: ScheduleMonth,
-                slots: _slots,
-                employees: _employees,
-                readOnly: false,
-                configureGrid: false
-            );
+            var year = ScheduleYear;
+            var month = ScheduleMonth;
+            var slotsSnapshot = _slots.ToList();
+            var employeesSnapshot = _employees.ToList();
+            var refreshVersion = Interlocked.Increment(ref _scheduleRefreshVersion);
 
+            Task.Run(() =>
+            {
+                var buildSw = Stopwatch.StartNew();
+                var table = BuildScheduleTable(year, month, slotsSnapshot, employeesSnapshot, out var map);
+                buildSw.Stop();
+                return (table, map, buildSw.Elapsed);
+            }, _lifetimeCts.Token).ContinueWith(task =>
+            {
+                if (task.IsCanceled || task.IsFaulted)
+                {
+#if DEBUG
+                    Debug.WriteLine($"[ScheduleMatrix] Build failed: {task.Exception?.GetBaseException().Message}");
+#endif
+                    return;
+                }
+
+                if (IsDisposed || refreshVersion != _scheduleRefreshVersion)
+                    return;
+
+                var (table, map, buildElapsed) = task.Result;
+                if (InvokeRequired)
+                {
+                    BeginInvoke(new Action(() => ApplyScheduleTable(table, map, year, month, buildElapsed)));
+                    return;
+                }
+
+                ApplyScheduleTable(table, map, year, month, buildElapsed);
+            }, TaskScheduler.Default);
+        }
+
+        private void ApplyScheduleTable(
+            DataTable table,
+            Dictionary<string, int> map,
+            int year,
+            int month,
+            TimeSpan buildElapsed)
+        {
+            if (IsDisposed) return;
+
+            var assignSw = Stopwatch.StartNew();
+
+            RegisterMatrixGridMetadata(slotGrid, map, year, month);
+
+            slotGrid.SuspendLayout();
+            try
+            {
+                slotGrid.DataSource = null;
+                slotGrid.AutoGenerateColumns = true;
+                slotGrid.DataSource = table;
+
+                ApplyDayAndConflictColumnsStyle(slotGrid);
+            }
+            finally
+            {
+                slotGrid.ResumeLayout();
+            }
+
+            _scheduleTable = table;
+            assignSw.Stop();
+
+#if DEBUG
+            Debug.WriteLine(
+                $"[ScheduleMatrix] Build={buildElapsed.TotalMilliseconds:N0}ms " +
+                $"Assign={assignSw.Elapsed.TotalMilliseconds:N0}ms " +
+                $"Rows={table.Rows.Count} Cols={table.Columns.Count}");
+#endif
         }
 
         private DataTable BindScheduleMatrix(

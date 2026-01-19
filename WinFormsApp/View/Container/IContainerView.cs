@@ -48,6 +48,10 @@ namespace WinFormsApp.View.Container
         IList<ScheduleEmployeeModel> ScheduleEmployees { get; set; }
         IList<ScheduleSlotModel> ScheduleSlots { get; set; }
         IList<ScheduleCellStyleModel> ScheduleCellStyles { get; set; }
+        void SetScheduleGeneratedData(
+            IList<ScheduleEmployeeModel> employees,
+            IList<ScheduleSlotModel> slots,
+            IList<ScheduleCellStyleModel> cellStyles);
 
         bool IsEdit { get; set; }
         bool IsSuccessful { get; set; }

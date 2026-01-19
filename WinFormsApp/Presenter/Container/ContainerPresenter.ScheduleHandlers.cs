@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Diagnostics;
 using WinFormsApp.Presenter.Availability;
 using WinFormsApp.ViewModel;
 
@@ -312,6 +313,7 @@ namespace WinFormsApp.Presenter.Container
                 return;
             }
 
+            var mapSw = Stopwatch.StartNew();
             await LoadLookupsAsync(ct);
 
             var fullGroups = new List<AvailabilityGroupModel>(capacity: 1);
@@ -353,19 +355,35 @@ namespace WinFormsApp.Presenter.Container
                 fullGroups.Add(group);
             }
 
+            mapSw.Stop();
+#if DEBUG
+            Debug.WriteLine($"[ScheduleGenerate] Mapping time: {mapSw.Elapsed.TotalMilliseconds:N0}ms");
+#endif
+
             if (fullGroups.Count == 0 || employees.Count == 0)
             {
                 _view.ShowError("No employees/availability found for selected groups for this month.");
                 return;
             }
 
+            var genSw = Stopwatch.StartNew();
             var slots = await _generator.GenerateAsync(model, fullGroups, employees, progress, ct);
+            genSw.Stop();
+#if DEBUG
+            Debug.WriteLine($"[ScheduleGenerate] Generation time: {genSw.Elapsed.TotalMilliseconds:N0}ms");
+#endif
 
+            var assignSw = Stopwatch.StartNew();
             _view.ScheduleShift1 = model.Shift1Time;
             _view.ScheduleShift2 = model.Shift2Time;
-            _view.ScheduleEmployees = employees;
-            _view.ScheduleSlots = slots.ToList();
-            _view.ScheduleCellStyles = new List<ScheduleCellStyleModel>();
+            _view.SetScheduleGeneratedData(
+                employees,
+                slots.ToList(),
+                new List<ScheduleCellStyleModel>());
+            assignSw.Stop();
+#if DEBUG
+            Debug.WriteLine($"[ScheduleGenerate] UI assignment time: {assignSw.Elapsed.TotalMilliseconds:N0}ms");
+#endif
 
             _view.ShowInfo("Slots generated. Review before saving.");
         }
