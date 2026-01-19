@@ -37,6 +37,8 @@ namespace WPFApp.ViewModel.Container
         private CancellationTokenSource? _availabilityPreviewCts;
         private CancellationTokenSource? _scheduleMatrixCts;
         private string? _availabilityPreviewKey;
+        private int _scheduleMatrixVersion;
+        private int _availabilityPreviewVersion;
 
 
         private readonly ContainerViewModel _owner;
@@ -150,7 +152,7 @@ namespace WPFApp.ViewModel.Container
                     RefreshCellStyleMap();
                     SelectedCellRefs.Clear();
                     SelectedCellRef = null;
-                    _ = EnsureAvailabilitySelectionLoadedAsync();
+                    SafeForget(EnsureAvailabilitySelectionLoadedAsync());
                 }
             }
         }
@@ -256,7 +258,7 @@ namespace WPFApp.ViewModel.Container
                 ClearValidationErrors(nameof(ScheduleMonth));
 
                 InvalidateGeneratedScheduleAndClearMatrices(); // очищає і schedule і preview
-                _ = _owner.UpdateAvailabilityPreviewAsync(); // ✅ підвантажити заново під новий місяць
+                SafeForget(_owner.UpdateAvailabilityPreviewAsync()); // ✅ підвантажити заново під новий місяць
             }
         }
 
@@ -405,10 +407,10 @@ namespace WPFApp.ViewModel.Container
 
                 // 1) підтягнути працівників в MinHours
                 if (groupId > 0)
-                    _ = _owner.SyncEmployeesFromAvailabilityGroupAsync(groupId);
+                    SafeForget(_owner.SyncEmployeesFromAvailabilityGroupAsync(groupId));
 
                 // 2) Availability grid — завантажити одразу
-                _ = _owner.UpdateAvailabilityPreviewAsync();
+                SafeForget(_owner.UpdateAvailabilityPreviewAsync());
             }
         }
 
@@ -550,6 +552,7 @@ namespace WPFApp.ViewModel.Container
             ScheduleMatrix = new DataView();
             AvailabilityPreviewMatrix = new DataView();
             _availabilityPreviewKey = null;
+            UpdateTotals(Array.Empty<ScheduleEmployeeModel>(), Array.Empty<ScheduleSlotModel>());
             _cellStyleStore.Load(Array.Empty<ScheduleCellStyleModel>());
             CellStyleRevision++;
             SelectedCellRef = null;
@@ -567,67 +570,6 @@ namespace WPFApp.ViewModel.Container
                 ? text
                 : "Total hours: 0h 0m";
         }
-
-        private void RecalculateTotals()
-        {
-            _employeeTotalHoursText.Clear();
-
-            if (SelectedBlock is null)
-            {
-                TotalEmployees = 0;
-                TotalHoursText = "0h 0m";
-                return;
-            }
-
-            // 1) Total employees (distinct)
-            TotalEmployees = SelectedBlock.Employees
-                .Select(e => e.EmployeeId)
-                .Distinct()
-                .Count();
-
-            // 2) Total hours (sum) + per employee totals
-            var total = TimeSpan.Zero;
-            var perEmp = new Dictionary<int, TimeSpan>();
-
-            foreach (var s in SelectedBlock.Slots)
-            {
-                // ✅ EmployeeId nullable
-                if (!s.EmployeeId.HasValue || s.EmployeeId.Value <= 0)
-                    continue;
-
-                var empId = s.EmployeeId.Value;
-
-                if (string.IsNullOrWhiteSpace(s.FromTime) || string.IsNullOrWhiteSpace(s.ToTime))
-                    continue;
-
-                if (!TimeSpan.TryParseExact(s.FromTime.Trim(), @"hh\:mm", CultureInfo.InvariantCulture, out var from))
-                    continue;
-
-                if (!TimeSpan.TryParseExact(s.ToTime.Trim(), @"hh\:mm", CultureInfo.InvariantCulture, out var to))
-                    continue;
-
-                var dur = to - from;
-                if (dur < TimeSpan.Zero)
-                    dur += TimeSpan.FromHours(24);
-
-                total += dur;
-
-                if (!perEmp.TryGetValue(empId, out var cur))
-                    cur = TimeSpan.Zero;
-
-                perEmp[empId] = cur + dur;
-            }
-
-            // кешуємо текст для всіх employees блоку (навіть якщо 0)
-            foreach (var empId in SelectedBlock.Employees.Select(e => e.EmployeeId).Distinct())
-            {
-                perEmp.TryGetValue(empId, out var empTotal);
-                _employeeTotalHoursText[empId] = $"Total hours: {(int)empTotal.TotalHours}h {empTotal.Minutes}m";
-            }
-
-            TotalHoursText = $"{(int)total.TotalHours}h {total.Minutes}m";
-        }
-
 
         public void SetLookups(IEnumerable<ShopModel> shops, IEnumerable<AvailabilityGroupModel> groups, IEnumerable<EmployeeModel> employees)
         {
@@ -659,10 +601,10 @@ namespace WPFApp.ViewModel.Container
                 if (groupId != previousGroupId)
                 {
                     if (groupId > 0)
-                        _ = _owner.SyncEmployeesFromAvailabilityGroupAsync(groupId);
+                        SafeForget(_owner.SyncEmployeesFromAvailabilityGroupAsync(groupId));
 
                     RestoreMatricesForSelection();
-                    _ = _owner.UpdateAvailabilityPreviewAsync();
+                    SafeForget(_owner.UpdateAvailabilityPreviewAsync());
                 }
             }
         }
@@ -679,6 +621,8 @@ namespace WPFApp.ViewModel.Container
 
             // очищаємо відображення (без BuildScheduleTable)
             ScheduleMatrix = new DataView();
+            UpdateTotals(Array.Empty<ScheduleEmployeeModel>(), Array.Empty<ScheduleSlotModel>());
+            MatrixRefreshDiagnostics.RecordMatrixChanged(nameof(ContainerScheduleEditViewModel));
             MatrixChanged?.Invoke(this, EventArgs.Empty);
         }
 
@@ -724,6 +668,7 @@ namespace WPFApp.ViewModel.Container
             _scheduleMatrixCts?.Cancel();
             _scheduleMatrixCts?.Dispose();
             var localCts = _scheduleMatrixCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            var version = ++_scheduleMatrixVersion;
 
             try
             {
@@ -734,7 +679,8 @@ namespace WPFApp.ViewModel.Container
                     await _owner.RunOnUiThreadAsync(() =>
                     {
                         ScheduleMatrix = new DataView();
-                        RecalculateTotals();
+                        UpdateTotals(Array.Empty<ScheduleEmployeeModel>(), Array.Empty<ScheduleSlotModel>());
+                        MatrixRefreshDiagnostics.RecordMatrixChanged(nameof(ContainerScheduleEditViewModel));
                         MatrixChanged?.Invoke(this, EventArgs.Empty);
                     }).ConfigureAwait(false);
 
@@ -750,20 +696,31 @@ namespace WPFApp.ViewModel.Container
                 // важка робота — OFF UI thread
                 var result = await Task.Run(() =>
                 {
+                    var sw = System.Diagnostics.Stopwatch.StartNew();
                     var table = BuildScheduleTable(year, month, slotsSnapshot, employeesSnapshot, out var colMap);
-                    return (View: table.DefaultView, ColMap: colMap);
+                    var totals = CalculateTotals(employeesSnapshot, slotsSnapshot);
+                    sw.Stop();
+                    MatrixRefreshDiagnostics.RecordScheduleMatrixBuild(sw.Elapsed, table.Rows.Count, table.Columns.Count);
+                    return (View: table.DefaultView, ColMap: colMap, Totals: totals);
                 }, localCts.Token).ConfigureAwait(false);
+
+                if (localCts.IsCancellationRequested || version != _scheduleMatrixVersion)
+                    return;
 
                 // застосування в VM — на UI thread
                 await _owner.RunOnUiThreadAsync(() =>
                 {
+                    if (localCts.IsCancellationRequested || version != _scheduleMatrixVersion)
+                        return;
+
                     _colNameToEmpId.Clear();
                     foreach (var pair in result.ColMap)
                         _colNameToEmpId[pair.Key] = pair.Value;
 
                     ScheduleMatrix = result.View;
 
-                    RecalculateTotals();
+                    ApplyTotals(result.Totals);
+                    MatrixRefreshDiagnostics.RecordMatrixChanged(nameof(ContainerScheduleEditViewModel));
                     MatrixChanged?.Invoke(this, EventArgs.Empty);
                 }).ConfigureAwait(false);
             }
@@ -791,6 +748,7 @@ namespace WPFApp.ViewModel.Container
             _availabilityPreviewCts?.Cancel();
             _availabilityPreviewCts?.Dispose();
             var localCts = _availabilityPreviewCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            var version = ++_availabilityPreviewVersion;
 
             try
             {
@@ -807,6 +765,7 @@ namespace WPFApp.ViewModel.Container
                     {
                         AvailabilityPreviewMatrix = new DataView();
                         _availabilityPreviewKey = null;
+                        MatrixRefreshDiagnostics.RecordMatrixChanged(nameof(ContainerScheduleEditViewModel));
                         MatrixChanged?.Invoke(this, EventArgs.Empty);
                     }).ConfigureAwait(false);
                     return;
@@ -815,14 +774,24 @@ namespace WPFApp.ViewModel.Container
                 // Heavy work off the UI thread
                 var view = await Task.Run(() =>
                 {
+                    var sw = System.Diagnostics.Stopwatch.StartNew();
                     var table = BuildScheduleTable(year, month, slots, employees, out _);
+                    sw.Stop();
+                    MatrixRefreshDiagnostics.RecordAvailabilityPreviewBuild(sw.Elapsed, table.Rows.Count, table.Columns.Count);
                     return table.DefaultView;
                 }, localCts.Token).ConfigureAwait(false);
 
+                if (localCts.IsCancellationRequested || version != _availabilityPreviewVersion)
+                    return;
+
                 await _owner.RunOnUiThreadAsync(() =>
                 {
+                    if (localCts.IsCancellationRequested || version != _availabilityPreviewVersion)
+                        return;
+
                     AvailabilityPreviewMatrix = view;
                     _availabilityPreviewKey = previewKey;
+                    MatrixRefreshDiagnostics.RecordMatrixChanged(nameof(ContainerScheduleEditViewModel));
                     MatrixChanged?.Invoke(this, EventArgs.Empty);
                 }).ConfigureAwait(false);
             }
@@ -1017,6 +986,8 @@ namespace WPFApp.ViewModel.Container
             _scheduleMatrixCts?.Cancel();
             _scheduleMatrixCts?.Dispose();
             _scheduleMatrixCts = null;
+
+            _owner.CancelScheduleEditWork();
         }
 
 
@@ -1149,6 +1120,15 @@ namespace WPFApp.ViewModel.Container
             target.Clear();
             foreach (var item in items)
                 target.Add(item);
+        }
+
+        internal bool IsAvailabilityPreviewCurrent(string? previewKey)
+        {
+            if (string.IsNullOrWhiteSpace(previewKey))
+                return false;
+
+            return previewKey == _availabilityPreviewKey
+                && AvailabilityPreviewMatrix?.Table?.Columns.Count > 0;
         }
 
         public static DataTable BuildScheduleTable(
@@ -1287,6 +1267,76 @@ namespace WPFApp.ViewModel.Container
 
             return table;
         }
+
+        private static ScheduleTotals CalculateTotals(
+            IList<ScheduleEmployeeModel> employees,
+            IList<ScheduleSlotModel> slots)
+        {
+            var employeeTotalHoursText = new Dictionary<int, string>();
+            var totalEmployees = employees
+                .Select(e => e.EmployeeId)
+                .Distinct()
+                .Count();
+
+            var total = TimeSpan.Zero;
+            var perEmp = new Dictionary<int, TimeSpan>();
+
+            foreach (var s in slots)
+            {
+                if (!s.EmployeeId.HasValue || s.EmployeeId.Value <= 0)
+                    continue;
+
+                if (string.IsNullOrWhiteSpace(s.FromTime) || string.IsNullOrWhiteSpace(s.ToTime))
+                    continue;
+
+                if (!TimeSpan.TryParseExact(s.FromTime.Trim(), @"hh\:mm", CultureInfo.InvariantCulture, out var from))
+                    continue;
+
+                if (!TimeSpan.TryParseExact(s.ToTime.Trim(), @"hh\:mm", CultureInfo.InvariantCulture, out var to))
+                    continue;
+
+                var dur = to - from;
+                if (dur < TimeSpan.Zero)
+                    dur += TimeSpan.FromHours(24);
+
+                total += dur;
+
+                var empId = s.EmployeeId.Value;
+                if (!perEmp.TryGetValue(empId, out var cur))
+                    cur = TimeSpan.Zero;
+
+                perEmp[empId] = cur + dur;
+            }
+
+            foreach (var empId in employees.Select(e => e.EmployeeId).Distinct())
+            {
+                perEmp.TryGetValue(empId, out var empTotal);
+                employeeTotalHoursText[empId] = $"Total hours: {(int)empTotal.TotalHours}h {empTotal.Minutes}m";
+            }
+
+            return new ScheduleTotals(totalEmployees, $"{(int)total.TotalHours}h {total.Minutes}m", employeeTotalHoursText);
+        }
+
+        private void ApplyTotals(ScheduleTotals totals)
+        {
+            _employeeTotalHoursText.Clear();
+            foreach (var kv in totals.EmployeeTotalHoursText)
+                _employeeTotalHoursText[kv.Key] = kv.Value;
+
+            TotalEmployees = totals.TotalEmployees;
+            TotalHoursText = totals.TotalHoursText;
+        }
+
+        private void UpdateTotals(IList<ScheduleEmployeeModel> employees, IList<ScheduleSlotModel> slots)
+        {
+            var totals = CalculateTotals(employees, slots);
+            ApplyTotals(totals);
+        }
+
+        private sealed record ScheduleTotals(
+            int TotalEmployees,
+            string TotalHoursText,
+            Dictionary<int, string> EmployeeTotalHoursText);
         private static List<(string from, string to)> MergeIntervalsForDisplay(IEnumerable<ScheduleSlotModel> slots)
         {
             var list = new List<(TimeSpan from, TimeSpan to)>();
@@ -1434,7 +1484,8 @@ namespace WPFApp.ViewModel.Container
             AvailabilityPreviewMatrix = new DataView();
             ScheduleMatrix = new DataView();
             _availabilityPreviewKey = null;
-            RecalculateTotals();
+            UpdateTotals(Array.Empty<ScheduleEmployeeModel>(), Array.Empty<ScheduleSlotModel>());
+            MatrixRefreshDiagnostics.RecordMatrixChanged(nameof(ContainerScheduleEditViewModel));
             MatrixChanged?.Invoke(this, EventArgs.Empty);
         }
 
@@ -1451,6 +1502,8 @@ namespace WPFApp.ViewModel.Container
             ScheduleMatrix = new DataView();
             AvailabilityPreviewMatrix = new DataView();
             _availabilityPreviewKey = null;
+            UpdateTotals(Array.Empty<ScheduleEmployeeModel>(), Array.Empty<ScheduleSlotModel>());
+            MatrixRefreshDiagnostics.RecordMatrixChanged(nameof(ContainerScheduleEditViewModel));
             MatrixChanged?.Invoke(this, EventArgs.Empty);
         }
 
