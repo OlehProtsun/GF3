@@ -68,14 +68,16 @@ namespace WinFormsApp.View.Container
             var slotsSnapshot = _slots.ToList();
             var employeesSnapshot = _employees.ToList();
             var refreshVersion = Interlocked.Increment(ref _scheduleRefreshVersion);
+            var buildCts = ReplaceMatrixBuildToken(ref _scheduleMatrixBuildCts);
 
             Task.Run(() =>
             {
+                buildCts.Token.ThrowIfCancellationRequested();
                 var buildSw = Stopwatch.StartNew();
                 var table = BuildScheduleTable(year, month, slotsSnapshot, employeesSnapshot, out var map);
                 buildSw.Stop();
                 return (table, map, buildSw.Elapsed);
-            }, _lifetimeCts.Token).ContinueWith(task =>
+            }, buildCts.Token).ContinueWith(task =>
             {
                 if (task.IsCanceled || task.IsFaulted)
                 {
@@ -137,16 +139,81 @@ namespace WinFormsApp.View.Container
 #endif
         }
 
-        private DataTable BindScheduleMatrix(
+        private void BindScheduleMatrix(
             Guna2DataGridView grid,
             int year,
             int month,
             IList<ScheduleSlotModel> slots,
             IList<ScheduleEmployeeModel> employees,
             bool readOnly,
+            bool configureGrid,
+            ref int refreshVersion,
+            ref CancellationTokenSource? buildCts)
+        {
+            if (IsDisposed) return;
+
+            if (InvokeRequired)
+            {
+                BeginInvoke(new Action(() => BindScheduleMatrix(
+                    grid,
+                    year,
+                    month,
+                    slots,
+                    employees,
+                    readOnly,
+                    configureGrid,
+                    ref refreshVersion,
+                    ref buildCts)));
+                return;
+            }
+
+            var slotsSnapshot = slots?.ToList() ?? new List<ScheduleSlotModel>();
+            var employeesSnapshot = employees?.ToList() ?? new List<ScheduleEmployeeModel>();
+            var localVersion = Interlocked.Increment(ref refreshVersion);
+            var localCts = ReplaceMatrixBuildToken(ref buildCts);
+
+            Task.Run(() =>
+            {
+                localCts.Token.ThrowIfCancellationRequested();
+                var buildSw = Stopwatch.StartNew();
+                var table = BuildScheduleTable(year, month, slotsSnapshot, employeesSnapshot, out var map);
+                buildSw.Stop();
+                return (table, map, buildSw.Elapsed);
+            }, localCts.Token).ContinueWith(task =>
+            {
+                if (task.IsCanceled || task.IsFaulted)
+                {
+#if DEBUG
+                    Debug.WriteLine($"[ScheduleMatrix] Build failed: {task.Exception?.GetBaseException().Message}");
+#endif
+                    return;
+                }
+
+                if (IsDisposed || localVersion != refreshVersion)
+                    return;
+
+                var (table, map, _) = task.Result;
+                if (InvokeRequired)
+                {
+                    BeginInvoke(new Action(() => ApplyMatrixTable(grid, table, map, year, month, readOnly, configureGrid)));
+                    return;
+                }
+
+                ApplyMatrixTable(grid, table, map, year, month, readOnly, configureGrid);
+            }, TaskScheduler.Default);
+
+        }
+
+        private void ApplyMatrixTable(
+            Guna2DataGridView grid,
+            DataTable table,
+            Dictionary<string, int> map,
+            int year,
+            int month,
+            bool readOnly,
             bool configureGrid)
         {
-            var table = BuildScheduleTable(year, month, slots, employees, out var map);
+            if (IsDisposed) return;
 
             RegisterMatrixGridMetadata(grid, map, year, month);
 
@@ -166,9 +233,23 @@ namespace WinFormsApp.View.Container
             {
                 grid.ResumeLayout();
             }
+        }
 
-            return table;
+        private CancellationTokenSource ReplaceMatrixBuildToken(ref CancellationTokenSource? field)
+        {
+            CancelAndDispose(ref field);
+            var linked = CancellationTokenSource.CreateLinkedTokenSource(_lifetimeCts.Token);
+            field = linked;
+            return linked;
+        }
 
+        private static void CancelAndDispose(ref CancellationTokenSource? field)
+        {
+            var current = Interlocked.Exchange(ref field, null);
+            if (current == null) return;
+
+            try { current.Cancel(); } catch { }
+            current.Dispose();
         }
 
         private DataTable BuildScheduleTable(
@@ -532,7 +613,9 @@ namespace WinFormsApp.View.Container
                 slots: slots ?? new List<ScheduleSlotModel>(),
                 employees: employees ?? new List<ScheduleEmployeeModel>(),
                 readOnly: true,
-                configureGrid: !_availabilityPreviewGridConfigured
+                configureGrid: !_availabilityPreviewGridConfigured,
+                refreshVersion: ref _availabilityPreviewRefreshVersion,
+                buildCts: ref _availabilityPreviewBuildCts
             );
 
             _availabilityPreviewGridConfigured = true;
