@@ -35,6 +35,8 @@ namespace WPFApp.ViewModel.Container
         public const string WeekendColumnName = "IsWeekend";
 
         private CancellationTokenSource? _availabilityPreviewCts;
+        private CancellationTokenSource? _scheduleMatrixCts;
+
 
         private readonly ContainerViewModel _owner;
         private readonly Dictionary<string, List<string>> _errors = new();
@@ -643,22 +645,22 @@ namespace WPFApp.ViewModel.Container
         {
             SetOptions(AvailabilityGroups, groups);
 
-                if (SelectedBlock != null)
-                {
-                    _suppressAvailabilityGroupUpdate = true;
-                    SelectedAvailabilityGroup = AvailabilityGroups
-                        .FirstOrDefault(g => g.Id == SelectedBlock.SelectedAvailabilityGroupId);
-                    _suppressAvailabilityGroupUpdate = false;
+            if (SelectedBlock != null)
+            {
+                _suppressAvailabilityGroupUpdate = true;
+                SelectedAvailabilityGroup = AvailabilityGroups
+                    .FirstOrDefault(g => g.Id == SelectedBlock.SelectedAvailabilityGroupId);
+                _suppressAvailabilityGroupUpdate = false;
 
-                    // <-- замість LoadAvailabilityPreviewAsync()
-                    var groupId = SelectedBlock.SelectedAvailabilityGroupId;
-                    if (groupId > 0)
-                        _ = _owner.SyncEmployeesFromAvailabilityGroupAsync(groupId);
+                // <-- замість LoadAvailabilityPreviewAsync()
+                var groupId = SelectedBlock.SelectedAvailabilityGroupId;
+                if (groupId > 0)
+                    _ = _owner.SyncEmployeesFromAvailabilityGroupAsync(groupId);
 
-                    RestoreMatricesForSelection();
-                    _ = LoadAvailabilityPreviewForSelectedGroupAsync();
+                RestoreMatricesForSelection();
+                _ = LoadAvailabilityPreviewForSelectedGroupAsync();
 
-                }
+            }
         }
 
         // ContainerScheduleEditViewModel.cs
@@ -698,43 +700,72 @@ namespace WPFApp.ViewModel.Container
 
         public void RefreshScheduleMatrix()
         {
-            if (SelectedBlock is null)
-            {
-                ScheduleMatrix = new DataView();
-                RecalculateTotals();
-                MatrixChanged?.Invoke(this, EventArgs.Empty);
-                return;
-            }
-
-            if (ScheduleYear < 1 || ScheduleMonth < 1 || ScheduleMonth > 12)
-            {
-                ScheduleMatrix = new DataView();
-                RecalculateTotals();
-                MatrixChanged?.Invoke(this, EventArgs.Empty);
-                return;
-            }
-
-            if (SelectedBlock.Slots.Count == 0)
-            {
-                ScheduleMatrix = new DataView();
-                RecalculateTotals();
-                MatrixChanged?.Invoke(this, EventArgs.Empty);
-                return;
-            }
-
-            var table = BuildScheduleTable(ScheduleYear, ScheduleMonth,
-                SelectedBlock.Slots.ToList(), SelectedBlock.Employees.ToList(), out var colMap);
-
-            _colNameToEmpId.Clear();
-            foreach (var pair in colMap)
-                _colNameToEmpId[pair.Key] = pair.Value;
-
-            ScheduleMatrix = table.DefaultView;
-
-            RecalculateTotals(); // ✅ тут теж
-
-            MatrixChanged?.Invoke(this, EventArgs.Empty);
+            SafeForget(RefreshScheduleMatrixAsync());
         }
+
+
+        private static void SafeForget(Task task)
+        {
+            // Забираємо Exception, щоб вона не стала "unobserved" у дебагері
+            task.ContinueWith(t =>
+            {
+                _ = t.Exception;
+            }, TaskContinuationOptions.OnlyOnFaulted);
+        }
+
+
+        internal async Task RefreshScheduleMatrixAsync(CancellationToken ct = default)
+        {
+            // cancel попереднього білду (щоб не було черги з 10 білдів)
+            _scheduleMatrixCts?.Cancel();
+            _scheduleMatrixCts?.Dispose();
+            var localCts = _scheduleMatrixCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+
+            try
+            {
+                if (SelectedBlock is null ||
+                    ScheduleYear < 1 || ScheduleMonth < 1 || ScheduleMonth > 12 ||
+                    SelectedBlock.Slots.Count == 0)
+                {
+                    await _owner.RunOnUiThreadAsync(() =>
+                    {
+                        ScheduleMatrix = new DataView();
+                        RecalculateTotals();
+                        MatrixChanged?.Invoke(this, EventArgs.Empty);
+                    }).ConfigureAwait(false);
+
+                    return;
+                }
+
+                // snapshot (швидко) — на поточному потоці
+                var year = ScheduleYear;
+                var month = ScheduleMonth;
+                var slotsSnapshot = SelectedBlock.Slots.ToList();
+                var employeesSnapshot = SelectedBlock.Employees.ToList();
+
+                // важка робота — OFF UI thread
+                var result = await Task.Run(() =>
+                {
+                    var table = BuildScheduleTable(year, month, slotsSnapshot, employeesSnapshot, out var colMap);
+                    return (View: table.DefaultView, ColMap: colMap);
+                }, localCts.Token).ConfigureAwait(false);
+
+                // застосування в VM — на UI thread
+                await _owner.RunOnUiThreadAsync(() =>
+                {
+                    _colNameToEmpId.Clear();
+                    foreach (var pair in result.ColMap)
+                        _colNameToEmpId[pair.Key] = pair.Value;
+
+                    ScheduleMatrix = result.View;
+
+                    RecalculateTotals();
+                    MatrixChanged?.Invoke(this, EventArgs.Empty);
+                }).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) { }
+        }
+
 
         public void RefreshAvailabilityPreviewMatrix(int year, int month, IList<ScheduleSlotModel> slots, IList<ScheduleEmployeeModel> employees)
         {
@@ -748,6 +779,41 @@ namespace WPFApp.ViewModel.Container
             var table = BuildScheduleTable(year, month, slots, employees, out _);
             AvailabilityPreviewMatrix = table.DefaultView;
             MatrixChanged?.Invoke(this, EventArgs.Empty);
+        }
+
+        /// <summary>
+        /// Builds the preview matrix off the UI thread and only assigns the DataView on the Dispatcher.
+        /// This prevents scroll stutter right after Generate / group changes.
+        /// </summary>
+        internal async Task RefreshAvailabilityPreviewMatrixAsync(
+            int year,
+            int month,
+            IList<ScheduleSlotModel> slots,
+            IList<ScheduleEmployeeModel> employees,
+            CancellationToken ct = default)
+        {
+            if (year < 1 || month < 1 || month > 12)
+            {
+                await _owner.RunOnUiThreadAsync(() =>
+                {
+                    AvailabilityPreviewMatrix = new DataView();
+                    MatrixChanged?.Invoke(this, EventArgs.Empty);
+                }).ConfigureAwait(false);
+                return;
+            }
+
+            // Heavy work off the UI thread
+            var view = await Task.Run(() =>
+            {
+                var table = BuildScheduleTable(year, month, slots, employees, out _);
+                return table.DefaultView;
+            }, ct).ConfigureAwait(false);
+
+            await _owner.RunOnUiThreadAsync(() =>
+            {
+                AvailabilityPreviewMatrix = view;
+                MatrixChanged?.Invoke(this, EventArgs.Empty);
+            }).ConfigureAwait(false);
         }
 
         public bool TryApplyMatrixEdit(string columnName, int day, string rawInput, out string normalizedValue, out string? error)
@@ -928,6 +994,19 @@ namespace WPFApp.ViewModel.Container
         {
             SetCellTextColor(null);
         }
+
+        internal void CancelBackgroundWork()
+        {
+            _availabilityPreviewCts?.Cancel();
+            _availabilityPreviewCts?.Dispose();
+            _availabilityPreviewCts = null;
+
+            _scheduleMatrixCts?.Cancel();
+            _scheduleMatrixCts?.Dispose();
+            _scheduleMatrixCts = null;
+        }
+
+
 
         private void ClearCellFormatting(ScheduleMatrixCellRef? cellRef)
             => ClearSelectedCellStyles(cellRef);
@@ -1340,8 +1419,11 @@ namespace WPFApp.ViewModel.Container
         private void RestoreMatricesForSelection()
         {
             AvailabilityPreviewMatrix = new DataView();
-            RefreshScheduleMatrix();
+            ScheduleMatrix = new DataView();
+            RecalculateTotals();
+            MatrixChanged?.Invoke(this, EventArgs.Empty);
         }
+
 
         // 2) коли змінили параметри — скинути результат генерації + очистити відображення
         internal void InvalidateGeneratedScheduleAndClearMatrices()
@@ -1361,7 +1443,9 @@ namespace WPFApp.ViewModel.Container
         {
             // debounce + cancel попередніх
             _availabilityPreviewCts?.Cancel();
+            _availabilityPreviewCts?.Dispose();
             var cts = _availabilityPreviewCts = new CancellationTokenSource();
+
 
             try
             {
@@ -1452,9 +1536,19 @@ namespace WPFApp.ViewModel.Container
                     .Select(g => new ScheduleEmployeeModel { EmployeeId = g.Key, Employee = g.First().Employee })
                     .ToList();
 
+                // IMPORTANT: Build the DataTable off the UI thread.
+                // Creating a full month x employees matrix can be expensive and will make scrolling janky
+                // if it happens on the Dispatcher thread.
+                var previewView = await Task.Run(() =>
+                {
+                    var table = BuildScheduleTable(group.Year, group.Month, previewSlots, previewEmployees, out _);
+                    return table.DefaultView;
+                }, cts.Token).ConfigureAwait(false);
+
                 await _owner.RunOnUiThreadAsync(() =>
                 {
-                    RefreshAvailabilityPreviewMatrix(group.Year, group.Month, previewSlots, previewEmployees);
+                    AvailabilityPreviewMatrix = previewView;
+                    MatrixChanged?.Invoke(this, EventArgs.Empty);
                 }).ConfigureAwait(false);
             }
             catch (OperationCanceledException) { }
@@ -1510,3 +1604,4 @@ namespace WPFApp.ViewModel.Container
 
     }
 }
+

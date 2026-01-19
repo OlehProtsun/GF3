@@ -422,7 +422,7 @@
                        Foreground="Black" />
 
                     <TextBlock Grid.Row="2"
-                       Margin="0,6,0,0"
+                       Margin="0,15,0,0"
                        Text="{Binding FormSubtitle}"
                        FontFamily="{StaticResource DefaultFontFamily}"
                        FontSize="17"
@@ -449,7 +449,7 @@
                         VerticalAlignment="Bottom"
                         Margin="0,0,0,-2"
                         Style="{StaticResource InlineSectionCardStyle}"
-                        Padding="12">
+                        Padding="10">
 
                         <Grid>
                             <Grid.RowDefinitions>
@@ -1288,7 +1288,7 @@
                         <!-- Schedule Matrix (фіксована висота) -->
                         <Border Style="{StaticResource CardStyle}"
                     Padding="12"
-                    Height="850"
+                    Height="650"
                     Margin="0,18,12,10">
                             <Grid>
                                 <Grid.RowDefinitions>

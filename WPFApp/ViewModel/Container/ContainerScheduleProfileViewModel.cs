@@ -16,6 +16,8 @@ namespace WPFApp.ViewModel.Container
         private readonly ScheduleCellStyleStore _cellStyleStore = new();
 
         private readonly Dictionary<int, string> _employeeTotalHoursText = new();
+        private CancellationTokenSource? _matrixCts;
+
 
         private int _scheduleId;
         public int ScheduleId
@@ -99,37 +101,82 @@ namespace WPFApp.ViewModel.Container
             DeleteCommand = new AsyncRelayCommand(() => _owner.DeleteSelectedScheduleAsync());
         }
 
-        public void SetProfile(
+        public async Task SetProfileAsync(
             ScheduleModel schedule,
             IList<ScheduleEmployeeModel> employees,
             IList<ScheduleSlotModel> slots,
-            IList<ScheduleCellStyleModel> cellStyles)
+            IList<ScheduleCellStyleModel> cellStyles,
+            CancellationToken ct = default)
         {
-            ScheduleId = schedule.Id;
-            ScheduleName = schedule.Name;
-            ScheduleMonthYear = $"{schedule.Month:D2}.{schedule.Year}";
-            ShopName = schedule.Shop?.Name ?? string.Empty;
-            Note = schedule.Note ?? string.Empty;
+            // cancel попереднього білду, якщо юзер швидко перемикає профілі
+            _matrixCts?.Cancel();
+            _matrixCts?.Dispose();
+            var localCts = _matrixCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
 
-            Employees.Clear();
-            foreach (var emp in employees)
-                Employees.Add(emp);
+            // швидко оновлюємо прості поля (на UI thread)
+            await _owner.RunOnUiThreadAsync(() =>
+            {
+                ScheduleId = schedule.Id;
+                ScheduleName = schedule.Name;
+                ScheduleMonthYear = $"{schedule.Month:D2}.{schedule.Year}";
+                ShopName = schedule.Shop?.Name ?? string.Empty;
+                Note = schedule.Note ?? string.Empty;
 
-            var table = ContainerScheduleEditViewModel.BuildScheduleTable(
-                schedule.Year,
-                schedule.Month,
-                slots,
-                employees,
-                out var colMap);
+                Employees.Clear();
+                foreach (var emp in employees)
+                    Employees.Add(emp);
 
+                // поки будуємо матрицю — можна очистити/залишити стару (я очищаю)
+                ScheduleMatrix = new DataView();
+                MatrixChanged?.Invoke(this, EventArgs.Empty);
+            }).ConfigureAwait(false);
 
-            ScheduleMatrix = table.DefaultView;
-            RecalculateTotals(employees, slots, out var empCount, out var hoursText);
-            RebuildStyleMaps(colMap, cellStyles);
-            TotalEmployees = empCount;
-            TotalHoursText = hoursText;
-            MatrixChanged?.Invoke(this, EventArgs.Empty);
+            try
+            {
+                // snapshot (на випадок, якщо списки Observable/EF proxy)
+                var year = schedule.Year;
+                var month = schedule.Month;
+                var slotsSnapshot = slots.ToList();
+                var employeesSnapshot = employees.ToList();
+                var stylesSnapshot = cellStyles.ToList();
+
+                // важка побудова — OFF UI thread
+                var built = await Task.Run(() =>
+                {
+                    localCts.Token.ThrowIfCancellationRequested();
+
+                    var table = ContainerScheduleEditViewModel.BuildScheduleTable(
+                        year, month,
+                        slotsSnapshot,
+                        employeesSnapshot,
+                        out var colMap);
+
+                    // totals теж порахуємо тут, щоб UI тільки присвоїв
+                    RecalculateTotals(employeesSnapshot, slotsSnapshot, out var empCount, out var hoursText);
+
+                    return (View: table.DefaultView, ColMap: colMap, EmpCount: empCount, HoursText: hoursText, Styles: stylesSnapshot);
+                }, localCts.Token).ConfigureAwait(false);
+
+                // застосування результатів — на UI thread
+                await _owner.RunOnUiThreadAsync(() =>
+                {
+                    ScheduleMatrix = built.View;
+                    RebuildStyleMaps(built.ColMap, built.Styles);
+                    TotalEmployees = built.EmpCount;
+                    TotalHoursText = built.HoursText;
+                    MatrixChanged?.Invoke(this, EventArgs.Empty);
+                }).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) { }
         }
+
+        internal void CancelBackgroundWork()
+        {
+            _matrixCts?.Cancel();
+            _matrixCts?.Dispose();
+            _matrixCts = null;
+        }
+
 
         private void RecalculateTotals(
             IList<ScheduleEmployeeModel> employees,
@@ -137,7 +184,7 @@ namespace WPFApp.ViewModel.Container
             out int totalEmployees,
             out string totalHoursText)
         {
-            _employeeTotalHoursText.Clear();
+            var perEmployeeText = new Dictionary<int, string>();
 
             totalEmployees = employees
                 .Select(e => e.EmployeeId)
@@ -166,12 +213,16 @@ namespace WPFApp.ViewModel.Container
                 perEmp[empId] = cur + dur;
             }
 
-            // ✅ пер-employee кеш (НЕ ламає старі total out-параметри)
             foreach (var empId in employees.Select(e => e.EmployeeId).Distinct())
             {
                 perEmp.TryGetValue(empId, out var empTotal);
-                _employeeTotalHoursText[empId] = $"Total hours: {(int)empTotal.TotalHours}h {empTotal.Minutes}m";
+                perEmployeeText[empId] = $"Total hours: {(int)empTotal.TotalHours}h {empTotal.Minutes}m";
             }
+
+            // ✅ запис у поле робимо атомарно (це викличеться на UI-thread з SetProfileAsync)
+            _employeeTotalHoursText.Clear();
+            foreach (var kv in perEmployeeText)
+                _employeeTotalHoursText[kv.Key] = kv.Value;
 
             totalHoursText = $"{(int)total.TotalHours}h {total.Minutes}m";
 

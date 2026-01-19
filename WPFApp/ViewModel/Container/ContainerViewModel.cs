@@ -290,8 +290,14 @@ namespace WPFApp.ViewModel.Container
             ScheduleEditVm.Blocks.Add(block);
             ScheduleEditVm.SelectedBlock = block;
 
-            ScheduleEditVm.RefreshScheduleMatrix();
-            ScheduleEditVm.RefreshAvailabilityPreviewMatrix(block.Model.Year, block.Model.Month, new List<ScheduleSlotModel>(), new List<ScheduleEmployeeModel>());
+            await ScheduleEditVm.RefreshScheduleMatrixAsync(ct);
+            await ScheduleEditVm.RefreshAvailabilityPreviewMatrixAsync(
+                block.Model.Year,
+                block.Model.Month,
+                new List<ScheduleSlotModel>(),
+                new List<ScheduleEmployeeModel>(),
+                ct
+            );
 
             ScheduleCancelTarget = ContainerSection.Profile;
             await SwitchToScheduleEditAsync();
@@ -328,7 +334,7 @@ namespace WPFApp.ViewModel.Container
 
             ScheduleEditVm.Blocks.Add(block);
             ScheduleEditVm.SelectedBlock = block;
-            ScheduleEditVm.RefreshScheduleMatrix();
+            await ScheduleEditVm.RefreshScheduleMatrixAsync(ct);
 
             ScheduleCancelTarget = Mode == ContainerSection.ScheduleProfile
                 ? ContainerSection.ScheduleProfile
@@ -416,7 +422,7 @@ namespace WPFApp.ViewModel.Container
                 ShowInfo($"Opened only first {MaxOpenedSchedules}. Skipped due to limit:{Environment.NewLine}{string.Join(Environment.NewLine, limitSkipped)}");
 
             ScheduleEditVm.SelectedBlock = openedBlocks.First();
-            ScheduleEditVm.RefreshScheduleMatrix();
+            await ScheduleEditVm.RefreshScheduleMatrixAsync(ct);
 
             ScheduleCancelTarget = Mode == ContainerSection.ScheduleProfile
                 ? ContainerSection.ScheduleProfile
@@ -537,7 +543,7 @@ namespace WPFApp.ViewModel.Container
                         var employees = detailed.Employees?.ToList() ?? new List<ScheduleEmployeeModel>();
                         var slots = detailed.Slots?.ToList() ?? new List<ScheduleSlotModel>();
                         var cellStyles = detailed.CellStyles?.ToList() ?? new List<ScheduleCellStyleModel>();
-                        ScheduleProfileVm.SetProfile(detailed, employees, slots, cellStyles);
+                        await ScheduleProfileVm.SetProfileAsync(detailed, employees, slots, cellStyles, ct);
                         ProfileVm.ScheduleListVm.SelectedItem =
                             ProfileVm.ScheduleListVm.Items.FirstOrDefault(x => x.Model.Id == detailed.Id);
 
@@ -580,7 +586,7 @@ namespace WPFApp.ViewModel.Container
             var slots = detailed.Slots?.ToList() ?? new List<ScheduleSlotModel>();
             var cellStyles = detailed.CellStyles?.ToList() ?? new List<ScheduleCellStyleModel>();
 
-            ScheduleProfileVm.SetProfile(detailed, employees, slots, cellStyles);
+            await ScheduleProfileVm.SetProfileAsync(detailed, employees, slots, cellStyles, ct);
             ProfileVm.ScheduleListVm.SelectedItem =
                 ProfileVm.ScheduleListVm.Items.FirstOrDefault(x => x.Model.Id == detailed.Id);
 
@@ -696,7 +702,7 @@ namespace WPFApp.ViewModel.Container
             foreach (var slot in slots)
                 block.Slots.Add(slot);
 
-            ScheduleEditVm.RefreshScheduleMatrix();
+            await ScheduleEditVm.RefreshScheduleMatrixAsync(ct);
             ShowInfo("Slots generated. Review before saving.");
         }
 
@@ -742,22 +748,22 @@ namespace WPFApp.ViewModel.Container
             return Task.CompletedTask;
         }
 
-        internal Task AddScheduleEmployeeAsync(CancellationToken ct = default)
+        internal async Task AddScheduleEmployeeAsync(CancellationToken ct = default)
         {
             if (ScheduleEditVm.SelectedBlock is null)
-                return Task.CompletedTask;
+                return;
 
             var employee = ScheduleEditVm.SelectedEmployee;
             if (employee is null)
             {
                 ShowError("Select employee first.");
-                return Task.CompletedTask;
+                return;
             }
 
             if (ScheduleEditVm.SelectedBlock.Employees.Any(e => e.EmployeeId == employee.Id))
             {
                 ShowInfo("This employee is already added.");
-                return Task.CompletedTask;
+                return;
             }
 
             ScheduleEditVm.SelectedBlock.Employees.Add(new ScheduleEmployeeModel
@@ -766,27 +772,27 @@ namespace WPFApp.ViewModel.Container
                 Employee = employee
             });
 
-            ScheduleEditVm.RefreshScheduleMatrix();
-            return UpdateAvailabilityPreviewAsync(ct);
+            await ScheduleEditVm.RefreshScheduleMatrixAsync(ct);
+            await UpdateAvailabilityPreviewAsync(ct);
         }
 
-        internal Task RemoveScheduleEmployeeAsync(CancellationToken ct = default)
+        internal async Task RemoveScheduleEmployeeAsync(CancellationToken ct = default)
         {
             if (ScheduleEditVm.SelectedBlock is null)
-                return Task.CompletedTask;
+                return;
 
             var selected = ScheduleEditVm.SelectedScheduleEmployee;
             if (selected is null)
             {
                 ShowError("Select employee first.");
-                return Task.CompletedTask;
+                return;
             }
 
             var toRemove = ScheduleEditVm.SelectedBlock.Employees.FirstOrDefault(e => e.EmployeeId == selected.EmployeeId);
             if (toRemove is null)
             {
                 ShowInfo("This employee is not in the group.");
-                return Task.CompletedTask;
+                return;
             }
 
             ScheduleEditVm.SelectedBlock.Employees.Remove(toRemove);
@@ -794,41 +800,43 @@ namespace WPFApp.ViewModel.Container
             var slotsToRemove = ScheduleEditVm.SelectedBlock.Slots
                 .Where(s => s.EmployeeId == selected.EmployeeId)
                 .ToList();
+
             foreach (var slot in slotsToRemove)
                 ScheduleEditVm.SelectedBlock.Slots.Remove(slot);
 
             ScheduleEditVm.RemoveCellStylesForEmployee(selected.EmployeeId);
-            ScheduleEditVm.RefreshScheduleMatrix();
-            return UpdateAvailabilityPreviewAsync(ct);
+
+            await ScheduleEditVm.RefreshScheduleMatrixAsync(ct);
+            await UpdateAvailabilityPreviewAsync(ct);
         }
 
         // ContainerViewModel.cs
-        internal Task AddScheduleBlockAsync(CancellationToken ct = default)
+        internal async Task AddScheduleBlockAsync(CancellationToken ct = default)
         {
             if (ScheduleEditVm.IsEdit)
-                return Task.CompletedTask;
+                return;
 
             if (ScheduleEditVm.SelectedBlock is null)
-                return Task.CompletedTask;
+                return;
 
             if (ScheduleEditVm.Blocks.Count >= MaxOpenedSchedules)
             {
                 ShowInfo($"You can open max {MaxOpenedSchedules} schedules.");
-                return Task.CompletedTask;
+                return;
             }
 
             var block = CreateDefaultBlock(ScheduleEditVm.SelectedBlock.Model.ContainerId);
             ScheduleEditVm.Blocks.Add(block);
             ScheduleEditVm.SelectedBlock = block;
-            ScheduleEditVm.RefreshScheduleMatrix();
 
-            return UpdateAvailabilityPreviewAsync(ct);
+            await ScheduleEditVm.RefreshScheduleMatrixAsync(ct);
+            await UpdateAvailabilityPreviewAsync(ct);
         }
 
-        internal Task SelectScheduleBlockAsync(ScheduleBlockViewModel block, CancellationToken ct = default)
+        internal async Task SelectScheduleBlockAsync(ScheduleBlockViewModel block, CancellationToken ct = default)
         {
             if (!ScheduleEditVm.Blocks.Contains(block))
-                return Task.CompletedTask;
+                return;
 
             ScheduleEditVm.SelectedBlock = block;
             ScheduleEditVm.ClearValidationErrors();
@@ -836,8 +844,10 @@ namespace WPFApp.ViewModel.Container
             if (block.ValidationErrors.Count > 0)
                 ScheduleEditVm.SetValidationErrors(block.ValidationErrors);
 
-            return UpdateAvailabilityPreviewAsync(ct);
+            await ScheduleEditVm.RefreshScheduleMatrixAsync(ct);
+            await UpdateAvailabilityPreviewAsync(ct);
         }
+
 
         internal async Task CloseScheduleBlockAsync(ScheduleBlockViewModel block, CancellationToken ct = default)
         {
@@ -853,8 +863,13 @@ namespace WPFApp.ViewModel.Container
             if (ScheduleEditVm.Blocks.Count == 0)
             {
                 ScheduleEditVm.SelectedBlock = null;
-                ScheduleEditVm.RefreshScheduleMatrix();
-                ScheduleEditVm.RefreshAvailabilityPreviewMatrix(1, 1, new List<ScheduleSlotModel>(), new List<ScheduleEmployeeModel>());
+                await ScheduleEditVm.RefreshScheduleMatrixAsync(ct);
+                await ScheduleEditVm.RefreshAvailabilityPreviewMatrixAsync(
+                    1, 1,
+                    new List<ScheduleSlotModel>(),
+                    new List<ScheduleEmployeeModel>(),
+                    ct
+                );
                 return;
             }
 
@@ -880,14 +895,24 @@ namespace WPFApp.ViewModel.Container
 
             if (year < 1 || month < 1 || month > 12)
             {
-                ScheduleEditVm.RefreshAvailabilityPreviewMatrix(year, month, new List<ScheduleSlotModel>(), new List<ScheduleEmployeeModel>());
+                await ScheduleEditVm.RefreshAvailabilityPreviewMatrixAsync(
+                    year, month,
+                    new List<ScheduleSlotModel>(),
+                    new List<ScheduleEmployeeModel>(),
+                    ct
+                );
                 return;
             }
 
             var selectedGroupId = ScheduleEditVm.SelectedBlock.SelectedAvailabilityGroupId;
             if (selectedGroupId <= 0)
             {
-                ScheduleEditVm.RefreshAvailabilityPreviewMatrix(year, month, new List<ScheduleSlotModel>(), new List<ScheduleEmployeeModel>());
+                await ScheduleEditVm.RefreshAvailabilityPreviewMatrixAsync(
+                    year, month,
+                    new List<ScheduleSlotModel>(),
+                    new List<ScheduleEmployeeModel>(),
+                    ct
+                );
                 return;
             }
 
@@ -903,7 +928,12 @@ namespace WPFApp.ViewModel.Container
 
             if (group.Year != year || group.Month != month)
             {
-                ScheduleEditVm.RefreshAvailabilityPreviewMatrix(year, month, new List<ScheduleSlotModel>(), new List<ScheduleEmployeeModel>());
+                await ScheduleEditVm.RefreshAvailabilityPreviewMatrixAsync(
+                    year, month,
+                    new List<ScheduleSlotModel>(),
+                    new List<ScheduleEmployeeModel>(),
+                    ct
+                );
                 return;
             }
 
@@ -952,7 +982,8 @@ namespace WPFApp.ViewModel.Container
                 }
             }
 
-            ScheduleEditVm.RefreshAvailabilityPreviewMatrix(year, month, slots, employees);
+            // Build matrix off UI thread to keep scrolling smooth.
+            await ScheduleEditVm.RefreshAvailabilityPreviewMatrixAsync(year, month, slots, employees, ct);
 
             void AddSlotUnique(int empId, int day, string from, string to)
             {
@@ -1439,9 +1470,11 @@ namespace WPFApp.ViewModel.Container
                 }
 
                 if (ReferenceEquals(ScheduleEditVm.SelectedBlock, block))
-                    ScheduleEditVm.RefreshScheduleMatrix();
+                    _ = ScheduleEditVm.RefreshScheduleMatrixAsync(ct);
+
             }).ConfigureAwait(false);
         }
 
     }
 }
+

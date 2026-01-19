@@ -7,6 +7,7 @@ using System.Windows.Controls;
 using System.Windows.Data;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Controls.Primitives;
 using WPFApp.Service;
 using WPFApp.ViewModel.Container;
 using WPFApp.ViewModel.Dialogs;
@@ -26,10 +27,18 @@ namespace WPFApp.View.Container
         private string? _scheduleSchemaSig;
         private string? _previewSchemaSig;
 
+        // coalesce MatrixChanged bursts (generation/lookup refreshes) into a single UI refresh
+        private bool _refreshQueued;
+
 
         public ContainerScheduleEditView()
         {
             InitializeComponent();
+
+            // Performance: ensure virtualization is ON even if the Style turns it off.
+            ConfigureGridPerformance(dataGridScheduleMatrix);
+            ConfigureGridPerformance(dataGridAvailabilityPreview);
+
             Loaded += ContainerScheduleEditView_Loaded;
             Unloaded += ContainerScheduleEditView_Unloaded;
             DataContextChanged += ContainerScheduleEditView_DataContextChanged;
@@ -39,6 +48,35 @@ namespace WPFApp.View.Container
             dataGridScheduleMatrix.PreviewMouseLeftButtonDown += ScheduleMatrix_PreviewMouseLeftButtonDown;
             dataGridScheduleMatrix.MouseMove += ScheduleMatrix_MouseMove;
             dataGridScheduleMatrix.PreviewMouseLeftButtonUp += ScheduleMatrix_PreviewMouseLeftButtonUp;
+        }
+
+        private static void ResetGridColumns(DataGrid grid)
+        {
+            // важливо: скинути ItemsSource, щоб WPF відпустив старі binding-и/containers
+            grid.ItemsSource = null;
+            grid.Columns.Clear();
+        }
+
+
+        private static void ConfigureGridPerformance(DataGrid grid)
+        {
+            if (grid == null) return;
+
+            // Row/column virtualization
+            grid.EnableRowVirtualization = true;
+            grid.EnableColumnVirtualization = true;
+            VirtualizingPanel.SetIsVirtualizing(grid, true);
+            VirtualizingPanel.SetVirtualizationMode(grid, VirtualizationMode.Recycling);
+
+            // Keep virtualization working (some styles disable it via CanContentScroll=false)
+            grid.SetValue(ScrollViewer.CanContentScrollProperty, true);
+            grid.SetValue(ScrollViewer.IsDeferredScrollingEnabledProperty, false);
+
+            // Avoid layout churn on fast scroll
+            grid.SetValue(VirtualizingPanel.ScrollUnitProperty, ScrollUnit.Item);
+            VirtualizingPanel.SetCacheLengthUnit(grid, VirtualizationCacheLengthUnit.Page);
+            VirtualizingPanel.SetCacheLength(grid, new VirtualizationCacheLength(1));
+
         }
 
         private void ContainerScheduleEditView_DataContextChanged(object sender, DependencyPropertyChangedEventArgs e)
@@ -67,8 +105,13 @@ namespace WPFApp.View.Container
             if (_vm != null)
             {
                 _vm.MatrixChanged += VmOnMatrixChanged;
-                ScheduleMatrixColumnBuilder.BuildScheduleMatrixColumns(_vm.ScheduleMatrix.Table, dataGridScheduleMatrix, isReadOnly: false);
-                ScheduleMatrixColumnBuilder.BuildScheduleMatrixColumns(_vm.AvailabilityPreviewMatrix.Table, dataGridAvailabilityPreview, isReadOnly: true);
+
+                // Build columns only if we already have a schema.
+                if (_vm.ScheduleMatrix?.Table != null)
+                    ScheduleMatrixColumnBuilder.BuildScheduleMatrixColumns(_vm.ScheduleMatrix.Table, dataGridScheduleMatrix, isReadOnly: false);
+                if (_vm.AvailabilityPreviewMatrix?.Table != null)
+                    ScheduleMatrixColumnBuilder.BuildScheduleMatrixColumns(_vm.AvailabilityPreviewMatrix.Table, dataGridAvailabilityPreview, isReadOnly: true);
+
                 dataGridScheduleMatrix.ItemsSource = _vm.ScheduleMatrix;
                 dataGridAvailabilityPreview.ItemsSource = _vm.AvailabilityPreviewMatrix;
             }
@@ -92,15 +135,27 @@ namespace WPFApp.View.Container
         private void DetachViewModel()
         {
             if (_vm == null) return;
+
             _vm.MatrixChanged -= VmOnMatrixChanged;
+
+            // ✅ зупиняємо фоновий preview, щоб він не спамив UI після виходу з Edit
+            _vm.CancelBackgroundWork();
         }
 
         private void VmOnMatrixChanged(object? sender, System.EventArgs e)
         {
             if (_vm is null) return;
 
-            // щоб не блокувати UI (скрол/ввід)
-            Dispatcher.BeginInvoke(new Action(RefreshMatricesSmart), System.Windows.Threading.DispatcherPriority.Background);
+            // Coalesce multiple MatrixChanged into one refresh so we don't queue dozens of UI updates
+            // during Generate / availability preview rebuild.
+            if (_refreshQueued) return;
+            _refreshQueued = true;
+
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                _refreshQueued = false;
+                RefreshMatricesSmart();
+            }), System.Windows.Threading.DispatcherPriority.Background);
         }
 
         private void ScheduleMatrix_PreparingCellForEdit(object sender, DataGridPreparingCellForEditEventArgs e)
@@ -134,6 +189,7 @@ namespace WPFApp.View.Container
             var scheduleSig = BuildSig(_vm.ScheduleMatrix?.Table);
             if (scheduleSig != _scheduleSchemaSig)
             {
+                ResetGridColumns(dataGridScheduleMatrix);
                 ScheduleMatrixColumnBuilder.BuildScheduleMatrixColumns(_vm.ScheduleMatrix.Table, dataGridScheduleMatrix, isReadOnly: false);
                 _scheduleSchemaSig = scheduleSig;
             }
@@ -141,15 +197,18 @@ namespace WPFApp.View.Container
             if (!ReferenceEquals(dataGridScheduleMatrix.ItemsSource, _vm.ScheduleMatrix))
                 dataGridScheduleMatrix.ItemsSource = _vm.ScheduleMatrix;
 
+
             var previewSig = BuildSig(_vm.AvailabilityPreviewMatrix?.Table);
             if (previewSig != _previewSchemaSig)
             {
+                ResetGridColumns(dataGridAvailabilityPreview);
                 ScheduleMatrixColumnBuilder.BuildScheduleMatrixColumns(_vm.AvailabilityPreviewMatrix.Table, dataGridAvailabilityPreview, isReadOnly: true);
                 _previewSchemaSig = previewSig;
             }
 
             if (!ReferenceEquals(dataGridAvailabilityPreview.ItemsSource, _vm.AvailabilityPreviewMatrix))
                 dataGridAvailabilityPreview.ItemsSource = _vm.AvailabilityPreviewMatrix;
+
         }
 
         private static string BuildSig(DataTable? t)
@@ -313,3 +372,4 @@ namespace WPFApp.View.Container
 
     }
 }
+
