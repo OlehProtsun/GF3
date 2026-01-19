@@ -38,6 +38,8 @@ namespace WinFormsApp.View.Container
 
         private bool _scheduleRefreshPending;
         private int _rebindRetry;
+        private int _scheduleRefreshVersion;
+        private bool _suppressScheduleRefresh;
 
         private ScheduleModel? _scheduleProfileModel;
 

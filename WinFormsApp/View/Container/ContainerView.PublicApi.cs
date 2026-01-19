@@ -151,6 +151,7 @@ namespace WinFormsApp.View.Container
             {
                 _slots.Clear();
                 if (value != null) _slots.AddRange(value);
+                if (_suppressScheduleRefresh) return;
                 RequestScheduleGridRefresh();
                 RefreshScheduleProfileIfOpened();
             }
@@ -165,6 +166,7 @@ namespace WinFormsApp.View.Container
                 _cellStyles.Clear();
                 if (value != null) _cellStyles.AddRange(value);
                 RebuildCellStyleLookup();
+                if (_suppressScheduleRefresh) return;
                 RequestScheduleGridRefresh();
                 RefreshScheduleProfileIfOpened();
             }
@@ -178,9 +180,38 @@ namespace WinFormsApp.View.Container
             {
                 _employees.Clear();
                 if (value != null) _employees.AddRange(value);
+                if (_suppressScheduleRefresh) return;
                 RequestScheduleGridRefresh();
                 RefreshScheduleProfileIfOpened();
             }
+        }
+
+        public void SetScheduleGeneratedData(
+            IList<ScheduleEmployeeModel> employees,
+            IList<ScheduleSlotModel> slots,
+            IList<ScheduleCellStyleModel> cellStyles)
+        {
+            _suppressScheduleRefresh = true;
+            try
+            {
+                _employees.Clear();
+                if (employees != null) _employees.AddRange(employees);
+
+                _slots.Clear();
+                if (slots != null) _slots.AddRange(slots);
+
+                _cellStyles.Clear();
+                if (cellStyles != null) _cellStyles.AddRange(cellStyles);
+
+                RebuildCellStyleLookup();
+            }
+            finally
+            {
+                _suppressScheduleRefresh = false;
+            }
+
+            RequestScheduleGridRefresh();
+            RefreshScheduleProfileIfOpened();
         }
 
         private bool _suppressAvailabilitySelectionChanged;
