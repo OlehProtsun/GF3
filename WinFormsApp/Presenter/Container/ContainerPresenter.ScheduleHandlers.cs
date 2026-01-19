@@ -93,9 +93,10 @@ namespace WinFormsApp.Presenter.Container
                 innerCt => _scheduleService.GetDetailedAsync(schedule.Id, innerCt),
                 ct);
 
-            _view.ScheduleEmployees = detailed?.Employees?.ToList() ?? new List<ScheduleEmployeeModel>();
-            _view.ScheduleSlots = detailed?.Slots?.ToList() ?? new List<ScheduleSlotModel>();
-            _view.ScheduleCellStyles = detailed?.CellStyles?.ToList() ?? new List<ScheduleCellStyleModel>();
+            _view.SetScheduleGeneratedData(
+                detailed?.Employees?.ToList() ?? new List<ScheduleEmployeeModel>(),
+                detailed?.Slots?.ToList() ?? new List<ScheduleSlotModel>(),
+                detailed?.CellStyles?.ToList() ?? new List<ScheduleCellStyleModel>());
 
             _view.ClearScheduleValidationErrors();
 
@@ -282,9 +283,10 @@ namespace WinFormsApp.Presenter.Container
                 ct);
             if (detailed is null) return;
 
-            _view.ScheduleEmployees = detailed.Employees?.ToList() ?? new List<ScheduleEmployeeModel>();
-            _view.ScheduleSlots = detailed.Slots?.ToList() ?? new List<ScheduleSlotModel>();
-            _view.ScheduleCellStyles = detailed.CellStyles?.ToList() ?? new List<ScheduleCellStyleModel>();
+            _view.SetScheduleGeneratedData(
+                detailed.Employees?.ToList() ?? new List<ScheduleEmployeeModel>(),
+                detailed.Slots?.ToList() ?? new List<ScheduleSlotModel>(),
+                detailed.CellStyles?.ToList() ?? new List<ScheduleCellStyleModel>());
 
             _view.SetScheduleProfile(detailed);
             _view.ScheduleCancelTarget = ScheduleViewModel.List;

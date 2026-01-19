@@ -118,7 +118,9 @@ namespace WinFormsApp.View.Container
                 slots: slots,
                 employees: _employees,
                 readOnly: true,
-                configureGrid: false
+                configureGrid: false,
+                refreshVersion: ref _scheduleProfileRefreshVersion,
+                buildCts: ref _scheduleProfileBuildCts
             );
         }
 
@@ -146,7 +148,9 @@ namespace WinFormsApp.View.Container
                 slots: slots,
                 employees: _employees,
                 readOnly: true,
-                configureGrid: false
+                configureGrid: false,
+                refreshVersion: ref _scheduleProfileRefreshVersion,
+                buildCts: ref _scheduleProfileBuildCts
             );
         }
     }

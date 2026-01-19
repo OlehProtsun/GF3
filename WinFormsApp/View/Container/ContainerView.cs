@@ -31,6 +31,9 @@ namespace WinFormsApp.View.Container
         {
             try { _lifetimeCts.Cancel(); } catch { /* ignore */ }
             _lifetimeCts.Dispose();
+            CancelAndDispose(ref _scheduleMatrixBuildCts);
+            CancelAndDispose(ref _scheduleProfileBuildCts);
+            CancelAndDispose(ref _availabilityPreviewBuildCts);
 
             _gridVPen.Dispose();
             _gridHPen.Dispose();
