@@ -296,6 +296,7 @@ namespace WPFApp.ViewModel.Container
                 block.Model.Month,
                 new List<ScheduleSlotModel>(),
                 new List<ScheduleEmployeeModel>(),
+                previewKey: null,
                 ct
             );
 
@@ -868,6 +869,7 @@ namespace WPFApp.ViewModel.Container
                     1, 1,
                     new List<ScheduleSlotModel>(),
                     new List<ScheduleEmployeeModel>(),
+                    previewKey: null,
                     ct
                 );
                 return;
@@ -899,6 +901,7 @@ namespace WPFApp.ViewModel.Container
                     year, month,
                     new List<ScheduleSlotModel>(),
                     new List<ScheduleEmployeeModel>(),
+                    previewKey: null,
                     ct
                 );
                 return;
@@ -911,6 +914,7 @@ namespace WPFApp.ViewModel.Container
                     year, month,
                     new List<ScheduleSlotModel>(),
                     new List<ScheduleEmployeeModel>(),
+                    previewKey: null,
                     ct
                 );
                 return;
@@ -918,6 +922,7 @@ namespace WPFApp.ViewModel.Container
 
             (string from, string to)? shift1 = TrySplitShift(ScheduleEditVm.ScheduleShift1);
             (string from, string to)? shift2 = TrySplitShift(ScheduleEditVm.ScheduleShift2);
+            var previewKey = $"{selectedGroupId}|{year}|{month}|{ScheduleEditVm.ScheduleShift1}|{ScheduleEditVm.ScheduleShift2}";
 
             var employees = new List<ScheduleEmployeeModel>();
             var slots = new List<ScheduleSlotModel>();
@@ -932,6 +937,7 @@ namespace WPFApp.ViewModel.Container
                     year, month,
                     new List<ScheduleSlotModel>(),
                     new List<ScheduleEmployeeModel>(),
+                    previewKey: null,
                     ct
                 );
                 return;
@@ -983,7 +989,7 @@ namespace WPFApp.ViewModel.Container
             }
 
             // Build matrix off UI thread to keep scrolling smooth.
-            await ScheduleEditVm.RefreshAvailabilityPreviewMatrixAsync(year, month, slots, employees, ct);
+            await ScheduleEditVm.RefreshAvailabilityPreviewMatrixAsync(year, month, slots, employees, previewKey, ct);
 
             void AddSlotUnique(int empId, int day, string from, string to)
             {
@@ -1477,4 +1483,3 @@ namespace WPFApp.ViewModel.Container
 
     }
 }
-

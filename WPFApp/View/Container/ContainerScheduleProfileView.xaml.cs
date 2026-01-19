@@ -70,6 +70,7 @@ namespace WPFApp.View.Container
         {
             if (_vm == null) return;
             _vm.MatrixChanged -= VmOnMatrixChanged;
+            _vm.CancelBackgroundWork();
         }
 
         private void VmOnMatrixChanged(object? sender, EventArgs e)
@@ -107,4 +108,3 @@ namespace WPFApp.View.Container
         }
     }
 }
-
