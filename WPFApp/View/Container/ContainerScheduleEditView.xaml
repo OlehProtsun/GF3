@@ -969,13 +969,29 @@
                                                     </Grid>
 
                                                     <ComboBox ItemsSource="{Binding Shops}"
-                                                           Style="{StaticResource RoundedComboBoxStyle}"
-                                                            ItemContainerStyle="{StaticResource RoundedComboBoxItemStyle}"
-                                                           
-                                                              Tag="Select employee..."
-                                                          SelectedItem="{Binding SelectedShop}"
-                                                          DisplayMemberPath="Name"
-                                                          Height="33" />
+                                                      SelectedItem="{Binding SelectedShop}"
+                                                      DisplayMemberPath="Name"
+                                                      Style="{StaticResource RoundedComboBoxStyle}"
+                                                      ItemContainerStyle="{StaticResource RoundedComboBoxItemStyle}"
+                                                      IsTextSearchEnabled="False">
+
+                                                    <ComboBox.ItemsPanel>
+                                                            <ItemsPanelTemplate>
+                                                                <VirtualizingStackPanel />
+                                                            </ItemsPanelTemplate>
+                                                        </ComboBox.ItemsPanel>
+
+                                                        <!-- ВАЖЛИВО: форсуємо параметри ScrollViewer всередині Popup,
+         навіть якщо RoundedComboBoxStyle їх не TemplateBind-ить -->
+                                                        <ComboBox.Resources>
+                                                            <Style TargetType="{x:Type ScrollViewer}">
+                                                                <Setter Property="CanContentScroll" Value="True"/>
+                                                                <Setter Property="VirtualizingPanel.IsVirtualizing" Value="True"/>
+                                                                <Setter Property="VirtualizingPanel.VirtualizationMode" Value="Recycling"/>
+                                                                <Setter Property="ScrollViewer.IsDeferredScrollingEnabled" Value="True"/>
+                                                            </Style>
+                                                        </ComboBox.Resources>
+                                                    </ComboBox>
 
                                                     <!-- Checkboxes під Shop (стиль як в Availability Edit) -->
                                                     <WrapPanel Margin="0,10,0,0"/>
@@ -1022,11 +1038,35 @@
                                                     </Grid>
 
                                                     <ComboBox ItemsSource="{Binding AvailabilityGroups}"
-                                                          SelectedItem="{Binding SelectedAvailabilityGroup}"                                                                                                            Style="{StaticResource RoundedComboBoxStyle}"
-                                                          ItemContainerStyle="{StaticResource RoundedComboBoxItemStyle}"
-                                                          Tag="Select employee..."
-                                                          DisplayMemberPath="Name"
-                                                          Height="33" />
+          SelectedItem="{Binding SelectedAvailabilityGroup}"
+          DisplayMemberPath="Name"
+          Tag="Select employee..."
+          Style="{StaticResource RoundedComboBoxStyle}"
+          ItemContainerStyle="{StaticResource RoundedComboBoxItemStyle}"
+          Height="33"
+          MaxDropDownHeight="420"
+          ScrollViewer.CanContentScroll="True"
+          ScrollViewer.IsDeferredScrollingEnabled="True"
+          VirtualizingPanel.IsVirtualizing="True"
+          VirtualizingPanel.VirtualizationMode="Recycling"
+          IsTextSearchEnabled="False">
+
+                                                        <ComboBox.ItemsPanel>
+                                                            <ItemsPanelTemplate>
+                                                                <VirtualizingStackPanel />
+                                                            </ItemsPanelTemplate>
+                                                        </ComboBox.ItemsPanel>
+
+                                                        <ComboBox.Resources>
+                                                            <Style TargetType="{x:Type ScrollViewer}">
+                                                                <Setter Property="CanContentScroll" Value="True"/>
+                                                                <Setter Property="VirtualizingPanel.IsVirtualizing" Value="True"/>
+                                                                <Setter Property="VirtualizingPanel.VirtualizationMode" Value="Recycling"/>
+                                                                <Setter Property="ScrollViewer.IsDeferredScrollingEnabled" Value="True"/>
+                                                            </Style>
+                                                        </ComboBox.Resources>
+                                                    </ComboBox>
+
 
                                                     <!-- Checkboxes під Availability -->
                                                     <WrapPanel Margin="0,10,0,0"/>
