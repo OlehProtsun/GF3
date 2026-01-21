@@ -444,40 +444,14 @@ namespace WPFApp.View.Container
             await _vm.CloseBlockAsync(block);
         }
 
-        private void ShopComboBox_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
-        {
-            LogGridSnapshot("ShopComboBox_PreviewMouseLeftButtonDown");
-        }
-
-        private void ShopComboBox_DropDownOpened(object sender, EventArgs e)
-        {
-            _shopComboOpen = true;
-            LogGridSnapshot("ShopComboBox_DropDownOpened");
-        }
-
         private void ShopComboBox_DropDownClosed(object sender, EventArgs e)
         {
             _vm?.CommitPendingShopSelection();
-            LogGridSnapshot("ShopComboBox_DropDownClosed");
-            _shopComboOpen = false;
-        }
-
-        private void AvailabilityComboBox_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
-        {
-            LogGridSnapshot("AvailabilityComboBox_PreviewMouseLeftButtonDown");
-        }
-
-        private void AvailabilityComboBox_DropDownOpened(object sender, EventArgs e)
-        {
-            _availabilityComboOpen = true;
-            LogGridSnapshot("AvailabilityComboBox_DropDownOpened");
         }
 
         private void AvailabilityComboBox_DropDownClosed(object sender, EventArgs e)
         {
             _vm?.CommitPendingAvailabilitySelection();
-            LogGridSnapshot("AvailabilityComboBox_DropDownClosed");
-            _availabilityComboOpen = false;
         }
 
         private void ApplyPaint(ScheduleMatrixCellRef cellRef)
