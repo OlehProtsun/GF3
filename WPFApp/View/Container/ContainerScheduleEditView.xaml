@@ -969,11 +969,12 @@
                                                     </Grid>
 
                                                     <ComboBox ItemsSource="{Binding Shops}"
-                                                      SelectedItem="{Binding SelectedShop}"
+                                                      SelectedItem="{Binding PendingSelectedShop}"
                                                       DisplayMemberPath="Name"
                                                       Style="{StaticResource RoundedComboBoxStyle}"
                                                       ItemContainerStyle="{StaticResource RoundedComboBoxItemStyle}"
-                                                      IsTextSearchEnabled="False">
+                                                      IsTextSearchEnabled="False"
+                                                      DropDownClosed="ShopComboBox_DropDownClosed">
 
                                                     <ComboBox.ItemsPanel>
                                                             <ItemsPanelTemplate>
@@ -1038,7 +1039,7 @@
                                                     </Grid>
 
                                                     <ComboBox ItemsSource="{Binding AvailabilityGroups}"
-          SelectedItem="{Binding SelectedAvailabilityGroup}"
+          SelectedItem="{Binding PendingSelectedAvailabilityGroup}"
           DisplayMemberPath="Name"
           Tag="Select employee..."
           Style="{StaticResource RoundedComboBoxStyle}"
@@ -1049,7 +1050,8 @@
           ScrollViewer.IsDeferredScrollingEnabled="True"
           VirtualizingPanel.IsVirtualizing="True"
           VirtualizingPanel.VirtualizationMode="Recycling"
-          IsTextSearchEnabled="False">
+          IsTextSearchEnabled="False"
+          DropDownClosed="AvailabilityComboBox_DropDownClosed">
 
                                                         <ComboBox.ItemsPanel>
                                                             <ItemsPanelTemplate>
