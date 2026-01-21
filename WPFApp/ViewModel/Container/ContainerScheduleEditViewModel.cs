@@ -176,11 +176,7 @@ namespace WPFApp.ViewModel.Container
 
                     SelectedCellRefs.Clear();
                     SelectedCellRef = null;
-                    if (SelectedBlock != null)
-                    {
-                        QueueParamPipeline("SelectedBlock changed");
-                    }
-                    else
+                    if (SelectedBlock == null)
                     {
                         // cleanup: не запускаємо pipeline в null-стані
                         _paramPipelineCts?.Cancel();
@@ -190,6 +186,16 @@ namespace WPFApp.ViewModel.Container
                         MatrixRefreshDiagnostics.RecordParamEvent(
                             "SelectedBlock changed",
                             "SelectedBlock is null -> SKIP QueueParamPipeline");
+                    }
+                    else if (_selectionSyncDepth > 0)
+                    {
+                        MatrixRefreshDiagnostics.RecordParamEvent(
+                            "SelectedBlock changed",
+                            $"SelectedBlock set while selectionSyncDepth={_selectionSyncDepth} -> SKIP QueueParamPipeline");
+                    }
+                    else
+                    {
+                        QueueParamPipeline("SelectedBlock changed");
                     }
 
                 }
@@ -832,8 +838,14 @@ namespace WPFApp.ViewModel.Container
                 SelectedShop = null;
 
                 _suppressAvailabilityGroupUpdate = true;
-                SelectedAvailabilityGroup = null;
-                _suppressAvailabilityGroupUpdate = false;
+                try
+                {
+                    SelectedAvailabilityGroup = null;
+                }
+                finally
+                {
+                    _suppressAvailabilityGroupUpdate = false;
+                }
 
                 return;
             }
@@ -841,8 +853,14 @@ namespace WPFApp.ViewModel.Container
             SelectedShop = Shops.FirstOrDefault(s => s.Id == SelectedBlock.Model.ShopId);
 
             _suppressAvailabilityGroupUpdate = true;
-            SelectedAvailabilityGroup = AvailabilityGroups.FirstOrDefault(g => g.Id == SelectedBlock.SelectedAvailabilityGroupId);
-            _suppressAvailabilityGroupUpdate = false;
+            try
+            {
+                SelectedAvailabilityGroup = AvailabilityGroups.FirstOrDefault(g => g.Id == SelectedBlock.SelectedAvailabilityGroupId);
+            }
+            finally
+            {
+                _suppressAvailabilityGroupUpdate = false;
+            }
         }
 
 
