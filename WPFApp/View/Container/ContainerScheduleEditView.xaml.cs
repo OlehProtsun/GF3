@@ -31,6 +31,8 @@ namespace WPFApp.View.Container
         private DateTime _lastScrollLogUtc = DateTime.MinValue;
         private bool _shopComboOpen;
         private bool _availabilityComboOpen;
+        private bool _suspendMatrixRefresh;
+        private bool _pendingMatrixRefresh;
 
         // coalesce MatrixChanged bursts (generation/lookup refreshes) into a single UI refresh
         private bool _refreshQueued;
@@ -203,6 +205,12 @@ namespace WPFApp.View.Container
         private void VmOnMatrixChanged(object? sender, EventArgs e)
         {
             if (_vm is null) return;
+
+            if (_suspendMatrixRefresh)
+            {
+                _pendingMatrixRefresh = true;
+                return;
+            }
 
             if (_refreshQueued) return;
             _refreshQueued = true;
@@ -446,12 +454,44 @@ namespace WPFApp.View.Container
 
         private void ShopComboBox_DropDownClosed(object sender, EventArgs e)
         {
+            _shopComboOpen = false;
             _vm?.CommitPendingShopSelection();
+            ResumeMatrixRefresh();
         }
 
         private void AvailabilityComboBox_DropDownClosed(object sender, EventArgs e)
         {
+            _availabilityComboOpen = false;
             _vm?.CommitPendingAvailabilitySelection();
+            ResumeMatrixRefresh();
+        }
+
+        private void ShopComboBox_DropDownOpened(object sender, EventArgs e)
+        {
+            _shopComboOpen = true;
+            PauseMatrixRefresh();
+        }
+
+        private void AvailabilityComboBox_DropDownOpened(object sender, EventArgs e)
+        {
+            _availabilityComboOpen = true;
+            PauseMatrixRefresh();
+        }
+
+        private void PauseMatrixRefresh()
+        {
+            _suspendMatrixRefresh = true;
+        }
+
+        private void ResumeMatrixRefresh()
+        {
+            _suspendMatrixRefresh = false;
+
+            if (_pendingMatrixRefresh)
+            {
+                _pendingMatrixRefresh = false;
+                RefreshMatricesSmart();
+            }
         }
 
         private void ApplyPaint(ScheduleMatrixCellRef cellRef)
