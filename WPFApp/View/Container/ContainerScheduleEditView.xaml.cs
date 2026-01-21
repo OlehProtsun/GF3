@@ -1,9 +1,7 @@
-﻿using Microsoft.EntityFrameworkCore.Metadata.Internal;
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Data;
-using System.Diagnostics;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
@@ -12,7 +10,6 @@ using System.Windows.Data;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
-using WPFApp.Infrastructure;
 using WPFApp.Service;
 using WPFApp.ViewModel.Container;
 using WPFApp.ViewModel.Dialogs;
@@ -34,22 +31,6 @@ namespace WPFApp.View.Container
 
         // coalesce MatrixChanged bursts (generation/lookup refreshes) into a single UI refresh
         private bool _refreshQueued;
-
-        private static int _nextViewId;
-        private readonly int _viewId = Interlocked.Increment(ref _nextViewId);
-
-        private long _attachCalls;
-        private long _detachCalls;
-
-        private long _matrixChangedReceived;
-        private long _matrixChangedQueued;
-        private long _matrixChangedExecuted;
-
-        private long _refreshSmartRuns;
-        private long _scheduleRebuildCols;
-        private long _scheduleSwapSrc;
-        private long _previewRebuildCols;
-        private long _previewSwapSrc;
 
         public ContainerScheduleEditView()
         {
@@ -101,106 +82,38 @@ namespace WPFApp.View.Container
 
         private void ContainerScheduleEditView_DataContextChanged(object sender, DependencyPropertyChangedEventArgs e)
         {
-            MatrixRefreshDiagnostics.RecordUiRefresh(
-    "EditView.DataContextChanged",
-    $"view={_viewId} newVm={VmId(DataContext as ContainerScheduleEditViewModel)}");
-
             AttachViewModel(DataContext as ContainerScheduleEditViewModel);
 
         }
 
         private void ContainerScheduleEditView_Loaded(object sender, RoutedEventArgs e)
         {
-            MatrixRefreshDiagnostics.RecordUiRefresh(
-            "EditView.Loaded",
-            $"view={_viewId} vm={VmId(DataContext as ContainerScheduleEditViewModel)}");
-
             AttachViewModel(DataContext as ContainerScheduleEditViewModel);
         }
 
         private void ContainerScheduleEditView_Unloaded(object sender, RoutedEventArgs e)
         {
-            MatrixRefreshDiagnostics.RecordUiRefresh(
-    "EditView.Unloaded",
-    $"view={_viewId} vm={VmId(_vm)}");
-
             DetachViewModel();
         }
 
         private void AttachViewModel(ContainerScheduleEditViewModel? viewModel)
         {
             if (ReferenceEquals(_vm, viewModel))
-            {
-                MatrixRefreshDiagnostics.RecordUiRefresh(
-                    "EditView.AttachViewModel: SKIP (same vm)",
-                    $"view={_viewId} vm={VmId(viewModel)} colsS={dataGridScheduleMatrix.Columns.Count} colsP={dataGridAvailabilityPreview.Columns.Count}");
                 return;
-            }
-
-            var snap = MatrixRefreshDiagnostics.AllocSnapshot();
-            var callNo = Interlocked.Increment(ref _attachCalls);
-
-            int oldVmId = VmId(_vm);
-            int newVmId = VmId(viewModel);
-
-            MatrixRefreshDiagnostics.RecordUiRefresh(
-                "EditView.AttachViewModel: ENTER",
-                $"view={_viewId} call={callNo} oldVm={oldVmId} newVm={newVmId} " +
-                $"{GridPerfSnapshot(dataGridScheduleMatrix)} | {GridPerfSnapshot(dataGridAvailabilityPreview)}");
 
             // ---- unsubscribe old vm ----
             if (_vm != null)
             {
-                int subsBeforeUnsub = -1;
-                try { subsBeforeUnsub = _vm.GetMatrixChangedSubscriberCount(); } catch { /* ignore */ }
-
-                MatrixRefreshDiagnostics.RecordUiRefresh(
-                    "EditView.AttachViewModel: before-unsubscribe",
-                    $"view={_viewId} oldVm={oldVmId} subs={subsBeforeUnsub}");
-
                 _vm.MatrixChanged -= VmOnMatrixChanged;
-                MatrixRefreshDiagnostics.Count(
-                    "EditView.MatrixChanged-=",
-                    log: true,
-                    extra: $"view={_viewId} vm={oldVmId}");
-
-                int subsAfterUnsub = -1;
-                try { subsAfterUnsub = _vm.GetMatrixChangedSubscriberCount(); } catch { /* ignore */ }
-
-                MatrixRefreshDiagnostics.RecordUiRefresh(
-                    "EditView.AttachViewModel: after-unsubscribe",
-                    $"view={_viewId} oldVm={oldVmId} subs={subsAfterUnsub}");
             }
 
             // ---- assign new vm ----
             _vm = viewModel;
 
-            MatrixRefreshDiagnostics.RecordUiRefresh(
-                "EditView.AttachViewModel: assigned vm",
-                $"view={_viewId} vm={(viewModel == null ? "null" : "!=null")} vmId={VmId(_vm)}");
-
             // ---- subscribe new vm + init grid ----
             if (_vm != null)
             {
-                int subsBeforeSub = -1;
-                try { subsBeforeSub = _vm.GetMatrixChangedSubscriberCount(); } catch { /* ignore */ }
-
-                MatrixRefreshDiagnostics.RecordUiRefresh(
-                    "EditView.AttachViewModel: before-subscribe",
-                    $"view={_viewId} vm={newVmId} subs={subsBeforeSub}");
-
                 _vm.MatrixChanged += VmOnMatrixChanged;
-                MatrixRefreshDiagnostics.Count(
-                    "EditView.MatrixChanged+=",
-                    log: true,
-                    extra: $"view={_viewId} vm={newVmId}");
-
-                int subsAfterSub = -1;
-                try { subsAfterSub = _vm.GetMatrixChangedSubscriberCount(); } catch { /* ignore */ }
-
-                MatrixRefreshDiagnostics.RecordUiRefresh(
-                    "EditView.AttachViewModel: after-subscribe",
-                    $"view={_viewId} vm={newVmId} subs={subsAfterSub}");
 
                 // Build columns only if we already have a schema.
                 int scheduleCols = 0, previewCols = 0;
@@ -226,28 +139,7 @@ namespace WPFApp.View.Container
                 // Assign ItemsSource
                 dataGridScheduleMatrix.ItemsSource = _vm.ScheduleMatrix;
                 dataGridAvailabilityPreview.ItemsSource = _vm.AvailabilityPreviewMatrix;
-
-                MatrixRefreshDiagnostics.RecordUiRefresh(
-                    "EditView.AttachViewModel: ItemsSource set",
-                    $"view={_viewId} vm={newVmId} " +
-                    $"scheduleCols={scheduleCols} previewCols={previewCols} " +
-                    $"scheduleSrc={MatrixRefreshDiagnostics.IdOf(dataGridScheduleMatrix.ItemsSource)} " +
-                    $"previewSrc={MatrixRefreshDiagnostics.IdOf(dataGridAvailabilityPreview.ItemsSource)}");
             }
-            else
-            {
-                // Optional: keep grid stable if vm becomes null (you can comment this out if not desired)
-                // dataGridScheduleMatrix.ItemsSource = null;
-                // dataGridAvailabilityPreview.ItemsSource = null;
-                MatrixRefreshDiagnostics.RecordUiRefresh(
-                    "EditView.AttachViewModel: vm is null",
-                    $"view={_viewId} call={callNo}");
-            }
-
-            MatrixRefreshDiagnostics.RecordAllocDelta(
-                "EditView.AttachViewModel: EXIT",
-                snap,
-                $"view={_viewId} call={callNo} vm={VmId(_vm)}");
         }
 
 
@@ -287,36 +179,14 @@ namespace WPFApp.View.Container
             // важливо: спочатку null -> тоді нове
             grid.ItemsSource = null;
             grid.ItemsSource = source; // тепер тип правильний
-
-            MatrixRefreshDiagnostics.Count(
-                "EditView.SwapItemsSource",
-                log: true,
-                extra: $"grid={grid.Name} src={MatrixRefreshDiagnostics.IdOf(source)} cols={grid.Columns.Count}");
         }
 
 
         private void DetachViewModel()
         {
-            var snap = MatrixRefreshDiagnostics.AllocSnapshot();
-            var callNo = Interlocked.Increment(ref _detachCalls);
-
-            MatrixRefreshDiagnostics.RecordUiRefresh(
-                "EditView.DetachViewModel: ENTER",
-                $"view={_viewId} call={callNo} vm={VmId(_vm)}");
-
-            MatrixRefreshDiagnostics.RecordUiRefresh("EditView.DetachViewModel: start");
-
             if (_vm == null) return;
 
-            MatrixRefreshDiagnostics.RecordUiRefresh(
-    "EditView.DetachViewModel: before-unsubscribe",
-    $"view={_viewId} vm={VmId(_vm)} subs={_vm.GetMatrixChangedSubscriberCount()}");
-
             _vm.MatrixChanged -= VmOnMatrixChanged;
-            MatrixRefreshDiagnostics.Count(
-                "EditView.MatrixChanged-=",
-                log: true,
-                extra: $"view={_viewId} vm={VmId(_vm)}");
             _vm.CancelBackgroundWork();
 
             // !!! ключове: відпускаємо важкі DataView/DataRowView зі сторони DataGrid
@@ -324,14 +194,6 @@ namespace WPFApp.View.Container
             SwapItemsSource(dataGridAvailabilityPreview, null);
             dataGridScheduleMatrix.Columns.Clear();
             dataGridAvailabilityPreview.Columns.Clear();
-            MatrixRefreshDiagnostics.RecordUiRefresh(
-    "EditView.DetachViewModel: after-clear",
-    $"view={_viewId} {GridPerfSnapshot(dataGridScheduleMatrix)} | {GridPerfSnapshot(dataGridAvailabilityPreview)}");
-            MatrixRefreshDiagnostics.RecordAllocDelta("EditView.DetachViewModel: EXIT", snap, $"view={_viewId} call={callNo}");
-
-            MatrixRefreshDiagnostics.RecordUiRefresh("EditView.DetachViewModel: cleared grids");
-
-
             _scheduleSchemaSig = null;
             _previewSchemaSig = null;
             _vm = null;
@@ -340,49 +202,16 @@ namespace WPFApp.View.Container
 
         private void VmOnMatrixChanged(object? sender, EventArgs e)
         {
-            var recv = Interlocked.Increment(ref _matrixChangedReceived);
-            int vmId = VmId(_vm);
-            var stack = MatrixRefreshDiagnostics.ShortStack(skipFrames: 2);
-
-            MatrixRefreshDiagnostics.Count(
-                "EditView.VmOnMatrixChanged",
-                log: true,
-                extra: stack == null ? $"view={_viewId} vm={vmId}" : $"view={_viewId} vm={vmId} stack={stack}");
-
-            MatrixRefreshDiagnostics.RecordUiRefresh(
-                "EditView.VmOnMatrixChanged: RECEIVED",
-                $"view={_viewId} vm={vmId} recv={recv} refreshQueued={_refreshQueued}");
-
             if (_vm is null) return;
 
             if (_refreshQueued) return;
             _refreshQueued = true;
 
-            var queued = Interlocked.Increment(ref _matrixChangedQueued);
-
-            MatrixRefreshDiagnostics.RecordUiRefresh(
-                "EditView.VmOnMatrixChanged: QUEUED",
-                $"view={_viewId} vm={vmId} queued={queued}");
-
             Dispatcher.BeginInvoke(new Action(() =>
             {
-                var snap = MatrixRefreshDiagnostics.AllocSnapshot();
-                var exec = Interlocked.Increment(ref _matrixChangedExecuted);
-
                 _refreshQueued = false;
 
-                MatrixRefreshDiagnostics.RecordUiRefresh(
-                    "EditView.VmOnMatrixChanged: EXECUTE",
-                    $"view={_viewId} vm={vmId} exec={exec} " +
-                    $"{GridPerfSnapshot(dataGridScheduleMatrix)}");
-
                 RefreshMatricesSmart();
-
-                MatrixRefreshDiagnostics.RecordAllocDelta(
-                    "EditView.VmOnMatrixChanged: EXECUTE_DONE",
-                    snap,
-                    $"view={_viewId} vm={vmId} exec={exec}");
-
             }), DispatcherPriority.Background);
         }
 
@@ -412,195 +241,69 @@ namespace WPFApp.View.Container
 
         private void RefreshMatricesSmart()
         {
-            var snap = MatrixRefreshDiagnostics.AllocSnapshot();
-            var sw = Stopwatch.StartNew();
-            var run = Interlocked.Increment(ref _refreshSmartRuns);
+            if (_vm is null)
+                return;
 
-            int vmId = VmId(_vm);
+            var scheduleTable = _vm.ScheduleMatrix?.Table;
 
-            bool sRebuild = false, sSwap = false, pRebuild = false, pSwap = false;
-
-            string oldScheduleSig = _scheduleSchemaSig ?? "<null>";
-            string oldPreviewSig = _previewSchemaSig ?? "<null>";
-
-            int scheduleSrcBefore = MatrixRefreshDiagnostics.IdOf(dataGridScheduleMatrix.ItemsSource);
-            int previewSrcBefore = MatrixRefreshDiagnostics.IdOf(dataGridAvailabilityPreview.ItemsSource);
-
-            MatrixRefreshDiagnostics.RecordUiRefresh(
-                "EditView.RefreshMatricesSmart: ENTER",
-                $"view={_viewId} vm={vmId} run={run} " +
-                $"{GridPerfSnapshot(dataGridScheduleMatrix)} | {GridPerfSnapshot(dataGridAvailabilityPreview)} " +
-                $"oldSig[s]={oldScheduleSig} oldSig[p]={oldPreviewSig} " +
-                $"srcBefore[s]={scheduleSrcBefore} srcBefore[p]={previewSrcBefore}");
-
-            try
+            if (scheduleTable == null || scheduleTable.Columns.Count == 0)
             {
-                if (_vm is null)
+                if (dataGridScheduleMatrix.ItemsSource != null || dataGridScheduleMatrix.Columns.Count > 0)
                 {
-                    MatrixRefreshDiagnostics.RecordUiRefresh(
-                        "EditView.RefreshMatricesSmart: VM_NULL",
-                        $"view={_viewId} run={run}");
-                    return;
+                    ResetGridColumns(dataGridScheduleMatrix);
+                    _scheduleSchemaSig = null;
                 }
-
-                // -----------------------------
-                // SCHEDULE GRID
-                // -----------------------------
-                var scheduleTable = _vm.ScheduleMatrix?.Table;
-
-                if (scheduleTable == null || scheduleTable.Columns.Count == 0)
-                {
-                    if (dataGridScheduleMatrix.ItemsSource != null || dataGridScheduleMatrix.Columns.Count > 0)
-                    {
-                        ResetGridColumns(dataGridScheduleMatrix);
-                        _scheduleSchemaSig = null;
-                        sSwap = true;
-                        Interlocked.Increment(ref _scheduleSwapSrc);
-
-                        MatrixRefreshDiagnostics.RecordUiRefresh(
-                            "EditView.ScheduleGrid: reset columns (empty table)",
-                            $"view={_viewId} run={run}");
-                    }
-                }
-                else
-                {
-                    var scheduleSig = BuildSig(scheduleTable);
-
-                    if (scheduleSig != _scheduleSchemaSig)
-                    {
-                        ResetGridColumns(dataGridScheduleMatrix);
-                        ScheduleMatrixColumnBuilder.BuildScheduleMatrixColumns(
-                            scheduleTable,
-                            dataGridScheduleMatrix,
-                            isReadOnly: false);
-
-                        _scheduleSchemaSig = scheduleSig;
-
-                        sRebuild = true;
-                        Interlocked.Increment(ref _scheduleRebuildCols);
-
-                        MatrixRefreshDiagnostics.RecordUiRefresh(
-                            "EditView.ScheduleGrid: rebuild columns",
-                            $"view={_viewId} run={run} newSig={scheduleSig} oldSig={oldScheduleSig} cols={scheduleTable.Columns.Count}");
-                    }
-
-                    if (!ReferenceEquals(dataGridScheduleMatrix.ItemsSource, _vm.ScheduleMatrix))
-                    {
-                        SwapItemsSource(dataGridScheduleMatrix, _vm.ScheduleMatrix);
-                        sSwap = true;
-                        Interlocked.Increment(ref _scheduleSwapSrc);
-
-                        MatrixRefreshDiagnostics.RecordUiRefresh(
-                            "EditView.ScheduleGrid: swap ItemsSource",
-                            $"view={_viewId} run={run} newSrc={MatrixRefreshDiagnostics.IdOf(_vm.ScheduleMatrix)}");
-                    }
-                }
-
-                // -----------------------------
-                // PREVIEW GRID
-                // -----------------------------
-                var previewTable = _vm.AvailabilityPreviewMatrix?.Table;
-
-                if (previewTable == null || previewTable.Columns.Count == 0)
-                {
-                    if (dataGridAvailabilityPreview.ItemsSource != null || dataGridAvailabilityPreview.Columns.Count > 0)
-                    {
-                        ResetGridColumns(dataGridAvailabilityPreview);
-                        _previewSchemaSig = null;
-                        pSwap = true;
-                        Interlocked.Increment(ref _previewSwapSrc);
-
-                        MatrixRefreshDiagnostics.RecordUiRefresh(
-                            "EditView.PreviewGrid: reset columns (empty table)",
-                            $"view={_viewId} run={run}");
-                    }
-                }
-                else
-                {
-                    var previewSig = BuildSig(previewTable);
-
-                    if (previewSig != _previewSchemaSig)
-                    {
-                        ResetGridColumns(dataGridAvailabilityPreview);
-                        ScheduleMatrixColumnBuilder.BuildScheduleMatrixColumns(
-                            previewTable,
-                            dataGridAvailabilityPreview,
-                            isReadOnly: true);
-
-                        _previewSchemaSig = previewSig;
-
-                        pRebuild = true;
-                        Interlocked.Increment(ref _previewRebuildCols);
-
-                        MatrixRefreshDiagnostics.RecordUiRefresh(
-                            "EditView.PreviewGrid: rebuild columns",
-                            $"view={_viewId} run={run} newSig={previewSig} oldSig={oldPreviewSig} cols={previewTable.Columns.Count}");
-                    }
-
-                    if (!ReferenceEquals(dataGridAvailabilityPreview.ItemsSource, _vm.AvailabilityPreviewMatrix))
-                    {
-                        SwapItemsSource(dataGridAvailabilityPreview, _vm.AvailabilityPreviewMatrix);
-                        pSwap = true;
-                        Interlocked.Increment(ref _previewSwapSrc);
-
-                        MatrixRefreshDiagnostics.RecordUiRefresh(
-                            "EditView.PreviewGrid: swap ItemsSource",
-                            $"view={_viewId} run={run} newSrc={MatrixRefreshDiagnostics.IdOf(_vm.AvailabilityPreviewMatrix)}");
-                    }
-                }
-
-                MatrixRefreshDiagnostics.RecordUiRefresh(
-                    "EditView.RefreshMatricesSmart: MID",
-                    $"view={_viewId} run={run} " +
-                    $"did[sRebuild]={sRebuild} did[sSwap]={sSwap} did[pRebuild]={pRebuild} did[pSwap]={pSwap} " +
-                    $"cnt[sRebuild]={_scheduleRebuildCols} cnt[sSwap]={_scheduleSwapSrc} " +
-                    $"cnt[pRebuild]={_previewRebuildCols} cnt[pSwap]={_previewSwapSrc}");
             }
-            finally
+            else
             {
-                sw.Stop();
+                var scheduleSig = BuildSig(scheduleTable);
 
-                int scheduleSrcAfter = MatrixRefreshDiagnostics.IdOf(dataGridScheduleMatrix.ItemsSource);
-                int previewSrcAfter = MatrixRefreshDiagnostics.IdOf(dataGridAvailabilityPreview.ItemsSource);
+                if (scheduleSig != _scheduleSchemaSig)
+                {
+                    ResetGridColumns(dataGridScheduleMatrix);
+                    ScheduleMatrixColumnBuilder.BuildScheduleMatrixColumns(
+                        scheduleTable,
+                        dataGridScheduleMatrix,
+                        isReadOnly: false);
 
-                MatrixRefreshDiagnostics.RecordUiRefresh(
-                    "EditView.RefreshMatricesSmart: EXIT",
-                    $"view={_viewId} vm={VmId(_vm)} run={run} durMs={sw.Elapsed.TotalMilliseconds:0} " +
-                    $"did[sRebuild]={sRebuild} did[sSwap]={sSwap} did[pRebuild]={pRebuild} did[pSwap]={pSwap} " +
-                    $"sigNow[s]={_scheduleSchemaSig ?? "<null>"} sigNow[p]={_previewSchemaSig ?? "<null>"} " +
-                    $"srcAfter[s]={scheduleSrcAfter} srcAfter[p]={previewSrcAfter} " +
-                    $"{GridPerfSnapshot(dataGridScheduleMatrix)} | {GridPerfSnapshot(dataGridAvailabilityPreview)}");
+                    _scheduleSchemaSig = scheduleSig;
+                }
 
-                MatrixRefreshDiagnostics.RecordAllocDelta(
-                    "EditView.RefreshMatricesSmart: ALLOC",
-                    snap,
-                    $"view={_viewId} run={run} durMs={sw.Elapsed.TotalMilliseconds:0} " +
-                    $"srcBefore[s]={scheduleSrcBefore} srcAfter[s]={scheduleSrcAfter} " +
-                    $"srcBefore[p]={previewSrcBefore} srcAfter[p]={previewSrcAfter}");
+                if (!ReferenceEquals(dataGridScheduleMatrix.ItemsSource, _vm.ScheduleMatrix))
+                {
+                    SwapItemsSource(dataGridScheduleMatrix, _vm.ScheduleMatrix);
+                }
             }
-        }
 
+            var previewTable = _vm.AvailabilityPreviewMatrix?.Table;
 
-        private static int VmId(ContainerScheduleEditViewModel? vm) => MatrixRefreshDiagnostics.IdOf(vm);
-
-        private string GridPerfSnapshot(DataGrid g)
-        {
-            try
+            if (previewTable == null || previewTable.Columns.Count == 0)
             {
-                bool isVirt = VirtualizingPanel.GetIsVirtualizing(g);
-                var mode = VirtualizingPanel.GetVirtualizationMode(g);
-                bool canScroll = (bool)g.GetValue(ScrollViewer.CanContentScrollProperty);
-
-                int cols = g.Columns?.Count ?? 0;
-                int items = g.Items?.Count ?? 0;
-
-                return $"grid='{g.Name}' virt={isVirt} mode={mode} canContentScroll={canScroll} " +
-                       $"rowVirt={g.EnableRowVirtualization} colVirt={g.EnableColumnVirtualization} " +
-                       $"cols={cols} items={items}";
+                if (dataGridAvailabilityPreview.ItemsSource != null || dataGridAvailabilityPreview.Columns.Count > 0)
+                {
+                    ResetGridColumns(dataGridAvailabilityPreview);
+                    _previewSchemaSig = null;
+                }
             }
-            catch (Exception ex)
+            else
             {
-                return $"gridPerfSnap failed: {ex.GetType().Name}: {ex.Message}";
+                var previewSig = BuildSig(previewTable);
+
+                if (previewSig != _previewSchemaSig)
+                {
+                    ResetGridColumns(dataGridAvailabilityPreview);
+                    ScheduleMatrixColumnBuilder.BuildScheduleMatrixColumns(
+                        previewTable,
+                        dataGridAvailabilityPreview,
+                        isReadOnly: true);
+
+                    _previewSchemaSig = previewSig;
+                }
+
+                if (!ReferenceEquals(dataGridAvailabilityPreview.ItemsSource, _vm.AvailabilityPreviewMatrix))
+                {
+                    SwapItemsSource(dataGridAvailabilityPreview, _vm.AvailabilityPreviewMatrix);
+                }
             }
         }
 

@@ -12,17 +12,12 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Media;
 using WPFApp.Infrastructure;
-using System.Runtime.CompilerServices;
-using System.Diagnostics;
 
 
 namespace WPFApp.ViewModel.Container
 {
     public sealed class ContainerScheduleEditViewModel : ViewModelBase, INotifyDataErrorInfo, IScheduleMatrixStyleProvider
     {
-        private long _setSelectedShopCalls;
-        private long _setSelectedGroupCalls;
-        private long _setSelectedBlockCalls;
         private int _scheduleBuildVersion; // інкремент на кожен refresh
 
 
@@ -37,14 +32,8 @@ namespace WPFApp.ViewModel.Container
         public const string ConflictColumnName = "Conflict";
         public const string EmptyMark = "-";
 
-        private long _paramQueueCount;
-
-
         // кеш: EmployeeId -> "Total hours: 12h 30m"
         private readonly Dictionary<int, string> _employeeTotalHoursText = new();
-
-        private CancellationTokenSource? _paramPipelineCts;
-        private int _paramPipelineVersion;
 
         // ✅ додай
         public const string WeekendColumnName = "IsWeekend";
@@ -138,12 +127,6 @@ namespace WPFApp.ViewModel.Container
             get => _selectedBlock;
             set
             {
-                var call = Interlocked.Increment(ref _setSelectedBlockCalls);
-                MatrixRefreshDiagnostics.RecordParamEvent(
-                    "SET SelectedBlock",
-                    $"call={call} new={(value?.Model.Id ?? 0)} old={(_selectedBlock?.Model.Id ?? 0)}");
-
-
                 if (SetProperty(ref _selectedBlock, value))
                 {
                     OnPropertiesChanged(
@@ -169,35 +152,9 @@ namespace WPFApp.ViewModel.Container
                     SyncSelectionFromBlock();
                     RestoreMatricesForSelection();
                     RefreshCellStyleMap();
-                    MatrixRefreshDiagnostics.RecordParamEvent(
-    "SelectedBlock SET done",
-    $"call={call} blockId={(SelectedBlock?.Model.Id ?? 0)} shopId={(SelectedBlock?.Model.ShopId ?? 0)} groupId={(SelectedBlock?.SelectedAvailabilityGroupId ?? 0)} " +
-    $"syncDepth={_selectionSyncDepth} syncReason={_selectionSyncReason ?? "<none>"}");
 
                     SelectedCellRefs.Clear();
                     SelectedCellRef = null;
-                    if (SelectedBlock == null)
-                    {
-                        // cleanup: не запускаємо pipeline в null-стані
-                        _paramPipelineCts?.Cancel();
-                        _paramPipelineCts?.Dispose();
-                        _paramPipelineCts = null;
-
-                        MatrixRefreshDiagnostics.RecordParamEvent(
-                            "SelectedBlock changed",
-                            "SelectedBlock is null -> SKIP QueueParamPipeline");
-                    }
-                    else if (_selectionSyncDepth > 0)
-                    {
-                        MatrixRefreshDiagnostics.RecordParamEvent(
-                            "SelectedBlock changed",
-                            $"SelectedBlock set while selectionSyncDepth={_selectionSyncDepth} -> SKIP QueueParamPipeline");
-                    }
-                    else
-                    {
-                        QueueParamPipeline("SelectedBlock changed");
-                    }
-
                 }
             }
         }
@@ -303,8 +260,6 @@ namespace WPFApp.ViewModel.Container
                 ClearValidationErrors(nameof(ScheduleMonth));
 
                 InvalidateGeneratedScheduleAndClearMatrices();
-                MatrixRefreshDiagnostics.RecordParamEvent("ScheduleMonth changed", $"m={ScheduleMonth} y={ScheduleYear}");
-                QueueParamPipeline("Month changed");
             }
         }
 
@@ -427,14 +382,6 @@ namespace WPFApp.ViewModel.Container
             get => _selectedShop;
             set
             {
-                var call = Interlocked.Increment(ref _setSelectedShopCalls);
-                var stack = MatrixRefreshDiagnostics.ShortStack(skipFrames: 2);
-                MatrixRefreshDiagnostics.RecordParamEvent(
-                    "SET SelectedShop",
-                    $"call={call} depth={_selectionSyncDepth} reason={_selectionSyncReason ?? "<none>"} " +
-                    (stack != null ? $"stack={stack}" : ""));
-
-
                 var oldId = _selectedShop?.Id ?? 0;
                 var newId = value?.Id ?? 0;
 
@@ -445,12 +392,6 @@ namespace WPFApp.ViewModel.Container
                     return;
 
                 ScheduleShopId = newId;
-                MatrixRefreshDiagnostics.RecordParamEvent(
-                    "SelectedShop changed",
-                    $"shopId={newId} old={oldId} call={call} depth={_selectionSyncDepth} reason={_selectionSyncReason ?? "<none>"}");
-
-                // якщо shop впливає на preview/дані — роби через pipeline, а не напряму
-                // QueueParamPipeline("Shop changed");
             }
         }
 
@@ -460,14 +401,6 @@ namespace WPFApp.ViewModel.Container
             get => _selectedAvailabilityGroup;
             set
             {
-                var call = Interlocked.Increment(ref _setSelectedGroupCalls);
-                var stack = MatrixRefreshDiagnostics.ShortStack(skipFrames: 2);
-                MatrixRefreshDiagnostics.RecordParamEvent(
-                    "SET SelectedAvailabilityGroup",
-                    $"call={call} depth={_selectionSyncDepth} reason={_selectionSyncReason ?? "<none>"} suppress={_suppressAvailabilityGroupUpdate} " +
-                    (stack != null ? $"stack={stack}" : ""));
-
-
                 var oldId = _selectedAvailabilityGroup?.Id ?? 0;
                 var newId = value?.Id ?? 0;
 
@@ -481,22 +414,13 @@ namespace WPFApp.ViewModel.Container
                     return;
 
                 if (SelectedBlock == null)
-                {
-                    MatrixRefreshDiagnostics.RecordParamEvent(
-                        "SelectedAvailabilityGroup changed",
-                        $"groupId={newId} old={oldId} but SelectedBlock==null -> SKIP pipeline");
                     return;
-                }
 
                 if (_selectionSyncDepth > 0)
-                {
-                    MatrixRefreshDiagnostics.RecordParamEvent(
-                        "SelectedAvailabilityGroup changed",
-                        $"groupId={newId} old={oldId} but selectionSyncDepth={_selectionSyncDepth} -> SKIP pipeline");
                     return;
-                }
 
-                QueueParamPipeline("AvailabilityGroup changed");
+                SelectedBlock.SelectedAvailabilityGroupId = newId;
+                InvalidateGeneratedScheduleAndClearMatrices();
             }
         }
 
@@ -624,20 +548,6 @@ namespace WPFApp.ViewModel.Container
             return list;
         }
 
-        internal int GetMatrixChangedSubscriberCount()
-        {
-            // Важливо: НІЯКОГО логування всередині.
-            // Це просто допоміжний метод.
-            try
-            {
-                return MatrixChanged?.GetInvocationList().Length ?? 0;
-            }
-            catch
-            {
-                return -1;
-            }
-        }
-
 
         public void ResetForNew()
         {
@@ -660,10 +570,6 @@ namespace WPFApp.ViewModel.Container
             SelectedCellRef = null;
             SelectedCellRefs.Clear();
             ActivePaintMode = SchedulePaintMode.None;
-            _paramPipelineCts?.Cancel();
-            _paramPipelineCts?.Dispose();
-            _paramPipelineCts = null;
-
         }
 
         public string GetEmployeeTotalHoursText(string columnName)
@@ -678,34 +584,23 @@ namespace WPFApp.ViewModel.Container
         }
 
         private int _selectionSyncDepth;
-        private string? _selectionSyncReason;
 
         private readonly struct SelectionSyncScope : IDisposable
         {
             private readonly ContainerScheduleEditViewModel _vm;
-            public SelectionSyncScope(ContainerScheduleEditViewModel vm, string reason)
+            public SelectionSyncScope(ContainerScheduleEditViewModel vm)
             {
                 _vm = vm;
                 _vm._selectionSyncDepth++;
-                _vm._selectionSyncReason = reason;
-
-                MatrixRefreshDiagnostics.RecordParamEvent(
-                    "SEL_SYNC:ENTER",
-                    $"depth={_vm._selectionSyncDepth} reason={reason}");
             }
 
             public void Dispose()
             {
-                MatrixRefreshDiagnostics.RecordParamEvent(
-                    "SEL_SYNC:EXIT",
-                    $"depth={_vm._selectionSyncDepth} reason={_vm._selectionSyncReason}");
-
                 _vm._selectionSyncDepth = Math.Max(0, _vm._selectionSyncDepth - 1);
-                if (_vm._selectionSyncDepth == 0) _vm._selectionSyncReason = null;
             }
         }
 
-        private SelectionSyncScope EnterSelectionSync(string reason) => new(this, reason);
+        private SelectionSyncScope EnterSelectionSync() => new(this);
 
 
         private void RecalculateTotals()
@@ -789,19 +684,10 @@ namespace WPFApp.ViewModel.Container
 
             if (SelectedBlock != null)
             {
-                var previousGroupId = SelectedAvailabilityGroup?.Id ?? 0;
                 _suppressAvailabilityGroupUpdate = true;
                 SelectedAvailabilityGroup = AvailabilityGroups
                     .FirstOrDefault(g => g.Id == SelectedBlock.SelectedAvailabilityGroupId);
                 _suppressAvailabilityGroupUpdate = false;
-
-                var groupId = SelectedAvailabilityGroup?.Id ?? 0;
-                if (groupId != previousGroupId)
-                {
-                    RestoreMatricesForSelection();
-                    QueueParamPipeline("AvailabilityGroups list refreshed");
-                }
-
             }
         }
 
@@ -817,11 +703,6 @@ namespace WPFApp.ViewModel.Container
 
             // очищаємо відображення (без BuildScheduleTable)
             ScheduleMatrix = new DataView();
-
-            MatrixRefreshDiagnostics.RecordMatrixChanged(
-    $"VM raises MatrixChanged | subs={GetMatrixChangedSubscriberCount()} " +
-    $"scheduleSrc={MatrixRefreshDiagnostics.IdOf(ScheduleMatrix)} previewSrc={MatrixRefreshDiagnostics.IdOf(AvailabilityPreviewMatrix)}");
-
             MatrixChanged?.Invoke(this, EventArgs.Empty);
         }
 
@@ -831,7 +712,7 @@ namespace WPFApp.ViewModel.Container
 
         public void SyncSelectionFromBlock()
         {
-            using var _ = EnterSelectionSync("SyncSelectionFromBlock");
+            using var _ = EnterSelectionSync();
 
             if (SelectedBlock == null)
             {
@@ -882,12 +763,7 @@ namespace WPFApp.ViewModel.Container
 
         internal async Task RefreshScheduleMatrixAsync(CancellationToken ct = default)
         {
-            var snapAll = MatrixRefreshDiagnostics.AllocSnapshot();
-            var swAll = Stopwatch.StartNew();
-
             int buildVer = Interlocked.Increment(ref _scheduleBuildVersion);
-
-            MatrixRefreshDiagnostics.Step($"VM.RefreshScheduleMatrixAsync: START ver={buildVer}");
 
             // cancel попереднього білду (щоб не було черги з 10 білдів)
             CancellationTokenSource? prev = Interlocked.Exchange(ref _scheduleMatrixCts, null);
@@ -911,29 +787,12 @@ namespace WPFApp.ViewModel.Container
                     ScheduleYear < 1 || ScheduleMonth < 1 || ScheduleMonth > 12 ||
                     SelectedBlock.Slots.Count == 0)
                 {
-                    MatrixRefreshDiagnostics.Step($"VM.RefreshScheduleMatrixAsync: CLEAR ver={buildVer} reason=no-block/invalid-date/no-slots");
-
                     await _owner.RunOnUiThreadAsync(() =>
                     {
-                        var snapUi = MatrixRefreshDiagnostics.AllocSnapshot();
-
                         ScheduleMatrix = new DataView();
                         RecalculateTotals();
 
-                        MatrixRefreshDiagnostics.RecordUiRefresh(
-                            "VM.RefreshScheduleMatrixAsync: CLEARED_ON_UI",
-                            $"ver={buildVer} scheduleSrc={MatrixRefreshDiagnostics.IdOf(ScheduleMatrix)}");
-
-                        MatrixRefreshDiagnostics.RecordMatrixChanged(
-                            $"VM raises MatrixChanged (CLEAR) | ver={buildVer} subs={GetMatrixChangedSubscriberCount()} " +
-                            $"scheduleSrc={MatrixRefreshDiagnostics.IdOf(ScheduleMatrix)} previewSrc={MatrixRefreshDiagnostics.IdOf(AvailabilityPreviewMatrix)}");
-
                         MatrixChanged?.Invoke(this, EventArgs.Empty);
-
-                        MatrixRefreshDiagnostics.RecordAllocDelta(
-                            "VM.RefreshScheduleMatrixAsync: CLEAR_UI_ALLOC",
-                            snapUi,
-                            $"ver={buildVer}");
                     }).ConfigureAwait(false);
 
                     return;
@@ -950,16 +809,6 @@ namespace WPFApp.ViewModel.Container
                 var slotsSnapshot = SelectedBlock.Slots.ToList();
                 var employeesSnapshot = SelectedBlock.Employees.ToList();
 
-                MatrixRefreshDiagnostics.Step(
-                    $"VM.RefreshScheduleMatrixAsync: SNAPSHOT ver={buildVer} blockId={blockId} year={year} month={month} " +
-                    $"slots={slotsSnapshot.Count} emps={employeesSnapshot.Count}");
-
-                // -----------------------------
-                // BUILD OFF UI THREAD
-                // -----------------------------
-                var snapBuild = MatrixRefreshDiagnostics.AllocSnapshot();
-                MatrixRefreshDiagnostics.Step($"VM.RefreshScheduleMatrixAsync: BUILD_BEGIN ver={buildVer}");
-
                 var result = await Task.Run(() =>
                 {
                     token.ThrowIfCancellationRequested();
@@ -971,35 +820,23 @@ namespace WPFApp.ViewModel.Container
                     return (View: table.DefaultView, ColMap: colMap);
                 }, token).ConfigureAwait(false);
 
-                MatrixRefreshDiagnostics.RecordAllocDelta(
-                    "VM.RefreshScheduleMatrixAsync: BUILD_ALLOC",
-                    snapBuild,
-                    $"ver={buildVer} rows={result.View?.Table?.Rows.Count ?? 0} cols={result.View?.Table?.Columns.Count ?? 0}");
-
-                MatrixRefreshDiagnostics.Step($"VM.RefreshScheduleMatrixAsync: BUILD_DONE ver={buildVer}");
-
                 // -----------------------------
                 // IGNORE STALE RESULT
                 // (якщо під час білду стартанув новий buildVer)
                 // -----------------------------
                 if (buildVer != Volatile.Read(ref _scheduleBuildVersion) || token.IsCancellationRequested)
                 {
-                    MatrixRefreshDiagnostics.Step($"VM.RefreshScheduleMatrixAsync: STALE_RESULT_SKIP ver={buildVer} curVer={_scheduleBuildVersion} cancelled={token.IsCancellationRequested}");
                     return;
                 }
 
                 // -----------------------------
                 // APPLY ON UI THREAD
                 // -----------------------------
-                var snapApply = MatrixRefreshDiagnostics.AllocSnapshot();
-                MatrixRefreshDiagnostics.Step($"VM.RefreshScheduleMatrixAsync: APPLY_BEGIN ver={buildVer}");
-
                 await _owner.RunOnUiThreadAsync(() =>
                 {
                     // ще раз захист: якщо вже не актуально на момент UI
                     if (buildVer != _scheduleBuildVersion || token.IsCancellationRequested)
                     {
-                        MatrixRefreshDiagnostics.Step($"VM.RefreshScheduleMatrixAsync: APPLY_SKIP_STALE ver={buildVer} curVer={_scheduleBuildVersion} cancelled={token.IsCancellationRequested}");
                         return;
                     }
 
@@ -1009,50 +846,26 @@ namespace WPFApp.ViewModel.Container
 
                     ScheduleMatrix = result.View;
 
-                    MatrixRefreshDiagnostics.RecordUiRefresh(
-                        "VM.RefreshScheduleMatrixAsync: ASSIGNED_ON_UI",
-                        $"ver={buildVer} rows={result.View?.Table?.Rows.Count ?? 0} cols={result.View?.Table?.Columns.Count ?? 0} " +
-                        $"scheduleSrc={MatrixRefreshDiagnostics.IdOf(ScheduleMatrix)}");
-
                     RecalculateTotals();
-
-                    MatrixRefreshDiagnostics.RecordMatrixChanged(
-                        $"VM raises MatrixChanged (ASSIGN) | ver={buildVer} subs={GetMatrixChangedSubscriberCount()} " +
-                        $"scheduleSrc={MatrixRefreshDiagnostics.IdOf(ScheduleMatrix)} previewSrc={MatrixRefreshDiagnostics.IdOf(AvailabilityPreviewMatrix)}");
 
                     MatrixChanged?.Invoke(this, EventArgs.Empty);
                 }).ConfigureAwait(false);
-
-                MatrixRefreshDiagnostics.RecordAllocDelta(
-                    "VM.RefreshScheduleMatrixAsync: APPLY_UI_ALLOC",
-                    snapApply,
-                    $"ver={buildVer}");
-
-                MatrixRefreshDiagnostics.Step($"VM.RefreshScheduleMatrixAsync: DONE ver={buildVer}");
             }
             catch (OperationCanceledException)
             {
-                MatrixRefreshDiagnostics.Step($"VM.RefreshScheduleMatrixAsync: OCE ver={buildVer}");
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                MatrixRefreshDiagnostics.RecordException("VM.RefreshScheduleMatrixAsync", ex);
+                // ignore
             }
             finally
             {
-                swAll.Stop();
-
                 // dispose тільки якщо це досі наш CTS (щоб не прибити новий)
                 if (ReferenceEquals(_scheduleMatrixCts, localCts))
                 {
                     _scheduleMatrixCts = null;
                     try { localCts.Dispose(); } catch { /* ignore */ }
                 }
-
-                MatrixRefreshDiagnostics.RecordAllocDelta(
-                    "VM.RefreshScheduleMatrixAsync: TOTAL_ALLOC",
-                    snapAll,
-                    $"ver={buildVer} durMs={swAll.Elapsed.TotalMilliseconds:0}");
             }
         }
 
@@ -1061,97 +874,6 @@ namespace WPFApp.ViewModel.Container
         {
             SafeForget(RefreshAvailabilityPreviewMatrixAsync(year, month, slots, employees, previewKey: null));
         }
-
-        private void QueueParamPipeline(string reason)
-        {
-            var q = Interlocked.Increment(ref _paramQueueCount);
-            var stack = MatrixRefreshDiagnostics.ShortStack(skipFrames: 2);
-
-            MatrixRefreshDiagnostics.RecordParamEvent(
-                "QueueParamPipeline",
-                $"q={q} reason={reason} ver(next)={_paramPipelineVersion + 1} " +
-                $"blockId={(SelectedBlock?.Model.Id ?? 0)} shopId={(SelectedBlock?.Model.ShopId ?? 0)} groupId={(SelectedBlock?.SelectedAvailabilityGroupId ?? 0)} " +
-                $"selNull={(SelectedBlock == null)} syncDepth={_selectionSyncDepth} syncReason={_selectionSyncReason ?? "<none>"} " +
-                (stack != null ? $"stack={stack}" : ""));
-
-
-            var blockId = SelectedBlock?.Model.Id ?? 0;
-            var shopId = SelectedBlock?.Model.ShopId ?? 0;
-            var groupId = SelectedBlock?.SelectedAvailabilityGroupId ?? 0;
-
-            MatrixRefreshDiagnostics.RecordParamEvent(
-                "QueueParamPipeline",
-                $"reason={reason} blockId={blockId} shopId={shopId} groupId={groupId} y={ScheduleYear} m={ScheduleMonth}");
-
-            _paramPipelineCts?.Cancel();
-            _paramPipelineCts?.Dispose();
-            _paramPipelineCts = new CancellationTokenSource();
-
-            var token = _paramPipelineCts.Token;
-            var ver = ++_paramPipelineVersion;
-
-            SafeForget(RunParamPipelineAsync(ver, token));
-        }
-
-        private async Task RunParamPipelineAsync(int ver, CancellationToken token)
-        {
-            var snapAll = MatrixRefreshDiagnostics.AllocSnapshot();
-            var groupId = SelectedBlock?.SelectedAvailabilityGroupId ?? 0;
-
-            MatrixRefreshDiagnostics.RecordParamEvent(
-                "RunParamPipelineAsync:START",
-                $"ver={ver} groupId={groupId} subs={GetMatrixChangedSubscriberCount()}");
-
-            try
-            {
-                await Task.Delay(150, token);
-
-                if (token.IsCancellationRequested || ver != _paramPipelineVersion)
-                {
-                    MatrixRefreshDiagnostics.RecordParamEvent("RunParamPipelineAsync:CANCELLED", $"ver={ver}");
-                    MatrixRefreshDiagnostics.RecordAllocDelta("RunParamPipelineAsync:CANCELLED_ALLOC", snapAll, $"ver={ver}");
-                    return;
-                }
-
-                // --- SYNC_EMP ---
-                var snapEmp = MatrixRefreshDiagnostics.AllocSnapshot();
-                if (groupId > 0)
-                {
-                    MatrixRefreshDiagnostics.RecordParamEvent("RunParamPipelineAsync:SYNC_EMP:START", $"ver={ver} groupId={groupId}");
-                    await _owner.SyncEmployeesFromAvailabilityGroupAsync(groupId, token);
-                    MatrixRefreshDiagnostics.RecordParamEvent("RunParamPipelineAsync:SYNC_EMP:DONE", $"ver={ver} groupId={groupId}");
-                }
-                MatrixRefreshDiagnostics.RecordAllocDelta("RunParamPipelineAsync:SYNC_EMP_ALLOC", snapEmp, $"ver={ver} groupId={groupId}");
-
-                if (token.IsCancellationRequested || ver != _paramPipelineVersion)
-                {
-                    MatrixRefreshDiagnostics.RecordParamEvent("RunParamPipelineAsync:CANCELLED_AFTER_SYNC", $"ver={ver}");
-                    MatrixRefreshDiagnostics.RecordAllocDelta("RunParamPipelineAsync:CANCELLED_AFTER_SYNC_ALLOC", snapAll, $"ver={ver}");
-                    return;
-                }
-
-                // --- PREVIEW ---
-                var snapPrev = MatrixRefreshDiagnostics.AllocSnapshot();
-                MatrixRefreshDiagnostics.RecordParamEvent("RunParamPipelineAsync:PREVIEW:START", $"ver={ver}");
-                await _owner.UpdateAvailabilityPreviewAsync(token);
-                MatrixRefreshDiagnostics.RecordParamEvent("RunParamPipelineAsync:PREVIEW:DONE", $"ver={ver}");
-                MatrixRefreshDiagnostics.RecordAllocDelta("RunParamPipelineAsync:PREVIEW_ALLOC", snapPrev, $"ver={ver}");
-
-                MatrixRefreshDiagnostics.RecordParamEvent("RunParamPipelineAsync:DONE", $"ver={ver}");
-                MatrixRefreshDiagnostics.RecordAllocDelta("RunParamPipelineAsync:TOTAL_ALLOC", snapAll, $"ver={ver}");
-            }
-            catch (OperationCanceledException)
-            {
-                MatrixRefreshDiagnostics.RecordParamEvent("RunParamPipelineAsync:OCE", $"ver={ver}");
-                MatrixRefreshDiagnostics.RecordAllocDelta("RunParamPipelineAsync:OCE_ALLOC", snapAll, $"ver={ver}");
-            }
-            catch (Exception ex)
-            {
-                MatrixRefreshDiagnostics.RecordException("RunParamPipelineAsync", ex);
-                MatrixRefreshDiagnostics.RecordAllocDelta("RunParamPipelineAsync:EX_ALLOC", snapAll, $"ver={ver}");
-            }
-        }
-
 
         /// <summary>
         /// Builds the preview matrix off the UI thread and only assigns the DataView on the Dispatcher.
@@ -1171,7 +893,6 @@ namespace WPFApp.ViewModel.Container
             // ✅ РЕАЛЬНИЙ SKIP
             if (effectiveKey == _availabilityPreviewKey)
             {
-                MatrixRefreshDiagnostics.Step($"VM.Preview: SKIP (same key) key='{effectiveKey}'");
                 return;
             }
 
@@ -1181,8 +902,6 @@ namespace WPFApp.ViewModel.Container
 
             try
             {
-                MatrixRefreshDiagnostics.Step("VM.Preview: build in background (Task.Run)");
-
                 var view = await Task.Run(() =>
                 {
                     var table = BuildScheduleTable(year, month, slots, employees, out _);
@@ -1193,10 +912,6 @@ namespace WPFApp.ViewModel.Container
                 {
                     AvailabilityPreviewMatrix = view;
                     _availabilityPreviewKey = effectiveKey; // ✅ запам’ятали ключ
-                    MatrixRefreshDiagnostics.RecordMatrixChanged(
-    $"VM raises MatrixChanged | subs={GetMatrixChangedSubscriberCount()} " +
-    $"scheduleSrc={MatrixRefreshDiagnostics.IdOf(ScheduleMatrix)} previewSrc={MatrixRefreshDiagnostics.IdOf(AvailabilityPreviewMatrix)}");
-
                     MatrixChanged?.Invoke(this, EventArgs.Empty);
                 }).ConfigureAwait(false);
             }
@@ -1846,10 +1561,6 @@ namespace WPFApp.ViewModel.Container
             ScheduleMatrix = new DataView();
             _availabilityPreviewKey = null;
             RecalculateTotals();
-            MatrixRefreshDiagnostics.RecordMatrixChanged(
-    $"VM raises MatrixChanged | subs={GetMatrixChangedSubscriberCount()} " +
-    $"scheduleSrc={MatrixRefreshDiagnostics.IdOf(ScheduleMatrix)} previewSrc={MatrixRefreshDiagnostics.IdOf(AvailabilityPreviewMatrix)}");
-
             MatrixChanged?.Invoke(this, EventArgs.Empty);
         }
 
@@ -1866,27 +1577,8 @@ namespace WPFApp.ViewModel.Container
             ScheduleMatrix = new DataView();
             AvailabilityPreviewMatrix = new DataView();
             _availabilityPreviewKey = null;
-            MatrixRefreshDiagnostics.RecordMatrixChanged(
-    $"VM raises MatrixChanged | subs={GetMatrixChangedSubscriberCount()} " +
-    $"scheduleSrc={MatrixRefreshDiagnostics.IdOf(ScheduleMatrix)} previewSrc={MatrixRefreshDiagnostics.IdOf(AvailabilityPreviewMatrix)}");
-
             MatrixChanged?.Invoke(this, EventArgs.Empty);
         }
-
-        private async Task EnsureAvailabilitySelectionLoadedAsync()
-        {
-            if (SelectedBlock is null)
-                return;
-
-            var groupId = SelectedBlock.SelectedAvailabilityGroupId;
-            if (groupId <= 0)
-                return;
-
-            await _owner.SyncEmployeesFromAvailabilityGroupAsync(groupId);
-            await _owner.UpdateAvailabilityPreviewAsync();
-        }
-
-
 
     }
 }

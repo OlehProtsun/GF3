@@ -3,7 +3,6 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
 using System.Windows.Shapes;
-using WPFApp.Infrastructure;
 using WPFApp.ViewModel.Container;
 
 namespace WPFApp.View.Container
@@ -105,11 +104,6 @@ namespace WPFApp.View.Container
                 grid.Columns.Add(col);
             }
 
-            MatrixRefreshDiagnostics.RecordColumnBuild(
-                grid.Name,
-                MatrixRefreshDiagnostics.BuildColumnSignature(table),
-                grid.Columns.Count,
-                grid.FrozenColumnCount);
         }
     }
 }

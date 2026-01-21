@@ -5,7 +5,6 @@ using Microsoft.Extensions.Hosting;
 using System;
 using System.IO;
 using System.Windows;
-using WPFApp.Infrastructure;
 using WPFApp.View;
 using WPFApp.View.Availability;
 using WPFApp.View.Employee;
@@ -74,10 +73,6 @@ namespace WPFApp
         protected override void OnStartup(StartupEventArgs e)
         {
             base.OnStartup(e);
-
-            MatrixRefreshDiagnostics.EnableToFile(
-                uiDispatcher: Application.Current.Dispatcher,
-                enableUiStallMonitor: true);
 
             try
             {
