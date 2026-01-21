@@ -139,6 +139,17 @@
         <Setter Property="BorderBrush" Value="{StaticResource LightBorderBrush}" />
         <Setter Property="BorderThickness" Value="1" />
         <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+        <Setter Property="ScrollViewer.CanContentScroll" Value="True" />
+        <Setter Property="VirtualizingPanel.IsVirtualizing" Value="True" />
+        <Setter Property="VirtualizingPanel.VirtualizationMode" Value="Recycling" />
+
+        <Setter Property="ItemsPanel">
+            <Setter.Value>
+                <ItemsPanelTemplate>
+                    <VirtualizingStackPanel />
+                </ItemsPanelTemplate>
+            </Setter.Value>
+        </Setter>
 
         <Setter Property="Template">
             <Setter.Value>
@@ -218,6 +229,7 @@
                                     SnapsToDevicePixels="True">
                                 <ScrollViewer Margin="4"
                                               SnapsToDevicePixels="True"
+                                              CanContentScroll="True"
                                               MaxHeight="260">
                                     <ItemsPresenter />
                                 </ScrollViewer>
