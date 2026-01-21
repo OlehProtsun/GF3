@@ -8,7 +8,6 @@ using System.ComponentModel;
 using System.Data;
 using System.Globalization;
 using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Media;
 using WPFApp.Infrastructure;
@@ -38,8 +37,11 @@ namespace WPFApp.ViewModel.Container
         // ✅ додай
         public const string WeekendColumnName = "IsWeekend";
 
+        private static readonly TimeSpan SelectionDebounceDelay = TimeSpan.FromMilliseconds(200);
         private CancellationTokenSource? _availabilityPreviewCts;
         private CancellationTokenSource? _scheduleMatrixCts;
+        private CancellationTokenSource? _shopSelectionCts;
+        private CancellationTokenSource? _availabilitySelectionCts;
         private string? _availabilityPreviewKey;
 
 
@@ -388,10 +390,13 @@ namespace WPFApp.ViewModel.Container
                 if (!SetProperty(ref _selectedShop, value))
                     return;
 
+                if (_selectionSyncDepth > 0)
+                    return;
+
                 if (oldId == newId)
                     return;
 
-                ScheduleShopId = newId;
+                ScheduleShopSelectionChange(newId);
             }
         }
 
@@ -419,8 +424,7 @@ namespace WPFApp.ViewModel.Container
                 if (_selectionSyncDepth > 0)
                     return;
 
-                SelectedBlock.SelectedAvailabilityGroupId = newId;
-                InvalidateGeneratedScheduleAndClearMatrices();
+                ScheduleAvailabilitySelectionChange(newId);
             }
         }
 
@@ -570,6 +574,7 @@ namespace WPFApp.ViewModel.Container
             SelectedCellRef = null;
             SelectedCellRefs.Clear();
             ActivePaintMode = SchedulePaintMode.None;
+            CancelSelectionUpdates();
         }
 
         public string GetEmployeeTotalHoursText(string columnName)
@@ -1126,6 +1131,7 @@ namespace WPFApp.ViewModel.Container
             _scheduleMatrixCts?.Dispose();
             _scheduleMatrixCts = null;
 
+            CancelSelectionUpdates();
         }
 
         // ContainerScheduleEditViewModel.cs
@@ -1269,6 +1275,80 @@ namespace WPFApp.ViewModel.Container
             target.Clear();
             foreach (var item in items)
                 target.Add(item);
+        }
+
+        private void ScheduleShopSelectionChange(int newId)
+        {
+            ScheduleSelectionUpdate(
+                ref _shopSelectionCts,
+                () =>
+                {
+                    if (SelectedShop?.Id != newId)
+                        return;
+
+                    ScheduleShopId = newId;
+                });
+        }
+
+        private void ScheduleAvailabilitySelectionChange(int newId)
+        {
+            ScheduleSelectionUpdate(
+                ref _availabilitySelectionCts,
+                () =>
+                {
+                    if (SelectedAvailabilityGroup?.Id != newId)
+                        return;
+
+                    if (SelectedBlock is null)
+                        return;
+
+                    SelectedBlock.SelectedAvailabilityGroupId = newId;
+                    InvalidateGeneratedScheduleAndClearMatrices();
+                });
+        }
+
+        private void ScheduleSelectionUpdate(ref CancellationTokenSource? cts, Action apply)
+        {
+            cts?.Cancel();
+            cts?.Dispose();
+
+            var localCts = new CancellationTokenSource();
+            cts = localCts;
+            var token = localCts.Token;
+
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await Task.Delay(SelectionDebounceDelay, token).ConfigureAwait(false);
+                }
+                catch (OperationCanceledException)
+                {
+                    return;
+                }
+
+                if (token.IsCancellationRequested)
+                    return;
+
+                await _owner.RunOnUiThreadAsync(() =>
+                {
+                    if (token.IsCancellationRequested)
+                        return;
+
+                    apply();
+                }).ConfigureAwait(false);
+            }, token);
+        }
+
+        private void CancelSelectionUpdates()
+        {
+            _shopSelectionCts?.Cancel();
+            _shopSelectionCts?.Dispose();
+            _shopSelectionCts = null;
+
+            _availabilitySelectionCts?.Cancel();
+            _availabilitySelectionCts?.Dispose();
+            _availabilitySelectionCts = null;
         }
 
         public static DataTable BuildScheduleTable(
