@@ -27,6 +27,10 @@ namespace WPFApp.View.Container
         private ScheduleMatrixCellRef? _lastPaintedCell;
         private string? _scheduleSchemaSig;
         private string? _previewSchemaSig;
+        private readonly ILoggerService _logger = LoggerService.Instance;
+        private DateTime _lastScrollLogUtc = DateTime.MinValue;
+        private bool _shopComboOpen;
+        private bool _availabilityComboOpen;
 
         // coalesce MatrixChanged bursts (generation/lookup refreshes) into a single UI refresh
         private bool _refreshQueued;
@@ -48,6 +52,7 @@ namespace WPFApp.View.Container
             dataGridScheduleMatrix.PreviewMouseLeftButtonDown += ScheduleMatrix_PreviewMouseLeftButtonDown;
             dataGridScheduleMatrix.MouseMove += ScheduleMatrix_MouseMove;
             dataGridScheduleMatrix.PreviewMouseLeftButtonUp += ScheduleMatrix_PreviewMouseLeftButtonUp;
+            dataGridScheduleMatrix.ScrollChanged += ScheduleMatrix_ScrollChanged;
         }
 
         private static void ResetGridColumns(DataGrid grid)
@@ -470,6 +475,54 @@ namespace WPFApp.View.Container
                     return typed;
 
                 child = VisualTreeHelper.GetParent(child);
+            }
+
+            return null;
+        }
+
+        private void ScheduleMatrix_ScrollChanged(object sender, ScrollChangedEventArgs e)
+        {
+            if (!_shopComboOpen && !_availabilityComboOpen)
+                return;
+
+            var now = DateTime.UtcNow;
+            if ((now - _lastScrollLogUtc).TotalMilliseconds < 500)
+                return;
+
+            _lastScrollLogUtc = now;
+            _logger.LogPerf("ScheduleGrid", $"ScrollChanged: V={e.VerticalOffset:F2} H={e.HorizontalOffset:F2} ΔV={e.VerticalChange:F2} ΔH={e.HorizontalChange:F2}");
+        }
+
+        private void LogGridSnapshot(string context)
+        {
+            var grid = dataGridScheduleMatrix;
+            var scrollViewer = FindChild<ScrollViewer>(grid);
+            var itemsCount = grid.Items.Count;
+            var columnsCount = grid.Columns.Count;
+            var sourceType = grid.ItemsSource?.GetType().Name ?? "null";
+            var scrollInfo = scrollViewer == null
+                ? "ScrollViewer=null"
+                : $"V={scrollViewer.VerticalOffset:F2}/{scrollViewer.ScrollableHeight:F2} H={scrollViewer.HorizontalOffset:F2}/{scrollViewer.ScrollableWidth:F2}";
+
+            _logger.LogPerf(
+                "ScheduleGrid",
+                $"{context} Items={itemsCount} Columns={columnsCount} Source={sourceType} {scrollInfo}");
+        }
+
+        private static T? FindChild<T>(DependencyObject? parent) where T : DependencyObject
+        {
+            if (parent == null) return null;
+
+            var count = VisualTreeHelper.GetChildrenCount(parent);
+            for (var i = 0; i < count; i++)
+            {
+                var child = VisualTreeHelper.GetChild(parent, i);
+                if (child is T typed)
+                    return typed;
+
+                var nested = FindChild<T>(child);
+                if (nested != null)
+                    return nested;
             }
 
             return null;
