@@ -1716,26 +1716,28 @@ namespace WPFApp.ViewModel.Container
         // 1) просто очистити відображення (НЕ чіпаючи Slots) — для вибору блоку
         private void RestoreMatricesForSelection()
         {
-            AvailabilityPreviewMatrix = new DataView();
-            ScheduleMatrix = new DataView();
-            _availabilityPreviewKey = null;
-            RecalculateTotals();
-            MatrixChanged?.Invoke(this, EventArgs.Empty);
+            ResetMatrices(clearSlots: false, recalcTotals: true);
         }
 
 
         // 2) коли змінили параметри — скинути результат генерації + очистити відображення
         internal void InvalidateGeneratedScheduleAndClearMatrices()
         {
-            if (SelectedBlock is null) return;
+            ResetMatrices(clearSlots: true, recalcTotals: false);
+        }
 
-            // скидаємо вже згенерований результат
-            if (SelectedBlock.Slots.Count > 0)
+        private void ResetMatrices(bool clearSlots, bool recalcTotals)
+        {
+            if (clearSlots && SelectedBlock != null && SelectedBlock.Slots.Count > 0)
                 SelectedBlock.Slots.Clear();
 
             ScheduleMatrix = new DataView();
             AvailabilityPreviewMatrix = new DataView();
             _availabilityPreviewKey = null;
+
+            if (recalcTotals)
+                RecalculateTotals();
+
             MatrixChanged?.Invoke(this, EventArgs.Empty);
         }
 
