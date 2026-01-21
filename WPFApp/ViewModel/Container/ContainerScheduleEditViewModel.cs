@@ -1571,17 +1571,23 @@ namespace WPFApp.ViewModel.Container
             table.Columns.Add(WeekendColumnName, typeof(bool)); // технічна колонка під RowStyle
 
             // 1) Колонки по працівниках
+            var seenEmpIds = new HashSet<int>();
             foreach (var emp in employees)
             {
+                if (!seenEmpIds.Add(emp.EmployeeId))
+                    continue;
+
                 var displayName = $"{emp.Employee.FirstName} {emp.Employee.LastName}".Trim();
                 var baseName = string.IsNullOrWhiteSpace(displayName) ? $"Employee {emp.EmployeeId}" : displayName;
 
-                var columnName = baseName;
+                // стабільні імена колонок (для кешу WPF/DataView) + заголовок у Caption
+                var columnName = $"emp_{emp.EmployeeId}";
                 var suffix = 1;
                 while (table.Columns.Contains(columnName))
-                    columnName = $"{baseName} ({++suffix})";
+                    columnName = $"emp_{emp.EmployeeId}_{++suffix}";
 
-                table.Columns.Add(columnName, typeof(string));
+                var col = table.Columns.Add(columnName, typeof(string));
+                col.Caption = baseName;
                 colNameToEmpId[columnName] = emp.EmployeeId;
             }
 

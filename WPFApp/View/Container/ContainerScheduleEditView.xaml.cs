@@ -159,6 +159,10 @@ namespace WPFApp.View.Container
                     $"view={_viewId} oldVm={oldVmId} subs={subsBeforeUnsub}");
 
                 _vm.MatrixChanged -= VmOnMatrixChanged;
+                MatrixRefreshDiagnostics.Count(
+                    "EditView.MatrixChanged-=",
+                    log: true,
+                    extra: $"view={_viewId} vm={oldVmId}");
 
                 int subsAfterUnsub = -1;
                 try { subsAfterUnsub = _vm.GetMatrixChangedSubscriberCount(); } catch { /* ignore */ }
@@ -186,6 +190,10 @@ namespace WPFApp.View.Container
                     $"view={_viewId} vm={newVmId} subs={subsBeforeSub}");
 
                 _vm.MatrixChanged += VmOnMatrixChanged;
+                MatrixRefreshDiagnostics.Count(
+                    "EditView.MatrixChanged+=",
+                    log: true,
+                    extra: $"view={_viewId} vm={newVmId}");
 
                 int subsAfterSub = -1;
                 try { subsAfterSub = _vm.GetMatrixChangedSubscriberCount(); } catch { /* ignore */ }
@@ -279,6 +287,11 @@ namespace WPFApp.View.Container
             // важливо: спочатку null -> тоді нове
             grid.ItemsSource = null;
             grid.ItemsSource = source; // тепер тип правильний
+
+            MatrixRefreshDiagnostics.Count(
+                "EditView.SwapItemsSource",
+                log: true,
+                extra: $"grid={grid.Name} src={MatrixRefreshDiagnostics.IdOf(source)} cols={grid.Columns.Count}");
         }
 
 
@@ -300,6 +313,10 @@ namespace WPFApp.View.Container
     $"view={_viewId} vm={VmId(_vm)} subs={_vm.GetMatrixChangedSubscriberCount()}");
 
             _vm.MatrixChanged -= VmOnMatrixChanged;
+            MatrixRefreshDiagnostics.Count(
+                "EditView.MatrixChanged-=",
+                log: true,
+                extra: $"view={_viewId} vm={VmId(_vm)}");
             _vm.CancelBackgroundWork();
 
             // !!! ключове: відпускаємо важкі DataView/DataRowView зі сторони DataGrid
@@ -325,6 +342,12 @@ namespace WPFApp.View.Container
         {
             var recv = Interlocked.Increment(ref _matrixChangedReceived);
             int vmId = VmId(_vm);
+            var stack = MatrixRefreshDiagnostics.ShortStack(skipFrames: 2);
+
+            MatrixRefreshDiagnostics.Count(
+                "EditView.VmOnMatrixChanged",
+                log: true,
+                extra: stack == null ? $"view={_viewId} vm={vmId}" : $"view={_viewId} vm={vmId} stack={stack}");
 
             MatrixRefreshDiagnostics.RecordUiRefresh(
                 "EditView.VmOnMatrixChanged: RECEIVED",
@@ -585,7 +608,8 @@ namespace WPFApp.View.Container
             if (table == null || table.Columns.Count == 0)
                 return string.Empty;
 
-            return string.Join("|", table.Columns.Cast<DataColumn>().Select(c => $"{c.ColumnName}:{c.DataType.Name}"));
+            return string.Join("|", table.Columns.Cast<DataColumn>()
+                .Select(c => $"{c.ColumnName}:{c.DataType.Name}:{c.Caption}"));
         }
 
 
@@ -743,4 +767,3 @@ namespace WPFApp.View.Container
 
     }
 }
-

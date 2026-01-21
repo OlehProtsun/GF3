@@ -1,7 +1,9 @@
 ﻿using System;
 using System.Collections.Concurrent;
+using System.Data;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading;
@@ -298,7 +300,7 @@ namespace WPFApp.Infrastructure
 
                 if (delta > _uiStallThreshold)
                 {
-                    Log("STALL", $"UI STALL delta={delta.TotalMilliseconds:0}ms threshold={_uiStallThreshold.TotalMilliseconds:0}ms | {BuildRuntimeSnapshot()}");
+                    Log("STALL", $"UI STALL delta={delta.TotalMilliseconds:0}ms threshold={_uiStallThreshold.TotalMilliseconds:0}ms | {BuildRuntimeSnapshot()} | {BuildCountersSnapshot()}");
                     DumpRecent("Recent events around UI stall");
                 }
 
@@ -349,6 +351,21 @@ namespace WPFApp.Infrastructure
             if (log)
                 Log("CNT", extra == null ? $"{name}={v}" : $"{name}={v} | {extra}");
             return v;
+        }
+
+        public static void RecordColumnBuild(string gridName, string signature, int columns, int frozen)
+        {
+            if (!Enabled) return;
+            var count = Count($"COL_BUILD:{gridName}", log: false);
+            Log("COL", $"#{count} grid={gridName} cols={columns} frozen={frozen} sig={signature}");
+        }
+
+        public static string BuildColumnSignature(DataTable table)
+        {
+            var sb = new StringBuilder();
+            foreach (DataColumn col in table.Columns)
+                sb.Append(col.ColumnName).Append(":").Append(col.DataType.Name).Append(":").Append(col.Caption).Append("|");
+            return sb.ToString();
         }
 
         /// <summary>Take lightweight allocation snapshot.</summary>
@@ -422,6 +439,24 @@ namespace WPFApp.Infrastructure
         }
 
         public static int IdOf(object? o) => o == null ? 0 : RuntimeHelpers.GetHashCode(o);
+
+        private static string BuildCountersSnapshot()
+        {
+            if (_counters.IsEmpty)
+                return "counters=<empty>";
+
+            try
+            {
+                var sb = new StringBuilder("counters=");
+                foreach (var kv in _counters.OrderBy(k => k.Key))
+                    sb.Append(kv.Key).Append("=").Append(kv.Value).Append(",");
+                return sb.ToString().TrimEnd(',');
+            }
+            catch
+            {
+                return "counters=<failed>";
+            }
+        }
 
     }
 }
