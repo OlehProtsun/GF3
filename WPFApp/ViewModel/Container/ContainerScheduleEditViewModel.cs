@@ -390,6 +390,8 @@ namespace WPFApp.ViewModel.Container
                 if (!SetProperty(ref _selectedShop, value))
                     return;
 
+                PendingSelectedShop = value;
+
                 if (_selectionSyncDepth > 0)
                     return;
 
@@ -398,6 +400,13 @@ namespace WPFApp.ViewModel.Container
 
                 ScheduleShopSelectionChange(newId);
             }
+        }
+
+        private ShopModel? _pendingSelectedShop;
+        public ShopModel? PendingSelectedShop
+        {
+            get => _pendingSelectedShop;
+            set => SetProperty(ref _pendingSelectedShop, value);
         }
 
         private AvailabilityGroupModel? _selectedAvailabilityGroup;
@@ -411,6 +420,8 @@ namespace WPFApp.ViewModel.Container
 
                 if (!SetProperty(ref _selectedAvailabilityGroup, value))
                     return;
+
+                PendingSelectedAvailabilityGroup = value;
 
                 if (_suppressAvailabilityGroupUpdate)
                     return;
@@ -426,6 +437,13 @@ namespace WPFApp.ViewModel.Container
 
                 ScheduleAvailabilitySelectionChange(newId);
             }
+        }
+
+        private AvailabilityGroupModel? _pendingSelectedAvailabilityGroup;
+        public AvailabilityGroupModel? PendingSelectedAvailabilityGroup
+        {
+            get => _pendingSelectedAvailabilityGroup;
+            set => SetProperty(ref _pendingSelectedAvailabilityGroup, value);
         }
 
 
@@ -694,6 +712,22 @@ namespace WPFApp.ViewModel.Container
                     .FirstOrDefault(g => g.Id == SelectedBlock.SelectedAvailabilityGroupId);
                 _suppressAvailabilityGroupUpdate = false;
             }
+        }
+
+        public void CommitPendingShopSelection()
+        {
+            if (PendingSelectedShop == SelectedShop)
+                return;
+
+            SelectedShop = PendingSelectedShop;
+        }
+
+        public void CommitPendingAvailabilitySelection()
+        {
+            if (PendingSelectedAvailabilityGroup == SelectedAvailabilityGroup)
+                return;
+
+            SelectedAvailabilityGroup = PendingSelectedAvailabilityGroup;
         }
 
         // ContainerScheduleEditViewModel.cs

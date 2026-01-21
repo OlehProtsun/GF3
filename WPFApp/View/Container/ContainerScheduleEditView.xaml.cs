@@ -439,6 +439,16 @@ namespace WPFApp.View.Container
             await _vm.CloseBlockAsync(block);
         }
 
+        private void ShopComboBox_DropDownClosed(object sender, EventArgs e)
+        {
+            _vm?.CommitPendingShopSelection();
+        }
+
+        private void AvailabilityComboBox_DropDownClosed(object sender, EventArgs e)
+        {
+            _vm?.CommitPendingAvailabilitySelection();
+        }
+
         private void ApplyPaint(ScheduleMatrixCellRef cellRef)
         {
             _vm?.ApplyPaintToCell(cellRef);
