@@ -6,7 +6,6 @@ using DataAccessLayer.Models;
 using DataAccessLayer.Models.Enums;
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Globalization;
 using System.Linq;
 using System.Text;
@@ -437,9 +436,6 @@ namespace WPFApp.ViewModel.Container
         }
         internal async Task SaveScheduleAsync(CancellationToken ct = default)
         {
-            MatrixRefreshDiagnostics.Step("ACTION: SaveScheduleAsync START");
-            MatrixRefreshDiagnostics.Snapshot("Before save");
-
             ScheduleEditVm.ClearValidationErrors();
 
             if (ScheduleEditVm.Blocks.Count == 0)
@@ -523,9 +519,6 @@ namespace WPFApp.ViewModel.Container
 
                 try
                 {
-                    MatrixRefreshDiagnostics.Step(
-                          $"CellStyles total={block.CellStyles.Count}, colored={cellStyles.Count}"
-                        );
                     await _scheduleService.SaveWithDetailsAsync(block.Model, employees, slots, cellStyles, ct);
                 }
                 catch (Exception ex)
@@ -539,9 +532,6 @@ namespace WPFApp.ViewModel.Container
             var containerId = ScheduleEditVm.Blocks.FirstOrDefault()?.Model.ContainerId ?? GetCurrentContainerId();
             if (containerId > 0)
                 await LoadSchedulesAsync(containerId, search: null, ct);
-
-            MatrixRefreshDiagnostics.Step("ACTION: SaveScheduleAsync DONE");
-            MatrixRefreshDiagnostics.Snapshot("After save");
 
             ShowInfo("Schedules saved successfully.");
 
@@ -624,9 +614,6 @@ namespace WPFApp.ViewModel.Container
 
         internal async Task GenerateScheduleAsync(CancellationToken ct = default)
         {
-            MatrixRefreshDiagnostics.Step("ACTION: GenerateScheduleAsync START");
-            MatrixRefreshDiagnostics.Snapshot("Before generation");
-
             await RunOnUiThreadAsync(() => Keyboard.ClearFocus());
 
             if (ScheduleEditVm.SelectedBlock is null)
@@ -714,9 +701,6 @@ namespace WPFApp.ViewModel.Container
             var slots = await _generator.GenerateAsync(model, fullGroups, employees, ct)
                        ?? new List<ScheduleSlotModel>(); // (опціонально) щоб прибрати warning про null
 
-            MatrixRefreshDiagnostics.Step($"ACTION: GenerateScheduleAsync GENERATED slots={slots.Count}");
-            MatrixRefreshDiagnostics.Snapshot("After generation");
-
             // ✅ 5) Оновлюємо слоти
             block.Slots.Clear();
             foreach (var slot in slots)
@@ -724,8 +708,6 @@ namespace WPFApp.ViewModel.Container
 
             // ✅ 6) Оновлюємо матрицю
             await ScheduleEditVm.RefreshScheduleMatrixAsync(ct);
-            MatrixRefreshDiagnostics.Step("ACTION: GenerateScheduleAsync RefreshScheduleMatrixAsync DONE");
-
             ShowInfo("Slots generated. Review before saving.");
 
         }
@@ -959,18 +941,15 @@ namespace WPFApp.ViewModel.Container
 
             if (ScheduleEditVm.IsAvailabilityPreviewCurrent(previewKey))
             {
-                MatrixRefreshDiagnostics.RecordAvailabilityPreviewRequest(previewKey, skipped: true);
                 _availabilityPreviewRequestKey = previewKey;
                 return;
             }
 
             if (previewKey == _availabilityPreviewRequestKey && _availabilityPreviewCts != null && !_availabilityPreviewCts.IsCancellationRequested)
             {
-                MatrixRefreshDiagnostics.RecordAvailabilityPreviewRequest(previewKey, skipped: true);
                 return;
             }
 
-            MatrixRefreshDiagnostics.RecordAvailabilityPreviewRequest(previewKey, skipped: false);
             _availabilityPreviewRequestKey = previewKey;
 
             CancelAvailabilityPreviewPipeline();
@@ -979,7 +958,7 @@ namespace WPFApp.ViewModel.Container
 
             try
             {
-                var (group, members, days) = await _availabilityGroupService.LoadFullAsync(selectedGroupId, localCts.Token);
+                var (group, members, days) = await _availabilityGroupService.LoadFullAsync(selectedGroupId, localCts.Token).ConfigureAwait(false);
 
                 if (localCts.IsCancellationRequested || version != _availabilityPreviewVersion)
                     return;
@@ -1186,7 +1165,6 @@ namespace WPFApp.ViewModel.Container
 
         private Task SwitchToProfileAsync()
         {
-            MatrixRefreshDiagnostics.Step("NAV: SwitchToProfile");
             if (Mode == ContainerSection.ScheduleEdit || Mode == ContainerSection.ScheduleProfile)
                 CleanupScheduleEdit();
 
@@ -1197,7 +1175,6 @@ namespace WPFApp.ViewModel.Container
 
         private Task SwitchToScheduleEditAsync()
         {
-            MatrixRefreshDiagnostics.Step("NAV: SwitchToScheduleEdit");
             CurrentSection = ScheduleEditVm;
             Mode = ContainerSection.ScheduleEdit;
             return Task.CompletedTask;
@@ -1205,7 +1182,6 @@ namespace WPFApp.ViewModel.Container
 
         private Task SwitchToScheduleProfileAsync()
         {
-            MatrixRefreshDiagnostics.Step("NAV: SwitchToScheduleProfile");
             CurrentSection = ScheduleProfileVm;
             Mode = ContainerSection.ScheduleProfile;
             return Task.CompletedTask;
@@ -1551,29 +1527,12 @@ namespace WPFApp.ViewModel.Container
                 return;
 
             var block = ScheduleEditVm.SelectedBlock;
-
-            MatrixRefreshDiagnostics.RecordEmployeesSync(
-                $"START groupId={groupId} blockId={block.Model.Id} employeesBefore={block.Employees.Count}");
-
-            // ---- HOT SPOT instrumentation: LoadFullAsync ----
-            var snapLoad = MatrixRefreshDiagnostics.AllocSnapshot();
-            var swLoad = Stopwatch.StartNew();
-
             var (grp, members, days) =
                 await _availabilityGroupService.LoadFullAsync(groupId, ct).ConfigureAwait(false);
-
-            swLoad.Stop();
 
             // якщо сервіс раптом повертає null усередині tuple (навіть якщо типи non-nullable)
             members ??= new List<AvailabilityGroupMemberModel>();
             days ??= new List<AvailabilityGroupDayModel>();
-
-            MatrixRefreshDiagnostics.RecordEmployeesSync(
-                $"LOAD_FULL DONE groupId={groupId} durMs={swLoad.Elapsed.TotalMilliseconds:0} " +
-                $"members={members.Count} days={days.Count} grpYM={grp.Year}/{grp.Month}");
-
-            MatrixRefreshDiagnostics.RecordAllocDelta("EMP_SYNC:LOAD_FULL_ALLOC", snapLoad, $"groupId={groupId}");
-            MatrixRefreshDiagnostics.Snapshot($"After LoadFullAsync (EMP_SYNC) groupId={groupId}");
 
             if (ct.IsCancellationRequested)
                 return;
@@ -1602,11 +1561,7 @@ namespace WPFApp.ViewModel.Container
                 }
             }
 
-            if (duplicates > 0)
-            {
-                MatrixRefreshDiagnostics.RecordEmployeesSync(
-                    $"WARN groupId={groupId} duplicateMembers={duplicates} uniqueMembers={memberByEmpId.Count}");
-            }
+            _ = duplicates;
 
             bool changed = false;
             int removed = 0, added = 0, empRefFixed = 0, existingDuplicates = 0;
@@ -1677,15 +1632,9 @@ namespace WPFApp.ViewModel.Container
                 }
             }).ConfigureAwait(false);
 
-            MatrixRefreshDiagnostics.RecordEmployeesSync(
-                $"DONE groupId={groupId} blockId={block.Model.Id} changed={changed} " +
-                $"removed={removed} added={added} empRefFixed={empRefFixed} existingDupInBlock={existingDuplicates} " +
-                $"employeesAfter={block.Employees.Count}");
-
             // ✅ рефреш матриці тільки якщо реально були зміни і блок ще активний
             if (changed && !ct.IsCancellationRequested && ReferenceEquals(ScheduleEditVm.SelectedBlock, block))
             {
-                MatrixRefreshDiagnostics.Step("SyncEmployees: triggering RefreshScheduleMatrixAsync (changed=true)");
                 await ScheduleEditVm.RefreshScheduleMatrixAsync(ct).ConfigureAwait(false);
             }
         }

@@ -4,7 +4,6 @@ using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
-using WPFApp.Infrastructure;
 using WPFApp.ViewModel.Container;
 
 namespace WPFApp.View.Container
@@ -76,17 +75,13 @@ namespace WPFApp.View.Container
 
         private void VmOnMatrixChanged(object? sender, EventArgs e)
         {
-            MatrixRefreshDiagnostics.RecordUiRefresh("ProfileView.VmOnMatrixChanged: received");
-
             if (_vm is null) return;
             if (_refreshQueued) return;
             _refreshQueued = true;
-            MatrixRefreshDiagnostics.RecordUiRefresh("ProfileView.VmOnMatrixChanged: queued");
 
             Dispatcher.BeginInvoke(new Action(() =>
             {
                 _refreshQueued = false;
-                MatrixRefreshDiagnostics.RecordUiRefresh("ProfileView.VmOnMatrixChanged: executing RefreshGridSmart");
                 RefreshGridSmart();
 
             }), System.Windows.Threading.DispatcherPriority.Background);
@@ -100,7 +95,6 @@ namespace WPFApp.View.Container
 
         private void RefreshGridSmart()
         {
-            MatrixRefreshDiagnostics.RecordUiRefresh("ProfileView.RefreshGridSmart: start");
             if (_vm is null) return;
             var table = _vm.ScheduleMatrix?.Table;
             if (table == null) return;
@@ -108,8 +102,6 @@ namespace WPFApp.View.Container
             var sig = string.Join("|", table.Columns.Cast<DataColumn>().Select(c => c.ColumnName));
             if (sig != _schemaSig)
             {
-                MatrixRefreshDiagnostics.RecordUiRefresh("ProfileView: rebuild columns", $"newSig={sig}");
-
                 ResetGridColumns(dataGridScheduleProfile);
                 ScheduleMatrixColumnBuilder.BuildScheduleMatrixColumns(table, dataGridScheduleProfile, isReadOnly: true);
                 _schemaSig = sig;

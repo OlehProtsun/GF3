@@ -130,7 +130,6 @@ namespace WPFApp.ViewModel.Container
 
                 // поки будуємо матрицю — можна очистити/залишити стару (я очищаю)
                 ScheduleMatrix = new DataView();
-                MatrixRefreshDiagnostics.RecordMatrixChanged(nameof(ContainerScheduleProfileViewModel));
                 MatrixChanged?.Invoke(this, EventArgs.Empty);
             }).ConfigureAwait(false);
 
@@ -156,7 +155,6 @@ namespace WPFApp.ViewModel.Container
                     // totals теж порахуємо тут, щоб UI тільки присвоїв
                     RecalculateTotals(employeesSnapshot, slotsSnapshot, out var empCount, out var hoursText);
                     sw.Stop();
-                    MatrixRefreshDiagnostics.RecordScheduleMatrixBuild(sw.Elapsed, table.Rows.Count, table.Columns.Count);
                     return (View: table.DefaultView, ColMap: colMap, EmpCount: empCount, HoursText: hoursText, Styles: stylesSnapshot);
                 }, localCts.Token).ConfigureAwait(false);
 
@@ -173,7 +171,6 @@ namespace WPFApp.ViewModel.Container
                     RebuildStyleMaps(built.ColMap, built.Styles);
                     TotalEmployees = built.EmpCount;
                     TotalHoursText = built.HoursText;
-                    MatrixRefreshDiagnostics.RecordMatrixChanged(nameof(ContainerScheduleProfileViewModel));
                     MatrixChanged?.Invoke(this, EventArgs.Empty);
                 }).ConfigureAwait(false);
             }
