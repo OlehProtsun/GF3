@@ -233,7 +233,12 @@
                                     SnapsToDevicePixels="True">
                                 <ScrollViewer Margin="4"
                                               SnapsToDevicePixels="True"
-                                              CanContentScroll="True"
+                                              CanContentScroll="{TemplateBinding ScrollViewer.CanContentScroll}"
+                                              VerticalScrollBarVisibility="Auto"
+                                              HorizontalScrollBarVisibility="Disabled"
+                                              VirtualizingPanel.IsVirtualizing="{TemplateBinding VirtualizingPanel.IsVirtualizing}"
+                                              VirtualizingPanel.VirtualizationMode="{TemplateBinding VirtualizingPanel.VirtualizationMode}"
+                                              VirtualizingPanel.ScrollUnit="Item"
                                               MaxHeight="260">
                                     <ItemsPresenter />
                                 </ScrollViewer>
