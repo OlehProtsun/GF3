@@ -2,7 +2,6 @@
 using System.Collections;
 using System.Collections.Generic;
 using System.Data;
-using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
@@ -116,11 +115,8 @@ namespace WPFApp.View.Container
                 _vm.MatrixChanged += VmOnMatrixChanged;
 
                 // Build columns only if we already have a schema.
-                int scheduleCols = 0, previewCols = 0;
-
                 if (_vm.ScheduleMatrix?.Table != null)
                 {
-                    scheduleCols = _vm.ScheduleMatrix.Table.Columns.Count;
                     ScheduleMatrixColumnBuilder.BuildScheduleMatrixColumns(
                         _vm.ScheduleMatrix.Table,
                         dataGridScheduleMatrix,
@@ -129,7 +125,6 @@ namespace WPFApp.View.Container
 
                 if (_vm.AvailabilityPreviewMatrix?.Table != null)
                 {
-                    previewCols = _vm.AvailabilityPreviewMatrix.Table.Columns.Count;
                     ScheduleMatrixColumnBuilder.BuildScheduleMatrixColumns(
                         _vm.AvailabilityPreviewMatrix.Table,
                         dataGridAvailabilityPreview,
