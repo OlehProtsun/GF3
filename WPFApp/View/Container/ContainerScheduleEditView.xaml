@@ -974,6 +974,7 @@
                                                       Style="{StaticResource RoundedComboBoxStyle}"
                                                       ItemContainerStyle="{StaticResource RoundedComboBoxItemStyle}"
                                                       IsTextSearchEnabled="False"
+                                                      PreviewMouseWheel="ComboBox_PreviewMouseWheel"
                                                       DropDownOpened="ShopComboBox_DropDownOpened"
                                                       DropDownClosed="ShopComboBox_DropDownClosed">
 
@@ -1052,6 +1053,7 @@
           VirtualizingPanel.IsVirtualizing="True"
           VirtualizingPanel.VirtualizationMode="Recycling"
           IsTextSearchEnabled="False"
+          PreviewMouseWheel="ComboBox_PreviewMouseWheel"
           DropDownOpened="AvailabilityComboBox_DropDownOpened"
           DropDownClosed="AvailabilityComboBox_DropDownClosed">
 

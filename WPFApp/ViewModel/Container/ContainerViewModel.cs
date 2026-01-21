@@ -41,6 +41,9 @@ namespace WPFApp.ViewModel.Container
         private readonly List<ShopModel> _allShops = new();
         private readonly List<AvailabilityGroupModel> _allAvailabilityGroups = new();
         private readonly List<EmployeeModel> _allEmployees = new();
+        private string? _lastShopFilter;
+        private string? _lastAvailabilityFilter;
+        private string? _lastEmployeeFilter;
 
         private bool _initialized;
         private int? _openedProfileContainerId;
@@ -1135,6 +1138,10 @@ namespace WPFApp.ViewModel.Container
             _allEmployees.Clear();
             _allEmployees.AddRange(employees);
 
+            _lastShopFilter = null;
+            _lastAvailabilityFilter = null;
+            _lastEmployeeFilter = null;
+
             ScheduleEditVm.SetLookups(shops, groups, employees);
         }
 
@@ -1291,12 +1298,20 @@ namespace WPFApp.ViewModel.Container
             ScheduleEditVm.AvailabilitySearchText = string.Empty;
             ScheduleEditVm.EmployeeSearchText = string.Empty;
 
+            _lastShopFilter = null;
+            _lastAvailabilityFilter = null;
+            _lastEmployeeFilter = null;
+
             ScheduleEditVm.SetLookups(_allShops, _allAvailabilityGroups, _allEmployees);
         }
 
         private void ApplyShopFilter(string? raw)
         {
             var term = raw?.Trim() ?? string.Empty;
+            if (string.Equals(_lastShopFilter, term, StringComparison.OrdinalIgnoreCase))
+                return;
+
+            _lastShopFilter = term;
             if (string.IsNullOrWhiteSpace(term))
             {
                 ScheduleEditVm.SetShops(_allShops);
@@ -1313,6 +1328,10 @@ namespace WPFApp.ViewModel.Container
         private void ApplyAvailabilityFilter(string? raw)
         {
             var term = raw?.Trim() ?? string.Empty;
+            if (string.Equals(_lastAvailabilityFilter, term, StringComparison.OrdinalIgnoreCase))
+                return;
+
+            _lastAvailabilityFilter = term;
             if (string.IsNullOrWhiteSpace(term))
             {
                 ScheduleEditVm.SetAvailabilityGroups(_allAvailabilityGroups);
@@ -1329,6 +1348,10 @@ namespace WPFApp.ViewModel.Container
         private void ApplyEmployeeFilter(string? raw)
         {
             var term = raw?.Trim() ?? string.Empty;
+            if (string.Equals(_lastEmployeeFilter, term, StringComparison.OrdinalIgnoreCase))
+                return;
+
+            _lastEmployeeFilter = term;
             if (string.IsNullOrWhiteSpace(term))
             {
                 ScheduleEditVm.SetEmployees(_allEmployees);

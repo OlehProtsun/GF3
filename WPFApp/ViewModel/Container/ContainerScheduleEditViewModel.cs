@@ -700,6 +700,7 @@ namespace WPFApp.ViewModel.Container
 
         public void SetShops(IEnumerable<ShopModel> shops)
         {
+            using var _ = EnterSelectionSync();
             SetOptions(Shops, shops);
             if (SelectedBlock != null)
                 SelectedShop = Shops.FirstOrDefault(s => s.Id == SelectedBlock.Model.ShopId);
@@ -707,6 +708,7 @@ namespace WPFApp.ViewModel.Container
 
         public void SetAvailabilityGroups(IEnumerable<AvailabilityGroupModel> groups)
         {
+            using var _ = EnterSelectionSync();
             SetOptions(AvailabilityGroups, groups);
 
             if (SelectedBlock != null)
@@ -751,7 +753,10 @@ namespace WPFApp.ViewModel.Container
 
 
         public void SetEmployees(IEnumerable<EmployeeModel> employees)
-            => SetOptions(Employees, employees);
+        {
+            using var _ = EnterSelectionSync();
+            SetOptions(Employees, employees);
+        }
 
         public void SyncSelectionFromBlock()
         {
@@ -1323,8 +1328,27 @@ namespace WPFApp.ViewModel.Container
 
         private void SetOptions<T>(ObservableCollection<T> target, IEnumerable<T> items)
         {
+            if (items is not IList<T> list)
+                list = items.ToList();
+
+            if (target.Count == list.Count)
+            {
+                var same = true;
+                for (var i = 0; i < list.Count; i++)
+                {
+                    if (!EqualityComparer<T>.Default.Equals(target[i], list[i]))
+                    {
+                        same = false;
+                        break;
+                    }
+                }
+
+                if (same)
+                    return;
+            }
+
             target.Clear();
-            foreach (var item in items)
+            foreach (var item in list)
                 target.Add(item);
         }
 

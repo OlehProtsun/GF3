@@ -500,6 +500,14 @@ namespace WPFApp.View.Container
             PauseMatrixRefresh();
         }
 
+        private void ComboBox_PreviewMouseWheel(object sender, MouseWheelEventArgs e)
+        {
+            if (sender is ComboBox comboBox && comboBox.IsDropDownOpen)
+            {
+                e.Handled = true;
+            }
+        }
+
         private void PauseMatrixRefresh()
         {
             _suspendMatrixRefresh = true;
