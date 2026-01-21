@@ -450,14 +450,15 @@ namespace WPFApp.View.Container
 
                 if (scheduleTable == null || scheduleTable.Columns.Count == 0)
                 {
-                    if (dataGridScheduleMatrix.ItemsSource != null)
+                    if (dataGridScheduleMatrix.ItemsSource != null || dataGridScheduleMatrix.Columns.Count > 0)
                     {
-                        SwapItemsSource(dataGridScheduleMatrix, null);
+                        ResetGridColumns(dataGridScheduleMatrix);
+                        _scheduleSchemaSig = null;
                         sSwap = true;
                         Interlocked.Increment(ref _scheduleSwapSrc);
 
                         MatrixRefreshDiagnostics.RecordUiRefresh(
-                            "EditView.ScheduleGrid: detach ItemsSource (empty table)",
+                            "EditView.ScheduleGrid: reset columns (empty table)",
                             $"view={_viewId} run={run}");
                     }
                 }
@@ -502,14 +503,15 @@ namespace WPFApp.View.Container
 
                 if (previewTable == null || previewTable.Columns.Count == 0)
                 {
-                    if (dataGridAvailabilityPreview.ItemsSource != null)
+                    if (dataGridAvailabilityPreview.ItemsSource != null || dataGridAvailabilityPreview.Columns.Count > 0)
                     {
-                        SwapItemsSource(dataGridAvailabilityPreview, null);
+                        ResetGridColumns(dataGridAvailabilityPreview);
+                        _previewSchemaSig = null;
                         pSwap = true;
                         Interlocked.Increment(ref _previewSwapSrc);
 
                         MatrixRefreshDiagnostics.RecordUiRefresh(
-                            "EditView.PreviewGrid: detach ItemsSource (empty table)",
+                            "EditView.PreviewGrid: reset columns (empty table)",
                             $"view={_viewId} run={run}");
                     }
                 }
