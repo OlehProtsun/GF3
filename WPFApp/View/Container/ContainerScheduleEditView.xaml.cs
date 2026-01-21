@@ -109,6 +109,8 @@ namespace WPFApp.View.Container
             if (ReferenceEquals(_vm, viewModel))
                 return;
 
+            ResetInteractionState(commitPendingSelections: false);
+
             // ---- unsubscribe old vm ----
             if (_vm != null)
             {
@@ -190,6 +192,8 @@ namespace WPFApp.View.Container
         {
             if (_vm == null) return;
 
+            ResetInteractionState(commitPendingSelections: true);
+
             _vm.MatrixChanged -= VmOnMatrixChanged;
             _vm.CancelBackgroundWork();
 
@@ -201,6 +205,22 @@ namespace WPFApp.View.Container
             _scheduleSchemaSig = null;
             _previewSchemaSig = null;
             _vm = null;
+        }
+
+        private void ResetInteractionState(bool commitPendingSelections)
+        {
+            _shopComboOpen = false;
+            _availabilityComboOpen = false;
+            _suspendMatrixRefresh = false;
+            _pendingMatrixRefresh = false;
+            _refreshQueued = false;
+            _lastScrollLogUtc = DateTime.MinValue;
+
+            if (commitPendingSelections && _vm != null)
+            {
+                _vm.CommitPendingShopSelection();
+                _vm.CommitPendingAvailabilitySelection();
+            }
         }
 
 
