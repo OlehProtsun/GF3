@@ -33,6 +33,7 @@ namespace WPFApp.View.Container
         private bool _availabilityComboOpen;
         private bool _suspendMatrixRefresh;
         private bool _pendingMatrixRefresh;
+        private bool _isScheduleSelectionHandling;
 
         // coalesce MatrixChanged bursts (generation/lookup refreshes) into a single UI refresh
         private bool _refreshQueued;
@@ -153,13 +154,23 @@ namespace WPFApp.View.Container
         {
             if (_vm is null) return;
 
-            if (sender is ListBox lb && lb.SelectedItem is ScheduleBlockViewModel block)
-            {
-                // щоб не викликати повторно при тих самих значеннях
-                if (ReferenceEquals(_vm.ActiveSchedule, block))
-                    return;
+            if (_isScheduleSelectionHandling)
+                return;
 
-                await _vm.SelectBlockAsync(block); // це веде в owner.SelectScheduleBlockAsync(...) :contentReference[oaicite:1]{index=1}
+            if (e.AddedItems.Count == 0)
+                return;
+
+            if (e.AddedItems[0] is ScheduleBlockViewModel block)
+            {
+                _isScheduleSelectionHandling = true;
+                try
+                {
+                    await _vm.SelectBlockAsync(block);
+                }
+                finally
+                {
+                    _isScheduleSelectionHandling = false;
+                }
             }
         }
 
@@ -274,67 +285,35 @@ namespace WPFApp.View.Container
             if (_vm is null)
                 return;
 
-            var scheduleTable = _vm.ScheduleMatrix?.Table;
+            RefreshGrid(dataGridScheduleMatrix, _vm.ScheduleMatrix, isReadOnly: false, ref _scheduleSchemaSig);
+            RefreshGrid(dataGridAvailabilityPreview, _vm.AvailabilityPreviewMatrix, isReadOnly: true, ref _previewSchemaSig);
+        }
 
-            if (scheduleTable == null || scheduleTable.Columns.Count == 0)
+        private static void RefreshGrid(DataGrid grid, DataView? view, bool isReadOnly, ref string? schemaSig)
+        {
+            var table = view?.Table;
+
+            if (table == null || table.Columns.Count == 0)
             {
-                if (dataGridScheduleMatrix.ItemsSource != null || dataGridScheduleMatrix.Columns.Count > 0)
+                if (grid.ItemsSource != null || grid.Columns.Count > 0)
                 {
-                    ResetGridColumns(dataGridScheduleMatrix);
-                    _scheduleSchemaSig = null;
-                }
-            }
-            else
-            {
-                var scheduleSig = BuildSig(scheduleTable);
-
-                if (scheduleSig != _scheduleSchemaSig)
-                {
-                    ResetGridColumns(dataGridScheduleMatrix);
-                    ScheduleMatrixColumnBuilder.BuildScheduleMatrixColumns(
-                        scheduleTable,
-                        dataGridScheduleMatrix,
-                        isReadOnly: false);
-
-                    _scheduleSchemaSig = scheduleSig;
+                    ResetGridColumns(grid);
+                    schemaSig = null;
                 }
 
-                if (!ReferenceEquals(dataGridScheduleMatrix.ItemsSource, _vm.ScheduleMatrix))
-                {
-                    SwapItemsSource(dataGridScheduleMatrix, _vm.ScheduleMatrix);
-                }
+                return;
             }
 
-            var previewTable = _vm.AvailabilityPreviewMatrix?.Table;
-
-            if (previewTable == null || previewTable.Columns.Count == 0)
+            var currentSig = BuildSig(table);
+            if (currentSig != schemaSig)
             {
-                if (dataGridAvailabilityPreview.ItemsSource != null || dataGridAvailabilityPreview.Columns.Count > 0)
-                {
-                    ResetGridColumns(dataGridAvailabilityPreview);
-                    _previewSchemaSig = null;
-                }
+                ResetGridColumns(grid);
+                ScheduleMatrixColumnBuilder.BuildScheduleMatrixColumns(table, grid, isReadOnly);
+                schemaSig = currentSig;
             }
-            else
-            {
-                var previewSig = BuildSig(previewTable);
 
-                if (previewSig != _previewSchemaSig)
-                {
-                    ResetGridColumns(dataGridAvailabilityPreview);
-                    ScheduleMatrixColumnBuilder.BuildScheduleMatrixColumns(
-                        previewTable,
-                        dataGridAvailabilityPreview,
-                        isReadOnly: true);
-
-                    _previewSchemaSig = previewSig;
-                }
-
-                if (!ReferenceEquals(dataGridAvailabilityPreview.ItemsSource, _vm.AvailabilityPreviewMatrix))
-                {
-                    SwapItemsSource(dataGridAvailabilityPreview, _vm.AvailabilityPreviewMatrix);
-                }
-            }
+            if (!ReferenceEquals(grid.ItemsSource, view))
+                SwapItemsSource(grid, view);
         }
 
 
