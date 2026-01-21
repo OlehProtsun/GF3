@@ -1,11 +1,11 @@
-﻿using System;
-using System.IO;
-using System.Windows;
+﻿using BusinessLogicLayer;
+using DataAccessLayer.Models.DataBaseContext;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-
-using BusinessLogicLayer;
-using DataAccessLayer.Models.DataBaseContext;
+using System;
+using System.IO;
+using System.Windows;
+using WPFApp.Infrastructure;
 using WPFApp.View;
 using WPFApp.View.Availability;
 using WPFApp.View.Employee;
@@ -74,6 +74,10 @@ namespace WPFApp
         protected override void OnStartup(StartupEventArgs e)
         {
             base.OnStartup(e);
+
+            MatrixRefreshDiagnostics.EnableToFile(
+                uiDispatcher: Application.Current.Dispatcher,
+                enableUiStallMonitor: true);
 
             try
             {

@@ -1,4 +1,5 @@
-using System;
+﻿using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.Windows.Media;
 
@@ -6,6 +7,9 @@ namespace WPFApp.Infrastructure
 {
     public static class ColorHelpers
     {
+        private static readonly object _brushLock = new();
+        private static readonly Dictionary<int, SolidColorBrush> _brushCache = new();
+
         public static int ToArgb(Color color)
             => (color.A << 24) | (color.R << 16) | (color.G << 8) | color.B;
 
@@ -18,11 +22,19 @@ namespace WPFApp.Infrastructure
             return Color.FromArgb(a, r, g, b);
         }
 
+        // ✅ Кеш: один ARGB -> один Brush (Freeze() лишається)
         public static SolidColorBrush ToBrush(int argb)
         {
-            var brush = new SolidColorBrush(FromArgb(argb));
-            brush.Freeze();
-            return brush;
+            lock (_brushLock)
+            {
+                if (_brushCache.TryGetValue(argb, out var cached))
+                    return cached;
+
+                var brush = new SolidColorBrush(FromArgb(argb));
+                brush.Freeze();
+                _brushCache[argb] = brush;
+                return brush;
+            }
         }
 
         public static bool TryParseHexColor(string? hex, out Color color)
