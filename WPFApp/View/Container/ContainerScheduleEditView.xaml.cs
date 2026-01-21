@@ -54,7 +54,9 @@ namespace WPFApp.View.Container
             dataGridScheduleMatrix.PreviewMouseLeftButtonDown += ScheduleMatrix_PreviewMouseLeftButtonDown;
             dataGridScheduleMatrix.MouseMove += ScheduleMatrix_MouseMove;
             dataGridScheduleMatrix.PreviewMouseLeftButtonUp += ScheduleMatrix_PreviewMouseLeftButtonUp;
-            dataGridScheduleMatrix.ScrollChanged += ScheduleMatrix_ScrollChanged;
+            dataGridScheduleMatrix.AddHandler(
+                ScrollViewer.ScrollChangedEvent,
+                new ScrollChangedEventHandler(ScheduleMatrix_ScrollChanged));
         }
 
         private static void ResetGridColumns(DataGrid grid)
