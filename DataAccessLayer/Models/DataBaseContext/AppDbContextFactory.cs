@@ -10,7 +10,14 @@ namespace DataAccessLayer.Models.DataBaseContext
     {
         public AppDbContext CreateDbContext(string[] args)
         {
-            var connectionString = @"Data Source=C:\Users\Oleg\Desktop\С#\GF3\GF3\WinFormsApp\bin\Debug\net10.0-windows7.0\DB\SQLite.db";
+            var root = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "GF3");
+
+            Directory.CreateDirectory(root);
+
+            var dbPath = Path.Combine(root, "SQLite.db");
+            var connectionString = $"Data Source={dbPath}";
 
             var optionsBuilder = new DbContextOptionsBuilder<AppDbContext>();
             optionsBuilder.UseSqlite(connectionString);

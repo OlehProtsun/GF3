@@ -40,6 +40,9 @@ namespace DataAccessLayer.Models.DataBaseContext
             {
                 e.Property(p => p.FirstName).IsRequired();
                 e.Property(p => p.LastName).IsRequired();
+                e.HasIndex(p => new { p.FirstName, p.LastName })
+                    .IsUnique()
+                    .HasDatabaseName("ux_employee_full_name");
             });
 
             // ----- Shop
@@ -48,6 +51,9 @@ namespace DataAccessLayer.Models.DataBaseContext
                 e.Property(p => p.Name).IsRequired();
                 e.Property(p => p.Address).IsRequired();
                 e.Property(p => p.Description).IsRequired(false);
+                e.HasIndex(p => p.Name)
+                    .IsUnique()
+                    .HasDatabaseName("ux_shop_name");
             });
 
             // ----- Schedule
@@ -81,6 +87,16 @@ namespace DataAccessLayer.Models.DataBaseContext
                     t.HasCheckConstraint("ck_schedule_shift2_format", "shift2_time LIKE '__:__ - __:__'");
                 });
                 // тригери в БД додатково перевіряють коректність часу зміни
+
+                // AppDbContext.cs -> modelBuilder.Entity<ScheduleModel>(e => { ... })
+
+                e.HasOne(s => s.AvailabilityGroup)
+                 .WithMany()
+                 .HasForeignKey(s => s.AvailabilityGroupId)
+                 .OnDelete(DeleteBehavior.SetNull);
+
+                e.HasIndex(s => s.AvailabilityGroupId).HasDatabaseName("ix_sched_avail_group");
+
             });
 
             // ----- ScheduleEmployee
@@ -144,6 +160,30 @@ namespace DataAccessLayer.Models.DataBaseContext
                         "from_time < to_time"
                     );
                 });
+
+
+            });
+
+            // ----- ScheduleCellStyle
+            modelBuilder.Entity<ScheduleCellStyleModel>(e =>
+            {
+                e.HasOne(cs => cs.Schedule)
+                 .WithMany(s => s.CellStyles)
+                 .HasForeignKey(cs => cs.ScheduleId)
+                 .OnDelete(DeleteBehavior.Cascade);
+
+                e.HasOne(cs => cs.Employee)
+                 .WithMany()
+                 .HasForeignKey(cs => cs.EmployeeId)
+                 .OnDelete(DeleteBehavior.Cascade);
+
+                e.HasIndex(cs => new { cs.ScheduleId, cs.DayOfMonth, cs.EmployeeId })
+                 .IsUnique();
+
+                e.ToTable(t =>
+                {
+                    t.HasCheckConstraint("ck_schedule_cell_style_dom", "day_of_month BETWEEN 1 AND 31");
+                });
             });
 
             // ----- ScheduleCellStyle
@@ -171,6 +211,9 @@ namespace DataAccessLayer.Models.DataBaseContext
             modelBuilder.Entity<AvailabilityGroupModel>(e =>
             {
                 e.Property(x => x.Name).IsRequired();
+                e.HasIndex(x => new { x.Year, x.Month, x.Name })
+                    .IsUnique()
+                    .HasDatabaseName("ux_avail_group_year_month_name");
 
                 e.ToTable(t =>
                 {
@@ -219,6 +262,8 @@ namespace DataAccessLayer.Models.DataBaseContext
                     );
                 });
             });
+
+
 
         }
     }

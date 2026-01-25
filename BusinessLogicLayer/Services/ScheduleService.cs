@@ -1,8 +1,8 @@
-﻿using BusinessLogicLayer.Services.Abstractions;
+﻿using BusinessLogicLayer.Common;
+using BusinessLogicLayer.Services.Abstractions;
 using DataAccessLayer.Models;
 using DataAccessLayer.Repositories.Abstractions;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -54,6 +54,7 @@ namespace BusinessLogicLayer.Services
             CancellationToken ct = default)
         {
             NormalizeSchedule(schedule);
+            EnsureGenerated(schedule, slots);
 
             var employeeList = employees?.ToList() ?? new List<ScheduleEmployeeModel>();
             var slotList = slots?.ToList() ?? new List<ScheduleSlotModel>();
@@ -111,16 +112,24 @@ namespace BusinessLogicLayer.Services
                 await _slotRepo.AddAsync(s, ct).ConfigureAwait(false);
             }
 
-            // replace cell styles
+            var normalizedStyles = (cellStyles ?? Enumerable.Empty<ScheduleCellStyleModel>())
+                .Where(cs => cs.BackgroundColorArgb.HasValue || cs.TextColorArgb.HasValue)
+                .ToList();
+
+            foreach (var style in normalizedStyles)
+            {
+                style.Schedule = null!;
+                style.Employee = null!;
+            }
+
             var existingStyles = await _cellStyleRepo.GetByScheduleAsync(scheduleId, ct).ConfigureAwait(false);
             foreach (var style in existingStyles)
                 await _cellStyleRepo.DeleteAsync(style.Id, ct).ConfigureAwait(false);
 
-            foreach (var style in cellStyleList)
+            foreach (var style in normalizedStyles)
             {
                 style.Id = 0;
                 style.ScheduleId = scheduleId;
-                style.Schedule = null!;
                 await _cellStyleRepo.AddAsync(style, ct).ConfigureAwait(false);
             }
         }
@@ -138,16 +147,6 @@ namespace BusinessLogicLayer.Services
             schedule.Slots = (await _slotRepo.GetByScheduleAsync(id, ct).ConfigureAwait(false)).ToList();
             schedule.CellStyles = (await _cellStyleRepo.GetByScheduleAsync(id, ct).ConfigureAwait(false)).ToList();
 
-#if DEBUG
-            Debug.WriteLine($"[ScheduleService] Loaded {schedule.CellStyles.Count} cell styles for schedule {id}");
-            foreach (var style in schedule.CellStyles.Take(3))
-            {
-                Debug.WriteLine(
-                    $"[ScheduleService] Style load day={style.DayOfMonth} emp={style.EmployeeId} " +
-                    $"bg={style.BackgroundHex ?? "none"} fg={style.ForegroundHex ?? "none"}");
-            }
-#endif
-
             return schedule;
         }
 
@@ -159,6 +158,18 @@ namespace BusinessLogicLayer.Services
             schedule.Note = string.IsNullOrWhiteSpace(schedule.Note)
                 ? null
                 : schedule.Note.Trim();
+        }
+
+        private static void EnsureGenerated(ScheduleModel schedule, IEnumerable<ScheduleSlotModel> slots)
+        {
+            if (schedule is null)
+                throw new ValidationException("Schedule is required.");
+
+            if (schedule.AvailabilityGroupId is null || schedule.AvailabilityGroupId <= 0)
+                throw new ValidationException("You can’t save a schedule until something has been generated. Please run generation first.");
+
+            if (slots == null || !slots.Any())
+                throw new ValidationException("You can’t save a schedule until something has been generated. Please run generation first.");
         }
     }
 }

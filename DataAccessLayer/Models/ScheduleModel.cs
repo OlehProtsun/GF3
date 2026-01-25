@@ -77,6 +77,12 @@ namespace DataAccessLayer.Models
         [Column("note")]
         public string? Note { get; set; }
 
+        [Column("availability_group_id")]
+        public int? AvailabilityGroupId { get; set; }
+
+        // optional navigation (можна і без неї, якщо не треба Include)
+        public AvailabilityGroupModel? AvailabilityGroup { get; set; }
+
         public ICollection<ScheduleEmployeeModel> Employees { get; set; } = new List<ScheduleEmployeeModel>();
         public ICollection<ScheduleSlotModel> Slots { get; set; } = new List<ScheduleSlotModel>();
         public ICollection<ScheduleCellStyleModel> CellStyles { get; set; } = new List<ScheduleCellStyleModel>();

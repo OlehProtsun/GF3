@@ -29,7 +29,7 @@ namespace DataAccessLayer.Repositories
         public async Task<TEntity> AddAsync(TEntity entity, CancellationToken ct = default)
         {
             await _set.AddAsync(entity, ct).ConfigureAwait(false);
-            await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+            await SaveChangesOrResetAsync(ct).ConfigureAwait(false);
 
             // Щоб контекст не тримав створену сутність у трекері
             _db.Entry(entity).State = EntityState.Detached;
@@ -58,7 +58,7 @@ namespace DataAccessLayer.Repositories
                 _db.Entry(entity).State = EntityState.Modified;
             }
 
-            await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+            await SaveChangesOrResetAsync(ct).ConfigureAwait(false);
 
             // (опційно) Відчепити, щоб контекст не набирав «боргів» трекінгу на WinForms-життєвому циклі
             //_db.Entry(tracked ?? entity).State = EntityState.Detached;
@@ -69,7 +69,20 @@ namespace DataAccessLayer.Repositories
             var entity = await GetByIdAsync(id, ct).ConfigureAwait(false);
             if (entity is null) return;
             _set.Remove(entity);
-            await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+            await SaveChangesOrResetAsync(ct).ConfigureAwait(false);
+        }
+
+        private async Task SaveChangesOrResetAsync(CancellationToken ct)
+        {
+            try
+            {
+                await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+            }
+            catch
+            {
+                _db.ChangeTracker.Clear();
+                throw;
+            }
         }
     }
 }

@@ -1,0 +1,629 @@
+﻿<UserControl x:Class="WPFApp.View.Availability.AvailabilityEditView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:dt="clr-namespace:WPFApp.View.Availability.DesignTime"
+             xmlns:controls="clr-namespace:WPFApp.Controls"
+             mc:Ignorable="d"
+             d:DesignHeight="1200" d:DesignWidth="852"
+             d:DataContext="{d:DesignInstance Type=dt:AvailabilityEditViewDesignVM, IsDesignTimeCreatable=True}"
+             Background="{StaticResource PageBackgroundBrush}">
+
+    <Grid ClipToBounds="False">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!-- TOP CARD (як в AvailabilityListView, але тільки Back + текст) -->
+        <Border Grid.Row="0" Style="{StaticResource TopCardStyle}" Margin="9,8,9,0">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <!-- Back button (зверху над текстом) -->
+                <Button Grid.Row="0"
+                        HorizontalAlignment="Left"
+                        Style="{StaticResource BackButtonSmallStyle}"
+                        Command="{Binding CancelCommand}" Width="62">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <Viewbox Width="14" Height="14" Margin="0,0,6,0">
+                            <Path Data="{StaticResource BackSvgIconGeometry}"
+                                  Stretch="Uniform"
+                                  Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
+                        </Viewbox>
+
+                        <TextBlock Text="Back"
+                                   Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
+                    </StackPanel>
+                </Button>
+                <!-- Title -->
+                <TextBlock Grid.Row="1"
+                           Margin="0,10,0,0"
+                           Text="Availability Edit"
+                           FontFamily="{StaticResource DefaultFontFamily}"
+                           FontSize="{StaticResource FontSizePageTitle}"
+                           Foreground="Black" />
+
+                <!-- Subtitle -->
+                <TextBlock Grid.Row="2"
+                           Margin="0,6,0,0"
+                           Text="Here you can change or provide information about availability"
+                           FontFamily="{StaticResource DefaultFontFamily}"
+                           FontSize="17"
+                           Foreground="{StaticResource SecondaryTextBrush}" />
+            </Grid>
+        </Border>
+
+        <!-- CONTENT -->
+        <Grid Grid.Row="1" Margin="9,10,9,10">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="409" />
+                <ColumnDefinition Width="18" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <!-- LEFT SIDE (scroll) -->
+            <ScrollViewer Grid.Column="0"
+                          VerticalScrollBarVisibility="Auto"
+                          HorizontalScrollBarVisibility="Disabled"
+                          Padding="0,12,0,12"
+                          ClipToBounds="False">
+
+                <StackPanel ClipToBounds="False">
+
+                    <!-- Spacer for first card shadow -->
+                    <Border Height="6" Background="Transparent" />
+
+                    <!-- INFORMATION CARD -->
+                    <Border Style="{StaticResource CardStyle}" Margin="7,0,7,16">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+
+                            <!-- HEADER: зліва назва, справа Hide/Show -->
+                            <Grid Grid.Row="0" Margin="15,10,10,10">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                    <Viewbox Width="20" Height="20" Margin="0,0,8,0">
+                                        <Path Data="{StaticResource IconInformation}"
+                                              Fill="Black"
+                                              Stretch="Uniform" />
+                                    </Viewbox>
+
+                                    <TextBlock Text="Information"
+                                               FontFamily="{StaticResource DefaultFontFamily}"
+                                               FontSize="{StaticResource FontSizeTitle}"
+                                               FontWeight="Bold"
+                                               Foreground="Black"
+                                               VerticalAlignment="Center" />
+                                </StackPanel>
+
+                                <ToggleButton x:Name="InfoToggle"
+                                              Grid.Column="1"
+                                              Style="{StaticResource HideShowToggleStyle}"
+                                              IsChecked="True" />
+                            </Grid>
+
+                            <!-- BODY: все, що має ховатись -->
+                            <Grid x:Name="InfoBody"
+                                  Grid.Row="1"
+                                  Margin="10,0,10,10"
+                                  Visibility="{Binding IsChecked, ElementName=InfoToggle, Converter={StaticResource BoolToVis}}">
+
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
+
+                                <!-- ТВОЇ 3 поля (ID / Month / Year) -->
+                                <Grid Grid.Row="0" Margin="0,0,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="12" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="8" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+
+                                    <StackPanel>
+                                        <TextBlock Text="Availability ID"
+                                                   FontFamily="{StaticResource DefaultFontFamily}"
+                                                   FontSize="15"
+                                                   Foreground="Black" />
+                                        <TextBox Margin="5"
+                                                 Style="{StaticResource RoundedTextBoxStyle}"
+                                                 Height="33"
+                                                 Width="45"
+                                                 Background="#FFF5F5F5"
+                                                 IsReadOnly="True"
+                                                 VerticalContentAlignment="Center"
+                                                 HorizontalContentAlignment="Center"
+                                                 Text="{Binding AvailabilityId}" />
+                                    </StackPanel>
+
+                                    <StackPanel Grid.Column="2">
+                                        <TextBlock Text="Availability Month"
+                                                   FontFamily="{StaticResource DefaultFontFamily}"
+                                                   FontSize="15"
+                                                   Foreground="Black" />
+                                        <controls:NumericUpDown
+                                            Value="{Binding AvailabilityMonth, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"                                            
+                                            Minimum="1"
+                                            Margin="0,7,0,0"
+                                            Width="100"
+                                            Height="33"
+                                            Maximum="12"
+                                            Step="1"/>
+                                    </StackPanel>
+
+                                    <StackPanel Grid.Column="4">
+                                        <TextBlock Text="Availability Year"
+                                                   TextAlignment="Center"
+                                                   FontFamily="{StaticResource DefaultFontFamily}"
+                                                   FontSize="15"
+                                                   Foreground="Black" />
+                                        <controls:NumericUpDown
+                                            Value="{Binding AvailabilityYear, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                            Minimum="2026"
+                                            Margin="0,7,0,0"
+                                            Width="130"
+                                            Height="33"
+                                            Maximum="4000"
+                                            Step="1"/>
+                                    </StackPanel>
+                                </Grid>
+
+                                <!-- Availability Name -->
+                                <StackPanel Grid.Row="1" Margin="0,12,0,0">
+                                    <TextBlock Text="Availability Name"
+                                               FontFamily="{StaticResource DefaultFontFamily}"
+                                               FontSize="15"
+                                               Foreground="Black" />
+                                    <TextBox x:Name="inputAvailabilityMonthName"
+                                             Margin="5"
+                                             Style="{StaticResource ValidatedRoundedTextBoxStyle}"
+                                             Tag="Write availability name..."
+                                             Height="36"
+                                             VerticalContentAlignment="Center"
+                                             HorizontalContentAlignment="Left"
+                                             Text="{Binding AvailabilityName, UpdateSourceTrigger=PropertyChanged, ValidatesOnNotifyDataErrors=True,  NotifyOnValidationError=True}" />
+
+                                </StackPanel>
+
+                                <!-- Cancel -->
+                                <Button Grid.Row="2"
+                                        Margin="0,14,0,0"
+                                        HorizontalAlignment="Left"
+                                        Style="{StaticResource RoundedButtonStyle}"
+                                        Height="33"
+                                        Width="84"
+                                        Background="{StaticResource CancelButtonBackgroundBrush}"
+                                        Foreground="{StaticResource MutedTextBrush}"
+                                        Content="Cancel"
+                                        Command="{Binding CancelInformationCommand}" />
+                            </Grid>
+                        </Grid>
+                    </Border>
+
+                    <!-- EMPLOYEE CARD (same style as Information card) -->
+                    <Border Style="{StaticResource CardStyle}" Margin="7,0,7,16">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+
+                            <!-- HEADER: left icon + title, right Hide/Show -->
+                            <Grid Grid.Row="0" Margin="15,10,10,10">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                    <Viewbox Width="20" Height="20" Margin="0,0,8,0">
+                                        <Path Data="{StaticResource IconEmployee}"
+                                              Fill="Black"
+                                              Stretch="Uniform"
+                                              RenderTransformOrigin="0.5,0.5">
+                                            <Path.RenderTransform>
+                                                <ScaleTransform ScaleX="1" ScaleY="-1" />
+                                            </Path.RenderTransform>
+                                        </Path>
+                                    </Viewbox>
+
+                                    <TextBlock Text="Employee"
+                                               FontFamily="{StaticResource DefaultFontFamily}"
+                                               FontSize="{StaticResource FontSizeTitle}"
+                                               FontWeight="Bold"
+                                               Foreground="Black"
+                                               VerticalAlignment="Center" />
+                                </StackPanel>
+
+                                <ToggleButton x:Name="EmployeeToggle"
+                                              Grid.Column="1"
+                                              Style="{StaticResource HideShowToggleStyle}"
+                                              IsChecked="True" />
+                            </Grid>
+
+                            <!-- BODY: collapsible -->
+                            <Grid x:Name="EmployeeBody"
+                                  Grid.Row="1"
+                                  Margin="10,0,10,10"
+                                  Visibility="{Binding IsChecked, ElementName=EmployeeToggle, Converter={StaticResource BoolToVis}}">
+
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
+
+                                <!-- Search row -->
+                                <Grid Grid.Row="0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="12" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+
+                                    <StackPanel>
+                                        <TextBlock Text="Search employee"
+                                                   FontFamily="{StaticResource DefaultFontFamily}"
+                                                   FontSize="15"
+                                                   Foreground="Black" />
+                                        <TextBox x:Name="textBoxSearchValueFromAvailabilityEdit"
+                                                 Margin="5,6,0,0"
+                                                 Style="{StaticResource RoundedTextBoxWithPlaceholderStyle}"
+                                                 Tag="Write search value..."
+                                                 Height="36"
+                                                 VerticalContentAlignment="Center"
+                                                 Text="{Binding EmployeeSearchText, UpdateSourceTrigger=PropertyChanged}" />
+                                    </StackPanel>
+
+                                    <Button Grid.Column="2"
+                                            x:Name="btnSearchEmployeeInAvailabilityEdit"
+                                            Margin="0,23,0,0"
+                                            Style="{StaticResource IconButtonStyle}"
+                                            Command="{Binding SearchEmployeeCommand}">
+                                        <Viewbox Width="15" Height="15">
+                                            <Path Data="{StaticResource SearchIcon}"
+                                                  Fill="Black"
+                                                  Stretch="Uniform"
+                                                  RenderTransformOrigin="0.5,0.5">
+                                                <Path.RenderTransform>
+                                                    <ScaleTransform ScaleX="1" ScaleY="-1" />
+                                                </Path.RenderTransform>
+                                            </Path>
+                                        </Viewbox>
+
+                                    </Button>
+                                </Grid>
+
+                                <!-- Selected employee -->
+                                <Grid Grid.Row="1" Margin="0,12,0,0">
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                    </Grid.RowDefinitions>
+
+                                    <!-- Row 0: label + ID (on the same line) -->
+                                    <Grid Grid.Row="0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="auto" />
+                                        </Grid.ColumnDefinitions>
+
+                                        <TextBlock Text="Selected Employee"
+                                                   FontFamily="{StaticResource DefaultFontFamily}"
+                                                   FontSize="15"
+                                                   Foreground="Black" />
+
+                                        <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,0,15,0">
+
+                                            <TextBlock Text="Employee ID: "
+                                                       FontFamily="{StaticResource DefaultFontFamily}"
+                                                       FontSize="11"
+                                                       Foreground="{StaticResource MutedTextBrush}" />
+                                            <TextBlock Text="{Binding SelectedEmployeeId}"
+                                                       FontFamily="{StaticResource DefaultFontFamily}"
+                                                       FontSize="11"
+                                                       Foreground="Black" />
+                                        </StackPanel>
+                                    </Grid>
+
+                                    <!-- Row 1: ComboBox stretches максимально вправо -->
+                                    <ComboBox Grid.Row="1"
+                                              x:Name="comboboxEmployee"
+                                              Style="{StaticResource RoundedComboBoxStyle}"
+                                              ItemContainerStyle="{StaticResource RoundedComboBoxItemStyle}"
+                                              Tag="Select employee..."
+                                              Margin="5,6,5,0"
+                                              HorizontalAlignment="Stretch"
+                                              HorizontalContentAlignment="Stretch"
+                                              ItemsSource="{Binding Employees}"
+                                              DisplayMemberPath="FullName"
+                                              SelectedItem="{Binding SelectedEmployee}" />
+                                </Grid>
+                                <!-- Buttons -->
+                                <Grid Grid.Row="2" Margin="0,14,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="12" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+
+                                    <Button x:Name="btnCancelInEmployeeBox"
+                                            Style="{StaticResource RoundedButtonStyle}"
+                                            Height="33"
+                                            Width="84"
+                                            Background="{StaticResource CancelButtonBackgroundBrush}"
+                                            Foreground="{StaticResource MutedTextBrush}"
+                                            Content="Cancel"
+                                            Command="{Binding CancelEmployeeCommand}" />
+
+                                    <Button x:Name="btnRemoveEmployeeFromGroup"
+                                            Grid.Column="2"
+                                            Style="{StaticResource RoundedButtonStyle}"
+                                            Height="33"
+                                            Width="90"
+                                            Background="{StaticResource DangerBrush}"
+                                            Content="Remove"
+                                            Foreground="White"
+                                            Command="{Binding RemoveEmployeeCommand}" />
+
+                                    <Button x:Name="btnAddEmployeeToGroup"
+                                            Grid.Column="4"
+                                            Style="{StaticResource RoundedButtonStyle}"
+                                            Height="33"
+                                            Width="60"
+                                            Content="Add"
+                                            Command="{Binding AddEmployeeCommand}" />
+                                </Grid>
+                            </Grid>
+                        </Grid>
+                    </Border>
+
+                    <!-- BIND INFORMATION CARD (same style as others) -->
+                    <Border Style="{StaticResource CardStyle}" Margin="7,0,7,16">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+
+                            <!-- HEADER: icon + title, Hide/Show -->
+                            <Grid Grid.Row="0" Margin="15,10,10,10">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                    <Viewbox Width="20" Height="20" Margin="0,0,8,0">
+                                        <Path Data="{StaticResource IconBind}"
+                                              Fill="Black"
+                                              Stretch="Uniform" />
+                                    </Viewbox>
+
+                                    <TextBlock Text="Bind Information"
+                                               FontFamily="{StaticResource DefaultFontFamily}"
+                                               FontSize="{StaticResource FontSizeTitle}"
+                                               FontWeight="Bold"
+                                               Foreground="Black"
+                                               VerticalAlignment="Center" />
+                                </StackPanel>
+
+                                <ToggleButton x:Name="BindToggle"
+                                              Grid.Column="1"
+                                              Style="{StaticResource HideShowToggleStyle}"
+                                              IsChecked="True" />
+                            </Grid>
+
+                            <!-- BODY -->
+                            <Grid Grid.Row="1"
+                                  Margin="10,0,10,10"
+                                  Visibility="{Binding IsChecked, ElementName=BindToggle, Converter={StaticResource BoolToVis}}">
+
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="*" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
+
+                                <!-- DataGrid container -->
+                                <Border Grid.Row="0"
+                                        Margin="0,6,0,10"
+                                        Background="{StaticResource SurfaceBrush}"
+                                        BorderBrush="{StaticResource CardBorderBrush}"
+                                        BorderThickness="2"
+                                        CornerRadius="{StaticResource Cr20}"
+                                        Padding="5"
+                                        ClipToBounds="True">
+
+                                    <DataGrid x:Name="dataGridBinds"
+                                              Style="{StaticResource BindsGridStyle}"
+                                              Background="Transparent"
+                                              BorderThickness="0"
+                                              ItemsSource="{Binding Binds}"
+                                              SelectedItem="{Binding SelectedBind}">
+
+                                        <DataGrid.Columns>
+                                            <DataGridTextColumn Header="Id"
+                                                                Binding="{Binding Id}"
+                                                                Width="40"
+                                                                IsReadOnly="True" />
+
+                                            <DataGridTextColumn Header="Key"
+                                                                Binding="{Binding Key, UpdateSourceTrigger=PropertyChanged}"
+                                                                Width="130" />
+
+
+                                            <DataGridTextColumn Header="Value"
+                                                                Binding="{Binding Value, UpdateSourceTrigger=PropertyChanged}"
+                                                                Width="*" />
+
+                                            <DataGridTemplateColumn Header="Active" Width="60">
+                                                <DataGridTemplateColumn.CellTemplate>
+                                                    <DataTemplate>
+                                                        <CheckBox IsChecked="{Binding IsActive, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                                  Style="{StaticResource RoundedCheckBoxStyle}" />
+                                                    </DataTemplate>
+                                                </DataGridTemplateColumn.CellTemplate>
+                                            </DataGridTemplateColumn>
+
+                                        </DataGrid.Columns>
+                                    </DataGrid>
+                                </Border>
+
+                                <!-- Buttons -->
+                                <Grid Grid.Row="1">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="12" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+
+                                    <Button x:Name="btnCacnelAvailabilityEdit3"
+                                            Style="{StaticResource RoundedButtonStyle}"
+                                            Height="33"
+                                            Width="84"
+                                            Background="{StaticResource CancelButtonBackgroundBrush}"
+                                            Foreground="{StaticResource MutedTextBrush}"
+                                            Content="Cancel"
+                                            Command="{Binding CancelBindCommand}" />
+
+                                    <Button x:Name="btnDeleteBind"
+                                            Grid.Column="2"
+                                            Style="{StaticResource RoundedButtonStyle}"
+                                            Height="33"
+                                            Width="86"
+                                            Background="{StaticResource DangerBrush}"
+                                            Content="Delete"
+                                            Command="{Binding DeleteBindCommand}" />
+
+                                    <Button x:Name="btnAddNewBind"
+                                            Grid.Column="4"
+                                            Style="{StaticResource RoundedButtonStyle}"
+                                            Height="33"
+                                            Width="60"
+                                            Content="Add"
+                                            Command="{Binding AddBindCommand}" />
+                                </Grid>
+                            </Grid>
+                        </Grid>
+                    </Border>
+
+                </StackPanel>
+            </ScrollViewer>
+
+            <!-- RIGHT SIDE: Availability Schedule (card style like others) -->
+            <Border Grid.Column="2"
+                    Style="{StaticResource CardStyle}"
+                    Margin="7,17,7,0">
+
+                <Grid Margin="15">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <!-- Header -->
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <Viewbox Width="20" Height="20" Margin="0,0,8,0">
+                            <Path Data="{StaticResource IconAvailability}"
+                                  Fill="Black"
+                                  Stretch="Uniform"
+                                  RenderTransformOrigin="0.5,0.5">
+                                <Path.RenderTransform>
+                                    <ScaleTransform ScaleX="1" ScaleY="-1" />
+                                </Path.RenderTransform>
+                            </Path>
+                        </Viewbox>
+
+                        <TextBlock Text="Availability Schedule"
+                                   FontFamily="{StaticResource DefaultFontFamily}"
+                                   FontSize="{StaticResource FontSizeTitle}"
+                                   FontWeight="Bold"
+                                   Foreground="Black"
+                                   VerticalAlignment="Center" />
+                    </StackPanel>
+
+
+                    <!-- Grid container (rounded like your binds) -->
+                    <Border Grid.Row="1"
+                            Margin="0,12,0,12"
+                            Background="{StaticResource SurfaceBrush}"
+                            BorderBrush="{StaticResource CardBorderBrush}"
+                            BorderThickness="2"
+                            CornerRadius="{StaticResource Cr20}"
+                            Padding="6"
+                            ClipToBounds="True">
+
+                        <DataGrid x:Name="dataGridAvailabilityDays"
+                                  Style="{StaticResource ScheduleMatrixGridStyle}"
+                                  Background="Transparent"
+                                  BorderThickness="0"
+                                  ItemsSource="{Binding AvailabilityDays}"
+                                  SelectedItem="{Binding SelectedAvailabilityDay}"
+
+                                  ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                                  ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                  ScrollViewer.CanContentScroll="True"
+
+                                  ColumnWidth="*" 
+                                  MinColumnWidth="140"
+                                  FrozenColumnCount="1"
+                                  AutoGeneratingColumn="AvailabilityGrid_AutoGeneratingColumn">
+                        </DataGrid>
+
+                    </Border>
+
+                    <!-- Buttons -->
+                    <Grid Grid.Row="2">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+
+                        <Button x:Name="btnCancel"
+                                Style="{StaticResource RoundedButtonStyle}"
+                                Height="33"
+                                Width="84"
+                                Background="{StaticResource CancelButtonBackgroundBrush}"
+                                Foreground="{StaticResource MutedTextBrush}"
+                                Content="Cancel"
+                                Command="{Binding CancelCommand}" />
+
+                        <Button x:Name="btnSave"
+                                Grid.Column="2"
+                                Style="{StaticResource RoundedButtonStyle}"
+                                Height="33"
+                                Width="114"
+                                Content="Save Changes"
+                                Command="{Binding SaveCommand}" />
+                    </Grid>
+                </Grid>
+            </Border>
+
+        </Grid>
+    </Grid>
+
+</UserControl>

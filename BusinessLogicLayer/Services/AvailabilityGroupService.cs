@@ -59,6 +59,13 @@ namespace BusinessLogicLayer.Services
             if (group is null) throw new ArgumentNullException(nameof(group));
             if (payload is null) throw new ArgumentNullException(nameof(payload));
 
+            group.Name = (group.Name ?? string.Empty).Trim();
+
+            if (await _groupRepo.ExistsByNameAsync(group.Name, group.Year, group.Month, group.Id == 0 ? null : group.Id, ct)
+                    .ConfigureAwait(false))
+                throw new System.ComponentModel.DataAnnotations.ValidationException(
+                    "An availability group with the same name already exists for this month.");
+
             // 1) Save group (важливо: гарантуємо, що group.Id оновиться у того ж інстансу)
             if (group.Id == 0)
             {

@@ -14,7 +14,7 @@ namespace DataAccessLayer.Migrations
         protected override void BuildModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
-            modelBuilder.HasAnnotation("ProductVersion", "10.0.0");
+            modelBuilder.HasAnnotation("ProductVersion", "10.0.1");
 
             modelBuilder.Entity("DataAccessLayer.Models.AvailabilityGroupDayModel", b =>
                 {
@@ -108,6 +108,10 @@ namespace DataAccessLayer.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("Year", "Month", "Name")
+                        .IsUnique()
+                        .HasDatabaseName("ux_avail_group_year_month_name");
+
                     b.HasIndex(new[] { "Year", "Month", "Name" }, "ix_avail_group_year_month_name");
 
                     b.ToTable("availability_group", t =>
@@ -192,7 +196,51 @@ namespace DataAccessLayer.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("FirstName", "LastName")
+                        .IsUnique()
+                        .HasDatabaseName("ux_employee_full_name");
+
                     b.ToTable("employee");
+                });
+
+            modelBuilder.Entity("DataAccessLayer.Models.ScheduleCellStyleModel", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("id");
+
+                    b.Property<int?>("BackgroundColorArgb")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("background_color_argb");
+
+                    b.Property<int>("DayOfMonth")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("day_of_month");
+
+                    b.Property<int>("EmployeeId")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("employee_id");
+
+                    b.Property<int>("ScheduleId")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("schedule_id");
+
+                    b.Property<int?>("TextColorArgb")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("text_color_argb");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EmployeeId");
+
+                    b.HasIndex("ScheduleId", "DayOfMonth", "EmployeeId")
+                        .IsUnique();
+
+                    b.ToTable("schedule_cell_style", t =>
+                        {
+                            t.HasCheckConstraint("ck_schedule_cell_style_dom", "day_of_month BETWEEN 1 AND 31");
+                        });
                 });
 
             modelBuilder.Entity("DataAccessLayer.Models.ScheduleEmployeeModel", b =>
@@ -267,6 +315,10 @@ namespace DataAccessLayer.Migrations
                         .HasColumnType("INTEGER")
                         .HasColumnName("id");
 
+                    b.Property<int?>("AvailabilityGroupId")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("availability_group_id");
+
                     b.Property<int>("ContainerId")
                         .HasColumnType("INTEGER")
                         .HasColumnName("container_id");
@@ -323,6 +375,9 @@ namespace DataAccessLayer.Migrations
                         .HasColumnName("year");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("AvailabilityGroupId")
+                        .HasDatabaseName("ix_sched_avail_group");
 
                     b.HasIndex("ContainerId")
                         .HasDatabaseName("ix_sched_container");
@@ -452,6 +507,10 @@ namespace DataAccessLayer.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("Name")
+                        .IsUnique()
+                        .HasDatabaseName("ux_shop_name");
+
                     b.ToTable("shop");
                 });
 
@@ -483,6 +542,25 @@ namespace DataAccessLayer.Migrations
                     b.Navigation("AvailabilityGroup");
 
                     b.Navigation("Employee");
+                });
+
+            modelBuilder.Entity("DataAccessLayer.Models.ScheduleCellStyleModel", b =>
+                {
+                    b.HasOne("DataAccessLayer.Models.EmployeeModel", "Employee")
+                        .WithMany()
+                        .HasForeignKey("EmployeeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("DataAccessLayer.Models.ScheduleModel", "Schedule")
+                        .WithMany("CellStyles")
+                        .HasForeignKey("ScheduleId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Employee");
+
+                    b.Navigation("Schedule");
                 });
 
             modelBuilder.Entity("DataAccessLayer.Models.ScheduleEmployeeModel", b =>
@@ -517,6 +595,11 @@ namespace DataAccessLayer.Migrations
 
             modelBuilder.Entity("DataAccessLayer.Models.ScheduleModel", b =>
                 {
+                    b.HasOne("DataAccessLayer.Models.AvailabilityGroupModel", "AvailabilityGroup")
+                        .WithMany()
+                        .HasForeignKey("AvailabilityGroupId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("DataAccessLayer.Models.ContainerModel", "Container")
                         .WithMany("Schedules")
                         .HasForeignKey("ContainerId")
@@ -528,6 +611,8 @@ namespace DataAccessLayer.Migrations
                         .HasForeignKey("ShopId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+
+                    b.Navigation("AvailabilityGroup");
 
                     b.Navigation("Container");
 
@@ -576,6 +661,8 @@ namespace DataAccessLayer.Migrations
 
             modelBuilder.Entity("DataAccessLayer.Models.ScheduleModel", b =>
                 {
+                    b.Navigation("CellStyles");
+
                     b.Navigation("Employees");
 
                     b.Navigation("CellStyles");

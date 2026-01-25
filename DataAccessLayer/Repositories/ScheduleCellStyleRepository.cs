@@ -1,4 +1,4 @@
-﻿using DataAccessLayer.Models;
+using DataAccessLayer.Models;
 using DataAccessLayer.Models.DataBaseContext;
 using DataAccessLayer.Repositories.Abstractions;
 using Microsoft.EntityFrameworkCore;
@@ -13,10 +13,13 @@ namespace DataAccessLayer.Repositories
     {
         public ScheduleCellStyleRepository(AppDbContext db) : base(db) { }
 
-        public Task<List<ScheduleCellStyleModel>> GetByScheduleAsync(int scheduleId, CancellationToken ct = default)
-            => _db.ScheduleCellStyles
+        public async Task<List<ScheduleCellStyleModel>> GetByScheduleAsync(int scheduleId, CancellationToken ct = default)
+        {
+            return await _set
                 .AsNoTracking()
-                .Where(s => s.ScheduleId == scheduleId)
-                .ToListAsync(ct);
+                .Where(cs => cs.ScheduleId == scheduleId)
+                .ToListAsync(ct)
+                .ConfigureAwait(false);
+        }
     }
 }

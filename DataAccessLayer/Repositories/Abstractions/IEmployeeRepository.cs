@@ -10,6 +10,9 @@ namespace DataAccessLayer.Repositories.Abstractions
     public interface IEmployeeRepository : IBaseRepository<EmployeeModel> 
     {
         Task<List<EmployeeModel>> GetByValueAsync(string value, CancellationToken ct = default);
+        Task<bool> ExistsByNameAsync(string firstName, string lastName, int? excludeId = null, CancellationToken ct = default);
+        Task<bool> HasAvailabilityReferencesAsync(int employeeId, CancellationToken ct = default);
+        Task<bool> HasScheduleReferencesAsync(int employeeId, CancellationToken ct = default);
     }
 
 }
