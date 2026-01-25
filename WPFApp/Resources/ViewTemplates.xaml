@@ -1,31 +1,53 @@
 ﻿<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-                    xmlns:vm="clr-namespace:WPFApp.ViewModel"
+
+    xmlns:vm="clr-namespace:WPFApp.ViewModel"
                     xmlns:avm="clr-namespace:WPFApp.ViewModel.Availability"
-                    xmlns:cvm="clr-namespace:WPFApp.ViewModel.Container"
                     xmlns:evm="clr-namespace:WPFApp.ViewModel.Employee"
                     xmlns:svm="clr-namespace:WPFApp.ViewModel.Shop"
-                    xmlns:v="clr-namespace:WPFApp.View"
+
+                    xmlns:cvmEdit="clr-namespace:WPFApp.ViewModel.Container.Edit"
+                    xmlns:cvmList="clr-namespace:WPFApp.ViewModel.Container.List"
+                    xmlns:cvmProfile="clr-namespace:WPFApp.ViewModel.Container.Profile"
+                    xmlns:cvmSchEdit="clr-namespace:WPFApp.ViewModel.Container.ScheduleEdit"
+                    xmlns:cvmSchProfile="clr-namespace:WPFApp.ViewModel.Container.ScheduleProfile"
+
+    xmlns:cvmSchList="clr-namespace:WPFApp.ViewModel.Container.ScheduleList"
+
+    xmlns:v="clr-namespace:WPFApp.View"
                     xmlns:av="clr-namespace:WPFApp.View.Availability"
                     xmlns:cv="clr-namespace:WPFApp.View.Container"
                     xmlns:ev="clr-namespace:WPFApp.View.Employee"
                     xmlns:sv="clr-namespace:WPFApp.View.Shop">
-    
+
+    <!-- =========================================================
+         ГЛОБАЛЬНІ СЕКЦІЇ (кореневі модулі)
+         ========================================================= -->
+
+    <!-- Employee module -->
     <DataTemplate DataType="{x:Type evm:EmployeeViewModel}">
         <ev:EmployeeView />
     </DataTemplate>
 
+    <!-- Shop module -->
     <DataTemplate DataType="{x:Type svm:ShopViewModel}">
         <sv:ShopView />
     </DataTemplate>
 
+    <!-- Availability module -->
     <DataTemplate DataType="{x:Type avm:AvailabilityViewModel}">
         <av:AvailabilityView />
     </DataTemplate>
 
-    <DataTemplate DataType="{x:Type cvm:ContainerViewModel}">
+    <!-- Container module (кореневий контейнерний “екран”) -->
+    <!-- ВАЖЛИВО: ContainerViewModel тепер у namespace Container.Edit -->
+    <DataTemplate DataType="{x:Type cvmEdit:ContainerViewModel}">
         <v:ContainerView />
     </DataTemplate>
+
+    <!-- =========================================================
+         EMPLOYEE (list/edit/profile)
+         ========================================================= -->
 
     <DataTemplate DataType="{x:Type evm:EmployeeListViewModel}">
         <ev:EmployeeListView />
@@ -39,6 +61,10 @@
         <ev:EmployeeProfileView />
     </DataTemplate>
 
+    <!-- =========================================================
+         SHOP (list/edit/profile)
+         ========================================================= -->
+
     <DataTemplate DataType="{x:Type svm:ShopListViewModel}">
         <sv:ShopListView />
     </DataTemplate>
@@ -50,6 +76,10 @@
     <DataTemplate DataType="{x:Type svm:ShopProfileViewModel}">
         <sv:ShopProfileView />
     </DataTemplate>
+
+    <!-- =========================================================
+         AVAILABILITY (list/edit/profile)
+         ========================================================= -->
 
     <DataTemplate DataType="{x:Type avm:AvailabilityListViewModel}">
         <av:AvailabilityListView />
@@ -63,24 +93,44 @@
         <av:AvailabilityProfileView />
     </DataTemplate>
 
-    <DataTemplate DataType="{x:Type cvm:ContainerListViewModel}">
+    <!-- =========================================================
+         CONTAINER (list/edit/profile)
+         ========================================================= -->
+
+    <!-- ContainerListViewModel тепер у Container.List -->
+    <DataTemplate DataType="{x:Type cvmList:ContainerListViewModel}">
         <cv:ContainerListView />
     </DataTemplate>
 
-    <DataTemplate DataType="{x:Type cvm:ContainerEditViewModel}">
+    <!-- ContainerEditViewModel тепер у Container.Edit -->
+    <DataTemplate DataType="{x:Type cvmEdit:ContainerEditViewModel}">
         <cv:ContainerEditView />
     </DataTemplate>
 
-    <DataTemplate DataType="{x:Type cvm:ContainerProfileViewModel}">
+    <!-- ContainerProfileViewModel тепер у Container.Profile -->
+    <DataTemplate DataType="{x:Type cvmProfile:ContainerProfileViewModel}">
         <cv:ContainerProfileView />
     </DataTemplate>
 
-    <DataTemplate DataType="{x:Type cvm:ContainerScheduleEditViewModel}">
+    <!-- =========================================================
+         SCHEDULE (edit/profile)
+         ========================================================= -->
+
+    <!-- ContainerScheduleEditViewModel тепер у Container.ScheduleEdit -->
+    <DataTemplate DataType="{x:Type cvmSchEdit:ContainerScheduleEditViewModel}">
         <cv:ContainerScheduleEditView />
     </DataTemplate>
 
-    <DataTemplate DataType="{x:Type cvm:ContainerScheduleProfileViewModel}">
+    <!-- ContainerScheduleProfileViewModel тепер у Container.ScheduleProfile -->
+    <DataTemplate DataType="{x:Type cvmSchProfile:ContainerScheduleProfileViewModel}">
         <cv:ContainerScheduleProfileView />
     </DataTemplate>
-    
+
+    <!-- (Опційно) якщо колись напряму відображаєш schedule list VM як Content -->
+    <!--
+    <DataTemplate DataType="{x:Type cvmSchList:ContainerScheduleListViewModel}">
+        <cv:ContainerScheduleListView />
+    </DataTemplate>
+    -->
+
 </ResourceDictionary>

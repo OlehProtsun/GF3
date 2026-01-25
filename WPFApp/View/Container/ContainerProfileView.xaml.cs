@@ -2,7 +2,9 @@
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
-using WPFApp.ViewModel.Container;
+using WPFApp.ViewModel.Container.List;
+using WPFApp.ViewModel.Container.Profile;
+using WPFApp.ViewModel.Container.ScheduleList;
 
 namespace WPFApp.View.Container
 {

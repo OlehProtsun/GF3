@@ -3,7 +3,7 @@ using System.Globalization;
 using System.Windows;
 using System.Windows.Data;
 using System.Windows.Media;
-using WPFApp.ViewModel.Container;
+using WPFApp.ViewModel.Container.ScheduleEdit.Helpers;
 
 namespace WPFApp.Converters
 {

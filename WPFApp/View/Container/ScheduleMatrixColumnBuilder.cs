@@ -3,7 +3,8 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
 using System.Windows.Shapes;
-using WPFApp.ViewModel.Container;
+using WPFApp.ViewModel.Container.Edit;
+using WPFApp.ViewModel.Container.ScheduleEdit;
 
 namespace WPFApp.View.Container
 {

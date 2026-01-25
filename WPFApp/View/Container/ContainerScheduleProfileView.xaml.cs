@@ -4,7 +4,8 @@ using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
-using WPFApp.ViewModel.Container;
+using WPFApp.ViewModel.Container.Profile;
+using WPFApp.ViewModel.Container.ScheduleProfile;
 
 namespace WPFApp.View.Container
 {

@@ -27,6 +27,25 @@
         </Style>
 
 
+
+
+        <!-- =============================================================
+             Shared templates/styles for ComboBox virtualization.
+             Defined once to avoid repeating the same XAML blocks in each ComboBox.
+             DOES NOT change the UI appearance; it only improves performance and maintainability.
+             ============================================================= -->
+        <ItemsPanelTemplate x:Key="VirtualizingComboItemsPanel">
+            <VirtualizingStackPanel />
+        </ItemsPanelTemplate>
+
+        <Style x:Key="ComboPopupScrollViewerStyle" TargetType="{x:Type ScrollViewer}">
+            <Setter Property="CanContentScroll" Value="True"/>
+            <Setter Property="VirtualizingPanel.IsVirtualizing" Value="True"/>
+            <Setter Property="VirtualizingPanel.VirtualizationMode" Value="Recycling"/>
+            <Setter Property="ScrollViewer.IsDeferredScrollingEnabled" Value="True"/>
+        </Style>
+
+
         <Style x:Key="TabsScrollViewerStyle" TargetType="{x:Type ScrollViewer}">
             <Setter Property="Template">
                 <Setter.Value>
@@ -61,23 +80,7 @@
         </Style>
 
 
-        <Style x:Key="NoClipHorizontalScrollViewerStyle" TargetType="{x:Type ScrollViewer}">
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="{x:Type ScrollViewer}">
-                        <!-- ВАЖЛИВО: ClipToBounds="False" -->
-                        <Grid ClipToBounds="False">
-                            <ScrollContentPresenter
-                        CanContentScroll="{TemplateBinding CanContentScroll}"
-                        Content="{TemplateBinding Content}"
-                        ContentTemplate="{TemplateBinding ContentTemplate}"
-                        Margin="{TemplateBinding Padding}"
-                        ClipToBounds="False"/>
-                        </Grid>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
+
 
 
         <Style x:Key="SplitMainButtonPressStyle"
@@ -531,7 +534,7 @@
                                 <Grid Grid.Column="0"
                                   ClipToBounds="False"
                                   Margin="0,-2,0,-2">
-                                        <ScrollViewer Style="{StaticResource TabsScrollViewerStyle}"
+                                    <ScrollViewer Style="{StaticResource TabsScrollViewerStyle}"
                                           HorizontalScrollBarVisibility="Auto"
                                           VerticalScrollBarVisibility="Disabled"
                                           PanningMode="HorizontalOnly"
@@ -539,7 +542,7 @@
                                           ClipToBounds="False"
                                           Padding="0,2,0,2">
 
-                                            <ListBox x:Name="OpenedSchedulesListBox"
+                                        <ListBox x:Name="OpenedSchedulesListBox"
                                              ItemsSource="{Binding OpenedSchedules}"
                                              SelectedItem="{Binding ActiveSchedule, Mode=TwoWay}"
                                              SelectionChanged="OpenedSchedulesListBox_SelectionChanged"
@@ -549,61 +552,61 @@
                                              ScrollViewer.VerticalScrollBarVisibility="Disabled"
                                              ItemContainerStyle="{StaticResource ScheduleChipItemStyle}">
 
-                                                <ListBox.ItemsPanel>
-                                                    <ItemsPanelTemplate>
-                                                        <StackPanel Orientation="Horizontal"/>
-                                                    </ItemsPanelTemplate>
-                                                </ListBox.ItemsPanel>
+                                            <ListBox.ItemsPanel>
+                                                <ItemsPanelTemplate>
+                                                    <StackPanel Orientation="Horizontal"/>
+                                                </ItemsPanelTemplate>
+                                            </ListBox.ItemsPanel>
 
 
-                                                <ListBox.ItemTemplate>
-                                                    <DataTemplate>
-                                                        <Grid VerticalAlignment="Center">
-                                                            <Grid.ColumnDefinitions>
-                                                                <ColumnDefinition Width="Auto"/>
-                                                                <ColumnDefinition Width="Auto"/>
-                                                            </Grid.ColumnDefinitions>
+                                            <ListBox.ItemTemplate>
+                                                <DataTemplate>
+                                                    <Grid VerticalAlignment="Center">
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="Auto"/>
+                                                            <ColumnDefinition Width="Auto"/>
+                                                        </Grid.ColumnDefinitions>
 
-                                                            <Border Grid.Column="0"
+                                                        <Border Grid.Column="0"
                                 Background="Transparent"
                                 Padding="10,2">
-                                                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                                                    <Border x:Name="Dot"
+                                                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                                <Border x:Name="Dot"
                                         Width="8" Height="8"
                                         CornerRadius="4"
                                         Background="#22000000"
                                         Margin="0,0,6,0"/>
-                                                                    <TextBlock FontSize="12" Foreground="Black">
+                                                                <TextBlock FontSize="12" Foreground="Black">
                                     <Run Text="{Binding Model.Name}"/>
-                                                                    </TextBlock>
-                                                                </StackPanel>
-                                                            </Border>
+                                                                </TextBlock>
+                                                            </StackPanel>
+                                                        </Border>
 
-                                                            <Button Grid.Column="1"
+                                                        <Button Grid.Column="1"
                                 Style="{StaticResource ScheduleChipInnerButtonStyle}"
                                 Padding="4,0,6,0"
                                 Width="22"
                                 Click="ScheduleBlockClose_Click">
-                                                                <TextBlock Text="×" FontSize="18" Foreground="#99000000"/>
-                                                            </Button>
-                                                        </Grid>
+                                                            <TextBlock Text="×" FontSize="18" Foreground="#99000000"/>
+                                                        </Button>
+                                                    </Grid>
 
-                                                        <DataTemplate.Triggers>
-                                                            <DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=ListBoxItem}}"
+                                                    <DataTemplate.Triggers>
+                                                        <DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=ListBoxItem}}"
                                      Value="True">
-                                                                <Setter TargetName="Dot" Property="Background" Value="{StaticResource NeonBlueBrush}"/>
-                                                            </DataTrigger>
+                                                            <Setter TargetName="Dot" Property="Background" Value="{StaticResource NeonBlueBrush}"/>
+                                                        </DataTrigger>
 
-                                                            <DataTrigger Binding="{Binding IsMouseOver, RelativeSource={RelativeSource AncestorType=ListBoxItem}}"
+                                                        <DataTrigger Binding="{Binding IsMouseOver, RelativeSource={RelativeSource AncestorType=ListBoxItem}}"
                                      Value="True">
-                                                                <Setter TargetName="Dot" Property="Background" Value="#662F80ED"/>
-                                                            </DataTrigger>
-                                                        </DataTemplate.Triggers>
-                                                    </DataTemplate>
-                                                </ListBox.ItemTemplate>
+                                                            <Setter TargetName="Dot" Property="Background" Value="#662F80ED"/>
+                                                        </DataTrigger>
+                                                    </DataTemplate.Triggers>
+                                                </DataTemplate>
+                                            </ListBox.ItemTemplate>
 
-                                            </ListBox>
-                                        </ScrollViewer>
+                                        </ListBox>
+                                    </ScrollViewer>
                                 </Grid>
 
                                 <!-- Add button (кругла) -->
@@ -973,26 +976,25 @@
                                                       DisplayMemberPath="Name"
                                                       Style="{StaticResource RoundedComboBoxStyle}"
                                                       ItemContainerStyle="{StaticResource RoundedComboBoxItemStyle}"
+                                                      MaxDropDownHeight="420"
+                                                      ScrollViewer.CanContentScroll="True"
+                                                      ScrollViewer.IsDeferredScrollingEnabled="True"
+                                                      VirtualizingPanel.IsVirtualizing="True"
+                                                      VirtualizingPanel.VirtualizationMode="Recycling"
                                                       IsTextSearchEnabled="False"
                                                       PreviewMouseWheel="ComboBox_PreviewMouseWheel"
+                                                    PreviewMouseLeftButtonDown="LookupComboBox_PreviewMouseLeftButtonDown"
                                                       DropDownOpened="ShopComboBox_DropDownOpened"
                                                       DropDownClosed="ShopComboBox_DropDownClosed">
 
-                                                    <ComboBox.ItemsPanel>
-                                                            <ItemsPanelTemplate>
-                                                                <VirtualizingStackPanel />
-                                                            </ItemsPanelTemplate>
+                                                        <ComboBox.ItemsPanel>
+                                                            <StaticResource ResourceKey="VirtualizingComboItemsPanel"/>
                                                         </ComboBox.ItemsPanel>
 
                                                         <!-- ВАЖЛИВО: форсуємо параметри ScrollViewer всередині Popup,
          навіть якщо RoundedComboBoxStyle їх не TemplateBind-ить -->
                                                         <ComboBox.Resources>
-                                                            <Style TargetType="{x:Type ScrollViewer}">
-                                                                <Setter Property="CanContentScroll" Value="True"/>
-                                                                <Setter Property="VirtualizingPanel.IsVirtualizing" Value="True"/>
-                                                                <Setter Property="VirtualizingPanel.VirtualizationMode" Value="Recycling"/>
-                                                                <Setter Property="ScrollViewer.IsDeferredScrollingEnabled" Value="True"/>
-                                                            </Style>
+                                                            <Style TargetType="{x:Type ScrollViewer}" BasedOn="{StaticResource ComboPopupScrollViewerStyle}"/>
                                                         </ComboBox.Resources>
                                                     </ComboBox>
 
@@ -1043,7 +1045,7 @@
                                                     <ComboBox ItemsSource="{Binding AvailabilityGroups}"
           SelectedItem="{Binding PendingSelectedAvailabilityGroup}"
           DisplayMemberPath="Name"
-          Tag="Select employee..."
+          Tag="Select group..."
           Style="{StaticResource RoundedComboBoxStyle}"
           ItemContainerStyle="{StaticResource RoundedComboBoxItemStyle}"
           Height="33"
@@ -1052,24 +1054,19 @@
           ScrollViewer.IsDeferredScrollingEnabled="True"
           VirtualizingPanel.IsVirtualizing="True"
           VirtualizingPanel.VirtualizationMode="Recycling"
+         PreviewMouseLeftButtonDown="LookupComboBox_PreviewMouseLeftButtonDown"
+
           IsTextSearchEnabled="False"
           PreviewMouseWheel="ComboBox_PreviewMouseWheel"
           DropDownOpened="AvailabilityComboBox_DropDownOpened"
           DropDownClosed="AvailabilityComboBox_DropDownClosed">
 
                                                         <ComboBox.ItemsPanel>
-                                                            <ItemsPanelTemplate>
-                                                                <VirtualizingStackPanel />
-                                                            </ItemsPanelTemplate>
+                                                            <StaticResource ResourceKey="VirtualizingComboItemsPanel"/>
                                                         </ComboBox.ItemsPanel>
 
                                                         <ComboBox.Resources>
-                                                            <Style TargetType="{x:Type ScrollViewer}">
-                                                                <Setter Property="CanContentScroll" Value="True"/>
-                                                                <Setter Property="VirtualizingPanel.IsVirtualizing" Value="True"/>
-                                                                <Setter Property="VirtualizingPanel.VirtualizationMode" Value="Recycling"/>
-                                                                <Setter Property="ScrollViewer.IsDeferredScrollingEnabled" Value="True"/>
-                                                            </Style>
+                                                            <Style TargetType="{x:Type ScrollViewer}" BasedOn="{StaticResource ComboPopupScrollViewerStyle}"/>
                                                         </ComboBox.Resources>
                                                     </ComboBox>
 
@@ -1081,7 +1078,6 @@
                                             </Border>
                                         </Grid>
 
-                                        <!-- Min Hours per employee (moved from Employees card) -->
                                         <!-- Min Hours per employee (styled like Binds grid + wrapped in rounded frame) -->
                                         <Border Grid.Row="3"
                                             Style="{StaticResource InlineSectionCardStyle}"
@@ -1101,7 +1097,12 @@
                                                       Background="Transparent"
                                                       BorderThickness="0"
                                                       Height="300"
-                                                      AutoGenerateColumns="False">
+                                                      AutoGenerateColumns="False"
+                                                      EnableRowVirtualization="True"
+                                                      EnableColumnVirtualization="True"
+                                                      VirtualizingPanel.IsVirtualizing="True"
+                                                      VirtualizingPanel.VirtualizationMode="Recycling"
+                                                      ScrollViewer.CanContentScroll="True">
 
                                                         <DataGrid.Columns>
                                                             <DataGridTextColumn Header="First Name"
@@ -1228,16 +1229,36 @@
                                             </Grid.ColumnDefinitions>
 
                                             <ComboBox Grid.Column="0"
-                                                ItemsSource="{Binding Employees}"                                                                                                               Style="{StaticResource RoundedComboBoxStyle}"
-                                                ItemContainerStyle="{StaticResource RoundedComboBoxItemStyle}"                                                           
-                                                Tag="Select employee..."
-                                                 SelectedItem="{Binding SelectedEmployee}">
+          ItemsSource="{Binding Employees}"
+          SelectedItem="{Binding SelectedEmployee}"
+          Style="{StaticResource RoundedComboBoxStyle}"
+          ItemContainerStyle="{StaticResource RoundedComboBoxItemStyle}"
+          Tag="Select group..."
+          MaxDropDownHeight="420"
+          IsTextSearchEnabled="False"
+          PreviewMouseWheel="ComboBox_PreviewMouseWheel"
+          PreviewMouseLeftButtonDown="LookupComboBox_PreviewMouseLeftButtonDown"
+          DropDownOpened="EmployeeComboBox_DropDownOpened"
+          DropDownClosed="EmployeeComboBox_DropDownClosed"
+          ScrollViewer.CanContentScroll="True"
+          ScrollViewer.IsDeferredScrollingEnabled="True"
+          VirtualizingPanel.IsVirtualizing="True"
+          VirtualizingPanel.VirtualizationMode="Recycling">
+
+                                                <ComboBox.ItemsPanel>
+                                                    <StaticResource ResourceKey="VirtualizingComboItemsPanel"/>
+                                                </ComboBox.ItemsPanel>
+
+                                                <ComboBox.Resources>
+                                                    <Style TargetType="{x:Type ScrollViewer}" BasedOn="{StaticResource ComboPopupScrollViewerStyle}"/>
+                                                </ComboBox.Resources>
+
                                                 <ComboBox.ItemTemplate>
                                                     <DataTemplate>
                                                         <TextBlock>
-                                                <Run Text="{Binding FirstName}" />
-                                                <Run Text=" " />
-                                                <Run Text="{Binding LastName}" />
+                <Run Text="{Binding FirstName}" />
+                <Run Text=" " />
+                <Run Text="{Binding LastName}" />
                                                         </TextBlock>
                                                     </DataTemplate>
                                                 </ComboBox.ItemTemplate>
@@ -1469,9 +1490,9 @@
                                                 </Border>
                                             </Grid>
                                         </Button>
-                                        
-                                        
-                                        
+
+
+
                                         <Button Style="{StaticResource RoundedButtonStyle}"
                                             Height="32"
                                             Padding="12,0"
@@ -1495,7 +1516,7 @@
                                             </StackPanel>
                                         </Button>
 
-                                        
+
 
                                         <Button Style="{StaticResource RoundedButtonStyle}"
                                             Height="32"
@@ -1563,6 +1584,11 @@
 
                                   IsReadOnly="False"
                                   AutoGenerateColumns="False"
+                                  EnableRowVirtualization="True"
+                                  EnableColumnVirtualization="True"
+                                  VirtualizingPanel.IsVirtualizing="True"
+                                  VirtualizingPanel.VirtualizationMode="Recycling"
+                                  ScrollViewer.CanContentScroll="True"
                                   CellEditEnding="ScheduleMatrix_CellEditEnding"/>
                             </Grid>
                         </Border>
@@ -1572,7 +1598,7 @@
                                 Padding="12"
                                 Margin="0,0,12,16"
                                 Height="850">
-                            
+
                             <Grid>
                                 <Grid.RowDefinitions>
                                     <RowDefinition Height="Auto" />
@@ -1599,7 +1625,12 @@
                                   Grid.Row="1"
                                   Style="{StaticResource ScheduleMatrixCompactGridStyle}"
                                   IsReadOnly="True"
-                                  AutoGenerateColumns="False"/>
+                                  AutoGenerateColumns="False"
+                                  EnableRowVirtualization="True"
+                                  EnableColumnVirtualization="True"
+                                  VirtualizingPanel.IsVirtualizing="True"
+                                  VirtualizingPanel.VirtualizationMode="Recycling"
+                                  ScrollViewer.CanContentScroll="True"/>
                             </Grid>
                         </Border>
 
@@ -1610,3 +1641,4 @@
         </Grid>
     </Grid>
 </UserControl>
+

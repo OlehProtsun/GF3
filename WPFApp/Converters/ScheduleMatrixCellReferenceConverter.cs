@@ -1,7 +1,7 @@
 using System;
 using System.Globalization;
 using System.Windows.Data;
-using WPFApp.ViewModel.Container;
+using WPFApp.ViewModel.Container.ScheduleEdit.Helpers;
 
 namespace WPFApp.Converters
 {
