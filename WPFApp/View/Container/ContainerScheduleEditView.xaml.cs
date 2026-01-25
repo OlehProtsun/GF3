@@ -122,6 +122,7 @@ namespace WPFApp.View.Container
         /// Коли ResumeMatrixRefresh() викликається — виконаємо refresh 1 раз.
         /// </summary>
         private bool _pendingMatrixRefresh;
+        private bool _isScheduleSelectionHandling;
 
         /// <summary>
         /// Coalescing: якщо MatrixChanged приходить “бурстом” (генерація/refresh/lookup),
