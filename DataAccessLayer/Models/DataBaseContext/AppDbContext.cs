@@ -186,6 +186,19 @@ namespace DataAccessLayer.Models.DataBaseContext
                 });
             });
 
+            // ----- ScheduleCellStyle
+            modelBuilder.Entity<ScheduleCellStyleModel>(e =>
+            {
+                e.HasOne(sc => sc.Schedule)
+                 .WithMany(s => s.CellStyles)
+                 .HasForeignKey(sc => sc.ScheduleId)
+                 .OnDelete(DeleteBehavior.Cascade);
+
+                e.HasIndex(sc => new { sc.ScheduleId, sc.DayOfMonth, sc.EmployeeId })
+                 .IsUnique()
+                 .HasDatabaseName("ux_sched_cell_style");
+            });
+
             // ----- AvailabilityBind
             modelBuilder.Entity<BindModel>(e =>
             {
