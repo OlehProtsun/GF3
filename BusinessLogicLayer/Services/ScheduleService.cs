@@ -78,15 +78,6 @@ namespace BusinessLogicLayer.Services
                 s.Employee = null;
             }
 
-#if DEBUG
-            Debug.WriteLine($"[ScheduleService] Saving {cellStyleList.Count} cell styles for schedule {scheduleId}");
-            foreach (var style in cellStyleList.Take(3))
-            {
-                Debug.WriteLine(
-                    $"[ScheduleService] Style save day={style.DayOfMonth} emp={style.EmployeeId} " +
-                    $"bg={style.BackgroundHex ?? "none"} fg={style.ForegroundHex ?? "none"}");
-            }
-#endif
 
             // replace employees
             var existingEmployees = await _employeeRepo.GetByScheduleAsync(scheduleId, ct).ConfigureAwait(false);

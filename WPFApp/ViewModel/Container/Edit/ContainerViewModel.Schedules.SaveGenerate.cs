@@ -329,7 +329,7 @@ namespace WPFApp.ViewModel.Container.Edit
             var fullGroups = new List<AvailabilityGroupModel>(capacity: 1) { group };
 
             // 5) Генерація
-            var slots = await _generator.GenerateAsync(model, fullGroups, employees, ct)
+            var slots = await _generator.GenerateAsync(model, fullGroups, employees, progress: null, ct: ct)
                        ?? new List<ScheduleSlotModel>();
 
             // 6) Оновлюємо слоти
