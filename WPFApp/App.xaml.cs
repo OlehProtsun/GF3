@@ -9,7 +9,7 @@ using WPFApp.View;
 using WPFApp.View.Availability;
 using WPFApp.View.Employee;
 using WPFApp.View.Shop;
-using WPFApp.ViewModel.Availability;
+using WPFApp.ViewModel.Availability.Main;
 using WPFApp.ViewModel.Container.Edit;
 using WPFApp.ViewModel.Employee;
 using WPFApp.ViewModel.Shop;

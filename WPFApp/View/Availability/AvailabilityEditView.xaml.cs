@@ -1,164 +1,189 @@
-﻿using System.Data;
-using System.Text.RegularExpressions;
+﻿using System;
+using System.Data;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
-using System.Windows.Documents;
 using System.Windows.Input;
-using System.Windows.Media;
-using System.Windows.Media.Imaging;
-using System.Windows.Navigation;
-using System.Windows.Shapes;
+using WPFApp.Infrastructure.AvailabilityMatrix;
+using WPFApp.View.Availability.Helpers;
 using WPFApp.ViewModel.Availability;
+using WPFApp.ViewModel.Availability.Edit;
+using WPFApp.ViewModel.Availability.Helpers;
 
 namespace WPFApp.View.Availability
 {
     /// <summary>
-    /// Interaction logic for AvailabilityEditView.xaml
+    /// AvailabilityEditView.xaml.cs
+    ///
+    /// Принцип:
+    /// - Мінімум логіки в code-behind:
+    ///   * побудова колонок DataGrid з DataTable (бо колонки динамічні по працівниках)
+    ///   * обробка hotkeys/binds при натисканні клавіш у матриці
+    ///   * обмеження вводу (Month/Year: цифри, clamp)
+    ///   * захоплення KeyGesture у таблиці binds
+    ///
+    /// Валідація/нормалізація availability-кодів:
+    /// - НЕ робимо тут regex-валідацію інтервалів
+    /// - використовуємо AvailabilityMatrixEngine.TryNormalizeCell, щоб не мати “дві правди”
     /// </summary>
     public partial class AvailabilityEditView : UserControl
     {
+        // Поточний VM, на який підписані.
         private AvailabilityEditViewModel? _vm;
-
-        private static readonly Regex _digitsOnly = new Regex("^[0-9]+$");
-        private static readonly Regex _intervalNoSpace = new Regex(
-            @"^\s*(?<h1>[01]?\d|2[0-3]):(?<m1>[0-5]\d)-(?<h2>[01]?\d|2[0-3]):(?<m2>[0-5]\d)\s*$",
-            RegexOptions.Compiled);
-
-
 
         public AvailabilityEditView()
         {
             InitializeComponent();
-            DataContextChanged += AvailabilityEditView_DataContextChanged;
-            Loaded += AvailabilityEditView_Loaded;
-            Unloaded += AvailabilityEditView_Unloaded;
 
+            // Підписки на lifecycle, щоб коректно attach/detach VM.
+            DataContextChanged += OnDataContextChanged;
+            Loaded += OnLoaded;
+            Unloaded += OnUnloaded;
+
+            // Матриця availability:
+            // - PreviewKeyDown перехоплює натиснення клавіш для bind apply (до того як TextBox вставить символ)
             dataGridAvailabilityDays.PreviewKeyDown += DataGridAvailabilityDays_PreviewKeyDown;
-            dataGridAvailabilityDays.CellEditEnding += DataGridAvailabilityDays_CellEditEnding;
+
+            // Binds grid:
             dataGridBinds.AutoGeneratingColumn += DataGridBinds_AutoGeneratingColumn;
             dataGridBinds.PreviewKeyDown += DataGridBinds_PreviewKeyDown;
             dataGridBinds.RowEditEnding += DataGridBinds_RowEditEnding;
+
+            // Search textbox: Enter -> SearchEmployeeCommand
             textBoxSearchValueFromAvailabilityEdit.KeyDown += TextBoxSearchValueFromAvailabilityEdit_KeyDown;
         }
 
-        private void AvailabilityEditView_DataContextChanged(object sender, DependencyPropertyChangedEventArgs e)
+        private void OnDataContextChanged(object sender, DependencyPropertyChangedEventArgs e)
         {
             AttachViewModel(DataContext as AvailabilityEditViewModel);
         }
 
-        private void AvailabilityEditView_Loaded(object sender, RoutedEventArgs e)
+        private void OnLoaded(object sender, RoutedEventArgs e)
         {
             AttachViewModel(DataContext as AvailabilityEditViewModel);
         }
 
-        private void AvailabilityEditView_Unloaded(object sender, RoutedEventArgs e)
+        private void OnUnloaded(object sender, RoutedEventArgs e)
         {
             DetachViewModel();
         }
 
         private void AttachViewModel(AvailabilityEditViewModel? viewModel)
         {
-            if (_vm != null)
-                _vm.MatrixChanged -= VmOnMatrixChanged;
+            // 1) Якщо той самий інстанс — нічого не робимо.
+            if (ReferenceEquals(_vm, viewModel))
+                return;
 
+            // 2) Від’єднуємо попередній.
+            DetachViewModel();
+
+            // 3) Запам’ятовуємо новий.
             _vm = viewModel;
 
-            if (_vm != null)
-            {
-                _vm.MatrixChanged += VmOnMatrixChanged;
-                BuildMatrixColumns(_vm.AvailabilityDays.Table, dataGridAvailabilityDays);
-            }
+            // 4) Якщо VM нема — виходимо.
+            if (_vm is null)
+                return;
+
+            // 5) Підписка на MatrixChanged:
+            //    коли VM перебудував DataTable (додав/прибрав employee колонки або rows),
+            //    view має перебудувати DataGridColumns.
+            _vm.MatrixChanged += VmOnMatrixChanged;
+
+            // 6) Перший build колонок одразу.
+            AvailabilityMatrixGridBuilder.BuildEditable(_vm.AvailabilityDays.Table, dataGridAvailabilityDays);
         }
 
         private void DetachViewModel()
         {
-            if (_vm == null) return;
+            // 1) Якщо VM нема — нічого.
+            if (_vm is null)
+                return;
+
+            // 2) Відписка.
             _vm.MatrixChanged -= VmOnMatrixChanged;
+
+            // 3) Обнуляємо.
+            _vm = null;
         }
 
         private void VmOnMatrixChanged(object? sender, EventArgs e)
         {
-            if (_vm is null) return;
-            BuildMatrixColumns(_vm.AvailabilityDays.Table, dataGridAvailabilityDays);
-        }
+            // 1) Якщо VM вже нема — виходимо.
+            if (_vm is null)
+                return;
 
-        private static void BuildMatrixColumns(DataTable? table, DataGrid grid)
-        {
-            if (table is null) return;
-
-            grid.AutoGenerateColumns = false;
-            grid.Columns.Clear();
-
-            // Day "заморожена"
-            grid.FrozenColumnCount = 1;
-
-            foreach (DataColumn column in table.Columns)
+            // 2) Маршалимо у UI thread (стійкість).
+            if (!Dispatcher.CheckAccess())
             {
-                var header = string.IsNullOrWhiteSpace(column.Caption) ? column.ColumnName : column.Caption;
-
-                var b = new Binding($"[{column.ColumnName}]")
-                {
-                    UpdateSourceTrigger = UpdateSourceTrigger.PropertyChanged,
-                    ValidatesOnDataErrors = true,
-                    NotifyOnValidationError = true
-                };
-
-                var col = new DataGridTextColumn
-                {
-                    Header = header,
-                    Binding = b,
-                    IsReadOnly = column.ReadOnly
-                };
-
-                // Day column
-                if (column.ColumnName == "DayOfMonth")
-                {
-                    col.Width = 60;
-                    col.IsReadOnly = true;
-                }
-                else
-                {
-                    col.Width = new DataGridLength(1, DataGridLengthUnitType.Star);
-                }
-
-                var tbStyle = (Style)Application.Current.FindResource("MatrixCellTextBlockStyle");
-                col.ElementStyle = tbStyle;
-
-                var editStyle = (Style)Application.Current.FindResource("MatrixCellTextBoxStyle");
-                col.EditingElementStyle = editStyle;
-
-                grid.Columns.Add(col);
+                Dispatcher.Invoke(() => VmOnMatrixChanged(sender, e));
+                return;
             }
+
+            // 3) Перебудова колонок.
+            AvailabilityMatrixGridBuilder.BuildEditable(_vm.AvailabilityDays.Table, dataGridAvailabilityDays);
         }
+
+        // =========================================================
+        // Employees search
+        // =========================================================
 
         private void TextBoxSearchValueFromAvailabilityEdit_KeyDown(object sender, KeyEventArgs e)
         {
-            if (e.Key != Key.Enter) return;
-            if (DataContext is AvailabilityEditViewModel vm && vm.SearchEmployeeCommand.CanExecute(null))
+            // 1) Лише Enter.
+            if (e.Key != Key.Enter)
+                return;
+
+            // 2) VM.
+            if (DataContext is not AvailabilityEditViewModel vm)
+                return;
+
+            // 3) Execute SearchEmployeeCommand.
+            if (vm.SearchEmployeeCommand.CanExecute(null))
                 vm.SearchEmployeeCommand.Execute(null);
+
+            e.Handled = true;
         }
+
+        // =========================================================
+        // Binds DataGrid
+        // =========================================================
 
         private async void DataGridBinds_RowEditEnding(object? sender, DataGridRowEditEndingEventArgs e)
         {
-            if (e.EditAction != DataGridEditAction.Commit) return;
-            if (_vm is null) return;
+            // 1) Цікавить лише commit.
+            if (e.EditAction != DataGridEditAction.Commit)
+                return;
 
-            var row = e.Row.Item as BindRow;
+            // 2) VM має бути підключений.
+            if (_vm is null)
+                return;
+
+            // 3) Рядок має бути BindRow.
+            if (e.Row.Item is not BindRow row)
+                return;
+
+            // 4) Upsert (Create/Update) bind-а.
+            //    Це async void handler (бо event), але тут це нормальна практика для WPF events.
             await _vm.UpsertBindAsync(row);
         }
 
         private void DataGridBinds_AutoGeneratingColumn(object? sender, DataGridAutoGeneratingColumnEventArgs e)
         {
+            // Якщо у XAML стоїть AutoGenerateColumns=true — ми можемо “підкрутити” поведінку колонок.
+            // Для Key: робимо ReadOnly, бо:
+            // - Key заповнюємо через “захоплення” hotkey у PreviewKeyDown
+            // - вручну вводити Key не хочемо (щоб уникнути різних форматів)
             if (e.PropertyName == nameof(BindRow.Key))
                 e.Column.IsReadOnly = true;
         }
 
         private void DataGridBinds_PreviewKeyDown(object sender, KeyEventArgs e)
         {
-            if (_vm is null) return;
+            // 1) Без VM — нема логіки.
+            if (_vm is null)
+                return;
 
-            // ENTER: комітимо клітинку+рядок (RowEditEnding викличе Upsert)
+            // 2) ENTER: комітимо клітинку+рядок (RowEditEnding викличе Upsert).
             if (e.Key == Key.Enter)
             {
                 dataGridBinds.CommitEdit(DataGridEditingUnit.Cell, true);
@@ -167,19 +192,26 @@ namespace WPFApp.View.Availability
                 return;
             }
 
-            // Якщо зараз редагуємо TextBox — даємо вводити вручну
+            // 3) Якщо зараз редагуємо TextBox — не перехоплюємо (щоб користувач міг вводити значення).
             if (IsCurrentCellEditing(dataGridBinds))
                 return;
 
-            if (dataGridBinds.CurrentColumn is not DataGridBoundColumn boundColumn) return;
-            var binding = boundColumn.Binding as Binding;
-            if (binding?.Path?.Path != nameof(BindRow.Key)) return;
+            // 4) Переконуємось, що поточна колонка — саме Key (бо ми “захоплюємо” hotkey тільки туди).
+            if (dataGridBinds.CurrentColumn is not DataGridBoundColumn boundColumn)
+                return;
 
-            // Якщо хочеш "запис хоткея" тільки з модифікаторами:
+            if (boundColumn.Binding is not Binding b)
+                return;
+
+            if (b.Path?.Path != nameof(BindRow.Key))
+                return;
+
+            // 5) Якщо модифікаторів нема — не захоплюємо.
+            //    Це твоя початкова логіка: хоткей = комбінація з Ctrl/Alt/Shift/Win.
             if (Keyboard.Modifiers == ModifierKeys.None)
                 return;
 
-            // ігноруємо навігацію
+            // 6) Не перехоплюємо навігацію.
             switch (e.Key)
             {
                 case Key.Up:
@@ -191,52 +223,64 @@ namespace WPFApp.View.Availability
                     return;
             }
 
-            var key = (e.Key == Key.System) ? e.SystemKey : e.Key;
-            var keyText = _vm.FormatKeyGesture(key, Keyboard.Modifiers);
-            if (string.IsNullOrWhiteSpace(keyText)) return;
+            // 7) Не ламаємо стандартні Ctrl shortcuts (Ctrl+C/V/X/Z/Y/A).
+            if (AvailabilityViewInputHelper.IsCommonEditorShortcut(e.Key, Keyboard.Modifiers))
+                return;
 
+            // 8) У WPF, коли натиснуто Alt+key, інколи приходить Key.System + SystemKey.
+            var key = (e.Key == Key.System) ? e.SystemKey : e.Key;
+
+            // 9) Форматуємо у “людський” вигляд (Ctrl+M).
+            var keyText = _vm.FormatKeyGesture(key, Keyboard.Modifiers);
+
+            // 10) Якщо форматування не вдалося — виходимо.
+            if (string.IsNullOrWhiteSpace(keyText))
+                return;
+
+            // 11) Записуємо в поточний BindRow.
             if (dataGridBinds.CurrentItem is BindRow row)
             {
                 row.Key = keyText;
+
+                // 12) Комітимо клітинку, щоб RowEditEnding міг спрацювати.
                 dataGridBinds.CommitEdit(DataGridEditingUnit.Cell, true);
             }
 
+            // 13) Handled, щоб key не пішов далі.
             e.Handled = true;
         }
 
-
-        private static T? FindParent<T>(DependencyObject? child) where T : DependencyObject
-        {
-            while (child != null)
-            {
-                if (child is T typed) return typed;
-                child = VisualTreeHelper.GetParent(child);
-            }
-            return null;
-        }
-
-        private bool IsCurrentCellEditing(DataGrid grid)
-        {
-            if (grid.CurrentItem == null || grid.CurrentColumn == null) return false;
-
-            var content = grid.CurrentColumn.GetCellContent(grid.CurrentItem);
-            if (content == null) return false;
-
-            var cell = FindParent<DataGridCell>(content);
-            return cell?.IsEditing == true;
-        }
+        // =========================================================
+        // Availability matrix: binds apply on key press
+        // =========================================================
 
         private void DataGridAvailabilityDays_PreviewKeyDown(object sender, KeyEventArgs e)
         {
-            if (_vm is null) return;
-            if (dataGridAvailabilityDays.CurrentColumn is not DataGridBoundColumn boundColumn) return;
+            // 1) Без VM — нема логіки.
+            if (_vm is null)
+                return;
 
-            var binding = boundColumn.Binding as Binding;
-            var columnName = binding?.Path?.Path?.Trim('[', ']') ?? string.Empty;
-            if (string.IsNullOrWhiteSpace(columnName)) return;
-            if (columnName == "DayOfMonth") return;
+            // 2) Має бути column з Binding, щоб дістати columnName.
+            if (dataGridAvailabilityDays.CurrentColumn is not DataGridBoundColumn boundColumn)
+                return;
 
-            // Навігацію не чіпаємо
+            if (boundColumn.Binding is not Binding binding)
+                return;
+
+            // 3) Binding.Path.Path має вигляд "[emp_12]" або "[DayOfMonth]".
+            //    Забираємо квадратні дужки.
+            var columnName = (binding.Path?.Path ?? string.Empty).Trim('[', ']');
+
+            // 4) Порожній columnName — вихід.
+            if (string.IsNullOrWhiteSpace(columnName))
+                return;
+
+            // 5) Day column не редагуємо і не застосовуємо binds.
+            if (columnName == AvailabilityMatrixEngine.DayColumnName)
+                return;
+
+            // 6) Не перехоплюємо навігаційні клавіші та службові клавіші.
+            //    Enter — окремо обробляє DataGrid (commit/move), тому не чіпаємо.
             switch (e.Key)
             {
                 case Key.Up:
@@ -249,41 +293,71 @@ namespace WPFApp.View.Availability
                     return;
             }
 
-            var key = (e.Key == Key.System) ? e.SystemKey : e.Key;
-            var keyText = _vm.FormatKeyGesture(key, Keyboard.Modifiers);
-
-            // Якщо FormatKeyGesture повернув null для одиночних клавіш (modifiers==None),
-            // беремо "символьний" варіант: 1 / M / A ...
-            if (string.IsNullOrWhiteSpace(keyText))
-                keyText = key.ToString();
-
-            // Якщо немає бінда — дозволяємо звичайний ввод (не чіпаємо)
-            if (!_vm.TryGetBindValue(keyText, out var bindValue))
+            // 7) Не ламаємо стандартні Ctrl shortcuts.
+            if (AvailabilityViewInputHelper.IsCommonEditorShortcut(e.Key, Keyboard.Modifiers))
                 return;
 
-            // Якщо клітинка редагується — зупиняємо редагування, щоб символ не вставився
+            // 8) Визначаємо “токен” клавіші для bind lookup:
+            //    - якщо є modifiers — беремо Ctrl+M (через FormatKeyGesture)
+            //    - якщо modifiers немає — беремо "A" або "1" (через helper, щоб D1 став "1")
+            var key = (e.Key == Key.System) ? e.SystemKey : e.Key;
+
+            string rawKeyToken;
+
+            if (Keyboard.Modifiers != ModifierKeys.None)
+            {
+                // 8.1) Комбінація — форматована строка.
+                rawKeyToken = _vm.FormatKeyGesture(key, Keyboard.Modifiers) ?? string.Empty;
+
+                // Якщо не вдалося — вихід.
+                if (string.IsNullOrWhiteSpace(rawKeyToken))
+                    return;
+            }
+            else
+            {
+                // 8.2) Одиночна клавіша — токен (A / 1 / NumPad3 / ...).
+                rawKeyToken = AvailabilityViewInputHelper.KeyToBindToken(key);
+            }
+
+            // 9) Питаємо VM: чи існує bind для цього key.
+            //    VM всередині нормалізує ключ через owner.TryNormalizeKey,
+            //    тому ми можемо передати “людський” токен.
+            if (!_vm.TryGetBindValue(rawKeyToken, out var bindValue))
+                return;
+
+            // 10) Якщо клітинка зараз редагується (TextBox активний),
+            //     комітимо edit, щоб символ не вставився у TextBox перед застосуванням bind-а.
             if (IsCurrentCellEditing(dataGridAvailabilityDays))
                 dataGridAvailabilityDays.CommitEdit(DataGridEditingUnit.Cell, true);
 
+            // 11) Визначаємо rowIndex поточного item.
             var rowIndex = dataGridAvailabilityDays.Items.IndexOf(dataGridAvailabilityDays.CurrentItem);
+
+            // 12) Просимо VM застосувати bind до клітинки (columnName,rowIndex).
+            //     VM може повернути nextRowIndex для “автопереходу вниз”.
             if (!_vm.TryApplyBindToCell(columnName, rowIndex, bindValue, out var nextRowIndex))
                 return;
 
+            // 13) Комітимо cell і row, щоб DataTable отримав значення і валідація відпрацювала.
             dataGridAvailabilityDays.CommitEdit(DataGridEditingUnit.Cell, true);
             dataGridAvailabilityDays.CommitEdit(DataGridEditingUnit.Row, true);
 
+            // 14) Якщо VM запропонував nextRowIndex — переміщаємо курсор вниз.
             if (nextRowIndex is int next && next >= 0 && next < dataGridAvailabilityDays.Items.Count)
             {
                 var nextItem = dataGridAvailabilityDays.Items[next];
 
+                // 14.1) Скролимо до елемента.
                 dataGridAvailabilityDays.ScrollIntoView(nextItem, boundColumn);
+
+                // 14.2) Ставимо поточну клітинку.
                 dataGridAvailabilityDays.CurrentCell = new DataGridCellInfo(nextItem, boundColumn);
 
-                // Замість SelectedItem (рядок) — вибираємо клітинку
+                // 14.3) Очищаємо SelectedCells і ставимо лише потрібну клітинку (UX: видно, де курсор).
                 dataGridAvailabilityDays.SelectedCells.Clear();
                 dataGridAvailabilityDays.SelectedCells.Add(new DataGridCellInfo(nextItem, boundColumn));
 
-                // Краще почати редагування через Dispatcher, щоб не ловити "invalid state"
+                // 14.4) Починаємо редагування через Dispatcher, щоб уникнути “invalid state” у деяких шаблонах.
                 dataGridAvailabilityDays.Dispatcher.BeginInvoke(new Action(() =>
                 {
                     dataGridAvailabilityDays.Focus();
@@ -291,106 +365,126 @@ namespace WPFApp.View.Availability
                 }), System.Windows.Threading.DispatcherPriority.Background);
             }
 
-
+            // 15) Перехопили клавішу — далі не передаємо.
             e.Handled = true;
         }
 
-        private void DataGridAvailabilityDays_CellEditEnding(object sender, DataGridCellEditEndingEventArgs e)
+        // =========================================================
+        // Helpers: determine current cell edit mode
+        // =========================================================
+
+        private static T? FindParent<T>(DependencyObject? child) where T : DependencyObject
         {
-            if (e.EditAction != DataGridEditAction.Commit) return;
-            if (e.Column is not DataGridBoundColumn boundColumn) return;
-            if (e.Row.Item is not DataRowView rowView) return;
+            // Піднімаємось по VisualTree вгору, поки:
+            // - не знайдемо T
+            // - або не дійдемо до кореня (null)
+            while (child != null)
+            {
+                if (child is T typed)
+                    return typed;
 
-            var binding = boundColumn.Binding as Binding;
-            var columnName = binding?.Path?.Path?.Trim('[', ']') ?? string.Empty;
-            if (string.IsNullOrWhiteSpace(columnName) || columnName == "DayOfMonth")
-                return;
+                child = System.Windows.Media.VisualTreeHelper.GetParent(child);
+            }
 
-            var raw = (e.EditingElement as TextBox)?.Text ?? string.Empty;
-            if (!TryNormalizeNoSpaceInterval(raw, out var normalized))
-                return;
-
-            rowView[columnName] = normalized;
+            return null;
         }
 
-        private static bool TryNormalizeNoSpaceInterval(string raw, out string normalized)
+        private bool IsCurrentCellEditing(DataGrid grid)
         {
-            normalized = raw;
-
-            var match = _intervalNoSpace.Match(raw);
-            if (!match.Success)
+            // 1) Якщо нема поточного item/column — нема що перевіряти.
+            if (grid.CurrentItem == null || grid.CurrentColumn == null)
                 return false;
 
-            var h1 = int.Parse(match.Groups["h1"].Value);
-            var m1 = int.Parse(match.Groups["m1"].Value);
-            var h2 = int.Parse(match.Groups["h2"].Value);
-            var m2 = int.Parse(match.Groups["m2"].Value);
+            // 2) Беремо UI-елемент клітинки.
+            var content = grid.CurrentColumn.GetCellContent(grid.CurrentItem);
 
-            var start = new TimeSpan(h1, m1, 0);
-            var end = new TimeSpan(h2, m2, 0);
-
-            if (start >= end)
+            // 3) Якщо контенту нема — значить клітинки нема (або ще не згенерована).
+            if (content == null)
                 return false;
 
-            normalized = $"{start:hh\\:mm} - {end:hh\\:mm}";
-            return true;
+            // 4) З контенту знаходимо DataGridCell.
+            var cell = FindParent<DataGridCell>(content);
+
+            // 5) IsEditing==true означає, що зараз активний EditingElement (TextBox).
+            return cell?.IsEditing == true;
         }
+
+        // =========================================================
+        // Numeric input helpers (Month/Year)
+        // =========================================================
 
         private void NumberOnly_PreviewTextInput(object sender, TextCompositionEventArgs e)
         {
-            e.Handled = !_digitsOnly.IsMatch(e.Text);
+            // PreviewTextInput дає ТІЛЬКИ новий фрагмент (e.Text),
+            // тому перевіряємо, що фрагмент — всі digits.
+            e.Handled = !AvailabilityViewInputHelper.IsAllDigits(e.Text);
         }
 
         private void NumberOnly_Pasting(object sender, DataObjectPastingEventArgs e)
         {
+            // 1) Переконуємось, що вставляється текст.
             if (!e.SourceDataObject.GetDataPresent(DataFormats.Text, true))
             {
                 e.CancelCommand();
                 return;
             }
 
-            var text = e.SourceDataObject.GetData(DataFormats.Text) as string ?? "";
-            if (!_digitsOnly.IsMatch(text))
+            // 2) Беремо текст.
+            var text = e.SourceDataObject.GetData(DataFormats.Text) as string ?? string.Empty;
+
+            // 3) Якщо не digits — відміняємо paste.
+            if (!AvailabilityViewInputHelper.IsAllDigits(text))
                 e.CancelCommand();
         }
 
-        // Month: 1..12
         private void Month_LostFocus(object sender, RoutedEventArgs e)
         {
-            if (sender is not TextBox tb) return;
-
-            if (!int.TryParse(tb.Text, out int value))
-            {
-                tb.Text = "1";
-                return;
-            }
-
-            if (value < 1) tb.Text = "1";
-            else if (value > 12) tb.Text = "12";
+            // Month: 1..12
+            // Виносимо clamp у спільний метод, щоб прибрати дублювання з Year.
+            ClampIntTextBox(sender, min: 1, max: 12, defaultValue: 1);
         }
 
-        // Year: 2000..3000
         private void Year_LostFocus(object sender, RoutedEventArgs e)
         {
-            if (sender is not TextBox tb) return;
+            // Year: 2000..3000
+            ClampIntTextBox(sender, min: 2000, max: 3000, defaultValue: 2000);
+        }
 
+        private static void ClampIntTextBox(object sender, int min, int max, int defaultValue)
+        {
+            // 1) Має бути TextBox.
+            if (sender is not TextBox tb)
+                return;
+
+            // 2) Якщо не парситься — ставимо default.
             if (!int.TryParse(tb.Text, out int value))
             {
-                tb.Text = "2000";
+                tb.Text = defaultValue.ToString();
                 return;
             }
 
-            if (value < 2000) tb.Text = "2000";
-            else if (value > 3000) tb.Text = "3000";
+            // 3) Clamp.
+            if (value < min) tb.Text = min.ToString();
+            else if (value > max) tb.Text = max.ToString();
         }
+
+        // =========================================================
+        // OPTIONAL: AutoGeneratingColumn fallback (якщо у XAML AutoGenerateColumns=true)
+        // =========================================================
 
         private void AvailabilityGrid_AutoGeneratingColumn(object sender, DataGridAutoGeneratingColumnEventArgs e)
         {
+            // Цей метод має сенс лише якщо у XAML:
+            // - AutoGenerateColumns=true
+            // - і ти хочеш підкрутити ширини/headers.
+            //
+            // Якщо ти використовуєш AvailabilityMatrixGridBuilder (AutoGenerateColumns=false),
+            // цей handler можна не підключати взагалі.
+
             if (sender is not DataGrid grid)
                 return;
 
-            // DataView -> DataTable -> DataColumn
-            if (grid.ItemsSource is not DataView dv || dv.Table == null)
+            if (grid.ItemsSource is not DataView dv || dv.Table is null)
                 return;
 
             if (!dv.Table.Columns.Contains(e.PropertyName))
@@ -398,11 +492,11 @@ namespace WPFApp.View.Availability
 
             var dc = dv.Table.Columns[e.PropertyName];
 
-            // Header з Caption (у тебе Caption = "Day" і ПІБ працівника)
+            // Header беремо з Caption (у тебе Caption = "Day" і ПІБ працівника).
             e.Column.Header = dc.Caption;
 
-            // 1) Day колонка фіксована і ReadOnly
-            if (dc.ColumnName == "DayOfMonth")
+            // Day column: fixed width + readonly.
+            if (dc.ColumnName == AvailabilityMatrixEngine.DayColumnName)
             {
                 e.Column.Width = new DataGridLength(70);
                 e.Column.MinWidth = 70;
@@ -410,12 +504,9 @@ namespace WPFApp.View.Availability
                 return;
             }
 
-            // 2) Employee колонки: ділять простір, але не менше MinWidth (скрол з’явиться автоматично)
+            // Employee columns: star + min width, щоб горизонтальний скрол був при потребі.
             e.Column.Width = new DataGridLength(1, DataGridLengthUnitType.Star);
-            e.Column.MinWidth = 140; // або інше число
+            e.Column.MinWidth = 140;
         }
-
-
-
     }
 }

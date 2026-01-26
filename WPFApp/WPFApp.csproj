@@ -24,8 +24,4 @@
     <ProjectReference Include="..\DataAccessLayer\DataAccessLayer.csproj" />
   </ItemGroup>
 
-  <ItemGroup>
-    <Folder Include="ViewModel\Helpers\" />
-  </ItemGroup>
-
 </Project>

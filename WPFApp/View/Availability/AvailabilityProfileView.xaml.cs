@@ -1,117 +1,105 @@
-﻿using System.Data;
+﻿using System;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Data;
-using System.Windows.Documents;
-using System.Windows.Input;
-using System.Windows.Media;
-using System.Windows.Media.Imaging;
-using System.Windows.Navigation;
-using System.Windows.Shapes;
-using WPFApp.ViewModel.Availability;
+using WPFApp.View.Availability.Helpers;
+using WPFApp.ViewModel.Availability.Profile;
 
 namespace WPFApp.View.Availability
 {
     /// <summary>
-    /// Interaction logic for AvailabilityProfileView.xaml
+    /// AvailabilityProfileView.xaml.cs
+    ///
+    /// Принцип:
+    /// - View підписується на vm.MatrixChanged, щоб перебудувати колонки DataGrid,
+    ///   бо колонки залежать від DataTable.Columns (працівники можуть змінюватися).
+    /// - Логіку побудови колонок винесено в AvailabilityMatrixGridBuilder.
     /// </summary>
     public partial class AvailabilityProfileView : UserControl
     {
+        // Поточний VM, на який ми підписані (щоб коректно відписуватись).
         private AvailabilityProfileViewModel? _vm;
 
         public AvailabilityProfileView()
         {
             InitializeComponent();
-            DataContextChanged += AvailabilityProfileView_DataContextChanged;
-            Loaded += AvailabilityProfileView_Loaded;
-            Unloaded += AvailabilityProfileView_Unloaded;
+
+            // DataContext може змінюватися під час життя view.
+            DataContextChanged += OnDataContextChanged;
+
+            // Unloaded — гарантована точка відписки від подій VM.
+            Unloaded += OnUnloaded;
+
+            // Loaded залишаємо як “страховку”, якщо DataContext підв’язали до Loaded.
+            Loaded += OnLoaded;
         }
 
-        private void AvailabilityProfileView_DataContextChanged(object sender, DependencyPropertyChangedEventArgs e)
+        private void OnDataContextChanged(object sender, DependencyPropertyChangedEventArgs e)
         {
             AttachViewModel(DataContext as AvailabilityProfileViewModel);
         }
 
-        private void AvailabilityProfileView_Loaded(object sender, RoutedEventArgs e)
+        private void OnLoaded(object sender, RoutedEventArgs e)
         {
             AttachViewModel(DataContext as AvailabilityProfileViewModel);
         }
 
-        private void AvailabilityProfileView_Unloaded(object sender, RoutedEventArgs e)
+        private void OnUnloaded(object sender, RoutedEventArgs e)
         {
             DetachViewModel();
         }
 
         private void AttachViewModel(AvailabilityProfileViewModel? viewModel)
         {
-            if (_vm != null)
-                _vm.MatrixChanged -= VmOnMatrixChanged;
+            // 1) Якщо підключають той самий інстанс — нічого не робимо.
+            if (ReferenceEquals(_vm, viewModel))
+                return;
 
+            // 2) Від’єднуємо старий VM (якщо був).
+            DetachViewModel();
+
+            // 3) Запам’ятовуємо новий VM.
             _vm = viewModel;
-            if (_vm != null)
-            {
-                _vm.MatrixChanged += VmOnMatrixChanged;
-                BuildMatrixColumns(_vm.ProfileAvailabilityMonths.Table, dataGridAvailabilityMonthProfile);
-            }
+
+            // 4) Якщо VM відсутній — виходимо (нема на що підписуватись).
+            if (_vm is null)
+                return;
+
+            // 5) Підписуємось на MatrixChanged.
+            _vm.MatrixChanged += VmOnMatrixChanged;
+
+            // 6) Перший build колонок одразу.
+            AvailabilityMatrixGridBuilder.BuildReadOnly(_vm.ProfileAvailabilityMonths.Table, dataGridAvailabilityMonthProfile);
         }
 
         private void DetachViewModel()
         {
-            if (_vm == null) return;
+            // 1) Якщо VM нема — нічого робити.
+            if (_vm is null)
+                return;
+
+            // 2) Відписка від події (щоб не було memory leaks та подвійних викликів).
             _vm.MatrixChanged -= VmOnMatrixChanged;
+
+            // 3) Обнуляємо посилання.
+            _vm = null;
         }
 
         private void VmOnMatrixChanged(object? sender, EventArgs e)
         {
-            if (_vm is null) return;
-            BuildMatrixColumns(_vm.ProfileAvailabilityMonths.Table, dataGridAvailabilityMonthProfile);
-        }
+            // 1) Якщо VM вже від’єднано — ігноруємо.
+            if (_vm is null)
+                return;
 
-        private static void BuildMatrixColumns(DataTable? table, DataGrid grid)
-        {
-            if (table is null) return;
-
-            grid.AutoGenerateColumns = false;
-            grid.Columns.Clear();
-
-            // як в Edit: перша колонка "заморожена"
-            grid.FrozenColumnCount = 1;
-
-            var tbStyle = (Style)Application.Current.FindResource("MatrixCellTextBlockStyle");
-
-            foreach (DataColumn column in table.Columns)
+            // 2) Якщо подія прийшла не з UI thread — маршалимо в Dispatcher.
+            //    Це робить код стійкішим, якщо колись MatrixChanged буде підніматися з background.
+            if (!Dispatcher.CheckAccess())
             {
-                var header = string.IsNullOrWhiteSpace(column.Caption)
-                    ? column.ColumnName
-                    : column.Caption;
-
-                // ReadOnly: робимо OneWay, бо редагування не потрібне
-                var b = new Binding($"[{column.ColumnName}]")
-                {
-                    Mode = BindingMode.OneWay
-                };
-
-                var col = new DataGridTextColumn
-                {
-                    Header = header,
-                    Binding = b,
-                    IsReadOnly = true,
-                    ElementStyle = tbStyle
-                };
-
-                if (column.ColumnName == "DayOfMonth")
-                {
-                    col.Width = 60;
-                }
-                else
-                {
-                    col.Width = new DataGridLength(1, DataGridLengthUnitType.Star);
-                    col.MinWidth = 140; // щоб нормально працював горизонтальний скрол
-                }
-
-                grid.Columns.Add(col);
+                Dispatcher.Invoke(() => VmOnMatrixChanged(sender, e));
+                return;
             }
-        }
 
+            // 3) Перебудовуємо колонки.
+            AvailabilityMatrixGridBuilder.BuildReadOnly(_vm.ProfileAvailabilityMonths.Table, dataGridAvailabilityMonthProfile);
+        }
     }
 }
