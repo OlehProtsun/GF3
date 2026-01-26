@@ -1,24 +1,28 @@
-﻿using System;
-using System.Collections.Generic;
-using System.ComponentModel;
-using System.Runtime.CompilerServices;
-using System.Text;
+﻿using System.Runtime.CompilerServices;
 
 namespace WPFApp.Infrastructure
 {
-    public abstract class ObservableObject : INotifyPropertyChanged
+    /// <summary>
+    /// ObservableObject — сумісний alias базового класу для VM.
+    ///
+    /// ВАЖЛИВО:
+    /// Раніше у вас були два майже однакові базові класи:
+    /// - ObservableObject (SetProperty + Raise)
+    /// - ViewModelBase (SetProperty + OnPropertyChanged + OnPropertiesChanged)
+    ///
+    /// Це створювало дублювання і ризики “роз’їзду” поведінки.
+    ///
+    /// Тепер:
+    /// - ViewModelBase є канонічною реалізацією.
+    /// - ObservableObject просто наслідує ViewModelBase і залишає метод Raise(...) для існуючого коду.
+    /// </summary>
+    public abstract class ObservableObject : ViewModelBase
     {
-        public event PropertyChangedEventHandler? PropertyChanged;
-
-        protected bool SetProperty<T>(ref T field, T value, [CallerMemberName] string? propName = null)
-        {
-            if (Equals(field, value)) return false;
-            field = value;
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propName));
-            return true;
-        }
-
+        /// <summary>
+        /// Raise — історичний alias для OnPropertyChanged.
+        /// Залишаємо його, щоб не ламати існуючі VM, які викликають Raise(...).
+        /// </summary>
         protected void Raise([CallerMemberName] string? propName = null)
-            => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propName));
+            => OnPropertyChanged(propName);
     }
 }

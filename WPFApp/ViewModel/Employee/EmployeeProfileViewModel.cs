@@ -1,8 +1,19 @@
 using DataAccessLayer.Models;
 using WPFApp.Infrastructure;
+using WPFApp.ViewModel.Employee.Helpers;
 
 namespace WPFApp.ViewModel.Employee
 {
+    /// <summary>
+    /// EmployeeProfileViewModel — read-only профіль працівника.
+    ///
+    /// Покращення:
+    /// - CancelProfileCommand = BackCommand (без дублювання AsyncRelayCommand)
+    /// - Edit/Delete мають canExecute (лише коли EmployeeId > 0)
+    /// - SetProfile синхронізує owner.ListVm.SelectedItem = model,
+    ///   щоб owner.EditSelectedAsync/DeleteSelectedAsync працювали гарантовано на правильному employee.
+    /// - FullName/Email/Phone формуються через EmployeeDisplayHelper (менше повторів).
+    /// </summary>
     public sealed class EmployeeProfileViewModel : ViewModelBase
     {
         private readonly EmployeeViewModel _owner;
@@ -11,7 +22,12 @@ namespace WPFApp.ViewModel.Employee
         public int EmployeeId
         {
             get => _employeeId;
-            set => SetProperty(ref _employeeId, value);
+            set
+            {
+                // При зміні Id оновлюємо canExecute для Edit/Delete.
+                if (SetProperty(ref _employeeId, value))
+                    UpdateCommands();
+            }
         }
 
         private string _fullName = string.Empty;
@@ -40,22 +56,39 @@ namespace WPFApp.ViewModel.Employee
         public AsyncRelayCommand EditCommand { get; }
         public AsyncRelayCommand DeleteCommand { get; }
 
+        private readonly AsyncRelayCommand[] _idDependentCommands;
+
         public EmployeeProfileViewModel(EmployeeViewModel owner)
         {
             _owner = owner;
 
+            // Back/Cancel — одна логіка.
             BackCommand = new AsyncRelayCommand(() => _owner.CancelAsync());
-            CancelProfileCommand = new AsyncRelayCommand(() => _owner.CancelAsync());
-            EditCommand = new AsyncRelayCommand(() => _owner.EditSelectedAsync());
-            DeleteCommand = new AsyncRelayCommand(() => _owner.DeleteSelectedAsync());
+            CancelProfileCommand = BackCommand;
+
+            // Edit/Delete — доступні лише якщо профіль завантажено (Id>0).
+            EditCommand = new AsyncRelayCommand(() => _owner.EditSelectedAsync(), () => EmployeeId > 0);
+            DeleteCommand = new AsyncRelayCommand(() => _owner.DeleteSelectedAsync(), () => EmployeeId > 0);
+
+            _idDependentCommands = new[] { EditCommand, DeleteCommand };
         }
 
         public void SetProfile(EmployeeModel model)
         {
+            // 1) Синхронізуємо selection у owner’і (важливо для owner-методів).
+            _owner.ListVm.SelectedItem = model;
+
+            // 2) Заповнюємо поля.
             EmployeeId = model.Id;
-            FullName = $"{model.FirstName} {model.LastName}".Trim();
-            Email = string.IsNullOrWhiteSpace(model.Email) ? "—" : model.Email;
-            Phone = string.IsNullOrWhiteSpace(model.Phone) ? "—" : model.Phone;
+            FullName = EmployeeDisplayHelper.GetFullName(model);
+            Email = EmployeeDisplayHelper.TextOrDash(model.Email);
+            Phone = EmployeeDisplayHelper.TextOrDash(model.Phone);
+        }
+
+        private void UpdateCommands()
+        {
+            for (int i = 0; i < _idDependentCommands.Length; i++)
+                _idDependentCommands[i].RaiseCanExecuteChanged();
         }
     }
 }

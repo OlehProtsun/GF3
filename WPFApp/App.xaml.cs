@@ -12,6 +12,7 @@ using WPFApp.View.Shop;
 using WPFApp.ViewModel.Availability.Main;
 using WPFApp.ViewModel.Container.Edit;
 using WPFApp.ViewModel.Employee;
+using WPFApp.ViewModel.Main;
 using WPFApp.ViewModel.Shop;
 
 namespace WPFApp
@@ -49,7 +50,7 @@ namespace WPFApp
                                   BusinessLogicLayer.Generators.ScheduleGenerator>();
 
             // 2) Реєстрація ViewModels
-            services.AddSingleton<WPFApp.ViewModel.MainViewModel>();
+            services.AddSingleton<MainViewModel>();
             services.AddTransient<EmployeeViewModel>();
             services.AddTransient<AvailabilityViewModel>();
             services.AddTransient<ShopViewModel>();

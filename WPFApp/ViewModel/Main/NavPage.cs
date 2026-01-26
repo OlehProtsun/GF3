@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Text;
 
-namespace WPFApp.ViewModel
+namespace WPFApp.ViewModel.Main
 {
     public enum NavPage
     {

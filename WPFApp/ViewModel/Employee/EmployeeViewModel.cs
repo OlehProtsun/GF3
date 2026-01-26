@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -6,8 +6,10 @@ using System.Threading.Tasks;
 using BusinessLogicLayer.Services.Abstractions;
 using DataAccessLayer.Models;
 using WPFApp.Infrastructure;
+using WPFApp.Infrastructure.Validation;
 using WPFApp.Service;
 using WPFApp.ViewModel.Dialogs;
+using WPFApp.ViewModel.Employee.Helpers;
 
 namespace WPFApp.ViewModel.Employee
 {
@@ -18,12 +20,40 @@ namespace WPFApp.ViewModel.Employee
         Profile
     }
 
+    /// <summary>
+    /// EmployeeViewModel — owner/coordinator модуля Employee.
+    ///
+    /// Відповідальність:
+    /// - тримати 3 під-VM (List/Edit/Profile)
+    /// - керувати навігацією (CurrentSection + Mode + CancelTarget)
+    /// - виконувати CRUD через IEmployeeService
+    /// - показувати повідомлення користувачу
+    ///
+    /// Покращення порівняно з початковим варіантом:
+    /// 1) EnsureInitializedAsync:
+    ///    - не виставляємо _initialized=true ДО успішного завершення
+    ///    - конкурентні виклики чекають один task (без дублювання Load)
+    /// 2) Валідація: використовуємо EmployeeValidationRules (без залежності від EditVM.Regex).
+    /// 3) Менше дублювання форматування імен: EmployeeDisplayHelper.
+    /// </summary>
     public sealed class EmployeeViewModel : ViewModelBase
     {
         private readonly IEmployeeService _employeeService;
 
+        // ----------------------------
+        // Initialization (safe)
+        // ----------------------------
+
         private bool _initialized;
+        private Task? _initializeTask;
+        private readonly object _initLock = new();
+
+        // Пам’ятаємо id відкритого профілю (щоб після Save повернутись і refreshнути).
         private int? _openedProfileEmployeeId;
+
+        // ----------------------------
+        // Navigation state
+        // ----------------------------
 
         private object _currentSection = null!;
         public object CurrentSection
@@ -41,6 +71,10 @@ namespace WPFApp.ViewModel.Employee
 
         public EmployeeSection CancelTarget { get; private set; } = EmployeeSection.List;
 
+        // ----------------------------
+        // Child VMs
+        // ----------------------------
+
         public EmployeeListViewModel ListVm { get; }
         public EmployeeEditViewModel EditVm { get; }
         public EmployeeProfileViewModel ProfileVm { get; }
@@ -56,17 +90,65 @@ namespace WPFApp.ViewModel.Employee
             CurrentSection = ListVm;
         }
 
-        public async Task EnsureInitializedAsync(CancellationToken ct = default)
-        {
-            if (_initialized) return;
+        // =========================================================
+        // Initialization
+        // =========================================================
 
-            _initialized = true;
-            await LoadEmployeesAsync(ct);
+        public Task EnsureInitializedAsync(CancellationToken ct = default)
+        {
+            // 1) Якщо вже ініціалізовано — ок.
+            if (_initialized)
+                return Task.CompletedTask;
+
+            // 2) Якщо task вже існує — повертаємо його (усі чекатимуть одне).
+            if (_initializeTask != null)
+                return _initializeTask;
+
+            // 3) Під lock створюємо init-task один раз.
+            lock (_initLock)
+            {
+                if (_initialized)
+                    return Task.CompletedTask;
+
+                if (_initializeTask != null)
+                    return _initializeTask;
+
+                _initializeTask = InitializeCoreAsync(ct);
+                return _initializeTask;
+            }
         }
+
+        private async Task InitializeCoreAsync(CancellationToken ct)
+        {
+            try
+            {
+                // 1) Завантажуємо список працівників.
+                await LoadEmployeesAsync(ct, selectId: null);
+
+                // 2) Фіксуємо успішну ініціалізацію.
+                _initialized = true;
+            }
+            catch
+            {
+                // Якщо впали — дозволяємо повторити init.
+                lock (_initLock)
+                {
+                    _initializeTask = null;
+                    _initialized = false;
+                }
+
+                throw;
+            }
+        }
+
+        // =========================================================
+        // List flows
+        // =========================================================
 
         internal async Task SearchAsync(CancellationToken ct = default)
         {
             var term = ListVm.SearchText;
+
             var list = string.IsNullOrWhiteSpace(term)
                 ? await _employeeService.GetAllAsync(ct)
                 : await _employeeService.GetByValueAsync(term, ct);
@@ -84,12 +166,15 @@ namespace WPFApp.ViewModel.Employee
         internal async Task EditSelectedAsync(CancellationToken ct = default)
         {
             var selected = ListVm.SelectedItem;
-            if (selected is null) return;
+            if (selected is null)
+                return;
 
+            // Беремо “latest” з сервісу, щоб редагувати актуальні дані.
             var latest = await _employeeService.GetAsync(selected.Id, ct) ?? selected;
 
             EditVm.SetEmployee(latest);
 
+            // Якщо зайшли з Profile — Cancel має повернути в Profile.
             CancelTarget = Mode == EmployeeSection.Profile
                 ? EmployeeSection.Profile
                 : EmployeeSection.List;
@@ -97,12 +182,22 @@ namespace WPFApp.ViewModel.Employee
             await SwitchToEditAsync();
         }
 
+        // =========================================================
+        // Save/Delete/Profile flows
+        // =========================================================
+
         internal async Task SaveAsync(CancellationToken ct = default)
         {
+            // 1) Перед Save чистимо старі помилки.
             EditVm.ClearValidationErrors();
 
+            // 2) Формуємо модель з VM.
             var model = EditVm.ToModel();
-            var errors = Validate(model);
+
+            // 3) Валідація через rules.
+            var errors = EmployeeValidationRules.ValidateAll(model);
+
+            // 4) Якщо є помилки — показуємо їх у формі і виходимо.
             if (errors.Count > 0)
             {
                 EditVm.SetValidationErrors(errors);
@@ -111,6 +206,7 @@ namespace WPFApp.ViewModel.Employee
 
             try
             {
+                // 5) Update або Create.
                 if (EditVm.IsEdit)
                 {
                     await _employeeService.UpdateAsync(model, ct);
@@ -118,7 +214,10 @@ namespace WPFApp.ViewModel.Employee
                 else
                 {
                     var created = await _employeeService.CreateAsync(model, ct);
+
+                    // Після create оновлюємо id у формі (на випадок, якщо UI ще показується).
                     EditVm.EmployeeId = created.Id;
+
                     model = created;
                 }
             }
@@ -132,11 +231,14 @@ namespace WPFApp.ViewModel.Employee
                 ? "Employee updated successfully."
                 : "Employee added successfully.");
 
+            // 6) Reload list + selection.
             await LoadEmployeesAsync(ct, selectId: model.Id);
 
+            // 7) Повернення туди, звідки зайшли.
             if (CancelTarget == EmployeeSection.Profile)
             {
                 var profileId = _openedProfileEmployeeId ?? model.Id;
+
                 if (profileId > 0)
                 {
                     var latest = await _employeeService.GetAsync(profileId, ct) ?? model;
@@ -154,18 +256,18 @@ namespace WPFApp.ViewModel.Employee
 
         internal async Task DeleteSelectedAsync(CancellationToken ct = default)
         {
+            // 1) Визначаємо “поточний id” залежно від режиму (Profile або List).
             var currentId = GetCurrentEmployeeId();
-            if (currentId <= 0) return;
+            if (currentId <= 0)
+                return;
 
-            var currentName = Mode == EmployeeSection.Profile
-                ? ProfileVm.FullName
-                : ListVm.SelectedItem is null
-                    ? string.Empty
-                    : $"{ListVm.SelectedItem.FirstName} {ListVm.SelectedItem.LastName}".Trim();
+            // 2) Формуємо “поточне ім’я” для confirm.
+            var currentName = GetCurrentEmployeeName();
 
+            // 3) Confirm.
             if (!Confirm(string.IsNullOrWhiteSpace(currentName)
-                    ? "Delete employee?"
-                    : $"Delete {currentName}?"))
+                ? "Delete employee?"
+                : $"Delete {currentName}?"))
             {
                 return;
             }
@@ -189,12 +291,16 @@ namespace WPFApp.ViewModel.Employee
         internal async Task OpenProfileAsync(CancellationToken ct = default)
         {
             var selected = ListVm.SelectedItem;
-            if (selected is null) return;
+            if (selected is null)
+                return;
 
             var latest = await _employeeService.GetAsync(selected.Id, ct) ?? selected;
 
             _openedProfileEmployeeId = latest.Id;
+
             ProfileVm.SetProfile(latest);
+
+            // Важливо: синхронізуємо selection у списку, щоб owner-дії працювали стабільно.
             ListVm.SelectedItem = latest;
 
             CancelTarget = EmployeeSection.List;
@@ -203,22 +309,33 @@ namespace WPFApp.ViewModel.Employee
 
         internal Task CancelAsync()
         {
+            // 1) При Cancel очищаємо помилки форми (щоб не “прилипали”).
             EditVm.ClearValidationErrors();
 
+            // 2) Навігація залежить від Mode і CancelTarget.
             return Mode switch
             {
                 EmployeeSection.Edit => CancelTarget == EmployeeSection.Profile
                     ? SwitchToProfileAsync()
                     : SwitchToListAsync(),
+
                 _ => SwitchToListAsync()
             };
         }
 
-        private async Task LoadEmployeesAsync(CancellationToken ct, int? selectId = null)
+        // =========================================================
+        // Load + navigation helpers
+        // =========================================================
+
+        private async Task LoadEmployeesAsync(CancellationToken ct, int? selectId)
         {
+            // 1) Беремо список.
             var list = await _employeeService.GetAllAsync(ct);
+
+            // 2) Заповнюємо ListVm.
             ListVm.SetItems(list);
 
+            // 3) Якщо треба — виставляємо selection по Id.
             if (selectId.HasValue)
                 ListVm.SelectedItem = list.FirstOrDefault(e => e.Id == selectId.Value);
         }
@@ -252,24 +369,19 @@ namespace WPFApp.ViewModel.Employee
             return ListVm.SelectedItem?.Id ?? 0;
         }
 
-        private static Dictionary<string, string> Validate(EmployeeModel model)
+        private string GetCurrentEmployeeName()
         {
-            var map = new Dictionary<string, string>(capacity: 4);
+            // У профілі вже є “готовий” FullName.
+            if (Mode == EmployeeSection.Profile)
+                return ProfileVm.FullName;
 
-            if (string.IsNullOrWhiteSpace(model.FirstName))
-                map[nameof(model.FirstName)] = "First name is required.";
-
-            if (string.IsNullOrWhiteSpace(model.LastName))
-                map[nameof(model.LastName)] = "Last name is required.";
-
-            if (!string.IsNullOrWhiteSpace(model.Email) && !EmployeeEditViewModel.EmailRegex.IsMatch(model.Email))
-                map[nameof(model.Email)] = "Invalid email format.";
-
-            if (!string.IsNullOrWhiteSpace(model.Phone) && !EmployeeEditViewModel.PhoneRegex.IsMatch(model.Phone))
-                map[nameof(model.Phone)] = "Invalid phone number.";
-
-            return map;
+            // У списку — беремо з SelectedItem.
+            return EmployeeDisplayHelper.GetFullName(ListVm.SelectedItem);
         }
+
+        // =========================================================
+        // UI messaging (залишив твою схему)
+        // =========================================================
 
         internal void ShowInfo(string text)
             => CustomMessageBox.Show("Info", text, CustomMessageBoxIcon.Info, okText: "OK");
