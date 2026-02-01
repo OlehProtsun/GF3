@@ -28,6 +28,8 @@ namespace WPFApp.ViewModel.Container.ScheduleProfile
     /// 5) “Excel-like Summary” таблицю знизу:
     ///    - Динамічні заголовки днів (Monday(01.01.2026), ...)
     ///    - По рядках: Employee | Sum | (From/To/Hours по кожному дню)
+    /// 6) ДОДАНО: Mini-table “Employee | Work Day | Free Day” під summary:
+    ///    - EmployeeWorkFreeStats: рахується з SummaryRows (кількість робочих/вільних днів).
     ///
     /// Важливо по потоках:
     /// - Будь-які зміни ObservableCollection / властивостей, що біндяться в UI, робимо ТІЛЬКИ на UI-thread.
@@ -46,6 +48,12 @@ namespace WPFApp.ViewModel.Container.ScheduleProfile
         /// </summary>
         private static readonly Regex TimeRegex =
             new(@"\b([01]?\d|2[0-3]):[0-5]\d\b", RegexOptions.Compiled | RegexOptions.CultureInvariant);
+
+        /// <summary>
+        /// Для розбору hours з summary (строки типу: "0", "6", "6h 30m", "12h 0m").
+        /// </summary>
+        private static readonly Regex SummaryHoursRegex =
+            new(@"^\s*(?:(\d+)\s*h)?\s*(?:(\d+)\s*m)?\s*$", RegexOptions.Compiled | RegexOptions.CultureInvariant | RegexOptions.IgnoreCase);
 
         // =========================================================
         // 1) ЗАЛЕЖНОСТІ (OWNER) ТА ВНУТРІШНІ СТРУКТУРИ
@@ -238,6 +246,34 @@ namespace WPFApp.ViewModel.Container.ScheduleProfile
         public ObservableCollection<SummaryEmployeeRow> SummaryRows { get; } = new();
 
         // =========================================================
+        // 5.1) ДОДАНО: MINI TABLE Employee | Work Day | Free Day
+        // =========================================================
+
+        /// <summary>
+        /// Один рядок для mini-table під summary:
+        /// Employee | WorkDays | FreeDays.
+        /// </summary>
+        public sealed class EmployeeWorkFreeStatRow
+        {
+            public string Employee { get; }
+            public int WorkDays { get; }
+            public int FreeDays { get; }
+
+            public EmployeeWorkFreeStatRow(string employee, int workDays, int freeDays)
+            {
+                Employee = employee ?? string.Empty;
+                WorkDays = workDays;
+                FreeDays = freeDays;
+            }
+        }
+
+        /// <summary>
+        /// Колекція для рендеру mini-table в XAML.
+        /// Оновлюється після побудови SummaryRows.
+        /// </summary>
+        public ObservableCollection<EmployeeWorkFreeStatRow> EmployeeWorkFreeStats { get; } = new();
+
+        // =========================================================
         // 6) КОМАНДИ (навігація/дії)
         // =========================================================
 
@@ -277,6 +313,7 @@ namespace WPFApp.ViewModel.Container.ScheduleProfile
         ///    - сформувати per-employee tooltip тексти,
         ///    - сформувати summary (headers + rows) з матриці.
         /// 4) На UI-thread застосувати всі результати разом.
+        /// 5) ДОДАНО: на UI-thread після SummaryRows — перебудувати EmployeeWorkFreeStats.
         /// </summary>
         public async Task SetProfileAsync(
             ScheduleModel schedule,
@@ -326,6 +363,9 @@ namespace WPFApp.ViewModel.Container.ScheduleProfile
 
                 SummaryDayHeaders.Clear();
                 SummaryRows.Clear();
+
+                // ДОДАНО: очищаємо mini-table
+                EmployeeWorkFreeStats.Clear();
 
                 MatrixChanged?.Invoke(this, EventArgs.Empty);
             }).ConfigureAwait(false);
@@ -422,6 +462,9 @@ namespace WPFApp.ViewModel.Container.ScheduleProfile
                     foreach (var kv in built.PerEmployeeText)
                         _employeeTotalHoursText[kv.Key] = kv.Value;
 
+                    // 5.6) ДОДАНО: mini-table Work/Free days
+                    RebuildEmployeeWorkFreeStats();
+
                     MatrixChanged?.Invoke(this, EventArgs.Empty);
                 }).ConfigureAwait(false);
             }
@@ -442,7 +485,106 @@ namespace WPFApp.ViewModel.Container.ScheduleProfile
         }
 
         // =========================================================
-        // 8) TOOLTIP TOTAL HOURS ПО КОЛОНЦІ ПРАЦІВНИКА
+        // 8) ДОДАНО: ОБЧИСЛЕННЯ WORK/FREE DAYS З SummaryRows
+        // =========================================================
+
+        /// <summary>
+        /// Перебудувати EmployeeWorkFreeStats на основі SummaryRows.
+        ///
+        /// Rules:
+        /// - Робочий день = якщо в SummaryDayCell є годинник/часи (Hours > 0) або заповнений From/To.
+        /// - FreeDays = TotalDays - WorkDays (мінімум 0).
+        ///
+        /// Викликаємо ТІЛЬКИ на UI-thread.
+        /// </summary>
+        private void RebuildEmployeeWorkFreeStats()
+        {
+            EmployeeWorkFreeStats.Clear();
+
+            if (SummaryRows.Count == 0 || TotalDays <= 0)
+                return;
+
+            foreach (var row in SummaryRows)
+            {
+                int workDays = 0;
+
+                // Days — ObservableCollection<SummaryDayCell>
+                if (row.Days != null)
+                {
+                    foreach (var d in row.Days)
+                    {
+                        // 1) Якщо є часи From/To — вже вважаємо день робочим
+                        if (!string.IsNullOrWhiteSpace(d.From) || !string.IsNullOrWhiteSpace(d.To))
+                        {
+                            workDays++;
+                            continue;
+                        }
+
+                        // 2) Інакше пробуємо розпарсити Hours ("0", "6", "6h 30m")
+                        if (TryParseSummaryHoursToMinutes(d.Hours, out var minutes) && minutes > 0)
+                        {
+                            workDays++;
+                            continue;
+                        }
+
+                        // 3) Інакше — не робочий
+                    }
+                }
+
+                int freeDays = Math.Max(0, TotalDays - workDays);
+
+                EmployeeWorkFreeStats.Add(new EmployeeWorkFreeStatRow(
+                    employee: row.Employee,
+                    workDays: workDays,
+                    freeDays: freeDays));
+            }
+        }
+
+        /// <summary>
+        /// Парсить summary Hours в хвилини.
+        /// Підтримка:
+        /// - "0"
+        /// - "6"  (години)
+        /// - "6h 30m"
+        /// - "12h"
+        /// - "30m"
+        /// </summary>
+        private static bool TryParseSummaryHoursToMinutes(string? text, out int minutes)
+        {
+            minutes = 0;
+
+            if (string.IsNullOrWhiteSpace(text))
+                return false;
+
+            var s = text.Trim();
+
+            // найчастіший формат у тебе: "0" або "6"
+            if (int.TryParse(s, NumberStyles.Integer, CultureInfo.InvariantCulture, out var hoursOnly))
+            {
+                minutes = Math.Max(0, hoursOnly) * 60;
+                return true;
+            }
+
+            // формат "6h 30m"
+            var m = SummaryHoursRegex.Match(s);
+            if (!m.Success)
+                return false;
+
+            int h = 0;
+            int mm = 0;
+
+            if (m.Groups[1].Success)
+                int.TryParse(m.Groups[1].Value, NumberStyles.Integer, CultureInfo.InvariantCulture, out h);
+
+            if (m.Groups[2].Success)
+                int.TryParse(m.Groups[2].Value, NumberStyles.Integer, CultureInfo.InvariantCulture, out mm);
+
+            minutes = Math.Max(0, h) * 60 + Math.Max(0, mm);
+            return true;
+        }
+
+        // =========================================================
+        // 9) TOOLTIP TOTAL HOURS ПО КОЛОНЦІ ПРАЦІВНИКА
         // =========================================================
 
         public string GetEmployeeTotalHoursText(string columnName)
@@ -459,7 +601,7 @@ namespace WPFApp.ViewModel.Container.ScheduleProfile
         }
 
         // =========================================================
-        // 9) IScheduleMatrixStyleProvider
+        // 10) IScheduleMatrixStyleProvider
         // =========================================================
 
         private static bool IsTechnicalMatrixColumn(string columnName)
@@ -534,7 +676,7 @@ namespace WPFApp.ViewModel.Container.ScheduleProfile
             => _cellStyleStore.TryGetStyle(cellRef, out style);
 
         // =========================================================
-        // 10) ВНУТРІШНІ HELPERS: стиль/brush кеш
+        // 11) ВНУТРІШНІ HELPERS: стиль/brush кеш
         // =========================================================
 
         private void RebuildStyleMaps(Dictionary<string, int> colMap, IList<ScheduleCellStyleModel> cellStyles)
@@ -565,7 +707,7 @@ namespace WPFApp.ViewModel.Container.ScheduleProfile
         }
 
         // =========================================================
-        // 11) SCHEDULE-INFO HELPERS (Month days, shifts, address)
+        // 12) SCHEDULE-INFO HELPERS (Month days, shifts, address)
         // =========================================================
 
         private static int SafeDaysInMonth(int year, int month)
@@ -648,7 +790,7 @@ namespace WPFApp.ViewModel.Container.ScheduleProfile
         }
 
         // =========================================================
-        // 12) SUMMARY MODELS + BUILDER
+        // 13) SUMMARY MODELS + BUILDER
         // =========================================================
 
         /// <summary>
@@ -920,10 +1062,10 @@ namespace WPFApp.ViewModel.Container.ScheduleProfile
             return null;
         }
 
-        /// <summary>
-        /// Дістаємо ім’я працівника максимально “толерантно” до різних моделей.
-        /// (Якщо в майбутньому модель зміниться — UI не впаде.)
-        /// </summary>
+            /// <summary>
+            /// Дістаємо ім’я працівника максимально “толерантно” до різних моделей.
+            /// (Якщо в майбутньому модель зміниться — UI не впаде.)
+            /// </summary>
         private static string GetEmployeeDisplayName(ScheduleEmployeeModel emp)
         {
             if (emp is null)

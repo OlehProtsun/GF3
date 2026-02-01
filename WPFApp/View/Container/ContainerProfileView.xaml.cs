@@ -1,64 +1,120 @@
-﻿using System.Windows;
+﻿using System;
+using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Data;
 using System.Windows.Input;
 using System.Windows.Media;
-using WPFApp.ViewModel.Container.List;
+using System.Windows.Threading;
 using WPFApp.ViewModel.Container.Profile;
 using WPFApp.ViewModel.Container.ScheduleList;
+using WPFApp.ViewModel.Container.List;
 
 namespace WPFApp.View.Container
 {
-    /// <summary>
-    /// Interaction logic for ContainerProfileView.xaml
-    /// </summary>
     public partial class ContainerProfileView : UserControl
     {
+        private ContainerProfileViewModel? _vm;
+        private bool _rebuildQueued;
+
         public ContainerProfileView()
         {
             InitializeComponent();
-            dataGridSchedules.MouseDoubleClick += DataGridSchedules_MouseDoubleClick;
+
+            DataContextChanged += (_, __) => AttachVm(DataContext as ContainerProfileViewModel);
+            Loaded += (_, __) => AttachVm(DataContext as ContainerProfileViewModel);
+            Unloaded += (_, __) => DetachVm();
         }
 
-        private void Row_MouseDoubleClick(object sender, MouseButtonEventArgs e)
+        private void AttachVm(ContainerProfileViewModel? vm)
         {
-            if (DataContext is not ContainerProfileViewModel rootVm) return;
+            if (_vm != null)
+                _vm.StatisticsChanged -= VmOnStatisticsChanged;
 
-            // MultiOpen = ON: подвійний клік нічого не робить
-            if (rootVm.ScheduleListVm.IsMultiOpenEnabled)
+            _vm = vm;
+
+            if (_vm != null)
             {
-                e.Handled = true;
-                return;
-            }
+                _vm.StatisticsChanged += VmOnStatisticsChanged;
 
-            // якщо подвійний клік по чекбоксу — ігноруємо
-            if (FindAncestor<CheckBox>((DependencyObject)e.OriginalSource) != null)
-                return;
-
-            if (sender is DataGridRow row)
-            {
-                // гарантуємо, що відкриваємо саме той рядок
-                dataGridSchedules.SelectedItem = row.DataContext;
-
-                if (rootVm.ScheduleListVm.OpenProfileCommand.CanExecute(null))
-                    rootVm.ScheduleListVm.OpenProfileCommand.Execute(null);
-
-                e.Handled = true;
+                // одразу побудувати колонки (якщо дані вже є)
+                QueueRebuildStatsColumns();
             }
         }
 
+        private void DetachVm()
+        {
+            if (_vm == null) return;
 
+            _vm.StatisticsChanged -= VmOnStatisticsChanged;
+            _vm.CancelBackgroundWork();
+            _vm = null;
+        }
+
+        private void VmOnStatisticsChanged(object? sender, EventArgs e) => QueueRebuildStatsColumns();
+
+        private void QueueRebuildStatsColumns()
+        {
+            if (_rebuildQueued) return;
+            _rebuildQueued = true;
+
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                _rebuildQueued = false;
+                RebuildEmployeeShopHoursColumns();
+            }), DispatcherPriority.Background);
+        }
+
+        private void RebuildEmployeeShopHoursColumns()
+        {
+            if (_vm == null || dataGridContainerEmployeeShopHours == null)
+                return;
+
+            dataGridContainerEmployeeShopHours.Columns.Clear();
+
+            // Employee
+            dataGridContainerEmployeeShopHours.Columns.Add(new DataGridTextColumn
+            {
+                Header = "Employee",
+                Binding = new Binding(nameof(ContainerProfileViewModel.EmployeeShopHoursRow.Employee)),
+                Width = new DataGridLength(240)
+            });
+
+            // HoursSum
+            dataGridContainerEmployeeShopHours.Columns.Add(new DataGridTextColumn
+            {
+                Header = "HoursSum",
+                Binding = new Binding(nameof(ContainerProfileViewModel.EmployeeShopHoursRow.HoursSum)),
+                Width = new DataGridLength(90)
+            });
+
+            // Dynamic shop columns
+            foreach (var shop in _vm.ShopHeaders)
+            {
+                var b = new Binding($"{nameof(ContainerProfileViewModel.EmployeeShopHoursRow.HoursByShop)}[{shop.Key}]")
+                {
+                    Mode = BindingMode.OneWay
+                };
+
+                dataGridContainerEmployeeShopHours.Columns.Add(new DataGridTextColumn
+                {
+                    Header = shop.Name,
+                    Binding = b,
+                    Width = new DataGridLength(90)
+                });
+            }
+        }
+
+        // ====== твої існуючі handlers (залишаю як були) ======
         private void DataGridSchedules_MouseDoubleClick(object sender, MouseButtonEventArgs e)
         {
             if (DataContext is not ContainerProfileViewModel vm) return;
 
-            // MultiOpen ON: double click нічого не робить
             if (vm.ScheduleListVm.IsMultiOpenEnabled)
             {
                 e.Handled = true;
                 return;
             }
 
-            // Відкривати ТІЛЬКИ якщо double-click реально по рядку
             var row = FindAncestor<DataGridRow>((DependencyObject)e.OriginalSource);
             if (row == null) return;
 
@@ -70,21 +126,16 @@ namespace WPFApp.View.Container
             e.Handled = true;
         }
 
-
-
         private void RowHitArea_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
             if (dataGridSchedules?.DataContext is not ContainerScheduleListViewModel vm) return;
 
-            // OFF: нічого не робимо, хай відпрацює MouseLeftButtonDown (швидке виділення)
             if (!vm.IsMultiOpenEnabled)
                 return;
 
-            // ON: кліком по CheckBox не керуємо
             if (FindAncestor<CheckBox>((DependencyObject)e.OriginalSource) != null)
                 return;
 
-            // Знаходимо рядок як в Employee
             var dep = (DependencyObject)sender;
             while (dep != null && dep is not DataGridRow)
                 dep = VisualTreeHelper.GetParent(dep);
@@ -102,11 +153,9 @@ namespace WPFApp.View.Container
         {
             if (dataGridSchedules?.DataContext is not ContainerScheduleListViewModel vm) return;
 
-            // ON: Preview вже обробив
             if (vm.IsMultiOpenEnabled)
                 return;
 
-            // швидко як в Employee: просто selected + focus
             var dep = (DependencyObject)sender;
             while (dep != null && dep is not DataGridRow)
                 dep = VisualTreeHelper.GetParent(dep);
@@ -119,8 +168,6 @@ namespace WPFApp.View.Container
             }
         }
 
-
-
         private static T? FindAncestor<T>(DependencyObject current) where T : DependencyObject
         {
             while (current != null)
@@ -131,14 +178,12 @@ namespace WPFApp.View.Container
             return null;
         }
 
-
         private void DataGridSchedules_PreviewMouseDoubleClick(object sender, MouseButtonEventArgs e)
         {
             if (dataGridSchedules?.DataContext is ContainerScheduleListViewModel vm && vm.IsMultiOpenEnabled)
             {
-                e.Handled = true; // В MULTIOPEN подвійний клік НІЧОГО не робить
+                e.Handled = true;
             }
         }
-
     }
 }
