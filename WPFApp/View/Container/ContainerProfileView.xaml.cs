@@ -75,7 +75,10 @@ namespace WPFApp.View.Container
             dataGridContainerEmployeeShopHours.Columns.Add(new DataGridTextColumn
             {
                 Header = "Employee",
-                Binding = new Binding(nameof(ContainerProfileViewModel.EmployeeShopHoursRow.Employee)),
+                Binding = new Binding(nameof(ContainerProfileViewModel.EmployeeShopHoursRow.Employee))
+                {
+                    Mode = BindingMode.OneWay
+                },
                 Width = new DataGridLength(240)
             });
 
@@ -83,7 +86,10 @@ namespace WPFApp.View.Container
             dataGridContainerEmployeeShopHours.Columns.Add(new DataGridTextColumn
             {
                 Header = "HoursSum",
-                Binding = new Binding(nameof(ContainerProfileViewModel.EmployeeShopHoursRow.HoursSum)),
+                Binding = new Binding(nameof(ContainerProfileViewModel.EmployeeShopHoursRow.HoursSum))
+                {
+                    Mode = BindingMode.OneWay
+                },
                 Width = new DataGridLength(90)
             });
 
