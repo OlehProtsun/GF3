@@ -496,10 +496,7 @@
                                 <!-- ===================== 2) SUMMARY TABLE (Frozen left + frozen headers + bottom H-scroll) ===================== -->
                                 <!-- ===================== 2) SUMMARY TABLE (Frozen left + frozen headers + bottom H-scroll) ===================== -->
                                 <Border Margin="0,16,0,0"
-        BorderBrush="Gainsboro"
-        BorderThickness="1"
-        Background="{StaticResource SurfaceBrush}"
-        SnapsToDevicePixels="True">
+        Style="{StaticResource StatisticGridCardBorderStyle}">
 
                                     <Grid SnapsToDevicePixels="True" UseLayoutRounding="True">
                                         <Grid.Resources>
