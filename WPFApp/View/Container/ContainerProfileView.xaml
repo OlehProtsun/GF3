@@ -7,7 +7,7 @@
              d:DataContext="{d:DesignInstance Type=design:ContainerProfileViewDesignVm, IsDesignTimeCreatable=True}"
 
              mc:Ignorable="d"
-             d:DesignHeight="830" d:DesignWidth="852"
+             d:DesignHeight="2000" d:DesignWidth="852"
              Background="{StaticResource PageBackgroundBrush}">
     <UserControl.Resources>
 
@@ -664,7 +664,8 @@
                                 </DataGrid>
                             </Border>
 
-                        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,12,0,0"/>                    </Grid>
+                        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,12,0,0"/>
+                    </Grid>
                 </Border>
 
                 <!-- ===================== BOTTOM: Container Statistic ===================== -->
@@ -695,118 +696,79 @@
                         <WrapPanel Margin="0,12,0,0" Orientation="Horizontal" HorizontalAlignment="Left">
 
                             <TextBlock Margin="0,0,18,6" TextWrapping="Wrap"
-                       FontFamily="{StaticResource DefaultFontFamily}">
-                <Run Text="Container name: " FontSize="12" Foreground="{StaticResource MutedTextBrush}"/>
-                <Run Text="{Binding Name, Mode=OneWay}" FontSize="14" Foreground="Black"/>
+               FontFamily="{StaticResource DefaultFontFamily}">
+        <Run Text="Container name: " FontSize="12" Foreground="{StaticResource MutedTextBrush}"/>
+        <Run Text="{Binding Name, Mode=OneWay}" FontSize="14" Foreground="Black"/>
                             </TextBlock>
 
                             <TextBlock Margin="0,0,18,6" TextWrapping="Wrap"
-                       FontFamily="{StaticResource DefaultFontFamily}">
-                <Run Text="Total hours: " FontSize="12" Foreground="{StaticResource MutedTextBrush}"/>
-                <Run Text="{Binding TotalHoursText, Mode=OneWay}" FontSize="14" Foreground="Black"/>
+               FontFamily="{StaticResource DefaultFontFamily}">
+        <Run Text="Total hours: " FontSize="12" Foreground="{StaticResource MutedTextBrush}"/>
+        <Run Text="{Binding TotalHoursText, Mode=OneWay}" FontSize="14" Foreground="Black"/>
                             </TextBlock>
 
-                            <TextBlock Margin="0,0,18,6" TextWrapping="Wrap"
-                       FontFamily="{StaticResource DefaultFontFamily}">
+                        </WrapPanel>
+
+                        <!-- EmployeeShopHours DataGrid: NOT inside TextBlock -->
                         <Border Style="{StaticResource CardStyle}"
-                Padding="12"
-                Margin="0,0,0,0"
-                SnapsToDevicePixels="True">
+        Padding="12"
+        Margin="0,10,0,0"
+        SnapsToDevicePixels="True">
                             <DataGrid x:Name="dataGridContainerEmployeeShopHours"
-                      ItemsSource="{Binding EmployeeShopHoursRows, Mode=OneWay}"
-                      Style="{StaticResource ContainerStatsGridStyle}"
-                      IsReadOnly="True"
-                      AutoGenerateColumns="False"
-                      CanUserAddRows="False"
-                      CanUserDeleteRows="False"
-                      HeadersVisibility="Column"
-                      RowHeaderWidth="0"
-                      FrozenColumnCount="2"
-                      Height="300"
-                      ScrollViewer.VerticalScrollBarVisibility="Auto"
-                      ScrollViewer.HorizontalScrollBarVisibility="Auto">
+              ItemsSource="{Binding EmployeeShopHoursRows}"
+              Style="{StaticResource ContainerStatsGridStyle}"
+              IsReadOnly="True"
+              AutoGenerateColumns="False"
+              FrozenColumnCount="2"
+              Height="300"
+              ScrollViewer.VerticalScrollBarVisibility="Auto"
+              ScrollViewer.HorizontalScrollBarVisibility="Auto">
                                 <DataGrid.Resources>
                                     <Style TargetType="{x:Type ScrollBar}"
-                           BasedOn="{StaticResource LeftRoundedScrollBarStyle}" />
+                   BasedOn="{StaticResource LeftRoundedScrollBarStyle}" />
                                 </DataGrid.Resources>
                             </DataGrid>
                         </Border>
+
+                        <!-- Mini table block -->
                         <Border Margin="0,16,0,0"
-                BorderBrush="Gainsboro"
-                BorderThickness="1"
-                Background="{StaticResource SurfaceBrush}"
-                SnapsToDevicePixels="True">
-                                    <Style x:Key="MiniCellBorder" TargetType="Border">
-                                        <Setter Property="BorderBrush" Value="Gainsboro"/>
-                                        <Setter Property="BorderThickness" Value="0,0,1,1"/>
-                                        <Setter Property="Background" Value="{StaticResource SurfaceBrush}"/>
-                                        <Setter Property="Height" Value="35"/>
-                                        <Setter Property="SnapsToDevicePixels" Value="True"/>
-                                    </Style>
+        BorderBrush="Gainsboro"
+        BorderThickness="1"
+        Background="{StaticResource SurfaceBrush}"
+        SnapsToDevicePixels="True">
 
-                                    <Style x:Key="MiniHeaderBorder" TargetType="Border" BasedOn="{StaticResource MiniCellBorder}">
-                                        <Setter Property="Height" Value="45"/>
-                                    </Style>
+                            <Border.Resources>
+                                <Style x:Key="MiniCellBorder2" TargetType="Border">
+                                    <Setter Property="BorderBrush" Value="Gainsboro"/>
+                                    <Setter Property="BorderThickness" Value="0,0,1,1"/>
+                                    <Setter Property="Background" Value="{StaticResource SurfaceBrush}"/>
+                                    <Setter Property="Height" Value="35"/>
+                                    <Setter Property="SnapsToDevicePixels" Value="True"/>
+                                </Style>
 
-                                    <Style x:Key="MiniHeaderText" TargetType="TextBlock">
-                                        <Setter Property="FontFamily" Value="{StaticResource DefaultFontFamily}"/>
-                                        <Setter Property="FontSize" Value="14"/>
-                                        <Setter Property="FontWeight" Value="SemiBold"/>
-                                        <Setter Property="Foreground" Value="Black"/>
-                                        <Setter Property="Margin" Value="6,0"/>
-                                    </Style>
+                                <Style x:Key="MiniHeaderBorder2" TargetType="Border" BasedOn="{StaticResource MiniCellBorder2}">
+                                    <Setter Property="Height" Value="45"/>
+                                </Style>
 
-                                    <Style x:Key="MiniBodyText" TargetType="TextBlock">
-                                        <Setter Property="FontFamily" Value="{StaticResource DefaultFontFamily}"/>
-                                        <Setter Property="FontSize" Value="16"/>
-                                        <Setter Property="Foreground" Value="Black"/>
-                                        <Setter Property="VerticalAlignment" Value="Center"/>
-                                </Grid.ColumnDefinitions>
+                                <Style x:Key="MiniHeaderText2" TargetType="TextBlock">
+                                    <Setter Property="FontFamily" Value="{StaticResource DefaultFontFamily}"/>
+                                    <Setter Property="FontSize" Value="14"/>
+                                    <Setter Property="FontWeight" Value="SemiBold"/>
+                                    <Setter Property="Foreground" Value="Black"/>
+                                    <Setter Property="Margin" Value="6,0"/>
+                                </Style>
 
-                                <!-- Header -->
-                                <Border Grid.Row="0" Grid.Column="0" Style="{StaticResource MiniHeaderBorder}">
-                                    <TextBlock Text="Employee" Style="{StaticResource MiniHeaderText}"/>
-                                </Border>
-                                <Border Grid.Row="0" Grid.Column="1" Style="{StaticResource MiniHeaderBorder}">
-                                    <TextBlock Text="Work Day" Style="{StaticResource MiniHeaderText}"/>
-                                </Border>
-                                <Border Grid.Row="0" Grid.Column="2" Style="{StaticResource MiniHeaderBorder}">
-                                    <TextBlock Text="Free Day" Style="{StaticResource MiniHeaderText}"/>
-                                </Border>
-                                                <Border Grid.Column="0" Style="{StaticResource MiniCellBorder}">
-                                                    <TextBlock Text="{Binding Employee, Mode=OneWay}"
-                                               Style="{StaticResource MiniBodyText}"
-                                               HorizontalAlignment="Left"
-                                               Margin="10,0,6,0"/>
-                                                </Border>
+                                <Style x:Key="MiniBodyText2" TargetType="TextBlock">
+                                    <Setter Property="FontFamily" Value="{StaticResource DefaultFontFamily}"/>
+                                    <Setter Property="FontSize" Value="16"/>
+                                    <Setter Property="Foreground" Value="Black"/>
+                                    <Setter Property="VerticalAlignment" Value="Center"/>
+                                    <Setter Property="TextWrapping" Value="NoWrap"/>
+                                    <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+                                </Style>
+                            </Border.Resources>
 
-                                                <Border Grid.Column="1" Style="{StaticResource MiniCellBorder}">
-                                                    <TextBlock Text="{Binding WorkDays, Mode=OneWay}"
-                                               Style="{StaticResource MiniBodyText}"
-                                               HorizontalAlignment="Center"/>
-                                                </Border>
-
-                                                <Border Grid.Column="2" Style="{StaticResource MiniCellBorder}">
-                                                    <TextBlock Text="{Binding FreeDays, Mode=OneWay}"
-                                               Style="{StaticResource MiniBodyText}"
-                                               HorizontalAlignment="Center"/>
-                                                </Border>
-                                        <Setter Property="TextAlignment" Value="Center"/>
-                                        <Setter Property="TextWrapping" Value="Wrap"/>
-                                        <Setter Property="Margin" Value="6,0"/>
-                                    </Style>
-
-                                    <Style x:Key="MiniBodyText2" TargetType="TextBlock">
-                                        <Setter Property="FontFamily" Value="{StaticResource DefaultFontFamily}"/>
-                                        <Setter Property="FontSize" Value="16"/>
-                                        <Setter Property="Foreground" Value="Black"/>
-                                        <Setter Property="VerticalAlignment" Value="Center"/>
-                                        <Setter Property="TextWrapping" Value="NoWrap"/>
-                                        <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
-                                    </Style>
-
-                                </Grid.Resources>
-
+                            <Grid>
                                 <Grid.RowDefinitions>
                                     <RowDefinition Height="Auto"/>
                                     <RowDefinition Height="Auto"/>
@@ -830,10 +792,8 @@
                                 </Border>
 
                                 <!-- Rows -->
-                                <ItemsControl Grid.Row="1"
-                              Grid.Column="0"
-                              Grid.ColumnSpan="3"
-                              ItemsSource="{Binding EmployeeWorkFreeStats, Mode=OneWay}">
+                                <ItemsControl Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="3"
+                      ItemsSource="{Binding EmployeeWorkFreeStats}">
                                     <ItemsControl.ItemTemplate>
                                         <DataTemplate>
                                             <Grid>
@@ -844,30 +804,27 @@
                                                 </Grid.ColumnDefinitions>
 
                                                 <Border Grid.Column="0" Style="{StaticResource MiniCellBorder2}">
-                                                    <TextBlock Text="{Binding Employee, Mode=OneWay}"
-                                               Style="{StaticResource MiniBodyText2}"
-                                               HorizontalAlignment="Left"
-                                               Margin="10,0,6,0"/>
+                                                    <TextBlock Text="{Binding Employee}" Style="{StaticResource MiniBodyText2}"
+                                       HorizontalAlignment="Left" Margin="10,0,6,0"/>
                                                 </Border>
 
                                                 <Border Grid.Column="1" Style="{StaticResource MiniCellBorder2}">
-                                                    <TextBlock Text="{Binding WorkDays, Mode=OneWay}"
-                                               Style="{StaticResource MiniBodyText2}"
-                                               HorizontalAlignment="Center"/>
+                                                    <TextBlock Text="{Binding WorkDays}" Style="{StaticResource MiniBodyText2}"
+                                       HorizontalAlignment="Center"/>
                                                 </Border>
 
                                                 <Border Grid.Column="2" Style="{StaticResource MiniCellBorder2}">
-                                                    <TextBlock Text="{Binding FreeDays, Mode=OneWay}"
-                                               Style="{StaticResource MiniBodyText2}"
-                                               HorizontalAlignment="Center"/>
+                                                    <TextBlock Text="{Binding FreeDays}" Style="{StaticResource MiniBodyText2}"
+                                       HorizontalAlignment="Center"/>
                                                 </Border>
                                             </Grid>
                                         </DataTemplate>
                                     </ItemsControl.ItemTemplate>
                                 </ItemsControl>
-
                             </Grid>
                         </Border>
+
+
 
                     </StackPanel>
                 </Border>
