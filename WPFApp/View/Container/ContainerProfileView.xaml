@@ -707,10 +707,38 @@
         <Run Text="{Binding TotalHoursText, Mode=OneWay}" FontSize="14" Foreground="Black"/>
                             </TextBlock>
 
+                            <TextBlock Margin="0,0,18,6" TextWrapping="Wrap"
+               FontFamily="{StaticResource DefaultFontFamily}">
+        <Run Text="Total employees: " FontSize="12" Foreground="{StaticResource MutedTextBrush}"/>
+        <Run Text="{Binding TotalEmployees, Mode=OneWay}" FontSize="14" Foreground="Black"/>
+                            </TextBlock>
+
+                            <TextBlock Margin="0,0,18,6" TextWrapping="Wrap"
+               FontFamily="{StaticResource DefaultFontFamily}">
+        <Run Text="Total shops: " FontSize="12" Foreground="{StaticResource MutedTextBrush}"/>
+        <Run Text="{Binding TotalShops, Mode=OneWay}" FontSize="14" Foreground="Black"/>
+                            </TextBlock>
+
                         </WrapPanel>
 
+                        <StackPanel Margin="0,6,0,0">
+                            <TextBlock TextWrapping="Wrap"
+               FontFamily="{StaticResource DefaultFontFamily}">
+        <Run Text="{Binding TotalEmployees, Mode=OneWay, StringFormat=Total employees ({0}): }"
+             FontSize="12" Foreground="{StaticResource MutedTextBrush}"/>
+        <Run Text="{Binding TotalEmployeesListText, Mode=OneWay}" FontSize="14" Foreground="Black"/>
+                            </TextBlock>
+
+                            <TextBlock Margin="0,6,0,0" TextWrapping="Wrap"
+               FontFamily="{StaticResource DefaultFontFamily}">
+        <Run Text="{Binding TotalShops, Mode=OneWay, StringFormat=Total shops ({0}): }"
+             FontSize="12" Foreground="{StaticResource MutedTextBrush}"/>
+        <Run Text="{Binding TotalShopsListText, Mode=OneWay}" FontSize="14" Foreground="Black"/>
+                            </TextBlock>
+                        </StackPanel>
+
                         <!-- EmployeeShopHours DataGrid: NOT inside TextBlock -->
-                        <Border Style="{StaticResource CardStyle}"
+                        <Border Style="{StaticResource StatisticGridCardBorderStyle}"
         Padding="12"
         Margin="0,10,0,0"
         SnapsToDevicePixels="True">
@@ -730,98 +758,25 @@
                             </DataGrid>
                         </Border>
 
-                        <!-- Mini table block -->
                         <Border Margin="0,16,0,0"
-        BorderBrush="Gainsboro"
-        BorderThickness="1"
-        Background="{StaticResource SurfaceBrush}"
-        SnapsToDevicePixels="True">
-
-                            <Border.Resources>
-                                <Style x:Key="MiniCellBorder2" TargetType="Border">
-                                    <Setter Property="BorderBrush" Value="Gainsboro"/>
-                                    <Setter Property="BorderThickness" Value="0,0,1,1"/>
-                                    <Setter Property="Background" Value="{StaticResource SurfaceBrush}"/>
-                                    <Setter Property="Height" Value="35"/>
-                                    <Setter Property="SnapsToDevicePixels" Value="True"/>
-                                </Style>
-
-                                <Style x:Key="MiniHeaderBorder2" TargetType="Border" BasedOn="{StaticResource MiniCellBorder2}">
-                                    <Setter Property="Height" Value="45"/>
-                                </Style>
-
-                                <Style x:Key="MiniHeaderText2" TargetType="TextBlock">
-                                    <Setter Property="FontFamily" Value="{StaticResource DefaultFontFamily}"/>
-                                    <Setter Property="FontSize" Value="14"/>
-                                    <Setter Property="FontWeight" Value="SemiBold"/>
-                                    <Setter Property="Foreground" Value="Black"/>
-                                    <Setter Property="Margin" Value="6,0"/>
-                                </Style>
-
-                                <Style x:Key="MiniBodyText2" TargetType="TextBlock">
-                                    <Setter Property="FontFamily" Value="{StaticResource DefaultFontFamily}"/>
-                                    <Setter Property="FontSize" Value="16"/>
-                                    <Setter Property="Foreground" Value="Black"/>
-                                    <Setter Property="VerticalAlignment" Value="Center"/>
-                                    <Setter Property="TextWrapping" Value="NoWrap"/>
-                                    <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
-                                </Style>
-                            </Border.Resources>
-
-                            <Grid>
-                                <Grid.RowDefinitions>
-                                    <RowDefinition Height="Auto"/>
-                                    <RowDefinition Height="Auto"/>
-                                </Grid.RowDefinitions>
-
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="240"/>
-                                    <ColumnDefinition Width="120"/>
-                                    <ColumnDefinition Width="120"/>
-                                </Grid.ColumnDefinitions>
-
-                                <!-- Header -->
-                                <Border Grid.Row="0" Grid.Column="0" Style="{StaticResource MiniHeaderBorder2}">
-                                    <TextBlock Text="Employee" Style="{StaticResource MiniHeaderText2}"/>
-                                </Border>
-                                <Border Grid.Row="0" Grid.Column="1" Style="{StaticResource MiniHeaderBorder2}">
-                                    <TextBlock Text="WorkDays" Style="{StaticResource MiniHeaderText2}"/>
-                                </Border>
-                                <Border Grid.Row="0" Grid.Column="2" Style="{StaticResource MiniHeaderBorder2}">
-                                    <TextBlock Text="FreeDays" Style="{StaticResource MiniHeaderText2}"/>
-                                </Border>
-
-                                <!-- Rows -->
-                                <ItemsControl Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="3"
-                      ItemsSource="{Binding EmployeeWorkFreeStats}">
-                                    <ItemsControl.ItemTemplate>
-                                        <DataTemplate>
-                                            <Grid>
-                                                <Grid.ColumnDefinitions>
-                                                    <ColumnDefinition Width="240"/>
-                                                    <ColumnDefinition Width="120"/>
-                                                    <ColumnDefinition Width="120"/>
-                                                </Grid.ColumnDefinitions>
-
-                                                <Border Grid.Column="0" Style="{StaticResource MiniCellBorder2}">
-                                                    <TextBlock Text="{Binding Employee}" Style="{StaticResource MiniBodyText2}"
-                                       HorizontalAlignment="Left" Margin="10,0,6,0"/>
-                                                </Border>
-
-                                                <Border Grid.Column="1" Style="{StaticResource MiniCellBorder2}">
-                                                    <TextBlock Text="{Binding WorkDays}" Style="{StaticResource MiniBodyText2}"
-                                       HorizontalAlignment="Center"/>
-                                                </Border>
-
-                                                <Border Grid.Column="2" Style="{StaticResource MiniCellBorder2}">
-                                                    <TextBlock Text="{Binding FreeDays}" Style="{StaticResource MiniBodyText2}"
-                                       HorizontalAlignment="Center"/>
-                                                </Border>
-                                            </Grid>
-                                        </DataTemplate>
-                                    </ItemsControl.ItemTemplate>
-                                </ItemsControl>
-                            </Grid>
+        Style="{StaticResource StatisticGridCardBorderStyle}">
+                            <DataGrid ItemsSource="{Binding EmployeeWorkFreeStats}"
+              Style="{StaticResource ContainerStatsGridStyle}"
+              IsReadOnly="True"
+              AutoGenerateColumns="False"
+              Height="320"
+              ScrollViewer.VerticalScrollBarVisibility="Auto"
+              ScrollViewer.HorizontalScrollBarVisibility="Auto">
+                                <DataGrid.Resources>
+                                    <Style TargetType="{x:Type ScrollBar}"
+                   BasedOn="{StaticResource LeftRoundedScrollBarStyle}" />
+                                </DataGrid.Resources>
+                                <DataGrid.Columns>
+                                    <DataGridTextColumn Header="Employee" Binding="{Binding Employee}" Width="*" />
+                                    <DataGridTextColumn Header="WorkDays" Binding="{Binding WorkDays}" Width="140" />
+                                    <DataGridTextColumn Header="FreeDays" Binding="{Binding FreeDays}" Width="140" />
+                                </DataGrid.Columns>
+                            </DataGrid>
                         </Border>
 
 

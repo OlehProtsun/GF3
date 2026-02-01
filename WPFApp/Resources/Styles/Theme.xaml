@@ -58,6 +58,15 @@
         </Setter>
     </Style>
 
+    <Style x:Key="StatisticGridCardBorderStyle" TargetType="Border" BasedOn="{StaticResource CardStyle}">
+        <Setter Property="Background" Value="{StaticResource SurfaceBrush}" />
+        <Setter Property="BorderBrush" Value="{StaticResource CardBorderBrush}" />
+        <Setter Property="BorderThickness" Value="2" />
+        <Setter Property="CornerRadius" Value="{StaticResource Cr20}" />
+        <Setter Property="Padding" Value="12" />
+        <Setter Property="SnapsToDevicePixels" Value="True" />
+    </Style>
+
     <Geometry x:Key="IconInfo">
         M12,2A10,10 0 1 0 22,12A10,10 0 0 0 12,2ZM11,10H13V18H11ZM11,6H13V8H11Z
     </Geometry>

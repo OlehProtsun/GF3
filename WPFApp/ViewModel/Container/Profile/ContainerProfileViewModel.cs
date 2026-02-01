@@ -73,6 +73,20 @@ namespace WPFApp.ViewModel.Container.Profile
             private set => SetProperty(ref _totalShops, value);
         }
 
+        private string _totalEmployeesListText = string.Empty;
+        public string TotalEmployeesListText
+        {
+            get => _totalEmployeesListText;
+            private set => SetProperty(ref _totalEmployeesListText, value);
+        }
+
+        private string _totalShopsListText = string.Empty;
+        public string TotalShopsListText
+        {
+            get => _totalShopsListText;
+            private set => SetProperty(ref _totalShopsListText, value);
+        }
+
         private string _totalHoursText = "0h 0m";
         public string TotalHoursText
         {
@@ -214,6 +228,8 @@ namespace WPFApp.ViewModel.Container.Profile
                 TotalEmployees = 0;
                 TotalShops = 0;
                 TotalHoursText = "0h 0m";
+                TotalEmployeesListText = string.Empty;
+                TotalShopsListText = string.Empty;
 
                 ShopHeaders.Clear();
                 EmployeeShopHoursRows.Clear();
@@ -381,10 +397,21 @@ namespace WPFApp.ViewModel.Container.Profile
                         wfRows.Add(new EmployeeWorkFreeStatRow(emp.Value, wd, fd));
                     }
 
+                    var employeeNames = empIdToName
+                        .OrderBy(kv => kv.Value, StringComparer.CurrentCultureIgnoreCase)
+                        .Select(kv => kv.Value)
+                        .ToList();
+
+                    var shopNames = shopHeaders
+                        .Select(h => h.Name)
+                        .ToList();
+
                     return new BuildStatsResult(
                         totalHoursText: FormatHoursMinutes(totalAll),
                         totalEmployees: empIdToName.Count,
                         totalShops: shopHeaders.Count,
+                        totalEmployeesListText: BuildPreviewList(employeeNames),
+                        totalShopsListText: BuildPreviewList(shopNames),
                         shopHeaders: shopHeaders,
                         pivotRows: pivotRows,
                         workFreeRows: wfRows
@@ -403,6 +430,8 @@ namespace WPFApp.ViewModel.Container.Profile
                     TotalHoursText = built.TotalHoursText;
                     TotalEmployees = built.TotalEmployees;
                     TotalShops = built.TotalShops;
+                    TotalEmployeesListText = built.TotalEmployeesListText;
+                    TotalShopsListText = built.TotalShopsListText;
 
                     ShopHeaders.Clear();
                     foreach (var h in built.ShopHeaders)
@@ -449,11 +478,14 @@ namespace WPFApp.ViewModel.Container.Profile
             public string TotalHoursText { get; }
             public int TotalEmployees { get; }
             public int TotalShops { get; }
+            public string TotalEmployeesListText { get; }
+            public string TotalShopsListText { get; }
             public List<ShopHeader> ShopHeaders { get; }
             public List<EmployeeShopHoursRow> PivotRows { get; }
             public List<EmployeeWorkFreeStatRow> WorkFreeRows { get; }
 
             public BuildStatsResult(string totalHoursText, int totalEmployees, int totalShops,
+                                    string totalEmployeesListText, string totalShopsListText,
                                     List<ShopHeader> shopHeaders,
                                     List<EmployeeShopHoursRow> pivotRows,
                                     List<EmployeeWorkFreeStatRow> workFreeRows)
@@ -461,6 +493,8 @@ namespace WPFApp.ViewModel.Container.Profile
                 TotalHoursText = totalHoursText;
                 TotalEmployees = totalEmployees;
                 TotalShops = totalShops;
+                TotalEmployeesListText = totalEmployeesListText;
+                TotalShopsListText = totalShopsListText;
                 ShopHeaders = shopHeaders;
                 PivotRows = pivotRows;
                 WorkFreeRows = workFreeRows;
@@ -608,6 +642,28 @@ namespace WPFApp.ViewModel.Container.Profile
             return m == 0
                 ? h.ToString(CultureInfo.InvariantCulture)
                 : $"{h}h {m}m";
+        }
+
+        private static string BuildPreviewList(IReadOnlyList<string> items, int previewCount = 8)
+        {
+            if (items == null || items.Count == 0)
+                return "—";
+
+            var trimmed = items
+                .Select(item => (item ?? string.Empty).Trim())
+                .Where(item => !string.IsNullOrWhiteSpace(item))
+                .ToList();
+
+            if (trimmed.Count == 0)
+                return "—";
+
+            var shown = trimmed.Take(previewCount).ToList();
+            var remaining = trimmed.Count - shown.Count;
+            var text = string.Join(", ", shown);
+
+            return remaining > 0
+                ? $"{text}, +{remaining} more"
+                : text;
         }
 
         // ===================== Shop helpers =====================
