@@ -225,6 +225,13 @@ namespace WPFApp.ViewModel.Container.ScheduleProfile
             private set => SetProperty(ref _totalHoursText, value);
         }
 
+        private string _totalEmployeesListText = string.Empty;
+        public string TotalEmployeesListText
+        {
+            get => _totalEmployeesListText;
+            private set => SetProperty(ref _totalEmployeesListText, value);
+        }
+
         /// <summary>
         /// Employees — працівники в цьому schedule (може біндитися в UI).
         /// </summary>
@@ -359,6 +366,7 @@ namespace WPFApp.ViewModel.Container.ScheduleProfile
                 ScheduleMatrix = new DataView();
                 TotalEmployees = 0;
                 TotalHoursText = "0h 0m";
+                TotalEmployeesListText = string.Empty;
                 _employeeTotalHoursText.Clear();
 
                 SummaryDayHeaders.Clear();
@@ -412,6 +420,14 @@ namespace WPFApp.ViewModel.Container.ScheduleProfile
 
                     var totalHoursText = ScheduleTotalsCalculator.FormatHoursMinutes(totals.TotalDuration);
 
+                    var employeeNames = employeesSnapshot
+                        .Select(GetEmployeeDisplayName)
+                        .Select(name => (name ?? string.Empty).Trim())
+                        .Where(name => !string.IsNullOrWhiteSpace(name))
+                        .Distinct(StringComparer.CurrentCultureIgnoreCase)
+                        .OrderBy(name => name, StringComparer.CurrentCultureIgnoreCase)
+                        .ToList();
+
                     // 4.4) Summary з матриці (ВАЖЛИВО: саме тут table/colMap вже існують)
                     var summary = BuildSummaryFromMatrix(table, colMap, employeesSnapshot, year, month);
 
@@ -421,6 +437,7 @@ namespace WPFApp.ViewModel.Container.ScheduleProfile
                         styles: stylesSnapshot,
                         totalEmployees: totals.TotalEmployees,
                         totalHoursText: totalHoursText,
+                        totalEmployeesListText: BuildPreviewList(employeeNames),
                         perEmployeeText: perEmployeeText,
                         summaryHeaders: summary.Headers,
                         summaryRows: summary.Rows);
@@ -456,6 +473,7 @@ namespace WPFApp.ViewModel.Container.ScheduleProfile
                     // 5.4) Totals
                     TotalEmployees = built.TotalEmployees;
                     TotalHoursText = built.TotalHoursText;
+                    TotalEmployeesListText = built.TotalEmployeesListText;
 
                     // 5.5) Tooltips
                     _employeeTotalHoursText.Clear();
@@ -1022,6 +1040,28 @@ namespace WPFApp.ViewModel.Container.ScheduleProfile
                 : $"{h}h {m}m";
         }
 
+        private static string BuildPreviewList(IReadOnlyList<string> items, int previewCount = 8)
+        {
+            if (items == null || items.Count == 0)
+                return "—";
+
+            var trimmed = items
+                .Select(item => (item ?? string.Empty).Trim())
+                .Where(item => !string.IsNullOrWhiteSpace(item))
+                .ToList();
+
+            if (trimmed.Count == 0)
+                return "—";
+
+            var shown = trimmed.Take(previewCount).ToList();
+            var remaining = trimmed.Count - shown.Count;
+            var text = string.Join(", ", shown);
+
+            return remaining > 0
+                ? $"{text}, +{remaining} more"
+                : text;
+        }
+
         /// <summary>
         /// Дістає FirstName/LastName (або варіанти назв) з будь-якого об’єкта.
         /// Повертає "FirstName LastName" або "FirstName"/"LastName" якщо є тільки одне.
@@ -1120,6 +1160,7 @@ namespace WPFApp.ViewModel.Container.ScheduleProfile
             public IList<ScheduleCellStyleModel> Styles { get; }
             public int TotalEmployees { get; }
             public string TotalHoursText { get; }
+            public string TotalEmployeesListText { get; }
             public Dictionary<int, string> PerEmployeeText { get; }
             public List<SummaryDayHeader> SummaryHeaders { get; }
             public List<SummaryEmployeeRow> SummaryRows { get; }
@@ -1130,6 +1171,7 @@ namespace WPFApp.ViewModel.Container.ScheduleProfile
                 IList<ScheduleCellStyleModel> styles,
                 int totalEmployees,
                 string totalHoursText,
+                string totalEmployeesListText,
                 Dictionary<int, string> perEmployeeText,
                 List<SummaryDayHeader> summaryHeaders,
                 List<SummaryEmployeeRow> summaryRows)
@@ -1139,6 +1181,7 @@ namespace WPFApp.ViewModel.Container.ScheduleProfile
                 Styles = styles;
                 TotalEmployees = totalEmployees;
                 TotalHoursText = totalHoursText;
+                TotalEmployeesListText = totalEmployeesListText;
                 PerEmployeeText = perEmployeeText;
                 SummaryHeaders = summaryHeaders;
                 SummaryRows = summaryRows;
