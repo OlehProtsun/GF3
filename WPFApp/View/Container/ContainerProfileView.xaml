@@ -221,6 +221,53 @@
                 </Setter.Value>
             </Setter>
         </Style>
+
+        <Style x:Key="ContainerStatsGridStyle"
+               TargetType="DataGrid"
+               BasedOn="{StaticResource AvailabilityBaseGridStyle}">
+            <Setter Property="HeadersVisibility" Value="Column" />
+            <Setter Property="RowHeaderWidth" Value="0" />
+            <Setter Property="SelectionUnit" Value="FullRow" />
+            <Setter Property="SelectionMode" Value="Single" />
+            <Setter Property="CanUserAddRows" Value="False" />
+            <Setter Property="CanUserDeleteRows" Value="False" />
+            <Setter Property="CanUserResizeRows" Value="False" />
+            <Setter Property="GridLinesVisibility" Value="All" />
+            <Setter Property="HorizontalGridLinesBrush" Value="Gainsboro" />
+            <Setter Property="VerticalGridLinesBrush" Value="Gainsboro" />
+            <Setter Property="Background" Value="{StaticResource SurfaceBrush}" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="RowHeight" Value="35" />
+            <Setter Property="ColumnHeaderHeight" Value="45" />
+            <Setter Property="FontSize" Value="16" />
+            <Setter Property="FontFamily" Value="{StaticResource DefaultFontFamily}" />
+            <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Auto" />
+            <Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Auto" />
+            <Setter Property="CellStyle">
+                <Setter.Value>
+                    <Style TargetType="DataGridCell">
+                        <Setter Property="BorderThickness" Value="0" />
+                        <Setter Property="Padding" Value="10,0" />
+                        <Setter Property="HorizontalContentAlignment" Value="Center" />
+                        <Setter Property="VerticalContentAlignment" Value="Center" />
+                    </Style>
+                </Setter.Value>
+            </Setter>
+            <Setter Property="ColumnHeaderStyle">
+                <Setter.Value>
+                    <Style TargetType="DataGridColumnHeader">
+                        <Setter Property="Background" Value="{StaticResource SurfaceBrush}" />
+                        <Setter Property="Foreground" Value="Black" />
+                        <Setter Property="BorderThickness" Value="0" />
+                        <Setter Property="HorizontalContentAlignment" Value="Center" />
+                        <Setter Property="VerticalContentAlignment" Value="Center" />
+                        <Setter Property="FontFamily" Value="{StaticResource DefaultFontFamily}" />
+                        <Setter Property="FontSize" Value="14" />
+                        <Setter Property="Padding" Value="6,0" />
+                    </Style>
+                </Setter.Value>
+            </Setter>
+        </Style>
         
     </UserControl.Resources>
 
@@ -661,60 +708,35 @@
 
                             <TextBlock Margin="0,0,18,6" TextWrapping="Wrap"
                        FontFamily="{StaticResource DefaultFontFamily}">
-                <Run Text="Total employees: " FontSize="12" Foreground="{StaticResource MutedTextBrush}"/>
-                <Run Text="{Binding TotalEmployees, Mode=OneWay}" FontSize="14" Foreground="Black"/>
-                            </TextBlock>
-
-                            <TextBlock Margin="0,0,18,6" TextWrapping="Wrap"
-                       FontFamily="{StaticResource DefaultFontFamily}">
-                <Run Text="Total shops: " FontSize="12" Foreground="{StaticResource MutedTextBrush}"/>
-                <Run Text="{Binding TotalShops, Mode=OneWay}" FontSize="14" Foreground="Black"/>
-                            </TextBlock>
-
-                        </WrapPanel>
-
-                        <!-- GRID #1: Employee | HoursSum | Shop1 | Shop2 | ...  -->
-                        <TextBlock Margin="0,12,0,6"
-                   Text="Employee hours by shop"
-                   FontFamily="{StaticResource DefaultFontFamily}"
-                   FontSize="13"
-                   FontWeight="SemiBold"
-                   Foreground="Black"/>
-
-                        <!-- ВАЖЛИВО:
-             Колонки Shop1/Shop2/... будуються з code-behind динамічно.
-             Тому тут AutoGenerateColumns=False і x:Name = dataGridContainerEmployeeShopHours -->
-                        <DataGrid x:Name="dataGridContainerEmployeeShopHours"
-                  ItemsSource="{Binding EmployeeShopHoursRows, Mode=OneWay}"
-                  IsReadOnly="True"
-                  AutoGenerateColumns="False"
-                  CanUserAddRows="False"
-                  CanUserDeleteRows="False"
-                  HeadersVisibility="Column"
-                  GridLinesVisibility="All"
-                  RowHeaderWidth="0"
-                  FrozenColumnCount="2"
-                  Height="300"
-                  ScrollViewer.VerticalScrollBarVisibility="Auto"
-                  ScrollViewer.HorizontalScrollBarVisibility="Auto"/>
-
-                        <!-- GRID #2: Employee | WorkDays | FreeDays -->
-                        <TextBlock Margin="0,14,0,6"
-                   Text="Employee work/free days"
-                   FontFamily="{StaticResource DefaultFontFamily}"
-                   FontSize="13"
-                   FontWeight="SemiBold"
-                   Foreground="Black"/>
-
-                        <Border BorderBrush="Gainsboro"
+                        <Border Style="{StaticResource CardStyle}"
+                Padding="12"
+                Margin="0,0,0,0"
+                SnapsToDevicePixels="True">
+                            <DataGrid x:Name="dataGridContainerEmployeeShopHours"
+                      ItemsSource="{Binding EmployeeShopHoursRows, Mode=OneWay}"
+                      Style="{StaticResource ContainerStatsGridStyle}"
+                      IsReadOnly="True"
+                      AutoGenerateColumns="False"
+                      CanUserAddRows="False"
+                      CanUserDeleteRows="False"
+                      HeadersVisibility="Column"
+                      RowHeaderWidth="0"
+                      FrozenColumnCount="2"
+                      Height="300"
+                      ScrollViewer.VerticalScrollBarVisibility="Auto"
+                      ScrollViewer.HorizontalScrollBarVisibility="Auto">
+                                <DataGrid.Resources>
+                                    <Style TargetType="{x:Type ScrollBar}"
+                           BasedOn="{StaticResource LeftRoundedScrollBarStyle}" />
+                                </DataGrid.Resources>
+                            </DataGrid>
+                        </Border>
+                        <Border Margin="0,16,0,0"
+                BorderBrush="Gainsboro"
                 BorderThickness="1"
                 Background="{StaticResource SurfaceBrush}"
                 SnapsToDevicePixels="True">
-
-                            <Grid SnapsToDevicePixels="True" UseLayoutRounding="True">
-                                <Grid.Resources>
-
-                                    <Style x:Key="MiniCellBorder2" TargetType="Border">
+                                    <Style x:Key="MiniCellBorder" TargetType="Border">
                                         <Setter Property="BorderBrush" Value="Gainsboro"/>
                                         <Setter Property="BorderThickness" Value="0,0,1,1"/>
                                         <Setter Property="Background" Value="{StaticResource SurfaceBrush}"/>
@@ -722,17 +744,53 @@
                                         <Setter Property="SnapsToDevicePixels" Value="True"/>
                                     </Style>
 
-                                    <Style x:Key="MiniHeaderBorder2" TargetType="Border" BasedOn="{StaticResource MiniCellBorder2}">
+                                    <Style x:Key="MiniHeaderBorder" TargetType="Border" BasedOn="{StaticResource MiniCellBorder}">
                                         <Setter Property="Height" Value="45"/>
                                     </Style>
 
-                                    <Style x:Key="MiniHeaderText2" TargetType="TextBlock">
+                                    <Style x:Key="MiniHeaderText" TargetType="TextBlock">
                                         <Setter Property="FontFamily" Value="{StaticResource DefaultFontFamily}"/>
                                         <Setter Property="FontSize" Value="14"/>
                                         <Setter Property="FontWeight" Value="SemiBold"/>
                                         <Setter Property="Foreground" Value="Black"/>
-                                        <Setter Property="HorizontalAlignment" Value="Center"/>
+                                        <Setter Property="Margin" Value="6,0"/>
+                                    </Style>
+
+                                    <Style x:Key="MiniBodyText" TargetType="TextBlock">
+                                        <Setter Property="FontFamily" Value="{StaticResource DefaultFontFamily}"/>
+                                        <Setter Property="FontSize" Value="16"/>
+                                        <Setter Property="Foreground" Value="Black"/>
                                         <Setter Property="VerticalAlignment" Value="Center"/>
+                                </Grid.ColumnDefinitions>
+
+                                <!-- Header -->
+                                <Border Grid.Row="0" Grid.Column="0" Style="{StaticResource MiniHeaderBorder}">
+                                    <TextBlock Text="Employee" Style="{StaticResource MiniHeaderText}"/>
+                                </Border>
+                                <Border Grid.Row="0" Grid.Column="1" Style="{StaticResource MiniHeaderBorder}">
+                                    <TextBlock Text="Work Day" Style="{StaticResource MiniHeaderText}"/>
+                                </Border>
+                                <Border Grid.Row="0" Grid.Column="2" Style="{StaticResource MiniHeaderBorder}">
+                                    <TextBlock Text="Free Day" Style="{StaticResource MiniHeaderText}"/>
+                                </Border>
+                                                <Border Grid.Column="0" Style="{StaticResource MiniCellBorder}">
+                                                    <TextBlock Text="{Binding Employee, Mode=OneWay}"
+                                               Style="{StaticResource MiniBodyText}"
+                                               HorizontalAlignment="Left"
+                                               Margin="10,0,6,0"/>
+                                                </Border>
+
+                                                <Border Grid.Column="1" Style="{StaticResource MiniCellBorder}">
+                                                    <TextBlock Text="{Binding WorkDays, Mode=OneWay}"
+                                               Style="{StaticResource MiniBodyText}"
+                                               HorizontalAlignment="Center"/>
+                                                </Border>
+
+                                                <Border Grid.Column="2" Style="{StaticResource MiniCellBorder}">
+                                                    <TextBlock Text="{Binding FreeDays, Mode=OneWay}"
+                                               Style="{StaticResource MiniBodyText}"
+                                               HorizontalAlignment="Center"/>
+                                                </Border>
                                         <Setter Property="TextAlignment" Value="Center"/>
                                         <Setter Property="TextWrapping" Value="Wrap"/>
                                         <Setter Property="Margin" Value="6,0"/>

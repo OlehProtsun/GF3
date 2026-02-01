@@ -1,6 +1,12 @@
 ﻿using BusinessLogicLayer.Generators;
 using BusinessLogicLayer.Services.Abstractions;
+using DataAccessLayer.Models;
 using System;
+using System.Collections.Concurrent;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 using WPFApp.Infrastructure;
 using WPFApp.Service;
 using WPFApp.ViewModel.Container.List;
@@ -51,6 +57,7 @@ namespace WPFApp.ViewModel.Container.Edit
         private readonly IEmployeeService _employeeService;
         private readonly IScheduleGenerator _generator;
         private readonly IColorPickerService _colorPickerService;
+        private readonly ConcurrentDictionary<int, Lazy<Task<ScheduleModel?>>> _scheduleDetailsCache = new();
 
         // =========================================================
         // 2) ВНУТРІШНІ СТАНИ ДЛЯ ВСЬОГО МОДУЛЯ
@@ -146,9 +153,43 @@ namespace WPFApp.ViewModel.Container.Edit
             ScheduleEditVm = new ContainerScheduleEditViewModel(this);
             ScheduleProfileVm = new ContainerScheduleProfileViewModel(this);
 
+            ProfileVm.EmployeesLoader = LoadScheduleEmployeesAsync;
+            ProfileVm.SlotsLoader = LoadScheduleSlotsAsync;
+
             // Стартова секція — список контейнерів.
             // CurrentSection визначений у Navigation partial-файлі.
             CurrentSection = ListVm;
         }
+
+        private async Task<IReadOnlyList<ScheduleEmployeeModel>> LoadScheduleEmployeesAsync(int scheduleId, CancellationToken ct)
+        {
+            var detailed = await GetScheduleDetailsCachedAsync(scheduleId, ct).ConfigureAwait(false);
+            return detailed?.Employees?.ToList() ?? new List<ScheduleEmployeeModel>();
+        }
+
+        private async Task<IReadOnlyList<ScheduleSlotModel>> LoadScheduleSlotsAsync(int scheduleId, CancellationToken ct)
+        {
+            var detailed = await GetScheduleDetailsCachedAsync(scheduleId, ct).ConfigureAwait(false);
+            return detailed?.Slots?.ToList() ?? new List<ScheduleSlotModel>();
+        }
+
+        private async Task<ScheduleModel?> GetScheduleDetailsCachedAsync(int scheduleId, CancellationToken ct)
+        {
+            ct.ThrowIfCancellationRequested();
+
+            if (scheduleId <= 0)
+                return null;
+
+            var lazyTask = _scheduleDetailsCache.GetOrAdd(
+                scheduleId,
+                id => new Lazy<Task<ScheduleModel?>>(() => _scheduleService.GetDetailedAsync(id, CancellationToken.None)));
+
+            var detailed = await lazyTask.Value.ConfigureAwait(false);
+            ct.ThrowIfCancellationRequested();
+            return detailed;
+        }
+
+        private void ClearScheduleDetailsCache()
+            => _scheduleDetailsCache.Clear();
     }
 }

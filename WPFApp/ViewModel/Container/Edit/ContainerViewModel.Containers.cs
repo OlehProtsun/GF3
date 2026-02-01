@@ -268,6 +268,7 @@ namespace WPFApp.ViewModel.Container.Edit
         /// </summary>
         private async Task LoadSchedulesAsync(int containerId, string? search, CancellationToken ct)
         {
+            ClearScheduleDetailsCache();
             var schedules = await _scheduleService.GetByContainerAsync(containerId, search, ct);
             ProfileVm.ScheduleListVm.SetItems(schedules);
         }
