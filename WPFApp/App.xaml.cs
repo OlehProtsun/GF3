@@ -61,6 +61,7 @@ namespace WPFApp
 
             services.AddSingleton<WPFApp.Service.IColorPickerService, WPFApp.Service.ColorPickerService>();
             services.AddSingleton<WPFApp.Service.ILoggerService>(_ => WPFApp.Service.LoggerService.Instance);
+            services.AddSingleton<WPFApp.Service.IScheduleExportService, WPFApp.Service.ScheduleExportService>();
 
             // Якщо робиш навігацію через UserControl-и:
             services.AddTransient<EmployeeView>();

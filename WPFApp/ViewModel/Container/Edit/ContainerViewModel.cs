@@ -57,6 +57,7 @@ namespace WPFApp.ViewModel.Container.Edit
         private readonly IEmployeeService _employeeService;
         private readonly IScheduleGenerator _generator;
         private readonly IColorPickerService _colorPickerService;
+        private readonly IScheduleExportService _scheduleExportService;
         private readonly ConcurrentDictionary<int, Lazy<Task<ScheduleModel?>>> _scheduleDetailsCache = new();
 
         // =========================================================
@@ -121,7 +122,8 @@ namespace WPFApp.ViewModel.Container.Edit
             IShopService shopService,
             IEmployeeService employeeService,
             IScheduleGenerator generator,
-            IColorPickerService colorPickerService)
+            IColorPickerService colorPickerService,
+            IScheduleExportService scheduleExportService)
         {
             // Null-guards:
             // Якщо DI-контейнер налаштований неправильно, ми хочемо отримати помилку одразу тут,
@@ -133,6 +135,7 @@ namespace WPFApp.ViewModel.Container.Edit
             ArgumentNullException.ThrowIfNull(employeeService);
             ArgumentNullException.ThrowIfNull(generator);
             ArgumentNullException.ThrowIfNull(colorPickerService);
+            ArgumentNullException.ThrowIfNull(scheduleExportService);
 
             _containerService = containerService;
             _scheduleService = scheduleService;
@@ -141,6 +144,7 @@ namespace WPFApp.ViewModel.Container.Edit
             _employeeService = employeeService;
             _generator = generator;
             _colorPickerService = colorPickerService;
+            _scheduleExportService = scheduleExportService;
 
             // Створюємо “дочірні” VM-и.
             // Вони отримують owner (this), щоб викликати методи типу:
