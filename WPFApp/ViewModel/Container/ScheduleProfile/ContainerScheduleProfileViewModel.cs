@@ -1,4 +1,5 @@
 ﻿using DataAccessLayer.Models;
+using Microsoft.Win32;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -12,6 +13,7 @@ using System.Windows;
 using System.Windows.Media;
 using WPFApp.Infrastructure;
 using WPFApp.Infrastructure.ScheduleMatrix;
+using WPFApp.Service;
 using WPFApp.ViewModel.Container.Edit;
 using WPFApp.ViewModel.Container.ScheduleEdit.Helpers;
 
@@ -101,6 +103,11 @@ namespace WPFApp.ViewModel.Container.ScheduleProfile
         /// якщо старий Task завершиться після нового — ігноруємо старий результат.
         /// </summary>
         private int _matrixVersion;
+
+        private ScheduleModel? _currentSchedule;
+        private IReadOnlyList<ScheduleEmployeeModel> _scheduleEmployees = Array.Empty<ScheduleEmployeeModel>();
+        private IReadOnlyList<ScheduleSlotModel> _scheduleSlots = Array.Empty<ScheduleSlotModel>();
+        private IReadOnlyList<ScheduleCellStyleModel> _scheduleCellStyles = Array.Empty<ScheduleCellStyleModel>();
 
         // =========================================================
         // 2) ПРОСТІ ПОЛЯ ПРОФІЛЮ (Показуються в UI)
@@ -288,6 +295,8 @@ namespace WPFApp.ViewModel.Container.ScheduleProfile
         public AsyncRelayCommand CancelProfileCommand { get; }
         public AsyncRelayCommand EditCommand { get; }
         public AsyncRelayCommand DeleteCommand { get; }
+        public AsyncRelayCommand ExportToExcelCommand { get; }
+        public AsyncRelayCommand ExportToSQLiteCommand { get; }
 
         /// <summary>
         /// MatrixChanged — подія для View (коли треба перебудувати DataGrid columns, refresh tooltips, etc).
@@ -302,6 +311,8 @@ namespace WPFApp.ViewModel.Container.ScheduleProfile
             CancelProfileCommand = new AsyncRelayCommand(() => _owner.CancelScheduleAsync());
             EditCommand = new AsyncRelayCommand(() => _owner.EditSelectedScheduleAsync());
             DeleteCommand = new AsyncRelayCommand(() => _owner.DeleteSelectedScheduleAsync());
+            ExportToExcelCommand = new AsyncRelayCommand(ExportToExcelAsync);
+            ExportToSQLiteCommand = new AsyncRelayCommand(ExportToSQLiteAsync);
         }
 
         // =========================================================
@@ -329,6 +340,10 @@ namespace WPFApp.ViewModel.Container.ScheduleProfile
             IList<ScheduleCellStyleModel> cellStyles,
             CancellationToken ct = default)
         {
+            var employeesSnapshot = employees?.ToList() ?? new List<ScheduleEmployeeModel>();
+            var slotsSnapshot = slots?.ToList() ?? new List<ScheduleSlotModel>();
+            var stylesSnapshot = cellStyles?.ToList() ?? new List<ScheduleCellStyleModel>();
+
             // ---------- 1) Cancel попереднього білду ----------
             _matrixCts?.Cancel();
             _matrixCts?.Dispose();
@@ -343,6 +358,11 @@ namespace WPFApp.ViewModel.Container.ScheduleProfile
             await _owner.RunOnUiThreadAsync(() =>
             {
                 // Базові поля профілю
+                _currentSchedule = schedule;
+                _scheduleEmployees = employeesSnapshot;
+                _scheduleSlots = slotsSnapshot;
+                _scheduleCellStyles = stylesSnapshot;
+
                 ScheduleId = schedule.Id;
                 ScheduleName = schedule.Name ?? string.Empty;
                 ScheduleMonthYear = $"{schedule.Month:D2}.{schedule.Year}";
@@ -359,7 +379,7 @@ namespace WPFApp.ViewModel.Container.ScheduleProfile
 
                 // Employees (використовуємо в summary і потенційно в UI)
                 Employees.Clear();
-                foreach (var emp in employees)
+                foreach (var emp in employeesSnapshot)
                     Employees.Add(emp);
 
                 // Очищаємо старі дані (щоб не миготіли чужі значення)
@@ -383,10 +403,6 @@ namespace WPFApp.ViewModel.Container.ScheduleProfile
                 // ---------- 3) Snapshot (захист від зміни колекцій ззовні під час Task.Run) ----------
                 var year = schedule.Year;
                 var month = schedule.Month;
-
-                var slotsSnapshot = slots.ToList();
-                var employeesSnapshot = employees.ToList();
-                var stylesSnapshot = cellStyles.ToList();
 
                 // ---------- 4) Важка побудова на background thread ----------
                 var built = await Task.Run(() =>
@@ -500,6 +516,101 @@ namespace WPFApp.ViewModel.Container.ScheduleProfile
             _matrixCts?.Cancel();
             _matrixCts?.Dispose();
             _matrixCts = null;
+        }
+
+        // =========================================================
+        // 7.1) EXPORT (Excel / SQLite)
+        // =========================================================
+
+        private async Task ExportToExcelAsync(CancellationToken ct)
+        {
+            if (_currentSchedule is null)
+            {
+                _owner.ShowError("No schedule is selected for export.");
+                return;
+            }
+
+            var dialog = new SaveFileDialog
+            {
+                Title = "Export Schedule to Excel",
+                Filter = "Excel Workbook (*.xlsx)|*.xlsx|All Files (*.*)|*.*",
+                FileName = ScheduleExportService.SanitizeFileName(
+                    $"{ScheduleName}.xlsx",
+                    "Schedule.xlsx")
+            };
+
+            if (dialog.ShowDialog() != true)
+                return;
+
+            var context = new ScheduleExportContext(
+                scheduleName: ScheduleName,
+                scheduleMonth: ScheduleMonth,
+                scheduleYear: ScheduleYear,
+                shopName: ShopName,
+                shopAddress: ShopAddress,
+                totalHoursText: TotalHoursText,
+                totalEmployees: TotalEmployees,
+                totalDays: TotalDays,
+                shift1: Shift1,
+                shift2: Shift2,
+                totalEmployeesListText: TotalEmployeesListText,
+                scheduleMatrix: ScheduleMatrix,
+                summaryDayHeaders: SummaryDayHeaders.ToList(),
+                summaryRows: SummaryRows.ToList(),
+                employeeWorkFreeStats: EmployeeWorkFreeStats.ToList(),
+                styleProvider: this);
+
+            try
+            {
+                await _owner.ExportScheduleToExcelAsync(context, dialog.FileName, ct).ConfigureAwait(false);
+                _owner.ShowInfo($"Excel export saved to:{Environment.NewLine}{dialog.FileName}");
+            }
+            catch (Exception ex)
+            {
+                _owner.ShowError(ex);
+            }
+        }
+
+        private async Task ExportToSQLiteAsync(CancellationToken ct)
+        {
+            if (_currentSchedule is null)
+            {
+                _owner.ShowError("No schedule is selected for export.");
+                return;
+            }
+
+            var dialog = new SaveFileDialog
+            {
+                Title = "Export Schedule to SQLite Script",
+                Filter = "SQLite Script (*.sql)|*.sql|All Files (*.*)|*.*",
+                FileName = ScheduleExportService.SanitizeFileName(
+                    $"{ScheduleName}.sqlite.sql",
+                    "Schedule.sqlite.sql")
+            };
+
+            if (dialog.ShowDialog() != true)
+                return;
+
+            try
+            {
+                var availabilityData = await _owner
+                    .LoadAvailabilityGroupExportDataAsync(_currentSchedule.AvailabilityGroupId, ct)
+                    .ConfigureAwait(false);
+
+                var context = new ScheduleSqlExportContext(
+                    schedule: _currentSchedule,
+                    employees: _scheduleEmployees,
+                    slots: _scheduleSlots,
+                    cellStyles: _scheduleCellStyles,
+                    availabilityGroupData: availabilityData);
+
+                await _owner.ExportScheduleToSqlAsync(context, dialog.FileName, ct).ConfigureAwait(false);
+                _owner.ShowInfo($"SQLite export saved to:{Environment.NewLine}{dialog.FileName}");
+            }
+            catch (Exception ex)
+            {
+                _owner.ShowError(ex);
+            }
         }
 
         // =========================================================
