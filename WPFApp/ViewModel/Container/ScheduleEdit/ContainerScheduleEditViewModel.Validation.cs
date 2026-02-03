@@ -178,12 +178,20 @@ namespace WPFApp.ViewModel.Container.ScheduleEdit
             // тоді WPF правильно “прикріпить” помилки до потрібних контролів.
             var errors = ScheduleValidationRules.ValidateAll(model);
 
+            var mergedErrors = new Dictionary<string, string>(errors, StringComparer.Ordinal);
+
+            if (errors.TryGetValue(nameof(ScheduleShopId), out var shopError))
+                mergedErrors[nameof(PendingSelectedShop)] = shopError;
+
+            if (SelectedBlock.SelectedAvailabilityGroupId <= 0)
+                mergedErrors[nameof(PendingSelectedAvailabilityGroup)] = "Please select an availability group.";
+
             // 2) Перезаписуємо помилки у нашому сховищі ValidationErrors:
             // - якщо помилок немає => SetValidationErrors очистить все
             // - якщо помилки є => вони підуть у _validation і піднімуть ErrorsChanged
             //
             // Це важливо: UI одразу підсвітить всі проблемні поля.
-            SetValidationErrors(errors);
+            SetValidationErrors(mergedErrors);
 
             // 3) Якщо HasErrors == true, значить є хоча б одна помилка,
             // і далі продовжувати Save/Generate не можна.
@@ -229,7 +237,10 @@ namespace WPFApp.ViewModel.Container.ScheduleEdit
         {
             // 1) Перевіряємо всі правила
             if (!ValidateBeforeSave())
+            {
+                _owner.ShowError("Please fix the highlighted fields before saving.");
                 return Task.CompletedTask;
+            }
 
             // 2) Якщо помилок немає — виконуємо реальне збереження
             return _owner.SaveScheduleAsync();
@@ -242,9 +253,23 @@ namespace WPFApp.ViewModel.Container.ScheduleEdit
         private Task GenerateWithValidationAsync()
         {
             if (!ValidateBeforeSave())
+            {
+                _owner.ShowError("Please fix the highlighted fields before generating.");
                 return Task.CompletedTask;
+            }
 
             return _owner.GenerateScheduleAsync();
+        }
+
+        private void ClearShopSelectionErrors()
+        {
+            ClearValidationErrors(nameof(ScheduleShopId));
+            ClearValidationErrors(nameof(PendingSelectedShop));
+        }
+
+        private void ClearAvailabilitySelectionErrors()
+        {
+            ClearValidationErrors(nameof(PendingSelectedAvailabilityGroup));
         }
 
 

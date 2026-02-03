@@ -972,7 +972,7 @@
                                                     </Grid>
 
                                                     <ComboBox ItemsSource="{Binding Shops}"
-                                                      SelectedItem="{Binding PendingSelectedShop}"
+                                                      SelectedItem="{Binding PendingSelectedShop, UpdateSourceTrigger=PropertyChanged, ValidatesOnNotifyDataErrors=True}"
                                                       DisplayMemberPath="Name"
                                                       Style="{StaticResource RoundedComboBoxStyle}"
                                                       ItemContainerStyle="{StaticResource RoundedComboBoxItemStyle}"
@@ -1043,7 +1043,7 @@
                                                     </Grid>
 
                                                     <ComboBox ItemsSource="{Binding AvailabilityGroups}"
-          SelectedItem="{Binding PendingSelectedAvailabilityGroup}"
+          SelectedItem="{Binding PendingSelectedAvailabilityGroup, UpdateSourceTrigger=PropertyChanged, ValidatesOnNotifyDataErrors=True}"
           DisplayMemberPath="Name"
           Tag="Select group..."
           Style="{StaticResource RoundedComboBoxStyle}"
