@@ -187,6 +187,8 @@ namespace WPFApp.ViewModel.Container.ScheduleEdit
                 return;
 
             SelectedShop = PendingSelectedShop;
+            if (SelectedShop?.Id > 0)
+                ClearShopSelectionErrors();
         }
 
         /// <summary>
@@ -198,6 +200,8 @@ namespace WPFApp.ViewModel.Container.ScheduleEdit
                 return;
 
             SelectedAvailabilityGroup = PendingSelectedAvailabilityGroup;
+            if (SelectedAvailabilityGroup?.Id > 0)
+                ClearAvailabilitySelectionErrors();
         }
 
 

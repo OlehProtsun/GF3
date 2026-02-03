@@ -1,5 +1,9 @@
-﻿using System;
+﻿using DataAccessLayer.Models;
+using System;
+using System.Collections.Generic;
 using System.Data;
+using System.Linq;
+using System.Threading.Tasks;
 using WPFApp.Infrastructure.Threading;
 
 namespace WPFApp.ViewModel.Container.ScheduleEdit
@@ -92,6 +96,9 @@ namespace WPFApp.ViewModel.Container.ScheduleEdit
                 // 2) Записуємо в модель через властивість ScheduleShopId.
                 // Це запускає SetScheduleValue(...) та пов'язані реакції/валідацію.
                 ScheduleShopId = newId;
+
+                if (newId > 0)
+                    ClearShopSelectionErrors();
             });
         }
 
@@ -132,7 +139,82 @@ namespace WPFApp.ViewModel.Container.ScheduleEdit
                 // Зміна групи доступності змінює “правила”, за якими генерується розклад.
                 // Тому старі згенеровані слоти стають недійсними.
                 InvalidateGeneratedSchedule(clearPreviewMatrix: true);
+
+                if (newId > 0)
+                    ClearAvailabilitySelectionErrors();
+
+                SafeForget(HandleAvailabilitySelectionChangedAsync(newId));
             });
+        }
+
+        private async Task HandleAvailabilitySelectionChangedAsync(int availabilityGroupId)
+        {
+            if (availabilityGroupId <= 0)
+                return;
+
+            var block = SelectedBlock;
+            if (block is null)
+                return;
+
+            var year = ScheduleYear;
+            var month = ScheduleMonth;
+
+            var preview = await _owner.GetAvailabilityPreviewAsync(availabilityGroupId, year, month).ConfigureAwait(false);
+
+            if (!ReferenceEquals(SelectedBlock, block) || block.SelectedAvailabilityGroupId != availabilityGroupId)
+                return;
+
+            var minHoursByEmpId = block.Employees
+                .GroupBy(e => e.EmployeeId)
+                .ToDictionary(g => g.Key, g => g.First().MinHoursMonth);
+
+            List<ScheduleEmployeeModel> previewEmployees = new();
+
+            await _owner.RunOnUiThreadAsync(() =>
+            {
+                if (!ReferenceEquals(SelectedBlock, block) || block.SelectedAvailabilityGroupId != availabilityGroupId)
+                    return;
+
+                block.Employees.Clear();
+
+                foreach (var employee in preview.employees)
+                {
+                    minHoursByEmpId.TryGetValue(employee.Id, out var minHours);
+
+                    block.Employees.Add(new ScheduleEmployeeModel
+                    {
+                        EmployeeId = employee.Id,
+                        Employee = employee,
+                        MinHoursMonth = minHours
+                    });
+                }
+
+                previewEmployees = block.Employees.ToList();
+            }).ConfigureAwait(false);
+
+            if (!ReferenceEquals(SelectedBlock, block) || block.SelectedAvailabilityGroupId != availabilityGroupId)
+                return;
+
+            var previewKey = BuildAvailabilityPreviewKey(availabilityGroupId, year, month);
+            var availabilitySlots = preview.availabilitySlots.ToList();
+
+            await RefreshAvailabilityPreviewMatrixAsync(
+                year,
+                month,
+                availabilitySlots,
+                previewEmployees,
+                previewKey).ConfigureAwait(false);
+        }
+
+        private string BuildAvailabilityPreviewKey(int availabilityGroupId, int year, int month)
+        {
+            static string CanonShift(string? value)
+            {
+                value = (value ?? string.Empty).Trim();
+                return value.Replace(" - ", "-").Replace(" -", "-").Replace("- ", "-");
+            }
+
+            return $"{availabilityGroupId}|{year}|{month}|{CanonShift(ScheduleShift1)}|{CanonShift(ScheduleShift2)}";
         }
 
 

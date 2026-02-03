@@ -2,6 +2,7 @@
 using DataAccessLayer.Models;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using WPFApp.Infrastructure.AvailabilityPreview;
@@ -163,6 +164,46 @@ namespace WPFApp.ViewModel.Container.Edit
                 // Тут ми зберігаємо поведінку 1-в-1 як у твоєму поточному коді:
                 // - якщо shift невалідний => повертаємо null
                 // - якщо валідний => нормалізуємо і віддаємо (from,to)
+                if (!TryNormalizeShiftRange(rawShift, out var normalized, out _))
+                    return null;
+
+                var parts = normalized.Split('-', 2, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+                return parts.Length == 2 ? (parts[0], parts[1]) : null;
+            }
+        }
+
+        public async Task<(IReadOnlyList<EmployeeModel> employees, IReadOnlyList<ScheduleSlotModel> availabilitySlots)>
+            GetAvailabilityPreviewAsync(int availabilityGroupId, int year, int month)
+        {
+            if (availabilityGroupId <= 0)
+                return (Array.Empty<EmployeeModel>(), Array.Empty<ScheduleSlotModel>());
+
+            var loaded = await _availabilityGroupService.LoadFullAsync(availabilityGroupId, CancellationToken.None)
+                .ConfigureAwait(false);
+
+            var group = loaded.Item1;
+            var members = loaded.Item2 ?? new List<AvailabilityGroupMemberModel>();
+            var days = loaded.Item3 ?? new List<AvailabilityGroupDayModel>();
+
+            var employees = members
+                .Select(m => m.Employee)
+                .Where(e => e != null)
+                .GroupBy(e => e!.Id)
+                .Select(g => g.First()!)
+                .ToList();
+
+            if (group.Year != year || group.Month != month)
+                return (employees, Array.Empty<ScheduleSlotModel>());
+
+            var shift1 = TrySplitShift(ScheduleEditVm.ScheduleShift1);
+            var shift2 = TrySplitShift(ScheduleEditVm.ScheduleShift2);
+
+            var result = AvailabilityPreviewBuilder.Build(members, days, shift1, shift2, CancellationToken.None);
+
+            return (employees, result.Slots);
+
+            static (string from, string to)? TrySplitShift(string rawShift)
+            {
                 if (!TryNormalizeShiftRange(rawShift, out var normalized, out _))
                     return null;
 

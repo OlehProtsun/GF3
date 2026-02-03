@@ -582,7 +582,14 @@ namespace WPFApp.ViewModel.Container.ScheduleEdit
         public ShopModel? PendingSelectedShop
         {
             get => _pendingSelectedShop;
-            set => SetProperty(ref _pendingSelectedShop, value);
+            set
+            {
+                if (!SetProperty(ref _pendingSelectedShop, value))
+                    return;
+
+                if (value?.Id > 0)
+                    ClearShopSelectionErrors();
+            }
         }
 
         public AvailabilityGroupModel? SelectedAvailabilityGroup
@@ -621,7 +628,14 @@ namespace WPFApp.ViewModel.Container.ScheduleEdit
         public AvailabilityGroupModel? PendingSelectedAvailabilityGroup
         {
             get => _pendingSelectedAvailabilityGroup;
-            set => SetProperty(ref _pendingSelectedAvailabilityGroup, value);
+            set
+            {
+                if (!SetProperty(ref _pendingSelectedAvailabilityGroup, value))
+                    return;
+
+                if (value?.Id > 0)
+                    ClearAvailabilitySelectionErrors();
+            }
         }
 
         // --------------------------
