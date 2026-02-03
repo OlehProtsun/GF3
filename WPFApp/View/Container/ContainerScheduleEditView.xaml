@@ -544,7 +544,7 @@
 
                                         <ListBox x:Name="OpenedSchedulesListBox"
                                              ItemsSource="{Binding OpenedSchedules}"
-                                             SelectedItem="{Binding ActiveSchedule, Mode=TwoWay}"
+                                             SelectedItem="{Binding ActiveSchedule, Mode=OneWay}"
                                              SelectionChanged="OpenedSchedulesListBox_SelectionChanged"
                                              BorderThickness="0"
                                              Background="Transparent"
@@ -1641,4 +1641,3 @@
         </Grid>
     </Grid>
 </UserControl>
-

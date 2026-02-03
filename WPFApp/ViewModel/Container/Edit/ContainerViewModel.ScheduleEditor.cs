@@ -240,12 +240,7 @@ namespace WPFApp.ViewModel.Container.Edit
             var nextIndex = Math.Max(0, Math.Min(index, ScheduleEditVm.Blocks.Count - 1));
             var next = ScheduleEditVm.Blocks[nextIndex];
 
-            ScheduleEditVm.SelectedBlock = next;
-
-            // Нема окремих ValidationErrors на блок — просто очищаємо
-            ScheduleEditVm.ClearValidationErrors();
-
-            await UpdateAvailabilityPreviewAsync(ct);
+            await SelectScheduleBlockAsync(next, ct);
         }
     }
 }

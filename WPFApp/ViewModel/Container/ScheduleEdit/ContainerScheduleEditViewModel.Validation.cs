@@ -162,6 +162,8 @@ namespace WPFApp.ViewModel.Container.ScheduleEdit
         /// </summary>
         private bool ValidateBeforeSave()
         {
+            ApplyPendingSelectionsForValidation();
+
             // 0) Якщо немає активного блоку або моделі — немає що валідити.
             // Це “не помилка валідації”, просто стан такий (наприклад форма порожня).
             // Тут можна було б повернути false, якщо Save без SelectedBlock неможливий,
@@ -186,6 +188,37 @@ namespace WPFApp.ViewModel.Container.ScheduleEdit
             // 3) Якщо HasErrors == true, значить є хоча б одна помилка,
             // і далі продовжувати Save/Generate не можна.
             return !HasErrors;
+        }
+
+        /// <summary>
+        /// Перед валідацією/генерацією важливо “зафіксувати” pending selections,
+        /// щоб в моделі були актуальні ShopId/AvailabilityGroupId.
+        /// Це захищає від ситуацій, коли користувач швидко натискає Generate/Save
+        /// ще до спрацювання debounce.
+        /// </summary>
+        private void ApplyPendingSelectionsForValidation()
+        {
+            if (SelectedBlock is null)
+                return;
+
+            using var _ = EnterSelectionSync();
+
+            if (!ReferenceEquals(PendingSelectedShop, SelectedShop))
+                SelectedShop = PendingSelectedShop;
+
+            if (!ReferenceEquals(PendingSelectedAvailabilityGroup, SelectedAvailabilityGroup))
+                SelectedAvailabilityGroup = PendingSelectedAvailabilityGroup;
+
+            var pendingShopId = PendingSelectedShop?.Id ?? 0;
+            if (ScheduleShopId != pendingShopId)
+                ScheduleShopId = pendingShopId;
+
+            var pendingGroupId = PendingSelectedAvailabilityGroup?.Id ?? 0;
+            if (SelectedBlock.SelectedAvailabilityGroupId != pendingGroupId)
+            {
+                SelectedBlock.SelectedAvailabilityGroupId = pendingGroupId;
+                InvalidateGeneratedSchedule(clearPreviewMatrix: true);
+            }
         }
 
         /// <summary>
