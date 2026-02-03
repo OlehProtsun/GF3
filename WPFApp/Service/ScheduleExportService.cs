@@ -1,4 +1,4 @@
-using ClosedXML.Excel;
+﻿using ClosedXML.Excel;
 using DataAccessLayer.Models;
 using System;
 using System.Collections.Generic;
@@ -64,10 +64,12 @@ namespace WPFApp.Service
             Shift1 = shift1 ?? string.Empty;
             Shift2 = shift2 ?? string.Empty;
             TotalEmployeesListText = totalEmployeesListText ?? string.Empty;
+
             ScheduleMatrix = scheduleMatrix ?? new DataView();
             SummaryDayHeaders = summaryDayHeaders ?? Array.Empty<ContainerScheduleProfileViewModel.SummaryDayHeader>();
             SummaryRows = summaryRows ?? Array.Empty<ContainerScheduleProfileViewModel.SummaryEmployeeRow>();
             EmployeeWorkFreeStats = employeeWorkFreeStats ?? Array.Empty<ContainerScheduleProfileViewModel.EmployeeWorkFreeStatRow>();
+
             StyleProvider = styleProvider ?? throw new ArgumentNullException(nameof(styleProvider));
         }
     }
@@ -117,6 +119,43 @@ namespace WPFApp.Service
         private const string DefaultSheetName = "Schedule";
         private const string DefaultStatisticSheetName = "Schedule - Statistic";
 
+        // ===================== TEMPLATE CONFIG =====================
+        // Put template here (Build Action: Content, Copy to Output Directory: Copy if newer/always)
+        private const string ExcelTemplateRelativePath = @"Resources\Excel\ScheduleTemplate.xlsx";
+
+        // Supported template sheet names (your template had R_FL_35 originally)
+        private static readonly string[] MatrixTemplateSheetNames = { "ScheduleName", "R_FL_35", "MatrixTemplate" };
+        private static readonly string[] StatisticTemplateSheetNames = { "ScheduleStatistic", "Schedule Statistic", "StatisticTemplate" };
+
+        // ===================== MATRIX TEMPLATE LAYOUT =====================
+        // Expected in template:
+        //   B1  = ShopName
+        //   C1..AA1 = employee headers (rotated + tall row)
+        //   B2..B32 = dates
+        //   C2..AA32 = matrix body
+        private const string MatrixClearRange = "B1:AA32";
+        private const int M_ShopRow = 1;
+        private const int M_ShopCol = 2;         // B1
+        private const int M_HeaderRow = 1;
+        private const int M_DateCol = 2;         // B
+        private const int M_FirstDataCol = 3;    // C
+        private const int M_LastDataCol = 27;    // AA (25 cols)
+        private const int M_FirstDayRow = 2;
+        private const int M_DayCount = 31;
+
+        // ===================== STAT TEMPLATE LAYOUT =====================
+        // This matches the template you showed (labels in col A, values in col B)
+        private const int S_ValueCol = 2;                // B
+        private const int S_EmployeesLineRow = 12;       // A12 merged in template typically
+        private const int S_DayHeaderRow = 14;           // merged day header blocks
+        private const int S_BodyFirstRow = 16;           // first employee row in summary
+        private const int S_MaxSummaryRows = 10;         // template-styled rows (16..25)
+        private const int S_MiniBodyFirstRow = 28;       // first row of mini-table body
+        private const int S_MaxMiniRows = 10;            // template-styled rows (28..37)
+        private const int S_FirstDayCol = 3;             // C
+        private const int S_DaysCapacity = 31;           // 31 days * 3 columns (C..CQ)
+
+        // ===================== PUBLIC API =====================
         public Task ExportToExcelAsync(ScheduleExportContext context, string filePath, CancellationToken ct = default)
         {
             if (context is null) throw new ArgumentNullException(nameof(context));
@@ -126,19 +165,36 @@ namespace WPFApp.Service
             {
                 ct.ThrowIfCancellationRequested();
 
-                using var workbook = new XLWorkbook();
+                var templatePath = ResolveExcelTemplatePath();
+                using var workbook = new XLWorkbook(templatePath);
 
+                var matrixTemplate = FindTemplateSheet(workbook, MatrixTemplateSheetNames)
+                    ?? throw new InvalidOperationException($"Matrix template sheet not found. Expected one of: {string.Join(", ", MatrixTemplateSheetNames)}");
+
+                var statTemplate = FindTemplateSheet(workbook, StatisticTemplateSheetNames)
+                    ?? throw new InvalidOperationException($"Statistic template sheet not found. Expected one of: {string.Join(", ", StatisticTemplateSheetNames)}");
+
+                // Copy template sheets to new names
                 var scheduleName = SanitizeWorksheetName(context.ScheduleName, DefaultSheetName);
-                var matrixSheet = workbook.AddWorksheet(scheduleName);
 
-                var statisticName = SanitizeWorksheetName($"{scheduleName} - Statistic", DefaultStatisticSheetName);
-                if (string.Equals(statisticName, scheduleName, StringComparison.OrdinalIgnoreCase))
-                    statisticName = SanitizeWorksheetName($"{scheduleName} Stats", DefaultStatisticSheetName);
+                // Important: CopyTo keeps 1:1 styling (row heights, column widths, CF, patterns, rotated text)
+                var matrixSheet = matrixTemplate.CopyTo(scheduleName);
 
-                var statisticSheet = workbook.AddWorksheet(statisticName);
+                var statisticNameBase = SanitizeWorksheetName($"{scheduleName} - Statistic", DefaultStatisticSheetName);
+                var statisticName = MakeUniqueSheetName(workbook, statisticNameBase);
+                var statSheet = statTemplate.CopyTo(statisticName);
 
-                ExportMatrixSheet(matrixSheet, context);
-                ExportStatisticSheet(statisticSheet, context);
+                // Remove original template sheets from output
+                // (so user sees only their schedule sheets)
+                matrixTemplate.Delete();
+                statTemplate.Delete();
+                // Fill ONLY values (do not modify styling)
+                FillMatrixSheetFromTemplate(matrixSheet, context);
+                FillStatisticSheetFromTemplate(statSheet, context);
+
+                // Normalize problematic Gray125 pattern fills (ClosedXML can roundtrip them as black)
+                FixGray125Fills(matrixSheet, "B2:AA32");
+                FixGray125Fills(statSheet); // safe no-op if none
 
                 workbook.SaveAs(filePath);
             }, ct);
@@ -153,13 +209,48 @@ namespace WPFApp.Service
             await File.WriteAllTextAsync(filePath, script, Encoding.UTF8, ct).ConfigureAwait(false);
         }
 
+        // ===================== TEMPLATE HELPERS =====================
+        private static string ResolveExcelTemplatePath()
+        {
+            var baseDir = AppDomain.CurrentDomain.BaseDirectory;
+            var path = Path.Combine(baseDir, ExcelTemplateRelativePath);
+
+            if (!File.Exists(path))
+                throw new FileNotFoundException("Excel template not found. Ensure it is copied to output directory.", path);
+
+            return path;
+        }
+
+        private static IXLWorksheet? FindTemplateSheet(XLWorkbook wb, IEnumerable<string> names)
+        {
+            foreach (var n in names)
+            {
+                var ws = wb.Worksheets.FirstOrDefault(s => string.Equals(s.Name, n, StringComparison.OrdinalIgnoreCase));
+                if (ws != null) return ws;
+            }
+            return null;
+        }
+
+        private static string MakeUniqueSheetName(XLWorkbook wb, string baseName)
+        {
+            var name = baseName;
+            var i = 1;
+            while (wb.Worksheets.Any(s => string.Equals(s.Name, name, StringComparison.OrdinalIgnoreCase)))
+            {
+                var suffix = $" ({i++})";
+                var trimmed = baseName;
+                if (trimmed.Length + suffix.Length > 31)
+                    trimmed = trimmed.Substring(0, 31 - suffix.Length);
+                name = trimmed + suffix;
+            }
+            return name;
+        }
+
         public static string SanitizeFileName(string? name, string fallback)
         {
             var safe = string.IsNullOrWhiteSpace(name) ? fallback : name.Trim();
-
             foreach (var c in Path.GetInvalidFileNameChars())
                 safe = safe.Replace(c, '_');
-
             return string.IsNullOrWhiteSpace(safe) ? fallback : safe;
         }
 
@@ -177,193 +268,297 @@ namespace WPFApp.Service
             return string.IsNullOrWhiteSpace(safe) ? fallback : safe;
         }
 
-        private static void ExportMatrixSheet(IXLWorksheet sheet, ScheduleExportContext context)
-        {
-            var table = context.ScheduleMatrix?.Table;
-            if (table is null)
-                return;
 
-            var columns = table.Columns
-                .Cast<DataColumn>()
+
+        /// <summary>
+        /// ClosedXML (and some other OOXML writers) can roundtrip PatternType=Gray125 incorrectly
+        /// (often ending up as solid black in Excel). The safest workaround is to replace Gray125
+        /// with an explicit solid fill (white) both for direct cell styles and for conditional formats.
+        /// </summary>
+        private static void FixGray125Fills(IXLWorksheet sheet, string? rangeAddress = null)
+        {
+            if (sheet is null) return;
+
+            // 1) Direct cell styles (only where template uses Gray125)
+            var range = !string.IsNullOrWhiteSpace(rangeAddress) ? sheet.Range(rangeAddress) : sheet.RangeUsed();
+            if (range != null)
+            {
+                foreach (var cell in range.Cells())
+                {
+                    if (cell.Style.Fill.PatternType == XLFillPatternValues.Gray125)
+                    {
+                        // Keep the 12.5% gray pattern, but force explicit colors (avoid Excel showing it as black)
+                        cell.Style.Fill.PatternType = XLFillPatternValues.Gray125;
+                        cell.Style.Fill.BackgroundColor = XLColor.White;
+                        cell.Style.Fill.PatternColor = XLColor.Black; // pattern (foreground)
+                    }
+                }
+            }
+
+            // 2) Conditional formats (template may have weekend rule using Gray125)
+            foreach (var cf in sheet.ConditionalFormats)
+            {
+                if (cf.Style.Fill.PatternType == XLFillPatternValues.Gray125)
+                {
+                    // Keep the 12.5% gray pattern, but force explicit colors (avoid Excel showing it as black)
+                    cf.Style.Fill.PatternType = XLFillPatternValues.Gray125;
+                    cf.Style.Fill.BackgroundColor = XLColor.White;
+                    cf.Style.Fill.PatternColor = XLColor.Black; // pattern (foreground)
+                }
+            }
+        }
+
+        // ===================== EXCEL FILL: MATRIX (1:1 style) =====================
+        private static void FillMatrixSheetFromTemplate(IXLWorksheet sheet, ScheduleExportContext context)
+        {
+            // Clear ONLY contents (keep template styles + column widths + row heights + conditional formatting)
+            sheet.Range(MatrixClearRange).Clear(XLClearOptions.Contents);
+
+            // B1 = ShopName
+            sheet.Cell(M_ShopRow, M_ShopCol).Value = context.ShopName;
+
+            var table = context.ScheduleMatrix?.Table;
+            if (table is null) return;
+
+            var visibleCols = table.Columns.Cast<DataColumn>()
                 .Where(c => c.ColumnName != ScheduleMatrixConstants.ConflictColumnName
                          && c.ColumnName != ScheduleMatrixConstants.WeekendColumnName)
                 .ToList();
 
-            var headerRow = 1;
-            var dataStartRow = headerRow + 1;
+            var dayCol = visibleCols.FirstOrDefault(c => c.ColumnName == ScheduleMatrixConstants.DayColumnName)
+                         ?? visibleCols.FirstOrDefault();
 
-            for (int colIndex = 0; colIndex < columns.Count; colIndex++)
+            var dataCols = visibleCols.Where(c => !ReferenceEquals(c, dayCol)).ToList();
+
+            // Capacity = template width: C..AA
+            var capacity = M_LastDataCol - M_FirstDataCol + 1;
+            if (dataCols.Count > capacity)
+                throw new InvalidOperationException($"Template supports max {capacity} employee columns (C..AA). Current: {dataCols.Count}.");
+
+            // Header: employee names
+            for (int i = 0; i < dataCols.Count; i++)
             {
-                var column = columns[colIndex];
-                var cell = sheet.Cell(headerRow, colIndex + 1);
-                cell.Value = string.IsNullOrWhiteSpace(column.Caption) ? column.ColumnName : column.Caption;
-                ApplyHeaderCellStyle(cell);
+                var col = dataCols[i];
+                sheet.Cell(M_HeaderRow, M_FirstDataCol + i).Value =
+                    string.IsNullOrWhiteSpace(col.Caption) ? col.ColumnName : col.Caption;
             }
 
-            var rowIndex = dataStartRow;
-            foreach (DataRowView rowView in context.ScheduleMatrix)
+            // Header placeholders (no employee) -> "0"
+            for (int c = M_FirstDataCol + dataCols.Count; c <= M_LastDataCol; c++)
+                sheet.Cell(M_HeaderRow, c).Value = "0";
+
+            // Fill days (rows 2..32)
+            var maxRows = Math.Min(M_DayCount, context.ScheduleMatrix.Count);
+            for (int r = 0; r < M_DayCount; r++)
             {
-                var isWeekend = GetBoolValue(rowView, ScheduleMatrixConstants.WeekendColumnName);
-                var hasConflict = GetBoolValue(rowView, ScheduleMatrixConstants.ConflictColumnName);
+                var excelRow = M_FirstDayRow + r;
 
-                for (int colIndex = 0; colIndex < columns.Count; colIndex++)
+                DataRowView? rowView = r < maxRows ? (DataRowView)context.ScheduleMatrix[r] : null;
+
+                // Put DateTime into column B so template conditional formatting draws weekend dotted fill correctly
+                if (rowView != null)
                 {
-                    var column = columns[colIndex];
-                    var cell = sheet.Cell(rowIndex, colIndex + 1);
+                    var date = TryBuildDate(context, dayCol, rowView);
+                    sheet.Cell(excelRow, M_DateCol).Value = date.HasValue ? date.Value : string.Empty;
+                }
+                else
+                {
+                    sheet.Cell(excelRow, M_DateCol).Value = string.Empty;
+                }
 
-                    cell.Value = GetCellText(rowView[column.ColumnName]);
-                    ApplyMatrixBodyStyle(cell, column.ColumnName == ScheduleMatrixConstants.DayColumnName);
+                // Real employee columns
+                for (int i = 0; i < dataCols.Count; i++)
+                {
+                    var col = dataCols[i];
+                    var cell = sheet.Cell(excelRow, M_FirstDataCol + i);
 
-                    if (isWeekend)
-                        ApplyWeekendStyle(cell);
-
-                    if (hasConflict && column.ColumnName == ScheduleMatrixConstants.DayColumnName)
-                        ApplyConflictStyle(cell);
-
-                    if (context.StyleProvider.TryBuildCellReference(rowView, column.ColumnName, out var cellRef)
-                        && context.StyleProvider.TryGetCellStyle(cellRef, out var style))
+                    if (rowView == null)
                     {
-                        ApplyCellStyle(cell, style);
-                    }
-                }
-
-                rowIndex++;
-            }
-
-            sheet.SheetView.FreezeRows(1);
-            sheet.SheetView.FreezeColumns(1);
-            sheet.Columns().AdjustToContents();
-            sheet.Rows().AdjustToContents();
-        }
-
-        private static void ExportStatisticSheet(IXLWorksheet sheet, ScheduleExportContext context)
-        {
-            var totalColumns = Math.Max(6, 2 + context.SummaryDayHeaders.Count * 3);
-            var currentRow = 1;
-
-            var titleCell = sheet.Cell(currentRow, 1);
-            titleCell.Value = "Schedule Statistic";
-            titleCell.Style.Font.Bold = true;
-            titleCell.Style.Font.FontSize = 16;
-            titleCell.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Left;
-            sheet.Range(currentRow, 1, currentRow, totalColumns).Merge();
-
-            currentRow += 2;
-
-            currentRow = WriteLabelValue(sheet, currentRow, "Name", context.ScheduleName);
-            currentRow = WriteLabelValue(sheet, currentRow, "Month", context.ScheduleMonth.ToString("D2", CultureInfo.InvariantCulture));
-            currentRow = WriteLabelValue(sheet, currentRow, "Year", context.ScheduleYear.ToString(CultureInfo.InvariantCulture));
-            currentRow = WriteLabelValue(sheet, currentRow, "Shop Name", context.ShopName);
-            currentRow = WriteLabelValue(sheet, currentRow, "Shop Address", context.ShopAddress);
-            currentRow = WriteLabelValue(sheet, currentRow, "Total Hours", context.TotalHoursText);
-            currentRow = WriteLabelValue(sheet, currentRow, "Total Employees", context.TotalEmployees.ToString(CultureInfo.InvariantCulture));
-            currentRow = WriteLabelValue(sheet, currentRow, "Total Days", context.TotalDays.ToString(CultureInfo.InvariantCulture));
-            currentRow = WriteLabelValue(sheet, currentRow, "Shift 1", context.Shift1);
-            currentRow = WriteLabelValue(sheet, currentRow, "Shift 2", context.Shift2);
-
-            currentRow += 1;
-            var employeeListCell = sheet.Cell(currentRow, 1);
-            employeeListCell.Value = $"Total employees ({context.TotalEmployees}): {context.TotalEmployeesListText}";
-            employeeListCell.Style.Font.FontSize = 12;
-            employeeListCell.Style.Alignment.WrapText = true;
-            sheet.Range(currentRow, 1, currentRow, totalColumns).Merge();
-
-            currentRow += 2;
-
-            if (context.SummaryDayHeaders.Count > 0)
-            {
-                var summaryStartRow = currentRow;
-                var employeeColumn = 1;
-                var sumColumn = 2;
-                var dayStartColumn = 3;
-
-                ApplyHeaderCellStyle(sheet.Cell(summaryStartRow, employeeColumn));
-                ApplyHeaderCellStyle(sheet.Cell(summaryStartRow, sumColumn));
-
-                var dayColumn = dayStartColumn;
-                foreach (var dayHeader in context.SummaryDayHeaders)
-                {
-                    var range = sheet.Range(summaryStartRow, dayColumn, summaryStartRow, dayColumn + 2);
-                    range.Merge();
-                    range.Value = dayHeader.Text;
-                    ApplyHeaderRangeStyle(range);
-                    dayColumn += 3;
-                }
-
-                var subHeaderRow = summaryStartRow + 1;
-                ApplyHeaderCellStyle(sheet.Cell(subHeaderRow, employeeColumn), "Employee");
-                ApplyHeaderCellStyle(sheet.Cell(subHeaderRow, sumColumn), "Sum");
-
-                dayColumn = dayStartColumn;
-                foreach (var _ in context.SummaryDayHeaders)
-                {
-                    ApplyHeaderCellStyle(sheet.Cell(subHeaderRow, dayColumn), "From");
-                    ApplyHeaderCellStyle(sheet.Cell(subHeaderRow, dayColumn + 1), "To");
-                    ApplyHeaderCellStyle(sheet.Cell(subHeaderRow, dayColumn + 2), "Hours");
-                    dayColumn += 3;
-                }
-
-                var bodyRow = subHeaderRow + 1;
-                foreach (var summaryRow in context.SummaryRows)
-                {
-                    ApplyBodyCellStyle(sheet.Cell(bodyRow, employeeColumn), summaryRow.Employee, XLAlignmentHorizontalValues.Left);
-                    ApplyBodyCellStyle(sheet.Cell(bodyRow, sumColumn), summaryRow.Sum, XLAlignmentHorizontalValues.Center);
-
-                    dayColumn = dayStartColumn;
-                    var dayCells = summaryRow.Days ?? new List<ContainerScheduleProfileViewModel.SummaryDayCell>();
-                    for (int i = 0; i < context.SummaryDayHeaders.Count; i++)
-                    {
-                        var dayCell = i < dayCells.Count ? dayCells[i] : null;
-                        ApplyBodyCellStyle(sheet.Cell(bodyRow, dayColumn), dayCell?.From ?? string.Empty, XLAlignmentHorizontalValues.Center);
-                        ApplyBodyCellStyle(sheet.Cell(bodyRow, dayColumn + 1), dayCell?.To ?? string.Empty, XLAlignmentHorizontalValues.Center);
-                        ApplyBodyCellStyle(sheet.Cell(bodyRow, dayColumn + 2), dayCell?.Hours ?? string.Empty, XLAlignmentHorizontalValues.Center);
-                        dayColumn += 3;
+                        cell.Value = "-";
+                        continue;
                     }
 
-                    bodyRow++;
+                    SetDashIfEmpty(cell, rowView[col.ColumnName]);
                 }
 
-                currentRow = bodyRow + 2;
+                // Placeholder columns (no employee) -> "-"
+                for (int c = M_FirstDataCol + dataCols.Count; c <= M_LastDataCol; c++)
+                    sheet.Cell(excelRow, c).Value = "-";
             }
-
-            if (context.EmployeeWorkFreeStats.Count > 0)
-            {
-                var headerRow = currentRow;
-                ApplyHeaderCellStyle(sheet.Cell(headerRow, 1), "Employee");
-                ApplyHeaderCellStyle(sheet.Cell(headerRow, 2), "Work Day");
-                ApplyHeaderCellStyle(sheet.Cell(headerRow, 3), "Free Day");
-
-                var row = headerRow + 1;
-                foreach (var stat in context.EmployeeWorkFreeStats)
-                {
-                    ApplyBodyCellStyle(sheet.Cell(row, 1), stat.Employee, XLAlignmentHorizontalValues.Left);
-                    ApplyBodyCellStyle(sheet.Cell(row, 2), stat.WorkDays.ToString(CultureInfo.InvariantCulture), XLAlignmentHorizontalValues.Center);
-                    ApplyBodyCellStyle(sheet.Cell(row, 3), stat.FreeDays.ToString(CultureInfo.InvariantCulture), XLAlignmentHorizontalValues.Center);
-                    row++;
-                }
-            }
-
-            sheet.Columns().AdjustToContents();
-            sheet.Rows().AdjustToContents();
         }
 
-        private static int WriteLabelValue(IXLWorksheet sheet, int row, string label, string value)
+        private static void SetDashIfEmpty(IXLCell cell, object? value)
         {
-            var labelCell = sheet.Cell(row, 1);
-            labelCell.Value = $"{label}:";
-            labelCell.Style.Font.Bold = true;
-            labelCell.Style.Font.FontSize = 12;
-            labelCell.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Left;
+            if (value is null || value == DBNull.Value)
+            {
+                cell.Value = "-";
+                return;
+            }
 
-            var valueCell = sheet.Cell(row, 2);
-            valueCell.Value = value ?? string.Empty;
-            valueCell.Style.Font.FontSize = 12;
-            valueCell.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Left;
-            valueCell.Style.Alignment.WrapText = true;
-
-            return row + 1;
+            var text = value.ToString()?.Trim() ?? string.Empty;
+            cell.Value = string.IsNullOrWhiteSpace(text) ? "-" : text;
         }
 
+        // ===== helpers =====
+
+
+
+
+
+
+        private static DateTime? TryBuildDate(ScheduleExportContext context, DataColumn? dayCol, DataRowView rowView)
+        {
+            if (dayCol is null) return null;
+
+            var raw = rowView[dayCol.ColumnName];
+            if (raw is null || raw == DBNull.Value) return null;
+
+            if (raw is int d && d >= 1 && d <= 31)
+                return SafeDate(context.ScheduleYear, context.ScheduleMonth, d);
+
+            var s = raw.ToString()?.Trim();
+            if (int.TryParse(s, out var parsed) && parsed >= 1 && parsed <= 31)
+                return SafeDate(context.ScheduleYear, context.ScheduleMonth, parsed);
+
+            return null;
+        }
+
+        private static DateTime? SafeDate(int year, int month, int day)
+        {
+            try { return new DateTime(year, month, day); }
+            catch { return null; }
+        }
+
+        private static void SetExcelValuePreservingFormat(IXLCell cell, object? value)
+        {
+            if (value is null || value == DBNull.Value)
+            {
+                cell.Clear(XLClearOptions.Contents);
+                return;
+            }
+
+            // If already typed:
+            if (value is TimeSpan ts)
+            {
+                cell.Value = ts;
+                return;
+            }
+            if (value is DateTime dt)
+            {
+                cell.Value = dt;
+                return;
+            }
+            if (value is int or long or double or decimal)
+            {
+                cell.Value = Convert.ToString(value, CultureInfo.InvariantCulture) ?? string.Empty;
+                return;
+            }
+
+            var text = value.ToString()?.Trim() ?? string.Empty;
+
+            // Try parse HH:mm (helps if template uses time format)
+            if (TimeSpan.TryParse(text, CultureInfo.InvariantCulture, out var t1))
+            {
+                cell.Value = t1;
+                return;
+            }
+
+            cell.Value = text;
+        }
+
+        // ===================== EXCEL FILL: STATISTIC (1:1 style) =====================
+        private static void FillStatisticSheetFromTemplate(IXLWorksheet sheet, ScheduleExportContext context)
+        {
+            // Values B2..B11 (labels are in A and already styled in template)
+            sheet.Cell(2, S_ValueCol).Value = context.ScheduleName;
+            sheet.Cell(3, S_ValueCol).Value = context.ScheduleMonth.ToString("D2", CultureInfo.InvariantCulture);
+            sheet.Cell(4, S_ValueCol).Value = context.ScheduleYear.ToString(CultureInfo.InvariantCulture);
+            sheet.Cell(5, S_ValueCol).Value = context.ShopName;
+            sheet.Cell(6, S_ValueCol).Value = context.ShopAddress;
+            sheet.Cell(7, S_ValueCol).Value = context.TotalHoursText;
+            sheet.Cell(8, S_ValueCol).Value = context.TotalEmployees.ToString(CultureInfo.InvariantCulture);
+            sheet.Cell(9, S_ValueCol).Value = context.TotalDays.ToString(CultureInfo.InvariantCulture);
+            sheet.Cell(10, S_ValueCol).Value = context.Shift1;
+            sheet.Cell(11, S_ValueCol).Value = context.Shift2;
+
+            // Total employees line (A12 merged in template)
+            sheet.Cell(S_EmployeesLineRow, 1).Value =
+                $"Total employees ({context.TotalEmployees}): {context.TotalEmployeesListText}";
+
+            // Summary day headers (row 14, merged blocks of 3 columns each)
+            for (int i = 0; i < S_DaysCapacity; i++)
+            {
+                var col = S_FirstDayCol + i * 3; // C, F, I...
+                var text = i < context.SummaryDayHeaders.Count ? context.SummaryDayHeaders[i].Text : string.Empty;
+                sheet.Cell(S_DayHeaderRow, col).Value = text;
+            }
+
+            // Summary rows (template-styled range is limited; extend template if you need more)
+            if (context.SummaryRows.Count > S_MaxSummaryRows)
+                throw new InvalidOperationException($"Statistic template supports max {S_MaxSummaryRows} summary rows. Current: {context.SummaryRows.Count}. Extend the template styling below row {S_BodyFirstRow + S_MaxSummaryRows - 1}.");
+
+            for (int r = 0; r < S_MaxSummaryRows; r++)
+            {
+                var row = S_BodyFirstRow + r;
+
+                if (r >= context.SummaryRows.Count)
+                {
+                    // Clear unused row contents (keep formatting)
+                    sheet.Cell(row, 1).Clear(XLClearOptions.Contents);
+                    sheet.Cell(row, 2).Clear(XLClearOptions.Contents);
+                    for (int d = 0; d < S_DaysCapacity; d++)
+                    {
+                        var c = S_FirstDayCol + d * 3;
+                        sheet.Cell(row, c).Clear(XLClearOptions.Contents);
+                        sheet.Cell(row, c + 1).Clear(XLClearOptions.Contents);
+                        sheet.Cell(row, c + 2).Clear(XLClearOptions.Contents);
+                    }
+                    continue;
+                }
+
+                var summaryRow = context.SummaryRows[r];
+                sheet.Cell(row, 1).Value = summaryRow.Employee ?? string.Empty;
+                sheet.Cell(row, 2).Value = summaryRow.Sum ?? string.Empty;
+
+                // Snapshot Days (avoid background-thread issues with ObservableCollection)
+                var dayCells = summaryRow.Days?.ToList()
+                              ?? new List<ContainerScheduleProfileViewModel.SummaryDayCell>();
+
+                for (int d = 0; d < S_DaysCapacity; d++)
+                {
+                    var c = S_FirstDayCol + d * 3;
+                    var day = d < dayCells.Count ? dayCells[d] : null;
+
+                    sheet.Cell(row, c).Value = day?.From ?? string.Empty;
+                    sheet.Cell(row, c + 1).Value = day?.To ?? string.Empty;
+                    sheet.Cell(row, c + 2).Value = day?.Hours ?? string.Empty;
+                }
+            }
+
+            // Mini-table rows
+            if (context.EmployeeWorkFreeStats.Count > S_MaxMiniRows)
+                throw new InvalidOperationException($"Statistic template supports max {S_MaxMiniRows} mini-table rows. Current: {context.EmployeeWorkFreeStats.Count}. Extend the template styling below row {S_MiniBodyFirstRow + S_MaxMiniRows - 1}.");
+
+            for (int r = 0; r < S_MaxMiniRows; r++)
+            {
+                var row = S_MiniBodyFirstRow + r;
+
+                if (r >= context.EmployeeWorkFreeStats.Count)
+                {
+                    sheet.Cell(row, 1).Clear(XLClearOptions.Contents);
+                    sheet.Cell(row, 2).Clear(XLClearOptions.Contents);
+                    sheet.Cell(row, 3).Clear(XLClearOptions.Contents);
+                    continue;
+                }
+
+                var stat = context.EmployeeWorkFreeStats[r];
+                sheet.Cell(row, 1).Value = stat.Employee ?? string.Empty;
+                sheet.Cell(row, 2).Value = stat.WorkDays.ToString(CultureInfo.InvariantCulture);
+                sheet.Cell(row, 3).Value = stat.FreeDays.ToString(CultureInfo.InvariantCulture);
+            }
+        }
+
+        // ===================== SQL EXPORT (unchanged logic, just kept) =====================
         private static string BuildSqlScript(ScheduleSqlExportContext context)
         {
             var schedule = context.Schedule;
@@ -488,7 +683,6 @@ namespace WPFApp.Service
 
             sb.AppendLine();
             sb.AppendLine("COMMIT;");
-
             return sb.ToString();
         }
 
@@ -525,49 +719,30 @@ namespace WPFApp.Service
 
         private static string ToSqlLiteral(object? value)
         {
-            if (value is null)
-                return "NULL";
+            if (value is null) return "NULL";
 
-            if (value is string s)
-                return $"'{EscapeSqlString(s)}'";
-
-            if (value is bool b)
-                return b ? "1" : "0";
-
-            if (value is DateTime dt)
-                return $"'{dt:yyyy-MM-dd HH:mm:ss}'";
-
-            if (value is Enum)
-                return $"'{value}'";
+            if (value is string s) return $"'{EscapeSqlString(s)}'";
+            if (value is bool b) return b ? "1" : "0";
+            if (value is DateTime dt) return $"'{dt:yyyy-MM-dd HH:mm:ss}'";
+            if (value is Enum) return $"'{value}'";
 
             if (value is IFormattable formattable)
-                return formattable.ToString(null, CultureInfo.InvariantCulture);
+                return formattable.ToString(null, CultureInfo.InvariantCulture) ?? "NULL";
 
             return $"'{EscapeSqlString(value.ToString() ?? string.Empty)}'";
         }
 
-        private static string EscapeSqlString(string value)
-            => value.Replace("'", "''");
+        private static string EscapeSqlString(string value) => value.Replace("'", "''");
 
-        private static string GetCellText(object? value)
-        {
-            if (value is null || value == DBNull.Value)
-                return string.Empty;
-
-            return value.ToString() ?? string.Empty;
-        }
-
+        // ===================== EXISTING HELPERS (kept) =====================
         private static bool GetBoolValue(DataRowView rowView, string columnName)
         {
-            if (!rowView.Row.Table.Columns.Contains(columnName))
-                return false;
+            if (rowView?.Row?.Table == null) return false;
+            if (!rowView.Row.Table.Columns.Contains(columnName)) return false;
 
             var value = rowView[columnName];
-            if (value is bool b)
-                return b;
-
-            if (value is null || value == DBNull.Value)
-                return false;
+            if (value is bool b) return b;
+            if (value is null || value == DBNull.Value) return false;
 
             if (bool.TryParse(value.ToString(), out var parsed))
                 return parsed;
@@ -575,81 +750,6 @@ namespace WPFApp.Service
             return false;
         }
 
-        private static void ApplyHeaderCellStyle(IXLCell cell, string? text = null)
-        {
-            if (text != null)
-                cell.Value = text;
-
-            cell.Style.Font.Bold = true;
-            cell.Style.Font.FontSize = 12;
-            cell.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
-            cell.Style.Alignment.Vertical = XLAlignmentVerticalValues.Center;
-            cell.Style.Alignment.WrapText = true;
-            cell.Style.Fill.BackgroundColor = XLColor.FromHtml("#F2F2F2");
-            ApplyBorder(cell.Style.Border);
-        }
-
-        private static void ApplyHeaderRangeStyle(IXLRange range)
-        {
-            range.Style.Font.Bold = true;
-            range.Style.Font.FontSize = 12;
-            range.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
-            range.Style.Alignment.Vertical = XLAlignmentVerticalValues.Center;
-            range.Style.Alignment.WrapText = true;
-            range.Style.Fill.BackgroundColor = XLColor.FromHtml("#F2F2F2");
-            ApplyBorder(range.Style.Border);
-        }
-
-        private static void ApplyBodyCellStyle(IXLCell cell, string text, XLAlignmentHorizontalValues align)
-        {
-            cell.Value = text ?? string.Empty;
-            cell.Style.Alignment.Horizontal = align;
-            cell.Style.Alignment.Vertical = XLAlignmentVerticalValues.Center;
-            cell.Style.Alignment.WrapText = true;
-            ApplyBorder(cell.Style.Border);
-        }
-
-        private static void ApplyMatrixBodyStyle(IXLCell cell, bool isDayColumn)
-        {
-            cell.Style.Alignment.Horizontal = isDayColumn
-                ? XLAlignmentHorizontalValues.Left
-                : XLAlignmentHorizontalValues.Center;
-            cell.Style.Alignment.Vertical = XLAlignmentVerticalValues.Center;
-            cell.Style.Alignment.WrapText = true;
-            ApplyBorder(cell.Style.Border);
-        }
-
-        private static void ApplyWeekendStyle(IXLCell cell)
-        {
-            cell.Style.Fill.BackgroundColor = XLColor.FromHtml("#EDEDED");
-        }
-
-        private static void ApplyConflictStyle(IXLCell cell)
-        {
-            cell.Style.Fill.BackgroundColor = XLColor.FromHtml("#F8D7DA");
-        }
-
-        private static void ApplyCellStyle(IXLCell cell, ScheduleCellStyleModel style)
-        {
-            if (style.BackgroundColorArgb.HasValue && style.BackgroundColorArgb.Value != 0)
-            {
-                var bg = ColorHelpers.FromArgb(style.BackgroundColorArgb.Value);
-                cell.Style.Fill.BackgroundColor = XLColor.FromArgb(bg.A, bg.R, bg.G, bg.B);
-            }
-
-            if (style.TextColorArgb.HasValue && style.TextColorArgb.Value != 0)
-            {
-                var fg = ColorHelpers.FromArgb(style.TextColorArgb.Value);
-                cell.Style.Font.FontColor = XLColor.FromArgb(fg.A, fg.R, fg.G, fg.B);
-            }
-        }
-
-        private static void ApplyBorder(IXLBorder border)
-        {
-            border.TopBorder = XLBorderStyleValues.Thin;
-            border.BottomBorder = XLBorderStyleValues.Thin;
-            border.LeftBorder = XLBorderStyleValues.Thin;
-            border.RightBorder = XLBorderStyleValues.Thin;
-        }
     }
 }
+
