@@ -582,7 +582,16 @@ namespace WPFApp.ViewModel.Container.ScheduleEdit
         public ShopModel? PendingSelectedShop
         {
             get => _pendingSelectedShop;
-            set => SetProperty(ref _pendingSelectedShop, value);
+            set
+            {
+                if (SetProperty(ref _pendingSelectedShop, value))
+                {
+                    // зняти помилку з ComboBox (pending)
+                    ClearValidationErrors(nameof(PendingSelectedShop));
+                    // і на всяк випадок зняти помилку з id-поля, якщо вона там
+                    ClearValidationErrors(nameof(ScheduleShopId));
+                }
+            }
         }
 
         public AvailabilityGroupModel? SelectedAvailabilityGroup
@@ -621,7 +630,13 @@ namespace WPFApp.ViewModel.Container.ScheduleEdit
         public AvailabilityGroupModel? PendingSelectedAvailabilityGroup
         {
             get => _pendingSelectedAvailabilityGroup;
-            set => SetProperty(ref _pendingSelectedAvailabilityGroup, value);
+            set
+            {
+                if (SetProperty(ref _pendingSelectedAvailabilityGroup, value))
+                {
+                    ClearValidationErrors(nameof(PendingSelectedAvailabilityGroup));
+                }
+            }
         }
 
         // --------------------------
@@ -824,5 +839,7 @@ namespace WPFApp.ViewModel.Container.ScheduleEdit
             // 10) Скасовуємо відкладені debounce-дії (Selection.cs)
             CancelSelectionDebounce();
         }
+
+
     }
 }

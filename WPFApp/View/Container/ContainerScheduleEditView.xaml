@@ -12,6 +12,35 @@
 
     <UserControl.Resources>
 
+        <ControlTemplate x:Key="InlineRedErrorTemplate">
+            <Border BorderBrush="#E53935" BorderThickness="2" CornerRadius="8" SnapsToDevicePixels="True">
+                <AdornedElementPlaceholder/>
+            </Border>
+        </ControlTemplate>
+
+        <Style x:Key="ValidatedRoundedComboBoxStyle"
+       TargetType="{x:Type ComboBox}"
+       BasedOn="{StaticResource RoundedComboBoxStyle}">
+            <Setter Property="Validation.ErrorTemplate" Value="{StaticResource InlineRedErrorTemplate}"/>
+            <Style.Triggers>
+                <Trigger Property="Validation.HasError" Value="True">
+                    <Setter Property="ToolTip"
+                    Value="{Binding RelativeSource={RelativeSource Self}, Path=(Validation.Errors)[0].ErrorContent}"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="ValidatedNumericUpDownStyle"
+       TargetType="{x:Type controls:NumericUpDown}">
+            <Setter Property="Validation.ErrorTemplate" Value="{StaticResource InlineRedErrorTemplate}"/>
+            <Style.Triggers>
+                <Trigger Property="Validation.HasError" Value="True">
+                    <Setter Property="ToolTip"
+                    Value="{Binding RelativeSource={RelativeSource Self}, Path=(Validation.Errors)[0].ErrorContent}"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
         <Style x:Key="SideCardTitleTextStyle" TargetType="TextBlock">
             <Setter Property="Visibility" Value="Visible"/>
             <Style.Triggers>
@@ -851,24 +880,27 @@
                                             <StackPanel Style="{StaticResource FieldBlockStyle}">
                                                 <TextBlock Text="People/shift" Style="{StaticResource FieldLabelStyle}" />
                                                 <controls:NumericUpDown Height="33"
-                                    Minimum="1" Maximum="50" Step="1"
-                                    Value="{Binding SchedulePeoplePerShift, UpdateSourceTrigger=PropertyChanged}" />
+                        Style="{StaticResource ValidatedNumericUpDownStyle}"
+                        Minimum="1" Maximum="50" Step="1"
+                        Value="{Binding SchedulePeoplePerShift, UpdateSourceTrigger=PropertyChanged, ValidatesOnNotifyDataErrors=True}" />
                                             </StackPanel>
 
                                             <!-- Month -->
                                             <StackPanel Style="{StaticResource FieldBlockStyle}">
                                                 <TextBlock Text="Month" Style="{StaticResource FieldLabelStyle}" />
                                                 <controls:NumericUpDown Height="33"
-                                    Minimum="1" Maximum="12" Step="1"
-                                    Value="{Binding ScheduleMonth, UpdateSourceTrigger=PropertyChanged}" />
+                        Style="{StaticResource ValidatedNumericUpDownStyle}"
+                        Minimum="1" Maximum="12" Step="1"
+                        Value="{Binding ScheduleMonth, UpdateSourceTrigger=PropertyChanged, ValidatesOnNotifyDataErrors=True}" />
                                             </StackPanel>
 
                                             <!-- Year -->
                                             <StackPanel Style="{StaticResource FieldBlockStyle}">
                                                 <TextBlock Text="Year" Style="{StaticResource FieldLabelStyle}" />
                                                 <controls:NumericUpDown Height="33"
-                                    Minimum="2000" Maximum="3000" Step="1"
-                                    Value="{Binding ScheduleYear, UpdateSourceTrigger=PropertyChanged}" />
+                        Style="{StaticResource ValidatedNumericUpDownStyle}"
+                        Minimum="2000" Maximum="3000" Step="1"
+                        Value="{Binding ScheduleYear, UpdateSourceTrigger=PropertyChanged, ValidatesOnNotifyDataErrors=True}" />
                                             </StackPanel>
 
                                             <!-- Shift 1 (на всю ширину) -->
@@ -895,32 +927,36 @@
                                             <StackPanel Style="{StaticResource FieldBlockStyle}">
                                                 <TextBlock Text="Max hours/emp" Style="{StaticResource FieldLabelStyle}" />
                                                 <controls:NumericUpDown Height="33"
-                                    Minimum="1" Maximum="400" Step="1"
-                                    Value="{Binding ScheduleMaxHoursPerEmp, UpdateSourceTrigger=PropertyChanged}" />
+                        Style="{StaticResource ValidatedNumericUpDownStyle}"
+                        Minimum="1" Maximum="400" Step="1"
+                        Value="{Binding ScheduleMaxHoursPerEmp, UpdateSourceTrigger=PropertyChanged, ValidatesOnNotifyDataErrors=True}" />
                                             </StackPanel>
 
                                             <!-- Max Consecutive Days -->
                                             <StackPanel Style="{StaticResource FieldBlockStyle}">
                                                 <TextBlock Text="Max consec. days" Style="{StaticResource FieldLabelStyle}" />
                                                 <controls:NumericUpDown Height="33"
-                                    Minimum="1" Maximum="31" Step="1"
-                                    Value="{Binding ScheduleMaxConsecutiveDays, UpdateSourceTrigger=PropertyChanged}" />
+                        Style="{StaticResource ValidatedNumericUpDownStyle}"
+                        Minimum="1" Maximum="31" Step="1"
+                        Value="{Binding ScheduleMaxConsecutiveDays, UpdateSourceTrigger=PropertyChanged, ValidatesOnNotifyDataErrors=True}" />
                                             </StackPanel>
 
                                             <!-- Max Consecutive Full -->
                                             <StackPanel Style="{StaticResource FieldBlockStyle}">
                                                 <TextBlock Text="Max consec. full" Style="{StaticResource FieldLabelStyle}" />
                                                 <controls:NumericUpDown Height="33"
-                                    Minimum="1" Maximum="31" Step="1"
-                                    Value="{Binding ScheduleMaxConsecutiveFull, UpdateSourceTrigger=PropertyChanged}" />
+                        Style="{StaticResource ValidatedNumericUpDownStyle}"
+                        Minimum="1" Maximum="31" Step="1"
+                        Value="{Binding ScheduleMaxConsecutiveFull, UpdateSourceTrigger=PropertyChanged, ValidatesOnNotifyDataErrors=True}" />
                                             </StackPanel>
 
                                             <!-- Max Full/Month -->
                                             <StackPanel Style="{StaticResource FieldBlockStyle}">
                                                 <TextBlock Text="Max full/month" Style="{StaticResource FieldLabelStyle}" />
                                                 <controls:NumericUpDown Height="33"
-                                    Minimum="0" Maximum="31" Step="1"
-                                    Value="{Binding ScheduleMaxFullPerMonth, UpdateSourceTrigger=PropertyChanged}" />
+                        Style="{StaticResource ValidatedNumericUpDownStyle}"
+                        Minimum="0" Maximum="31" Step="1"
+                        Value="{Binding ScheduleMaxFullPerMonth, UpdateSourceTrigger=PropertyChanged, ValidatesOnNotifyDataErrors=True}" />
                                             </StackPanel>
 
                                         </UniformGrid>
@@ -972,8 +1008,9 @@
                                                     </Grid>
 
                                                     <ComboBox ItemsSource="{Binding Shops}"
-                                                      SelectedItem="{Binding PendingSelectedShop}"
-                                                      DisplayMemberPath="Name"
+          SelectedItem="{Binding PendingSelectedShop,
+                                UpdateSourceTrigger=PropertyChanged,
+                                ValidatesOnNotifyDataErrors=True}"                                                      DisplayMemberPath="Name"
                                                       Style="{StaticResource RoundedComboBoxStyle}"
                                                       ItemContainerStyle="{StaticResource RoundedComboBoxItemStyle}"
                                                       MaxDropDownHeight="420"
@@ -1043,8 +1080,9 @@
                                                     </Grid>
 
                                                     <ComboBox ItemsSource="{Binding AvailabilityGroups}"
-          SelectedItem="{Binding PendingSelectedAvailabilityGroup}"
-          DisplayMemberPath="Name"
+          SelectedItem="{Binding PendingSelectedAvailabilityGroup,
+                                UpdateSourceTrigger=PropertyChanged,
+                                ValidatesOnNotifyDataErrors=True}"          DisplayMemberPath="Name"
           Tag="Select group..."
           Style="{StaticResource RoundedComboBoxStyle}"
           ItemContainerStyle="{StaticResource RoundedComboBoxItemStyle}"

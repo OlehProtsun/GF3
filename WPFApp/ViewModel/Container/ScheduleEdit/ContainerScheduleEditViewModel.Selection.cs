@@ -1,6 +1,9 @@
-﻿using System;
+﻿using DataAccessLayer.Models;
+using System;
 using System.Data;
 using WPFApp.Infrastructure.Threading;
+using WPFApp.Service;
+using WPFApp.ViewModel.Dialogs;
 
 namespace WPFApp.ViewModel.Container.ScheduleEdit
 {
@@ -132,6 +135,7 @@ namespace WPFApp.ViewModel.Container.ScheduleEdit
                 // Зміна групи доступності змінює “правила”, за якими генерується розклад.
                 // Тому старі згенеровані слоти стають недійсними.
                 InvalidateGeneratedSchedule(clearPreviewMatrix: true);
+                SafeForget(LoadAvailabilityContextAsync(newId));
             });
         }
 
@@ -181,6 +185,120 @@ namespace WPFApp.ViewModel.Container.ScheduleEdit
 
             // 5) Нотифікація, що матриця/стан змінився
             MatrixChanged?.Invoke(this, EventArgs.Empty);
+        }
+
+        private async Task LoadAvailabilityContextAsync(int availabilityGroupId)
+        {
+            if (SelectedBlock is null)
+                return;
+
+            if (availabilityGroupId <= 0)
+            {
+                await _owner.RunOnUiThreadAsync(() =>
+                {
+                    AvailabilityPreviewMatrix = new DataView();
+                    _availabilityPreviewKey = null;
+                    MatrixChanged?.Invoke(this, EventArgs.Empty);
+                }).ConfigureAwait(false);
+
+                return;
+            }
+
+            var year = ScheduleYear;
+            var month = ScheduleMonth;
+            if (year < 1 || month < 1 || month > 12)
+                return;
+
+            var previewKey = $"AV|{availabilityGroupId}|{year}|{month}";
+            if (IsAvailabilityPreviewCurrent(previewKey))
+                return;
+
+            try
+            {
+                var preview =
+                    await _owner.GetAvailabilityPreviewAsync(availabilityGroupId, year, month)
+                                .ConfigureAwait(false);
+
+                var employees = preview.employees ?? Array.Empty<EmployeeModel>();
+                var availabilitySlots = preview.availabilitySlots ?? Array.Empty<ScheduleSlotModel>();
+
+
+                await _owner.RunOnUiThreadAsync(() =>
+                {
+                    ReplaceScheduleEmployeesFromAvailability(employees);
+                }).ConfigureAwait(false);
+
+                // preview matrix build (background inside VM method)
+                var scheduleEmployeesSnapshot = SelectedBlock.Employees.ToList();
+                await RefreshAvailabilityPreviewMatrixAsync(
+                        year, month,
+                        availabilitySlots,
+                        scheduleEmployeesSnapshot,
+                        previewKey: previewKey)
+                    .ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                await _owner.RunOnUiThreadAsync(() =>
+                {
+                    CustomMessageBox.Show("Error", ex.Message, CustomMessageBoxIcon.Error, okText: "OK");
+                }).ConfigureAwait(false);
+            }
+        }
+
+        private void ReplaceScheduleEmployeesFromAvailability(IEnumerable<EmployeeModel> employees)
+        {
+            if (SelectedBlock is null)
+                return;
+
+            // preserve existing MinHoursMonth by EmployeeId
+            var oldMin = SelectedBlock.Employees
+                .GroupBy(x => x.EmployeeId)
+                .ToDictionary(g => g.Key, g => g.First().MinHoursMonth);
+
+            SelectedBlock.Employees.Clear();
+
+            foreach (var emp in employees
+                .Where(e => e != null)
+                .OrderBy(e => e.LastName)
+                .ThenBy(e => e.FirstName))
+            {
+                var min = oldMin.TryGetValue(emp.Id, out var v) ? v : 0;
+
+                SelectedBlock.Employees.Add(new ScheduleEmployeeModel
+                {
+                    EmployeeId = emp.Id,
+                    Employee = emp,
+                    MinHoursMonth = min
+                });
+            }
+
+            OnPropertyChanged(nameof(ScheduleEmployees));
+            RecalculateTotals();
+            MatrixChanged?.Invoke(this, EventArgs.Empty);
+        }
+
+        private void EnsureScheduleEmployeesFromAvailability(IList<EmployeeModel> employees)
+        {
+            if (SelectedBlock is null)
+                return;
+
+            // Мерджимо, не зносячи вже доданих вручну (щоб не ламати сценарії)
+            var existing = SelectedBlock.Employees.ToDictionary(e => e.EmployeeId);
+
+            foreach (var emp in employees)
+            {
+                if (existing.ContainsKey(emp.Id))
+                    continue;
+
+                // Мінімально необхідні поля (по твоєму XAML вони точно є):
+                SelectedBlock.Employees.Add(new ScheduleEmployeeModel
+                {
+                    EmployeeId = emp.Id,
+                    Employee = emp,
+                    MinHoursMonth = 0
+                });
+            }
         }
     }
 }

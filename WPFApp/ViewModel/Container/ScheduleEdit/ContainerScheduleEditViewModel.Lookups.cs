@@ -187,6 +187,10 @@ namespace WPFApp.ViewModel.Container.ScheduleEdit
                 return;
 
             SelectedShop = PendingSelectedShop;
+
+            // після коміту прибираємо помилки (і pending, і id)
+            ClearValidationErrors(nameof(PendingSelectedShop));
+            ClearValidationErrors(nameof(ScheduleShopId));
         }
 
         /// <summary>
@@ -198,6 +202,8 @@ namespace WPFApp.ViewModel.Container.ScheduleEdit
                 return;
 
             SelectedAvailabilityGroup = PendingSelectedAvailabilityGroup;
+
+            ClearValidationErrors(nameof(PendingSelectedAvailabilityGroup));
         }
 
 
