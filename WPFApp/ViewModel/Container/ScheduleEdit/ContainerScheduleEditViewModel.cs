@@ -6,6 +6,8 @@
 // - System.*: базові колекції/дані/тексти
 // - WPFApp.Infrastructure.*: твої утиліти (MatrixEngine, ValidationErrors, Debouncer тощо)
 // - WPFApp.Service: команди/RelayCommand, AsyncRelayCommand (ймовірно звідси)
+using BusinessLogicLayer.Availability;
+using BusinessLogicLayer.Services.Abstractions;
 using DataAccessLayer.Models;
 using DataAccessLayer.Models.Enums;
 using System.Collections.ObjectModel;
@@ -18,6 +20,7 @@ using System.Text;
 using System.Windows;
 using System.Windows.Media;
 using WPFApp.Infrastructure;
+using WPFApp.Infrastructure.AvailabilityPreview;
 using WPFApp.Infrastructure.ScheduleMatrix;
 using WPFApp.Infrastructure.Threading;
 using WPFApp.Infrastructure.Validation;
@@ -27,6 +30,7 @@ using WPFApp.ViewModel.Container.ScheduleEdit.Helpers;
 
 namespace WPFApp.ViewModel.Container.ScheduleEdit
 {
+
     /// <summary>
     /// Головний ViewModel для додавання/редагування Schedule (розкладу).
     ///
@@ -49,6 +53,8 @@ namespace WPFApp.ViewModel.Container.ScheduleEdit
     public sealed partial class ContainerScheduleEditViewModel
         : ViewModelBase, INotifyDataErrorInfo, IScheduleMatrixStyleProvider
     {
+        private readonly IAvailabilityGroupService _availabilityGroupService;
+        private readonly IEmployeeService _employeeService;
         // --------------------------
         // 1) РЕЖИМ "ФАРБУВАННЯ" КЛІТИНОК
         // --------------------------
@@ -182,10 +188,12 @@ namespace WPFApp.ViewModel.Container.ScheduleEdit
         // -------------------------------------------------------
 
         // Подія: WPF підписується, щоб реагувати на зміну помилок для властивості.
-        public event EventHandler<DataErrorsChangedEventArgs>? ErrorsChanged
+        public event EventHandler<DataErrorsChangedEventArgs>? ErrorsChanged;
+
+        private void Validation_ErrorsChanged(object? sender, DataErrorsChangedEventArgs e)
         {
-            add => _validation.ErrorsChanged += value;
-            remove => _validation.ErrorsChanged -= value;
+            // Перепіднімаємо подію від імені VM (sender = this)
+            ErrorsChanged?.Invoke(this, e);
         }
 
         // Чи є хоч одна помилка у формі.
@@ -439,21 +447,33 @@ namespace WPFApp.ViewModel.Container.ScheduleEdit
         public int ScheduleYear
         {
             get => SelectedBlock?.Model.Year ?? 0;
-            set => SetScheduleValue(
-                value,
-                m => m.Year,
-                (m, v) => m.Year = v,
-                invalidateGenerated: true); // зміна року робить старі слоти неактуальними
+            set
+            {
+                if (SetScheduleValue(
+                        value,
+                        m => m.Year,
+                        (m, v) => m.Year = v,
+                        invalidateGenerated: true))
+                {
+                    OnSchedulePeriodChanged();
+                }
+            }
         }
 
         public int ScheduleMonth
         {
             get => SelectedBlock?.Model.Month ?? 0;
-            set => SetScheduleValue(
-                value,
-                m => m.Month,
-                (m, v) => m.Month = v,
-                invalidateGenerated: true); // зміна місяця також інвалідить слоти
+            set
+            {
+                if (SetScheduleValue(
+                        value,
+                        m => m.Month,
+                        (m, v) => m.Month = v,
+                        invalidateGenerated: true))
+                {
+                    OnSchedulePeriodChanged();
+                }
+            }
         }
 
         public int SchedulePeoplePerShift
@@ -584,15 +604,14 @@ namespace WPFApp.ViewModel.Container.ScheduleEdit
             get => _pendingSelectedShop;
             set
             {
-                if (SetProperty(ref _pendingSelectedShop, value))
-                {
-                    // зняти помилку з ComboBox (pending)
-                    ClearValidationErrors(nameof(PendingSelectedShop));
-                    // і на всяк випадок зняти помилку з id-поля, якщо вона там
-                    ClearValidationErrors(nameof(ScheduleShopId));
-                }
+                SetProperty(ref _pendingSelectedShop, value);
+
+                ClearValidationErrors(nameof(PendingSelectedShop));
+                ClearValidationErrors(nameof(ScheduleShopId));
+                ClearValidationErrors(nameof(SelectedShop)); // ← додати
             }
         }
+
 
         public AvailabilityGroupModel? SelectedAvailabilityGroup
         {
@@ -632,10 +651,8 @@ namespace WPFApp.ViewModel.Container.ScheduleEdit
             get => _pendingSelectedAvailabilityGroup;
             set
             {
-                if (SetProperty(ref _pendingSelectedAvailabilityGroup, value))
-                {
-                    ClearValidationErrors(nameof(PendingSelectedAvailabilityGroup));
-                }
+                SetProperty(ref _pendingSelectedAvailabilityGroup, value);
+                ClearValidationErrors(nameof(PendingSelectedAvailabilityGroup));
             }
         }
 
@@ -735,9 +752,13 @@ namespace WPFApp.ViewModel.Container.ScheduleEdit
         // --------------------------
         // 18) КОНСТРУКТОР
         // --------------------------
-        public ContainerScheduleEditViewModel(ContainerViewModel owner)
+        public ContainerScheduleEditViewModel(ContainerViewModel owner, IAvailabilityGroupService availabilityGroupService,
+            IEmployeeService employeeService)
         {
+            _availabilityGroupService = availabilityGroupService;
+            _employeeService = employeeService;
             _owner = owner;
+            _validation.ErrorsChanged += Validation_ErrorsChanged;
 
             // Дебаунсери визначені в Selection.cs (partial),
             // але ініціалізуються тут у конструкторі.
@@ -838,6 +859,89 @@ namespace WPFApp.ViewModel.Container.ScheduleEdit
 
             // 10) Скасовуємо відкладені debounce-дії (Selection.cs)
             CancelSelectionDebounce();
+        }
+
+
+        public async Task<(IReadOnlyList<EmployeeModel> employees,
+                   IReadOnlyList<ScheduleSlotModel> availabilitySlots,
+                   bool periodMatched)>
+    GetAvailabilityPreviewAsync(
+        int availabilityGroupId,
+        int scheduleYear,
+        int scheduleMonth,
+        string? shift1Text,
+        string? shift2Text,
+        CancellationToken ct = default)
+        {
+            var (group, members, days) =
+                await _availabilityGroupService.LoadFullAsync(availabilityGroupId, ct)
+                                               .ConfigureAwait(false);
+
+            // 1) Employees завжди (навіть якщо місяць/рік не збігаються)
+            var empIds = members.Select(m => m.EmployeeId).Distinct().ToHashSet();
+
+            // Якщо members вже include-ять Employee — беремо звідти, інакше добираємо через EmployeeService
+            var empById = new Dictionary<int, EmployeeModel>();
+
+            foreach (var m in members)
+            {
+                if (m.Employee != null)
+                    empById[m.EmployeeId] = m.Employee;
+            }
+
+            if (empById.Count != empIds.Count)
+            {
+                var all = await _employeeService.GetAllAsync(ct).ConfigureAwait(false);
+                foreach (var e in all)
+                {
+                    if (empIds.Contains(e.Id))
+                        empById[e.Id] = e;
+                }
+            }
+
+            // проставляємо member.Employee (щоб AvailabilityPreviewBuilder міг правильно зібрати employees/slots)
+            foreach (var m in members)
+            {
+                if (m.Employee == null && empById.TryGetValue(m.EmployeeId, out var e))
+                    m.Employee = e;
+            }
+
+            var employees = empById.Values
+                .OrderBy(e => e.LastName)
+                .ThenBy(e => e.FirstName)
+                .ToList();
+
+            // 2) Перевірка періоду (це твоя бізнес-вимога)
+            var periodMatched = (group.Year == scheduleYear && group.Month == scheduleMonth);
+            if (!periodMatched)
+                return (employees, Array.Empty<ScheduleSlotModel>(), false);
+
+            // 3) Будуємо availability slots для preview (ANY -> shift1/shift2)
+            var shift1 = ParseShift(shift1Text);
+            var shift2 = ParseShift(shift2Text);
+
+            var (_, slots) = AvailabilityPreviewBuilder.Build(
+                members,
+                days,
+                shift1,
+                shift2,
+                ct);
+
+            return (employees, slots, true);
+        }
+
+        private static (string from, string to)? ParseShift(string? text)
+        {
+            if (string.IsNullOrWhiteSpace(text))
+                return null;
+
+            if (!AvailabilityCodeParser.TryNormalizeInterval(text, out var normalized))
+                return null;
+
+            var parts = normalized.Split('-', 2,
+                StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+            return parts.Length == 2 ? (parts[0], parts[1]) : null;
         }
 
 

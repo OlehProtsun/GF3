@@ -4,6 +4,14 @@ using System.Data;
 using WPFApp.Infrastructure.Threading;
 using WPFApp.Service;
 using WPFApp.ViewModel.Dialogs;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
+using System.Threading;
+using BusinessLogicLayer.Availability;
+using WPFApp.Infrastructure.AvailabilityPreview;
+
+
 
 namespace WPFApp.ViewModel.Container.ScheduleEdit
 {
@@ -209,27 +217,69 @@ namespace WPFApp.ViewModel.Container.ScheduleEdit
             if (year < 1 || month < 1 || month > 12)
                 return;
 
+            var expectedGroupId = availabilityGroupId;
+            var expectedYear = year;
+            var expectedMonth = month;
+
             var previewKey = $"AV|{availabilityGroupId}|{year}|{month}";
-            if (IsAvailabilityPreviewCurrent(previewKey))
-                return;
 
             try
             {
-                var preview =
-                    await _owner.GetAvailabilityPreviewAsync(availabilityGroupId, year, month)
-                                .ConfigureAwait(false);
+                // 1) Тягнемо group + members + days через BLL service
+                var (group, members, days) =
+                    await _availabilityGroupService.LoadFullAsync(availabilityGroupId, CancellationToken.None)
+                                                   .ConfigureAwait(false);
 
-                var employees = preview.employees ?? Array.Empty<EmployeeModel>();
-                var availabilitySlots = preview.availabilitySlots ?? Array.Empty<ScheduleSlotModel>();
+                // Guard: користувач міг змінити selection поки тягнули дані
+                if (SelectedAvailabilityGroup?.Id != expectedGroupId)
+                    return;
+                if (ScheduleYear != expectedYear || ScheduleMonth != expectedMonth)
+                    return;
 
+                // 2) Employees для "hours per employee" — завжди оновлюємо
+                var employees = await ResolveEmployeesForMembersAsync(members, CancellationToken.None)
+                    .ConfigureAwait(false);
+
+                List<ScheduleEmployeeModel> scheduleEmployeesSnapshot = new();
 
                 await _owner.RunOnUiThreadAsync(() =>
                 {
                     ReplaceScheduleEmployeesFromAvailability(employees);
+                    scheduleEmployeesSnapshot = SelectedBlock.Employees.ToList();
                 }).ConfigureAwait(false);
 
-                // preview matrix build (background inside VM method)
-                var scheduleEmployeesSnapshot = SelectedBlock.Employees.ToList();
+                // 3) Якщо період group != schedule (year/month) — preview НЕ будуємо
+                var periodMatched = (group.Year == year && group.Month == month);
+                if (!periodMatched)
+                {
+                    await _owner.RunOnUiThreadAsync(() =>
+                    {
+                        AvailabilityPreviewMatrix = new DataView();
+                        _availabilityPreviewKey = null;
+                        MatrixChanged?.Invoke(this, EventArgs.Empty);
+                    }).ConfigureAwait(false);
+
+                    return;
+                }
+
+                // 4) Build availability slots для preview
+                var shift1 = TryParseShiftIntervalText(ScheduleShift1);
+                var shift2 = TryParseShiftIntervalText(ScheduleShift2);
+
+                var (_, availabilitySlots) = AvailabilityPreviewBuilder.Build(
+                    members,
+                    days,
+                    shift1,
+                    shift2,
+                    CancellationToken.None);
+
+                // Guard ще раз перед важкою побудовою матриці
+                if (SelectedAvailabilityGroup?.Id != expectedGroupId)
+                    return;
+                if (ScheduleYear != expectedYear || ScheduleMonth != expectedMonth)
+                    return;
+
+                // 5) Build preview matrix
                 await RefreshAvailabilityPreviewMatrixAsync(
                         year, month,
                         availabilitySlots,
@@ -278,27 +328,123 @@ namespace WPFApp.ViewModel.Container.ScheduleEdit
             MatrixChanged?.Invoke(this, EventArgs.Empty);
         }
 
-        private void EnsureScheduleEmployeesFromAvailability(IList<EmployeeModel> employees)
+
+        private void OnSchedulePeriodChanged()
         {
-            if (SelectedBlock is null)
+            // Якщо availability group вже вибраний — треба одразу оновити:
+            // 1) список працівників (Min hours grid)
+            // 2) Availability preview (якщо для цього року/місяця є дані)
+            var groupId = SelectedAvailabilityGroup?.Id ?? 0;
+            if (groupId <= 0)
                 return;
 
-            // Мерджимо, не зносячи вже доданих вручну (щоб не ламати сценарії)
-            var existing = SelectedBlock.Employees.ToDictionary(e => e.EmployeeId);
-
-            foreach (var emp in employees)
-            {
-                if (existing.ContainsKey(emp.Id))
-                    continue;
-
-                // Мінімально необхідні поля (по твоєму XAML вони точно є):
-                SelectedBlock.Employees.Add(new ScheduleEmployeeModel
-                {
-                    EmployeeId = emp.Id,
-                    Employee = emp,
-                    MinHoursMonth = 0
-                });
-            }
+            // Використовуємо той самий debounce, щоб не спамити запити при швидкій зміні значень.
+            ScheduleAvailabilitySelectionChange(groupId);
         }
+
+        private static bool TryGetAvailabilityGroupPeriod(AvailabilityGroupModel? group, out int year, out int month)
+        {
+            year = 0;
+            month = 0;
+            if (group is null) return false;
+
+            static int ReadInt(object obj, string propName)
+            {
+                var p = obj.GetType().GetProperty(propName);
+                if (p == null) return 0;
+
+                var v = p.GetValue(obj);
+                if (v is int i) return i;
+                if (v is null) return 0;
+
+                // інколи можуть прилітати строки (залежить від моделі/мапінгу)
+                if (v is string s && int.TryParse(s, out var parsed))
+                    return parsed;
+
+                return 0;
+            }
+
+            year = ReadInt(group, "Year");
+            month = ReadInt(group, "Month");
+
+            return year > 0 && month is >= 1 and <= 12;
+        }
+
+
+        private bool IsAvailabilityPeriodMismatch(AvailabilityGroupModel? group, int scheduleYear, int scheduleMonth,
+            out int groupYear, out int groupMonth)
+        {
+            groupYear = 0;
+            groupMonth = 0;
+
+            if (scheduleYear <= 0 || scheduleMonth is < 1 or > 12)
+                return false;
+
+            if (!TryGetAvailabilityGroupPeriod(group, out groupYear, out groupMonth))
+                return false;
+
+            return groupYear != scheduleYear || groupMonth != scheduleMonth;
+        }
+
+        private async Task<List<EmployeeModel>> ResolveEmployeesForMembersAsync(
+    List<AvailabilityGroupMemberModel> members,
+    CancellationToken ct)
+        {
+            // спроба взяти Employee прямо з members (якщо repo робив Include)
+            var empById = new Dictionary<int, EmployeeModel>();
+            var neededIds = new HashSet<int>();
+
+            foreach (var m in members)
+            {
+                neededIds.Add(m.EmployeeId);
+
+                if (m.Employee != null)
+                    empById[m.EmployeeId] = m.Employee;
+            }
+
+            // якщо якихось Employee не вистачає — добираємо через EmployeeService.GetAllAsync і фільтруємо
+            if (empById.Count != neededIds.Count)
+            {
+                var all = await _employeeService.GetAllAsync(ct).ConfigureAwait(false);
+                foreach (var e in all)
+                {
+                    if (neededIds.Contains(e.Id))
+                        empById[e.Id] = e;
+                }
+
+                // прокинемо Employee назад у member, щоб AvailabilityPreviewBuilder мав m.Employee
+                foreach (var m in members)
+                {
+                    if (m.Employee == null && empById.TryGetValue(m.EmployeeId, out var e))
+                        m.Employee = e;
+                }
+            }
+
+            return empById.Values
+                .OrderBy(e => e.LastName)
+                .ThenBy(e => e.FirstName)
+                .ToList();
+        }
+
+        private static (string from, string to)? TryParseShiftIntervalText(string? text)
+        {
+            if (string.IsNullOrWhiteSpace(text))
+                return null;
+
+            // нормалізуємо до "HH:mm-HH:mm"
+            if (!AvailabilityCodeParser.TryNormalizeInterval(text, out var normalized))
+                return null;
+
+            var parts = normalized.Split('-', 2,
+                StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+            if (parts.Length != 2)
+                return null;
+
+            return (parts[0], parts[1]);
+        }
+
+
+
     }
 }

@@ -166,7 +166,10 @@ namespace WPFApp.ViewModel.Container.ScheduleEdit
         /// - true  => помилок немає, можна продовжувати (Save/Generate)
         /// - false => є помилки, UI покаже їх, дію треба зупинити
         /// </summary>
-        private bool ValidateBeforeSave(bool showDialog = true)
+        private bool ValidateBeforeSave(
+            bool showDialog = true,
+            bool requireShift2 = false,
+            bool requireAvailabilityGroup = false)
         {
             ApplyPendingSelectionsForValidation();
 
@@ -187,11 +190,12 @@ namespace WPFApp.ViewModel.Container.ScheduleEdit
                 return false;
             }
 
-            // 2) Base validation
+            // 2) ЄДИНЕ джерело базових правил для ScheduleModel
             var raw = ScheduleValidationRules.ValidateAll(model);
 
-            // 3) Map keys to VM properties (safe even if already VM keys)
+            // 3) ЄДИНЕ місце, де ключі приводяться до UI-binding property
             var errors = new Dictionary<string, string>(StringComparer.Ordinal);
+
             foreach (var kv in raw)
             {
                 var vmKey = MapValidationKeyToVm(kv.Key);
@@ -199,12 +203,38 @@ namespace WPFApp.ViewModel.Container.ScheduleEdit
                     errors[vmKey] = kv.Value;
             }
 
-            // 4) Extra: Shop / Availability (binds to Pending*)
-            if (model.ShopId <= 0)
-                errors[nameof(PendingSelectedShop)] = "Please select a shop.";
+            // 4a) Extra requirements (context-dependent)
+            // Generate needs AvailabilityGroup + Shift2; Save can be more permissive.
+            if (requireAvailabilityGroup)
+            {
+                if (SelectedAvailabilityGroup is null || SelectedAvailabilityGroup.Id <= 0)
+                {
+                    errors[nameof(SelectedAvailabilityGroup)] = "Please select an availability group.";
+                }
+            }
 
-            if (SelectedBlock.SelectedAvailabilityGroupId <= 0)
-                errors[nameof(PendingSelectedAvailabilityGroup)] = "Please select an availability group.";
+            if (requireShift2)
+            {
+                // Base rules allow empty Shift2 (optional). For Generate we require it.
+                if (string.IsNullOrWhiteSpace(model.Shift2Time))
+                {
+                    errors[nameof(ScheduleShift2)] = "Shift 2 time is required (example: 09:00 - 18:00).";
+                }
+            }
+
+            // 5) Period mismatch (якщо в AvailabilityGroup є Year/Month і вони не співпадають)
+            if (SelectedAvailabilityGroup is not null
+                && TryGetAvailabilityGroupPeriod(SelectedAvailabilityGroup, out var gy, out var gm)
+                && model.Year > 0 && model.Month is >= 1 and <= 12
+                && (gy != model.Year || gm != model.Month))
+            {
+                errors[nameof(SelectedAvailabilityGroup)] =
+                    $"Selected availability group is for {gy:D4}-{gm:D2}, but schedule is {model.Year:D4}-{model.Month:D2}.";
+            }
+
+            // 6) MinHours per employee (для MessageBox). Підсвітка клітинок йде через ValidationRule в XAML
+            if (SelectedBlock.Employees.Any(e => e.MinHoursMonth < 1))
+                errors[nameof(ScheduleEmployees)] = "Min hours per employee must be at least 1.";
 
             SetValidationErrors(errors);
 
@@ -229,22 +259,15 @@ namespace WPFApp.ViewModel.Container.ScheduleEdit
             if (SelectedBlock is null)
                 return;
 
-            using var _ = EnterSelectionSync();
+            // Вирівнюємо модель під фактичний Selected* (навіть якщо debounce ще не встиг)
+            var shopId = SelectedShop?.Id ?? 0;
+            if (ScheduleShopId != shopId)
+                ScheduleShopId = shopId;
 
-            if (!ReferenceEquals(PendingSelectedShop, SelectedShop))
-                SelectedShop = PendingSelectedShop;
-
-            if (!ReferenceEquals(PendingSelectedAvailabilityGroup, SelectedAvailabilityGroup))
-                SelectedAvailabilityGroup = PendingSelectedAvailabilityGroup;
-
-            var pendingShopId = PendingSelectedShop?.Id ?? 0;
-            if (ScheduleShopId != pendingShopId)
-                ScheduleShopId = pendingShopId;
-
-            var pendingGroupId = PendingSelectedAvailabilityGroup?.Id ?? 0;
-            if (SelectedBlock.SelectedAvailabilityGroupId != pendingGroupId)
+            var groupId = SelectedAvailabilityGroup?.Id ?? 0;
+            if (SelectedBlock.SelectedAvailabilityGroupId != groupId)
             {
-                SelectedBlock.SelectedAvailabilityGroupId = pendingGroupId;
+                SelectedBlock.SelectedAvailabilityGroupId = groupId;
                 InvalidateGeneratedSchedule(clearPreviewMatrix: true);
             }
         }
@@ -253,104 +276,48 @@ namespace WPFApp.ViewModel.Container.ScheduleEdit
         /// Обгортка над Save, яка спочатку запускає повну валідацію.
         /// Якщо є помилки — ми НЕ викликаємо _owner.SaveScheduleAsync().
         /// </summary>
-        private Task SaveWithValidationAsync()
+        private async Task SaveWithValidationAsync()
         {
-            if (!ValidateBeforeSave(showDialog: true))
-                return Task.CompletedTask;
+            var ok = await Application.Current.Dispatcher
+                .InvokeAsync(() => ValidateBeforeSave(showDialog: true));
 
-            return _owner.SaveScheduleAsync();
-        }                 /// Обгортка над Generate, яка спочатку запускає повну валідацію.
-                          /// Якщо є помилки — генерацію не запускаємо.
-                          /// </summary>
+            if (!ok)
+                return;
+
+            await _owner.SaveScheduleAsync().ConfigureAwait(false);
+        }               /// Обгортка над Generate, яка спочатку запускає повну валідацію.
+                        /// Якщо є помилки — генерацію не запускаємо.
+                        /// </summary>
         private async Task GenerateWithValidationAsync()
         {
-            if (!ValidateBeforeSave(showDialog: true))
+            var ok = await Application.Current.Dispatcher
+                .InvokeAsync(() => ValidateBeforeSave(
+                    showDialog: true,
+                    requireShift2: true,
+                    requireAvailabilityGroup: true));
+
+
+            if (!ok)
                 return;
 
             await _owner.GenerateScheduleAsync().ConfigureAwait(false);
 
-            // гарантовано оновити матрицю після генерації (щоб грід підхопив)
-            await RefreshScheduleMatrixAsync().ConfigureAwait(false);
+            await Application.Current.Dispatcher
+                .InvokeAsync(async () => await RefreshScheduleMatrixAsync());
         }
+
 
         private static string MapValidationKeyToVm(string key)
         {
-            // якщо твої rules вже повертають "ScheduleName" то мап не заважає (піде в default)
             return key switch
             {
-                nameof(ScheduleModel.Name) => nameof(ScheduleName),
-                nameof(ScheduleModel.Year) => nameof(ScheduleYear),
-                nameof(ScheduleModel.Month) => nameof(ScheduleMonth),
-                nameof(ScheduleModel.PeoplePerShift) => nameof(SchedulePeoplePerShift),
-                nameof(ScheduleModel.Shift1Time) => nameof(ScheduleShift1),
-                nameof(ScheduleModel.Shift2Time) => nameof(ScheduleShift2),
-                nameof(ScheduleModel.MaxHoursPerEmpMonth) => nameof(ScheduleMaxHoursPerEmp),
-                nameof(ScheduleModel.MaxConsecutiveDays) => nameof(ScheduleMaxConsecutiveDays),
-                nameof(ScheduleModel.MaxConsecutiveFull) => nameof(ScheduleMaxConsecutiveFull),
-                nameof(ScheduleModel.MaxFullPerMonth) => nameof(ScheduleMaxFullPerMonth),
-                nameof(ScheduleModel.ShopId) => nameof(PendingSelectedShop),
+                // ScheduleValidationRules.K_ScheduleShopId == "ScheduleShopId"
+                ScheduleValidationRules.K_ScheduleShopId => nameof(SelectedShop),
+
                 _ => key
             };
         }
-        private static bool TryParseShiftInterval(string? text)
-        {
-            if (string.IsNullOrWhiteSpace(text))
-                return false;
 
-            // приймаємо "08:00 - 16:00" та "08:00-16:00"
-            var parts = text.Split('-', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
-            if (parts.Length != 2) return false;
-
-            return TimeSpan.TryParseExact(parts[0], "hh\\:mm", CultureInfo.InvariantCulture, out _)
-                && TimeSpan.TryParseExact(parts[1], "hh\\:mm", CultureInfo.InvariantCulture, out _);
-        }
-
-        private void ShowValidationMessageBox()
-        {
-            var msgs = new List<string>();
-
-            foreach (var err in GetErrors(null))
-            {
-                if (err is string s && !string.IsNullOrWhiteSpace(s))
-                    msgs.Add(s);
-                else if (err != null)
-                    msgs.Add(err.ToString() ?? string.Empty);
-            }
-
-            var text = string.Join(Environment.NewLine, msgs.Where(x => !string.IsNullOrWhiteSpace(x)).Distinct());
-
-            if (!string.IsNullOrWhiteSpace(text))
-            {
-                MessageBox.Show(
-                    text,
-                    "Перевірте введені дані",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Warning);
-            }
-        }
-
-        private void ShowValidationSummary()
-        {
-            var all = new List<string>();
-
-            foreach (var e in GetErrors(null))
-            {
-                if (e is string s && !string.IsNullOrWhiteSpace(s))
-                    all.Add(s);
-                else if (e != null)
-                    all.Add(e.ToString() ?? string.Empty);
-            }
-
-            var text = string.Join(Environment.NewLine, all.Where(x => !string.IsNullOrWhiteSpace(x)).Distinct());
-            if (string.IsNullOrWhiteSpace(text))
-                return;
-
-            CustomMessageBox.Show(
-                "Validation",
-                text,
-                CustomMessageBoxIcon.Error,
-                okText: "OK");
-        }
 
         private static string BuildValidationSummary(IReadOnlyDictionary<string, string> errors)
         {
@@ -362,6 +329,8 @@ namespace WPFApp.ViewModel.Container.ScheduleEdit
             var text = sb.ToString().Trim();
             return string.IsNullOrWhiteSpace(text) ? "Please check the input values." : text;
         }
+
+
 
     }
 }

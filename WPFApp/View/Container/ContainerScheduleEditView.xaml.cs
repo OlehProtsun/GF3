@@ -10,6 +10,7 @@ using System.Windows.Data;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
+using WPFApp.Controls;
 using WPFApp.Service;
 using WPFApp.ViewModel.Container.Edit;
 using WPFApp.ViewModel.Container.Edit.Helpers;
@@ -850,6 +851,17 @@ namespace WPFApp.View.Container
             _logger.LogPerf(
                 "ScheduleGrid",
                 $"ScrollChanged: V={e.VerticalOffset:F2} H={e.HorizontalOffset:F2} ΔV={e.VerticalChange:F2} ΔH={e.HorizontalChange:F2}");
+        }
+
+        private void MinHoursCell_TargetUpdated(object sender, DataTransferEventArgs e)
+        {
+            // Важливо: ValidationRule не спрацьовує на старті,
+            // тому примусово “проганяємо” source update — отримаємо Validation.HasError одразу.
+            if (sender is DependencyObject d)
+            {
+                var be = BindingOperations.GetBindingExpression(d, NumericUpDown.ValueProperty);
+                be?.UpdateSource();
+            }
         }
     }
 }

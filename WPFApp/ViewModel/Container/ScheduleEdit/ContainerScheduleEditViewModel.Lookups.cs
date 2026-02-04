@@ -183,28 +183,33 @@ namespace WPFApp.ViewModel.Container.ScheduleEdit
         /// </summary>
         public void CommitPendingShopSelection()
         {
+            ClearValidationErrors(nameof(PendingSelectedShop));
+            ClearValidationErrors(nameof(ScheduleShopId));
+
+            // ВАЖЛИВО: саме це поле зараз підсвічується у UI
+            ClearValidationErrors(nameof(SelectedShop));
+
             if (PendingSelectedShop == SelectedShop)
                 return;
 
             SelectedShop = PendingSelectedShop;
-
-            // після коміту прибираємо помилки (і pending, і id)
-            ClearValidationErrors(nameof(PendingSelectedShop));
-            ClearValidationErrors(nameof(ScheduleShopId));
         }
+
 
         /// <summary>
         /// Аналогічно для AvailabilityGroup.
         /// </summary>
         public void CommitPendingAvailabilitySelection()
         {
+            ClearValidationErrors(nameof(PendingSelectedAvailabilityGroup));
+            ClearValidationErrors(nameof(SelectedAvailabilityGroup)); // ← додати
+
             if (PendingSelectedAvailabilityGroup == SelectedAvailabilityGroup)
                 return;
 
             SelectedAvailabilityGroup = PendingSelectedAvailabilityGroup;
-
-            ClearValidationErrors(nameof(PendingSelectedAvailabilityGroup));
         }
+
 
 
         // =========================

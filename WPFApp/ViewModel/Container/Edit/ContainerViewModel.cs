@@ -154,7 +154,10 @@ namespace WPFApp.ViewModel.Container.Edit
             ListVm = new ContainerListViewModel(this);
             EditVm = new ContainerEditViewModel(this);
             ProfileVm = new ContainerProfileViewModel(this);
-            ScheduleEditVm = new ContainerScheduleEditViewModel(this);
+            ScheduleEditVm = new ContainerScheduleEditViewModel(
+                this,
+                _availabilityGroupService,
+                _employeeService);
             ScheduleProfileVm = new ContainerScheduleProfileViewModel(this);
 
             ProfileVm.EmployeesLoader = LoadScheduleEmployeesAsync;
