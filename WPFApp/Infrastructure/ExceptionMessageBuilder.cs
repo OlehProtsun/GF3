@@ -1,4 +1,5 @@
 ﻿using System;
+using Microsoft.EntityFrameworkCore;
 using System.Diagnostics;
 using System.Text;
 
@@ -50,12 +51,18 @@ namespace WPFApp.Infrastructure
 
             // summary: максимально коротко.
             var summary = string.IsNullOrWhiteSpace(ex.Message) ? "Unknown error." : ex.Message;
+            if (ex is Microsoft.EntityFrameworkCore.DbUpdateException dbUpdate && dbUpdate.InnerException != null)
+                summary = $"{summary} (DB: {dbUpdate.InnerException.Message})";
 
             // Builder з початковою ємністю, щоб зменшити realloc при великих stack trace.
             var sb = new StringBuilder(capacity: 1024);
 
             // Додаємо короткий заголовок для details.
             sb.AppendLine("Exception details:");
+            sb.AppendLine();
+
+            sb.AppendLine("Exception.ToString():");
+            sb.AppendLine(ex.ToString());
             sb.AppendLine();
 
             // Записуємо ланцюг / aggregate.
@@ -115,6 +122,17 @@ namespace WPFApp.Infrastructure
             // Для звичайних exception: пишемо мітку рівня.
             var label = depth == 0 ? "Error" : $"Inner {depth}";
             sb.AppendLine($"{label}: {ex.GetType().Name}: {ex.Message}");
+
+            if (ex is DbUpdateException dbUpdateException)
+            {
+                var entries = dbUpdateException.Entries;
+                if (entries != null && entries.Count > 0)
+                {
+                    sb.AppendLine("DbUpdateException entries:");
+                    foreach (var entry in entries)
+                        sb.AppendLine($"- {entry.Metadata.Name} ({entry.State})");
+                }
+            }
 
             // StackTrace (якщо доступний і requested).
             if (includeStackTrace && !string.IsNullOrWhiteSpace(ex.StackTrace))
