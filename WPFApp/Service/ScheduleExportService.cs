@@ -12,6 +12,7 @@ using System.Threading.Tasks;
 using WPFApp.Infrastructure;
 using WPFApp.Infrastructure.ScheduleMatrix;
 using WPFApp.ViewModel.Container.ScheduleEdit.Helpers;
+using WPFApp.ViewModel.Container.Profile;
 using WPFApp.ViewModel.Container.ScheduleProfile;
 
 namespace WPFApp.Service
@@ -91,6 +92,82 @@ namespace WPFApp.Service
         }
     }
 
+
+
+    public sealed class ContainerExcelExportChartContext
+    {
+        public string ChartName { get; }
+        public ScheduleExportContext ScheduleContext { get; }
+
+        public ContainerExcelExportChartContext(string chartName, ScheduleExportContext scheduleContext)
+        {
+            ChartName = chartName ?? string.Empty;
+            ScheduleContext = scheduleContext ?? throw new ArgumentNullException(nameof(scheduleContext));
+        }
+    }
+
+    public sealed class ContainerExcelExportContext
+    {
+        public string ContainerName { get; }
+        public string ContainerNote { get; }
+        public int TotalEmployees { get; }
+        public int TotalShops { get; }
+        public string TotalEmployeesListText { get; }
+        public string TotalShopsListText { get; }
+        public string TotalHoursText { get; }
+        public IReadOnlyList<ContainerProfileViewModel.ShopHeader> ShopHeaders { get; }
+        public IReadOnlyList<ContainerProfileViewModel.EmployeeShopHoursRow> EmployeeShopHoursRows { get; }
+        public IReadOnlyList<ContainerProfileViewModel.EmployeeWorkFreeStatRow> EmployeeWorkFreeStats { get; }
+        public IReadOnlyList<ContainerExcelExportChartContext> Charts { get; }
+
+        public ContainerExcelExportContext(
+            string containerName,
+            string containerNote,
+            int totalEmployees,
+            int totalShops,
+            string totalEmployeesListText,
+            string totalShopsListText,
+            string totalHoursText,
+            IReadOnlyList<ContainerProfileViewModel.ShopHeader> shopHeaders,
+            IReadOnlyList<ContainerProfileViewModel.EmployeeShopHoursRow> employeeShopHoursRows,
+            IReadOnlyList<ContainerProfileViewModel.EmployeeWorkFreeStatRow> employeeWorkFreeStats,
+            IReadOnlyList<ContainerExcelExportChartContext> charts)
+        {
+            ContainerName = containerName ?? string.Empty;
+            ContainerNote = containerNote ?? string.Empty;
+            TotalEmployees = totalEmployees;
+            TotalShops = totalShops;
+            TotalEmployeesListText = totalEmployeesListText ?? string.Empty;
+            TotalShopsListText = totalShopsListText ?? string.Empty;
+            TotalHoursText = totalHoursText ?? string.Empty;
+            ShopHeaders = shopHeaders ?? Array.Empty<ContainerProfileViewModel.ShopHeader>();
+            EmployeeShopHoursRows = employeeShopHoursRows ?? Array.Empty<ContainerProfileViewModel.EmployeeShopHoursRow>();
+            EmployeeWorkFreeStats = employeeWorkFreeStats ?? Array.Empty<ContainerProfileViewModel.EmployeeWorkFreeStatRow>();
+            Charts = charts ?? Array.Empty<ContainerExcelExportChartContext>();
+        }
+    }
+
+    public sealed class ContainerSqlExportScheduleContext
+    {
+        public ScheduleSqlExportContext Schedule { get; }
+
+        public ContainerSqlExportScheduleContext(ScheduleSqlExportContext schedule)
+        {
+            Schedule = schedule ?? throw new ArgumentNullException(nameof(schedule));
+        }
+    }
+
+    public sealed class ContainerSqlExportContext
+    {
+        public ContainerModel Container { get; }
+        public IReadOnlyList<ContainerSqlExportScheduleContext> Charts { get; }
+
+        public ContainerSqlExportContext(ContainerModel container, IReadOnlyList<ContainerSqlExportScheduleContext> charts)
+        {
+            Container = container ?? throw new ArgumentNullException(nameof(container));
+            Charts = charts ?? Array.Empty<ContainerSqlExportScheduleContext>();
+        }
+    }
     public sealed class ScheduleSqlExportContext
     {
         public ScheduleModel Schedule { get; }
@@ -205,6 +282,54 @@ namespace WPFApp.Service
             if (string.IsNullOrWhiteSpace(filePath)) throw new ArgumentException("File path is required.", nameof(filePath));
 
             var script = BuildSqlScript(context);
+            await File.WriteAllTextAsync(filePath, script, Encoding.UTF8, ct).ConfigureAwait(false);
+        }
+
+
+        public Task ExportContainerToExcelAsync(ContainerExcelExportContext context, string filePath, CancellationToken ct = default)
+        {
+            if (context is null) throw new ArgumentNullException(nameof(context));
+            if (string.IsNullOrWhiteSpace(filePath)) throw new ArgumentException("File path is required.", nameof(filePath));
+
+            return Task.Run(() =>
+            {
+                ct.ThrowIfCancellationRequested();
+
+                var templatePath = ResolveExcelTemplatePath();
+                using var workbook = new XLWorkbook(templatePath);
+
+                var matrixTemplate = FindTemplateSheet(workbook, MatrixTemplateSheetNames)
+                    ?? throw new InvalidOperationException($"Matrix template sheet not found. Expected one of: {string.Join(", ", MatrixTemplateSheetNames)}");
+
+                var statTemplate = FindTemplateSheet(workbook, StatisticTemplateSheetNames)
+                    ?? throw new InvalidOperationException($"Statistic template sheet not found. Expected one of: {string.Join(", ", StatisticTemplateSheetNames)}");
+
+                var containerSheet = statTemplate.CopyTo(MakeUniqueSheetName(workbook, SanitizeWorksheetName("Container Statistic", "Container Statistic")));
+                FillContainerStatisticSheetFromTemplate(containerSheet, context);
+                FixGray125Fills(containerSheet);
+
+                foreach (var chart in context.Charts)
+                {
+                    ct.ThrowIfCancellationRequested();
+                    var sheetName = MakeUniqueSheetName(workbook, SanitizeWorksheetName(chart.ChartName, DefaultSheetName));
+                    var chartSheet = matrixTemplate.CopyTo(sheetName);
+                    FillMatrixSheetFromTemplate(chartSheet, chart.ScheduleContext);
+                    FixGray125Fills(chartSheet, "B2:AA32");
+                }
+
+                matrixTemplate.Delete();
+                statTemplate.Delete();
+
+                workbook.SaveAs(filePath);
+            }, ct);
+        }
+
+        public async Task ExportContainerToSqlAsync(ContainerSqlExportContext context, string filePath, CancellationToken ct = default)
+        {
+            if (context is null) throw new ArgumentNullException(nameof(context));
+            if (string.IsNullOrWhiteSpace(filePath)) throw new ArgumentException("File path is required.", nameof(filePath));
+
+            var script = BuildContainerSqlScript(context);
             await File.WriteAllTextAsync(filePath, script, Encoding.UTF8, ct).ConfigureAwait(false);
         }
 
@@ -562,7 +687,163 @@ namespace WPFApp.Service
             }
         }
 
+        private static void FillContainerStatisticSheetFromTemplate(IXLWorksheet sheet, ContainerExcelExportContext context)
+        {
+            sheet.RangeUsed()?.Clear(XLClearOptions.Contents);
+
+            sheet.Cell(2, 1).Value = "Container Name";
+            sheet.Cell(2, 2).Value = context.ContainerName;
+            sheet.Cell(3, 1).Value = "Container Note";
+            sheet.Cell(3, 2).Value = context.ContainerNote;
+            sheet.Cell(5, 1).Value = "Total Employees";
+            sheet.Cell(5, 2).Value = context.TotalEmployees;
+            sheet.Cell(6, 1).Value = "Total Shops";
+            sheet.Cell(6, 2).Value = context.TotalShops;
+            sheet.Cell(7, 1).Value = "Total Hours";
+            sheet.Cell(7, 2).Value = context.TotalHoursText;
+            sheet.Cell(8, 1).Value = "Employees";
+            sheet.Cell(8, 2).Value = context.TotalEmployeesListText;
+            sheet.Cell(9, 1).Value = "Shops";
+            sheet.Cell(9, 2).Value = context.TotalShopsListText;
+
+            var headerRow = 12;
+            sheet.Cell(headerRow, 1).Value = "Employee";
+            sheet.Cell(headerRow, 2).Value = "Sum";
+
+            var col = 3;
+            foreach (var shop in context.ShopHeaders)
+            {
+                sheet.Cell(headerRow, col++).Value = shop.Name;
+            }
+
+            var row = headerRow + 1;
+            foreach (var item in context.EmployeeShopHoursRows)
+            {
+                sheet.Cell(row, 1).Value = item.Employee;
+                sheet.Cell(row, 2).Value = item.HoursSum;
+                col = 3;
+                foreach (var shop in context.ShopHeaders)
+                {
+                    item.HoursByShop.TryGetValue(shop.Key, out var val);
+                    sheet.Cell(row, col++).Value = val ?? "0";
+                }
+                row++;
+            }
+
+            row += 2;
+            sheet.Cell(row, 1).Value = "Employee";
+            sheet.Cell(row, 2).Value = "Work Day";
+            sheet.Cell(row, 3).Value = "Free Day";
+            row++;
+
+            foreach (var wf in context.EmployeeWorkFreeStats)
+            {
+                sheet.Cell(row, 1).Value = wf.Employee;
+                sheet.Cell(row, 2).Value = wf.WorkDays;
+                sheet.Cell(row, 3).Value = wf.FreeDays;
+                row++;
+            }
+
+            sheet.Columns().AdjustToContents();
+            sheet.SheetView.FreezeRows(1);
+        }
+
         // ===================== SQL EXPORT (unchanged logic, just kept) =====================
+        private static string BuildContainerSqlScript(ContainerSqlExportContext context)
+        {
+            var sb = new StringBuilder(8192);
+            sb.AppendLine("-- GF3 Container export");
+            sb.AppendLine($"-- Generated: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+            sb.AppendLine("BEGIN TRANSACTION;");
+            sb.AppendLine();
+
+            var container = context.Container;
+            sb.AppendLine(SqlInsert("container",
+                ("id", container.Id),
+                ("name", container.Name),
+                ("note", container.Note)));
+
+            var shops = new Dictionary<int, ShopModel>();
+            var employees = new Dictionary<int, EmployeeModel>();
+            var availabilityGroups = new Dictionary<int, AvailabilityGroupModel>();
+            var availabilityMembers = new Dictionary<int, AvailabilityGroupMemberModel>();
+            var availabilityDays = new Dictionary<int, AvailabilityGroupDayModel>();
+            var schedules = new List<ScheduleModel>();
+            var scheduleEmployees = new List<ScheduleEmployeeModel>();
+            var slots = new List<ScheduleSlotModel>();
+            var styles = new List<ScheduleCellStyleModel>();
+
+            foreach (var chart in context.Charts)
+            {
+                var scheduleCtx = chart.Schedule;
+                var schedule = scheduleCtx.Schedule;
+                schedules.Add(schedule);
+
+                if (schedule.Shop != null && !shops.ContainsKey(schedule.Shop.Id))
+                    shops.Add(schedule.Shop.Id, schedule.Shop);
+
+                foreach (var employee in CollectEmployees(scheduleCtx))
+                {
+                    if (!employees.ContainsKey(employee.Id))
+                        employees.Add(employee.Id, employee);
+                }
+
+                if (scheduleCtx.AvailabilityGroupData is not null)
+                {
+                    var grp = scheduleCtx.AvailabilityGroupData.Group;
+                    if (!availabilityGroups.ContainsKey(grp.Id))
+                        availabilityGroups.Add(grp.Id, grp);
+
+                    foreach (var member in scheduleCtx.AvailabilityGroupData.Members)
+                    {
+                        if (!availabilityMembers.ContainsKey(member.Id))
+                            availabilityMembers.Add(member.Id, member);
+                    }
+
+                    foreach (var day in scheduleCtx.AvailabilityGroupData.Days)
+                    {
+                        if (!availabilityDays.ContainsKey(day.Id))
+                            availabilityDays.Add(day.Id, day);
+                    }
+                }
+
+                scheduleEmployees.AddRange(scheduleCtx.Employees ?? Array.Empty<ScheduleEmployeeModel>());
+                slots.AddRange(scheduleCtx.Slots ?? Array.Empty<ScheduleSlotModel>());
+                styles.AddRange(scheduleCtx.CellStyles ?? Array.Empty<ScheduleCellStyleModel>());
+            }
+
+            foreach (var shop in shops.Values.OrderBy(s => s.Id))
+                sb.AppendLine(SqlInsert("shop", ("id", shop.Id), ("name", shop.Name), ("address", shop.Address), ("description", shop.Description)));
+
+            foreach (var employee in employees.Values.OrderBy(e => e.Id))
+                sb.AppendLine(SqlInsert("employee", ("id", employee.Id), ("first_name", employee.FirstName), ("last_name", employee.LastName), ("phone", employee.Phone), ("email", employee.Email)));
+
+            foreach (var group in availabilityGroups.Values.OrderBy(g => g.Id))
+                sb.AppendLine(SqlInsert("availability_group", ("id", group.Id), ("name", group.Name), ("year", group.Year), ("month", group.Month)));
+
+            foreach (var member in availabilityMembers.Values.OrderBy(m => m.Id))
+                sb.AppendLine(SqlInsert("availability_group_member", ("id", member.Id), ("availability_group_id", member.AvailabilityGroupId), ("employee_id", member.EmployeeId)));
+
+            foreach (var day in availabilityDays.Values.OrderBy(d => d.Id))
+                sb.AppendLine(SqlInsert("availability_group_day", ("id", day.Id), ("availability_group_member_id", day.AvailabilityGroupMemberId), ("day_of_month", day.DayOfMonth), ("kind", day.Kind.ToString()), ("interval_str", day.IntervalStr)));
+
+            foreach (var schedule in schedules.OrderBy(s => s.Id))
+                sb.AppendLine(SqlInsert("schedule", ("id", schedule.Id), ("container_id", schedule.ContainerId), ("shop_id", schedule.ShopId), ("name", schedule.Name), ("year", schedule.Year), ("month", schedule.Month), ("people_per_shift", schedule.PeoplePerShift), ("shift1_time", schedule.Shift1Time), ("shift2_time", schedule.Shift2Time), ("max_hours_per_emp_month", schedule.MaxHoursPerEmpMonth), ("max_consecutive_days", schedule.MaxConsecutiveDays), ("max_consecutive_full", schedule.MaxConsecutiveFull), ("max_full_per_month", schedule.MaxFullPerMonth), ("note", schedule.Note), ("availability_group_id", schedule.AvailabilityGroupId)));
+
+            foreach (var se in scheduleEmployees.OrderBy(e => e.Id))
+                sb.AppendLine(SqlInsert("schedule_employee", ("id", se.Id), ("schedule_id", se.ScheduleId), ("employee_id", se.EmployeeId), ("min_hours_month", se.MinHoursMonth)));
+
+            foreach (var slot in slots.OrderBy(s => s.Id))
+                sb.AppendLine(SqlInsert("schedule_slot", ("id", slot.Id), ("schedule_id", slot.ScheduleId), ("day_of_month", slot.DayOfMonth), ("slot_no", slot.SlotNo), ("employee_id", slot.EmployeeId), ("status", slot.Status.ToString()), ("from_time", slot.FromTime), ("to_time", slot.ToTime)));
+
+            foreach (var style in styles.OrderBy(s => s.Id))
+                sb.AppendLine(SqlInsert("schedule_cell_style", ("id", style.Id), ("schedule_id", style.ScheduleId), ("day_of_month", style.DayOfMonth), ("employee_id", style.EmployeeId), ("background_color_argb", style.BackgroundColorArgb), ("text_color_argb", style.TextColorArgb)));
+
+            sb.AppendLine();
+            sb.AppendLine("COMMIT;");
+            return sb.ToString();
+        }
+
         private static string BuildSqlScript(ScheduleSqlExportContext context)
         {
             var schedule = context.Schedule;
