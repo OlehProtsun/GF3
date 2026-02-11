@@ -1,4 +1,5 @@
 ﻿using DataAccessLayer.Models;
+using Microsoft.Win32;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -11,6 +12,10 @@ using System.Threading;
 using System.Threading.Tasks;
 using WPFApp.Infrastructure;
 using WPFApp.Infrastructure.ScheduleMatrix;
+using WPFApp.Service;
+using WPFApp.ViewModel.Container.ScheduleProfile;
+using WPFApp.ViewModel.Container.ScheduleEdit.Helpers;
+using System.Windows.Media;
 using WPFApp.ViewModel.Container.Edit;
 using WPFApp.ViewModel.Container.List;
 using WPFApp.ViewModel.Container.ScheduleList;
@@ -46,11 +51,15 @@ namespace WPFApp.ViewModel.Container.Profile
         // ===================== Nested schedule list =====================
         public ContainerScheduleListViewModel ScheduleListVm { get; }
 
+        private ContainerModel? _currentContainer;
+
         // ===================== Commands =====================
         public AsyncRelayCommand BackCommand { get; }
         public AsyncRelayCommand CancelProfileCommand { get; }
         public AsyncRelayCommand EditCommand { get; }
         public AsyncRelayCommand DeleteCommand { get; }
+        public AsyncRelayCommand ExportToExcelCommand { get; }
+        public AsyncRelayCommand ExportToCodeCommand { get; }
 
         // ===================== OPTIONAL loaders (кращий шлях для точних даних) =====================
         // Якщо ScheduleListVm.Items не містить employees/slots, то встанови ці делегати з owner/repo
@@ -172,17 +181,25 @@ namespace WPFApp.ViewModel.Container.Profile
 
             EditCommand = new AsyncRelayCommand(async () => await _owner.EditSelectedAsync());
             DeleteCommand = new AsyncRelayCommand(async () => await _owner.DeleteSelectedAsync());
+            ExportToExcelCommand = new AsyncRelayCommand(ExportToExcelAsync, CanExport);
+            ExportToCodeCommand = new AsyncRelayCommand(ExportToCodeAsync, CanExport);
 
             HookScheduleListForAutoStatistics();
         }
 
+        private bool CanExport()
+            => _currentContainer != null && ScheduleListVm.Items.Count > 0;
+
         public void SetProfile(ContainerModel model)
         {
+            _currentContainer = model;
             ContainerId = model.Id;
             Name = model.Name;
             Note = model.Note;
 
             // якщо schedules вже завантажені — пробуємо порахувати
+            ExportToExcelCommand.RaiseCanExecuteChanged();
+            ExportToCodeCommand.RaiseCanExecuteChanged();
             _ = QueueAutoStatsRebuildAsync();
         }
 
@@ -514,6 +531,8 @@ namespace WPFApp.ViewModel.Container.Profile
             }
 
             // перший запуск (на випадок якщо Items вже заповнений)
+            ExportToExcelCommand.RaiseCanExecuteChanged();
+            ExportToCodeCommand.RaiseCanExecuteChanged();
             _ = QueueAutoStatsRebuildAsync();
         }
 
@@ -534,6 +553,314 @@ namespace WPFApp.ViewModel.Container.Profile
             finally
             {
                 Interlocked.Exchange(ref _autoQueued, 0);
+                ExportToExcelCommand.RaiseCanExecuteChanged();
+                ExportToCodeCommand.RaiseCanExecuteChanged();
+            }
+        }
+
+        private async Task ExportToExcelAsync(CancellationToken ct)
+        {
+            if (_currentContainer is null)
+            {
+                _owner.ShowError("No container is selected for export.");
+                return;
+            }
+
+            var chartData = await BuildChartExportDataAsync(ct).ConfigureAwait(false);
+            if (chartData.Count == 0)
+            {
+                _owner.ShowError("No charts were found in this container.");
+                return;
+            }
+
+            var dialog = new SaveFileDialog
+            {
+                Title = "Export Container to Excel",
+                Filter = "Excel Workbook (*.xlsx)|*.xlsx|All Files (*.*)|*.*",
+                FileName = ScheduleExportService.SanitizeFileName($"{Name}.xlsx", "Container.xlsx")
+            };
+
+            if (dialog.ShowDialog() != true)
+                return;
+
+            var context = new ContainerExcelExportContext(
+                containerName: Name,
+                containerNote: Note ?? string.Empty,
+                totalEmployees: TotalEmployees,
+                totalShops: TotalShops,
+                totalEmployeesListText: TotalEmployeesListText,
+                totalShopsListText: TotalShopsListText,
+                totalHoursText: TotalHoursText,
+                shopHeaders: ShopHeaders.ToList(),
+                employeeShopHoursRows: EmployeeShopHoursRows.ToList(),
+                employeeWorkFreeStats: EmployeeWorkFreeStats.ToList(),
+                charts: chartData.Select(x => x.Excel).ToList());
+
+            try
+            {
+                await _owner.ExportContainerToExcelAsync(context, dialog.FileName, ct).ConfigureAwait(false);
+                _owner.ShowInfo($"Excel export saved to:{Environment.NewLine}{dialog.FileName}");
+            }
+            catch (Exception ex)
+            {
+                _owner.ShowError(ex);
+            }
+        }
+
+        private async Task ExportToCodeAsync(CancellationToken ct)
+        {
+            if (_currentContainer is null)
+            {
+                _owner.ShowError("No container is selected for export.");
+                return;
+            }
+
+            var chartData = await BuildChartExportDataAsync(ct).ConfigureAwait(false);
+            if (chartData.Count == 0)
+            {
+                _owner.ShowError("No charts were found in this container.");
+                return;
+            }
+
+            var dialog = new SaveFileDialog
+            {
+                Title = "Export Container to SQLite Script",
+                Filter = "SQLite Script (*.sql)|*.sql|All Files (*.*)|*.*",
+                FileName = ScheduleExportService.SanitizeFileName($"{Name}.sqlite.sql", "Container.sqlite.sql")
+            };
+
+            if (dialog.ShowDialog() != true)
+                return;
+
+            var context = new ContainerSqlExportContext(
+                container: _currentContainer,
+                charts: chartData.Select(x => x.Sql).ToList());
+
+            try
+            {
+                await _owner.ExportContainerToSqlAsync(context, dialog.FileName, ct).ConfigureAwait(false);
+                _owner.ShowInfo($"SQLite export saved to:{Environment.NewLine}{dialog.FileName}");
+            }
+            catch (Exception ex)
+            {
+                _owner.ShowError(ex);
+            }
+        }
+
+        private async Task<List<(ContainerExcelExportChartContext Excel, ContainerSqlExportScheduleContext Sql)>> BuildChartExportDataAsync(CancellationToken ct)
+        {
+            var result = new List<(ContainerExcelExportChartContext Excel, ContainerSqlExportScheduleContext Sql)>();
+            var items = ScheduleListVm.Items?.ToList() ?? new List<ScheduleRowVm>();
+
+            foreach (var row in items)
+            {
+                ct.ThrowIfCancellationRequested();
+
+                var detailed = await _owner.LoadScheduleDetailsForExportAsync(row.Model.Id, ct).ConfigureAwait(false);
+                if (detailed is null)
+                    continue;
+
+                var employees = detailed.Employees?.ToList() ?? new List<ScheduleEmployeeModel>();
+                var slots = detailed.Slots?.ToList() ?? new List<ScheduleSlotModel>();
+                var cellStyles = detailed.CellStyles?.ToList() ?? new List<ScheduleCellStyleModel>();
+
+                var matrix = ScheduleMatrixEngine.BuildScheduleTable(
+                    detailed.Year,
+                    detailed.Month,
+                    slots,
+                    employees,
+                    out var colMap,
+                    ct);
+
+                var totals = ScheduleTotalsCalculator.Calculate(employees, slots);
+                var summary = BuildScheduleSummary(detailed, matrix, colMap, employees);
+
+                var shop = detailed.Shop;
+                var scheduleName = string.IsNullOrWhiteSpace(detailed.Name) ? $"Schedule {detailed.Id}" : detailed.Name;
+                var shopName = shop?.Name ?? string.Empty;
+
+                var scheduleExcel = new ScheduleExportContext(
+                    scheduleName: scheduleName,
+                    scheduleMonth: detailed.Month,
+                    scheduleYear: detailed.Year,
+                    shopName: shopName,
+                    shopAddress: GetShopAddress(shop),
+                    totalHoursText: FormatHoursMinutes(totals.TotalDuration),
+                    totalEmployees: totals.TotalEmployees,
+                    totalDays: DateTime.DaysInMonth(detailed.Year, detailed.Month),
+                    shift1: detailed.Shift1Time ?? string.Empty,
+                    shift2: detailed.Shift2Time ?? string.Empty,
+                    totalEmployeesListText: BuildPreviewList(totals.EmployeeNames),
+                    scheduleMatrix: matrix.DefaultView,
+                    summaryDayHeaders: summary.Headers,
+                    summaryRows: summary.Rows,
+                    employeeWorkFreeStats: BuildEmployeeWorkFreeStats(summary.Rows, detailed.Year, detailed.Month),
+                    styleProvider: new NullScheduleMatrixStyleProvider());
+
+                var availabilityData = await _owner.LoadAvailabilityGroupExportDataAsync(detailed.AvailabilityGroupId, ct).ConfigureAwait(false);
+                var scheduleSql = new ScheduleSqlExportContext(detailed, employees, slots, cellStyles, availabilityData);
+
+                result.Add((
+                    new ContainerExcelExportChartContext(scheduleName, scheduleExcel),
+                    new ContainerSqlExportScheduleContext(scheduleSql)));
+            }
+
+            return result;
+        }
+
+        private static (List<ContainerScheduleProfileViewModel.SummaryDayHeader> Headers, List<ContainerScheduleProfileViewModel.SummaryEmployeeRow> Rows) BuildScheduleSummary(
+            ScheduleModel schedule,
+            System.Data.DataTable matrix,
+            Dictionary<string, int> colMap,
+            IList<ScheduleEmployeeModel> employees)
+        {
+            var daysInMonth = DateTime.DaysInMonth(schedule.Year, schedule.Month);
+            var rowsByDay = matrix.Rows.Cast<System.Data.DataRow>()
+                .ToDictionary(r => Convert.ToInt32(r[ScheduleMatrixConstants.DayColumnName], CultureInfo.InvariantCulture), r => r);
+
+            var headers = new List<ContainerScheduleProfileViewModel.SummaryDayHeader>(daysInMonth);
+            for (var d = 1; d <= daysInMonth; d++)
+            {
+                var dt = new DateTime(schedule.Year, schedule.Month, d);
+                headers.Add(new ContainerScheduleProfileViewModel.SummaryDayHeader(d, dt.ToString("dddd(dd.MM.yyyy)", CultureInfo.InvariantCulture)));
+            }
+
+            var colByEmpId = colMap.ToDictionary(kv => kv.Value, kv => kv.Key);
+            var rows = new List<ContainerScheduleProfileViewModel.SummaryEmployeeRow>(employees.Count);
+
+            foreach (var emp in employees)
+            {
+                if (!colByEmpId.TryGetValue(emp.EmployeeId, out var colName))
+                    continue;
+
+                var dayCells = new List<ContainerScheduleProfileViewModel.SummaryDayCell>(daysInMonth);
+                var sum = TimeSpan.Zero;
+
+                for (var d = 1; d <= daysInMonth; d++)
+                {
+                    if (!rowsByDay.TryGetValue(d, out var dr))
+                    {
+                        dayCells.Add(new ContainerScheduleProfileViewModel.SummaryDayCell());
+                        continue;
+                    }
+
+                    var raw = dr[colName]?.ToString() ?? string.Empty;
+                    if (string.IsNullOrWhiteSpace(raw) || raw == ScheduleMatrixConstants.EmptyMark)
+                    {
+                        dayCells.Add(new ContainerScheduleProfileViewModel.SummaryDayCell());
+                        continue;
+                    }
+
+                    if (TryParseTimeRanges(raw, out var from, out var to, out var dur))
+                    {
+                        sum += dur;
+                        dayCells.Add(new ContainerScheduleProfileViewModel.SummaryDayCell(from, to, FormatHoursCell(dur)));
+                    }
+                    else
+                    {
+                        dayCells.Add(new ContainerScheduleProfileViewModel.SummaryDayCell(raw, string.Empty, string.Empty));
+                    }
+                }
+
+                rows.Add(new ContainerScheduleProfileViewModel.SummaryEmployeeRow(GetEmployeeDisplayName(emp), FormatHoursCell(sum), dayCells));
+            }
+
+            return (headers, rows);
+        }
+
+        private static List<ContainerScheduleProfileViewModel.EmployeeWorkFreeStatRow> BuildEmployeeWorkFreeStats(
+            IList<ContainerScheduleProfileViewModel.SummaryEmployeeRow> summaryRows,
+            int year,
+            int month)
+        {
+            var totalDays = DateTime.DaysInMonth(year, month);
+            var list = new List<ContainerScheduleProfileViewModel.EmployeeWorkFreeStatRow>(summaryRows.Count);
+
+            foreach (var row in summaryRows)
+            {
+                var work = row.Days.Count(d => !string.IsNullOrWhiteSpace(d.From) || !string.IsNullOrWhiteSpace(d.To) || TryParseSummaryHoursToMinutes(d.Hours, out var m) && m > 0);
+                var free = Math.Max(0, totalDays - work);
+                list.Add(new ContainerScheduleProfileViewModel.EmployeeWorkFreeStatRow(row.Employee, work, free));
+            }
+
+            return list;
+        }
+
+        private static bool TryParseTimeRanges(string text, out string from, out string to, out TimeSpan duration)
+        {
+            from = string.Empty;
+            to = string.Empty;
+            duration = TimeSpan.Zero;
+
+            var matches = Regex.Matches(text ?? string.Empty, "\b([01]?\d|2[0-3]):[0-5]\d\b");
+            if (matches.Count < 2)
+                return false;
+
+            var times = new List<TimeSpan>(matches.Count);
+            foreach (Match m in matches)
+            {
+                if (TimeSpan.TryParseExact(m.Value, new[] { @"h\:mm", @"hh\:mm" }, CultureInfo.InvariantCulture, out var t))
+                    times.Add(t);
+            }
+
+            if (times.Count < 2)
+                return false;
+
+            from = times.First().ToString(@"hh\:mm", CultureInfo.InvariantCulture);
+            to = times.Last().ToString(@"hh\:mm", CultureInfo.InvariantCulture);
+
+            for (var i = 0; i + 1 < times.Count; i += 2)
+            {
+                var start = times[i];
+                var end = times[i + 1];
+                if (end < start) end += TimeSpan.FromDays(1);
+                duration += end - start;
+            }
+
+            return true;
+        }
+
+        private static bool TryParseSummaryHoursToMinutes(string? text, out int minutes)
+        {
+            minutes = 0;
+            var s = (text ?? string.Empty).Trim();
+            if (string.IsNullOrWhiteSpace(s) || s == "0") return true;
+
+            if (int.TryParse(s, NumberStyles.Integer, CultureInfo.InvariantCulture, out var h))
+            {
+                minutes = Math.Max(0, h * 60);
+                return true;
+            }
+
+            var m = SummaryHoursRegex.Match(s);
+            if (!m.Success) return false;
+
+            var hh = m.Groups[1].Success ? int.Parse(m.Groups[1].Value, CultureInfo.InvariantCulture) : 0;
+            var mm = m.Groups[2].Success ? int.Parse(m.Groups[2].Value, CultureInfo.InvariantCulture) : 0;
+            minutes = Math.Max(0, hh * 60 + mm);
+            return true;
+        }
+
+        private static string GetShopAddress(ShopModel? shop)
+        {
+            if (shop == null) return string.Empty;
+            return shop.Address ?? string.Empty;
+        }
+
+        private sealed class NullScheduleMatrixStyleProvider : IScheduleMatrixStyleProvider
+        {
+            public int CellStyleRevision => 0;
+            public Brush? GetCellBackgroundBrush(ScheduleMatrixCellRef cellRef) => null;
+            public Brush? GetCellForegroundBrush(ScheduleMatrixCellRef cellRef) => null;
+            public bool TryBuildCellReference(object? rowData, string? columnName, out ScheduleMatrixCellRef cellRef)
+            {
+                cellRef = default;
+                return false;
+            }
+            public bool TryGetCellStyle(ScheduleMatrixCellRef cellRef, out ScheduleCellStyleModel style)
+            {
+                style = null!;
+                return false;
             }
         }
 
