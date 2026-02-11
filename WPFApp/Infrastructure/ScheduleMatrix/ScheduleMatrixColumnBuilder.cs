@@ -6,7 +6,7 @@ using System.Windows.Shapes;
 using WPFApp.ViewModel.Container.Edit;
 using WPFApp.ViewModel.Container.ScheduleEdit;
 
-namespace WPFApp.View.Container
+namespace WPFApp.Infrastructure.ScheduleMatrix
 {
     public static class ScheduleMatrixColumnBuilder
     {
@@ -73,6 +73,14 @@ namespace WPFApp.View.Container
                     dot.SetBinding(UIElement.VisibilityProperty, new Binding($"[{conflictColName}]")
                     {
                         Converter = boolToVis
+                    });
+                    dot.SetValue(UIElement.VisibilityProperty, Visibility.Collapsed);
+
+                    dot.SetBinding(UIElement.VisibilityProperty, new Binding($"[{conflictColName}]")
+                    {
+                        Converter = boolToVis,
+                        FallbackValue = Visibility.Collapsed,
+                        TargetNullValue = Visibility.Collapsed
                     });
                     root.AppendChild(dot);
 

@@ -74,35 +74,52 @@ namespace WPFApp.ViewModel.Container.ScheduleEdit
         /// </summary>
         private void RecalculateTotals()
         {
-            _employeeTotalHoursText.Clear();
+            var block = SelectedBlock;
 
-            if (SelectedBlock is null)
+            if (block is null)
             {
+                _employeeTotalHoursText.Clear();
                 TotalEmployees = 0;
                 TotalHoursText = "0h 0m";
                 return;
             }
 
-            // 1) Рахуємо totals через винесений engine-клас
-            var result = ScheduleTotalsCalculator.Calculate(SelectedBlock.Employees, SelectedBlock.Slots);
+            // 1) Рахуємо totals
+            var result = ScheduleTotalsCalculator.Calculate(block.Employees, block.Slots);
 
-            // 2) Кількість працівників
-            TotalEmployees = result.TotalEmployees;
+            // 2) ОНОВЛЮЄМО кеш по працівниках ПЕРШИМ (не очищаємо на старті!)
+            var aliveIds = new HashSet<int>();
 
-            // 3) Загальна тривалість по всіх слотах
-            TotalHoursText = ScheduleTotalsCalculator.FormatHoursMinutes(result.TotalDuration);
-
-            // 4) Кеш текстів для кожного працівника
-            foreach (var emp in SelectedBlock.Employees)
+            foreach (var emp in block.Employees)
             {
                 var empId = emp.EmployeeId;
+                aliveIds.Add(empId);
 
-                // Якщо працівник не має слотів — у словнику може не бути ключа, тоді empTotal буде 00:00
                 result.PerEmployeeDuration.TryGetValue(empId, out var empTotal);
 
                 _employeeTotalHoursText[empId] =
                     $"Total hours: {ScheduleTotalsCalculator.FormatHoursMinutes(empTotal)}";
             }
+
+            // 3) Прибираємо “мертві” ключі (якщо працівників стало менше)
+            if (_employeeTotalHoursText.Count > aliveIds.Count)
+            {
+                var toRemove = new List<int>();
+
+                foreach (var id in _employeeTotalHoursText.Keys)
+                {
+                    if (!aliveIds.Contains(id))
+                        toRemove.Add(id);
+                }
+
+                foreach (var id in toRemove)
+                    _employeeTotalHoursText.Remove(id);
+            }
+
+            // 4) І ТІЛЬКИ ТЕПЕР міняємо TotalHoursText (це тригерить оновлення хедерів)
+            TotalEmployees = result.TotalEmployees;
+            TotalHoursText = ScheduleTotalsCalculator.FormatHoursMinutes(result.TotalDuration);
         }
+
     }
 }

@@ -273,8 +273,8 @@ namespace WPFApp.Infrastructure.Validation
         {
             note = note ?? string.Empty;
 
-            if (note.Length > 1000)
-                return "Note is too long (max 1000 chars).";
+            if (note.Length > 2000)
+                return "Note is too long (max 2000 chars).";
 
             return null;
         }

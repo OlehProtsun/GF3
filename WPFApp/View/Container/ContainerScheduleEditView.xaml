@@ -6,6 +6,7 @@
              xmlns:controls="clr-namespace:WPFApp.Controls"      
              xmlns:dt="clr-namespace:WPFApp.DesignTime"
              xmlns:validation="clr-namespace:WPFApp.Infrastructure.Validation"
+             xmlns:conv="clr-namespace:WPFApp.Converters"
              mc:Ignorable="d"
              d:DesignHeight="2000" d:DesignWidth="2000"
              d:DataContext="{d:DesignInstance Type=dt:ContainerScheduleEditDesignVM, IsDesignTimeCreatable=True}"
@@ -325,33 +326,6 @@
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsSelected" Value="True">
                                 <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource NeonBlueBrush}"/>
-                            </Trigger>
-
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Trigger.EnterActions>
-                                    <BeginStoryboard>
-                                        <Storyboard>
-                                            <DoubleAnimation Storyboard.TargetName="Scale"
-                                                     Storyboard.TargetProperty="ScaleX"
-                                                     To="1.03" Duration="0:0:0.10"/>
-                                            <DoubleAnimation Storyboard.TargetName="Scale"
-                                                     Storyboard.TargetProperty="ScaleY"
-                                                     To="1.03" Duration="0:0:0.10"/>
-                                        </Storyboard>
-                                    </BeginStoryboard>
-                                </Trigger.EnterActions>
-                                <Trigger.ExitActions>
-                                    <BeginStoryboard>
-                                        <Storyboard>
-                                            <DoubleAnimation Storyboard.TargetName="Scale"
-                                                     Storyboard.TargetProperty="ScaleX"
-                                                     To="1" Duration="0:0:0.12"/>
-                                            <DoubleAnimation Storyboard.TargetName="Scale"
-                                                     Storyboard.TargetProperty="ScaleY"
-                                                     To="1" Duration="0:0:0.12"/>
-                                        </Storyboard>
-                                    </BeginStoryboard>
-                                </Trigger.ExitActions>
                             </Trigger>
 
                             <Trigger Property="IsMouseCaptured" Value="True">
@@ -1169,7 +1143,7 @@
                                                     <!-- DataGrid container like Bind Information -->
                                                     <Border Style="{StaticResource BindsGridContainerStyle}">
                                                         <DataGrid x:Name="dataGridScheduleEmployees"
-                                                      ItemsSource="{Binding ScheduleEmployees}"
+                                                      ItemsSource="{Binding MinHoursEmployeesView}"
                                                       SelectedItem="{Binding SelectedScheduleEmployee}"
                                                       Style="{StaticResource BindsGridStyle}"
                                                       Background="Transparent"
@@ -1197,16 +1171,19 @@
                                                                             Style="{StaticResource ValidatedNumericUpDownStyle}"
                                                                             TargetUpdated="MinHoursCell_TargetUpdated">
                                                                                 <controls:NumericUpDown.Value>
-                                                                                    <Binding Path="MinHoursMonth"
-                                                                                     Mode="TwoWay"
-                                                                                     UpdateSourceTrigger="PropertyChanged"
-                                                                                     NotifyOnTargetUpdated="True"
-                                                                                     NotifyOnValidationError="True">
-                                                                                        <Binding.ValidationRules>
-                                                                                            <validation:MinHoursAtLeastOneRule ValidatesOnTargetUpdated="True"/>
-                                                                                        </Binding.ValidationRules>
-                                                                                    </Binding>
-                                                                                </controls:NumericUpDown.Value>
+                                                                                <Binding Path="MinHoursMonth"
+         Mode="TwoWay"
+         UpdateSourceTrigger="PropertyChanged"
+         TargetNullValue="0"
+         FallbackValue="0"
+         NotifyOnTargetUpdated="True"
+         NotifyOnValidationError="True">
+                                                                                    <Binding.ValidationRules>
+                                                                                        <validation:MinHoursAtLeastOneRule ValidatesOnTargetUpdated="True"/>
+                                                                                    </Binding.ValidationRules>
+                                                                                </Binding>
+
+                                                                            </controls:NumericUpDown.Value>
 
                                                                             </controls:NumericUpDown>
                                                                         </DataTemplate>
@@ -1425,14 +1402,20 @@
                                     <Grid Grid.Row="1"
                                   Margin="10,0,10,10"
                                   Visibility="{Binding IsChecked, ElementName=NoteToggle, Converter={StaticResource BoolToVis}}">
+                                    <TextBox Style="{StaticResource RoundedTextBoxWithPlaceholderStyle}"
+                                         Height="300"
+                                         AcceptsReturn="True"
+                                         TextWrapping="Wrap"
+                                         VerticalScrollBarVisibility="Auto"
 
-                                        <TextBox Style="{StaticResource ValidatedRoundedTextBoxStyle}"
-                                     Height="300"
-                                     AcceptsReturn="True"
-                                     TextWrapping="Wrap"                                 
-                                     VerticalScrollBarVisibility="Auto"
-                                     Text="{Binding ScheduleNote, UpdateSourceTrigger=PropertyChanged}" />
-                                    </Grid>
+                                         MaxLength="2000"
+                                         Validation.ErrorTemplate="{x:Null}"
+
+                                         Text="{Binding ScheduleNote,
+                                                        UpdateSourceTrigger=PropertyChanged,
+                                                        ValidatesOnNotifyDataErrors=False,
+                                                        NotifyOnValidationError=False}" />
+                                </Grid>
                                 </Grid>
                             </Border>
 
@@ -1672,24 +1655,70 @@
                                         </StackPanel>
                                     </Grid>
 
-                                    <!-- MATRIX -->
-                                    <DataGrid x:Name="dataGridScheduleMatrix"
-                                  Grid.Row="1"
-                                          Margin="0,12,0,0"
-                                  Style="{StaticResource ScheduleMatrixCompactGridStyle}"
-                                  CellStyle="{StaticResource ScheduleMatrixCellStyleEditable}"
-                                    SelectionUnit="Cell"
-                                    SelectionMode="Extended"
+                                <DataGrid x:Name="dataGridScheduleMatrix"
+          Grid.Row="1"
+          Margin="0,12,0,0"
+                                                                            CanUserSortColumns="False"
 
-                                  IsReadOnly="False"
-                                  AutoGenerateColumns="False"
-                                  EnableRowVirtualization="True"
-                                  EnableColumnVirtualization="True"
-                                  VirtualizingPanel.IsVirtualizing="True"
-                                  VirtualizingPanel.VirtualizationMode="Recycling"
-                                  ScrollViewer.CanContentScroll="True"
-                                  CellEditEnding="ScheduleMatrix_CellEditEnding"/>
-                                </Grid>
+          Style="{StaticResource ScheduleMatrixCompactGridStyle}"
+          CellStyle="{StaticResource ScheduleMatrixCellStyleEditable}"
+          SelectionUnit="Cell"
+          SelectionMode="Extended"
+          IsReadOnly="False"
+          AutoGenerateColumns="False"
+          EnableRowVirtualization="True"
+          EnableColumnVirtualization="True"
+          VirtualizingPanel.IsVirtualizing="True"
+          VirtualizingPanel.VirtualizationMode="Recycling"
+          ScrollViewer.CanContentScroll="True"
+          CellEditEnding="ScheduleMatrix_CellEditEnding">
+
+                                    <DataGrid.Resources>
+                                        <conv:EmployeeTotalHoursHeaderConverter x:Key="EmpTotalHeaderConverter"/>
+
+                                        <Style TargetType="{x:Type DataGridColumnHeader}">
+                                            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+                                            <Setter Property="VerticalContentAlignment" Value="Center"/>
+                                            <Setter Property="MinHeight" Value="56"/>
+                                            <Setter Property="Padding" Value="6,8"/>
+                                            <Setter Property="VerticalContentAlignment" Value="Center"/>
+
+                                            <Setter Property="ContentTemplate">
+                                                <Setter.Value>
+                                                    <DataTemplate>
+                                                        <StackPanel Orientation="Vertical" Margin="0,2" HorizontalAlignment="Center">
+                                                            <TextBlock Text="{Binding}"
+                                       TextAlignment="Center"
+                                       FontWeight="SemiBold"
+                                       TextWrapping="NoWrap"
+                                       TextTrimming="CharacterEllipsis"/>
+
+                                                            <TextBlock x:Name="HoursLine"
+                                       FontSize="11"
+                                       Foreground="{StaticResource MutedTextBrush}"
+                                       TextAlignment="Center">
+                                                                <TextBlock.Text>
+                                                                    <MultiBinding Converter="{StaticResource EmpTotalHeaderConverter}">
+                                                                        <Binding RelativeSource="{RelativeSource AncestorType=DataGrid}" Path="DataContext"/>
+                                                                        <Binding RelativeSource="{RelativeSource AncestorType=DataGridColumnHeader}" Path="Column.SortMemberPath"/>
+                                                                        <Binding RelativeSource="{RelativeSource AncestorType=DataGrid}" Path="DataContext.TotalHoursText"/>
+                                                                    </MultiBinding>
+                                                                </TextBlock.Text>
+                                                            </TextBlock>
+                                                        </StackPanel>
+
+                                                        <DataTemplate.Triggers>
+                                                            <DataTrigger Binding="{Binding ElementName=HoursLine, Path=Text}" Value="">
+                                                                <Setter TargetName="HoursLine" Property="Visibility" Value="Collapsed"/>
+                                                            </DataTrigger>
+                                                        </DataTemplate.Triggers>
+                                                    </DataTemplate>
+                                                </Setter.Value>
+                                            </Setter>
+                                        </Style>
+                                    </DataGrid.Resources>
+                                </DataGrid>
+                            </Grid>
                             </Border>
 
                             <!-- Availability Preview (фіксована висота) -->
@@ -1724,6 +1753,8 @@
                                   Grid.Row="1"
                                   Style="{StaticResource ScheduleMatrixCompactGridStyle}"
                                   IsReadOnly="True"
+                                                                                CanUserSortColumns="False"
+
                                   AutoGenerateColumns="False"
                                   EnableRowVirtualization="True"
                                   EnableColumnVirtualization="True"

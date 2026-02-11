@@ -582,6 +582,7 @@
                                   BorderThickness="0"
                                   ItemsSource="{Binding AvailabilityDays}"
                                   SelectedItem="{Binding SelectedAvailabilityDay}"
+                                  CanUserSortColumns="False"
 
                                   ScrollViewer.HorizontalScrollBarVisibility="Auto"
                                   ScrollViewer.VerticalScrollBarVisibility="Auto"

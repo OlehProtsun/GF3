@@ -298,11 +298,27 @@ namespace WPFApp.ViewModel.Container.ScheduleEdit
 
         private void ReplaceScheduleEmployeesFromAvailability(IEnumerable<EmployeeModel> employees)
         {
+
+            SetAvailabilityEmployees(employees);
+
+
             if (SelectedBlock is null)
                 return;
 
-            // preserve existing MinHoursMonth by EmployeeId
+            var availabilityIds = (employees ?? Enumerable.Empty<EmployeeModel>())
+                .Where(e => e != null)
+                .Select(e => e.Id)
+                .Distinct()
+                .ToHashSet();
+
+            // manual = ті, кого вже було в schedule, але нема в availability group
+            var manualEmployees = SelectedBlock.Employees
+                .Where(se => se != null && !availabilityIds.Contains(se.EmployeeId))
+                .ToList();
+
+            // preserve existing MinHoursMonth by EmployeeId (тільки для availability employees)
             var oldMin = SelectedBlock.Employees
+                .Where(se => se != null && availabilityIds.Contains(se.EmployeeId))
                 .GroupBy(x => x.EmployeeId)
                 .ToDictionary(g => g.Key, g => g.First().MinHoursMonth);
 
@@ -313,7 +329,7 @@ namespace WPFApp.ViewModel.Container.ScheduleEdit
                 .OrderBy(e => e.LastName)
                 .ThenBy(e => e.FirstName))
             {
-                var min = oldMin.TryGetValue(emp.Id, out var v) ? v : 0;
+                var min = oldMin.TryGetValue(emp.Id, out var v) ? (v ?? 0) : 0;
 
                 SelectedBlock.Employees.Add(new ScheduleEmployeeModel
                 {
@@ -323,9 +339,24 @@ namespace WPFApp.ViewModel.Container.ScheduleEdit
                 });
             }
 
-            OnPropertyChanged(nameof(ScheduleEmployees));
-            RecalculateTotals();
-            MatrixChanged?.Invoke(this, EventArgs.Empty);
+            // додаємо назад manual employees (в кінець)
+            foreach (var se in manualEmployees)
+            {
+                if (se == null) continue;
+                if (se.MinHoursMonth == null) se.MinHoursMonth = 0; // <-- додай
+                if (SelectedBlock.Employees.Any(x => x.EmployeeId == se.EmployeeId))
+                    continue;
+
+                SelectedBlock.Employees.Add(se);
+            }
+
+            // оновлюємо manual ids і refresh view для MinHours
+            _manualEmployeeIds.Clear();
+            foreach (var se in manualEmployees)
+                if (se != null && se.EmployeeId > 0)
+                    _manualEmployeeIds.Add(se.EmployeeId);
+
+            RebindMinHoursEmployeesView();
         }
 
 

@@ -153,8 +153,14 @@ namespace WPFApp.ViewModel.Container.ScheduleEdit
                 {
                     _suppressAvailabilityGroupUpdate = false;
                 }
+
+                // ✅ Авто-побудова AvailabilityPreview після синхронізації lookup’ів
+                var groupId = SelectedAvailabilityGroup?.Id ?? 0;
+                if (groupId > 0)
+                    SafeForget(LoadAvailabilityContextAsync(groupId));
             }
         }
+
 
         /// <summary>
         /// Оновлює довідник Employees (список працівників).

@@ -233,8 +233,13 @@ namespace WPFApp.ViewModel.Container.ScheduleEdit
             }
 
             // 6) MinHours per employee (для MessageBox). Підсвітка клітинок йде через ValidationRule в XAML
-            if (SelectedBlock.Employees.Any(e => e.MinHoursMonth < 1))
+            if (SelectedBlock.Employees
+                    .Where(e => e != null && IsAvailabilityEmployee(e.EmployeeId))
+                    .Any(e => e.MinHoursMonth < 1))
+            {
                 errors[nameof(ScheduleEmployees)] = "Min hours per employee must be at least 1.";
+            }
+
 
             SetValidationErrors(errors);
 

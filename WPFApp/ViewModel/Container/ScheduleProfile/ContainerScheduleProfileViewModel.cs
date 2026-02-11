@@ -403,6 +403,9 @@ namespace WPFApp.ViewModel.Container.ScheduleProfile
                 // ---------- 3) Snapshot (захист від зміни колекцій ззовні під час Task.Run) ----------
                 var year = schedule.Year;
                 var month = schedule.Month;
+                var peoplePerShift = schedule.PeoplePerShift;
+                var shift1Time = schedule.Shift1Time;
+                var shift2Time = schedule.Shift2Time;
 
                 // ---------- 4) Важка побудова на background thread ----------
                 var built = await Task.Run(() =>
@@ -419,6 +422,20 @@ namespace WPFApp.ViewModel.Container.ScheduleProfile
                         token);
 
                     token.ThrowIfCancellationRequested();
+
+                    var daysInMonth = DateTime.DaysInMonth(year, month);
+                    for (int day = 1; day <= daysInMonth; day++)
+                    {
+                        var conflict = ScheduleMatrixEngine.ComputeConflictForDayWithStaffing(
+                            slotsSnapshot,
+                            day,
+                            peoplePerShift,
+                            shift1Time,
+                            shift2Time);
+
+                        table.Rows[day - 1][ScheduleMatrixConstants.ConflictColumnName] = conflict;
+                    }
+
 
                     // 4.2) Totals (engine)
                     var totals = ScheduleTotalsCalculator.Calculate(employeesSnapshot, slotsSnapshot);

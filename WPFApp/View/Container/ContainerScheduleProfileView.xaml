@@ -3,12 +3,15 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:conv="clr-namespace:WPFApp.Converters"
              mc:Ignorable="d"
-             d:DesignHeight="2000" d:DesignWidth="852"
+             d:DesignHeight="2000" d:DesignWidth="1500"
              Background="{StaticResource PageBackgroundBrush}">
 
     <UserControl.Resources>
 
+        
+        
         <!-- Hide title when collapsed (same idea as SideCardTitleTextStyle in Edit) -->
         <Style x:Key="SideCardTitleTextStyle" TargetType="TextBlock">
             <Setter Property="Visibility" Value="Visible"/>
@@ -24,7 +27,7 @@
             <Setter Property="Padding" Value="15"/>
             <Setter Property="Margin" Value="0,12,0,0"/>
             <Setter Property="VerticalAlignment" Value="Top"/>
-            <Setter Property="Height" Value="520"/>
+            <Setter Property="Height" Value="650"/>
             <Style.Triggers>
                 <DataTrigger Binding="{Binding IsChecked, ElementName=ScheduleInfoToggle}" Value="False">
                     <Setter Property="Height" Value="62"/>
@@ -33,6 +36,8 @@
             </Style.Triggers>
         </Style>
 
+        
+        
     </UserControl.Resources>
 
     <Grid ClipToBounds="False">
@@ -42,112 +47,123 @@
         </Grid.RowDefinitions>
 
         <!-- Pinned top card -->
-        <Border Grid.Row="0" Style="{StaticResource TopCardStyle}" Margin="9,8,9,0">
-            <Grid>
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="Auto" />
-                </Grid.RowDefinitions>
+        <!-- Pinned top card -->
+        <Border Grid.Row="0"
+        Style="{StaticResource TopCardStyle}"
+        Margin="9,8,9,0">
 
-                <!-- Header row: Back (left) + Export buttons (right) -->
-                <Grid Grid.Row="0">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="Auto"/>
-                    </Grid.ColumnDefinitions>
+            <!-- 2 halves -->
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+
+                <!-- LEFT HALF: Back + title + subtitle -->
+                <Grid Grid.Column="0">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
 
                     <!-- Back -->
-                    <Button Grid.Column="0"
-            HorizontalAlignment="Left"
-            Style="{StaticResource BackButtonSmallStyle}"
-            Command="{Binding BackCommand}"
-            Width="62">
+                    <Button Grid.Row="0"
+                    HorizontalAlignment="Left"
+                    Style="{StaticResource BackButtonSmallStyle}"
+                    Command="{Binding BackCommand}"
+                    Width="62">
                         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                             <Viewbox Width="14" Height="14" Margin="0,0,6,0">
                                 <Path Data="{StaticResource BackSvgIconGeometry}"
-                      Stretch="Uniform"
-                      Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
+                              Stretch="Uniform"
+                              Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
                             </Viewbox>
                             <TextBlock Text="Back"
-                       Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
+                               Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
                         </StackPanel>
                     </Button>
 
-                    <!-- Export buttons (top-right, side by side) -->
-                    <StackPanel Grid.Column="2"
-                Orientation="Horizontal"
-                HorizontalAlignment="Right"
-                VerticalAlignment="Center">
+                    <!-- Title -->
+                    <TextBlock Grid.Row="1"
+                       Margin="0,10,0,0"
+                       Text="Schedule Profile"
+                       FontFamily="{StaticResource DefaultFontFamily}"
+                       FontSize="{StaticResource FontSizePageTitle}"
+                       Foreground="Black" />
 
-                        <!-- Export to Excel -->
-                        <Button Height="44"
-                MinWidth="180"
-                Padding="14,0"
-                Margin="0,0,10,0"
-                Style="{StaticResource TopExportButtonStyle}"
-                Command="{Binding ExportToExcelCommand}">
-                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                <Viewbox Width="20" Height="20" Margin="0,0,8,0">
-                                    <Path Data="{StaticResource IconExcel}"
-Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"                                          Stretch="Uniform"
-                                          RenderTransformOrigin="0.5,0.5">
-                                        <Path.RenderTransform>
-                                            <ScaleTransform ScaleX="1" ScaleY="-1" />
-                                        </Path.RenderTransform>
-                                    </Path>
-                                </Viewbox>
-
-                                <TextBlock Text="Export to Excel"
-                           FontFamily="{StaticResource DefaultFontFamily}"
-                           FontSize="14"
-                           FontWeight="SemiBold"
-                           VerticalAlignment="Center"/>
-                            </StackPanel>
-                        </Button>
-
-                        <!-- Export to SQLite -->
-                        <Button Height="44"
-                MinWidth="190"
-                Padding="14,0"
-                Style="{StaticResource TopExportButtonStyle}"
-                Command="{Binding ExportToSQLiteCommand}">
-                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                <Viewbox Width="20" Height="20" Margin="0,0,8,0">
-                                    <Path Data="{StaticResource IconCode}"
-      Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"                                          Stretch="Uniform"
-                                          RenderTransformOrigin="0.5,0.5">
-                                        <Path.RenderTransform>
-                                            <ScaleTransform ScaleX="1" ScaleY="-1" />
-                                        </Path.RenderTransform>
-                                    </Path>
-                                </Viewbox>
-
-                                <TextBlock Text="Export to Code"
-                           FontFamily="{StaticResource DefaultFontFamily}"
-                           FontSize="14"
-                           FontWeight="SemiBold"
-                           VerticalAlignment="Center"/>
-                            </StackPanel>
-                        </Button>
-
-                    </StackPanel>
+                    <!-- Subtitle -->
+                    <TextBlock Grid.Row="2"
+                       Margin="0,6,0,0"
+                       Text="Here you can see schedule profile details"
+                       FontFamily="{StaticResource DefaultFontFamily}"
+                       FontSize="17"
+                       Foreground="{StaticResource SecondaryTextBrush}" />
                 </Grid>
 
-                <TextBlock Grid.Row="1"
-                           Margin="0,0,0,0"
-                           Text="Schedule Profile"
-                           FontFamily="{StaticResource DefaultFontFamily}"
-                           FontSize="{StaticResource FontSizePageTitle}"
-                           Foreground="Black" />
+                <!-- RIGHT HALF: export buttons centered in this half -->
+                <StackPanel Grid.Column="1"
+                    Orientation="Horizontal"
+                    HorizontalAlignment="Right"
+                            Margin="0,0,30,0"
+                    VerticalAlignment="Center">
 
-                <TextBlock Grid.Row="2"
-                           Margin="0,6,0,0"
-                           Text="Here you can see schedule profile details"
-                           FontFamily="{StaticResource DefaultFontFamily}"
-                           FontSize="17"
-                           Foreground="{StaticResource SecondaryTextBrush}" />
+                    <!-- Export to Excel -->
+                    <Button Height="56"
+                    MinWidth="220"
+                    Padding="20,0"
+                    Margin="0,0,12,0"
+                    VerticalContentAlignment="Center"
+                    Style="{StaticResource TopExportButtonStyle}"
+                    Command="{Binding ExportToExcelCommand}">
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <Viewbox Width="20" Height="20" Margin="0,0,10,0">
+                                <Path Data="{StaticResource IconExcel}"
+                              Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                              Stretch="Uniform"
+                              RenderTransformOrigin="0.5,0.5">
+                                    <Path.RenderTransform>
+                                        <ScaleTransform ScaleX="1" ScaleY="-1"/>
+                                    </Path.RenderTransform>
+                                </Path>
+                            </Viewbox>
+
+                            <TextBlock Text="Export to Excel"
+                               FontFamily="{StaticResource DefaultFontFamily}"
+                               FontSize="14"
+                               FontWeight="SemiBold"
+                               VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+
+                    <!-- Export to Code -->
+                    <Button Height="56"
+                    MinWidth="220"
+                    Padding="20,0"
+                    VerticalContentAlignment="Center"
+                    Style="{StaticResource TopExportButtonStyle}"
+                    Command="{Binding ExportToSQLiteCommand}">
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <Viewbox Width="20" Height="20" Margin="0,0,10,0">
+                                <Path Data="{StaticResource IconCode}"
+                              Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                              Stretch="Uniform"
+                              RenderTransformOrigin="0.5,0.5">
+                                    <Path.RenderTransform>
+                                        <ScaleTransform ScaleX="1" ScaleY="-1"/>
+                                    </Path.RenderTransform>
+                                </Path>
+                            </Viewbox>
+
+                            <TextBlock Text="Export to Code"
+                               FontFamily="{StaticResource DefaultFontFamily}"
+                               FontSize="14"
+                               FontWeight="SemiBold"
+                               VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+
+                </StackPanel>
             </Grid>
         </Border>
 
@@ -246,78 +262,98 @@ Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
                         </Grid>
 
                         <!-- Body -->
-                        <StackPanel Grid.Row="1"
-                                    Margin="0,14,0,0"
-                                    Visibility="{Binding IsChecked, ElementName=ScheduleInfoToggle, Converter={StaticResource BoolToVis}}">
+                        <Grid Grid.Row="1"
+      Margin="0,14,0,0"
+      Visibility="{Binding IsChecked, ElementName=ScheduleInfoToggle, Converter={StaticResource BoolToVis}}"
+      VerticalAlignment="Stretch">
 
-                            <Grid Margin="0,0,0,10">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                            </Grid.RowDefinitions>
 
-                                <TextBlock Text="Schedule ID:"
-                                           FontFamily="{StaticResource DefaultFontFamily}"
-                                           FontSize="12"
-                                           Foreground="{StaticResource MutedTextBrush}"
-                                           VerticalAlignment="Center" />
+                            <!-- УСІ поля ДО Note (включно з заголовком "Note:") -->
+                            <StackPanel Grid.Row="0">
 
-                                <TextBlock Grid.Column="1"
-                                           Text="{Binding ScheduleId}"
-                                           FontFamily="{StaticResource DefaultFontFamily}"
-                                           FontSize="12"
-                                           Margin="6,0,0,0"
-                                           Foreground="Black"
-                                           VerticalAlignment="Center" />
-                            </Grid>
+                                <!-- (це твій існуючий контент без зміни) -->
+                                <Grid Margin="0,0,0,10">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
 
-                            <TextBlock Text="Schedule Name:"
-                                       FontFamily="{StaticResource DefaultFontFamily}"
-                                       FontSize="12"
-                                       Foreground="{StaticResource MutedTextBrush}" />
-                            <TextBlock Text="{Binding ScheduleName}"
-                                       Margin="0,4,0,0"
-                                       FontFamily="{StaticResource DefaultFontFamily}"
-                                       FontSize="16"
-                                       Foreground="Black"
-                                       TextWrapping="Wrap" />
+                                    <TextBlock Text="Schedule ID:"
+                       FontFamily="{StaticResource DefaultFontFamily}"
+                       FontSize="12"
+                       Foreground="{StaticResource MutedTextBrush}"
+                       VerticalAlignment="Center" />
 
-                            <TextBlock Text="Month-Year:"
-                                       Margin="0,12,0,0"
-                                       FontFamily="{StaticResource DefaultFontFamily}"
-                                       FontSize="12"
-                                       Foreground="{StaticResource MutedTextBrush}" />
-                            <TextBlock Text="{Binding ScheduleMonthYear}"
-                                       Margin="0,4,0,0"
-                                       FontFamily="{StaticResource DefaultFontFamily}"
-                                       FontSize="16"
-                                       Foreground="Black"
-                                       TextWrapping="Wrap" />
+                                    <TextBlock Grid.Column="1"
+                       Text="{Binding ScheduleId}"
+                       FontFamily="{StaticResource DefaultFontFamily}"
+                       FontSize="12"
+                       Margin="6,0,0,0"
+                       Foreground="Black"
+                       VerticalAlignment="Center" />
+                                </Grid>
 
-                            <TextBlock Text="Shop:"
-                                       Margin="0,12,0,0"
-                                       FontFamily="{StaticResource DefaultFontFamily}"
-                                       FontSize="12"
-                                       Foreground="{StaticResource MutedTextBrush}" />
-                            <TextBlock Text="{Binding ShopName}"
-                                       Margin="0,4,0,0"
-                                       FontFamily="{StaticResource DefaultFontFamily}"
-                                       FontSize="16"
-                                       Foreground="Black"
-                                       TextWrapping="Wrap" />
+                                <TextBlock Text="Schedule Name:"
+                   FontFamily="{StaticResource DefaultFontFamily}"
+                   FontSize="12"
+                   Foreground="{StaticResource MutedTextBrush}" />
+                                <TextBlock Text="{Binding ScheduleName}"
+                   Margin="0,4,0,0"
+                   FontFamily="{StaticResource DefaultFontFamily}"
+                   FontSize="16"
+                   Foreground="Black"
+                   TextWrapping="Wrap" />
 
-                            <TextBlock Text="Note:"
-                                       Margin="0,12,0,0"
-                                       FontFamily="{StaticResource DefaultFontFamily}"
-                                       FontSize="12"
-                                       Foreground="{StaticResource MutedTextBrush}" />
-                            <TextBlock Text="{Binding Note}"
-                                       Margin="0,4,0,0"
-                                       FontFamily="{StaticResource DefaultFontFamily}"
-                                       FontSize="16"
-                                       Foreground="Black"
-                                       TextWrapping="Wrap" />
-                        </StackPanel>
+                                <TextBlock Text="Month-Year:"
+                   Margin="0,12,0,0"
+                   FontFamily="{StaticResource DefaultFontFamily}"
+                   FontSize="12"
+                   Foreground="{StaticResource MutedTextBrush}" />
+                                <TextBlock Text="{Binding ScheduleMonthYear}"
+                   Margin="0,4,0,0"
+                   FontFamily="{StaticResource DefaultFontFamily}"
+                   FontSize="16"
+                   Foreground="Black"
+                   TextWrapping="Wrap" />
+
+                                <TextBlock Text="Shop:"
+                   Margin="0,12,0,0"
+                   FontFamily="{StaticResource DefaultFontFamily}"
+                   FontSize="12"
+                   Foreground="{StaticResource MutedTextBrush}" />
+                                <TextBlock Text="{Binding ShopName}"
+                   Margin="0,4,0,0"
+                   FontFamily="{StaticResource DefaultFontFamily}"
+                   FontSize="16"
+                   Foreground="Black"
+                   TextWrapping="Wrap" />
+
+                                <TextBlock Text="Note:"
+                   Margin="0,12,0,0"
+                   FontFamily="{StaticResource DefaultFontFamily}"
+                   FontSize="12"
+                   Foreground="{StaticResource MutedTextBrush}" />
+                            </StackPanel>
+
+                            <!-- NOTE: росте по контенту, але максимум = решта висоти секції; далі — скрол всередині -->
+                            <ScrollViewer Grid.Row="1"
+                  Margin="0,4,0,0"
+                  VerticalAlignment="Top"
+                  VerticalScrollBarVisibility="Auto"
+                  HorizontalScrollBarVisibility="Disabled"
+                  PanningMode="VerticalOnly">
+
+                                <TextBlock Text="{Binding Note}"
+                   FontFamily="{StaticResource DefaultFontFamily}"
+                   FontSize="16"
+                   Foreground="Black"
+                   TextWrapping="Wrap" />
+                            </ScrollViewer>
+                        </Grid>
 
                         <!-- Buttons hidden when collapsed -->
                         <Grid Grid.Row="2"
@@ -425,20 +461,71 @@ Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
                         </Grid>
 
                         <DataGrid x:Name="dataGridScheduleProfile"
-          Grid.Row="1"
-          Style="{StaticResource ScheduleMatrixCompactGridStyle}"
-          CellStyle="{StaticResource ScheduleMatrixCellStyleBase}"
-          ItemsSource="{Binding ScheduleMatrix}"
-          IsReadOnly="True"
-          AutoGenerateColumns="False"
-          ScrollViewer.VerticalScrollBarVisibility="Auto"
-          ScrollViewer.HorizontalScrollBarVisibility="Auto">
+                          Grid.Row="1"
+                                  CanUserSortColumns="False"
+                          Style="{StaticResource ScheduleMatrixCompactGridStyle}"
+                          CellStyle="{StaticResource ScheduleMatrixCellStyleBase}"
+                          ItemsSource="{Binding ScheduleMatrix}"
+                          IsReadOnly="True"
+                          AutoGenerateColumns="False"
+                          ScrollViewer.VerticalScrollBarVisibility="Auto"
+                          ScrollViewer.HorizontalScrollBarVisibility="Auto">
 
-                            <!-- ВАЖЛИВО: у WPF саме так стилізується DataGrid scrollbars -->
                             <DataGrid.Resources>
                                 <Style TargetType="{x:Type ScrollBar}"
-               BasedOn="{StaticResource LeftRoundedScrollBarStyle}" />
+           BasedOn="{StaticResource LeftRoundedScrollBarStyle}" />
+
+                                <conv:EmployeeTotalHoursHeaderConverter x:Key="EmpTotalHeaderConverter"/>
+
+                                <!-- Дворядковий header -->
+                                <Style TargetType="{x:Type DataGridColumnHeader}">
+                                    <Setter Property="HorizontalContentAlignment" Value="Center"/>
+                                    <Setter Property="VerticalContentAlignment" Value="Center"/>
+                                    <Setter Property="MinHeight" Value="56"/>
+                                    <Setter Property="Padding" Value="6,8"/>
+                                    <Setter Property="VerticalContentAlignment" Value="Center"/>
+
+                                    <Setter Property="ContentTemplate">
+                                        <Setter.Value>
+                                            <DataTemplate>
+                                                <StackPanel Orientation="Vertical" Margin="0,2" HorizontalAlignment="Center">
+                                                    <!-- 1-й рядок: те, що вже було header (ім'я) -->
+                                                    <TextBlock Text="{Binding}"
+                                   TextAlignment="Center"
+                                   FontWeight="SemiBold"
+                                   TextWrapping="NoWrap"
+                                   TextTrimming="CharacterEllipsis"/>
+
+                                                    <!-- 2-й рядок: totals -->
+                                                    <TextBlock x:Name="HoursLine"
+                                   FontSize="11"
+                                   Foreground="{StaticResource MutedTextBrush}"
+                                   TextAlignment="Center">
+                                                        <TextBlock.Text>
+                                                            <MultiBinding Converter="{StaticResource EmpTotalHeaderConverter}">
+                                                                <!-- VM -->
+                                                                <Binding RelativeSource="{RelativeSource AncestorType=DataGrid}" Path="DataContext"/>
+                                                                <!-- columnName -->
+                                                                <Binding RelativeSource="{RelativeSource AncestorType=DataGridColumnHeader}" Path="Column.SortMemberPath"/>
+                                                                <!-- тригер для оновлення (коли зміниться TotalHoursText) -->
+                                                                <Binding RelativeSource="{RelativeSource AncestorType=DataGrid}" Path="DataContext.TotalHoursText"/>
+                                                            </MultiBinding>
+                                                        </TextBlock.Text>
+                                                    </TextBlock>
+                                                </StackPanel>
+
+                                                <!-- якщо converter повернув пусто (технічні колонки Day/Conflict/Weekend) -->
+                                                <DataTemplate.Triggers>
+                                                    <DataTrigger Binding="{Binding ElementName=HoursLine, Path=Text}" Value="">
+                                                        <Setter TargetName="HoursLine" Property="Visibility" Value="Collapsed"/>
+                                                    </DataTrigger>
+                                                </DataTemplate.Triggers>
+                                            </DataTemplate>
+                                        </Setter.Value>
+                                    </Setter>
+                                </Style>
                             </DataGrid.Resources>
+
 
                         </DataGrid>
                     </Grid>
@@ -471,10 +558,10 @@ Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
                         </StackPanel>
 
                         <ScrollViewer Grid.Row="1"
-              Margin="0,12,0,0"
-              VerticalScrollBarVisibility="Auto"
-              HorizontalScrollBarVisibility="Disabled"
-              Padding="0">
+                          Margin="0,12,0,0"
+                          VerticalScrollBarVisibility="Auto"
+                          HorizontalScrollBarVisibility="Disabled"
+                          Padding="0">
 
                             <StackPanel>
 
@@ -660,31 +747,30 @@ Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
                                         <Grid Grid.Row="0" Grid.Column="1" Grid.RowSpan="2">
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="*"/>
-                                                <ColumnDefinition Width="{x:Static SystemParameters.VerticalScrollBarWidth}"/>
+                                                <!-- Auto бере ширину контенту (нашого filler Border) -->
+                                                <ColumnDefinition Width="Auto"/>
                                             </Grid.ColumnDefinitions>
 
                                             <ScrollViewer x:Name="SummaryHeaderScroll"
-                          Grid.Column="0"
-                          HorizontalScrollBarVisibility="Hidden"
-                          VerticalScrollBarVisibility="Disabled"
-                          CanContentScroll="False"
-                          PanningMode="HorizontalOnly"
-                          PreviewMouseWheel="SummaryHeaderScroll_PreviewMouseWheel">
-
+                  Grid.Column="0"
+                  HorizontalScrollBarVisibility="Hidden"
+                  VerticalScrollBarVisibility="Disabled"
+                  CanContentScroll="False"
+                  PanningMode="HorizontalOnly"
+                  PreviewMouseWheel="SummaryHeaderScroll_PreviewMouseWheel">
                                                 <ScrollViewer.Resources>
                                                     <Style TargetType="{x:Type ScrollBar}"
-                           BasedOn="{StaticResource LeftRoundedScrollBarStyle}" />
+                   BasedOn="{StaticResource LeftRoundedScrollBarStyle}" />
                                                 </ScrollViewer.Resources>
 
+                                                <!-- (твій існуючий StackPanel з ItemsControl — без змін) -->
                                                 <StackPanel>
-                                                    <!-- Day group header -->
                                                     <ItemsControl ItemsSource="{Binding SummaryDayHeaders}">
                                                         <ItemsControl.ItemsPanel>
                                                             <ItemsPanelTemplate>
                                                                 <StackPanel Orientation="Horizontal"/>
                                                             </ItemsPanelTemplate>
                                                         </ItemsControl.ItemsPanel>
-
                                                         <ItemsControl.ItemTemplate>
                                                             <DataTemplate>
                                                                 <Border Style="{StaticResource SumHeaderBorder}" Width="270">
@@ -694,14 +780,12 @@ Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
                                                         </ItemsControl.ItemTemplate>
                                                     </ItemsControl>
 
-                                                    <!-- Sub headers -->
                                                     <ItemsControl ItemsSource="{Binding SummaryDayHeaders}">
                                                         <ItemsControl.ItemsPanel>
                                                             <ItemsPanelTemplate>
                                                                 <StackPanel Orientation="Horizontal"/>
                                                             </ItemsPanelTemplate>
                                                         </ItemsControl.ItemsPanel>
-
                                                         <ItemsControl.ItemTemplate>
                                                             <DataTemplate>
                                                                 <Grid Width="270">
@@ -729,10 +813,12 @@ Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
 
                                             <!-- filler area under vertical scrollbar -->
                                             <Border Grid.Column="1"
-                    Background="{StaticResource SurfaceBrush}"
-                    BorderBrush="Gainsboro"
-                    BorderThickness="1,0,0,0"/>
+                                                Width="{x:Static SystemParameters.VerticalScrollBarWidth}"
+                                                Background="{StaticResource SurfaceBrush}"
+                                                BorderBrush="Gainsboro"
+                                                BorderThickness="1,0,0,0"/>
                                         </Grid>
+
 
                                         <!-- ===================== BOTTOM-LEFT (Y-sync, fixed X) ===================== -->
                                         <ScrollViewer x:Name="SummaryLeftScroll"
@@ -837,20 +923,22 @@ Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
                                         <Grid Grid.Row="3" Grid.Column="1">
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="*"/>
-                                                <ColumnDefinition Width="{x:Static SystemParameters.VerticalScrollBarWidth}"/>
+                                                <ColumnDefinition Width="Auto"/>
                                             </Grid.ColumnDefinitions>
 
                                             <ScrollBar x:Name="SummaryHScroll"
-                       Grid.Column="0"
-                       Orientation="Horizontal"
-                       Height="18"
-                       ValueChanged="SummaryHScroll_ValueChanged"/>
+                                               Grid.Column="0"
+                                               Orientation="Horizontal"
+                                               Height="18"
+                                               ValueChanged="SummaryHScroll_ValueChanged"/>
 
                                             <Border Grid.Column="1"
-                    Background="{StaticResource SurfaceBrush}"
-                    BorderBrush="Gainsboro"
-                    BorderThickness="1,0,0,0"/>
+                                                Width="{x:Static SystemParameters.VerticalScrollBarWidth}"
+                                                Background="{StaticResource SurfaceBrush}"
+                                                BorderBrush="Gainsboro"
+                                                BorderThickness="1,0,0,0"/>
                                         </Grid>
+
 
                                     </Grid>
                                 </Border>

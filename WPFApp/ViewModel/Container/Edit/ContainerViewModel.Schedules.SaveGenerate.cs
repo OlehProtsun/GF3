@@ -12,6 +12,8 @@ using WPFApp.Infrastructure.ScheduleMatrix;
 using WPFApp.ViewModel.Container.Edit.Helpers;
 using WPFApp.ViewModel.Container.ScheduleEdit;
 using WPFApp.ViewModel.Container.ScheduleEdit.Helpers;
+using System.Globalization;
+
 // Явно фіксуємо, ЯКИЙ саме ScheduleBlockViewModel ми використовуємо в цьому файлі,
 // щоб не було “підміни” типу через інші using.
 using ScheduleBlockVm = WPFApp.ViewModel.Container.ScheduleEdit.Helpers.ScheduleBlockViewModel;
@@ -161,6 +163,35 @@ namespace WPFApp.ViewModel.Container.Edit
                     .ToList();
 
                 var slots = block.Slots.ToList();
+
+                foreach (var s in slots)
+                {
+                    // 1) Якщо десь просочується 0 замість null — SQLite вважає це NOT NULL
+                    if (s.EmployeeId is int id && id == 0)
+                        s.EmployeeId = null;
+
+                    // 2) Приводимо status до того, що дозволяє CHECK:
+                    // UNFURNISHED => employee_id NULL
+                    // ASSIGNED    => employee_id NOT NULL
+                    s.Status = s.EmployeeId == null ? SlotStatus.UNFURNISHED : SlotStatus.ASSIGNED;
+
+                    // 3) (опційно, але часто потрібно після ручного вводу) нормалізуємо "9:00" => "09:00"
+                    s.FromTime = NormalizeHHmm(s.FromTime);
+                    s.ToTime = NormalizeHHmm(s.ToTime);
+
+                    // 4) (опційно) швидка перевірка порядку часу, бо є CHECK (from_time < to_time)
+                    if (string.CompareOrdinal(s.FromTime, s.ToTime) >= 0)
+                        throw new InvalidOperationException(
+                            $"Invalid time range: day={s.DayOfMonth}, slot={s.SlotNo}, {s.FromTime}-{s.ToTime}");
+                }
+
+                static string NormalizeHHmm(string value)
+                {
+                    if (TimeSpan.TryParse(value, out var ts))
+                        return ts.ToString(@"hh\:mm");
+                    return value; // якщо не парситься — хай впаде на валідації/БД, або зроби ShowError
+                }
+
 
                 // cellStyles зберігаємо тільки якщо реально є колір (фон або текст)
                 var cellStyles = block.CellStyles
@@ -550,17 +581,33 @@ namespace WPFApp.ViewModel.Container.Edit
                 return false;
             }
 
-            var parts = input.Split('-', 2, StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
-            if (parts.Length != 2)
+            // 1) Нормалізуємо єдиним парсером, який уже використовується в проекті
+            if (!AvailabilityCodeParser.TryNormalizeInterval(input, out var normalizedCandidate))
             {
-                error = "Shift format must be: HH:mm - HH:mm.";
+                error = "Shift format must be: HH:mm-HH:mm.";
                 return false;
             }
 
-            if (!ScheduleMatrixEngine.TryParseTime(parts[0], out var from) ||
-                !ScheduleMatrixEngine.TryParseTime(parts[1], out var to))
+            var parts = normalizedCandidate.Split('-', 2, StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length != 2)
+            {
+                error = "Shift format must be: HH:mm-HH:mm.";
+                return false;
+            }
+
+            // 2) Строгий парс + гарантія, що це в межах доби (00:00..23:59)
+            if (!TimeSpan.TryParseExact(parts[0], @"hh\:mm", CultureInfo.InvariantCulture, out var from) ||
+                !TimeSpan.TryParseExact(parts[1], @"hh\:mm", CultureInfo.InvariantCulture, out var to))
             {
                 error = "Shift time must be HH:mm.";
+                return false;
+            }
+
+            // на випадок якщо хтось протягне 24:00 як TimeSpan 1.00:00
+            if (from < TimeSpan.Zero || from >= TimeSpan.FromHours(24) ||
+                to < TimeSpan.Zero || to >= TimeSpan.FromHours(24))
+            {
+                error = "Shift time must be within 00:00..23:59 (24:00 is not allowed).";
                 return false;
             }
 
@@ -570,8 +617,9 @@ namespace WPFApp.ViewModel.Container.Edit
                 return false;
             }
 
-            normalized = $"{from:hh\\:mm}-{to:hh\\:mm}";
+            normalized = $"{from:hh\\:mm} - {to:hh\\:mm}";
             return true;
+
         }
 
         /// <summary>

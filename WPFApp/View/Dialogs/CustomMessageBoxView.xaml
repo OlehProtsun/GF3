@@ -280,20 +280,46 @@
                                TextWrapping="Wrap"/>
 
                     <!-- DETAILS -->
+                    <!-- DETAILS -->
                     <Expander Grid.Row="2"
-                              Margin="0,12,0,0"
-                              Header="Details"
-                              Visibility="{Binding HasDetails, Converter={StaticResource BoolToVis}}">
-                        <Border Background="#F5F5F5" CornerRadius="8" Padding="8" BorderBrush="#DDDDDD" BorderThickness="1">
-                            <ScrollViewer MaxHeight="220" VerticalScrollBarVisibility="Auto">
-                                <TextBlock Text="{Binding Details}"
-                                           FontFamily="Consolas"
-                                           FontSize="12"
-                                           Foreground="#333"
-                                           TextWrapping="Wrap"/>
-                            </ScrollViewer>
+          Margin="0,12,0,0"
+          Header="Details"
+          Visibility="{Binding HasDetails, Converter={StaticResource BoolToVis}}">
+                        <Border Background="#F5F5F5"
+            CornerRadius="8"
+            Padding="8"
+            BorderBrush="#DDDDDD"
+            BorderThickness="1">
+
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="*"/>
+                                </Grid.RowDefinitions>
+
+                                <!-- Copy button -->
+                                <Button Grid.Row="0"
+                    Content="Copy"
+                    HorizontalAlignment="Right"
+                    Height="28"
+                    Padding="12,0"
+                    Margin="0,0,0,8"
+                    Style="{StaticResource CancelButtonStyle}"
+                    Click="CopyDetails_Click"/>
+
+                                <!-- Details text -->
+                                <ScrollViewer Grid.Row="1" MaxHeight="220" VerticalScrollBarVisibility="Auto">
+                                    <TextBlock Text="{Binding Details}"
+                           FontFamily="Consolas"
+                           FontSize="12"
+                           Foreground="#333"
+                           TextWrapping="Wrap"/>
+                                </ScrollViewer>
+                            </Grid>
+
                         </Border>
                     </Expander>
+
 
                     <!-- BUTTONS -->
                     <Grid Grid.Row="3" Margin="0,16,0,0">

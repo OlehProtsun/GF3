@@ -213,6 +213,8 @@
                                   Style="{StaticResource ScheduleMatrixCompactGridStyle}"
                                   Background="Transparent"
                                   BorderThickness="0"
+                                                                    CanUserSortColumns="False"
+
                                   IsReadOnly="True"
                                   AutoGenerateColumns="True"
                                   ItemsSource="{Binding ProfileAvailabilityMonths}"

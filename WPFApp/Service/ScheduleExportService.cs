@@ -144,7 +144,6 @@ namespace WPFApp.Service
         private const int M_DayCount = 31;
 
         // ===================== STAT TEMPLATE LAYOUT =====================
-        // This matches the template you showed (labels in col A, values in col B)
         private const int S_ValueCol = 2;                // B
         private const int S_EmployeesLineRow = 12;       // A12 merged in template typically
         private const int S_DayHeaderRow = 14;           // merged day header blocks
@@ -185,16 +184,16 @@ namespace WPFApp.Service
                 var statSheet = statTemplate.CopyTo(statisticName);
 
                 // Remove original template sheets from output
-                // (so user sees only their schedule sheets)
                 matrixTemplate.Delete();
                 statTemplate.Delete();
+
                 // Fill ONLY values (do not modify styling)
                 FillMatrixSheetFromTemplate(matrixSheet, context);
                 FillStatisticSheetFromTemplate(statSheet, context);
 
                 // Normalize problematic Gray125 pattern fills (ClosedXML can roundtrip them as black)
                 FixGray125Fills(matrixSheet, "B2:AA32");
-                FixGray125Fills(statSheet); // safe no-op if none
+                FixGray125Fills(statSheet);
 
                 workbook.SaveAs(filePath);
             }, ct);
@@ -267,8 +266,6 @@ namespace WPFApp.Service
 
             return string.IsNullOrWhiteSpace(safe) ? fallback : safe;
         }
-
-
 
         /// <summary>
         /// ClosedXML (and some other OOXML writers) can roundtrip PatternType=Gray125 incorrectly
@@ -347,23 +344,34 @@ namespace WPFApp.Service
             for (int c = M_FirstDataCol + dataCols.Count; c <= M_LastDataCol; c++)
                 sheet.Cell(M_HeaderRow, c).Value = "0";
 
-            // Fill days (rows 2..32)
+            var daysInMonth = DateTime.DaysInMonth(context.ScheduleYear, context.ScheduleMonth);
             var maxRows = Math.Min(M_DayCount, context.ScheduleMatrix.Count);
+
+            // Fill days (rows 2..32)
             for (int r = 0; r < M_DayCount; r++)
             {
                 var excelRow = M_FirstDayRow + r;
-
                 DataRowView? rowView = r < maxRows ? (DataRowView)context.ScheduleMatrix[r] : null;
 
-                // Put DateTime into column B so template conditional formatting draws weekend dotted fill correctly
-                if (rowView != null)
+                // === KEY FIX ===
+                // For real month days -> write DateTime (template keeps its own date format like "pon., 02/02").
+                // For non-existing days (e.g. 29-31 in Feb) -> write TEXT (" ") so Excel CF WEEKDAY() doesn't treat blank as 0 (Sunday).
+                var dateCell = sheet.Cell(excelRow, M_DateCol);
+
+                if (r < daysInMonth)
                 {
-                    var date = TryBuildDate(context, dayCol, rowView);
-                    sheet.Cell(excelRow, M_DateCol).Value = date.HasValue ? date.Value : string.Empty;
+                    // Prefer any explicit date/day in data (if present), otherwise fall back to calendar day index.
+                    var date = rowView != null ? TryBuildDate(context, dayCol, rowView) : null;
+                    date ??= SafeDate(context.ScheduleYear, context.ScheduleMonth, r + 1);
+
+                    if (date.HasValue)
+                        dateCell.Value = date.Value;   // do NOT touch styles/number formats
+                    else
+                        dateCell.Value = " ";          // safety fallback (non-numeric)
                 }
                 else
                 {
-                    sheet.Cell(excelRow, M_DateCol).Value = string.Empty;
+                    dateCell.Value = " ";              // IMPORTANT: non-numeric placeholder, visually empty
                 }
 
                 // Real employee columns
@@ -400,12 +408,6 @@ namespace WPFApp.Service
         }
 
         // ===== helpers =====
-
-
-
-
-
-
         private static DateTime? TryBuildDate(ScheduleExportContext context, DataColumn? dayCol, DataRowView rowView)
         {
             if (dayCol is null) return null;
@@ -413,12 +415,21 @@ namespace WPFApp.Service
             var raw = rowView[dayCol.ColumnName];
             if (raw is null || raw == DBNull.Value) return null;
 
+            // already a date
+            if (raw is DateTime dt) return dt.Date;
+
+            // day-of-month as int / string
             if (raw is int d && d >= 1 && d <= 31)
                 return SafeDate(context.ScheduleYear, context.ScheduleMonth, d);
 
             var s = raw.ToString()?.Trim();
             if (int.TryParse(s, out var parsed) && parsed >= 1 && parsed <= 31)
                 return SafeDate(context.ScheduleYear, context.ScheduleMonth, parsed);
+
+            // full date string in current culture (optional)
+            if (!string.IsNullOrWhiteSpace(s) &&
+                DateTime.TryParse(s, CultureInfo.CurrentCulture, DateTimeStyles.None, out var parsedDt))
+                return parsedDt.Date;
 
             return null;
         }
@@ -469,7 +480,6 @@ namespace WPFApp.Service
         // ===================== EXCEL FILL: STATISTIC (1:1 style) =====================
         private static void FillStatisticSheetFromTemplate(IXLWorksheet sheet, ScheduleExportContext context)
         {
-            // Values B2..B11 (labels are in A and already styled in template)
             sheet.Cell(2, S_ValueCol).Value = context.ScheduleName;
             sheet.Cell(3, S_ValueCol).Value = context.ScheduleMonth.ToString("D2", CultureInfo.InvariantCulture);
             sheet.Cell(4, S_ValueCol).Value = context.ScheduleYear.ToString(CultureInfo.InvariantCulture);
@@ -481,19 +491,16 @@ namespace WPFApp.Service
             sheet.Cell(10, S_ValueCol).Value = context.Shift1;
             sheet.Cell(11, S_ValueCol).Value = context.Shift2;
 
-            // Total employees line (A12 merged in template)
             sheet.Cell(S_EmployeesLineRow, 1).Value =
                 $"Total employees ({context.TotalEmployees}): {context.TotalEmployeesListText}";
 
-            // Summary day headers (row 14, merged blocks of 3 columns each)
             for (int i = 0; i < S_DaysCapacity; i++)
             {
-                var col = S_FirstDayCol + i * 3; // C, F, I...
+                var col = S_FirstDayCol + i * 3;
                 var text = i < context.SummaryDayHeaders.Count ? context.SummaryDayHeaders[i].Text : string.Empty;
                 sheet.Cell(S_DayHeaderRow, col).Value = text;
             }
 
-            // Summary rows (template-styled range is limited; extend template if you need more)
             if (context.SummaryRows.Count > S_MaxSummaryRows)
                 throw new InvalidOperationException($"Statistic template supports max {S_MaxSummaryRows} summary rows. Current: {context.SummaryRows.Count}. Extend the template styling below row {S_BodyFirstRow + S_MaxSummaryRows - 1}.");
 
@@ -503,7 +510,6 @@ namespace WPFApp.Service
 
                 if (r >= context.SummaryRows.Count)
                 {
-                    // Clear unused row contents (keep formatting)
                     sheet.Cell(row, 1).Clear(XLClearOptions.Contents);
                     sheet.Cell(row, 2).Clear(XLClearOptions.Contents);
                     for (int d = 0; d < S_DaysCapacity; d++)
@@ -520,7 +526,6 @@ namespace WPFApp.Service
                 sheet.Cell(row, 1).Value = summaryRow.Employee ?? string.Empty;
                 sheet.Cell(row, 2).Value = summaryRow.Sum ?? string.Empty;
 
-                // Snapshot Days (avoid background-thread issues with ObservableCollection)
                 var dayCells = summaryRow.Days?.ToList()
                               ?? new List<ContainerScheduleProfileViewModel.SummaryDayCell>();
 
@@ -535,7 +540,6 @@ namespace WPFApp.Service
                 }
             }
 
-            // Mini-table rows
             if (context.EmployeeWorkFreeStats.Count > S_MaxMiniRows)
                 throw new InvalidOperationException($"Statistic template supports max {S_MaxMiniRows} mini-table rows. Current: {context.EmployeeWorkFreeStats.Count}. Extend the template styling below row {S_MiniBodyFirstRow + S_MaxMiniRows - 1}.");
 
@@ -749,7 +753,5 @@ namespace WPFApp.Service
 
             return false;
         }
-
     }
 }
-

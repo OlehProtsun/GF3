@@ -7,7 +7,8 @@ using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Threading;
 using WPFApp.ViewModel.Container.ScheduleProfile;
-using WPFApp.ViewModel.Container.Profile; // якщо тут лежить ScheduleMatrixColumnBuilder - лишаємо
+using WPFApp.ViewModel.Container.Profile;
+using WPFApp.Infrastructure.ScheduleMatrix; // якщо тут лежить ScheduleMatrixColumnBuilder - лишаємо
 
 namespace WPFApp.View.Container
 {
