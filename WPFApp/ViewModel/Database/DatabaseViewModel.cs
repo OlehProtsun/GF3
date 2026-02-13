@@ -13,6 +13,7 @@ namespace WPFApp.ViewModel.Database
     public sealed class DatabaseViewModel : ViewModelBase
     {
         private readonly ISqliteAdminService _sqliteAdminService;
+        private bool _autoQueryExecuted;
 
         private string _executorSql = "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name;";
         private DataView? _queryResult;
@@ -44,7 +45,19 @@ namespace WPFApp.ViewModel.Database
             ExecuteImportScriptCommand = new AsyncRelayCommand(ExecuteImportScriptAsync);
             RefreshInfoCommand = new AsyncRelayCommand(RefreshDatabaseInfoAsync);
 
-            _ = RefreshDatabaseInfoAsync(CancellationToken.None);
+            _ = InitializeOnEnterAsync();
+        }
+
+        private async Task InitializeOnEnterAsync()
+        {
+            if (_autoQueryExecuted) return;
+            _autoQueryExecuted = true;
+
+            // якщо хочеш — спочатку онови інфу
+            await RefreshDatabaseInfoAsync(CancellationToken.None);
+
+            // виконається запит з ExecutorSql (він у тебе вже заданий дефолтом)
+            await ExecuteSqlAsync(CancellationToken.None);
         }
 
         public string ExecutorSql

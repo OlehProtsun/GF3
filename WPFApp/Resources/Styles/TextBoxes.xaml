@@ -10,7 +10,7 @@
     </Style>
 
     <Style x:Key="RoundedTextBoxStyle" TargetType="TextBox" BasedOn="{StaticResource RoundedTextBoxBaseStyle}">
-        <Setter Property="Height" Value="42" />
+        <Setter Property="MinHeight" Value="42" />
         <Setter Property="Padding" Value="12,0" />
         <Setter Property="FontSize" Value="{StaticResource FontSizeBase}" />
         <Setter Property="Template">
@@ -64,7 +64,7 @@
     </Style>
 
     <Style x:Key="CompactRoundedTextBoxStyle" TargetType="TextBox" BasedOn="{StaticResource RoundedTextBoxBaseStyle}">
-        <Setter Property="Height" Value="37" />
+        <Setter Property="MinHeight" Value="37" />
         <Setter Property="Padding" Value="5,0" />
         <Setter Property="FontSize" Value="{StaticResource FontSizeSmall}" />
         <Setter Property="Template">
@@ -106,6 +106,10 @@
                                    Visibility="Collapsed" />
                     </Grid>
                     <ControlTemplate.Triggers>
+                        <Trigger Property="AcceptsReturn" Value="True">
+                            <Setter TargetName="Watermark" Property="VerticalAlignment" Value="Top" />
+                            <Setter TargetName="Watermark" Property="Margin" Value="14,8,0,0" />
+                        </Trigger>
                         <Trigger Property="Text" Value="">
                             <Setter TargetName="Watermark" Property="Visibility" Value="Visible" />
                         </Trigger>

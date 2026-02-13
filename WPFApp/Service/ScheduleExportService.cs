@@ -1168,8 +1168,12 @@ namespace WPFApp.Service
         {
             var columns = string.Join(", ", values.Select(v => v.Column));
             var vals = string.Join(", ", values.Select(v => ToSqlLiteral(v.Value)));
-            return $"INSERT INTO {table} ({columns}) VALUES ({vals});";
+
+            // Ідемпотентно: якщо запис з таким ключем уже є (UNIQUE/PK), нічого не робимо
+            return $"INSERT OR IGNORE INTO {table} ({columns}) VALUES ({vals});";
         }
+
+
 
         private static string ToSqlLiteral(object? value)
         {
