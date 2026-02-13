@@ -9,6 +9,11 @@
     <sys:Double x:Key="FontSizeBase">13</sys:Double>
     <sys:Double x:Key="FontSizeTitle">20</sys:Double>
     <sys:Double x:Key="FontSizePageTitle">25</sys:Double>
+    <sys:Double x:Key="FontSizeMedium">16</sys:Double>
+
+    <!-- Accent = твій PrimaryBrush по кольору -->
+    <SolidColorBrush x:Key="AccentBrush" Color="#FF3347FF" />
+
 
     <CornerRadius x:Key="Cr5">5</CornerRadius>
     <CornerRadius x:Key="Cr10">10</CornerRadius>

@@ -9,10 +9,14 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <None Remove="Resources\Excel\ContainerTemplate.xlsx" />
     <None Remove="Resources\Excel\ScheduleTemplate.xlsx" />
   </ItemGroup>
 
   <ItemGroup>
+    <Content Include="Resources\Excel\ContainerTemplate.xlsx">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
     <Content Include="Resources\Excel\ScheduleTemplate.xlsx">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>

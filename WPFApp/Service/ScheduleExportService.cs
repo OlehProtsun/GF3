@@ -108,6 +108,8 @@ namespace WPFApp.Service
 
     public sealed class ContainerExcelExportContext
     {
+        public int ContainerId { get; }
+
         public string ContainerName { get; }
         public string ContainerNote { get; }
         public int TotalEmployees { get; }
@@ -121,6 +123,7 @@ namespace WPFApp.Service
         public IReadOnlyList<ContainerExcelExportChartContext> Charts { get; }
 
         public ContainerExcelExportContext(
+                int containerId,
             string containerName,
             string containerNote,
             int totalEmployees,
@@ -133,6 +136,7 @@ namespace WPFApp.Service
             IReadOnlyList<ContainerProfileViewModel.EmployeeWorkFreeStatRow> employeeWorkFreeStats,
             IReadOnlyList<ContainerExcelExportChartContext> charts)
         {
+            ContainerId = containerId;
             ContainerName = containerName ?? string.Empty;
             ContainerNote = containerNote ?? string.Empty;
             TotalEmployees = totalEmployees;
@@ -193,12 +197,15 @@ namespace WPFApp.Service
 
     public sealed class ScheduleExportService : IScheduleExportService
     {
+        private static readonly string[] ContainerTemplateSheetNames = { "ContainerTemplate", "Sheet1", "Container" };
+
         private const string DefaultSheetName = "Schedule";
         private const string DefaultStatisticSheetName = "Schedule - Statistic";
 
         // ===================== TEMPLATE CONFIG =====================
         // Put template here (Build Action: Content, Copy to Output Directory: Copy if newer/always)
         private const string ExcelTemplateRelativePath = @"Resources\Excel\ScheduleTemplate.xlsx";
+        private const string ContainerExcelTemplateRelativePath = @"Resources\Excel\ContainerTemplate.xlsx";
 
         // Supported template sheet names (your template had R_FL_35 originally)
         private static readonly string[] MatrixTemplateSheetNames = { "ScheduleName", "R_FL_35", "MatrixTemplate" };
@@ -304,21 +311,45 @@ namespace WPFApp.Service
                 var statTemplate = FindTemplateSheet(workbook, StatisticTemplateSheetNames)
                     ?? throw new InvalidOperationException($"Statistic template sheet not found. Expected one of: {string.Join(", ", StatisticTemplateSheetNames)}");
 
-                var containerSheet = statTemplate.CopyTo(MakeUniqueSheetName(workbook, SanitizeWorksheetName("Container Statistic", "Container Statistic")));
-                FillContainerStatisticSheetFromTemplate(containerSheet, context);
-                FixGray125Fills(containerSheet);
+                // ---- container template comes from ANOTHER FILE ----
+                var containerTemplatePath = ResolveContainerTemplatePath();
+                using var containerWb = new XLWorkbook(containerTemplatePath);
 
+                var containerSrc = FindTemplateSheet(containerWb, ContainerTemplateSheetNames)
+                    ?? throw new InvalidOperationException($"Container template sheet not found in ContainerTemplate.xlsx. Expected one of: {string.Join(", ", ContainerTemplateSheetNames)}");
+
+                // copy container template sheet into 'workbook' (same workbook as matrix/stat)
+                var containerTemplateName = MakeUniqueSheetName(workbook, "__ContainerTemplate__");
+
+                // ВАЖЛИВО: тут залежить від версії ClosedXML — дивись примітку нижче
+                var containerTemplate = containerSrc.CopyTo(workbook, containerTemplateName);
+
+                // 1) Container sheet from template
+                var containerSheetName = MakeUniqueSheetName(workbook, SanitizeWorksheetName("Container", "Container"));
+                var containerSheet = containerTemplate.CopyTo(containerSheetName);
+                FillContainerTemplateSheetFromTemplate(containerSheet, context);
+
+                // 2) Each chart: Matrix + Statistic (like обычный ExportToExcel)
                 foreach (var chart in context.Charts)
                 {
                     ct.ThrowIfCancellationRequested();
-                    var sheetName = MakeUniqueSheetName(workbook, SanitizeWorksheetName(chart.ChartName, DefaultSheetName));
-                    var chartSheet = matrixTemplate.CopyTo(sheetName);
-                    FillMatrixSheetFromTemplate(chartSheet, chart.ScheduleContext);
-                    FixGray125Fills(chartSheet, "B2:AA32");
+
+                    var scheduleName = MakeUniqueSheetName(workbook, SanitizeWorksheetName(chart.ChartName, DefaultSheetName));
+                    var matrixSheet = matrixTemplate.CopyTo(scheduleName);
+                    FillMatrixSheetFromTemplate(matrixSheet, chart.ScheduleContext);
+                    FixGray125Fills(matrixSheet, "B2:AA32");
+
+                    var statNameBase = SanitizeWorksheetName($"{scheduleName} - Statistic", DefaultStatisticSheetName);
+                    var statName = MakeUniqueSheetName(workbook, statNameBase);
+                    var statSheet = statTemplate.CopyTo(statName);
+                    FillStatisticSheetFromTemplate(statSheet, chart.ScheduleContext);
+                    FixGray125Fills(statSheet);
                 }
 
+                // remove templates from output
                 matrixTemplate.Delete();
                 statTemplate.Delete();
+                containerTemplate.Delete();
 
                 workbook.SaveAs(filePath);
             }, ct);
@@ -341,6 +372,17 @@ namespace WPFApp.Service
 
             if (!File.Exists(path))
                 throw new FileNotFoundException("Excel template not found. Ensure it is copied to output directory.", path);
+
+            return path;
+        }
+
+        private static string ResolveContainerTemplatePath()
+        {
+            var baseDir = AppDomain.CurrentDomain.BaseDirectory;
+            var path = Path.Combine(baseDir, ContainerExcelTemplateRelativePath);
+
+            if (!File.Exists(path))
+                throw new FileNotFoundException("Container Excel template not found.", path);
 
             return path;
         }
@@ -605,6 +647,7 @@ namespace WPFApp.Service
         // ===================== EXCEL FILL: STATISTIC (1:1 style) =====================
         private static void FillStatisticSheetFromTemplate(IXLWorksheet sheet, ScheduleExportContext context)
         {
+            // Header fields
             sheet.Cell(2, S_ValueCol).Value = context.ScheduleName;
             sheet.Cell(3, S_ValueCol).Value = context.ScheduleMonth.ToString("D2", CultureInfo.InvariantCulture);
             sheet.Cell(4, S_ValueCol).Value = context.ScheduleYear.ToString(CultureInfo.InvariantCulture);
@@ -619,6 +662,7 @@ namespace WPFApp.Service
             sheet.Cell(S_EmployeesLineRow, 1).Value =
                 $"Total employees ({context.TotalEmployees}): {context.TotalEmployeesListText}";
 
+            // Day headers (C..CQ, every day uses 3 columns)
             for (int i = 0; i < S_DaysCapacity; i++)
             {
                 var col = S_FirstDayCol + i * 3;
@@ -626,17 +670,43 @@ namespace WPFApp.Service
                 sheet.Cell(S_DayHeaderRow, col).Value = text;
             }
 
-            if (context.SummaryRows.Count > S_MaxSummaryRows)
-                throw new InvalidOperationException($"Statistic template supports max {S_MaxSummaryRows} summary rows. Current: {context.SummaryRows.Count}. Extend the template styling below row {S_BodyFirstRow + S_MaxSummaryRows - 1}.");
+            // ===== SUMMARY: auto-expand rows if needed =====
+            var summaryNeeded = context.SummaryRows.Count;
+            var summaryExtra = Math.Max(0, summaryNeeded - S_MaxSummaryRows);
 
-            for (int r = 0; r < S_MaxSummaryRows; r++)
+            // summary table last column: C + (31 days * 3 cols) - 1 = CQ (чисельно 95)
+            var summaryLastCol = S_FirstDayCol + (S_DaysCapacity - 1) * 3 + 2; // last day block ends at +2
+
+            if (summaryExtra > 0)
+            {
+                // Insert extra rows below last template-styled summary row (row 25)
+                var insertAfter = S_BodyFirstRow + S_MaxSummaryRows - 1; // 25
+                sheet.Row(insertAfter).InsertRowsBelow(summaryExtra);
+
+                // Copy style from the last template summary row into inserted rows
+                var templateRange = sheet.Range(insertAfter, 1, insertAfter, summaryLastCol);
+                var templateHeight = sheet.Row(insertAfter).Height;
+
+                for (int k = 1; k <= summaryExtra; k++)
+                {
+                    templateRange.CopyTo(sheet.Range(insertAfter + k, 1, insertAfter + k, summaryLastCol));
+                    sheet.Row(insertAfter + k).Height = templateHeight;
+                }
+            }
+
+            // Render all summary rows (template rows + inserted if needed)
+            var summaryTotalRows = Math.Max(S_MaxSummaryRows, summaryNeeded);
+
+            for (int r = 0; r < summaryTotalRows; r++)
             {
                 var row = S_BodyFirstRow + r;
 
-                if (r >= context.SummaryRows.Count)
+                if (r >= summaryNeeded)
                 {
+                    // Clear unused template rows (only when summaryNeeded < S_MaxSummaryRows)
                     sheet.Cell(row, 1).Clear(XLClearOptions.Contents);
                     sheet.Cell(row, 2).Clear(XLClearOptions.Contents);
+
                     for (int d = 0; d < S_DaysCapacity; d++)
                     {
                         var c = S_FirstDayCol + d * 3;
@@ -657,7 +727,7 @@ namespace WPFApp.Service
                 for (int d = 0; d < S_DaysCapacity; d++)
                 {
                     var c = S_FirstDayCol + d * 3;
-                    var day = d < dayCells.Count ? dayCells[d] : null;
+                    ContainerScheduleProfileViewModel.SummaryDayCell? day = d < dayCells.Count ? dayCells[d] : null;
 
                     sheet.Cell(row, c).Value = day?.From ?? string.Empty;
                     sheet.Cell(row, c + 1).Value = day?.To ?? string.Empty;
@@ -665,15 +735,39 @@ namespace WPFApp.Service
                 }
             }
 
-            if (context.EmployeeWorkFreeStats.Count > S_MaxMiniRows)
-                throw new InvalidOperationException($"Statistic template supports max {S_MaxMiniRows} mini-table rows. Current: {context.EmployeeWorkFreeStats.Count}. Extend the template styling below row {S_MiniBodyFirstRow + S_MaxMiniRows - 1}.");
+            // ===== MINI TABLE: shift start row by summaryExtra (because we inserted rows above it) =====
+            var miniBodyFirstRow = S_MiniBodyFirstRow + summaryExtra;
 
-            for (int r = 0; r < S_MaxMiniRows; r++)
+            // ===== MINI TABLE: auto-expand rows if needed =====
+            var miniNeeded = context.EmployeeWorkFreeStats.Count;
+            var miniExtra = Math.Max(0, miniNeeded - S_MaxMiniRows);
+
+            if (miniExtra > 0)
             {
-                var row = S_MiniBodyFirstRow + r;
+                // Insert extra rows below last template-styled mini row
+                var miniInsertAfter = miniBodyFirstRow + S_MaxMiniRows - 1; // last mini template row
+                sheet.Row(miniInsertAfter).InsertRowsBelow(miniExtra);
 
-                if (r >= context.EmployeeWorkFreeStats.Count)
+                // Copy style from last mini template row into inserted rows (usually only A..C are used)
+                var miniTemplateRange = sheet.Range(miniInsertAfter, 1, miniInsertAfter, 3);
+                var miniHeight = sheet.Row(miniInsertAfter).Height;
+
+                for (int k = 1; k <= miniExtra; k++)
                 {
+                    miniTemplateRange.CopyTo(sheet.Range(miniInsertAfter + k, 1, miniInsertAfter + k, 3));
+                    sheet.Row(miniInsertAfter + k).Height = miniHeight;
+                }
+            }
+
+            var miniTotalRows = Math.Max(S_MaxMiniRows, miniNeeded);
+
+            for (int r = 0; r < miniTotalRows; r++)
+            {
+                var row = miniBodyFirstRow + r;
+
+                if (r >= miniNeeded)
+                {
+                    // Clear unused template rows (only when miniNeeded < S_MaxMiniRows)
                     sheet.Cell(row, 1).Clear(XLClearOptions.Contents);
                     sheet.Cell(row, 2).Clear(XLClearOptions.Contents);
                     sheet.Cell(row, 3).Clear(XLClearOptions.Contents);
@@ -687,65 +781,140 @@ namespace WPFApp.Service
             }
         }
 
-        private static void FillContainerStatisticSheetFromTemplate(IXLWorksheet sheet, ContainerExcelExportContext context)
+        private static void FillContainerTemplateSheetFromTemplate(IXLWorksheet sheet, ContainerExcelExportContext context)
         {
-            sheet.RangeUsed()?.Clear(XLClearOptions.Contents);
-
-            sheet.Cell(2, 1).Value = "Container Name";
-            sheet.Cell(2, 2).Value = context.ContainerName;
-            sheet.Cell(3, 1).Value = "Container Note";
-            sheet.Cell(3, 2).Value = context.ContainerNote;
-            sheet.Cell(5, 1).Value = "Total Employees";
-            sheet.Cell(5, 2).Value = context.TotalEmployees;
-            sheet.Cell(6, 1).Value = "Total Shops";
-            sheet.Cell(6, 2).Value = context.TotalShops;
-            sheet.Cell(7, 1).Value = "Total Hours";
-            sheet.Cell(7, 2).Value = context.TotalHoursText;
-            sheet.Cell(8, 1).Value = "Employees";
-            sheet.Cell(8, 2).Value = context.TotalEmployeesListText;
-            sheet.Cell(9, 1).Value = "Shops";
-            sheet.Cell(9, 2).Value = context.TotalShopsListText;
-
-            var headerRow = 12;
-            sheet.Cell(headerRow, 1).Value = "Employee";
-            sheet.Cell(headerRow, 2).Value = "Sum";
-
-            var col = 3;
-            foreach (var shop in context.ShopHeaders)
+            // 1) Replace placeholders everywhere
+            var map = new Dictionary<string, string>(StringComparer.Ordinal)
             {
-                sheet.Cell(headerRow, col++).Value = shop.Name;
+                ["{Id}"] = context.ContainerId.ToString(CultureInfo.InvariantCulture),
+                ["{Name}"] = context.ContainerName ?? string.Empty,
+                ["{Note}"] = context.ContainerNote ?? string.Empty,
+
+                ["{Container Name}"] = context.ContainerName ?? string.Empty,
+                ["{Total Hours}"] = context.TotalHoursText ?? string.Empty,
+                ["{Total Employees Count}"] = context.TotalEmployees.ToString(CultureInfo.InvariantCulture),
+                ["{Total Shops Count}"] = context.TotalShops.ToString(CultureInfo.InvariantCulture),
+                ["{Total Employees}"] = context.TotalEmployeesListText ?? string.Empty,
+                ["{Total Shops}"] = context.TotalShopsListText ?? string.Empty,
+            };
+
+            foreach (var cell in sheet.CellsUsed())
+            {
+                var s = cell.GetString();
+                if (string.IsNullOrWhiteSpace(s) || !s.Contains('{')) continue;
+
+                foreach (var kv in map)
+                    if (s.Contains(kv.Key, StringComparison.Ordinal))
+                        s = s.Replace(kv.Key, kv.Value);
+
+                cell.Value = s;
             }
 
-            var row = headerRow + 1;
-            foreach (var item in context.EmployeeShopHoursRows)
+            // 2) Locate table header row: "Employee" + "Hours Sum"
+            var headerRow = sheet.RowsUsed()
+                .Select(r => r.RowNumber())
+                .FirstOrDefault(r =>
+                    string.Equals(sheet.Cell(r, 1).GetString(), "Employee", StringComparison.OrdinalIgnoreCase) &&
+                    string.Equals(sheet.Cell(r, 4).GetString(), "Hours Sum", StringComparison.OrdinalIgnoreCase));
+
+            if (headerRow <= 0) return;
+
+            // Data template row: first row with "{Employee}"
+            var templateRow = sheet.RowsUsed()
+                .Select(r => r.RowNumber())
+                .FirstOrDefault(r => sheet.Cell(r, 1).GetString().Contains("{Employee}", StringComparison.OrdinalIgnoreCase));
+
+            if (templateRow <= 0) templateRow = headerRow + 1;
+
+            // 3) Find shop columns in header row (cells with "{Shop}")
+            int firstShopCol = 0, lastShopCol = 0;
+            var lastUsedCol = sheet.LastColumnUsed()?.ColumnNumber() ?? 50;
+
+            for (int c = 1; c <= lastUsedCol; c++)
             {
-                sheet.Cell(row, 1).Value = item.Employee;
-                sheet.Cell(row, 2).Value = item.HoursSum;
-                col = 3;
-                foreach (var shop in context.ShopHeaders)
+                if (sheet.Cell(headerRow, c).GetString().Contains("{Shop}", StringComparison.OrdinalIgnoreCase))
                 {
-                    item.HoursByShop.TryGetValue(shop.Key, out var val);
-                    sheet.Cell(row, col++).Value = val ?? "0";
+                    firstShopCol = c;
+                    break;
                 }
-                row++;
             }
+            if (firstShopCol <= 0) return;
 
-            row += 2;
-            sheet.Cell(row, 1).Value = "Employee";
-            sheet.Cell(row, 2).Value = "Work Day";
-            sheet.Cell(row, 3).Value = "Free Day";
-            row++;
+            lastShopCol = firstShopCol;
+            while (lastShopCol <= lastUsedCol &&
+                   sheet.Cell(headerRow, lastShopCol).GetString().Contains("{Shop}", StringComparison.OrdinalIgnoreCase))
+                lastShopCol++;
+            lastShopCol--;
 
-            foreach (var wf in context.EmployeeWorkFreeStats)
+            var shopCapacity = lastShopCol - firstShopCol + 1;
+            var shops = context.ShopHeaders?.ToList() ?? new List<ContainerProfileViewModel.ShopHeader>();
+
+            // Якщо магазинів більше, ніж є {Shop} в темплейті — або додай ще {Shop} колонок у темплейті,
+            // або розширюй тут (я залишив простий і безпечний шлях: вимагати достатню кількість у темплейті).
+            if (shops.Count > shopCapacity)
+                throw new InvalidOperationException($"ContainerTemplate supports max {shopCapacity} shops. Add more {{Shop}} columns to the template.");
+
+            // 4) Write shop headers
+            for (int i = 0; i < shopCapacity; i++)
             {
-                sheet.Cell(row, 1).Value = wf.Employee;
-                sheet.Cell(row, 2).Value = wf.WorkDays;
-                sheet.Cell(row, 3).Value = wf.FreeDays;
-                row++;
+                sheet.Cell(headerRow, firstShopCol + i).Value = i < shops.Count ? shops[i].Name : string.Empty;
             }
 
-            sheet.Columns().AdjustToContents();
-            sheet.SheetView.FreezeRows(1);
+            // 5) Fill employee rows (merge data from two lists)
+            var rows = context.EmployeeShopHoursRows?.ToList() ?? new List<ContainerProfileViewModel.EmployeeShopHoursRow>();
+            var wfByEmp = (context.EmployeeWorkFreeStats ?? Array.Empty<ContainerProfileViewModel.EmployeeWorkFreeStatRow>())
+                .GroupBy(x => x.Employee ?? string.Empty, StringComparer.CurrentCultureIgnoreCase)
+                .ToDictionary(g => g.Key, g => g.First(), StringComparer.CurrentCultureIgnoreCase);
+
+            if (rows.Count == 0)
+            {
+                sheet.Range(templateRow, 1, templateRow, lastShopCol).Clear(XLClearOptions.Contents);
+                return;
+            }
+
+            if (rows.Count > 1)
+            {
+                sheet.Row(templateRow).InsertRowsBelow(rows.Count - 1);
+
+                // copy formatting from template row into inserted rows
+                var templateRange = sheet.Range(templateRow, 1, templateRow, lastShopCol);
+                for (int i = 1; i < rows.Count; i++)
+                    templateRange.CopyTo(sheet.Range(templateRow + i, 1, templateRow + i, lastShopCol));
+            }
+
+            for (int i = 0; i < rows.Count; i++)
+            {
+                var r = templateRow + i;
+                var item = rows[i];
+
+                sheet.Cell(r, 1).Value = item.Employee ?? string.Empty;
+
+                if (wfByEmp.TryGetValue(item.Employee ?? string.Empty, out var wf))
+                {
+                    sheet.Cell(r, 2).Value = wf.WorkDays;
+                    sheet.Cell(r, 3).Value = wf.FreeDays;
+                }
+                else
+                {
+                    sheet.Cell(r, 2).Value = string.Empty;
+                    sheet.Cell(r, 3).Value = string.Empty;
+                }
+
+                sheet.Cell(r, 4).Value = item.HoursSum ?? "0";
+
+                for (int s = 0; s < shopCapacity; s++)
+                {
+                    if (s >= shops.Count)
+                    {
+                        sheet.Cell(r, firstShopCol + s).Value = string.Empty;
+                        continue;
+                    }
+
+                    var shopKey = shops[s].Key;
+                    item.HoursByShop.TryGetValue(shopKey, out var val);
+                    sheet.Cell(r, firstShopCol + s).Value = string.IsNullOrWhiteSpace(val) ? "0" : val;
+                }
+            }
         }
 
         // ===================== SQL EXPORT (unchanged logic, just kept) =====================

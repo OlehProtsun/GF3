@@ -101,116 +101,6 @@
             </Style.Triggers>
         </Style>
 
-        <BooleanToVisibilityConverter x:Key="BoolToVisibility" />
-
-        <Style x:Key="RoundCheckBoxStyle" TargetType="CheckBox">
-            <Setter Property="Focusable" Value="False" />
-            <Setter Property="Width" Value="20"/>
-            <Setter Property="Height" Value="20"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="CheckBox">
-                        <Grid Width="{TemplateBinding Width}" Height="{TemplateBinding Height}">
-                            <Border x:Name="Box"
-                                    CornerRadius="4"
-                                    BorderBrush="{StaticResource MutedTextBrush}"
-                                    BorderThickness="2"
-                                    Background="Transparent"/>
-
-                            <Path x:Name="Tick"
-                                  Data="M 3 8 L 7 12 L 13 4"
-                                  Stroke="White"
-                                  StrokeThickness="2"
-                                  StrokeStartLineCap="Round"
-                                  StrokeEndLineCap="Round"
-                                  Visibility="Collapsed" />
-                        </Grid>
-
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsChecked" Value="True">
-                                <Setter TargetName="Box" Property="Background" Value="{StaticResource PrimaryBrush}" />
-                                <Setter TargetName="Box" Property="BorderBrush" Value="{StaticResource PrimaryBrush}" />
-                                <Setter TargetName="Tick" Property="Visibility" Value="Visible" />
-                            </Trigger>
-
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Box" Property="Opacity" Value="0.85" />
-                            </Trigger>
-
-                            <Trigger Property="IsEnabled" Value="False">
-                                <Setter TargetName="Box" Property="Opacity" Value="0.55" />
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
-        <Style x:Key="ScheduleCardGridStyle"
-               TargetType="DataGrid"
-               BasedOn="{StaticResource AvailabilityListCardGridBaseStyle}">
-
-            <Setter Property="RowStyle">
-                <Setter.Value>
-                    <Style TargetType="DataGridRow">
-                        <Setter Property="Height" Value="44" />
-                        <Setter Property="Margin" Value="0,8,0,12" />
-                        <Setter Property="Background" Value="{StaticResource SurfaceBrush}" />
-                        <Setter Property="SnapsToDevicePixels" Value="True" />
-                        <Setter Property="BorderThickness" Value="0" />
-                        <EventSetter Event="MouseDoubleClick" Handler="DataGridSchedules_MouseDoubleClick"/>
-                        <Setter Property="Template">
-                            <Setter.Value>
-                                <ControlTemplate TargetType="DataGridRow">
-                                    <Border Background="Transparent"
-                                            Margin="6,0,6,0"
-                                            PreviewMouseLeftButtonDown="RowHitArea_PreviewMouseLeftButtonDown"
-                                            MouseLeftButtonDown="RowHitArea_MouseLeftButtonDown">
-                                        <Border x:Name="RowCard"
-                                                Background="{TemplateBinding Background}"
-                                                CornerRadius="{StaticResource Cr12}"
-                                                Padding="18,0,12,0"
-                                                SnapsToDevicePixels="True">
-
-                                            <Border.Effect>
-                                                <DropShadowEffect BlurRadius="16"
-                                                                  ShadowDepth="0"
-                                                                  Opacity="0.18" />
-                                            </Border.Effect>
-
-                                            <DataGridCellsPresenter />
-                                        </Border>
-                                    </Border>
-
-                                    <ControlTemplate.Triggers>
-
-                                        <DataTrigger Binding="{Binding IsChecked}" Value="True">
-                                            <Setter TargetName="RowCard" Property="Background" Value="{StaticResource PrimaryBrush}" />
-                                            <Setter Property="Foreground" Value="White" />
-                                        </DataTrigger>
-
-                                        <MultiDataTrigger>
-                                            <MultiDataTrigger.Conditions>
-                                                <Condition Binding="{Binding IsSelected, RelativeSource={RelativeSource Self}}" Value="True" />
-                                                <Condition Binding="{Binding DataContext.IsMultiOpenEnabled, RelativeSource={RelativeSource AncestorType=DataGrid}}" Value="False" />
-                                            </MultiDataTrigger.Conditions>
-                                            <Setter TargetName="RowCard" Property="Background" Value="{StaticResource PrimaryBrush}" />
-                                            <Setter Property="Foreground" Value="White" />
-                                        </MultiDataTrigger>
-
-                                        <Trigger Property="IsMouseOver" Value="True">
-                                            <Setter TargetName="RowCard" Property="Opacity" Value="0.97" />
-                                        </Trigger>
-
-                                    </ControlTemplate.Triggers>
-                                </ControlTemplate>
-                            </Setter.Value>
-                        </Setter>
-                    </Style>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
         <Style x:Key="ContainerStatsGridStyle"
                TargetType="DataGrid"
                BasedOn="{StaticResource AvailabilityBaseGridStyle}">
@@ -398,7 +288,7 @@
                         Style="{StaticResource CardStyle}"
                         Margin="0,12,0,12"
                         VerticalAlignment="Top"
-                        MaxHeight="520">
+                        MaxHeight="650">
 
                     <Grid Margin="15">
                         <Grid.RowDefinitions>
@@ -515,11 +405,14 @@
 
                 <!-- RIGHT: Schedules list -->
                 <Border Grid.Row="0"
-                        Grid.Column="2"
-                        Margin="0,10,0,10"
-                        Background="{StaticResource SurfaceBrush}"
-                        CornerRadius="{StaticResource Cr20}"
-                        ClipToBounds="False">
+        Grid.Column="2"
+        Margin="0,10,0,10"
+        Background="{StaticResource SurfaceBrush}"
+        CornerRadius="{StaticResource Cr20}"
+        ClipToBounds="False"
+        Height="650"
+        VerticalAlignment="Top">
+
 
                     <Border.Effect>
                         <DropShadowEffect BlurRadius="18" ShadowDepth="2" Opacity="0.22" />
@@ -665,59 +558,45 @@
                                 ClipToBounds="True">
 
                             <DataGrid x:Name="dataGridSchedules"
-                                      Style="{StaticResource ScheduleCardGridStyle}"
-                                      Background="Transparent"
-                                      BorderThickness="0"
-                                      ItemsSource="{Binding Items}"
-                                      SelectedItem="{Binding SelectedItem}"
-                                      PreviewMouseDoubleClick="DataGridSchedules_PreviewMouseDoubleClick">
+          Style="{StaticResource ScheduleCardGridStyle}"
+          Background="Transparent"
+          BorderThickness="0"
+          IsReadOnly="True"
+          ItemsSource="{Binding Items}"
+          SelectedItem="{Binding SelectedItem}"
+
+          PreviewMouseLeftButtonDown="DataGridSchedules_PreviewMouseLeftButtonDown"
+          PreviewMouseDoubleClick="DataGridSchedules_PreviewMouseDoubleClick"
+          MouseDoubleClick="DataGridSchedules_MouseDoubleClick">
 
                                 <DataGrid.Columns>
 
-                                    <!-- MULTIOPEN CHECKBOX колонка -->
-                                    <DataGridTemplateColumn Width="Auto" MinWidth="0">
+                                    <!-- MULTI-OPEN CHECKBOX колонка -->
+                                    <DataGridTemplateColumn Width="Auto"
+                                MinWidth="0"
+                                IsReadOnly="True"
+                                CellStyle="{StaticResource CardListCheckBoxCellStyle}">
 
                                         <DataGridTemplateColumn.HeaderStyle>
                                             <Style TargetType="DataGridColumnHeader">
-                                                <Setter Property="Visibility" Value="Collapsed" />
+                                                <Setter Property="Visibility" Value="Collapsed"/>
                                             </Style>
                                         </DataGridTemplateColumn.HeaderStyle>
 
-                                        <DataGridTemplateColumn.CellStyle>
-                                            <Style TargetType="DataGridCell">
-                                                <Setter Property="Padding" Value="0" />
-                                                <Setter Property="BorderThickness" Value="0" />
-                                                <Setter Property="Background" Value="Transparent" />
-                                                <Setter Property="Visibility" Value="Collapsed" />
-
-                                                <Style.Triggers>
-                                                    <DataTrigger
-                Binding="{Binding DataContext.IsMultiOpenEnabled,
-                                  RelativeSource={RelativeSource AncestorType={x:Type DataGrid}}}"
-                Value="True">
-                                                        <Setter Property="Visibility" Value="Visible" />
-                                                    </DataTrigger>
-                                                </Style.Triggers>
-                                            </Style>
-                                        </DataGridTemplateColumn.CellStyle>
-
-
                                         <DataGridTemplateColumn.CellTemplate>
                                             <DataTemplate>
-                                                <CheckBox Style="{StaticResource RoundCheckBoxStyle}"
-                                                          IsChecked="{Binding IsChecked, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                                          VerticalAlignment="Center"
-                                                          HorizontalAlignment="Center"
-                                                          Margin="0,0,10,0" />
+                                                <CheckBox Style="{StaticResource MultiOpenRowCheckBoxStyle}"
+                              IsChecked="{Binding IsChecked, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
                                             </DataTemplate>
                                         </DataGridTemplateColumn.CellTemplate>
                                     </DataGridTemplateColumn>
 
-                                    <!-- твої існуючі -->
-                                    <DataGridTextColumn Header="Name"  Binding="{Binding Name}"       Width="*" />
-                                    <DataGridTextColumn Header="Year"  Binding="{Binding Year}"       Width="*" />
-                                    <DataGridTextColumn Header="Month" Binding="{Binding Month}"      Width="*" />
-                                    <DataGridTextColumn Header="Shop"  Binding="{Binding Shop.Name}"  Width="*" />
+                                    <!-- твої колонки -->
+                                    <DataGridTextColumn Header="Name"  Binding="{Binding Name}"      Width="*"/>
+                                    <DataGridTextColumn Header="Year"  Binding="{Binding Year}"      Width="*"/>
+                                    <DataGridTextColumn Header="Month" Binding="{Binding Month}"     Width="*"/>
+                                    <DataGridTextColumn Header="Shop"  Binding="{Binding Shop.Name}" Width="*"/>
+
                                 </DataGrid.Columns>
                             </DataGrid>
                         </Border>

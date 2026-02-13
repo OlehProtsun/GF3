@@ -183,6 +183,35 @@ namespace WPFApp.View.Container
             }
             return null;
         }
+        private void DataGridSchedules_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            if (dataGridSchedules?.DataContext is not ContainerScheduleListViewModel vm)
+                return;
+
+            // Працює ТІЛЬКИ в MultiOpen режимі
+            if (!vm.IsMultiOpenEnabled)
+                return;
+
+            var original = e.OriginalSource as DependencyObject;
+            if (original == null)
+                return;
+
+            // Якщо клік прямо по чекбоксу — не чіпаємо (даємо йому самому переключитись)
+            if (FindAncestor<CheckBox>(original) != null)
+                return;
+
+            // Знаходимо рядок під кліком
+            var row = FindAncestor<DataGridRow>(original);
+            if (row?.DataContext is ScheduleRowVm item)
+                vm.ToggleRowSelection(item);
+
+            // щоб DataGrid не робив стандартний selection (ти керуєш вибором через IsChecked)
+            dataGridSchedules.UnselectAll();
+            dataGridSchedules.Focus();
+
+            e.Handled = true;
+        }
+
 
         private void DataGridSchedules_PreviewMouseDoubleClick(object sender, MouseButtonEventArgs e)
         {

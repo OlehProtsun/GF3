@@ -60,30 +60,50 @@ namespace WPFApp.ViewModel.Container.Edit
                 return;
             }
 
-            await LoadLookupsAsync(ct);
-            ResetScheduleFilters();
+            try
+            {
+                // Важливо: зупинити старі білди/preview, щоб вони не “стріляли” під час переходу
+                ScheduleEditVm.CancelBackgroundWork();
+                CancelScheduleEditWork(); // preview pipeline в ContainerViewModel (AvailabilityPreview.cs)
 
-            ScheduleEditVm.ClearValidationErrors();
-            ScheduleEditVm.ResetForNew();
-            ScheduleEditVm.IsEdit = false;
-            ScheduleEditVm.Blocks.Clear();
+                // Якщо токен випадково вже скасований — не даємо цьому зірвати Add
+                var safeCt = ct.IsCancellationRequested ? CancellationToken.None : ct;
 
-            var block = CreateDefaultBlock(containerId);
-            ScheduleEditVm.Blocks.Add(block);
-            ScheduleEditVm.SelectedBlock = block;
+                await LoadLookupsAsync(safeCt);
+                ResetScheduleFilters();
 
-            await ScheduleEditVm.RefreshScheduleMatrixAsync(ct);
+                ScheduleEditVm.ClearValidationErrors();
+                ScheduleEditVm.ResetForNew();
+                ScheduleEditVm.IsEdit = false;
+                ScheduleEditVm.Blocks.Clear();
 
-            // очистити preview матрицю (порожній стан)
-            await ScheduleEditVm.RefreshAvailabilityPreviewMatrixAsync(
-                block.Model.Year, block.Model.Month,
-                new List<ScheduleSlotModel>(),
-                new List<ScheduleEmployeeModel>(),
-                previewKey: $"CLEAR|{block.Model.Year}|{block.Model.Month}",
-                ct);
+                var block = CreateDefaultBlock(containerId);
+                ScheduleEditVm.Blocks.Add(block);
+                ScheduleEditVm.SelectedBlock = block;
 
-            ScheduleCancelTarget = ContainerSection.Profile;
-            await SwitchToScheduleEditAsync();
+                ScheduleCancelTarget = ContainerSection.Profile;
+
+                // Можна переключитись одразу, щоб UI не “виглядав як завис”
+                await SwitchToScheduleEditAsync();
+
+                // Для нового schedule slots порожні — Refresh просто очистить матрицю й вийде
+                await ScheduleEditVm.RefreshScheduleMatrixAsync(CancellationToken.None);
+
+                await ScheduleEditVm.RefreshAvailabilityPreviewMatrixAsync(
+                    block.Model.Year, block.Model.Month,
+                    new List<ScheduleSlotModel>(),
+                    new List<ScheduleEmployeeModel>(),
+                    previewKey: $"CLEAR|{block.Model.Year}|{block.Model.Month}",
+                    CancellationToken.None);
+            }
+            catch (OperationCanceledException)
+            {
+                // Cancellation тут не має ламати Add
+            }
+            catch (Exception ex)
+            {
+                ShowError(ex);
+            }
         }
 
         /// <summary>

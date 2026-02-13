@@ -584,6 +584,7 @@ namespace WPFApp.ViewModel.Container.Profile
                 return;
 
             var context = new ContainerExcelExportContext(
+                containerId: ContainerId,
                 containerName: Name,
                 containerNote: Note ?? string.Empty,
                 totalEmployees: TotalEmployees,
@@ -678,6 +679,13 @@ namespace WPFApp.ViewModel.Container.Profile
                 var shop = detailed.Shop;
                 var scheduleName = string.IsNullOrWhiteSpace(detailed.Name) ? $"Schedule {detailed.Id}" : detailed.Name;
                 var shopName = shop?.Name ?? string.Empty;
+                var employeeNames = employees
+                    .Select(GetEmployeeDisplayName)
+                    .Select(x => (x ?? string.Empty).Trim())
+                    .Where(x => !string.IsNullOrWhiteSpace(x))
+                    .Distinct(StringComparer.CurrentCultureIgnoreCase)
+                    .OrderBy(x => x, StringComparer.CurrentCultureIgnoreCase)
+                    .ToList();
 
                 var scheduleExcel = new ScheduleExportContext(
                     scheduleName: scheduleName,
@@ -690,7 +698,8 @@ namespace WPFApp.ViewModel.Container.Profile
                     totalDays: DateTime.DaysInMonth(detailed.Year, detailed.Month),
                     shift1: detailed.Shift1Time ?? string.Empty,
                     shift2: detailed.Shift2Time ?? string.Empty,
-                    totalEmployeesListText: BuildPreviewList(totals.EmployeeNames),
+                    totalEmployeesListText: BuildPreviewList(employeeNames),
+
                     scheduleMatrix: matrix.DefaultView,
                     summaryDayHeaders: summary.Headers,
                     summaryRows: summary.Rows,
@@ -792,7 +801,8 @@ namespace WPFApp.ViewModel.Container.Profile
             to = string.Empty;
             duration = TimeSpan.Zero;
 
-            var matches = Regex.Matches(text ?? string.Empty, "\b([01]?\d|2[0-3]):[0-5]\d\b");
+            var matches = Regex.Matches(text ?? string.Empty, @"\b([01]?\d|2[0-3]):[0-5]\d\b");
+
             if (matches.Count < 2)
                 return false;
 

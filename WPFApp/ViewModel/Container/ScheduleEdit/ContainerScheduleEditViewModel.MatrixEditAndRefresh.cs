@@ -249,7 +249,6 @@ namespace WPFApp.ViewModel.Container.ScheduleEdit
             CancellationToken ct = default)
         {
             var effectiveKey = previewKey ?? $"CLEAR|{year}|{month}";
-
             if (effectiveKey == _availabilityPreviewKey)
                 return;
 
@@ -269,14 +268,30 @@ namespace WPFApp.ViewModel.Container.ScheduleEdit
 
             try
             {
+                // Важливо: НЕ передаємо token у Task.Run, щоб не отримати "cancelled task" до старту делегата.
                 var view = await Task.Run(() =>
                 {
-                    token.ThrowIfCancellationRequested();
+                    if (token.IsCancellationRequested)
+                        return (System.Data.DataView?)null;
 
-                    var table = ScheduleMatrixEngine.BuildScheduleTable(year, month, slots, employees, out _, token);
-                    return table.DefaultView;
+                    try
+                    {
+                        var table = ScheduleMatrixEngine.BuildScheduleTable(
+                            year, month, slots, employees, out _, token);
 
-                }, token).ConfigureAwait(false);
+                        return token.IsCancellationRequested ? null : table.DefaultView;
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        // Cancel = нормальний сценарій, просто кажемо "нічого не оновлювати"
+                        return null;
+                    }
+
+                }, CancellationToken.None).ConfigureAwait(false);
+
+                // Якщо скасовано або делегат повернув null — тихо виходимо
+                if (view == null)
+                    return;
 
                 if (token.IsCancellationRequested || buildVer != Volatile.Read(ref _availabilityPreviewBuildVersion))
                     return;
@@ -288,14 +303,9 @@ namespace WPFApp.ViewModel.Container.ScheduleEdit
 
                     AvailabilityPreviewMatrix = view;
                     _availabilityPreviewKey = effectiveKey;
-
                     MatrixChanged?.Invoke(this, EventArgs.Empty);
 
                 }).ConfigureAwait(false);
-            }
-            catch (OperationCanceledException)
-            {
-                // нормальна ситуація — ігноруємо
             }
             catch (Exception ex)
             {
