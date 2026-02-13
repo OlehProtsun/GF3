@@ -5,6 +5,7 @@
 
                     xmlns:evm="clr-namespace:WPFApp.ViewModel.Employee"
                     xmlns:svm="clr-namespace:WPFApp.ViewModel.Shop"
+                    xmlns:dvm="clr-namespace:WPFApp.ViewModel.Database"
 
                     xmlns:avmMain="clr-namespace:WPFApp.ViewModel.Availability.Main"
                     xmlns:avmList="clr-namespace:WPFApp.ViewModel.Availability.List"
@@ -42,6 +43,11 @@
     <!-- Container module -->
     <DataTemplate DataType="{x:Type cvmEdit:ContainerViewModel}">
         <v:ContainerView />
+    </DataTemplate>
+
+    <!-- Database module -->
+    <DataTemplate DataType="{x:Type dvm:DatabaseViewModel}">
+        <v:DatabaseView />
     </DataTemplate>
 
     <!-- Employee -->

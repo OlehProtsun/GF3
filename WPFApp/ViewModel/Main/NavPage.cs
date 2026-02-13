@@ -10,6 +10,7 @@ namespace WPFApp.ViewModel.Main
         Employee,
         Shop,
         Availability,
-        Container
+        Container,
+        Database
     }
 }

@@ -14,6 +14,7 @@ using WPFApp.ViewModel.Container.Edit;
 using WPFApp.ViewModel.Employee;
 using WPFApp.ViewModel.Main;
 using WPFApp.ViewModel.Shop;
+using WPFApp.ViewModel.Database;
 
 namespace WPFApp
 {
@@ -34,14 +35,9 @@ namespace WPFApp
         private static void ConfigureServices(IServiceCollection services)
         {
             // 1) DAL/BLL як у WinForms
-            var root = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                "GF3");
-
-            Directory.CreateDirectory(root);
-
-            var dbPath = Path.Combine(root, "SQLite.db");
-            services.AddDataAccess($"Data Source={dbPath}");
+            var dbPathProvider = new WPFApp.Service.DatabasePathProvider();
+            services.AddSingleton<WPFApp.Service.IDatabasePathProvider>(dbPathProvider);
+            services.AddDataAccess(dbPathProvider.ConnectionString);
 
             services.AddBusinessLogicLayer();
 
@@ -55,11 +51,13 @@ namespace WPFApp
             services.AddTransient<AvailabilityViewModel>();
             services.AddTransient<ShopViewModel>();
             services.AddTransient<ContainerViewModel>();
+            services.AddTransient<DatabaseViewModel>();
 
             // 3) Реєстрація Views (Windows/UserControls)
             services.AddSingleton<MainWindow>();
 
             services.AddSingleton<WPFApp.Service.IColorPickerService, WPFApp.Service.ColorPickerService>();
+            services.AddSingleton<WPFApp.Service.ISqliteAdminService, WPFApp.Service.SqliteAdminService>();
             services.AddSingleton<WPFApp.Service.ILoggerService>(_ => WPFApp.Service.LoggerService.Instance);
             services.AddSingleton<WPFApp.Service.IScheduleExportService, WPFApp.Service.ScheduleExportService>();
 
@@ -68,6 +66,7 @@ namespace WPFApp
             services.AddTransient<AvailabilityView>();
             services.AddTransient<ShopView>();
             services.AddTransient<ContainerView>();
+            services.AddTransient<DatabaseView>();
 
             // 4) Навігація / фабрики (заміна твого MdiViewFactory)
             //services.AddSingleton<Service.NavigationService>();
