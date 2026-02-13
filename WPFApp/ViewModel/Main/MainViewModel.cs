@@ -8,6 +8,7 @@ using WPFApp.ViewModel.Availability.Main;
 using WPFApp.ViewModel.Container.Edit;
 using WPFApp.ViewModel.Employee;
 using WPFApp.ViewModel.Shop;
+using WPFApp.ViewModel.Database;
 
 namespace WPFApp.ViewModel.Main
 {
@@ -67,6 +68,7 @@ namespace WPFApp.ViewModel.Main
         private ShopViewModel? _shopVm;
         private AvailabilityViewModel? _availabilityVm;
         private ContainerViewModel? _containerVm;
+        private DatabaseViewModel? _databaseVm;
 
         // =========================================================
         // 4) Стан навігації
@@ -159,6 +161,8 @@ namespace WPFApp.ViewModel.Main
 
         public bool IsContainerEnabled => !IsBusy && ActivePage != NavPage.Container;
 
+        public bool IsDatabaseEnabled => !IsBusy && ActivePage != NavPage.Database;
+
         // =========================================================
         // 6) Commands
         // =========================================================
@@ -167,6 +171,7 @@ namespace WPFApp.ViewModel.Main
         public AsyncRelayCommand ShowShopCommand { get; }
         public AsyncRelayCommand ShowAvailabilityCommand { get; }
         public AsyncRelayCommand ShowContainerCommand { get; }
+        public AsyncRelayCommand ShowDatabaseCommand { get; }
 
         public AsyncRelayCommand CloseCommand { get; }
         public AsyncRelayCommand MinimizeCommand { get; }
@@ -210,13 +215,20 @@ namespace WPFApp.ViewModel.Main
                 getOrCreateVm: () => _containerVm ??= _sp.GetRequiredService<ContainerViewModel>(),
                 isEnabled: () => IsContainerEnabled);
 
+            ShowDatabaseCommand = CreateNavCommand(
+                page: NavPage.Database,
+                busyText: "Opening Database...",
+                getOrCreateVm: () => _databaseVm ??= _sp.GetRequiredService<DatabaseViewModel>(),
+                isEnabled: () => IsDatabaseEnabled);
+
             // 3) Збираємо навігаційні команди в масив для швидкого оновлення CanExecute.
             _navCommands = new[]
             {
                 ShowEmployeeCommand,
                 ShowShopCommand,
                 ShowAvailabilityCommand,
-                ShowContainerCommand
+                ShowContainerCommand,
+                ShowDatabaseCommand
             };
 
             // 4) CloseCommand — закриває застосунок.
@@ -343,6 +355,7 @@ namespace WPFApp.ViewModel.Main
                 EmployeeViewModel employeeVm => employeeVm.EnsureInitializedAsync(ct),
                 ShopViewModel shopVm => shopVm.EnsureInitializedAsync(ct),
                 ContainerViewModel containerVm => containerVm.EnsureInitializedAsync(ct),
+                DatabaseViewModel _ => Task.CompletedTask,
                 _ => Task.CompletedTask
             };
         }
@@ -401,6 +414,7 @@ namespace WPFApp.ViewModel.Main
             Raise(nameof(IsShopEnabled));
             Raise(nameof(IsAvailabilityEnabled));
             Raise(nameof(IsContainerEnabled));
+            Raise(nameof(IsDatabaseEnabled));
         }
 
         /// <summary>
