@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Windows;
 using BusinessLogicLayer.Services.Abstractions;
 using DataAccessLayer.Models;
 using WPFApp.Infrastructure;
@@ -42,6 +43,9 @@ namespace WPFApp.ViewModel.Shop
     public sealed class ShopViewModel : ViewModelBase
     {
         private readonly IShopService _shopService;
+        private readonly IDatabaseChangeNotifier _databaseChangeNotifier;
+        private readonly ILoggerService _logger;
+        private int _databaseReloadInProgress;
 
         // ----------------------------
         // Initialization (safe, без гонок)
@@ -85,14 +89,20 @@ namespace WPFApp.ViewModel.Shop
         public ShopEditViewModel EditVm { get; }
         public ShopProfileViewModel ProfileVm { get; }
 
-        public ShopViewModel(IShopService shopService)
+        public ShopViewModel(
+            IShopService shopService,
+            IDatabaseChangeNotifier databaseChangeNotifier,
+            ILoggerService logger)
         {
             _shopService = shopService;
+            _databaseChangeNotifier = databaseChangeNotifier;
+            _logger = logger;
 
             ListVm = new ShopListViewModel(this);
             EditVm = new ShopEditViewModel(this);
             ProfileVm = new ShopProfileViewModel(this);
 
+            _databaseChangeNotifier.DatabaseChanged += OnDatabaseChanged;
             CurrentSection = ListVm;
         }
 
@@ -250,6 +260,8 @@ namespace WPFApp.ViewModel.Shop
                 ? "Shop updated successfully."
                 : "Shop added successfully.");
 
+            _databaseChangeNotifier.NotifyDatabaseChanged("Shop.Save");
+
             // 8) Reload list + selection.
             await LoadShopsAsync(ct, selectId: model.Id);
 
@@ -314,6 +326,7 @@ namespace WPFApp.ViewModel.Shop
             ShowInfo("Shop deleted successfully.");
 
             // 7) Reload + return to list.
+            _databaseChangeNotifier.NotifyDatabaseChanged("Shop.Delete");
             await LoadShopsAsync(ct, selectId: null);
             await SwitchToListAsync();
         }
@@ -406,6 +419,60 @@ namespace WPFApp.ViewModel.Shop
 
             // Інакше — зі списку.
             return ListVm.SelectedItem?.Id ?? 0;
+        }
+
+
+        private void OnDatabaseChanged(object? sender, DatabaseChangedEventArgs e)
+        {
+            _ = ReloadAfterDatabaseChangeAsync(e.Source);
+        }
+
+        private async Task ReloadAfterDatabaseChangeAsync(string source)
+        {
+            if (!_initialized)
+                return;
+
+            if (Interlocked.Exchange(ref _databaseReloadInProgress, 1) == 1)
+                return;
+
+            try
+            {
+                if (Mode == ShopSection.Edit)
+                {
+                    _logger.Log($"[DB-CHANGE] Shop reload skipped in edit mode. Source={source}.");
+                    return;
+                }
+
+                var selectedId = Mode == ShopSection.Profile ? ProfileVm.ShopId : ListVm.SelectedItem?.Id;
+                await Application.Current.Dispatcher.InvokeAsync(async () =>
+                {
+                    await LoadShopsAsync(CancellationToken.None, selectedId);
+
+                    if (Mode == ShopSection.Profile && selectedId.HasValue)
+                    {
+                        var latest = await _shopService.GetAsync(selectedId.Value, CancellationToken.None);
+                        if (latest != null)
+                        {
+                            ProfileVm.SetProfile(latest);
+                            ListVm.SelectedItem = latest;
+                        }
+                        else
+                        {
+                            await SwitchToListAsync();
+                        }
+                    }
+                }).Task.Unwrap();
+
+                _logger.Log($"[DB-CHANGE] Shop module reloaded. Source={source}.");
+            }
+            catch (Exception ex)
+            {
+                _logger.Log($"[DB-CHANGE] Shop reload failed: {ex.Message}");
+            }
+            finally
+            {
+                Interlocked.Exchange(ref _databaseReloadInProgress, 0);
+            }
         }
 
         // =========================================================

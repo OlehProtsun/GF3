@@ -13,6 +13,8 @@ namespace WPFApp.ViewModel.Database
     public sealed class DatabaseViewModel : ViewModelBase
     {
         private readonly ISqliteAdminService _sqliteAdminService;
+        private readonly IDatabaseChangeNotifier _databaseChangeNotifier;
+        private readonly ILoggerService _logger;
         private bool _autoQueryExecuted;
 
         private string _executorSql = "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name;";
@@ -35,9 +37,14 @@ namespace WPFApp.ViewModel.Database
         private string _schemaVersion = "0";
         private string _tablesSummary = "No tables.";
 
-        public DatabaseViewModel(ISqliteAdminService sqliteAdminService)
+        public DatabaseViewModel(
+            ISqliteAdminService sqliteAdminService,
+            IDatabaseChangeNotifier databaseChangeNotifier,
+            ILoggerService logger)
         {
             _sqliteAdminService = sqliteAdminService;
+            _databaseChangeNotifier = databaseChangeNotifier;
+            _logger = logger;
 
             ExecuteSqlCommand = new AsyncRelayCommand(ExecuteSqlAsync);
             ClearExecutorOutputCommand = new RelayCommand(ClearExecutorOutput);
@@ -188,6 +195,12 @@ namespace WPFApp.ViewModel.Database
                 }
 
                 await RefreshDatabaseInfoAsync(ct);
+
+                if (!result.IsSelect)
+                {
+                    _databaseChangeNotifier.NotifyDatabaseChanged("DatabaseView.ExecuteSql");
+                }
+
             }
             catch (Exception ex)
             {
@@ -235,9 +248,12 @@ namespace WPFApp.ViewModel.Database
             try
             {
                 await _sqliteAdminService.ImportSqlScriptAsync(ImportScript, ct);
+                _databaseChangeNotifier.NotifyDatabaseChanged("DatabaseView.ImportSqlScript");
+                _logger.Log("[DB-CHANGE] Import SQL completed; change event emitted.");
                 IsImportError = false;
                 ImportOutput = "Import script executed successfully against the current application database.";
                 await RefreshDatabaseInfoAsync(ct);
+
             }
             catch (Exception ex)
             {

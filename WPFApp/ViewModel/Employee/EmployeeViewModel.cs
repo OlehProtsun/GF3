@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Windows;
 using BusinessLogicLayer.Services.Abstractions;
 using DataAccessLayer.Models;
 using WPFApp.Infrastructure;
@@ -39,6 +40,9 @@ namespace WPFApp.ViewModel.Employee
     public sealed class EmployeeViewModel : ViewModelBase
     {
         private readonly IEmployeeService _employeeService;
+        private readonly IDatabaseChangeNotifier _databaseChangeNotifier;
+        private readonly ILoggerService _logger;
+        private int _databaseReloadInProgress;
 
         // ----------------------------
         // Initialization (safe)
@@ -79,14 +83,20 @@ namespace WPFApp.ViewModel.Employee
         public EmployeeEditViewModel EditVm { get; }
         public EmployeeProfileViewModel ProfileVm { get; }
 
-        public EmployeeViewModel(IEmployeeService employeeService)
+        public EmployeeViewModel(
+            IEmployeeService employeeService,
+            IDatabaseChangeNotifier databaseChangeNotifier,
+            ILoggerService logger)
         {
             _employeeService = employeeService;
+            _databaseChangeNotifier = databaseChangeNotifier;
+            _logger = logger;
 
             ListVm = new EmployeeListViewModel(this);
             EditVm = new EmployeeEditViewModel(this);
             ProfileVm = new EmployeeProfileViewModel(this);
 
+            _databaseChangeNotifier.DatabaseChanged += OnDatabaseChanged;
             CurrentSection = ListVm;
         }
 
@@ -231,6 +241,8 @@ namespace WPFApp.ViewModel.Employee
                 ? "Employee updated successfully."
                 : "Employee added successfully.");
 
+            _databaseChangeNotifier.NotifyDatabaseChanged("Employee.Save");
+
             // 6) Reload list + selection.
             await LoadEmployeesAsync(ct, selectId: model.Id);
 
@@ -284,6 +296,7 @@ namespace WPFApp.ViewModel.Employee
 
             ShowInfo("Employee deleted successfully.");
 
+            _databaseChangeNotifier.NotifyDatabaseChanged("Employee.Delete");
             await LoadEmployeesAsync(ct, selectId: null);
             await SwitchToListAsync();
         }
@@ -377,6 +390,61 @@ namespace WPFApp.ViewModel.Employee
 
             // У списку — беремо з SelectedItem.
             return EmployeeDisplayHelper.GetFullName(ListVm.SelectedItem);
+        }
+
+
+
+        private void OnDatabaseChanged(object? sender, DatabaseChangedEventArgs e)
+        {
+            _ = ReloadAfterDatabaseChangeAsync(e.Source);
+        }
+
+        private async Task ReloadAfterDatabaseChangeAsync(string source)
+        {
+            if (!_initialized)
+                return;
+
+            if (Interlocked.Exchange(ref _databaseReloadInProgress, 1) == 1)
+                return;
+
+            try
+            {
+                if (Mode == EmployeeSection.Edit)
+                {
+                    _logger.Log($"[DB-CHANGE] Employee reload skipped in edit mode. Source={source}.");
+                    return;
+                }
+
+                var selectedId = Mode == EmployeeSection.Profile ? ProfileVm.EmployeeId : ListVm.SelectedItem?.Id;
+                await Application.Current.Dispatcher.InvokeAsync(async () =>
+                {
+                    await LoadEmployeesAsync(CancellationToken.None, selectedId);
+
+                    if (Mode == EmployeeSection.Profile && selectedId.HasValue)
+                    {
+                        var latest = await _employeeService.GetAsync(selectedId.Value, CancellationToken.None);
+                        if (latest != null)
+                        {
+                            ProfileVm.SetProfile(latest);
+                            ListVm.SelectedItem = latest;
+                        }
+                        else
+                        {
+                            await SwitchToListAsync();
+                        }
+                    }
+                }).Task.Unwrap();
+
+                _logger.Log($"[DB-CHANGE] Employee module reloaded. Source={source}.");
+            }
+            catch (Exception ex)
+            {
+                _logger.Log($"[DB-CHANGE] Employee reload failed: {ex.Message}");
+            }
+            finally
+            {
+                Interlocked.Exchange(ref _databaseReloadInProgress, 0);
+            }
         }
 
         // =========================================================

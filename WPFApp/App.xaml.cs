@@ -60,6 +60,7 @@ namespace WPFApp
             services.AddSingleton<WPFApp.Service.ISqliteAdminService, WPFApp.Service.SqliteAdminService>();
             services.AddSingleton<WPFApp.Service.ILoggerService>(_ => WPFApp.Service.LoggerService.Instance);
             services.AddSingleton<WPFApp.Service.IScheduleExportService, WPFApp.Service.ScheduleExportService>();
+            services.AddSingleton<WPFApp.Service.IDatabaseChangeNotifier, WPFApp.Service.DatabaseChangeNotifier>();
 
             // Якщо робиш навігацію через UserControl-и:
             services.AddTransient<EmployeeView>();

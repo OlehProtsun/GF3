@@ -21,7 +21,10 @@ namespace DataAccessLayer.Repositories
         }
 
         public async Task<TEntity?> GetByIdAsync(int id, CancellationToken ct = default)
-            => await _set.FindAsync(new object?[] { id }, ct).ConfigureAwait(false);
+            => await _set
+                .AsNoTracking()
+                .FirstOrDefaultAsync(e => EF.Property<int>(e, "Id") == id, ct)
+                .ConfigureAwait(false);
 
         public virtual async Task<List<TEntity>> GetAllAsync(CancellationToken ct = default)
             => await _set.AsNoTracking().ToListAsync(ct).ConfigureAwait(false);

@@ -153,6 +153,8 @@ namespace WPFApp.ViewModel.Container.Edit
                 ? "Container updated successfully."
                 : "Container added successfully.");
 
+            _databaseChangeNotifier.NotifyDatabaseChanged("Container.Save");
+
             await LoadContainersAsync(ct, selectId: model.Id);
 
             // Якщо ми прийшли в Edit із профілю, то після Save треба повернутись назад у профіль
@@ -213,6 +215,7 @@ namespace WPFApp.ViewModel.Container.Edit
 
             ShowInfo("Container deleted successfully.");
 
+            _databaseChangeNotifier.NotifyDatabaseChanged("Container.Delete");
             await LoadContainersAsync(ct, selectId: null);
             await SwitchToListAsync();
         }
