@@ -33,6 +33,8 @@ namespace WPFApp.ViewModel.Availability.Main
         private readonly IAvailabilityGroupService _availabilityService;
         private readonly IEmployeeService _employeeService;
         private readonly IBindService _bindService;
+        private readonly Service.IDatabaseChangeNotifier _databaseChangeNotifier;
+        private readonly Service.ILoggerService _logger;
 
         // 2) Під-VM (UI секції).
         public AvailabilityListViewModel ListVm { get; }
@@ -47,12 +49,16 @@ namespace WPFApp.ViewModel.Availability.Main
         public AvailabilityViewModel(
             IAvailabilityGroupService availabilityService,
             IEmployeeService employeeService,
-            IBindService bindService)
+            IBindService bindService,
+            Service.IDatabaseChangeNotifier databaseChangeNotifier,
+            Service.ILoggerService logger)
         {
             // 1) Інʼєкції.
             _availabilityService = availabilityService;
             _employeeService = employeeService;
             _bindService = bindService;
+            _databaseChangeNotifier = databaseChangeNotifier;
+            _logger = logger;
 
             // 2) Створюємо під-VM і передаємо owner (this).
             ListVm = new AvailabilityListViewModel(this);
@@ -63,6 +69,8 @@ namespace WPFApp.ViewModel.Availability.Main
             ShowListCommand = new AsyncRelayCommand(() => SwitchToListAsync());
             ShowEditCommand = new AsyncRelayCommand(() => SwitchToEditAsync());
             ShowProfileCommand = new AsyncRelayCommand(() => SwitchToProfileAsync());
+
+            _databaseChangeNotifier.DatabaseChanged += OnDatabaseChanged;
 
             // 4) Початково показуємо список.
             CurrentSection = ListVm;

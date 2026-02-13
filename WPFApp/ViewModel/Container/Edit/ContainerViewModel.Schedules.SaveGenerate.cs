@@ -219,6 +219,7 @@ namespace WPFApp.ViewModel.Container.Edit
             if (containerId > 0)
                 await LoadSchedulesAsync(containerId, search: null, ct);
 
+            _databaseChangeNotifier.NotifyDatabaseChanged("Container.ScheduleSave");
             ShowInfo("Schedules saved successfully.");
 
             // 7) Якщо редагували (IsEdit) — зазвичай хочемо перейти у ScheduleProfile

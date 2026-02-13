@@ -58,6 +58,8 @@ namespace WPFApp.ViewModel.Container.Edit
         private readonly IScheduleGenerator _generator;
         private readonly IColorPickerService _colorPickerService;
         private readonly IScheduleExportService _scheduleExportService;
+        private readonly IDatabaseChangeNotifier _databaseChangeNotifier;
+        private readonly ILoggerService _logger;
         private readonly ConcurrentDictionary<int, Lazy<Task<ScheduleModel?>>> _scheduleDetailsCache = new();
 
         // =========================================================
@@ -123,7 +125,9 @@ namespace WPFApp.ViewModel.Container.Edit
             IEmployeeService employeeService,
             IScheduleGenerator generator,
             IColorPickerService colorPickerService,
-            IScheduleExportService scheduleExportService)
+            IScheduleExportService scheduleExportService,
+            IDatabaseChangeNotifier databaseChangeNotifier,
+            ILoggerService logger)
         {
             // Null-guards:
             // Якщо DI-контейнер налаштований неправильно, ми хочемо отримати помилку одразу тут,
@@ -136,6 +140,8 @@ namespace WPFApp.ViewModel.Container.Edit
             ArgumentNullException.ThrowIfNull(generator);
             ArgumentNullException.ThrowIfNull(colorPickerService);
             ArgumentNullException.ThrowIfNull(scheduleExportService);
+            ArgumentNullException.ThrowIfNull(databaseChangeNotifier);
+            ArgumentNullException.ThrowIfNull(logger);
 
             _containerService = containerService;
             _scheduleService = scheduleService;
@@ -145,6 +151,8 @@ namespace WPFApp.ViewModel.Container.Edit
             _generator = generator;
             _colorPickerService = colorPickerService;
             _scheduleExportService = scheduleExportService;
+            _databaseChangeNotifier = databaseChangeNotifier;
+            _logger = logger;
 
             // Створюємо “дочірні” VM-и.
             // Вони отримують owner (this), щоб викликати методи типу:
@@ -162,6 +170,8 @@ namespace WPFApp.ViewModel.Container.Edit
 
             ProfileVm.EmployeesLoader = LoadScheduleEmployeesAsync;
             ProfileVm.SlotsLoader = LoadScheduleSlotsAsync;
+
+            _databaseChangeNotifier.DatabaseChanged += OnDatabaseChanged;
 
             // Стартова секція — список контейнерів.
             // CurrentSection визначений у Navigation partial-файлі.

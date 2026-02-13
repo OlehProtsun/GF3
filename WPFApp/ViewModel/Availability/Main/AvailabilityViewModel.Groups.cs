@@ -157,6 +157,8 @@ namespace WPFApp.ViewModel.Availability.Main
                 ? "Availability Group added successfully."
                 : "Availability Group updated successfully.");
 
+            _databaseChangeNotifier.NotifyDatabaseChanged("Availability.Save");
+
             // 16) Перезавантажуємо список.
             await LoadAllGroupsAsync(ct);
 
@@ -206,6 +208,7 @@ namespace WPFApp.ViewModel.Availability.Main
             // 5) Info.
             ShowInfo("Availability Group deleted successfully.");
 
+            _databaseChangeNotifier.NotifyDatabaseChanged("Availability.Delete");
             // 6) Reload list.
             await LoadAllGroupsAsync(ct);
 

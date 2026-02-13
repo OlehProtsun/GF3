@@ -294,6 +294,7 @@ namespace WPFApp.ViewModel.Container.Edit
                 return;
 
             await _scheduleService.DeleteAsync(schedule.Id, ct);
+            _databaseChangeNotifier.NotifyDatabaseChanged("Container.ScheduleDelete");
             await LoadSchedulesAsync(schedule.ContainerId, search: null, ct);
 
             ShowInfo("Schedule deleted successfully.");
