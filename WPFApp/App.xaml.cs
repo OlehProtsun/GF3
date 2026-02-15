@@ -9,12 +9,14 @@ using WPFApp.View;
 using WPFApp.View.Availability;
 using WPFApp.View.Employee;
 using WPFApp.View.Shop;
+using WPFApp.View.Home;
 using WPFApp.ViewModel.Availability.Main;
 using WPFApp.ViewModel.Container.Edit;
 using WPFApp.ViewModel.Employee;
 using WPFApp.ViewModel.Main;
 using WPFApp.ViewModel.Shop;
 using WPFApp.ViewModel.Database;
+using WPFApp.ViewModel.Home;
 
 namespace WPFApp
 {
@@ -47,6 +49,7 @@ namespace WPFApp
 
             // 2) Реєстрація ViewModels
             services.AddSingleton<MainViewModel>();
+            services.AddTransient<HomeViewModel>();
             services.AddTransient<EmployeeViewModel>();
             services.AddTransient<AvailabilityViewModel>();
             services.AddTransient<ShopViewModel>();
@@ -63,6 +66,7 @@ namespace WPFApp
             services.AddSingleton<WPFApp.Service.IDatabaseChangeNotifier, WPFApp.Service.DatabaseChangeNotifier>();
 
             // Якщо робиш навігацію через UserControl-и:
+            services.AddTransient<HomeView>();
             services.AddTransient<EmployeeView>();
             services.AddTransient<AvailabilityView>();
             services.AddTransient<ShopView>();
