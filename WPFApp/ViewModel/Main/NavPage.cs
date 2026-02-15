@@ -7,6 +7,7 @@ namespace WPFApp.ViewModel.Main
     public enum NavPage
     {
         None = 0,
+        Home,
         Employee,
         Shop,
         Availability,

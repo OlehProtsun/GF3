@@ -9,6 +9,7 @@ using WPFApp.ViewModel.Container.Edit;
 using WPFApp.ViewModel.Employee;
 using WPFApp.ViewModel.Shop;
 using WPFApp.ViewModel.Database;
+using WPFApp.ViewModel.Home;
 
 namespace WPFApp.ViewModel.Main
 {
@@ -64,6 +65,7 @@ namespace WPFApp.ViewModel.Main
         // Ми тримаємо посилання, щоб:
         // - не створювати модулі повторно
         // - зберігати їх стан (List selections, Edit state, etc.)
+        private HomeViewModel? _homeVm;
         private EmployeeViewModel? _employeeVm;
         private ShopViewModel? _shopVm;
         private AvailabilityViewModel? _availabilityVm;
@@ -153,6 +155,8 @@ namespace WPFApp.ViewModel.Main
         /// - ми не busy
         /// - і ми вже не на Employee
         /// </summary>
+        public bool IsHomeEnabled => !IsBusy && ActivePage != NavPage.Home;
+
         public bool IsEmployeeEnabled => !IsBusy && ActivePage != NavPage.Employee;
 
         public bool IsShopEnabled => !IsBusy && ActivePage != NavPage.Shop;
@@ -167,6 +171,7 @@ namespace WPFApp.ViewModel.Main
         // 6) Commands
         // =========================================================
 
+        public AsyncRelayCommand ShowHomeCommand { get; }
         public AsyncRelayCommand ShowEmployeeCommand { get; }
         public AsyncRelayCommand ShowShopCommand { get; }
         public AsyncRelayCommand ShowAvailabilityCommand { get; }
@@ -191,6 +196,12 @@ namespace WPFApp.ViewModel.Main
             _sp = sp ?? throw new ArgumentNullException(nameof(sp));
 
             // 2) Створюємо навігаційні команди через одну фабрику, щоб не дублювати шаблон.
+            ShowHomeCommand = CreateNavCommand(
+                page: NavPage.Home,
+                busyText: "Opening Home...",
+                getOrCreateVm: () => _homeVm ??= _sp.GetRequiredService<HomeViewModel>(),
+                isEnabled: () => IsHomeEnabled);
+
             ShowEmployeeCommand = CreateNavCommand(
                 page: NavPage.Employee,
                 busyText: "Opening Employee...",
@@ -224,6 +235,7 @@ namespace WPFApp.ViewModel.Main
             // 3) Збираємо навігаційні команди в масив для швидкого оновлення CanExecute.
             _navCommands = new[]
             {
+                ShowHomeCommand,
                 ShowEmployeeCommand,
                 ShowShopCommand,
                 ShowAvailabilityCommand,
@@ -352,6 +364,7 @@ namespace WPFApp.ViewModel.Main
             return viewModel switch
             {
                 AvailabilityViewModel availabilityVm => availabilityVm.EnsureInitializedAsync(ct),
+                HomeViewModel homeVm => homeVm.EnsureInitializedAsync(ct),
                 EmployeeViewModel employeeVm => employeeVm.EnsureInitializedAsync(ct),
                 ShopViewModel shopVm => shopVm.EnsureInitializedAsync(ct),
                 ContainerViewModel containerVm => containerVm.EnsureInitializedAsync(ct),
@@ -410,6 +423,7 @@ namespace WPFApp.ViewModel.Main
         /// </summary>
         private void RaiseNavStateProperties()
         {
+            Raise(nameof(IsHomeEnabled));
             Raise(nameof(IsEmployeeEnabled));
             Raise(nameof(IsShopEnabled));
             Raise(nameof(IsAvailabilityEnabled));

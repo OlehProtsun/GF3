@@ -241,7 +241,9 @@
                         <!-- top icon (guna2Button1: 12,15) -->
                         <Button Style="{StaticResource IconButton39}"
                                 BorderBrush="White" BorderThickness="1"
-                                Margin="0,5,0,0">
+                                Margin="0,5,0,0"
+                                Command="{Binding ShowHomeCommand}"
+                                IsEnabled="{Binding IsHomeEnabled}">
 
                             <Viewbox Width="26" Height="26">
                                 <Viewbox.RenderTransform>

@@ -24,9 +24,9 @@ namespace WPFApp.View
 
             Loaded += (_, __) =>
             {
-                // Якщо ще нічого не відкрито — відкриваємо Employee як стартову сторінку
+                // Якщо ще нічого не відкрито — відкриваємо Home як стартову сторінку
                 if (_vm.CurrentViewModel == null)
-                    _vm.ShowEmployeeCommand.Execute(null);
+                    _vm.ShowHomeCommand.Execute(null);
             };
 
             Closed += (_, __) => _vm.Dispose();
