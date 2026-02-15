@@ -92,8 +92,6 @@ namespace WPFApp.Service
         }
     }
 
-
-
     public sealed class ContainerExcelExportChartContext
     {
         public string ChartName { get; }
@@ -172,6 +170,7 @@ namespace WPFApp.Service
             Charts = charts ?? Array.Empty<ContainerSqlExportScheduleContext>();
         }
     }
+
     public sealed class ScheduleSqlExportContext
     {
         public ScheduleModel Schedule { get; }
@@ -233,9 +232,14 @@ namespace WPFApp.Service
         private const int S_DayHeaderRow = 14;           // merged day header blocks
         private const int S_BodyFirstRow = 16;           // first employee row in summary
         private const int S_MaxSummaryRows = 10;         // template-styled rows (16..25)
-        private const int S_MiniBodyFirstRow = 28;       // first row of mini-table body
-        private const int S_MaxMiniRows = 10;            // template-styled rows (28..37)
-        private const int S_FirstDayCol = 3;             // C
+
+
+        private const int S_EmployeeCol = 1;            // A
+        private const int S_WorkDaysCol = 2;            // B
+        private const int S_FreeDaysCol = 3;            // C
+        private const int S_SumCol = 4;                 // D
+
+        private const int S_FirstDayCol = 5;
         private const int S_DaysCapacity = 31;           // 31 days * 3 columns (C..CQ)
 
         // ===================== PUBLIC API =====================
@@ -560,6 +564,14 @@ namespace WPFApp.Service
                 for (int c = M_FirstDataCol + dataCols.Count; c <= M_LastDataCol; c++)
                     sheet.Cell(excelRow, c).Value = "-";
             }
+
+            // --- PRINT SETTINGS: repeat Days column on every printed page ---
+            sheet.PageSetup.SetRowsToRepeatAtTop(M_HeaderRow, M_HeaderRow);       // row 1
+            sheet.PageSetup.SetColumnsToRepeatAtLeft(M_DateCol, M_DateCol);       // column B
+                                                                                  // optional but useful: restrict printing to the matrix area
+            sheet.PageSetup.PrintAreas.Clear();
+            sheet.PageSetup.PrintAreas.Add(MatrixClearRange);                    // "B1:AA32"
+
         }
 
         private static void SetDashIfEmpty(IXLCell cell, object? value)
@@ -662,7 +674,7 @@ namespace WPFApp.Service
             sheet.Cell(S_EmployeesLineRow, 1).Value =
                 $"Total employees ({context.TotalEmployees}): {context.TotalEmployeesListText}";
 
-            // Day headers (C..CQ, every day uses 3 columns)
+            // Day headers (start from S_FirstDayCol; each day uses 3 columns)
             for (int i = 0; i < S_DaysCapacity; i++)
             {
                 var col = S_FirstDayCol + i * 3;
@@ -670,20 +682,24 @@ namespace WPFApp.Service
                 sheet.Cell(S_DayHeaderRow, col).Value = text;
             }
 
+            // Map Work/Free days by employee (by name)
+            var wfByEmployee = (context.EmployeeWorkFreeStats ?? Array.Empty<ContainerScheduleProfileViewModel.EmployeeWorkFreeStatRow>())
+                .Where(x => !string.IsNullOrWhiteSpace(x.Employee))
+                .GroupBy(x => x.Employee!, StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
+
             // ===== SUMMARY: auto-expand rows if needed =====
             var summaryNeeded = context.SummaryRows.Count;
             var summaryExtra = Math.Max(0, summaryNeeded - S_MaxSummaryRows);
 
-            // summary table last column: C + (31 days * 3 cols) - 1 = CQ (чисельно 95)
-            var summaryLastCol = S_FirstDayCol + (S_DaysCapacity - 1) * 3 + 2; // last day block ends at +2
+            // last column of the summary range: first day col + (31 * 3) - 1
+            var summaryLastCol = S_FirstDayCol + (S_DaysCapacity - 1) * 3 + 2;
 
             if (summaryExtra > 0)
             {
-                // Insert extra rows below last template-styled summary row (row 25)
-                var insertAfter = S_BodyFirstRow + S_MaxSummaryRows - 1; // 25
+                var insertAfter = S_BodyFirstRow + S_MaxSummaryRows - 1; // last styled summary row
                 sheet.Row(insertAfter).InsertRowsBelow(summaryExtra);
 
-                // Copy style from the last template summary row into inserted rows
                 var templateRange = sheet.Range(insertAfter, 1, insertAfter, summaryLastCol);
                 var templateHeight = sheet.Row(insertAfter).Height;
 
@@ -694,7 +710,6 @@ namespace WPFApp.Service
                 }
             }
 
-            // Render all summary rows (template rows + inserted if needed)
             var summaryTotalRows = Math.Max(S_MaxSummaryRows, summaryNeeded);
 
             for (int r = 0; r < summaryTotalRows; r++)
@@ -703,9 +718,11 @@ namespace WPFApp.Service
 
                 if (r >= summaryNeeded)
                 {
-                    // Clear unused template rows (only when summaryNeeded < S_MaxSummaryRows)
-                    sheet.Cell(row, 1).Clear(XLClearOptions.Contents);
-                    sheet.Cell(row, 2).Clear(XLClearOptions.Contents);
+                    // Clear unused rows
+                    sheet.Cell(row, S_EmployeeCol).Clear(XLClearOptions.Contents);
+                    sheet.Cell(row, S_WorkDaysCol).Clear(XLClearOptions.Contents);
+                    sheet.Cell(row, S_FreeDaysCol).Clear(XLClearOptions.Contents);
+                    sheet.Cell(row, S_SumCol).Clear(XLClearOptions.Contents);
 
                     for (int d = 0; d < S_DaysCapacity; d++)
                     {
@@ -718,16 +735,34 @@ namespace WPFApp.Service
                 }
 
                 var summaryRow = context.SummaryRows[r];
-                sheet.Cell(row, 1).Value = summaryRow.Employee ?? string.Empty;
-                sheet.Cell(row, 2).Value = summaryRow.Sum ?? string.Empty;
+                var employeeName = summaryRow.Employee ?? string.Empty;
 
+                // A: Employee
+                sheet.Cell(row, S_EmployeeCol).Value = employeeName;
+
+                // B/C: Work Days / Free Days (taken from wfByEmployee)
+                if (wfByEmployee.TryGetValue(employeeName, out var wf))
+                {
+                    sheet.Cell(row, S_WorkDaysCol).Value = wf.WorkDays.ToString(CultureInfo.InvariantCulture);
+                    sheet.Cell(row, S_FreeDaysCol).Value = wf.FreeDays.ToString(CultureInfo.InvariantCulture);
+                }
+                else
+                {
+                    sheet.Cell(row, S_WorkDaysCol).Clear(XLClearOptions.Contents);
+                    sheet.Cell(row, S_FreeDaysCol).Clear(XLClearOptions.Contents);
+                }
+
+                // D: Sum
+                sheet.Cell(row, S_SumCol).Value = summaryRow.Sum ?? string.Empty;
+
+                // Days
                 var dayCells = summaryRow.Days?.ToList()
                               ?? new List<ContainerScheduleProfileViewModel.SummaryDayCell>();
 
                 for (int d = 0; d < S_DaysCapacity; d++)
                 {
                     var c = S_FirstDayCol + d * 3;
-                    ContainerScheduleProfileViewModel.SummaryDayCell? day = d < dayCells.Count ? dayCells[d] : null;
+                    var day = d < dayCells.Count ? dayCells[d] : null;
 
                     sheet.Cell(row, c).Value = day?.From ?? string.Empty;
                     sheet.Cell(row, c + 1).Value = day?.To ?? string.Empty;
@@ -735,50 +770,7 @@ namespace WPFApp.Service
                 }
             }
 
-            // ===== MINI TABLE: shift start row by summaryExtra (because we inserted rows above it) =====
-            var miniBodyFirstRow = S_MiniBodyFirstRow + summaryExtra;
-
-            // ===== MINI TABLE: auto-expand rows if needed =====
-            var miniNeeded = context.EmployeeWorkFreeStats.Count;
-            var miniExtra = Math.Max(0, miniNeeded - S_MaxMiniRows);
-
-            if (miniExtra > 0)
-            {
-                // Insert extra rows below last template-styled mini row
-                var miniInsertAfter = miniBodyFirstRow + S_MaxMiniRows - 1; // last mini template row
-                sheet.Row(miniInsertAfter).InsertRowsBelow(miniExtra);
-
-                // Copy style from last mini template row into inserted rows (usually only A..C are used)
-                var miniTemplateRange = sheet.Range(miniInsertAfter, 1, miniInsertAfter, 3);
-                var miniHeight = sheet.Row(miniInsertAfter).Height;
-
-                for (int k = 1; k <= miniExtra; k++)
-                {
-                    miniTemplateRange.CopyTo(sheet.Range(miniInsertAfter + k, 1, miniInsertAfter + k, 3));
-                    sheet.Row(miniInsertAfter + k).Height = miniHeight;
-                }
-            }
-
-            var miniTotalRows = Math.Max(S_MaxMiniRows, miniNeeded);
-
-            for (int r = 0; r < miniTotalRows; r++)
-            {
-                var row = miniBodyFirstRow + r;
-
-                if (r >= miniNeeded)
-                {
-                    // Clear unused template rows (only when miniNeeded < S_MaxMiniRows)
-                    sheet.Cell(row, 1).Clear(XLClearOptions.Contents);
-                    sheet.Cell(row, 2).Clear(XLClearOptions.Contents);
-                    sheet.Cell(row, 3).Clear(XLClearOptions.Contents);
-                    continue;
-                }
-
-                var stat = context.EmployeeWorkFreeStats[r];
-                sheet.Cell(row, 1).Value = stat.Employee ?? string.Empty;
-                sheet.Cell(row, 2).Value = stat.WorkDays.ToString(CultureInfo.InvariantCulture);
-                sheet.Cell(row, 3).Value = stat.FreeDays.ToString(CultureInfo.InvariantCulture);
-            }
+            // Нижню mini-таблицю (Employee/WorkDays/FreeDays) прибрано повністю.
         }
 
         private static void FillContainerTemplateSheetFromTemplate(IXLWorksheet sheet, ContainerExcelExportContext context)
@@ -841,6 +833,7 @@ namespace WPFApp.Service
             if (firstShopCol <= 0) return;
 
             lastShopCol = firstShopCol;
+
             while (lastShopCol <= lastUsedCol &&
                    sheet.Cell(headerRow, lastShopCol).GetString().Contains("{Shop}", StringComparison.OrdinalIgnoreCase))
                 lastShopCol++;
@@ -860,11 +853,17 @@ namespace WPFApp.Service
                 sheet.Cell(headerRow, firstShopCol + i).Value = i < shops.Count ? shops[i].Name : string.Empty;
             }
 
-            // 5) Fill employee rows (merge data from two lists)
+            // 5) Fill employee rows
             var rows = context.EmployeeShopHoursRows?.ToList() ?? new List<ContainerProfileViewModel.EmployeeShopHoursRow>();
-            var wfByEmp = (context.EmployeeWorkFreeStats ?? Array.Empty<ContainerProfileViewModel.EmployeeWorkFreeStatRow>())
-                .GroupBy(x => x.Employee ?? string.Empty, StringComparer.CurrentCultureIgnoreCase)
-                .ToDictionary(g => g.Key, g => g.First(), StringComparer.CurrentCultureIgnoreCase);
+
+            // ✅ гарантуємо, що TOTAL (якщо є) піде в самий кінець
+            if (rows.Count > 1)
+            {
+                rows = rows
+                    .OrderBy(x => string.Equals(x.Employee, "TOTAL", StringComparison.OrdinalIgnoreCase) ? 1 : 0)
+                    .ToList();
+            }
+
 
             if (rows.Count == 0)
             {
@@ -889,16 +888,9 @@ namespace WPFApp.Service
 
                 sheet.Cell(r, 1).Value = item.Employee ?? string.Empty;
 
-                if (wfByEmp.TryGetValue(item.Employee ?? string.Empty, out var wf))
-                {
-                    sheet.Cell(r, 2).Value = wf.WorkDays;
-                    sheet.Cell(r, 3).Value = wf.FreeDays;
-                }
-                else
-                {
-                    sheet.Cell(r, 2).Value = string.Empty;
-                    sheet.Cell(r, 3).Value = string.Empty;
-                }
+                sheet.Cell(r, 2).Value = item.WorkDays;
+                sheet.Cell(r, 3).Value = item.FreeDays;
+
 
                 sheet.Cell(r, 4).Value = item.HoursSum ?? "0";
 
@@ -915,6 +907,33 @@ namespace WPFApp.Service
                     sheet.Cell(r, firstShopCol + s).Value = string.IsNullOrWhiteSpace(val) ? "0" : val;
                 }
             }
+
+            // 6) Apply "All Borders" for whole table (header + all data rows + all shop columns)
+            var lastDataRow = templateRow + rows.Count - 1;
+
+            var endCol = firstShopCol + Math.Max(shops.Count, 1) - 1;  // остання "реальна" shop-колонка
+            var tableRange = sheet.Range(headerRow, 1, lastDataRow, endCol);
+
+
+            // All borders
+            tableRange.Style.Border.OutsideBorder = XLBorderStyleValues.Thin;
+            tableRange.Style.Border.InsideBorder = XLBorderStyleValues.Thin;
+
+            // ✅ Re-apply TOTAL styling AFTER borders
+            var totalIndex = rows.FindIndex(x => string.Equals(x.Employee, "TOTAL", StringComparison.OrdinalIgnoreCase));
+            if (totalIndex >= 0)
+            {
+                var totalRow = templateRow + totalIndex;
+
+                sheet.Row(totalRow).Style.Font.Bold = true;
+
+                // топ-бордер по всій ширині таблиці
+                tableRange.Worksheet.Range(totalRow, 1, totalRow, tableRange.LastColumn().ColumnNumber())
+                    .Style.Border.TopBorder = XLBorderStyleValues.Medium; // або Thin
+            }
+
+
+
         }
 
         // ===================== SQL EXPORT (unchanged logic, just kept) =====================

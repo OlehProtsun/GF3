@@ -5,6 +5,7 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:controls="clr-namespace:WPFApp.Controls"      
              xmlns:dt="clr-namespace:WPFApp.DesignTime"
+             
              xmlns:validation="clr-namespace:WPFApp.Infrastructure.Validation"
              xmlns:conv="clr-namespace:WPFApp.Converters"
              mc:Ignorable="d"
@@ -14,6 +15,7 @@
 
     <UserControl.Resources>
 
+        <validation:FirstValidationErrorConverter x:Key="FirstValidationErrorConverter"/>
 
 
         <!-- ЄДИНІ кисті для validation -->
@@ -45,9 +47,10 @@
                 <Trigger Property="Validation.HasError" Value="True">
                     <Setter Property="Background" Value="{StaticResource FieldErrorFillBrush}"/>
                     <Setter Property="BorderBrush" Value="{StaticResource FieldErrorBorderBrush}"/>
-                    <Setter Property="BorderThickness" Value="2"/>
                     <Setter Property="ToolTip"
-                    Value="{Binding RelativeSource={RelativeSource Self}, Path=(Validation.Errors)[0].ErrorContent}"/>
+        Value="{Binding RelativeSource={RelativeSource Self},
+                        Path=(Validation.Errors),
+                        Converter={StaticResource FirstValidationErrorConverter}}"/>
                 </Trigger>
             </Style.Triggers>
         </Style>
@@ -62,7 +65,9 @@
                     <Setter Property="BorderBrush" Value="{StaticResource FieldErrorBorderBrush}"/>
                     <Setter Property="BorderThickness" Value="2"/>
                     <Setter Property="ToolTip"
-                    Value="{Binding RelativeSource={RelativeSource Self}, Path=(Validation.Errors)[0].ErrorContent}"/>
+        Value="{Binding RelativeSource={RelativeSource Self},
+                        Path=(Validation.Errors),
+                        Converter={StaticResource FirstValidationErrorConverter}}"/>
                 </Trigger>
             </Style.Triggers>
         </Style>
@@ -81,14 +86,6 @@
             </Style.Triggers>
         </Style>
 
-
-
-
-        <!-- =============================================================
-             Shared templates/styles for ComboBox virtualization.
-             Defined once to avoid repeating the same XAML blocks in each ComboBox.
-             DOES NOT change the UI appearance; it only improves performance and maintainability.
-             ============================================================= -->
         <ItemsPanelTemplate x:Key="VirtualizingComboItemsPanel">
             <VirtualizingStackPanel />
         </ItemsPanelTemplate>
@@ -134,10 +131,6 @@
             </Setter>
         </Style>
 
-
-
-
-
         <Style x:Key="SplitMainButtonPressStyle"
        TargetType="Button"
        BasedOn="{StaticResource RoundedButtonStyle}">
@@ -159,7 +152,6 @@
                 </Trigger>
             </Style.Triggers>
         </Style>
-
 
         <!-- Rounded vertical ScrollBar -->
         <Style x:Key="LeftRoundedScrollBarStyle" TargetType="{x:Type ScrollBar}">
@@ -415,8 +407,9 @@
                     <Setter Property="BorderBrush" Value="{StaticResource FieldErrorBorderBrush}"/>
                     <Setter Property="BorderThickness" Value="2"/>
                     <Setter Property="ToolTip"
-                    Value="{Binding RelativeSource={RelativeSource Self},
-                                    Path=(Validation.Errors)[0].ErrorContent}"/>
+        Value="{Binding RelativeSource={RelativeSource Self},
+                        Path=(Validation.Errors),
+                        Converter={StaticResource FirstValidationErrorConverter}}"/>
                 </Trigger>
             </Style.Triggers>
         </Style>
@@ -1725,7 +1718,7 @@
                             <Border Style="{StaticResource CardStyle}"
                                 Padding="12"
                                 Margin="0,0,12,16"
-                                Height="850">
+                                Height="650">
 
                                 <Grid>
                                     <Grid.RowDefinitions>

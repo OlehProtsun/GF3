@@ -68,6 +68,14 @@ namespace WPFApp.ViewModel.Container.Profile
         public Func<int, CancellationToken, Task<IReadOnlyList<ScheduleSlotModel>>>? SlotsLoader { get; set; }
 
         // ===================== Container Statistic: Top fields =====================
+        private int _cellStyleRevision;
+        public int CellStyleRevision
+        {
+            get => _cellStyleRevision;
+            private set => SetProperty(ref _cellStyleRevision, value);
+        }
+
+
         private int _totalEmployees;
         public int TotalEmployees
         {
@@ -121,18 +129,35 @@ namespace WPFApp.ViewModel.Container.Profile
         public sealed class EmployeeShopHoursRow
         {
             public string Employee { get; }
+            public int WorkDays { get; }
+            public int FreeDays { get; }
             public string HoursSum { get; }
 
             // Key = ShopHeader.Key, Value = formatted hours cell
             public Dictionary<string, string> HoursByShop { get; }
 
-            public EmployeeShopHoursRow(string employee, string hoursSum, Dictionary<string, string> hoursByShop)
+            public EmployeeShopHoursRow(
+                string employee,
+                int workDays,
+                int freeDays,
+                string hoursSum,
+                Dictionary<string, string> hoursByShop)
             {
                 Employee = employee ?? string.Empty;
+                WorkDays = workDays;
+                FreeDays = freeDays;
                 HoursSum = hoursSum ?? "0";
-                HoursByShop = hoursByShop ?? new Dictionary<string, string>();
+                HoursByShop = hoursByShop ?? new Dictionary<string, string>(StringComparer.Ordinal);
             }
+
+            // ✅ SAFE INDEXER
+            public string this[string shopKey]
+                => (shopKey != null && HoursByShop != null && HoursByShop.TryGetValue(shopKey, out var v))
+                    ? (v ?? string.Empty)
+                    : string.Empty;
         }
+
+
 
         public ObservableCollection<EmployeeShopHoursRow> EmployeeShopHoursRows { get; } = new();
 
@@ -276,6 +301,9 @@ namespace WPFApp.ViewModel.Container.Profile
                     var empTotalDur = new Dictionary<int, TimeSpan>();                      // empId -> total duration
                     var empWorkDays = new Dictionary<int, int>();
                     var empFreeDays = new Dictionary<int, int>();
+                    // ✅ totals only per shop (shopKey -> duration)
+                    var shopTotalDur = new Dictionary<string, TimeSpan>(StringComparer.Ordinal);
+
 
                     TimeSpan totalAll = TimeSpan.Zero;
 
@@ -318,7 +346,12 @@ namespace WPFApp.ViewModel.Container.Profile
 
                             shopMap.TryGetValue(shopKey, out var curS);
                             shopMap[shopKey] = curS + dur;
+
+                            // ✅ accumulate total per shop
+                            shopTotalDur.TryGetValue(shopKey, out var curShopTotal);
+                            shopTotalDur[shopKey] = curShopTotal + dur;
                         }
+
 
                         // Work/Free days (sum across schedules)
                         var daysInMonth = DateTime.DaysInMonth(schedule.Year, schedule.Month);
@@ -375,7 +408,8 @@ namespace WPFApp.ViewModel.Container.Profile
 
                     // --------- Build pivot rows ----------
                     var allShopKeys = shopHeaders.Select(h => h.Key).ToList();
-                    var pivotRows = new List<EmployeeShopHoursRow>(empIdToName.Count);
+
+                    var pivotRows = new List<EmployeeShopHoursRow>(empIdToName.Count + 1);
 
                     foreach (var emp in empIdToName.OrderBy(kv => kv.Value, StringComparer.CurrentCultureIgnoreCase))
                     {
@@ -397,11 +431,37 @@ namespace WPFApp.ViewModel.Container.Profile
                             byShopText[sk] = FormatHoursCell(d);
                         }
 
+                        empWorkDays.TryGetValue(empId, out var wd);
+                        empFreeDays.TryGetValue(empId, out var fd);
+
                         pivotRows.Add(new EmployeeShopHoursRow(
                             employee: name,
+                            workDays: wd,
+                            freeDays: fd,
                             hoursSum: FormatHoursCell(totalDur),
                             hoursByShop: byShopText));
                     }
+
+                    // ✅ TOTAL row: totals for ALL columns (додаємо 1 раз в самому кінці)
+                    var totalWorkDays = empWorkDays.Values.Sum();
+                    var totalFreeDays = empFreeDays.Values.Sum();
+
+                    var totalsByShopText = new Dictionary<string, string>(StringComparer.Ordinal);
+                    foreach (var sk in allShopKeys)
+                    {
+                        shopTotalDur.TryGetValue(sk, out var d);
+                        totalsByShopText[sk] = FormatHoursCell(d);
+                    }
+
+                    pivotRows.Add(new EmployeeShopHoursRow(
+                        employee: "TOTAL",
+                        workDays: totalWorkDays,
+                        freeDays: totalFreeDays,
+                        hoursSum: FormatHoursCell(totalAll),
+                        hoursByShop: totalsByShopText
+                    ));
+
+
 
                     // --------- Work/Free rows ----------
                     var wfRows = new List<EmployeeWorkFreeStatRow>(empIdToName.Count);
@@ -461,6 +521,8 @@ namespace WPFApp.ViewModel.Container.Profile
                     EmployeeWorkFreeStats.Clear();
                     foreach (var r in built.WorkFreeRows)
                         EmployeeWorkFreeStats.Add(r);
+
+                    CellStyleRevision++;
 
                     StatisticsChanged?.Invoke(this, EventArgs.Empty);
                 }).ConfigureAwait(false);
@@ -771,7 +833,19 @@ namespace WPFApp.ViewModel.Container.Profile
                     }
                 }
 
-                rows.Add(new ContainerScheduleProfileViewModel.SummaryEmployeeRow(GetEmployeeDisplayName(emp), FormatHoursCell(sum), dayCells));
+                var sumText = FormatHoursCell(sum); // "132" або "145h 30m" як у UI
+                var workDays = dayCells.Count(c =>
+                    !string.IsNullOrWhiteSpace(c.From) ||
+                    !string.IsNullOrWhiteSpace(c.To) ||
+                    (TryParseSummaryHoursToMinutes(c.Hours, out var mm) && mm > 0));
+                var freeDays = Math.Max(0, daysInMonth - workDays);
+
+                rows.Add(new ContainerScheduleProfileViewModel.SummaryEmployeeRow(
+                    employee: GetEmployeeDisplayName(emp),
+                    workDays: workDays,
+                    freeDays: freeDays,
+                    sum: sumText,
+                    days: dayCells));
             }
 
             return (headers, rows);

@@ -258,11 +258,24 @@ namespace WPFApp.ViewModel.Container.Edit
         /// </summary>
         private async Task LoadContainersAsync(CancellationToken ct, int? selectId = null)
         {
-            var list = await _containerService.GetAllAsync(ct);
-            ListVm.SetItems(list);
+            var list = await _containerService.GetAllAsync(ct).ConfigureAwait(false);
 
-            if (selectId.HasValue)
-                ListVm.SelectedItem = list.FirstOrDefault(c => c.Id == selectId.Value);
+            var disp = System.Windows.Application.Current?.Dispatcher;
+            if (disp != null && !disp.CheckAccess())
+            {
+                await disp.InvokeAsync(() =>
+                {
+                    ListVm.SetItems(list);
+                    if (selectId.HasValue)
+                        ListVm.SelectedItem = ListVm.Items.FirstOrDefault(x => x.Id == selectId.Value);
+                });
+            }
+            else
+            {
+                ListVm.SetItems(list);
+                if (selectId.HasValue)
+                    ListVm.SelectedItem = ListVm.Items.FirstOrDefault(x => x.Id == selectId.Value);
+            }
         }
 
         /// <summary>

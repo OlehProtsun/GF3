@@ -609,6 +609,7 @@
                 <Border Grid.Row="1"
                         Grid.Column="0"
                         Grid.ColumnSpan="3"
+                                Height="650"
                         Style="{StaticResource CardStyle}"
                         Padding="15"
                         Margin="0,10,0,0">
@@ -679,55 +680,51 @@
                                 Margin="0,10,0,0"
                                 SnapsToDevicePixels="True">
                             <DataGrid x:Name="dataGridContainerEmployeeShopHours"
-                                      ItemsSource="{Binding EmployeeShopHoursRows}"
-                                      Style="{StaticResource ContainerStatsGridStyle}"
-                                      IsReadOnly="True"
-                                      AutoGenerateColumns="False"
-                                      FrozenColumnCount="2"
-                                      Height="300"
-                                      ScrollViewer.VerticalScrollBarVisibility="Auto"
-                                      ScrollViewer.HorizontalScrollBarVisibility="Auto">
+          ItemsSource="{Binding EmployeeShopHoursRows}"
+          Style="{StaticResource ScheduleMatrixCompactGridStyle}"
+          CellStyle="{StaticResource ScheduleMatrixCellStyleBase}"
+          IsReadOnly="True"
+          AutoGenerateColumns="False"
+                                                CanUserSortColumns="False"
+          FrozenColumnCount="4"
+          Height="470"
+          RowHeight="35"
+          GridLinesVisibility="All"
+          ScrollViewer.VerticalScrollBarVisibility="Auto"
+          ScrollViewer.HorizontalScrollBarVisibility="Auto"
+          SnapsToDevicePixels="True"
+          UseLayoutRounding="True">
+
                                 <DataGrid.Resources>
                                     <Style TargetType="{x:Type ScrollBar}"
-                                           BasedOn="{StaticResource LeftRoundedScrollBarStyle}" />
+               BasedOn="{StaticResource LeftRoundedScrollBarStyle}" />
+
+                                    <!-- 🔥 Важливо: прибирає “щілину” між рядками тільки тут -->
+                                    <Style TargetType="{x:Type DataGridRow}">
+                                        <Setter Property="Margin" Value="0"/>
+                                        <Setter Property="Padding" Value="0"/>
+                                        <Setter Property="BorderThickness" Value="0"/>
+
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding Employee}" Value="TOTAL">
+                                                <Setter Property="FontWeight" Value="Bold"/>
+                                                <Setter Property="Background" Value="#11000000"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+
+
+                                    <!-- (опційно) щоб заголовок був як в ScheduleProfile -->
+                                    <Style TargetType="{x:Type DataGridColumnHeader}">
+                                        <Setter Property="HorizontalContentAlignment" Value="Center"/>
+                                        <Setter Property="VerticalContentAlignment" Value="Center"/>
+                                        <Setter Property="MinHeight" Value="45"/>
+                                        <Setter Property="Padding" Value="6,0"/>
+                                    </Style>
                                 </DataGrid.Resources>
                             </DataGrid>
                         </Border>
 
-                        <Border Margin="0,16,0,0"
-                                Style="{StaticResource StatisticGridCardBorderStyle}"
-                                HorizontalAlignment="Left">
-
-                            <DataGrid ItemsSource="{Binding EmployeeWorkFreeStats}"
-                                      Style="{StaticResource ContainerStatsGridStyle}"
-                                      IsReadOnly="True"
-                                      AutoGenerateColumns="False"
-                                      Height="320"
-                                      HorizontalAlignment="Left"
-                                      ColumnWidth="Auto"
-                                      ScrollViewer.VerticalScrollBarVisibility="Auto"
-                                      ScrollViewer.HorizontalScrollBarVisibility="Disabled">
-
-                                <DataGrid.Resources>
-                                    <Style TargetType="{x:Type ScrollBar}"
-                                           BasedOn="{StaticResource LeftRoundedScrollBarStyle}" />
-                                </DataGrid.Resources>
-
-                                <DataGrid.Columns>
-                                    <DataGridTextColumn Header="Employee"
-                                                        Binding="{Binding Employee}"
-                                                        Width="Auto"
-                                                        MinWidth="220" />
-                                    <DataGridTextColumn Header="WorkDays"
-                                                        Binding="{Binding WorkDays}"
-                                                        Width="140" />
-                                    <DataGridTextColumn Header="FreeDays"
-                                                        Binding="{Binding FreeDays}"
-                                                        Width="140" />
-                                </DataGrid.Columns>
-
-                            </DataGrid>
-                        </Border>
 
                     </StackPanel>
                 </Border>

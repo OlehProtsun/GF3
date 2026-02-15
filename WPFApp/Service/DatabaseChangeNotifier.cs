@@ -50,21 +50,29 @@ namespace WPFApp.Service
         {
             try
             {
-                await Task.Delay(_debounceDelay, cts.Token).ConfigureAwait(false);
+                await Task.Delay(_debounceDelay, cts.Token); // без ConfigureAwait(false)
 
                 if (cts.Token.IsCancellationRequested)
                     return;
 
-                _logger.Log($"[DB-CHANGE] Notification published. Source={source}.");
-                DatabaseChanged?.Invoke(this, new DatabaseChangedEventArgs
+                void Raise()
                 {
-                    Source = source,
-                    ChangedAtUtc = DateTime.UtcNow
-                });
+                    DatabaseChanged?.Invoke(this, new DatabaseChangedEventArgs
+                    {
+                        Source = source,
+                        ChangedAtUtc = DateTime.UtcNow
+                    });
+                }
+
+                var disp = System.Windows.Application.Current?.Dispatcher;
+                if (disp != null && !disp.CheckAccess())
+                    disp.Invoke(Raise);
+                else
+                    Raise();
             }
             catch (OperationCanceledException)
             {
-                // expected when multiple changes are fired quickly
+                // ignore
             }
             finally
             {
@@ -73,7 +81,6 @@ namespace WPFApp.Service
                     if (ReferenceEquals(_pendingCts, cts))
                         _pendingCts = null;
                 }
-
                 cts.Dispose();
             }
         }

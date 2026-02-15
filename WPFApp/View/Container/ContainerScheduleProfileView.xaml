@@ -10,8 +10,8 @@
 
     <UserControl.Resources>
 
-        
-        
+
+
         <!-- Hide title when collapsed (same idea as SideCardTitleTextStyle in Edit) -->
         <Style x:Key="SideCardTitleTextStyle" TargetType="TextBlock">
             <Setter Property="Visibility" Value="Visible"/>
@@ -36,8 +36,8 @@
             </Style.Triggers>
         </Style>
 
-        
-        
+
+
     </UserControl.Resources>
 
     <Grid ClipToBounds="False">
@@ -533,143 +533,141 @@
 
                 <!-- BOTTOM -->
                 <Border Grid.Row="1"
-                        Grid.Column="0"
-                        Grid.ColumnSpan="3"
-                        Style="{StaticResource CardStyle}"
-                        Padding="15"
-                        Margin="0,10,0,0"
-                        Height="650">
+        Grid.Column="0"
+        Grid.ColumnSpan="3"
+        Style="{StaticResource CardStyle}"
+        Padding="15"
+        Margin="0,10,0,0"
+        Height="650">
 
                     <Grid>
+                        <!-- FIX: одна колонка, щоб не було порожнього простору справа -->
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="*"/>
                         </Grid.RowDefinitions>
 
-                        <StackPanel Grid.Row="0" Orientation="Horizontal" VerticalAlignment="Center">
+                        <!-- Header -->
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                             <Viewbox Width="18" Height="18" Margin="0,0,8,0">
                                 <Path Data="{StaticResource IconInfo}" Fill="Black" Stretch="Uniform"/>
                             </Viewbox>
                             <TextBlock Text="Schedule Statistic"
-                                       FontFamily="{StaticResource DefaultFontFamily}"
-                                       FontSize="{StaticResource FontSizeTitle}"
-                                       FontWeight="Bold"
-                                       Foreground="Black"/>
+                       FontFamily="{StaticResource DefaultFontFamily}"
+                       FontSize="{StaticResource FontSizeTitle}"
+                       FontWeight="Bold"
+                       Foreground="Black"/>
                         </StackPanel>
 
                         <ScrollViewer Grid.Row="1"
-                          Margin="0,12,0,0"
-                          VerticalScrollBarVisibility="Auto"
-                          HorizontalScrollBarVisibility="Disabled"
-                          Padding="0">
+                      Margin="0,12,0,0"
+                      VerticalScrollBarVisibility="Auto"
+                      HorizontalScrollBarVisibility="Disabled"
+                      Padding="0"
+                      HorizontalAlignment="Stretch">
 
-                            <StackPanel>
+                            <Grid HorizontalAlignment="Stretch">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="*"/>
+                                </Grid.RowDefinitions>
 
                                 <!-- ===================== 1) TOP: Statistic wrap ===================== -->
-                                <Grid Width="{Binding RelativeSource={RelativeSource AncestorType=ScrollViewer}, Path=ViewportWidth}">
+                                <Grid Grid.Row="0" HorizontalAlignment="Stretch">
                                     <WrapPanel Orientation="Horizontal"
-           HorizontalAlignment="Left"
-           Margin="0">
+                               HorizontalAlignment="Left"
+                               Margin="0">
 
-                                        <!-- Name -->
                                         <TextBlock Margin="0,0,18,6" TextWrapping="Wrap"
-               FontFamily="{StaticResource DefaultFontFamily}">
-        <Run Text="Name: " FontSize="12" Foreground="{StaticResource MutedTextBrush}"/>
-        <Run Text="{Binding ScheduleName, Mode=OneWay}" FontSize="14" Foreground="Black"/>
+                                   FontFamily="{StaticResource DefaultFontFamily}">
+                            <Run Text="Name: " FontSize="12" Foreground="{StaticResource MutedTextBrush}"/>
+                            <Run Text="{Binding ScheduleName, Mode=OneWay}" FontSize="14" Foreground="Black"/>
                                         </TextBlock>
 
-                                        <!-- Month -->
                                         <TextBlock Margin="0,0,18,6" TextWrapping="Wrap"
-               FontFamily="{StaticResource DefaultFontFamily}">
-        <Run Text="Month: " FontSize="12" Foreground="{StaticResource MutedTextBrush}"/>
-        <Run Text="{Binding ScheduleMonth, Mode=OneWay, StringFormat={}{0:D2}}"
-             FontSize="14" Foreground="Black"/>
+                                   FontFamily="{StaticResource DefaultFontFamily}">
+                            <Run Text="Month: " FontSize="12" Foreground="{StaticResource MutedTextBrush}"/>
+                            <Run Text="{Binding ScheduleMonth, Mode=OneWay, StringFormat={}{0:D2}}"
+                                 FontSize="14" Foreground="Black"/>
                                         </TextBlock>
 
-                                        <!-- Year -->
                                         <TextBlock Margin="0,0,18,6" TextWrapping="Wrap"
-               FontFamily="{StaticResource DefaultFontFamily}">
-        <Run Text="Year: " FontSize="12" Foreground="{StaticResource MutedTextBrush}"/>
-        <Run Text="{Binding ScheduleYear, Mode=OneWay}" FontSize="14" Foreground="Black"/>
+                                   FontFamily="{StaticResource DefaultFontFamily}">
+                            <Run Text="Year: " FontSize="12" Foreground="{StaticResource MutedTextBrush}"/>
+                            <Run Text="{Binding ScheduleYear, Mode=OneWay}" FontSize="14" Foreground="Black"/>
                                         </TextBlock>
 
-                                        <!-- Shop Name -->
                                         <TextBlock Margin="0,0,18,6" TextWrapping="Wrap"
-               FontFamily="{StaticResource DefaultFontFamily}">
-        <Run Text="Shop Name: " FontSize="12" Foreground="{StaticResource MutedTextBrush}"/>
-        <Run Text="{Binding ShopName, Mode=OneWay}" FontSize="14" Foreground="Black"/>
+                                   FontFamily="{StaticResource DefaultFontFamily}">
+                            <Run Text="Shop Name: " FontSize="12" Foreground="{StaticResource MutedTextBrush}"/>
+                            <Run Text="{Binding ShopName, Mode=OneWay}" FontSize="14" Foreground="Black"/>
                                         </TextBlock>
 
-                                        <!-- Shop Address -->
                                         <TextBlock Margin="0,0,18,6" TextWrapping="Wrap"
-               FontFamily="{StaticResource DefaultFontFamily}">
-        <Run Text="Shop Address: " FontSize="12" Foreground="{StaticResource MutedTextBrush}"/>
-        <Run Text="{Binding ShopAddress, Mode=OneWay}" FontSize="14" Foreground="Black"/>
+                                   FontFamily="{StaticResource DefaultFontFamily}">
+                            <Run Text="Shop Address: " FontSize="12" Foreground="{StaticResource MutedTextBrush}"/>
+                            <Run Text="{Binding ShopAddress, Mode=OneWay}" FontSize="14" Foreground="Black"/>
                                         </TextBlock>
 
-                                        <!-- Total Hours -->
                                         <TextBlock Margin="0,0,18,6" TextWrapping="Wrap"
-               FontFamily="{StaticResource DefaultFontFamily}">
-        <Run Text="Total Hours: " FontSize="12" Foreground="{StaticResource MutedTextBrush}"/>
-        <Run Text="{Binding TotalHoursText, Mode=OneWay}" FontSize="14" Foreground="Black"/>
+                                   FontFamily="{StaticResource DefaultFontFamily}">
+                            <Run Text="Total Hours: " FontSize="12" Foreground="{StaticResource MutedTextBrush}"/>
+                            <Run Text="{Binding TotalHoursText, Mode=OneWay}" FontSize="14" Foreground="Black"/>
                                         </TextBlock>
 
-                                        <!-- Total Employees -->
                                         <TextBlock Margin="0,0,18,6" TextWrapping="Wrap"
-               FontFamily="{StaticResource DefaultFontFamily}">
-        <Run Text="Total Employees: " FontSize="12" Foreground="{StaticResource MutedTextBrush}"/>
-        <Run Text="{Binding TotalEmployees, Mode=OneWay}" FontSize="14" Foreground="Black"/>
+                                   FontFamily="{StaticResource DefaultFontFamily}">
+                            <Run Text="Total Employees: " FontSize="12" Foreground="{StaticResource MutedTextBrush}"/>
+                            <Run Text="{Binding TotalEmployees, Mode=OneWay}" FontSize="14" Foreground="Black"/>
                                         </TextBlock>
 
-                                        <!-- Total Days -->
                                         <TextBlock Margin="0,0,18,6" TextWrapping="Wrap"
-               FontFamily="{StaticResource DefaultFontFamily}">
-        <Run Text="Total Days: " FontSize="12" Foreground="{StaticResource MutedTextBrush}"/>
-        <Run Text="{Binding TotalDays, Mode=OneWay}" FontSize="14" Foreground="Black"/>
+                                   FontFamily="{StaticResource DefaultFontFamily}">
+                            <Run Text="Total Days: " FontSize="12" Foreground="{StaticResource MutedTextBrush}"/>
+                            <Run Text="{Binding TotalDays, Mode=OneWay}" FontSize="14" Foreground="Black"/>
                                         </TextBlock>
 
-                                        <!-- Shift 1 -->
                                         <TextBlock Margin="0,0,18,6" TextWrapping="Wrap"
-               FontFamily="{StaticResource DefaultFontFamily}">
-        <Run Text="Shift 1: " FontSize="12" Foreground="{StaticResource MutedTextBrush}"/>
-        <Run Text="{Binding Shift1, Mode=OneWay}" FontSize="14" Foreground="Black"/>
+                                   FontFamily="{StaticResource DefaultFontFamily}">
+                            <Run Text="Shift 1: " FontSize="12" Foreground="{StaticResource MutedTextBrush}"/>
+                            <Run Text="{Binding Shift1, Mode=OneWay}" FontSize="14" Foreground="Black"/>
                                         </TextBlock>
 
-                                        <!-- Shift 2 -->
                                         <TextBlock Margin="0,0,18,6" TextWrapping="Wrap"
-               FontFamily="{StaticResource DefaultFontFamily}">
-        <Run Text="Shift 2: " FontSize="12" Foreground="{StaticResource MutedTextBrush}"/>
-        <Run Text="{Binding Shift2, Mode=OneWay}" FontSize="14" Foreground="Black"/>
+                                   FontFamily="{StaticResource DefaultFontFamily}">
+                            <Run Text="Shift 2: " FontSize="12" Foreground="{StaticResource MutedTextBrush}"/>
+                            <Run Text="{Binding Shift2, Mode=OneWay}" FontSize="14" Foreground="Black"/>
                                         </TextBlock>
 
                                     </WrapPanel>
                                 </Grid>
 
-                                <StackPanel Margin="0,6,0,0">
+                                <StackPanel Grid.Row="1" Margin="0,6,0,0" HorizontalAlignment="Stretch">
                                     <TextBlock TextWrapping="Wrap"
-               FontFamily="{StaticResource DefaultFontFamily}">
-        <Run Text="{Binding TotalEmployees, Mode=OneWay, StringFormat=Total employees ({0}): }"
-             FontSize="12" Foreground="{StaticResource MutedTextBrush}"/>
-        <Run Text="{Binding TotalEmployeesListText, Mode=OneWay}" FontSize="14" Foreground="Black"/>
+                               FontFamily="{StaticResource DefaultFontFamily}">
+                        <Run Text="{Binding TotalEmployees, Mode=OneWay, StringFormat=Total employees ({0}): }"
+                             FontSize="12" Foreground="{StaticResource MutedTextBrush}"/>
+                        <Run Text="{Binding TotalEmployeesListText, Mode=OneWay}" FontSize="14" Foreground="Black"/>
                                     </TextBlock>
                                 </StackPanel>
 
-
-                                <!-- ===================== 2) BOTTOM: Summary table (Matrix-like) ===================== -->
-                                <!-- Відступ від верхніх полів -->
-                                <!-- ===================== 2) SUMMARY TABLE (Frozen left + frozen headers) ===================== -->
-                                <!-- ===================== 2) SUMMARY TABLE (Frozen left + frozen headers + bottom H-scroll) ===================== -->
-                                <!-- ===================== 2) SUMMARY TABLE (Frozen left + frozen headers + bottom H-scroll) ===================== -->
-                                <Border Margin="0,16,0,0"
-        Style="{StaticResource StatisticGridCardBorderStyle}">
+                                <!-- ===================== 2) SUMMARY TABLE (Matrix-like) ===================== -->
+                                <Border Grid.Row="2"
+                        Margin="0,16,0,0"
+                        Style="{StaticResource StatisticGridCardBorderStyle}"
+                        VerticalAlignment="Stretch"
+                        HorizontalAlignment="Stretch">
 
                                     <Grid SnapsToDevicePixels="True" UseLayoutRounding="True">
                                         <Grid.Resources>
 
-                                            <!-- Matrix-like look -->
                                             <Style x:Key="SumCellBorder" TargetType="Border">
                                                 <Setter Property="BorderBrush" Value="Gainsboro"/>
-                                                <!-- Only Right+Bottom to avoid double lines -->
                                                 <Setter Property="BorderThickness" Value="0,0,1,1"/>
                                                 <Setter Property="Background" Value="{StaticResource SurfaceBrush}"/>
                                                 <Setter Property="Height" Value="35"/>
@@ -678,6 +676,7 @@
 
                                             <Style x:Key="SumHeaderBorder" TargetType="Border" BasedOn="{StaticResource SumCellBorder}">
                                                 <Setter Property="Height" Value="45"/>
+                                                <Setter Property="Background" Value="Transparent"/>
                                             </Style>
 
                                             <Style x:Key="SumHeaderText" TargetType="TextBlock">
@@ -703,68 +702,80 @@
 
                                         </Grid.Resources>
 
-                                        <!-- 2 header rows + body viewport + bottom horizontal scrollbar -->
                                         <Grid.RowDefinitions>
                                             <RowDefinition Height="Auto"/>
                                             <RowDefinition Height="Auto"/>
-                                            <RowDefinition Height="320"/>
+                                            <RowDefinition Height="*"/>
                                             <RowDefinition Height="18"/>
                                         </Grid.RowDefinitions>
 
-                                        <!-- Left fixed (Employee+Sum) + Right scroll area -->
+                                        <!-- LEFT fixed + RIGHT scroll area -->
                                         <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="330"/>
+                                            <ColumnDefinition Width="510"/>
                                             <ColumnDefinition Width="*"/>
                                         </Grid.ColumnDefinitions>
 
-                                        <!-- ===================== TOP-LEFT (no scroll) ===================== -->
+                                        <!-- ===================== TOP-LEFT ===================== -->
                                         <Grid Grid.Row="0" Grid.Column="0">
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="240"/>
+                                                <ColumnDefinition Width="90"/>
+                                                <ColumnDefinition Width="90"/>
                                                 <ColumnDefinition Width="90"/>
                                             </Grid.ColumnDefinitions>
 
                                             <Border Grid.Column="0" Style="{StaticResource SumHeaderBorder}"/>
                                             <Border Grid.Column="1" Style="{StaticResource SumHeaderBorder}"/>
+                                            <Border Grid.Column="2" Style="{StaticResource SumHeaderBorder}"/>
+                                            <Border Grid.Column="3" Style="{StaticResource SumHeaderBorder}"/>
                                         </Grid>
 
                                         <Grid Grid.Row="1" Grid.Column="0">
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="240"/>
                                                 <ColumnDefinition Width="90"/>
+                                                <ColumnDefinition Width="90"/>
+                                                <ColumnDefinition Width="90"/>
                                             </Grid.ColumnDefinitions>
 
                                             <Border Grid.Column="0" Style="{StaticResource SumHeaderBorder}">
                                                 <TextBlock Text="Employee" Style="{StaticResource SumHeaderText}"/>
                                             </Border>
+
                                             <Border Grid.Column="1" Style="{StaticResource SumHeaderBorder}">
+                                                <TextBlock Text="Work Days" Style="{StaticResource SumHeaderText}"/>
+                                            </Border>
+
+                                            <Border Grid.Column="2" Style="{StaticResource SumHeaderBorder}">
+                                                <TextBlock Text="Free Days" Style="{StaticResource SumHeaderText}"/>
+                                            </Border>
+
+                                            <Border Grid.Column="3" Style="{StaticResource SumHeaderBorder}">
                                                 <TextBlock Text="Sum" Style="{StaticResource SumHeaderText}"/>
                                             </Border>
                                         </Grid>
 
-                                        <!-- ===================== TOP-RIGHT (header X-sync, no Y) ===================== -->
-                                        <!-- ВАЖЛИВО: тут робимо 2 колонки: контент + “компенсація” під vertical scrollbar -->
+                                        <!-- ===================== TOP-RIGHT (header X-sync) ===================== -->
                                         <Grid Grid.Row="0" Grid.Column="1" Grid.RowSpan="2">
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="*"/>
-                                                <!-- Auto бере ширину контенту (нашого filler Border) -->
                                                 <ColumnDefinition Width="Auto"/>
                                             </Grid.ColumnDefinitions>
 
                                             <ScrollViewer x:Name="SummaryHeaderScroll"
-                  Grid.Column="0"
-                  HorizontalScrollBarVisibility="Hidden"
-                  VerticalScrollBarVisibility="Disabled"
-                  CanContentScroll="False"
-                  PanningMode="HorizontalOnly"
-                  PreviewMouseWheel="SummaryHeaderScroll_PreviewMouseWheel">
+                                          Grid.Column="0"
+                                          HorizontalScrollBarVisibility="Hidden"
+                                          VerticalScrollBarVisibility="Disabled"
+                                          CanContentScroll="False"
+                                          PanningMode="HorizontalOnly"
+                                          PreviewMouseWheel="SummaryHeaderScroll_PreviewMouseWheel">
                                                 <ScrollViewer.Resources>
                                                     <Style TargetType="{x:Type ScrollBar}"
-                   BasedOn="{StaticResource LeftRoundedScrollBarStyle}" />
+                                           BasedOn="{StaticResource LeftRoundedScrollBarStyle}" />
                                                 </ScrollViewer.Resources>
 
-                                                <!-- (твій існуючий StackPanel з ItemsControl — без змін) -->
-                                                <StackPanel>
+                                                <!-- IMPORTANT: stretch header content to body viewport -->
+                                                <StackPanel MinWidth="{Binding ElementName=SummaryBodyScroll, Path=ViewportWidth}">
                                                     <ItemsControl ItemsSource="{Binding SummaryDayHeaders}">
                                                         <ItemsControl.ItemsPanel>
                                                             <ItemsPanelTemplate>
@@ -811,22 +822,38 @@
                                                 </StackPanel>
                                             </ScrollViewer>
 
-                                            <!-- filler area under vertical scrollbar -->
+                                            <!-- filler under vertical scrollbar -->
                                             <Border Grid.Column="1"
-                                                Width="{x:Static SystemParameters.VerticalScrollBarWidth}"
-                                                Background="{StaticResource SurfaceBrush}"
-                                                BorderBrush="Gainsboro"
-                                                BorderThickness="1,0,0,0"/>
+                                    Background="{StaticResource SurfaceBrush}"
+                                    BorderBrush="Gainsboro"
+                                    BorderThickness="1,0,0,0">
+                                                <Border.Style>
+                                                    <Style TargetType="Border">
+                                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                                        <Setter Property="Width" Value="0"/>
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding ElementName=SummaryBodyScroll, Path=ComputedVerticalScrollBarVisibility}"
+                                                         Value="Visible">
+                                                                <Setter Property="Visibility" Value="Visible"/>
+                                                                <Setter Property="Width" Value="{x:Static SystemParameters.VerticalScrollBarWidth}"/>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </Border.Style>
+                                            </Border>
                                         </Grid>
 
-
-                                        <!-- ===================== BOTTOM-LEFT (Y-sync, fixed X) ===================== -->
+                                        <!-- ===================== BOTTOM-LEFT (Y-sync) ===================== -->
                                         <ScrollViewer x:Name="SummaryLeftScroll"
-                      Grid.Row="2" Grid.Column="0"
-                      HorizontalScrollBarVisibility="Disabled"
-                      VerticalScrollBarVisibility="Hidden"
-                      CanContentScroll="False"
-                      PreviewMouseWheel="SummaryLeftScroll_PreviewMouseWheel">
+                                      Grid.Row="2" Grid.Column="0"
+                                      HorizontalScrollBarVisibility="Disabled"
+                                      VerticalScrollBarVisibility="Hidden"
+                                      CanContentScroll="False"
+                                      PreviewMouseWheel="SummaryLeftScroll_PreviewMouseWheel">
+                                            <ScrollViewer.Resources>
+                                                <Style TargetType="{x:Type ScrollBar}"
+                                       BasedOn="{StaticResource LeftRoundedScrollBarStyle}" />
+                                            </ScrollViewer.Resources>
 
                                             <ItemsControl ItemsSource="{Binding SummaryRows}">
                                                 <ItemsControl.ItemTemplate>
@@ -835,19 +862,33 @@
                                                             <Grid.ColumnDefinitions>
                                                                 <ColumnDefinition Width="240"/>
                                                                 <ColumnDefinition Width="90"/>
+                                                                <ColumnDefinition Width="90"/>
+                                                                <ColumnDefinition Width="90"/>
                                                             </Grid.ColumnDefinitions>
 
                                                             <Border Grid.Column="0" Style="{StaticResource SumCellBorder}">
                                                                 <TextBlock Text="{Binding Employee}"
-                                           Style="{StaticResource SumBodyText}"
-                                           HorizontalAlignment="Left"
-                                           Margin="10,0,6,0"/>
+                                                           Style="{StaticResource SumBodyText}"
+                                                           HorizontalAlignment="Left"
+                                                           Margin="10,0,6,0"/>
                                                             </Border>
 
                                                             <Border Grid.Column="1" Style="{StaticResource SumCellBorder}">
+                                                                <TextBlock Text="{Binding WorkDays}"
+                                                           Style="{StaticResource SumBodyText}"
+                                                           HorizontalAlignment="Center"/>
+                                                            </Border>
+
+                                                            <Border Grid.Column="2" Style="{StaticResource SumCellBorder}">
+                                                                <TextBlock Text="{Binding FreeDays}"
+                                                           Style="{StaticResource SumBodyText}"
+                                                           HorizontalAlignment="Center"/>
+                                                            </Border>
+
+                                                            <Border Grid.Column="3" Style="{StaticResource SumCellBorder}">
                                                                 <TextBlock Text="{Binding Sum}"
-                                           Style="{StaticResource SumBodyText}"
-                                           HorizontalAlignment="Center"/>
+                                                           Style="{StaticResource SumBodyText}"
+                                                           HorizontalAlignment="Center"/>
                                                             </Border>
                                                         </Grid>
                                                     </DataTemplate>
@@ -855,25 +896,27 @@
                                             </ItemsControl>
                                         </ScrollViewer>
 
-                                        <!-- ===================== BOTTOM-RIGHT (main body; NO horizontal bar here) ===================== -->
+                                        <!-- ===================== BOTTOM-RIGHT (main body) ===================== -->
                                         <ScrollViewer x:Name="SummaryBodyScroll"
-                      Grid.Row="2" Grid.Column="1"
-                      HorizontalScrollBarVisibility="Hidden"
-                      VerticalScrollBarVisibility="Visible"
-                      CanContentScroll="False"
-                      ScrollChanged="SummaryBodyScroll_ScrollChanged"
-                      Loaded="SummaryBodyScroll_Loaded"
-                      SizeChanged="SummaryBodyScroll_SizeChanged">
-
+                                      Grid.Row="2" Grid.Column="1"
+                                      HorizontalScrollBarVisibility="Hidden"
+                                      VerticalScrollBarVisibility="Visible"
+                                      CanContentScroll="False"
+                                      ScrollChanged="SummaryBodyScroll_ScrollChanged"
+                                      Loaded="SummaryBodyScroll_Loaded"
+                                      SizeChanged="SummaryBodyScroll_SizeChanged">
                                             <ScrollViewer.Resources>
                                                 <Style TargetType="{x:Type ScrollBar}"
-                       BasedOn="{StaticResource LeftRoundedScrollBarStyle}" />
+                                       BasedOn="{StaticResource LeftRoundedScrollBarStyle}" />
                                             </ScrollViewer.Resources>
 
                                             <ItemsControl ItemsSource="{Binding SummaryRows}">
                                                 <ItemsControl.ItemTemplate>
                                                     <DataTemplate>
-                                                        <ItemsControl ItemsSource="{Binding Days}">
+
+                                                        <!-- IMPORTANT: each row stretches to viewport width -->
+                                                        <ItemsControl ItemsSource="{Binding Days}"
+                                                      MinWidth="{Binding ElementName=SummaryBodyScroll, Path=ViewportWidth}">
                                                             <ItemsControl.ItemsPanel>
                                                                 <ItemsPanelTemplate>
                                                                     <StackPanel Orientation="Horizontal"/>
@@ -891,23 +934,24 @@
 
                                                                         <Border Grid.Column="0" Style="{StaticResource SumCellBorder}">
                                                                             <TextBlock Text="{Binding From}"
-                                                       Style="{StaticResource SumBodyText}"
-                                                       HorizontalAlignment="Center"/>
+                                                                       Style="{StaticResource SumBodyText}"
+                                                                       HorizontalAlignment="Center"/>
                                                                         </Border>
                                                                         <Border Grid.Column="1" Style="{StaticResource SumCellBorder}">
                                                                             <TextBlock Text="{Binding To}"
-                                                       Style="{StaticResource SumBodyText}"
-                                                       HorizontalAlignment="Center"/>
+                                                                       Style="{StaticResource SumBodyText}"
+                                                                       HorizontalAlignment="Center"/>
                                                                         </Border>
                                                                         <Border Grid.Column="2" Style="{StaticResource SumCellBorder}">
                                                                             <TextBlock Text="{Binding Hours}"
-                                                       Style="{StaticResource SumBodyText}"
-                                                       HorizontalAlignment="Center"/>
+                                                                       Style="{StaticResource SumBodyText}"
+                                                                       HorizontalAlignment="Center"/>
                                                                         </Border>
                                                                     </Grid>
                                                                 </DataTemplate>
                                                             </ItemsControl.ItemTemplate>
                                                         </ItemsControl>
+
                                                     </DataTemplate>
                                                 </ItemsControl.ItemTemplate>
                                             </ItemsControl>
@@ -915,11 +959,10 @@
 
                                         <!-- ===================== Bottom horizontal scrollbar (separate) ===================== -->
                                         <Border Grid.Row="3" Grid.Column="0"
-                BorderBrush="Gainsboro"
-                BorderThickness="0,1,1,0"
-                Background="{StaticResource SurfaceBrush}" />
+                                BorderBrush="Gainsboro"
+                                BorderThickness="0,1,1,0"
+                                Background="{StaticResource SurfaceBrush}" />
 
-                                        <!-- Тут теж робимо 2 колонки: ScrollBar + filler під vertical scrollbar -->
                                         <Grid Grid.Row="3" Grid.Column="1">
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="*"/>
@@ -927,138 +970,35 @@
                                             </Grid.ColumnDefinitions>
 
                                             <ScrollBar x:Name="SummaryHScroll"
-                                               Grid.Column="0"
-                                               Orientation="Horizontal"
-                                               Height="18"
-                                               ValueChanged="SummaryHScroll_ValueChanged"/>
+                                       Grid.Column="0"
+                                       Orientation="Horizontal"
+                                       Height="18"
+                                       ValueChanged="SummaryHScroll_ValueChanged"/>
 
                                             <Border Grid.Column="1"
-                                                Width="{x:Static SystemParameters.VerticalScrollBarWidth}"
-                                                Background="{StaticResource SurfaceBrush}"
-                                                BorderBrush="Gainsboro"
-                                                BorderThickness="1,0,0,0"/>
+                                    Background="{StaticResource SurfaceBrush}"
+                                    BorderBrush="Gainsboro"
+                                    BorderThickness="1,0,0,0">
+                                                <Border.Style>
+                                                    <Style TargetType="Border">
+                                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                                        <Setter Property="Width" Value="0"/>
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding ElementName=SummaryBodyScroll, Path=ComputedVerticalScrollBarVisibility}"
+                                                         Value="Visible">
+                                                                <Setter Property="Visibility" Value="Visible"/>
+                                                                <Setter Property="Width" Value="{x:Static SystemParameters.VerticalScrollBarWidth}"/>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </Border.Style>
+                                            </Border>
                                         </Grid>
-
 
                                     </Grid>
                                 </Border>
 
-                                <!-- ===================== 3) EXTRA: Employee Work/Free Day mini-table ===================== -->
-                                <Border Margin="0,16,0,0"
-        Style="{StaticResource StatisticGridCardBorderStyle}"
-        Padding="12"
-        SnapsToDevicePixels="True">
-
-                                    <ScrollViewer VerticalScrollBarVisibility="Auto"
-                  HorizontalScrollBarVisibility="Auto">
-
-                                        <Grid SnapsToDevicePixels="True" UseLayoutRounding="True">
-                                            <Grid.Resources>
-
-                                                <!-- Matrix-like look (same vibe as summary table) -->
-                                                <Style x:Key="MiniCellBorder" TargetType="Border">
-                                                    <Setter Property="BorderBrush" Value="Gainsboro"/>
-                                                    <!-- Only Right+Bottom to avoid double lines -->
-                                                    <Setter Property="BorderThickness" Value="0,0,1,1"/>
-                                                    <Setter Property="Background" Value="{StaticResource SurfaceBrush}"/>
-                                                    <Setter Property="Height" Value="35"/>
-                                                    <Setter Property="SnapsToDevicePixels" Value="True"/>
-                                                </Style>
-
-                                                <Style x:Key="MiniHeaderBorder" TargetType="Border" BasedOn="{StaticResource MiniCellBorder}">
-                                                    <Setter Property="Height" Value="45"/>
-                                                </Style>
-
-                                                <Style x:Key="MiniHeaderText" TargetType="TextBlock">
-                                                    <Setter Property="FontFamily" Value="{StaticResource DefaultFontFamily}"/>
-                                                    <Setter Property="FontSize" Value="14"/>
-                                                    <Setter Property="FontWeight" Value="SemiBold"/>
-                                                    <Setter Property="Foreground" Value="Black"/>
-                                                    <Setter Property="HorizontalAlignment" Value="Center"/>
-                                                    <Setter Property="VerticalAlignment" Value="Center"/>
-                                                    <Setter Property="TextAlignment" Value="Center"/>
-                                                    <Setter Property="TextWrapping" Value="Wrap"/>
-                                                    <Setter Property="Margin" Value="6,0"/>
-                                                </Style>
-
-                                                <Style x:Key="MiniBodyText" TargetType="TextBlock">
-                                                    <Setter Property="FontFamily" Value="{StaticResource DefaultFontFamily}"/>
-                                                    <Setter Property="FontSize" Value="16"/>
-                                                    <Setter Property="Foreground" Value="Black"/>
-                                                    <Setter Property="VerticalAlignment" Value="Center"/>
-                                                    <Setter Property="TextWrapping" Value="NoWrap"/>
-                                                    <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
-                                                </Style>
-
-                                            </Grid.Resources>
-
-                                            <Grid.RowDefinitions>
-                                                <RowDefinition Height="Auto"/>
-                                                <RowDefinition Height="Auto"/>
-                                            </Grid.RowDefinitions>
-
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="240"/>
-                                                <ColumnDefinition Width="120"/>
-                                                <ColumnDefinition Width="120"/>
-                                            </Grid.ColumnDefinitions>
-
-                                            <!-- Header -->
-                                            <Border Grid.Row="0" Grid.Column="0" Style="{StaticResource MiniHeaderBorder}">
-                                                <TextBlock Text="Employe" Style="{StaticResource MiniHeaderText}"/>
-                                            </Border>
-                                            <Border Grid.Row="0" Grid.Column="1" Style="{StaticResource MiniHeaderBorder}">
-                                                <TextBlock Text="Work Day" Style="{StaticResource MiniHeaderText}"/>
-                                            </Border>
-                                            <Border Grid.Row="0" Grid.Column="2" Style="{StaticResource MiniHeaderBorder}">
-                                                <TextBlock Text="Free Day" Style="{StaticResource MiniHeaderText}"/>
-                                            </Border>
-
-                                            <!-- Row -->
-                                            <!-- Rows (dynamic) -->
-                                            <ItemsControl Grid.Row="1"
-              Grid.Column="0"
-              Grid.ColumnSpan="3"
-              ItemsSource="{Binding EmployeeWorkFreeStats}">
-                                                <ItemsControl.ItemTemplate>
-                                                    <DataTemplate>
-                                                        <Grid>
-                                                            <Grid.ColumnDefinitions>
-                                                                <ColumnDefinition Width="240"/>
-                                                                <ColumnDefinition Width="120"/>
-                                                                <ColumnDefinition Width="120"/>
-                                                            </Grid.ColumnDefinitions>
-
-                                                            <Border Grid.Column="0" Style="{StaticResource MiniCellBorder}">
-                                                                <TextBlock Text="{Binding Employee}"
-                               Style="{StaticResource MiniBodyText}"
-                               HorizontalAlignment="Left"
-                               Margin="10,0,6,0"/>
-                                                            </Border>
-
-                                                            <Border Grid.Column="1" Style="{StaticResource MiniCellBorder}">
-                                                                <TextBlock Text="{Binding WorkDays}"
-                               Style="{StaticResource MiniBodyText}"
-                               HorizontalAlignment="Center"/>
-                                                            </Border>
-
-                                                            <Border Grid.Column="2" Style="{StaticResource MiniCellBorder}">
-                                                                <TextBlock Text="{Binding FreeDays}"
-                               Style="{StaticResource MiniBodyText}"
-                               HorizontalAlignment="Center"/>
-                                                            </Border>
-                                                        </Grid>
-                                                    </DataTemplate>
-                                                </ItemsControl.ItemTemplate>
-                                            </ItemsControl>
-
-
-                                        </Grid>
-                                    </ScrollViewer>
-                                </Border>
-
-
-                            </StackPanel>
+                            </Grid>
                         </ScrollViewer>
 
                     </Grid>

@@ -64,7 +64,9 @@ namespace WPFApp.View.Container
             }), DispatcherPriority.Background);
         }
 
-        private void RebuildEmployeeShopHoursColumns()
+
+
+        void RebuildEmployeeShopHoursColumns()
         {
             if (_vm == null || dataGridContainerEmployeeShopHours == null)
                 return;
@@ -82,10 +84,32 @@ namespace WPFApp.View.Container
                 Width = new DataGridLength(240)
             });
 
-            // HoursSum
+            // Work Days
             dataGridContainerEmployeeShopHours.Columns.Add(new DataGridTextColumn
             {
-                Header = "HoursSum",
+                Header = "Work Days",
+                Binding = new Binding(nameof(ContainerProfileViewModel.EmployeeShopHoursRow.WorkDays))
+                {
+                    Mode = BindingMode.OneWay
+                },
+                Width = new DataGridLength(90)
+            });
+
+            // Free Days
+            dataGridContainerEmployeeShopHours.Columns.Add(new DataGridTextColumn
+            {
+                Header = "Free Days",
+                Binding = new Binding(nameof(ContainerProfileViewModel.EmployeeShopHoursRow.FreeDays))
+                {
+                    Mode = BindingMode.OneWay
+                },
+                Width = new DataGridLength(90)
+            });
+
+            // Sum
+            dataGridContainerEmployeeShopHours.Columns.Add(new DataGridTextColumn
+            {
+                Header = "Sum",
                 Binding = new Binding(nameof(ContainerProfileViewModel.EmployeeShopHoursRow.HoursSum))
                 {
                     Mode = BindingMode.OneWay
@@ -96,9 +120,11 @@ namespace WPFApp.View.Container
             // Dynamic shop columns
             foreach (var shop in _vm.ShopHeaders)
             {
-                var b = new Binding($"{nameof(ContainerProfileViewModel.EmployeeShopHoursRow.HoursByShop)}[{shop.Key}]")
+                var b = new Binding($"[{shop.Key}]")
                 {
-                    Mode = BindingMode.OneWay
+                    Mode = BindingMode.OneWay,
+                    FallbackValue = "",
+                    TargetNullValue = ""
                 };
 
                 dataGridContainerEmployeeShopHours.Columns.Add(new DataGridTextColumn
@@ -108,6 +134,8 @@ namespace WPFApp.View.Container
                     Width = new DataGridLength(90)
                 });
             }
+
+            dataGridContainerEmployeeShopHours.FrozenColumnCount = 4;
         }
 
         // ====== твої існуючі handlers (залишаю як були) ======
@@ -153,6 +181,22 @@ namespace WPFApp.View.Container
             dataGridSchedules.Focus();
 
             e.Handled = true;
+        }
+
+        private static Style BlankTextWhenTotalsRow()
+        {
+            var style = new Style(typeof(TextBlock));
+
+            var trigger = new DataTrigger
+            {
+                Binding = new Binding(nameof(ContainerProfileViewModel.EmployeeShopHoursRow.Employee)),
+                Value = "TOTAL"
+            };
+
+            trigger.Setters.Add(new Setter(TextBlock.TextProperty, ""));
+            style.Triggers.Add(trigger);
+
+            return style;
         }
 
         private void RowHitArea_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)

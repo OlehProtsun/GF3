@@ -652,37 +652,12 @@ namespace WPFApp.ViewModel.Container.ScheduleProfile
 
             foreach (var row in SummaryRows)
             {
-                int workDays = 0;
-
-                // Days — ObservableCollection<SummaryDayCell>
-                if (row.Days != null)
-                {
-                    foreach (var d in row.Days)
-                    {
-                        // 1) Якщо є часи From/To — вже вважаємо день робочим
-                        if (!string.IsNullOrWhiteSpace(d.From) || !string.IsNullOrWhiteSpace(d.To))
-                        {
-                            workDays++;
-                            continue;
-                        }
-
-                        // 2) Інакше пробуємо розпарсити Hours ("0", "6", "6h 30m")
-                        if (TryParseSummaryHoursToMinutes(d.Hours, out var minutes) && minutes > 0)
-                        {
-                            workDays++;
-                            continue;
-                        }
-
-                        // 3) Інакше — не робочий
-                    }
-                }
-
-                int freeDays = Math.Max(0, TotalDays - workDays);
-
+                // TotalDays = кількість днів у місяці (вже виставлено у VM)
+                // WorkDays/FreeDays вже пораховані при BuildSummaryFromMatrix
                 EmployeeWorkFreeStats.Add(new EmployeeWorkFreeStatRow(
                     employee: row.Employee,
-                    workDays: workDays,
-                    freeDays: freeDays));
+                    workDays: row.WorkDays,
+                    freeDays: row.FreeDays));
             }
         }
 
@@ -728,6 +703,32 @@ namespace WPFApp.ViewModel.Container.ScheduleProfile
             minutes = Math.Max(0, h) * 60 + Math.Max(0, mm);
             return true;
         }
+
+        private static int CountWorkDays(IEnumerable<SummaryDayCell>? days)
+        {
+            if (days == null) return 0;
+
+            int workDays = 0;
+
+            foreach (var d in days)
+            {
+                // 1) Якщо є From/To — день робочий
+                if (!string.IsNullOrWhiteSpace(d.From) || !string.IsNullOrWhiteSpace(d.To))
+                {
+                    workDays++;
+                    continue;
+                }
+
+                // 2) Або якщо Hours > 0
+                if (TryParseSummaryHoursToMinutes(d.Hours, out var minutes) && minutes > 0)
+                {
+                    workDays++;
+                }
+            }
+
+            return workDays;
+        }
+
 
         // =========================================================
         // 9) TOOLTIP TOTAL HOURS ПО КОЛОНЦІ ПРАЦІВНИКА
@@ -977,16 +978,21 @@ namespace WPFApp.ViewModel.Container.ScheduleProfile
         public sealed class SummaryEmployeeRow
         {
             public string Employee { get; }
+            public int WorkDays { get; }
+            public int FreeDays { get; }
             public string Sum { get; }
             public ObservableCollection<SummaryDayCell> Days { get; }
 
-            public SummaryEmployeeRow(string employee, string sum, IList<SummaryDayCell> days)
+            public SummaryEmployeeRow(string employee, int workDays, int freeDays, string sum, IList<SummaryDayCell> days)
             {
-                Employee = employee;
-                Sum = sum;
+                Employee = employee ?? string.Empty;
+                WorkDays = workDays;
+                FreeDays = freeDays;
+                Sum = sum ?? string.Empty;
                 Days = new ObservableCollection<SummaryDayCell>(days);
             }
         }
+
 
         /// <summary>
         /// Формує:
@@ -1081,10 +1087,34 @@ namespace WPFApp.ViewModel.Container.ScheduleProfile
                     }
                 }
 
-                resultRows.Add(new SummaryEmployeeRow(displayName, FormatHoursCell(sum), dayCells));
+                var sumText = FormatTimeSpanToSummary(sum);
+
+                var workDays = CountWorkDays(dayCells);
+                var freeDays = Math.Max(0, daysInMonth - workDays);
+
+                resultRows.Add(new SummaryEmployeeRow(
+                    employee: displayName,
+                    workDays: workDays,
+                    freeDays: freeDays,
+                    sum: sumText,
+                    days: dayCells));
+
             }
 
             return (headers, resultRows);
+        }
+
+        private static string FormatTimeSpanToSummary(TimeSpan ts)
+        {
+            var totalMinutes = (int)Math.Round(ts.TotalMinutes);
+            if (totalMinutes <= 0) return "0";
+
+            var h = totalMinutes / 60;
+            var m = totalMinutes % 60;
+
+            return m == 0
+                ? h.ToString(CultureInfo.InvariantCulture)
+                : $"{h}h {m}m";
         }
 
         /// <summary>
@@ -1272,6 +1302,7 @@ namespace WPFApp.ViewModel.Container.ScheduleProfile
             // 5) Fallback
             return $"Employee {emp.EmployeeId}";
         }
+
 
         // =========================================================
         // 13) RESULT DTO (щоб не повертати 8-10 елементів tuple-ом)
