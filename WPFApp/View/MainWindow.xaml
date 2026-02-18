@@ -392,6 +392,20 @@
                             <TextBlock Text="Container" Style="{StaticResource NavLabel}"/>
                         </StackPanel>
 
+                        <!-- Information -->
+                        <StackPanel Margin="0,0,0,20">
+                            <Button Style="{StaticResource IconButton39}"
+                                    Command="{Binding ShowInformationCommand}"
+                                    IsEnabled="{Binding IsInformationEnabled}">
+
+                                <Viewbox Width="26" Height="26">
+                                    <Path Fill="Black"
+                                          Data="M2560 5100 c-1400 0 -2540 -1140 -2540 -2540 0 -1400 1140 -2540 2540 -2540 1400 0 2540 1140 2540 2540 0 1400 -1140 2540 -2540 2540z m0 -750 c220 0 400 -180 400 -400 0 -220 -180 -400 -400 -400 -220 0 -400 180 -400 400 0 220 180 400 400 400z m380 -1150 l0 -1730 -760 0 0 520 130 0 c71 0 130 59 130 130 l0 950 c0 71 -59 130 -130 130 l-130 0 0 520 760 0 z"/>
+                                </Viewbox>
+                            </Button>
+                            <TextBlock Text="Information" Style="{StaticResource NavLabel}"/>
+                        </StackPanel>
+
                     </StackPanel>
 
                     <!-- spacer -->

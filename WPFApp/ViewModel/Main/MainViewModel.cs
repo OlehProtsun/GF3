@@ -10,6 +10,7 @@ using WPFApp.ViewModel.Employee;
 using WPFApp.ViewModel.Shop;
 using WPFApp.ViewModel.Database;
 using WPFApp.ViewModel.Home;
+using WPFApp.ViewModel.Information;
 
 namespace WPFApp.ViewModel.Main
 {
@@ -70,6 +71,7 @@ namespace WPFApp.ViewModel.Main
         private ShopViewModel? _shopVm;
         private AvailabilityViewModel? _availabilityVm;
         private ContainerViewModel? _containerVm;
+        private InformationViewModel? _informationVm;
         private DatabaseViewModel? _databaseVm;
 
         // =========================================================
@@ -165,6 +167,8 @@ namespace WPFApp.ViewModel.Main
 
         public bool IsContainerEnabled => !IsBusy && ActivePage != NavPage.Container;
 
+        public bool IsInformationEnabled => !IsBusy && ActivePage != NavPage.Information;
+
         public bool IsDatabaseEnabled => !IsBusy && ActivePage != NavPage.Database;
 
         // =========================================================
@@ -176,6 +180,7 @@ namespace WPFApp.ViewModel.Main
         public AsyncRelayCommand ShowShopCommand { get; }
         public AsyncRelayCommand ShowAvailabilityCommand { get; }
         public AsyncRelayCommand ShowContainerCommand { get; }
+        public AsyncRelayCommand ShowInformationCommand { get; }
         public AsyncRelayCommand ShowDatabaseCommand { get; }
 
         public AsyncRelayCommand CloseCommand { get; }
@@ -226,6 +231,12 @@ namespace WPFApp.ViewModel.Main
                 getOrCreateVm: () => _containerVm ??= _sp.GetRequiredService<ContainerViewModel>(),
                 isEnabled: () => IsContainerEnabled);
 
+            ShowInformationCommand = CreateNavCommand(
+                page: NavPage.Information,
+                busyText: "Opening Information...",
+                getOrCreateVm: () => _informationVm ??= _sp.GetRequiredService<InformationViewModel>(),
+                isEnabled: () => IsInformationEnabled);
+
             ShowDatabaseCommand = CreateNavCommand(
                 page: NavPage.Database,
                 busyText: "Opening Database...",
@@ -240,6 +251,7 @@ namespace WPFApp.ViewModel.Main
                 ShowShopCommand,
                 ShowAvailabilityCommand,
                 ShowContainerCommand,
+                ShowInformationCommand,
                 ShowDatabaseCommand
             };
 
@@ -368,6 +380,7 @@ namespace WPFApp.ViewModel.Main
                 EmployeeViewModel employeeVm => employeeVm.EnsureInitializedAsync(ct),
                 ShopViewModel shopVm => shopVm.EnsureInitializedAsync(ct),
                 ContainerViewModel containerVm => containerVm.EnsureInitializedAsync(ct),
+                InformationViewModel _ => Task.CompletedTask,
                 DatabaseViewModel _ => Task.CompletedTask,
                 _ => Task.CompletedTask
             };
@@ -428,6 +441,7 @@ namespace WPFApp.ViewModel.Main
             Raise(nameof(IsShopEnabled));
             Raise(nameof(IsAvailabilityEnabled));
             Raise(nameof(IsContainerEnabled));
+            Raise(nameof(IsInformationEnabled));
             Raise(nameof(IsDatabaseEnabled));
         }
 

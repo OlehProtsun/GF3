@@ -12,6 +12,7 @@ namespace WPFApp.ViewModel.Main
         Shop,
         Availability,
         Container,
+        Information,
         Database
     }
 }
