@@ -19,7 +19,7 @@
                 Style="{StaticResource TopCardStyle}"
                 Margin="9,8,9,0">
 
-            <Grid Margin="15">
+            <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />

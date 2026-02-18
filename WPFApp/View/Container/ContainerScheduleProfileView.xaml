@@ -29,7 +29,10 @@
             <Setter Property="Padding" Value="15"/>
             <Setter Property="Margin" Value="0,12,0,0"/>
             <Setter Property="VerticalAlignment" Value="Top"/>
-            <Setter Property="Height" Value="650"/>
+
+            <!-- ключова зміна -->
+            <Setter Property="MaxHeight" Value="650"/>
+
             <Style.Triggers>
                 <DataTrigger Binding="{Binding IsChecked, ElementName=ScheduleInfoToggle}" Value="False">
                     <Setter Property="Height" Value="62"/>
@@ -37,6 +40,7 @@
                 </DataTrigger>
             </Style.Triggers>
         </Style>
+
 
 
 

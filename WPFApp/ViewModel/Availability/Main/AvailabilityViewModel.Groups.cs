@@ -212,10 +212,6 @@ namespace WPFApp.ViewModel.Availability.Main
                 ShowError(ex);
                 return;
             }
-
-            ShowInfo(isNew
-                ? "Availability Group added successfully."
-                : "Availability Group updated successfully.");
         }
 
         internal async Task DeleteSelectedAsync(CancellationToken ct = default)
