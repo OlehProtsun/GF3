@@ -4,11 +4,13 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
+using System.Windows.Threading;
 using BusinessLogicLayer.Services.Abstractions;
 using DataAccessLayer.Models;
 using WPFApp.Infrastructure;
 using WPFApp.Infrastructure.Validation;
 using WPFApp.Service;
+using WPFApp.View.Dialogs;
 using WPFApp.ViewModel.Dialogs;
 using WPFApp.ViewModel.Shop.Helpers;
 
@@ -57,6 +59,54 @@ namespace WPFApp.ViewModel.Shop
 
         // Id профілю, який зараз відкрито (щоб після Save можна було refresh).
         private int? _openedProfileShopId;
+
+        private bool _isNavStatusVisible;
+        public bool IsNavStatusVisible
+        {
+            get => _isNavStatusVisible;
+            private set => SetProperty(ref _isNavStatusVisible, value);
+        }
+
+        private UIStatusKind _navStatus = UIStatusKind.Success;
+        public UIStatusKind NavStatus
+        {
+            get => _navStatus;
+            private set => SetProperty(ref _navStatus, value);
+        }
+
+        private CancellationTokenSource? _navUiCts;
+
+        private CancellationToken ResetNavUiCts(CancellationToken outer)
+        {
+            _navUiCts?.Cancel();
+            _navUiCts?.Dispose();
+            _navUiCts = CancellationTokenSource.CreateLinkedTokenSource(outer);
+            return _navUiCts.Token;
+        }
+
+        private Task ShowNavWorkingAsync()
+            => RunOnUiThreadAsync(() =>
+            {
+                NavStatus = UIStatusKind.Working;
+                IsNavStatusVisible = true;
+            });
+
+        private Task HideNavStatusAsync()
+            => RunOnUiThreadAsync(() => IsNavStatusVisible = false);
+
+        private async Task ShowNavSuccessThenAutoHideAsync(CancellationToken ct, int ms = 900)
+        {
+            await RunOnUiThreadAsync(() =>
+            {
+                NavStatus = UIStatusKind.Success;
+                IsNavStatusVisible = true;
+            }).ConfigureAwait(false);
+
+            try { await Task.Delay(ms, ct).ConfigureAwait(false); }
+            catch (OperationCanceledException) { return; }
+
+            await HideNavStatusAsync().ConfigureAwait(false);
+        }
 
         // ----------------------------
         // Navigation state
@@ -178,38 +228,75 @@ namespace WPFApp.ViewModel.Shop
             ListVm.SetItems(list);
         }
 
-        internal Task StartAddAsync(CancellationToken ct = default)
+        internal async Task StartAddAsync(CancellationToken ct = default)
         {
-            // 1) Скидаємо форму.
-            EditVm.ResetForNew();
+            var uiToken = ResetNavUiCts(ct);
 
-            // 2) Cancel з Edit поверне у List.
-            CancelTarget = ShopSection.List;
+            await ShowNavWorkingAsync();
+            await Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
 
-            // 3) Переходимо в Edit.
-            return SwitchToEditAsync();
+            try
+            {
+                await RunOnUiThreadAsync(() =>
+                {
+                    EditVm.ResetForNew();
+                    CancelTarget = ShopSection.List;
+                });
+
+                await SwitchToEditAsync();
+
+                await Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+                await ShowNavSuccessThenAutoHideAsync(uiToken, 700);
+            }
+            catch (OperationCanceledException)
+            {
+                await HideNavStatusAsync();
+            }
+            catch (Exception ex)
+            {
+                await HideNavStatusAsync();
+                ShowError(ex);
+            }
         }
 
         internal async Task EditSelectedAsync(CancellationToken ct = default)
         {
-            // 1) Беремо selection зі списку.
             var selected = ListVm.SelectedItem;
             if (selected is null)
                 return;
 
-            // 2) Беремо “latest” з сервісу (щоб редагувати актуальні дані).
-            var latest = await _shopService.GetAsync(selected.Id, ct) ?? selected;
+            var uiToken = ResetNavUiCts(ct);
 
-            // 3) Заповнюємо форму.
-            EditVm.SetShop(latest);
+            await ShowNavWorkingAsync();
+            await Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
 
-            // 4) Якщо прийшли з Profile — Cancel має повернути в Profile.
-            CancelTarget = Mode == ShopSection.Profile
-                ? ShopSection.Profile
-                : ShopSection.List;
+            try
+            {
+                var latest = await _shopService.GetAsync(selected.Id, uiToken) ?? selected;
 
-            // 5) В Edit.
-            await SwitchToEditAsync();
+                await RunOnUiThreadAsync(() =>
+                {
+                    EditVm.SetShop(latest);
+
+                    CancelTarget = Mode == ShopSection.Profile
+                        ? ShopSection.Profile
+                        : ShopSection.List;
+                });
+
+                await SwitchToEditAsync();
+
+                await Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+                await ShowNavSuccessThenAutoHideAsync(uiToken, 700);
+            }
+            catch (OperationCanceledException)
+            {
+                await HideNavStatusAsync();
+            }
+            catch (Exception ex)
+            {
+                await HideNavStatusAsync();
+                ShowError(ex);
+            }
         }
 
         // =========================================================
@@ -218,73 +305,72 @@ namespace WPFApp.ViewModel.Shop
 
         internal async Task SaveAsync(CancellationToken ct = default)
         {
-            // 1) При новому Save чистимо попередні помилки.
             EditVm.ClearValidationErrors();
 
-            // 2) Збираємо модель.
             var model = EditVm.ToModel();
-
-            // 3) Валідація через rules.
             var errors = ShopValidationRules.ValidateAll(model);
 
-            // 4) Якщо є помилки — показуємо у формі і виходимо.
             if (errors.Count > 0)
             {
                 EditVm.SetValidationErrors(errors);
                 return;
             }
 
+            var uiToken = ResetNavUiCts(ct);
+
+            await ShowNavWorkingAsync();
+            await Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+
             try
             {
-                // 5) Update або Create.
                 if (EditVm.IsEdit)
                 {
-                    await _shopService.UpdateAsync(model, ct);
+                    await _shopService.UpdateAsync(model, uiToken);
                 }
                 else
                 {
-                    var created = await _shopService.CreateAsync(model, ct);
-                    EditVm.ShopId = created.Id;
+                    var created = await _shopService.CreateAsync(model, uiToken);
+                    await RunOnUiThreadAsync(() => EditVm.ShopId = created.Id);
                     model = created;
                 }
+
+                _databaseChangeNotifier.NotifyDatabaseChanged("Shop.Save");
+
+                await LoadShopsAsync(uiToken, selectId: model.Id);
+
+                if (CancelTarget == ShopSection.Profile)
+                {
+                    var profileId = _openedProfileShopId ?? model.Id;
+
+                    if (profileId > 0)
+                    {
+                        var latest = await _shopService.GetAsync(profileId, uiToken) ?? model;
+
+                        await RunOnUiThreadAsync(() =>
+                        {
+                            ProfileVm.SetProfile(latest);
+                            ListVm.SelectedItem = latest;
+                        });
+                    }
+
+                    await SwitchToProfileAsync();
+                }
+                else
+                {
+                    await SwitchToListAsync();
+                }
+
+                await Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+                await ShowNavSuccessThenAutoHideAsync(uiToken, 900);
+            }
+            catch (OperationCanceledException)
+            {
+                await HideNavStatusAsync();
             }
             catch (Exception ex)
             {
-                // 6) Помилка — показуємо.
+                await HideNavStatusAsync();
                 ShowError(ex);
-                return;
-            }
-
-            // 7) Повідомлення.
-            ShowInfo(EditVm.IsEdit
-                ? "Shop updated successfully."
-                : "Shop added successfully.");
-
-            _databaseChangeNotifier.NotifyDatabaseChanged("Shop.Save");
-
-            // 8) Reload list + selection.
-            await LoadShopsAsync(ct, selectId: model.Id);
-
-            // 9) Повернення в Profile або List залежно від CancelTarget.
-            if (CancelTarget == ShopSection.Profile)
-            {
-                // 9.1) Визначаємо id профілю для refresh.
-                var profileId = _openedProfileShopId ?? model.Id;
-
-                // 9.2) Якщо id валідний — refresh профілю.
-                if (profileId > 0)
-                {
-                    var latest = await _shopService.GetAsync(profileId, ct) ?? model;
-
-                    ProfileVm.SetProfile(latest);
-                    ListVm.SelectedItem = latest;
-                }
-
-                await SwitchToProfileAsync();
-            }
-            else
-            {
-                await SwitchToListAsync();
             }
         }
 
@@ -333,28 +419,41 @@ namespace WPFApp.ViewModel.Shop
 
         internal async Task OpenProfileAsync(CancellationToken ct = default)
         {
-            // 1) Беремо selection.
             var selected = ListVm.SelectedItem;
             if (selected is null)
                 return;
 
-            // 2) Latest.
-            var latest = await _shopService.GetAsync(selected.Id, ct) ?? selected;
+            var uiToken = ResetNavUiCts(ct);
 
-            // 3) Запам’ятовуємо відкритий profileId.
-            _openedProfileShopId = latest.Id;
+            await ShowNavWorkingAsync();
+            await Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
 
-            // 4) Заповнюємо ProfileVm (він також синхронізує ListVm.SelectedItem).
-            ProfileVm.SetProfile(latest);
+            try
+            {
+                var latest = await _shopService.GetAsync(selected.Id, uiToken) ?? selected;
 
-            // 5) На всяк випадок синхронізуємо selection у списку.
-            ListVm.SelectedItem = latest;
+                await RunOnUiThreadAsync(() =>
+                {
+                    _openedProfileShopId = latest.Id;
+                    ProfileVm.SetProfile(latest);
+                    ListVm.SelectedItem = latest;
+                    CancelTarget = ShopSection.List;
+                });
 
-            // 6) Cancel з профілю веде в List.
-            CancelTarget = ShopSection.List;
+                await SwitchToProfileAsync();
 
-            // 7) Переходимо в Profile.
-            await SwitchToProfileAsync();
+                await Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+                await ShowNavSuccessThenAutoHideAsync(uiToken, 900);
+            }
+            catch (OperationCanceledException)
+            {
+                await HideNavStatusAsync();
+            }
+            catch (Exception ex)
+            {
+                await HideNavStatusAsync();
+                ShowError(ex);
+            }
         }
 
         internal Task CancelAsync()
@@ -379,15 +478,15 @@ namespace WPFApp.ViewModel.Shop
 
         private async Task LoadShopsAsync(CancellationToken ct, int? selectId)
         {
-            // 1) Беремо список.
             var list = (await _shopService.GetAllAsync(ct)).ToList();
 
-            // 2) Оновлюємо ListVm.
-            ListVm.SetItems(list);
+            await RunOnUiThreadAsync(() =>
+            {
+                ListVm.SetItems(list);
 
-            // 3) Якщо треба — виставляємо selection по Id.
-            if (selectId.HasValue)
-                ListVm.SelectedItem = list.FirstOrDefault(s => s.Id == selectId.Value);
+                if (selectId.HasValue)
+                    ListVm.SelectedItem = list.FirstOrDefault(s => s.Id == selectId.Value);
+            });
         }
 
         private Task SwitchToListAsync()
@@ -473,6 +572,18 @@ namespace WPFApp.ViewModel.Shop
             {
                 Interlocked.Exchange(ref _databaseReloadInProgress, 0);
             }
+        }
+
+        internal Task RunOnUiThreadAsync(Action action)
+        {
+            var d = Application.Current?.Dispatcher;
+            if (d is null || d.CheckAccess())
+            {
+                action();
+                return Task.CompletedTask;
+            }
+
+            return d.InvokeAsync(action).Task;
         }
 
         // =========================================================

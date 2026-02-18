@@ -1,6 +1,7 @@
 ﻿using DataAccessLayer.Models;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -93,41 +94,34 @@ namespace WPFApp.ViewModel.Availability.Main
 
         private async Task LoadAllGroupsAsync(CancellationToken ct = default)
         {
-            // 1) Беремо всі групи з сервісу.
             var list = await _availabilityService.GetAllAsync(ct);
 
-            // 2) Кладемо в ListVm (там вже логіка оновлення ObservableCollection).
-            ListVm.SetItems(list);
+            await RunOnUiThreadAsync(() => ListVm.SetItems(list));
         }
 
         private async Task LoadEmployeesAsync(CancellationToken ct = default)
         {
-            // 1) Отримуємо працівників.
-            var employees = await _employeeService.GetAllAsync(ct);
+            var employees = (await _employeeService.GetAllAsync(ct)).ToList();
 
-            // 2) Перекладаємо у локальні кеші.
-            //    (Кеші оголошені в Employees partial.)
-            _allEmployees.Clear();
-            _employeeNames.Clear();
+            await RunOnUiThreadAsync(() =>
+            {
+                _allEmployees.Clear();
+                _employeeNames.Clear();
 
-            // 3) Зберігаємо повний список.
-            _allEmployees.AddRange(employees);
+                _allEmployees.AddRange(employees);
 
-            // 4) Будуємо lookup employeeId -> "First Last".
-            foreach (var e in employees)
-                _employeeNames[e.Id] = $"{e.FirstName} {e.LastName}";
+                foreach (var e in employees)
+                    _employeeNames[e.Id] = $"{e.FirstName} {e.LastName}";
 
-            // 5) Віддаємо в EditVm повний список для відображення.
-            EditVm.SetEmployees(_allEmployees, _employeeNames);
+                EditVm.SetEmployees(_allEmployees, _employeeNames);
+            });
         }
 
         private async Task LoadBindsAsync(CancellationToken ct = default)
         {
-            // 1) Беремо bind-и.
             var binds = await _bindService.GetAllAsync(ct);
 
-            // 2) Віддаємо їх в EditVm.
-            EditVm.SetBinds(binds);
+            await RunOnUiThreadAsync(() => EditVm.SetBinds(binds));
         }
     }
 }

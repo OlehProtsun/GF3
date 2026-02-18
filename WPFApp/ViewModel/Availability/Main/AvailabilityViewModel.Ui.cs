@@ -1,4 +1,6 @@
 ﻿using System;
+using System.Threading.Tasks;
+using System.Windows;
 using WPFApp.Infrastructure;
 using WPFApp.Service;
 using WPFApp.ViewModel.Dialogs;
@@ -13,6 +15,18 @@ namespace WPFApp.ViewModel.Availability.Main
     /// </summary>
     public sealed partial class AvailabilityViewModel
     {
+        internal Task RunOnUiThreadAsync(Action action)
+        {
+            var d = Application.Current?.Dispatcher;
+            if (d is null || d.CheckAccess())
+            {
+                action();
+                return Task.CompletedTask;
+            }
+
+            return d.InvokeAsync(action).Task;
+        }
+
         internal void ShowInfo(string text)
             => CustomMessageBox.Show("Info", text, CustomMessageBoxIcon.Info, okText: "OK");
 
