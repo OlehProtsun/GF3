@@ -7,6 +7,7 @@
                     xmlns:svm="clr-namespace:WPFApp.ViewModel.Shop"
                     xmlns:dvm="clr-namespace:WPFApp.ViewModel.Database"
                     xmlns:hvm="clr-namespace:WPFApp.ViewModel.Home"
+                    xmlns:ivm="clr-namespace:WPFApp.ViewModel.Information"
 
                     xmlns:avmMain="clr-namespace:WPFApp.ViewModel.Availability.Main"
                     xmlns:avmList="clr-namespace:WPFApp.ViewModel.Availability.List"
@@ -25,7 +26,8 @@
                     xmlns:cv="clr-namespace:WPFApp.View.Container"
                     xmlns:ev="clr-namespace:WPFApp.View.Employee"
                     xmlns:sv="clr-namespace:WPFApp.View.Shop"
-                    xmlns:hv="clr-namespace:WPFApp.View.Home">
+                    xmlns:hv="clr-namespace:WPFApp.View.Home"
+                    xmlns:iv="clr-namespace:WPFApp.View.Information">
 
     <!-- Home module -->
     <DataTemplate DataType="{x:Type hvm:HomeViewModel}">
@@ -50,6 +52,12 @@
     <!-- Container module -->
     <DataTemplate DataType="{x:Type cvmEdit:ContainerViewModel}">
         <v:ContainerView />
+    </DataTemplate>
+
+
+    <!-- Information module -->
+    <DataTemplate DataType="{x:Type ivm:InformationViewModel}">
+        <iv:InformationView />
     </DataTemplate>
 
     <!-- Database module -->

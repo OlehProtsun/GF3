@@ -10,6 +10,7 @@ using WPFApp.View.Availability;
 using WPFApp.View.Employee;
 using WPFApp.View.Shop;
 using WPFApp.View.Home;
+using WPFApp.View.Information;
 using WPFApp.ViewModel.Availability.Main;
 using WPFApp.ViewModel.Container.Edit;
 using WPFApp.ViewModel.Employee;
@@ -17,6 +18,7 @@ using WPFApp.ViewModel.Main;
 using WPFApp.ViewModel.Shop;
 using WPFApp.ViewModel.Database;
 using WPFApp.ViewModel.Home;
+using WPFApp.ViewModel.Information;
 
 namespace WPFApp
 {
@@ -54,6 +56,7 @@ namespace WPFApp
             services.AddTransient<AvailabilityViewModel>();
             services.AddTransient<ShopViewModel>();
             services.AddTransient<ContainerViewModel>();
+            services.AddTransient<InformationViewModel>();
             services.AddTransient<DatabaseViewModel>();
 
             // 3) Реєстрація Views (Windows/UserControls)
@@ -71,6 +74,7 @@ namespace WPFApp
             services.AddTransient<AvailabilityView>();
             services.AddTransient<ShopView>();
             services.AddTransient<ContainerView>();
+            services.AddTransient<InformationView>();
             services.AddTransient<DatabaseView>();
 
             // 4) Навігація / фабрики (заміна твого MdiViewFactory)
