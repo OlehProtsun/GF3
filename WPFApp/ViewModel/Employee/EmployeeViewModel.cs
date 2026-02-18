@@ -4,11 +4,13 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
+using System.Windows.Threading;
 using BusinessLogicLayer.Services.Abstractions;
 using DataAccessLayer.Models;
 using WPFApp.Infrastructure;
 using WPFApp.Infrastructure.Validation;
 using WPFApp.Service;
+using WPFApp.View.Dialogs;
 using WPFApp.ViewModel.Dialogs;
 using WPFApp.ViewModel.Employee.Helpers;
 
@@ -54,6 +56,54 @@ namespace WPFApp.ViewModel.Employee
 
         // Пам’ятаємо id відкритого профілю (щоб після Save повернутись і refreshнути).
         private int? _openedProfileEmployeeId;
+
+        private bool _isNavStatusVisible;
+        public bool IsNavStatusVisible
+        {
+            get => _isNavStatusVisible;
+            private set => SetProperty(ref _isNavStatusVisible, value);
+        }
+
+        private UIStatusKind _navStatus = UIStatusKind.Success;
+        public UIStatusKind NavStatus
+        {
+            get => _navStatus;
+            private set => SetProperty(ref _navStatus, value);
+        }
+
+        private CancellationTokenSource? _navUiCts;
+
+        private CancellationToken ResetNavUiCts(CancellationToken outer)
+        {
+            _navUiCts?.Cancel();
+            _navUiCts?.Dispose();
+            _navUiCts = CancellationTokenSource.CreateLinkedTokenSource(outer);
+            return _navUiCts.Token;
+        }
+
+        private Task ShowNavWorkingAsync()
+            => RunOnUiThreadAsync(() =>
+            {
+                NavStatus = UIStatusKind.Working;
+                IsNavStatusVisible = true;
+            });
+
+        private Task HideNavStatusAsync()
+            => RunOnUiThreadAsync(() => IsNavStatusVisible = false);
+
+        private async Task ShowNavSuccessThenAutoHideAsync(CancellationToken ct, int ms = 900)
+        {
+            await RunOnUiThreadAsync(() =>
+            {
+                NavStatus = UIStatusKind.Success;
+                IsNavStatusVisible = true;
+            }).ConfigureAwait(false);
+
+            try { await Task.Delay(ms, ct).ConfigureAwait(false); }
+            catch (OperationCanceledException) { return; }
+
+            await HideNavStatusAsync().ConfigureAwait(false);
+        }
 
         // ----------------------------
         // Navigation state
@@ -166,11 +216,35 @@ namespace WPFApp.ViewModel.Employee
             ListVm.SetItems(list);
         }
 
-        internal Task StartAddAsync(CancellationToken ct = default)
+        internal async Task StartAddAsync(CancellationToken ct = default)
         {
-            EditVm.ResetForNew();
-            CancelTarget = EmployeeSection.List;
-            return SwitchToEditAsync();
+            var uiToken = ResetNavUiCts(ct);
+
+            await ShowNavWorkingAsync();
+            await Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+
+            try
+            {
+                await RunOnUiThreadAsync(() =>
+                {
+                    EditVm.ResetForNew();
+                    CancelTarget = EmployeeSection.List;
+                });
+
+                await SwitchToEditAsync();
+
+                await Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+                await ShowNavSuccessThenAutoHideAsync(uiToken, 700);
+            }
+            catch (OperationCanceledException)
+            {
+                await HideNavStatusAsync();
+            }
+            catch (Exception ex)
+            {
+                await HideNavStatusAsync();
+                ShowError(ex);
+            }
         }
 
         internal async Task EditSelectedAsync(CancellationToken ct = default)
@@ -179,17 +253,38 @@ namespace WPFApp.ViewModel.Employee
             if (selected is null)
                 return;
 
-            // Беремо “latest” з сервісу, щоб редагувати актуальні дані.
-            var latest = await _employeeService.GetAsync(selected.Id, ct) ?? selected;
+            var uiToken = ResetNavUiCts(ct);
 
-            EditVm.SetEmployee(latest);
+            await ShowNavWorkingAsync();
+            await Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
 
-            // Якщо зайшли з Profile — Cancel має повернути в Profile.
-            CancelTarget = Mode == EmployeeSection.Profile
-                ? EmployeeSection.Profile
-                : EmployeeSection.List;
+            try
+            {
+                var latest = await _employeeService.GetAsync(selected.Id, uiToken) ?? selected;
 
-            await SwitchToEditAsync();
+                await RunOnUiThreadAsync(() =>
+                {
+                    EditVm.SetEmployee(latest);
+
+                    CancelTarget = Mode == EmployeeSection.Profile
+                        ? EmployeeSection.Profile
+                        : EmployeeSection.List;
+                });
+
+                await SwitchToEditAsync();
+
+                await Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+                await ShowNavSuccessThenAutoHideAsync(uiToken, 700);
+            }
+            catch (OperationCanceledException)
+            {
+                await HideNavStatusAsync();
+            }
+            catch (Exception ex)
+            {
+                await HideNavStatusAsync();
+                ShowError(ex);
+            }
         }
 
         // =========================================================
@@ -198,71 +293,74 @@ namespace WPFApp.ViewModel.Employee
 
         internal async Task SaveAsync(CancellationToken ct = default)
         {
-            // 1) Перед Save чистимо старі помилки.
             EditVm.ClearValidationErrors();
 
-            // 2) Формуємо модель з VM.
             var model = EditVm.ToModel();
-
-            // 3) Валідація через rules.
             var errors = EmployeeValidationRules.ValidateAll(model);
 
-            // 4) Якщо є помилки — показуємо їх у формі і виходимо.
             if (errors.Count > 0)
             {
                 EditVm.SetValidationErrors(errors);
                 return;
             }
 
+            var uiToken = ResetNavUiCts(ct);
+
+            await ShowNavWorkingAsync();
+            await Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+
             try
             {
-                // 5) Update або Create.
                 if (EditVm.IsEdit)
                 {
-                    await _employeeService.UpdateAsync(model, ct);
+                    await _employeeService.UpdateAsync(model, uiToken);
                 }
                 else
                 {
-                    var created = await _employeeService.CreateAsync(model, ct);
+                    var created = await _employeeService.CreateAsync(model, uiToken);
 
-                    // Після create оновлюємо id у формі (на випадок, якщо UI ще показується).
-                    EditVm.EmployeeId = created.Id;
+                    await RunOnUiThreadAsync(() => EditVm.EmployeeId = created.Id);
 
                     model = created;
                 }
+
+                _databaseChangeNotifier.NotifyDatabaseChanged("Employee.Save");
+
+                await LoadEmployeesAsync(uiToken, selectId: model.Id);
+
+                if (CancelTarget == EmployeeSection.Profile)
+                {
+                    var profileId = _openedProfileEmployeeId ?? model.Id;
+
+                    if (profileId > 0)
+                    {
+                        var latest = await _employeeService.GetAsync(profileId, uiToken) ?? model;
+
+                        await RunOnUiThreadAsync(() =>
+                        {
+                            ProfileVm.SetProfile(latest);
+                            ListVm.SelectedItem = latest;
+                        });
+                    }
+
+                    await SwitchToProfileAsync();
+                }
+                else
+                {
+                    await SwitchToListAsync();
+                }
+
+                await Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+                await ShowNavSuccessThenAutoHideAsync(uiToken, 900);
+            }
+            catch (OperationCanceledException)
+            {
+                await HideNavStatusAsync();
             }
             catch (Exception ex)
             {
+                await HideNavStatusAsync();
                 ShowError(ex);
-                return;
-            }
-
-            ShowInfo(EditVm.IsEdit
-                ? "Employee updated successfully."
-                : "Employee added successfully.");
-
-            _databaseChangeNotifier.NotifyDatabaseChanged("Employee.Save");
-
-            // 6) Reload list + selection.
-            await LoadEmployeesAsync(ct, selectId: model.Id);
-
-            // 7) Повернення туди, звідки зайшли.
-            if (CancelTarget == EmployeeSection.Profile)
-            {
-                var profileId = _openedProfileEmployeeId ?? model.Id;
-
-                if (profileId > 0)
-                {
-                    var latest = await _employeeService.GetAsync(profileId, ct) ?? model;
-                    ProfileVm.SetProfile(latest);
-                    ListVm.SelectedItem = latest;
-                }
-
-                await SwitchToProfileAsync();
-            }
-            else
-            {
-                await SwitchToListAsync();
             }
         }
 
@@ -307,17 +405,37 @@ namespace WPFApp.ViewModel.Employee
             if (selected is null)
                 return;
 
-            var latest = await _employeeService.GetAsync(selected.Id, ct) ?? selected;
+            var uiToken = ResetNavUiCts(ct);
 
-            _openedProfileEmployeeId = latest.Id;
+            await ShowNavWorkingAsync();
+            await Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
 
-            ProfileVm.SetProfile(latest);
+            try
+            {
+                var latest = await _employeeService.GetAsync(selected.Id, uiToken) ?? selected;
 
-            // Важливо: синхронізуємо selection у списку, щоб owner-дії працювали стабільно.
-            ListVm.SelectedItem = latest;
+                await RunOnUiThreadAsync(() =>
+                {
+                    _openedProfileEmployeeId = latest.Id;
+                    ProfileVm.SetProfile(latest);
+                    ListVm.SelectedItem = latest;
+                    CancelTarget = EmployeeSection.List;
+                });
 
-            CancelTarget = EmployeeSection.List;
-            await SwitchToProfileAsync();
+                await SwitchToProfileAsync();
+
+                await Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+                await ShowNavSuccessThenAutoHideAsync(uiToken, 900);
+            }
+            catch (OperationCanceledException)
+            {
+                await HideNavStatusAsync();
+            }
+            catch (Exception ex)
+            {
+                await HideNavStatusAsync();
+                ShowError(ex);
+            }
         }
 
         internal Task CancelAsync()
@@ -342,15 +460,15 @@ namespace WPFApp.ViewModel.Employee
 
         private async Task LoadEmployeesAsync(CancellationToken ct, int? selectId)
         {
-            // 1) Беремо список.
-            var list = await _employeeService.GetAllAsync(ct);
+            var list = (await _employeeService.GetAllAsync(ct)).ToList();
 
-            // 2) Заповнюємо ListVm.
-            ListVm.SetItems(list);
+            await RunOnUiThreadAsync(() =>
+            {
+                ListVm.SetItems(list);
 
-            // 3) Якщо треба — виставляємо selection по Id.
-            if (selectId.HasValue)
-                ListVm.SelectedItem = list.FirstOrDefault(e => e.Id == selectId.Value);
+                if (selectId.HasValue)
+                    ListVm.SelectedItem = list.FirstOrDefault(e => e.Id == selectId.Value);
+            });
         }
 
         private Task SwitchToListAsync()
@@ -445,6 +563,18 @@ namespace WPFApp.ViewModel.Employee
             {
                 Interlocked.Exchange(ref _databaseReloadInProgress, 0);
             }
+        }
+
+        internal Task RunOnUiThreadAsync(Action action)
+        {
+            var d = Application.Current?.Dispatcher;
+            if (d is null || d.CheckAccess())
+            {
+                action();
+                return Task.CompletedTask;
+            }
+
+            return d.InvokeAsync(action).Task;
         }
 
         // =========================================================

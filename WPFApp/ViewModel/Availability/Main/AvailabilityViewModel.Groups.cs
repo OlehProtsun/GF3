@@ -4,6 +4,8 @@ using System;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Windows;
+using System.Windows.Threading;
 
 namespace WPFApp.ViewModel.Availability.Main
 {
@@ -35,57 +37,84 @@ namespace WPFApp.ViewModel.Availability.Main
 
         internal async Task StartAddAsync(CancellationToken ct = default)
         {
-            // 1) Перед створенням — переконуємось, що employees актуальні.
-            await LoadEmployeesAsync(ct);
+            var uiToken = ResetNavUiCts(ct);
 
-            // 2) Скидаємо фільтр працівників (щоб користувач бачив повний список).
-            ResetEmployeeSearch();
+            await ShowNavWorkingAsync();
+            await Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
 
-            // 3) Скидаємо EditVm у “новий запис”.
-            EditVm.ResetForNew();
+            try
+            {
+                await LoadEmployeesAsync(uiToken);
 
-            // 4) Якщо користувач натисне Cancel — повертаємось у List.
-            CancelTarget = AvailabilitySection.List;
+                await RunOnUiThreadAsync(() =>
+                {
+                    ResetEmployeeSearch();
+                    EditVm.ResetForNew();
+                    CancelTarget = AvailabilitySection.List;
+                });
 
-            // 5) Переходимо в Edit.
-            await SwitchToEditAsync();
+                await SwitchToEditAsync();
+
+                await Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+                await ShowNavSuccessThenAutoHideAsync(uiToken, 700);
+            }
+            catch (OperationCanceledException)
+            {
+                await HideNavStatusAsync();
+            }
+            catch (Exception ex)
+            {
+                await HideNavStatusAsync();
+                ShowError(ex);
+            }
         }
 
         internal async Task EditSelectedAsync(CancellationToken ct = default)
         {
-            // 1) Беремо вибраний елемент зі списку.
             var selected = ListVm.SelectedItem;
-
-            // 2) Якщо нічого не вибрано — виходимо.
             if (selected is null)
                 return;
 
-            // 3) Оновлюємо employees (щоб headers/captions були актуальні).
-            await LoadEmployeesAsync(ct);
+            var uiToken = ResetNavUiCts(ct);
 
-            // 4) Завантажуємо повний набір (group+members+days).
-            var (group, members, days) = await _availabilityService.LoadFullAsync(selected.Id, ct);
+            await ShowNavWorkingAsync();
+            await Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
 
-            // 5) Заповнюємо EditVm.
-            EditVm.LoadGroup(group, members, days, _employeeNames);
+            try
+            {
+                await LoadEmployeesAsync(uiToken);
 
-            // 6) Налаштовуємо CancelTarget:
-            //    - якщо ми прийшли з Profile — Cancel має повернути в Profile
-            //    - інакше — у List
-            CancelTarget = Mode == AvailabilitySection.Profile
-                ? AvailabilitySection.Profile
-                : AvailabilitySection.List;
+                var (group, members, days) = await _availabilityService.LoadFullAsync(selected.Id, uiToken);
 
-            // 7) Відкриваємо Edit.
-            await SwitchToEditAsync();
+                await RunOnUiThreadAsync(() =>
+                {
+                    EditVm.LoadGroup(group, members, days, _employeeNames);
+
+                    CancelTarget = Mode == AvailabilitySection.Profile
+                        ? AvailabilitySection.Profile
+                        : AvailabilitySection.List;
+                });
+
+                await SwitchToEditAsync();
+
+                await Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+                await ShowNavSuccessThenAutoHideAsync(uiToken, 700);
+            }
+            catch (OperationCanceledException)
+            {
+                await HideNavStatusAsync();
+            }
+            catch (Exception ex)
+            {
+                await HideNavStatusAsync();
+                ShowError(ex);
+            }
         }
 
         internal async Task SaveAsync(CancellationToken ct = default)
         {
-            // 1) Перед збереженням — очищаємо попередні помилки форми.
             EditVm.ClearValidationErrors();
 
-            // 2) Зчитуємо назву, trim.
             var rawName = (EditVm.AvailabilityName ?? string.Empty).Trim();
 
             // 3) Визначаємо, чи це create.
@@ -140,46 +169,53 @@ namespace WPFApp.ViewModel.Availability.Main
                 return;
             }
 
+            var uiToken = ResetNavUiCts(ct);
+
+            await ShowNavWorkingAsync();
+            await Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+
             try
             {
-                // 13) Виконуємо збереження.
-                await _availabilityService.SaveGroupAsync(group, payload, ct);
+                await _availabilityService.SaveGroupAsync(group, payload, uiToken);
+
+                _databaseChangeNotifier.NotifyDatabaseChanged("Availability.Save");
+
+                await LoadAllGroupsAsync(uiToken);
+
+                if (CancelTarget == AvailabilitySection.Profile)
+                {
+                    var profileId = _openedProfileGroupId ?? group.Id;
+
+                    if (profileId > 0)
+                    {
+                        var (g, members, days) = await _availabilityService.LoadFullAsync(profileId, uiToken);
+                        await RunOnUiThreadAsync(() => ProfileVm.SetProfile(g, members, days));
+                    }
+
+                    await SwitchToProfileAsync();
+                }
+                else
+                {
+                    await SwitchToListAsync();
+                }
+
+                await Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+                await ShowNavSuccessThenAutoHideAsync(uiToken, 900);
+            }
+            catch (OperationCanceledException)
+            {
+                await HideNavStatusAsync();
             }
             catch (Exception ex)
             {
-                // 14) На будь-якій помилці — показуємо exception.
+                await HideNavStatusAsync();
                 ShowError(ex);
                 return;
             }
 
-            // 15) Повідомляємо користувача.
             ShowInfo(isNew
                 ? "Availability Group added successfully."
                 : "Availability Group updated successfully.");
-
-            _databaseChangeNotifier.NotifyDatabaseChanged("Availability.Save");
-
-            // 16) Перезавантажуємо список.
-            await LoadAllGroupsAsync(ct);
-
-            // 17) Після Save повертаємось туди, звідки зайшли.
-            if (CancelTarget == AvailabilitySection.Profile)
-            {
-                // 18) Якщо треба повернутись в Profile — перезавантажуємо його дані.
-                var profileId = _openedProfileGroupId ?? group.Id;
-
-                if (profileId > 0)
-                {
-                    var (g, members, days) = await _availabilityService.LoadFullAsync(profileId, ct);
-                    ProfileVm.SetProfile(g, members, days);
-                }
-
-                await SwitchToProfileAsync();
-            }
-            else
-            {
-                await SwitchToListAsync();
-            }
         }
 
         internal async Task DeleteSelectedAsync(CancellationToken ct = default)
@@ -218,25 +254,40 @@ namespace WPFApp.ViewModel.Availability.Main
 
         internal async Task OpenProfileAsync(CancellationToken ct = default)
         {
-            // 1) Беремо вибір.
             var current = ListVm.SelectedItem;
             if (current is null)
                 return;
 
-            // 2) Запам’ятовуємо id відкритого profile.
-            _openedProfileGroupId = current.Id;
+            var uiToken = ResetNavUiCts(ct);
 
-            // 3) Завантажуємо повні дані.
-            var (group, members, days) = await _availabilityService.LoadFullAsync(current.Id, ct);
+            await ShowNavWorkingAsync();
+            await Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
 
-            // 4) Заповнюємо ProfileVm.
-            ProfileVm.SetProfile(group, members, days);
+            try
+            {
+                var (group, members, days) = await _availabilityService.LoadFullAsync(current.Id, uiToken);
 
-            // 5) Якщо з profile натиснуть Edit->Cancel — маємо вернутись в List.
-            CancelTarget = AvailabilitySection.List;
+                await RunOnUiThreadAsync(() =>
+                {
+                    _openedProfileGroupId = current.Id;
+                    ProfileVm.SetProfile(group, members, days);
+                    CancelTarget = AvailabilitySection.List;
+                });
 
-            // 6) Переходимо в Profile.
-            await SwitchToProfileAsync();
+                await SwitchToProfileAsync();
+
+                await Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+                await ShowNavSuccessThenAutoHideAsync(uiToken, 900);
+            }
+            catch (OperationCanceledException)
+            {
+                await HideNavStatusAsync();
+            }
+            catch (Exception ex)
+            {
+                await HideNavStatusAsync();
+                ShowError(ex);
+            }
         }
 
         internal Task CancelAsync()
