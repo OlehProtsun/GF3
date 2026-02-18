@@ -5,7 +5,7 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:controls="clr-namespace:WPFApp.Controls"      
              xmlns:dt="clr-namespace:WPFApp.DesignTime"
-             
+             xmlns:dialogs="clr-namespace:WPFApp.View.Dialogs"
              xmlns:validation="clr-namespace:WPFApp.Infrastructure.Validation"
              xmlns:conv="clr-namespace:WPFApp.Converters"
              mc:Ignorable="d"
@@ -1762,5 +1762,23 @@
                 </Grid>
 
             </Grid>
-        </Grid>
+        <!-- ===================== SAVE STATUS OVERLAY ===================== -->
+
+        <Border Grid.RowSpan="99"
+        Panel.ZIndex="9998"
+        Background="#40000000"
+        Visibility="{Binding IsSaveStatusVisible, Converter={StaticResource BoolToVis}}"
+        IsHitTestVisible="True"/>
+
+        <dialogs:UIStatus Grid.RowSpan="99"
+                  Panel.ZIndex="9999"
+                  HorizontalAlignment="Center"
+                  VerticalAlignment="Center"
+                  IsHitTestVisible="False"
+                  Status="{Binding SaveStatus}"
+                  Visibility="{Binding IsSaveStatusVisible, Converter={StaticResource BoolToVis}}"
+                  Width="420"
+                          Height="120"/>
+
+    </Grid>
 </UserControl>

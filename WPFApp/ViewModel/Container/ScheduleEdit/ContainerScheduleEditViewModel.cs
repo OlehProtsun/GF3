@@ -26,6 +26,7 @@ using WPFApp.Infrastructure.ScheduleMatrix;
 using WPFApp.Infrastructure.Threading;
 using WPFApp.Infrastructure.Validation;
 using WPFApp.Service;
+using WPFApp.View.Dialogs;
 using WPFApp.ViewModel.Container.Edit;
 using WPFApp.ViewModel.Container.ScheduleEdit.Helpers;
 
@@ -119,6 +120,22 @@ namespace WPFApp.ViewModel.Container.ScheduleEdit
         private SchedulePaintMode _activePaintMode = SchedulePaintMode.None;
 
         private bool _syncingEmployeeSelection;
+
+        // ===================== Save status popup =====================
+
+        private bool _isSaveStatusVisible;
+        public bool IsSaveStatusVisible
+        {
+            get => _isSaveStatusVisible;
+            set => SetProperty(ref _isSaveStatusVisible, value);
+        }
+
+        private UIStatusKind _saveStatus = UIStatusKind.Success;
+        public UIStatusKind SaveStatus
+        {
+            get => _saveStatus;
+            set => SetProperty(ref _saveStatus, value);
+        }
 
 
         // Порожні колекції, щоб не повертати null у ScheduleEmployees/ScheduleSlots.

@@ -3,17 +3,17 @@ using DataAccessLayer.Models;
 using DataAccessLayer.Models.Enums;
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Input;
 using WPFApp.Infrastructure.ScheduleMatrix;
+using WPFApp.View.Dialogs;
 using WPFApp.ViewModel.Container.Edit.Helpers;
 using WPFApp.ViewModel.Container.ScheduleEdit;
 using WPFApp.ViewModel.Container.ScheduleEdit.Helpers;
-using System.Globalization;
-
 // Явно фіксуємо, ЯКИЙ саме ScheduleBlockViewModel ми використовуємо в цьому файлі,
 // щоб не було “підміни” типу через інші using.
 using ScheduleBlockVm = WPFApp.ViewModel.Container.ScheduleEdit.Helpers.ScheduleBlockViewModel;
@@ -91,7 +91,7 @@ namespace WPFApp.ViewModel.Container.Edit
                 return;
             }
 
-            // invalidBlocks: список блоків з помилками (помилки зберігаємо окремо, не в block)
+            // 1) Validate + normalize shifts
             var invalidBlocks = new List<(ScheduleBlockVm Block, Dictionary<string, string> Errors)>();
 
             foreach (ScheduleBlockVm block in ScheduleEditVm.Blocks)
@@ -100,7 +100,6 @@ namespace WPFApp.ViewModel.Container.Edit
 
                 if (errors.Count > 0)
                 {
-                    // Явно іменуємо елементи кортежу — додатковий захист від інференсу
                     invalidBlocks.Add((Block: block, Errors: errors));
                     continue;
                 }
@@ -108,7 +107,6 @@ namespace WPFApp.ViewModel.Container.Edit
                 block.Model.Shift1Time = normalizedShift1!;
                 block.Model.Shift2Time = normalizedShift2!;
             }
-
 
             // 2) Якщо є помилки — показуємо перший проблемний блок + summary
             if (invalidBlocks.Count > 0)
@@ -149,108 +147,133 @@ namespace WPFApp.ViewModel.Container.Edit
             if (!Confirm(confirmMessage))
                 return;
 
-            // 5) Збереження кожного блока
-            foreach (var block in ScheduleEditVm.Blocks)
+            // ====== POPUP: Working ======
+            var uiToken = ResetSaveUiCts(ct);
+            await ShowSaveWorkingAsync(); // <-- без ConfigureAwait(false) тут
+
+            // Гарантовано дати WPF зробити layout+render кадр перед важкою синхронною роботою
+            await System.Windows.Application.Current.Dispatcher.InvokeAsync(
+                () => { },
+                System.Windows.Threading.DispatcherPriority.ApplicationIdle
+            );
+
+
+            try
             {
-                // employees: унікальні по EmployeeId
-                var employees = block.Employees
-                    .GroupBy(e => e.EmployeeId)
-                    .Select(g => new ScheduleEmployeeModel
+                // 5) Збереження кожного блока
+                foreach (var block in ScheduleEditVm.Blocks)
+                {
+                    // employees: унікальні по EmployeeId
+                    var employees = block.Employees
+                        .GroupBy(e => e.EmployeeId)
+                        .Select(g => new ScheduleEmployeeModel
+                        {
+                            EmployeeId = g.Key,
+                            MinHoursMonth = g.First().MinHoursMonth
+                        })
+                        .ToList();
+
+                    var slots = block.Slots.ToList();
+
+                    foreach (var s in slots)
                     {
-                        EmployeeId = g.Key,
-                        MinHoursMonth = g.First().MinHoursMonth
-                    })
-                    .ToList();
+                        // 1) Якщо десь просочується 0 замість null — SQLite вважає це NOT NULL
+                        if (s.EmployeeId is int id && id == 0)
+                            s.EmployeeId = null;
 
-                var slots = block.Slots.ToList();
+                        // 2) Приводимо status до того, що дозволяє CHECK:
+                        // UNFURNISHED => employee_id NULL
+                        // ASSIGNED    => employee_id NOT NULL
+                        s.Status = s.EmployeeId == null ? SlotStatus.UNFURNISHED : SlotStatus.ASSIGNED;
 
-                foreach (var s in slots)
-                {
-                    // 1) Якщо десь просочується 0 замість null — SQLite вважає це NOT NULL
-                    if (s.EmployeeId is int id && id == 0)
-                        s.EmployeeId = null;
+                        // 3) нормалізація "9:00" => "09:00"
+                        s.FromTime = NormalizeHHmm(s.FromTime);
+                        s.ToTime = NormalizeHHmm(s.ToTime);
 
-                    // 2) Приводимо status до того, що дозволяє CHECK:
-                    // UNFURNISHED => employee_id NULL
-                    // ASSIGNED    => employee_id NOT NULL
-                    s.Status = s.EmployeeId == null ? SlotStatus.UNFURNISHED : SlotStatus.ASSIGNED;
+                        // 4) CHECK (from_time < to_time)
+                        if (string.CompareOrdinal(s.FromTime, s.ToTime) >= 0)
+                            throw new InvalidOperationException(
+                                $"Invalid time range: day={s.DayOfMonth}, slot={s.SlotNo}, {s.FromTime}-{s.ToTime}");
+                    }
 
-                    // 3) (опційно, але часто потрібно після ручного вводу) нормалізуємо "9:00" => "09:00"
-                    s.FromTime = NormalizeHHmm(s.FromTime);
-                    s.ToTime = NormalizeHHmm(s.ToTime);
+                    // cellStyles зберігаємо тільки якщо реально є колір (фон або текст)
+                    var cellStyles = block.CellStyles
+                        .Where(cs => cs.BackgroundColorArgb.HasValue || cs.TextColorArgb.HasValue)
+                        .ToList();
 
-                    // 4) (опційно) швидка перевірка порядку часу, бо є CHECK (from_time < to_time)
-                    if (string.CompareOrdinal(s.FromTime, s.ToTime) >= 0)
-                        throw new InvalidOperationException(
-                            $"Invalid time range: day={s.DayOfMonth}, slot={s.SlotNo}, {s.FromTime}-{s.ToTime}");
+                    // AvailabilityGroupId: зберігаємо вибрану групу, якщо є
+                    block.Model.AvailabilityGroupId = block.SelectedAvailabilityGroupId > 0
+                        ? block.SelectedAvailabilityGroupId
+                        : null;
+
+                    // ВАЖЛИВО: без inner try/catch — outer catch гарантує hide popup
+                    await _scheduleService
+                        .SaveWithDetailsAsync(block.Model, employees, slots, cellStyles, uiToken)
+                        .ConfigureAwait(false);
                 }
 
-                static string NormalizeHHmm(string value)
+                // 6) Reload schedule list в профілі контейнера
+                var containerId = ScheduleEditVm.Blocks.FirstOrDefault()?.Model.ContainerId ?? GetCurrentContainerId();
+                if (containerId > 0)
+                    await LoadSchedulesAsync(containerId, search: null, uiToken).ConfigureAwait(false);
+
+                _databaseChangeNotifier.NotifyDatabaseChanged("Container.ScheduleSave");
+
+                // ====== POPUP: Successful (auto-hide) ======
+                await ShowSaveSuccessThenAutoHideAsync(uiToken, 1400).ConfigureAwait(false);
+
+                // (краще прибрати, щоб UX не дублювався)
+                // ShowInfo("Schedules saved successfully.");
+
+                // 7) Якщо редагували (IsEdit) — переходимо у ScheduleProfile
+                if (ScheduleEditVm.IsEdit)
                 {
-                    if (TimeSpan.TryParse(value, out var ts))
-                        return ts.ToString(@"hh\:mm");
-                    return value; // якщо не парситься — хай впаде на валідації/БД, або зроби ShowError
-                }
+                    var savedBlock = ScheduleEditVm.Blocks.FirstOrDefault();
+                    if (savedBlock != null)
+                    {
+                        var detailed = await _scheduleService.GetDetailedAsync(savedBlock.Model.Id, uiToken)
+                                                             .ConfigureAwait(false);
+                        if (detailed != null)
+                        {
+                            var employees = detailed.Employees?.ToList() ?? new List<ScheduleEmployeeModel>();
+                            var slots = detailed.Slots?.ToList() ?? new List<ScheduleSlotModel>();
+                            var cellStyles = detailed.CellStyles?.ToList() ?? new List<ScheduleCellStyleModel>();
 
+                            await ScheduleProfileVm.SetProfileAsync(detailed, employees, slots, cellStyles, uiToken)
+                                                   .ConfigureAwait(false);
 
-                // cellStyles зберігаємо тільки якщо реально є колір (фон або текст)
-                var cellStyles = block.CellStyles
-                    .Where(cs => cs.BackgroundColorArgb.HasValue || cs.TextColorArgb.HasValue)
-                    .ToList();
+                            ProfileVm.ScheduleListVm.SelectedItem =
+                                ProfileVm.ScheduleListVm.Items.FirstOrDefault(x => x.Model.Id == detailed.Id);
+                        }
+                    }
 
-                // AvailabilityGroupId: зберігаємо вибрану групу, якщо є
-                block.Model.AvailabilityGroupId = block.SelectedAvailabilityGroupId > 0
-                    ? block.SelectedAvailabilityGroupId
-                    : null;
-
-                try
-                {
-                    await _scheduleService.SaveWithDetailsAsync(block.Model, employees, slots, cellStyles, ct);
-                }
-                catch (Exception ex)
-                {
-                    ShowError(ex);
+                    ScheduleCancelTarget = ContainerSection.Profile;
+                    await SwitchToScheduleProfileAsync().ConfigureAwait(false);
                     return;
                 }
+
+                // Якщо це “Add mode” — повертаємось у Profile контейнера
+                await SwitchToProfileAsync().ConfigureAwait(false);
             }
-
-            // 6) Reload schedule list в профілі контейнера
-            var containerId = ScheduleEditVm.Blocks.FirstOrDefault()?.Model.ContainerId ?? GetCurrentContainerId();
-            if (containerId > 0)
-                await LoadSchedulesAsync(containerId, search: null, ct);
-
-            _databaseChangeNotifier.NotifyDatabaseChanged("Container.ScheduleSave");
-            ShowInfo("Schedules saved successfully.");
-
-            // 7) Якщо редагували (IsEdit) — зазвичай хочемо перейти у ScheduleProfile
-            if (ScheduleEditVm.IsEdit)
+            catch (OperationCanceledException)
             {
-                var savedBlock = ScheduleEditVm.Blocks.FirstOrDefault();
-                if (savedBlock != null)
-                {
-                    // Перетягуємо актуальну detailed-модель і показуємо у ScheduleProfile
-                    var detailed = await _scheduleService.GetDetailedAsync(savedBlock.Model.Id, ct);
-                    if (detailed != null)
-                    {
-                        var employees = detailed.Employees?.ToList() ?? new List<ScheduleEmployeeModel>();
-                        var slots = detailed.Slots?.ToList() ?? new List<ScheduleSlotModel>();
-                        var cellStyles = detailed.CellStyles?.ToList() ?? new List<ScheduleCellStyleModel>();
-
-                        await ScheduleProfileVm.SetProfileAsync(detailed, employees, slots, cellStyles, ct);
-
-                        // синхронізуємо selection у списку schedule
-                        ProfileVm.ScheduleListVm.SelectedItem =
-                            ProfileVm.ScheduleListVm.Items.FirstOrDefault(x => x.Model.Id == detailed.Id);
-                    }
-                }
-
-                ScheduleCancelTarget = ContainerSection.Profile;
-                await SwitchToScheduleProfileAsync();
+                await HideSaveStatusAsync().ConfigureAwait(false);
+                return;
+            }
+            catch (Exception ex)
+            {
+                await HideSaveStatusAsync().ConfigureAwait(false);
+                ShowError(ex);
                 return;
             }
 
-            // Якщо це “Add mode” — повертаємось у Profile контейнера
-            await SwitchToProfileAsync();
+            // локальна helper-функція (як було в тебе)
+            static string NormalizeHHmm(string value)
+            {
+                if (TimeSpan.TryParse(value, out var ts))
+                    return ts.ToString(@"hh\:mm");
+                return value;
+            }
         }
 
         // =========================================================
@@ -491,6 +514,43 @@ namespace WPFApp.ViewModel.Container.Edit
                 await ScheduleEditVm.RefreshScheduleMatrixAsync(ct).ConfigureAwait(false);
             }
         }
+
+        // ===================== Save UI status helpers (ScheduleEdit) =====================
+
+        private CancellationTokenSource? _saveUiCts;
+
+        private CancellationToken ResetSaveUiCts(CancellationToken outer)
+        {
+            _saveUiCts?.Cancel();
+            _saveUiCts?.Dispose();
+            _saveUiCts = CancellationTokenSource.CreateLinkedTokenSource(outer);
+            return _saveUiCts.Token;
+        }
+
+        private Task ShowSaveWorkingAsync()
+            => RunOnUiThreadAsync(() =>
+            {
+                ScheduleEditVm.SaveStatus = UIStatusKind.Working;
+                ScheduleEditVm.IsSaveStatusVisible = true;
+            });
+
+        private Task HideSaveStatusAsync()
+            => RunOnUiThreadAsync(() => ScheduleEditVm.IsSaveStatusVisible = false);
+
+        private async Task ShowSaveSuccessThenAutoHideAsync(CancellationToken ct, int ms = 1400)
+        {
+            await RunOnUiThreadAsync(() =>
+            {
+                ScheduleEditVm.SaveStatus = UIStatusKind.Success;
+                ScheduleEditVm.IsSaveStatusVisible = true;
+            }).ConfigureAwait(false);
+
+            try { await Task.Delay(ms, ct).ConfigureAwait(false); }
+            catch (OperationCanceledException) { return; }
+
+            await HideSaveStatusAsync().ConfigureAwait(false);
+        }
+
 
         // =========================================================
         // 4) VALIDATION + NORMALIZATION HELPERS (без дублювання)

@@ -16,6 +16,8 @@ using WPFApp.Infrastructure.ScheduleMatrix;
 using WPFApp.Service;
 using WPFApp.ViewModel.Container.Edit;
 using WPFApp.ViewModel.Container.ScheduleEdit.Helpers;
+using WPFApp.View.Dialogs;
+
 
 namespace WPFApp.ViewModel.Container.ScheduleProfile
 {
@@ -97,6 +99,7 @@ namespace WPFApp.ViewModel.Container.ScheduleProfile
         /// Якщо користувач швидко перемикає профілі — попередній build скасовуємо.
         /// </summary>
         private CancellationTokenSource? _matrixCts;
+
 
         /// <summary>
         /// Версія білду для stale-guard:
@@ -239,6 +242,23 @@ namespace WPFApp.ViewModel.Container.ScheduleProfile
             private set => SetProperty(ref _totalEmployeesListText, value);
         }
 
+        private bool _isExportStatusVisible;
+        public bool IsExportStatusVisible
+        {
+            get => _isExportStatusVisible;
+            private set => SetProperty(ref _isExportStatusVisible, value);
+        }
+
+        private UIStatusKind _exportStatus = UIStatusKind.Success;
+        public UIStatusKind ExportStatus
+        {
+            get => _exportStatus;
+            private set => SetProperty(ref _exportStatus, value);
+        }
+
+        private CancellationTokenSource? _exportUiCts;
+
+
         /// <summary>
         /// Employees — працівники в цьому schedule (може біндитися в UI).
         /// </summary>
@@ -354,9 +374,11 @@ namespace WPFApp.ViewModel.Container.ScheduleProfile
             // Унікальна версія білду для stale-guard
             var version = Interlocked.Increment(ref _matrixVersion);
 
-            // ---------- 2) Швидке оновлення базових полів на UI-thread ----------
-            await _owner.RunOnUiThreadAsync(() =>
+                // ---------- 2) Швидке оновлення базових полів на UI-thread ----------
+                await _owner.RunOnUiThreadAsync(() =>
             {
+                IsExportStatusVisible = false;
+                ExportStatus = UIStatusKind.Success;
                 // Базові поля профілю
                 _currentSchedule = schedule;
                 _scheduleEmployees = employeesSnapshot;
@@ -398,7 +420,7 @@ namespace WPFApp.ViewModel.Container.ScheduleProfile
                 MatrixChanged?.Invoke(this, EventArgs.Empty);
             }).ConfigureAwait(false);
 
-            try
+                try
             {
                 // ---------- 3) Snapshot (захист від зміни колекцій ззовні під час Task.Run) ----------
                 var year = schedule.Year;
@@ -523,6 +545,7 @@ namespace WPFApp.ViewModel.Container.ScheduleProfile
             {
                 // Норма: користувач переключив профіль, білд скасований
             }
+
         }
 
         /// <summary>
@@ -559,6 +582,9 @@ namespace WPFApp.ViewModel.Container.ScheduleProfile
             if (dialog.ShowDialog() != true)
                 return;
 
+            var uiToken = ResetExportUiCts(ct);
+            await ShowExportWorkingAsync().ConfigureAwait(false);
+
             var context = new ScheduleExportContext(
                 scheduleName: ScheduleName,
                 scheduleMonth: ScheduleMonth,
@@ -579,11 +605,21 @@ namespace WPFApp.ViewModel.Container.ScheduleProfile
 
             try
             {
-                await _owner.ExportScheduleToExcelAsync(context, dialog.FileName, ct).ConfigureAwait(false);
-                _owner.ShowInfo($"Excel export saved to:{Environment.NewLine}{dialog.FileName}");
+                await _owner.ExportScheduleToExcelAsync(context, dialog.FileName, uiToken).ConfigureAwait(false);
+
+                // toast: Successfully (1.4s) then hide
+                await ShowExportSuccessThenAutoHideAsync(uiToken, milliseconds: 1400).ConfigureAwait(false);
+
+                // якщо не хочеш MessageBox/Info — прибери цей рядок
+                // _owner.ShowInfo($"Excel export saved to:{Environment.NewLine}{dialog.FileName}");
+            }
+            catch (OperationCanceledException)
+            {
+                await HideExportStatusAsync().ConfigureAwait(false);
             }
             catch (Exception ex)
             {
+                await HideExportStatusAsync().ConfigureAwait(false);
                 _owner.ShowError(ex);
             }
         }
@@ -608,10 +644,13 @@ namespace WPFApp.ViewModel.Container.ScheduleProfile
             if (dialog.ShowDialog() != true)
                 return;
 
+            var uiToken = ResetExportUiCts(ct);
+            await ShowExportWorkingAsync().ConfigureAwait(false);
+
             try
             {
                 var availabilityData = await _owner
-                    .LoadAvailabilityGroupExportDataAsync(_currentSchedule.AvailabilityGroupId, ct)
+                    .LoadAvailabilityGroupExportDataAsync(_currentSchedule.AvailabilityGroupId, uiToken)
                     .ConfigureAwait(false);
 
                 var context = new ScheduleSqlExportContext(
@@ -621,11 +660,19 @@ namespace WPFApp.ViewModel.Container.ScheduleProfile
                     cellStyles: _scheduleCellStyles,
                     availabilityGroupData: availabilityData);
 
-                await _owner.ExportScheduleToSqlAsync(context, dialog.FileName, ct).ConfigureAwait(false);
-                _owner.ShowInfo($"SQLite export saved to:{Environment.NewLine}{dialog.FileName}");
+                await _owner.ExportScheduleToSqlAsync(context, dialog.FileName, uiToken).ConfigureAwait(false);
+
+                await ShowExportSuccessThenAutoHideAsync(uiToken, milliseconds: 1400).ConfigureAwait(false);
+
+                // _owner.ShowInfo($"SQLite export saved to:{Environment.NewLine}{dialog.FileName}");
+            }
+            catch (OperationCanceledException)
+            {
+                await HideExportStatusAsync().ConfigureAwait(false);
             }
             catch (Exception ex)
             {
+                await HideExportStatusAsync().ConfigureAwait(false);
                 _owner.ShowError(ex);
             }
         }
@@ -1219,6 +1266,49 @@ namespace WPFApp.ViewModel.Container.ScheduleProfile
                 ? $"{text}, +{remaining} more"
                 : text;
         }
+
+        private CancellationToken ResetExportUiCts(CancellationToken outer)
+        {
+            _exportUiCts?.Cancel();
+            _exportUiCts?.Dispose();
+            _exportUiCts = CancellationTokenSource.CreateLinkedTokenSource(outer);
+            return _exportUiCts.Token;
+        }
+
+        private Task ShowExportWorkingAsync()
+        {
+            return _owner.RunOnUiThreadAsync(() =>
+            {
+                ExportStatus = UIStatusKind.Working;
+                IsExportStatusVisible = true;
+            });
+        }
+
+        private Task HideExportStatusAsync()
+        {
+            return _owner.RunOnUiThreadAsync(() => IsExportStatusVisible = false);
+        }
+
+        private async Task ShowExportSuccessThenAutoHideAsync(CancellationToken ct, int milliseconds = 1400)
+        {
+            await _owner.RunOnUiThreadAsync(() =>
+            {
+                ExportStatus = UIStatusKind.Success;
+                IsExportStatusVisible = true;
+            }).ConfigureAwait(false);
+
+            try
+            {
+                await Task.Delay(milliseconds, ct).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException)
+            {
+                return;
+            }
+
+            await HideExportStatusAsync().ConfigureAwait(false);
+        }
+
 
         /// <summary>
         /// Дістає FirstName/LastName (або варіанти назв) з будь-якого об’єкта.

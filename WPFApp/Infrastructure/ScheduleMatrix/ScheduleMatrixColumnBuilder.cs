@@ -12,34 +12,29 @@ namespace WPFApp.Infrastructure.ScheduleMatrix
     {
         public static void BuildScheduleMatrixColumns(DataTable? table, DataGrid grid, bool isReadOnly)
         {
-            if (table is null)
-            {
-                grid.ItemsSource = null;
-                grid.Columns.Clear();
-                return;
-            }
-
-            grid.ItemsSource = table.DefaultView;
+            // НЕ чіпаємо ItemsSource — він має лишатись у XAML binding!
             grid.AutoGenerateColumns = false;
             grid.Columns.Clear();
             grid.FrozenColumnCount = 1;
 
+            if (table is null)
+                return;
+
             var dayColName = ContainerScheduleEditViewModel.DayColumnName;
             var conflictColName = ContainerScheduleEditViewModel.ConflictColumnName;
-
-            // ✅ додай
             var weekendColName = ContainerScheduleEditViewModel.WeekendColumnName;
 
             var tbStyle = (Style)Application.Current.FindResource("MatrixCellTextBlockStyle");
             var editStyle = isReadOnly
                 ? null
                 : (Style)Application.Current.FindResource("MatrixCellTextBoxStyle");
+
             var dangerBrush = (System.Windows.Media.Brush)Application.Current.FindResource("DangerBrush");
             var boolToVis = new BooleanToVisibilityConverter();
 
             foreach (DataColumn column in table.Columns)
             {
-                // ✅ було: if (column.ColumnName == conflictColName) continue;
+                // приховуємо технічні колонки
                 if (column.ColumnName == conflictColName || column.ColumnName == weekendColName)
                     continue;
 
@@ -70,12 +65,6 @@ namespace WPFApp.Infrastructure.ScheduleMatrix
                     dot.SetValue(FrameworkElement.HorizontalAlignmentProperty, HorizontalAlignment.Left);
                     dot.SetValue(FrameworkElement.VerticalAlignmentProperty, VerticalAlignment.Center);
                     dot.SetValue(FrameworkElement.MarginProperty, new Thickness(4, 0, 0, 0));
-                    dot.SetBinding(UIElement.VisibilityProperty, new Binding($"[{conflictColName}]")
-                    {
-                        Converter = boolToVis
-                    });
-                    dot.SetValue(UIElement.VisibilityProperty, Visibility.Collapsed);
-
                     dot.SetBinding(UIElement.VisibilityProperty, new Binding($"[{conflictColName}]")
                     {
                         Converter = boolToVis,
@@ -112,7 +101,6 @@ namespace WPFApp.Infrastructure.ScheduleMatrix
 
                 grid.Columns.Add(col);
             }
-
         }
     }
 }

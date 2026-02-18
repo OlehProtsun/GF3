@@ -19,6 +19,8 @@ using System.Windows.Media;
 using WPFApp.ViewModel.Container.Edit;
 using WPFApp.ViewModel.Container.List;
 using WPFApp.ViewModel.Container.ScheduleList;
+using WPFApp.View.Dialogs;
+
 
 namespace WPFApp.ViewModel.Container.Profile
 {
@@ -27,6 +29,24 @@ namespace WPFApp.ViewModel.Container.Profile
         private readonly ContainerViewModel _owner;
 
         // ===================== Profile fields =====================
+
+        private bool _isExportStatusVisible;
+        public bool IsExportStatusVisible
+        {
+            get => _isExportStatusVisible;
+            private set => SetProperty(ref _isExportStatusVisible, value);
+        }
+
+        private UIStatusKind _exportStatus = UIStatusKind.Success;
+        public UIStatusKind ExportStatus
+        {
+            get => _exportStatus;
+            private set => SetProperty(ref _exportStatus, value);
+        }
+
+        private CancellationTokenSource? _exportUiCts;
+
+
         private int _containerId;
         public int ContainerId
         {
@@ -217,6 +237,9 @@ namespace WPFApp.ViewModel.Container.Profile
 
         public void SetProfile(ContainerModel model)
         {
+            IsExportStatusVisible = false;
+            ExportStatus = UIStatusKind.Success;
+
             _currentContainer = model;
             ContainerId = model.Id;
             Name = model.Name;
@@ -533,6 +556,38 @@ namespace WPFApp.ViewModel.Container.Profile
             }
         }
 
+        private CancellationToken ResetExportUiCts(CancellationToken outer)
+        {
+            _exportUiCts?.Cancel();
+            _exportUiCts?.Dispose();
+            _exportUiCts = CancellationTokenSource.CreateLinkedTokenSource(outer);
+            return _exportUiCts.Token;
+        }
+
+        private Task ShowExportWorkingAsync()
+            => _owner.RunOnUiThreadAsync(() =>
+            {
+                ExportStatus = UIStatusKind.Working;
+                IsExportStatusVisible = true;
+            });
+
+        private Task HideExportStatusAsync()
+            => _owner.RunOnUiThreadAsync(() => IsExportStatusVisible = false);
+
+        private async Task ShowExportSuccessThenAutoHideAsync(CancellationToken ct, int ms = 1400)
+        {
+            await _owner.RunOnUiThreadAsync(() =>
+            {
+                ExportStatus = UIStatusKind.Success;
+                IsExportStatusVisible = true;
+            }).ConfigureAwait(false);
+
+            try { await Task.Delay(ms, ct).ConfigureAwait(false); }
+            catch (OperationCanceledException) { return; }
+
+            await HideExportStatusAsync().ConfigureAwait(false);
+        }
+
         /// <summary>
         /// Основна “корисна” функція: бере всі schedules, що зараз в ScheduleListVm.Items,
         /// підтягує employees/slots (через делегати або з об’єктів),
@@ -628,13 +683,6 @@ namespace WPFApp.ViewModel.Container.Profile
                 return;
             }
 
-            var chartData = await BuildChartExportDataAsync(ct).ConfigureAwait(false);
-            if (chartData.Count == 0)
-            {
-                _owner.ShowError("No charts were found in this container.");
-                return;
-            }
-
             var dialog = new SaveFileDialog
             {
                 Title = "Export Container to Excel",
@@ -645,27 +693,49 @@ namespace WPFApp.ViewModel.Container.Profile
             if (dialog.ShowDialog() != true)
                 return;
 
-            var context = new ContainerExcelExportContext(
-                containerId: ContainerId,
-                containerName: Name,
-                containerNote: Note ?? string.Empty,
-                totalEmployees: TotalEmployees,
-                totalShops: TotalShops,
-                totalEmployeesListText: TotalEmployeesListText,
-                totalShopsListText: TotalShopsListText,
-                totalHoursText: TotalHoursText,
-                shopHeaders: ShopHeaders.ToList(),
-                employeeShopHoursRows: EmployeeShopHoursRows.ToList(),
-                employeeWorkFreeStats: EmployeeWorkFreeStats.ToList(),
-                charts: chartData.Select(x => x.Excel).ToList());
+            var uiToken = ResetExportUiCts(ct);
+            await ShowExportWorkingAsync().ConfigureAwait(false);
 
             try
             {
-                await _owner.ExportContainerToExcelAsync(context, dialog.FileName, ct).ConfigureAwait(false);
-                _owner.ShowInfo($"Excel export saved to:{Environment.NewLine}{dialog.FileName}");
+                // важке завантаження даних контейнера — тепер під Working
+                var chartData = await BuildChartExportDataAsync(uiToken).ConfigureAwait(false);
+                if (chartData.Count == 0)
+                {
+                    await HideExportStatusAsync().ConfigureAwait(false);
+                    _owner.ShowError("No charts were found in this container.");
+                    return;
+                }
+
+                var context = new ContainerExcelExportContext(
+                    containerId: ContainerId,
+                    containerName: Name,
+                    containerNote: Note ?? string.Empty,
+                    totalEmployees: TotalEmployees,
+                    totalShops: TotalShops,
+                    totalEmployeesListText: TotalEmployeesListText,
+                    totalShopsListText: TotalShopsListText,
+                    totalHoursText: TotalHoursText,
+                    shopHeaders: ShopHeaders.ToList(),
+                    employeeShopHoursRows: EmployeeShopHoursRows.ToList(),
+                    employeeWorkFreeStats: EmployeeWorkFreeStats.ToList(),
+                    charts: chartData.Select(x => x.Excel).ToList());
+
+                await _owner.ExportContainerToExcelAsync(context, dialog.FileName, uiToken).ConfigureAwait(false);
+
+                // Success toast + auto hide
+                await ShowExportSuccessThenAutoHideAsync(uiToken, 1400).ConfigureAwait(false);
+
+                // якщо хочеш ще й MessageBox — розкоментуй:
+                // _owner.ShowInfo($"Excel export saved to:{Environment.NewLine}{dialog.FileName}");
+            }
+            catch (OperationCanceledException)
+            {
+                await HideExportStatusAsync().ConfigureAwait(false);
             }
             catch (Exception ex)
             {
+                await HideExportStatusAsync().ConfigureAwait(false);
                 _owner.ShowError(ex);
             }
         }
@@ -675,13 +745,6 @@ namespace WPFApp.ViewModel.Container.Profile
             if (_currentContainer is null)
             {
                 _owner.ShowError("No container is selected for export.");
-                return;
-            }
-
-            var chartData = await BuildChartExportDataAsync(ct).ConfigureAwait(false);
-            if (chartData.Count == 0)
-            {
-                _owner.ShowError("No charts were found in this container.");
                 return;
             }
 
@@ -695,17 +758,36 @@ namespace WPFApp.ViewModel.Container.Profile
             if (dialog.ShowDialog() != true)
                 return;
 
-            var context = new ContainerSqlExportContext(
-                container: _currentContainer,
-                charts: chartData.Select(x => x.Sql).ToList());
+            var uiToken = ResetExportUiCts(ct);
+            await ShowExportWorkingAsync().ConfigureAwait(false);
 
             try
             {
-                await _owner.ExportContainerToSqlAsync(context, dialog.FileName, ct).ConfigureAwait(false);
-                _owner.ShowInfo($"SQLite export saved to:{Environment.NewLine}{dialog.FileName}");
+                var chartData = await BuildChartExportDataAsync(uiToken).ConfigureAwait(false);
+                if (chartData.Count == 0)
+                {
+                    await HideExportStatusAsync().ConfigureAwait(false);
+                    _owner.ShowError("No charts were found in this container.");
+                    return;
+                }
+
+                var context = new ContainerSqlExportContext(
+                    container: _currentContainer,
+                    charts: chartData.Select(x => x.Sql).ToList());
+
+                await _owner.ExportContainerToSqlAsync(context, dialog.FileName, uiToken).ConfigureAwait(false);
+
+                await ShowExportSuccessThenAutoHideAsync(uiToken, 1400).ConfigureAwait(false);
+
+                // _owner.ShowInfo($"SQLite export saved to:{Environment.NewLine}{dialog.FileName}");
+            }
+            catch (OperationCanceledException)
+            {
+                await HideExportStatusAsync().ConfigureAwait(false);
             }
             catch (Exception ex)
             {
+                await HideExportStatusAsync().ConfigureAwait(false);
                 _owner.ShowError(ex);
             }
         }
