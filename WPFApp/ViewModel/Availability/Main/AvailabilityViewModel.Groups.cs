@@ -225,27 +225,31 @@ namespace WPFApp.ViewModel.Availability.Main
             if (!Confirm($"Delete '{current.Name}' ?"))
                 return;
 
+            var uiToken = ResetNavUiCts(ct);
+
+            await ShowNavWorkingAsync();
+            await Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+
             try
             {
-                // 3) Delete через сервіс.
-                await _availabilityService.DeleteAsync(current.Id, ct);
+                await _availabilityService.DeleteAsync(current.Id, uiToken);
+
+                _databaseChangeNotifier.NotifyDatabaseChanged("Availability.Delete");
+                await LoadAllGroupsAsync(uiToken);
+                await SwitchToListAsync();
+
+                await Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+                await ShowNavSuccessThenAutoHideAsync(uiToken, 900);
+            }
+            catch (OperationCanceledException)
+            {
+                await HideNavStatusAsync();
             }
             catch (Exception ex)
             {
-                // 4) Помилка — показуємо.
+                await HideNavStatusAsync();
                 ShowError(ex);
-                return;
             }
-
-            // 5) Info.
-            ShowInfo("Availability Group deleted successfully.");
-
-            _databaseChangeNotifier.NotifyDatabaseChanged("Availability.Delete");
-            // 6) Reload list.
-            await LoadAllGroupsAsync(ct);
-
-            // 7) Повертаємось у List.
-            await SwitchToListAsync();
         }
 
         internal async Task OpenProfileAsync(CancellationToken ct = default)

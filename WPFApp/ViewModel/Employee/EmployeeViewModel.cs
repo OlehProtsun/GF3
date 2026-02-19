@@ -382,21 +382,31 @@ namespace WPFApp.ViewModel.Employee
                 return;
             }
 
+            var uiToken = ResetNavUiCts(ct);
+
+            await ShowNavWorkingAsync();
+            await Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+
             try
             {
-                await _employeeService.DeleteAsync(currentId, ct);
+                await _employeeService.DeleteAsync(currentId, uiToken);
+
+                _databaseChangeNotifier.NotifyDatabaseChanged("Employee.Delete");
+                await LoadEmployeesAsync(uiToken, selectId: null);
+                await SwitchToListAsync();
+
+                await Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+                await ShowNavSuccessThenAutoHideAsync(uiToken, 900);
+            }
+            catch (OperationCanceledException)
+            {
+                await HideNavStatusAsync();
             }
             catch (Exception ex)
             {
+                await HideNavStatusAsync();
                 ShowError(ex);
-                return;
             }
-
-            ShowInfo("Employee deleted successfully.");
-
-            _databaseChangeNotifier.NotifyDatabaseChanged("Employee.Delete");
-            await LoadEmployeesAsync(ct, selectId: null);
-            await SwitchToListAsync();
         }
 
         internal async Task OpenProfileAsync(CancellationToken ct = default)

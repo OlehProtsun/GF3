@@ -410,12 +410,30 @@ namespace WPFApp.ViewModel.Container.Edit
             if (!Confirm($"Delete schedule {schedule.Name}?"))
                 return;
 
-            await _scheduleService.DeleteAsync(schedule.Id, ct);
-            _databaseChangeNotifier.NotifyDatabaseChanged("Container.ScheduleDelete");
-            await LoadSchedulesAsync(schedule.ContainerId, search: null, ct);
+            var uiToken = ResetNavUiCts(ct);
 
-            ShowInfo("Schedule deleted successfully.");
-            await SwitchToProfileAsync();
+            await ShowNavWorkingAsync();
+            await Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+
+            try
+            {
+                await _scheduleService.DeleteAsync(schedule.Id, uiToken);
+                _databaseChangeNotifier.NotifyDatabaseChanged("Container.ScheduleDelete");
+                await LoadSchedulesAsync(schedule.ContainerId, search: null, uiToken);
+                await SwitchToProfileAsync();
+
+                await Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+                await ShowNavSuccessThenAutoHideAsync(uiToken, 900);
+            }
+            catch (OperationCanceledException)
+            {
+                await HideNavStatusAsync();
+            }
+            catch (Exception ex)
+            {
+                await HideNavStatusAsync();
+                ShowError(ex);
+            }
         }
     }
 }

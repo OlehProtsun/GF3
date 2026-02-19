@@ -273,21 +273,31 @@ namespace WPFApp.ViewModel.Container.Edit
                 return;
             }
 
+            var uiToken = ResetNavUiCts(ct);
+
+            await ShowNavWorkingAsync();
+            await Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+
             try
             {
-                await _containerService.DeleteAsync(currentId, ct);
+                await _containerService.DeleteAsync(currentId, uiToken);
+
+                _databaseChangeNotifier.NotifyDatabaseChanged("Container.Delete");
+                await LoadContainersAsync(uiToken, selectId: null);
+                await SwitchToListAsync();
+
+                await Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+                await ShowNavSuccessThenAutoHideAsync(uiToken, 900);
+            }
+            catch (OperationCanceledException)
+            {
+                await HideNavStatusAsync();
             }
             catch (Exception ex)
             {
+                await HideNavStatusAsync();
                 ShowError(ex);
-                return;
             }
-
-            ShowInfo("Container deleted successfully.");
-
-            _databaseChangeNotifier.NotifyDatabaseChanged("Container.Delete");
-            await LoadContainersAsync(ct, selectId: null);
-            await SwitchToListAsync();
         }
 
         /// <summary>
