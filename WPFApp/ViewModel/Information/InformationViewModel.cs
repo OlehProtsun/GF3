@@ -1,3 +1,4 @@
+using WPFApp.Infrastructure;
 using WPFApp.ViewModel;
 
 namespace WPFApp.ViewModel.Information

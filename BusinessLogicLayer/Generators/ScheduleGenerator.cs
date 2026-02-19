@@ -1,5 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Globalization;
+using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using DataAccessLayer.Models;
@@ -16,7 +18,11 @@ namespace BusinessLogicLayer.Generators
             public int Index { get; init; }             // 1 => Shift1, 2 => Shift2
             public string From { get; init; } = null!;  // "HH:mm"
             public string To { get; init; } = null!;    // "HH:mm"
-            public double Hours { get; init; }          // duration in hours
+
+            public int StartMin { get; init; }          // minutes from midnight
+            public int EndMin { get; init; }            // minutes from midnight
+
+            public double Hours { get; init; }          // duration in hours (template)
         }
 
         public Task<IList<ScheduleSlotModel>> GenerateAsync(
@@ -53,6 +59,9 @@ namespace BusinessLogicLayer.Generators
             var shiftCount = shifts.Count;                 // 1 or 2
             var pps = schedule.PeoplePerShift;
 
+            var sh1 = shifts[0];
+            var sh2 = shiftCount >= 2 ? shifts[1] : null;
+
             // 1) Unique employees (stable) + MinHoursMonth
             var idToIndex = new Dictionary<int, int>(capacity: 256);
             var employeeIds = new List<int>(capacity: 256);
@@ -85,8 +94,18 @@ namespace BusinessLogicLayer.Generators
             var minHours = minHoursTmp.ToArray();
             var stride = daysInMonth + 1; // for [emp * stride + day]
 
-            // 2) Unavailable matrix: unavailable[day*n + emp] = true only if AvailabilityKind.NONE
+            // 2) Availability matrices
+            //    - unavailable[day*n + emp] = true only when AvailabilityKind.NONE or empty window
+            //    - availStartMin / availEndMin describe daily window (minutes from midnight)
             var unavailable = new bool[(daysInMonth + 1) * n];
+            var availStartMin = new int[(daysInMonth + 1) * n];
+            var availEndMin = new int[(daysInMonth + 1) * n];
+
+            for (var i = 0; i < availStartMin.Length; i++)
+            {
+                availStartMin[i] = 0;
+                availEndMin[i] = 24 * 60;
+            }
 
             foreach (var g in availabilities)
             {
@@ -109,9 +128,36 @@ namespace BusinessLogicLayer.Generators
                         var day = d.DayOfMonth;
                         if (day < 1 || day > daysInMonth) continue;
 
-                        // only NONE blocks
+                        var idx = day * n + empIdx;
+
+                        // NONE blocks completely
                         if (d.Kind == AvailabilityKind.NONE)
-                            unavailable[day * n + empIdx] = true;
+                        {
+                            unavailable[idx] = true;
+                            availStartMin[idx] = 24 * 60;
+                            availEndMin[idx] = 0;
+                            continue;
+                        }
+
+                        // Optional: time window inside a day (e.g. 15:30-24:00)
+                        if (TryReadAvailabilityWindow(d, out var fromMin, out var toMin))
+                        {
+                            fromMin = Clamp(fromMin, 0, 24 * 60);
+                            toMin = Clamp(toMin, 0, 24 * 60);
+                            if (toMin < fromMin)
+                                (fromMin, toMin) = (toMin, fromMin);
+
+                            // intersection
+                            if (fromMin > availStartMin[idx]) availStartMin[idx] = fromMin;
+                            if (toMin < availEndMin[idx]) availEndMin[idx] = toMin;
+
+                            if (availEndMin[idx] <= availStartMin[idx])
+                            {
+                                unavailable[idx] = true;
+                                availStartMin[idx] = 24 * 60;
+                                availEndMin[idx] = 0;
+                            }
+                        }
                     }
                 }
             }
@@ -146,6 +192,13 @@ namespace BusinessLogicLayer.Generators
             var totalSlots = daysInMonth * shiftCount * pps;
             var assigned = new int[totalSlots];
             Array.Fill(assigned, -1);
+
+            // Per-slot actual timing and hours (hours == 0 when UNFURNISHED)
+            var slotFromMin = new int[totalSlots];
+            var slotToMin = new int[totalSlots];
+            var slotHours = new double[totalSlots];
+            InitSlotBaseTimes(daysInMonth, shiftCount, pps, shifts, slotFromMin, slotToMin);
+            // slotHours default is 0 for all
 
             // Stats used by both phases:
             var totalHours = new double[n];
@@ -185,11 +238,10 @@ namespace BusinessLogicLayer.Generators
                 {
                     stamp = NextStamp(assignedStamp, stamp);
 
-                    // mark already assigned in this shift (none initially, but keep consistent)
+                    // mark already assigned in this shift
                     PremarkAssignedInShift(assigned, day, s, pps, shiftCount, assignedStamp, stamp);
 
-                    var sh = shifts[s];
-                    var preferNoSecondShift = (shiftCount >= 2 && sh.Index == 2);
+                    var preferNoSecondShift = (shiftCount >= 2 && shifts[s].Index == 2);
 
                     for (var slot = 0; slot < pps; slot++)
                     {
@@ -199,7 +251,8 @@ namespace BusinessLogicLayer.Generators
                         var chosen = PickCandidatePhase1Fast(
                             availableToday,
                             day,
-                            sh.Hours,
+                            s,
+                            slot,
                             preferNoSecondShift,
                             schedule,
                             minHours,
@@ -212,6 +265,15 @@ namespace BusinessLogicLayer.Generators
                             lastFullDay,
                             consecutiveFullDays,
                             shiftCount,
+                            assigned,
+                            slotFromMin,
+                            slotToMin,
+                            slotHours,
+                            availStartMin,
+                            availEndMin,
+                            shifts,
+                            n,
+                            pps,
                             assignedStamp,
                             stamp,
                             rrCursor);
@@ -219,9 +281,13 @@ namespace BusinessLogicLayer.Generators
                         if (chosen >= 0)
                         {
                             rrCursor = (chosen + 1) % n;
+
                             AssignPhase1Fast(
-                                day, s, slot, chosen, sh.Hours,
+                                day, s, slot, chosen,
                                 assigned,
+                                slotFromMin, slotToMin, slotHours,
+                                availStartMin, availEndMin,
+                                shifts,
                                 totalHours,
                                 shiftsPerDay,
                                 fullDaysCount,
@@ -233,6 +299,7 @@ namespace BusinessLogicLayer.Generators
                                 shiftCount,
                                 stride,
                                 pps,
+                                n,
                                 assignedStamp,
                                 stamp);
                         }
@@ -249,17 +316,48 @@ namespace BusinessLogicLayer.Generators
             progress?.Report(75);
 
             FillAllUnfurnishedOrderIndependent(
-                schedule, shifts, availableByDay, unavailable,
-                assigned, totalHours, shiftsPerDay, fullDaysCount,
-                daysInMonth, shiftCount, pps, stride, scarcityDays,
-                ref rrCursor, ct);
+                schedule,
+                shifts,
+                availableByDay,
+                unavailable,
+                availStartMin,
+                availEndMin,
+                assigned,
+                slotFromMin,
+                slotToMin,
+                slotHours,
+                totalHours,
+                shiftsPerDay,
+                fullDaysCount,
+                daysInMonth,
+                shiftCount,
+                pps,
+                stride,
+                scarcityDays,
+                ref rrCursor,
+                ct);
 
             progress?.Report(85);
 
             StrictMinHoursRepairMinConflicts(
-                schedule, shifts, unavailable, minHours,
-                assigned, totalHours, shiftsPerDay, fullDaysCount,
-                daysInMonth, shiftCount, pps, stride,
+                schedule,
+                shifts,
+                unavailable,
+                availStartMin,
+                availEndMin,
+                minHours,
+                assigned,
+                slotFromMin,
+                slotToMin,
+                slotHours,
+                totalHours,
+                shiftsPerDay,
+                fullDaysCount,
+                daysInMonth,
+                shiftCount,
+                pps,
+                stride,
+                n,
                 ct);
 
             progress?.Report(100);
@@ -276,14 +374,15 @@ namespace BusinessLogicLayer.Generators
 
                     for (var slotNo = 1; slotNo <= pps; slotNo++)
                     {
-                        var empIdx = assigned[basePos + (slotNo - 1)];
+                        var pos = basePos + (slotNo - 1);
+                        var empIdx = assigned[pos];
 
                         var slotModel = new ScheduleSlotModel
                         {
                             DayOfMonth = day,
                             SlotNo = slotNo,
-                            FromTime = sh.From,
-                            ToTime = sh.To,
+                            FromTime = empIdx >= 0 ? MinutesToHHmm(slotFromMin[pos]) : sh.From,
+                            ToTime = empIdx >= 0 ? MinutesToHHmm(slotToMin[pos]) : sh.To,
                             Status = empIdx >= 0 ? SlotStatus.ASSIGNED : SlotStatus.UNFURNISHED
                         };
 
@@ -306,7 +405,12 @@ namespace BusinessLogicLayer.Generators
             List<ShiftTemplate> shifts,
             int[][] availableByDay,
             bool[] unavailable,
+            int[] availStartMin,
+            int[] availEndMin,
             int[] assigned,
+            int[] slotFromMin,
+            int[] slotToMin,
+            double[] slotHours,
             double[] totalHours,
             int[] shiftsPerDay,
             int[] fullDaysCount,
@@ -338,8 +442,7 @@ namespace BusinessLogicLayer.Generators
                     stamp = NextStamp(assignedStamp, stamp);
                     PremarkAssignedInShift(assigned, day, s, pps, shiftCount, assignedStamp, stamp);
 
-                    var sh = shifts[s];
-                    var preferNoSecondShift = (shiftCount >= 2 && sh.Index == 2);
+                    var preferNoSecondShift = (shiftCount >= 2 && shifts[s].Index == 2);
 
                     var basePos = SlotBase(day, s, pps, shiftCount);
 
@@ -352,11 +455,17 @@ namespace BusinessLogicLayer.Generators
                         var chosen = FindBestOrderIndependent(
                             availableToday,
                             day,
-                            sh.Hours,
-                            preferNoSecondShift,
+                            s,
+                            slot,
+                            restrictSecondShift: preferNoSecondShift,
                             schedule,
                             unavailable,
+                            availStartMin,
+                            availEndMin,
                             assigned,
+                            slotFromMin,
+                            slotToMin,
+                            slotHours,
                             totalHours,
                             shiftsPerDay,
                             fullDaysCount,
@@ -365,6 +474,8 @@ namespace BusinessLogicLayer.Generators
                             pps,
                             stride,
                             scarcityDays,
+                            shifts,
+                            n,
                             assignedStamp,
                             stamp,
                             rrCursor);
@@ -374,11 +485,17 @@ namespace BusinessLogicLayer.Generators
                             chosen = FindBestOrderIndependent(
                                 availableToday,
                                 day,
-                                sh.Hours,
+                                s,
+                                slot,
                                 restrictSecondShift: false,
                                 schedule,
                                 unavailable,
+                                availStartMin,
+                                availEndMin,
                                 assigned,
+                                slotFromMin,
+                                slotToMin,
+                                slotHours,
                                 totalHours,
                                 shiftsPerDay,
                                 fullDaysCount,
@@ -387,6 +504,8 @@ namespace BusinessLogicLayer.Generators
                                 pps,
                                 stride,
                                 scarcityDays,
+                                shifts,
+                                n,
                                 assignedStamp,
                                 stamp,
                                 rrCursor);
@@ -395,9 +514,20 @@ namespace BusinessLogicLayer.Generators
                         if (chosen >= 0)
                         {
                             rrCursor = (chosen + 1) % n;
-                            AssignToEmptySlot(day, s, slot, chosen, sh.Hours,
-                                assigned, totalHours, shiftsPerDay, fullDaysCount,
-                                shiftCount, stride, pps);
+
+                            AssignToEmptySlot(day, s, slot, chosen,
+                                assigned,
+                                slotFromMin, slotToMin, slotHours,
+                                availStartMin, availEndMin,
+                                shifts,
+                                totalHours,
+                                shiftsPerDay,
+                                fullDaysCount,
+                                shiftCount,
+                                stride,
+                                pps,
+                                n);
+
                             assignedStamp[chosen] = stamp;
                         }
                     }
@@ -408,11 +538,17 @@ namespace BusinessLogicLayer.Generators
         private static int FindBestOrderIndependent(
             int[] availableToday,
             int day,
-            double shiftHours,
+            int shiftIdx,
+            int slotIdx,
             bool restrictSecondShift,
             ScheduleModel schedule,
             bool[] unavailable,
+            int[] availStartMin,
+            int[] availEndMin,
             int[] assigned,
+            int[] slotFromMin,
+            int[] slotToMin,
+            double[] slotHours,
             double[] totalHours,
             int[] shiftsPerDay,
             int[] fullDaysCount,
@@ -421,12 +557,12 @@ namespace BusinessLogicLayer.Generators
             int pps,
             int stride,
             int[] scarcityDays,
+            List<ShiftTemplate> shifts,
+            int n,
             int[] assignedStamp,
             int stamp,
             int rrCursor)
         {
-            var n = totalHours.Length;
-
             var best = -1;
             var bestNeed = -1.0;
             var bestTotal = double.MaxValue;
@@ -451,24 +587,52 @@ namespace BusinessLogicLayer.Generators
                 if (restrictSecondShift && cur != 0)
                     continue;
 
-                if (IsEmployeeInShift(assigned, day, /*shiftIdx*/ 0, /*ignored*/ 0, /*ignored*/ 0, emp))
+                if (IsEmployeeInShift(assigned, day, shiftIdx, pps, shiftCount, emp))
+                    continue;
+
+                if (!TryPredictAssignmentImpact(
+                        day,
+                        shiftIdx,
+                        slotIdx,
+                        emp,
+                        assigned,
+                        slotFromMin,
+                        slotToMin,
+                        slotHours,
+                        availStartMin,
+                        availEndMin,
+                        shifts,
+                        n,
+                        pps,
+                        shiftCount,
+                        out var empHours,
+                        out var pairedEmp,
+                        out var pairedDelta))
+                    continue;
+
+                if (empHours <= EPS)
+                    continue;
+
+                // max hours for candidate and paired (if boundary extension increases paired hours)
+                if (schedule.MaxHoursPerEmpMonth > 0)
                 {
-                    // This overload isn't used; real check below with shiftIdx+pps+shiftCount
+                    if (totalHours[emp] + empHours > schedule.MaxHoursPerEmpMonth + EPS)
+                        continue;
+
+                    if (pairedEmp >= 0 && pairedDelta > EPS)
+                    {
+                        if (totalHours[pairedEmp] + pairedDelta > schedule.MaxHoursPerEmpMonth + EPS)
+                            continue;
+                    }
                 }
 
-                // must not already be in THIS shift (we rely on assignedStamp + premark, but keep safe)
-                // The caller already premarked existing employees in shift into assignedStamp.
-                // So this is redundant but harmless.
-
                 if (!CanAddShiftOrderIndependent(
-                        schedule, emp, day, shiftHours,
+                        schedule, emp, day, empHours,
                         totalHours, shiftsPerDay, fullDaysCount,
                         daysInMonth, shiftCount, stride))
                     continue;
 
-                // need = how much under MinHoursMonth (we don't have minHours here in phase2A),
-                // so phase2A is purely fairness-based (hours + full days + scarcity + RR).
-                // (MinHours strict handled in phase2B)
+                // phase2A is purely fairness-based (hours + full days + scarcity + RR).
                 var need = 0.0;
 
                 var total = totalHours[emp];
@@ -504,8 +668,13 @@ namespace BusinessLogicLayer.Generators
             ScheduleModel schedule,
             List<ShiftTemplate> shifts,
             bool[] unavailable,
+            int[] availStartMin,
+            int[] availEndMin,
             double[] minHours,
             int[] assigned,
+            int[] slotFromMin,
+            int[] slotToMin,
+            double[] slotHours,
             double[] totalHours,
             int[] shiftsPerDay,
             int[] fullDaysCount,
@@ -513,10 +682,9 @@ namespace BusinessLogicLayer.Generators
             int shiftCount,
             int pps,
             int stride,
+            int n,
             CancellationToken ct)
         {
-            var n = totalHours.Length;
-
             // list deficits
             var deficit = new List<int>(n);
             for (var i = 0; i < n; i++)
@@ -546,9 +714,6 @@ namespace BusinessLogicLayer.Generators
                     if (minHours[emp] - totalHours[emp] <= EPS)
                         continue;
 
-                    // While deficit exists, attempt:
-                    // 1) Take UNFURNISHED slot (reduces conflicts)
-                    // 2) If none, swap with donor (donor must keep >= its MinHours)
                     while (minHours[emp] - totalHours[emp] > EPS)
                     {
                         ct.ThrowIfCancellationRequested();
@@ -603,31 +768,65 @@ namespace BusinessLogicLayer.Generators
                         if (IsEmployeeInShift(assigned, day, s, pps, shiftCount, emp))
                             continue;
 
-                        var sh = shifts[s];
-
-                        if (!CanAddShiftOrderIndependent(
-                                schedule, emp, day, sh.Hours,
-                                totalHours, shiftsPerDay, fullDaysCount,
-                                daysInMonth, shiftCount, stride))
-                            continue;
-
-                        var basePos = SlotBase(day, s, pps, shiftCount);
-
                         for (var slot = 0; slot < pps; slot++)
                         {
-                            if (assigned[basePos + slot] >= 0)
+                            var pos = SlotIndex(day, s, slot, pps, shiftCount);
+                            if (assigned[pos] >= 0)
                                 continue; // not empty
 
+                            if (!TryPredictAssignmentImpact(
+                                    day,
+                                    s,
+                                    slot,
+                                    emp,
+                                    assigned,
+                                    slotFromMin,
+                                    slotToMin,
+                                    slotHours,
+                                    availStartMin,
+                                    availEndMin,
+                                    shifts,
+                                    n,
+                                    pps,
+                                    shiftCount,
+                                    out var empHours,
+                                    out var pairedEmp,
+                                    out var pairedDelta))
+                                continue;
+
+                            if (empHours <= EPS)
+                                continue;
+
+                            // max hours for candidate and paired
+                            if (schedule.MaxHoursPerEmpMonth > 0)
+                            {
+                                if (totalHours[emp] + empHours > schedule.MaxHoursPerEmpMonth + EPS)
+                                    continue;
+
+                                if (pairedEmp >= 0 && pairedDelta > EPS)
+                                {
+                                    if (totalHours[pairedEmp] + pairedDelta > schedule.MaxHoursPerEmpMonth + EPS)
+                                        continue;
+                                }
+                            }
+
+                            if (!CanAddShiftOrderIndependent(
+                                    schedule, emp, day, empHours,
+                                    totalHours, shiftsPerDay, fullDaysCount,
+                                    daysInMonth, shiftCount, stride))
+                                continue;
+
                             var createsFull = (shiftCount >= 2 && cur == 1); // would make day full (1->2)
+
                             // prefer: not creating full day, then longer hours
                             if (bestDay < 0
                                 || (!createsFull && bestCreatesFull)
-                                || (createsFull == bestCreatesFull && sh.Hours > bestHours + EPS))
+                                || (createsFull == bestCreatesFull && empHours > bestHours + EPS))
                             {
                                 bestDay = day;
                                 bestShift = s;
                                 bestSlot = slot;
-                                bestHours = sh.Hours;
+                                bestHours = empHours;
                                 bestCreatesFull = createsFull;
                             }
                         }
@@ -637,9 +836,18 @@ namespace BusinessLogicLayer.Generators
                 if (bestDay < 0)
                     return false;
 
-                AssignToEmptySlot(bestDay, bestShift, bestSlot, emp, bestHours,
-                    assigned, totalHours, shiftsPerDay, fullDaysCount,
-                    shiftCount, stride, pps);
+                AssignToEmptySlot(bestDay, bestShift, bestSlot, emp,
+                    assigned,
+                    slotFromMin, slotToMin, slotHours,
+                    availStartMin, availEndMin,
+                    shifts,
+                    totalHours,
+                    shiftsPerDay,
+                    fullDaysCount,
+                    shiftCount,
+                    stride,
+                    pps,
+                    n);
 
                 return true;
             }
@@ -649,7 +857,7 @@ namespace BusinessLogicLayer.Generators
                 var bestDay = -1;
                 var bestShift = -1;
                 var bestSlot = -1;
-                var bestHours = 0.0;
+                var bestReceiverHours = 0.0;
                 var bestDonor = -1;
                 var bestDonorSurplus = -1.0;
                 var bestCreatesFull = true;
@@ -671,42 +879,72 @@ namespace BusinessLogicLayer.Generators
                         if (IsEmployeeInShift(assigned, day, s, pps, shiftCount, emp))
                             continue;
 
-                        var sh = shifts[s];
-
-                        if (!CanAddShiftOrderIndependent(
-                                schedule, emp, day, sh.Hours,
-                                totalHours, shiftsPerDay, fullDaysCount,
-                                daysInMonth, shiftCount, stride))
-                            continue;
-
-                        var basePos = SlotBase(day, s, pps, shiftCount);
-
                         for (var slot = 0; slot < pps; slot++)
                         {
-                            var donor = assigned[basePos + slot];
+                            var pos = SlotIndex(day, s, slot, pps, shiftCount);
+                            var donor = assigned[pos];
                             if (donor < 0) continue;
                             if (donor == emp) continue;
 
-                            // donor must remain >= its MinHours after giving away this shift
-                            if (totalHours[donor] - sh.Hours < minHours[donor] - EPS)
+                            // donor must remain >= its MinHours after giving away this slot (using ACTUAL hours)
+                            var donorRemovedHours = slotHours[pos];
+                            if (totalHours[donor] - donorRemovedHours < minHours[donor] - EPS)
+                                continue;
+
+                            if (!TryPredictAssignmentImpact(
+                                    day,
+                                    s,
+                                    slot,
+                                    emp,
+                                    assigned,
+                                    slotFromMin,
+                                    slotToMin,
+                                    slotHours,
+                                    availStartMin,
+                                    availEndMin,
+                                    shifts,
+                                    n,
+                                    pps,
+                                    shiftCount,
+                                    out var empHours,
+                                    out var pairedEmp,
+                                    out var pairedDelta))
+                                continue;
+
+                            if (empHours <= EPS)
+                                continue;
+
+                            // max hours for receiver and paired
+                            if (schedule.MaxHoursPerEmpMonth > 0)
+                            {
+                                if (totalHours[emp] + empHours > schedule.MaxHoursPerEmpMonth + EPS)
+                                    continue;
+
+                                if (pairedEmp >= 0 && pairedDelta > EPS)
+                                {
+                                    if (totalHours[pairedEmp] + pairedDelta > schedule.MaxHoursPerEmpMonth + EPS)
+                                        continue;
+                                }
+                            }
+
+                            if (!CanAddShiftOrderIndependent(
+                                    schedule, emp, day, empHours,
+                                    totalHours, shiftsPerDay, fullDaysCount,
+                                    daysInMonth, shiftCount, stride))
                                 continue;
 
                             var donorSurplus = totalHours[donor] - minHours[donor];
                             var createsFull = (shiftCount >= 2 && cur == 1);
 
-                            // prioritize:
-                            // 1) donor with largest surplus (safe)
-                            // 2) avoid creating full day if possible
-                            // 3) longer shift hours
                             if (bestDay < 0
                                 || donorSurplus > bestDonorSurplus + EPS
                                 || (Math.Abs(donorSurplus - bestDonorSurplus) <= EPS && (!createsFull && bestCreatesFull))
-                                || (Math.Abs(donorSurplus - bestDonorSurplus) <= EPS && createsFull == bestCreatesFull && sh.Hours > bestHours + EPS))
+                                || (Math.Abs(donorSurplus - bestDonorSurplus) <= EPS && createsFull == bestCreatesFull && empHours > bestReceiverHours + EPS))
                             {
                                 bestDay = day;
                                 bestShift = s;
                                 bestSlot = slot;
-                                bestHours = sh.Hours;
+                                bestReceiverHours = empHours;
                                 bestDonor = donor;
                                 bestDonorSurplus = donorSurplus;
                                 bestCreatesFull = createsFull;
@@ -718,9 +956,18 @@ namespace BusinessLogicLayer.Generators
                 if (bestDay < 0 || bestDonor < 0)
                     return false;
 
-                SwapSlot(bestDay, bestShift, bestSlot, bestDonor, emp, bestHours,
-                    assigned, totalHours, shiftsPerDay, fullDaysCount,
-                    pps, shiftCount, stride);
+                SwapSlot(bestDay, bestShift, bestSlot, bestDonor, emp,
+                    assigned,
+                    slotFromMin, slotToMin, slotHours,
+                    availStartMin, availEndMin,
+                    shifts,
+                    totalHours,
+                    shiftsPerDay,
+                    fullDaysCount,
+                    pps,
+                    shiftCount,
+                    stride,
+                    n);
 
                 return true;
             }
@@ -733,7 +980,7 @@ namespace BusinessLogicLayer.Generators
             ScheduleModel schedule,
             int emp,
             int day,
-            double shiftHours,
+            double addedHours,
             double[] totalHours,
             int[] shiftsPerDay,
             int[] fullDaysCount,
@@ -744,7 +991,7 @@ namespace BusinessLogicLayer.Generators
             // Max hours per month
             if (schedule.MaxHoursPerEmpMonth > 0)
             {
-                if (totalHours[emp] + shiftHours > schedule.MaxHoursPerEmpMonth + EPS)
+                if (totalHours[emp] + addedHours > schedule.MaxHoursPerEmpMonth + EPS)
                     return false;
             }
 
@@ -811,7 +1058,8 @@ namespace BusinessLogicLayer.Generators
         private static int PickCandidatePhase1Fast(
             int[] availableToday,
             int day,
-            double shiftHours,
+            int shiftIdx,
+            int slotIdx,
             bool preferNoSecondShift,
             ScheduleModel schedule,
             double[] minHours,
@@ -824,19 +1072,48 @@ namespace BusinessLogicLayer.Generators
             int[] lastFullDay,
             int[] consecutiveFullDays,
             int shiftCount,
+            int[] assigned,
+            int[] slotFromMin,
+            int[] slotToMin,
+            double[] slotHours,
+            int[] availStartMin,
+            int[] availEndMin,
+            List<ShiftTemplate> shifts,
+            int n,
+            int pps,
             int[] assignedStamp,
             int stamp,
             int rrCursor)
         {
             var best = FindBestPhase1Fast(
-                availableToday, day, shiftHours,
+                availableToday,
+                day,
+                shiftIdx,
+                slotIdx,
                 restrictSecondShift: preferNoSecondShift,
-                schedule, minHours, scarcityDays,
-                totalHours, fullDaysCount,
-                shiftsToday, lastWorkedDay, consecutiveDays,
-                lastFullDay, consecutiveFullDays,
+                schedule,
+                minHours,
+                scarcityDays,
+                totalHours,
+                fullDaysCount,
+                shiftsToday,
+                lastWorkedDay,
+                consecutiveDays,
+                lastFullDay,
+                consecutiveFullDays,
                 shiftCount,
-                assignedStamp, stamp, rrCursor);
+                assigned,
+                slotFromMin,
+                slotToMin,
+                slotHours,
+                availStartMin,
+                availEndMin,
+                shifts,
+                n,
+                pps,
+                assignedStamp,
+                stamp,
+                rrCursor);
 
             if (best >= 0)
                 return best;
@@ -844,14 +1121,34 @@ namespace BusinessLogicLayer.Generators
             if (preferNoSecondShift)
             {
                 best = FindBestPhase1Fast(
-                    availableToday, day, shiftHours,
+                    availableToday,
+                    day,
+                    shiftIdx,
+                    slotIdx,
                     restrictSecondShift: false,
-                    schedule, minHours, scarcityDays,
-                    totalHours, fullDaysCount,
-                    shiftsToday, lastWorkedDay, consecutiveDays,
-                    lastFullDay, consecutiveFullDays,
+                    schedule,
+                    minHours,
+                    scarcityDays,
+                    totalHours,
+                    fullDaysCount,
+                    shiftsToday,
+                    lastWorkedDay,
+                    consecutiveDays,
+                    lastFullDay,
+                    consecutiveFullDays,
                     shiftCount,
-                    assignedStamp, stamp, rrCursor);
+                    assigned,
+                    slotFromMin,
+                    slotToMin,
+                    slotHours,
+                    availStartMin,
+                    availEndMin,
+                    shifts,
+                    n,
+                    pps,
+                    assignedStamp,
+                    stamp,
+                    rrCursor);
             }
 
             return best;
@@ -860,7 +1157,8 @@ namespace BusinessLogicLayer.Generators
         private static int FindBestPhase1Fast(
             int[] availableToday,
             int day,
-            double shiftHours,
+            int shiftIdx,
+            int slotIdx,
             bool restrictSecondShift,
             ScheduleModel schedule,
             double[] minHours,
@@ -873,12 +1171,19 @@ namespace BusinessLogicLayer.Generators
             int[] lastFullDay,
             int[] consecutiveFullDays,
             int shiftCount,
+            int[] assigned,
+            int[] slotFromMin,
+            int[] slotToMin,
+            double[] slotHours,
+            int[] availStartMin,
+            int[] availEndMin,
+            List<ShiftTemplate> shifts,
+            int n,
+            int pps,
             int[] assignedStamp,
             int stamp,
             int rrCursor)
         {
-            var n = totalHours.Length;
-
             var best = -1;
             var bestNeed = -1.0;
             var bestTotal = double.MaxValue;
@@ -900,12 +1205,54 @@ namespace BusinessLogicLayer.Generators
                 if (restrictSecondShift && st != 0)
                     continue;
 
+                if (!TryPredictAssignmentImpact(
+                        day,
+                        shiftIdx,
+                        slotIdx,
+                        emp,
+                        assigned,
+                        slotFromMin,
+                        slotToMin,
+                        slotHours,
+                        availStartMin,
+                        availEndMin,
+                        shifts,
+                        n,
+                        pps,
+                        shiftCount,
+                        out var empHours,
+                        out var pairedEmp,
+                        out var pairedDelta))
+                    continue;
+
+                if (empHours <= EPS)
+                    continue;
+
+                // max hours for candidate and paired
+                if (schedule.MaxHoursPerEmpMonth > 0)
+                {
+                    if (totalHours[emp] + empHours > schedule.MaxHoursPerEmpMonth + EPS)
+                        continue;
+
+                    if (pairedEmp >= 0 && pairedDelta > EPS)
+                    {
+                        if (totalHours[pairedEmp] + pairedDelta > schedule.MaxHoursPerEmpMonth + EPS)
+                            continue;
+                    }
+                }
+
                 if (!CanAssignPhase1Fast(
-                        emp, day, shiftHours, st,
+                        emp,
+                        day,
+                        empHours,
+                        st,
                         schedule,
-                        totalHours, fullDaysCount,
-                        lastWorkedDay, consecutiveDays,
-                        lastFullDay, consecutiveFullDays,
+                        totalHours,
+                        fullDaysCount,
+                        lastWorkedDay,
+                        consecutiveDays,
+                        lastFullDay,
+                        consecutiveFullDays,
                         shiftCount))
                     continue;
 
@@ -941,7 +1288,7 @@ namespace BusinessLogicLayer.Generators
         private static bool CanAssignPhase1Fast(
             int emp,
             int day,
-            double shiftHours,
+            double addedHours,
             int shiftsAlreadyToday,
             ScheduleModel schedule,
             double[] totalHours,
@@ -955,7 +1302,7 @@ namespace BusinessLogicLayer.Generators
             // Max hours
             if (schedule.MaxHoursPerEmpMonth > 0)
             {
-                if (totalHours[emp] + shiftHours > schedule.MaxHoursPerEmpMonth + EPS)
+                if (totalHours[emp] + addedHours > schedule.MaxHoursPerEmpMonth + EPS)
                     return false;
             }
 
@@ -990,8 +1337,13 @@ namespace BusinessLogicLayer.Generators
             int shiftIdx,
             int slotIdx,
             int emp,
-            double shiftHours,
             int[] assigned,
+            int[] slotFromMin,
+            int[] slotToMin,
+            double[] slotHours,
+            int[] availStartMin,
+            int[] availEndMin,
+            List<ShiftTemplate> shifts,
             double[] totalHours,
             int[] shiftsPerDay,
             int[] fullDaysCount,
@@ -1003,6 +1355,7 @@ namespace BusinessLogicLayer.Generators
             int shiftCount,
             int stride,
             int pps,
+            int n,
             int[] assignedStamp,
             int stamp)
         {
@@ -1012,7 +1365,7 @@ namespace BusinessLogicLayer.Generators
             assigned[pos] = emp;
             assignedStamp[emp] = stamp;
 
-            totalHours[emp] += shiftHours;
+            // We'll recompute hours from slotHours[pos] (currently 0) -> actual.
 
             var prevToday = shiftsToday[emp];
             var newToday = prevToday + 1;
@@ -1039,6 +1392,20 @@ namespace BusinessLogicLayer.Generators
 
                 lastFullDay[emp] = day;
             }
+
+            // Apply timing and hour deltas (also adjusts paired shift if needed)
+            RecomputeAfterChange(day, shiftIdx, slotIdx,
+                assigned,
+                slotFromMin,
+                slotToMin,
+                slotHours,
+                availStartMin,
+                availEndMin,
+                shifts,
+                totalHours,
+                n,
+                pps,
+                shiftCount);
         }
 
         // =========================
@@ -1049,20 +1416,25 @@ namespace BusinessLogicLayer.Generators
             int shiftIdx,
             int slotIdx,
             int emp,
-            double shiftHours,
             int[] assigned,
+            int[] slotFromMin,
+            int[] slotToMin,
+            double[] slotHours,
+            int[] availStartMin,
+            int[] availEndMin,
+            List<ShiftTemplate> shifts,
             double[] totalHours,
             int[] shiftsPerDay,
             int[] fullDaysCount,
             int shiftCount,
             int stride,
-            int pps)
+            int pps,
+            int n)
         {
             var pos = SlotIndex(day, shiftIdx, slotIdx, pps, shiftCount);
             if (assigned[pos] >= 0) return;
 
             assigned[pos] = emp;
-            totalHours[emp] += shiftHours;
 
             var p = emp * stride + day;
             var before = shiftsPerDay[p];
@@ -1071,6 +1443,19 @@ namespace BusinessLogicLayer.Generators
 
             if (shiftCount >= 2 && before == 1 && after == 2)
                 fullDaysCount[emp] += 1;
+
+            RecomputeAfterChange(day, shiftIdx, slotIdx,
+                assigned,
+                slotFromMin,
+                slotToMin,
+                slotHours,
+                availStartMin,
+                availEndMin,
+                shifts,
+                totalHours,
+                n,
+                pps,
+                shiftCount);
         }
 
         private static void SwapSlot(
@@ -1079,21 +1464,30 @@ namespace BusinessLogicLayer.Generators
             int slotIdx,
             int donor,
             int receiver,
-            double shiftHours,
             int[] assigned,
+            int[] slotFromMin,
+            int[] slotToMin,
+            double[] slotHours,
+            int[] availStartMin,
+            int[] availEndMin,
+            List<ShiftTemplate> shifts,
             double[] totalHours,
             int[] shiftsPerDay,
             int[] fullDaysCount,
             int pps,
             int shiftCount,
-            int stride)
+            int stride,
+            int n)
         {
             var pos = SlotIndex(day, shiftIdx, slotIdx, pps, shiftCount);
             if (assigned[pos] != donor)
                 return;
 
-            // remove donor
-            totalHours[donor] -= shiftHours;
+            // remove donor hours
+            totalHours[donor] -= slotHours[pos];
+            slotHours[pos] = 0;
+
+            // update donor day counts
             var dPos = donor * stride + day;
             var dBefore = shiftsPerDay[dPos];
             var dAfter = dBefore - 1;
@@ -1102,10 +1496,10 @@ namespace BusinessLogicLayer.Generators
             if (shiftCount >= 2 && dBefore == 2 && dAfter == 1)
                 fullDaysCount[donor] -= 1;
 
-            // add receiver
+            // set receiver
             assigned[pos] = receiver;
 
-            totalHours[receiver] += shiftHours;
+            // update receiver day counts
             var rPos = receiver * stride + day;
             var rBefore = shiftsPerDay[rPos];
             var rAfter = rBefore + 1;
@@ -1113,6 +1507,322 @@ namespace BusinessLogicLayer.Generators
 
             if (shiftCount >= 2 && rBefore == 1 && rAfter == 2)
                 fullDaysCount[receiver] += 1;
+
+            RecomputeAfterChange(day, shiftIdx, slotIdx,
+                assigned,
+                slotFromMin,
+                slotToMin,
+                slotHours,
+                availStartMin,
+                availEndMin,
+                shifts,
+                totalHours,
+                n,
+                pps,
+                shiftCount);
+        }
+
+        // =========================
+        // Time-aware prediction + recompute
+        // =========================
+        private static bool TryPredictAssignmentImpact(
+            int day,
+            int shiftIdx,
+            int slotIdx,
+            int candidateEmp,
+            int[] assigned,
+            int[] slotFromMin,
+            int[] slotToMin,
+            double[] slotHours,
+            int[] availStartMin,
+            int[] availEndMin,
+            List<ShiftTemplate> shifts,
+            int n,
+            int pps,
+            int shiftCount,
+            out double candidateHours,
+            out int pairedEmp,
+            out double pairedDelta)
+        {
+            candidateHours = 0;
+            pairedEmp = -1;
+            pairedDelta = 0;
+
+            if (candidateEmp < 0) return false;
+
+            var idx = day * n + candidateEmp;
+            var aStart = availStartMin[idx];
+            var aEnd = availEndMin[idx];
+            if (aEnd <= aStart)
+                return false;
+
+            if (shiftCount <= 1)
+            {
+                var sh = shifts[0];
+                var from = Math.Max(sh.StartMin, aStart);
+                var to = Math.Min(sh.EndMin, aEnd);
+                if (to <= from) return false;
+                candidateHours = (to - from) / 60d;
+                pairedEmp = -1;
+                pairedDelta = 0;
+                return true;
+            }
+
+            var sh1 = shifts[0];
+            var sh2 = shifts[1];
+            var pos1 = SlotIndex(day, 0, slotIdx, pps, shiftCount);
+            var pos2 = SlotIndex(day, 1, slotIdx, pps, shiftCount);
+
+            if (shiftIdx == 0)
+            {
+                // Assigning to shift1. If shift2 already assigned in this slot, shift1 must reach shift2 actual start.
+                var emp2 = assigned[pos2];
+                var boundary = sh1.EndMin;
+                if (emp2 >= 0)
+                {
+                    // shift2 actual start already computed as slotFromMin[pos2]
+                    boundary = Math.Max(boundary, slotFromMin[pos2]);
+                }
+
+                var from = Math.Max(sh1.StartMin, aStart);
+                var to = Math.Min(boundary, aEnd);
+                if (to <= from) return false;
+
+                // Also, if shift2 exists and is assigned, ensure continuity (shift1 must be able to reach boundary)
+                if (emp2 >= 0 && aEnd < boundary)
+                    return false;
+
+                candidateHours = (to - from) / 60d;
+                pairedEmp = -1;
+                pairedDelta = 0;
+                return true;
+            }
+
+            // Assigning to shift2.
+            var boundary2 = Math.Max(sh2.StartMin, aStart); // shift2 starts no earlier than template
+            var to2 = Math.Min(sh2.EndMin, aEnd);
+            if (to2 <= boundary2) return false;
+
+            candidateHours = (to2 - boundary2) / 60d;
+
+            var emp1 = assigned[pos1];
+            if (emp1 >= 0)
+            {
+                // shift1 must be able to extend until boundary2
+                var idx1 = day * n + emp1;
+                var a1Start = availStartMin[idx1];
+                var a1End = availEndMin[idx1];
+                if (a1End < boundary2)
+                    return false;
+
+                var from1 = Math.Max(sh1.StartMin, a1Start);
+                if (boundary2 <= from1)
+                    return false;
+
+                var newH1 = (boundary2 - from1) / 60d;
+                pairedEmp = emp1;
+                pairedDelta = newH1 - slotHours[pos1];
+            }
+
+            return true;
+        }
+
+        private static void RecomputeAfterChange(
+            int day,
+            int shiftIdx,
+            int slotIdx,
+            int[] assigned,
+            int[] slotFromMin,
+            int[] slotToMin,
+            double[] slotHours,
+            int[] availStartMin,
+            int[] availEndMin,
+            List<ShiftTemplate> shifts,
+            double[] totalHours,
+            int n,
+            int pps,
+            int shiftCount)
+        {
+            if (shiftCount <= 1)
+            {
+                RecomputeSingleShiftSlot(day, slotIdx,
+                    assigned,
+                    slotFromMin,
+                    slotToMin,
+                    slotHours,
+                    availStartMin,
+                    availEndMin,
+                    shifts[0],
+                    totalHours,
+                    n,
+                    pps);
+                return;
+            }
+
+            // two shifts: recompute pair for this slot index
+            RecomputeTwoShiftPair(day, slotIdx,
+                assigned,
+                slotFromMin,
+                slotToMin,
+                slotHours,
+                availStartMin,
+                availEndMin,
+                shifts[0],
+                shifts[1],
+                totalHours,
+                n,
+                pps,
+                shiftCount);
+        }
+
+        private static void RecomputeSingleShiftSlot(
+            int day,
+            int slotIdx,
+            int[] assigned,
+            int[] slotFromMin,
+            int[] slotToMin,
+            double[] slotHours,
+            int[] availStartMin,
+            int[] availEndMin,
+            ShiftTemplate sh,
+            double[] totalHours,
+            int n,
+            int pps)
+        {
+            var pos = SlotIndex(day, 0, slotIdx, pps, 1);
+            var emp = assigned[pos];
+
+            // base times (for output when assigned)
+            var baseFrom = sh.StartMin;
+            var baseTo = sh.EndMin;
+
+            if (emp < 0)
+            {
+                slotFromMin[pos] = baseFrom;
+                slotToMin[pos] = baseTo;
+                slotHours[pos] = 0;
+                return;
+            }
+
+            var idx = day * n + emp;
+            var aStart = availStartMin[idx];
+            var aEnd = availEndMin[idx];
+
+            var from = Math.Max(baseFrom, aStart);
+            var to = Math.Min(baseTo, aEnd);
+            var newH = to > from ? (to - from) / 60d : 0;
+
+            totalHours[emp] += newH - slotHours[pos];
+
+            slotFromMin[pos] = from;
+            slotToMin[pos] = to;
+            slotHours[pos] = newH;
+        }
+
+        private static void RecomputeTwoShiftPair(
+            int day,
+            int slotIdx,
+            int[] assigned,
+            int[] slotFromMin,
+            int[] slotToMin,
+            double[] slotHours,
+            int[] availStartMin,
+            int[] availEndMin,
+            ShiftTemplate sh1,
+            ShiftTemplate sh2,
+            double[] totalHours,
+            int n,
+            int pps,
+            int shiftCount)
+        {
+            var pos1 = SlotIndex(day, 0, slotIdx, pps, shiftCount);
+            var pos2 = SlotIndex(day, 1, slotIdx, pps, shiftCount);
+
+            var emp1 = assigned[pos1];
+            var emp2 = assigned[pos2];
+
+            // default template times
+            slotFromMin[pos1] = sh1.StartMin;
+            slotToMin[pos1] = sh1.EndMin;
+            slotFromMin[pos2] = sh2.StartMin;
+            slotToMin[pos2] = sh2.EndMin;
+
+            // If empty: hours = 0
+            if (emp1 < 0) slotHours[pos1] = 0;
+            if (emp2 < 0) slotHours[pos2] = 0;
+
+            // Only shift1 assigned
+            if (emp1 >= 0 && emp2 < 0)
+            {
+                var idx1 = day * n + emp1;
+                var a1Start = availStartMin[idx1];
+                var a1End = availEndMin[idx1];
+
+                var from1 = Math.Max(sh1.StartMin, a1Start);
+                var to1 = Math.Min(sh1.EndMin, a1End);
+                var h1 = to1 > from1 ? (to1 - from1) / 60d : 0;
+
+                totalHours[emp1] += h1 - slotHours[pos1];
+                slotFromMin[pos1] = from1;
+                slotToMin[pos1] = to1;
+                slotHours[pos1] = h1;
+                return;
+            }
+
+            // Only shift2 assigned
+            if (emp2 >= 0 && emp1 < 0)
+            {
+                var idx2 = day * n + emp2;
+                var a2Start = availStartMin[idx2];
+                var a2End = availEndMin[idx2];
+
+                var from2 = Math.Max(sh2.StartMin, a2Start);
+                var to2 = Math.Min(sh2.EndMin, a2End);
+                var h2 = to2 > from2 ? (to2 - from2) / 60d : 0;
+
+                totalHours[emp2] += h2 - slotHours[pos2];
+                slotFromMin[pos2] = from2;
+                slotToMin[pos2] = to2;
+                slotHours[pos2] = h2;
+                return;
+            }
+
+            if (emp1 < 0 && emp2 < 0)
+                return;
+
+            // Both assigned: enforce continuity by moving the boundary to shift2 actual start (>= template)
+            var idxEmp1 = day * n + emp1;
+            var a1Start2 = availStartMin[idxEmp1];
+            var a1End2 = availEndMin[idxEmp1];
+
+            var idxEmp2 = day * n + emp2;
+            var a2Start2 = availStartMin[idxEmp2];
+            var a2End2 = availEndMin[idxEmp2];
+
+            // shift2 actual start
+            var boundary = Math.Max(sh2.StartMin, a2Start2);
+
+            // If shift1 cannot reach boundary (due to availability), best-effort: cap at their end.
+            // Candidate selection tries to avoid this situation.
+            var from1b = Math.Max(sh1.StartMin, a1Start2);
+            var to1b = Math.Min(boundary, a1End2);
+
+            var from2b = boundary;
+            var to2b = Math.Min(sh2.EndMin, a2End2);
+
+            var h1b = to1b > from1b ? (to1b - from1b) / 60d : 0;
+            var h2b = to2b > from2b ? (to2b - from2b) / 60d : 0;
+
+            totalHours[emp1] += h1b - slotHours[pos1];
+            totalHours[emp2] += h2b - slotHours[pos2];
+
+            slotFromMin[pos1] = from1b;
+            slotToMin[pos1] = to1b;
+            slotHours[pos1] = h1b;
+
+            slotFromMin[pos2] = from2b;
+            slotToMin[pos2] = to2b;
+            slotHours[pos2] = h2b;
         }
 
         // =========================
@@ -1167,6 +1877,30 @@ namespace BusinessLogicLayer.Generators
         private static int SlotIndex(int day, int shiftIdx, int slotIdx, int pps, int shiftCount)
             => SlotBase(day, shiftIdx, pps, shiftCount) + slotIdx;
 
+        private static void InitSlotBaseTimes(
+            int daysInMonth,
+            int shiftCount,
+            int pps,
+            List<ShiftTemplate> shifts,
+            int[] slotFromMin,
+            int[] slotToMin)
+        {
+            for (var day = 1; day <= daysInMonth; day++)
+            {
+                for (var s = 0; s < shiftCount; s++)
+                {
+                    var sh = shifts[s];
+                    var basePos = SlotBase(day, s, pps, shiftCount);
+                    for (var slot = 0; slot < pps; slot++)
+                    {
+                        var pos = basePos + slot;
+                        slotFromMin[pos] = sh.StartMin;
+                        slotToMin[pos] = sh.EndMin;
+                    }
+                }
+            }
+        }
+
         // =========================
         // MinHours parsing
         // =========================
@@ -1213,8 +1947,8 @@ namespace BusinessLogicLayer.Generators
                 throw new InvalidOperationException(
                     $"Invalid shift format '{shiftText}'. Expected 'HH:mm-HH:mm' or 'HH:mm - HH:mm'.");
 
-            if (!TimeSpan.TryParse(parts[0], out var start) ||
-                !TimeSpan.TryParse(parts[1], out var end))
+            if (!TimeSpan.TryParse(parts[0], CultureInfo.InvariantCulture, out var start) ||
+                !TimeSpan.TryParse(parts[1], CultureInfo.InvariantCulture, out var end))
                 throw new InvalidOperationException(
                     $"Invalid shift time '{shiftText}'. Cannot parse start/end as time.");
 
@@ -1227,10 +1961,190 @@ namespace BusinessLogicLayer.Generators
                 Index = index,
                 From = start.ToString(@"hh\:mm"),
                 To = end.ToString(@"hh\:mm"),
+                StartMin = (int)start.TotalMinutes,
+                EndMin = (int)end.TotalMinutes,
                 Hours = (end - start).TotalHours
             };
 
             return true;
         }
+
+        // =========================
+        // Availability window parsing (reflection-based)
+        // =========================
+        private static bool TryReadAvailabilityWindow(object dayModel, out int fromMin, out int toMin)
+        {
+            fromMin = 0;
+            toMin = 24 * 60;
+
+            // Common property names (string "HH:mm", TimeSpan, numeric)
+            var hasFrom = TryReadTime(dayModel,
+                new[] { "FromTime", "StartTime", "From", "Start", "AvailableFrom", "TimeFrom" },
+                out var fm);
+
+            var hasTo = TryReadTime(dayModel,
+                new[] { "ToTime", "EndTime", "To", "End", "AvailableTo", "TimeTo" },
+                out var tm);
+
+            // Also support pairs like FromHour/FromMinute etc.
+            if (!hasFrom)
+                hasFrom = TryReadHourMinute(dayModel,
+                    new[] { "FromHour", "StartHour" },
+                    new[] { "FromMinute", "StartMinute" },
+                    out fm);
+
+            if (!hasTo)
+                hasTo = TryReadHourMinute(dayModel,
+                    new[] { "ToHour", "EndHour" },
+                    new[] { "ToMinute", "EndMinute" },
+                    out tm);
+
+            if (!hasFrom && !hasTo)
+                return false;
+
+            if (hasFrom) fromMin = fm;
+            if (hasTo) toMin = tm;
+
+            return true;
+        }
+
+        private static bool TryReadTime(object obj, string[] names, out int minutes)
+        {
+            minutes = 0;
+            var t = obj.GetType();
+
+            foreach (var name in names)
+            {
+                var p = t.GetProperty(name, BindingFlags.Instance | BindingFlags.Public | BindingFlags.IgnoreCase);
+                if (p is null) continue;
+
+                var v = p.GetValue(obj);
+                if (v is null) continue;
+
+                if (TryConvertToMinutes(v, out minutes))
+                    return true;
+            }
+
+            return false;
+        }
+
+        private static bool TryReadHourMinute(object obj, string[] hourNames, string[] minuteNames, out int minutes)
+        {
+            minutes = 0;
+            var t = obj.GetType();
+
+            int? h = null;
+            int? m = null;
+
+            foreach (var hn in hourNames)
+            {
+                var p = t.GetProperty(hn, BindingFlags.Instance | BindingFlags.Public | BindingFlags.IgnoreCase);
+                if (p is null) continue;
+                var v = p.GetValue(obj);
+                if (v is null) continue;
+                if (TryToInt(v, out var hi)) { h = hi; break; }
+            }
+
+            foreach (var mn in minuteNames)
+            {
+                var p = t.GetProperty(mn, BindingFlags.Instance | BindingFlags.Public | BindingFlags.IgnoreCase);
+                if (p is null) continue;
+                var v = p.GetValue(obj);
+                if (v is null) continue;
+                if (TryToInt(v, out var mi)) { m = mi; break; }
+            }
+
+            if (h is null && m is null)
+                return false;
+
+            var hh = h ?? 0;
+            var mm = m ?? 0;
+            minutes = Clamp(hh, 0, 23) * 60 + Clamp(mm, 0, 59);
+            return true;
+        }
+
+        private static bool TryConvertToMinutes(object value, out int minutes)
+        {
+            minutes = 0;
+
+            switch (value)
+            {
+                case TimeSpan ts:
+                    minutes = (int)Math.Round(ts.TotalMinutes);
+                    return true;
+
+                case string s:
+                    s = s.Trim();
+                    if (string.IsNullOrEmpty(s)) return false;
+
+                    // try HH:mm
+                    if (TimeSpan.TryParse(s, CultureInfo.InvariantCulture, out var ts2))
+                    {
+                        minutes = (int)Math.Round(ts2.TotalMinutes);
+                        return true;
+                    }
+
+                    // try minutes as number
+                    if (double.TryParse(s, NumberStyles.Float, CultureInfo.InvariantCulture, out var dmins))
+                    {
+                        // Heuristic: if value <= 24, treat as hours; else minutes
+                        if (dmins <= 24.0 + 1e-6)
+                            minutes = (int)Math.Round(dmins * 60.0);
+                        else
+                            minutes = (int)Math.Round(dmins);
+                        return true;
+                    }
+
+                    return false;
+
+                default:
+                    if (value is IConvertible)
+                    {
+                        try
+                        {
+                            var d = Convert.ToDouble(value, CultureInfo.InvariantCulture);
+                            if (d <= 24.0 + 1e-6)
+                                minutes = (int)Math.Round(d * 60.0);
+                            else
+                                minutes = (int)Math.Round(d);
+                            return true;
+                        }
+                        catch
+                        {
+                            return false;
+                        }
+                    }
+
+                    return false;
+            }
+        }
+
+        private static bool TryToInt(object value, out int i)
+        {
+            i = 0;
+            try
+            {
+                i = Convert.ToInt32(value, CultureInfo.InvariantCulture);
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        // =========================
+        // Formatting + utilities
+        // =========================
+        private static int Clamp(int v, int lo, int hi)
+            => v < lo ? lo : (v > hi ? hi : v);
+
+        private static string MinutesToHHmm(int minutes)
+        {
+            minutes = Clamp(minutes, 0, 24 * 60);
+            var ts = TimeSpan.FromMinutes(minutes);
+            return ts.ToString(@"hh\:mm");
+        }
     }
 }
+

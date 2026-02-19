@@ -6,13 +6,12 @@
         ShowInTaskbar="False"
         WindowStyle="None"
         AllowsTransparency="True"
-        Background="Transparent"       
+        Background="Transparent"
         SizeToContent="WidthAndHeight">
-    
 
     <Window.Resources>
-
         <BooleanToVisibilityConverter x:Key="BoolToVis" />
+
         <!-- =========================================
              BUTTON BASE (Hover + Press animations)
              ========================================= -->
@@ -26,10 +25,7 @@
                 </Setter.Value>
             </Setter>
 
-            <!-- Smooth animation on hover/press -->
             <Style.Triggers>
-
-                <!-- HOVER -->
                 <Trigger Property="IsMouseOver" Value="True">
                     <Trigger.EnterActions>
                         <BeginStoryboard>
@@ -57,7 +53,6 @@
                     </Trigger.ExitActions>
                 </Trigger>
 
-                <!-- PRESSED (hold/click) -->
                 <Trigger Property="IsPressed" Value="True">
                     <Trigger.EnterActions>
                         <BeginStoryboard>
@@ -85,17 +80,13 @@
                     </Trigger.ExitActions>
                 </Trigger>
 
-                <!-- DISABLED -->
                 <Trigger Property="IsEnabled" Value="False">
                     <Setter Property="Opacity" Value="0.5"/>
                 </Trigger>
-
             </Style.Triggers>
         </Style>
 
-        <!-- =========================================
-             Primary rounded button
-             ========================================= -->
+        <!-- Primary rounded button -->
         <Style x:Key="RoundedButtonStyle"
                TargetType="Button"
                BasedOn="{StaticResource AnimatedButtonBaseStyle}">
@@ -128,12 +119,12 @@
             </Setter>
         </Style>
 
-        <!-- Cancel button (grey) -->
+        <!-- Cancel button -->
         <Style x:Key="CancelButtonStyle"
                TargetType="Button"
                BasedOn="{StaticResource RoundedButtonStyle}">
-            <Setter Property="Background" Value="#FFE0E0E0"/>
-            <Setter Property="Foreground" Value="Gray"/>
+            <Setter Property="Background" Value="#FFE9ECEF"/>
+            <Setter Property="Foreground" Value="#14161A"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
@@ -146,10 +137,10 @@
 
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Bd" Property="Background" Value="#FFDADADA"/>
+                                <Setter TargetName="Bd" Property="Background" Value="#FFDEE2E6"/>
                             </Trigger>
                             <Trigger Property="IsPressed" Value="True">
-                                <Setter TargetName="Bd" Property="Background" Value="#FFCFCFCF"/>
+                                <Setter TargetName="Bd" Property="Background" Value="#FFD3D7DC"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -157,16 +148,14 @@
             </Setter>
         </Style>
 
-        <!-- =========================================
-             Close (X) button rounded + animated
-             ========================================= -->
+        <!-- Close (X) button - like UIStatus style -->
         <Style x:Key="CloseIconButtonStyle"
                TargetType="Button"
                BasedOn="{StaticResource AnimatedButtonBaseStyle}">
             <Setter Property="Width" Value="34"/>
             <Setter Property="Height" Value="34"/>
-            <Setter Property="Background" Value="#e6e6e6"/>
-            <Setter Property="Foreground" Value="Black"/>
+            <Setter Property="Background" Value="#E9ECEF"/>
+            <Setter Property="Foreground" Value="#14161A"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
@@ -183,14 +172,9 @@
                                 <Setter TargetName="Bd" Property="Background" Value="#FF3347FF"/>
                                 <Setter Property="Foreground" Value="White"/>
                             </Trigger>
-
                             <Trigger Property="IsPressed" Value="True">
                                 <Setter TargetName="Bd" Property="Background" Value="#FF2234CC"/>
                                 <Setter Property="Foreground" Value="White"/>
-                            </Trigger>
-
-                            <Trigger Property="IsEnabled" Value="False">
-                                <Setter Property="Opacity" Value="0.5"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -198,154 +182,139 @@
             </Setter>
         </Style>
 
-        <!-- Card style -->
-        <Style x:Key="CardStyle" TargetType="Border">
-            <Setter Property="Background" Value="White"/>
-            <Setter Property="CornerRadius" Value="20"/>
-            <Setter Property="Padding" Value="18"/>
-            <Setter Property="Effect">
-                <Setter.Value>
-                    <DropShadowEffect BlurRadius="18" ShadowDepth="0" Opacity="0.12"/>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
-        <!-- simple icons -->
+        <!-- icons -->
         <Geometry x:Key="IconInfo">M12,2A10,10 0 1 0 22,12A10,10 0 0 0 12,2ZM11,10H13V18H11ZM11,6H13V8H11Z</Geometry>
         <Geometry x:Key="IconWarn">M1,21H23L12,2L1,21ZM11,16H13V18H11ZM11,10H13V14H11Z</Geometry>
         <Geometry x:Key="IconError">M12,2A10,10 0 1 0 22,12A10,10 0 0 0 12,2ZM9,9L15,15M15,9L9,15</Geometry>
-
     </Window.Resources>
 
-    <!-- Dim background -->
-    <Grid Background="#80000000">
-        
-        
-        
-        <!-- Rounded gray shell -->
-        <Border Background="#cfd0d1"
+    <!-- OUTER BORDER gives extra space so DropShadow is NOT clipped -->
+    <Border Background="Transparent" Padding="28">
+        <Border x:Name="RootBorder"
+                CornerRadius="16"
                 Padding="18"
-                CornerRadius="0">
+                Background="#F7FFFFFF"
+                BorderBrush="#E6E8EC"
+                BorderThickness="1"
+                SnapsToDevicePixels="True">
 
-            <!-- Inner card -->
-            <Border Style="{StaticResource CardStyle}" Width="460">
-                <Grid>
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="Auto"/>
-                    </Grid.RowDefinitions>
+            <Border.Effect>
+                <DropShadowEffect BlurRadius="26"
+                                  ShadowDepth="0"
+                                  Opacity="0.22"
+                                  Color="#000000"/>
+            </Border.Effect>
 
-                    <!-- HEADER -->
-                    <Grid Grid.Row="0">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="Auto"/>
-                        </Grid.ColumnDefinitions>
+            <Grid Width="460">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
 
-                        <Viewbox Width="22" Height="22" VerticalAlignment="Center" Margin="0,0,10,0">
-                            <Path Stretch="Uniform" Fill="Black"
-                                  Data="{Binding IconGeometry}"/>
-                        </Viewbox>
+                <!-- HEADER -->
+                <Grid Grid.Row="0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
 
-                        <TextBlock Grid.Column="1"
-                                   Text="{Binding Title}"
-                                   FontFamily="Segoe UI"
-                                   FontSize="18"
-                                   FontWeight="Bold"
-                                   Foreground="Black"
-                                   VerticalAlignment="Center"/>
+                    <Viewbox Width="22" Height="22" VerticalAlignment="Center" Margin="0,0,10,0">
+                        <Path Stretch="Uniform" Fill="#14161A"
+                              Data="{Binding IconGeometry}"/>
+                    </Viewbox>
 
-                        <!-- X -->
-                        <Button Grid.Column="2"
-                                Style="{StaticResource CloseIconButtonStyle}"
-                                Command="{Binding CancelCommand}">
-                            <TextBlock Text="✕"
-                                       FontSize="14"
-                                       Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
-                                       HorizontalAlignment="Center"
-                                       VerticalAlignment="Center"/>
-                        </Button>
-                    </Grid>
-
-                    <!-- MESSAGE -->
-                    <TextBlock Grid.Row="1"
-                               Margin="0,12,0,0"
-                               Text="{Binding Message}"
+                    <TextBlock Grid.Column="1"
+                               Text="{Binding Title}"
                                FontFamily="Segoe UI"
-                               FontSize="14"
-                               Foreground="#333"
-                               TextWrapping="Wrap"/>
+                               FontSize="18"
+                               FontWeight="Bold"
+                               Foreground="#14161A"
+                               VerticalAlignment="Center"/>
 
-                    <!-- DETAILS -->
-                    <!-- DETAILS -->
-                    <Expander Grid.Row="2"
-          Margin="0,12,0,0"
-          Header="Details"
-          Visibility="{Binding HasDetails, Converter={StaticResource BoolToVis}}">
-                        <Border Background="#F5F5F5"
-            CornerRadius="8"
-            Padding="8"
-            BorderBrush="#DDDDDD"
-            BorderThickness="1">
-
-                            <Grid>
-                                <Grid.RowDefinitions>
-                                    <RowDefinition Height="Auto"/>
-                                    <RowDefinition Height="*"/>
-                                </Grid.RowDefinitions>
-
-                                <!-- Copy button -->
-                                <Button Grid.Row="0"
-                    Content="Copy"
-                    HorizontalAlignment="Right"
-                    Height="28"
-                    Padding="12,0"
-                    Margin="0,0,0,8"
-                    Style="{StaticResource CancelButtonStyle}"
-                    Click="CopyDetails_Click"/>
-
-                                <!-- Details text -->
-                                <ScrollViewer Grid.Row="1" MaxHeight="220" VerticalScrollBarVisibility="Auto">
-                                    <TextBlock Text="{Binding Details}"
-                           FontFamily="Consolas"
-                           FontSize="12"
-                           Foreground="#333"
-                           TextWrapping="Wrap"/>
-                                </ScrollViewer>
-                            </Grid>
-
-                        </Border>
-                    </Expander>
-
-
-                    <!-- BUTTONS -->
-                    <Grid Grid.Row="3" Margin="0,16,0,0">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="12"/>
-                            <ColumnDefinition Width="Auto"/>
-                        </Grid.ColumnDefinitions>
-
-                        <Button Grid.Column="1"
-                                Style="{StaticResource CancelButtonStyle}"
-                                Width="110"
-                                Content="{Binding CancelText}"
-                                Command="{Binding CancelCommand}"
-                                Visibility="{Binding IsCancelVisible, Converter={StaticResource BoolToVis}}"
-/>
-
-                        <Button Grid.Column="3"
-                                Style="{StaticResource RoundedButtonStyle}"
-                                Width="110"
-                                Content="{Binding OkText}"
-                                Command="{Binding OkCommand}"/>
-                    </Grid>
+                    <Button Grid.Column="2"
+                            Style="{StaticResource CloseIconButtonStyle}"
+                            Command="{Binding CancelCommand}">
+                        <TextBlock Text="✕"
+                                   FontSize="14"
+                                   Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                   HorizontalAlignment="Center"
+                                   VerticalAlignment="Center"/>
+                    </Button>
                 </Grid>
-            </Border>
+
+                <!-- MESSAGE -->
+                <TextBlock Grid.Row="1"
+                           Margin="0,12,0,0"
+                           Text="{Binding Message}"
+                           FontFamily="Segoe UI"
+                           FontSize="14"
+                           Foreground="#14161A"
+                           Opacity="0.86"
+                           TextWrapping="Wrap"/>
+
+                <!-- DETAILS -->
+                <Expander Grid.Row="2"
+                          Margin="0,12,0,0"
+                          Header="Details"
+                          Visibility="{Binding HasDetails, Converter={StaticResource BoolToVis}}">
+                    <Border Background="#F5F6F8"
+                            CornerRadius="12"
+                            Padding="10"
+                            BorderBrush="#E6E8EC"
+                            BorderThickness="1">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                            </Grid.RowDefinitions>
+
+                            <Button Grid.Row="0"
+                                    Content="Copy"
+                                    HorizontalAlignment="Right"
+                                    Height="28"
+                                    Padding="12,0"
+                                    Margin="0,0,0,8"
+                                    Style="{StaticResource CancelButtonStyle}"
+                                    Click="CopyDetails_Click"/>
+
+                            <ScrollViewer Grid.Row="1" MaxHeight="220" VerticalScrollBarVisibility="Auto">
+                                <TextBlock Text="{Binding Details}"
+                                           FontFamily="Consolas"
+                                           FontSize="12"
+                                           Foreground="#14161A"
+                                           Opacity="0.86"
+                                           TextWrapping="Wrap"/>
+                            </ScrollViewer>
+                        </Grid>
+                    </Border>
+                </Expander>
+
+                <!-- BUTTONS -->
+                <Grid Grid.Row="3" Margin="0,16,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="12"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <Button Grid.Column="1"
+                            Style="{StaticResource CancelButtonStyle}"
+                            Width="110"
+                            Content="{Binding CancelText}"
+                            Command="{Binding CancelCommand}"
+                            Visibility="{Binding IsCancelVisible, Converter={StaticResource BoolToVis}}"/>
+
+                    <Button Grid.Column="3"
+                            Style="{StaticResource RoundedButtonStyle}"
+                            Width="110"
+                            Content="{Binding OkText}"
+                            Command="{Binding OkCommand}"/>
+                </Grid>
+            </Grid>
         </Border>
-    </Grid>
+    </Border>
 </Window>

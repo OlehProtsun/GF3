@@ -1,5 +1,9 @@
-﻿<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+﻿<ResourceDictionary     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                        xmlns:local="clr-namespace:WPFApp.Converters">
+
+    <local:FirstValidationErrorConverter x:Key="FirstValidationErrorConverter"/>
+
     <Style x:Key="RoundedTextBoxBaseStyle" TargetType="TextBox">
         <Setter Property="FontFamily" Value="{StaticResource DefaultFontFamily}" />
         <Setter Property="Foreground" Value="Black" />
@@ -123,18 +127,25 @@
     </Style>
 
     <Style x:Key="ValidatedRoundedTextBoxStyle"
-           TargetType="TextBox"
-           BasedOn="{StaticResource RoundedTextBoxWithPlaceholderStyle}">
+       TargetType="TextBox"
+       BasedOn="{StaticResource RoundedTextBoxWithPlaceholderStyle}">
         <Style.Triggers>
             <Trigger Property="Validation.HasError" Value="True">
                 <Setter Property="BorderBrush" Value="{StaticResource ErrorBrush}" />
                 <Setter Property="Background" Value="{StaticResource ErrorBackgroundBrush}" />
                 <Setter Property="ToolTip"
-                        Value="{Binding RelativeSource={RelativeSource Self},
-                                        Path=(Validation.Errors)[0].ErrorContent}" />
+                    Value="{Binding RelativeSource={RelativeSource Self},
+                                    Path=(Validation.Errors),
+                                    Converter={StaticResource FirstValidationErrorConverter}}" />
+            </Trigger>
+
+            <!-- необов’язково, але корисно -->
+            <Trigger Property="Validation.HasError" Value="False">
+                <Setter Property="ToolTip" Value="{x:Null}" />
             </Trigger>
         </Style.Triggers>
     </Style>
+
 
     <Style x:Key="RoundedComboBoxStyle" TargetType="ComboBox">
         <Setter Property="Height" Value="36" />

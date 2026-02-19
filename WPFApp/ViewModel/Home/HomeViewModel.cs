@@ -14,7 +14,10 @@ using System.Windows.Threading;
 using WPFApp.Infrastructure;
 using WPFApp.Infrastructure.ScheduleMatrix;
 using WPFApp.Service;
+using WPFApp.View.Dialogs;
+using WPFApp.ViewModel.Container.Edit.Helpers; // UIStatusKind
 using WPFApp.ViewModel.Container.ScheduleEdit.Helpers;
+
 
 namespace WPFApp.ViewModel.Home
 {
@@ -59,7 +62,7 @@ namespace WPFApp.ViewModel.Home
             WhoWorksTodayItems = new ObservableCollection<WhoWorksTodayRowViewModel>();
             ActiveSchedules = new ObservableCollection<HomeScheduleCardViewModel>();
 
-            RefreshCommand = new AsyncRelayCommand(LoadDataAsync, () => !IsLoading);
+            RefreshCommand = new AsyncRelayCommand(RefreshWithOverlayAsync, () => !IsLoading);
 
             _databaseChangeNotifier.DatabaseChanged += OnDatabaseChanged;
 
@@ -235,6 +238,67 @@ namespace WPFApp.ViewModel.Home
             }
         }
 
+        // ---- Overlay (Working / Success) for manual refresh
+        private bool _isNavStatusVisible;
+        public bool IsNavStatusVisible
+        {
+            get => _isNavStatusVisible;
+            private set => SetProperty(ref _isNavStatusVisible, value);
+        }
+
+        private UIStatusKind _navStatus = UIStatusKind.Success;
+        public UIStatusKind NavStatus
+        {
+            get => _navStatus;
+            private set => SetProperty(ref _navStatus, value);
+        }
+
+        private CancellationTokenSource? _navUiCts;
+        private bool _lastLoadSuccessful;
+
+        private CancellationToken ResetNavUiCts(CancellationToken outer)
+        {
+            _navUiCts?.Cancel();
+            _navUiCts?.Dispose();
+            _navUiCts = CancellationTokenSource.CreateLinkedTokenSource(outer);
+            return _navUiCts.Token;
+        }
+
+        private Task RunOnUiThreadAsync(Action a)
+        {
+            var d = Application.Current?.Dispatcher;
+            if (d == null || d.CheckAccess())
+            {
+                a();
+                return Task.CompletedTask;
+            }
+            return d.InvokeAsync(a).Task;
+        }
+
+        private Task ShowNavWorkingAsync()
+            => RunOnUiThreadAsync(() =>
+            {
+                NavStatus = UIStatusKind.Working;
+                IsNavStatusVisible = true;
+            });
+
+        private Task HideNavStatusAsync()
+            => RunOnUiThreadAsync(() => IsNavStatusVisible = false);
+
+        private async Task ShowNavSuccessThenAutoHideAsync(CancellationToken ct, int ms = 700)
+        {
+            await RunOnUiThreadAsync(() =>
+            {
+                NavStatus = UIStatusKind.Success;
+                IsNavStatusVisible = true;
+            });
+
+            try { await Task.Delay(ms, ct); }
+            catch (OperationCanceledException) { return; }
+
+            await HideNavStatusAsync();
+        }
+
         private async Task LoadDataAsync(CancellationToken ct)
         {
             void UI(Action a)
@@ -249,6 +313,9 @@ namespace WPFApp.ViewModel.Home
                 IsLoading = true;
                 StatusText = "Loading home data...";
             });
+
+            _lastLoadSuccessful = false;
+
 
             // Helper: parse "08:00", "8:00", "08:00:00" (and tolerant formats)
             static bool TryParseTime(string? value, out TimeSpan ts)
@@ -678,6 +745,9 @@ namespace WPFApp.ViewModel.Home
                     StatusText = "Home data is up to date.";
                     _initialized = true;
                 });
+
+                _lastLoadSuccessful = true;
+
             }
             catch (OperationCanceledException)
             {
@@ -687,6 +757,8 @@ namespace WPFApp.ViewModel.Home
             {
                 _logger.Log($"[Home] Failed to load data: {ex}");
                 UI(() => StatusText = "Failed to load home data.");
+                _lastLoadSuccessful = false;
+
             }
             finally
             {
@@ -702,6 +774,41 @@ namespace WPFApp.ViewModel.Home
             _logger.Log($"[Home] Database changed from {e.Source}; refreshing Home.");
             await LoadDataAsync(CancellationToken.None);
         }
+
+        private async Task RefreshWithOverlayAsync(CancellationToken ct)
+        {
+            var uiToken = ResetNavUiCts(ct);
+
+            await ShowNavWorkingAsync();
+            await Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+
+            try
+            {
+                await LoadDataAsync(uiToken);
+
+                // Якщо LoadDataAsync зловив exception всередині (він не кидає назовні),
+                // то не показуємо Success при fail.
+                if (_lastLoadSuccessful)
+                {
+                    await Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+                    await ShowNavSuccessThenAutoHideAsync(uiToken, 700);
+                }
+                else
+                {
+                    await HideNavStatusAsync();
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                await HideNavStatusAsync();
+            }
+            catch (Exception ex)
+            {
+                await HideNavStatusAsync();
+                _logger.Log($"[Home] Refresh failed: {ex}");
+            }
+        }
+
     }
 
     public sealed class WhoWorksTodayRowViewModel

@@ -38,7 +38,6 @@ namespace WPFApp.View.Dialogs
             }
             catch
             {
-                // інколи SetText кидає при проблемах з буфером — fallback
                 Clipboard.SetDataObject(text, true);
             }
         }
