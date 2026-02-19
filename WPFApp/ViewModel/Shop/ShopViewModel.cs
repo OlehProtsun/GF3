@@ -396,25 +396,31 @@ namespace WPFApp.ViewModel.Shop
                 return;
             }
 
+            var uiToken = ResetNavUiCts(ct);
+
+            await ShowNavWorkingAsync();
+            await Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+
             try
             {
-                // 4) Delete.
-                await _shopService.DeleteAsync(currentId, ct);
+                await _shopService.DeleteAsync(currentId, uiToken);
+
+                _databaseChangeNotifier.NotifyDatabaseChanged("Shop.Delete");
+                await LoadShopsAsync(uiToken, selectId: null);
+                await SwitchToListAsync();
+
+                await Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+                await ShowNavSuccessThenAutoHideAsync(uiToken, 900);
+            }
+            catch (OperationCanceledException)
+            {
+                await HideNavStatusAsync();
             }
             catch (Exception ex)
             {
-                // 5) Error.
+                await HideNavStatusAsync();
                 ShowError(ex);
-                return;
             }
-
-            // 6) Info.
-            ShowInfo("Shop deleted successfully.");
-
-            // 7) Reload + return to list.
-            _databaseChangeNotifier.NotifyDatabaseChanged("Shop.Delete");
-            await LoadShopsAsync(ct, selectId: null);
-            await SwitchToListAsync();
         }
 
         internal async Task OpenProfileAsync(CancellationToken ct = default)
