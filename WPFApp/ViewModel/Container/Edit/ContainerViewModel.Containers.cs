@@ -4,6 +4,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Windows;
+using System.Windows.Threading;
 using WPFApp.ViewModel.Container.Edit.Helpers;
 
 namespace WPFApp.ViewModel.Container.Edit
@@ -70,12 +72,37 @@ namespace WPFApp.ViewModel.Container.Edit
         /// 2) CancelTarget = List — якщо користувач натисне Cancel, повертаємось у список
         /// 3) SwitchToEditAsync — переключаємо UI секцію (Navigation partial)
         /// </summary>
-        internal Task StartAddAsync(CancellationToken ct = default)
+        internal async Task StartAddAsync(CancellationToken ct = default)
         {
-            EditVm.ResetForNew();
-            CancelTarget = ContainerSection.List;
-            return SwitchToEditAsync();
+            var uiToken = ResetNavUiCts(ct);
+
+            await ShowNavWorkingAsync();
+            await Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+
+            try
+            {
+                await RunOnUiThreadAsync(() =>
+                {
+                    EditVm.ResetForNew();
+                    CancelTarget = ContainerSection.List;
+                });
+
+                await SwitchToEditAsync();
+
+                await Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+                await ShowNavSuccessThenAutoHideAsync(uiToken, 700);
+            }
+            catch (OperationCanceledException)
+            {
+                await HideNavStatusAsync();
+            }
+            catch (Exception ex)
+            {
+                await HideNavStatusAsync();
+                ShowError(ex);
+            }
         }
+
 
         /// <summary>
         /// EditSelectedAsync — відкрити редагування поточного контейнера.
@@ -94,17 +121,45 @@ namespace WPFApp.ViewModel.Container.Edit
             var id = GetCurrentContainerId();
             if (id <= 0) return;
 
-            var latest = await _containerService.GetAsync(id, ct);
-            if (latest is null) return;
+            var uiToken = ResetNavUiCts(ct);
 
-            EditVm.SetContainer(latest);
+            await ShowNavWorkingAsync();
+            await Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
 
-            CancelTarget = Mode == ContainerSection.Profile
-                ? ContainerSection.Profile
-                : ContainerSection.List;
+            try
+            {
+                var latest = await _containerService.GetAsync(id, uiToken).ConfigureAwait(false);
+                if (latest is null)
+                {
+                    await HideNavStatusAsync();
+                    return;
+                }
 
-            await SwitchToEditAsync();
+                await RunOnUiThreadAsync(() =>
+                {
+                    EditVm.SetContainer(latest);
+
+                    CancelTarget = Mode == ContainerSection.Profile
+                        ? ContainerSection.Profile
+                        : ContainerSection.List;
+                });
+
+                await SwitchToEditAsync().ConfigureAwait(false);
+
+                await Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+                await ShowNavSuccessThenAutoHideAsync(uiToken, 700);
+            }
+            catch (OperationCanceledException)
+            {
+                await HideNavStatusAsync();
+            }
+            catch (Exception ex)
+            {
+                await HideNavStatusAsync();
+                ShowError(ex);
+            }
         }
+
 
         /// <summary>
         /// SaveAsync — зберегти контейнер (create або update).
@@ -130,50 +185,67 @@ namespace WPFApp.ViewModel.Container.Edit
                 return;
             }
 
+            var uiToken = ResetNavUiCts(ct);
+
+            await ShowNavWorkingAsync();
+            await Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+
             try
             {
                 if (EditVm.IsEdit)
                 {
-                    await _containerService.UpdateAsync(model, ct);
+                    await _containerService.UpdateAsync(model, uiToken).ConfigureAwait(false);
                 }
                 else
                 {
-                    var created = await _containerService.CreateAsync(model, ct);
-                    EditVm.ContainerId = created.Id;
+                    var created = await _containerService.CreateAsync(model, uiToken).ConfigureAwait(false);
+                    await RunOnUiThreadAsync(() => EditVm.ContainerId = created.Id);
                     model = created;
                 }
+
+                _databaseChangeNotifier.NotifyDatabaseChanged("Container.Save");
+
+                await LoadContainersAsync(uiToken, selectId: model.Id).ConfigureAwait(false);
+
+                if (CancelTarget == ContainerSection.Profile)
+                {
+                    var profileId = _openedProfileContainerId ?? model.Id;
+
+                    if (profileId > 0)
+                    {
+                        var latest = await _containerService.GetAsync(profileId, uiToken).ConfigureAwait(false) ?? model;
+
+                        await RunOnUiThreadAsync(() =>
+                        {
+                            ProfileVm.SetProfile(latest);
+                            ListVm.SelectedItem = latest;
+                        });
+                    }
+
+                    await SwitchToProfileAsync().ConfigureAwait(false);
+                }
+                else
+                {
+                    await SwitchToListAsync().ConfigureAwait(false);
+                }
+
+                await Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+                await ShowNavSuccessThenAutoHideAsync(uiToken, 900);
+
+                // Якщо хочеш — можеш прибрати старий ShowInfo, щоб не було дубля:
+                // ShowInfo(EditVm.IsEdit ? "Container updated successfully." : "Container added successfully.");
+            }
+            catch (OperationCanceledException)
+            {
+                await HideNavStatusAsync();
             }
             catch (Exception ex)
             {
+                await HideNavStatusAsync();
                 ShowError(ex);
-                return;
-            }
-
-            ShowInfo(EditVm.IsEdit
-                ? "Container updated successfully."
-                : "Container added successfully.");
-
-            await LoadContainersAsync(ct, selectId: model.Id);
-
-            // Якщо ми прийшли в Edit із профілю, то після Save треба повернутись назад у профіль
-            if (CancelTarget == ContainerSection.Profile)
-            {
-                var profileId = _openedProfileContainerId ?? model.Id;
-
-                if (profileId > 0)
-                {
-                    var latest = await _containerService.GetAsync(profileId, ct) ?? model;
-                    ProfileVm.SetProfile(latest);
-                    ListVm.SelectedItem = latest;
-                }
-
-                await SwitchToProfileAsync();
-            }
-            else
-            {
-                await SwitchToListAsync();
             }
         }
+
 
         /// <summary>
         /// DeleteSelectedAsync — видалити поточний контейнер.
@@ -201,20 +273,31 @@ namespace WPFApp.ViewModel.Container.Edit
                 return;
             }
 
+            var uiToken = ResetNavUiCts(ct);
+
+            await ShowNavWorkingAsync();
+            await Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+
             try
             {
-                await _containerService.DeleteAsync(currentId, ct);
+                await _containerService.DeleteAsync(currentId, uiToken);
+
+                _databaseChangeNotifier.NotifyDatabaseChanged("Container.Delete");
+                await LoadContainersAsync(uiToken, selectId: null);
+                await SwitchToListAsync();
+
+                await Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+                await ShowNavSuccessThenAutoHideAsync(uiToken, 900);
+            }
+            catch (OperationCanceledException)
+            {
+                await HideNavStatusAsync();
             }
             catch (Exception ex)
             {
+                await HideNavStatusAsync();
                 ShowError(ex);
-                return;
             }
-
-            ShowInfo("Container deleted successfully.");
-
-            await LoadContainersAsync(ct, selectId: null);
-            await SwitchToListAsync();
         }
 
         /// <summary>
@@ -232,18 +315,49 @@ namespace WPFApp.ViewModel.Container.Edit
             var selected = ListVm.SelectedItem;
             if (selected is null) return;
 
-            var latest = await _containerService.GetAsync(selected.Id, ct) ?? selected;
+            var uiToken = ResetNavUiCts(ct);
 
-            _openedProfileContainerId = latest.Id;
+            await ShowNavWorkingAsync();
 
-            ProfileVm.SetProfile(latest);
-            ListVm.SelectedItem = latest;
+            // щоб Working гарантовано відрендерився
+            await Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
 
-            await LoadSchedulesAsync(latest.Id, search: null, ct);
+            try
+            {
+                var latest = await _containerService.GetAsync(selected.Id, uiToken).ConfigureAwait(false) ?? selected;
 
-            CancelTarget = ContainerSection.List;
-            await SwitchToProfileAsync();
+                _openedProfileContainerId = latest.Id;
+
+                // profile + selection — на UI thread
+                await RunOnUiThreadAsync(() =>
+                {
+                    ProfileVm.SetProfile(latest);
+                    ListVm.SelectedItem = latest;
+                }).ConfigureAwait(false);
+
+                // schedules (графіки) — підвантажуємо як і було
+                await LoadSchedulesAsync(latest.Id, search: null, uiToken).ConfigureAwait(false);
+
+                CancelTarget = ContainerSection.List;
+
+                await SwitchToProfileAsync().ConfigureAwait(false);
+
+                // дати профілю відрендеритись
+                await Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+
+                await ShowNavSuccessThenAutoHideAsync(uiToken, 900).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException)
+            {
+                await HideNavStatusAsync().ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                await HideNavStatusAsync().ConfigureAwait(false);
+                ShowError(ex);
+            }
         }
+
 
         // =========================================================
         // Завантаження даних (списки)
@@ -255,11 +369,24 @@ namespace WPFApp.ViewModel.Container.Edit
         /// </summary>
         private async Task LoadContainersAsync(CancellationToken ct, int? selectId = null)
         {
-            var list = await _containerService.GetAllAsync(ct);
-            ListVm.SetItems(list);
+            var list = await _containerService.GetAllAsync(ct).ConfigureAwait(false);
 
-            if (selectId.HasValue)
-                ListVm.SelectedItem = list.FirstOrDefault(c => c.Id == selectId.Value);
+            var disp = System.Windows.Application.Current?.Dispatcher;
+            if (disp != null && !disp.CheckAccess())
+            {
+                await disp.InvokeAsync(() =>
+                {
+                    ListVm.SetItems(list);
+                    if (selectId.HasValue)
+                        ListVm.SelectedItem = ListVm.Items.FirstOrDefault(x => x.Id == selectId.Value);
+                });
+            }
+            else
+            {
+                ListVm.SetItems(list);
+                if (selectId.HasValue)
+                    ListVm.SelectedItem = ListVm.Items.FirstOrDefault(x => x.Id == selectId.Value);
+            }
         }
 
         /// <summary>
@@ -268,9 +395,23 @@ namespace WPFApp.ViewModel.Container.Edit
         /// </summary>
         private async Task LoadSchedulesAsync(int containerId, string? search, CancellationToken ct)
         {
-            var schedules = await _scheduleService.GetByContainerAsync(containerId, search, ct);
-            ProfileVm.ScheduleListVm.SetItems(schedules);
+            ClearScheduleDetailsCache();
+
+            var schedules = await _scheduleService
+                .GetByContainerAsync(containerId, search, ct)
+                .ConfigureAwait(false);
+
+            var disp = Application.Current?.Dispatcher;
+            if (disp != null && !disp.CheckAccess())
+            {
+                await disp.InvokeAsync(() => ProfileVm.ScheduleListVm.SetItems(schedules));
+            }
+            else
+            {
+                ProfileVm.ScheduleListVm.SetItems(schedules);
+            }
         }
+
 
         // =========================================================
         // Валідація контейнера (поки проста)

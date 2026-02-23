@@ -64,7 +64,7 @@ namespace WPFApp.ViewModel.Container.Edit
             var block = new ScheduleBlockViewModel
             {
                 Model = model,
-                SelectedAvailabilityGroupId = GetDefaultAvailabilityGroupId(model.Year, model.Month)
+                SelectedAvailabilityGroupId = 0,
             };
 
             return block;

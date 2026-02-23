@@ -153,8 +153,14 @@ namespace WPFApp.ViewModel.Container.ScheduleEdit
                 {
                     _suppressAvailabilityGroupUpdate = false;
                 }
+
+                // ✅ Авто-побудова AvailabilityPreview після синхронізації lookup’ів
+                var groupId = SelectedAvailabilityGroup?.Id ?? 0;
+                if (groupId > 0)
+                    SafeForget(LoadAvailabilityContextAsync(groupId));
             }
         }
+
 
         /// <summary>
         /// Оновлює довідник Employees (список працівників).
@@ -183,22 +189,33 @@ namespace WPFApp.ViewModel.Container.ScheduleEdit
         /// </summary>
         public void CommitPendingShopSelection()
         {
+            ClearValidationErrors(nameof(PendingSelectedShop));
+            ClearValidationErrors(nameof(ScheduleShopId));
+
+            // ВАЖЛИВО: саме це поле зараз підсвічується у UI
+            ClearValidationErrors(nameof(SelectedShop));
+
             if (PendingSelectedShop == SelectedShop)
                 return;
 
             SelectedShop = PendingSelectedShop;
         }
 
+
         /// <summary>
         /// Аналогічно для AvailabilityGroup.
         /// </summary>
         public void CommitPendingAvailabilitySelection()
         {
+            ClearValidationErrors(nameof(PendingSelectedAvailabilityGroup));
+            ClearValidationErrors(nameof(SelectedAvailabilityGroup)); // ← додати
+
             if (PendingSelectedAvailabilityGroup == SelectedAvailabilityGroup)
                 return;
 
             SelectedAvailabilityGroup = PendingSelectedAvailabilityGroup;
         }
+
 
 
         // =========================

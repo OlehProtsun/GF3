@@ -1,0 +1,580 @@
+<UserControl x:Class="WPFApp.View.DatabaseView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d"
+             d:DesignHeight="2000"
+             d:DesignWidth="1100"
+             Background="{StaticResource PageBackgroundBrush}">
+
+    <Grid ClipToBounds="False">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <!-- ===================== TOP HEADER (WITHOUT Back button) ===================== -->
+        <Border Grid.Row="0"
+                Style="{StaticResource TopCardStyle}"
+                Margin="9,8,9,0">
+
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <Grid Grid.Column="0">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Grid.Row="0"
+                               Text="Database"
+                               FontFamily="{StaticResource DefaultFontFamily}"
+                               FontSize="{StaticResource FontSizePageTitle}"
+                               Foreground="Black" />
+
+                    <TextBlock Grid.Row="1"
+                               Margin="0,6,0,0"
+                               Text="Execute SQL, run import scripts, and inspect live database metadata."
+                               FontFamily="{StaticResource DefaultFontFamily}"
+                               FontSize="17"
+                               Foreground="{StaticResource SecondaryTextBrush}" />
+                </Grid>
+
+                <StackPanel Grid.Column="1"
+                            Orientation="Horizontal"
+                            HorizontalAlignment="Right"
+                            VerticalAlignment="Center" />
+            </Grid>
+        </Border>
+
+        <!-- ===================== CONTENT (2x2 sections) ===================== -->
+        <ScrollViewer Grid.Row="1"
+                      Margin="9,10,9,10"
+                      VerticalScrollBarVisibility="Auto"
+                      HorizontalScrollBarVisibility="Disabled"
+                      Padding="0,0,0,12"
+                      ClipToBounds="False">
+
+            <!-- 2 columns + spacer, 2 rows -->
+            <Grid ClipToBounds="False">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="20" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+
+                <!-- ===================== (1/4) EXECUTOR (with small labels above fields) ===================== -->
+                <Border Grid.Row="0"
+        Grid.Column="0"
+        Height="650"
+        Style="{StaticResource CardStyle}"
+        Padding="15"
+        Margin="0,12,0,12"
+        VerticalAlignment="Top">
+
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <!-- header -->
+                            <RowDefinition Height="Auto"/>
+                            <!-- label + sql box -->
+                            <RowDefinition Height="Auto"/>
+                            <!-- buttons -->
+                            <RowDefinition Height="*"/>
+                            <!-- label + output + grid -->
+                        </Grid.RowDefinitions>
+
+                        <!-- HEADER: title (left) + Execute (right) -->
+                        <Grid Grid.Row="0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+
+                            <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                                <Viewbox Width="18" Height="18" Margin="0,0,8,0">
+                                    <Path Data="{StaticResource IconCode}"
+                          Fill="Black"
+                          Stretch="Uniform"
+                          RenderTransformOrigin="0.5,0.5">
+                                        <Path.RenderTransform>
+                                            <ScaleTransform ScaleX="1" ScaleY="-1"/>
+                                        </Path.RenderTransform>
+                                    </Path>
+                                </Viewbox>
+
+                                <TextBlock Text="Executor"
+                           FontFamily="{StaticResource DefaultFontFamily}"
+                           FontSize="{StaticResource FontSizeTitle}"
+                           FontWeight="Bold"
+                           Foreground="Black" />
+                            </StackPanel>
+
+                            <Button Grid.Column="1"
+                    Style="{StaticResource RoundedButtonStyle}"
+                    Height="37"
+                    MinWidth="120"
+                    Padding="16,0"
+                    HorizontalAlignment="Right"
+                    VerticalAlignment="Center"
+                    Command="{Binding ExecuteSqlCommand}">
+                                <TextBlock Text="Execute" />
+                            </Button>
+                        </Grid>
+
+                        <!-- SQL LABEL + INPUT -->
+                        <StackPanel Grid.Row="1" Margin="0,12,0,10">
+                            <TextBlock Text="SQL command"
+                       FontFamily="{StaticResource DefaultFontFamily}"
+                       FontSize="12"
+                       Foreground="{StaticResource MutedTextBrush}"
+                       Margin="2,0,0,6" />
+
+                            <TextBox MinHeight="140"
+                     TextWrapping="Wrap"
+                     AcceptsReturn="True"
+                     VerticalScrollBarVisibility="Auto"
+                     FontFamily="Consolas"
+                     FontSize="13"
+                     Style="{StaticResource CompactRoundedTextBoxWithPlaceholderStyle}"
+                     Tag="Write command here.."
+                     Text="{Binding ExecutorSql, UpdateSourceTrigger=PropertyChanged}"
+                     VerticalContentAlignment="Top"
+                     HorizontalContentAlignment="Left"
+                     Padding="10,8,10,10"/>
+                        </StackPanel>
+
+                        <!-- Actions row -->
+                        <StackPanel Grid.Row="2"
+                    Orientation="Horizontal"
+                    Margin="0,0,0,10">
+                            <Button Style="{StaticResource TopExportButtonStyle}"
+                    Width="140"
+                    Height="37"
+                    Command="{Binding ClearExecutorOutputCommand}">
+                                <TextBlock Text="Clear output" />
+                            </Button>
+                        </StackPanel>
+
+                        <!-- RESULT LABEL + OUTPUT + GRID -->
+                        <Grid Grid.Row="3">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <!-- label -->
+                                <RowDefinition Height="Auto"/>
+                                <!-- output -->
+                                <RowDefinition Height="*"/>
+                                <!-- grid -->
+                            </Grid.RowDefinitions>
+
+                            <TextBlock Grid.Row="0"
+                       Text="Result"
+                       FontFamily="{StaticResource DefaultFontFamily}"
+                       FontSize="12"
+                       Foreground="{StaticResource MutedTextBrush}"
+                       Margin="2,0,0,6" />
+
+                            <Border Grid.Row="1"
+                    Background="{StaticResource SoftGrayBrush}"
+                    CornerRadius="{StaticResource Cr12}"
+                    Padding="10"
+                    Margin="0,0,0,10">
+                                <TextBlock Text="{Binding ExecutorOutput}"
+                           TextWrapping="Wrap"
+                           Foreground="Black" />
+                            </Border>
+
+                            <Border Grid.Row="2"
+                    Background="{StaticResource SurfaceBrush}"
+                    BorderBrush="{StaticResource CardBorderBrush}"
+                    BorderThickness="2"
+                    CornerRadius="{StaticResource Cr20}"
+                    Padding="6"
+                    ClipToBounds="True"
+                    Visibility="{Binding HasQueryResult, Converter={StaticResource BoolToVis}}">
+
+                                <DataGrid ItemsSource="{Binding QueryResult}"
+                          Style="{StaticResource DatabaseQueryResultGridStyle}"
+                          Background="{StaticResource SurfaceBrush}"
+                          BorderThickness="0"
+                          AutoGenerateColumns="True"
+                          IsReadOnly="True"
+                          HeadersVisibility="Column"
+                          ScrollViewer.VerticalScrollBarVisibility="Auto"
+                          ScrollViewer.HorizontalScrollBarVisibility="Auto"/>
+                            </Border>
+                        </Grid>
+                    </Grid>
+                </Border>
+
+                <!-- ===================== (2/4) IMPORTER (TextBox takes all free space between Import file and Result) ===================== -->
+                <Border Grid.Row="0"
+        Grid.Column="2"
+        Style="{StaticResource CardStyle}"
+        Padding="15"
+        Height="650"
+        Margin="0,12,0,12"
+        VerticalAlignment="Top">
+
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <!-- header -->
+                            <RowDefinition Height="Auto"/>
+                            <!-- file info -->
+                            <RowDefinition Height="*"/>
+                            <!-- script textbox fills -->
+                            <RowDefinition Height="Auto"/>
+                            <!-- result/actions -->
+                        </Grid.RowDefinitions>
+
+                        <!-- HEADER -->
+                        <Grid Grid.Row="0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+
+                            <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                                <Viewbox Width="18" Height="18" Margin="0,0,8,0">
+                                    <Path Data="{StaticResource IconImport}"
+                          Fill="Black"
+                          Stretch="Uniform"
+                          RenderTransformOrigin="0.5,0.5">
+                                        <Path.RenderTransform>
+                                            <ScaleTransform ScaleX="1" ScaleY="-1"/>
+                                        </Path.RenderTransform>
+                                    </Path>
+                                </Viewbox>
+
+                                <TextBlock Text="Importer"
+                           FontFamily="{StaticResource DefaultFontFamily}"
+                           FontSize="{StaticResource FontSizeTitle}"
+                           FontWeight="Bold"
+                           Foreground="Black" />
+                            </StackPanel>
+
+                            <Border Grid.Column="1"
+                    Height="37"
+                    VerticalAlignment="Center"
+                    Margin="0,0,10,0"
+                    Background="Transparent">
+                                <TextBlock Text="First, click here →"
+                           VerticalAlignment="Center"
+                           FontFamily="{StaticResource DefaultFontFamily}"
+                           FontSize="12"
+                           Foreground="{StaticResource SecondaryTextBrush}" />
+                            </Border>
+
+                            <Button Grid.Column="2"
+                    Style="{StaticResource RoundedButtonStyle}"
+                    Height="37"
+                    MinWidth="140"
+                    Padding="16,0"
+                    HorizontalAlignment="Right"
+                    VerticalAlignment="Center"
+                    Command="{Binding ChooseImportFileCommand}">
+                                <TextBlock Text="Choose file"/>
+                            </Button>
+                        </Grid>
+
+                        <!-- FILE INFO (same layout as Database Information: 2-column mini form) -->
+                        <StackPanel Grid.Row="1" Margin="0,12,0,8">
+                            <TextBlock Text="Import file"
+               FontFamily="{StaticResource DefaultFontFamily}"
+               FontSize="12"
+               Foreground="{StaticResource MutedTextBrush}"
+               Margin="2,0,0,6" />
+
+                            <Border Background="{StaticResource SoftGrayBrush}"
+            CornerRadius="{StaticResource Cr12}"
+            Padding="12">
+
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="160"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                    </Grid.RowDefinitions>
+
+                                    <!-- Path -->
+                                    <TextBlock Grid.Row="0" Grid.Column="0"
+                       Text="Path"
+                       FontFamily="{StaticResource DefaultFontFamily}"
+                       FontSize="12"
+                       Foreground="{StaticResource MutedTextBrush}"
+                       VerticalAlignment="Top"
+                       Margin="0,2,10,8" />
+                                    <TextBlock Grid.Row="0" Grid.Column="1"
+                       Text="{Binding ImportFilePath}"
+                       TextWrapping="Wrap"
+                       FontFamily="{StaticResource DefaultFontFamily}"
+                       FontSize="13"
+                       Foreground="Black"
+                       Margin="0,2,0,8" />
+
+                                    <!-- Size -->
+                                    <TextBlock Grid.Row="1" Grid.Column="0"
+                       Text="Size"
+                       FontFamily="{StaticResource DefaultFontFamily}"
+                       FontSize="12"
+                       Foreground="{StaticResource MutedTextBrush}"
+                       Margin="0,0,10,8" />
+                                    <TextBlock Grid.Row="1" Grid.Column="1"
+                       Text="{Binding ImportFileSize}"
+                       FontFamily="{StaticResource DefaultFontFamily}"
+                       FontSize="13"
+                       Foreground="Black"
+                       Margin="0,0,0,8" />
+
+                                    <!-- Modified -->
+                                    <TextBlock Grid.Row="2" Grid.Column="0"
+                       Text="Last modified"
+                       FontFamily="{StaticResource DefaultFontFamily}"
+                       FontSize="12"
+                       Foreground="{StaticResource MutedTextBrush}"
+                       Margin="0,0,10,8" />
+                                    <TextBlock Grid.Row="2" Grid.Column="1"
+                       Text="{Binding ImportFileModified}"
+                       FontFamily="{StaticResource DefaultFontFamily}"
+                       FontSize="13"
+                       Foreground="Black"
+                       Margin="0,0,0,8" />
+
+                                    <!-- SHA-256 -->
+                                    <TextBlock Grid.Row="3" Grid.Column="0"
+                       Text="SHA-256"
+                       FontFamily="{StaticResource DefaultFontFamily}"
+                       FontSize="12"
+                       Foreground="{StaticResource MutedTextBrush}"
+                       Margin="0,0,10,0" />
+                                    <TextBlock Grid.Row="3" Grid.Column="1"
+                       Text="{Binding ImportFileHash}"
+                       TextWrapping="Wrap"
+                       FontFamily="{StaticResource DefaultFontFamily}"
+                       FontSize="13"
+                       Foreground="Black"
+                       Margin="0,0,0,0" />
+                                </Grid>
+                            </Border>
+                        </StackPanel>
+
+                        <!-- SCRIPT (fills ALL remaining height) -->
+                        <Grid Grid.Row="2">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <!-- label -->
+                                <RowDefinition Height="*"/>
+                                <!-- textbox -->
+                            </Grid.RowDefinitions>
+
+                            <TextBlock Grid.Row="0"
+                       Text="Import script"
+                       FontFamily="{StaticResource DefaultFontFamily}"
+                       FontSize="12"
+                       Foreground="{StaticResource MutedTextBrush}"
+                       Margin="2,0,0,6" />
+
+                            <TextBox Grid.Row="1"
+                     VerticalAlignment="Stretch"
+                     HorizontalAlignment="Stretch"
+                     TextWrapping="Wrap"
+                     AcceptsReturn="True"
+                     VerticalScrollBarVisibility="Auto"
+                     FontFamily="Consolas"
+                     FontSize="13"
+                     Style="{StaticResource CompactRoundedTextBoxWithPlaceholderStyle}"
+                     Tag="Write import script here.."
+                     Text="{Binding ImportScript, UpdateSourceTrigger=PropertyChanged}"
+                     VerticalContentAlignment="Top"
+                     HorizontalContentAlignment="Left"
+                     Padding="10,8,10,10"/>
+                        </Grid>
+
+                        <!-- RESULT / ACTIONS (reduced top margin to not steal height) -->
+                        <Grid Grid.Row="3" Margin="0,8,0,0">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+
+                            <TextBlock Grid.Row="0"
+                       Text="Result"
+                       FontFamily="{StaticResource DefaultFontFamily}"
+                       FontSize="12"
+                       Foreground="{StaticResource MutedTextBrush}"
+                       Margin="2,0,0,6" />
+
+                            <StackPanel Grid.Row="1" Orientation="Horizontal">
+                                <Button Style="{StaticResource RoundedButtonStyle}"
+                        Width="190"
+                        Height="37"
+                        Command="{Binding ExecuteImportScriptCommand}">
+                                    <TextBlock Text="Execute Import Script" />
+                                </Button>
+
+                                <Border Background="{StaticResource SoftGrayBrush}"
+                        CornerRadius="{StaticResource Cr12}"
+                        Padding="10"
+                        Margin="12,0,0,0"
+                        VerticalAlignment="Center">
+                                    <TextBlock Text="{Binding ImportOutput}"
+                               TextWrapping="Wrap"
+                               Foreground="Black" />
+                                </Border>
+                            </StackPanel>
+                        </Grid>
+
+                    </Grid>
+                </Border>
+
+                <!-- ===================== (3/4) DATABASE INFORMATION (minimal + labeled fields) ===================== -->
+                <Border Grid.Row="1"
+        Grid.Column="0"
+        Style="{StaticResource CardStyle}"
+        Padding="15"
+        Height="205"
+        Margin="0,0,0,12"
+        VerticalAlignment="Top">
+
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <!-- header -->
+                            <RowDefinition Height="Auto"/>
+                            <!-- label -->
+                            <RowDefinition Height="Auto"/>
+                            <!-- info card -->
+                            <RowDefinition Height="*"/>
+                            <!-- spacer -->
+                        </Grid.RowDefinitions>
+
+                        <!-- HEADER: title (left) + refresh (right) -->
+                        <Grid Grid.Row="0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+
+                            <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                                <Viewbox Width="18" Height="18" Margin="0,0,8,0">
+                                    <Path Data="{StaticResource IconInfo}"
+                          Fill="Black"
+                          Stretch="Uniform"/>
+                                </Viewbox>
+
+                                <TextBlock Text="Database Information"
+                           FontFamily="{StaticResource DefaultFontFamily}"
+                           FontSize="{StaticResource FontSizeTitle}"
+                           FontWeight="Bold"
+                           Foreground="Black" />
+                            </StackPanel>
+
+                            <Button Grid.Column="1"
+                    Style="{StaticResource RoundedButtonStyle}"
+                    Height="37"
+                    MinWidth="110"
+                    Padding="16,0"
+                    Command="{Binding RefreshInfoCommand}">
+                                <TextBlock Text="Refresh" />
+                            </Button>
+                        </Grid>
+
+                        <!-- Small label -->
+                        <TextBlock Grid.Row="1"
+                   Text="Connection details"
+                   FontFamily="{StaticResource DefaultFontFamily}"
+                   FontSize="12"
+                   Foreground="{StaticResource MutedTextBrush}"
+                   Margin="2,12,0,6" />
+
+                        <!-- INFO (clean, aligned like a mini form) -->
+                        <Border Grid.Row="2"
+                Background="{StaticResource SoftGrayBrush}"
+                CornerRadius="{StaticResource Cr12}"
+                Padding="12">
+
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="160"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+
+                                <!-- Path -->
+                                <TextBlock Grid.Row="0" Grid.Column="0"
+                           Text="Path"
+                           FontFamily="{StaticResource DefaultFontFamily}"
+                           FontSize="12"
+                           Foreground="{StaticResource MutedTextBrush}"
+                           VerticalAlignment="Top"
+                           Margin="0,2,10,8" />
+                                <TextBlock Grid.Row="0" Grid.Column="1"
+                           Text="{Binding DatabasePath}"
+                           TextWrapping="Wrap"
+                           FontFamily="{StaticResource DefaultFontFamily}"
+                           FontSize="13"
+                           Foreground="Black"
+                           Margin="0,2,0,8" />
+
+                                <!-- Size -->
+                                <TextBlock Grid.Row="1" Grid.Column="0"
+                           Text="Size"
+                           FontFamily="{StaticResource DefaultFontFamily}"
+                           FontSize="12"
+                           Foreground="{StaticResource MutedTextBrush}"
+                           Margin="0,0,10,8" />
+                                <TextBlock Grid.Row="1" Grid.Column="1"
+                           Text="{Binding DatabaseSize}"
+                           FontFamily="{StaticResource DefaultFontFamily}"
+                           FontSize="13"
+                           Foreground="Black"
+                           Margin="0,0,0,8" />
+
+                                <!-- Last modified -->
+                                <TextBlock Grid.Row="2" Grid.Column="0"
+                           Text="Last modified"
+                           FontFamily="{StaticResource DefaultFontFamily}"
+                           FontSize="12"
+                           Foreground="{StaticResource MutedTextBrush}"
+                           Margin="0,0,10,8" />
+                                <TextBlock Grid.Row="2" Grid.Column="1"
+                           Text="{Binding DatabaseLastUpdated}"
+                           FontFamily="{StaticResource DefaultFontFamily}"
+                           FontSize="13"
+                           Foreground="Black"
+                           Margin="0,0,0,8" />
+
+                            </Grid>
+                        </Border>
+                    </Grid>
+                </Border>
+
+
+            </Grid>
+        </ScrollViewer>
+    </Grid>
+</UserControl>

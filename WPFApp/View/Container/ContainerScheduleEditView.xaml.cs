@@ -10,6 +10,8 @@ using System.Windows.Data;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
+using WPFApp.Controls;
+using WPFApp.Infrastructure.ScheduleMatrix;
 using WPFApp.Service;
 using WPFApp.ViewModel.Container.Edit;
 using WPFApp.ViewModel.Container.Edit.Helpers;
@@ -65,6 +67,11 @@ namespace WPFApp.View.Container
         /// Чи зараз йде процес “малювання” (Alt+LMB + move).
         /// </summary>
         private bool _isPainting;
+
+        private bool _isDayRowDragSelecting;
+        private int _dayRowDragAnchorIndex = -1;
+        private int _dayRowDragLastIndex = -1;
+        private bool _dayRowDragKeepExisting;
 
         /// <summary>
         /// Остання клітинка, яку ми пофарбували під час drag,
@@ -588,57 +595,214 @@ namespace WPFApp.View.Container
         {
             if (_vm is null) return;
 
-            // Якщо Alt НЕ натиснутий — нічого не робимо (звичайне виділення)
+            // ---------------------------
+            // A) DAY row drag select (NO Alt)
+            // ---------------------------
             if (!Keyboard.Modifiers.HasFlag(ModifierKeys.Alt))
-                return;
+            {
+                var cell = FindParent<DataGridCell>(e.OriginalSource as DependencyObject);
+                if (cell == null) return;
 
-            // Paint дозволений тільки якщо VM увімкнув режим
+                var colName = cell.Column?.SortMemberPath ?? cell.Column?.Header?.ToString();
+                if (string.IsNullOrWhiteSpace(colName)) return;
+
+                if (string.Equals(colName, ContainerScheduleEditViewModel.DayColumnName, StringComparison.Ordinal))
+                {
+                    _dayRowDragKeepExisting = Keyboard.Modifiers.HasFlag(ModifierKeys.Control);
+
+                    // Row index anchor
+                    var row = FindParent<DataGridRow>(cell)
+                              ?? (dataGridScheduleMatrix.ItemContainerGenerator.ContainerFromItem(cell.DataContext) as DataGridRow);
+
+                    if (row == null) return;
+
+                    _isDayRowDragSelecting = true;
+                    _dayRowDragAnchorIndex = row.GetIndex();
+                    _dayRowDragLastIndex = _dayRowDragAnchorIndex;
+
+                    dataGridScheduleMatrix.Focus();
+                    dataGridScheduleMatrix.CaptureMouse();
+
+                    // Select initial single row (full row = all columns)
+                    SelectWholeRowsRange(_dayRowDragAnchorIndex, _dayRowDragAnchorIndex, _dayRowDragKeepExisting);
+
+                    e.Handled = true;
+                    return;
+                }
+
+                // не Day — нічого не робимо (даємо DataGrid своїм дефолтом)
+                return;
+            }
+
+            // ---------------------------
+            // B) твоє існуюче Alt+paint (drag single cells)
+            // ---------------------------
             if (_vm.ActivePaintMode == ContainerScheduleEditViewModel.SchedulePaintMode.None)
                 return;
 
-            // Визначаємо клітинку, по якій натиснули
-            var cell = FindParent<DataGridCell>(e.OriginalSource as DependencyObject);
-            if (cell == null) return;
+            var paintCell = FindParent<DataGridCell>(e.OriginalSource as DependencyObject);
+            if (paintCell == null) return;
 
-            if (TryGetCellReference(cell, out var cellRef))
+            if (TryGetCellReference(paintCell, out var cellRef))
             {
                 _vm.SelectedCellRef = cellRef;
-
-                // Реальна логіка “як фарбувати” всередині VM (ApplyPaintToCell)
                 _vm.ApplyPaintToCell(cellRef);
 
                 _isPainting = true;
                 _lastPaintedCell = cellRef;
 
-                // Важливо: щоб DataGrid не “перетягував” selection під час paint
                 e.Handled = true;
             }
         }
 
         private void ScheduleMatrix_MouseMove(object sender, MouseEventArgs e)
         {
-            // paint працює тільки коли LMB затиснута і ми почали paint у MouseDown
-            if (!_isPainting || _vm is null || e.LeftButton != MouseButtonState.Pressed)
-                return;
+            if (_vm is null) return;
 
-            var cell = FindParent<DataGridCell>(e.OriginalSource as DependencyObject);
-            if (cell == null) return;
-
-            if (TryGetCellReference(cell, out var cellRef))
+            // ===========================
+            // A) Day-row drag selection (NO Alt)
+            // ===========================
+            if (_isDayRowDragSelecting &&
+                e.LeftButton == MouseButtonState.Pressed &&
+                !Keyboard.Modifiers.HasFlag(ModifierKeys.Alt))
             {
-                if (_lastPaintedCell.HasValue && _lastPaintedCell.Value.Equals(cellRef))
-                    return;
+                // важливо: при MouseCapture OriginalSource часто "не той",
+                // тому беремо рядок через hit-test по позиції миші
+                if (TryGetRowIndexUnderMouse(e, out int idx))
+                {
+                    if (idx != _dayRowDragLastIndex)
+                    {
+                        SelectWholeRowsRange(_dayRowDragAnchorIndex, idx, _dayRowDragKeepExisting);
+                        _dayRowDragLastIndex = idx;
+                    }
+                }
 
-                _vm.ApplyPaintToCell(cellRef);
-                _lastPaintedCell = cellRef;
+                e.Handled = true;
+                return;
+            }
+
+            // ===========================
+            // B) Alt+paint (твій існуючий)
+            // ===========================
+            if (!_isPainting) return;
+
+            var paintCell = FindParent<DataGridCell>(e.OriginalSource as DependencyObject);
+            if (paintCell == null) return;
+
+            if (TryGetCellReference(paintCell, out var cellRef))
+            {
+                if (_lastPaintedCell == null || !_lastPaintedCell.Equals(cellRef))
+                {
+                    _vm.ApplyPaintToCell(cellRef);
+                    _lastPaintedCell = cellRef;
+                }
             }
         }
+
+        private bool TryGetRowIndexUnderMouse(MouseEventArgs e, out int rowIndex)
+        {
+            rowIndex = -1;
+
+            // позиція миші відносно DataGrid
+            var pos = e.GetPosition(dataGridScheduleMatrix);
+
+            // hit-test по цій позиції
+            var hit = dataGridScheduleMatrix.InputHitTest(pos) as DependencyObject;
+            if (hit == null) return false;
+
+            var row = FindParent<DataGridRow>(hit);
+            if (row == null) return false;
+
+            rowIndex = row.GetIndex();
+            return rowIndex >= 0;
+        }
+
+
+        private void SelectWholeRowCells(object rowItem, bool keepExistingSelection)
+        {
+            if (rowItem == null) return;
+
+            dataGridScheduleMatrix.Focus();
+
+            if (!keepExistingSelection)
+                dataGridScheduleMatrix.SelectedCells.Clear();
+
+            foreach (var col in dataGridScheduleMatrix.Columns)
+            {
+                if (col.Visibility != Visibility.Visible)
+                    continue;
+
+                // Якщо НЕ хочеш включати Conflict у виділення — розкоментуй:
+                // var name = col.SortMemberPath ?? col.Header?.ToString();
+                // if (name == ContainerScheduleEditViewModel.ConflictColumnName) continue;
+
+                dataGridScheduleMatrix.SelectedCells.Add(new DataGridCellInfo(rowItem, col));
+            }
+
+            // Повертаємо CurrentCell на Day (щоб SelectedCellRef/CurrentCell логіка лишалась прогнозованою)
+            var dayCol = dataGridScheduleMatrix.Columns.FirstOrDefault(c =>
+                string.Equals(c.SortMemberPath ?? c.Header?.ToString(),
+                              ContainerScheduleEditViewModel.DayColumnName,
+                              StringComparison.Ordinal));
+
+            if (dayCol != null)
+            {
+                dataGridScheduleMatrix.CurrentCell = new DataGridCellInfo(rowItem, dayCol);
+                dataGridScheduleMatrix.ScrollIntoView(rowItem, dayCol);
+            }
+        }
+
+        private void SelectWholeRowsRange(int a, int b, bool keepExistingSelection)
+        {
+            if (a < 0 || b < 0) return;
+            if (dataGridScheduleMatrix.Items.Count == 0) return;
+
+            int start = Math.Min(a, b);
+            int end = Math.Max(a, b);
+
+            start = Math.Max(0, start);
+            end = Math.Min(dataGridScheduleMatrix.Items.Count - 1, end);
+
+            dataGridScheduleMatrix.Focus();
+
+            if (!keepExistingSelection)
+                dataGridScheduleMatrix.SelectedCells.Clear();
+
+            var cols = dataGridScheduleMatrix.Columns
+                .Where(c => c.Visibility == Visibility.Visible)
+                .ToList();
+
+            for (int i = start; i <= end; i++)
+            {
+                var item = dataGridScheduleMatrix.Items[i];
+                foreach (var col in cols)
+                    dataGridScheduleMatrix.SelectedCells.Add(new DataGridCellInfo(item, col));
+            }
+
+            // легкий UX: тримаємо в полі зору останній рядок
+            dataGridScheduleMatrix.ScrollIntoView(dataGridScheduleMatrix.Items[end]);
+        }
+
+
 
         private void ScheduleMatrix_PreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
         {
             _isPainting = false;
             _lastPaintedCell = null;
+
+            if (_isDayRowDragSelecting)
+            {
+                _isDayRowDragSelecting = false;
+                _dayRowDragAnchorIndex = -1;
+                _dayRowDragLastIndex = -1;
+
+                if (dataGridScheduleMatrix.IsMouseCaptured)
+                    dataGridScheduleMatrix.ReleaseMouseCapture();
+
+                e.Handled = true;
+            }
         }
+
 
         private bool TryGetCellReference(DataGridCell cell, out ScheduleMatrixCellRef cellRef)
         {
@@ -688,40 +852,47 @@ namespace WPFApp.View.Container
             if (_vm is null) return;
             if (e.EditAction != DataGridEditAction.Commit) return;
             if (e.Row.Item is not DataRowView rowView) return;
-            if (e.Column is not DataGridBoundColumn boundColumn) return;
 
-            // Отримуємо “технічне” ім’я колонки з binding (наприклад [emp_12])
-            var binding = boundColumn.Binding as Binding;
-            var columnName = binding?.Path?.Path?.Trim('[', ']') ?? string.Empty;
+            // Найстабільніше ім’я колонки — SortMemberPath (ти його виставляєш у builder’і)
+            var columnName = e.Column?.SortMemberPath;
+            if (string.IsNullOrWhiteSpace(columnName)) return;
 
-            // Службові колонки не редагуємо
-            if (columnName == ContainerScheduleEditViewModel.DayColumnName
-                || columnName == ContainerScheduleEditViewModel.ConflictColumnName)
+            if (columnName == ContainerScheduleEditViewModel.DayColumnName ||
+                columnName == ContainerScheduleEditViewModel.ConflictColumnName)
                 return;
 
-            // Беремо день
             if (!int.TryParse(rowView[ContainerScheduleEditViewModel.DayColumnName]?.ToString(), out var day))
                 return;
 
-            // raw введення: або з TextBox, або fallback з rowView
-            var raw = (e.EditingElement as TextBox)?.Text ?? rowView[columnName]?.ToString() ?? string.Empty;
+            var raw = (e.EditingElement as TextBox)?.Text ?? string.Empty;
 
-            // VM повертає normalized і error (якщо невалідно)
-            if (!_vm.TryApplyMatrixEdit(columnName, day, raw, out var normalized, out var error))
+            Dispatcher.BeginInvoke(new Action(() =>
             {
-                // відкат
-                rowView[columnName] = _previousCellValue ?? ContainerScheduleEditViewModel.EmptyMark;
+                // 1) Дотиснути коміт WPF-редагування (щоб рядок вийшов з edit-mode)
+                dataGridScheduleMatrix.CommitEdit(DataGridEditingUnit.Cell, true);
+                dataGridScheduleMatrix.CommitEdit(DataGridEditingUnit.Row, true);
 
-                // показ помилки
-                if (!string.IsNullOrWhiteSpace(error))
-                    CustomMessageBox.Show("Error", error, CustomMessageBoxIcon.Error, okText: "OK");
+                // 2) Застосувати бізнес-логіку (слоти + totals + conflict)
+                if (!_vm.TryApplyMatrixEdit(columnName, day, raw, out var normalized, out var error))
+                {
+                    rowView[columnName] = _previousCellValue ?? ContainerScheduleEditViewModel.EmptyMark;
 
-                return;
-            }
+                    if (!string.IsNullOrWhiteSpace(error))
+                        CustomMessageBox.Show("Error", error, CustomMessageBoxIcon.Error, okText: "OK");
 
-            // commit нормалізованого значення
-            rowView[columnName] = normalized;
+                    return;
+                }
+
+                // 3) Закріпити нормалізоване значення
+                rowView[columnName] = normalized;
+
+                // 4) (опційно) легкий “пінок” перемальовки рядка — корисно при Recycling
+                if (dataGridScheduleMatrix.ItemContainerGenerator.ContainerFromItem(rowView) is DataGridRow dgRow)
+                    dgRow.InvalidateVisual();
+
+            }), DispatcherPriority.Background);
         }
+
 
         // =========================================================
         // Opened schedules list / buttons
@@ -850,6 +1021,17 @@ namespace WPFApp.View.Container
             _logger.LogPerf(
                 "ScheduleGrid",
                 $"ScrollChanged: V={e.VerticalOffset:F2} H={e.HorizontalOffset:F2} ΔV={e.VerticalChange:F2} ΔH={e.HorizontalChange:F2}");
+        }
+
+        private void MinHoursCell_TargetUpdated(object sender, DataTransferEventArgs e)
+        {
+            // Важливо: ValidationRule не спрацьовує на старті,
+            // тому примусово “проганяємо” source update — отримаємо Validation.HasError одразу.
+            if (sender is DependencyObject d)
+            {
+                var be = BindingOperations.GetBindingExpression(d, NumericUpDown.ValueProperty);
+                be?.UpdateSource();
+            }
         }
     }
 }

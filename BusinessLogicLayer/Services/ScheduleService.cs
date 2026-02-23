@@ -6,6 +6,10 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using System;
+using System.Globalization;
+using System.Text.RegularExpressions;
+
 
 namespace BusinessLogicLayer.Services
 {
@@ -78,15 +82,6 @@ namespace BusinessLogicLayer.Services
                 s.Employee = null;
             }
 
-#if DEBUG
-            Debug.WriteLine($"[ScheduleService] Saving {cellStyleList.Count} cell styles for schedule {scheduleId}");
-            foreach (var style in cellStyleList.Take(3))
-            {
-                Debug.WriteLine(
-                    $"[ScheduleService] Style save day={style.DayOfMonth} emp={style.EmployeeId} " +
-                    $"bg={style.BackgroundHex ?? "none"} fg={style.ForegroundHex ?? "none"}");
-            }
-#endif
 
             // replace employees
             var existingEmployees = await _employeeRepo.GetByScheduleAsync(scheduleId, ct).ConfigureAwait(false);
@@ -158,7 +153,39 @@ namespace BusinessLogicLayer.Services
             schedule.Note = string.IsNullOrWhiteSpace(schedule.Note)
                 ? null
                 : schedule.Note.Trim();
+
+            schedule.Shift1Time = NormalizeShift(schedule.Shift1Time, "Shift1");
+            schedule.Shift2Time = NormalizeShift(schedule.Shift2Time, "Shift2");
         }
+
+        private static string NormalizeShift(string? value, string label)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+                throw new ValidationException($"{label} is required.");
+
+            var s = value.Trim()
+                .Replace('–', '-')
+                .Replace('—', '-')
+                .Replace('−', '-');
+
+            var parts = s.Split('-', 2, StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length != 2)
+                throw new ValidationException($"{label} format must be HH:mm - HH:mm.");
+
+            if (!TimeSpan.TryParseExact(parts[0], new[] { @"h\:mm", @"hh\:mm" }, CultureInfo.InvariantCulture, out var from) ||
+                !TimeSpan.TryParseExact(parts[1], new[] { @"h\:mm", @"hh\:mm" }, CultureInfo.InvariantCulture, out var to))
+                throw new ValidationException($"{label} format must be HH:mm - HH:mm.");
+
+            if (to <= from)
+                throw new ValidationException($"{label} end must be later than start.");
+
+            // ВАЖЛИВО: формат БД (з пробілами)
+            return $"{from:hh\\:mm} - {to:hh\\:mm}";
+        }
+
+
+
+
 
         private static void EnsureGenerated(ScheduleModel schedule, IEnumerable<ScheduleSlotModel> slots)
         {

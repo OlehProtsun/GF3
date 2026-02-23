@@ -9,10 +9,16 @@ using WPFApp.View;
 using WPFApp.View.Availability;
 using WPFApp.View.Employee;
 using WPFApp.View.Shop;
-using WPFApp.ViewModel.Availability;
+using WPFApp.View.Home;
+using WPFApp.View.Information;
+using WPFApp.ViewModel.Availability.Main;
 using WPFApp.ViewModel.Container.Edit;
 using WPFApp.ViewModel.Employee;
+using WPFApp.ViewModel.Main;
 using WPFApp.ViewModel.Shop;
+using WPFApp.ViewModel.Database;
+using WPFApp.ViewModel.Home;
+using WPFApp.ViewModel.Information;
 
 namespace WPFApp
 {
@@ -33,14 +39,9 @@ namespace WPFApp
         private static void ConfigureServices(IServiceCollection services)
         {
             // 1) DAL/BLL як у WinForms
-            var root = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                "GF3");
-
-            Directory.CreateDirectory(root);
-
-            var dbPath = Path.Combine(root, "SQLite.db");
-            services.AddDataAccess($"Data Source={dbPath}");
+            var dbPathProvider = new WPFApp.Service.DatabasePathProvider();
+            services.AddSingleton<WPFApp.Service.IDatabasePathProvider>(dbPathProvider);
+            services.AddDataAccess(dbPathProvider.ConnectionString);
 
             services.AddBusinessLogicLayer();
 
@@ -49,23 +50,32 @@ namespace WPFApp
                                   BusinessLogicLayer.Generators.ScheduleGenerator>();
 
             // 2) Реєстрація ViewModels
-            services.AddSingleton<WPFApp.ViewModel.MainViewModel>();
+            services.AddSingleton<MainViewModel>();
+            services.AddTransient<HomeViewModel>();
             services.AddTransient<EmployeeViewModel>();
             services.AddTransient<AvailabilityViewModel>();
             services.AddTransient<ShopViewModel>();
             services.AddTransient<ContainerViewModel>();
+            services.AddTransient<InformationViewModel>();
+            services.AddTransient<DatabaseViewModel>();
 
             // 3) Реєстрація Views (Windows/UserControls)
             services.AddSingleton<MainWindow>();
 
             services.AddSingleton<WPFApp.Service.IColorPickerService, WPFApp.Service.ColorPickerService>();
+            services.AddSingleton<WPFApp.Service.ISqliteAdminService, WPFApp.Service.SqliteAdminService>();
             services.AddSingleton<WPFApp.Service.ILoggerService>(_ => WPFApp.Service.LoggerService.Instance);
+            services.AddSingleton<WPFApp.Service.IScheduleExportService, WPFApp.Service.ScheduleExportService>();
+            services.AddSingleton<WPFApp.Service.IDatabaseChangeNotifier, WPFApp.Service.DatabaseChangeNotifier>();
 
             // Якщо робиш навігацію через UserControl-и:
+            services.AddTransient<HomeView>();
             services.AddTransient<EmployeeView>();
             services.AddTransient<AvailabilityView>();
             services.AddTransient<ShopView>();
             services.AddTransient<ContainerView>();
+            services.AddTransient<InformationView>();
+            services.AddTransient<DatabaseView>();
 
             // 4) Навігація / фабрики (заміна твого MdiViewFactory)
             //services.AddSingleton<Service.NavigationService>();

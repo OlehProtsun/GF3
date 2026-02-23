@@ -5,6 +5,9 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:controls="clr-namespace:WPFApp.Controls"      
              xmlns:dt="clr-namespace:WPFApp.DesignTime"
+             xmlns:dialogs="clr-namespace:WPFApp.View.Dialogs"
+             xmlns:validation="clr-namespace:WPFApp.Infrastructure.Validation"
+             xmlns:conv="clr-namespace:WPFApp.Converters"
              mc:Ignorable="d"
              d:DesignHeight="2000" d:DesignWidth="2000"
              d:DataContext="{d:DesignInstance Type=dt:ContainerScheduleEditDesignVM, IsDesignTimeCreatable=True}"
@@ -12,6 +15,63 @@
 
     <UserControl.Resources>
 
+        <validation:FirstValidationErrorConverter x:Key="FirstValidationErrorConverter"/>
+
+
+        <!-- ЄДИНІ кисті для validation -->
+        <SolidColorBrush x:Key="FieldErrorBorderBrush" Color="#E53935"/>
+        <SolidColorBrush x:Key="FieldErrorFillBrush" Color="#FFFFEBEE"/>
+
+        <!-- "КВАДРАТНИЙ" бордер-адорнер навколо контролу -->
+        <ControlTemplate x:Key="SquareRedErrorTemplate">
+            <Border BorderBrush="{StaticResource FieldErrorBorderBrush}"
+            BorderThickness="2"
+            CornerRadius="2"
+            SnapsToDevicePixels="True">
+                <AdornedElementPlaceholder/>
+            </Border>
+        </ControlTemplate>
+
+        <ControlTemplate x:Key="InlineRedErrorTemplate">
+            <Border BorderBrush="#E53935" BorderThickness="2" CornerRadius="8" SnapsToDevicePixels="True">
+                <AdornedElementPlaceholder/>
+            </Border>
+        </ControlTemplate>
+
+        <!-- ComboBox validation style -->
+        <Style x:Key="ValidatedRoundedComboBoxStyle"
+       TargetType="{x:Type ComboBox}"
+       BasedOn="{StaticResource RoundedComboBoxStyle}">
+            <Setter Property="Validation.ErrorTemplate" Value="{StaticResource SquareRedErrorTemplate}"/>
+            <Style.Triggers>
+                <Trigger Property="Validation.HasError" Value="True">
+                    <Setter Property="Background" Value="{StaticResource FieldErrorFillBrush}"/>
+                    <Setter Property="BorderBrush" Value="{StaticResource FieldErrorBorderBrush}"/>
+                    <Setter Property="ToolTip"
+        Value="{Binding RelativeSource={RelativeSource Self},
+                        Path=(Validation.Errors),
+                        Converter={StaticResource FirstValidationErrorConverter}}"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <!-- NumericUpDown validation style -->
+        <Style x:Key="ValidatedNumericUpDownStyle"
+       TargetType="{x:Type controls:NumericUpDown}">
+            <Setter Property="Validation.ErrorTemplate" Value="{StaticResource SquareRedErrorTemplate}"/>
+            <Style.Triggers>
+                <Trigger Property="Validation.HasError" Value="True">
+                    <Setter Property="Background" Value="{StaticResource FieldErrorFillBrush}"/>
+                    <Setter Property="BorderBrush" Value="{StaticResource FieldErrorBorderBrush}"/>
+                    <Setter Property="BorderThickness" Value="2"/>
+                    <Setter Property="ToolTip"
+        Value="{Binding RelativeSource={RelativeSource Self},
+                        Path=(Validation.Errors),
+                        Converter={StaticResource FirstValidationErrorConverter}}"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+        
         <Style x:Key="SideCardTitleTextStyle" TargetType="TextBlock">
             <Setter Property="Visibility" Value="Visible"/>
             <Style.Triggers>
@@ -26,14 +86,6 @@
             </Style.Triggers>
         </Style>
 
-
-
-
-        <!-- =============================================================
-             Shared templates/styles for ComboBox virtualization.
-             Defined once to avoid repeating the same XAML blocks in each ComboBox.
-             DOES NOT change the UI appearance; it only improves performance and maintainability.
-             ============================================================= -->
         <ItemsPanelTemplate x:Key="VirtualizingComboItemsPanel">
             <VirtualizingStackPanel />
         </ItemsPanelTemplate>
@@ -79,10 +131,6 @@
             </Setter>
         </Style>
 
-
-
-
-
         <Style x:Key="SplitMainButtonPressStyle"
        TargetType="Button"
        BasedOn="{StaticResource RoundedButtonStyle}">
@@ -104,7 +152,6 @@
                 </Trigger>
             </Style.Triggers>
         </Style>
-
 
         <!-- Rounded vertical ScrollBar -->
         <Style x:Key="LeftRoundedScrollBarStyle" TargetType="{x:Type ScrollBar}">
@@ -273,33 +320,6 @@
                                 <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource NeonBlueBrush}"/>
                             </Trigger>
 
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Trigger.EnterActions>
-                                    <BeginStoryboard>
-                                        <Storyboard>
-                                            <DoubleAnimation Storyboard.TargetName="Scale"
-                                                     Storyboard.TargetProperty="ScaleX"
-                                                     To="1.03" Duration="0:0:0.10"/>
-                                            <DoubleAnimation Storyboard.TargetName="Scale"
-                                                     Storyboard.TargetProperty="ScaleY"
-                                                     To="1.03" Duration="0:0:0.10"/>
-                                        </Storyboard>
-                                    </BeginStoryboard>
-                                </Trigger.EnterActions>
-                                <Trigger.ExitActions>
-                                    <BeginStoryboard>
-                                        <Storyboard>
-                                            <DoubleAnimation Storyboard.TargetName="Scale"
-                                                     Storyboard.TargetProperty="ScaleX"
-                                                     To="1" Duration="0:0:0.12"/>
-                                            <DoubleAnimation Storyboard.TargetName="Scale"
-                                                     Storyboard.TargetProperty="ScaleY"
-                                                     To="1" Duration="0:0:0.12"/>
-                                        </Storyboard>
-                                    </BeginStoryboard>
-                                </Trigger.ExitActions>
-                            </Trigger>
-
                             <Trigger Property="IsMouseCaptured" Value="True">
                                 <Trigger.EnterActions>
                                     <BeginStoryboard>
@@ -376,69 +396,85 @@
         </Style>
 
         <BooleanToVisibilityConverter x:Key="BoolToVis"/>
+        
+        <Style x:Key="ValidatedRoundedTextBoxStyle"
+       TargetType="{x:Type TextBox}"
+       BasedOn="{StaticResource RoundedTextBoxWithPlaceholderStyle}">
+            <Setter Property="Validation.ErrorTemplate" Value="{StaticResource SquareRedErrorTemplate}"/>
+            <Style.Triggers>
+                <Trigger Property="Validation.HasError" Value="True">
+                    <Setter Property="Background" Value="{StaticResource FieldErrorFillBrush}"/>
+                    <Setter Property="BorderBrush" Value="{StaticResource FieldErrorBorderBrush}"/>
+                    <Setter Property="BorderThickness" Value="2"/>
+                    <Setter Property="ToolTip"
+        Value="{Binding RelativeSource={RelativeSource Self},
+                        Path=(Validation.Errors),
+                        Converter={StaticResource FirstValidationErrorConverter}}"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
 
     </UserControl.Resources>
 
+        <Grid ClipToBounds="False">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+            <Border Grid.Row="0" Style="{StaticResource TopCardStyle}" Margin="9,8,9,0">
+                <Grid>
+                    <!-- 1) Ліва фіксована (Auto), права росте (*) -->
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
 
-    <Grid ClipToBounds="False">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="*" />
-        </Grid.RowDefinitions>
-        <Border Grid.Row="0" Style="{StaticResource TopCardStyle}" Margin="9,8,9,0">
-            <Grid>
-                <!-- 1) Ліва фіксована (Auto), права росте (*) -->
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="*" />
-                </Grid.ColumnDefinitions>
+                    <!-- LEFT: заголовки, обмежуємо ширину щоб була "фіксована" -->
+                    <Grid Grid.Column="0" MinWidth="360" MaxWidth="420">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
 
-                <!-- LEFT: заголовки, обмежуємо ширину щоб була "фіксована" -->
-                <Grid Grid.Column="0" MinWidth="360" MaxWidth="420">
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
-                    </Grid.RowDefinitions>
-
-                    <Button Grid.Row="0"
+                        <Button Grid.Row="0"
                     HorizontalAlignment="Left"
                     Style="{StaticResource BackButtonSmallStyle}"
                     Command="{Binding CancelCommand}"
                     Width="62">
-                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                            <Viewbox Width="14" Height="14" Margin="0,0,6,0">
-                                <Path Data="{StaticResource BackSvgIconGeometry}"
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <Viewbox Width="14" Height="14" Margin="0,0,6,0">
+                                    <Path Data="{StaticResource BackSvgIconGeometry}"
                               Stretch="Uniform"
                               Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
-                            </Viewbox>
-                            <TextBlock Text="Back"
+                                </Viewbox>
+                                <TextBlock Text="Back"
                                Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
-                        </StackPanel>
-                    </Button>
+                            </StackPanel>
+                        </Button>
 
-                    <TextBlock Grid.Row="1"
+                        <TextBlock Grid.Row="1"
                        Margin="0,10,0,0"
                        Text="{Binding FormTitle}"
                        FontFamily="{StaticResource DefaultFontFamily}"
                        FontSize="{StaticResource FontSizePageTitle}"
                        Foreground="Black" />
 
-                    <TextBlock Grid.Row="2"
+                        <TextBlock Grid.Row="2"
                        Margin="0,15,0,0"
                        Text="{Binding FormSubtitle}"
                        FontFamily="{StaticResource DefaultFontFamily}"
                        FontSize="17"
                        Foreground="{StaticResource SecondaryTextBrush}" />
-                </Grid>
+                    </Grid>
 
-                <!-- RIGHT: ростягується і дає більше місця під chips -->
-                <Grid Grid.Column="1" Margin="16,0,0,0">
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="*" />
-                        <RowDefinition Height="Auto" />
-                    </Grid.RowDefinitions>
-                    <!-- =========================================================
+                    <!-- RIGHT: ростягується і дає більше місця під chips -->
+                    <Grid Grid.Column="1" Margin="16,0,0,0">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="*" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+                        <!-- =========================================================
      Schedules (Multi OPEN) – красивіше: title + counter + actions,
      горизонтальний скрол з “fade”, чіпи з іконкою/ховером/активом,
      кнопка Add як кругла.
@@ -447,94 +483,94 @@
      InlineSectionCardStyle, RoundedButtonStyle, MutedTextBrush, DefaultFontFamily.
 ========================================================= -->
 
-                    <Border Grid.Row="1"
+                        <Border Grid.Row="1"
                         HorizontalAlignment="Right"
                         VerticalAlignment="Bottom"
                         Margin="0,0,0,-2"
                         Style="{StaticResource InlineSectionCardStyle}"
                         Padding="10">
 
-                        <Grid>
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="10"/>
-                                <RowDefinition Height="Auto"/>
-                            </Grid.RowDefinitions>
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="10"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
 
-                            <!-- Header -->
-                            <Grid Grid.Row="0">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                    <ColumnDefinition Width="0"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                </Grid.ColumnDefinitions>
+                                <!-- Header -->
+                                <Grid Grid.Row="0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="0"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
 
-                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                    <!-- маленька “іконка” (крапка) -->
-                                    <Border Width="10" Height="10" CornerRadius="5"
+                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                        <!-- маленька “іконка” (крапка) -->
+                                        <Border Width="10" Height="10" CornerRadius="5"
                         Background="#2F80ED"
                         Margin="0,0,8,0"/>
 
-                                    <TextBlock Text="Schedules"
+                                        <TextBlock Text="Schedules"
                                        FontFamily="{StaticResource DefaultFontFamily}"
                                        FontSize="15"
                                        FontWeight="SemiBold"
                                        Foreground="Black"/>
 
-                                    <Border Margin="10,0,0,0"
+                                        <Border Margin="10,0,0,0"
                                         Padding="8,2"
                                         CornerRadius="10"
                                         Background="#14000000">
-                                        <TextBlock FontSize="12"
+                                            <TextBlock FontSize="12"
                                    Foreground="{StaticResource MutedTextBrush}">
                                         <Run Text="{Binding OpenedSchedules.Count, Mode=OneWay}"/>
                                         <Run Text=" open"/>
-                                        </TextBlock>
-                                    </Border>
-                                </StackPanel>
+                                            </TextBlock>
+                                        </Border>
+                                    </StackPanel>
 
-                                <!-- Save -->
-                                <Button Grid.Column="1"
+                                    <!-- Save -->
+                                    <Button Grid.Column="1"
                                     Style="{StaticResource RoundedButtonStyle}"
                                     Height="34"
                                     Padding="14,0"
                                         Margin="8,0,0,0"
                                     Command="{Binding SaveCommand}">
-                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                        <Viewbox Width="18" Height="18" Margin="0,0,8,0">
-                                            <Path Data="{StaticResource IconSave}"
+                                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                            <Viewbox Width="18" Height="18" Margin="0,0,8,0">
+                                                <Path Data="{StaticResource IconSave}"
                                               Fill="White"
                                               Stretch="Uniform"
                                               RenderTransformOrigin="0.5,0.5">
-                                                <Path.RenderTransform>
-                                                    <ScaleTransform ScaleX="1" ScaleY="-1"/>
-                                                </Path.RenderTransform>
-                                            </Path>
-                                        </Viewbox>
+                                                    <Path.RenderTransform>
+                                                        <ScaleTransform ScaleX="1" ScaleY="-1"/>
+                                                    </Path.RenderTransform>
+                                                </Path>
+                                            </Viewbox>
 
-                                        <TextBlock Text="Save" Foreground="White" VerticalAlignment="Center"/>
-                                    </StackPanel>
-                                </Button>
+                                            <TextBlock Text="Save" Foreground="White" VerticalAlignment="Center"/>
+                                        </StackPanel>
+                                    </Button>
 
 
-                                <!-- (опціонально) ще одна action-кнопка: Close active -->
-                            </Grid>
+                                    <!-- (опціонально) ще одна action-кнопка: Close active -->
+                                </Grid>
 
-                            <!-- Chips row -->
-                            <Grid Grid.Row="2">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="10"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                </Grid.ColumnDefinitions>
+                                <!-- Chips row -->
+                                <Grid Grid.Row="2">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="10"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
 
-                                <!-- Scroll + fade edges -->
-                                <!-- Scroll + fade edges (НЕ обрізаємо таби) -->
-                                <Grid Grid.Column="0"
+                                    <!-- Scroll + fade edges -->
+                                    <!-- Scroll + fade edges (НЕ обрізаємо таби) -->
+                                    <Grid Grid.Column="0"
                                   ClipToBounds="False"
                                   Margin="0,-2,0,-2">
-                                    <ScrollViewer Style="{StaticResource TabsScrollViewerStyle}"
+                                        <ScrollViewer Style="{StaticResource TabsScrollViewerStyle}"
                                           HorizontalScrollBarVisibility="Auto"
                                           VerticalScrollBarVisibility="Disabled"
                                           PanningMode="HorizontalOnly"
@@ -542,9 +578,9 @@
                                           ClipToBounds="False"
                                           Padding="0,2,0,2">
 
-                                        <ListBox x:Name="OpenedSchedulesListBox"
+                                            <ListBox x:Name="OpenedSchedulesListBox"
                                              ItemsSource="{Binding OpenedSchedules}"
-                                             SelectedItem="{Binding ActiveSchedule, Mode=TwoWay}"
+                                             SelectedItem="{Binding ActiveSchedule, Mode=OneWay}"
                                              SelectionChanged="OpenedSchedulesListBox_SelectionChanged"
                                              BorderThickness="0"
                                              Background="Transparent"
@@ -552,65 +588,65 @@
                                              ScrollViewer.VerticalScrollBarVisibility="Disabled"
                                              ItemContainerStyle="{StaticResource ScheduleChipItemStyle}">
 
-                                            <ListBox.ItemsPanel>
-                                                <ItemsPanelTemplate>
-                                                    <StackPanel Orientation="Horizontal"/>
-                                                </ItemsPanelTemplate>
-                                            </ListBox.ItemsPanel>
+                                                <ListBox.ItemsPanel>
+                                                    <ItemsPanelTemplate>
+                                                        <StackPanel Orientation="Horizontal"/>
+                                                    </ItemsPanelTemplate>
+                                                </ListBox.ItemsPanel>
 
 
-                                            <ListBox.ItemTemplate>
-                                                <DataTemplate>
-                                                    <Grid VerticalAlignment="Center">
-                                                        <Grid.ColumnDefinitions>
-                                                            <ColumnDefinition Width="Auto"/>
-                                                            <ColumnDefinition Width="Auto"/>
-                                                        </Grid.ColumnDefinitions>
+                                                <ListBox.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <Grid VerticalAlignment="Center">
+                                                            <Grid.ColumnDefinitions>
+                                                                <ColumnDefinition Width="Auto"/>
+                                                                <ColumnDefinition Width="Auto"/>
+                                                            </Grid.ColumnDefinitions>
 
-                                                        <Border Grid.Column="0"
+                                                            <Border Grid.Column="0"
                                 Background="Transparent"
                                 Padding="10,2">
-                                                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                                                <Border x:Name="Dot"
+                                                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                                    <Border x:Name="Dot"
                                         Width="8" Height="8"
                                         CornerRadius="4"
                                         Background="#22000000"
                                         Margin="0,0,6,0"/>
-                                                                <TextBlock FontSize="12" Foreground="Black">
+                                                                    <TextBlock FontSize="12" Foreground="Black">
                                     <Run Text="{Binding Model.Name}"/>
-                                                                </TextBlock>
-                                                            </StackPanel>
-                                                        </Border>
+                                                                    </TextBlock>
+                                                                </StackPanel>
+                                                            </Border>
 
-                                                        <Button Grid.Column="1"
+                                                            <Button Grid.Column="1"
                                 Style="{StaticResource ScheduleChipInnerButtonStyle}"
                                 Padding="4,0,6,0"
                                 Width="22"
                                 Click="ScheduleBlockClose_Click">
-                                                            <TextBlock Text="×" FontSize="18" Foreground="#99000000"/>
-                                                        </Button>
-                                                    </Grid>
+                                                                <TextBlock Text="×" FontSize="18" Foreground="#99000000"/>
+                                                            </Button>
+                                                        </Grid>
 
-                                                    <DataTemplate.Triggers>
-                                                        <DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=ListBoxItem}}"
+                                                        <DataTemplate.Triggers>
+                                                            <DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=ListBoxItem}}"
                                      Value="True">
-                                                            <Setter TargetName="Dot" Property="Background" Value="{StaticResource NeonBlueBrush}"/>
-                                                        </DataTrigger>
+                                                                <Setter TargetName="Dot" Property="Background" Value="{StaticResource NeonBlueBrush}"/>
+                                                            </DataTrigger>
 
-                                                        <DataTrigger Binding="{Binding IsMouseOver, RelativeSource={RelativeSource AncestorType=ListBoxItem}}"
+                                                            <DataTrigger Binding="{Binding IsMouseOver, RelativeSource={RelativeSource AncestorType=ListBoxItem}}"
                                      Value="True">
-                                                            <Setter TargetName="Dot" Property="Background" Value="#662F80ED"/>
-                                                        </DataTrigger>
-                                                    </DataTemplate.Triggers>
-                                                </DataTemplate>
-                                            </ListBox.ItemTemplate>
+                                                                <Setter TargetName="Dot" Property="Background" Value="#662F80ED"/>
+                                                            </DataTrigger>
+                                                        </DataTemplate.Triggers>
+                                                    </DataTemplate>
+                                                </ListBox.ItemTemplate>
 
-                                        </ListBox>
-                                    </ScrollViewer>
-                                </Grid>
+                                            </ListBox>
+                                        </ScrollViewer>
+                                    </Grid>
 
-                                <!-- Add button (кругла) -->
-                                <Button Grid.Column="2"
+                                    <!-- Add button (кругла) -->
+                                    <Button Grid.Column="2"
                                     Width="36"
                                     Height="36"
                                     Margin="0"
@@ -621,360 +657,368 @@
                                     Foreground="White"
                                     HorizontalAlignment="Right"
                                     VerticalAlignment="Center">
-                                    <Button.Template>
-                                        <ControlTemplate TargetType="Button">
-                                            <Border x:Name="Bd"
+                                        <Button.Template>
+                                            <ControlTemplate TargetType="Button">
+                                                <Border x:Name="Bd"
                                                 Background="{TemplateBinding Background}"
                                                 CornerRadius="12">
-                                                <ContentPresenter HorizontalAlignment="Center"
+                                                    <ContentPresenter HorizontalAlignment="Center"
                                               VerticalAlignment="Center"/>
-                                            </Border>
-                                            <ControlTemplate.Triggers>
-                                                <Trigger Property="IsMouseOver" Value="True">
-                                                    <Setter TargetName="Bd" Property="Opacity" Value="0.92"/>
-                                                </Trigger>
-                                                <Trigger Property="IsPressed" Value="True">
-                                                    <Setter TargetName="Bd" Property="RenderTransformOrigin" Value="0.5,0.5"/>
-                                                    <Setter TargetName="Bd" Property="RenderTransform">
-                                                        <Setter.Value>
-                                                            <ScaleTransform ScaleX="0.96" ScaleY="0.96"/>
-                                                        </Setter.Value>
-                                                    </Setter>
-                                                </Trigger>
-                                                <Trigger Property="IsEnabled" Value="False">
-                                                    <Setter TargetName="Bd" Property="Opacity" Value="0.45"/>
-                                                </Trigger>
-                                            </ControlTemplate.Triggers>
-                                        </ControlTemplate>
-                                    </Button.Template>
+                                                </Border>
+                                                <ControlTemplate.Triggers>
+                                                    <Trigger Property="IsMouseOver" Value="True">
+                                                        <Setter TargetName="Bd" Property="Opacity" Value="0.92"/>
+                                                    </Trigger>
+                                                    <Trigger Property="IsPressed" Value="True">
+                                                        <Setter TargetName="Bd" Property="RenderTransformOrigin" Value="0.5,0.5"/>
+                                                        <Setter TargetName="Bd" Property="RenderTransform">
+                                                            <Setter.Value>
+                                                                <ScaleTransform ScaleX="0.96" ScaleY="0.96"/>
+                                                            </Setter.Value>
+                                                        </Setter>
+                                                    </Trigger>
+                                                    <Trigger Property="IsEnabled" Value="False">
+                                                        <Setter TargetName="Bd" Property="Opacity" Value="0.45"/>
+                                                    </Trigger>
+                                                </ControlTemplate.Triggers>
+                                            </ControlTemplate>
+                                        </Button.Template>
 
-                                    <TextBlock Text="＋" FontSize="14" FontWeight="SemiBold"/>
-                                </Button>
+                                        <TextBlock Text="＋" FontSize="14" FontWeight="SemiBold"/>
+                                    </Button>
+                                </Grid>
                             </Grid>
-                        </Grid>
-                    </Border>
+                        </Border>
+                    </Grid>
                 </Grid>
-            </Grid>
-        </Border>
+            </Border>
 
-        <Grid Grid.Row="1" Margin="9,10,9,10">
-            <Grid.ColumnDefinitions>
+            <Grid Grid.Row="1" Margin="9,10,9,10">
+                <Grid.ColumnDefinitions>
 
-                <!-- LEFT PANEL -->
-                <ColumnDefinition>
-                    <ColumnDefinition.Style>
-                        <Style TargetType="ColumnDefinition">
-                            <!-- як зараз -->
-                            <Setter Property="Width" Value="380"/>
-                            <Style.Triggers>
-                                <!-- compact тільки коли ВСІ закриті -->
-                                <MultiDataTrigger>
-                                    <MultiDataTrigger.Conditions>
-                                        <Condition Binding="{Binding IsChecked, ElementName=DetailsToggle}" Value="False"/>
-                                        <Condition Binding="{Binding IsChecked, ElementName=EmployeesToggle}" Value="False"/>
-                                        <Condition Binding="{Binding IsChecked, ElementName=NoteToggle}" Value="False"/>
-                                    </MultiDataTrigger.Conditions>
-                                    <!-- підбери під свою кнопку Show; стартово раджу 200 -->
-                                    <Setter Property="Width" Value="140"/>
-                                </MultiDataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </ColumnDefinition.Style>
-                </ColumnDefinition>
+                    <!-- LEFT PANEL -->
+                    <ColumnDefinition>
+                        <ColumnDefinition.Style>
+                            <Style TargetType="ColumnDefinition">
+                                <!-- як зараз -->
+                                <Setter Property="Width" Value="380"/>
+                                <Style.Triggers>
+                                    <!-- compact тільки коли ВСІ закриті -->
+                                    <MultiDataTrigger>
+                                        <MultiDataTrigger.Conditions>
+                                            <Condition Binding="{Binding IsChecked, ElementName=DetailsToggle}" Value="False"/>
+                                            <Condition Binding="{Binding IsChecked, ElementName=EmployeesToggle}" Value="False"/>
+                                            <Condition Binding="{Binding IsChecked, ElementName=NoteToggle}" Value="False"/>
+                                        </MultiDataTrigger.Conditions>
+                                        <!-- підбери під свою кнопку Show; стартово раджу 200 -->
+                                        <Setter Property="Width" Value="140"/>
+                                    </MultiDataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </ColumnDefinition.Style>
+                    </ColumnDefinition>
 
-                <!-- GAP між панелями -->
-                <ColumnDefinition>
-                    <ColumnDefinition.Style>
-                        <Style TargetType="ColumnDefinition">
-                            <Setter Property="Width" Value="10"/>
-                            <Style.Triggers>
-                                <MultiDataTrigger>
-                                    <MultiDataTrigger.Conditions>
-                                        <Condition Binding="{Binding IsChecked, ElementName=DetailsToggle}" Value="False"/>
-                                        <Condition Binding="{Binding IsChecked, ElementName=EmployeesToggle}" Value="False"/>
-                                        <Condition Binding="{Binding IsChecked, ElementName=NoteToggle}" Value="False"/>
-                                    </MultiDataTrigger.Conditions>
-                                    <Setter Property="Width" Value="0"/>
-                                </MultiDataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </ColumnDefinition.Style>
-                </ColumnDefinition>
+                    <!-- GAP між панелями -->
+                    <ColumnDefinition>
+                        <ColumnDefinition.Style>
+                            <Style TargetType="ColumnDefinition">
+                                <Setter Property="Width" Value="10"/>
+                                <Style.Triggers>
+                                    <MultiDataTrigger>
+                                        <MultiDataTrigger.Conditions>
+                                            <Condition Binding="{Binding IsChecked, ElementName=DetailsToggle}" Value="False"/>
+                                            <Condition Binding="{Binding IsChecked, ElementName=EmployeesToggle}" Value="False"/>
+                                            <Condition Binding="{Binding IsChecked, ElementName=NoteToggle}" Value="False"/>
+                                        </MultiDataTrigger.Conditions>
+                                        <Setter Property="Width" Value="0"/>
+                                    </MultiDataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </ColumnDefinition.Style>
+                    </ColumnDefinition>
 
-                <!-- MAIN -->
-                <ColumnDefinition Width="*"/>
+                    <!-- MAIN -->
+                    <ColumnDefinition Width="*"/>
 
-            </Grid.ColumnDefinitions>
+                </Grid.ColumnDefinitions>
 
 
-            <Grid Grid.Column="0">
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="*" />
-                    <RowDefinition Height="Auto" />
-                </Grid.RowDefinitions>
+                <Grid Grid.Column="0">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
 
-                <!-- LEFT SIDE (scroll) -->
-                <ScrollViewer Grid.Row="0"
+                    <!-- LEFT SIDE (scroll) -->
+                    <ScrollViewer Grid.Row="0"
                       Style="{StaticResource LeftScrollViewerStyle}"
                       VerticalScrollBarVisibility="Auto"
                       HorizontalScrollBarVisibility="Disabled"
                       Padding="0,12,0,12"
                       ClipToBounds="False">
 
-                    <StackPanel ClipToBounds="False">
+                        <StackPanel ClipToBounds="False">
 
-                        <!-- Spacer for first card shadow -->
-                        <Border Height="6" Background="Transparent" />
+                            <!-- Spacer for first card shadow -->
+                            <Border Height="6" Background="Transparent" />
 
-                        <!-- ===================== CARD 1: Schedule Details ===================== -->
-                        <Border Style="{StaticResource CardStyle}" Margin="7,0,7,16">
-                            <Grid>
-                                <Grid.RowDefinitions>
-                                    <RowDefinition Height="Auto" />
-                                    <RowDefinition Height="*" />
-                                    <RowDefinition Height="Auto" />
-                                </Grid.RowDefinitions>
+                            <!-- ===================== CARD 1: Schedule Details ===================== -->
+                            <Border Style="{StaticResource CardStyle}" Margin="7,0,7,16">
+                                <Grid>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="*" />
+                                        <RowDefinition Height="Auto" />
+                                    </Grid.RowDefinitions>
 
-                                <!-- HEADER -->
-                                <Grid Grid.Row="0" Margin="15,10,10,10">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
-                                    </Grid.ColumnDefinitions>
+                                    <!-- HEADER -->
+                                    <Grid Grid.Row="0" Margin="15,10,10,10">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
 
-                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                        <Viewbox Width="20" Height="20" Margin="0,0,8,0">
-                                            <Path Data="{StaticResource IconScheduleDetails}"
+                                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                            <Viewbox Width="20" Height="20" Margin="0,0,8,0">
+                                                <Path Data="{StaticResource IconScheduleDetails}"
                                                   Fill="Black"
                                                   Stretch="Uniform"
                                                   RenderTransformOrigin="0.5,0.5">
-                                                <Path.RenderTransform>
-                                                    <ScaleTransform ScaleX="1" ScaleY="-1" />
-                                                </Path.RenderTransform>
-                                            </Path>
-                                        </Viewbox>
+                                                    <Path.RenderTransform>
+                                                        <ScaleTransform ScaleX="1" ScaleY="-1" />
+                                                    </Path.RenderTransform>
+                                                </Path>
+                                            </Viewbox>
 
-                                        <TextBlock Text="Schedule Details"
+                                            <TextBlock Text="Schedule Details"
                                         Style="{StaticResource SideCardTitleTextStyle}" 
                                        FontFamily="{StaticResource DefaultFontFamily}"
                                        FontSize="{StaticResource FontSizeTitle}"
                                        FontWeight="Bold"
                                        Foreground="Black"
                                        VerticalAlignment="Center" />
-                                    </StackPanel>
+                                        </StackPanel>
 
-                                    <ToggleButton x:Name="DetailsToggle"
+                                        <ToggleButton x:Name="DetailsToggle"
                                       Grid.Column="1"
                                       Style="{StaticResource HideShowToggleStyle}"
                                       IsChecked="True" />
-                                </Grid>
+                                    </Grid>
 
-                                <!-- BODY -->
-                                <Grid Grid.Row="1"
+                                    <!-- BODY -->
+                                    <Grid Grid.Row="1"
                                       Margin="10,0,10,10"
                                       Visibility="{Binding IsChecked, ElementName=DetailsToggle, Converter={StaticResource BoolToVis}}">
 
-                                    <Grid.RowDefinitions>
-                                        <RowDefinition Height="Auto"/>
-                                        <!-- ID -->
-                                        <RowDefinition Height="Auto"/>
-                                        <!-- компактні поля -->
-                                        <RowDefinition Height="Auto"/>
-                                        <!-- Shop + Availability -->
-                                        <RowDefinition Height="Auto"/>
-                                        <!-- MinHours grid -->
-                                    </Grid.RowDefinitions>
-
-                                    <!-- Schedules blocks (chips) -->
-                                    <StackPanel Grid.Row="0">
-
-                                        <Grid Margin="0,6,0,0">
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="*" />
-                                                <ColumnDefinition Width="Auto" />
-                                            </Grid.ColumnDefinitions>
-                                        </Grid>
-                                    </StackPanel>
-
-                                    <!-- Main fields (compact) -->
-                                    <Grid Grid.Row="1" Margin="0,10,0,0">
                                         <Grid.RowDefinitions>
                                             <RowDefinition Height="Auto"/>
-                                            <!-- Schedule ID -->
+                                            <!-- ID -->
                                             <RowDefinition Height="Auto"/>
-                                            <!-- Compact fields -->
+                                            <!-- компактні поля -->
                                             <RowDefinition Height="Auto"/>
                                             <!-- Shop + Availability -->
                                             <RowDefinition Height="Auto"/>
-                                            <!-- Min Hours grid -->
+                                            <!-- MinHours grid -->
                                         </Grid.RowDefinitions>
 
-                                        <!-- Schedule ID окремо (бо це просто текст) -->
-                                        <Grid Grid.Row="0" Margin="0,0,0,10">
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="Auto"/>
-                                                <ColumnDefinition Width="*"/>
-                                            </Grid.ColumnDefinitions>
+                                        <!-- Schedules blocks (chips) -->
+                                        <StackPanel Grid.Row="0">
 
-                                            <TextBlock Grid.Column="0"
+                                            <Grid Margin="0,6,0,0">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+                                            </Grid>
+                                        </StackPanel>
+
+                                        <!-- Main fields (compact) -->
+                                        <Grid Grid.Row="1" Margin="0,10,0,0">
+                                            <Grid.RowDefinitions>
+                                                <RowDefinition Height="Auto"/>
+                                                <!-- Schedule ID -->
+                                                <RowDefinition Height="Auto"/>
+                                                <!-- Compact fields -->
+                                                <RowDefinition Height="Auto"/>
+                                                <!-- Shop + Availability -->
+                                                <RowDefinition Height="Auto"/>
+                                                <!-- Min Hours grid -->
+                                            </Grid.RowDefinitions>
+
+                                            <!-- Schedule ID окремо (бо це просто текст) -->
+                                            <Grid Grid.Row="0" Margin="0,0,0,10">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                </Grid.ColumnDefinitions>
+
+                                                <TextBlock Grid.Column="0"
                                                 Text="Schedule ID:"
                                                 Style="{StaticResource FieldLabelStyle}"
                                                 Margin="0,0,6,0"/>
 
-                                            <TextBlock Grid.Column="1"
+                                                <TextBlock Grid.Column="1"
                                                Text="{Binding ScheduleId}"
                                                FontFamily="{StaticResource DefaultFontFamily}"
                                                FontSize="13"
                                                Foreground="Black"
                                                VerticalAlignment="Center"/>
-                                        </Grid>
+                                            </Grid>
 
 
-                                        <!-- 2 колонки полів -->
-                                        <UniformGrid Grid.Row="1" Columns="2">
+                                            <!-- 2 колонки полів -->
+                                            <UniformGrid Grid.Row="1" Columns="2">
 
-                                            <!-- Name (на всю ширину) -->
-                                            <Grid Margin="0,0,10,10">
+                                                <!-- Name (на всю ширину) -->
+                                                <Grid Margin="0,0,10,10">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*"/>
+                                                    </Grid.ColumnDefinitions>
+
+                                                    <StackPanel>
+                                                        <TextBlock Text="Name" Style="{StaticResource FieldLabelStyle}" />
+                                                        <TextBox Style="{StaticResource ValidatedRoundedTextBoxStyle}"
+                                                             Tag="Enter schedule name..."
+                                                         Text="{Binding ScheduleName, UpdateSourceTrigger=PropertyChanged, ValidatesOnNotifyDataErrors=True, Mode=TwoWay}" />
+                                                    </StackPanel>
+                                                </Grid>
+
+                                                <!-- People per shift -->
+                                                <StackPanel Style="{StaticResource FieldBlockStyle}">
+                                                    <TextBlock Text="People/shift" Style="{StaticResource FieldLabelStyle}" />
+                                                    <controls:NumericUpDown Height="33"
+                        Style="{StaticResource ValidatedNumericUpDownStyle}"
+                        Minimum="1" Maximum="50" Step="1"
+                        Value="{Binding SchedulePeoplePerShift, UpdateSourceTrigger=PropertyChanged, ValidatesOnNotifyDataErrors=True}" />
+                                                </StackPanel>
+
+                                                <!-- Month -->
+                                                <StackPanel Style="{StaticResource FieldBlockStyle}">
+                                                    <TextBlock Text="Month" Style="{StaticResource FieldLabelStyle}" />
+                                                    <controls:NumericUpDown Height="33"
+                        Style="{StaticResource ValidatedNumericUpDownStyle}"
+                        Minimum="1" Maximum="12" Step="1"
+                        Value="{Binding ScheduleMonth, UpdateSourceTrigger=PropertyChanged, ValidatesOnNotifyDataErrors=True}" />
+                                                </StackPanel>
+
+                                                <!-- Year -->
+                                                <StackPanel Style="{StaticResource FieldBlockStyle}">
+                                                    <TextBlock Text="Year" Style="{StaticResource FieldLabelStyle}" />
+                                                    <controls:NumericUpDown Height="33"
+                        Style="{StaticResource ValidatedNumericUpDownStyle}"
+                        Minimum="2000" Maximum="3000" Step="1"
+                        Value="{Binding ScheduleYear, UpdateSourceTrigger=PropertyChanged, ValidatesOnNotifyDataErrors=True}" />
+                                                </StackPanel>
+
+                                                <!-- Shift 1 (на всю ширину) -->
+                                                <Grid Margin="0,0,10,10">
+                                                    <StackPanel>
+                                                        <TextBlock Text="Shift 1 (HH:mm - HH:mm)" Style="{StaticResource FieldLabelStyle}" />
+                                                        <TextBox Style="{StaticResource ValidatedRoundedTextBoxStyle}"
+                                                             Tag="Write shift..."
+                         Text="{Binding ScheduleShift1, UpdateSourceTrigger=PropertyChanged, ValidatesOnNotifyDataErrors=True, Mode=TwoWay}" />
+                                                    </StackPanel>
+                                                </Grid>
+
+                                                <!-- Shift 2 (на всю ширину) -->
+                                                <Grid Margin="0,0,10,10">
+                                                    <StackPanel>
+                                                        <TextBlock Text="Shift 2 (HH:mm - HH:mm)" Style="{StaticResource FieldLabelStyle}" />
+                                                        <TextBox Style="{StaticResource ValidatedRoundedTextBoxStyle}"
+                                                                                     Tag="Write shift..."
+                                                             Text="{Binding ScheduleShift2, UpdateSourceTrigger=PropertyChanged, ValidatesOnNotifyDataErrors=True, Mode=TwoWay}" />
+                                                    </StackPanel>
+                                                </Grid>
+
+                                                <!-- Max Hours/Employee -->
+                                                <StackPanel Style="{StaticResource FieldBlockStyle}">
+                                                    <TextBlock Text="Max hours/emp" Style="{StaticResource FieldLabelStyle}" />
+                                                    <controls:NumericUpDown Height="33"
+                        Style="{StaticResource ValidatedNumericUpDownStyle}"
+                        Minimum="1" Maximum="400" Step="1"
+                        Value="{Binding ScheduleMaxHoursPerEmp, UpdateSourceTrigger=PropertyChanged, ValidatesOnNotifyDataErrors=True}" />
+                                                </StackPanel>
+
+                                                <!-- Max Consecutive Days -->
+                                                <StackPanel Style="{StaticResource FieldBlockStyle}">
+                                                    <TextBlock Text="Max consec. days" Style="{StaticResource FieldLabelStyle}" />
+                                                    <controls:NumericUpDown Height="33"
+                        Style="{StaticResource ValidatedNumericUpDownStyle}"
+                        Minimum="1" Maximum="31" Step="1"
+                        Value="{Binding ScheduleMaxConsecutiveDays, UpdateSourceTrigger=PropertyChanged, ValidatesOnNotifyDataErrors=True}" />
+                                                </StackPanel>
+
+                                                <!-- Max Consecutive Full -->
+                                                <StackPanel Style="{StaticResource FieldBlockStyle}">
+                                                    <TextBlock Text="Max consec. full" Style="{StaticResource FieldLabelStyle}" />
+                                                    <controls:NumericUpDown Height="33"
+                        Style="{StaticResource ValidatedNumericUpDownStyle}"
+                        Minimum="1" Maximum="31" Step="1"
+                        Value="{Binding ScheduleMaxConsecutiveFull, UpdateSourceTrigger=PropertyChanged, ValidatesOnNotifyDataErrors=True}" />
+                                                </StackPanel>
+
+                                                <!-- Max Full/Month -->
+                                                <StackPanel Style="{StaticResource FieldBlockStyle}">
+                                                    <TextBlock Text="Max full/month" Style="{StaticResource FieldLabelStyle}" />
+                                                    <controls:NumericUpDown Height="33"
+                        Style="{StaticResource ValidatedNumericUpDownStyle}"
+                        Minimum="0" Maximum="31" Step="1"
+                        Value="{Binding ScheduleMaxFullPerMonth, UpdateSourceTrigger=PropertyChanged, ValidatesOnNotifyDataErrors=True}" />
+                                                </StackPanel>
+
+                                            </UniformGrid>
+
+                                            <!-- Shop + Availability (boxed) -->
+                                            <Grid Grid.Row="2" Margin="0,6,0,10">
                                                 <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="10"/>
                                                     <ColumnDefinition Width="*"/>
                                                 </Grid.ColumnDefinitions>
 
-                                                <StackPanel>
-                                                    <TextBlock Text="Name" Style="{StaticResource FieldLabelStyle}" />
-                                                    <TextBox Style="{StaticResource ValidatedRoundedTextBoxStyle}"
-                                                             Tag="Enter schedule name..."
-                                                         Text="{Binding ScheduleName, UpdateSourceTrigger=PropertyChanged, ValidatesOnNotifyDataErrors=True}" />
-                                                </StackPanel>
-                                            </Grid>
+                                                <!-- SHOP boxed -->
+                                                <Border Grid.Column="0" Style="{StaticResource InlineSectionCardStyle}">
+                                                    <StackPanel>
 
-                                            <!-- People per shift -->
-                                            <StackPanel Style="{StaticResource FieldBlockStyle}">
-                                                <TextBlock Text="People/shift" Style="{StaticResource FieldLabelStyle}" />
-                                                <controls:NumericUpDown Height="33"
-                                    Minimum="1" Maximum="50" Step="1"
-                                    Value="{Binding SchedulePeoplePerShift, UpdateSourceTrigger=PropertyChanged}" />
-                                            </StackPanel>
+                                                        <TextBlock Text="Shop" Style="{StaticResource InlineSectionHeaderStyle}" />
 
-                                            <!-- Month -->
-                                            <StackPanel Style="{StaticResource FieldBlockStyle}">
-                                                <TextBlock Text="Month" Style="{StaticResource FieldLabelStyle}" />
-                                                <controls:NumericUpDown Height="33"
-                                    Minimum="1" Maximum="12" Step="1"
-                                    Value="{Binding ScheduleMonth, UpdateSourceTrigger=PropertyChanged}" />
-                                            </StackPanel>
+                                                        <Grid Margin="0,0,0,8">
+                                                            <Grid.ColumnDefinitions>
+                                                                <ColumnDefinition Width="*" />
+                                                                <ColumnDefinition Width="8" />
+                                                                <ColumnDefinition Width="Auto" />
+                                                            </Grid.ColumnDefinitions>
 
-                                            <!-- Year -->
-                                            <StackPanel Style="{StaticResource FieldBlockStyle}">
-                                                <TextBlock Text="Year" Style="{StaticResource FieldLabelStyle}" />
-                                                <controls:NumericUpDown Height="33"
-                                    Minimum="2000" Maximum="3000" Step="1"
-                                    Value="{Binding ScheduleYear, UpdateSourceTrigger=PropertyChanged}" />
-                                            </StackPanel>
-
-                                            <!-- Shift 1 (на всю ширину) -->
-                                            <Grid Margin="0,0,10,10">
-                                                <StackPanel>
-                                                    <TextBlock Text="Shift 1 (HH:mm - HH:mm)" Style="{StaticResource FieldLabelStyle}" />
-                                                    <TextBox Style="{StaticResource ValidatedRoundedTextBoxStyle}"
-                                                             Tag="Write shift..."
-                         Text="{Binding ScheduleShift1, UpdateSourceTrigger=PropertyChanged, ValidatesOnNotifyDataErrors=True}" />
-                                                </StackPanel>
-                                            </Grid>
-
-                                            <!-- Shift 2 (на всю ширину) -->
-                                            <Grid Margin="0,0,10,10">
-                                                <StackPanel>
-                                                    <TextBlock Text="Shift 2 (HH:mm - HH:mm)" Style="{StaticResource FieldLabelStyle}" />
-                                                    <TextBox Style="{StaticResource ValidatedRoundedTextBoxStyle}"
-                                                                                     Tag="Write shift..."
-                                                             Text="{Binding ScheduleShift2, UpdateSourceTrigger=PropertyChanged, ValidatesOnNotifyDataErrors=True}" />
-                                                </StackPanel>
-                                            </Grid>
-
-                                            <!-- Max Hours/Employee -->
-                                            <StackPanel Style="{StaticResource FieldBlockStyle}">
-                                                <TextBlock Text="Max hours/emp" Style="{StaticResource FieldLabelStyle}" />
-                                                <controls:NumericUpDown Height="33"
-                                    Minimum="1" Maximum="400" Step="1"
-                                    Value="{Binding ScheduleMaxHoursPerEmp, UpdateSourceTrigger=PropertyChanged}" />
-                                            </StackPanel>
-
-                                            <!-- Max Consecutive Days -->
-                                            <StackPanel Style="{StaticResource FieldBlockStyle}">
-                                                <TextBlock Text="Max consec. days" Style="{StaticResource FieldLabelStyle}" />
-                                                <controls:NumericUpDown Height="33"
-                                    Minimum="1" Maximum="31" Step="1"
-                                    Value="{Binding ScheduleMaxConsecutiveDays, UpdateSourceTrigger=PropertyChanged}" />
-                                            </StackPanel>
-
-                                            <!-- Max Consecutive Full -->
-                                            <StackPanel Style="{StaticResource FieldBlockStyle}">
-                                                <TextBlock Text="Max consec. full" Style="{StaticResource FieldLabelStyle}" />
-                                                <controls:NumericUpDown Height="33"
-                                    Minimum="1" Maximum="31" Step="1"
-                                    Value="{Binding ScheduleMaxConsecutiveFull, UpdateSourceTrigger=PropertyChanged}" />
-                                            </StackPanel>
-
-                                            <!-- Max Full/Month -->
-                                            <StackPanel Style="{StaticResource FieldBlockStyle}">
-                                                <TextBlock Text="Max full/month" Style="{StaticResource FieldLabelStyle}" />
-                                                <controls:NumericUpDown Height="33"
-                                    Minimum="0" Maximum="31" Step="1"
-                                    Value="{Binding ScheduleMaxFullPerMonth, UpdateSourceTrigger=PropertyChanged}" />
-                                            </StackPanel>
-
-                                        </UniformGrid>
-
-                                        <!-- Shop + Availability (boxed) -->
-                                        <Grid Grid.Row="2" Margin="0,6,0,10">
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="*"/>
-                                                <ColumnDefinition Width="10"/>
-                                                <ColumnDefinition Width="*"/>
-                                            </Grid.ColumnDefinitions>
-
-                                            <!-- SHOP boxed -->
-                                            <Border Grid.Column="0" Style="{StaticResource InlineSectionCardStyle}">
-                                                <StackPanel>
-
-                                                    <TextBlock Text="Shop" Style="{StaticResource InlineSectionHeaderStyle}" />
-
-                                                    <Grid Margin="0,0,0,8">
-                                                        <Grid.ColumnDefinitions>
-                                                            <ColumnDefinition Width="*" />
-                                                            <ColumnDefinition Width="8" />
-                                                            <ColumnDefinition Width="Auto" />
-                                                        </Grid.ColumnDefinitions>
-
-                                                        <!-- Placeholder через Tag -->
-                                                        <TextBox Grid.Column="0"
+                                                            <!-- Placeholder через Tag -->
+                                                            <TextBox Grid.Column="0"
                          Style="{StaticResource RoundedTextBoxWithPlaceholderStyle}"
                          Tag="Search..."
                          Height="36"
                          VerticalContentAlignment="Center"
                          Text="{Binding ShopSearchText, UpdateSourceTrigger=PropertyChanged}" />
 
-                                                        <Button Grid.Column="2"
+                                                            <Button Grid.Column="2"
                                                             Style="{StaticResource IconButtonStyle}"
                                                             Width="40"
                                                             Command="{Binding SearchShopCommand}">
-                                                            <Viewbox Width="15" Height="15">
-                                                                <Path Data="{StaticResource SearchIcon}"
+                                                                <Viewbox Width="15" Height="15">
+                                                                    <Path Data="{StaticResource SearchIcon}"
                                                                       Fill="Black"
                                                                       Stretch="Uniform"
                                                                       RenderTransformOrigin="0.5,0.5">
-                                                                    <Path.RenderTransform>
-                                                                        <ScaleTransform ScaleX="1" ScaleY="-1" />
-                                                                    </Path.RenderTransform>
-                                                                </Path>
-                                                            </Viewbox>
-                                                        </Button>
-                                                    </Grid>
+                                                                        <Path.RenderTransform>
+                                                                            <ScaleTransform ScaleX="1" ScaleY="-1" />
+                                                                        </Path.RenderTransform>
+                                                                    </Path>
+                                                                </Viewbox>
+                                                            </Button>
+                                                        </Grid>
 
-                                                    <ComboBox ItemsSource="{Binding Shops}"
-                                                      SelectedItem="{Binding PendingSelectedShop}"
-                                                      DisplayMemberPath="Name"
-                                                      Style="{StaticResource RoundedComboBoxStyle}"
+                                                        <ComboBox ItemsSource="{Binding Shops}"
+          SelectedItem="{Binding SelectedShop,
+                                UpdateSourceTrigger=PropertyChanged,
+                                ValidatesOnNotifyDataErrors=True, Mode=TwoWay}"                                                      DisplayMemberPath="Name"
+                                                      Style="{StaticResource ValidatedRoundedComboBoxStyle}"
                                                       ItemContainerStyle="{StaticResource RoundedComboBoxItemStyle}"
                                                       MaxDropDownHeight="420"
                                                       ScrollViewer.CanContentScroll="True"
@@ -987,68 +1031,69 @@
                                                       DropDownOpened="ShopComboBox_DropDownOpened"
                                                       DropDownClosed="ShopComboBox_DropDownClosed">
 
-                                                        <ComboBox.ItemsPanel>
-                                                            <StaticResource ResourceKey="VirtualizingComboItemsPanel"/>
-                                                        </ComboBox.ItemsPanel>
+                                                            <ComboBox.ItemsPanel>
+                                                                <StaticResource ResourceKey="VirtualizingComboItemsPanel"/>
+                                                            </ComboBox.ItemsPanel>
 
-                                                        <!-- ВАЖЛИВО: форсуємо параметри ScrollViewer всередині Popup,
+                                                            <!-- ВАЖЛИВО: форсуємо параметри ScrollViewer всередині Popup,
          навіть якщо RoundedComboBoxStyle їх не TemplateBind-ить -->
-                                                        <ComboBox.Resources>
-                                                            <Style TargetType="{x:Type ScrollViewer}" BasedOn="{StaticResource ComboPopupScrollViewerStyle}"/>
-                                                        </ComboBox.Resources>
-                                                    </ComboBox>
+                                                            <ComboBox.Resources>
+                                                                <Style TargetType="{x:Type ScrollViewer}" BasedOn="{StaticResource ComboPopupScrollViewerStyle}"/>
+                                                            </ComboBox.Resources>
+                                                        </ComboBox>
 
-                                                    <!-- Checkboxes під Shop (стиль як в Availability Edit) -->
-                                                    <WrapPanel Margin="0,10,0,0"/>
+                                                        <!-- Checkboxes під Shop (стиль як в Availability Edit) -->
+                                                        <WrapPanel Margin="0,10,0,0"/>
 
-                                                </StackPanel>
-                                            </Border>
+                                                    </StackPanel>
+                                                </Border>
 
-                                            <!-- AVAILABILITY boxed -->
-                                            <Border Grid.Column="2" Style="{StaticResource InlineSectionCardStyle}">
-                                                <StackPanel>
+                                                <!-- AVAILABILITY boxed -->
+                                                <Border Grid.Column="2" Style="{StaticResource InlineSectionCardStyle}">
+                                                    <StackPanel>
 
-                                                    <TextBlock Text="Availability Group" Style="{StaticResource InlineSectionHeaderStyle}" />
+                                                        <TextBlock Text="Availability Group" Style="{StaticResource InlineSectionHeaderStyle}" />
 
-                                                    <Grid Margin="0,0,0,8">
-                                                        <Grid.ColumnDefinitions>
-                                                            <ColumnDefinition Width="*" />
-                                                            <ColumnDefinition Width="8" />
-                                                            <ColumnDefinition Width="Auto" />
-                                                        </Grid.ColumnDefinitions>
+                                                        <Grid Margin="0,0,0,8">
+                                                            <Grid.ColumnDefinitions>
+                                                                <ColumnDefinition Width="*" />
+                                                                <ColumnDefinition Width="8" />
+                                                                <ColumnDefinition Width="Auto" />
+                                                            </Grid.ColumnDefinitions>
 
-                                                        <!-- Placeholder через Tag -->
-                                                        <TextBox Grid.Column="0"
+                                                            <!-- Placeholder через Tag -->
+                                                            <TextBox Grid.Column="0"
                          Style="{StaticResource RoundedTextBoxWithPlaceholderStyle}"
                          Tag="Search..."
                          Height="36"
                          VerticalContentAlignment="Center"
                          Text="{Binding AvailabilitySearchText, UpdateSourceTrigger=PropertyChanged}" />
 
-                                                        <Button Grid.Column="2"
+                                                            <Button Grid.Column="2"
                         Style="{StaticResource IconButtonStyle}"
                         Width="40"
                         Command="{Binding SearchAvailabilityCommand}">
-                                                            <Viewbox Width="15" Height="15">
-                                                                <Path Data="{StaticResource SearchIcon}"
+                                                                <Viewbox Width="15" Height="15">
+                                                                    <Path Data="{StaticResource SearchIcon}"
                               Fill="Black"
                               Stretch="Uniform"
                               RenderTransformOrigin="0.5,0.5">
-                                                                    <Path.RenderTransform>
-                                                                        <ScaleTransform ScaleX="1" ScaleY="-1" />
-                                                                    </Path.RenderTransform>
-                                                                </Path>
-                                                            </Viewbox>
-                                                        </Button>
-                                                    </Grid>
+                                                                        <Path.RenderTransform>
+                                                                            <ScaleTransform ScaleX="1" ScaleY="-1" />
+                                                                        </Path.RenderTransform>
+                                                                    </Path>
+                                                                </Viewbox>
+                                                            </Button>
+                                                        </Grid>
 
-                                                    <ComboBox ItemsSource="{Binding AvailabilityGroups}"
-          SelectedItem="{Binding PendingSelectedAvailabilityGroup}"
-          DisplayMemberPath="Name"
+                                                        <ComboBox ItemsSource="{Binding AvailabilityGroups}"
+          SelectedItem="{Binding SelectedAvailabilityGroup,
+                                UpdateSourceTrigger=PropertyChanged,
+                                ValidatesOnNotifyDataErrors=True, Mode=TwoWay}"          DisplayMemberPath="Name"
           Tag="Select group..."
-          Style="{StaticResource RoundedComboBoxStyle}"
+          Style="{StaticResource ValidatedRoundedComboBoxStyle}"
           ItemContainerStyle="{StaticResource RoundedComboBoxItemStyle}"
-          Height="33"
+          Height="36"
           MaxDropDownHeight="420"
           ScrollViewer.CanContentScroll="True"
           ScrollViewer.IsDeferredScrollingEnabled="True"
@@ -1061,37 +1106,37 @@
           DropDownOpened="AvailabilityComboBox_DropDownOpened"
           DropDownClosed="AvailabilityComboBox_DropDownClosed">
 
-                                                        <ComboBox.ItemsPanel>
-                                                            <StaticResource ResourceKey="VirtualizingComboItemsPanel"/>
-                                                        </ComboBox.ItemsPanel>
+                                                            <ComboBox.ItemsPanel>
+                                                                <StaticResource ResourceKey="VirtualizingComboItemsPanel"/>
+                                                            </ComboBox.ItemsPanel>
 
-                                                        <ComboBox.Resources>
-                                                            <Style TargetType="{x:Type ScrollViewer}" BasedOn="{StaticResource ComboPopupScrollViewerStyle}"/>
-                                                        </ComboBox.Resources>
-                                                    </ComboBox>
+                                                            <ComboBox.Resources>
+                                                                <Style TargetType="{x:Type ScrollViewer}" BasedOn="{StaticResource ComboPopupScrollViewerStyle}"/>
+                                                            </ComboBox.Resources>
+                                                        </ComboBox>
 
 
-                                                    <!-- Checkboxes під Availability -->
-                                                    <WrapPanel Margin="0,10,0,0"/>
+                                                        <!-- Checkboxes під Availability -->
+                                                        <WrapPanel Margin="0,10,0,0"/>
 
-                                                </StackPanel>
-                                            </Border>
-                                        </Grid>
+                                                    </StackPanel>
+                                                </Border>
+                                            </Grid>
 
-                                        <!-- Min Hours per employee (styled like Binds grid + wrapped in rounded frame) -->
-                                        <Border Grid.Row="3"
+                                            <!-- Min Hours per employee (styled like Binds grid + wrapped in rounded frame) -->
+                                            <Border Grid.Row="3"
                                             Style="{StaticResource InlineSectionCardStyle}"
                                             Margin="0,10,0,0">
 
-                                            <StackPanel>
-                                                <TextBlock Text="Min hours per employee"
+                                                <StackPanel>
+                                                    <TextBlock Text="Min hours per employee"
                                                    Style="{StaticResource InlineSectionHeaderStyle}"
                                                    Margin="0,0,0,6"/>
 
-                                                <!-- DataGrid container like Bind Information -->
-                                                <Border Style="{StaticResource BindsGridContainerStyle}">
-                                                    <DataGrid x:Name="dataGridScheduleEmployees"
-                                                      ItemsSource="{Binding ScheduleEmployees}"
+                                                    <!-- DataGrid container like Bind Information -->
+                                                    <Border Style="{StaticResource BindsGridContainerStyle}">
+                                                        <DataGrid x:Name="dataGridScheduleEmployees"
+                                                      ItemsSource="{Binding MinHoursEmployeesView}"
                                                       SelectedItem="{Binding SelectedScheduleEmployee}"
                                                       Style="{StaticResource BindsGridStyle}"
                                                       Background="Transparent"
@@ -1104,131 +1149,155 @@
                                                       VirtualizingPanel.VirtualizationMode="Recycling"
                                                       ScrollViewer.CanContentScroll="True">
 
-                                                        <DataGrid.Columns>
-                                                            <DataGridTextColumn Header="First Name"
+                                                            <DataGrid.Columns>
+                                                                <DataGridTextColumn Header="First Name"
                                         Binding="{Binding Employee.FirstName}"
                                         Width="*" />
-                                                            <DataGridTextColumn Header="Last Name"
+                                                                <DataGridTextColumn Header="Last Name"
                                         Binding="{Binding Employee.LastName}"
                                         Width="*" />
-                                                            <DataGridTextColumn Header="Min Hours"
-                                        Binding="{Binding MinHoursMonth, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                        Width="100" />
-                                                        </DataGrid.Columns>
-                                                    </DataGrid>
-                                                </Border>
-                                            </StackPanel>
-                                        </Border>
+                                                                <DataGridTemplateColumn Header="Min Hours" Width="120">
+                                                                    <DataGridTemplateColumn.CellTemplate>
+                                                                        <DataTemplate>
+                                                                            <controls:NumericUpDown Height="30"
+                                                                            Minimum="0" Maximum="400" Step="1"
+                                                                            Style="{StaticResource ValidatedNumericUpDownStyle}"
+                                                                            TargetUpdated="MinHoursCell_TargetUpdated">
+                                                                                <controls:NumericUpDown.Value>
+                                                                                <Binding Path="MinHoursMonth"
+         Mode="TwoWay"
+         UpdateSourceTrigger="PropertyChanged"
+         TargetNullValue="0"
+         FallbackValue="0"
+         NotifyOnTargetUpdated="True"
+         NotifyOnValidationError="True">
+                                                                                    <Binding.ValidationRules>
+                                                                                        <validation:MinHoursAtLeastOneRule ValidatesOnTargetUpdated="True"/>
+                                                                                    </Binding.ValidationRules>
+                                                                                </Binding>
+
+                                                                            </controls:NumericUpDown.Value>
+
+                                                                            </controls:NumericUpDown>
+                                                                        </DataTemplate>
+                                                                    </DataGridTemplateColumn.CellTemplate>
+                                                                </DataGridTemplateColumn>
+
+                                                            </DataGrid.Columns>
+                                                        </DataGrid>
+                                                    </Border>
+                                                </StackPanel>
+                                            </Border>
 
 
 
+                                        </Grid>
                                     </Grid>
-                                </Grid>
 
-                                <!-- FOOTER inside Schedule Details -->
-                                <Grid Grid.Row="2"
+                                    <!-- FOOTER inside Schedule Details -->
+                                    <Grid Grid.Row="2"
       Margin="10,0,10,10"
       Visibility="{Binding IsChecked, ElementName=DetailsToggle, Converter={StaticResource BoolToVis}}">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
-                                    </Grid.ColumnDefinitions>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
 
-                                    <Button Grid.Column="1"
+                                        <Button Grid.Column="1"
             Width="110"
             Height="36"
             Style="{StaticResource RoundedButtonStyle}"
             Content="Generate"
             Command="{Binding GenerateCommand}"/>
+                                    </Grid>
+
+
+
                                 </Grid>
+                            </Border>
 
 
+                            <!-- ===================== CARD 3: Employees ===================== -->
+                            <Border Style="{StaticResource CardStyle}" Margin="7,0,7,16">
+                                <Grid>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                    </Grid.RowDefinitions>
 
-                            </Grid>
-                        </Border>
+                                    <Grid Grid.Row="0" Margin="15,10,10,10">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
 
-
-                        <!-- ===================== CARD 3: Employees ===================== -->
-                        <Border Style="{StaticResource CardStyle}" Margin="7,0,7,16">
-                            <Grid>
-                                <Grid.RowDefinitions>
-                                    <RowDefinition Height="Auto" />
-                                    <RowDefinition Height="Auto" />
-                                </Grid.RowDefinitions>
-
-                                <Grid Grid.Row="0" Margin="15,10,10,10">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
-                                    </Grid.ColumnDefinitions>
-
-                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                        <Viewbox Width="20" Height="20" Margin="0,0,8,0">
-                                            <Path Data="{StaticResource IconEmployee}"
+                                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                            <Viewbox Width="20" Height="20" Margin="0,0,8,0">
+                                                <Path Data="{StaticResource IconEmployee}"
                                       Fill="Black"
                                       Stretch="Uniform"
                                       RenderTransformOrigin="0.5,0.5">
-                                                <Path.RenderTransform>
-                                                    <ScaleTransform ScaleX="1" ScaleY="-1" />
-                                                </Path.RenderTransform>
-                                            </Path>
-                                        </Viewbox>
-                                        <TextBlock Text="Employees"
+                                                    <Path.RenderTransform>
+                                                        <ScaleTransform ScaleX="1" ScaleY="-1" />
+                                                    </Path.RenderTransform>
+                                                </Path>
+                                            </Viewbox>
+                                            <TextBlock Text="Employees"
                                         Style="{StaticResource SideCardTitleTextStyle}" 
                                        FontFamily="{StaticResource DefaultFontFamily}"
                                        FontSize="{StaticResource FontSizeTitle}"
                                        FontWeight="Bold"
                                        Foreground="Black" />
-                                    </StackPanel>
+                                        </StackPanel>
 
-                                    <ToggleButton x:Name="EmployeesToggle"
+                                        <ToggleButton x:Name="EmployeesToggle"
                                       Grid.Column="1"
                                       Style="{StaticResource HideShowToggleStyle}"
                                       IsChecked="True" />
-                                </Grid>
+                                    </Grid>
 
-                                <Grid Grid.Row="1"
+                                    <Grid Grid.Row="1"
                           Margin="10,0,10,10"
                           Visibility="{Binding IsChecked, ElementName=EmployeesToggle, Converter={StaticResource BoolToVis}}">
 
-                                    <StackPanel>
-                                        <Grid Margin="0,0,0,8">
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="*" />
-                                                <ColumnDefinition Width="8" />
-                                                <ColumnDefinition Width="Auto" />
-                                            </Grid.ColumnDefinitions>
+                                        <StackPanel>
+                                            <Grid Margin="0,0,0,8">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="8" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
 
-                                            <TextBox Grid.Column="0"
+                                                <TextBox Grid.Column="0"
                                          Style="{StaticResource CompactRoundedTextBoxWithPlaceholderStyle}"
                                          Tag="Search employees"
                                          Text="{Binding EmployeeSearchText, UpdateSourceTrigger=PropertyChanged}" />
-                                            <Button Grid.Column="2"
+                                                <Button Grid.Column="2"
                                                 Style="{StaticResource IconButtonStyle}"
                                                 Width="45"
                                                 Command="{Binding SearchEmployeeCommand}">
-                                                <Viewbox Width="15" Height="15">
-                                                    <Path Data="{StaticResource SearchIcon}"
+                                                    <Viewbox Width="15" Height="15">
+                                                        <Path Data="{StaticResource SearchIcon}"
                                                                       Fill="Black"
                                                                       Stretch="Uniform"
                                                                       RenderTransformOrigin="0.5,0.5">
-                                                        <Path.RenderTransform>
-                                                            <ScaleTransform ScaleX="1" ScaleY="-1" />
-                                                        </Path.RenderTransform>
-                                                    </Path>
-                                                </Viewbox>
-                                            </Button>
-                                        </Grid>
+                                                            <Path.RenderTransform>
+                                                                <ScaleTransform ScaleX="1" ScaleY="-1" />
+                                                            </Path.RenderTransform>
+                                                        </Path>
+                                                    </Viewbox>
+                                                </Button>
+                                            </Grid>
 
-                                        <Grid Margin="0,0,0,8">
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="*" />
-                                                <ColumnDefinition Width="8" />
-                                                <ColumnDefinition Width="Auto" />
-                                                <ColumnDefinition Width="Auto" />
-                                            </Grid.ColumnDefinitions>
+                                            <Grid Margin="0,0,0,8">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="8" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
 
-                                            <ComboBox Grid.Column="0"
+                                                <ComboBox Grid.Column="0"
           ItemsSource="{Binding Employees}"
           SelectedItem="{Binding SelectedEmployee}"
           Style="{StaticResource RoundedComboBoxStyle}"
@@ -1245,33 +1314,33 @@
           VirtualizingPanel.IsVirtualizing="True"
           VirtualizingPanel.VirtualizationMode="Recycling">
 
-                                                <ComboBox.ItemsPanel>
-                                                    <StaticResource ResourceKey="VirtualizingComboItemsPanel"/>
-                                                </ComboBox.ItemsPanel>
+                                                    <ComboBox.ItemsPanel>
+                                                        <StaticResource ResourceKey="VirtualizingComboItemsPanel"/>
+                                                    </ComboBox.ItemsPanel>
 
-                                                <ComboBox.Resources>
-                                                    <Style TargetType="{x:Type ScrollViewer}" BasedOn="{StaticResource ComboPopupScrollViewerStyle}"/>
-                                                </ComboBox.Resources>
+                                                    <ComboBox.Resources>
+                                                        <Style TargetType="{x:Type ScrollViewer}" BasedOn="{StaticResource ComboPopupScrollViewerStyle}"/>
+                                                    </ComboBox.Resources>
 
-                                                <ComboBox.ItemTemplate>
-                                                    <DataTemplate>
-                                                        <TextBlock>
+                                                    <ComboBox.ItemTemplate>
+                                                        <DataTemplate>
+                                                            <TextBlock>
                 <Run Text="{Binding FirstName}" />
                 <Run Text=" " />
                 <Run Text="{Binding LastName}" />
-                                                        </TextBlock>
-                                                    </DataTemplate>
-                                                </ComboBox.ItemTemplate>
-                                            </ComboBox>
+                                                            </TextBlock>
+                                                        </DataTemplate>
+                                                    </ComboBox.ItemTemplate>
+                                                </ComboBox>
 
-                                            <Button Grid.Column="2"
+                                                <Button Grid.Column="2"
                                         Style="{StaticResource RoundedButtonStyle}"
                                         Width="55"
                                                     Height="35"
                                         Content="Add"
                                         Command="{Binding AddEmployeeCommand}" />
 
-                                            <Button Grid.Column="3"
+                                                <Button Grid.Column="3"
                                                 Style="{StaticResource RoundedButtonStyle}"
                                                 Width="80"
                                                 Height="35"
@@ -1279,366 +1348,438 @@
                                                 
                                                 Content="Remove"
                                                 Command="{Binding RemoveEmployeeCommand}" />
-                                        </Grid>
+                                            </Grid>
 
-                                    </StackPanel>
+                                        </StackPanel>
+                                    </Grid>
                                 </Grid>
-                            </Grid>
-                        </Border>
+                            </Border>
 
-                        <!-- ===================== CARD 4: Note ===================== -->
-                        <Border Style="{StaticResource CardStyle}" Margin="7,0,7,0">
-                            <Grid>
-                                <Grid.RowDefinitions>
-                                    <RowDefinition Height="Auto" />
-                                    <RowDefinition Height="Auto" />
-                                </Grid.RowDefinitions>
+                            <!-- ===================== CARD 4: Note ===================== -->
+                            <Border Style="{StaticResource CardStyle}" Margin="7,0,7,0">
+                                <Grid>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                    </Grid.RowDefinitions>
 
-                                <Grid Grid.Row="0" Margin="15,10,10,10">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
-                                    </Grid.ColumnDefinitions>
+                                    <Grid Grid.Row="0" Margin="15,10,10,10">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
 
-                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                        <Viewbox Width="20" Height="20" Margin="0,0,8,0">
-                                            <Path Data="{StaticResource IconNote}" Fill="Black" Stretch="Uniform"
+                                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                            <Viewbox Width="20" Height="20" Margin="0,0,8,0">
+                                                <Path Data="{StaticResource IconNote}" Fill="Black" Stretch="Uniform"
                                                 RenderTransformOrigin="0.5,0.5">
-                                                <Path.RenderTransform>
-                                                    <ScaleTransform ScaleX="1" ScaleY="-1" />
-                                                </Path.RenderTransform>
-                                            </Path>
-                                        </Viewbox>
-                                        <TextBlock Text="Note"
+                                                    <Path.RenderTransform>
+                                                        <ScaleTransform ScaleX="1" ScaleY="-1" />
+                                                    </Path.RenderTransform>
+                                                </Path>
+                                            </Viewbox>
+                                            <TextBlock Text="Note"
                                         Style="{StaticResource SideCardTitleTextStyle}" 
                                        FontFamily="{StaticResource DefaultFontFamily}"
                                        FontSize="{StaticResource FontSizeTitle}"
                                        FontWeight="Bold"
                                        Foreground="Black" />
-                                    </StackPanel>
+                                        </StackPanel>
 
-                                    <ToggleButton x:Name="NoteToggle"
+                                        <ToggleButton x:Name="NoteToggle"
                                       Grid.Column="1"
                                       Style="{StaticResource HideShowToggleStyle}"
                                       IsChecked="True" />
-                                </Grid>
+                                    </Grid>
 
-                                <Grid Grid.Row="1"
+                                    <Grid Grid.Row="1"
                                   Margin="10,0,10,10"
                                   Visibility="{Binding IsChecked, ElementName=NoteToggle, Converter={StaticResource BoolToVis}}">
-
-                                    <TextBox Style="{StaticResource ValidatedRoundedTextBoxStyle}"
-                                     Height="300"
-                                     AcceptsReturn="True"
-                                     TextWrapping="Wrap"                                 
-                                     VerticalScrollBarVisibility="Auto"
-                                     Text="{Binding ScheduleNote, UpdateSourceTrigger=PropertyChanged}" />
+                                    <TextBox Style="{StaticResource RoundedTextBoxWithPlaceholderStyle}"
+         Tag="Enter schedule note..."
+         Height="300"
+         AcceptsReturn="True"
+         TextWrapping="Wrap"
+         VerticalScrollBarVisibility="Auto"
+         VerticalContentAlignment="Top"
+         Padding="12,10,12,10"
+         MaxLength="2000"
+         Validation.ErrorTemplate="{x:Null}"
+         Text="{Binding ScheduleNote,
+                        UpdateSourceTrigger=PropertyChanged,
+                        ValidatesOnNotifyDataErrors=False,
+                        NotifyOnValidationError=False}" />
                                 </Grid>
-                            </Grid>
-                        </Border>
+                                </Grid>
+                            </Border>
 
-                    </StackPanel>
-                </ScrollViewer>
+                        </StackPanel>
+                    </ScrollViewer>
 
-                <!-- Footer buttons (sticky) -->
-            </Grid>
-            <Grid Grid.Column="2">
-                <!-- Один вертикальний скрол для двох великих блоків -->
-                <ScrollViewer Style="{StaticResource RightScrollViewerStyle}"
+                    <!-- Footer buttons (sticky) -->
+                </Grid>
+                <Grid Grid.Column="2">
+                    <!-- Один вертикальний скрол для двох великих блоків -->
+                    <ScrollViewer Style="{StaticResource RightScrollViewerStyle}"
                       VerticalScrollBarVisibility="Auto"
                       HorizontalScrollBarVisibility="Disabled"
                       Padding="0"
                       Margin="0">
 
-                    <StackPanel>
+                        <StackPanel>
 
-                        <!-- Schedule Matrix (фіксована висота) -->
-                        <Border Style="{StaticResource CardStyle}"
+                            <!-- Schedule Matrix (фіксована висота) -->
+                            <Border Style="{StaticResource CardStyle}"
                     Padding="12"
                     Height="650"
                     Margin="0,18,12,10">
-                            <Grid>
-                                <Grid.RowDefinitions>
-                                    <RowDefinition Height="Auto" />
-                                    <RowDefinition Height="*" />
-                                </Grid.RowDefinitions>
+                                <Grid>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="*" />
+                                    </Grid.RowDefinitions>
 
-                                <!-- TOP ROW: title left + buttons right -->
-                                <Grid Grid.Row="0">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
-                                    </Grid.ColumnDefinitions>
+                                    <!-- TOP ROW: title left + buttons right -->
+                                    <Grid Grid.Row="0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
 
-                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                        <Viewbox Width="20" Height="20" Margin="0,0,8,0">
-                                            <Path Data="{StaticResource IconSchedule}" Fill="Black" Stretch="Uniform"
+                                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                            <Viewbox Width="20" Height="20" Margin="0,0,8,0">
+                                                <Path Data="{StaticResource IconSchedule}" Fill="Black" Stretch="Uniform"
                           RenderTransformOrigin="0.5,0.5">
-                                                <Path.RenderTransform>
-                                                    <ScaleTransform ScaleX="1" ScaleY="-1" />
-                                                </Path.RenderTransform>
-                                            </Path>
-                                        </Viewbox>
+                                                    <Path.RenderTransform>
+                                                        <ScaleTransform ScaleX="1" ScaleY="-1" />
+                                                    </Path.RenderTransform>
+                                                </Path>
+                                            </Viewbox>
 
-                                        <TextBlock Text="Schedule Matrix"
+                                            <TextBlock Text="Schedule Matrix"
                            FontFamily="{StaticResource DefaultFontFamily}"
                            FontSize="{StaticResource FontSizeTitle}"
                            FontWeight="Bold"
                            Foreground="Black" />
-                                    </StackPanel>
+                                        </StackPanel>
 
-                                    <StackPanel Grid.Column="1"
+                                        <StackPanel Grid.Column="1"
                                             Orientation="Horizontal"
                                             VerticalAlignment="Center"
                                             HorizontalAlignment="Right">
 
-                                        <!-- FILL COLOR (split як Text Color) -->
-                                        <Button Style="{StaticResource SplitMainButtonPressStyle}"
+                                            <!-- FILL COLOR (split як Text Color) -->
+                                            <Button Style="{StaticResource SplitMainButtonPressStyle}"
         Height="32"
         Padding="0"
         Command="{Binding ApplyLastFillColorCommand}"
         CommandParameter="{Binding SelectedCellRef}">
 
-                                            <Grid ClipToBounds="True">
-                                                <Grid.ColumnDefinitions>
-                                                    <ColumnDefinition Width="*" />
-                                                    <ColumnDefinition Width="32" />
-                                                </Grid.ColumnDefinitions>
+                                                <Grid ClipToBounds="True">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="32" />
+                                                    </Grid.ColumnDefinitions>
 
-                                                <StackPanel Orientation="Horizontal"
+                                                    <StackPanel Orientation="Horizontal"
                     VerticalAlignment="Center"
                     Margin="12,0,0,0">
-                                                    <Border Width="16" Height="16" CornerRadius="2"
+                                                        <Border Width="16" Height="16" CornerRadius="2"
                     BorderBrush="{StaticResource LightBorderBrush}"
                     BorderThickness="1"
                     Background="{Binding LastFillBrush}" />
-                                                    <TextBlock Text="Fill Color"
+                                                        <TextBlock Text="Fill Color"
                        Margin="8,0,0,0"
                        Foreground="White"
                        VerticalAlignment="Center"/>
-                                                </StackPanel>
+                                                    </StackPanel>
 
-                                                <Border Grid.Column="1"
+                                                    <Border Grid.Column="1"
                                                     Width="1"
                                                     HorizontalAlignment="Left"
                                                         Margin="3,0,0,0"
                                                     Background="#33FFFFFF"/>
 
-                                                <Border Grid.Column="1"
+                                                    <Border Grid.Column="1"
                                                 Background="Transparent">
-                                                    <Border.InputBindings>
-                                                        <MouseBinding Gesture="LeftClick"
+                                                        <Border.InputBindings>
+                                                            <MouseBinding Gesture="LeftClick"
                                                         Command="{Binding PickFillColorCommand}"/>
-                                                    </Border.InputBindings>
+                                                        </Border.InputBindings>
 
-                                                    <TextBlock Text="⋯"
+                                                        <TextBlock Text="⋯"
                                                        FontSize="16"
                                                        Foreground="White"
                                                        VerticalAlignment="Center"
                                                        HorizontalAlignment="Center"/>
-                                                </Border>
-                                            </Grid>
-                                        </Button>
+                                                    </Border>
+                                                </Grid>
+                                            </Button>
 
-                                        <Button Style="{StaticResource SplitMainButtonPressStyle}"
+                                            <Button Style="{StaticResource SplitMainButtonPressStyle}"
                                             Height="32"
                                             Padding="0"
                                             Margin="10,0,0,0"
                                             Command="{Binding ApplyLastTextColorCommand}"
                                             CommandParameter="{Binding SelectedCellRef}">
 
-                                            <Grid ClipToBounds="True">
-                                                <Grid.ColumnDefinitions>
-                                                    <ColumnDefinition Width="*" />
-                                                    <ColumnDefinition Width="32" />
-                                                </Grid.ColumnDefinitions>
+                                                <Grid ClipToBounds="True">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="32" />
+                                                    </Grid.ColumnDefinitions>
 
-                                                <!-- Ліва частина контент -->
-                                                <StackPanel Orientation="Horizontal"
+                                                    <!-- Ліва частина контент -->
+                                                    <StackPanel Orientation="Horizontal"
                                                         VerticalAlignment="Center"
                                                         Margin="12,0,0,0">
-                                                    <Border Width="16" Height="16" CornerRadius="2"
+                                                        <Border Width="16" Height="16" CornerRadius="2"
                                                         BorderBrush="{StaticResource LightBorderBrush}"
                                                         BorderThickness="1"
                                                         Background="{Binding LastTextBrush}" />
-                                                    <TextBlock Text="Text Color"
+                                                        <TextBlock Text="Text Color"
                                                        Margin="8,0,0,0"
                                                        Foreground="White"
                                                        VerticalAlignment="Center"/>
-                                                </StackPanel>
+                                                    </StackPanel>
 
-                                                <!-- Розділювач -->
-                                                <Border Grid.Column="1"
+                                                    <!-- Розділювач -->
+                                                    <Border Grid.Column="1"
                                                     Width="1"
                                                         Margin="3,0,0,0"
                                                     HorizontalAlignment="Left"
                                                     Background="#33FFFFFF"/>
 
-                                                <!-- Права зона (НЕ кнопка), викликає PickTextColorCommand -->
-                                                <Border Grid.Column="1"
+                                                    <!-- Права зона (НЕ кнопка), викликає PickTextColorCommand -->
+                                                    <Border Grid.Column="1"
                                                      Background="Transparent">
-                                                    <Border.InputBindings>
-                                                        <MouseBinding Gesture="LeftClick"
+                                                        <Border.InputBindings>
+                                                            <MouseBinding Gesture="LeftClick"
                                                          Command="{Binding PickTextColorCommand}"/>
-                                                    </Border.InputBindings>
+                                                        </Border.InputBindings>
 
-                                                    <TextBlock Text="⋯"
+                                                        <TextBlock Text="⋯"
                                                        FontSize="16"
                                                        Foreground="White"
                                                        VerticalAlignment="Center"
                                                        HorizontalAlignment="Center"/>
-                                                </Border>
-                                            </Grid>
-                                        </Button>
+                                                    </Border>
+                                                </Grid>
+                                            </Button>
 
 
 
-                                        <Button Style="{StaticResource RoundedButtonStyle}"
+                                            <Button Style="{StaticResource RoundedButtonStyle}"
                                             Height="32"
                                             Padding="12,0"
                                             Margin="10,0,0,0"
                                             Command="{Binding ClearSelectedCellStyleCommand}"
                                             CommandParameter="{Binding SelectedCellRef}">
 
-                                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                                <Viewbox Width="20" Height="20" Margin="0,0,8,0">
-                                                    <Path Data="{StaticResource IconClearFromat}"
+                                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                    <Viewbox Width="20" Height="20" Margin="0,0,8,0">
+                                                        <Path Data="{StaticResource IconClearFromat}"
                                                           Fill="White"
                                                           Stretch="Uniform"
                                                           RenderTransformOrigin="0.5,0.5">
-                                                        <Path.RenderTransform>
-                                                            <ScaleTransform ScaleX="1" ScaleY="-1" />
-                                                        </Path.RenderTransform>
-                                                    </Path>
-                                                </Viewbox>
+                                                            <Path.RenderTransform>
+                                                                <ScaleTransform ScaleX="1" ScaleY="-1" />
+                                                            </Path.RenderTransform>
+                                                        </Path>
+                                                    </Viewbox>
 
-                                                <TextBlock Text="Clear Cell" VerticalAlignment="Center"/>
-                                            </StackPanel>
-                                        </Button>
+                                                    <TextBlock Text="Clear Cell" VerticalAlignment="Center"/>
+                                                </StackPanel>
+                                            </Button>
 
 
 
-                                        <Button Style="{StaticResource RoundedButtonStyle}"
+                                            <Button Style="{StaticResource RoundedButtonStyle}"
                                             Height="32"
                                             Padding="12,0"
                                             Margin="10,0,0,0"
                                             Command="{Binding ClearAllScheduleStylesCommand}">
 
-                                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                                <Viewbox Width="20" Height="20" Margin="0,0,8,0">
-                                                    <Path Data="{StaticResource IconClearFormatAll}"
+                                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                    <Viewbox Width="20" Height="20" Margin="0,0,8,0">
+                                                        <Path Data="{StaticResource IconClearFormatAll}"
                                                           Fill="White"
                                                           Stretch="Uniform"
                                                           RenderTransformOrigin="0.5,0.5">
-                                                        <Path.RenderTransform>
-                                                            <ScaleTransform ScaleX="1" ScaleY="-1" />
-                                                        </Path.RenderTransform>
-                                                    </Path>
-                                                </Viewbox>
+                                                            <Path.RenderTransform>
+                                                                <ScaleTransform ScaleX="1" ScaleY="-1" />
+                                                            </Path.RenderTransform>
+                                                        </Path>
+                                                    </Viewbox>
 
-                                                <TextBlock Text="Clear All Cells" VerticalAlignment="Center"/>
-                                            </StackPanel>
-                                        </Button>
+                                                    <TextBlock Text="Clear All Cells" VerticalAlignment="Center"/>
+                                                </StackPanel>
+                                            </Button>
 
-                                        <Grid Margin="12,0,0,0" VerticalAlignment="Center">
-                                            <Grid.RowDefinitions>
-                                                <RowDefinition Height="Auto"/>
-                                                <RowDefinition Height="6"/>
-                                                <RowDefinition Height="Auto"/>
-                                            </Grid.RowDefinitions>
+                                            <Grid Margin="12,0,0,0" VerticalAlignment="Center">
+                                                <Grid.RowDefinitions>
+                                                    <RowDefinition Height="Auto"/>
+                                                    <RowDefinition Height="6"/>
+                                                    <RowDefinition Height="Auto"/>
+                                                </Grid.RowDefinitions>
 
-                                            <Border Grid.Row="0"
+                                                <Border Grid.Row="0"
             Padding="8,2"
             CornerRadius="10"
             Background="#14000000">
-                                                <TextBlock FontSize="12" Foreground="{StaticResource MutedTextBrush}">
+                                                    <TextBlock FontSize="12" Foreground="{StaticResource MutedTextBrush}">
             <Run Text="Total Employees: "/>
             <Run Text="{Binding TotalEmployees, Mode=OneWay}"/>
-                                                </TextBlock>
-                                            </Border>
+                                                    </TextBlock>
+                                                </Border>
 
-                                            <Border Grid.Row="2"
+                                                <Border Grid.Row="2"
             Padding="8,2"
             CornerRadius="10"
             Background="#14000000">
-                                                <TextBlock FontSize="12" Foreground="{StaticResource MutedTextBrush}">
+                                                    <TextBlock FontSize="12" Foreground="{StaticResource MutedTextBrush}">
             <Run Text="Total Hours: "/>
             <Run Text="{Binding TotalHoursText, Mode=OneWay}"/>
-                                                </TextBlock>
-                                            </Border>
-                                        </Grid>
+                                                    </TextBlock>
+                                                </Border>
+                                            </Grid>
 
 
 
-                                    </StackPanel>
-                                </Grid>
+                                        </StackPanel>
+                                    </Grid>
 
-                                <!-- MATRIX -->
                                 <DataGrid x:Name="dataGridScheduleMatrix"
-                                  Grid.Row="1"
-                                          Margin="0,12,0,0"
-                                  Style="{StaticResource ScheduleMatrixCompactGridStyle}"
-                                  CellStyle="{StaticResource ScheduleMatrixCellStyleEditable}"
-                                    SelectionUnit="Cell"
-                                    SelectionMode="Extended"
+          Grid.Row="1"
+          Margin="0,12,0,0"
+                                                                            CanUserSortColumns="False"
 
-                                  IsReadOnly="False"
-                                  AutoGenerateColumns="False"
-                                  EnableRowVirtualization="True"
-                                  EnableColumnVirtualization="True"
-                                  VirtualizingPanel.IsVirtualizing="True"
-                                  VirtualizingPanel.VirtualizationMode="Recycling"
-                                  ScrollViewer.CanContentScroll="True"
-                                  CellEditEnding="ScheduleMatrix_CellEditEnding"/>
+          Style="{StaticResource ScheduleMatrixCompactGridStyle}"
+          CellStyle="{StaticResource ScheduleMatrixCellStyleEditable}"
+          SelectionUnit="Cell"
+          SelectionMode="Extended"
+          IsReadOnly="False"
+          AutoGenerateColumns="False"
+          EnableRowVirtualization="True"
+          EnableColumnVirtualization="True"
+          VirtualizingPanel.IsVirtualizing="True"
+          VirtualizingPanel.VirtualizationMode="Recycling"
+          ScrollViewer.CanContentScroll="True"
+          CellEditEnding="ScheduleMatrix_CellEditEnding">
+
+                                    <DataGrid.Resources>
+                                        <conv:EmployeeTotalHoursHeaderConverter x:Key="EmpTotalHeaderConverter"/>
+
+                                        <Style TargetType="{x:Type DataGridColumnHeader}">
+                                            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+                                            <Setter Property="VerticalContentAlignment" Value="Center"/>
+                                            <Setter Property="MinHeight" Value="56"/>
+                                            <Setter Property="Padding" Value="6,8"/>
+                                            <Setter Property="VerticalContentAlignment" Value="Center"/>
+
+                                            <Setter Property="ContentTemplate">
+                                                <Setter.Value>
+                                                    <DataTemplate>
+                                                        <StackPanel Orientation="Vertical" Margin="0,2" HorizontalAlignment="Center">
+                                                            <TextBlock Text="{Binding}"
+                                       TextAlignment="Center"
+                                       FontWeight="SemiBold"
+                                       TextWrapping="NoWrap"
+                                       TextTrimming="CharacterEllipsis"/>
+
+                                                            <TextBlock x:Name="HoursLine"
+                                       FontSize="11"
+                                       Foreground="{StaticResource MutedTextBrush}"
+                                       TextAlignment="Center">
+                                                                <TextBlock.Text>
+                                                                    <MultiBinding Converter="{StaticResource EmpTotalHeaderConverter}">
+                                                                        <Binding RelativeSource="{RelativeSource AncestorType=DataGrid}" Path="DataContext"/>
+                                                                        <Binding RelativeSource="{RelativeSource AncestorType=DataGridColumnHeader}" Path="Column.SortMemberPath"/>
+                                                                        <Binding RelativeSource="{RelativeSource AncestorType=DataGrid}" Path="DataContext.TotalHoursText"/>
+                                                                    </MultiBinding>
+                                                                </TextBlock.Text>
+                                                            </TextBlock>
+                                                        </StackPanel>
+
+                                                        <DataTemplate.Triggers>
+                                                            <DataTrigger Binding="{Binding ElementName=HoursLine, Path=Text}" Value="">
+                                                                <Setter TargetName="HoursLine" Property="Visibility" Value="Collapsed"/>
+                                                            </DataTrigger>
+                                                        </DataTemplate.Triggers>
+                                                    </DataTemplate>
+                                                </Setter.Value>
+                                            </Setter>
+                                        </Style>
+                                    </DataGrid.Resources>
+                                </DataGrid>
                             </Grid>
-                        </Border>
+                            </Border>
 
-                        <!-- Availability Preview (фіксована висота) -->
-                        <Border Style="{StaticResource CardStyle}"
+                            <!-- Availability Preview (фіксована висота) -->
+                            <Border Style="{StaticResource CardStyle}"
                                 Padding="12"
                                 Margin="0,0,12,16"
-                                Height="850">
+                                Height="650">
 
-                            <Grid>
-                                <Grid.RowDefinitions>
-                                    <RowDefinition Height="Auto" />
-                                    <RowDefinition Height="*" />
-                                </Grid.RowDefinitions>
+                                <Grid>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="*" />
+                                    </Grid.RowDefinitions>
 
-                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                    <Viewbox Width="20" Height="20" Margin="0,0,8,0">
-                                        <Path Data="{StaticResource IconAvailability}" Fill="Black" Stretch="Uniform"
+                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                        <Viewbox Width="20" Height="20" Margin="0,0,8,0">
+                                            <Path Data="{StaticResource IconAvailability}" Fill="Black" Stretch="Uniform"
                                             RenderTransformOrigin="0.5,0.5">
-                                            <Path.RenderTransform>
-                                                <ScaleTransform ScaleX="1" ScaleY="-1" />
-                                            </Path.RenderTransform>
-                                        </Path>
-                                    </Viewbox>
-                                    <TextBlock Text="Availability Preview"
+                                                <Path.RenderTransform>
+                                                    <ScaleTransform ScaleX="1" ScaleY="-1" />
+                                                </Path.RenderTransform>
+                                            </Path>
+                                        </Viewbox>
+                                        <TextBlock Text="Availability Preview"
                                    FontFamily="{StaticResource DefaultFontFamily}"
                                    FontSize="{StaticResource FontSizeTitle}"
                                    FontWeight="Bold"
                                    Foreground="Black" />
-                                </StackPanel>
+                                    </StackPanel>
 
-                                <DataGrid x:Name="dataGridAvailabilityPreview"
+                                    <DataGrid x:Name="dataGridAvailabilityPreview"
                                   Grid.Row="1"
                                   Style="{StaticResource ScheduleMatrixCompactGridStyle}"
                                   IsReadOnly="True"
+                                                                                CanUserSortColumns="False"
+
                                   AutoGenerateColumns="False"
                                   EnableRowVirtualization="True"
                                   EnableColumnVirtualization="True"
                                   VirtualizingPanel.IsVirtualizing="True"
                                   VirtualizingPanel.VirtualizationMode="Recycling"
                                   ScrollViewer.CanContentScroll="True"/>
-                            </Grid>
-                        </Border>
+                                </Grid>
+                            </Border>
 
-                    </StackPanel>
-                </ScrollViewer>
+                        </StackPanel>
+                    </ScrollViewer>
+                </Grid>
+
             </Grid>
+        <!-- ===================== SAVE STATUS OVERLAY ===================== -->
 
-        </Grid>
+        <Border Grid.RowSpan="99"
+        Panel.ZIndex="9998"
+        Background="#40000000"
+        Visibility="{Binding IsSaveStatusVisible, Converter={StaticResource BoolToVis}}"
+        IsHitTestVisible="True"/>
+
+        <dialogs:UIStatus Grid.RowSpan="99"
+                  Panel.ZIndex="9999"
+                  HorizontalAlignment="Center"
+                  VerticalAlignment="Center"
+                  IsHitTestVisible="False"
+                  Status="{Binding SaveStatus}"
+                  Visibility="{Binding IsSaveStatusVisible, Converter={StaticResource BoolToVis}}"
+                  Width="420"
+                          Height="120"/>
+
     </Grid>
 </UserControl>
-

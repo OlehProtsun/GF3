@@ -6,40 +6,35 @@ using System.Windows.Shapes;
 using WPFApp.ViewModel.Container.Edit;
 using WPFApp.ViewModel.Container.ScheduleEdit;
 
-namespace WPFApp.View.Container
+namespace WPFApp.Infrastructure.ScheduleMatrix
 {
     public static class ScheduleMatrixColumnBuilder
     {
         public static void BuildScheduleMatrixColumns(DataTable? table, DataGrid grid, bool isReadOnly)
         {
-            if (table is null)
-            {
-                grid.ItemsSource = null;
-                grid.Columns.Clear();
-                return;
-            }
-
-            grid.ItemsSource = table.DefaultView;
+            // НЕ чіпаємо ItemsSource — він має лишатись у XAML binding!
             grid.AutoGenerateColumns = false;
             grid.Columns.Clear();
             grid.FrozenColumnCount = 1;
 
+            if (table is null)
+                return;
+
             var dayColName = ContainerScheduleEditViewModel.DayColumnName;
             var conflictColName = ContainerScheduleEditViewModel.ConflictColumnName;
-
-            // ✅ додай
             var weekendColName = ContainerScheduleEditViewModel.WeekendColumnName;
 
             var tbStyle = (Style)Application.Current.FindResource("MatrixCellTextBlockStyle");
             var editStyle = isReadOnly
                 ? null
                 : (Style)Application.Current.FindResource("MatrixCellTextBoxStyle");
+
             var dangerBrush = (System.Windows.Media.Brush)Application.Current.FindResource("DangerBrush");
             var boolToVis = new BooleanToVisibilityConverter();
 
             foreach (DataColumn column in table.Columns)
             {
-                // ✅ було: if (column.ColumnName == conflictColName) continue;
+                // приховуємо технічні колонки
                 if (column.ColumnName == conflictColName || column.ColumnName == weekendColName)
                     continue;
 
@@ -72,7 +67,9 @@ namespace WPFApp.View.Container
                     dot.SetValue(FrameworkElement.MarginProperty, new Thickness(4, 0, 0, 0));
                     dot.SetBinding(UIElement.VisibilityProperty, new Binding($"[{conflictColName}]")
                     {
-                        Converter = boolToVis
+                        Converter = boolToVis,
+                        FallbackValue = Visibility.Collapsed,
+                        TargetNullValue = Visibility.Collapsed
                     });
                     root.AppendChild(dot);
 
@@ -104,7 +101,6 @@ namespace WPFApp.View.Container
 
                 grid.Columns.Add(col);
             }
-
         }
     }
 }

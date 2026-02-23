@@ -5,11 +5,13 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:design="clr-namespace:WPFApp.DesignTime"
              d:DataContext="{d:DesignInstance Type=design:ContainerProfileViewDesignVm, IsDesignTimeCreatable=True}"
-
              mc:Ignorable="d"
-             d:DesignHeight="830" d:DesignWidth="852"
+             xmlns:dialogs="clr-namespace:WPFApp.View.Dialogs"
+             d:DesignHeight="2000" d:DesignWidth="852"
              Background="{StaticResource PageBackgroundBrush}">
+
     <UserControl.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVis"/>
 
         <!-- Проста іконка "дві панелі" (можеш замінити на свою Geometry) -->
         <GeometryGroup x:Key="MultiOpenIconOn">
@@ -27,18 +29,15 @@
             <PathGeometry Figures="M3340 4467 c-48 -15 -113 -83 -128 -133 -8 -27 -12 -115 -12 -258 l0 -216 -148 0 c-494 0 -890 -131 -1159 -384 -175 -164 -311 -414 -374 -686 -26 -111 -38 -406 -19 -487 25 -114 146 -191 254 -162 73 19 101 45 167 151 184 301 487 456 969 498 132 11 234 13 279 4 l31 -6 0 -242 c0 -240 0 -242 26 -294 44 -89 133 -132 234 -111 l55 11 569 566 c385 385 574 580 587 607 10 22 19 62 19 90 0 105 13 92 -592 577 -304 243 -573 453 -597 465 -48 25 -103 28 -161 10z"/>
         </GeometryGroup>
 
-
         <Style x:Key="MultiOpenPrettyButtonStyle"
-           TargetType="Button"
-           BasedOn="{StaticResource RoundedButtonStyle}">
+               TargetType="Button"
+               BasedOn="{StaticResource RoundedButtonStyle}">
 
-            <!-- Базові кольори OFF -->
             <Setter Property="Height" Value="37"/>
             <Setter Property="Padding" Value="12,0"/>
             <Setter Property="Background" Value="{StaticResource BadgeBackgroundBrush}"/>
             <Setter Property="Foreground" Value="{StaticResource MutedTextBrush}"/>
 
-            <!-- Контент: іконка + текст + бейдж -->
             <Setter Property="ContentTemplate">
                 <Setter.Value>
                     <DataTemplate>
@@ -53,10 +52,10 @@
 
                             <Viewbox Width="14" Height="14" VerticalAlignment="Center">
                                 <Path x:Name="Icon"
-                                  Data="{StaticResource MultiOpenIconOff}"
-                                  Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
-                                  RenderTransformOrigin="0.5,0.5"
-                                  Stretch="Uniform">
+                                      Data="{StaticResource MultiOpenIconOff}"
+                                      Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                      RenderTransformOrigin="0.5,0.5"
+                                      Stretch="Uniform">
                                     <Path.RenderTransform>
                                         <ScaleTransform ScaleX="1" ScaleY="-1" />
                                     </Path.RenderTransform>
@@ -64,29 +63,28 @@
                             </Viewbox>
 
                             <TextBlock Grid.Column="2"
-                               Text="MultiOpen"
-                               VerticalAlignment="Center"
-                               FontSize="12"
-                               Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+                                       Text="MultiOpen"
+                                       VerticalAlignment="Center"
+                                       FontSize="12"
+                                       Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
 
                             <Border x:Name="Badge"
-                                Grid.Column="4"
-                                VerticalAlignment="Center"
-                                CornerRadius="6"
-                                Padding="7,2"
-                                Background="#22000000">
+                                    Grid.Column="4"
+                                    VerticalAlignment="Center"
+                                    CornerRadius="6"
+                                    Padding="7,2"
+                                    Background="#22000000">
                                 <TextBlock x:Name="BadgeText"
-                                   Text="OFF"
-                                   FontSize="10"
-                                   FontWeight="SemiBold"
-                                   Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+                                           Text="OFF"
+                                           FontSize="10"
+                                           FontWeight="SemiBold"
+                                           Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
                             </Border>
                         </Grid>
 
-                        <!-- Перемикання іконки/бейджа по IsMultiOpenEnabled -->
                         <DataTemplate.Triggers>
                             <DataTrigger Binding="{Binding DataContext.IsMultiOpenEnabled, RelativeSource={RelativeSource AncestorType=Button}}"
-                 Value="True">
+                                         Value="True">
                                 <Setter TargetName="Icon" Property="Path.Data" Value="{StaticResource MultiOpenIconOn}"/>
                                 <Setter TargetName="BadgeText" Property="Text" Value="ON"/>
                                 <Setter TargetName="Badge" Property="Background" Value="#22FFFFFF"/>
@@ -96,132 +94,62 @@
                 </Setter.Value>
             </Setter>
 
-            <!-- Перемикання фону/тексту кнопки -->
             <Style.Triggers>
                 <DataTrigger Binding="{Binding DataContext.IsMultiOpenEnabled, RelativeSource={RelativeSource Self}}"
-                 Value="True">
+                             Value="True">
                     <Setter Property="Background" Value="{StaticResource PrimaryBrush}"/>
                     <Setter Property="Foreground" Value="White"/>
                 </DataTrigger>
             </Style.Triggers>
         </Style>
 
-
-        <BooleanToVisibilityConverter x:Key="BoolToVisibility" />
-
-        <Style x:Key="RoundCheckBoxStyle" TargetType="CheckBox">
-            <Setter Property="Focusable" Value="False" />
-            <Setter Property="Width" Value="20"/>
-            <Setter Property="Height" Value="20"/>
-            <Setter Property="Template">
+        <Style x:Key="ContainerStatsGridStyle"
+               TargetType="DataGrid"
+               BasedOn="{StaticResource AvailabilityBaseGridStyle}">
+            <Setter Property="HeadersVisibility" Value="Column" />
+            <Setter Property="RowHeaderWidth" Value="0" />
+            <Setter Property="SelectionUnit" Value="FullRow" />
+            <Setter Property="SelectionMode" Value="Single" />
+            <Setter Property="CanUserAddRows" Value="False" />
+            <Setter Property="CanUserDeleteRows" Value="False" />
+            <Setter Property="CanUserResizeRows" Value="False" />
+            <Setter Property="GridLinesVisibility" Value="All" />
+            <Setter Property="HorizontalGridLinesBrush" Value="Gainsboro" />
+            <Setter Property="VerticalGridLinesBrush" Value="Gainsboro" />
+            <Setter Property="Background" Value="{StaticResource SurfaceBrush}" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="RowHeight" Value="35" />
+            <Setter Property="ColumnHeaderHeight" Value="45" />
+            <Setter Property="FontSize" Value="16" />
+            <Setter Property="FontFamily" Value="{StaticResource DefaultFontFamily}" />
+            <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Auto" />
+            <Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Auto" />
+            <Setter Property="CellStyle">
                 <Setter.Value>
-                    <ControlTemplate TargetType="CheckBox">
-                        <Grid Width="{TemplateBinding Width}" Height="{TemplateBinding Height}">
-                            <!-- НЕ Ellipse, а Border: це дає "менш круглий" вигляд -->
-                            <Border x:Name="Box"
-                            CornerRadius="4"
-                            BorderBrush="{StaticResource MutedTextBrush}"
-                            BorderThickness="2"
-                            Background="Transparent"/>
-
-                            <!-- галочка під центр, масштабується -->
-                            <Path x:Name="Tick"
-                          Data="M 3 8 L 7 12 L 13 4"
-                          Stroke="White"
-                          StrokeThickness="2"
-                          StrokeStartLineCap="Round"
-                          StrokeEndLineCap="Round"
-                          Visibility="Collapsed" />
-                        </Grid>
-
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsChecked" Value="True">
-                                <Setter TargetName="Box" Property="Background" Value="{StaticResource PrimaryBrush}" />
-                                <Setter TargetName="Box" Property="BorderBrush" Value="{StaticResource PrimaryBrush}" />
-                                <Setter TargetName="Tick" Property="Visibility" Value="Visible" />
-                            </Trigger>
-
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Box" Property="Opacity" Value="0.85" />
-                            </Trigger>
-
-                            <Trigger Property="IsEnabled" Value="False">
-                                <Setter TargetName="Box" Property="Opacity" Value="0.55" />
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
+                    <Style TargetType="DataGridCell">
+                        <Setter Property="BorderThickness" Value="0" />
+                        <Setter Property="Padding" Value="10,0" />
+                        <Setter Property="HorizontalContentAlignment" Value="Center" />
+                        <Setter Property="VerticalContentAlignment" Value="Center" />
+                    </Style>
                 </Setter.Value>
             </Setter>
-        </Style>
-
-
-        <Style x:Key="ScheduleCardGridStyle"
-           TargetType="DataGrid"
-           BasedOn="{StaticResource AvailabilityListCardGridBaseStyle}">
-
-            <Setter Property="RowStyle">
+            <Setter Property="ColumnHeaderStyle">
                 <Setter.Value>
-                    <Style TargetType="DataGridRow">
-                        <Setter Property="Height" Value="44" />
-                        <Setter Property="Margin" Value="0,8,0,12" />
+                    <Style TargetType="DataGridColumnHeader">
                         <Setter Property="Background" Value="{StaticResource SurfaceBrush}" />
-                        <Setter Property="SnapsToDevicePixels" Value="True" />
+                        <Setter Property="Foreground" Value="Black" />
                         <Setter Property="BorderThickness" Value="0" />
-                        <EventSetter Event="MouseDoubleClick" Handler="Row_MouseDoubleClick"/>
-                        <Setter Property="Template">
-                            <Setter.Value>
-                                <ControlTemplate TargetType="DataGridRow">
-                                    <Border Background="Transparent"
-                                        Margin="6,0,6,0"
-                                        PreviewMouseLeftButtonDown="RowHitArea_PreviewMouseLeftButtonDown"
-                                        MouseLeftButtonDown="RowHitArea_MouseLeftButtonDown">
-                                        <Border x:Name="RowCard"
-                                            Background="{TemplateBinding Background}"
-                                            CornerRadius="{StaticResource Cr12}"
-                                            Padding="18,0,12,0"
-                                            SnapsToDevicePixels="True">
-
-                                            <Border.Effect>
-                                                <DropShadowEffect BlurRadius="16"
-                                                              ShadowDepth="0"
-                                                              Opacity="0.18" />
-                                            </Border.Effect>
-
-                                            <DataGridCellsPresenter />
-                                        </Border>
-                                    </Border>
-
-                                    <ControlTemplate.Triggers>
-
-                                        <!-- MULTIOPEN: підсвітка коли чекбокс вибраний -->
-                                        <DataTrigger Binding="{Binding IsChecked}" Value="True">
-                                            <Setter TargetName="RowCard" Property="Background" Value="{StaticResource PrimaryBrush}" />
-                                            <Setter Property="Foreground" Value="White" />
-                                        </DataTrigger>
-
-                                        <!-- NORMAL MODE: IsSelected підсвічує тільки коли MultiOpen = False -->
-                                        <MultiDataTrigger>
-                                            <MultiDataTrigger.Conditions>
-                                                <Condition Binding="{Binding IsSelected, RelativeSource={RelativeSource Self}}" Value="True" />
-                                                <Condition Binding="{Binding DataContext.IsMultiOpenEnabled, RelativeSource={RelativeSource AncestorType=DataGrid}}" Value="False" />
-                                            </MultiDataTrigger.Conditions>
-                                            <Setter TargetName="RowCard" Property="Background" Value="{StaticResource PrimaryBrush}" />
-                                            <Setter Property="Foreground" Value="White" />
-                                        </MultiDataTrigger>
-
-                                        <Trigger Property="IsMouseOver" Value="True">
-                                            <Setter TargetName="RowCard" Property="Opacity" Value="0.97" />
-                                        </Trigger>
-
-                                    </ControlTemplate.Triggers>
-                                </ControlTemplate>
-                            </Setter.Value>
-                        </Setter>
+                        <Setter Property="HorizontalContentAlignment" Value="Center" />
+                        <Setter Property="VerticalContentAlignment" Value="Center" />
+                        <Setter Property="FontFamily" Value="{StaticResource DefaultFontFamily}" />
+                        <Setter Property="FontSize" Value="14" />
+                        <Setter Property="Padding" Value="6,0" />
                     </Style>
                 </Setter.Value>
             </Setter>
         </Style>
-        
+
     </UserControl.Resources>
 
     <Grid ClipToBounds="False">
@@ -232,248 +160,148 @@
 
         <Border Grid.Row="0" Style="{StaticResource TopCardStyle}" Margin="9,8,9,0">
             <Grid>
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="Auto" />
-                </Grid.RowDefinitions>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
 
-                <Button Grid.Row="0"
-                        HorizontalAlignment="Left"
-                        Style="{StaticResource BackButtonSmallStyle}"
-                        Command="{Binding BackCommand}"
-                        Width="62">
-                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                        <Viewbox Width="14" Height="14" Margin="0,0,6,0">
-                            <Path Data="{StaticResource BackSvgIconGeometry}"
-                                  Stretch="Uniform"
-                                  Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
-                        </Viewbox>
-                        <TextBlock Text="Back"
-                                   Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
-                    </StackPanel>
-                </Button>
-
-                <TextBlock Grid.Row="1"
-                           Margin="0,10,0,0"
-                           Text="Container Profile"
-                           FontFamily="{StaticResource DefaultFontFamily}"
-                           FontSize="{StaticResource FontSizePageTitle}"
-                           Foreground="Black" />
-
-                <TextBlock Grid.Row="2"
-                           Margin="0,6,0,0"
-                           Text="Here you can see container profile details"
-                           FontFamily="{StaticResource DefaultFontFamily}"
-                           FontSize="17"
-                           Foreground="{StaticResource SecondaryTextBrush}" />
-            </Grid>
-        </Border>
-
-        <Grid Grid.Row="1" Margin="9,10,9,10">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="350" />
-                <ColumnDefinition Width="20" />
-                <ColumnDefinition Width="*"/>
-            </Grid.ColumnDefinitions>
-
-            <Border Style="{StaticResource CardStyle}"
-        Margin="0,12,0,12"
-        Grid.Column="0"
-        VerticalAlignment="Top"
-        MaxHeight="520">
-                <Grid Margin="15">
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto"/>
-                        <!-- header -->
-                        <RowDefinition Height="*"/>
-                        <!-- scrollable content -->
-                        <RowDefinition Height="Auto"/>
-                        <!-- buttons -->
-                    </Grid.RowDefinitions>
-
-                    <!-- Header -->
-                    <StackPanel Grid.Row="0" Orientation="Horizontal" VerticalAlignment="Center">
-                        <Viewbox Width="20" Height="20" Margin="0,0,8,0">
-                            <Path Data="{StaticResource IconContainerInfo}" Fill="Black" Stretch="Uniform"
-                                                            RenderTransformOrigin="0.5,0.5">
-                                <Path.RenderTransform>
-                                    <ScaleTransform ScaleX="1" ScaleY="-1" />
-                                </Path.RenderTransform>
-                            </Path>
-                        </Viewbox>
-                        <TextBlock Text="Profile Information"
-                       FontFamily="{StaticResource DefaultFontFamily}"
-                       FontSize="{StaticResource FontSizeTitle}"
-                       FontWeight="Bold"
-                       Foreground="Black"
-                       VerticalAlignment="Center" />
-                    </StackPanel>
-
-                    <!-- Scrollable content -->
-                    <ScrollViewer Grid.Row="1"
-                      Margin="0,14,0,0"
-                      VerticalScrollBarVisibility="Auto"
-                      HorizontalScrollBarVisibility="Disabled">
-                        <StackPanel>
-
-                            <Grid Margin="0,0,0,10">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-
-                                <TextBlock Text="Container ID:"
-                               FontFamily="{StaticResource DefaultFontFamily}"
-                               FontSize="12"
-                               Foreground="{StaticResource MutedTextBrush}"
-                               VerticalAlignment="Center" />
-
-                                <TextBlock Grid.Column="1"
-                               Text="{Binding ContainerId}"
-                               FontFamily="{StaticResource DefaultFontFamily}"
-                               FontSize="12"
-                               Margin="6,0,0,0"
-                               Foreground="Black"
-                               VerticalAlignment="Center" />
-                            </Grid>
-
-                            <TextBlock Text="Container Name:"
-                           FontFamily="{StaticResource DefaultFontFamily}"
-                           FontSize="12"
-                           Foreground="{StaticResource MutedTextBrush}" />
-                            <TextBlock Text="{Binding Name}"
-                           Margin="0,4,0,0"
-                           FontFamily="{StaticResource DefaultFontFamily}"
-                           FontSize="16"
-                           Foreground="Black"
-                           TextWrapping="Wrap" />
-
-                            <TextBlock Text="Note:"
-                           Margin="0,12,0,0"
-                           FontFamily="{StaticResource DefaultFontFamily}"
-                           FontSize="12"
-                           Foreground="{StaticResource MutedTextBrush}" />
-                            <TextBlock Text="{Binding Note}"
-                           Margin="0,4,0,0"
-                           FontFamily="{StaticResource DefaultFontFamily}"
-                           FontSize="16"
-                           Foreground="Black"
-                           TextWrapping="Wrap" />
-                        </StackPanel>
-                    </ScrollViewer>
-
-                    <!-- Buttons -->
-                    <Grid Grid.Row="2" Margin="0,12,0,0">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-
-                        <Button Width="84"
-                    Height="33"
-                    Style="{StaticResource RoundedButtonStyle}"
-                    Background="{StaticResource CancelButtonBackgroundBrush}"
-                    Foreground="{StaticResource MutedTextBrush}"
-                    Content="Cancel"
-                    Command="{Binding CancelProfileCommand}" />
-
-                        <Button Grid.Column="2"
-                    Width="86"
-                    Height="33"
-                    Margin="0,0,8,0"
-                    Style="{StaticResource RoundedButtonStyle}"
-                    Content="Edit"
-                    Command="{Binding EditCommand}" />
-
-                        <Button Grid.Column="3"
-                    Width="86"
-                    Height="33"
-                    Style="{StaticResource RoundedButtonStyle}"
-                    Background="{StaticResource DangerBrush}"
-                    Content="Delete"
-                    Command="{Binding DeleteCommand}" />
-                    </Grid>
-                </Grid>
-            </Border>
-
-            <Border Grid.Column="3"
-                    Margin="0,10,0,10"
-                    Background="{StaticResource SurfaceBrush}"
-                    CornerRadius="{StaticResource Cr20}"
-                    ClipToBounds="False">
-
-                <Border.Effect>
-                    <DropShadowEffect BlurRadius="18" ShadowDepth="2" Opacity="0.22" />
-                </Border.Effect>
-
-                <Grid Margin="15" DataContext="{Binding ScheduleListVm}">
+                <Grid Grid.Column="0">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="Auto" />
-                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
 
-                    <Grid Grid.Row="0" Margin="0,0,0,12">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-
+                    <Button Grid.Row="0"
+                            HorizontalAlignment="Left"
+                            Style="{StaticResource BackButtonSmallStyle}"
+                            Command="{Binding BackCommand}"
+                            Width="62">
                         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                            <Viewbox Width="20" Height="20" Margin="0,0,8,0">
-                                <Path Data="{StaticResource IconSchedule}"
-                                Fill="Black"
-                                Stretch="Uniform"
-                                RenderTransformOrigin="0.5,0.5">
+                            <Viewbox Width="14" Height="14" Margin="0,0,6,0">
+                                <Path Data="{StaticResource BackSvgIconGeometry}"
+                                      Stretch="Uniform"
+                                      Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
+                            </Viewbox>
+                            <TextBlock Text="Back"
+                                       Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
+                        </StackPanel>
+                    </Button>
+
+                    <TextBlock Grid.Row="1"
+                               Margin="0,10,0,0"
+                               Text="Container Profile"
+                               FontFamily="{StaticResource DefaultFontFamily}"
+                               FontSize="{StaticResource FontSizePageTitle}"
+                               Foreground="Black" />
+
+                    <TextBlock Grid.Row="2"
+                               Margin="0,6,0,0"
+                               Text="Here you can see container profile details"
+                               FontFamily="{StaticResource DefaultFontFamily}"
+                               FontSize="17"
+                               Foreground="{StaticResource SecondaryTextBrush}" />
+                </Grid>
+
+                <StackPanel Grid.Column="1"
+                            Orientation="Horizontal"
+                            HorizontalAlignment="Right"
+                            Margin="0,0,30,0"
+                            VerticalAlignment="Center">
+
+                    <Button Height="56"
+                            MinWidth="220"
+                            Padding="20,0"
+                            Margin="0,0,12,0"
+                            VerticalContentAlignment="Center"
+                            Style="{StaticResource TopExportButtonStyle}"
+                            Command="{Binding ExportToExcelCommand}">
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <Viewbox Width="20" Height="20" Margin="0,0,10,0">
+                                <Path Data="{StaticResource IconExcel}"
+                                      Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                      Stretch="Uniform"
+                                      RenderTransformOrigin="0.5,0.5">
                                     <Path.RenderTransform>
-                                        <ScaleTransform ScaleX="1" ScaleY="-1" />
+                                        <ScaleTransform ScaleX="1" ScaleY="-1"/>
                                     </Path.RenderTransform>
                                 </Path>
                             </Viewbox>
 
-                            <TextBlock Text="Schedules"
+                            <TextBlock Text="Export to Excel"
                                        FontFamily="{StaticResource DefaultFontFamily}"
-                                       FontSize="{StaticResource FontSizeTitle}"
-                                       FontWeight="Bold"
-                                       Foreground="Black"
-                                       VerticalAlignment="Center" />
+                                       FontSize="14"
+                                       FontWeight="SemiBold"
+                                       VerticalAlignment="Center"/>
                         </StackPanel>
+                    </Button>
 
-                        <Border Grid.Column="1"
-                                Background="{StaticResource BadgeBackgroundBrush}"
-                                CornerRadius="{StaticResource Cr10}"
-                                Padding="10,4"
-                                VerticalAlignment="Center"
-                                Margin="0,0,10,0">
-                            <TextBlock FontFamily="{StaticResource DefaultFontFamily}"
-                                       FontSize="12"
-                                       Foreground="{StaticResource MutedTextBrush}"
-                                       Text="{Binding Items.Count, StringFormat=Total: {0}}" />
-                        </Border>
-                    </Grid>
+                    <Button Height="56"
+                            MinWidth="220"
+                            Padding="20,0"
+                            VerticalContentAlignment="Center"
+                            Style="{StaticResource TopExportButtonStyle}"
+                            Command="{Binding ExportToCodeCommand}">
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <Viewbox Width="20" Height="20" Margin="0,0,10,0">
+                                <Path Data="{StaticResource IconCode}"
+                                      Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                      Stretch="Uniform"
+                                      RenderTransformOrigin="0.5,0.5">
+                                    <Path.RenderTransform>
+                                        <ScaleTransform ScaleX="1" ScaleY="-1"/>
+                                    </Path.RenderTransform>
+                                </Path>
+                            </Viewbox>
 
-                    <Grid Grid.Row="1" Height="37" Margin="0,0,0,12">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="37" />
-                            <ColumnDefinition Width="8" />
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="8" />
-                            <ColumnDefinition Width="70" />
-                            <ColumnDefinition Width="8" />
-                            <ColumnDefinition Width="150" />
-                            <ColumnDefinition Width="8" />
-                            <ColumnDefinition Width="80" />
-                        </Grid.ColumnDefinitions>
+                            <TextBlock Text="Export to Code"
+                                       FontFamily="{StaticResource DefaultFontFamily}"
+                                       FontSize="14"
+                                       FontWeight="SemiBold"
+                                       VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+                </StackPanel>
+            </Grid>
+        </Border>
 
-                        <Button Grid.Column="0"
-                                Style="{StaticResource IconButtonStyle}"
-                                ToolTip="Search"
-                                Command="{Binding SearchCommand}">
-                            <Viewbox Width="15" Height="15">
-                                <Path Data="{StaticResource SearchIcon}"
+        <ScrollViewer Grid.Row="1"
+                      Margin="9,10,9,10"
+                      VerticalScrollBarVisibility="Auto"
+                      HorizontalScrollBarVisibility="Disabled"
+                      Padding="0,0,0,12"
+                      ClipToBounds="False">
+
+            <Grid ClipToBounds="False">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="350" />
+                    <ColumnDefinition Width="20" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+
+                <!-- LEFT: Profile Information -->
+                <Border Grid.Row="0"
+                        Grid.Column="0"
+                        Style="{StaticResource CardStyle}"
+                        Margin="0,12,0,12"
+                        VerticalAlignment="Top"
+                        MaxHeight="650">
+
+                    <Grid Margin="15">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+
+                        <StackPanel Grid.Row="0" Orientation="Horizontal" VerticalAlignment="Center">
+                            <Viewbox Width="20" Height="20" Margin="0,0,8,0">
+                                <Path Data="{StaticResource IconContainerInfo}"
                                       Fill="Black"
                                       Stretch="Uniform"
                                       RenderTransformOrigin="0.5,0.5">
@@ -482,48 +310,133 @@
                                     </Path.RenderTransform>
                                 </Path>
                             </Viewbox>
-                        </Button>
+                            <TextBlock Text="Profile Information"
+                                       FontFamily="{StaticResource DefaultFontFamily}"
+                                       FontSize="{StaticResource FontSizeTitle}"
+                                       FontWeight="Bold"
+                                       Foreground="Black"
+                                       VerticalAlignment="Center" />
+                        </StackPanel>
 
-                        <TextBox Grid.Column="2"
-                                 Style="{StaticResource CompactRoundedTextBoxWithPlaceholderStyle}"
-                                 Tag="Enter search value"
-                                 Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}">
-                            <TextBox.InputBindings>
-                                <KeyBinding Key="Enter" Command="{Binding SearchCommand}" />
-                            </TextBox.InputBindings>
-                        </TextBox>
+                        <ScrollViewer Grid.Row="1"
+                                      Margin="0,14,0,0"
+                                      VerticalScrollBarVisibility="Auto"
+                                      HorizontalScrollBarVisibility="Disabled">
+                            <StackPanel>
 
-                        <Button Grid.Column="4"
-                            Style="{StaticResource RoundedButtonStyle}"
-                            Height="37"
-                                Width="70"
-                            Padding="10,0"
-                            Command="{Binding AddNewCommand}">
-                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                <TextBlock Text="＋" FontSize="14" Margin="0,0,6,0" />
-                                <TextBlock Text="Add" FontSize="12" />
+                                <Grid Margin="0,0,0,10">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+
+                                    <TextBlock Text="Container ID:"
+                                               FontFamily="{StaticResource DefaultFontFamily}"
+                                               FontSize="12"
+                                               Foreground="{StaticResource MutedTextBrush}"
+                                               VerticalAlignment="Center" />
+
+                                    <TextBlock Grid.Column="1"
+                                               Text="{Binding ContainerId}"
+                                               FontFamily="{StaticResource DefaultFontFamily}"
+                                               FontSize="12"
+                                               Margin="6,0,0,0"
+                                               Foreground="Black"
+                                               VerticalAlignment="Center" />
+                                </Grid>
+
+                                <TextBlock Text="Container Name:"
+                                           FontFamily="{StaticResource DefaultFontFamily}"
+                                           FontSize="12"
+                                           Foreground="{StaticResource MutedTextBrush}" />
+                                <TextBlock Text="{Binding Name}"
+                                           Margin="0,4,0,0"
+                                           FontFamily="{StaticResource DefaultFontFamily}"
+                                           FontSize="16"
+                                           Foreground="Black"
+                                           TextWrapping="Wrap" />
+
+                                <TextBlock Text="Note:"
+                                           Margin="0,12,0,0"
+                                           FontFamily="{StaticResource DefaultFontFamily}"
+                                           FontSize="12"
+                                           Foreground="{StaticResource MutedTextBrush}" />
+                                <TextBlock Text="{Binding Note}"
+                                           Margin="0,4,0,0"
+                                           FontFamily="{StaticResource DefaultFontFamily}"
+                                           FontSize="16"
+                                           Foreground="Black"
+                                           TextWrapping="Wrap" />
                             </StackPanel>
-                        </Button>
+                        </ScrollViewer>
 
-                        <!-- ON/OFF MultiOpen -->
-                        <Button Grid.Column="6"                                
-                            Style="{StaticResource MultiOpenPrettyButtonStyle}"
-                            Height="37"
-                            Width="150"
-                            Command="{Binding ToggleMultiOpenCommand}">
-                        </Button>
+                        <Grid Grid.Row="2" Margin="0,12,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
 
-                        <!-- ACTION MultiOpen -->
-                        <Button Grid.Column="8"
-                            Height="37"
-                            Width="80"
-                            Style="{StaticResource RoundedButtonStyle}"
-                            Command="{Binding MultiOpenCommand}">
+                            <Button Width="84"
+                                    Height="33"
+                                    Style="{StaticResource RoundedButtonStyle}"
+                                    Background="{StaticResource CancelButtonBackgroundBrush}"
+                                    Foreground="{StaticResource MutedTextBrush}"
+                                    Content="Cancel"
+                                    Command="{Binding CancelProfileCommand}" />
+
+                            <Button Grid.Column="2"
+                                    Width="86"
+                                    Height="33"
+                                    Margin="0,0,8,0"
+                                    Style="{StaticResource RoundedButtonStyle}"
+                                    Content="Edit"
+                                    Command="{Binding EditCommand}" />
+
+                            <Button Grid.Column="3"
+                                    Width="86"
+                                    Height="33"
+                                    Style="{StaticResource RoundedButtonStyle}"
+                                    Background="{StaticResource DangerBrush}"
+                                    Content="Delete"
+                                    Command="{Binding DeleteCommand}" />
+                        </Grid>
+                    </Grid>
+                </Border>
+
+                <!-- RIGHT: Schedules list -->
+                <Border Grid.Row="0"
+        Grid.Column="2"
+        Margin="0,10,0,10"
+        Background="{StaticResource SurfaceBrush}"
+        CornerRadius="{StaticResource Cr20}"
+        ClipToBounds="False"
+        Height="650"
+        VerticalAlignment="Top">
+
+
+                    <Border.Effect>
+                        <DropShadowEffect BlurRadius="18" ShadowDepth="2" Opacity="0.22" />
+                    </Border.Effect>
+
+                    <Grid Margin="15" DataContext="{Binding ScheduleListVm}">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+
+                        <Grid Grid.Row="0" Margin="0,0,0,12">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
 
                             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                <Viewbox Width="14" Height="14" Margin="0,0,6,0">
-                                    <Path Data="{StaticResource MultiOpenIconOpen}"
-                                          Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                <Viewbox Width="20" Height="20" Margin="0,0,8,0">
+                                    <Path Data="{StaticResource IconSchedule}"
+                                          Fill="Black"
                                           Stretch="Uniform"
                                           RenderTransformOrigin="0.5,0.5">
                                         <Path.RenderTransform>
@@ -532,79 +445,310 @@
                                     </Path>
                                 </Viewbox>
 
-                                <TextBlock Text="Open"
-                                   VerticalAlignment="Center"
-                                   Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+                                <TextBlock Text="Schedules"
+                                           FontFamily="{StaticResource DefaultFontFamily}"
+                                           FontSize="{StaticResource FontSizeTitle}"
+                                           FontWeight="Bold"
+                                           Foreground="Black"
+                                           VerticalAlignment="Center" />
                             </StackPanel>
-                        </Button>
 
+                            <Border Grid.Column="1"
+                                    Background="{StaticResource BadgeBackgroundBrush}"
+                                    CornerRadius="{StaticResource Cr10}"
+                                    Padding="10,4"
+                                    VerticalAlignment="Center"
+                                    Margin="0,0,10,0">
+                                <TextBlock FontFamily="{StaticResource DefaultFontFamily}"
+                                           FontSize="12"
+                                           Foreground="{StaticResource MutedTextBrush}"
+                                           Text="{Binding Items.Count, StringFormat=Total: {0}}" />
+                            </Border>
+                        </Grid>
+
+                        <Grid Grid.Row="1" Height="37" Margin="0,0,0,12">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="37" />
+                                <ColumnDefinition Width="8" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="8" />
+                                <ColumnDefinition Width="70" />
+                                <ColumnDefinition Width="8" />
+                                <ColumnDefinition Width="150" />
+                                <ColumnDefinition Width="8" />
+                                <ColumnDefinition Width="80" />
+                            </Grid.ColumnDefinitions>
+
+                            <Button Grid.Column="0"
+                                    Style="{StaticResource IconButtonStyle}"
+                                    ToolTip="Search"
+                                    Command="{Binding SearchCommand}">
+                                <Viewbox Width="15" Height="15">
+                                    <Path Data="{StaticResource SearchIcon}"
+                                          Fill="Black"
+                                          Stretch="Uniform"
+                                          RenderTransformOrigin="0.5,0.5">
+                                        <Path.RenderTransform>
+                                            <ScaleTransform ScaleX="1" ScaleY="-1" />
+                                        </Path.RenderTransform>
+                                    </Path>
+                                </Viewbox>
+                            </Button>
+
+                            <TextBox Grid.Column="2"
+                                     Style="{StaticResource CompactRoundedTextBoxWithPlaceholderStyle}"
+                                     Tag="Enter search value"
+                                     Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}">
+                                <TextBox.InputBindings>
+                                    <KeyBinding Key="Enter" Command="{Binding SearchCommand}" />
+                                </TextBox.InputBindings>
+                            </TextBox>
+
+                            <Button Grid.Column="4"
+                                    Style="{StaticResource RoundedButtonStyle}"
+                                    Height="37"
+                                    Width="70"
+                                    Padding="10,0"
+                                    Command="{Binding AddNewCommand}">
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                    <TextBlock Text="＋" FontSize="14" Margin="0,0,6,0" />
+                                    <TextBlock Text="Add" FontSize="12" />
+                                </StackPanel>
+                            </Button>
+
+                            <!-- ON/OFF MultiOpen -->
+                            <Button Grid.Column="6"
+                                    Style="{StaticResource MultiOpenPrettyButtonStyle}"
+                                    Height="37"
+                                    Width="150"
+                                    Command="{Binding ToggleMultiOpenCommand}">
+                            </Button>
+
+                            <!-- ACTION MultiOpen -->
+                            <Button Grid.Column="8"
+                                    Height="37"
+                                    Width="80"
+                                    Style="{StaticResource RoundedButtonStyle}"
+                                    Command="{Binding MultiOpenCommand}">
+
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                    <Viewbox Width="14" Height="14" Margin="0,0,6,0">
+                                        <Path Data="{StaticResource MultiOpenIconOpen}"
+                                              Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                              Stretch="Uniform"
+                                              RenderTransformOrigin="0.5,0.5">
+                                            <Path.RenderTransform>
+                                                <ScaleTransform ScaleX="1" ScaleY="-1" />
+                                            </Path.RenderTransform>
+                                        </Path>
+                                    </Viewbox>
+
+                                    <TextBlock Text="Open"
+                                               VerticalAlignment="Center"
+                                               Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+                                </StackPanel>
+                            </Button>
+
+                        </Grid>
+
+                        <Border Grid.Row="2"
+                                Background="{StaticResource SurfaceBrush}"
+                                BorderBrush="{StaticResource CardBorderBrush}"
+                                BorderThickness="2"
+                                CornerRadius="{StaticResource Cr20}"
+                                Padding="6"
+                                ClipToBounds="True">
+
+                            <DataGrid x:Name="dataGridSchedules"
+          Style="{StaticResource ScheduleCardGridStyle}"
+          Background="Transparent"
+          BorderThickness="0"
+          IsReadOnly="True"
+          ItemsSource="{Binding Items}"
+          SelectedItem="{Binding SelectedItem}"
+
+          PreviewMouseLeftButtonDown="DataGridSchedules_PreviewMouseLeftButtonDown"
+          PreviewMouseDoubleClick="DataGridSchedules_PreviewMouseDoubleClick"
+          MouseDoubleClick="DataGridSchedules_MouseDoubleClick">
+
+                                <DataGrid.Columns>
+
+                                    <!-- MULTI-OPEN CHECKBOX колонка -->
+                                    <DataGridTemplateColumn Width="Auto"
+                                MinWidth="0"
+                                IsReadOnly="True"
+                                CellStyle="{StaticResource CardListCheckBoxCellStyle}">
+
+                                        <DataGridTemplateColumn.HeaderStyle>
+                                            <Style TargetType="DataGridColumnHeader">
+                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                            </Style>
+                                        </DataGridTemplateColumn.HeaderStyle>
+
+                                        <DataGridTemplateColumn.CellTemplate>
+                                            <DataTemplate>
+                                                <CheckBox Style="{StaticResource MultiOpenRowCheckBoxStyle}"
+                              IsChecked="{Binding IsChecked, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                                            </DataTemplate>
+                                        </DataGridTemplateColumn.CellTemplate>
+                                    </DataGridTemplateColumn>
+
+                                    <!-- твої колонки -->
+                                    <DataGridTextColumn Header="Name"  Binding="{Binding Name}"      Width="*"/>
+                                    <DataGridTextColumn Header="Year"  Binding="{Binding Year}"      Width="*"/>
+                                    <DataGridTextColumn Header="Month" Binding="{Binding Month}"     Width="*"/>
+                                    <DataGridTextColumn Header="Shop"  Binding="{Binding Shop.Name}" Width="*"/>
+
+                                </DataGrid.Columns>
+                            </DataGrid>
+                        </Border>
+
+                        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,12,0,0"/>
                     </Grid>
+                </Border>
 
-                    <Border Grid.Row="2"
-                            Background="{StaticResource SurfaceBrush}"
-                            BorderBrush="{StaticResource CardBorderBrush}"
-                            BorderThickness="2"
-                            CornerRadius="{StaticResource Cr20}"
-                            Padding="6"
-                            ClipToBounds="True">
+                <!-- ===================== BOTTOM: Container Statistic ===================== -->
+                <Border Grid.Row="1"
+                        Grid.Column="0"
+                        Grid.ColumnSpan="3"
+                                Height="650"
+                        Style="{StaticResource CardStyle}"
+                        Padding="15"
+                        Margin="0,10,0,0">
 
-                        <DataGrid x:Name="dataGridSchedules"
-                          Style="{StaticResource ScheduleCardGridStyle}"
-                          Background="Transparent"
-                          BorderThickness="0"
-                          ItemsSource="{Binding Items}"
-                          SelectedItem="{Binding SelectedItem}"
-                          PreviewMouseDoubleClick="DataGridSchedules_PreviewMouseDoubleClick">
+                    <StackPanel>
 
-                            <DataGrid.Columns>
+                        <!-- Header -->
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <Viewbox Width="18" Height="18" Margin="0,0,8,0">
+                                <Path Data="{StaticResource IconInfo}" Fill="Black" Stretch="Uniform"/>
+                            </Viewbox>
 
-                                <!-- MULTIOPEN CHECKBOX колонка -->
-                                <DataGridTemplateColumn Width="Auto" MinWidth="0">
+                            <TextBlock Text="Container Statistic"
+                                       FontFamily="{StaticResource DefaultFontFamily}"
+                                       FontSize="{StaticResource FontSizeTitle}"
+                                       FontWeight="Bold"
+                                       Foreground="Black"/>
+                        </StackPanel>
 
-                                    <DataGridTemplateColumn.HeaderStyle>
-                                        <Style TargetType="DataGridColumnHeader">
-                                            <Setter Property="Visibility" Value="Collapsed" />
-                                        </Style>
-                                    </DataGridTemplateColumn.HeaderStyle>
+                        <!-- TOP FIELDS -->
+                        <WrapPanel Margin="0,12,0,0" Orientation="Horizontal" HorizontalAlignment="Left">
 
-                                    <DataGridTemplateColumn.CellStyle>
-                                        <Style TargetType="DataGridCell">
-                                            <Setter Property="Padding" Value="0" />
-                                            <Setter Property="BorderThickness" Value="0" />
-                                            <Setter Property="Background" Value="Transparent" />
-                                            <Setter Property="Visibility" Value="Collapsed" />
-                                            <Style.Triggers>
-                                                <DataTrigger Binding="{Binding DataContext.IsMultiOpenEnabled, RelativeSource={RelativeSource AncestorType=DataGrid}}"
-                                     Value="True">
-                                                    <Setter Property="Visibility" Value="Visible" />
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </DataGridTemplateColumn.CellStyle>
+                            <TextBlock Margin="0,0,18,6" TextWrapping="Wrap"
+                                       FontFamily="{StaticResource DefaultFontFamily}">
+                                <Run Text="Container name: " FontSize="12" Foreground="{StaticResource MutedTextBrush}"/>
+                                <Run Text="{Binding Name, Mode=OneWay}" FontSize="14" Foreground="Black"/>
+                            </TextBlock>
 
-                                    <DataGridTemplateColumn.CellTemplate>
-                                        <DataTemplate>
-                                            <CheckBox Style="{StaticResource RoundCheckBoxStyle}"
-                                              IsChecked="{Binding IsChecked, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                              VerticalAlignment="Center"
-                                              HorizontalAlignment="Center"
-                                              Margin="0,0,10,0" />
-                                        </DataTemplate>
-                                    </DataGridTemplateColumn.CellTemplate>
-                                </DataGridTemplateColumn>
+                            <TextBlock Margin="0,0,18,6" TextWrapping="Wrap"
+                                       FontFamily="{StaticResource DefaultFontFamily}">
+                                <Run Text="Total hours: " FontSize="12" Foreground="{StaticResource MutedTextBrush}"/>
+                                <Run Text="{Binding TotalHoursText, Mode=OneWay}" FontSize="14" Foreground="Black"/>
+                            </TextBlock>
 
-                                <!-- твої існуючі -->
-                                <DataGridTextColumn Header="Name"  Binding="{Binding Name}"       Width="*" />
-                                <DataGridTextColumn Header="Year"  Binding="{Binding Year}"       Width="*" />
-                                <DataGridTextColumn Header="Month" Binding="{Binding Month}"      Width="*" />
-                                <DataGridTextColumn Header="Shop"  Binding="{Binding Shop.Name}"  Width="*" />
-                            </DataGrid.Columns>
-                        </DataGrid>
-                    </Border>
+                            <TextBlock Margin="0,0,18,6" TextWrapping="Wrap"
+                                       FontFamily="{StaticResource DefaultFontFamily}">
+                                <Run Text="Total employees: " FontSize="12" Foreground="{StaticResource MutedTextBrush}"/>
+                                <Run Text="{Binding TotalEmployees, Mode=OneWay}" FontSize="14" Foreground="Black"/>
+                            </TextBlock>
 
-                    <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,12,0,0"/>
-                </Grid>
-            </Border>
-        </Grid>
+                            <TextBlock Margin="0,0,18,6" TextWrapping="Wrap"
+                                       FontFamily="{StaticResource DefaultFontFamily}">
+                                <Run Text="Total shops: " FontSize="12" Foreground="{StaticResource MutedTextBrush}"/>
+                                <Run Text="{Binding TotalShops, Mode=OneWay}" FontSize="14" Foreground="Black"/>
+                            </TextBlock>
+
+                        </WrapPanel>
+
+                        <StackPanel Margin="0,6,0,0">
+                            <TextBlock TextWrapping="Wrap"
+                                       FontFamily="{StaticResource DefaultFontFamily}">
+                                <Run Text="{Binding TotalEmployees, Mode=OneWay, StringFormat=Total employees ({0}): }"
+                                     FontSize="12" Foreground="{StaticResource MutedTextBrush}"/>
+                                <Run Text="{Binding TotalEmployeesListText, Mode=OneWay}" FontSize="14" Foreground="Black"/>
+                            </TextBlock>
+
+                            <TextBlock Margin="0,6,0,0" TextWrapping="Wrap"
+                                       FontFamily="{StaticResource DefaultFontFamily}">
+                                <Run Text="{Binding TotalShops, Mode=OneWay, StringFormat=Total shops ({0}): }"
+                                     FontSize="12" Foreground="{StaticResource MutedTextBrush}"/>
+                                <Run Text="{Binding TotalShopsListText, Mode=OneWay}" FontSize="14" Foreground="Black"/>
+                            </TextBlock>
+                        </StackPanel>
+
+                        <!-- EmployeeShopHours DataGrid: NOT inside TextBlock -->
+                        <Border Style="{StaticResource StatisticGridCardBorderStyle}"
+                                Padding="12"
+                                Margin="0,10,0,0"
+                                SnapsToDevicePixels="True">
+                            <DataGrid x:Name="dataGridContainerEmployeeShopHours"
+          ItemsSource="{Binding EmployeeShopHoursRows}"
+          Style="{StaticResource ScheduleMatrixCompactGridStyle}"
+          CellStyle="{StaticResource ScheduleMatrixCellStyleBase}"
+          IsReadOnly="True"
+          AutoGenerateColumns="False"
+                                                CanUserSortColumns="False"
+          FrozenColumnCount="4"
+          Height="470"
+          RowHeight="35"
+          GridLinesVisibility="All"
+          ScrollViewer.VerticalScrollBarVisibility="Auto"
+          ScrollViewer.HorizontalScrollBarVisibility="Auto"
+          SnapsToDevicePixels="True"
+          UseLayoutRounding="True">
+
+                                <DataGrid.Resources>
+                                    <Style TargetType="{x:Type ScrollBar}"
+               BasedOn="{StaticResource LeftRoundedScrollBarStyle}" />
+
+                                    <!-- 🔥 Важливо: прибирає “щілину” між рядками тільки тут -->
+                                    <Style TargetType="{x:Type DataGridRow}">
+                                        <Setter Property="Margin" Value="0"/>
+                                        <Setter Property="Padding" Value="0"/>
+                                        <Setter Property="BorderThickness" Value="0"/>
+
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding Employee}" Value="TOTAL">
+                                                <Setter Property="FontWeight" Value="Bold"/>
+                                                <Setter Property="Background" Value="#11000000"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+
+
+                                    <!-- (опційно) щоб заголовок був як в ScheduleProfile -->
+                                    <Style TargetType="{x:Type DataGridColumnHeader}">
+                                        <Setter Property="HorizontalContentAlignment" Value="Center"/>
+                                        <Setter Property="VerticalContentAlignment" Value="Center"/>
+                                        <Setter Property="MinHeight" Value="45"/>
+                                        <Setter Property="Padding" Value="6,0"/>
+                                    </Style>
+                                </DataGrid.Resources>
+                            </DataGrid>
+                        </Border>
+
+
+                    </StackPanel>
+                </Border>
+            </Grid>
+        </ScrollViewer>
+        <!-- Export overlay (dims background) -->
+        <Border Grid.RowSpan="2"
+        Panel.ZIndex="9998"
+        Background="#40000000"
+        Visibility="{Binding IsExportStatusVisible, Converter={StaticResource BoolToVis}}"
+        IsHitTestVisible="True"/>
+
+        <!-- Export status (center, wider X) -->
+        <dialogs:UIStatus Grid.RowSpan="2"
+                  Panel.ZIndex="9999"
+                  HorizontalAlignment="Center"
+                  VerticalAlignment="Center"
+                  IsHitTestVisible="False"
+                  Status="{Binding ExportStatus}"
+                  Visibility="{Binding IsExportStatusVisible, Converter={StaticResource BoolToVis}}"
+                  Width="420"
+                           Height="120"/>
+
     </Grid>
 </UserControl>

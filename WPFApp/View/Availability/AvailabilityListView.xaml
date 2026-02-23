@@ -9,57 +9,6 @@
              Background="{StaticResource PageBackgroundBrush}">
 
     <UserControl.Resources>
-        <Style x:Key="AvailabilityListCardGridStyle"
-               TargetType="DataGrid"
-               BasedOn="{StaticResource AvailabilityListCardGridBaseStyle}">
-            <Setter Property="RowStyle">
-                <Setter.Value>
-                    <Style TargetType="DataGridRow">
-                        <Setter Property="Height" Value="44" />
-                        <Setter Property="Margin" Value="0,8,0,12" />
-                        <Setter Property="Background" Value="{StaticResource SurfaceBrush}" />
-                        <Setter Property="SnapsToDevicePixels" Value="True" />
-                        <Setter Property="BorderThickness" Value="0" />
-
-                        <Setter Property="Template">
-                            <Setter.Value>
-                                <ControlTemplate TargetType="DataGridRow">
-                                    <Border Background="Transparent"
-                                            Margin="6,0,6,0"
-                                            MouseLeftButtonDown="RowHitArea_MouseLeftButtonDown">
-
-                                        <Border x:Name="RowCard"
-                                                Background="{TemplateBinding Background}"
-                                                CornerRadius="{StaticResource Cr12}"
-                                                Padding="18,0,12,0"
-                                                SnapsToDevicePixels="True">
-                                            <Border.Effect>
-                                                <DropShadowEffect BlurRadius="16"
-                                                                  ShadowDepth="0"
-                                                                  Opacity="0.18" />
-                                            </Border.Effect>
-
-                                            <DataGridCellsPresenter />
-                                        </Border>
-                                    </Border>
-
-                                    <ControlTemplate.Triggers>
-                                        <Trigger Property="IsSelected" Value="True">
-                                            <Setter TargetName="RowCard" Property="Background" Value="{StaticResource PrimaryBrush}" />
-                                            <Setter Property="Foreground" Value="White" />
-                                        </Trigger>
-
-                                        <Trigger Property="IsMouseOver" Value="True">
-                                            <Setter TargetName="RowCard" Property="Opacity" Value="0.97" />
-                                        </Trigger>
-                                    </ControlTemplate.Triggers>
-                                </ControlTemplate>
-                            </Setter.Value>
-                        </Setter>
-                    </Style>
-                </Setter.Value>
-            </Setter>
-        </Style>
     </UserControl.Resources>
 
     <Grid>

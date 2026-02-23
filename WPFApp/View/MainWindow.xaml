@@ -241,7 +241,9 @@
                         <!-- top icon (guna2Button1: 12,15) -->
                         <Button Style="{StaticResource IconButton39}"
                                 BorderBrush="White" BorderThickness="1"
-                                Margin="0,5,0,0">
+                                Margin="0,5,0,0"
+                                Command="{Binding ShowHomeCommand}"
+                                IsEnabled="{Binding IsHomeEnabled}">
 
                             <Viewbox Width="26" Height="26">
                                 <Viewbox.RenderTransform>
@@ -390,6 +392,20 @@
                             <TextBlock Text="Container" Style="{StaticResource NavLabel}"/>
                         </StackPanel>
 
+                        <!-- Information -->
+                        <StackPanel Margin="0,0,0,20">
+                            <Button Style="{StaticResource IconButton39}"
+                                    Command="{Binding ShowInformationCommand}"
+                                    IsEnabled="{Binding IsInformationEnabled}">
+
+                                <Viewbox Width="26" Height="26">
+                                    <Path Fill="Black"
+                                            Data="M12,2A10,10 0 1 0 22,12A10,10 0 0 0 12,2ZM11,10H13V18H11ZM11,6H13V8H11Z"/>
+                                </Viewbox>
+                            </Button>
+                            <TextBlock Text="Information" Style="{StaticResource NavLabel}"/>
+                        </StackPanel>
+
                     </StackPanel>
 
                     <!-- spacer -->
@@ -408,7 +424,9 @@
 
                         <!-- DataBase (label9 + button2) -->
                         <TextBlock Text="DataBase" Style="{StaticResource NavLabel}" Margin="0,0,0,4"/>
-                        <Button Style="{StaticResource IconButton39}" Margin="0,0,0,12">
+                        <Button Style="{StaticResource IconButton39}" Margin="0,0,0,12"
+                                Command="{Binding ShowDatabaseCommand}"
+                                IsEnabled="{Binding IsDatabaseEnabled}">
 
                             <Viewbox Width="26"
                                      Height="26"

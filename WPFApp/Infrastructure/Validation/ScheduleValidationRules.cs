@@ -36,7 +36,7 @@ namespace WPFApp.Infrastructure.Validation
         //
         // Так WPF зрозуміє: “помилка належить саме цьому полю”.
         //
-        public const string K_ScheduleShopId = "ScheduleShopId";
+        public const string K_ScheduleShopId = "PendingSelectedShop";
         public const string K_ScheduleName = "ScheduleName";
         public const string K_ScheduleYear = "ScheduleYear";
         public const string K_ScheduleMonth = "ScheduleMonth";
@@ -273,8 +273,8 @@ namespace WPFApp.Infrastructure.Validation
         {
             note = note ?? string.Empty;
 
-            if (note.Length > 1000)
-                return "Note is too long (max 1000 chars).";
+            if (note.Length > 2000)
+                return "Note is too long (max 2000 chars).";
 
             return null;
         }

@@ -2,14 +2,17 @@
 using System.Collections.Generic;
 using System.Text;
 
-namespace WPFApp.ViewModel
+namespace WPFApp.ViewModel.Main
 {
     public enum NavPage
     {
         None = 0,
+        Home,
         Employee,
         Shop,
         Availability,
-        Container
+        Container,
+        Information,
+        Database
     }
 }

@@ -81,35 +81,38 @@ namespace WPFApp.Infrastructure.ScheduleMatrix
 
             // 3) Колонки по працівниках (по одному на employeeId)
             // HashSet потрібен, щоб не додати одну людину двічі, якщо дані з дублікатами
+            // 3) Колонки по працівниках (по одному на employeeId)
+            // ✅ Єдиний канонічний порядок: LastName -> FirstName -> EmployeeId
+            var orderedEmployees = (employees ?? Array.Empty<ScheduleEmployeeModel>())
+                .Where(e => e != null)
+                .OrderBy(e => (e.Employee?.LastName ?? string.Empty).Trim(), StringComparer.CurrentCultureIgnoreCase)
+                .ThenBy(e => (e.Employee?.FirstName ?? string.Empty).Trim(), StringComparer.CurrentCultureIgnoreCase)
+                .ThenBy(e => e.EmployeeId)
+                .ToList();
+
+            // HashSet потрібен, щоб не додати одну людину двічі, якщо дані з дублікатами
             var seenEmpIds = new HashSet<int>();
 
-            foreach (var emp in employees)
+            foreach (var emp in orderedEmployees)
             {
                 // якщо id вже був — пропускаємо
                 if (!seenEmpIds.Add(emp.EmployeeId))
                     continue;
 
-                // 3.1) Як буде виглядати заголовок колонки (Caption)
-                // Caption в DataColumn використовується WPF як заголовок, а ColumnName — як технічний ключ
                 var displayName = $"{emp.Employee?.FirstName} {emp.Employee?.LastName}".Trim();
                 var baseName = string.IsNullOrWhiteSpace(displayName)
                     ? $"Employee {emp.EmployeeId}"
                     : displayName;
 
-                // 3.2) Стабільне технічне ім’я колонки (важливо для кешу DataView/WPF)
-                // Напр: "emp_12"
                 var columnName = $"emp_{emp.EmployeeId}";
 
-                // Якщо раптом така колонка вже є — додаємо суфікс "_2", "_3"...
                 var suffix = 1;
                 while (table.Columns.Contains(columnName))
                     columnName = $"emp_{emp.EmployeeId}_{++suffix}";
 
-                // 3.3) Додаємо колонку в таблицю
                 var col = table.Columns.Add(columnName, typeof(string));
                 col.Caption = baseName;
 
-                // 3.4) Запам’ятовуємо відповідність “назва колонки -> employeeId”
                 colNameToEmpId[columnName] = emp.EmployeeId;
             }
 
@@ -198,7 +201,7 @@ namespace WPFApp.Infrastructure.ScheduleMatrix
                 // 8.1) Групуємо слоти по працівнику в цей день
                 // byEmp[employeeId] = список слотів цієї людини в цей день
                 bool conflict = false;
-                var byEmp = new Dictionary<int, List<ScheduleSlotModel>>(capacity: Math.Min(employees.Count, 32));
+                var byEmp = new Dictionary<int, List<ScheduleSlotModel>>(capacity: Math.Min(orderedEmployees.Count, 32));
 
                 for (int i = 0; i < daySlots.Count; i++)
                 {
@@ -547,8 +550,7 @@ namespace WPFApp.Infrastructure.ScheduleMatrix
             int empId,
             List<(string from, string to)> intervals)
         {
-            // 1) Зберігаємо status з першого знайденого старого слоту
-            // Якщо слотів не було — ставимо UNFURNISHED (як у твоєму коді)
+            // 1) preserve status з першого слоту цього працівника (як було)
             var preservedStatus = SlotStatus.UNFURNISHED;
 
             for (int i = 0; i < slots.Count; i++)
@@ -561,8 +563,7 @@ namespace WPFApp.Infrastructure.ScheduleMatrix
                 }
             }
 
-            // 2) Видаляємо старі слоти для (day, empId)
-            // ВАЖЛИВО: видаляти треба з кінця, інакше індекси “з’їдуть”
+            // 2) Видаляємо старі слоти для (day, empId) (як було)
             for (int i = slots.Count - 1; i >= 0; i--)
             {
                 var s = slots[i];
@@ -570,15 +571,66 @@ namespace WPFApp.Infrastructure.ScheduleMatrix
                     slots.RemoveAt(i);
             }
 
-            // 3) Якщо нових інтервалів нема — на цьому все (очистка)
+            // 3) Якщо нових інтервалів нема — очистка
             if (intervals.Count == 0)
                 return;
 
-            // 4) Потрібно правильно підбирати SlotNo, щоб не було дублю в межах (day,from,to)
-            // usedByKey[(day,from,to)] = які slotNo вже зайняті
+            // =========================
+            // NEW: спочатку заповнюємо "порожні" слоти (EmployeeId=null) з тим самим from/to
+            // =========================
+            var intervalsToAdd = new List<(string from, string to)>();
+
+            for (int k = 0; k < intervals.Count; k++)
+            {
+                var (fromStr, toStr) = intervals[k];
+
+                // нормалізуємо до TimeSpan для коректного матчінгу 9:00 vs 09:00
+                if (!TryParseTime(fromStr, out var fromTs) || !TryParseTime(toStr, out var toTs))
+                {
+                    intervalsToAdd.Add((fromStr, toStr));
+                    continue;
+                }
+
+                ScheduleSlotModel? vacant = null;
+
+                for (int i = 0; i < slots.Count; i++)
+                {
+                    var s = slots[i];
+                    if (s.DayOfMonth != day) continue;
+
+                    if (s.EmployeeId.HasValue && s.EmployeeId.Value > 0)
+                        continue; // не вакантний
+
+                    if (!TryParseTime(s.FromTime, out var sf) || !TryParseTime(s.ToTime, out var st))
+                        continue;
+
+                    if (sf == fromTs && st == toTs)
+                    {
+                        vacant = s;
+                        break;
+                    }
+                }
+
+                if (vacant != null)
+                {
+                    // "займаємо" вакантний слот, замість створення нового
+                    vacant.EmployeeId = empId;
+                    // статус краще не ламати; але якщо треба — можна присвоїти preservedStatus
+                    // vacant.Status = preservedStatus;
+                }
+                else
+                {
+                    intervalsToAdd.Add((fromStr, toStr));
+                }
+            }
+
+            // Якщо всі інтервали лягли у вакантні слоти — нічого не додаємо
+            if (intervalsToAdd.Count == 0)
+                return;
+
+            // 4) usedByKey як було
             var usedByKey = new Dictionary<(int day, string from, string to), HashSet<int>>();
 
-            // зчитуємо існуючі слоти цього дня
             for (int i = 0; i < slots.Count; i++)
             {
                 var s = slots[i];
@@ -593,21 +645,19 @@ namespace WPFApp.Infrastructure.ScheduleMatrix
                 set.Add(s.SlotNo);
             }
 
-            // 5) Додаємо слоти з нових інтервалів
-            foreach (var (from, to) in intervals)
+            // 5) Додаємо тільки те, що не вдалося покласти у vacancy
+            foreach (var (from, to) in intervalsToAdd)
             {
                 var key = (day, from, to);
 
                 if (!usedByKey.TryGetValue(key, out var used))
                     usedByKey[key] = used = new HashSet<int>();
 
-                // підбираємо перший вільний SlotNo: 1,2,3...
                 var slotNo = 1;
                 while (used.Contains(slotNo)) slotNo++;
 
                 used.Add(slotNo);
 
-                // створюємо новий слот
                 slots.Add(new ScheduleSlotModel
                 {
                     ScheduleId = scheduleId,
@@ -620,5 +670,119 @@ namespace WPFApp.Infrastructure.ScheduleMatrix
                 });
             }
         }
+
+        public static bool ComputeConflictForDayWithStaffing(
+    IList<ScheduleSlotModel> slots,
+    int day,
+    int peoplePerShift,
+    string? shift1Range,
+    string? shift2Range)
+        {
+            // 0) захист
+            if (peoplePerShift <= 0)
+                peoplePerShift = 1;
+
+            // 1) парсимо shift ranges (приймаємо "09:00 - 15:00" і "09:00-15:00")
+            var shifts = new List<(TimeSpan from, TimeSpan to)>(2);
+
+            if (TryParseShiftRange(shift1Range, out var sh1)) shifts.Add(sh1);
+            if (TryParseShiftRange(shift2Range, out var sh2)) shifts.Add(sh2);
+
+            // якщо shift-и не парсяться — fallback на стару логіку
+            if (shifts.Count == 0)
+                return ComputeConflictForDay(slots, day);
+
+            // 2) конфлікт по overlap для ОДНОГО працівника (залишаємо твою ідею)
+            //    (не рахуємо vacancy як конфлікт тут — бо staffing це покриє)
+            var byEmp = new Dictionary<int, List<(TimeSpan from, TimeSpan to)>>();
+
+            for (int i = 0; i < slots.Count; i++)
+            {
+                var s = slots[i];
+                if (s.DayOfMonth != day) continue;
+                if (!s.EmployeeId.HasValue || s.EmployeeId.Value <= 0) continue;
+
+                if (!TryParseTime(s.FromTime, out var from)) continue;
+                if (!TryParseTime(s.ToTime, out var to)) continue;
+
+                if (to < from) to += TimeSpan.FromHours(24);
+
+                var empId = s.EmployeeId.Value;
+                if (!byEmp.TryGetValue(empId, out var list))
+                    byEmp[empId] = list = new List<(TimeSpan, TimeSpan)>();
+
+                list.Add((from, to));
+            }
+
+            foreach (var kv in byEmp)
+            {
+                var list = kv.Value;
+                if (list.Count <= 1) continue;
+
+                list.Sort((a, b) => a.from.CompareTo(b.from));
+                var lastEnd = list[0].to;
+
+                for (int j = 1; j < list.Count; j++)
+                {
+                    var cur = list[j];
+                    if (cur.from < lastEnd)
+                        return true;
+
+                    if (cur.to > lastEnd)
+                        lastEnd = cur.to;
+                }
+            }
+
+            // 3) staffing-check: для кожної зміни рахуємо людей, які ПОВНІСТЮ покривають зміну
+            foreach (var (shiftFrom, shiftTo) in shifts)
+            {
+                var covered = new HashSet<int>();
+
+                for (int i = 0; i < slots.Count; i++)
+                {
+                    var s = slots[i];
+                    if (s.DayOfMonth != day) continue;
+                    if (!s.EmployeeId.HasValue || s.EmployeeId.Value <= 0) continue;
+
+                    if (!TryParseTime(s.FromTime, out var from)) continue;
+                    if (!TryParseTime(s.ToTime, out var to)) continue;
+
+                    if (to < from) to += TimeSpan.FromHours(24);
+
+                    // shiftTo вже нормалізований в TryParseShiftRange (може бути +24h)
+                    if (from <= shiftFrom && to >= shiftTo)
+                        covered.Add(s.EmployeeId.Value);
+                }
+
+                if (covered.Count < peoplePerShift)
+                    return true;
+            }
+
+            return false;
+
+            static bool TryParseShiftRange(string? s, out (TimeSpan from, TimeSpan to) shift)
+            {
+                shift = default;
+
+                s = (s ?? string.Empty).Trim()
+                    .Replace('–', '-')  // на всякий випадок
+                    .Replace('—', '-');
+
+                if (s.Length == 0) return false;
+
+                var parts = s.Split('-', 2, StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+                if (parts.Length != 2) return false;
+
+                if (!TryParseTime(parts[0], out var from)) return false;
+                if (!TryParseTime(parts[1], out var to)) return false;
+
+                if (to < from) to += TimeSpan.FromHours(24); // дозволяємо нічні зміни
+                if (to == from) return false;
+
+                shift = (from, to);
+                return true;
+            }
+        }
+
     }
 }

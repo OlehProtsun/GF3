@@ -3,8 +3,10 @@ using System;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using WPFApp.ViewModel.Container.ScheduleEdit.Helpers;
+using System.Windows;
+using System.Windows.Threading;
 using WPFApp.Infrastructure.Validation;
+using WPFApp.ViewModel.Container.ScheduleEdit.Helpers;
 
 namespace WPFApp.ViewModel.Container.Edit
 {
@@ -174,24 +176,53 @@ namespace WPFApp.ViewModel.Container.Edit
         /// </summary>
         internal async Task SelectScheduleBlockAsync(ScheduleBlockViewModel block, CancellationToken ct = default)
         {
+            if (block is null)
+                return;
+
             if (!ScheduleEditVm.Blocks.Contains(block))
                 return;
 
-            ScheduleEditVm.SelectedBlock = block;
-            ScheduleEditVm.ClearValidationErrors();
+            // якщо той самий блок — нічого не робимо
+            if (ReferenceEquals(ScheduleEditVm.SelectedBlock, block))
+                return;
 
-            // Поки у тебе помилки зберігаються у block.ValidationErrors (Dictionary).
-            // Пізніше ми це оптимізуємо (щоб не було 2 систем валідації).
-            ScheduleEditVm.SelectedBlock = block;
+            var uiToken = ResetNavUiCts(ct);
 
-            // Помилки валідації зараз зберігаються тільки у ScheduleEditVm (INotifyDataErrorInfo).
-            // Ми НЕ тримаємо окремі помилки на кожен блок, тому при перемиканні блока
-            // просто очищаємо помилки і користувач при потребі отримає їх знову при Save/Generate.
-            ScheduleEditVm.ClearValidationErrors();
+            await ShowNavWorkingAsync();
 
-            await ScheduleEditVm.RefreshScheduleMatrixAsync(ct);
-            await UpdateAvailabilityPreviewAsync(ct);
+            // щоб Working гарантовано відрендерився
+            await Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+
+            try
+            {
+                // зафіксувати selection + прибрати старі errors (UI thread)
+                await RunOnUiThreadAsync(() =>
+                {
+                    ScheduleEditVm.SelectedBlock = block;
+                    ScheduleEditVm.ClearValidationErrors();
+                }).ConfigureAwait(false);
+
+                // важкі refresh'і під токеном, щоб швидкі кліки скасовували попереднє
+                await ScheduleEditVm.RefreshScheduleMatrixAsync(uiToken).ConfigureAwait(false);
+                await UpdateAvailabilityPreviewAsync(uiToken).ConfigureAwait(false);
+
+                // дати UI відрендерити матрицю для нового табу
+                await Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+
+                // Success (можеш зробити 400–600мс, щоб не дратувало при частих кліках)
+                await ShowNavSuccessThenAutoHideAsync(uiToken, 500).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException)
+            {
+                await HideNavStatusAsync().ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                await HideNavStatusAsync().ConfigureAwait(false);
+                ShowError(ex);
+            }
         }
+
 
         /// <summary>
         /// Закрити блок (таб) schedule у редакторі.
@@ -240,12 +271,7 @@ namespace WPFApp.ViewModel.Container.Edit
             var nextIndex = Math.Max(0, Math.Min(index, ScheduleEditVm.Blocks.Count - 1));
             var next = ScheduleEditVm.Blocks[nextIndex];
 
-            ScheduleEditVm.SelectedBlock = next;
-
-            // Нема окремих ValidationErrors на блок — просто очищаємо
-            ScheduleEditVm.ClearValidationErrors();
-
-            await UpdateAvailabilityPreviewAsync(ct);
+            await SelectScheduleBlockAsync(next, ct);
         }
     }
 }

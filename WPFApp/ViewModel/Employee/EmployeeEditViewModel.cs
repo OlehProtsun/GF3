@@ -1,24 +1,40 @@
+﻿using DataAccessLayer.Models;
 using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
-using System.Text.RegularExpressions;
-using DataAccessLayer.Models;
+using System.Text;
+using System.Threading.Tasks;
+using System.Windows;
 using WPFApp.Infrastructure;
+using WPFApp.Infrastructure.Validation;
+using WPFApp.Service;
+using WPFApp.ViewModel.Dialogs;
 
 namespace WPFApp.ViewModel.Employee
 {
+    /// <summary>
+    /// EmployeeEditViewModel — форма Add/Edit Employee.
+    ///
+    /// Покращення:
+    /// - не тримаємо власний Dictionary<string,List<string>>:
+    ///   використовуємо спільний ValidationErrors (як у Container/Availability/Schedule) :contentReference[oaicite:11]{index=11}
+    /// - inline validation: при зміні поля:
+    ///   * чистимо помилку цього поля
+    ///   * валідимо нове значення через EmployeeValidationRules
+    /// - не зберігаємо Regex тут: Regex винесені у EmployeeValidationRules
+    /// </summary>
     public sealed class EmployeeEditViewModel : ViewModelBase, INotifyDataErrorInfo
     {
-        internal static readonly Regex EmailRegex =
-            new(@"^\S+@\S+\.\S+$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Compiled);
-
-        internal static readonly Regex PhoneRegex =
-            new(@"^[0-9+\-\s()]{5,}$", RegexOptions.CultureInvariant | RegexOptions.Compiled);
-
         private readonly EmployeeViewModel _owner;
-        private readonly Dictionary<string, List<string>> _errors = new();
+
+        // Єдине сховище помилок.
+        private readonly ValidationErrors _validation = new();
+
+        // ----------------------------
+        // Поля форми
+        // ----------------------------
 
         private int _employeeId;
         public int EmployeeId
@@ -33,8 +49,14 @@ namespace WPFApp.ViewModel.Employee
             get => _firstName;
             set
             {
-                if (SetProperty(ref _firstName, value))
-                    ClearValidationErrors(nameof(FirstName));
+                if (!SetProperty(ref _firstName, value))
+                    return;
+
+                // 1) При зміні поля — прибираємо стару помилку FirstName.
+                ClearValidationErrors(nameof(FirstName));
+
+                // 2) Перевіряємо новий стан (inline).
+                ValidateProperty(nameof(FirstName));
             }
         }
 
@@ -44,8 +66,11 @@ namespace WPFApp.ViewModel.Employee
             get => _lastName;
             set
             {
-                if (SetProperty(ref _lastName, value))
-                    ClearValidationErrors(nameof(LastName));
+                if (!SetProperty(ref _lastName, value))
+                    return;
+
+                ClearValidationErrors(nameof(LastName));
+                ValidateProperty(nameof(LastName));
             }
         }
 
@@ -55,8 +80,11 @@ namespace WPFApp.ViewModel.Employee
             get => _email;
             set
             {
-                if (SetProperty(ref _email, value))
-                    ClearValidationErrors(nameof(Email));
+                if (!SetProperty(ref _email, value))
+                    return;
+
+                ClearValidationErrors(nameof(Email));
+                ValidateProperty(nameof(Email));
             }
         }
 
@@ -66,10 +94,17 @@ namespace WPFApp.ViewModel.Employee
             get => _phone;
             set
             {
-                if (SetProperty(ref _phone, value))
-                    ClearValidationErrors(nameof(Phone));
+                if (!SetProperty(ref _phone, value))
+                    return;
+
+                ClearValidationErrors(nameof(Phone));
+                ValidateProperty(nameof(Phone));
             }
         }
+
+        // ----------------------------
+        // Режим форми (Add/Edit)
+        // ----------------------------
 
         private bool _isEdit;
         public bool IsEdit
@@ -88,6 +123,10 @@ namespace WPFApp.ViewModel.Employee
             ? "Update the employee information and press Save."
             : "Fill the form and press Save.";
 
+        // ----------------------------
+        // Команди
+        // ----------------------------
+
         public AsyncRelayCommand SaveCommand { get; }
         public AsyncRelayCommand CancelCommand { get; }
 
@@ -95,21 +134,30 @@ namespace WPFApp.ViewModel.Employee
         {
             _owner = owner;
 
-            SaveCommand = new AsyncRelayCommand(() => _owner.SaveAsync());
+            // Save/Cancel делегуються owner’у.
+            SaveCommand = new AsyncRelayCommand(SaveWithValidationAsync);
+
             CancelCommand = new AsyncRelayCommand(() => _owner.CancelAsync());
         }
 
-        public bool HasErrors => _errors.Count > 0;
+        // ----------------------------
+        // INotifyDataErrorInfo (проксі на ValidationErrors)
+        // ----------------------------
 
-        public event EventHandler<DataErrorsChangedEventArgs>? ErrorsChanged;
+        public bool HasErrors => _validation.HasErrors;
+
+        public event EventHandler<DataErrorsChangedEventArgs>? ErrorsChanged
+        {
+            add => _validation.ErrorsChanged += value;
+            remove => _validation.ErrorsChanged -= value;
+        }
 
         public IEnumerable GetErrors(string? propertyName)
-        {
-            if (propertyName is null || !_errors.TryGetValue(propertyName, out var list))
-                return Array.Empty<string>();
+            => _validation.GetErrors(propertyName);
 
-            return list;
-        }
+        // ----------------------------
+        // Life-cycle / binding
+        // ----------------------------
 
         public void ResetForNew()
         {
@@ -119,6 +167,7 @@ namespace WPFApp.ViewModel.Employee
             Email = string.Empty;
             Phone = string.Empty;
             IsEdit = false;
+
             ClearValidationErrors();
         }
 
@@ -130,11 +179,15 @@ namespace WPFApp.ViewModel.Employee
             Email = model.Email;
             Phone = model.Phone;
             IsEdit = true;
+
             ClearValidationErrors();
         }
 
         public EmployeeModel ToModel()
         {
+            // Важливо:
+            // - Trim для імен
+            // - Email/Phone: null якщо пусто (зручніше для БД/сервісу)
             return new EmployeeModel
             {
                 Id = EmployeeId,
@@ -145,47 +198,167 @@ namespace WPFApp.ViewModel.Employee
             };
         }
 
+        // ----------------------------
+        // Validation operations (set/clear)
+        // ----------------------------
+
         public void SetValidationErrors(IReadOnlyDictionary<string, string> errors)
         {
-            ClearValidationErrors();
-            foreach (var kv in errors)
-                AddError(kv.Key, kv.Value);
+            // ВАЖЛИВО: WPF validation visuals краще оновлювати з UI thread
+            if (Application.Current?.Dispatcher is not null &&
+                !Application.Current.Dispatcher.CheckAccess())
+            {
+                Application.Current.Dispatcher.Invoke(() => SetValidationErrors(errors));
+                return;
+            }
+
+            if (errors is null || errors.Count == 0)
+            {
+                ClearValidationErrors();
+                return;
+            }
+
+            _validation.SetMany(errors);
+
+            // HasErrors — computed
+            OnPropertyChanged(nameof(HasErrors));
+
+            // КЛЮЧОВЕ: примусово “штовхаємо” WPF, щоб він одразу перемалював Validation.HasError
+            // навіть якщо користувач не змінював поле (не було PropertyChanged від binding’а)
+            foreach (var key in errors.Keys)
+            {
+                if (!string.IsNullOrWhiteSpace(key))
+                    OnPropertyChanged(key);
+            }
         }
+
 
         public void ClearValidationErrors()
         {
-            var keys = _errors.Keys.ToList();
-            _errors.Clear();
-
-            foreach (var key in keys)
-                ErrorsChanged?.Invoke(this, new DataErrorsChangedEventArgs(key));
-
+            _validation.ClearAll();
             OnPropertyChanged(nameof(HasErrors));
-        }
-
-        private void AddError(string propertyName, string message)
-        {
-            if (!_errors.TryGetValue(propertyName, out var list))
-            {
-                list = new List<string>();
-                _errors[propertyName] = list;
-            }
-
-            if (!list.Contains(message))
-            {
-                list.Add(message);
-                ErrorsChanged?.Invoke(this, new DataErrorsChangedEventArgs(propertyName));
-                OnPropertyChanged(nameof(HasErrors));
-            }
         }
 
         private void ClearValidationErrors(string propertyName)
         {
-            if (_errors.Remove(propertyName))
-            {
-                ErrorsChanged?.Invoke(this, new DataErrorsChangedEventArgs(propertyName));
-                OnPropertyChanged(nameof(HasErrors));
-            }
+            if (string.IsNullOrWhiteSpace(propertyName))
+                return;
+
+            _validation.Clear(propertyName);
+            OnPropertyChanged(nameof(HasErrors));
         }
+
+        private void ValidateProperty(string propertyName)
+        {
+            // 1) Беремо модель з поточного стану VM.
+            var model = ToModel();
+
+            // 2) Питаємо rules: чи є помилка саме для цього поля.
+            var msg = EmployeeValidationRules.ValidateProperty(model, propertyName);
+
+            // 3) Якщо є — додаємо.
+            if (!string.IsNullOrWhiteSpace(msg))
+                _validation.Add(propertyName, msg);
+
+            // 4) Оновлюємо HasErrors.
+            OnPropertyChanged(nameof(HasErrors));
+        }
+
+        // ----------------------------
+        // Full-form validation (Save gate) — як у ContainerScheduleEdit
+        // ----------------------------
+
+        private bool ValidateBeforeSave(bool showDialog = true)
+        {
+            // 1) Будь-які старі помилки прибираємо, щоб не змішувались зі свіжими.
+            ClearValidationErrors();
+
+            // 2) Валідимо всю модель одним проходом — єдине джерело правил.
+            var model = ToModel();
+            var raw = EmployeeValidationRules.ValidateAll(model);
+
+            // приводимо ключі до тих, що реально біндяться в XAML (FirstName/LastName/Email/Phone)
+            var errors = new Dictionary<string, string>(StringComparer.Ordinal);
+
+            foreach (var kv in raw)
+            {
+                var vmKey = MapValidationKeyToVm(kv.Key);
+                if (string.IsNullOrWhiteSpace(vmKey))
+                    continue;
+
+                // не даємо дублювати ключі
+                if (!errors.ContainsKey(vmKey))
+                    errors[vmKey] = kv.Value;
+            }
+
+            SetValidationErrors(errors);
+
+
+            // 4) Якщо треба — показуємо діалог із summary.
+            if (showDialog && HasErrors)
+            {
+                CustomMessageBox.Show(
+                    "Validation",
+                    BuildValidationSummary(errors),
+                    CustomMessageBoxIcon.Error,
+                    okText: "OK");
+            }
+
+            return !HasErrors;
+        }
+
+        private static string BuildValidationSummary(IReadOnlyDictionary<string, string> errors)
+        {
+            var sb = new StringBuilder();
+
+            foreach (var msg in errors.Values.Where(v => !string.IsNullOrWhiteSpace(v)).Distinct())
+                sb.AppendLine(msg);
+
+            var text = sb.ToString().Trim();
+            return string.IsNullOrWhiteSpace(text) ? "Please check the input values." : text;
+        }
+
+        private async Task SaveWithValidationAsync()
+        {
+            // як у ContainerScheduleEdit: валідацію виконуємо на UI thread
+            var ok = await Application.Current.Dispatcher
+                .InvokeAsync(() => ValidateBeforeSave(showDialog: true));
+
+            if (!ok)
+                return;
+
+            await _owner.SaveAsync().ConfigureAwait(false);
+        }
+
+        private static string MapValidationKeyToVm(string key)
+        {
+            if (string.IsNullOrWhiteSpace(key))
+                return string.Empty;
+
+            key = key.Trim();
+
+            // Якщо правила повертають "Employee.FirstName" або "Model.FirstName"
+            var dot = key.LastIndexOf('.');
+            if (dot >= 0 && dot < key.Length - 1)
+                key = key[(dot + 1)..];
+
+            // Нормалізуємо під VM property names
+            // (додай сюди всі нестиковки, які реально може повертати EmployeeValidationRules)
+            return key switch
+            {
+                "FirstName" => nameof(FirstName),
+                "LastName" => nameof(LastName),
+                "Email" => nameof(Email),
+                "Phone" => nameof(Phone),
+
+                // приклади на випадок інших назв з rules:
+                "EmailAddress" => nameof(Email),
+                "PhoneNumber" => nameof(Phone),
+
+                _ => key
+            };
+        }
+
+
     }
 }

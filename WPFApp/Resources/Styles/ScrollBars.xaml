@@ -1,0 +1,187 @@
+﻿<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!-- Arrow button style: BIGGER ICON, SAME BAR THICKNESS -->
+    <Style x:Key="ScrollBarArrowButtonStyle" TargetType="{x:Type RepeatButton}">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="Focusable" Value="False"/>
+        <Setter Property="Padding" Value="0"/>
+        <Setter Property="Foreground" Value="#99000000"/>
+
+        <!-- ВАЖЛИВО: збільшуємо саме символ, але він буде масштабований під доступний розмір -->
+        <Setter Property="FontSize" Value="16"/>
+
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="{x:Type RepeatButton}">
+                    <Border x:Name="Bd"
+                            Background="{TemplateBinding Background}"
+                            CornerRadius="4"
+                            Margin="0">
+                        <!-- було 2, тепер 0 щоб не з'їдати площу -->
+                        <Viewbox Stretch="Uniform"
+                                 Width="8" Height="8">
+                            <!-- контроль “реального” розміру іконки -->
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"/>
+                        </Viewbox>
+                    </Border>
+
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="#1A000000"/>
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="#2A000000"/>
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter TargetName="Bd" Property="Opacity" Value="0.45"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- UNIVERSAL Rounded ScrollBar (Vertical + Horizontal) -->
+    <Style x:Key="RoundedScrollBarStyle" TargetType="{x:Type ScrollBar}">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="SnapsToDevicePixels" Value="True"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="{x:Type ScrollBar}">
+                    <Grid Background="Transparent" SnapsToDevicePixels="True">
+
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+
+                        <RepeatButton x:Name="StartButton"
+                                      Grid.Row="0" Grid.Column="1"
+                                      Style="{StaticResource ScrollBarArrowButtonStyle}"
+                                      CommandTarget="{Binding RelativeSource={RelativeSource TemplatedParent}}"/>
+
+                        <Grid x:Name="TrackHost"
+                              Grid.Row="1" Grid.Column="1"
+                              Background="Transparent">
+                            <Border CornerRadius="6"
+                                    Background="#16000000"
+                                    Margin="2"/>
+
+                            <Track x:Name="PART_Track"
+                                   Orientation="{TemplateBinding Orientation}"
+                                   Minimum="{TemplateBinding Minimum}"
+                                   Maximum="{TemplateBinding Maximum}"
+                                   Value="{TemplateBinding Value}"
+                                   ViewportSize="{TemplateBinding ViewportSize}">
+
+                                <Track.DecreaseRepeatButton>
+                                    <RepeatButton x:Name="TrackDecreaseButton"
+                                                  Background="Transparent"
+                                                  Opacity="0"
+                                                  Focusable="False"
+                                                  CommandTarget="{Binding RelativeSource={RelativeSource TemplatedParent}}"/>
+                                </Track.DecreaseRepeatButton>
+
+                                <Track.Thumb>
+                                    <Thumb>
+                                        <Thumb.Template>
+                                            <ControlTemplate TargetType="{x:Type Thumb}">
+                                                <Border CornerRadius="6"
+                                                        Background="#55000000"
+                                                        Margin="2"/>
+                                            </ControlTemplate>
+                                        </Thumb.Template>
+                                    </Thumb>
+                                </Track.Thumb>
+
+                                <Track.IncreaseRepeatButton>
+                                    <RepeatButton x:Name="TrackIncreaseButton"
+                                                  Background="Transparent"
+                                                  Opacity="0"
+                                                  Focusable="False"
+                                                  CommandTarget="{Binding RelativeSource={RelativeSource TemplatedParent}}"/>
+                                </Track.IncreaseRepeatButton>
+
+                            </Track>
+                        </Grid>
+
+                        <RepeatButton x:Name="EndButton"
+                                      Grid.Row="2" Grid.Column="1"
+                                      Style="{StaticResource ScrollBarArrowButtonStyle}"
+                                      CommandTarget="{Binding RelativeSource={RelativeSource TemplatedParent}}"/>
+
+                    </Grid>
+
+                    <ControlTemplate.Triggers>
+
+                        <Trigger Property="Orientation" Value="Vertical">
+                            <Setter Property="Width" Value="10"/>
+
+                            <Setter TargetName="StartButton" Property="Grid.Row" Value="0"/>
+                            <Setter TargetName="StartButton" Property="Grid.Column" Value="1"/>
+                            <Setter TargetName="TrackHost" Property="Grid.Row" Value="1"/>
+                            <Setter TargetName="TrackHost" Property="Grid.Column" Value="1"/>
+                            <Setter TargetName="EndButton" Property="Grid.Row" Value="2"/>
+                            <Setter TargetName="EndButton" Property="Grid.Column" Value="1"/>
+
+                            <Setter TargetName="StartButton" Property="Content" Value="▲"/>
+                            <Setter TargetName="EndButton" Property="Content" Value="▼"/>
+
+                            <Setter TargetName="StartButton" Property="Command" Value="{x:Static ScrollBar.LineUpCommand}"/>
+                            <Setter TargetName="EndButton" Property="Command" Value="{x:Static ScrollBar.LineDownCommand}"/>
+
+                            <Setter TargetName="TrackDecreaseButton" Property="Command" Value="{x:Static ScrollBar.PageUpCommand}"/>
+                            <Setter TargetName="TrackIncreaseButton" Property="Command" Value="{x:Static ScrollBar.PageDownCommand}"/>
+
+                            <Setter TargetName="PART_Track" Property="IsDirectionReversed" Value="True"/>
+                        </Trigger>
+
+                        <Trigger Property="Orientation" Value="Horizontal">
+                            <Setter Property="Height" Value="10"/>
+
+                            <Setter TargetName="StartButton" Property="Grid.Row" Value="1"/>
+                            <Setter TargetName="StartButton" Property="Grid.Column" Value="0"/>
+                            <Setter TargetName="TrackHost" Property="Grid.Row" Value="1"/>
+                            <Setter TargetName="TrackHost" Property="Grid.Column" Value="1"/>
+                            <Setter TargetName="EndButton" Property="Grid.Row" Value="1"/>
+                            <Setter TargetName="EndButton" Property="Grid.Column" Value="2"/>
+
+                            <Setter TargetName="StartButton" Property="Content" Value="◀"/>
+                            <Setter TargetName="EndButton" Property="Content" Value="▶"/>
+
+                            <Setter TargetName="StartButton" Property="Command" Value="{x:Static ScrollBar.LineLeftCommand}"/>
+                            <Setter TargetName="EndButton" Property="Command" Value="{x:Static ScrollBar.LineRightCommand}"/>
+
+                            <Setter TargetName="TrackDecreaseButton" Property="Command" Value="{x:Static ScrollBar.PageLeftCommand}"/>
+                            <Setter TargetName="TrackIncreaseButton" Property="Command" Value="{x:Static ScrollBar.PageRightCommand}"/>
+
+                            <Setter TargetName="PART_Track" Property="IsDirectionReversed" Value="False"/>
+                        </Trigger>
+
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Opacity" Value="0.6"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style x:Key="LeftRoundedScrollBarStyle"
+           TargetType="{x:Type ScrollBar}"
+           BasedOn="{StaticResource RoundedScrollBarStyle}" />
+
+    <Style TargetType="{x:Type ScrollBar}"
+           BasedOn="{StaticResource RoundedScrollBarStyle}" />
+
+</ResourceDictionary>
+    

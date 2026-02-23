@@ -1,8 +1,15 @@
 ﻿using BusinessLogicLayer.Generators;
 using BusinessLogicLayer.Services.Abstractions;
+using DataAccessLayer.Models;
 using System;
+using System.Collections.Concurrent;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 using WPFApp.Infrastructure;
 using WPFApp.Service;
+using WPFApp.View.Dialogs;
 using WPFApp.ViewModel.Container.List;
 using WPFApp.ViewModel.Container.Profile;
 using WPFApp.ViewModel.Container.ScheduleEdit;
@@ -51,6 +58,10 @@ namespace WPFApp.ViewModel.Container.Edit
         private readonly IEmployeeService _employeeService;
         private readonly IScheduleGenerator _generator;
         private readonly IColorPickerService _colorPickerService;
+        private readonly IScheduleExportService _scheduleExportService;
+        private readonly IDatabaseChangeNotifier _databaseChangeNotifier;
+        private readonly ILoggerService _logger;
+        private readonly ConcurrentDictionary<int, Lazy<Task<ScheduleModel?>>> _scheduleDetailsCache = new();
 
         // =========================================================
         // 2) ВНУТРІШНІ СТАНИ ДЛЯ ВСЬОГО МОДУЛЯ
@@ -75,6 +86,54 @@ namespace WPFApp.ViewModel.Container.Edit
         /// Константа, бо це “правило UI”, а не дані.
         /// </summary>
         private const int MaxOpenedSchedules = 20;
+
+        private bool _isNavStatusVisible;
+        public bool IsNavStatusVisible
+        {
+            get => _isNavStatusVisible;
+            private set => SetProperty(ref _isNavStatusVisible, value);
+        }
+
+        private UIStatusKind _navStatus = UIStatusKind.Success;
+        public UIStatusKind NavStatus
+        {
+            get => _navStatus;
+            private set => SetProperty(ref _navStatus, value);
+        }
+
+        private CancellationTokenSource? _navUiCts;
+
+        private CancellationToken ResetNavUiCts(CancellationToken outer)
+        {
+            _navUiCts?.Cancel();
+            _navUiCts?.Dispose();
+            _navUiCts = CancellationTokenSource.CreateLinkedTokenSource(outer);
+            return _navUiCts.Token;
+        }
+
+        private Task ShowNavWorkingAsync()
+            => RunOnUiThreadAsync(() =>
+            {
+                NavStatus = UIStatusKind.Working;
+                IsNavStatusVisible = true;
+            });
+
+        private Task HideNavStatusAsync()
+            => RunOnUiThreadAsync(() => IsNavStatusVisible = false);
+
+        private async Task ShowNavSuccessThenAutoHideAsync(CancellationToken ct, int ms = 900)
+        {
+            await RunOnUiThreadAsync(() =>
+            {
+                NavStatus = UIStatusKind.Success;
+                IsNavStatusVisible = true;
+            }).ConfigureAwait(false);
+
+            try { await Task.Delay(ms, ct).ConfigureAwait(false); }
+            catch (OperationCanceledException) { return; }
+
+            await HideNavStatusAsync().ConfigureAwait(false);
+        }
 
         // =========================================================
         // 3) ПІД-ВЮ МОДЕЛИ (КОМПОЗИЦІЯ UI)
@@ -114,7 +173,10 @@ namespace WPFApp.ViewModel.Container.Edit
             IShopService shopService,
             IEmployeeService employeeService,
             IScheduleGenerator generator,
-            IColorPickerService colorPickerService)
+            IColorPickerService colorPickerService,
+            IScheduleExportService scheduleExportService,
+            IDatabaseChangeNotifier databaseChangeNotifier,
+            ILoggerService logger)
         {
             // Null-guards:
             // Якщо DI-контейнер налаштований неправильно, ми хочемо отримати помилку одразу тут,
@@ -126,6 +188,9 @@ namespace WPFApp.ViewModel.Container.Edit
             ArgumentNullException.ThrowIfNull(employeeService);
             ArgumentNullException.ThrowIfNull(generator);
             ArgumentNullException.ThrowIfNull(colorPickerService);
+            ArgumentNullException.ThrowIfNull(scheduleExportService);
+            ArgumentNullException.ThrowIfNull(databaseChangeNotifier);
+            ArgumentNullException.ThrowIfNull(logger);
 
             _containerService = containerService;
             _scheduleService = scheduleService;
@@ -134,6 +199,9 @@ namespace WPFApp.ViewModel.Container.Edit
             _employeeService = employeeService;
             _generator = generator;
             _colorPickerService = colorPickerService;
+            _scheduleExportService = scheduleExportService;
+            _databaseChangeNotifier = databaseChangeNotifier;
+            _logger = logger;
 
             // Створюємо “дочірні” VM-и.
             // Вони отримують owner (this), щоб викликати методи типу:
@@ -143,12 +211,51 @@ namespace WPFApp.ViewModel.Container.Edit
             ListVm = new ContainerListViewModel(this);
             EditVm = new ContainerEditViewModel(this);
             ProfileVm = new ContainerProfileViewModel(this);
-            ScheduleEditVm = new ContainerScheduleEditViewModel(this);
+            ScheduleEditVm = new ContainerScheduleEditViewModel(
+                this,
+                _availabilityGroupService,
+                _employeeService);
             ScheduleProfileVm = new ContainerScheduleProfileViewModel(this);
+
+            ProfileVm.EmployeesLoader = LoadScheduleEmployeesAsync;
+            ProfileVm.SlotsLoader = LoadScheduleSlotsAsync;
+
+            _databaseChangeNotifier.DatabaseChanged += OnDatabaseChanged;
 
             // Стартова секція — список контейнерів.
             // CurrentSection визначений у Navigation partial-файлі.
             CurrentSection = ListVm;
         }
+
+        private async Task<IReadOnlyList<ScheduleEmployeeModel>> LoadScheduleEmployeesAsync(int scheduleId, CancellationToken ct)
+        {
+            var detailed = await GetScheduleDetailsCachedAsync(scheduleId, ct).ConfigureAwait(false);
+            return detailed?.Employees?.ToList() ?? new List<ScheduleEmployeeModel>();
+        }
+
+        private async Task<IReadOnlyList<ScheduleSlotModel>> LoadScheduleSlotsAsync(int scheduleId, CancellationToken ct)
+        {
+            var detailed = await GetScheduleDetailsCachedAsync(scheduleId, ct).ConfigureAwait(false);
+            return detailed?.Slots?.ToList() ?? new List<ScheduleSlotModel>();
+        }
+
+        private async Task<ScheduleModel?> GetScheduleDetailsCachedAsync(int scheduleId, CancellationToken ct)
+        {
+            ct.ThrowIfCancellationRequested();
+
+            if (scheduleId <= 0)
+                return null;
+
+            var lazyTask = _scheduleDetailsCache.GetOrAdd(
+                scheduleId,
+                id => new Lazy<Task<ScheduleModel?>>(() => _scheduleService.GetDetailedAsync(id, CancellationToken.None)));
+
+            var detailed = await lazyTask.Value.ConfigureAwait(false);
+            ct.ThrowIfCancellationRequested();
+            return detailed;
+        }
+
+        private void ClearScheduleDetailsCache()
+            => _scheduleDetailsCache.Clear();
     }
 }
