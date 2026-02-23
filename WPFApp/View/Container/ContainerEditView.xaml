@@ -113,25 +113,79 @@
                     </Grid>
 
                     <StackPanel Grid.Row="2" Margin="0,16,0,0">
+                        <!-- Name -->
                         <TextBlock Text="Name"
-                                   FontFamily="{StaticResource DefaultFontFamily}"
-                                   FontSize="12"
-                                   Foreground="{StaticResource MutedTextBrush}" />
-                        <TextBox Style="{StaticResource ValidatedRoundedTextBoxStyle}"
-                                 Text="{Binding Name, UpdateSourceTrigger=PropertyChanged, ValidatesOnNotifyDataErrors=True}" />
+               FontFamily="{StaticResource DefaultFontFamily}"
+               FontSize="12"
+               Foreground="{StaticResource MutedTextBrush}" />
 
+                        <Grid>
+                            <TextBox x:Name="NameTextBox"
+                 Style="{StaticResource ValidatedRoundedTextBoxStyle}"
+                 Tag="Enter name..."
+                 Text="{Binding Name, UpdateSourceTrigger=PropertyChanged, ValidatesOnNotifyDataErrors=True}" />
+
+                            <TextBlock
+                   Margin="12,0,0,0"
+                   VerticalAlignment="Center"
+                   Foreground="#888888"
+                   IsHitTestVisible="False">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                        <Style.Triggers>
+                                            <MultiDataTrigger>
+                                                <MultiDataTrigger.Conditions>
+                                                    <Condition Binding="{Binding Text, ElementName=NameTextBox}" Value=""/>
+                                                    <Condition Binding="{Binding IsKeyboardFocused, ElementName=NameTextBox}" Value="False"/>
+                                                </MultiDataTrigger.Conditions>
+                                                <Setter Property="Visibility" Value="Visible"/>
+                                            </MultiDataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                        </Grid>
+
+                        <!-- Note -->
                         <TextBlock Text="Note"
-                                   Margin="0,12,0,0"
-                                   FontFamily="{StaticResource DefaultFontFamily}"
-                                   FontSize="12"
-                                   Foreground="{StaticResource MutedTextBrush}" />
-                        <TextBox Style="{StaticResource ValidatedRoundedTextBoxStyle}"
-                                 Height="190"
-                                 AcceptsReturn="True"
-                                 TextWrapping="Wrap"
-                                 Text="{Binding Note, UpdateSourceTrigger=PropertyChanged, ValidatesOnNotifyDataErrors=True}" />
-                    </StackPanel>
+               Margin="0,12,0,0"
+               FontFamily="{StaticResource DefaultFontFamily}"
+               FontSize="12"
+               Foreground="{StaticResource MutedTextBrush}" />
 
+                        <Grid>
+                            <TextBox x:Name="NoteTextBox"
+                 Style="{StaticResource ValidatedRoundedTextBoxStyle}"
+                 Height="190"
+                 AcceptsReturn="True"
+                 TextWrapping="Wrap"
+                 VerticalContentAlignment="Top"
+                 Padding="12,10,12,10"
+                 Text="{Binding Note, UpdateSourceTrigger=PropertyChanged, ValidatesOnNotifyDataErrors=True}" />
+
+                            <TextBlock Text="Enter note..."
+                   Margin="12,10,0,0"
+                   VerticalAlignment="Top"
+                   Foreground="#888888"
+                   IsHitTestVisible="False">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                        <Style.Triggers>
+                                            <MultiDataTrigger>
+                                                <MultiDataTrigger.Conditions>
+                                                    <Condition Binding="{Binding Text, ElementName=NoteTextBox}" Value=""/>
+                                                    <Condition Binding="{Binding IsKeyboardFocused, ElementName=NoteTextBox}" Value="False"/>
+                                                </MultiDataTrigger.Conditions>
+                                                <Setter Property="Visibility" Value="Visible"/>
+                                            </MultiDataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                        </Grid>
+                    </StackPanel>
                     <Grid Grid.Row="4" Margin="0,16,0,0">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto" />

@@ -1,12 +1,14 @@
-﻿using System;
+﻿using BusinessLogicLayer.Services.Abstractions;
+using DataAccessLayer.Models;
+using DocumentFormat.OpenXml.Spreadsheet;
+using DocumentFormat.OpenXml.Wordprocessing;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Threading;
-using BusinessLogicLayer.Services.Abstractions;
-using DataAccessLayer.Models;
 using WPFApp.Infrastructure;
 using WPFApp.Infrastructure.Validation;
 using WPFApp.Service;
@@ -293,16 +295,28 @@ namespace WPFApp.ViewModel.Employee
 
         internal async Task SaveAsync(CancellationToken ct = default)
         {
-            EditVm.ClearValidationErrors();
-
             var model = EditVm.ToModel();
-            var errors = EmployeeValidationRules.ValidateAll(model);
+            var raw = EmployeeValidationRules.ValidateAll(model);
 
-            if (errors.Count > 0)
+            if (raw.Count > 0)
             {
+                // те саме нормалізування ключів, але через EditVm helper
+                var errors = new Dictionary<string, string>(StringComparer.Ordinal);
+
+                foreach (var kv in raw)
+                {
+                    var vmKey = typeof(EmployeeEditViewModel)
+                        .GetMethod("MapValidationKeyToVm", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)!
+                        .Invoke(null, new object[] { kv.Key }) as string;
+
+                    if (!string.IsNullOrWhiteSpace(vmKey) && !errors.ContainsKey(vmKey))
+                        errors[vmKey] = kv.Value;
+                }
+
                 EditVm.SetValidationErrors(errors);
                 return;
             }
+
 
             var uiToken = ResetNavUiCts(ct);
 

@@ -29,6 +29,9 @@ using WPFApp.Service;
 using WPFApp.View.Dialogs;
 using WPFApp.ViewModel.Container.Edit;
 using WPFApp.ViewModel.Container.ScheduleEdit.Helpers;
+using System.Threading;
+using System.Threading.Tasks;
+using System.Windows.Threading;
 
 namespace WPFApp.ViewModel.Container.ScheduleEdit
 {
@@ -1104,6 +1107,73 @@ namespace WPFApp.ViewModel.Container.ScheduleEdit
                 .FirstOrDefault(se => se.EmployeeId == empId || (se.Employee?.Id ?? 0) == empId);
         }
 
+        private CancellationTokenSource? _saveUiPulseCts;
+
+        private CancellationToken ResetSaveUiPulseCts(CancellationToken outer = default)
+        {
+            _saveUiPulseCts?.Cancel();
+            _saveUiPulseCts?.Dispose();
+
+            _saveUiPulseCts = outer.CanBeCanceled
+                ? CancellationTokenSource.CreateLinkedTokenSource(outer)
+                : new CancellationTokenSource();
+
+            return _saveUiPulseCts.Token;
+        }
+
+        private Task ShowSaveWorkingAsync()
+            => _owner.RunOnUiThreadAsync(() =>
+            {
+                SaveStatus = UIStatusKind.Working;
+                IsSaveStatusVisible = true;
+            });
+
+        private Task HideSaveStatusAsync()
+            => _owner.RunOnUiThreadAsync(() => IsSaveStatusVisible = false);
+
+        private async Task ShowSaveSuccessThenAutoHideAsync(CancellationToken ct, int ms = 450)
+        {
+            await _owner.RunOnUiThreadAsync(() =>
+            {
+                SaveStatus = UIStatusKind.Success;
+                IsSaveStatusVisible = true;
+            }).ConfigureAwait(false);
+
+            try
+            {
+                await Task.Delay(ms, ct).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException)
+            {
+                return;
+            }
+
+            await HideSaveStatusAsync().ConfigureAwait(false);
+        }
+
+        private async Task PulseSaveWorkingSuccessAsync(int ms = 350, CancellationToken ct = default)
+        {
+            var uiToken = ResetSaveUiPulseCts(ct);
+
+            await ShowSaveWorkingAsync().ConfigureAwait(false);
+
+            // даємо WPF відрендерити "Working..."
+            await Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+
+            try
+            {
+                await ShowSaveSuccessThenAutoHideAsync(uiToken, ms).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException)
+            {
+                await HideSaveStatusAsync().ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                await HideSaveStatusAsync().ConfigureAwait(false);
+                _owner.ShowError(ex.Message);
+            }
+        }
 
         private async Task AddEmployeeAndKeepSelectionAsync()
         {
@@ -1143,45 +1213,86 @@ namespace WPFApp.ViewModel.Container.ScheduleEdit
 
         private async Task AddEmployeeManualAsync()
         {
-            // Employee додається через секцію Employee (ComboBox Employees + кнопка Add)
+            var block = SelectedBlock;
             var empId = SelectedEmployee?.Id ?? 0;
+
+            bool existedBefore = false;
+            if (block != null && empId > 0)
+            {
+                existedBefore = block.Employees.Any(se =>
+                    se.EmployeeId == empId || (se.Employee?.Id ?? 0) == empId);
+            }
 
             await _owner.AddScheduleEmployeeAsync().ConfigureAwait(false);
 
-            if (empId <= 0)
-                return;
+            bool added = false;
 
-            await _owner.RunOnUiThreadAsync(() =>
+            if (empId > 0)
             {
-                if (SelectedBlock is null)
-                    return;
-
-                // якщо реально додалося в schedule — маркуємо як manual
-                if (SelectedBlock.Employees.Any(se => se.EmployeeId == empId || (se.Employee?.Id ?? 0) == empId))
+                await _owner.RunOnUiThreadAsync(() =>
                 {
-                    _manualEmployeeIds.Add(empId);
-                    MinHoursEmployeesView?.Refresh(); // прибере з MinHours-grid
-                }
-            }).ConfigureAwait(false);
-        }
+                    if (SelectedBlock is null)
+                        return;
 
+                    bool existsAfter = SelectedBlock.Employees.Any(se =>
+                        se.EmployeeId == empId || (se.Employee?.Id ?? 0) == empId);
+
+                    // якщо реально додалося в schedule — маркуємо як manual
+                    if (existsAfter)
+                    {
+                        _manualEmployeeIds.Add(empId);
+                        MinHoursEmployeesView?.Refresh();
+                    }
+
+                    added = !existedBefore && existsAfter;
+                }).ConfigureAwait(false);
+            }
+
+            if (added)
+                await PulseSaveWorkingSuccessAsync(350).ConfigureAwait(false);
+        }
         private async Task RemoveEmployeeManualAsync()
         {
-            // Remove у тебе прив’язаний до ComboBox SelectedEmployee
-            var empId = SelectedEmployee?.Id ?? 0;
+            // Підстраховка: якщо вибраний тільки ComboBox, відновимо SelectedScheduleEmployee для remove
+            await _owner.RunOnUiThreadAsync(() => EnsureSelectedScheduleEmployee()).ConfigureAwait(false);
+
+            var block = SelectedBlock;
+            var empId = SelectedEmployee?.Id
+                        ?? SelectedScheduleEmployee?.EmployeeId
+                        ?? 0;
+
+            bool existedBefore = false;
+            if (block != null && empId > 0)
+            {
+                existedBefore = block.Employees.Any(se =>
+                    se.EmployeeId == empId || (se.Employee?.Id ?? 0) == empId);
+            }
 
             await _owner.RemoveScheduleEmployeeAsync().ConfigureAwait(false);
 
-            if (empId <= 0)
-                return;
+            bool removed = false;
 
-            await _owner.RunOnUiThreadAsync(() =>
+            if (empId > 0)
             {
-                _manualEmployeeIds.Remove(empId);
-                MinHoursEmployeesView?.Refresh();
-            }).ConfigureAwait(false);
-        }
+                await _owner.RunOnUiThreadAsync(() =>
+                {
+                    bool existsAfter = SelectedBlock?.Employees.Any(se =>
+                        se.EmployeeId == empId || (se.Employee?.Id ?? 0) == empId) == true;
 
+                    removed = existedBefore && !existsAfter;
+
+                    // manual-прапорець знімаємо тільки якщо реально видалили
+                    if (removed)
+                    {
+                        _manualEmployeeIds.Remove(empId);
+                        MinHoursEmployeesView?.Refresh();
+                    }
+                }).ConfigureAwait(false);
+            }
+
+            if (removed)
+                await PulseSaveWorkingSuccessAsync(350).ConfigureAwait(false);
+        }
 
         private bool IsAvailabilityEmployee(int employeeId)
     => employeeId > 0 && _availabilityEmployeeIds.Contains(employeeId);

@@ -163,7 +163,7 @@
                                             Minimum="1"
                                             Margin="0,7,0,0"
                                             Width="100"
-                                            Height="33"
+                                            Height="36"
                                             Maximum="12"
                                             Step="1"/>
                                     </StackPanel>
@@ -179,7 +179,7 @@
                                             Minimum="2026"
                                             Margin="0,7,0,0"
                                             Width="130"
-                                            Height="33"
+                                            Height="36"
                                             Maximum="4000"
                                             Step="1"/>
                                     </StackPanel>
@@ -446,49 +446,104 @@
 
                                 <!-- DataGrid container -->
                                 <Border Grid.Row="0"
-                                        Margin="0,6,0,10"
-                                        Background="{StaticResource SurfaceBrush}"
-                                        BorderBrush="{StaticResource CardBorderBrush}"
-                                        BorderThickness="2"
-                                        CornerRadius="{StaticResource Cr20}"
-                                        Padding="5"
-                                        ClipToBounds="True">
+        Margin="0,6,0,10"
+        Background="{StaticResource SurfaceBrush}"
+        BorderBrush="{StaticResource CardBorderBrush}"
+        BorderThickness="2"
+        CornerRadius="{StaticResource Cr20}"
+        Padding="5"
+        ClipToBounds="True">
 
                                     <DataGrid x:Name="dataGridBinds"
-                                              Style="{StaticResource BindsGridStyle}"
-                                              Background="Transparent"
-                                              BorderThickness="0"
-                                              ItemsSource="{Binding Binds}"
-                                              SelectedItem="{Binding SelectedBind}">
+              Style="{StaticResource BindsGridStyle}"
+              Background="Transparent"
+              BorderThickness="0"
+              ItemsSource="{Binding Binds}"
+              SelectedItem="{Binding SelectedBind}"
+              HeadersVisibility="Column"
+              ColumnHeaderHeight="30">
+
+                                        <!-- Header style -->
+                                        <DataGrid.ColumnHeaderStyle>
+                                            <Style TargetType="{x:Type DataGridColumnHeader}">
+                                                <Setter Property="HorizontalContentAlignment" Value="Center"/>
+                                                <Setter Property="VerticalContentAlignment" Value="Center"/>
+                                                <Setter Property="FontFamily" Value="{StaticResource DefaultFontFamily}"/>
+                                                <Setter Property="FontSize" Value="13"/>
+                                                <Setter Property="Foreground" Value="Black"/>
+                                                <Setter Property="Background" Value="Transparent"/>
+                                                <Setter Property="BorderBrush" Value="#FFD9D9D9"/>
+                                                <Setter Property="BorderThickness" Value="0,0,0,1"/>
+                                                <Setter Property="Padding" Value="4,0"/>
+                                            </Style>
+                                        </DataGrid.ColumnHeaderStyle>
+
+                                        <!-- Cell style: thin inner separators (does NOT break rounded row style) -->
+                                        <DataGrid.CellStyle>
+                                            <Style TargetType="{x:Type DataGridCell}">
+                                                <Setter Property="BorderThickness" Value="0"/>
+                                                <Setter Property="Background" Value="Transparent"/>
+                                                <Setter Property="Padding" Value="12,0"/>
+                                                <Setter Property="VerticalAlignment" Value="Center"/>
+                                                <Setter Property="HorizontalAlignment" Value="Stretch"/>
+
+                                                <Setter Property="Template">
+                                                    <Setter.Value>
+                                                        <ControlTemplate TargetType="{x:Type DataGridCell}">
+                                                            <Grid SnapsToDevicePixels="True">
+                                                                <!-- content -->
+                                                                <Border Background="{TemplateBinding Background}"
+                                                                Padding="{TemplateBinding Padding}">
+                                                                    <ContentPresenter VerticalAlignment="Center"/>
+                                                                </Border>
+
+                                                                <!-- horizontal separator between rows (inset) -->
+                                                                <Border x:Name="HorizontalSep"
+                                                                    VerticalAlignment="Bottom"
+                                                                    Height="1"
+                                                                    Margin="8,0,8,0"
+                                                                    Background="#FFD9D9D9"/>
+                                                            </Grid>
+                                                            <ControlTemplate.Triggers>
+                                                                <!-- Active column = 4th column (DisplayIndex = 3) -->
+                                                                <DataTrigger Binding="{Binding RelativeSource={RelativeSource Self}, Path=Column.DisplayIndex}"
+                                     Value="3">
+                                                                    <Setter TargetName="HorizontalSep" Property="Visibility" Value="Collapsed"/>
+                                                                </DataTrigger>
+                                                            </ControlTemplate.Triggers>
+
+
+                                                        </ControlTemplate>
+                                                    </Setter.Value>
+                                                </Setter>
+                                            </Style>
+                                        </DataGrid.CellStyle>
 
                                         <DataGrid.Columns>
                                             <DataGridTextColumn Header="Id"
-                                                                Binding="{Binding Id}"
-                                                                Width="40"
-                                                                IsReadOnly="True" />
+                                Binding="{Binding Id}"
+                                Width="60"
+                                IsReadOnly="True" />
 
                                             <DataGridTextColumn Header="Key"
-                                                                Binding="{Binding Key, UpdateSourceTrigger=PropertyChanged}"
-                                                                Width="130" />
-
+                                Binding="{Binding Key, UpdateSourceTrigger=PropertyChanged}"
+                                Width="80" />
 
                                             <DataGridTextColumn Header="Value"
-                                                                Binding="{Binding Value, UpdateSourceTrigger=PropertyChanged}"
-                                                                Width="*" />
+                                Binding="{Binding Value, UpdateSourceTrigger=PropertyChanged}"
+                                Width="*" />
 
                                             <DataGridTemplateColumn Header="Active" Width="60">
                                                 <DataGridTemplateColumn.CellTemplate>
                                                     <DataTemplate>
                                                         <CheckBox IsChecked="{Binding IsActive, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                                                  Style="{StaticResource RoundedCheckBoxStyle}" />
+                                  Style="{StaticResource RoundedCheckBoxStyle}" />
                                                     </DataTemplate>
                                                 </DataGridTemplateColumn.CellTemplate>
                                             </DataGridTemplateColumn>
-
                                         </DataGrid.Columns>
                                     </DataGrid>
                                 </Border>
-
                                 <!-- Buttons -->
                                 <Grid Grid.Row="1">
                                     <Grid.ColumnDefinitions>

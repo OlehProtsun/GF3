@@ -3,10 +3,47 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:validation="clr-namespace:WPFApp.Infrastructure.Validation"
              mc:Ignorable="d"
              d:DesignHeight="830" d:DesignWidth="852"
              Background="{StaticResource PageBackgroundBrush}">
 
+    <UserControl.Resources>
+
+        <validation:FirstValidationErrorConverter x:Key="FirstValidationErrorConverter"/>
+
+        <SolidColorBrush x:Key="FieldErrorBorderBrush" Color="#E53935"/>
+        <SolidColorBrush x:Key="FieldErrorFillBrush" Color="#FFFFEBEE"/>
+
+        <ControlTemplate x:Key="SquareRedErrorTemplate">
+            <Border BorderBrush="{StaticResource FieldErrorBorderBrush}"
+                    BorderThickness="2"
+                    CornerRadius="2"
+                    SnapsToDevicePixels="True">
+                <AdornedElementPlaceholder/>
+            </Border>
+        </ControlTemplate>
+
+        <!-- Override локально, щоб гарантовано був той же вигляд -->
+        <Style x:Key="ValidatedRoundedTextBoxStyle"
+               TargetType="{x:Type TextBox}"
+               BasedOn="{StaticResource RoundedTextBoxStyle}">
+            <Setter Property="Validation.ErrorTemplate" Value="{StaticResource SquareRedErrorTemplate}"/>
+            <Style.Triggers>
+                <Trigger Property="Validation.HasError" Value="True">
+                    <Setter Property="Background" Value="{StaticResource FieldErrorFillBrush}"/>
+                    <Setter Property="BorderBrush" Value="{StaticResource FieldErrorBorderBrush}"/>
+                    <Setter Property="BorderThickness" Value="2"/>
+                    <Setter Property="ToolTip"
+                            Value="{Binding RelativeSource={RelativeSource Self},
+                                            Path=(Validation.Errors),
+                                            Converter={StaticResource FirstValidationErrorConverter}}"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+    </UserControl.Resources>
+    
     <Grid ClipToBounds="False">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
@@ -116,30 +153,107 @@
 
 
                     <StackPanel Grid.Row="2" Margin="0,16,0,0">
+                        <!-- Name -->
                         <TextBlock Text="Name"
-                                   FontFamily="{StaticResource DefaultFontFamily}"
-                                   FontSize="12"
-                                   Foreground="{StaticResource MutedTextBrush}" />
-                        <TextBox Style="{StaticResource ValidatedRoundedTextBoxStyle}"
-                                 Text="{Binding Name, UpdateSourceTrigger=PropertyChanged, ValidatesOnNotifyDataErrors=True}" />
+               FontFamily="{StaticResource DefaultFontFamily}"
+               FontSize="12"
+               Foreground="{StaticResource MutedTextBrush}" />
 
+                        <Grid>
+                            <TextBox x:Name="NameTextBox"
+                 Style="{StaticResource ValidatedRoundedTextBoxStyle}"
+                 Text="{Binding Name, UpdateSourceTrigger=PropertyChanged, ValidatesOnNotifyDataErrors=True}" />
+
+                            <TextBlock Text="Enter name..."
+                   Margin="12,0,0,0"
+                   VerticalAlignment="Center"
+                   Foreground="#888888"
+                   IsHitTestVisible="False">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                        <Style.Triggers>
+                                            <MultiDataTrigger>
+                                                <MultiDataTrigger.Conditions>
+                                                    <Condition Binding="{Binding Text, ElementName=NameTextBox}" Value=""/>
+                                                    <Condition Binding="{Binding IsKeyboardFocused, ElementName=NameTextBox}" Value="False"/>
+                                                </MultiDataTrigger.Conditions>
+                                                <Setter Property="Visibility" Value="Visible"/>
+                                            </MultiDataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                        </Grid>
+
+                        <!-- Address -->
                         <TextBlock Text="Address"
-                                   Margin="0,12,0,0"
-                                   FontFamily="{StaticResource DefaultFontFamily}"
-                                   FontSize="12"
-                                   Foreground="{StaticResource MutedTextBrush}" />
-                        <TextBox Style="{StaticResource ValidatedRoundedTextBoxStyle}"
-                                 Text="{Binding Address, UpdateSourceTrigger=PropertyChanged, ValidatesOnNotifyDataErrors=True}" />
+               Margin="0,12,0,0"
+               FontFamily="{StaticResource DefaultFontFamily}"
+               FontSize="12"
+               Foreground="{StaticResource MutedTextBrush}" />
 
+                        <Grid>
+                            <TextBox x:Name="AddressTextBox"
+                 Style="{StaticResource ValidatedRoundedTextBoxStyle}"
+                 Text="{Binding Address, UpdateSourceTrigger=PropertyChanged, ValidatesOnNotifyDataErrors=True}" />
+
+                            <TextBlock Text="Enter address..."
+                   Margin="12,0,0,0"
+                   VerticalAlignment="Center"
+                   Foreground="#888888"
+                   IsHitTestVisible="False">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                        <Style.Triggers>
+                                            <MultiDataTrigger>
+                                                <MultiDataTrigger.Conditions>
+                                                    <Condition Binding="{Binding Text, ElementName=AddressTextBox}" Value=""/>
+                                                    <Condition Binding="{Binding IsKeyboardFocused, ElementName=AddressTextBox}" Value="False"/>
+                                                </MultiDataTrigger.Conditions>
+                                                <Setter Property="Visibility" Value="Visible"/>
+                                            </MultiDataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                        </Grid>
+
+                        <!-- Description -->
                         <TextBlock Text="Description"
-                                   Margin="0,12,0,0"
-                                   FontFamily="{StaticResource DefaultFontFamily}"
-                                   FontSize="12"
-                                   Foreground="{StaticResource MutedTextBrush}" />
-                        <TextBox Style="{StaticResource ValidatedRoundedTextBoxStyle}"
-                                 Text="{Binding Description, UpdateSourceTrigger=PropertyChanged, ValidatesOnNotifyDataErrors=True}" />
-                    </StackPanel>
+               Margin="0,12,0,0"
+               FontFamily="{StaticResource DefaultFontFamily}"
+               FontSize="12"
+               Foreground="{StaticResource MutedTextBrush}" />
 
+                        <Grid>
+                            <TextBox x:Name="DescriptionTextBox"
+                 Style="{StaticResource ValidatedRoundedTextBoxStyle}"
+                 Text="{Binding Description, UpdateSourceTrigger=PropertyChanged, ValidatesOnNotifyDataErrors=True}" />
+
+                            <TextBlock Text="Enter description..."
+                   Margin="12,0,0,0"
+                   VerticalAlignment="Center"
+                   Foreground="#888888"
+                   IsHitTestVisible="False">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                        <Style.Triggers>
+                                            <MultiDataTrigger>
+                                                <MultiDataTrigger.Conditions>
+                                                    <Condition Binding="{Binding Text, ElementName=DescriptionTextBox}" Value=""/>
+                                                    <Condition Binding="{Binding IsKeyboardFocused, ElementName=DescriptionTextBox}" Value="False"/>
+                                                </MultiDataTrigger.Conditions>
+                                                <Setter Property="Visibility" Value="Visible"/>
+                                            </MultiDataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                        </Grid>
+                    </StackPanel>
                     <Grid Grid.Row="5" Margin="0,16,0,0">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto" />

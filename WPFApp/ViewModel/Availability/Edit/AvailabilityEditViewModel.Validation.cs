@@ -1,9 +1,16 @@
 ﻿using System;
 using System.Collections;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.Data;
+using System.Linq;
+using System.Text;
+using System.Windows;
 using WPFApp.Infrastructure.AvailabilityMatrix;
 using WPFApp.Infrastructure.Validation;
+using WPFApp.Service;
+using WPFApp.View.Dialogs;
+using WPFApp.ViewModel.Dialogs;
 
 namespace WPFApp.ViewModel.Availability.Edit
 {
@@ -36,18 +43,30 @@ namespace WPFApp.ViewModel.Availability.Edit
         // Field validation (form)
         // ----------------------------
 
-        private bool ValidateBeforeSave()
+        private bool ValidateBeforeSave(bool showDialog = true)
         {
-            // 1) Отримуємо помилки для всіх полів одразу.
-            var errors = AvailabilityValidationRules.ValidateAll(
+            // 1) Чистимо старі помилки перед новим проходом.
+            ClearValidationErrors();
+
+            // 2) Валідимо всі поля форми.
+            var rawErrors = AvailabilityValidationRules.ValidateAll(
                 name: AvailabilityName,
                 year: AvailabilityYear,
                 month: AvailabilityMonth);
 
-            // 2) Проставляємо помилки у контейнер.
-            SetValidationErrors(errors);
+            // 3) Проставляємо помилки (всередині буде мапінг ключів).
+            SetValidationErrors(rawErrors);
 
-            // 3) Якщо помилок немає — можна зберігати.
+            // 4) Показуємо діалог як в Employee.
+            if (showDialog && HasErrors)
+            {
+                CustomMessageBox.Show(
+                    "Validation",
+                    BuildValidationSummary(rawErrors),
+                    CustomMessageBoxIcon.Error,
+                    okText: "OK");
+            }
+
             return !HasErrors;
         }
 
@@ -83,18 +102,53 @@ namespace WPFApp.ViewModel.Availability.Edit
 
         public void SetValidationErrors(IReadOnlyDictionary<string, string> errors)
         {
-            // 1) Якщо errors пустий — очищаємо все.
+            // Важливо: WPF validation visuals краще оновлювати в UI thread
+            if (Application.Current?.Dispatcher is not null &&
+                !Application.Current.Dispatcher.CheckAccess())
+            {
+                Application.Current.Dispatcher.Invoke(() => SetValidationErrors(errors));
+                return;
+            }
+
+            // 1) Якщо помилок нема — чистимо все.
             if (errors is null || errors.Count == 0)
             {
                 ClearValidationErrors();
                 return;
             }
 
-            // 2) Масово ставимо помилки.
-            _validation.SetMany(errors);
+            // 2) Мапимо ключі валідатора -> властивості VM (Name -> AvailabilityName і т.д.)
+            var mapped = new Dictionary<string, string>(StringComparer.Ordinal);
 
-            // 3) Оновлюємо HasErrors.
+            foreach (var kv in errors)
+            {
+                var vmKey = MapValidationKeyToVm(kv.Key);
+                if (string.IsNullOrWhiteSpace(vmKey))
+                    continue;
+
+                if (!mapped.ContainsKey(vmKey))
+                    mapped[vmKey] = kv.Value;
+            }
+
+            if (mapped.Count == 0)
+            {
+                ClearValidationErrors();
+                return;
+            }
+
+            // 3) Проставляємо помилки
+            _validation.SetMany(mapped);
+
+            // 4) Оновлюємо HasErrors
             OnPropertyChanged(nameof(HasErrors));
+
+            // 5) КЛЮЧОВЕ: пушимо PropertyChanged для конкретних полів,
+            //    щоб WPF одразу намалював Validation.HasError після Save
+            foreach (var key in mapped.Keys)
+            {
+                if (!string.IsNullOrWhiteSpace(key))
+                    OnPropertyChanged(key);
+            }
         }
 
         public void ClearValidationErrors()
@@ -104,6 +158,58 @@ namespace WPFApp.ViewModel.Availability.Edit
 
             // 2) Оновлюємо HasErrors.
             OnPropertyChanged(nameof(HasErrors));
+        }
+
+        private static string MapValidationKeyToVm(string key)
+        {
+            if (string.IsNullOrWhiteSpace(key))
+                return string.Empty;
+
+            key = key.Trim();
+
+            // Якщо валідатор повертає "Group.Name" / "Model.Year" — беремо останню частину
+            var dot = key.LastIndexOf('.');
+            if (dot >= 0 && dot < key.Length - 1)
+                key = key[(dot + 1)..];
+
+            return key switch
+            {
+                // VM names
+                "AvailabilityName" => nameof(AvailabilityName),
+                "AvailabilityMonth" => nameof(AvailabilityMonth),
+                "AvailabilityYear" => nameof(AvailabilityYear),
+
+                // Domain/BLL names (дуже важливо)
+                "Name" => nameof(AvailabilityName),
+                "Month" => nameof(AvailabilityMonth),
+                "Year" => nameof(AvailabilityYear),
+
+                _ => key
+            };
+        }
+
+        private static string BuildValidationSummary(IReadOnlyDictionary<string, string> errors)
+        {
+            if (errors is null || errors.Count == 0)
+                return "Please check the input values.";
+
+            var sb = new StringBuilder();
+
+            foreach (var msg in errors.Values.Where(v => !string.IsNullOrWhiteSpace(v)).Distinct())
+                sb.AppendLine(msg);
+
+            var text = sb.ToString().Trim();
+            return string.IsNullOrWhiteSpace(text) ? "Please check the input values." : text;
+        }
+
+        // (Опціонально, але дуже зручно — щоб показувати діалог і з owner-а)
+        internal void ShowValidationErrorsDialog(IReadOnlyDictionary<string, string> errors)
+        {
+            CustomMessageBox.Show(
+                "Validation",
+                BuildValidationSummary(errors),
+                CustomMessageBoxIcon.Error,
+                okText: "OK");
         }
 
         // ----------------------------

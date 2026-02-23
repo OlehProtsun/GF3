@@ -63,16 +63,20 @@ namespace DataAccessLayer.Repositories
 
             await SaveChangesOrResetAsync(ct).ConfigureAwait(false);
 
-            // (опційно) Відчепити, щоб контекст не набирав «боргів» трекінгу на WinForms-життєвому циклі
-            //_db.Entry(tracked ?? entity).State = EntityState.Detached;
+            _db.Entry(tracked ?? entity).State = EntityState.Detached;
         }
 
         public async Task DeleteAsync(int id, CancellationToken ct = default)
         {
-            var entity = await GetByIdAsync(id, ct).ConfigureAwait(false);
+            // FindAsync спочатку перевіряє Local (tracked entities)
+            var entity = await _set.FindAsync(new object[] { id }, ct).ConfigureAwait(false);
             if (entity is null) return;
+
             _set.Remove(entity);
             await SaveChangesOrResetAsync(ct).ConfigureAwait(false);
+
+            // (опційно) після видалення можна почистити трекер
+            // _db.ChangeTracker.Clear();
         }
 
         private async Task SaveChangesOrResetAsync(CancellationToken ct)

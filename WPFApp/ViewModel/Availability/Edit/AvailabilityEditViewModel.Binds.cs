@@ -7,6 +7,8 @@ using System.Threading.Tasks;
 using System.Windows.Input;
 using WPFApp.Infrastructure.AvailabilityMatrix;
 using WPFApp.ViewModel.Availability.Helpers;
+using System.Windows;
+using System.Windows.Threading;
 
 namespace WPFApp.ViewModel.Availability.Edit
 {
@@ -210,5 +212,7 @@ namespace WPFApp.ViewModel.Availability.Edit
                 _bindRowHandlers.Remove(row);
             }
         }
+
+
     }
 }

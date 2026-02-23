@@ -3,7 +3,9 @@ using System;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Windows;
 using System.Windows.Input;
+using System.Windows.Threading;
 using WPFApp.Infrastructure.Hotkeys;
 using WPFApp.ViewModel.Availability.Helpers;
 
@@ -19,10 +21,6 @@ namespace WPFApp.ViewModel.Availability.Main
             // 1) Унікальний маркер, щоб після reload знайти саме той рядок.
             var draftKey = $"__draft__{Guid.NewGuid():N}";
 
-            // 2) Створюємо "чернетку" в БД одразу, щоб одразу отримати реальний Id через LoadBindsAsync.
-            //    Важливо:
-            //    - IsActive=false, щоб чернетка не впливала на реальні хоткеї
-            //    - Value може бути "" або "__draft__" — залежно від обмежень БД
             var draft = new BindModel
             {
                 Key = draftKey,
@@ -30,36 +28,58 @@ namespace WPFApp.ViewModel.Availability.Main
                 IsActive = false
             };
 
+            var uiToken = ResetNavUiCts(ct);
+
+            await ShowNavWorkingAsync();
+            await Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+
             try
             {
-                // 3) Create в БД.
-                await _bindService.CreateAsync(draft, ct);
+                // 2) Create в БД.
+                await _bindService.CreateAsync(draft, uiToken);
 
-                // 4) Reload binds.
-                await LoadBindsAsync(ct);
+                // 3) Reload binds.
+                await LoadBindsAsync(uiToken);
+
+                // 4) Знаходимо чернетку і готуємо її для редагування.
+                var row = EditVm.Binds.FirstOrDefault(b => b.Key == draftKey);
+                if (row != null)
+                {
+                    row.Key = string.Empty;
+                    row.Value = string.Empty;
+                    row.IsActive = true;
+                    EditVm.SelectedBind = row;
+                }
+
+                await Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+                await ShowNavSuccessThenAutoHideAsync(uiToken, 700);
+            }
+            catch (OperationCanceledException)
+            {
+                await HideNavStatusAsync();
             }
             catch (Exception ex)
             {
-                // 5) Помилка — показуємо.
+                await HideNavStatusAsync();
                 ShowError(ex);
-                return;
             }
+        }
+        internal async Task FlashNavWorkingSuccessAsync(CancellationToken ct = default, int successMs = 550)
+        {
+            var uiToken = ResetNavUiCts(ct);
 
-            // 6) Знаходимо чернетку у колекції (в EditVm).
-            var row = EditVm.Binds.FirstOrDefault(b => b.Key == draftKey);
-            if (row != null)
+            await ShowNavWorkingAsync();
+            await Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+
+            try
             {
-                // 7) Для користувача показуємо “порожні” значення (ніби новий рядок).
-                row.Key = string.Empty;
-                row.Value = string.Empty;
-
-                // 8) ТУТ є вибір UX:
-                //    - якщо поставити true, рядок стає активним одразу
-                //    - якщо лишити false, можна активувати лише після валідного заповнення
-                row.IsActive = true;
-
-                // 9) Виставляємо selection, щоб курсор/фокус був у новому рядку.
-                EditVm.SelectedBind = row;
+                // Невелика пауза, щоб "Working..." встиг показатись навіть для дуже швидких локальних дій
+                await Task.Delay(120, uiToken);
+                await ShowNavSuccessThenAutoHideAsync(uiToken, successMs);
+            }
+            catch (OperationCanceledException)
+            {
+                await HideNavStatusAsync();
             }
         }
 
@@ -74,31 +94,45 @@ namespace WPFApp.ViewModel.Availability.Main
             if (!Confirm($"Delete bind '{bind.Key}'?", "Confirm"))
                 return;
 
-            // 3) Якщо це “локальний/тимчасовий” рядок без Id — просто прибираємо з колекції.
+            // 3) Якщо це локальний рядок без Id — просто прибираємо з колекції + короткий popup.
             if (bind.Id == 0)
             {
                 EditVm.Binds.Remove(bind);
+                EditVm.SelectedBind = null;
+
+                await FlashNavWorkingSuccessAsync(ct, successMs: 500);
                 return;
             }
+
+            var uiToken = ResetNavUiCts(ct);
+
+            await ShowNavWorkingAsync();
+            await Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
 
             try
             {
                 // 4) Delete в БД.
-                await _bindService.DeleteAsync(bind.Id, ct);
+                await _bindService.DeleteAsync(bind.Id, uiToken);
 
                 // 5) Reload binds.
-                await LoadBindsAsync(ct);
+                await LoadBindsAsync(uiToken);
 
-                // 6) Після reload selection можна очистити (або лишити як є, залежить від UX).
+                // 6) Після reload selection очищаємо.
                 EditVm.SelectedBind = null;
+
+                await Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+                await ShowNavSuccessThenAutoHideAsync(uiToken, 700);
+            }
+            catch (OperationCanceledException)
+            {
+                await HideNavStatusAsync();
             }
             catch (Exception ex)
             {
-                // 7) Помилка — показуємо.
+                await HideNavStatusAsync();
                 ShowError(ex);
             }
         }
-
         internal async Task UpsertBindAsync(BindRow? bind, CancellationToken ct = default)
         {
             // 1) Якщо нічого не передали — виходимо.

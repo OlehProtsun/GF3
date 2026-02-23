@@ -139,7 +139,7 @@ namespace BusinessLogicLayer.Generators
                             continue;
                         }
 
-                        // Optional: time window inside a day (e.g. 15:30-24:00)
+                        // Optional: time window inside a day (e.g. 15:30-24:00 or "09:00 - 15:00")
                         if (TryReadAvailabilityWindow(d, out var fromMin, out var toMin))
                         {
                             fromMin = Clamp(fromMin, 0, 24 * 60);
@@ -157,6 +157,14 @@ namespace BusinessLogicLayer.Generators
                                 availStartMin[idx] = 24 * 60;
                                 availEndMin[idx] = 0;
                             }
+                        }
+                        else if (AvailabilityKindRequiresWindow(d.Kind))
+                        {
+                            // Strict mode: interval-like availability without a readable interval
+                            // is treated as not schedulable rather than "ANY" (0..24).
+                            unavailable[idx] = true;
+                            availStartMin[idx] = 24 * 60;
+                            availEndMin[idx] = 0;
                         }
                     }
                 }
@@ -1977,7 +1985,18 @@ namespace BusinessLogicLayer.Generators
             fromMin = 0;
             toMin = 24 * 60;
 
-            // Common property names (string "HH:mm", TimeSpan, numeric)
+            // 1) Common packed interval properties ("09:00 - 15:00")
+            if (TryReadIntervalText(dayModel,
+                    new[] { "IntervalStr", "IntervalString", "Interval", "AvailabilityInterval", "TimeInterval" },
+                    out var iFrom,
+                    out var iTo))
+            {
+                fromMin = iFrom;
+                toMin = iTo;
+                return true;
+            }
+
+            // 2) Split time properties (string "HH:mm", TimeSpan, numeric)
             var hasFrom = TryReadTime(dayModel,
                 new[] { "FromTime", "StartTime", "From", "Start", "AvailableFrom", "TimeFrom" },
                 out var fm);
@@ -1986,7 +2005,7 @@ namespace BusinessLogicLayer.Generators
                 new[] { "ToTime", "EndTime", "To", "End", "AvailableTo", "TimeTo" },
                 out var tm);
 
-            // Also support pairs like FromHour/FromMinute etc.
+            // 3) Also support pairs like FromHour/FromMinute etc.
             if (!hasFrom)
                 hasFrom = TryReadHourMinute(dayModel,
                     new[] { "FromHour", "StartHour" },
@@ -2004,6 +2023,74 @@ namespace BusinessLogicLayer.Generators
 
             if (hasFrom) fromMin = fm;
             if (hasTo) toMin = tm;
+
+            return true;
+        }
+
+        private static bool AvailabilityKindRequiresWindow(object? kind)
+        {
+            if (kind is null) return false;
+
+            var s = kind.ToString();
+            if (string.IsNullOrWhiteSpace(s)) return false;
+
+            s = s.Trim();
+
+            // "INT", "INTERVAL", etc. => requires a parsable window.
+            if (string.Equals(s, "INT", StringComparison.OrdinalIgnoreCase))
+                return true;
+
+            if (s.IndexOf("INTERVAL", StringComparison.OrdinalIgnoreCase) >= 0)
+                return true;
+
+            // "ANY" / "NONE" do not require a window.
+            return false;
+        }
+
+        private static bool TryReadIntervalText(object obj, string[] names, out int fromMin, out int toMin)
+        {
+            fromMin = 0;
+            toMin = 0;
+
+            var t = obj.GetType();
+
+            foreach (var name in names)
+            {
+                var p = t.GetProperty(name, BindingFlags.Instance | BindingFlags.Public | BindingFlags.IgnoreCase);
+                if (p is null) continue;
+
+                var v = p.GetValue(obj);
+                if (v is null) continue;
+
+                if (v is string s && TryParseIntervalRange(s, out fromMin, out toMin))
+                    return true;
+            }
+
+            return false;
+        }
+
+        private static bool TryParseIntervalRange(string text, out int fromMin, out int toMin)
+        {
+            fromMin = 0;
+            toMin = 0;
+
+            if (string.IsNullOrWhiteSpace(text))
+                return false;
+
+            var s = text.Trim();
+
+            // Normalize common separators and dashes.
+            s = s.Replace("–", "-").Replace("—", "-");
+
+            var parts = s.Split('-', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length != 2)
+                return false;
+
+            if (!TryConvertToMinutes(parts[0], out fromMin))
+                return false;
+
+            if (!TryConvertToMinutes(parts[1], out toMin))
+                return false;
 
             return true;
         }
@@ -2147,4 +2234,5 @@ namespace BusinessLogicLayer.Generators
         }
     }
 }
+
 

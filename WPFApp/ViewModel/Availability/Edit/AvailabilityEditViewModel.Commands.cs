@@ -1,4 +1,5 @@
 ﻿using System.Threading.Tasks;
+using System.Windows;
 using WPFApp.Infrastructure;
 
 namespace WPFApp.ViewModel.Availability.Edit
@@ -26,15 +27,17 @@ namespace WPFApp.ViewModel.Availability.Edit
 
         private async Task SaveWithValidationAsync()
         {
-            // 1) Перед Save — робимо повну валідацію (Information fields).
-            if (!ValidateBeforeSave())
+            // Валідацію виконуємо на UI thread (щоб візуалка WPF оновилась стабільно)
+            var ok = await Application.Current.Dispatcher
+                .InvokeAsync(() => ValidateBeforeSave(showDialog: true));
+
+            if (!ok)
                 return;
 
-            // 2) Якщо ок — делегуємо Save на owner.
             await _owner.SaveAsync().ConfigureAwait(false);
         }
 
-        private Task AddEmployeeAsync()
+        private async Task AddEmployeeAsync()
         {
             // 1) Беремо id вибраного працівника.
             int empId = SelectedEmployee?.Id ?? 0;
@@ -43,7 +46,7 @@ namespace WPFApp.ViewModel.Availability.Edit
             if (empId <= 0)
             {
                 _owner.ShowError("Select employee first.");
-                return Task.CompletedTask;
+                return;
             }
 
             // 3) Підбираємо header (caption) для колонки.
@@ -53,12 +56,17 @@ namespace WPFApp.ViewModel.Availability.Edit
 
             // 4) Пробуємо додати колонку.
             if (!TryAddEmployeeColumn(empId, header))
+            {
                 _owner.ShowInfo("This employee is already added.");
+                return;
+            }
 
-            return Task.CompletedTask;
+            // 5) Показуємо короткий Working -> Success popup
+            await _owner.FlashNavWorkingSuccessAsync();
         }
 
-        private Task RemoveEmployeeAsync()
+
+        private async Task RemoveEmployeeAsync()
         {
             // 1) Беремо id вибраного працівника.
             int empId = SelectedEmployee?.Id ?? 0;
@@ -67,16 +75,19 @@ namespace WPFApp.ViewModel.Availability.Edit
             if (empId <= 0)
             {
                 _owner.ShowError("Select employee first.");
-                return Task.CompletedTask;
+                return;
             }
 
             // 3) Пробуємо видалити колонку.
             if (!RemoveEmployeeColumn(empId))
+            {
                 _owner.ShowInfo("This employee is not in the group.");
+                return;
+            }
 
-            return Task.CompletedTask;
+            // 4) Показуємо короткий Working -> Success popup
+            await _owner.FlashNavWorkingSuccessAsync();
         }
-
         private Task SearchEmployeeAsync()
         {
             // 1) Делегуємо фільтрацію в owner.

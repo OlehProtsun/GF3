@@ -144,6 +144,7 @@ namespace WPFApp.ViewModel.Availability.Main
             if (errors.Count > 0)
             {
                 EditVm.SetValidationErrors(errors);
+                EditVm.ShowValidationErrorsDialog(errors); // щоб була "комунітка" як в Employee
                 return;
             }
 
