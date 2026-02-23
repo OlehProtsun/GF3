@@ -7,11 +7,6 @@
              d:DesignHeight="830" d:DesignWidth="852"
              Background="{StaticResource PageBackgroundBrush}">
 
-    <UserControl.Resources>
-        <!-- Local resources are not required here:
-             typography / card wrappers are now reused from AvailabilityResources.xaml -->
-    </UserControl.Resources>
-
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
