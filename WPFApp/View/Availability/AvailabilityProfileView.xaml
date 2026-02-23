@@ -10,6 +10,11 @@
              d:DataContext="{d:DesignInstance Type=dt:AvailabilityProfileViewDesignVM, IsDesignTimeCreatable=True}"
              Background="{StaticResource PageBackgroundBrush}">
 
+    <!--
+        Profile page:
+        - ліва картка: основна інформація та дії (cancel/delete)
+        - права картка: read-only матриця availability за місяць
+    -->
     <Grid ClipToBounds="False">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
@@ -46,17 +51,13 @@
                 <TextBlock Grid.Row="1"
                            Margin="0,10,0,0"
                            Text="Availability Profile"
-                           FontFamily="{StaticResource DefaultFontFamily}"
-                           FontSize="{StaticResource FontSizePageTitle}"
-                           Foreground="Black" />
+                           Style="{StaticResource AvailabilityPageTitleTextStyle}" />
 
                 <!-- Subtitle -->
                 <TextBlock Grid.Row="2"
                            Margin="0,6,0,0"
                            Text="Here you can see a detailed availability profile"
-                           FontFamily="{StaticResource DefaultFontFamily}"
-                           FontSize="17"
-                           Foreground="{StaticResource SecondaryTextBrush}" />
+                           Style="{StaticResource AvailabilityPageSubtitleTextStyle}" />
             </Grid>
         </Border>
 
@@ -86,15 +87,10 @@
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                         <Viewbox Width="20" Height="20" Margin="0,0,8,0">
                             <Path Data="{StaticResource IconInformation}"
-                                  Fill="Black"
-                                  Stretch="Uniform" />
+                                  Style="{StaticResource AvailabilityHeaderIconPathStyle}" />
                         </Viewbox>
                         <TextBlock Text="Profile Information"
-                                   FontFamily="{StaticResource DefaultFontFamily}"
-                                   FontSize="{StaticResource FontSizeTitle}"
-                                   FontWeight="Bold"
-                                   Foreground="Black"
-                                   VerticalAlignment="Center" />
+                                   Style="{StaticResource AvailabilitySectionHeaderTextStyle}" />
                     </StackPanel>
 
                     <!-- ID -->
@@ -153,17 +149,14 @@
 
                         <Button Width="84"
                                 Height="33"
-                                Style="{StaticResource RoundedButtonStyle}"
-                                Background="{StaticResource CancelButtonBackgroundBrush}"
-                                Foreground="{StaticResource MutedTextBrush}"
+                                Style="{StaticResource AvailabilityCancelButtonStyle}"
                                 Content="Cancel"
                                 Command="{Binding CancelProfileCommand}" />
 
                         <Button Grid.Column="2"
                                 Width="86"
                                 Height="33"
-                                Style="{StaticResource RoundedButtonStyle}"
-                                Background="{StaticResource DangerBrush}"
+                                Style="{StaticResource AvailabilityDangerButtonStyle}"
                                 Content="Delete"
                                 Command="{Binding DeleteCommand}" />
                     </Grid>
@@ -185,31 +178,16 @@
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                         <Viewbox Width="20" Height="20" Margin="0,0,8,0">
                             <Path Data="{StaticResource IconAvailability}"
-                                  Fill="Black"
-                                  Stretch="Uniform"
-                                  RenderTransformOrigin="0.5,0.5">
-                                <Path.RenderTransform>
-                                    <ScaleTransform ScaleX="1" ScaleY="-1" />
-                                </Path.RenderTransform>
-                            </Path>
+                                  Style="{StaticResource AvailabilityHeaderIconPathFlippedStyle}" />
                         </Viewbox>
                         <TextBlock Text="Availability Table"
-                                   FontFamily="{StaticResource DefaultFontFamily}"
-                                   FontSize="{StaticResource FontSizeTitle}"
-                                   FontWeight="Bold"
-                                   Foreground="Black"
-                                   VerticalAlignment="Center" />
+                                   Style="{StaticResource AvailabilitySectionHeaderTextStyle}" />
                     </StackPanel>
 
                     <!-- Grid container (як в Edit) -->
                     <Border Grid.Row="1"
                             Margin="0,12,0,12"
-                            Background="{StaticResource SurfaceBrush}"
-                            BorderBrush="{StaticResource CardBorderBrush}"
-                            BorderThickness="2"
-                            CornerRadius="{StaticResource Cr20}"
-                            Padding="6"                           
-                            ClipToBounds="True">
+                            Style="{StaticResource AvailabilityGridContainerBorderStyle}">
                         <DataGrid x:Name="dataGridAvailabilityMonthProfile"
                           Style="{StaticResource ScheduleMatrixCompactGridStyle_NoTotals}"
                           Background="Transparent"
@@ -259,9 +237,7 @@
 
                         <Button Width="84"
                                 Height="33"
-                                Style="{StaticResource RoundedButtonStyle}"
-                                Background="{StaticResource CancelButtonBackgroundBrush}"
-                                Foreground="{StaticResource MutedTextBrush}"
+                                Style="{StaticResource AvailabilityCancelButtonStyle}"
                                 Content="Cancel"
                                 Command="{Binding CancelTableCommand}" />
 

@@ -7,15 +7,24 @@ using System.Windows.Media;
 using System.Windows.Threading;
 using WPFApp.ViewModel.Container.Profile;
 using WPFApp.ViewModel.Container.ScheduleList;
-using WPFApp.ViewModel.Container.List;
 
 namespace WPFApp.View.Container
 {
+    /// <summary>
+    /// Profile screen for a single container.
+    /// Code-behind handles only UI-specific behavior:
+    /// - dynamic grid column rebuild for statistics
+    /// - row click / double-click interactions for the schedules list
+    /// - safe attach/detach of VM events
+    /// </summary>
     public partial class ContainerProfileView : UserControl
     {
         private ContainerProfileViewModel? _vm;
         private bool _rebuildQueued;
 
+        /// <summary>
+        /// Wires lifecycle events so the view can subscribe/unsubscribe from VM notifications safely.
+        /// </summary>
         public ContainerProfileView()
         {
             InitializeComponent();

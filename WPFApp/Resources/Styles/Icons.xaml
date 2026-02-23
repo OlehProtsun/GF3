@@ -138,5 +138,14 @@
         <PathGeometry Figures="M2265 4405 c-66 -7 -177 -25 -246 -39 -125 -25 -357 -91 -371 -104 -4 -4 104 -119 240 -255 l249 -248 62 20 c405 137 869 29 1173 -273 221 -219 333 -473 345 -781 6 -155 -8 -265 -50 -398 l-24 -75 342 -342 342 -342 150 149 c269 265 463 544 603 864 l41 95 -41 95 c-254 579 -716 1068 -1280 1353 -275 140 -543 224 -864 272 -144 21 -520 27 -671 9z" />
     </GeometryGroup>
 
+    <Style x:Key="FlippedSvgPathStyle" TargetType="{x:Type Path}">
+        <Setter Property="Stretch" Value="Uniform"/>
+        <Setter Property="RenderTransformOrigin" Value="0.5,0.5"/>
+        <Setter Property="RenderTransform">
+            <Setter.Value>
+                <ScaleTransform ScaleX="1" ScaleY="-1"/>
+            </Setter.Value>
+        </Setter>
+    </Style>
 
 </ResourceDictionary>

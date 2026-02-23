@@ -1,23 +1,17 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
-using System.Windows;
-using System.Windows.Controls;
-using System.Windows.Data;
-using System.Windows.Documents;
-using System.Windows.Input;
-using System.Windows.Media;
-using System.Windows.Media.Imaging;
-using System.Windows.Navigation;
-using System.Windows.Shapes;
+﻿using System.Windows.Controls;
+
 
 namespace WPFApp.View.Container
 {
     /// <summary>
-    /// Interaction logic for ContainerEditView.xaml
+    /// Create/Edit form for a container.
+    /// No business logic is placed here: validation/save/cancel live in the ViewModel.
     /// </summary>
     public partial class ContainerEditView : UserControl
     {
+        /// <summary>
+        /// Initializes visual tree and binds XAML elements to the current DataContext.
+        /// </summary>
         public ContainerEditView()
         {
             InitializeComponent();

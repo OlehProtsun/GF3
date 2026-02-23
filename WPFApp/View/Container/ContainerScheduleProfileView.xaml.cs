@@ -3,17 +3,17 @@ using System.Data;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Threading;
 using WPFApp.ViewModel.Container.ScheduleProfile;
-using WPFApp.ViewModel.Container.Profile;
-using WPFApp.Infrastructure.ScheduleMatrix; // якщо тут лежить ScheduleMatrixColumnBuilder - лишаємо
+using WPFApp.Infrastructure.ScheduleMatrix;
 
 namespace WPFApp.View.Container
 {
     /// <summary>
-    /// Interaction logic for ContainerScheduleProfileView.xaml
+    /// Read-only schedule profile screen.
+    /// Code-behind is responsible for DataGrid performance settings, schema-aware column rebuild
+    /// and synchronized scrolling of the custom summary table (header/left/body/bottom scrollbar).
     /// </summary>
     public partial class ContainerScheduleProfileView : UserControl
     {
@@ -27,6 +27,9 @@ namespace WPFApp.View.Container
         private bool _summarySync;   // захист від рекурсії під час ScrollChanged
         private bool _summarySyncH;  // захист від рекурсії під час ValueChanged нижнього ScrollBar
 
+        /// <summary>
+        /// Initializes UI helpers (virtualization + lifecycle handlers).
+        /// </summary>
         public ContainerScheduleProfileView()
         {
             InitializeComponent();
@@ -71,6 +74,13 @@ namespace WPFApp.View.Container
 
         private void AttachViewModel(ContainerScheduleProfileViewModel? viewModel)
         {
+            if (ReferenceEquals(_vm, viewModel))
+            {
+                // тільки оновити UI-залежні речі після layout
+                Dispatcher.BeginInvoke(new Action(UpdateSummaryHorizontalBar), DispatcherPriority.Loaded);
+                return;
+            }
+
             if (_vm != null)
                 _vm.MatrixChanged -= VmOnMatrixChanged;
 
@@ -80,10 +90,7 @@ namespace WPFApp.View.Container
             {
                 _vm.MatrixChanged += VmOnMatrixChanged;
 
-                // одразу перебудувати DataGrid columns при першому attach
                 RefreshGridSmart();
-
-                // summary scrollbar може потребувати апдейту після layout
                 Dispatcher.BeginInvoke(new Action(UpdateSummaryHorizontalBar), DispatcherPriority.Loaded);
             }
         }
@@ -132,8 +139,8 @@ namespace WPFApp.View.Container
             var table = _vm.ScheduleMatrix?.Table;
             if (table == null) return;
 
-            var sig = string.Join("|", table.Columns.Cast<DataColumn>().Select(c => c.ColumnName));
-            if (sig == _schemaSig)
+            var sig = string.Join("|", table.Columns.Cast<DataColumn>()
+                .Select(c => $"{c.ColumnName}:{c.DataType.FullName}")); if (sig == _schemaSig)
                 return;
 
             ResetGridColumns(dataGridScheduleProfile);
@@ -164,12 +171,13 @@ namespace WPFApp.View.Container
                 if (e.HorizontalChange != 0)
                     SummaryHeaderScroll?.ScrollToHorizontalOffset(e.HorizontalOffset);
 
-                // Sync Y: body -> left (Employee/Sum)
+                // Sync Y: body -> left
                 if (e.VerticalChange != 0)
                     SummaryLeftScroll?.ScrollToVerticalOffset(e.VerticalOffset);
 
-                // Sync external bottom scrollbar
-                UpdateSummaryHorizontalBar();
+                // Оновлюємо нижній scrollbar тільки коли змінилась горизонтальна частина / viewport / extent
+                if (e.HorizontalChange != 0 || e.ExtentWidthChange != 0 || e.ViewportWidthChange != 0)
+                    UpdateSummaryHorizontalBar();
             }
             finally
             {
@@ -181,23 +189,14 @@ namespace WPFApp.View.Container
         /// Колесо миші над шапкою: скролимо вертикально Body (шапка лишається sticky).
         /// </summary>
         private void SummaryHeaderScroll_PreviewMouseWheel(object sender, MouseWheelEventArgs e)
-        {
-            if (SummaryBodyScroll == null) return;
-
-            SummaryBodyScroll.ScrollToVerticalOffset(SummaryBodyScroll.VerticalOffset - e.Delta);
-            e.Handled = true;
-        }
+            => ForwardWheelToSummaryBody(e);
 
         /// <summary>
         /// Колесо миші над лівою колонкою: скролимо вертикально Body.
         /// </summary>
-        private void SummaryLeftScroll_PreviewMouseWheel(object sender, MouseWheelEventArgs e)
-        {
-            if (SummaryBodyScroll == null) return;
 
-            SummaryBodyScroll.ScrollToVerticalOffset(SummaryBodyScroll.VerticalOffset - e.Delta);
-            e.Handled = true;
-        }
+        private void SummaryLeftScroll_PreviewMouseWheel(object sender, MouseWheelEventArgs e)
+            => ForwardWheelToSummaryBody(e);
 
         // =========================================================
         // 5) Bottom horizontal scrollbar (external)
@@ -261,5 +260,13 @@ namespace WPFApp.View.Container
 
         private void SummaryBodyScroll_SizeChanged(object sender, SizeChangedEventArgs e)
             => UpdateSummaryHorizontalBar();
+
+        private void ForwardWheelToSummaryBody(MouseWheelEventArgs e)
+        {
+            if (SummaryBodyScroll == null) return;
+
+            SummaryBodyScroll.ScrollToVerticalOffset(SummaryBodyScroll.VerticalOffset - e.Delta);
+            e.Handled = true;
+        }
     }
 }

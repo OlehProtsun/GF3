@@ -7,6 +7,9 @@
              d:DesignHeight="830" d:DesignWidth="852"
              Background="{StaticResource PageBackgroundBrush}">
 
+    <!-- Layout:
+         Row 0 - page header card
+         Row 1 - centered edit form card -->
     <Grid ClipToBounds="False">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
@@ -37,19 +40,16 @@
                     </StackPanel>
                 </Button>
 
+                <!-- Form title is dynamic (Create/Edit) -->
                 <TextBlock Grid.Row="1"
                            Margin="0,10,0,0"
                            Text="{Binding FormTitle}"
-                           FontFamily="{StaticResource DefaultFontFamily}"
-                           FontSize="{StaticResource FontSizePageTitle}"
-                           Foreground="Black" />
+                           Style="{StaticResource ContainerPageTitleTextStyle}" />
 
                 <TextBlock Grid.Row="2"
                            Margin="0,6,0,0"
                            Text="{Binding FormSubtitle}"
-                           FontFamily="{StaticResource DefaultFontFamily}"
-                           FontSize="17"
-                           Foreground="{StaticResource SecondaryTextBrush}" />
+                           Style="{StaticResource ContainerPageSubtitleTextStyle}" />
             </Grid>
         </Border>
 
@@ -59,10 +59,9 @@
                 <ColumnDefinition Width="400" />
                 <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
-            <Border Style="{StaticResource CardStyle}"
-                    Margin="0,12,0,0"
-                    Grid.Column="1"
-                    VerticalAlignment="Top">
+            <!-- Main edit form card -->
+            <Border Style="{StaticResource ContainerCenterCardStyle}"
+                    Grid.Column="1">
                 <Grid Margin="15">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
@@ -72,23 +71,14 @@
                         <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
 
-                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                        <Viewbox Width="20" Height="20" Margin="0,0,8,0">
+                    <!-- Section header -->
+                    <StackPanel Style="{StaticResource ContainerSectionHeaderStackStyle}">
+                        <Viewbox Style="{StaticResource ContainerSectionHeaderIconViewboxStyle}">
                             <Path Data="{StaticResource IconContainerInfo}"
-                                  Fill="Black"
-                                  Stretch="Uniform"
-                                                            RenderTransformOrigin="0.5,0.5">
-                                <Path.RenderTransform>
-                                    <ScaleTransform ScaleX="1" ScaleY="-1" />
-                                </Path.RenderTransform>
-                            </Path>
+                                  Style="{StaticResource ContainerHeaderIconPathFlippedStyle}" />
                         </Viewbox>
                         <TextBlock Text="Container Information"
-                                   FontFamily="{StaticResource DefaultFontFamily}"
-                                   FontSize="{StaticResource FontSizeTitle}"
-                                   FontWeight="Bold"
-                                   Foreground="Black"
-                                   VerticalAlignment="Center" />
+                                   Style="{StaticResource ContainerSectionHeaderTitleTextStyle}" />
                     </StackPanel>
 
                     <Grid Grid.Row="1" Margin="0,14,0,0">
@@ -98,26 +88,18 @@
                         </Grid.ColumnDefinitions>
 
                         <TextBlock Text="Container ID:"
-                                   FontFamily="{StaticResource DefaultFontFamily}"
-                                   FontSize="12"
-                                   Foreground="{StaticResource MutedTextBrush}"
-                                   VerticalAlignment="Center" />
+                                   Style="{StaticResource ContainerLabelTextStyle}" />
 
                         <TextBlock Grid.Column="1"
                                    Text="{Binding ContainerId}"
-                                   FontFamily="{StaticResource DefaultFontFamily}"
-                                   FontSize="12"
                                    Margin="6,0,0,0"
-                                   Foreground="Black"
-                                   VerticalAlignment="Center" />
+                                   Style="{StaticResource ContainerSmallValueTextStyle}" />
                     </Grid>
 
                     <StackPanel Grid.Row="2" Margin="0,16,0,0">
                         <!-- Name -->
                         <TextBlock Text="Name"
-               FontFamily="{StaticResource DefaultFontFamily}"
-               FontSize="12"
-               Foreground="{StaticResource MutedTextBrush}" />
+                                   Style="{StaticResource ContainerLabelTextStyle}" />
 
                         <Grid>
                             <TextBox x:Name="NameTextBox"
@@ -125,13 +107,11 @@
                  Tag="Enter name..."
                  Text="{Binding Name, UpdateSourceTrigger=PropertyChanged, ValidatesOnNotifyDataErrors=True}" />
 
-                            <TextBlock
-                   Margin="12,0,0,0"
-                   VerticalAlignment="Center"
-                   Foreground="#888888"
-                   IsHitTestVisible="False">
+                            <!-- Placeholder overlay (shown only when TextBox is empty and not focused) -->
+                            <TextBlock>
                                 <TextBlock.Style>
-                                    <Style TargetType="TextBlock">
+                                    <Style TargetType="TextBlock"
+                                           BasedOn="{StaticResource ContainerInputPlaceholderOverlayStyle}">
                                         <Setter Property="Visibility" Value="Collapsed"/>
                                         <Style.Triggers>
                                             <MultiDataTrigger>
@@ -149,10 +129,8 @@
 
                         <!-- Note -->
                         <TextBlock Text="Note"
-               Margin="0,12,0,0"
-               FontFamily="{StaticResource DefaultFontFamily}"
-               FontSize="12"
-               Foreground="{StaticResource MutedTextBrush}" />
+                                   Margin="0,12,0,0"
+                                   Style="{StaticResource ContainerLabelTextStyle}" />
 
                         <Grid>
                             <TextBox x:Name="NoteTextBox"
@@ -164,13 +142,10 @@
                  Padding="12,10,12,10"
                  Text="{Binding Note, UpdateSourceTrigger=PropertyChanged, ValidatesOnNotifyDataErrors=True}" />
 
-                            <TextBlock Text="Enter note..."
-                   Margin="12,10,0,0"
-                   VerticalAlignment="Top"
-                   Foreground="#888888"
-                   IsHitTestVisible="False">
+                            <TextBlock Text="Enter note...">
                                 <TextBlock.Style>
-                                    <Style TargetType="TextBlock">
+                                    <Style TargetType="TextBlock"
+                                           BasedOn="{StaticResource ContainerInputPlaceholderOverlayMultilineStyle}">
                                         <Setter Property="Visibility" Value="Collapsed"/>
                                         <Style.Triggers>
                                             <MultiDataTrigger>

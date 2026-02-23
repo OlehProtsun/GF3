@@ -6,7 +6,6 @@ using System.Windows.Data;
 using System.Windows.Input;
 using WPFApp.Infrastructure.AvailabilityMatrix;
 using WPFApp.View.Availability.Helpers;
-using WPFApp.ViewModel.Availability;
 using WPFApp.ViewModel.Availability.Edit;
 using WPFApp.ViewModel.Availability.Helpers;
 
@@ -409,64 +408,6 @@ namespace WPFApp.View.Availability
             return cell?.IsEditing == true;
         }
 
-        // =========================================================
-        // Numeric input helpers (Month/Year)
-        // =========================================================
-
-        private void NumberOnly_PreviewTextInput(object sender, TextCompositionEventArgs e)
-        {
-            // PreviewTextInput дає ТІЛЬКИ новий фрагмент (e.Text),
-            // тому перевіряємо, що фрагмент — всі digits.
-            e.Handled = !AvailabilityViewInputHelper.IsAllDigits(e.Text);
-        }
-
-        private void NumberOnly_Pasting(object sender, DataObjectPastingEventArgs e)
-        {
-            // 1) Переконуємось, що вставляється текст.
-            if (!e.SourceDataObject.GetDataPresent(DataFormats.Text, true))
-            {
-                e.CancelCommand();
-                return;
-            }
-
-            // 2) Беремо текст.
-            var text = e.SourceDataObject.GetData(DataFormats.Text) as string ?? string.Empty;
-
-            // 3) Якщо не digits — відміняємо paste.
-            if (!AvailabilityViewInputHelper.IsAllDigits(text))
-                e.CancelCommand();
-        }
-
-        private void Month_LostFocus(object sender, RoutedEventArgs e)
-        {
-            // Month: 1..12
-            // Виносимо clamp у спільний метод, щоб прибрати дублювання з Year.
-            ClampIntTextBox(sender, min: 1, max: 12, defaultValue: 1);
-        }
-
-        private void Year_LostFocus(object sender, RoutedEventArgs e)
-        {
-            // Year: 2000..3000
-            ClampIntTextBox(sender, min: 2000, max: 3000, defaultValue: 2000);
-        }
-
-        private static void ClampIntTextBox(object sender, int min, int max, int defaultValue)
-        {
-            // 1) Має бути TextBox.
-            if (sender is not TextBox tb)
-                return;
-
-            // 2) Якщо не парситься — ставимо default.
-            if (!int.TryParse(tb.Text, out int value))
-            {
-                tb.Text = defaultValue.ToString();
-                return;
-            }
-
-            // 3) Clamp.
-            if (value < min) tb.Text = min.ToString();
-            else if (value > max) tb.Text = max.ToString();
-        }
 
         // =========================================================
         // OPTIONAL: AutoGeneratingColumn fallback (якщо у XAML AutoGenerateColumns=true)

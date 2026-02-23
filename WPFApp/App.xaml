@@ -11,6 +11,8 @@
                 <ResourceDictionary Source="Resources/Styles/DataGrids.xaml" />
                 <ResourceDictionary Source="Resources/Styles/ScrollBars.xaml"/>
                 <ResourceDictionary Source="Resources/ViewTemplates.xaml" />
+                <ResourceDictionary Source="Resources/Availability/AvailabilityResources.xaml" />
+                <ResourceDictionary Source="Resources/Container/ContainerScheduleResources.xaml" />
             </ResourceDictionary.MergedDictionaries>
         </ResourceDictionary>
     </Application.Resources>

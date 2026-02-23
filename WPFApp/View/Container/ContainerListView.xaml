@@ -8,6 +8,8 @@
              Background="{StaticResource PageBackgroundBrush}">
 
     <UserControl.Resources>
+        <!-- Local resources are not required here:
+             typography / card wrappers are now reused from AvailabilityResources.xaml -->
     </UserControl.Resources>
 
     <Grid>
@@ -24,18 +26,15 @@
                     <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
 
+                <!-- Page header -->
                 <TextBlock Grid.Row="0"
                            Text="Container List"
-                           FontFamily="{StaticResource DefaultFontFamily}"
-                           FontSize="{StaticResource FontSizePageTitle}"
-                           Foreground="Black" />
+                           Style="{StaticResource ContainerPageTitleTextStyle}" />
 
                 <TextBlock Grid.Row="1"
                            Margin="0,6,0,10"
                            Text="Here you will see a list of all containers"
-                           FontFamily="{StaticResource DefaultFontFamily}"
-                           FontSize="17"
-                           Foreground="{StaticResource SecondaryTextBrush}" />
+                           Style="{StaticResource ContainerPageSubtitleTextStyle}" />
 
                 <Grid Grid.Row="2" Height="37">
                     <Grid.ColumnDefinitions>
@@ -85,15 +84,10 @@
             </Grid>
         </Border>
 
+        <!-- Main content card: shadow wrapper + inner grid host -->
         <Border Grid.Row="1"
                 Margin="7,21,7,7"
-                Background="{StaticResource SurfaceBrush}"
-                CornerRadius="{StaticResource Cr20}"
-                ClipToBounds="False">
-
-            <Border.Effect>
-                <DropShadowEffect BlurRadius="18" ShadowDepth="2" Opacity="0.22" />
-            </Border.Effect>
+                Style="{StaticResource ContainerCardShadowHostStyle}">
 
             <Grid Margin="15">
                 <Grid.RowDefinitions>
@@ -107,42 +101,30 @@
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
 
-                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                        <Viewbox Width="20" Height="20" Margin="0,0,8,0">
+                    <!-- Section title + icon -->
+                    <StackPanel Orientation="Horizontal"
+                                VerticalAlignment="Center"
+                                Style="{StaticResource ContainerSectionHeaderStackStyle}">
+                        <Viewbox Style="{StaticResource ContainerSectionHeaderIconViewboxStyle}">
                             <Path Data="{StaticResource IconContainer}"
-                                  Fill="Black"
-                                  Stretch="Uniform" />
+                                  Style="{StaticResource ContainerHeaderIconPathStyle}" />
                         </Viewbox>
 
                         <TextBlock Text="Containers"
-                                   FontFamily="{StaticResource DefaultFontFamily}"
-                                   FontSize="{StaticResource FontSizeTitle}"
-                                   FontWeight="Bold"
-                                   Foreground="Black"
-                                   VerticalAlignment="Center" />
+                                   Style="{StaticResource ContainerSectionHeaderTitleTextStyle}" />
                     </StackPanel>
 
                     <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                        <Border Background="{StaticResource BadgeBackgroundBrush}"
-                                CornerRadius="{StaticResource Cr10}"
-                                Padding="10,4"
-                                VerticalAlignment="Center"
+                        <Border Style="{StaticResource ContainerTotalBadgeBorderStyle}"
                                 Margin="0,0,10,0">
-                            <TextBlock FontFamily="{StaticResource DefaultFontFamily}"
-                                       FontSize="12"
-                                       Foreground="{StaticResource MutedTextBrush}"
+                            <TextBlock Style="{StaticResource ContainerTotalBadgeTextStyle}"
                                        Text="{Binding Items.Count, StringFormat=Total: {0}}" />
                         </Border>
                     </StackPanel>
                 </Grid>
 
                 <Border Grid.Row="1"
-                        Background="{StaticResource SurfaceBrush}"
-                        BorderBrush="{StaticResource CardBorderBrush}"
-                        BorderThickness="2"
-                        CornerRadius="{StaticResource Cr20}"
-                        Padding="6"
-                        ClipToBounds="True">
+                        Style="{StaticResource ContainerInnerGridHostBorderStyle}">
 
                     <DataGrid x:Name="dataGridContainerList"
                               Style="{StaticResource ContainerListCardGridStyle}"

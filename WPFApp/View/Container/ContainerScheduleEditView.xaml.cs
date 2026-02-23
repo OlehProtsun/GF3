@@ -136,6 +136,10 @@ namespace WPFApp.View.Container
         /// </summary>
         private bool _refreshQueued;
 
+        /// <summary>
+        /// Initializes the view, enables DataGrid virtualization and wires UI events
+        /// (selection, paint mode, combo-box UX and scroll diagnostics).
+        /// </summary>
         public ContainerScheduleEditView()
         {
             InitializeComponent();
