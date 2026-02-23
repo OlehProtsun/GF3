@@ -4,7 +4,6 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:dt="clr-namespace:WPFApp.View.Availability.DesignTime"
-             xmlns:sys="clr-namespace:System.Windows;assembly=PresentationFramework"
              mc:Ignorable="d"
              d:DesignHeight="830" d:DesignWidth="852"
              d:DataContext="{d:DesignInstance Type=dt:AvailabilityProfileViewDesignVM, IsDesignTimeCreatable=True}"
@@ -208,16 +207,7 @@
                           FrozenColumnCount="1">
 
                             <DataGrid.Resources>
-                                <!-- Прибрати підсвітку selection у WPF DataGrid -->
-                                <SolidColorBrush x:Key="{x:Static sys:SystemColors.HighlightBrushKey}" Color="Transparent" />
-                                <SolidColorBrush x:Key="{x:Static sys:SystemColors.InactiveSelectionHighlightBrushKey}" Color="Transparent" />
-
-                                <!-- І щоб текст НЕ ставав білим/іншим при selection -->
-                                <SolidColorBrush x:Key="{x:Static sys:SystemColors.HighlightTextBrushKey}"
-                         Color="{DynamicResource {x:Static sys:SystemColors.ControlTextColorKey}}" />
-                                <SolidColorBrush x:Key="{x:Static sys:SystemColors.InactiveSelectionHighlightTextBrushKey}"
-                         Color="{DynamicResource {x:Static sys:SystemColors.ControlTextColorKey}}" />
-
+                                <StaticResource ResourceKey="AvailabilityNoSelectionMatrixGridResources" />
                                 <Style TargetType="TextBlock" BasedOn="{StaticResource MatrixTextBlockStyle}" />
                                 <Style TargetType="CheckBox" BasedOn="{StaticResource CenterCheckBoxStyle}" />
                             </DataGrid.Resources>

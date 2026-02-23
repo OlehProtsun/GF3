@@ -8,69 +8,7 @@
              d:DesignHeight="2000" d:DesignWidth="1500"
              Background="{StaticResource PageBackgroundBrush}">
 
-    <UserControl.Resources>
-
-        <!-- BoolToVis already exists in Theme.xaml -->
-
-        <!-- Заголовок лівої карточки: базовий стиль вже винесений -->
-        <Style x:Key="SideCardTitleTextStyle"
-           TargetType="TextBlock"
-           BasedOn="{StaticResource ContainerSectionHeaderTitleTextStyle}">
-            <Setter Property="Visibility" Value="Visible"/>
-            <Style.Triggers>
-                <DataTrigger Binding="{Binding IsChecked, ElementName=ScheduleInfoToggle}" Value="False">
-                    <Setter Property="Visibility" Value="Collapsed"/>
-                </DataTrigger>
-            </Style.Triggers>
-        </Style>
-
-        <!-- Карточка лівої панелі: базовий стиль уже є в ContainerScheduleResources.xaml -->
-        <Style x:Key="ScheduleInfoCardStyle"
-           TargetType="Border"
-           BasedOn="{StaticResource CollapsibleSideCardBaseStyle}">
-            <Style.Triggers>
-                <DataTrigger Binding="{Binding IsChecked, ElementName=ScheduleInfoToggle}" Value="False">
-                    <Setter Property="Height" Value="62"/>
-                    <Setter Property="Padding" Value="12"/>
-                </DataTrigger>
-            </Style.Triggers>
-        </Style>
-
-        <!-- Щоб прибрати inline-Style у ColumnDefinition -->
-        <Style x:Key="ScheduleInfoPanelColumnStyle" TargetType="ColumnDefinition">
-            <Setter Property="Width" Value="400"/>
-            <Style.Triggers>
-                <DataTrigger Binding="{Binding IsChecked, ElementName=ScheduleInfoToggle}" Value="False">
-                    <Setter Property="Width" Value="140"/>
-                </DataTrigger>
-            </Style.Triggers>
-        </Style>
-
-        <Style x:Key="ScheduleInfoGapColumnStyle" TargetType="ColumnDefinition">
-            <Setter Property="Width" Value="10"/>
-            <Style.Triggers>
-                <DataTrigger Binding="{Binding IsChecked, ElementName=ScheduleInfoToggle}" Value="False">
-                    <Setter Property="Width" Value="8"/>
-                </DataTrigger>
-            </Style.Triggers>
-        </Style>
-
-        <!-- Дубльований filler під вертикальний scrollbar (використовується 2 рази) -->
-        <Style x:Key="SummaryVerticalScrollbarFillerBorderStyle" TargetType="Border">
-            <Setter Property="Background" Value="{StaticResource SurfaceBrush}"/>
-            <Setter Property="BorderBrush" Value="Gainsboro"/>
-            <Setter Property="BorderThickness" Value="1,0,0,0"/>
-            <Setter Property="Visibility" Value="Collapsed"/>
-            <Setter Property="Width" Value="0"/>
-            <Style.Triggers>
-                <DataTrigger Binding="{Binding ElementName=SummaryBodyScroll, Path=ComputedVerticalScrollBarVisibility}" Value="Visible">
-                    <Setter Property="Visibility" Value="Visible"/>
-                    <Setter Property="Width" Value="{x:Static SystemParameters.VerticalScrollBarWidth}"/>
-                </DataTrigger>
-            </Style.Triggers>
-        </Style>
-
-    </UserControl.Resources>
+    
     
     <Grid ClipToBounds="False">
         <Grid.RowDefinitions>
@@ -201,15 +139,15 @@
                 </Grid.RowDefinitions>
 
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Style="{StaticResource ScheduleInfoPanelColumnStyle}" />
-                    <ColumnDefinition Style="{StaticResource ScheduleInfoGapColumnStyle}" />
+                    <ColumnDefinition Style="{StaticResource ContainerScheduleInfoPanelColumnStyle}" />
+                    <ColumnDefinition Style="{StaticResource ContainerScheduleInfoGapColumnStyle}" />
                     <ColumnDefinition Width="*" />
                 </Grid.ColumnDefinitions>
                 
                 <!-- LEFT: Schedule Information -->
                 <Border Grid.Row="0"
                         Grid.Column="0"
-                        Style="{StaticResource ScheduleInfoCardStyle}">
+                        Style="{StaticResource ContainerScheduleInfoCardStyle}">
 
                     <Grid>
                         <Grid.RowDefinitions>
@@ -232,7 +170,7 @@
                                 </Viewbox>
 
                                 <TextBlock Text="Schedule Information"
-                                   Style="{StaticResource SideCardTitleTextStyle}" />
+                                   Style="{StaticResource ContainerScheduleInfoTitleTextStyle}" />
                             </StackPanel>
 
                             <ToggleButton x:Name="ScheduleInfoToggle"
@@ -689,7 +627,7 @@
 
                                             <!-- filler under vertical scrollbar -->
                                             <Border Grid.Column="1"
-                                            Style="{StaticResource SummaryVerticalScrollbarFillerBorderStyle}" />
+                                            Style="{StaticResource ContainerScheduleSummaryVerticalScrollbarFillerBorderStyle}" />
                                         </Grid>
 
                                         <!-- ===================== BOTTOM-LEFT (Y-sync) ===================== -->
@@ -825,7 +763,7 @@
                                        ValueChanged="SummaryHScroll_ValueChanged"/>
 
                                             <Border Grid.Column="1"
-                                            Style="{StaticResource SummaryVerticalScrollbarFillerBorderStyle}" />
+                                            Style="{StaticResource ContainerScheduleSummaryVerticalScrollbarFillerBorderStyle}" />
                                         </Grid>
 
                                     </Grid>

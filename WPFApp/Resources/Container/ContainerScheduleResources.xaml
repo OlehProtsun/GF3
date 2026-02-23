@@ -404,4 +404,102 @@
         <Setter Property="VerticalAlignment" Value="Center" />
     </Style>
 
+
+    <Style x:Key="ContainerScheduleCollapsibleTitleTextStyle"
+           TargetType="TextBlock"
+           BasedOn="{StaticResource ContainerSectionHeaderTitleTextStyle}">
+        <Setter Property="Visibility" Value="Visible"/>
+        <Style.Triggers>
+            <MultiDataTrigger>
+                <MultiDataTrigger.Conditions>
+                    <Condition Binding="{Binding IsChecked, ElementName=DetailsToggle}" Value="False"/>
+                    <Condition Binding="{Binding IsChecked, ElementName=EmployeesToggle}" Value="False"/>
+                    <Condition Binding="{Binding IsChecked, ElementName=NoteToggle}" Value="False"/>
+                </MultiDataTrigger.Conditions>
+                <Setter Property="Visibility" Value="Collapsed"/>
+            </MultiDataTrigger>
+        </Style.Triggers>
+    </Style>
+
+    <Style x:Key="ContainerScheduleInfoTitleTextStyle"
+           TargetType="TextBlock"
+           BasedOn="{StaticResource ContainerSectionHeaderTitleTextStyle}">
+        <Setter Property="Visibility" Value="Visible"/>
+        <Style.Triggers>
+            <DataTrigger Binding="{Binding IsChecked, ElementName=ScheduleInfoToggle}" Value="False">
+                <Setter Property="Visibility" Value="Collapsed"/>
+            </DataTrigger>
+        </Style.Triggers>
+    </Style>
+
+    <Style x:Key="ContainerScheduleInfoCardStyle"
+           TargetType="Border"
+           BasedOn="{StaticResource CollapsibleSideCardBaseStyle}">
+        <Style.Triggers>
+            <DataTrigger Binding="{Binding IsChecked, ElementName=ScheduleInfoToggle}" Value="False">
+                <Setter Property="Height" Value="62"/>
+                <Setter Property="Padding" Value="12"/>
+            </DataTrigger>
+        </Style.Triggers>
+    </Style>
+
+    <Style x:Key="ContainerScheduleInfoPanelColumnStyle" TargetType="ColumnDefinition">
+        <Setter Property="Width" Value="400"/>
+        <Style.Triggers>
+            <DataTrigger Binding="{Binding IsChecked, ElementName=ScheduleInfoToggle}" Value="False">
+                <Setter Property="Width" Value="140"/>
+            </DataTrigger>
+        </Style.Triggers>
+    </Style>
+
+    <Style x:Key="ContainerScheduleInfoGapColumnStyle" TargetType="ColumnDefinition">
+        <Setter Property="Width" Value="10"/>
+        <Style.Triggers>
+            <DataTrigger Binding="{Binding IsChecked, ElementName=ScheduleInfoToggle}" Value="False">
+                <Setter Property="Width" Value="8"/>
+            </DataTrigger>
+        </Style.Triggers>
+    </Style>
+
+    <Style x:Key="ContainerScheduleSummaryVerticalScrollbarFillerBorderStyle" TargetType="Border">
+        <Setter Property="Background" Value="{StaticResource SurfaceBrush}"/>
+        <Setter Property="BorderBrush" Value="Gainsboro"/>
+        <Setter Property="BorderThickness" Value="1,0,0,0"/>
+        <Setter Property="Visibility" Value="Collapsed"/>
+        <Setter Property="Width" Value="0"/>
+        <Style.Triggers>
+            <DataTrigger Binding="{Binding ElementName=SummaryBodyScroll, Path=ComputedVerticalScrollBarVisibility}" Value="Visible">
+                <Setter Property="Visibility" Value="Visible"/>
+                <Setter Property="Width" Value="{x:Static SystemParameters.VerticalScrollBarWidth}"/>
+            </DataTrigger>
+        </Style.Triggers>
+    </Style>
+
+    <Style x:Key="ContainerScheduleEditMainSideColumnStyle" TargetType="ColumnDefinition">
+        <Setter Property="Width" Value="380"/>
+        <Style.Triggers>
+            <MultiDataTrigger>
+                <MultiDataTrigger.Conditions>
+                    <Condition Binding="{Binding IsChecked, ElementName=DetailsToggle}" Value="False"/>
+                    <Condition Binding="{Binding IsChecked, ElementName=EmployeesToggle}" Value="False"/>
+                    <Condition Binding="{Binding IsChecked, ElementName=NoteToggle}" Value="False"/>
+                </MultiDataTrigger.Conditions>
+                <Setter Property="Width" Value="140"/>
+            </MultiDataTrigger>
+        </Style.Triggers>
+    </Style>
+
+    <Style x:Key="ContainerScheduleEditMainGapColumnStyle" TargetType="ColumnDefinition">
+        <Setter Property="Width" Value="10"/>
+        <Style.Triggers>
+            <MultiDataTrigger>
+                <MultiDataTrigger.Conditions>
+                    <Condition Binding="{Binding IsChecked, ElementName=DetailsToggle}" Value="False"/>
+                    <Condition Binding="{Binding IsChecked, ElementName=EmployeesToggle}" Value="False"/>
+                    <Condition Binding="{Binding IsChecked, ElementName=NoteToggle}" Value="False"/>
+                </MultiDataTrigger.Conditions>
+                <Setter Property="Width" Value="0"/>
+            </MultiDataTrigger>
+        </Style.Triggers>
+    </Style>
 </ResourceDictionary>
