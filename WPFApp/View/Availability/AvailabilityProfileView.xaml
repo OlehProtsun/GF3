@@ -4,6 +4,7 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:dt="clr-namespace:WPFApp.View.Availability.DesignTime"
+             xmlns:sys="clr-namespace:System.Windows;assembly=PresentationFramework"
              mc:Ignorable="d"
              d:DesignHeight="830" d:DesignWidth="852"
              d:DataContext="{d:DesignInstance Type=dt:AvailabilityProfileViewDesignVM, IsDesignTimeCreatable=True}"
@@ -207,7 +208,12 @@
                           FrozenColumnCount="1">
 
                             <DataGrid.Resources>
-                                <StaticResource ResourceKey="AvailabilityNoSelectionMatrixGridResources" />
+                                <SolidColorBrush x:Key="{x:Static SystemColors.HighlightBrushKey}" Color="Transparent" />
+                                <SolidColorBrush x:Key="{x:Static SystemColors.InactiveSelectionHighlightBrushKey}" Color="Transparent" />
+                                <SolidColorBrush x:Key="{x:Static SystemColors.HighlightTextBrushKey}"
+                                                 Color="{DynamicResource {x:Static SystemColors.ControlTextColorKey}}" />
+                                <SolidColorBrush x:Key="{x:Static SystemColors.InactiveSelectionHighlightTextBrushKey}"
+                                                 Color="{DynamicResource {x:Static SystemColors.ControlTextColorKey}}" />
                                 <Style TargetType="TextBlock" BasedOn="{StaticResource MatrixTextBlockStyle}" />
                                 <Style TargetType="CheckBox" BasedOn="{StaticResource CenterCheckBoxStyle}" />
                             </DataGrid.Resources>
