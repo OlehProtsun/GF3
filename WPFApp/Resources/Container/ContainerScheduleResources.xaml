@@ -61,7 +61,7 @@
         <Setter Property="CanContentScroll" Value="True"/>
         <Setter Property="VirtualizingPanel.IsVirtualizing" Value="True"/>
         <Setter Property="VirtualizingPanel.VirtualizationMode" Value="Recycling"/>
-        <Setter Property="ScrollViewer.IsDeferredScrollingEnabled" Value="True"/>
+        <Setter Property="ScrollViewer.IsDeferredScrollingEnabled" Value="False"/>
     </Style>
 
     <Style x:Key="TabsScrollViewerStyle" TargetType="{x:Type ScrollViewer}">

@@ -985,9 +985,18 @@ namespace WPFApp.View.Container
 
         private void ComboBox_PreviewMouseWheel(object sender, MouseWheelEventArgs e)
         {
-            // UX: коли дропдаун відкритий — не скролимо список під ним (запобігає “стрибанню”)
-            if (sender is ComboBox comboBox && comboBox.IsDropDownOpen)
-                e.Handled = true;
+            if (sender is not ComboBox comboBox)
+                return;
+
+            // Якщо дропдаун відкритий — дозволяємо ScrollViewer всередині Popup обробити wheel
+            if (comboBox.IsDropDownOpen)
+            {
+                e.Handled = false;
+                return;
+            }
+
+            // Якщо дропдаун ЗАКРИТИЙ — (опційно) блокуємо зміну вибору колесом
+            e.Handled = true;
         }
 
         private void PauseMatrixRefresh()

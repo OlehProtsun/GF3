@@ -802,7 +802,7 @@ Style="{StaticResource ValidatedNumericUpDownErrorStyle}"                       
           DropDownOpened="EmployeeComboBox_DropDownOpened"
           DropDownClosed="EmployeeComboBox_DropDownClosed"
           ScrollViewer.CanContentScroll="True"
-          ScrollViewer.IsDeferredScrollingEnabled="True"
+          ScrollViewer.IsDeferredScrollingEnabled="False"
           VirtualizingPanel.IsVirtualizing="True"
           VirtualizingPanel.VirtualizationMode="Recycling">
 
