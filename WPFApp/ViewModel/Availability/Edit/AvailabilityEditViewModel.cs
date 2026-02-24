@@ -2,8 +2,8 @@
 using System.Collections.Specialized;
 using System.Data;
 using System.Reflection;
-using WPFApp.Infrastructure;
-using WPFApp.Infrastructure.AvailabilityMatrix;
+using WPFApp.Applications.Matrix.Availability;
+using WPFApp.MVVM.Commands;
 using WPFApp.ViewModel.Availability.Main;
 
 namespace WPFApp.ViewModel.Availability.Edit

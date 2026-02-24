@@ -5,9 +5,9 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Data;
 using System.Linq;
-using WPFApp.Infrastructure;
-using WPFApp.Infrastructure.AvailabilityMatrix;
-using WPFApp.Infrastructure.Validation;
+using WPFApp.Applications.Matrix.Availability;
+using WPFApp.MVVM.Core;
+using WPFApp.MVVM.Validation;
 using WPFApp.ViewModel.Availability.Helpers;
 using WPFApp.ViewModel.Availability.Main;
 

@@ -3,7 +3,8 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
-using WPFApp.Infrastructure;
+using WPFApp.MVVM.Commands;
+using WPFApp.MVVM.Core;
 using WPFApp.ViewModel.Availability.Main;
 
 namespace WPFApp.ViewModel.Availability.List

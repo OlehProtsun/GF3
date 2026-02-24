@@ -4,7 +4,7 @@ using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
-using WPFApp.Infrastructure.ScheduleMatrix;
+using WPFApp.UI.Matrix.Schedule;
 using WPFApp.ViewModel.Home;
 
 namespace WPFApp.View.Home

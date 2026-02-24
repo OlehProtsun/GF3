@@ -1,5 +1,8 @@
 ﻿using BusinessLogicLayer.Services.Abstractions;
-using WPFApp.Infrastructure;
+using WPFApp.Applications.Diagnostics;
+using WPFApp.Applications.Notifications;
+using WPFApp.MVVM.Commands;
+using WPFApp.MVVM.Core;
 using WPFApp.ViewModel.Availability.Edit;
 using WPFApp.ViewModel.Availability.List;
 using WPFApp.ViewModel.Availability.Profile;
@@ -33,8 +36,8 @@ namespace WPFApp.ViewModel.Availability.Main
         private readonly IAvailabilityGroupService _availabilityService;
         private readonly IEmployeeService _employeeService;
         private readonly IBindService _bindService;
-        private readonly Service.IDatabaseChangeNotifier _databaseChangeNotifier;
-        private readonly Service.ILoggerService _logger;
+        private readonly IDatabaseChangeNotifier _databaseChangeNotifier;
+        private readonly ILoggerService _logger;
 
         // 2) Під-VM (UI секції).
         public AvailabilityListViewModel ListVm { get; }
@@ -50,8 +53,8 @@ namespace WPFApp.ViewModel.Availability.Main
             IAvailabilityGroupService availabilityService,
             IEmployeeService employeeService,
             IBindService bindService,
-            Service.IDatabaseChangeNotifier databaseChangeNotifier,
-            Service.ILoggerService logger)
+            IDatabaseChangeNotifier databaseChangeNotifier,
+            ILoggerService logger)
         {
             // 1) Інʼєкції.
             _availabilityService = availabilityService;

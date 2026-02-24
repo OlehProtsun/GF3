@@ -4,8 +4,9 @@ using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Linq;
-using WPFApp.Infrastructure;
-using WPFApp.Infrastructure.AvailabilityMatrix;
+using WPFApp.Applications.Matrix.Availability;
+using WPFApp.MVVM.Commands;
+using WPFApp.MVVM.Core;
 using WPFApp.ViewModel.Availability.Main;
 
 namespace WPFApp.ViewModel.Availability.Profile

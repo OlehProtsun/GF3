@@ -6,7 +6,7 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Threading;
 using WPFApp.ViewModel.Container.ScheduleProfile;
-using WPFApp.Infrastructure.ScheduleMatrix;
+using WPFApp.UI.Matrix.Schedule;
 
 namespace WPFApp.View.Container
 {

@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Threading;
-using WPFApp.Infrastructure.Hotkeys;
+using WPFApp.UI.Hotkeys;
 using WPFApp.ViewModel.Availability.Helpers;
 
 namespace WPFApp.ViewModel.Availability.Main

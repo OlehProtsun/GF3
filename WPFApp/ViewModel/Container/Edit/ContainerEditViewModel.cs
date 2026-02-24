@@ -2,8 +2,10 @@
 using System.Collections;
 using System.ComponentModel;
 using DataAccessLayer.Models;
-using WPFApp.Infrastructure;
-using WPFApp.Infrastructure.Validation;
+using WPFApp.MVVM.Commands;
+using WPFApp.MVVM.Core;
+using WPFApp.MVVM.Validation;
+using WPFApp.MVVM.Validation.Rules;
 
 namespace WPFApp.ViewModel.Container.Edit
 {

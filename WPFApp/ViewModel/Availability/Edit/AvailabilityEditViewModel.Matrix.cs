@@ -3,7 +3,7 @@ using DataAccessLayer.Models.Enums;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using WPFApp.Infrastructure.AvailabilityMatrix;
+using WPFApp.Applications.Matrix.Availability;
 using WPFApp.ViewModel.Availability.Helpers;
 
 namespace WPFApp.ViewModel.Availability.Edit

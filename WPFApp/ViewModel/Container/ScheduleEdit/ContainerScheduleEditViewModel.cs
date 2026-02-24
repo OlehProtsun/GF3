@@ -20,18 +20,18 @@ using System.Text;
 using System.Windows;
 using System.Windows.Data;
 using System.Windows.Media;
-using WPFApp.Infrastructure;
-using WPFApp.Infrastructure.AvailabilityPreview;
-using WPFApp.Infrastructure.ScheduleMatrix;
-using WPFApp.Infrastructure.Threading;
-using WPFApp.Infrastructure.Validation;
-using WPFApp.Service;
 using WPFApp.View.Dialogs;
 using WPFApp.ViewModel.Container.Edit;
 using WPFApp.ViewModel.Container.ScheduleEdit.Helpers;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Threading;
+using WPFApp.MVVM.Core;
+using WPFApp.MVVM.Validation;
+using WPFApp.MVVM.Commands;
+using WPFApp.MVVM.Threading;
+using WPFApp.Applications.Preview;
+using WPFApp.Applications.Matrix.Schedule;
 
 namespace WPFApp.ViewModel.Container.ScheduleEdit
 {
@@ -101,7 +101,7 @@ namespace WPFApp.ViewModel.Container.ScheduleEdit
 
         // _validation — єдиний контейнер помилок (INotifyDataErrorInfo).
         // Він зберігає помилки по propertyName і піднімає ErrorsChanged.
-        private readonly WPFApp.Infrastructure.Validation.ValidationErrors _validation = new();
+        private readonly ValidationErrors _validation = new();
 
         // _colNameToEmpId — відповідність “ім’я колонки матриці” -> EmployeeId.
         // Заповнюється коли матриця будується (BuildScheduleTable повертає map).

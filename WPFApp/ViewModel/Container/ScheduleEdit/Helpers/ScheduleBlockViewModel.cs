@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using DataAccessLayer.Models;
-using WPFApp.Infrastructure;
+using WPFApp.MVVM.Core;
 
 namespace WPFApp.ViewModel.Container.ScheduleEdit.Helpers
 {

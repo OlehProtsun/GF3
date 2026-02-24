@@ -11,12 +11,14 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Media;
-using WPFApp.Infrastructure;
-using WPFApp.Infrastructure.ScheduleMatrix;
-using WPFApp.Service;
 using WPFApp.ViewModel.Container.Edit;
 using WPFApp.ViewModel.Container.ScheduleEdit.Helpers;
 using WPFApp.View.Dialogs;
+using WPFApp.Applications.Export;
+using WPFApp.MVVM.Core;
+using WPFApp.MVVM.Commands;
+using WPFApp.UI.Helpers;
+using WPFApp.Applications.Matrix.Schedule;
 
 
 namespace WPFApp.ViewModel.Container.ScheduleProfile

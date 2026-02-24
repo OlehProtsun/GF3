@@ -7,9 +7,11 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows;
-using WPFApp.Infrastructure;
-using WPFApp.Infrastructure.Validation;
-using WPFApp.Service;
+using WPFApp.MVVM.Commands;
+using WPFApp.MVVM.Core;
+using WPFApp.MVVM.Validation;
+using WPFApp.MVVM.Validation.Rules;
+using WPFApp.UI.Dialogs;
 using WPFApp.ViewModel.Dialogs;
 
 namespace WPFApp.ViewModel.Shop

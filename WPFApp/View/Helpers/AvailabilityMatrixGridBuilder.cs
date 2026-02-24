@@ -3,7 +3,7 @@ using System.Data;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
-using WPFApp.Infrastructure.AvailabilityMatrix;
+using WPFApp.Applications.Matrix.Availability;
 
 namespace WPFApp.View.Availability.Helpers
 {

@@ -1,15 +1,15 @@
 ﻿using DataAccessLayer.Models;
 using System;
 using System.Data;
-using WPFApp.Infrastructure.Threading;
-using WPFApp.Service;
 using WPFApp.ViewModel.Dialogs;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Threading;
 using BusinessLogicLayer.Availability;
-using WPFApp.Infrastructure.AvailabilityPreview;
+using WPFApp.UI.Dialogs;
+using WPFApp.MVVM.Threading;
+using WPFApp.Applications.Preview;
 
 
 

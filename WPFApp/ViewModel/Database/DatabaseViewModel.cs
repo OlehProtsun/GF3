@@ -5,8 +5,10 @@ using System.Globalization;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
-using WPFApp.Infrastructure;
-using WPFApp.Service;
+using WPFApp.Applications.Diagnostics;
+using WPFApp.Applications.Notifications;
+using WPFApp.MVVM.Commands;
+using WPFApp.MVVM.Core;
 
 namespace WPFApp.ViewModel.Database
 {

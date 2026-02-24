@@ -11,9 +11,12 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Media;
 using System.Windows.Threading;
-using WPFApp.Infrastructure;
-using WPFApp.Infrastructure.ScheduleMatrix;
-using WPFApp.Service;
+using WPFApp.Applications.Diagnostics;
+using WPFApp.Applications.Matrix.Schedule;
+using WPFApp.Applications.Notifications;
+using WPFApp.MVVM.Commands;
+using WPFApp.MVVM.Core;
+using WPFApp.UI.Helpers;
 using WPFApp.View.Dialogs;
 using WPFApp.ViewModel.Container.Edit.Helpers; // UIStatusKind
 using WPFApp.ViewModel.Container.ScheduleEdit.Helpers;

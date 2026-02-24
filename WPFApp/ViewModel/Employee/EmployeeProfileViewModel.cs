@@ -1,5 +1,6 @@
 using DataAccessLayer.Models;
-using WPFApp.Infrastructure;
+using WPFApp.MVVM.Commands;
+using WPFApp.MVVM.Core;
 using WPFApp.ViewModel.Employee.Helpers;
 
 namespace WPFApp.ViewModel.Employee

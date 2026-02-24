@@ -3,7 +3,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using Microsoft.Extensions.DependencyInjection;
-using WPFApp.Infrastructure;
 using WPFApp.ViewModel.Availability.Main;
 using WPFApp.ViewModel.Container.Edit;
 using WPFApp.ViewModel.Employee;
@@ -11,6 +10,8 @@ using WPFApp.ViewModel.Shop;
 using WPFApp.ViewModel.Database;
 using WPFApp.ViewModel.Home;
 using WPFApp.ViewModel.Information;
+using WPFApp.MVVM.Core;
+using WPFApp.MVVM.Commands;
 
 namespace WPFApp.ViewModel.Main
 {

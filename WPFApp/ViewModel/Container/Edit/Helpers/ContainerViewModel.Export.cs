@@ -1,7 +1,7 @@
 using DataAccessLayer.Models;
 using System.Threading;
 using System.Threading.Tasks;
-using WPFApp.Service;
+using WPFApp.Applications.Export;
 
 namespace WPFApp.ViewModel.Container.Edit
 {

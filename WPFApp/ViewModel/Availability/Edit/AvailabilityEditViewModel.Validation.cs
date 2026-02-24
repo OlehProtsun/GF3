@@ -6,9 +6,9 @@ using System.Data;
 using System.Linq;
 using System.Text;
 using System.Windows;
-using WPFApp.Infrastructure.AvailabilityMatrix;
-using WPFApp.Infrastructure.Validation;
-using WPFApp.Service;
+using WPFApp.Applications.Matrix.Availability;
+using WPFApp.MVVM.Validation.Rules;
+using WPFApp.UI.Dialogs;
 using WPFApp.View.Dialogs;
 using WPFApp.ViewModel.Dialogs;
 

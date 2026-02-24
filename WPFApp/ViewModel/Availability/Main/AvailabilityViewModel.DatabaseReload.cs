@@ -2,6 +2,7 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
+using WPFApp.Applications.Notifications;
 
 namespace WPFApp.ViewModel.Availability.Main
 {
@@ -9,7 +10,7 @@ namespace WPFApp.ViewModel.Availability.Main
     {
         private int _databaseReloadInProgress;
 
-        private void OnDatabaseChanged(object? sender, Service.DatabaseChangedEventArgs e)
+        private void OnDatabaseChanged(object? sender, DatabaseChangedEventArgs e)
         {
             _ = ReloadAfterDatabaseChangeAsync(e.Source);
         }

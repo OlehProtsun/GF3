@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using WPFApp.Applications.Notifications;
 
 namespace WPFApp.ViewModel.Container.Edit
 {
@@ -9,7 +10,7 @@ namespace WPFApp.ViewModel.Container.Edit
     {
         private int _databaseReloadInProgress;
 
-        private void OnDatabaseChanged(object? sender, Service.DatabaseChangedEventArgs e)
+        private void OnDatabaseChanged(object? sender, DatabaseChangedEventArgs e)
         {
             _ = ReloadAfterDatabaseChangeAsync(e.Source);
         }

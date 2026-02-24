@@ -2,8 +2,8 @@
 using System.Threading.Tasks;
 using System.Windows;              // Application.Current.Dispatcher
 using System.Windows.Media;        // Color
-using WPFApp.Infrastructure;
-using WPFApp.Service;
+using WPFApp.Applications.Diagnostics;
+using WPFApp.UI.Dialogs;
 using WPFApp.ViewModel.Dialogs;    // CustomMessageBox, ExceptionMessageBuilder
 
 namespace WPFApp.ViewModel.Container.Edit

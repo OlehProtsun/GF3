@@ -4,7 +4,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
 using System.Windows.Input;
-using WPFApp.Infrastructure.AvailabilityMatrix;
+using WPFApp.Applications.Matrix.Availability;
 using WPFApp.View.Availability.Helpers;
 using WPFApp.ViewModel.Availability.Edit;
 using WPFApp.ViewModel.Availability.Helpers;

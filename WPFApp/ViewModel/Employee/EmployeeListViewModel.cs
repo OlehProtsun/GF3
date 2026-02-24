@@ -3,7 +3,8 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
 using DataAccessLayer.Models;
-using WPFApp.Infrastructure;
+using WPFApp.MVVM.Commands;
+using WPFApp.MVVM.Core;
 
 namespace WPFApp.ViewModel.Employee
 {

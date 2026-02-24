@@ -5,8 +5,8 @@ using System.Globalization;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Windows;
-using WPFApp.Infrastructure.Validation;
-using WPFApp.Service;
+using WPFApp.MVVM.Validation.Rules;
+using WPFApp.UI.Dialogs;
 using WPFApp.ViewModel.Dialogs;
 
 namespace WPFApp.ViewModel.Container.ScheduleEdit

@@ -2,7 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
-using WPFApp.Infrastructure.Validation;
+using WPFApp.MVVM.Validation.Rules;
 
 namespace WPFApp.ViewModel.Container.ScheduleEdit
 {

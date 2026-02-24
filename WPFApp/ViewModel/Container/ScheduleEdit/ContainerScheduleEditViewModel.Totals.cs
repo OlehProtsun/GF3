@@ -1,5 +1,5 @@
 ﻿using System.Collections.Generic;
-using WPFApp.Infrastructure.ScheduleMatrix;
+using WPFApp.Applications.Matrix.Schedule;
 
 namespace WPFApp.ViewModel.Container.ScheduleEdit
 {

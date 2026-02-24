@@ -5,10 +5,10 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Input;
-using WPFApp.Infrastructure.AvailabilityMatrix;
 using WPFApp.ViewModel.Availability.Helpers;
 using System.Windows;
 using System.Windows.Threading;
+using WPFApp.Applications.Matrix.Availability;
 
 namespace WPFApp.ViewModel.Availability.Edit
 {

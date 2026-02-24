@@ -4,7 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Windows;
 using System.Windows.Media;
-using WPFApp.Infrastructure;
+using WPFApp.UI.Helpers;
 using WPFApp.ViewModel.Container.ScheduleEdit.Helpers;
 
 namespace WPFApp.ViewModel.Container.ScheduleEdit

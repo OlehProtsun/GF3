@@ -3,7 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-             xmlns:validation="clr-namespace:WPFApp.Infrastructure.Validation"
+             xmlns:validation="clr-namespace:WPFApp.Converters.Validation"
 
              mc:Ignorable="d"
              d:DesignHeight="830" d:DesignWidth="852"

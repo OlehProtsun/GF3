@@ -19,6 +19,12 @@ using WPFApp.ViewModel.Shop;
 using WPFApp.ViewModel.Database;
 using WPFApp.ViewModel.Home;
 using WPFApp.ViewModel.Information;
+using WPFApp.UI.Dialogs;
+using WPFApp.Applications.Configuration;
+using WPFApp.Applications.Notifications;
+using WPFApp.Applications.Diagnostics;
+using WPFApp.Applications.Export;
+
 
 namespace WPFApp
 {
@@ -39,8 +45,8 @@ namespace WPFApp
         private static void ConfigureServices(IServiceCollection services)
         {
             // 1) DAL/BLL як у WinForms
-            var dbPathProvider = new WPFApp.Service.DatabasePathProvider();
-            services.AddSingleton<WPFApp.Service.IDatabasePathProvider>(dbPathProvider);
+            var dbPathProvider = new DatabasePathProvider();
+            services.AddSingleton<IDatabasePathProvider>(dbPathProvider);
             services.AddDataAccess(dbPathProvider.ConnectionString);
 
             services.AddBusinessLogicLayer();
@@ -62,11 +68,11 @@ namespace WPFApp
             // 3) Реєстрація Views (Windows/UserControls)
             services.AddSingleton<MainWindow>();
 
-            services.AddSingleton<WPFApp.Service.IColorPickerService, WPFApp.Service.ColorPickerService>();
-            services.AddSingleton<WPFApp.Service.ISqliteAdminService, WPFApp.Service.SqliteAdminService>();
-            services.AddSingleton<WPFApp.Service.ILoggerService>(_ => WPFApp.Service.LoggerService.Instance);
-            services.AddSingleton<WPFApp.Service.IScheduleExportService, WPFApp.Service.ScheduleExportService>();
-            services.AddSingleton<WPFApp.Service.IDatabaseChangeNotifier, WPFApp.Service.DatabaseChangeNotifier>();
+            services.AddSingleton<IColorPickerService, ColorPickerService>();
+            services.AddSingleton<ISqliteAdminService, SqliteAdminService>();
+            services.AddSingleton<ILoggerService>(_ => LoggerService.Instance);
+            services.AddSingleton<IScheduleExportService, ScheduleExportService>();
+            services.AddSingleton<IDatabaseChangeNotifier, DatabaseChangeNotifier>();
 
             // Якщо робиш навігацію через UserControl-и:
             services.AddTransient<HomeView>();

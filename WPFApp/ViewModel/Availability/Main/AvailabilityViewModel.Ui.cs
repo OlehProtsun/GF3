@@ -1,8 +1,8 @@
 ﻿using System;
 using System.Threading.Tasks;
 using System.Windows;
-using WPFApp.Infrastructure;
-using WPFApp.Service;
+using WPFApp.Applications.Diagnostics;
+using WPFApp.UI.Dialogs;
 using WPFApp.ViewModel.Dialogs;
 
 namespace WPFApp.ViewModel.Availability.Main

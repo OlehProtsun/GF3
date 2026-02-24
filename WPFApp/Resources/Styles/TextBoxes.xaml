@@ -1,7 +1,7 @@
 ﻿<ResourceDictionary     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
                         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
                         xmlns:controls="clr-namespace:WPFApp.Controls"
-                        xmlns:local="clr-namespace:WPFApp.Converters">
+                        xmlns:local="clr-namespace:WPFApp.Converters.Validation">
 
     <local:FirstValidationErrorConverter x:Key="FirstValidationErrorConverter"/>
 

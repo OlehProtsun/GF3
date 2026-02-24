@@ -1,6 +1,6 @@
 ﻿using System;
 using DataAccessLayer.Models;
-using WPFApp.Infrastructure;
+using WPFApp.MVVM.Core;
 
 namespace WPFApp.ViewModel.Availability.Helpers
 {

@@ -3,9 +3,11 @@ using System;                                 // Action, EventHandler (для п
 using System.Collections.ObjectModel;         // ObservableCollection для WPF binding
 using System.Linq;                            // LINQ (Where/Select/Any/ToList)
 using System.Windows.Input;                   // ICommand
-using WPFApp.Infrastructure;                  // ViewModelBase, RelayCommand, AsyncRelayCommand
+using WPFApp.MVVM.Commands;
+using WPFApp.MVVM.Core;
 using WPFApp.ViewModel.Container.Edit;
-using WPFApp.ViewModel.Dialogs;               // (ймовірно Confirm/Dialogs через owner)
+using WPFApp.ViewModel.Dialogs;
+using RelayCommand = WPFApp.MVVM.Commands.RelayCommand;               // (ймовірно Confirm/Dialogs через owner)
 
 namespace WPFApp.ViewModel.Container.ScheduleList
 {
@@ -221,7 +223,7 @@ namespace WPFApp.ViewModel.Container.ScheduleList
             OpenProfileCommand = new AsyncRelayCommand(() => _owner.OpenScheduleProfileAsync(), () => SelectedItem != null);
 
             // ToggleMultiOpenCommand просто перемикає режим
-            ToggleMultiOpenCommand = new Infrastructure.RelayCommand(() =>
+            ToggleMultiOpenCommand = new RelayCommand(() =>
             {
                 IsMultiOpenEnabled = !IsMultiOpenEnabled;
             });

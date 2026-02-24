@@ -7,7 +7,7 @@ using System.Globalization;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using WPFApp.Infrastructure.ScheduleMatrix;
+using WPFApp.Applications.Matrix.Schedule;
 
 namespace WPFApp.ViewModel.Container.ScheduleEdit
 {

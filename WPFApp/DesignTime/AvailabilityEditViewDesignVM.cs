@@ -2,8 +2,8 @@
 using System.Data;
 using System.Threading.Tasks;
 using System.Windows.Input;
-using WPFApp.Infrastructure;
-using WPFApp.Infrastructure.AvailabilityMatrix;
+using WPFApp.Applications.Matrix.Availability;
+using WPFApp.MVVM.Commands;
 using WPFApp.ViewModel.Availability;
 using WPFApp.ViewModel.Availability.Helpers; // EmployeeListItem, BindRow
 

@@ -1,6 +1,6 @@
 ﻿using System.Threading.Tasks;
 using System.Windows;
-using WPFApp.Infrastructure;
+using WPFApp.MVVM.Commands;
 
 namespace WPFApp.ViewModel.Availability.Edit
 {

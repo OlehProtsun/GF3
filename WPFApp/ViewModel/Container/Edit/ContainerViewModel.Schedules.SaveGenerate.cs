@@ -9,7 +9,6 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Input;
-using WPFApp.Infrastructure.ScheduleMatrix;
 using WPFApp.View.Dialogs;
 using WPFApp.ViewModel.Container.Edit.Helpers;
 using WPFApp.ViewModel.Container.ScheduleEdit;
