@@ -24,6 +24,7 @@ using WPFApp.Applications.Configuration;
 using WPFApp.Applications.Notifications;
 using WPFApp.Applications.Diagnostics;
 using WPFApp.Applications.Export;
+using DataAccessLayer.Administration;
 
 
 namespace WPFApp
@@ -69,7 +70,10 @@ namespace WPFApp
             services.AddSingleton<MainWindow>();
 
             services.AddSingleton<IColorPickerService, ColorPickerService>();
-            services.AddSingleton<ISqliteAdminService, SqliteAdminService>();
+            services.AddSingleton<ISqliteAdminService>(_ =>
+                new SqliteAdminService(
+                    dbPathProvider.ConnectionString,
+                    dbPathProvider.DatabaseFilePath));
             services.AddSingleton<ILoggerService>(_ => LoggerService.Instance);
             services.AddSingleton<IScheduleExportService, ScheduleExportService>();
             services.AddSingleton<IDatabaseChangeNotifier, DatabaseChangeNotifier>();

@@ -9,6 +9,7 @@ using WPFApp.Applications.Diagnostics;
 using WPFApp.Applications.Notifications;
 using WPFApp.MVVM.Commands;
 using WPFApp.MVVM.Core;
+using DataAccessLayer.Administration;
 
 namespace WPFApp.ViewModel.Database
 {

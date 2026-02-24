@@ -8,9 +8,8 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using WPFApp.Applications.Configuration;
 
-namespace WPFApp.Applications.Diagnostics
+namespace DataAccessLayer.Administration
 {
     public sealed class SqlExecutionResult
     {
@@ -40,14 +39,17 @@ namespace WPFApp.Applications.Diagnostics
 
     public sealed class SqliteAdminService : ISqliteAdminService
     {
-        private readonly IDatabasePathProvider _databasePathProvider;
 
-        public SqliteAdminService(IDatabasePathProvider databasePathProvider)
+        private readonly string _connectionString;
+        private readonly string _databasePath;
+
+        public SqliteAdminService(string connectionString, string databasePath)
         {
-            _databasePathProvider = databasePathProvider;
+            _connectionString = connectionString ?? throw new ArgumentNullException(nameof(connectionString));
+            _databasePath = databasePath ?? throw new ArgumentNullException(nameof(databasePath));
         }
 
-        public string DatabasePath => _databasePathProvider.DatabaseFilePath;
+        public string DatabasePath => _databasePath;
 
         public async Task<SqlExecutionResult> ExecuteSqlAsync(string sql, CancellationToken ct)
         {
@@ -60,7 +62,7 @@ namespace WPFApp.Applications.Diagnostics
                 normalized.StartsWith("PRAGMA", StringComparison.OrdinalIgnoreCase) ||
                 normalized.StartsWith("WITH", StringComparison.OrdinalIgnoreCase);
 
-            await using var connection = new SqliteConnection(_databasePathProvider.ConnectionString);
+            await using var connection = new SqliteConnection(_connectionString);
             await connection.OpenAsync(ct);
 
             await using var command = connection.CreateCommand();
@@ -94,7 +96,7 @@ namespace WPFApp.Applications.Diagnostics
             if (string.IsNullOrWhiteSpace(sqlScript))
                 throw new InvalidOperationException("Import script is empty.");
 
-            await using var connection = new SqliteConnection(_databasePathProvider.ConnectionString);
+            await using var connection = new SqliteConnection(_connectionString);
             await connection.OpenAsync(ct);
 
             await using var command = connection.CreateCommand();
@@ -104,10 +106,10 @@ namespace WPFApp.Applications.Diagnostics
 
         public async Task<DatabaseInfo> GetDatabaseInfoAsync(CancellationToken ct)
         {
-            var dbPath = _databasePathProvider.DatabaseFilePath;
+            var dbPath = _databasePath;
             var fi = new FileInfo(dbPath);
 
-            await using var connection = new SqliteConnection(_databasePathProvider.ConnectionString);
+            await using var connection = new SqliteConnection(_connectionString);
             await connection.OpenAsync(ct);
 
             var tables = new List<string>();

@@ -1,12 +1,6 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
-using System.Windows;
+﻿using System.Windows;
 using System.Windows.Threading;
 using BusinessLogicLayer.Services.Abstractions;
-using DataAccessLayer.Models;
 using WPFApp.Applications.Diagnostics;
 using WPFApp.Applications.Notifications;
 using WPFApp.MVVM.Core;
