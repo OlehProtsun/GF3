@@ -304,6 +304,7 @@ namespace WPFApp.ViewModel.Home
 
         private async Task LoadDataAsync(CancellationToken ct)
         {
+            using var perf = new PerfScope("Home", "LoadDataAsync", _logger);
             void UI(Action a)
             {
                 var d = App.Current?.Dispatcher;
