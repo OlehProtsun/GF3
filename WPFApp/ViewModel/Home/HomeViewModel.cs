@@ -11,7 +11,6 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Media;
 using System.Windows.Threading;
-using WPFApp.Applications.Diagnostics;
 using WPFApp.Applications.Matrix.Schedule;
 using WPFApp.Applications.Notifications;
 using WPFApp.MVVM.Commands;
@@ -36,8 +35,7 @@ namespace WPFApp.ViewModel.Home
         private readonly IScheduleService _scheduleService;
         private readonly IContainerService _containerService;
         private readonly IDatabaseChangeNotifier _databaseChangeNotifier;
-        private readonly ILoggerService _logger;
-
+        
         private readonly DispatcherTimer _clockTimer;
         private bool _initialized;
         private Task? _initializeTask;
@@ -54,13 +52,12 @@ namespace WPFApp.ViewModel.Home
         public HomeViewModel(
             IScheduleService scheduleService,
             IContainerService containerService,
-            IDatabaseChangeNotifier databaseChangeNotifier,
-            ILoggerService logger)
+            IDatabaseChangeNotifier databaseChangeNotifier
+            )
         {
             _scheduleService = scheduleService;
             _containerService = containerService;
             _databaseChangeNotifier = databaseChangeNotifier;
-            _logger = logger;
 
             WhoWorksTodayItems = new ObservableCollection<WhoWorksTodayRowViewModel>();
             ActiveSchedules = new ObservableCollection<HomeScheduleCardViewModel>();
@@ -304,7 +301,6 @@ namespace WPFApp.ViewModel.Home
 
         private async Task LoadDataAsync(CancellationToken ct)
         {
-            using var perf = new PerfScope("Home", "LoadDataAsync", _logger);
             void UI(Action a)
             {
                 var d = App.Current?.Dispatcher;
@@ -759,8 +755,7 @@ namespace WPFApp.ViewModel.Home
             }
             catch (Exception ex)
             {
-                _logger.Log($"[Home] Failed to load data: {ex}");
-                UI(() => StatusText = "Failed to load home data.");
+                                UI(() => StatusText = "Failed to load home data.");
                 _lastLoadSuccessful = false;
 
             }
@@ -775,8 +770,7 @@ namespace WPFApp.ViewModel.Home
 
         private async void OnDatabaseChanged(object? sender, DatabaseChangedEventArgs e)
         {
-            _logger.Log($"[Home] Database changed from {e.Source}; refreshing Home.");
-            await LoadDataAsync(CancellationToken.None);
+                        await LoadDataAsync(CancellationToken.None);
         }
 
         private async Task RefreshWithOverlayAsync(CancellationToken ct)
@@ -809,8 +803,7 @@ namespace WPFApp.ViewModel.Home
             catch (Exception ex)
             {
                 await HideNavStatusAsync();
-                _logger.Log($"[Home] Refresh failed: {ex}");
-            }
+                            }
         }
 
     }

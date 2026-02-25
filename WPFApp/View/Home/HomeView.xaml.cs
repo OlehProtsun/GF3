@@ -26,9 +26,9 @@ namespace WPFApp.View.Home
             VirtualizingPanel.SetVirtualizationMode(grid, VirtualizationMode.Recycling);
 
             grid.SetValue(ScrollViewer.CanContentScrollProperty, true);
-            grid.SetValue(ScrollViewer.IsDeferredScrollingEnabledProperty, true);
+            grid.SetValue(ScrollViewer.IsDeferredScrollingEnabledProperty, false);
 
-            grid.SetValue(VirtualizingPanel.ScrollUnitProperty, ScrollUnit.Item);
+            grid.SetValue(VirtualizingPanel.ScrollUnitProperty, ScrollUnit.Pixel);
             VirtualizingPanel.SetCacheLengthUnit(grid, VirtualizationCacheLengthUnit.Page);
             VirtualizingPanel.SetCacheLength(grid, new VirtualizationCacheLength(1));
         }

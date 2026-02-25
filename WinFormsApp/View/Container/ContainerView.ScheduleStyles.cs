@@ -2,7 +2,6 @@
 using System;
 using System.Collections.Generic;
 using System.Data;
-using System.Diagnostics;
 using System.Drawing;
 using System.Linq;
 using System.Windows.Forms;
@@ -228,16 +227,6 @@ namespace WinFormsApp.View.Container
             cellStyle.BackColor = _styleResolver.ResolveBackground(overrideStyle, isWeekend);
             cellStyle.ForeColor = _styleResolver.ResolveForeground(overrideStyle);
 
-#if DEBUG
-            if (isWeekend && _weekendStyleLogCount < 3)
-            {
-                _weekendStyleLogCount++;
-                Debug.WriteLine(
-                    $"[ScheduleStyle] {year:D4}-{month:D2}-{day:D2} col={columnName} " +
-                    $"bg={cellStyle.BackColor} fg={cellStyle.ForeColor} " +
-                    $"overrideBg={overrideStyle?.BackgroundHex ?? "none"} overrideFg={overrideStyle?.ForegroundHex ?? "none"}");
-            }
-#endif
         }
     }
 }

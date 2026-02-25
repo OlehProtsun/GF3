@@ -45,7 +45,7 @@ Based on `WpfPerf_Baseline.md`:
   - Container schedule profile matrix helper
 
 ### E. Perf instrumentation (debug/dev-safe)
-- Added reusable `PerfScope` (`Stopwatch` + debug/logger output).
+- Added reusable `PerfMeasurementScope` (`Stopwatch` + debug/logger output).
 - Instrumented critical flows:
   - Home `LoadDataAsync`
   - Availability `SearchAsync`, `EditSelectedAsync`, `OpenProfileAsync`, `SaveAsync`, `DeleteSelectedAsync`
@@ -53,7 +53,7 @@ Based on `WpfPerf_Baseline.md`:
 ## 3) Files changed
 - `WPFApp/Resources/Styles/DataGrids.xaml`
 - `WPFApp/UI/Helpers/SmoothScrollBehavior.cs`
-- `WPFApp/Applications/Diagnostics/PerfScope.cs`
+- `WPFApp/Applications/Diagnostics/PerfMeasurementScope.cs`
 - `WPFApp/View/Availability/AvailabilityEditView.xaml.cs`
 - `WPFApp/View/Availability/AvailabilityProfileView.xaml.cs`
 - `WPFApp/View/Home/HomeView.xaml.cs`
@@ -79,7 +79,7 @@ Based on `WpfPerf_Baseline.md`:
 ## 5) Metrics / indicators
 - Runtime metrics now emitted through:
   - `Debug` output (`[PERF][Area] START/END ... ms`)
-  - `LoggerService.LogPerf` (`ui-performance.log`)
+  - `DiagnosticsServiceImpl.PerfRecord` (`ui-perf.txt`)
 - This gives measurable flow timings for:
   - Home load
   - Availability search/open/edit/save/delete

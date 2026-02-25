@@ -22,7 +22,6 @@ using WPFApp.ViewModel.Information;
 using WPFApp.UI.Dialogs;
 using WPFApp.Applications.Configuration;
 using WPFApp.Applications.Notifications;
-using WPFApp.Applications.Diagnostics;
 using WPFApp.Applications.Export;
 
 
@@ -67,7 +66,6 @@ namespace WPFApp
             services.AddSingleton<MainWindow>();
 
             services.AddSingleton<IColorPickerService, ColorPickerService>();
-            services.AddSingleton<ILoggerService>(_ => LoggerService.Instance);
             services.AddSingleton<IScheduleExportService, ScheduleExportService>();
             services.AddSingleton<IDatabaseChangeNotifier, DatabaseChangeNotifier>();
 

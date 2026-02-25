@@ -160,7 +160,7 @@ Remaining known leaks (outside this targeted pass):
 - WPF startup still provides DAL admin service with primitive connection info from `DatabasePathProvider`.
 
 ## 9. Cross-Cutting Concerns
-- Logging/notifications remain in Presentation (`ILoggerService`, `IDatabaseChangeNotifier`).
+- Diagnostics/notifications remain in Presentation (`DiagnosticsService`, `IDatabaseChangeNotifier`).
 - Validation split:
   - BLL owns core business/service validation.
   - WPF keeps UX-triggered per-field/request validation adapters.

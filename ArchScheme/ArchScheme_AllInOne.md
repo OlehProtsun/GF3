@@ -533,7 +533,7 @@ WPFApp
 │   │   └── DatabasePathProvider.cs
 │   ├── Diagnostics
 │   │   ├── ExceptionMessageBuilder.cs
-│   │   └── LoggerService.cs
+│   │   └── DiagnosticsServiceImpl.cs
 │   ├── Export
 │   │   ├── IScheduleExportService.cs
 │   │   └── ScheduleExportService.cs
@@ -1051,7 +1051,7 @@ graph TD
 - У `ConfigureServices` реєструє:
   - `DatabasePathProvider`
   - `AddBusinessLogicStack(connectionString, databasePath)`
-  - UI сервіси (`IColorPickerService`, `ILoggerService`, `IScheduleExportService`, `IDatabaseChangeNotifier`)
+  - UI сервіси (`IColorPickerService`, `DiagnosticsService`, `IScheduleExportService`, `IDatabaseChangeNotifier`)
   - ViewModels (`MainViewModel`, `HomeViewModel`, `EmployeeViewModel`, `AvailabilityViewModel`, `ShopViewModel`, `ContainerViewModel`, `InformationViewModel`, `DatabaseViewModel`)
   - Views (`MainWindow`, `HomeView`, `EmployeeView`, `AvailabilityView`, `ShopView`, `ContainerView`, `InformationView`, `DatabaseView`)
 - `OnStartup`: запускає host і показує `MainWindow` з DI.
@@ -3077,14 +3077,14 @@ graph TD
 - **Пов’язані файли:** WPFApp/ViewModel/Availability/Main/AvailabilityViewModel.Ui.cs, WPFApp/ViewModel/Container/Edit/Helpers/ContainerViewModel.Ui.cs, WPFApp/ViewModel/Employee/EmployeeViewModel.cs, WPFApp/ViewModel/Shop/ShopViewModel.cs
 - **Примітки:** Опис сформовано за фактичним вмістом файлу та його позицією в дереві репозиторію.
 
-## LoggerService.cs
-- **File:** `WPFApp/Applications/Diagnostics/LoggerService.cs`
+## DiagnosticsServiceImpl.cs
+- **File:** `WPFApp/Applications/Diagnostics/DiagnosticsServiceImpl.cs`
 - **Layer / Project:** Presentation (WPF) / WPFApp
 - **Namespace:** WPFApp.Applications.Diagnostics
 - **Тип:** C# source
 - **Призначення:** Файл бере участь у реалізації функціональності згідно з типом та розташуванням у структурі проєкту.
-- **Основні типи:** ILoggerService, LoggerService
-- **Ключові публічні члени:** ILoggerService, Log, LogPerf
+- **Основні типи:** DiagnosticsService, DiagnosticsServiceImpl
+- **Ключові публічні члени:** DiagnosticsService, Log, PerfRecord
 - **Використовує:** System, System.Globalization, System.IO, System.Text, System.Threading
 - **Використовується в:** WPFApp/App.xaml.cs, WPFApp/Applications/Notifications/DatabaseChangeNotifier.cs, WPFApp/View/Container/ContainerScheduleEditView.xaml.cs, WPFApp/ViewModel/Availability/Main/AvailabilityViewModel.cs, WPFApp/ViewModel/Container/Edit/ContainerViewModel.cs, WPFApp/ViewModel/Database/DatabaseViewModel.cs, WPFApp/ViewModel/Employee/EmployeeViewModel.cs, WPFApp/ViewModel/Home/HomeViewModel.cs, WPFApp/ViewModel/Shop/ShopViewModel.cs
 - **Потік даних:** Вхідні/вихідні дані визначаються сигнатурами методів і binding/DTO-моделями; деталі наведені у пов’язаних файлах.
@@ -6421,7 +6421,7 @@ graph TD
 ## Вміст папки
 
 - `WPFApp/Applications/Diagnostics/ExceptionMessageBuilder.cs` — C# source.
-- `WPFApp/Applications/Diagnostics/LoggerService.cs` — C# source.
+- `WPFApp/Applications/Diagnostics/DiagnosticsServiceImpl.cs` — C# source.
 
 ## Зв’язок із сусідніми модулями
 - Основний шар: Presentation (WPF).

@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Diagnostics;
 using System.Text;
 
 namespace WPFApp.Applications.Diagnostics
@@ -43,10 +42,6 @@ namespace WPFApp.Applications.Diagnostics
             // Якщо ex == null — повертаємо “невідомо”.
             if (ex is null)
                 return ("Unknown error.", string.Empty);
-
-            // Лог у Trace: корисно для девелоперів (в Output).
-            // Це НЕ впливає на UI.
-            Trace.WriteLine(ex.ToString());
 
             // summary: максимально коротко.
             var summary = string.IsNullOrWhiteSpace(ex.Message) ? "Unknown error." : ex.Message;

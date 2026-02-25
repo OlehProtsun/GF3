@@ -7,7 +7,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Threading;
-using WPFApp.Applications.Diagnostics;
 using WPFApp.Applications.Notifications;
 using WPFApp.MVVM.Core;
 using WPFApp.MVVM.Validation.Rules;
@@ -46,8 +45,7 @@ namespace WPFApp.ViewModel.Employee
     {
         private readonly IEmployeeFacade _employeeService;
         private readonly IDatabaseChangeNotifier _databaseChangeNotifier;
-        private readonly ILoggerService _logger;
-        private int _databaseReloadInProgress;
+                private int _databaseReloadInProgress;
 
         // ----------------------------
         // Initialization (safe)
@@ -138,12 +136,11 @@ namespace WPFApp.ViewModel.Employee
 
         public EmployeeViewModel(
             IEmployeeFacade employeeService,
-            IDatabaseChangeNotifier databaseChangeNotifier,
-            ILoggerService logger)
+            IDatabaseChangeNotifier databaseChangeNotifier
+            )
         {
             _employeeService = employeeService;
             _databaseChangeNotifier = databaseChangeNotifier;
-            _logger = logger;
 
             ListVm = new EmployeeListViewModel(this);
             EditVm = new EmployeeEditViewModel(this);
@@ -505,8 +502,7 @@ namespace WPFApp.ViewModel.Employee
             {
                 if (Mode == EmployeeSection.Edit)
                 {
-                    _logger.Log($"[DB-CHANGE] Employee reload skipped in edit mode. Source={source}.");
-                    return;
+                                        return;
                 }
 
                 var selectedId = Mode == EmployeeSection.Profile ? ProfileVm.EmployeeId : ListVm.SelectedItem?.Id;
@@ -529,12 +525,10 @@ namespace WPFApp.ViewModel.Employee
                     }
                 }).Task.Unwrap();
 
-                _logger.Log($"[DB-CHANGE] Employee module reloaded. Source={source}.");
-            }
+                            }
             catch (Exception ex)
             {
-                _logger.Log($"[DB-CHANGE] Employee reload failed: {ex.Message}");
-            }
+                            }
             finally
             {
                 Interlocked.Exchange(ref _databaseReloadInProgress, 0);

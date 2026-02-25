@@ -21,7 +21,8 @@ namespace WPFApp.View.Container
 
         // ---- Matrix(DataGrid) rebuild guards ----
         private string? _schemaSig;
-        private bool _refreshQueued;
+        private readonly DispatcherTimer _refreshThrottleTimer;
+        private bool _refreshRequested;
 
         // ---- Summary scroll sync guards ----
         private bool _summarySync;   // захист від рекурсії під час ScrollChanged
@@ -33,6 +34,12 @@ namespace WPFApp.View.Container
         public ContainerScheduleProfileView()
         {
             InitializeComponent();
+
+            _refreshThrottleTimer = new DispatcherTimer(
+                TimeSpan.FromMilliseconds(16),
+                DispatcherPriority.Background,
+                RefreshThrottleTimer_Tick,
+                Dispatcher);
 
             ConfigureGridPerformance(dataGridScheduleProfile);
 
@@ -53,9 +60,9 @@ namespace WPFApp.View.Container
             VirtualizingPanel.SetVirtualizationMode(grid, VirtualizationMode.Recycling);
 
             grid.SetValue(ScrollViewer.CanContentScrollProperty, true);
-            grid.SetValue(ScrollViewer.IsDeferredScrollingEnabledProperty, true);
+            grid.SetValue(ScrollViewer.IsDeferredScrollingEnabledProperty, false);
 
-            grid.SetValue(VirtualizingPanel.ScrollUnitProperty, ScrollUnit.Item);
+            grid.SetValue(VirtualizingPanel.ScrollUnitProperty, ScrollUnit.Pixel);
             VirtualizingPanel.SetCacheLengthUnit(grid, VirtualizationCacheLengthUnit.Page);
             VirtualizingPanel.SetCacheLength(grid, new VirtualizationCacheLength(1));
         }
@@ -107,19 +114,26 @@ namespace WPFApp.View.Container
         private void VmOnMatrixChanged(object? sender, EventArgs e)
         {
             if (_vm is null) return;
-            if (_refreshQueued) return;
 
-            _refreshQueued = true;
+            _refreshRequested = true;
+            if (!_refreshThrottleTimer.IsEnabled)
+                _refreshThrottleTimer.Start();
+        }
 
-            Dispatcher.BeginInvoke(new Action(() =>
+        private void RefreshThrottleTimer_Tick(object? sender, EventArgs e)
+        {
+            if (!_refreshRequested)
             {
-                _refreshQueued = false;
-                RefreshGridSmart();
+                _refreshThrottleTimer.Stop();
+                return;
+            }
 
-                // після оновлення SummaryRows / headers — оновити max нижнього H-scroll
-                UpdateSummaryHorizontalBar();
+            _refreshRequested = false;
+            RefreshGridSmart();
+            UpdateSummaryHorizontalBar();
 
-            }), DispatcherPriority.Background);
+            if (!_refreshRequested)
+                _refreshThrottleTimer.Stop();
         }
 
         // =========================================================

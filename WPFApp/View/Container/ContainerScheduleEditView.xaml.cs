@@ -10,7 +10,6 @@ using System.Windows.Data;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
-using WPFApp.Applications.Diagnostics;
 using WPFApp.Controls;
 using WPFApp.UI.Dialogs;
 using WPFApp.UI.Matrix.Schedule;
@@ -100,9 +99,7 @@ namespace WPFApp.View.Container
         // 5) Logging/Perf (обмежено)
         // ============================
 
-        private readonly ILoggerService _logger = LoggerService.Instance;
-        private DateTime _lastScrollLogUtc = DateTime.MinValue;
-
+        
         // ============================
         // 6) UX: пауза refresh при відкритих ComboBox
         // ============================
@@ -136,6 +133,8 @@ namespace WPFApp.View.Container
         /// ми не робимо 10 refresh-ів, а робимо лише 1, запланований через Dispatcher.
         /// </summary>
         private bool _refreshQueued;
+        private readonly DispatcherTimer _matrixRefreshThrottleTimer;
+        private bool _matrixRefreshRequested;
 
         /// <summary>
         /// Initializes the view, enables DataGrid virtualization and wires UI events
@@ -144,6 +143,12 @@ namespace WPFApp.View.Container
         public ContainerScheduleEditView()
         {
             InitializeComponent();
+
+            _matrixRefreshThrottleTimer = new DispatcherTimer(
+                TimeSpan.FromMilliseconds(16),
+                DispatcherPriority.Background,
+                MatrixRefreshThrottleTimer_Tick,
+                Dispatcher);
 
             // 1) Примусово вмикаємо virtualization (навіть якщо стилі її вимикають)
             ConfigureGridPerformance(dataGridScheduleMatrix);
@@ -163,10 +168,6 @@ namespace WPFApp.View.Container
             dataGridScheduleMatrix.MouseMove += ScheduleMatrix_MouseMove;
             dataGridScheduleMatrix.PreviewMouseLeftButtonUp += ScheduleMatrix_PreviewMouseLeftButtonUp;
 
-            // ScrollChanged підключаємо як routed event handler
-            dataGridScheduleMatrix.AddHandler(
-                ScrollViewer.ScrollChangedEvent,
-                new ScrollChangedEventHandler(ScheduleMatrix_ScrollChanged));
         }
 
         // =========================================================
@@ -302,8 +303,6 @@ namespace WPFApp.View.Container
             _suspendMatrixRefresh = false;
             _pendingMatrixRefresh = false;
 
-            _refreshQueued = false;
-            _lastScrollLogUtc = DateTime.MinValue;
 
             if (commitPendingSelections && _vm != null)
             {
@@ -335,10 +334,10 @@ namespace WPFApp.View.Container
             grid.SetValue(ScrollViewer.CanContentScrollProperty, true);
 
             // deferred scrolling інколи робить UX гіршим (підвисання під час thumb drag)
-            grid.SetValue(ScrollViewer.IsDeferredScrollingEnabledProperty, true);
+            grid.SetValue(ScrollViewer.IsDeferredScrollingEnabledProperty, false);
 
             // оптимізація scroll unit
-            grid.SetValue(VirtualizingPanel.ScrollUnitProperty, ScrollUnit.Item);
+            grid.SetValue(VirtualizingPanel.ScrollUnitProperty, ScrollUnit.Pixel);
 
             // невеликий кеш “на сторінку” для зменшення churn при прокрутці
             VirtualizingPanel.SetCacheLengthUnit(grid, VirtualizationCacheLengthUnit.Page);
@@ -412,14 +411,9 @@ namespace WPFApp.View.Container
                 return;
             }
 
-            if (_refreshQueued) return;
-            _refreshQueued = true;
-
-            Dispatcher.BeginInvoke(new Action(() =>
-            {
-                _refreshQueued = false;
-                RefreshMatricesSmart();
-            }), DispatcherPriority.Background);
+            _matrixRefreshRequested = true;
+            if (!_matrixRefreshThrottleTimer.IsEnabled)
+                _matrixRefreshThrottleTimer.Start();
         }
 
         /// <summary>
@@ -1013,28 +1007,22 @@ namespace WPFApp.View.Container
             if (_pendingMatrixRefresh)
             {
                 _pendingMatrixRefresh = false;
-                Dispatcher.BeginInvoke(new Action(RefreshMatricesSmart), DispatcherPriority.Background);
+                _matrixRefreshRequested = true;
+                if (!_matrixRefreshThrottleTimer.IsEnabled)
+                    _matrixRefreshThrottleTimer.Start();
             }
         }
 
-        // =========================================================
-        // Perf logging (обмежено)
-        // =========================================================
-
-        private void ScheduleMatrix_ScrollChanged(object sender, ScrollChangedEventArgs e)
+        private void MatrixRefreshThrottleTimer_Tick(object? sender, EventArgs e)
         {
-            // Лог тільки коли відкриті комбобокси (вузький сценарій діагностики)
-            if (!_shopComboOpen && !_availabilityComboOpen)
+            if (!_matrixRefreshRequested || _suspendMatrixRefresh)
                 return;
 
-            var now = DateTime.UtcNow;
-            if ((now - _lastScrollLogUtc).TotalMilliseconds < 500)
-                return;
+            _matrixRefreshRequested = false;
+            RefreshMatricesSmart();
 
-            _lastScrollLogUtc = now;
-            _logger.LogPerf(
-                "ScheduleGrid",
-                $"ScrollChanged: V={e.VerticalOffset:F2} H={e.HorizontalOffset:F2} ΔV={e.VerticalChange:F2} ΔH={e.HorizontalChange:F2}");
+            if (!_matrixRefreshRequested)
+                _matrixRefreshThrottleTimer.Stop();
         }
 
         private void MinHoursCell_TargetUpdated(object sender, DataTransferEventArgs e)

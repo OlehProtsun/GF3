@@ -202,7 +202,7 @@
 │   │   ├── DatabasePathProvider.cs
 │   │   ├── IColorPickerService.cs
 │   │   ├── IScheduleExportService.cs
-│   │   ├── LoggerService.cs
+│   │   ├── DiagnosticsServiceImpl.cs
 │   │   ├── ScheduleExportService.cs
 │   │   └── SqliteAdminService.cs
 │   ├── View
@@ -7465,7 +7465,7 @@
 - Key declarations and dependencies extracted above.
 - Requires companion files (partial classes/resources/interfaces) for full runtime behavior in many cases.
 
-## WPFApp/Service/LoggerService.cs
+## WPFApp/Service/DiagnosticsServiceImpl.cs
 ### Purpose
 - Service class/interface coordinating business operations or app infrastructure.
 - Supports: UI.
@@ -7473,7 +7473,7 @@
 ### Type Information
 - File type: `.cs`.
 - Namespace(s): ['WPFApp.Service'].
-- Main declared type(s): ['interface ILoggerService', 'class LoggerService'].
+- Main declared type(s): ['interface DiagnosticsService', 'class DiagnosticsServiceImpl'].
 
 ### Dependencies
 - Key imports/usings: ['System', 'System.Globalization', 'System.IO', 'System.Text', 'System.Threading'].
@@ -7483,10 +7483,10 @@
 
 ### Public API / Members
 - Public/visible properties (detected):
-  - `public interface ILoggerService`
+  - `public interface DiagnosticsService`
 - Methods/constructors (detected signatures):
   - `public void Log(string message)` — implementation in file; inspect branches/side-effects in source.
-  - `public void LogPerf(string area, string message)` — implementation in file; inspect branches/side-effects in source.
+  - `public void PerfRecord(string area, string message)` — implementation in file; inspect branches/side-effects in source.
   - `private void WriteLine(string level, string message)` — implementation in file; inspect branches/side-effects in source.
 
 ### Internal Logic Details
@@ -13659,7 +13659,7 @@
 - Data flow: DbContext <-> repositories <-> BLL services <-> WPF ViewModels/UI.
 
 # CROSS-CUTTING COMPONENTS
-- Logging and notifications: `LoggerService`, `DatabaseChangeNotifier`, and custom message box service/viewmodel components.
+- Logging and notifications: `DiagnosticsServiceImpl`, `DatabaseChangeNotifier`, and custom message box service/viewmodel components.
 - Commands/observability: `ObservableObject`, `ViewModelBase`, `RelayCommand`, `AsyncRelayCommand`.
 - Validation: rule sets for schedule/container/shop/employee/availability, plus error aggregation/converters.
 - Threading/debounce: `UiDebouncedAction` to prevent excessive UI-triggered work.

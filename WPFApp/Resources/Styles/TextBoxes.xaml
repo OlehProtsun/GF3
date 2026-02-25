@@ -229,7 +229,7 @@
                     <VirtualizingStackPanel
                     VirtualizingPanel.IsVirtualizing="True"
                     VirtualizingPanel.VirtualizationMode="Recycling"
-                    VirtualizingPanel.ScrollUnit="Item"/>
+                    VirtualizingPanel.ScrollUnit="Pixel"/>
                 </ItemsPanelTemplate>
             </Setter.Value>
         </Setter>
@@ -328,7 +328,7 @@
                                           KeyboardNavigation.DirectionalNavigation="Contained"
                                           VirtualizingPanel.IsVirtualizing="{TemplateBinding VirtualizingPanel.IsVirtualizing}"
                                           VirtualizingPanel.VirtualizationMode="{TemplateBinding VirtualizingPanel.VirtualizationMode}"
-                                          VirtualizingPanel.ScrollUnit="Item"
+                                          VirtualizingPanel.ScrollUnit="Pixel"
                                           MaxHeight="260">
                                     <ItemsPresenter KeyboardNavigation.TabNavigation="None"/>
                                 </ScrollViewer>
