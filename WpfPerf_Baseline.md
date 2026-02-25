@@ -33,7 +33,7 @@
 - **Database query result grid** (auto-generated columns + potentially large result sets)
 
 ## Baseline instrumentation plan
-- Add lightweight `PerfScope` (`IDisposable + Stopwatch`) with `Debug.WriteLine` + existing `ILoggerService.LogPerf`.
+- Add lightweight `PerfMeasurementScope` (`IDisposable + Stopwatch`) with `debug output` + existing `DiagnosticsService.PerfRecord`.
 - Instrument key flows:
   - Home load (`LoadDataAsync`)
   - Availability flows (`Search`, `OpenProfile`, `EditSelected`, `Save`, `Delete`)

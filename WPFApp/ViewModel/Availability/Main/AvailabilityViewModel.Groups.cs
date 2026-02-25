@@ -5,7 +5,6 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
-using WPFApp.Applications.Diagnostics;
 using WPFApp.ViewModel.Shared;
 
 namespace WPFApp.ViewModel.Availability.Main
@@ -24,7 +23,6 @@ namespace WPFApp.ViewModel.Availability.Main
     {
         internal async Task SearchAsync(CancellationToken ct = default)
         {
-            using var perf = new PerfScope("Availability", "SearchAsync", _logger);
             // 1) Беремо search term з ListVm.
             var term = ListVm.SearchText;
 
@@ -63,7 +61,6 @@ namespace WPFApp.ViewModel.Availability.Main
 
         internal async Task EditSelectedAsync(CancellationToken ct = default)
         {
-            using var perf = new PerfScope("Availability", "EditSelectedAsync", _logger);
             var selected = ListVm.SelectedItem;
             if (selected is null)
                 return;
@@ -98,7 +95,6 @@ namespace WPFApp.ViewModel.Availability.Main
 
         internal async Task SaveAsync(CancellationToken ct = default)
         {
-            using var perf = new PerfScope("Availability", "SaveAsync", _logger);
             EditVm.ClearValidationErrors();
 
             var rawName = (EditVm.AvailabilityName ?? string.Empty).Trim();
@@ -194,7 +190,6 @@ namespace WPFApp.ViewModel.Availability.Main
 
         internal async Task DeleteSelectedAsync(CancellationToken ct = default)
         {
-            using var perf = new PerfScope("Availability", "DeleteSelectedAsync", _logger);
             // 1) Беремо поточний вибір.
             var current = ListVm.SelectedItem;
             if (current is null)
@@ -225,7 +220,6 @@ namespace WPFApp.ViewModel.Availability.Main
 
         internal async Task OpenProfileAsync(CancellationToken ct = default)
         {
-            using var perf = new PerfScope("Availability", "OpenProfileAsync", _logger);
             var current = ListVm.SelectedItem;
             if (current is null)
                 return;

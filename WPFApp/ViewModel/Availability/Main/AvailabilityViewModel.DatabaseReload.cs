@@ -27,8 +27,7 @@ namespace WPFApp.ViewModel.Availability.Main
             {
                 if (Mode == AvailabilitySection.Edit)
                 {
-                    _logger.Log($"[DB-CHANGE] Availability reload skipped in edit mode. Source={source}.");
-                    return;
+                                        return;
                 }
 
                 var selectedId = Mode == AvailabilitySection.Profile ? ProfileVm.AvailabilityId : ListVm.SelectedItem?.Id;
@@ -47,12 +46,10 @@ namespace WPFApp.ViewModel.Availability.Main
                     }
                 }).Task.Unwrap();
 
-                _logger.Log($"[DB-CHANGE] Availability module reloaded. Source={source}.");
-            }
+                            }
             catch (Exception ex)
             {
-                _logger.Log($"[DB-CHANGE] Availability reload failed: {ex.Message}");
-            }
+                            }
             finally
             {
                 Interlocked.Exchange(ref _databaseReloadInProgress, 0);

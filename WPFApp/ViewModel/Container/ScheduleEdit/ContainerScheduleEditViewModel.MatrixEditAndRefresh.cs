@@ -220,7 +220,6 @@ namespace WPFApp.ViewModel.Container.ScheduleEdit
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"RefreshScheduleMatrixAsync failed: {ex}");
             }
             finally
             {
@@ -309,7 +308,6 @@ namespace WPFApp.ViewModel.Container.ScheduleEdit
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"RefreshAvailabilityPreviewMatrixAsync failed: {ex}");
             }
             finally
             {

@@ -1,5 +1,4 @@
 ﻿using BusinessLogicLayer.Services.Abstractions;
-using WPFApp.Applications.Diagnostics;
 using WPFApp.Applications.Notifications;
 using WPFApp.MVVM.Commands;
 using WPFApp.MVVM.Core;
@@ -37,8 +36,7 @@ namespace WPFApp.ViewModel.Availability.Main
         private readonly IEmployeeService _employeeService;
         private readonly IBindService _bindService;
         private readonly IDatabaseChangeNotifier _databaseChangeNotifier;
-        private readonly ILoggerService _logger;
-
+        
         // 2) Під-VM (UI секції).
         public AvailabilityListViewModel ListVm { get; }
         public AvailabilityEditViewModel EditVm { get; }
@@ -53,15 +51,14 @@ namespace WPFApp.ViewModel.Availability.Main
             IAvailabilityGroupService availabilityService,
             IEmployeeService employeeService,
             IBindService bindService,
-            IDatabaseChangeNotifier databaseChangeNotifier,
-            ILoggerService logger)
+            IDatabaseChangeNotifier databaseChangeNotifier
+            )
         {
             // 1) Інʼєкції.
             _availabilityService = availabilityService;
             _employeeService = employeeService;
             _bindService = bindService;
             _databaseChangeNotifier = databaseChangeNotifier;
-            _logger = logger;
 
             // 2) Створюємо під-VM і передаємо owner (this).
             ListVm = new AvailabilityListViewModel(this);

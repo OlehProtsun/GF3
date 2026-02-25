@@ -5,7 +5,6 @@ using System.Globalization;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
-using WPFApp.Applications.Diagnostics;
 using WPFApp.Applications.Notifications;
 using WPFApp.MVVM.Commands;
 using WPFApp.MVVM.Core;
@@ -17,8 +16,7 @@ namespace WPFApp.ViewModel.Database
     {
         private readonly ISqliteAdminFacade _sqliteAdminService;
         private readonly IDatabaseChangeNotifier _databaseChangeNotifier;
-        private readonly ILoggerService _logger;
-        private bool _autoQueryExecuted;
+                private bool _autoQueryExecuted;
 
         private string _executorSql = "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name;";
         private DataView? _queryResult;
@@ -42,12 +40,11 @@ namespace WPFApp.ViewModel.Database
 
         public DatabaseViewModel(
             ISqliteAdminFacade sqliteAdminService,
-            IDatabaseChangeNotifier databaseChangeNotifier,
-            ILoggerService logger)
+            IDatabaseChangeNotifier databaseChangeNotifier
+            )
         {
             _sqliteAdminService = sqliteAdminService;
             _databaseChangeNotifier = databaseChangeNotifier;
-            _logger = logger;
 
             ExecuteSqlCommand = new AsyncRelayCommand(ExecuteSqlAsync);
             ClearExecutorOutputCommand = new RelayCommand(ClearExecutorOutput);
@@ -252,8 +249,7 @@ namespace WPFApp.ViewModel.Database
             {
                 await _sqliteAdminService.ImportSqlScriptAsync(ImportScript, ct);
                 _databaseChangeNotifier.NotifyDatabaseChanged("DatabaseView.ImportSqlScript");
-                _logger.Log("[DB-CHANGE] Import SQL completed; change event emitted.");
-                IsImportError = false;
+                                IsImportError = false;
                 ImportOutput = "Import script executed successfully against the current application database.";
                 await RefreshDatabaseInfoAsync(ct);
 

@@ -2,7 +2,6 @@
 using System.Windows.Threading;
 using BusinessLogicLayer.Contracts.Shops;
 using BusinessLogicLayer.Services.Abstractions;
-using WPFApp.Applications.Diagnostics;
 using WPFApp.Applications.Notifications;
 using WPFApp.MVVM.Core;
 using WPFApp.MVVM.Validation.Rules;
@@ -44,8 +43,7 @@ namespace WPFApp.ViewModel.Shop
     {
         private readonly IShopFacade _shopService;
         private readonly IDatabaseChangeNotifier _databaseChangeNotifier;
-        private readonly ILoggerService _logger;
-        private int _databaseReloadInProgress;
+                private int _databaseReloadInProgress;
 
         // ----------------------------
         // Initialization (safe, без гонок)
@@ -139,12 +137,11 @@ namespace WPFApp.ViewModel.Shop
 
         public ShopViewModel(
             IShopFacade shopService,
-            IDatabaseChangeNotifier databaseChangeNotifier,
-            ILoggerService logger)
+            IDatabaseChangeNotifier databaseChangeNotifier
+            )
         {
             _shopService = shopService;
             _databaseChangeNotifier = databaseChangeNotifier;
-            _logger = logger;
 
             ListVm = new ShopListViewModel(this);
             EditVm = new ShopEditViewModel(this);
@@ -508,8 +505,7 @@ namespace WPFApp.ViewModel.Shop
             {
                 if (Mode == ShopSection.Edit)
                 {
-                    _logger.Log($"[DB-CHANGE] Shop reload skipped in edit mode. Source={source}.");
-                    return;
+                                        return;
                 }
 
                 var selectedId = Mode == ShopSection.Profile ? ProfileVm.ShopId : ListVm.SelectedItem?.Id;
@@ -532,12 +528,10 @@ namespace WPFApp.ViewModel.Shop
                     }
                 }).Task.Unwrap();
 
-                _logger.Log($"[DB-CHANGE] Shop module reloaded. Source={source}.");
-            }
+                            }
             catch (Exception ex)
             {
-                _logger.Log($"[DB-CHANGE] Shop reload failed: {ex.Message}");
-            }
+                            }
             finally
             {
                 Interlocked.Exchange(ref _databaseReloadInProgress, 0);

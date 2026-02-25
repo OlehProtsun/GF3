@@ -1,7 +1,6 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
-using WPFApp.Applications.Diagnostics;
 
 namespace WPFApp.Applications.Notifications
 {
@@ -19,14 +18,12 @@ namespace WPFApp.Applications.Notifications
 
     public sealed class DatabaseChangeNotifier : IDatabaseChangeNotifier, IDisposable
     {
-        private readonly ILoggerService _logger;
-        private readonly TimeSpan _debounceDelay = TimeSpan.FromMilliseconds(250);
+                private readonly TimeSpan _debounceDelay = TimeSpan.FromMilliseconds(250);
         private readonly object _gate = new();
         private CancellationTokenSource? _pendingCts;
 
-        public DatabaseChangeNotifier(ILoggerService logger)
+        public DatabaseChangeNotifier()
         {
-            _logger = logger;
         }
 
         public event EventHandler<DatabaseChangedEventArgs>? DatabaseChanged;
@@ -43,7 +40,6 @@ namespace WPFApp.Applications.Notifications
                 cts = _pendingCts;
             }
 
-            _logger.Log($"[DB-CHANGE] Notification queued. Source={source}.");
             _ = PublishDebouncedAsync(source, cts);
         }
 
