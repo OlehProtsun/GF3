@@ -13,6 +13,7 @@ using WPFApp.MVVM.Validation;
 using WPFApp.MVVM.Validation.Rules;
 using WPFApp.UI.Dialogs;
 using WPFApp.ViewModel.Dialogs;
+using WPFApp.ViewModel.Shared;
 
 namespace WPFApp.ViewModel.Employee
 {
@@ -280,19 +281,7 @@ namespace WPFApp.ViewModel.Employee
             var raw = EmployeeValidationRules.ValidateAll(model);
 
             // приводимо ключі до тих, що реально біндяться в XAML (FirstName/LastName/Email/Phone)
-            var errors = new Dictionary<string, string>(StringComparer.Ordinal);
-
-            foreach (var kv in raw)
-            {
-                var vmKey = MapValidationKeyToVm(kv.Key);
-                if (string.IsNullOrWhiteSpace(vmKey))
-                    continue;
-
-                // не даємо дублювати ключі
-                if (!errors.ContainsKey(vmKey))
-                    errors[vmKey] = kv.Value;
-            }
-
+            var errors = ValidationDictionaryHelper.RemapFirstErrors(raw, MapValidationKeyToVm);
             SetValidationErrors(errors);
 
 
@@ -332,17 +321,12 @@ namespace WPFApp.ViewModel.Employee
             await _owner.SaveAsync().ConfigureAwait(false);
         }
 
-        private static string MapValidationKeyToVm(string key)
+        internal static string MapValidationKeyToVm(string key)
         {
             if (string.IsNullOrWhiteSpace(key))
                 return string.Empty;
 
-            key = key.Trim();
-
-            // Якщо правила повертають "Employee.FirstName" або "Model.FirstName"
-            var dot = key.LastIndexOf('.');
-            if (dot >= 0 && dot < key.Length - 1)
-                key = key[(dot + 1)..];
+            key = ValidationDictionaryHelper.NormalizeLastSegment(key);
 
             // Нормалізуємо під VM property names
             // (додай сюди всі нестиковки, які реально може повертати EmployeeValidationRules)

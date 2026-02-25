@@ -1,7 +1,5 @@
 ﻿using BusinessLogicLayer.Contracts.Employees;
 using BusinessLogicLayer.Services.Abstractions;
-using DocumentFormat.OpenXml.Spreadsheet;
-using DocumentFormat.OpenXml.Wordprocessing;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -17,6 +15,7 @@ using WPFApp.UI.Dialogs;
 using WPFApp.View.Dialogs;
 using WPFApp.ViewModel.Dialogs;
 using WPFApp.ViewModel.Employee.Helpers;
+using WPFApp.ViewModel.Shared;
 
 namespace WPFApp.ViewModel.Employee
 {
@@ -220,36 +219,26 @@ namespace WPFApp.ViewModel.Employee
             ListVm.SetItems(list);
         }
 
-        internal async Task StartAddAsync(CancellationToken ct = default)
-        {
-            var uiToken = ResetNavUiCts(ct);
-
-            await ShowNavWorkingAsync();
-            await Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
-
-            try
-            {
-                await RunOnUiThreadAsync(() =>
+        internal Task StartAddAsync(CancellationToken ct = default)
+            => UiOperationRunner.RunNavStatusFlowAsync(
+                ct,
+                ResetNavUiCts,
+                ShowNavWorkingAsync,
+                WaitForUiIdleAsync,
+                async uiToken =>
                 {
-                    EditVm.ResetForNew();
-                    CancelTarget = EmployeeSection.List;
-                });
+                    await RunOnUiThreadAsync(() =>
+                    {
+                        EditVm.ResetForNew();
+                        CancelTarget = EmployeeSection.List;
+                    });
 
-                await SwitchToEditAsync();
-
-                await Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
-                await ShowNavSuccessThenAutoHideAsync(uiToken, 700);
-            }
-            catch (OperationCanceledException)
-            {
-                await HideNavStatusAsync();
-            }
-            catch (Exception ex)
-            {
-                await HideNavStatusAsync();
-                ShowError(ex);
-            }
-        }
+                    await SwitchToEditAsync();
+                },
+                ShowNavSuccessThenAutoHideAsync,
+                HideNavStatusAsync,
+                ShowError,
+                successDelayMs: 700);
 
         internal async Task EditSelectedAsync(CancellationToken ct = default)
         {
@@ -257,38 +246,30 @@ namespace WPFApp.ViewModel.Employee
             if (selected is null)
                 return;
 
-            var uiToken = ResetNavUiCts(ct);
-
-            await ShowNavWorkingAsync();
-            await Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
-
-            try
-            {
-                var latest = await _employeeService.GetAsync(selected.Id, uiToken) ?? selected;
-
-                await RunOnUiThreadAsync(() =>
+            await UiOperationRunner.RunNavStatusFlowAsync(
+                ct,
+                ResetNavUiCts,
+                ShowNavWorkingAsync,
+                WaitForUiIdleAsync,
+                async uiToken =>
                 {
-                    EditVm.SetEmployee(latest);
+                    var latest = await _employeeService.GetAsync(selected.Id, uiToken) ?? selected;
 
-                    CancelTarget = Mode == EmployeeSection.Profile
-                        ? EmployeeSection.Profile
-                        : EmployeeSection.List;
-                });
+                    await RunOnUiThreadAsync(() =>
+                    {
+                        EditVm.SetEmployee(latest);
 
-                await SwitchToEditAsync();
+                        CancelTarget = Mode == EmployeeSection.Profile
+                            ? EmployeeSection.Profile
+                            : EmployeeSection.List;
+                    });
 
-                await Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
-                await ShowNavSuccessThenAutoHideAsync(uiToken, 700);
-            }
-            catch (OperationCanceledException)
-            {
-                await HideNavStatusAsync();
-            }
-            catch (Exception ex)
-            {
-                await HideNavStatusAsync();
-                ShowError(ex);
-            }
+                    await SwitchToEditAsync();
+                },
+                ShowNavSuccessThenAutoHideAsync,
+                HideNavStatusAsync,
+                ShowError,
+                successDelayMs: 700);
         }
 
         // =========================================================
@@ -302,87 +283,67 @@ namespace WPFApp.ViewModel.Employee
 
             if (raw.Count > 0)
             {
-                // те саме нормалізування ключів, але через EditVm helper
-                var errors = new Dictionary<string, string>(StringComparer.Ordinal);
-
-                foreach (var kv in raw)
-                {
-                    var vmKey = typeof(EmployeeEditViewModel)
-                        .GetMethod("MapValidationKeyToVm", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)!
-                        .Invoke(null, new object[] { kv.Key }) as string;
-
-                    if (!string.IsNullOrWhiteSpace(vmKey) && !errors.ContainsKey(vmKey))
-                        errors[vmKey] = kv.Value;
-                }
-
+                var errors = ValidationDictionaryHelper.RemapFirstErrors(raw, EmployeeEditViewModel.MapValidationKeyToVm);
                 EditVm.SetValidationErrors(errors);
                 return;
             }
 
 
-            var uiToken = ResetNavUiCts(ct);
-
-            await ShowNavWorkingAsync();
-            await Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
-
-            try
-            {
-                var savedEmployeeId = request.Id;
-                EmployeeDto? createdEmployee = null;
-
-                if (EditVm.IsEdit)
+            await UiOperationRunner.RunNavStatusFlowAsync(
+                ct,
+                ResetNavUiCts,
+                ShowNavWorkingAsync,
+                WaitForUiIdleAsync,
+                async uiToken =>
                 {
-                    await _employeeService.UpdateAsync(request, uiToken);
-                }
-                else
-                {
-                    createdEmployee = await _employeeService.CreateAsync(request, uiToken);
-                    savedEmployeeId = createdEmployee.Id;
+                    var savedEmployeeId = request.Id;
+                    EmployeeDto? createdEmployee = null;
 
-                    await RunOnUiThreadAsync(() => EditVm.EmployeeId = savedEmployeeId);
-                }
-
-                _databaseChangeNotifier.NotifyDatabaseChanged("Employee.Save");
-
-                await LoadEmployeesAsync(uiToken, selectId: savedEmployeeId);
-
-                if (CancelTarget == EmployeeSection.Profile)
-                {
-                    var profileId = _openedProfileEmployeeId ?? savedEmployeeId;
-
-                    if (profileId > 0)
+                    if (EditVm.IsEdit)
                     {
-                        var latest = await _employeeService.GetAsync(profileId, uiToken) ?? createdEmployee;
+                        await _employeeService.UpdateAsync(request, uiToken);
+                    }
+                    else
+                    {
+                        createdEmployee = await _employeeService.CreateAsync(request, uiToken);
+                        savedEmployeeId = createdEmployee.Id;
 
-                        if (latest is not null)
-                        {
-                            await RunOnUiThreadAsync(() =>
-                            {
-                                ProfileVm.SetProfile(latest);
-                                ListVm.SelectedItem = latest;
-                            });
-                        }
+                        await RunOnUiThreadAsync(() => EditVm.EmployeeId = savedEmployeeId);
                     }
 
-                    await SwitchToProfileAsync();
-                }
-                else
-                {
-                    await SwitchToListAsync();
-                }
+                    _databaseChangeNotifier.NotifyDatabaseChanged("Employee.Save");
 
-                await Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
-                await ShowNavSuccessThenAutoHideAsync(uiToken, 900);
-            }
-            catch (OperationCanceledException)
-            {
-                await HideNavStatusAsync();
-            }
-            catch (Exception ex)
-            {
-                await HideNavStatusAsync();
-                ShowError(ex);
-            }
+                    await LoadEmployeesAsync(uiToken, selectId: savedEmployeeId);
+
+                    if (CancelTarget == EmployeeSection.Profile)
+                    {
+                        var profileId = _openedProfileEmployeeId ?? savedEmployeeId;
+
+                        if (profileId > 0)
+                        {
+                            var latest = await _employeeService.GetAsync(profileId, uiToken) ?? createdEmployee;
+
+                            if (latest is not null)
+                            {
+                                await RunOnUiThreadAsync(() =>
+                                {
+                                    ProfileVm.SetProfile(latest);
+                                    ListVm.SelectedItem = latest;
+                                });
+                            }
+                        }
+
+                        await SwitchToProfileAsync();
+                    }
+                    else
+                    {
+                        await SwitchToListAsync();
+                    }
+                },
+                ShowNavSuccessThenAutoHideAsync,
+                HideNavStatusAsync,
+                ShowError,
+                successDelayMs: 900);
         }
 
         internal async Task DeleteSelectedAsync(CancellationToken ct = default)
@@ -403,31 +364,23 @@ namespace WPFApp.ViewModel.Employee
                 return;
             }
 
-            var uiToken = ResetNavUiCts(ct);
+            await UiOperationRunner.RunNavStatusFlowAsync(
+                ct,
+                ResetNavUiCts,
+                ShowNavWorkingAsync,
+                WaitForUiIdleAsync,
+                async uiToken =>
+                {
+                    await _employeeService.DeleteAsync(currentId, uiToken);
 
-            await ShowNavWorkingAsync();
-            await Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
-
-            try
-            {
-                await _employeeService.DeleteAsync(currentId, uiToken);
-
-                _databaseChangeNotifier.NotifyDatabaseChanged("Employee.Delete");
-                await LoadEmployeesAsync(uiToken, selectId: null);
-                await SwitchToListAsync();
-
-                await Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
-                await ShowNavSuccessThenAutoHideAsync(uiToken, 900);
-            }
-            catch (OperationCanceledException)
-            {
-                await HideNavStatusAsync();
-            }
-            catch (Exception ex)
-            {
-                await HideNavStatusAsync();
-                ShowError(ex);
-            }
+                    _databaseChangeNotifier.NotifyDatabaseChanged("Employee.Delete");
+                    await LoadEmployeesAsync(uiToken, selectId: null);
+                    await SwitchToListAsync();
+                },
+                ShowNavSuccessThenAutoHideAsync,
+                HideNavStatusAsync,
+                ShowError,
+                successDelayMs: 900);
         }
 
         internal async Task OpenProfileAsync(CancellationToken ct = default)
@@ -436,37 +389,29 @@ namespace WPFApp.ViewModel.Employee
             if (selected is null)
                 return;
 
-            var uiToken = ResetNavUiCts(ct);
-
-            await ShowNavWorkingAsync();
-            await Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
-
-            try
-            {
-                var latest = await _employeeService.GetAsync(selected.Id, uiToken) ?? selected;
-
-                await RunOnUiThreadAsync(() =>
+            await UiOperationRunner.RunNavStatusFlowAsync(
+                ct,
+                ResetNavUiCts,
+                ShowNavWorkingAsync,
+                WaitForUiIdleAsync,
+                async uiToken =>
                 {
-                    _openedProfileEmployeeId = latest.Id;
-                    ProfileVm.SetProfile(latest);
-                    ListVm.SelectedItem = latest;
-                    CancelTarget = EmployeeSection.List;
-                });
+                    var latest = await _employeeService.GetAsync(selected.Id, uiToken) ?? selected;
 
-                await SwitchToProfileAsync();
+                    await RunOnUiThreadAsync(() =>
+                    {
+                        _openedProfileEmployeeId = latest.Id;
+                        ProfileVm.SetProfile(latest);
+                        ListVm.SelectedItem = latest;
+                        CancelTarget = EmployeeSection.List;
+                    });
 
-                await Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
-                await ShowNavSuccessThenAutoHideAsync(uiToken, 900);
-            }
-            catch (OperationCanceledException)
-            {
-                await HideNavStatusAsync();
-            }
-            catch (Exception ex)
-            {
-                await HideNavStatusAsync();
-                ShowError(ex);
-            }
+                    await SwitchToProfileAsync();
+                },
+                ShowNavSuccessThenAutoHideAsync,
+                HideNavStatusAsync,
+                ShowError,
+                successDelayMs: 900);
         }
 
         internal Task CancelAsync()
@@ -595,6 +540,9 @@ namespace WPFApp.ViewModel.Employee
                 Interlocked.Exchange(ref _databaseReloadInProgress, 0);
             }
         }
+
+        private Task WaitForUiIdleAsync()
+            => Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle).Task;
 
         internal Task RunOnUiThreadAsync(Action action)
         {

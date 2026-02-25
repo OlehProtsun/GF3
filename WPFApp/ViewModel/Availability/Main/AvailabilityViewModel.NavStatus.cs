@@ -42,6 +42,9 @@ namespace WPFApp.ViewModel.Availability.Main
         private Task HideNavStatusAsync()
             => RunOnUiThreadAsync(() => IsNavStatusVisible = false);
 
+        private Task WaitForUiIdleAsync()
+            => Application.Current.Dispatcher.InvokeAsync(() => { }, System.Windows.Threading.DispatcherPriority.ApplicationIdle).Task;
+
         private async Task ShowNavSuccessThenAutoHideAsync(CancellationToken ct, int ms = 900)
         {
             await RunOnUiThreadAsync(() =>
