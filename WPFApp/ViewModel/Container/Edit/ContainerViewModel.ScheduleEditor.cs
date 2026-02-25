@@ -3,9 +3,8 @@ using System;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using System.Windows;
-using System.Windows.Threading;
 using WPFApp.ViewModel.Container.ScheduleEdit.Helpers;
+using WPFApp.ViewModel.Shared;
 
 namespace WPFApp.ViewModel.Container.Edit
 {
@@ -173,53 +172,34 @@ namespace WPFApp.ViewModel.Container.Edit
         /// 3) очистити/поставити помилки (якщо ти їх зберігаєш по блоках)
         /// 4) refresh матриці і preview
         /// </summary>
-        internal async Task SelectScheduleBlockAsync(ScheduleBlockViewModel block, CancellationToken ct = default)
+        internal Task SelectScheduleBlockAsync(ScheduleBlockViewModel block, CancellationToken ct = default)
         {
-            if (block is null)
-                return;
+            if (block is null || !ScheduleEditVm.Blocks.Contains(block))
+                return Task.CompletedTask;
 
-            if (!ScheduleEditVm.Blocks.Contains(block))
-                return;
-
-            // якщо той самий блок — нічого не робимо
             if (ReferenceEquals(ScheduleEditVm.SelectedBlock, block))
-                return;
+                return Task.CompletedTask;
 
-            var uiToken = ResetNavUiCts(ct);
-
-            await ShowNavWorkingAsync();
-
-            // щоб Working гарантовано відрендерився
-            await Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
-
-            try
-            {
-                // зафіксувати selection + прибрати старі errors (UI thread)
-                await RunOnUiThreadAsync(() =>
+            return UiOperationRunner.RunNavStatusFlowAsync(
+                ct,
+                ResetNavUiCts,
+                ShowNavWorkingAsync,
+                WaitForUiIdleAsync,
+                async uiToken =>
                 {
-                    ScheduleEditVm.SelectedBlock = block;
-                    ScheduleEditVm.ClearValidationErrors();
-                }).ConfigureAwait(false);
+                    await RunOnUiThreadAsync(() =>
+                    {
+                        ScheduleEditVm.SelectedBlock = block;
+                        ScheduleEditVm.ClearValidationErrors();
+                    }).ConfigureAwait(false);
 
-                // важкі refresh'і під токеном, щоб швидкі кліки скасовували попереднє
-                await ScheduleEditVm.RefreshScheduleMatrixAsync(uiToken).ConfigureAwait(false);
-                await UpdateAvailabilityPreviewAsync(uiToken).ConfigureAwait(false);
-
-                // дати UI відрендерити матрицю для нового табу
-                await Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
-
-                // Success (можеш зробити 400–600мс, щоб не дратувало при частих кліках)
-                await ShowNavSuccessThenAutoHideAsync(uiToken, 500).ConfigureAwait(false);
-            }
-            catch (OperationCanceledException)
-            {
-                await HideNavStatusAsync().ConfigureAwait(false);
-            }
-            catch (Exception ex)
-            {
-                await HideNavStatusAsync().ConfigureAwait(false);
-                ShowError(ex);
-            }
+                    await ScheduleEditVm.RefreshScheduleMatrixAsync(uiToken).ConfigureAwait(false);
+                    await UpdateAvailabilityPreviewAsync(uiToken).ConfigureAwait(false);
+                },
+                ShowNavSuccessThenAutoHideAsync,
+                HideNavStatusAsync,
+                ShowError,
+                successDelayMs: 500);
         }
 
 

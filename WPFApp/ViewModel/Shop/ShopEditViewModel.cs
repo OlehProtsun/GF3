@@ -243,16 +243,7 @@ namespace WPFApp.ViewModel.Shop
             var raw = ShopValidationRules.ValidateAll(model);
 
             // нормалізуємо ключі під VM property names (Name/Address/Description)
-            var errors = new Dictionary<string, string>(StringComparer.Ordinal);
-            foreach (var kv in raw)
-            {
-                var vmKey = MapValidationKeyToVm(kv.Key);
-                if (string.IsNullOrWhiteSpace(vmKey))
-                    continue;
-
-                if (!errors.ContainsKey(vmKey))
-                    errors[vmKey] = kv.Value;
-            }
+            var errors = ValidationDictionaryHelper.RemapFirstErrors(raw, MapValidationKeyToVm);
 
             SetValidationErrors(errors);
 
@@ -295,12 +286,7 @@ namespace WPFApp.ViewModel.Shop
             if (string.IsNullOrWhiteSpace(key))
                 return string.Empty;
 
-            key = key.Trim();
-
-            // якщо правила повертають "Shop.Name" / "Model.Name"
-            var dot = key.LastIndexOf('.');
-            if (dot >= 0 && dot < key.Length - 1)
-                key = key[(dot + 1)..];
+            key = ValidationDictionaryHelper.NormalizeLastSegment(key);
 
             return key switch
             {
