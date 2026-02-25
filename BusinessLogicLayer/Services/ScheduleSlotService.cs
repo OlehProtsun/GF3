@@ -15,13 +15,13 @@ public class ScheduleSlotService : IScheduleSlotService
     }
 
     public async Task<ScheduleSlotModel?> GetAsync(int id, CancellationToken ct = default)
-        => (await _repo.GetByIdAsync(id, ct).ConfigureAwait(false))?.ToContract();
+        => await ServiceMappingHelper.GetMappedAsync(token => _repo.GetByIdAsync(id, token), x => x.ToContract(), ct).ConfigureAwait(false);
 
     public async Task<List<ScheduleSlotModel>> GetAllAsync(CancellationToken ct = default)
-        => (await _repo.GetAllAsync(ct).ConfigureAwait(false)).Select(x => x.ToContract()).ToList();
+        => await ServiceMappingHelper.GetMappedListAsync(_repo.GetAllAsync, x => x.ToContract(), ct).ConfigureAwait(false);
 
     public async Task<ScheduleSlotModel> CreateAsync(ScheduleSlotModel entity, CancellationToken ct = default)
-        => (await _repo.AddAsync(entity.ToDal(), ct).ConfigureAwait(false)).ToContract();
+        => await ServiceMappingHelper.CreateMappedAsync(entity.ToDal(), _repo.AddAsync, x => x.ToContract(), ct).ConfigureAwait(false);
 
     public Task UpdateAsync(ScheduleSlotModel entity, CancellationToken ct = default)
         => _repo.UpdateAsync(entity.ToDal(), ct);

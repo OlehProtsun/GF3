@@ -5,18 +5,20 @@ namespace BusinessLogicLayer.Availability
 {
     public static class AvailabilityCodeParser
     {
+        public const string AnyMark = "+";
+        public const string NoneMark = "-";
         public static bool TryParse(string code, out AvailabilityKind kind, out string? intervalStr)
         {
             code = (code ?? string.Empty).Trim();
             intervalStr = null;
 
-            if (string.IsNullOrEmpty(code) || code == "-")
+            if (string.IsNullOrEmpty(code) || code == NoneMark)
             {
                 kind = AvailabilityKind.NONE;
                 return true;
             }
 
-            if (code == "+")
+            if (code == AnyMark)
             {
                 kind = AvailabilityKind.ANY;
                 return true;

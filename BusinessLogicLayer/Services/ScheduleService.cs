@@ -27,10 +27,10 @@ public class ScheduleService : IScheduleService
     }
 
     public async Task<ScheduleModel?> GetAsync(int id, CancellationToken ct = default)
-        => (await _scheduleRepo.GetByIdAsync(id, ct).ConfigureAwait(false))?.ToContract();
+        => await ServiceMappingHelper.GetMappedAsync(token => _scheduleRepo.GetByIdAsync(id, token), x => x.ToContract(), ct).ConfigureAwait(false);
 
     public async Task<List<ScheduleModel>> GetAllAsync(CancellationToken ct = default)
-        => (await _scheduleRepo.GetAllAsync(ct).ConfigureAwait(false)).Select(x => x.ToContract()).ToList();
+        => await ServiceMappingHelper.GetMappedListAsync(_scheduleRepo.GetAllAsync, x => x.ToContract(), ct).ConfigureAwait(false);
 
     public async Task<ScheduleModel> CreateAsync(ScheduleModel entity, CancellationToken ct = default)
     {
@@ -48,10 +48,10 @@ public class ScheduleService : IScheduleService
         => _scheduleRepo.DeleteAsync(id, ct);
 
     public async Task<List<ScheduleModel>> GetByContainerAsync(int containerId, string? value = null, CancellationToken ct = default)
-        => (await _scheduleRepo.GetByContainerAsync(containerId, value, ct).ConfigureAwait(false)).Select(x => x.ToContract()).ToList();
+        => await ServiceMappingHelper.GetMappedListAsync(token => _scheduleRepo.GetByContainerAsync(containerId, value, token), x => x.ToContract(), ct).ConfigureAwait(false);
 
     public async Task<List<ScheduleModel>> GetByValueAsync(string value, CancellationToken ct = default)
-        => (await _scheduleRepo.GetByValueAsync(value, ct).ConfigureAwait(false)).Select(x => x.ToContract()).ToList();
+        => await ServiceMappingHelper.GetMappedListAsync(token => _scheduleRepo.GetByValueAsync(value, token), x => x.ToContract(), ct).ConfigureAwait(false);
 
     public async Task SaveWithDetailsAsync(
         ScheduleModel schedule,

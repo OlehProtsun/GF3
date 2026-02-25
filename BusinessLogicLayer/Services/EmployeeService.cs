@@ -16,10 +16,10 @@ public class EmployeeService : IEmployeeService
     }
 
     public async Task<EmployeeModel?> GetAsync(int id, CancellationToken ct = default)
-        => (await _repo.GetByIdAsync(id, ct).ConfigureAwait(false))?.ToContract();
+        => await ServiceMappingHelper.GetMappedAsync(token => _repo.GetByIdAsync(id, token), x => x.ToContract(), ct).ConfigureAwait(false);
 
     public async Task<List<EmployeeModel>> GetAllAsync(CancellationToken ct = default)
-        => (await _repo.GetAllAsync(ct).ConfigureAwait(false)).Select(x => x.ToContract()).ToList();
+        => await ServiceMappingHelper.GetMappedListAsync(_repo.GetAllAsync, x => x.ToContract(), ct).ConfigureAwait(false);
 
     public async Task<EmployeeModel> CreateAsync(EmployeeModel entity, CancellationToken ct = default)
     {
@@ -36,7 +36,7 @@ public class EmployeeService : IEmployeeService
         if (await _repo.ExistsByNameAsync(entity.FirstName, entity.LastName, excludeId: null, ct).ConfigureAwait(false))
             throw new ValidationException("An employee with the same first and last name already exists.");
 
-        return (await _repo.AddAsync(entity.ToDal(), ct).ConfigureAwait(false)).ToContract();
+        return await ServiceMappingHelper.CreateMappedAsync(entity.ToDal(), _repo.AddAsync, x => x.ToContract(), ct).ConfigureAwait(false);
     }
 
     public async Task UpdateAsync(EmployeeModel entity, CancellationToken ct = default)
@@ -69,5 +69,5 @@ public class EmployeeService : IEmployeeService
     }
 
     public async Task<List<EmployeeModel>> GetByValueAsync(string value, CancellationToken ct = default)
-        => (await _repo.GetByValueAsync(value, ct).ConfigureAwait(false)).Select(x => x.ToContract()).ToList();
+        => await ServiceMappingHelper.GetMappedListAsync(token => _repo.GetByValueAsync(value, token), x => x.ToContract(), ct).ConfigureAwait(false);
 }

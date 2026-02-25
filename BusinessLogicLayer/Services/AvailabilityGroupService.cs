@@ -23,13 +23,13 @@ public class AvailabilityGroupService : IAvailabilityGroupService
     }
 
     public async Task<AvailabilityGroupModel?> GetAsync(int id, CancellationToken ct = default)
-        => (await _groupRepo.GetByIdAsync(id, ct).ConfigureAwait(false))?.ToContract();
+        => await ServiceMappingHelper.GetMappedAsync(token => _groupRepo.GetByIdAsync(id, token), x => x.ToContract(), ct).ConfigureAwait(false);
 
     public async Task<List<AvailabilityGroupModel>> GetAllAsync(CancellationToken ct = default)
-        => (await _groupRepo.GetAllAsync(ct).ConfigureAwait(false)).Select(x => x.ToContract()).ToList();
+        => await ServiceMappingHelper.GetMappedListAsync(_groupRepo.GetAllAsync, x => x.ToContract(), ct).ConfigureAwait(false);
 
     public async Task<AvailabilityGroupModel> CreateAsync(AvailabilityGroupModel entity, CancellationToken ct = default)
-        => (await _groupRepo.AddAsync(entity.ToDal(), ct).ConfigureAwait(false)).ToContract();
+        => await ServiceMappingHelper.CreateMappedAsync(entity.ToDal(), _groupRepo.AddAsync, x => x.ToContract(), ct).ConfigureAwait(false);
 
     public Task UpdateAsync(AvailabilityGroupModel entity, CancellationToken ct = default)
         => _groupRepo.UpdateAsync(entity.ToDal(), ct);
@@ -38,7 +38,7 @@ public class AvailabilityGroupService : IAvailabilityGroupService
         => _groupRepo.DeleteAsync(id, ct);
 
     public async Task<List<AvailabilityGroupModel>> GetByValueAsync(string value, CancellationToken ct = default)
-        => (await _groupRepo.GetByValueAsync(value, ct).ConfigureAwait(false)).Select(x => x.ToContract()).ToList();
+        => await ServiceMappingHelper.GetMappedListAsync(token => _groupRepo.GetByValueAsync(value, token), x => x.ToContract(), ct).ConfigureAwait(false);
 
     public async Task<(AvailabilityGroupModel group, List<AvailabilityGroupMemberModel> members, List<AvailabilityGroupDayModel> days)>
         LoadFullAsync(int groupId, CancellationToken ct = default)
@@ -109,7 +109,7 @@ public class AvailabilityGroupService : IAvailabilityGroupService
                 d.Id = 0;
                 d.AvailabilityGroupMemberId = memberId;
 
-                if (d.Kind != DataAccessLayer.Models.Enums.AvailabilityKind.INT)
+                if (d.Kind != AvailabilityKind.INT.ToDal())
                     d.IntervalStr = null;
             }
 
