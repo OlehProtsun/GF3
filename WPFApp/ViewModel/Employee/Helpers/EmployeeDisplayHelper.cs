@@ -1,5 +1,5 @@
-﻿using System;
-using DataAccessLayer.Models;
+﻿using BusinessLogicLayer.Contracts.Employees;
+using System;
 
 namespace WPFApp.ViewModel.Employee.Helpers
 {
@@ -17,7 +17,7 @@ namespace WPFApp.ViewModel.Employee.Helpers
         /// Побудувати повне ім’я "First Last" з trim.
         /// Повертає "" якщо обидві частини порожні.
         /// </summary>
-        public static string GetFullName(EmployeeModel? model)
+        public static string GetFullName(EmployeeDto? model)
         {
             // 1) Null-safe.
             if (model is null)

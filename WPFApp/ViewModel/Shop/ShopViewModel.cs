@@ -1,5 +1,6 @@
 ﻿using System.Windows;
 using System.Windows.Threading;
+using BusinessLogicLayer.Contracts.Shops;
 using BusinessLogicLayer.Services.Abstractions;
 using WPFApp.Applications.Diagnostics;
 using WPFApp.Applications.Notifications;
@@ -25,7 +26,7 @@ namespace WPFApp.ViewModel.Shop
     /// Відповідальність:
     /// - тримати 3 під-VM: List/Edit/Profile
     /// - керувати навігацією: CurrentSection + Mode + CancelTarget
-    /// - виконувати CRUD через IShopService
+    /// - виконувати CRUD через IShopFacade
     /// - показувати повідомлення користувачу
     ///
     /// Оптимізації:
@@ -40,7 +41,7 @@ namespace WPFApp.ViewModel.Shop
     /// </summary>
     public sealed class ShopViewModel : ViewModelBase
     {
-        private readonly IShopService _shopService;
+        private readonly IShopFacade _shopService;
         private readonly IDatabaseChangeNotifier _databaseChangeNotifier;
         private readonly ILoggerService _logger;
         private int _databaseReloadInProgress;
@@ -136,7 +137,7 @@ namespace WPFApp.ViewModel.Shop
         public ShopProfileViewModel ProfileVm { get; }
 
         public ShopViewModel(
-            IShopService shopService,
+            IShopFacade shopService,
             IDatabaseChangeNotifier databaseChangeNotifier,
             ILoggerService logger)
         {
@@ -303,7 +304,7 @@ namespace WPFApp.ViewModel.Shop
         {
             EditVm.ClearValidationErrors();
 
-            var model = EditVm.ToModel();
+            var model = EditVm.ToRequest();
             var errors = ShopValidationRules.ValidateAll(model);
 
             if (errors.Count > 0)

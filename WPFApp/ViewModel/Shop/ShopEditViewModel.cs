@@ -1,4 +1,4 @@
-﻿using DataAccessLayer.Models;
+﻿using BusinessLogicLayer.Contracts.Shops;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -147,7 +147,7 @@ namespace WPFApp.ViewModel.Shop
             ClearValidationErrors();
         }
 
-        public void SetShop(ShopModel model)
+        public void SetShop(ShopDto model)
         {
             ShopId = model.Id;
             Name = model.Name ?? string.Empty;
@@ -158,9 +158,9 @@ namespace WPFApp.ViewModel.Shop
             ClearValidationErrors();
         }
 
-        public ShopModel ToModel()
+        public SaveShopRequest ToRequest()
         {
-            return new ShopModel
+            return new SaveShopRequest
             {
                 Id = ShopId,
                 Name = Name?.Trim() ?? string.Empty,
@@ -218,7 +218,7 @@ namespace WPFApp.ViewModel.Shop
 
         private void ValidateProperty(string propertyName)
         {
-            var model = ToModel();
+            var model = ToRequest();
 
             // має існувати у тебе (аналог EmployeeValidationRules)
             var msg = ShopValidationRules.ValidateProperty(model, propertyName);
@@ -237,7 +237,7 @@ namespace WPFApp.ViewModel.Shop
         {
             ClearValidationErrors();
 
-            var model = ToModel();
+            var model = ToRequest();
 
             // має існувати у тебе (аналог EmployeeValidationRules.ValidateAll)
             var raw = ShopValidationRules.ValidateAll(model);

@@ -1,7 +1,7 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Text.RegularExpressions;
-using DataAccessLayer.Models;
+using BusinessLogicLayer.Contracts.Employees;
 
 namespace WPFApp.MVVM.Validation.Rules
 {
@@ -53,7 +53,7 @@ namespace WPFApp.MVVM.Validation.Rules
         /// Повна валідація всієї моделі (перед Save).
         /// Повертає словник: propertyName -> errorMessage.
         /// </summary>
-        public static IReadOnlyDictionary<string, string> ValidateAll(EmployeeModel? model)
+        public static IReadOnlyDictionary<string, string> ValidateAll(SaveEmployeeRequest? model)
         {
             // 1) Готуємо результуючий словник.
             var errors = new Dictionary<string, string>(StringComparer.Ordinal);
@@ -82,7 +82,7 @@ namespace WPFApp.MVVM.Validation.Rules
         /// Валідація одного поля (inline validation у setter'і ViewModel).
         /// vmPropertyName — назва властивості ViewModel (FirstName/LastName/Email/Phone).
         /// </summary>
-        public static string? ValidateProperty(EmployeeModel? model, string vmPropertyName)
+        public static string? ValidateProperty(SaveEmployeeRequest? model, string vmPropertyName)
         {
             // 1) Захист.
             if (model is null || string.IsNullOrWhiteSpace(vmPropertyName))

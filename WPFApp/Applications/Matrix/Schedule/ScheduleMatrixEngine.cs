@@ -39,18 +39,7 @@ namespace WPFApp.Applications.Matrix.Schedule
         /// </summary>
         public static bool TryParseTime(string? s, out TimeSpan t)
         {
-            // якщо прийшов null — робимо порожній рядок
-            // Trim() прибирає пробіли по краях (часта помилка користувачів)
-            s = (s ?? string.Empty).Trim();
-
-            // TryParseExact:
-            // - строго очікує один з форматів TimeFormats
-            // - CultureInfo.InvariantCulture, щоб не залежало від локалі ПК
-            return TimeSpan.TryParseExact(
-                s,
-                ScheduleMatrixConstants.TimeFormats,
-                CultureInfo.InvariantCulture,
-                out t);
+            return BusinessLogicLayer.Schedule.ScheduleMatrixEngine.TryParseTime(s, out t);
         }
 
         /// <summary>

@@ -1,5 +1,5 @@
-﻿using BusinessLogicLayer.Services.Abstractions;
-using DataAccessLayer.Models;
+﻿using BusinessLogicLayer.Contracts.Employees;
+using BusinessLogicLayer.Services.Abstractions;
 using DocumentFormat.OpenXml.Spreadsheet;
 using DocumentFormat.OpenXml.Wordprocessing;
 using System;
@@ -33,7 +33,7 @@ namespace WPFApp.ViewModel.Employee
     /// Відповідальність:
     /// - тримати 3 під-VM (List/Edit/Profile)
     /// - керувати навігацією (CurrentSection + Mode + CancelTarget)
-    /// - виконувати CRUD через IEmployeeService
+    /// - виконувати CRUD через IEmployeeFacade
     /// - показувати повідомлення користувачу
     ///
     /// Покращення порівняно з початковим варіантом:
@@ -45,7 +45,7 @@ namespace WPFApp.ViewModel.Employee
     /// </summary>
     public sealed class EmployeeViewModel : ViewModelBase
     {
-        private readonly IEmployeeService _employeeService;
+        private readonly IEmployeeFacade _employeeService;
         private readonly IDatabaseChangeNotifier _databaseChangeNotifier;
         private readonly ILoggerService _logger;
         private int _databaseReloadInProgress;
@@ -138,7 +138,7 @@ namespace WPFApp.ViewModel.Employee
         public EmployeeProfileViewModel ProfileVm { get; }
 
         public EmployeeViewModel(
-            IEmployeeService employeeService,
+            IEmployeeFacade employeeService,
             IDatabaseChangeNotifier databaseChangeNotifier,
             ILoggerService logger)
         {
@@ -297,7 +297,7 @@ namespace WPFApp.ViewModel.Employee
 
         internal async Task SaveAsync(CancellationToken ct = default)
         {
-            var model = EditVm.ToModel();
+            var model = EditVm.ToRequest();
             var raw = EmployeeValidationRules.ValidateAll(model);
 
             if (raw.Count > 0)

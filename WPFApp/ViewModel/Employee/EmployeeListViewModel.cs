@@ -1,8 +1,8 @@
-﻿using System;
+﻿using BusinessLogicLayer.Contracts.Employees;
+using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
-using DataAccessLayer.Models;
 using WPFApp.MVVM.Commands;
 using WPFApp.MVVM.Core;
 
@@ -28,12 +28,12 @@ namespace WPFApp.ViewModel.Employee
         private readonly EmployeeViewModel _owner;
 
         // Колекція для UI.
-        public ObservableCollection<EmployeeModel> Items { get; } = new();
+        public ObservableCollection<EmployeeDto> Items { get; } = new();
 
         // Поточний вибраний елемент.
-        private EmployeeModel? _selectedItem;
+        private EmployeeDto? _selectedItem;
 
-        public EmployeeModel? SelectedItem
+        public EmployeeDto? SelectedItem
         {
             get => _selectedItem;
             set
@@ -104,16 +104,16 @@ namespace WPFApp.ViewModel.Employee
         /// - якщо список еквівалентний поточному (за ключовими полями) — нічого не робимо
         /// - якщо оновлюємо — відновлюємо selection по Id
         /// </summary>
-        public void SetItems(IEnumerable<EmployeeModel> employees)
+        public void SetItems(IEnumerable<EmployeeDto> employees)
         {
             // 1) Null-safe.
-            employees ??= Array.Empty<EmployeeModel>();
+            employees ??= Array.Empty<EmployeeDto>();
 
             // 2) Запам’ятовуємо поточний selectedId.
             var selectedId = SelectedItem?.Id ?? 0;
 
             // 3) Матеріалізуємо в IList, щоб не ітерувати кілька разів.
-            if (employees is not IList<EmployeeModel> list)
+            if (employees is not IList<EmployeeDto> list)
                 list = employees.ToList();
 
             // 4) Якщо список “той самий” — виходимо.
@@ -134,7 +134,7 @@ namespace WPFApp.ViewModel.Employee
         /// Порівняння “чи еквівалентний” список для UI.
         /// Порівнюємо по порядку (бо DataGrid показує порядок).
         /// </summary>
-        private static bool IsSameList(IList<EmployeeModel> current, IList<EmployeeModel> next)
+        private static bool IsSameList(IList<EmployeeDto> current, IList<EmployeeDto> next)
         {
             // 1) Різна кількість — різні.
             if (current.Count != next.Count)
