@@ -1,5 +1,5 @@
-﻿using DataAccessLayer.Models;
-using DataAccessLayer.Models.Enums;
+﻿using BusinessLogicLayer.Contracts.Models;
+using BusinessLogicLayer.Contracts.Enums;
 using System;
 using System.Collections.Generic;
 using System.Linq;

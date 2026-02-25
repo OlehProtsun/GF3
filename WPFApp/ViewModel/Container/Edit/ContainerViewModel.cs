@@ -1,6 +1,6 @@
 ﻿using BusinessLogicLayer.Generators;
 using BusinessLogicLayer.Services.Abstractions;
-using DataAccessLayer.Models;
+using BusinessLogicLayer.Contracts.Models;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;

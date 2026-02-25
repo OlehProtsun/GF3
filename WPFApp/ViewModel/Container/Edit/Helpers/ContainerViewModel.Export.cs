@@ -1,4 +1,4 @@
-using DataAccessLayer.Models;
+using BusinessLogicLayer.Contracts.Models;
 using System.Threading;
 using System.Threading.Tasks;
 using WPFApp.Applications.Export;

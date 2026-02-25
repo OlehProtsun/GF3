@@ -1,5 +1,5 @@
 using BusinessLogicLayer.Contracts.Export;
-using DataAccessLayer.Models;
+using BusinessLogicLayer.Contracts.Models;
 
 namespace BusinessLogicLayer.Services.Abstractions
 {

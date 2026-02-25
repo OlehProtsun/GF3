@@ -1,11 +1,8 @@
 ﻿using BusinessLogicLayer.Services;
 using BusinessLogicLayer.Services.Abstractions;
+using DataAccessLayer.Administration;
+using DataAccessLayer.Models.DataBaseContext;
 using Microsoft.Extensions.DependencyInjection;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace BusinessLogicLayer
 {
@@ -24,9 +21,18 @@ namespace BusinessLogicLayer
             serviceCollection.AddScoped<IShopFacade, ShopFacade>();
             serviceCollection.AddScoped<IEmployeeFacade, EmployeeFacade>();
             serviceCollection.AddScoped<IScheduleExportDataBuilder, Services.Export.ScheduleExportDataBuilder>();
+            serviceCollection.AddScoped<ISqliteAdminFacade, SqliteAdminFacade>();
 
             return serviceCollection;
         }
 
+        public static IServiceCollection AddBusinessLogicStack(this IServiceCollection serviceCollection, string connectionString, string databasePath)
+        {
+            serviceCollection.AddDataAccess(connectionString);
+            serviceCollection.AddBusinessLogicLayer();
+            serviceCollection.AddSingleton<ISqliteAdminService>(_ => new SqliteAdminService(connectionString, databasePath));
+
+            return serviceCollection;
+        }
     }
 }

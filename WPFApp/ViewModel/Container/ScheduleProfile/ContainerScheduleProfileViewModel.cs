@@ -1,4 +1,4 @@
-﻿using DataAccessLayer.Models;
+﻿using BusinessLogicLayer.Contracts.Models;
 using Microsoft.Win32;
 using System;
 using System.Collections.Generic;

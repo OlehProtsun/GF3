@@ -1,5 +1,5 @@
 ﻿using BusinessLogicLayer.Availability;
-using DataAccessLayer.Models;
+using BusinessLogicLayer.Contracts.Models;
 using System;
 using System.Collections.Generic;
 using System.Threading;

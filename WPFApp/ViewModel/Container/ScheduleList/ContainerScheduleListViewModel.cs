@@ -1,4 +1,4 @@
-﻿using DataAccessLayer.Models;                 // ScheduleModel, ShopModel (дані з DAL)
+﻿using BusinessLogicLayer.Contracts.Models;                 // ScheduleModel, ShopModel (дані з DAL)
 using System;                                 // Action, EventHandler (для подій)
 using System.Collections.ObjectModel;         // ObservableCollection для WPF binding
 using System.Linq;                            // LINQ (Where/Select/Any/ToList)

@@ -25,7 +25,7 @@ namespace WPFApp.Applications.Matrix.Availability
                 return false;
             }
 
-            if (kind == DataAccessLayer.Models.Enums.AvailabilityKind.INT && !string.IsNullOrWhiteSpace(interval))
+            if (kind == BusinessLogicLayer.Contracts.Enums.AvailabilityKind.INT && !string.IsNullOrWhiteSpace(interval))
             {
                 if (!allowOvernight)
                 {
@@ -46,8 +46,8 @@ namespace WPFApp.Applications.Matrix.Availability
 
             normalized = kind switch
             {
-                DataAccessLayer.Models.Enums.AvailabilityKind.ANY => AnyMark,
-                DataAccessLayer.Models.Enums.AvailabilityKind.NONE => NoneMark,
+                BusinessLogicLayer.Contracts.Enums.AvailabilityKind.ANY => AnyMark,
+                BusinessLogicLayer.Contracts.Enums.AvailabilityKind.NONE => NoneMark,
                 _ => string.Empty
             };
 

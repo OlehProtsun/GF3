@@ -1,4 +1,4 @@
-﻿using DataAccessLayer.Models;
+﻿using BusinessLogicLayer.Contracts.Models;
 using System.Windows.Media;
 
 namespace WPFApp.ViewModel.Container.ScheduleEdit.Helpers
