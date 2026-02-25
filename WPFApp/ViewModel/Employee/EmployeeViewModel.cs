@@ -297,8 +297,8 @@ namespace WPFApp.ViewModel.Employee
 
         internal async Task SaveAsync(CancellationToken ct = default)
         {
-            var model = EditVm.ToRequest();
-            var raw = EmployeeValidationRules.ValidateAll(model);
+            var request = EditVm.ToRequest();
+            var raw = EmployeeValidationRules.ValidateAll(request);
 
             if (raw.Count > 0)
             {
@@ -327,36 +327,41 @@ namespace WPFApp.ViewModel.Employee
 
             try
             {
+                var savedEmployeeId = request.Id;
+                EmployeeDto? createdEmployee = null;
+
                 if (EditVm.IsEdit)
                 {
-                    await _employeeService.UpdateAsync(model, uiToken);
+                    await _employeeService.UpdateAsync(request, uiToken);
                 }
                 else
                 {
-                    var created = await _employeeService.CreateAsync(model, uiToken);
+                    createdEmployee = await _employeeService.CreateAsync(request, uiToken);
+                    savedEmployeeId = createdEmployee.Id;
 
-                    await RunOnUiThreadAsync(() => EditVm.EmployeeId = created.Id);
-
-                    model = created;
+                    await RunOnUiThreadAsync(() => EditVm.EmployeeId = savedEmployeeId);
                 }
 
                 _databaseChangeNotifier.NotifyDatabaseChanged("Employee.Save");
 
-                await LoadEmployeesAsync(uiToken, selectId: model.Id);
+                await LoadEmployeesAsync(uiToken, selectId: savedEmployeeId);
 
                 if (CancelTarget == EmployeeSection.Profile)
                 {
-                    var profileId = _openedProfileEmployeeId ?? model.Id;
+                    var profileId = _openedProfileEmployeeId ?? savedEmployeeId;
 
                     if (profileId > 0)
                     {
-                        var latest = await _employeeService.GetAsync(profileId, uiToken) ?? model;
+                        var latest = await _employeeService.GetAsync(profileId, uiToken) ?? createdEmployee;
 
-                        await RunOnUiThreadAsync(() =>
+                        if (latest is not null)
                         {
-                            ProfileVm.SetProfile(latest);
-                            ListVm.SelectedItem = latest;
-                        });
+                            await RunOnUiThreadAsync(() =>
+                            {
+                                ProfileVm.SetProfile(latest);
+                                ListVm.SelectedItem = latest;
+                            });
+                        }
                     }
 
                     await SwitchToProfileAsync();
