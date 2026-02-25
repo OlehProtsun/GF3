@@ -4,11 +4,9 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using System.Windows.Threading;
 using WPFApp.ViewModel.Container.Edit.Helpers;
 using WPFApp.ViewModel.Container.ScheduleEdit.Helpers;
-using System.Windows;
-
+using WPFApp.ViewModel.Shared;
 
 namespace WPFApp.ViewModel.Container.Edit
 {
@@ -54,64 +52,59 @@ namespace WPFApp.ViewModel.Container.Edit
         /// 7) очищаємо preview
         /// 8) переходимо в ScheduleEdit
         /// </summary>
-        internal async Task StartScheduleAddAsync(CancellationToken ct = default)
+        internal Task StartScheduleAddAsync(CancellationToken ct = default)
         {
             var containerId = GetCurrentContainerId();
             if (containerId <= 0)
             {
                 ShowError("Select a container first.");
-                return;
+                return Task.CompletedTask;
             }
 
-            var uiToken = ResetNavUiCts(ct);
+            return UiOperationRunner.RunNavStatusFlowAsync(
+                ct,
+                ResetNavUiCts,
+                ShowNavWorkingAsync,
+                WaitForUiIdleAsync,
+                async uiToken =>
+                {
+                    await PrepareScheduleEditContextAsync(uiToken).ConfigureAwait(false);
 
-            await ShowNavWorkingAsync();
-            await Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+                    ScheduleEditVm.ResetForNew();
+                    ScheduleEditVm.IsEdit = false;
+                    ScheduleEditVm.Blocks.Clear();
 
-            try
-            {
-                ScheduleEditVm.CancelBackgroundWork();
-                CancelScheduleEditWork();
+                    var block = CreateDefaultBlock(containerId);
+                    ScheduleEditVm.Blocks.Add(block);
+                    ScheduleEditVm.SelectedBlock = block;
 
-                var safeCt = ct.IsCancellationRequested ? CancellationToken.None : uiToken;
+                    ScheduleCancelTarget = ContainerSection.Profile;
 
-                await LoadLookupsAsync(safeCt);
-                ResetScheduleFilters();
+                    await SwitchToScheduleEditAsync().ConfigureAwait(false);
+                    await ScheduleEditVm.RefreshScheduleMatrixAsync(CancellationToken.None).ConfigureAwait(false);
+                    await ScheduleEditVm.RefreshAvailabilityPreviewMatrixAsync(
+                        block.Model.Year,
+                        block.Model.Month,
+                        new List<ScheduleSlotModel>(),
+                        new List<ScheduleEmployeeModel>(),
+                        previewKey: $"CLEAR|{block.Model.Year}|{block.Model.Month}",
+                        CancellationToken.None).ConfigureAwait(false);
+                },
+                ShowNavSuccessThenAutoHideAsync,
+                HideNavStatusAsync,
+                ShowError,
+                successDelayMs: 700);
+        }
 
-                ScheduleEditVm.ClearValidationErrors();
-                ScheduleEditVm.ResetForNew();
-                ScheduleEditVm.IsEdit = false;
-                ScheduleEditVm.Blocks.Clear();
 
-                var block = CreateDefaultBlock(containerId);
-                ScheduleEditVm.Blocks.Add(block);
-                ScheduleEditVm.SelectedBlock = block;
+        private async Task PrepareScheduleEditContextAsync(CancellationToken uiToken)
+        {
+            ScheduleEditVm.CancelBackgroundWork();
+            CancelScheduleEditWork();
 
-                ScheduleCancelTarget = ContainerSection.Profile;
-
-                await SwitchToScheduleEditAsync();
-
-                await ScheduleEditVm.RefreshScheduleMatrixAsync(CancellationToken.None);
-
-                await ScheduleEditVm.RefreshAvailabilityPreviewMatrixAsync(
-                    block.Model.Year, block.Model.Month,
-                    new List<ScheduleSlotModel>(),
-                    new List<ScheduleEmployeeModel>(),
-                    previewKey: $"CLEAR|{block.Model.Year}|{block.Model.Month}",
-                    CancellationToken.None);
-
-                await Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
-                await ShowNavSuccessThenAutoHideAsync(uiToken, 700);
-            }
-            catch (OperationCanceledException)
-            {
-                await HideNavStatusAsync();
-            }
-            catch (Exception ex)
-            {
-                await HideNavStatusAsync();
-                ShowError(ex);
-            }
+            await LoadLookupsAsync(uiToken).ConfigureAwait(false);
+            ResetScheduleFilters();
+            ScheduleEditVm.ClearValidationErrors();
         }
 
         /// <summary>
@@ -125,154 +118,34 @@ namespace WPFApp.ViewModel.Container.Edit
         /// 5) refresh матриці + preview
         /// 6) переходимо в ScheduleEdit
         /// </summary>
-        internal async Task EditSelectedScheduleAsync(CancellationToken ct = default)
+        internal Task EditSelectedScheduleAsync(CancellationToken ct = default)
         {
             var schedule = ProfileVm.ScheduleListVm.SelectedItem?.Model;
-            if (schedule is null) return;
+            if (schedule is null)
+                return Task.CompletedTask;
 
-            var uiToken = ResetNavUiCts(ct);
-
-            await ShowNavWorkingAsync();
-
-            // дати WPF відрендерити "Working" ДО важких await
-            await Application.Current.Dispatcher.InvokeAsync(
-                () => { },
-                DispatcherPriority.ApplicationIdle
-            );
-
-            try
-            {
-                // щоб старі білди/preview не "вистрілили" під час переходу
-                ScheduleEditVm.CancelBackgroundWork();
-                CancelScheduleEditWork();
-
-                await LoadLookupsAsync(uiToken);
-                ResetScheduleFilters();
-
-                var detailed = await _scheduleService.GetDetailedAsync(schedule.Id, uiToken);
-                if (detailed is null)
+            return UiOperationRunner.RunNavStatusFlowAsync(
+                ct,
+                ResetNavUiCts,
+                ShowNavWorkingAsync,
+                WaitForUiIdleAsync,
+                async uiToken =>
                 {
-                    await HideNavStatusAsync();
-                    return;
-                }
+                    await PrepareScheduleEditContextAsync(uiToken).ConfigureAwait(false);
 
-                if (!HasGeneratedContent(detailed))
-                {
-                    await HideNavStatusAsync();
-                    ShowError("This schedule doesn’t contain generated data and can’t be edited. Please run generation first.");
-                    return;
-                }
-
-                ScheduleEditVm.ClearValidationErrors();
-                ScheduleEditVm.ResetForNew();
-                ScheduleEditVm.IsEdit = true;
-                ScheduleEditVm.Blocks.Clear();
-
-                var block = CreateBlockFromSchedule(
-                    detailed,
-                    detailed.Employees?.ToList() ?? new List<ScheduleEmployeeModel>(),
-                    detailed.Slots?.ToList() ?? new List<ScheduleSlotModel>(),
-                    detailed.CellStyles?.ToList());
-
-                block.SelectedAvailabilityGroupId = detailed.AvailabilityGroupId!.Value;
-
-                ScheduleEditVm.Blocks.Add(block);
-                ScheduleEditVm.SelectedBlock = block;
-
-                await ScheduleEditVm.RefreshScheduleMatrixAsync(uiToken);
-
-                ScheduleCancelTarget = Mode == ContainerSection.ScheduleProfile
-                    ? ContainerSection.ScheduleProfile
-                    : ContainerSection.Profile;
-
-                await UpdateAvailabilityPreviewAsync(uiToken);
-
-                // навігація на Edit view
-                await SwitchToScheduleEditAsync();
-
-                // дати новому view реально піднятись/відрендеритись
-                await Application.Current.Dispatcher.InvokeAsync(
-                    () => { },
-                    DispatcherPriority.ApplicationIdle
-                );
-
-                // тепер Success (і авто-hide)
-                await ShowNavSuccessThenAutoHideAsync(uiToken, 900);
-            }
-            catch (OperationCanceledException)
-            {
-                await HideNavStatusAsync();
-            }
-            catch (Exception ex)
-            {
-                await HideNavStatusAsync();
-                ShowError(ex);
-            }
-        }
-
-        /// <summary>
-        /// Відкрити кілька schedules у табах редактора.
-        ///
-        /// Поведінка:
-        /// - якщо schedule вже відкритий — не дублюємо, а додаємо як openedBlocks (щоб можна було активувати)
-        /// - якщо перевищили ліміт MaxOpenedSchedules — пропускаємо і показуємо повідомлення
-        /// - schedules без generated data — пропускаємо і показуємо повідомлення
-        /// </summary>
-        internal async Task MultiOpenSchedulesAsync(IReadOnlyList<ScheduleModel> schedules, CancellationToken ct = default)
-        {
-            if (schedules is null || schedules.Count == 0)
-                return;
-
-            var uiToken = ResetNavUiCts(ct);
-
-            await ShowNavWorkingAsync();
-            await Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
-
-            try
-            {
-                await LoadLookupsAsync(uiToken);
-                ResetScheduleFilters();
-
-                ScheduleEditVm.ClearValidationErrors();
-
-                var keepExisting = Mode == ContainerSection.ScheduleEdit && ScheduleEditVm.IsEdit;
-                if (!keepExisting)
-                    ScheduleEditVm.ResetForNew();
-
-                ScheduleEditVm.IsEdit = true;
-
-                var openedBlocks = new List<ScheduleBlockViewModel>();
-                var invalidSchedules = new List<string>();
-                var limitSkipped = new List<string>();
-
-                foreach (var schedule in schedules)
-                {
-                    uiToken.ThrowIfCancellationRequested();
-
-                    // якщо вже відкритий — просто активуємо
-                    var existing = ScheduleEditVm.Blocks.FirstOrDefault(b => b.Model.Id == schedule.Id);
-                    if (existing != null)
-                    {
-                        openedBlocks.Add(existing);
-                        continue;
-                    }
-
-                    // ліміт табів
-                    if (ScheduleEditVm.Blocks.Count >= MaxOpenedSchedules)
-                    {
-                        limitSkipped.Add(string.IsNullOrWhiteSpace(schedule.Name) ? $"Schedule {schedule.Id}" : schedule.Name);
-                        continue;
-                    }
-
-                    var detailed = await _scheduleService.GetDetailedAsync(schedule.Id, uiToken);
+                    var detailed = await _scheduleService.GetDetailedAsync(schedule.Id, uiToken).ConfigureAwait(false);
                     if (detailed is null)
-                        continue;
+                        return false;
 
                     if (!HasGeneratedContent(detailed))
                     {
-                        invalidSchedules.Add(string.IsNullOrWhiteSpace(detailed.Name) ? $"Schedule {detailed.Id}" : detailed.Name);
-                        continue;
+                        ShowError("This schedule doesn’t contain generated data and can’t be edited. Please run generation first.");
+                        return false;
                     }
+
+                    ScheduleEditVm.ResetForNew();
+                    ScheduleEditVm.IsEdit = true;
+                    ScheduleEditVm.Blocks.Clear();
 
                     var block = CreateBlockFromSchedule(
                         detailed,
@@ -283,157 +156,200 @@ namespace WPFApp.ViewModel.Container.Edit
                     block.SelectedAvailabilityGroupId = detailed.AvailabilityGroupId!.Value;
 
                     ScheduleEditVm.Blocks.Add(block);
-                    openedBlocks.Add(block);
-                }
+                    ScheduleEditVm.SelectedBlock = block;
 
-                if (openedBlocks.Count == 0)
+                    await ScheduleEditVm.RefreshScheduleMatrixAsync(uiToken).ConfigureAwait(false);
+                    ScheduleCancelTarget = Mode == ContainerSection.ScheduleProfile
+                        ? ContainerSection.ScheduleProfile
+                        : ContainerSection.Profile;
+
+                    await UpdateAvailabilityPreviewAsync(uiToken).ConfigureAwait(false);
+                    await SwitchToScheduleEditAsync().ConfigureAwait(false);
+
+                    return true;
+                },
+                ShowNavSuccessThenAutoHideAsync,
+                HideNavStatusAsync,
+                ShowError,
+                successDelayMs: 900);
+        }
+
+        /// <summary>
+        /// Відкрити кілька schedules у табах редактора.
+        ///
+        /// Поведінка:
+        /// - якщо schedule вже відкритий — не дублюємо, а додаємо як openedBlocks (щоб можна було активувати)
+        /// - якщо перевищили ліміт MaxOpenedSchedules — пропускаємо і показуємо повідомлення
+        /// - schedules без generated data — пропускаємо і показуємо повідомлення
+        /// </summary>
+        internal Task MultiOpenSchedulesAsync(IReadOnlyList<ScheduleModel> schedules, CancellationToken ct = default)
+        {
+            if (schedules is null || schedules.Count == 0)
+                return Task.CompletedTask;
+
+            return UiOperationRunner.RunNavStatusFlowAsync(
+                ct,
+                ResetNavUiCts,
+                ShowNavWorkingAsync,
+                WaitForUiIdleAsync,
+                async uiToken =>
                 {
-                    await HideNavStatusAsync();
+                    await PrepareScheduleEditContextAsync(uiToken).ConfigureAwait(false);
 
-                    if (limitSkipped.Count > 0)
+                    var keepExisting = Mode == ContainerSection.ScheduleEdit && ScheduleEditVm.IsEdit;
+                    if (!keepExisting)
+                        ScheduleEditVm.ResetForNew();
+
+                    ScheduleEditVm.IsEdit = true;
+
+                    var openedBlocks = new List<ScheduleBlockViewModel>();
+                    var invalidSchedules = new List<string>();
+                    var limitSkipped = new List<string>();
+
+                    foreach (var schedule in schedules)
                     {
-                        ShowError($"Max open schedules limit is {MaxOpenedSchedules}. Close some tabs first.");
-                        return;
+                        uiToken.ThrowIfCancellationRequested();
+
+                        var existing = ScheduleEditVm.Blocks.FirstOrDefault(b => b.Model.Id == schedule.Id);
+                        if (existing != null)
+                        {
+                            openedBlocks.Add(existing);
+                            continue;
+                        }
+
+                        if (ScheduleEditVm.Blocks.Count >= MaxOpenedSchedules)
+                        {
+                            limitSkipped.Add(string.IsNullOrWhiteSpace(schedule.Name) ? $"Schedule {schedule.Id}" : schedule.Name);
+                            continue;
+                        }
+
+                        var detailed = await _scheduleService.GetDetailedAsync(schedule.Id, uiToken).ConfigureAwait(false);
+                        if (detailed is null)
+                            continue;
+
+                        if (!HasGeneratedContent(detailed))
+                        {
+                            invalidSchedules.Add(string.IsNullOrWhiteSpace(detailed.Name) ? $"Schedule {detailed.Id}" : detailed.Name);
+                            continue;
+                        }
+
+                        var block = CreateBlockFromSchedule(
+                            detailed,
+                            detailed.Employees?.ToList() ?? new List<ScheduleEmployeeModel>(),
+                            detailed.Slots?.ToList() ?? new List<ScheduleSlotModel>(),
+                            detailed.CellStyles?.ToList());
+
+                        block.SelectedAvailabilityGroupId = detailed.AvailabilityGroupId!.Value;
+
+                        ScheduleEditVm.Blocks.Add(block);
+                        openedBlocks.Add(block);
                     }
 
-                    ShowError("Selected schedules could not be loaded.");
-                    return;
-                }
+                    if (openedBlocks.Count == 0)
+                    {
+                        if (limitSkipped.Count > 0)
+                            ShowError($"Max open schedules limit is {MaxOpenedSchedules}. Close some tabs first.");
+                        else
+                            ShowError("Selected schedules could not be loaded.");
 
-                if (invalidSchedules.Count > 0)
-                    ShowError($"Skipped schedules without generated data:{Environment.NewLine}{string.Join(Environment.NewLine, invalidSchedules)}");
+                        return false;
+                    }
 
-                if (limitSkipped.Count > 0)
-                    ShowInfo($"Opened only first {MaxOpenedSchedules}. Skipped due to limit:{Environment.NewLine}{string.Join(Environment.NewLine, limitSkipped)}");
+                    if (invalidSchedules.Count > 0)
+                        ShowError($"Skipped schedules without generated data:{Environment.NewLine}{string.Join(Environment.NewLine, invalidSchedules)}");
 
-                ScheduleEditVm.SelectedBlock = openedBlocks.First();
-                await ScheduleEditVm.RefreshScheduleMatrixAsync(uiToken);
+                    if (limitSkipped.Count > 0)
+                        ShowInfo($"Opened only first {MaxOpenedSchedules}. Skipped due to limit:{Environment.NewLine}{string.Join(Environment.NewLine, limitSkipped)}");
 
-                ScheduleCancelTarget = Mode == ContainerSection.ScheduleProfile
-                    ? ContainerSection.ScheduleProfile
-                    : ContainerSection.Profile;
+                    ScheduleEditVm.SelectedBlock = openedBlocks.First();
+                    await ScheduleEditVm.RefreshScheduleMatrixAsync(uiToken).ConfigureAwait(false);
 
-                await UpdateAvailabilityPreviewAsync(uiToken);
+                    ScheduleCancelTarget = Mode == ContainerSection.ScheduleProfile
+                        ? ContainerSection.ScheduleProfile
+                        : ContainerSection.Profile;
 
-                await SwitchToScheduleEditAsync();
-
-                // дати view відрендеритися
-                await Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
-
-                await ShowNavSuccessThenAutoHideAsync(uiToken, 900);
-            }
-            catch (OperationCanceledException)
-            {
-                await HideNavStatusAsync();
-            }
-            catch (Exception ex)
-            {
-                await HideNavStatusAsync();
-                ShowError(ex);
-            }
+                    await UpdateAvailabilityPreviewAsync(uiToken).ConfigureAwait(false);
+                    await SwitchToScheduleEditAsync().ConfigureAwait(false);
+                    return true;
+                },
+                ShowNavSuccessThenAutoHideAsync,
+                HideNavStatusAsync,
+                ShowError,
+                successDelayMs: 900);
         }
 
         /// <summary>
         /// Відкрити профіль schedule (read-only перегляд).
         /// </summary>
-        internal async Task OpenScheduleProfileAsync(CancellationToken ct = default)
+        internal Task OpenScheduleProfileAsync(CancellationToken ct = default)
         {
             var schedule = ProfileVm.ScheduleListVm.SelectedItem?.Model;
-            if (schedule is null) return;
+            if (schedule is null)
+                return Task.CompletedTask;
 
-            var uiToken = ResetNavUiCts(ct);
-
-            await ShowNavWorkingAsync(); // показали Working
-                                         // дати WPF відрендерити оверлей ДО важких await
-            await System.Windows.Application.Current.Dispatcher.InvokeAsync(
-                () => { },
-                DispatcherPriority.ApplicationIdle
-            );
-
-            try
-            {
-                var detailed = await _scheduleService.GetDetailedAsync(schedule.Id, uiToken).ConfigureAwait(false);
-                if (detailed is null)
+            return UiOperationRunner.RunNavStatusFlowAsync(
+                ct,
+                ResetNavUiCts,
+                ShowNavWorkingAsync,
+                WaitForUiIdleAsync,
+                async uiToken =>
                 {
-                    await HideNavStatusAsync().ConfigureAwait(false);
-                    return;
-                }
+                    var detailed = await _scheduleService.GetDetailedAsync(schedule.Id, uiToken).ConfigureAwait(false);
+                    if (detailed is null)
+                        return false;
 
-                var employees = detailed.Employees?.ToList() ?? new List<ScheduleEmployeeModel>();
-                var slots = detailed.Slots?.ToList() ?? new List<ScheduleSlotModel>();
-                var cellStyles = detailed.CellStyles?.ToList() ?? new List<ScheduleCellStyleModel>();
+                    var employees = detailed.Employees?.ToList() ?? new List<ScheduleEmployeeModel>();
+                    var slots = detailed.Slots?.ToList() ?? new List<ScheduleSlotModel>();
+                    var cellStyles = detailed.CellStyles?.ToList() ?? new List<ScheduleCellStyleModel>();
 
-                await ScheduleProfileVm.SetProfileAsync(detailed, employees, slots, cellStyles, uiToken)
-                                       .ConfigureAwait(false);
+                    await ScheduleProfileVm.SetProfileAsync(detailed, employees, slots, cellStyles, uiToken)
+                        .ConfigureAwait(false);
 
-                // синхронізуємо selection у списку
-                await RunOnUiThreadAsync(() =>
-                {
-                    ProfileVm.ScheduleListVm.SelectedItem =
-                        ProfileVm.ScheduleListVm.Items.FirstOrDefault(x => x.Model.Id == detailed.Id);
-                });
+                    await RunOnUiThreadAsync(() =>
+                    {
+                        ProfileVm.ScheduleListVm.SelectedItem =
+                            ProfileVm.ScheduleListVm.Items.FirstOrDefault(x => x.Model.Id == detailed.Id);
+                    }).ConfigureAwait(false);
 
-                ScheduleCancelTarget = ContainerSection.Profile;
-
-                // навігація
-                await SwitchToScheduleProfileAsync().ConfigureAwait(false);
-
-                // важливо: дати новому view завантажитись/відрендеритись
-                await System.Windows.Application.Current.Dispatcher.InvokeAsync(
-                    () => { },
-                    DispatcherPriority.ApplicationIdle
-                );
-
-                // тепер Success (і авто-hide)
-                await ShowNavSuccessThenAutoHideAsync(uiToken, 900).ConfigureAwait(false);
-            }
-            catch (OperationCanceledException)
-            {
-                await HideNavStatusAsync().ConfigureAwait(false);
-            }
-            catch (Exception ex)
-            {
-                await HideNavStatusAsync().ConfigureAwait(false);
-                ShowError(ex);
-            }
+                    ScheduleCancelTarget = ContainerSection.Profile;
+                    await SwitchToScheduleProfileAsync().ConfigureAwait(false);
+                    return true;
+                },
+                ShowNavSuccessThenAutoHideAsync,
+                HideNavStatusAsync,
+                ShowError,
+                successDelayMs: 900);
         }
 
 
         /// <summary>
         /// Видалити вибраний schedule з контейнера.
         /// </summary>
-        internal async Task DeleteSelectedScheduleAsync(CancellationToken ct = default)
+        internal Task DeleteSelectedScheduleAsync(CancellationToken ct = default)
         {
             var schedule = ProfileVm.ScheduleListVm.SelectedItem?.Model;
-            if (schedule is null) return;
+            if (schedule is null)
+                return Task.CompletedTask;
 
             if (!Confirm($"Delete schedule {schedule.Name}?"))
-                return;
+                return Task.CompletedTask;
 
-            var uiToken = ResetNavUiCts(ct);
-
-            await ShowNavWorkingAsync();
-            await Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
-
-            try
-            {
-                await _scheduleService.DeleteAsync(schedule.Id, uiToken);
-                _databaseChangeNotifier.NotifyDatabaseChanged("Container.ScheduleDelete");
-                await LoadSchedulesAsync(schedule.ContainerId, search: null, uiToken);
-                await SwitchToProfileAsync();
-
-                await Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
-                await ShowNavSuccessThenAutoHideAsync(uiToken, 900);
-            }
-            catch (OperationCanceledException)
-            {
-                await HideNavStatusAsync();
-            }
-            catch (Exception ex)
-            {
-                await HideNavStatusAsync();
-                ShowError(ex);
-            }
+            return UiOperationRunner.RunNavStatusFlowAsync(
+                ct,
+                ResetNavUiCts,
+                ShowNavWorkingAsync,
+                WaitForUiIdleAsync,
+                async uiToken =>
+                {
+                    await _scheduleService.DeleteAsync(schedule.Id, uiToken).ConfigureAwait(false);
+                    _databaseChangeNotifier.NotifyDatabaseChanged("Container.ScheduleDelete");
+                    await LoadSchedulesAsync(schedule.ContainerId, search: null, uiToken).ConfigureAwait(false);
+                    await SwitchToProfileAsync().ConfigureAwait(false);
+                },
+                ShowNavSuccessThenAutoHideAsync,
+                HideNavStatusAsync,
+                ShowError,
+                successDelayMs: 900);
         }
     }
 }
