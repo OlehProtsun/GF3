@@ -84,10 +84,10 @@ namespace WPFApp.ViewModel.Container.ScheduleEdit
         // Це назви колонок у DataTable/DataView, які будує ScheduleMatrixEngine.
         // Вони винесені в ScheduleMatrixConstants, а тут продубльовані як const-аліаси,
         // щоб в решті VM не змінювати сотні посилань.
-        public const string DayColumnName = ScheduleMatrixConstants.DayColumnName;
-        public const string ConflictColumnName = ScheduleMatrixConstants.ConflictColumnName;
-        public const string WeekendColumnName = ScheduleMatrixConstants.WeekendColumnName;
-        public const string EmptyMark = ScheduleMatrixConstants.EmptyMark;
+        public static readonly string DayColumnName = ScheduleMatrixConstants.DayColumnName;
+        public static readonly string ConflictColumnName = ScheduleMatrixConstants.ConflictColumnName;
+        public static readonly string WeekendColumnName = ScheduleMatrixConstants.WeekendColumnName;
+        public static readonly string EmptyMark = ScheduleMatrixConstants.EmptyMark;
 
         // --------------------------
         // 3) ПРИВАТНІ ПОЛЯ СТАНУ VM
