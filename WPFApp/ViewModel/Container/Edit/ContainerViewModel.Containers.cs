@@ -1,9 +1,10 @@
-﻿using BusinessLogicLayer.Contracts.Models;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+
+using BusinessLogicLayer.Contracts.Models;
 using System.Windows;
 using WPFApp.ViewModel.Container.Edit.Helpers;
 using WPFApp.ViewModel.Shared;
@@ -193,7 +194,7 @@ namespace WPFApp.ViewModel.Container.Edit
                         if (profileId > 0)
                         {
                             var latest = await _containerService.GetAsync(profileId, uiToken).ConfigureAwait(false) ?? model;
-                            await SetProfileAndSelectionAsync(latest).ConfigureAwait(false);
+                            await SyncProfileAndSelectionAsync(latest).ConfigureAwait(false);
                         }
 
                         await SwitchToProfileAsync().ConfigureAwait(false);
@@ -281,7 +282,7 @@ namespace WPFApp.ViewModel.Container.Edit
                     var latest = await _containerService.GetAsync(selected.Id, uiToken).ConfigureAwait(false) ?? selected;
 
                     _openedProfileContainerId = latest.Id;
-                    await SetProfileAndSelectionAsync(latest).ConfigureAwait(false);
+                    await SyncProfileAndSelectionAsync(latest).ConfigureAwait(false);
                     await LoadSchedulesAsync(latest.Id, search: null, uiToken).ConfigureAwait(false);
 
                     CancelTarget = ContainerSection.List;
@@ -295,12 +296,6 @@ namespace WPFApp.ViewModel.Container.Edit
 
 
 
-        private Task SetProfileAndSelectionAsync(ContainerModel model)
-            => RunOnUiThreadAsync(() =>
-            {
-                ProfileVm.SetProfile(model);
-                ListVm.SelectedItem = ListVm.Items.FirstOrDefault(x => x.Id == model.Id) ?? model;
-            });
 
         // =========================================================
         // Завантаження даних (списки)
