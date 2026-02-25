@@ -144,7 +144,7 @@ namespace WPFApp.UI.Helpers
             return null;
         }
 
-        private sealed class ScrollAnimationHost : DependencyObject, IDisposable
+        private sealed class ScrollAnimationHost : Animatable, IDisposable
         {
             public static readonly DependencyProperty VerticalOffsetProperty =
                 DependencyProperty.Register(
@@ -153,7 +153,7 @@ namespace WPFApp.UI.Helpers
                     typeof(ScrollAnimationHost),
                     new PropertyMetadata(0d, OnVerticalOffsetChanged));
 
-            public ScrollViewer ScrollViewer { get; }
+            public ScrollViewer ScrollViewer { get; private set; }
 
             public double VerticalOffset
             {
@@ -161,10 +161,23 @@ namespace WPFApp.UI.Helpers
                 set => SetValue(VerticalOffsetProperty, value);
             }
 
+            // Public constructor used by the behavior
             public ScrollAnimationHost(ScrollViewer scrollViewer)
             {
-                ScrollViewer = scrollViewer;
+                ScrollViewer = scrollViewer ?? throw new ArgumentNullException(nameof(scrollViewer));
                 VerticalOffset = scrollViewer.VerticalOffset;
+            }
+
+            // Parameterless constructor required for Freezable/Animatable infrastructure
+            private ScrollAnimationHost()
+            {
+                ScrollViewer = null!;
+            }
+
+            // Freezable override required by Animatable
+            protected override Freezable CreateInstanceCore()
+            {
+                return new ScrollAnimationHost();
             }
 
             public void AnimateBy(double delta, TimeSpan duration)

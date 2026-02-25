@@ -13,6 +13,7 @@ using WPFApp.MVVM.Validation;
 using WPFApp.MVVM.Validation.Rules;
 using WPFApp.UI.Dialogs;
 using WPFApp.ViewModel.Dialogs;
+using WPFApp.ViewModel.Shared;
 
 namespace WPFApp.ViewModel.Shop
 {
