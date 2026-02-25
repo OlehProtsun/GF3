@@ -304,8 +304,8 @@ namespace WPFApp.ViewModel.Shop
         {
             EditVm.ClearValidationErrors();
 
-            var model = EditVm.ToRequest();
-            var errors = ShopValidationRules.ValidateAll(model);
+            var request = EditVm.ToRequest();
+            var errors = ShopValidationRules.ValidateAll(request);
 
             if (errors.Count > 0)
             {
@@ -320,34 +320,42 @@ namespace WPFApp.ViewModel.Shop
 
             try
             {
+                ShopDto? createdShop = null;
+
                 if (EditVm.IsEdit)
                 {
-                    await _shopService.UpdateAsync(model, uiToken);
+                    await _shopService.UpdateAsync(request, uiToken);
                 }
                 else
                 {
-                    var created = await _shopService.CreateAsync(model, uiToken);
-                    await RunOnUiThreadAsync(() => EditVm.ShopId = created.Id);
-                    model = created;
+                    createdShop = await _shopService.CreateAsync(request, uiToken);
+                    await RunOnUiThreadAsync(() => EditVm.ShopId = createdShop.Id);
                 }
+
+                var savedShopId = createdShop?.Id ?? request.Id;
 
                 _databaseChangeNotifier.NotifyDatabaseChanged("Shop.Save");
 
-                await LoadShopsAsync(uiToken, selectId: model.Id);
+                await LoadShopsAsync(uiToken, selectId: savedShopId);
 
                 if (CancelTarget == ShopSection.Profile)
                 {
-                    var profileId = _openedProfileShopId ?? model.Id;
+                    var profileId = _openedProfileShopId ?? savedShopId;
 
                     if (profileId > 0)
                     {
-                        var latest = await _shopService.GetAsync(profileId, uiToken) ?? model;
+                        var latest = await _shopService.GetAsync(profileId, uiToken)
+                                     ?? createdShop
+                                     ?? ListVm.SelectedItem;
 
-                        await RunOnUiThreadAsync(() =>
+                        if (latest != null)
                         {
-                            ProfileVm.SetProfile(latest);
-                            ListVm.SelectedItem = latest;
-                        });
+                            await RunOnUiThreadAsync(() =>
+                            {
+                                ProfileVm.SetProfile(latest);
+                                ListVm.SelectedItem = latest;
+                            });
+                        }
                     }
 
                     await SwitchToProfileAsync();

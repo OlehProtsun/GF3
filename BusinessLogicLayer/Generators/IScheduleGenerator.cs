@@ -1,7 +1,7 @@
 ﻿using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
-using DataAccessLayer.Models;
+using BusinessLogicLayer.Contracts.Models;
 
 namespace BusinessLogicLayer.Generators
 {

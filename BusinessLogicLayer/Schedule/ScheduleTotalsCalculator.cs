@@ -1,4 +1,4 @@
-using DataAccessLayer.Models;
+using BusinessLogicLayer.Contracts.Models;
 
 namespace BusinessLogicLayer.Schedule
 {
