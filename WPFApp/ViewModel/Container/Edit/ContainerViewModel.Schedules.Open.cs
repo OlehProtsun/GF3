@@ -1,9 +1,10 @@
-﻿using BusinessLogicLayer.Contracts.Models;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+
+using BusinessLogicLayer.Contracts.Models;
 using WPFApp.ViewModel.Container.Edit.Helpers;
 using WPFApp.ViewModel.Container.ScheduleEdit.Helpers;
 using WPFApp.ViewModel.Shared;
@@ -97,6 +98,9 @@ namespace WPFApp.ViewModel.Container.Edit
         }
 
 
+        /// <summary>
+        /// Prepares shared ScheduleEdit state before open/add flows (cancel background work, load lookups, reset filters/errors).
+        /// </summary>
         private async Task PrepareScheduleEditContextAsync(CancellationToken uiToken)
         {
             ScheduleEditVm.CancelBackgroundWork();

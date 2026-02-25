@@ -1,4 +1,4 @@
-# DedupPass2 Report
+# Dedup Pass 2 Report
 
 ## 1) Baseline duplication map (WPF/MVVM)
 

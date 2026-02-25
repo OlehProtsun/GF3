@@ -4,11 +4,18 @@ using System.Threading.Tasks;
 
 namespace WPFApp.ViewModel.Shared
 {
+    /// <summary>
+    /// Shared wrapper for UI navigation status orchestration (working/success/hide/error).
+    /// Keeps flow steps consistent across ViewModel modules without changing business logic.
+    /// </summary>
     internal static class UiOperationRunner
     {
+        /// <summary>
+        /// Executes a navigation flow where the body always completes successfully unless it throws/cancels.
+        /// </summary>
         internal static async Task RunNavStatusFlowAsync(
             CancellationToken outerToken,
-            Func<CancellationToken, CancellationToken> resetToken,
+            Func<CancellationToken, CancellationToken> createUiToken,
             Func<Task> showWorkingAsync,
             Func<Task> waitForUiIdleAsync,
             Func<CancellationToken, Task> bodyAsync,
@@ -17,7 +24,7 @@ namespace WPFApp.ViewModel.Shared
             Action<Exception> showError,
             int successDelayMs)
         {
-            var uiToken = resetToken(outerToken);
+            var uiToken = createUiToken(outerToken);
 
             await showWorkingAsync().ConfigureAwait(false);
             await waitForUiIdleAsync().ConfigureAwait(false);
@@ -39,9 +46,12 @@ namespace WPFApp.ViewModel.Shared
             }
         }
 
+        /// <summary>
+        /// Executes a navigation flow where the body can return <c>false</c> for a non-error early exit.
+        /// </summary>
         internal static async Task RunNavStatusFlowAsync(
             CancellationToken outerToken,
-            Func<CancellationToken, CancellationToken> resetToken,
+            Func<CancellationToken, CancellationToken> createUiToken,
             Func<Task> showWorkingAsync,
             Func<Task> waitForUiIdleAsync,
             Func<CancellationToken, Task<bool>> bodyAsync,
@@ -50,7 +60,7 @@ namespace WPFApp.ViewModel.Shared
             Action<Exception> showError,
             int successDelayMs)
         {
-            var uiToken = resetToken(outerToken);
+            var uiToken = createUiToken(outerToken);
 
             await showWorkingAsync().ConfigureAwait(false);
             await waitForUiIdleAsync().ConfigureAwait(false);

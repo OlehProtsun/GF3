@@ -1,4 +1,8 @@
-﻿using System.Threading.Tasks;
+﻿using System.Linq;
+using System.Threading.Tasks;
+
+using BusinessLogicLayer.Contracts.Models;
+
 using WPFApp.ViewModel.Container.Edit.Helpers;
 
 namespace WPFApp.ViewModel.Container.Edit
@@ -197,6 +201,17 @@ namespace WPFApp.ViewModel.Container.Edit
             Mode = ContainerSection.ScheduleProfile;
             return Task.CompletedTask;
         }
+
+
+        /// <summary>
+        /// Synchronizes container profile and current list selection to the same latest model.
+        /// </summary>
+        private Task SyncProfileAndSelectionAsync(ContainerModel container)
+            => RunOnUiThreadAsync(() =>
+            {
+                ProfileVm.SetProfile(container);
+                ListVm.SelectedItem = ListVm.Items.FirstOrDefault(item => item.Id == container.Id) ?? container;
+            });
 
         /// <summary>
         /// CleanupScheduleEdit — “прибрати” важкий стан schedule-редактора,
