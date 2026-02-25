@@ -21,6 +21,9 @@ namespace BusinessLogicLayer
             serviceCollection.AddScoped<IScheduleSlotService, ScheduleSlotService>();
             serviceCollection.AddScoped<IBindService, BindService>();
             serviceCollection.AddScoped<IAvailabilityGroupService, AvailabilityGroupService>();
+            serviceCollection.AddScoped<IShopFacade, ShopFacade>();
+            serviceCollection.AddScoped<IEmployeeFacade, EmployeeFacade>();
+            serviceCollection.AddScoped<IScheduleExportDataBuilder, Services.Export.ScheduleExportDataBuilder>();
 
             return serviceCollection;
         }

@@ -1,6 +1,6 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
-using DataAccessLayer.Models;
+using BusinessLogicLayer.Contracts.Shops;
 
 namespace WPFApp.MVVM.Validation.Rules
 {
@@ -26,7 +26,7 @@ namespace WPFApp.MVVM.Validation.Rules
         /// <summary>
         /// Повна валідація (перед Save).
         /// </summary>
-        public static IReadOnlyDictionary<string, string> ValidateAll(ShopModel? model)
+        public static IReadOnlyDictionary<string, string> ValidateAll(SaveShopRequest? model)
         {
             // 1) Готуємо результуючий словник.
             var errors = new Dictionary<string, string>(StringComparer.Ordinal);
@@ -51,7 +51,7 @@ namespace WPFApp.MVVM.Validation.Rules
         /// <summary>
         /// Валідація конкретної властивості (inline-валидація у setter'і).
         /// </summary>
-        public static string? ValidateProperty(ShopModel? model, string vmPropertyName)
+        public static string? ValidateProperty(SaveShopRequest? model, string vmPropertyName)
         {
             // 1) Захист.
             if (model is null || string.IsNullOrWhiteSpace(vmPropertyName))

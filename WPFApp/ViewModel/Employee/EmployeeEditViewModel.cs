@@ -1,4 +1,4 @@
-﻿using DataAccessLayer.Models;
+﻿using BusinessLogicLayer.Contracts.Employees;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -173,7 +173,7 @@ namespace WPFApp.ViewModel.Employee
             ClearValidationErrors();
         }
 
-        public void SetEmployee(EmployeeModel model)
+        public void SetEmployee(EmployeeDto model)
         {
             EmployeeId = model.Id;
             FirstName = model.FirstName;
@@ -185,12 +185,12 @@ namespace WPFApp.ViewModel.Employee
             ClearValidationErrors();
         }
 
-        public EmployeeModel ToModel()
+        public SaveEmployeeRequest ToRequest()
         {
             // Важливо:
             // - Trim для імен
             // - Email/Phone: null якщо пусто (зручніше для БД/сервісу)
-            return new EmployeeModel
+            return new SaveEmployeeRequest
             {
                 Id = EmployeeId,
                 FirstName = FirstName?.Trim() ?? string.Empty,
@@ -253,7 +253,7 @@ namespace WPFApp.ViewModel.Employee
         private void ValidateProperty(string propertyName)
         {
             // 1) Беремо модель з поточного стану VM.
-            var model = ToModel();
+            var model = ToRequest();
 
             // 2) Питаємо rules: чи є помилка саме для цього поля.
             var msg = EmployeeValidationRules.ValidateProperty(model, propertyName);
@@ -276,7 +276,7 @@ namespace WPFApp.ViewModel.Employee
             ClearValidationErrors();
 
             // 2) Валідимо всю модель одним проходом — єдине джерело правил.
-            var model = ToModel();
+            var model = ToRequest();
             var raw = EmployeeValidationRules.ValidateAll(model);
 
             // приводимо ключі до тих, що реально біндяться в XAML (FirstName/LastName/Email/Phone)

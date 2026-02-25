@@ -1,5 +1,5 @@
-﻿using DataAccessLayer.Models;
-
+using BusinessLogicLayer.Contracts.Shops;
+﻿
 namespace WPFApp.ViewModel.Shop.Helpers
 {
     /// <summary>
@@ -21,7 +21,7 @@ namespace WPFApp.ViewModel.Shop.Helpers
         /// <summary>
         /// Витягнути Name з null-safe.
         /// </summary>
-        public static string NameOrEmpty(ShopModel? model)
+        public static string NameOrEmpty(ShopDto? model)
             => model?.Name?.Trim() ?? string.Empty;
     }
 }

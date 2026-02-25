@@ -1,4 +1,4 @@
-using DataAccessLayer.Models;
+using BusinessLogicLayer.Contracts.Shops;
 using WPFApp.MVVM.Commands;
 using WPFApp.MVVM.Core;
 using WPFApp.ViewModel.Shop.Helpers;
@@ -74,7 +74,7 @@ namespace WPFApp.ViewModel.Shop
             _idDependentCommands = new[] { EditCommand, DeleteCommand };
         }
 
-        public void SetProfile(ShopModel model)
+        public void SetProfile(ShopDto model)
         {
             // 1) Синхронізуємо selection у owner, щоб owner-методи працювали по “правильному” об’єкту.
             _owner.ListVm.SelectedItem = model;

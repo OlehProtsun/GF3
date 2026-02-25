@@ -1,8 +1,8 @@
-﻿using System;
+﻿using BusinessLogicLayer.Contracts.Shops;
+using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
-using DataAccessLayer.Models;
 using WPFApp.MVVM.Commands;
 using WPFApp.MVVM.Core;
 
@@ -30,16 +30,16 @@ namespace WPFApp.ViewModel.Shop
         /// <summary>
         /// Items — список магазинів для UI.
         /// </summary>
-        public ObservableCollection<ShopModel> Items { get; } = new();
+        public ObservableCollection<ShopDto> Items { get; } = new();
 
-        private ShopModel? _selectedItem;
+        private ShopDto? _selectedItem;
 
         /// <summary>
         /// SelectedItem — вибраний магазин.
         /// При зміні:
         /// - оновлюємо CanExecute для Edit/Delete/OpenProfile
         /// </summary>
-        public ShopModel? SelectedItem
+        public ShopDto? SelectedItem
         {
             get => _selectedItem;
             set
@@ -102,16 +102,16 @@ namespace WPFApp.ViewModel.Shop
         /// - якщо список еквівалентний поточному (за ключовими полями) — виходимо
         /// - якщо оновлюємо — відновлюємо SelectedItem по Id
         /// </summary>
-        public void SetItems(IEnumerable<ShopModel> shops)
+        public void SetItems(IEnumerable<ShopDto> shops)
         {
             // 1) Null-safe.
-            shops ??= Array.Empty<ShopModel>();
+            shops ??= Array.Empty<ShopDto>();
 
             // 2) Запам’ятовуємо поточний selection.
             var selectedId = SelectedItem?.Id ?? 0;
 
             // 3) Матеріалізуємо в IList, щоб можна було порівнювати по індексу.
-            if (shops is not IList<ShopModel> list)
+            if (shops is not IList<ShopDto> list)
                 list = shops.ToList();
 
             // 4) Якщо “по суті” список не змінився — нічого не робимо.
@@ -128,7 +128,7 @@ namespace WPFApp.ViewModel.Shop
                 SelectedItem = Items.FirstOrDefault(x => x.Id == selectedId);
         }
 
-        private static bool IsSameList(IList<ShopModel> current, IList<ShopModel> next)
+        private static bool IsSameList(IList<ShopDto> current, IList<ShopDto> next)
         {
             // 1) Якщо різна кількість — точно різні.
             if (current.Count != next.Count)

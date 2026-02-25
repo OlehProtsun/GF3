@@ -1,4 +1,4 @@
-using DataAccessLayer.Models;
+using BusinessLogicLayer.Contracts.Employees;
 using WPFApp.MVVM.Commands;
 using WPFApp.MVVM.Core;
 using WPFApp.ViewModel.Employee.Helpers;
@@ -74,7 +74,7 @@ namespace WPFApp.ViewModel.Employee
             _idDependentCommands = new[] { EditCommand, DeleteCommand };
         }
 
-        public void SetProfile(EmployeeModel model)
+        public void SetProfile(EmployeeDto model)
         {
             // 1) Синхронізуємо selection у owner’і (важливо для owner-методів).
             _owner.ListVm.SelectedItem = model;
