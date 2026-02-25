@@ -66,7 +66,7 @@ namespace BusinessLogicLayer.Services.Export
             Id = source.Id,
             ScheduleId = source.ScheduleId,
             EmployeeId = source.EmployeeId,
-            MinHoursMonth = source.MinHoursMonth
+            MinHoursMonth = (int)source.MinHoursMonth
         };
 
         private static ScheduleSlotSqlDto Map(ScheduleSlotModel source) => new()

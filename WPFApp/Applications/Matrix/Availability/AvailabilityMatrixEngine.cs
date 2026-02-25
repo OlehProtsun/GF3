@@ -30,7 +30,7 @@ namespace WPFApp.Applications.Matrix.Availability
         /// Ми навмисно використовуємо ScheduleMatrixConstants.DayColumnName,
         /// бо у проекті вже прийнята конвенція "DayOfMonth".
         /// </summary>
-        public const string DayColumnName = ScheduleMatrixConstants.DayColumnName;
+        public static readonly string DayColumnName = ScheduleMatrixConstants.DayColumnName;
 
         /// <summary>
         /// Побудувати технічну назву колонки працівника за його EmployeeId.
