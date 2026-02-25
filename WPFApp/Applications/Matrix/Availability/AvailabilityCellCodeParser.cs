@@ -9,8 +9,8 @@ namespace WPFApp.Applications.Matrix.Availability
     /// </summary>
     public static class AvailabilityCellCodeParser
     {
-        public const string AnyMark = "+";
-        public const string NoneMark = "-";
+        public static string AnyMark => AvailabilityCodeParser.AnyMark;
+        public static string NoneMark => AvailabilityCodeParser.NoneMark;
 
         public static bool TryNormalize(string? raw, out string normalized, out string? error, bool allowOvernight = false)
         {
@@ -27,14 +27,7 @@ namespace WPFApp.Applications.Matrix.Availability
                 return false;
             }
 
-            // Bridge legacy parser enum -> contract enum (without DAL usage in WPF)
-            if (!Enum.TryParse<AvailabilityKind>(parsedKind.ToString(), ignoreCase: true, out var kind))
-            {
-                error = "Unsupported availability code kind.";
-                return false;
-            }
-
-            if (kind == AvailabilityKind.INT && !string.IsNullOrWhiteSpace(interval))
+            if (parsedKind == AvailabilityKind.INT && !string.IsNullOrWhiteSpace(interval))
             {
                 if (!allowOvernight)
                 {
@@ -53,7 +46,7 @@ namespace WPFApp.Applications.Matrix.Availability
                 return true;
             }
 
-            normalized = kind switch
+            normalized = parsedKind switch
             {
                 AvailabilityKind.ANY => AnyMark,
                 AvailabilityKind.NONE => NoneMark,

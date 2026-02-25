@@ -16,10 +16,10 @@ public class ShopService : IShopService
     }
 
     public async Task<ShopModel?> GetAsync(int id, CancellationToken ct = default)
-        => (await _repo.GetByIdAsync(id, ct).ConfigureAwait(false))?.ToContract();
+        => await ServiceMappingHelper.GetMappedAsync(token => _repo.GetByIdAsync(id, token), x => x.ToContract(), ct).ConfigureAwait(false);
 
     public async Task<List<ShopModel>> GetAllAsync(CancellationToken ct = default)
-        => (await _repo.GetAllAsync(ct).ConfigureAwait(false)).Select(x => x.ToContract()).ToList();
+        => await ServiceMappingHelper.GetMappedListAsync(_repo.GetAllAsync, x => x.ToContract(), ct).ConfigureAwait(false);
 
     public async Task<ShopModel> CreateAsync(ShopModel entity, CancellationToken ct = default)
     {
@@ -37,7 +37,7 @@ public class ShopService : IShopService
         if (await _repo.ExistsByNameAsync(entity.Name, excludeId: null, ct).ConfigureAwait(false))
             throw new ValidationException("A shop with the same name already exists.");
 
-        return (await _repo.AddAsync(entity.ToDal(), ct).ConfigureAwait(false)).ToContract();
+        return await ServiceMappingHelper.CreateMappedAsync(entity.ToDal(), _repo.AddAsync, x => x.ToContract(), ct).ConfigureAwait(false);
     }
 
     public async Task UpdateAsync(ShopModel entity, CancellationToken ct = default)
@@ -62,5 +62,5 @@ public class ShopService : IShopService
     public Task DeleteAsync(int id, CancellationToken ct = default) => _repo.DeleteAsync(id, ct);
 
     public async Task<List<ShopModel>> GetByValueAsync(string value, CancellationToken ct = default)
-        => (await _repo.GetByValueAsync(value, ct).ConfigureAwait(false)).Select(x => x.ToContract()).ToList();
+        => await ServiceMappingHelper.GetMappedListAsync(token => _repo.GetByValueAsync(value, token), x => x.ToContract(), ct).ConfigureAwait(false);
 }

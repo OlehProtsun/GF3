@@ -15,13 +15,13 @@ public class ScheduleEmployeeService : IScheduleEmployeeService
     }
 
     public async Task<ScheduleEmployeeModel?> GetAsync(int id, CancellationToken ct = default)
-        => (await _repo.GetByIdAsync(id, ct).ConfigureAwait(false))?.ToContract();
+        => await ServiceMappingHelper.GetMappedAsync(token => _repo.GetByIdAsync(id, token), x => x.ToContract(), ct).ConfigureAwait(false);
 
     public async Task<List<ScheduleEmployeeModel>> GetAllAsync(CancellationToken ct = default)
-        => (await _repo.GetAllAsync(ct).ConfigureAwait(false)).Select(x => x.ToContract()).ToList();
+        => await ServiceMappingHelper.GetMappedListAsync(_repo.GetAllAsync, x => x.ToContract(), ct).ConfigureAwait(false);
 
     public async Task<ScheduleEmployeeModel> CreateAsync(ScheduleEmployeeModel entity, CancellationToken ct = default)
-        => (await _repo.AddAsync(entity.ToDal(), ct).ConfigureAwait(false)).ToContract();
+        => await ServiceMappingHelper.CreateMappedAsync(entity.ToDal(), _repo.AddAsync, x => x.ToContract(), ct).ConfigureAwait(false);
 
     public Task UpdateAsync(ScheduleEmployeeModel entity, CancellationToken ct = default)
         => _repo.UpdateAsync(entity.ToDal(), ct);
