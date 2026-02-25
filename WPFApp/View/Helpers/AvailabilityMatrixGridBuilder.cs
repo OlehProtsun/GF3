@@ -21,7 +21,7 @@ namespace WPFApp.View.Availability.Helpers
     public static class AvailabilityMatrixGridBuilder
     {
         // Єдина “правда” про назву колонки дня.
-        private const string DayColumnName = AvailabilityMatrixEngine.DayColumnName;
+        private static readonly string DayColumnName = AvailabilityMatrixEngine.DayColumnName;
 
         /// <summary>
         /// Побудувати колонки для editable матриці (EditView):

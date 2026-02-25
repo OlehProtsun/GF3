@@ -1,4 +1,6 @@
-﻿using BusinessLogicLayer.Availability;
+﻿using System;
+using BusinessLogicLayer.Availability;
+using BusinessLogicLayer.Contracts.Enums;
 
 namespace WPFApp.Applications.Matrix.Availability
 {
@@ -19,17 +21,24 @@ namespace WPFApp.Applications.Matrix.Availability
             if (raw.Length == 0)
                 return true;
 
-            if (!AvailabilityCodeParser.TryParse(raw, out var kind, out var interval))
+            if (!AvailabilityCodeParser.TryParse(raw, out var parsedKind, out var interval))
             {
                 error = "Allowed: +, -, HH:mm-HH:mm or HH:mm - HH:mm (e.g., 09:00-18:00).";
                 return false;
             }
 
-            if (kind == BusinessLogicLayer.Contracts.Enums.AvailabilityKind.INT && !string.IsNullOrWhiteSpace(interval))
+            // Bridge legacy parser enum -> contract enum (without DAL usage in WPF)
+            if (!Enum.TryParse<AvailabilityKind>(parsedKind.ToString(), ignoreCase: true, out var kind))
+            {
+                error = "Unsupported availability code kind.";
+                return false;
+            }
+
+            if (kind == AvailabilityKind.INT && !string.IsNullOrWhiteSpace(interval))
             {
                 if (!allowOvernight)
                 {
-                    var parts = interval.Split('-', 2, System.StringSplitOptions.TrimEntries);
+                    var parts = interval.Split('-', 2, StringSplitOptions.TrimEntries);
                     if (parts.Length == 2
                         && BusinessLogicLayer.Schedule.ScheduleMatrixEngine.TryParseTime(parts[0], out var from)
                         && BusinessLogicLayer.Schedule.ScheduleMatrixEngine.TryParseTime(parts[1], out var to)
@@ -46,8 +55,8 @@ namespace WPFApp.Applications.Matrix.Availability
 
             normalized = kind switch
             {
-                BusinessLogicLayer.Contracts.Enums.AvailabilityKind.ANY => AnyMark,
-                BusinessLogicLayer.Contracts.Enums.AvailabilityKind.NONE => NoneMark,
+                AvailabilityKind.ANY => AnyMark,
+                AvailabilityKind.NONE => NoneMark,
                 _ => string.Empty
             };
 

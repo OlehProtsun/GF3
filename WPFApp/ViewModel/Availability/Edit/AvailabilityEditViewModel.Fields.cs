@@ -26,7 +26,7 @@ namespace WPFApp.ViewModel.Availability.Edit
     public sealed partial class AvailabilityEditViewModel : ViewModelBase
     {
         // Day column name — єдиний центр правди (через engine).
-        private const string DayColumnName = AvailabilityMatrixEngine.DayColumnName;
+        private static readonly string DayColumnName = AvailabilityMatrixEngine.DayColumnName;
 
         // Owner — координатор екрану (Save/Cancel/UI messages/bind operations).
         private readonly AvailabilityViewModel _owner;

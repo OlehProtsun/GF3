@@ -22,7 +22,7 @@ namespace WPFApp.ViewModel.Availability.Profile
     public sealed class AvailabilityProfileViewModel : ViewModelBase
     {
         // Єдина “правда” про назву Day колонки.
-        private const string DayColumnName = AvailabilityMatrixEngine.DayColumnName;
+        private static readonly string DayColumnName = AvailabilityMatrixEngine.DayColumnName;
 
         // Owner (координатор): навігація / CRUD / повідомлення.
         private readonly AvailabilityViewModel _owner;
