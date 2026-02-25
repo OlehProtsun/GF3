@@ -9,13 +9,13 @@ using WPFApp.Applications.Diagnostics;
 using WPFApp.Applications.Notifications;
 using WPFApp.MVVM.Commands;
 using WPFApp.MVVM.Core;
-using DataAccessLayer.Administration;
+using BusinessLogicLayer.Services.Abstractions;
 
 namespace WPFApp.ViewModel.Database
 {
     public sealed class DatabaseViewModel : ViewModelBase
     {
-        private readonly ISqliteAdminService _sqliteAdminService;
+        private readonly ISqliteAdminFacade _sqliteAdminService;
         private readonly IDatabaseChangeNotifier _databaseChangeNotifier;
         private readonly ILoggerService _logger;
         private bool _autoQueryExecuted;
@@ -41,7 +41,7 @@ namespace WPFApp.ViewModel.Database
         private string _tablesSummary = "No tables.";
 
         public DatabaseViewModel(
-            ISqliteAdminService sqliteAdminService,
+            ISqliteAdminFacade sqliteAdminService,
             IDatabaseChangeNotifier databaseChangeNotifier,
             ILoggerService logger)
         {

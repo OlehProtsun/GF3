@@ -1,5 +1,5 @@
 ﻿using System.Collections.ObjectModel;    // ObservableCollection: колекція, яка повідомляє UI про зміни
-using DataAccessLayer.Models;            // ContainerModel: модель контейнера з DAL
+using BusinessLogicLayer.Contracts.Models;            // ContainerModel: модель контейнера з DAL
 using WPFApp.MVVM.Commands;
 using WPFApp.MVVM.Core;
 using WPFApp.ViewModel.Container.Edit;             // ViewModelBase, AsyncRelayCommand (базова інфраструктура VM/команд)

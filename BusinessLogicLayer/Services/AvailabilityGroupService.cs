@@ -1,134 +1,119 @@
-﻿using BusinessLogicLayer.Services.Abstractions;
-using DataAccessLayer.Models;
-using DataAccessLayer.Models.Enums;
+using BusinessLogicLayer.Contracts.Enums;
+using BusinessLogicLayer.Contracts.Models;
+using BusinessLogicLayer.Mappers;
+using BusinessLogicLayer.Services.Abstractions;
 using DataAccessLayer.Repositories.Abstractions;
-using System;
-using System.Collections.Generic;
-using System.Text;
 
-namespace BusinessLogicLayer.Services
+namespace BusinessLogicLayer.Services;
+
+public class AvailabilityGroupService : IAvailabilityGroupService
 {
-    // Можеш (необов'язково) наслідувати GenericService, якщо хочеш базовий CRUD для Group.
-    // Якщо не треба — прибери ": GenericService<AvailabilityGroupModel>" і base(groupRepo).
-    public class AvailabilityGroupService : GenericService<AvailabilityGroupModel>, IAvailabilityGroupService
+    private readonly IAvailabilityGroupRepository _groupRepo;
+    private readonly IAvailabilityGroupMemberRepository _memberRepo;
+    private readonly IAvailabilityGroupDayRepository _dayRepo;
+
+    public AvailabilityGroupService(
+        IAvailabilityGroupRepository groupRepo,
+        IAvailabilityGroupMemberRepository memberRepo,
+        IAvailabilityGroupDayRepository dayRepo)
     {
-        private readonly IAvailabilityGroupRepository _groupRepo;
-        private readonly IAvailabilityGroupMemberRepository _memberRepo;
-        private readonly IAvailabilityGroupDayRepository _dayRepo;
+        _groupRepo = groupRepo;
+        _memberRepo = memberRepo;
+        _dayRepo = dayRepo;
+    }
 
-        public AvailabilityGroupService(
-            IAvailabilityGroupRepository groupRepo,
-            IAvailabilityGroupMemberRepository memberRepo,
-            IAvailabilityGroupDayRepository dayRepo)
-            : base(groupRepo)
+    public async Task<AvailabilityGroupModel?> GetAsync(int id, CancellationToken ct = default)
+        => (await _groupRepo.GetByIdAsync(id, ct).ConfigureAwait(false))?.ToContract();
+
+    public async Task<List<AvailabilityGroupModel>> GetAllAsync(CancellationToken ct = default)
+        => (await _groupRepo.GetAllAsync(ct).ConfigureAwait(false)).Select(x => x.ToContract()).ToList();
+
+    public async Task<AvailabilityGroupModel> CreateAsync(AvailabilityGroupModel entity, CancellationToken ct = default)
+        => (await _groupRepo.AddAsync(entity.ToDal(), ct).ConfigureAwait(false)).ToContract();
+
+    public Task UpdateAsync(AvailabilityGroupModel entity, CancellationToken ct = default)
+        => _groupRepo.UpdateAsync(entity.ToDal(), ct);
+
+    public Task DeleteAsync(int id, CancellationToken ct = default)
+        => _groupRepo.DeleteAsync(id, ct);
+
+    public async Task<List<AvailabilityGroupModel>> GetByValueAsync(string value, CancellationToken ct = default)
+        => (await _groupRepo.GetByValueAsync(value, ct).ConfigureAwait(false)).Select(x => x.ToContract()).ToList();
+
+    public async Task<(AvailabilityGroupModel group, List<AvailabilityGroupMemberModel> members, List<AvailabilityGroupDayModel> days)>
+        LoadFullAsync(int groupId, CancellationToken ct = default)
+    {
+        var full = await _groupRepo.GetFullByIdAsync(groupId, ct).ConfigureAwait(false)
+                   ?? throw new InvalidOperationException($"AvailabilityGroup with Id={groupId} not found.");
+
+        var members = full.Members?.Select(m => m.ToContract()).ToList() ?? new List<AvailabilityGroupMemberModel>();
+        var days = (await _dayRepo.GetByGroupIdAsync(groupId, ct).ConfigureAwait(false)).Select(d => d.ToContract()).ToList();
+        return (full.ToContract(), members, days);
+    }
+
+    public async Task SaveGroupAsync(
+        AvailabilityGroupModel group,
+        IList<(int employeeId, IList<AvailabilityGroupDayModel> days)> payload,
+        CancellationToken ct = default)
+    {
+        if (group is null) throw new ArgumentNullException(nameof(group));
+        if (payload is null) throw new ArgumentNullException(nameof(payload));
+
+        group.Name = (group.Name ?? string.Empty).Trim();
+
+        if (await _groupRepo.ExistsByNameAsync(group.Name, group.Year, group.Month, group.Id == 0 ? null : group.Id, ct).ConfigureAwait(false))
+            throw new System.ComponentModel.DataAnnotations.ValidationException(
+                "An availability group with the same name already exists for this month.");
+
+        if (group.Id == 0)
         {
-            _groupRepo = groupRepo;
-            _memberRepo = memberRepo;
-            _dayRepo = dayRepo;
+            var created = await _groupRepo.AddAsync(group.ToDal(), ct).ConfigureAwait(false);
+            group.Id = created.Id;
+        }
+        else
+        {
+            await _groupRepo.UpdateAsync(group.ToDal(), ct).ConfigureAwait(false);
         }
 
-        public async Task<List<AvailabilityGroupModel>> GetByValueAsync(
-            string value,
-            CancellationToken ct = default)
+        var groupId = group.Id;
+        var existingMembers = await _memberRepo.GetByGroupIdAsync(groupId, ct).ConfigureAwait(false);
+        var memberByEmployee = existingMembers.ToDictionary(m => m.EmployeeId);
+        var desiredEmployeeIds = payload.Select(x => x.employeeId).Distinct().ToHashSet();
+
+        foreach (var m in existingMembers)
         {
-            return await _groupRepo.GetByValueAsync(value, ct).ConfigureAwait(false);
+            if (!desiredEmployeeIds.Contains(m.EmployeeId))
+                await _memberRepo.DeleteAsync(m.Id, ct).ConfigureAwait(false);
         }
 
-        public async Task<(AvailabilityGroupModel group, List<AvailabilityGroupMemberModel> members, List<AvailabilityGroupDayModel> days)>
-            LoadFullAsync(int groupId, CancellationToken ct = default)
+        foreach (var (employeeId, days) in payload)
         {
-            // Якщо ти додав GetFullByIdAsync у репозиторій — це найзручніше:
-            var full = await _groupRepo.GetFullByIdAsync(groupId, ct).ConfigureAwait(false);
-            if (full is null)
-                throw new InvalidOperationException($"AvailabilityGroup with Id={groupId} not found.");
-
-            var members = full.Members?.ToList() ?? new List<AvailabilityGroupMemberModel>();
-
-            // days можуть бути вже включені (якщо ти include-ив їх у GetFullByIdAsync)
-            // але якщо ні — доберемо через dayRepo:
-            var days = await _dayRepo.GetByGroupIdAsync(groupId, ct).ConfigureAwait(false);
-            return (full, members, days);
-        }
-
-        public async Task SaveGroupAsync(
-            AvailabilityGroupModel group,
-            IList<(int employeeId, IList<AvailabilityGroupDayModel> days)> payload,
-            CancellationToken ct = default)
-        {
-
-            if (group is null) throw new ArgumentNullException(nameof(group));
-            if (payload is null) throw new ArgumentNullException(nameof(payload));
-
-            group.Name = (group.Name ?? string.Empty).Trim();
-
-            if (await _groupRepo.ExistsByNameAsync(group.Name, group.Year, group.Month, group.Id == 0 ? null : group.Id, ct)
-                    .ConfigureAwait(false))
-                throw new System.ComponentModel.DataAnnotations.ValidationException(
-                    "An availability group with the same name already exists for this month.");
-
-            // 1) Save group (важливо: гарантуємо, що group.Id оновиться у того ж інстансу)
-            if (group.Id == 0)
+            if (!memberByEmployee.TryGetValue(employeeId, out var member))
             {
-                var created = await _groupRepo.AddAsync(group, ct).ConfigureAwait(false);
-                group.Id = created.Id; // <-- ключовий рядок
-            }
-            else
-            {
-                await _groupRepo.UpdateAsync(group, ct).ConfigureAwait(false);
-            }
-
-            var groupId = group.Id;
-
-
-            // 2) Поточні members групи (1 запит)
-            var existingMembers = await _memberRepo.GetByGroupIdAsync(groupId, ct).ConfigureAwait(false);
-
-            // Будуємо lookup employeeId -> member
-            var memberByEmployee = existingMembers.ToDictionary(m => m.EmployeeId);
-
-            // 3) Які мають лишитись
-            var desiredEmployeeIds = payload.Select(x => x.employeeId).Distinct().ToHashSet();
-
-            // 4) Видаляємо зайвих members (дні каскадно видаляться, якщо налаштовано)
-            foreach (var m in existingMembers)
-            {
-                if (!desiredEmployeeIds.Contains(m.EmployeeId))
-                    await _memberRepo.DeleteAsync(m.Id, ct).ConfigureAwait(false);
-            }
-
-            // 5) Upsert member + replace days
-            foreach (var (employeeId, days) in payload)
-            {
-                // 5.1) Member: беремо з lookup (без додаткового SELECT)
-                if (!memberByEmployee.TryGetValue(employeeId, out var member))
+                member = await _memberRepo.AddAsync(new DataAccessLayer.Models.AvailabilityGroupMemberModel
                 {
-                    member = await _memberRepo.AddAsync(new AvailabilityGroupMemberModel
-                    {
-                        Id = 0,
-                        AvailabilityGroupId = groupId,
-                        EmployeeId = employeeId
-                    }, ct).ConfigureAwait(false);
+                    Id = 0,
+                    AvailabilityGroupId = groupId,
+                    EmployeeId = employeeId
+                }, ct).ConfigureAwait(false);
 
-                    memberByEmployee[employeeId] = member;
-                }
-
-                var memberId = member.Id;
-
-                // 5.2) Replace days
-                await _dayRepo.DeleteByMemberIdAsync(memberId, ct).ConfigureAwait(false);
-
-                foreach (var d in days)
-                {
-                    d.Id = 0;
-                    d.AvailabilityGroupMemberId = memberId;
-
-                    if (d.Kind != AvailabilityKind.INT)
-                        d.IntervalStr = null;
-                }
-
-                await _dayRepo.AddRangeAsync(days, ct).ConfigureAwait(false);
-
+                memberByEmployee[employeeId] = member;
             }
+
+            var memberId = member.Id;
+            await _dayRepo.DeleteByMemberIdAsync(memberId, ct).ConfigureAwait(false);
+
+            var dalDays = days.Select(d => d.ToDal()).ToList();
+            foreach (var d in dalDays)
+            {
+                d.Id = 0;
+                d.AvailabilityGroupMemberId = memberId;
+
+                if (d.Kind != DataAccessLayer.Models.Enums.AvailabilityKind.INT)
+                    d.IntervalStr = null;
+            }
+
+            await _dayRepo.AddRangeAsync(dalDays, ct).ConfigureAwait(false);
         }
     }
 }

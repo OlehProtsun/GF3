@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
-using DataAccessLayer.Models;
+using BusinessLogicLayer.Contracts.Models;
 using WPFApp.MVVM.Core;
 
 namespace WPFApp.ViewModel.Container.ScheduleEdit.Helpers

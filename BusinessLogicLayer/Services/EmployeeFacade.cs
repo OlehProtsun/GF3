@@ -1,6 +1,6 @@
 using BusinessLogicLayer.Contracts.Employees;
 using BusinessLogicLayer.Services.Abstractions;
-using DataAccessLayer.Models;
+using BusinessLogicLayer.Contracts.Models;
 
 namespace BusinessLogicLayer.Services
 {

@@ -1,5 +1,5 @@
 ﻿using BusinessLogicLayer;
-using DataAccessLayer.Models.DataBaseContext;
+using BusinessLogicLayer.Services.Abstractions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using System;
@@ -24,7 +24,6 @@ using WPFApp.Applications.Configuration;
 using WPFApp.Applications.Notifications;
 using WPFApp.Applications.Diagnostics;
 using WPFApp.Applications.Export;
-using DataAccessLayer.Administration;
 
 
 namespace WPFApp
@@ -48,9 +47,7 @@ namespace WPFApp
             // 1) DAL/BLL як у WinForms
             var dbPathProvider = new DatabasePathProvider();
             services.AddSingleton<IDatabasePathProvider>(dbPathProvider);
-            services.AddDataAccess(dbPathProvider.ConnectionString);
-
-            services.AddBusinessLogicLayer();
+            services.AddBusinessLogicStack(dbPathProvider.ConnectionString, dbPathProvider.DatabaseFilePath);
 
             // Те, що ти реєстрував вручну
             services.AddSingleton<BusinessLogicLayer.Generators.IScheduleGenerator,
@@ -70,10 +67,6 @@ namespace WPFApp
             services.AddSingleton<MainWindow>();
 
             services.AddSingleton<IColorPickerService, ColorPickerService>();
-            services.AddSingleton<ISqliteAdminService>(_ =>
-                new SqliteAdminService(
-                    dbPathProvider.ConnectionString,
-                    dbPathProvider.DatabaseFilePath));
             services.AddSingleton<ILoggerService>(_ => LoggerService.Instance);
             services.AddSingleton<IScheduleExportService, ScheduleExportService>();
             services.AddSingleton<IDatabaseChangeNotifier, DatabaseChangeNotifier>();

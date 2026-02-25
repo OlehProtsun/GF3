@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections;
 using System.ComponentModel;
-using DataAccessLayer.Models;
+using BusinessLogicLayer.Contracts.Models;
 using WPFApp.MVVM.Commands;
 using WPFApp.MVVM.Core;
 using WPFApp.MVVM.Validation;

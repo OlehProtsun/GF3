@@ -1,5 +1,5 @@
 using BusinessLogicLayer.Services.Abstractions;
-using DataAccessLayer.Models;
+using BusinessLogicLayer.Contracts.Models;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;

@@ -2,14 +2,14 @@
 // ПІДКЛЮЧЕННЯ ПРОСТОРІВ ІМЕН
 // --------------------------
 // Тут підключаються всі типи/моделі, які використовує ViewModel:
-// - DataAccessLayer.Models: моделі з БД/сервісу (ScheduleModel, ShopModel, EmployeeModel, SlotModel тощо)
+// - Business contract models: моделі з БД/сервісу (ScheduleModel, ShopModel, EmployeeModel, SlotModel тощо)
 // - System.*: базові колекції/дані/тексти
 // - WPFApp.Infrastructure.*: твої утиліти (MatrixEngine, ValidationErrors, Debouncer тощо)
 // - WPFApp.Service: команди/RelayCommand, AsyncRelayCommand (ймовірно звідси)
 using BusinessLogicLayer.Availability;
 using BusinessLogicLayer.Services.Abstractions;
-using DataAccessLayer.Models;
-using DataAccessLayer.Models.Enums;
+using BusinessLogicLayer.Contracts.Models;
+using BusinessLogicLayer.Contracts.Enums;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Data;

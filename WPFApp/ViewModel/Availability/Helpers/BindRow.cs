@@ -1,5 +1,5 @@
 ﻿using System;
-using DataAccessLayer.Models;
+using BusinessLogicLayer.Contracts.Models;
 using WPFApp.MVVM.Core;
 
 namespace WPFApp.ViewModel.Availability.Helpers
