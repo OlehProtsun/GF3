@@ -4,8 +4,8 @@ using System.Globalization;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
-using DataAccessLayer.Models;
-using DataAccessLayer.Models.Enums;
+using BusinessLogicLayer.Contracts.Models;
+using BusinessLogicLayer.Contracts.Enums;
 
 namespace BusinessLogicLayer.Generators
 {

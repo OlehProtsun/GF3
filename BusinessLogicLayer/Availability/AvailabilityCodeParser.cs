@@ -1,4 +1,4 @@
-﻿using DataAccessLayer.Models.Enums;
+﻿using BusinessLogicLayer.Contracts.Enums;
 using System.Globalization;
 
 namespace BusinessLogicLayer.Availability
