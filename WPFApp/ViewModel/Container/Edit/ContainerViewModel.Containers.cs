@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Threading;
 using WPFApp.ViewModel.Container.Edit.Helpers;
+using WPFApp.ViewModel.Shared;
 
 namespace WPFApp.ViewModel.Container.Edit
 {
@@ -72,36 +73,26 @@ namespace WPFApp.ViewModel.Container.Edit
         /// 2) CancelTarget = List — якщо користувач натисне Cancel, повертаємось у список
         /// 3) SwitchToEditAsync — переключаємо UI секцію (Navigation partial)
         /// </summary>
-        internal async Task StartAddAsync(CancellationToken ct = default)
-        {
-            var uiToken = ResetNavUiCts(ct);
-
-            await ShowNavWorkingAsync();
-            await Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
-
-            try
-            {
-                await RunOnUiThreadAsync(() =>
+        internal Task StartAddAsync(CancellationToken ct = default)
+            => UiOperationRunner.RunNavStatusFlowAsync(
+                ct,
+                ResetNavUiCts,
+                ShowNavWorkingAsync,
+                WaitForUiIdleAsync,
+                async _ =>
                 {
-                    EditVm.ResetForNew();
-                    CancelTarget = ContainerSection.List;
-                });
+                    await RunOnUiThreadAsync(() =>
+                    {
+                        EditVm.ResetForNew();
+                        CancelTarget = ContainerSection.List;
+                    });
 
-                await SwitchToEditAsync();
-
-                await Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
-                await ShowNavSuccessThenAutoHideAsync(uiToken, 700);
-            }
-            catch (OperationCanceledException)
-            {
-                await HideNavStatusAsync();
-            }
-            catch (Exception ex)
-            {
-                await HideNavStatusAsync();
-                ShowError(ex);
-            }
-        }
+                    await SwitchToEditAsync();
+                },
+                ShowNavSuccessThenAutoHideAsync,
+                HideNavStatusAsync,
+                ShowError,
+                successDelayMs: 700);
 
 
         /// <summary>
@@ -273,31 +264,23 @@ namespace WPFApp.ViewModel.Container.Edit
                 return;
             }
 
-            var uiToken = ResetNavUiCts(ct);
+            await UiOperationRunner.RunNavStatusFlowAsync(
+                ct,
+                ResetNavUiCts,
+                ShowNavWorkingAsync,
+                WaitForUiIdleAsync,
+                async uiToken =>
+                {
+                    await _containerService.DeleteAsync(currentId, uiToken);
 
-            await ShowNavWorkingAsync();
-            await Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
-
-            try
-            {
-                await _containerService.DeleteAsync(currentId, uiToken);
-
-                _databaseChangeNotifier.NotifyDatabaseChanged("Container.Delete");
-                await LoadContainersAsync(uiToken, selectId: null);
-                await SwitchToListAsync();
-
-                await Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
-                await ShowNavSuccessThenAutoHideAsync(uiToken, 900);
-            }
-            catch (OperationCanceledException)
-            {
-                await HideNavStatusAsync();
-            }
-            catch (Exception ex)
-            {
-                await HideNavStatusAsync();
-                ShowError(ex);
-            }
+                    _databaseChangeNotifier.NotifyDatabaseChanged("Container.Delete");
+                    await LoadContainersAsync(uiToken, selectId: null);
+                    await SwitchToListAsync();
+                },
+                ShowNavSuccessThenAutoHideAsync,
+                HideNavStatusAsync,
+                ShowError,
+                successDelayMs: 900);
         }
 
         /// <summary>

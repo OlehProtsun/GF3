@@ -11,6 +11,7 @@ using WPFApp.MVVM.Validation.Rules;
 using WPFApp.UI.Dialogs;
 using WPFApp.View.Dialogs;
 using WPFApp.ViewModel.Dialogs;
+using WPFApp.ViewModel.Shared;
 
 namespace WPFApp.ViewModel.Availability.Edit
 {
@@ -118,17 +119,7 @@ namespace WPFApp.ViewModel.Availability.Edit
             }
 
             // 2) Мапимо ключі валідатора -> властивості VM (Name -> AvailabilityName і т.д.)
-            var mapped = new Dictionary<string, string>(StringComparer.Ordinal);
-
-            foreach (var kv in errors)
-            {
-                var vmKey = MapValidationKeyToVm(kv.Key);
-                if (string.IsNullOrWhiteSpace(vmKey))
-                    continue;
-
-                if (!mapped.ContainsKey(vmKey))
-                    mapped[vmKey] = kv.Value;
-            }
+            var mapped = ValidationDictionaryHelper.RemapFirstErrors(errors, MapValidationKeyToVm);
 
             if (mapped.Count == 0)
             {
@@ -165,12 +156,7 @@ namespace WPFApp.ViewModel.Availability.Edit
             if (string.IsNullOrWhiteSpace(key))
                 return string.Empty;
 
-            key = key.Trim();
-
-            // Якщо валідатор повертає "Group.Name" / "Model.Year" — беремо останню частину
-            var dot = key.LastIndexOf('.');
-            if (dot >= 0 && dot < key.Length - 1)
-                key = key[(dot + 1)..];
+            key = ValidationDictionaryHelper.NormalizeLastSegment(key);
 
             return key switch
             {

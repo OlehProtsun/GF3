@@ -17,6 +17,7 @@ using WPFApp.ViewModel.Container.List;
 using WPFApp.ViewModel.Container.Profile;
 using WPFApp.ViewModel.Container.ScheduleEdit;
 using WPFApp.ViewModel.Container.ScheduleProfile;
+using WPFApp.ViewModel.Shared;
 
 namespace WPFApp.ViewModel.Container.Edit
 {
@@ -123,6 +124,9 @@ namespace WPFApp.ViewModel.Container.Edit
 
         private Task HideNavStatusAsync()
             => RunOnUiThreadAsync(() => IsNavStatusVisible = false);
+
+        private Task WaitForUiIdleAsync()
+            => System.Windows.Application.Current.Dispatcher.InvokeAsync(() => { }, System.Windows.Threading.DispatcherPriority.ApplicationIdle).Task;
 
         private async Task ShowNavSuccessThenAutoHideAsync(CancellationToken ct, int ms = 900)
         {

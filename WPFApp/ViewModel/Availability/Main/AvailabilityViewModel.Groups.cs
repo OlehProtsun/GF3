@@ -5,7 +5,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
-using System.Windows.Threading;
+using WPFApp.ViewModel.Shared;
 
 namespace WPFApp.ViewModel.Availability.Main
 {
@@ -35,39 +35,29 @@ namespace WPFApp.ViewModel.Availability.Main
             ListVm.SetItems(list);
         }
 
-        internal async Task StartAddAsync(CancellationToken ct = default)
-        {
-            var uiToken = ResetNavUiCts(ct);
-
-            await ShowNavWorkingAsync();
-            await Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
-
-            try
-            {
-                await LoadEmployeesAsync(uiToken);
-
-                await RunOnUiThreadAsync(() =>
+        internal Task StartAddAsync(CancellationToken ct = default)
+            => UiOperationRunner.RunNavStatusFlowAsync(
+                ct,
+                ResetNavUiCts,
+                ShowNavWorkingAsync,
+                WaitForUiIdleAsync,
+                async uiToken =>
                 {
-                    ResetEmployeeSearch();
-                    EditVm.ResetForNew();
-                    CancelTarget = AvailabilitySection.List;
-                });
+                    await LoadEmployeesAsync(uiToken);
 
-                await SwitchToEditAsync();
+                    await RunOnUiThreadAsync(() =>
+                    {
+                        ResetEmployeeSearch();
+                        EditVm.ResetForNew();
+                        CancelTarget = AvailabilitySection.List;
+                    });
 
-                await Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
-                await ShowNavSuccessThenAutoHideAsync(uiToken, 700);
-            }
-            catch (OperationCanceledException)
-            {
-                await HideNavStatusAsync();
-            }
-            catch (Exception ex)
-            {
-                await HideNavStatusAsync();
-                ShowError(ex);
-            }
-        }
+                    await SwitchToEditAsync();
+                },
+                ShowNavSuccessThenAutoHideAsync,
+                HideNavStatusAsync,
+                ShowError,
+                successDelayMs: 700);
 
         internal async Task EditSelectedAsync(CancellationToken ct = default)
         {
@@ -75,40 +65,32 @@ namespace WPFApp.ViewModel.Availability.Main
             if (selected is null)
                 return;
 
-            var uiToken = ResetNavUiCts(ct);
-
-            await ShowNavWorkingAsync();
-            await Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
-
-            try
-            {
-                await LoadEmployeesAsync(uiToken);
-
-                var (group, members, days) = await _availabilityService.LoadFullAsync(selected.Id, uiToken);
-
-                await RunOnUiThreadAsync(() =>
+            await UiOperationRunner.RunNavStatusFlowAsync(
+                ct,
+                ResetNavUiCts,
+                ShowNavWorkingAsync,
+                WaitForUiIdleAsync,
+                async uiToken =>
                 {
-                    EditVm.LoadGroup(group, members, days, _employeeNames);
+                    await LoadEmployeesAsync(uiToken);
 
-                    CancelTarget = Mode == AvailabilitySection.Profile
-                        ? AvailabilitySection.Profile
-                        : AvailabilitySection.List;
-                });
+                    var (group, members, days) = await _availabilityService.LoadFullAsync(selected.Id, uiToken);
 
-                await SwitchToEditAsync();
+                    await RunOnUiThreadAsync(() =>
+                    {
+                        EditVm.LoadGroup(group, members, days, _employeeNames);
 
-                await Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
-                await ShowNavSuccessThenAutoHideAsync(uiToken, 700);
-            }
-            catch (OperationCanceledException)
-            {
-                await HideNavStatusAsync();
-            }
-            catch (Exception ex)
-            {
-                await HideNavStatusAsync();
-                ShowError(ex);
-            }
+                        CancelTarget = Mode == AvailabilitySection.Profile
+                            ? AvailabilitySection.Profile
+                            : AvailabilitySection.List;
+                    });
+
+                    await SwitchToEditAsync();
+                },
+                ShowNavSuccessThenAutoHideAsync,
+                HideNavStatusAsync,
+                ShowError,
+                successDelayMs: 700);
         }
 
         internal async Task SaveAsync(CancellationToken ct = default)
@@ -170,49 +152,40 @@ namespace WPFApp.ViewModel.Availability.Main
                 return;
             }
 
-            var uiToken = ResetNavUiCts(ct);
-
-            await ShowNavWorkingAsync();
-            await Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
-
-            try
-            {
-                await _availabilityService.SaveGroupAsync(group, payload, uiToken);
-
-                _databaseChangeNotifier.NotifyDatabaseChanged("Availability.Save");
-
-                await LoadAllGroupsAsync(uiToken);
-
-                if (CancelTarget == AvailabilitySection.Profile)
+            await UiOperationRunner.RunNavStatusFlowAsync(
+                ct,
+                ResetNavUiCts,
+                ShowNavWorkingAsync,
+                WaitForUiIdleAsync,
+                async uiToken =>
                 {
-                    var profileId = _openedProfileGroupId ?? group.Id;
+                    await _availabilityService.SaveGroupAsync(group, payload, uiToken);
 
-                    if (profileId > 0)
+                    _databaseChangeNotifier.NotifyDatabaseChanged("Availability.Save");
+
+                    await LoadAllGroupsAsync(uiToken);
+
+                    if (CancelTarget == AvailabilitySection.Profile)
                     {
-                        var (g, members, days) = await _availabilityService.LoadFullAsync(profileId, uiToken);
-                        await RunOnUiThreadAsync(() => ProfileVm.SetProfile(g, members, days));
+                        var profileId = _openedProfileGroupId ?? group.Id;
+
+                        if (profileId > 0)
+                        {
+                            var (g, members, days) = await _availabilityService.LoadFullAsync(profileId, uiToken);
+                            await RunOnUiThreadAsync(() => ProfileVm.SetProfile(g, members, days));
+                        }
+
+                        await SwitchToProfileAsync();
                     }
-
-                    await SwitchToProfileAsync();
-                }
-                else
-                {
-                    await SwitchToListAsync();
-                }
-
-                await Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
-                await ShowNavSuccessThenAutoHideAsync(uiToken, 900);
-            }
-            catch (OperationCanceledException)
-            {
-                await HideNavStatusAsync();
-            }
-            catch (Exception ex)
-            {
-                await HideNavStatusAsync();
-                ShowError(ex);
-                return;
-            }
+                    else
+                    {
+                        await SwitchToListAsync();
+                    }
+                },
+                ShowNavSuccessThenAutoHideAsync,
+                HideNavStatusAsync,
+                ShowError,
+                successDelayMs: 900);
         }
 
         internal async Task DeleteSelectedAsync(CancellationToken ct = default)
@@ -226,31 +199,23 @@ namespace WPFApp.ViewModel.Availability.Main
             if (!Confirm($"Delete '{current.Name}' ?"))
                 return;
 
-            var uiToken = ResetNavUiCts(ct);
+            await UiOperationRunner.RunNavStatusFlowAsync(
+                ct,
+                ResetNavUiCts,
+                ShowNavWorkingAsync,
+                WaitForUiIdleAsync,
+                async uiToken =>
+                {
+                    await _availabilityService.DeleteAsync(current.Id, uiToken);
 
-            await ShowNavWorkingAsync();
-            await Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
-
-            try
-            {
-                await _availabilityService.DeleteAsync(current.Id, uiToken);
-
-                _databaseChangeNotifier.NotifyDatabaseChanged("Availability.Delete");
-                await LoadAllGroupsAsync(uiToken);
-                await SwitchToListAsync();
-
-                await Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
-                await ShowNavSuccessThenAutoHideAsync(uiToken, 900);
-            }
-            catch (OperationCanceledException)
-            {
-                await HideNavStatusAsync();
-            }
-            catch (Exception ex)
-            {
-                await HideNavStatusAsync();
-                ShowError(ex);
-            }
+                    _databaseChangeNotifier.NotifyDatabaseChanged("Availability.Delete");
+                    await LoadAllGroupsAsync(uiToken);
+                    await SwitchToListAsync();
+                },
+                ShowNavSuccessThenAutoHideAsync,
+                HideNavStatusAsync,
+                ShowError,
+                successDelayMs: 900);
         }
 
         internal async Task OpenProfileAsync(CancellationToken ct = default)
@@ -259,36 +224,28 @@ namespace WPFApp.ViewModel.Availability.Main
             if (current is null)
                 return;
 
-            var uiToken = ResetNavUiCts(ct);
-
-            await ShowNavWorkingAsync();
-            await Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
-
-            try
-            {
-                var (group, members, days) = await _availabilityService.LoadFullAsync(current.Id, uiToken);
-
-                await RunOnUiThreadAsync(() =>
+            await UiOperationRunner.RunNavStatusFlowAsync(
+                ct,
+                ResetNavUiCts,
+                ShowNavWorkingAsync,
+                WaitForUiIdleAsync,
+                async uiToken =>
                 {
-                    _openedProfileGroupId = current.Id;
-                    ProfileVm.SetProfile(group, members, days);
-                    CancelTarget = AvailabilitySection.List;
-                });
+                    var (group, members, days) = await _availabilityService.LoadFullAsync(current.Id, uiToken);
 
-                await SwitchToProfileAsync();
+                    await RunOnUiThreadAsync(() =>
+                    {
+                        _openedProfileGroupId = current.Id;
+                        ProfileVm.SetProfile(group, members, days);
+                        CancelTarget = AvailabilitySection.List;
+                    });
 
-                await Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
-                await ShowNavSuccessThenAutoHideAsync(uiToken, 900);
-            }
-            catch (OperationCanceledException)
-            {
-                await HideNavStatusAsync();
-            }
-            catch (Exception ex)
-            {
-                await HideNavStatusAsync();
-                ShowError(ex);
-            }
+                    await SwitchToProfileAsync();
+                },
+                ShowNavSuccessThenAutoHideAsync,
+                HideNavStatusAsync,
+                ShowError,
+                successDelayMs: 900);
         }
 
         internal Task CancelAsync()

@@ -10,6 +10,7 @@ using WPFApp.UI.Dialogs;
 using WPFApp.View.Dialogs;
 using WPFApp.ViewModel.Dialogs;
 using WPFApp.ViewModel.Shop.Helpers;
+using WPFApp.ViewModel.Shared;
 
 namespace WPFApp.ViewModel.Shop
 {
@@ -225,36 +226,26 @@ namespace WPFApp.ViewModel.Shop
             ListVm.SetItems(list);
         }
 
-        internal async Task StartAddAsync(CancellationToken ct = default)
-        {
-            var uiToken = ResetNavUiCts(ct);
-
-            await ShowNavWorkingAsync();
-            await Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
-
-            try
-            {
-                await RunOnUiThreadAsync(() =>
+        internal Task StartAddAsync(CancellationToken ct = default)
+            => UiOperationRunner.RunNavStatusFlowAsync(
+                ct,
+                ResetNavUiCts,
+                ShowNavWorkingAsync,
+                WaitForUiIdleAsync,
+                async uiToken =>
                 {
-                    EditVm.ResetForNew();
-                    CancelTarget = ShopSection.List;
-                });
+                    await RunOnUiThreadAsync(() =>
+                    {
+                        EditVm.ResetForNew();
+                        CancelTarget = ShopSection.List;
+                    });
 
-                await SwitchToEditAsync();
-
-                await Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
-                await ShowNavSuccessThenAutoHideAsync(uiToken, 700);
-            }
-            catch (OperationCanceledException)
-            {
-                await HideNavStatusAsync();
-            }
-            catch (Exception ex)
-            {
-                await HideNavStatusAsync();
-                ShowError(ex);
-            }
-        }
+                    await SwitchToEditAsync();
+                },
+                ShowNavSuccessThenAutoHideAsync,
+                HideNavStatusAsync,
+                ShowError,
+                successDelayMs: 700);
 
         internal async Task EditSelectedAsync(CancellationToken ct = default)
         {
@@ -262,38 +253,30 @@ namespace WPFApp.ViewModel.Shop
             if (selected is null)
                 return;
 
-            var uiToken = ResetNavUiCts(ct);
-
-            await ShowNavWorkingAsync();
-            await Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
-
-            try
-            {
-                var latest = await _shopService.GetAsync(selected.Id, uiToken) ?? selected;
-
-                await RunOnUiThreadAsync(() =>
+            await UiOperationRunner.RunNavStatusFlowAsync(
+                ct,
+                ResetNavUiCts,
+                ShowNavWorkingAsync,
+                WaitForUiIdleAsync,
+                async uiToken =>
                 {
-                    EditVm.SetShop(latest);
+                    var latest = await _shopService.GetAsync(selected.Id, uiToken) ?? selected;
 
-                    CancelTarget = Mode == ShopSection.Profile
-                        ? ShopSection.Profile
-                        : ShopSection.List;
-                });
+                    await RunOnUiThreadAsync(() =>
+                    {
+                        EditVm.SetShop(latest);
 
-                await SwitchToEditAsync();
+                        CancelTarget = Mode == ShopSection.Profile
+                            ? ShopSection.Profile
+                            : ShopSection.List;
+                    });
 
-                await Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
-                await ShowNavSuccessThenAutoHideAsync(uiToken, 700);
-            }
-            catch (OperationCanceledException)
-            {
-                await HideNavStatusAsync();
-            }
-            catch (Exception ex)
-            {
-                await HideNavStatusAsync();
-                ShowError(ex);
-            }
+                    await SwitchToEditAsync();
+                },
+                ShowNavSuccessThenAutoHideAsync,
+                HideNavStatusAsync,
+                ShowError,
+                successDelayMs: 700);
         }
 
         // =========================================================
@@ -313,70 +296,62 @@ namespace WPFApp.ViewModel.Shop
                 return;
             }
 
-            var uiToken = ResetNavUiCts(ct);
-
-            await ShowNavWorkingAsync();
-            await Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
-
-            try
-            {
-                ShopDto? createdShop = null;
-
-                if (EditVm.IsEdit)
+            await UiOperationRunner.RunNavStatusFlowAsync(
+                ct,
+                ResetNavUiCts,
+                ShowNavWorkingAsync,
+                WaitForUiIdleAsync,
+                async uiToken =>
                 {
-                    await _shopService.UpdateAsync(request, uiToken);
-                }
-                else
-                {
-                    createdShop = await _shopService.CreateAsync(request, uiToken);
-                    await RunOnUiThreadAsync(() => EditVm.ShopId = createdShop.Id);
-                }
+                    ShopDto? createdShop = null;
 
-                var savedShopId = createdShop?.Id ?? request.Id;
-
-                _databaseChangeNotifier.NotifyDatabaseChanged("Shop.Save");
-
-                await LoadShopsAsync(uiToken, selectId: savedShopId);
-
-                if (CancelTarget == ShopSection.Profile)
-                {
-                    var profileId = _openedProfileShopId ?? savedShopId;
-
-                    if (profileId > 0)
+                    if (EditVm.IsEdit)
                     {
-                        var latest = await _shopService.GetAsync(profileId, uiToken)
-                                     ?? createdShop
-                                     ?? ListVm.SelectedItem;
-
-                        if (latest != null)
-                        {
-                            await RunOnUiThreadAsync(() =>
-                            {
-                                ProfileVm.SetProfile(latest);
-                                ListVm.SelectedItem = latest;
-                            });
-                        }
+                        await _shopService.UpdateAsync(request, uiToken);
+                    }
+                    else
+                    {
+                        createdShop = await _shopService.CreateAsync(request, uiToken);
+                        await RunOnUiThreadAsync(() => EditVm.ShopId = createdShop.Id);
                     }
 
-                    await SwitchToProfileAsync();
-                }
-                else
-                {
-                    await SwitchToListAsync();
-                }
+                    var savedShopId = createdShop?.Id ?? request.Id;
 
-                await Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
-                await ShowNavSuccessThenAutoHideAsync(uiToken, 900);
-            }
-            catch (OperationCanceledException)
-            {
-                await HideNavStatusAsync();
-            }
-            catch (Exception ex)
-            {
-                await HideNavStatusAsync();
-                ShowError(ex);
-            }
+                    _databaseChangeNotifier.NotifyDatabaseChanged("Shop.Save");
+
+                    await LoadShopsAsync(uiToken, selectId: savedShopId);
+
+                    if (CancelTarget == ShopSection.Profile)
+                    {
+                        var profileId = _openedProfileShopId ?? savedShopId;
+
+                        if (profileId > 0)
+                        {
+                            var latest = await _shopService.GetAsync(profileId, uiToken)
+                                         ?? createdShop
+                                         ?? ListVm.SelectedItem;
+
+                            if (latest != null)
+                            {
+                                await RunOnUiThreadAsync(() =>
+                                {
+                                    ProfileVm.SetProfile(latest);
+                                    ListVm.SelectedItem = latest;
+                                });
+                            }
+                        }
+
+                        await SwitchToProfileAsync();
+                    }
+                    else
+                    {
+                        await SwitchToListAsync();
+                    }
+                },
+                ShowNavSuccessThenAutoHideAsync,
+                HideNavStatusAsync,
+                ShowError,
+                successDelayMs: 900);
         }
 
         internal async Task DeleteSelectedAsync(CancellationToken ct = default)
@@ -401,31 +376,23 @@ namespace WPFApp.ViewModel.Shop
                 return;
             }
 
-            var uiToken = ResetNavUiCts(ct);
+            await UiOperationRunner.RunNavStatusFlowAsync(
+                ct,
+                ResetNavUiCts,
+                ShowNavWorkingAsync,
+                WaitForUiIdleAsync,
+                async uiToken =>
+                {
+                    await _shopService.DeleteAsync(currentId, uiToken);
 
-            await ShowNavWorkingAsync();
-            await Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
-
-            try
-            {
-                await _shopService.DeleteAsync(currentId, uiToken);
-
-                _databaseChangeNotifier.NotifyDatabaseChanged("Shop.Delete");
-                await LoadShopsAsync(uiToken, selectId: null);
-                await SwitchToListAsync();
-
-                await Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
-                await ShowNavSuccessThenAutoHideAsync(uiToken, 900);
-            }
-            catch (OperationCanceledException)
-            {
-                await HideNavStatusAsync();
-            }
-            catch (Exception ex)
-            {
-                await HideNavStatusAsync();
-                ShowError(ex);
-            }
+                    _databaseChangeNotifier.NotifyDatabaseChanged("Shop.Delete");
+                    await LoadShopsAsync(uiToken, selectId: null);
+                    await SwitchToListAsync();
+                },
+                ShowNavSuccessThenAutoHideAsync,
+                HideNavStatusAsync,
+                ShowError,
+                successDelayMs: 900);
         }
 
         internal async Task OpenProfileAsync(CancellationToken ct = default)
@@ -434,37 +401,29 @@ namespace WPFApp.ViewModel.Shop
             if (selected is null)
                 return;
 
-            var uiToken = ResetNavUiCts(ct);
-
-            await ShowNavWorkingAsync();
-            await Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
-
-            try
-            {
-                var latest = await _shopService.GetAsync(selected.Id, uiToken) ?? selected;
-
-                await RunOnUiThreadAsync(() =>
+            await UiOperationRunner.RunNavStatusFlowAsync(
+                ct,
+                ResetNavUiCts,
+                ShowNavWorkingAsync,
+                WaitForUiIdleAsync,
+                async uiToken =>
                 {
-                    _openedProfileShopId = latest.Id;
-                    ProfileVm.SetProfile(latest);
-                    ListVm.SelectedItem = latest;
-                    CancelTarget = ShopSection.List;
-                });
+                    var latest = await _shopService.GetAsync(selected.Id, uiToken) ?? selected;
 
-                await SwitchToProfileAsync();
+                    await RunOnUiThreadAsync(() =>
+                    {
+                        _openedProfileShopId = latest.Id;
+                        ProfileVm.SetProfile(latest);
+                        ListVm.SelectedItem = latest;
+                        CancelTarget = ShopSection.List;
+                    });
 
-                await Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
-                await ShowNavSuccessThenAutoHideAsync(uiToken, 900);
-            }
-            catch (OperationCanceledException)
-            {
-                await HideNavStatusAsync();
-            }
-            catch (Exception ex)
-            {
-                await HideNavStatusAsync();
-                ShowError(ex);
-            }
+                    await SwitchToProfileAsync();
+                },
+                ShowNavSuccessThenAutoHideAsync,
+                HideNavStatusAsync,
+                ShowError,
+                successDelayMs: 900);
         }
 
         internal Task CancelAsync()
@@ -584,6 +543,10 @@ namespace WPFApp.ViewModel.Shop
                 Interlocked.Exchange(ref _databaseReloadInProgress, 0);
             }
         }
+
+
+        private Task WaitForUiIdleAsync()
+            => Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle).Task;
 
         internal Task RunOnUiThreadAsync(Action action)
         {
