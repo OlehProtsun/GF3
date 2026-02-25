@@ -335,7 +335,7 @@ namespace WPFApp.View.Container
             grid.SetValue(ScrollViewer.CanContentScrollProperty, true);
 
             // deferred scrolling інколи робить UX гіршим (підвисання під час thumb drag)
-            grid.SetValue(ScrollViewer.IsDeferredScrollingEnabledProperty, false);
+            grid.SetValue(ScrollViewer.IsDeferredScrollingEnabledProperty, true);
 
             // оптимізація scroll unit
             grid.SetValue(VirtualizingPanel.ScrollUnitProperty, ScrollUnit.Item);

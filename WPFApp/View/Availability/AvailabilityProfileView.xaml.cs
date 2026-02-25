@@ -94,7 +94,7 @@ namespace WPFApp.View.Availability
             //    Це робить код стійкішим, якщо колись MatrixChanged буде підніматися з background.
             if (!Dispatcher.CheckAccess())
             {
-                Dispatcher.Invoke(() => VmOnMatrixChanged(sender, e));
+                _ = Dispatcher.BeginInvoke(new Action(() => VmOnMatrixChanged(sender, e)));
                 return;
             }
 

@@ -53,7 +53,7 @@ namespace WPFApp.View.Container
             VirtualizingPanel.SetVirtualizationMode(grid, VirtualizationMode.Recycling);
 
             grid.SetValue(ScrollViewer.CanContentScrollProperty, true);
-            grid.SetValue(ScrollViewer.IsDeferredScrollingEnabledProperty, false);
+            grid.SetValue(ScrollViewer.IsDeferredScrollingEnabledProperty, true);
 
             grid.SetValue(VirtualizingPanel.ScrollUnitProperty, ScrollUnit.Item);
             VirtualizingPanel.SetCacheLengthUnit(grid, VirtualizationCacheLengthUnit.Page);

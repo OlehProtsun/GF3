@@ -114,7 +114,7 @@ namespace WPFApp.View.Availability
             // 2) Маршалимо у UI thread (стійкість).
             if (!Dispatcher.CheckAccess())
             {
-                Dispatcher.Invoke(() => VmOnMatrixChanged(sender, e));
+                _ = Dispatcher.BeginInvoke(new Action(() => VmOnMatrixChanged(sender, e)));
                 return;
             }
 
