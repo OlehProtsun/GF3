@@ -22,7 +22,9 @@ namespace BusinessLogicLayer
             serviceCollection.AddScoped<IShopFacade, ShopFacade>();
             serviceCollection.AddScoped<IEmployeeFacade, EmployeeFacade>();
             serviceCollection.AddScoped<IScheduleExportDataBuilder, Services.Export.ScheduleExportDataBuilder>();
+            serviceCollection.AddScoped<IGraphExportService, GraphExportService>();
             serviceCollection.AddScoped<ISqliteAdminFacade, SqliteAdminFacade>();
+            serviceCollection.AddScoped<IAdminDbService, AdminDbService>();
             serviceCollection.AddTransient<IScheduleGenerator, ScheduleGenerator>();
 
             return serviceCollection;
