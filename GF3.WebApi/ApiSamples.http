@@ -176,3 +176,53 @@ Content-Type: application/json
   "returnSlots": false
 }
 
+
+### Graph export - Excel-compatible CSV
+GET {{host}}/api/containers/1/graphs/1/export/excel?includeStyles=true&includeEmployees=true
+Accept: text/csv
+
+### Graph export - SQL script
+GET {{host}}/api/containers/1/graphs/1/export/sql?includeStyles=true&includeEmployees=true
+Accept: text/plain
+
+@adminToken = someSecret
+
+### Admin DB - metadata (requires localhost + X-Admin-Token + enabled tools)
+GET {{host}}/api/admin/db/metadata
+X-Admin-Token: {{adminToken}}
+Accept: application/json
+
+### Admin DB - hash
+GET {{host}}/api/admin/db/hash
+X-Admin-Token: {{adminToken}}
+Accept: application/json
+
+### Admin DB - query (read-only)
+POST {{host}}/api/admin/db/query
+X-Admin-Token: {{adminToken}}
+Content-Type: application/json
+
+{
+  "sql": "SELECT 1 AS value"
+}
+
+### Admin DB - execute (works only if AllowWriteSql=true)
+POST {{host}}/api/admin/db/execute
+X-Admin-Token: {{adminToken}}
+Content-Type: application/json
+
+{
+  "sql": "UPDATE schedule SET note = 'updated via admin endpoint' WHERE id = 1"
+}
+
+### Admin DB - import SQL file multipart (works only if AllowWriteSql=true)
+POST {{host}}/api/admin/db/import
+X-Admin-Token: {{adminToken}}
+Content-Type: multipart/form-data; boundary=boundary
+
+--boundary
+Content-Disposition: form-data; name="file"; filename="import.sql"
+Content-Type: application/sql
+
+SELECT 1;
+--boundary--
