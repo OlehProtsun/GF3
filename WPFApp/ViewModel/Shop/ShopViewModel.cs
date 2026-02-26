@@ -1,4 +1,9 @@
-﻿using System.Windows;
+/*
+  Опис файлу: цей модуль містить реалізацію компонента ShopViewModel у шарі WPFApp.
+  Призначення: інкапсулювати поведінку UI або прикладної логіки без зміни доменної моделі.
+  Примітка: коментарі описують спостережуваний потік даних, очікувані обмеження та точки взаємодії.
+*/
+using System.Windows;
 using System.Windows.Threading;
 using BusinessLogicLayer.Contracts.Shops;
 using BusinessLogicLayer.Services.Abstractions;
@@ -14,6 +19,9 @@ using WPFApp.Applications.Diagnostics;
 
 namespace WPFApp.ViewModel.Shop
 {
+    /// <summary>
+    /// Визначає публічний елемент `public enum ShopSection` та контракт його використання у шарі WPFApp.
+    /// </summary>
     public enum ShopSection
     {
         List,
@@ -21,24 +29,27 @@ namespace WPFApp.ViewModel.Shop
         Profile
     }
 
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
     /// <summary>
-    /// ShopViewModel — owner/coordinator модуля Shop.
-    ///
-    /// Відповідальність:
-    /// - тримати 3 під-VM: List/Edit/Profile
-    /// - керувати навігацією: CurrentSection + Mode + CancelTarget
-    /// - виконувати CRUD через IShopFacade
-    /// - показувати повідомлення користувачу
-    ///
-    /// Оптимізації:
-    /// 1) EnsureInitializedAsync:
-    ///    - конкурентні виклики чекають один init-task
-    ///    - _initialized стає true лише після успішного завершення
-    /// 2) Валідація перенесена в ShopValidationRules
-    /// 3) Після Save:
-    ///    - робимо reload списку
-    ///    - відновлюємо selection
-    ///    - якщо повертаємось у Profile — refresh profile
+    /// Визначає публічний елемент `public sealed class ShopViewModel : ViewModelBase` та контракт його використання у шарі WPFApp.
     /// </summary>
     public sealed class ShopViewModel : ViewModelBase
     {
@@ -46,18 +57,21 @@ namespace WPFApp.ViewModel.Shop
         private readonly IDatabaseChangeNotifier _databaseChangeNotifier;
                 private int _databaseReloadInProgress;
 
-        // ----------------------------
-        // Initialization (safe, без гонок)
-        // ----------------------------
+        
+        
+        
 
         private bool _initialized;
         private Task? _initializeTask;
         private readonly object _initLock = new();
 
-        // Id профілю, який зараз відкрито (щоб після Save можна було refresh).
+        
         private int? _openedProfileShopId;
 
         private bool _isNavStatusVisible;
+        /// <summary>
+        /// Визначає публічний елемент `public bool IsNavStatusVisible` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public bool IsNavStatusVisible
         {
             get => _isNavStatusVisible;
@@ -65,6 +79,9 @@ namespace WPFApp.ViewModel.Shop
         }
 
         private UIStatusKind _navStatus = UIStatusKind.Success;
+        /// <summary>
+        /// Визначає публічний елемент `public UIStatusKind NavStatus` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public UIStatusKind NavStatus
         {
             get => _navStatus;
@@ -105,11 +122,14 @@ namespace WPFApp.ViewModel.Shop
             await HideNavStatusAsync().ConfigureAwait(false);
         }
 
-        // ----------------------------
-        // Navigation state
-        // ----------------------------
+        
+        
+        
 
         private object _currentSection = null!;
+        /// <summary>
+        /// Визначає публічний елемент `public object CurrentSection` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public object CurrentSection
         {
             get => _currentSection;
@@ -117,25 +137,43 @@ namespace WPFApp.ViewModel.Shop
         }
 
         private ShopSection _mode = ShopSection.List;
+        /// <summary>
+        /// Визначає публічний елемент `public ShopSection Mode` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public ShopSection Mode
         {
             get => _mode;
             private set => SetProperty(ref _mode, value);
         }
 
+        
+        
+        
         /// <summary>
-        /// CancelTarget — куди повертаємось з Edit при Cancel (List або Profile).
+        /// Визначає публічний елемент `public ShopSection CancelTarget { get; private set; } = ShopSection.List;` та контракт його використання у шарі WPFApp.
         /// </summary>
         public ShopSection CancelTarget { get; private set; } = ShopSection.List;
 
-        // ----------------------------
-        // Child VMs
-        // ----------------------------
+        
+        
+        
 
+        /// <summary>
+        /// Визначає публічний елемент `public ShopListViewModel ListVm { get; }` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public ShopListViewModel ListVm { get; }
+        /// <summary>
+        /// Визначає публічний елемент `public ShopEditViewModel EditVm { get; }` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public ShopEditViewModel EditVm { get; }
+        /// <summary>
+        /// Визначає публічний елемент `public ShopProfileViewModel ProfileVm { get; }` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public ShopProfileViewModel ProfileVm { get; }
 
+        /// <summary>
+        /// Визначає публічний елемент `public ShopViewModel(` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public ShopViewModel(
             IShopFacade shopService,
             IDatabaseChangeNotifier databaseChangeNotifier
@@ -152,31 +190,34 @@ namespace WPFApp.ViewModel.Shop
             CurrentSection = ListVm;
         }
 
-        // =========================================================
-        // Initialization
-        // =========================================================
+        
+        
+        
 
+        /// <summary>
+        /// Визначає публічний елемент `public Task EnsureInitializedAsync(CancellationToken ct = default)` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public Task EnsureInitializedAsync(CancellationToken ct = default)
         {
-            // 1) Якщо вже ініціалізовано — ок.
+            
             if (_initialized)
                 return Task.CompletedTask;
 
-            // 2) Якщо task вже існує — повертаємо його.
+            
             if (_initializeTask != null)
                 return _initializeTask;
 
-            // 3) Створюємо init-task під lock, щоб не запускати двічі.
+            
             lock (_initLock)
             {
-                // 4) Перевірка повторно, бо поки чекали lock стан міг змінитись.
+                
                 if (_initialized)
                     return Task.CompletedTask;
 
                 if (_initializeTask != null)
                     return _initializeTask;
 
-                // 5) Створюємо реальний init-task.
+                
                 _initializeTask = InitializeCoreAsync(ct);
 
                 return _initializeTask;
@@ -187,15 +228,15 @@ namespace WPFApp.ViewModel.Shop
         {
             try
             {
-                // 1) Завантажуємо початковий список.
+                
                 await LoadShopsAsync(ct, selectId: null);
 
-                // 2) Тільки тут ставимо _initialized=true (після успіху).
+                
                 _initialized = true;
             }
             catch
             {
-                // 3) Якщо впали — дозволяємо повторити init.
+                
                 lock (_initLock)
                 {
                     _initializeTask = null;
@@ -206,21 +247,21 @@ namespace WPFApp.ViewModel.Shop
             }
         }
 
-        // =========================================================
-        // List flows
-        // =========================================================
+        
+        
+        
 
         internal async Task SearchAsync(CancellationToken ct = default)
         {
-            // 1) Беремо search term.
+            
             var term = ListVm.SearchText;
 
-            // 2) Якщо пусто — беремо все, інакше — фільтр.
+            
             var list = string.IsNullOrWhiteSpace(term)
                 ? await _shopService.GetAllAsync(ct)
                 : await _shopService.GetByValueAsync(term, ct);
 
-            // 3) Віддаємо в ListVm.
+            
             ListVm.SetItems(list);
         }
 
@@ -277,9 +318,9 @@ namespace WPFApp.ViewModel.Shop
                 successDelayMs: 700);
         }
 
-        // =========================================================
-        // Save / Delete / Profile flows
-        // =========================================================
+        
+        
+        
 
         internal async Task SaveAsync(CancellationToken ct = default)
         {
@@ -354,19 +395,19 @@ namespace WPFApp.ViewModel.Shop
 
         internal async Task DeleteSelectedAsync(CancellationToken ct = default)
         {
-            // 1) Визначаємо currentId (із профілю або зі списку).
+            
             var currentId = GetCurrentShopId();
             if (currentId <= 0)
                 return;
 
-            // 2) Для confirm беремо ім’я:
-            //    - якщо у Profile — там вже є Name
-            //    - якщо у List — беремо зі SelectedItem
+            
+            
+            
             var currentName = Mode == ShopSection.Profile
                 ? ProfileVm.Name
                 : ShopDisplayHelper.NameOrEmpty(ListVm.SelectedItem);
 
-            // 3) Confirm.
+            
             if (!Confirm(string.IsNullOrWhiteSpace(currentName)
                     ? "Delete shop?"
                     : $"Delete {currentName}?"))
@@ -426,10 +467,10 @@ namespace WPFApp.ViewModel.Shop
 
         internal Task CancelAsync()
         {
-            // 1) При Cancel чистимо помилки Edit.
+            
             EditVm.ClearValidationErrors();
 
-            // 2) Навігація залежить від Mode та CancelTarget.
+            
             return Mode switch
             {
                 ShopSection.Edit => CancelTarget == ShopSection.Profile
@@ -440,9 +481,9 @@ namespace WPFApp.ViewModel.Shop
             };
         }
 
-        // =========================================================
-        // Load + navigation helpers
-        // =========================================================
+        
+        
+        
 
         private async Task LoadShopsAsync(CancellationToken ct, int? selectId)
         {
@@ -480,11 +521,11 @@ namespace WPFApp.ViewModel.Shop
 
         private int GetCurrentShopId()
         {
-            // Якщо ми в профілі — беремо ShopId з ProfileVm.
+            
             if (Mode == ShopSection.Profile)
                 return ProfileVm.ShopId;
 
-            // Інакше — зі списку.
+            
             return ListVm.SelectedItem?.Id ?? 0;
         }
 
@@ -555,9 +596,9 @@ namespace WPFApp.ViewModel.Shop
             return d.InvokeAsync(action).Task;
         }
 
-        // =========================================================
-        // UI messaging (як у твоєму проєкті)
-        // =========================================================
+        
+        
+        
 
         internal void ShowInfo(string text)
             => CustomMessageBox.Show("Info", text, CustomMessageBoxIcon.Info, okText: "OK");

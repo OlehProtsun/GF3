@@ -1,4 +1,9 @@
-﻿using BusinessLogicLayer.Contracts.Shops;
+/*
+  Опис файлу: цей модуль містить реалізацію компонента ShopEditViewModel у шарі WPFApp.
+  Призначення: інкапсулювати поведінку UI або прикладної логіки без зміни доменної моделі.
+  Примітка: коментарі описують спостережуваний потік даних, очікувані обмеження та точки взаємодії.
+*/
+using BusinessLogicLayer.Contracts.Shops;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -17,24 +22,30 @@ using WPFApp.ViewModel.Shared;
 
 namespace WPFApp.ViewModel.Shop
 {
+    
+    
+    
+    
+    
+    
+    
     /// <summary>
-    /// ShopEditViewModel — форма Add/Edit Shop.
-    /// Логіка валідації: як у ContainerScheduleEdit/EmployeeEdit
-    /// - INotifyDataErrorInfo через ValidationErrors
-    /// - Save -> ValidateAll -> SetMany(errors) -> MessageBox -> підсвітка полів
-    /// - ВАЖЛИВО: після SetMany робимо OnPropertyChanged(key), щоб WPF одразу намалював red-border
+    /// Визначає публічний елемент `public sealed class ShopEditViewModel : ViewModelBase, INotifyDataErrorInfo` та контракт його використання у шарі WPFApp.
     /// </summary>
     public sealed class ShopEditViewModel : ViewModelBase, INotifyDataErrorInfo
     {
-        private readonly ShopViewModel _owner; // має мати SaveAsync/CancelAsync як у інших
+        private readonly ShopViewModel _owner; 
 
         private readonly ValidationErrors _validation = new();
 
-        // ----------------------------
-        // Form fields
-        // ----------------------------
+        
+        
+        
 
         private int _shopId;
+        /// <summary>
+        /// Визначає публічний елемент `public int ShopId` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public int ShopId
         {
             get => _shopId;
@@ -42,6 +53,9 @@ namespace WPFApp.ViewModel.Shop
         }
 
         private string _name = string.Empty;
+        /// <summary>
+        /// Визначає публічний елемент `public string Name` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public string Name
         {
             get => _name;
@@ -56,6 +70,9 @@ namespace WPFApp.ViewModel.Shop
         }
 
         private string _address = string.Empty;
+        /// <summary>
+        /// Визначає публічний елемент `public string Address` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public string Address
         {
             get => _address;
@@ -70,6 +87,9 @@ namespace WPFApp.ViewModel.Shop
         }
 
         private string _description = string.Empty;
+        /// <summary>
+        /// Визначає публічний елемент `public string Description` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public string Description
         {
             get => _description;
@@ -83,11 +103,14 @@ namespace WPFApp.ViewModel.Shop
             }
         }
 
-        // ----------------------------
-        // Mode (Add/Edit)
-        // ----------------------------
+        
+        
+        
 
         private bool _isEdit;
+        /// <summary>
+        /// Визначає публічний елемент `public bool IsEdit` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public bool IsEdit
         {
             get => _isEdit;
@@ -98,18 +121,33 @@ namespace WPFApp.ViewModel.Shop
             }
         }
 
+        /// <summary>
+        /// Визначає публічний елемент `public string FormTitle => IsEdit ? "Edit Shop" : "Add Shop";` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public string FormTitle => IsEdit ? "Edit Shop" : "Add Shop";
+        /// <summary>
+        /// Визначає публічний елемент `public string FormSubtitle => IsEdit` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public string FormSubtitle => IsEdit
             ? "Update the shop information and press Save."
             : "Fill the form and press Save.";
 
-        // ----------------------------
-        // Commands
-        // ----------------------------
+        
+        
+        
 
+        /// <summary>
+        /// Визначає публічний елемент `public AsyncRelayCommand SaveCommand { get; }` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public AsyncRelayCommand SaveCommand { get; }
+        /// <summary>
+        /// Визначає публічний елемент `public AsyncRelayCommand CancelCommand { get; }` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public AsyncRelayCommand CancelCommand { get; }
 
+        /// <summary>
+        /// Визначає публічний елемент `public ShopEditViewModel(ShopViewModel owner)` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public ShopEditViewModel(ShopViewModel owner)
         {
             _owner = owner;
@@ -118,25 +156,37 @@ namespace WPFApp.ViewModel.Shop
             CancelCommand = new AsyncRelayCommand(() => _owner.CancelAsync());
         }
 
-        // ----------------------------
-        // INotifyDataErrorInfo
-        // ----------------------------
+        
+        
+        
 
+        /// <summary>
+        /// Визначає публічний елемент `public bool HasErrors => _validation.HasErrors;` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public bool HasErrors => _validation.HasErrors;
 
+        /// <summary>
+        /// Визначає публічний елемент `public event EventHandler<DataErrorsChangedEventArgs>? ErrorsChanged` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public event EventHandler<DataErrorsChangedEventArgs>? ErrorsChanged
         {
             add => _validation.ErrorsChanged += value;
             remove => _validation.ErrorsChanged -= value;
         }
 
+        /// <summary>
+        /// Визначає публічний елемент `public IEnumerable GetErrors(string? propertyName)` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public IEnumerable GetErrors(string? propertyName)
             => _validation.GetErrors(propertyName);
 
-        // ----------------------------
-        // Lifecycle / binding helpers
-        // ----------------------------
+        
+        
+        
 
+        /// <summary>
+        /// Визначає публічний елемент `public void ResetForNew()` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public void ResetForNew()
         {
             ShopId = 0;
@@ -148,6 +198,9 @@ namespace WPFApp.ViewModel.Shop
             ClearValidationErrors();
         }
 
+        /// <summary>
+        /// Визначає публічний елемент `public void SetShop(ShopDto model)` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public void SetShop(ShopDto model)
         {
             ShopId = model.Id;
@@ -159,6 +212,9 @@ namespace WPFApp.ViewModel.Shop
             ClearValidationErrors();
         }
 
+        /// <summary>
+        /// Визначає публічний елемент `public SaveShopRequest ToRequest()` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public SaveShopRequest ToRequest()
         {
             return new SaveShopRequest
@@ -170,13 +226,16 @@ namespace WPFApp.ViewModel.Shop
             };
         }
 
-        // ----------------------------
-        // Validation operations (set/clear)
-        // ----------------------------
+        
+        
+        
 
+        /// <summary>
+        /// Визначає публічний елемент `public void SetValidationErrors(IReadOnlyDictionary<string, string> errors)` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public void SetValidationErrors(IReadOnlyDictionary<string, string> errors)
         {
-            // важливо: UI thread
+            
             if (Application.Current?.Dispatcher is not null &&
                 !Application.Current.Dispatcher.CheckAccess())
             {
@@ -194,7 +253,7 @@ namespace WPFApp.ViewModel.Shop
 
             OnPropertyChanged(nameof(HasErrors));
 
-            // КЛЮЧ: примусово “штовхаємо” WPF, щоб red-border з’явився одразу після Save
+            
             foreach (var key in errors.Keys)
             {
                 if (!string.IsNullOrWhiteSpace(key))
@@ -202,6 +261,9 @@ namespace WPFApp.ViewModel.Shop
             }
         }
 
+        /// <summary>
+        /// Визначає публічний елемент `public void ClearValidationErrors()` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public void ClearValidationErrors()
         {
             _validation.ClearAll();
@@ -221,7 +283,7 @@ namespace WPFApp.ViewModel.Shop
         {
             var model = ToRequest();
 
-            // має існувати у тебе (аналог EmployeeValidationRules)
+            
             var msg = ShopValidationRules.ValidateProperty(model, propertyName);
 
             if (!string.IsNullOrWhiteSpace(msg))
@@ -230,9 +292,9 @@ namespace WPFApp.ViewModel.Shop
             OnPropertyChanged(nameof(HasErrors));
         }
 
-        // ----------------------------
-        // Full-form validation (Save gate)
-        // ----------------------------
+        
+        
+        
 
         private bool ValidateBeforeSave(bool showDialog = true)
         {
@@ -240,10 +302,10 @@ namespace WPFApp.ViewModel.Shop
 
             var model = ToRequest();
 
-            // має існувати у тебе (аналог EmployeeValidationRules.ValidateAll)
+            
             var raw = ShopValidationRules.ValidateAll(model);
 
-            // нормалізуємо ключі під VM property names (Name/Address/Description)
+            
             var errors = ValidationDictionaryHelper.RemapFirstErrors(raw, MapValidationKeyToVm);
 
             SetValidationErrors(errors);
@@ -295,7 +357,7 @@ namespace WPFApp.ViewModel.Shop
                 "Address" => nameof(Address),
                 "Description" => nameof(Description),
 
-                // можливі альтернативи з rules (якщо є)
+                
                 "ShopName" => nameof(Name),
 
                 _ => key

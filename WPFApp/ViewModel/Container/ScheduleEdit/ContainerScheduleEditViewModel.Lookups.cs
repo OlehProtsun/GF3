@@ -1,4 +1,9 @@
-﻿using BusinessLogicLayer.Contracts.Models;
+/*
+  Опис файлу: цей модуль містить реалізацію компонента ContainerScheduleEditViewModel.Lookups у шарі WPFApp.
+  Призначення: інкапсулювати поведінку UI або прикладної логіки без зміни доменної моделі.
+  Примітка: коментарі описують спостережуваний потік даних, очікувані обмеження та точки взаємодії.
+*/
+using BusinessLogicLayer.Contracts.Models;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -6,90 +11,102 @@ using System.Linq;
 
 namespace WPFApp.ViewModel.Container.ScheduleEdit
 {
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
     /// <summary>
-    /// Частина (partial) того самого ViewModel, яка відповідає за:
-    ///
-    /// 1) Завантаження “довідників” (lookup’ів): Shops, AvailabilityGroups, Employees
-    /// 2) Правильне оновлення ObservableCollection без зайвого “миготіння” UI
-    /// 3) Синхронізацію вибраних значень (SelectedShop / SelectedAvailabilityGroup)
-    ///    з даними обраного блоку (SelectedBlock)
-    ///
-    /// Чому це винесено в окремий файл:
-    /// - в основному VM дуже багато логіки (матриця, стилі, команди, валідація)
-    /// - “довідники + selection sync” — окрема тема, їй зручно жити тут
+    /// Визначає публічний елемент `public sealed partial class ContainerScheduleEditViewModel` та контракт його використання у шарі WPFApp.
     /// </summary>
     public sealed partial class ContainerScheduleEditViewModel
     {
-        // =========================
-        // 1) Захист від “зациклення” при синхронізації selection
-        // =========================
+        
+        
+        
 
-        /// <summary>
-        /// Лічильник “глибини” синхронізації selection.
-        ///
-        /// Навіщо:
-        /// - Коли ми програмно змінюємо SelectedShop/SelectedAvailabilityGroup,
-        ///   їх setter’и можуть запускати логіку (debounce + schedule change).
-        /// - Але коли ми робимо це “службово” (під час SetShops/SyncSelectionFromBlock),
-        ///   нам НЕ треба запускати цю логіку, інакше буде зайва робота/зациклення.
-        ///
-        /// Тому в таких місцях ми заходимо в EnterSelectionSync():
-        /// - збільшуємо depth
-        /// - робимо потрібні присвоєння
-        /// - на виході depth зменшується
-        ///
-        /// А в setter’ах SelectedShop/SelectedAvailabilityGroup є перевірка:
-        ///   if (_selectionSyncDepth > 0) return;
-        /// </summary>
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
         private int _selectionSyncDepth;
 
-        /// <summary>
-        /// Маленький scope-об’єкт для pattern “using var _ = EnterSelectionSync();”.
-        ///
-        /// Плюс цього підходу:
-        /// - навіть якщо всередині кинули exception або зробили return,
-        ///   Dispose() все одно спрацює, і _selectionSyncDepth не “зависне”.
-        /// </summary>
+        
+        
+        
+        
+        
+        
+        
         private readonly struct SelectionSyncScope : IDisposable
         {
             private readonly ContainerScheduleEditViewModel _vm;
 
+            /// <summary>
+            /// Визначає публічний елемент `public SelectionSyncScope(ContainerScheduleEditViewModel vm)` та контракт його використання у шарі WPFApp.
+            /// </summary>
             public SelectionSyncScope(ContainerScheduleEditViewModel vm)
             {
                 _vm = vm;
                 _vm._selectionSyncDepth++;
             }
 
+            /// <summary>
+            /// Визначає публічний елемент `public void Dispose()` та контракт його використання у шарі WPFApp.
+            /// </summary>
             public void Dispose()
             {
-                // гарантуємо, що не піде у мінус
+                
                 _vm._selectionSyncDepth = Math.Max(0, _vm._selectionSyncDepth - 1);
             }
         }
 
-        /// <summary>
-        /// Вхід у “режим синхронізації selection”.
-        /// Використання:
-        ///     using var _ = EnterSelectionSync();
-        ///     ... присвоєння SelectedShop / SelectedAvailabilityGroup ...
-        /// </summary>
+        
+        
+        
+        
+        
+        
         private SelectionSyncScope EnterSelectionSync() => new(this);
 
 
-        // =========================
-        // 2) Публічні методи для оновлення lookup’ів
-        // =========================
+        
+        
+        
 
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
         /// <summary>
-        /// Оновити всі 3 довідники одним викликом.
-        ///
-        /// Коли викликається:
-        /// - після завантаження даних з БД/API
-        /// - після Search... команд, коли owner приніс новий список
-        ///
-        /// Чому тут просто виклик 3 методів:
-        /// - кожен список має свою логіку “після оновлення”
-        ///   (наприклад після SetShops потрібно виставити SelectedShop, якщо є SelectedBlock)
+        /// Визначає публічний елемент `public void SetLookups(IEnumerable<ShopModel> shops,` та контракт його використання у шарі WPFApp.
         /// </summary>
         public void SetLookups(IEnumerable<ShopModel> shops,
                                IEnumerable<AvailabilityGroupModel> groups,
@@ -100,16 +117,19 @@ namespace WPFApp.ViewModel.Container.ScheduleEdit
             SetEmployees(employees);
         }
 
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
         /// <summary>
-        /// Оновлює список Shops (довідник магазинів) і синхронізує SelectedShop з SelectedBlock.
-        ///
-        /// Важливі моменти:
-        /// 1) В EnterSelectionSync() ми робимо програмні присвоєння,
-        ///    і не хочемо, щоб setter SelectedShop запустив debounce-логіку.
-        ///
-        /// 2) SetOptions(...) оновлює ObservableCollection максимально акуратно:
-        ///    - якщо елементи ті ж самі, в тому ж порядку — нічого не робить
-        ///    - інакше чистить і додає заново
+        /// Визначає публічний елемент `public void SetShops(IEnumerable<ShopModel> shops)` та контракт його використання у шарі WPFApp.
         /// </summary>
         public void SetShops(IEnumerable<ShopModel> shops)
         {
@@ -117,23 +137,26 @@ namespace WPFApp.ViewModel.Container.ScheduleEdit
 
             SetOptions(Shops, shops);
 
-            // Якщо є вибраний блок — підбираємо SelectedShop за ID з моделі
+            
             if (SelectedBlock != null)
                 SelectedShop = Shops.FirstOrDefault(s => s.Id == SelectedBlock.Model.ShopId);
         }
 
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
         /// <summary>
-        /// Оновлює список AvailabilityGroups і синхронізує SelectedAvailabilityGroup з SelectedBlock.
-        ///
-        /// Тут додатковий нюанс:
-        /// - в setter SelectedAvailabilityGroup у тебе є логіка, яка при зміні групи
-        ///   може інваліднути (InvalidateGeneratedSchedule).
-        /// - коли ми синхронізуємо selection “службово” (після отримання довідника),
-        ///   нам НЕ треба інвалідити згенерований розклад.
-        ///
-        /// Тому ти використовуєш прапорець _suppressAvailabilityGroupUpdate:
-        /// - під час службового присвоєння ставимо true
-        /// - після присвоєння повертаємо false
+        /// Визначає публічний елемент `public void SetAvailabilityGroups(IEnumerable<AvailabilityGroupModel> groups)` та контракт його використання у шарі WPFApp.
         /// </summary>
         public void SetAvailabilityGroups(IEnumerable<AvailabilityGroupModel> groups)
         {
@@ -154,7 +177,7 @@ namespace WPFApp.ViewModel.Container.ScheduleEdit
                     _suppressAvailabilityGroupUpdate = false;
                 }
 
-                // ✅ Авто-побудова AvailabilityPreview після синхронізації lookup’ів
+                
                 var groupId = SelectedAvailabilityGroup?.Id ?? 0;
                 if (groupId > 0)
                     SafeForget(LoadAvailabilityContextAsync(groupId));
@@ -162,11 +185,14 @@ namespace WPFApp.ViewModel.Container.ScheduleEdit
         }
 
 
+        
+        
+        
+        
+        
+        
         /// <summary>
-        /// Оновлює довідник Employees (список працівників).
-        ///
-        /// Тут синхронізувати SelectedEmployee/SelectedScheduleEmployee можна окремо,
-        /// якщо потрібно. Зараз ти просто оновлюєш довідник.
+        /// Визначає публічний елемент `public void SetEmployees(IEnumerable<EmployeeModel> employees)` та контракт його використання у шарі WPFApp.
         /// </summary>
         public void SetEmployees(IEnumerable<EmployeeModel> employees)
         {
@@ -175,24 +201,27 @@ namespace WPFApp.ViewModel.Container.ScheduleEdit
         }
 
 
-        // =========================
-        // 3) Commit “pending” selection (коли є проміжний вибір)
-        // =========================
+        
+        
+        
 
+        
+        
+        
+        
+        
+        
+        
+        
         /// <summary>
-        /// У тебе є PendingSelectedShop — це “тимчасово обраний” магазин,
-        /// який ще НЕ застосований як SelectedShop.
-        ///
-        /// Такий патерн корисний, якщо:
-        /// - ти хочеш показувати вибір в UI, але застосовувати його тільки після confirm
-        /// - або при великих запитах, щоб не тригерити логіку при кожному кліку
+        /// Визначає публічний елемент `public void CommitPendingShopSelection()` та контракт його використання у шарі WPFApp.
         /// </summary>
         public void CommitPendingShopSelection()
         {
             ClearValidationErrors(nameof(PendingSelectedShop));
             ClearValidationErrors(nameof(ScheduleShopId));
 
-            // ВАЖЛИВО: саме це поле зараз підсвічується у UI
+            
             ClearValidationErrors(nameof(SelectedShop));
 
             if (PendingSelectedShop == SelectedShop)
@@ -202,13 +231,16 @@ namespace WPFApp.ViewModel.Container.ScheduleEdit
         }
 
 
+        
+        
+        
         /// <summary>
-        /// Аналогічно для AvailabilityGroup.
+        /// Визначає публічний елемент `public void CommitPendingAvailabilitySelection()` та контракт його використання у шарі WPFApp.
         /// </summary>
         public void CommitPendingAvailabilitySelection()
         {
             ClearValidationErrors(nameof(PendingSelectedAvailabilityGroup));
-            ClearValidationErrors(nameof(SelectedAvailabilityGroup)); // ← додати
+            ClearValidationErrors(nameof(SelectedAvailabilityGroup)); 
 
             if (PendingSelectedAvailabilityGroup == SelectedAvailabilityGroup)
                 return;
@@ -218,18 +250,21 @@ namespace WPFApp.ViewModel.Container.ScheduleEdit
 
 
 
-        // =========================
-        // 4) Синхронізація selection з SelectedBlock
-        // =========================
+        
+        
+        
 
+        
+        
+        
+        
+        
+        
+        
+        
+        
         /// <summary>
-        /// Синхронізує SelectedShop і SelectedAvailabilityGroup з поточним SelectedBlock.
-        ///
-        /// Коли викликається:
-        /// - при зміні SelectedBlock (у setter SelectedBlock)
-        ///
-        /// Для SelectedBlock == null:
-        /// - треба очистити selection, щоб UI не показував дані старого блоку
+        /// Визначає публічний елемент `public void SyncSelectionFromBlock()` та контракт його використання у шарі WPFApp.
         /// </summary>
         public void SyncSelectionFromBlock()
         {
@@ -252,10 +287,10 @@ namespace WPFApp.ViewModel.Container.ScheduleEdit
                 return;
             }
 
-            // Shop
+            
             SelectedShop = Shops.FirstOrDefault(s => s.Id == SelectedBlock.Model.ShopId);
 
-            // Availability group
+            
             _suppressAvailabilityGroupUpdate = true;
             try
             {
@@ -269,42 +304,42 @@ namespace WPFApp.ViewModel.Container.ScheduleEdit
         }
 
 
-        // =========================
-        // 5) Загальний helper: “аккуратно оновити ObservableCollection”
-        // =========================
+        
+        
+        
 
-        /// <summary>
-        /// SetOptions — універсальний helper для оновлення ObservableCollection.
-        ///
-        /// Чому не просто target.Clear() + Add():
-        /// - якщо дані не змінилися, зайве очищення:
-        ///   - викликає багато UI-оновлень
-        ///   - збиває selection у списках
-        ///   - може створити “миготіння”
-        ///
-        /// Алгоритм:
-        /// 1) Перетворюємо items у IList (щоб можна було звертатись по індексу).
-        /// 2) Якщо кількість елементів однакова — перевіряємо “чи всі рівні в тому ж порядку”.
-        ///    Якщо так — нічого не робимо.
-        /// 3) Якщо різні — очищаємо і додаємо заново.
-        /// </summary>
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
         private void SetOptions<T>(ObservableCollection<T> target, IEnumerable<T> items)
         {
-            // 1) Намагаємось не робити зайвих алокацій.
-            // Якщо items уже IList<T> — просто використовуємо.
+            
+            
             if (items is not IList<T> list)
                 list = items.ToList();
 
-            // 2) Якщо count однаковий — є шанс, що список взагалі не змінився.
+            
             if (target.Count == list.Count)
             {
                 var same = true;
 
                 for (var i = 0; i < list.Count; i++)
                 {
-                    // EqualityComparer<T>.Default — стандартне порівняння для типу:
-                    // - для класів це ReferenceEquals або override Equals
-                    // - для struct це value equality
+                    
+                    
+                    
                     if (!EqualityComparer<T>.Default.Equals(target[i], list[i]))
                     {
                         same = false;
@@ -312,12 +347,12 @@ namespace WPFApp.ViewModel.Container.ScheduleEdit
                     }
                 }
 
-                // 3) Якщо все однакове — нічого не робимо.
+                
                 if (same)
                     return;
             }
 
-            // 4) Якщо різне — оновлюємо повністю.
+            
             target.Clear();
             foreach (var item in list)
                 target.Add(item);

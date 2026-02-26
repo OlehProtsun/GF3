@@ -1,4 +1,9 @@
-﻿using BusinessLogicLayer.Contracts.Employees;
+/*
+  Опис файлу: цей модуль містить реалізацію компонента EmployeeEditViewModel у шарі WPFApp.
+  Призначення: інкапсулювати поведінку UI або прикладної логіки без зміни доменної моделі.
+  Примітка: коментарі описують спостережуваний потік даних, очікувані обмеження та точки взаємодії.
+*/
+using BusinessLogicLayer.Contracts.Employees;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -17,29 +22,35 @@ using WPFApp.ViewModel.Shared;
 
 namespace WPFApp.ViewModel.Employee
 {
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
     /// <summary>
-    /// EmployeeEditViewModel — форма Add/Edit Employee.
-    ///
-    /// Покращення:
-    /// - не тримаємо власний Dictionary<string,List<string>>:
-    ///   використовуємо спільний ValidationErrors (як у Container/Availability/Schedule) :contentReference[oaicite:11]{index=11}
-    /// - inline validation: при зміні поля:
-    ///   * чистимо помилку цього поля
-    ///   * валідимо нове значення через EmployeeValidationRules
-    /// - не зберігаємо Regex тут: Regex винесені у EmployeeValidationRules
+    /// Визначає публічний елемент `public sealed class EmployeeEditViewModel : ViewModelBase, INotifyDataErrorInfo` та контракт його використання у шарі WPFApp.
     /// </summary>
     public sealed class EmployeeEditViewModel : ViewModelBase, INotifyDataErrorInfo
     {
         private readonly EmployeeViewModel _owner;
 
-        // Єдине сховище помилок.
+        
         private readonly ValidationErrors _validation = new();
 
-        // ----------------------------
-        // Поля форми
-        // ----------------------------
+        
+        
+        
 
         private int _employeeId;
+        /// <summary>
+        /// Визначає публічний елемент `public int EmployeeId` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public int EmployeeId
         {
             get => _employeeId;
@@ -47,6 +58,9 @@ namespace WPFApp.ViewModel.Employee
         }
 
         private string _firstName = string.Empty;
+        /// <summary>
+        /// Визначає публічний елемент `public string FirstName` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public string FirstName
         {
             get => _firstName;
@@ -55,15 +69,18 @@ namespace WPFApp.ViewModel.Employee
                 if (!SetProperty(ref _firstName, value))
                     return;
 
-                // 1) При зміні поля — прибираємо стару помилку FirstName.
+                
                 ClearValidationErrors(nameof(FirstName));
 
-                // 2) Перевіряємо новий стан (inline).
+                
                 ValidateProperty(nameof(FirstName));
             }
         }
 
         private string _lastName = string.Empty;
+        /// <summary>
+        /// Визначає публічний елемент `public string LastName` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public string LastName
         {
             get => _lastName;
@@ -78,6 +95,9 @@ namespace WPFApp.ViewModel.Employee
         }
 
         private string? _email;
+        /// <summary>
+        /// Визначає публічний елемент `public string? Email` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public string? Email
         {
             get => _email;
@@ -92,6 +112,9 @@ namespace WPFApp.ViewModel.Employee
         }
 
         private string? _phone;
+        /// <summary>
+        /// Визначає публічний елемент `public string? Phone` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public string? Phone
         {
             get => _phone;
@@ -105,11 +128,14 @@ namespace WPFApp.ViewModel.Employee
             }
         }
 
-        // ----------------------------
-        // Режим форми (Add/Edit)
-        // ----------------------------
+        
+        
+        
 
         private bool _isEdit;
+        /// <summary>
+        /// Визначає публічний елемент `public bool IsEdit` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public bool IsEdit
         {
             get => _isEdit;
@@ -120,48 +146,75 @@ namespace WPFApp.ViewModel.Employee
             }
         }
 
+        /// <summary>
+        /// Визначає публічний елемент `public string FormTitle => IsEdit ? "Edit Employee" : "Add Employee";` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public string FormTitle => IsEdit ? "Edit Employee" : "Add Employee";
 
+        /// <summary>
+        /// Визначає публічний елемент `public string FormSubtitle => IsEdit` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public string FormSubtitle => IsEdit
             ? "Update the employee information and press Save."
             : "Fill the form and press Save.";
 
-        // ----------------------------
-        // Команди
-        // ----------------------------
+        
+        
+        
 
+        /// <summary>
+        /// Визначає публічний елемент `public AsyncRelayCommand SaveCommand { get; }` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public AsyncRelayCommand SaveCommand { get; }
+        /// <summary>
+        /// Визначає публічний елемент `public AsyncRelayCommand CancelCommand { get; }` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public AsyncRelayCommand CancelCommand { get; }
 
+        /// <summary>
+        /// Визначає публічний елемент `public EmployeeEditViewModel(EmployeeViewModel owner)` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public EmployeeEditViewModel(EmployeeViewModel owner)
         {
             _owner = owner;
 
-            // Save/Cancel делегуються owner’у.
+            
             SaveCommand = new AsyncRelayCommand(SaveWithValidationAsync);
 
             CancelCommand = new AsyncRelayCommand(() => _owner.CancelAsync());
         }
 
-        // ----------------------------
-        // INotifyDataErrorInfo (проксі на ValidationErrors)
-        // ----------------------------
+        
+        
+        
 
+        /// <summary>
+        /// Визначає публічний елемент `public bool HasErrors => _validation.HasErrors;` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public bool HasErrors => _validation.HasErrors;
 
+        /// <summary>
+        /// Визначає публічний елемент `public event EventHandler<DataErrorsChangedEventArgs>? ErrorsChanged` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public event EventHandler<DataErrorsChangedEventArgs>? ErrorsChanged
         {
             add => _validation.ErrorsChanged += value;
             remove => _validation.ErrorsChanged -= value;
         }
 
+        /// <summary>
+        /// Визначає публічний елемент `public IEnumerable GetErrors(string? propertyName)` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public IEnumerable GetErrors(string? propertyName)
             => _validation.GetErrors(propertyName);
 
-        // ----------------------------
-        // Life-cycle / binding
-        // ----------------------------
+        
+        
+        
 
+        /// <summary>
+        /// Визначає публічний елемент `public void ResetForNew()` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public void ResetForNew()
         {
             EmployeeId = 0;
@@ -174,6 +227,9 @@ namespace WPFApp.ViewModel.Employee
             ClearValidationErrors();
         }
 
+        /// <summary>
+        /// Визначає публічний елемент `public void SetEmployee(EmployeeDto model)` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public void SetEmployee(EmployeeDto model)
         {
             EmployeeId = model.Id;
@@ -186,11 +242,14 @@ namespace WPFApp.ViewModel.Employee
             ClearValidationErrors();
         }
 
+        /// <summary>
+        /// Визначає публічний елемент `public SaveEmployeeRequest ToRequest()` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public SaveEmployeeRequest ToRequest()
         {
-            // Важливо:
-            // - Trim для імен
-            // - Email/Phone: null якщо пусто (зручніше для БД/сервісу)
+            
+            
+            
             return new SaveEmployeeRequest
             {
                 Id = EmployeeId,
@@ -201,13 +260,16 @@ namespace WPFApp.ViewModel.Employee
             };
         }
 
-        // ----------------------------
-        // Validation operations (set/clear)
-        // ----------------------------
+        
+        
+        
 
+        /// <summary>
+        /// Визначає публічний елемент `public void SetValidationErrors(IReadOnlyDictionary<string, string> errors)` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public void SetValidationErrors(IReadOnlyDictionary<string, string> errors)
         {
-            // ВАЖЛИВО: WPF validation visuals краще оновлювати з UI thread
+            
             if (Application.Current?.Dispatcher is not null &&
                 !Application.Current.Dispatcher.CheckAccess())
             {
@@ -223,11 +285,11 @@ namespace WPFApp.ViewModel.Employee
 
             _validation.SetMany(errors);
 
-            // HasErrors — computed
+            
             OnPropertyChanged(nameof(HasErrors));
 
-            // КЛЮЧОВЕ: примусово “штовхаємо” WPF, щоб він одразу перемалював Validation.HasError
-            // навіть якщо користувач не змінював поле (не було PropertyChanged від binding’а)
+            
+            
             foreach (var key in errors.Keys)
             {
                 if (!string.IsNullOrWhiteSpace(key))
@@ -236,6 +298,9 @@ namespace WPFApp.ViewModel.Employee
         }
 
 
+        /// <summary>
+        /// Визначає публічний елемент `public void ClearValidationErrors()` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public void ClearValidationErrors()
         {
             _validation.ClearAll();
@@ -253,39 +318,39 @@ namespace WPFApp.ViewModel.Employee
 
         private void ValidateProperty(string propertyName)
         {
-            // 1) Беремо модель з поточного стану VM.
+            
             var model = ToRequest();
 
-            // 2) Питаємо rules: чи є помилка саме для цього поля.
+            
             var msg = EmployeeValidationRules.ValidateProperty(model, propertyName);
 
-            // 3) Якщо є — додаємо.
+            
             if (!string.IsNullOrWhiteSpace(msg))
                 _validation.Add(propertyName, msg);
 
-            // 4) Оновлюємо HasErrors.
+            
             OnPropertyChanged(nameof(HasErrors));
         }
 
-        // ----------------------------
-        // Full-form validation (Save gate) — як у ContainerScheduleEdit
-        // ----------------------------
+        
+        
+        
 
         private bool ValidateBeforeSave(bool showDialog = true)
         {
-            // 1) Будь-які старі помилки прибираємо, щоб не змішувались зі свіжими.
+            
             ClearValidationErrors();
 
-            // 2) Валідимо всю модель одним проходом — єдине джерело правил.
+            
             var model = ToRequest();
             var raw = EmployeeValidationRules.ValidateAll(model);
 
-            // приводимо ключі до тих, що реально біндяться в XAML (FirstName/LastName/Email/Phone)
+            
             var errors = ValidationDictionaryHelper.RemapFirstErrors(raw, MapValidationKeyToVm);
             SetValidationErrors(errors);
 
 
-            // 4) Якщо треба — показуємо діалог із summary.
+            
             if (showDialog && HasErrors)
             {
                 CustomMessageBox.Show(
@@ -311,7 +376,7 @@ namespace WPFApp.ViewModel.Employee
 
         private async Task SaveWithValidationAsync()
         {
-            // як у ContainerScheduleEdit: валідацію виконуємо на UI thread
+            
             var ok = await Application.Current.Dispatcher
                 .InvokeAsync(() => ValidateBeforeSave(showDialog: true));
 
@@ -328,8 +393,8 @@ namespace WPFApp.ViewModel.Employee
 
             key = ValidationDictionaryHelper.NormalizeLastSegment(key);
 
-            // Нормалізуємо під VM property names
-            // (додай сюди всі нестиковки, які реально може повертати EmployeeValidationRules)
+            
+            
             return key switch
             {
                 "FirstName" => nameof(FirstName),
@@ -337,7 +402,7 @@ namespace WPFApp.ViewModel.Employee
                 "Email" => nameof(Email),
                 "Phone" => nameof(Phone),
 
-                // приклади на випадок інших назв з rules:
+                
                 "EmailAddress" => nameof(Email),
                 "PhoneNumber" => nameof(Phone),
 

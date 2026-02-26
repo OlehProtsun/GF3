@@ -1,4 +1,9 @@
-﻿using System;
+/*
+  Опис файлу: цей модуль містить реалізацію компонента NumericUpDown у шарі WPFApp.
+  Призначення: інкапсулювати поведінку UI або прикладної логіки без зміни доменної моделі.
+  Примітка: коментарі описують спостережуваний потік даних, очікувані обмеження та точки взаємодії.
+*/
+using System;
 using System.Globalization;
 using System.Windows;
 using System.Windows.Controls;
@@ -8,10 +13,16 @@ using System.Windows.Data;
 
 namespace WPFApp.Controls
 {
+    /// <summary>
+    /// Визначає публічний елемент `public partial class NumericUpDown : UserControl` та контракт його використання у шарі WPFApp.
+    /// </summary>
     public partial class NumericUpDown : UserControl
     {
-        // Value ---------------------------------------------------------------
+        
 
+        /// <summary>
+        /// Визначає публічний елемент `public static readonly DependencyProperty ValueProperty =` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public static readonly DependencyProperty ValueProperty =
             DependencyProperty.Register(
                 nameof(Value),
@@ -23,14 +34,20 @@ namespace WPFApp.Controls
                     OnValueChanged,
                     CoerceValue));
 
+        /// <summary>
+        /// Визначає публічний елемент `public int Value` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public int Value
         {
             get => (int)GetValue(ValueProperty);
             set => SetValue(ValueProperty, value);
         }
 
-        // Minimum -------------------------------------------------------------
+        
 
+        /// <summary>
+        /// Визначає публічний елемент `public static readonly DependencyProperty MinimumProperty =` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public static readonly DependencyProperty MinimumProperty =
             DependencyProperty.Register(
                 nameof(Minimum),
@@ -38,14 +55,20 @@ namespace WPFApp.Controls
                 typeof(NumericUpDown),
                 new PropertyMetadata(int.MinValue, OnMinMaxChanged));
 
+        /// <summary>
+        /// Визначає публічний елемент `public int Minimum` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public int Minimum
         {
             get => (int)GetValue(MinimumProperty);
             set => SetValue(MinimumProperty, value);
         }
 
-        // Maximum -------------------------------------------------------------
+        
 
+        /// <summary>
+        /// Визначає публічний елемент `public static readonly DependencyProperty MaximumProperty =` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public static readonly DependencyProperty MaximumProperty =
             DependencyProperty.Register(
                 nameof(Maximum),
@@ -53,14 +76,20 @@ namespace WPFApp.Controls
                 typeof(NumericUpDown),
                 new PropertyMetadata(int.MaxValue, OnMinMaxChanged));
 
+        /// <summary>
+        /// Визначає публічний елемент `public int Maximum` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public int Maximum
         {
             get => (int)GetValue(MaximumProperty);
             set => SetValue(MaximumProperty, value);
         }
 
-        // Step ----------------------------------------------------------------
+        
 
+        /// <summary>
+        /// Визначає публічний елемент `public static readonly DependencyProperty StepProperty =` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public static readonly DependencyProperty StepProperty =
             DependencyProperty.Register(
                 nameof(Step),
@@ -68,14 +97,20 @@ namespace WPFApp.Controls
                 typeof(NumericUpDown),
                 new PropertyMetadata(1, OnStepChanged, CoerceStep));
 
+        /// <summary>
+        /// Визначає публічний елемент `public int Step` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public int Step
         {
             get => (int)GetValue(StepProperty);
             set => SetValue(StepProperty, value);
         }
 
-        // IsReadOnly ----------------------------------------------------------
+        
 
+        /// <summary>
+        /// Визначає публічний елемент `public static readonly DependencyProperty IsReadOnlyProperty =` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public static readonly DependencyProperty IsReadOnlyProperty =
             DependencyProperty.Register(
                 nameof(IsReadOnly),
@@ -83,24 +118,30 @@ namespace WPFApp.Controls
                 typeof(NumericUpDown),
                 new PropertyMetadata(false));
 
+        /// <summary>
+        /// Визначає публічний елемент `public bool IsReadOnly` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public bool IsReadOnly
         {
             get => (bool)GetValue(IsReadOnlyProperty);
             set => SetValue(IsReadOnlyProperty, value);
         }
 
+        /// <summary>
+        /// Визначає публічний елемент `public NumericUpDown()` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public NumericUpDown()
         {
             InitializeComponent();
             Loaded += (_, __) => UpdateButtonState();
         }
 
-        // Button handlers -----------------------------------------------------
+        
 
         private void Up_Click(object sender, RoutedEventArgs e)
         {
             if (IsReadOnly) return;
-            CommitText(); // на випадок, якщо в полі зараз введено щось некомітнуте
+            CommitText(); 
             SetCurrentValue(ValueProperty, CoerceToRange(Value + Step));
         }
 
@@ -111,7 +152,7 @@ namespace WPFApp.Controls
             SetCurrentValue(ValueProperty, CoerceToRange(Value - Step));
         }
 
-        // TextBox validation --------------------------------------------------
+        
 
         private void TextBox_PreviewTextInput(object sender, TextCompositionEventArgs e)
         {
@@ -153,7 +194,7 @@ namespace WPFApp.Controls
         {
             if (IsReadOnly) return;
 
-            // Стрілки вгору/вниз як інкремент/декремент
+            
             if (e.Key == Key.Up)
             {
                 Up_Click(this, new RoutedEventArgs());
@@ -170,7 +211,7 @@ namespace WPFApp.Controls
         {
             if (IsReadOnly) return;
 
-            // Enter — коміт значення одразу
+            
             if (e.Key == Key.Enter)
             {
                 CommitText();
@@ -182,7 +223,7 @@ namespace WPFApp.Controls
         {
             if (PART_TextBox == null) return;
 
-            // якщо binding ще є — просто оновлюємо target
+            
             var be = PART_TextBox.GetBindingExpression(TextBox.TextProperty);
             if (be != null)
             {
@@ -190,7 +231,7 @@ namespace WPFApp.Controls
             }
             else
             {
-                // якщо binding вже був зламаний — ставимо текст, але НЕ зносимо binding повторно
+                
                 PART_TextBox.SetCurrentValue(
                     TextBox.TextProperty,
                     Value.ToString(CultureInfo.InvariantCulture));
@@ -212,7 +253,7 @@ namespace WPFApp.Controls
 
             string text = (PART_TextBox.Text ?? string.Empty).Trim();
 
-            // Пусто / + / - : повертаємо показ поточного Value (без ламання binding)
+            
             if (string.IsNullOrEmpty(text) || text == "-" || text == "+")
             {
                 SyncTextWithValue();
@@ -228,7 +269,7 @@ namespace WPFApp.Controls
             int coerced = CoerceToRange(parsed);
             SetCurrentValue(ValueProperty, coerced);
 
-            // показати реальне (coerce) значення
+            
             SyncTextWithValue();
         }
 
@@ -255,18 +296,18 @@ namespace WPFApp.Controls
             if (text.Length == 0)
                 return true;
 
-            // Дозволяємо "-" тільки якщо мінімум < 0
+            
             if (text == "-")
                 return EffectiveMin < 0;
 
-            // "+" не дуже потрібен, але не заважає
+            
             if (text == "+")
                 return true;
 
             return int.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out _);
         }
 
-        // DP callbacks --------------------------------------------------------
+        
 
         private static void OnValueChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
         {
@@ -307,7 +348,7 @@ namespace WPFApp.Controls
             return c.CoerceToRange(value);
         }
 
-        // Helpers -------------------------------------------------------------
+        
 
         private int EffectiveMin => Math.Min(Minimum, Maximum);
         private int EffectiveMax => Math.Max(Minimum, Maximum);

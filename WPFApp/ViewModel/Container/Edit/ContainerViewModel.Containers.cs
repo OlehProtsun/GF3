@@ -1,4 +1,9 @@
-﻿using System;
+/*
+  Опис файлу: цей модуль містить реалізацію компонента ContainerViewModel.Containers у шарі WPFApp.
+  Призначення: інкапсулювати поведінку UI або прикладної логіки без зміни доменної моделі.
+  Примітка: коментарі описують спостережуваний потік даних, очікувані обмеження та точки взаємодії.
+*/
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -11,31 +16,37 @@ using WPFApp.ViewModel.Shared;
 
 namespace WPFApp.ViewModel.Container.Edit
 {
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
     /// <summary>
-    /// ContainerViewModel.Containers — частина (partial) ContainerViewModel, яка відповідає ТІЛЬКИ за:
-    ///
-    /// 1) Ініціалізацію екрану контейнерів (EnsureInitializedAsync)
-    /// 2) CRUD контейнерів:
-    ///    - SearchAsync
-    ///    - StartAddAsync
-    ///    - EditSelectedAsync
-    ///    - SaveAsync
-    ///    - DeleteSelectedAsync
-    ///    - OpenProfileAsync
-    /// 3) Підвантаження даних для списків:
-    ///    - LoadContainersAsync
-    ///    - LoadSchedulesAsync (бо профіль контейнера показує schedules)
-    ///
-    /// Навіщо винесено:
-    /// - це окрема бізнес-ділянка (робота з ContainerModel)
-    /// - не має змішуватися з schedule-генерацією, preview pipeline, lookup-фільтрами, навігацією
-    /// - головний ContainerViewModel.cs стане “скелетом”, а логіка буде по модулях
+    /// Визначає публічний елемент `public sealed partial class ContainerViewModel` та контракт його використання у шарі WPFApp.
     /// </summary>
     public sealed partial class ContainerViewModel
     {
+        
+        
+        
+        
         /// <summary>
-        /// EnsureInitializedAsync — гарантує, що стартові дані (список контейнерів) завантажені один раз.
-        /// Якщо метод викликали вдруге — просто виходимо.
+        /// Визначає публічний елемент `public async Task EnsureInitializedAsync(CancellationToken ct = default)` та контракт його використання у шарі WPFApp.
         /// </summary>
         public async Task EnsureInitializedAsync(CancellationToken ct = default)
         {
@@ -45,15 +56,15 @@ namespace WPFApp.ViewModel.Container.Edit
             await LoadContainersAsync(ct);
         }
 
-        /// <summary>
-        /// SearchAsync — пошук контейнерів.
-        ///
-        /// Логіка:
-        /// - якщо SearchText порожній => беремо всі контейнери
-        /// - інакше => шукаємо по значенню (бекенд вирішує як саме)
-        ///
-        /// Результат кладемо в ListVm.Items через SetItems (ObservableCollection => UI оновиться).
-        /// </summary>
+        
+        
+        
+        
+        
+        
+        
+        
+        
         internal async Task SearchAsync(CancellationToken ct = default)
         {
             var term = ListVm.SearchText;
@@ -65,14 +76,14 @@ namespace WPFApp.ViewModel.Container.Edit
             ListVm.SetItems(list);
         }
 
-        /// <summary>
-        /// StartAddAsync — перейти у форму створення нового контейнера.
-        ///
-        /// Потік:
-        /// 1) ResetForNew — очистити EditVm
-        /// 2) CancelTarget = List — якщо користувач натисне Cancel, повертаємось у список
-        /// 3) SwitchToEditAsync — переключаємо UI секцію (Navigation partial)
-        /// </summary>
+        
+        
+        
+        
+        
+        
+        
+        
         internal Task StartAddAsync(CancellationToken ct = default)
             => UiOperationRunner.RunNavStatusFlowAsync(
                 ct,
@@ -95,18 +106,18 @@ namespace WPFApp.ViewModel.Container.Edit
                 successDelayMs: 700);
 
 
-        /// <summary>
-        /// EditSelectedAsync — відкрити редагування поточного контейнера.
-        ///
-        /// Потік:
-        /// 1) Визначаємо containerId через GetCurrentContainerId()
-        /// 2) Тягнемо "latest" модель з сервісу (щоб мати актуальні дані)
-        /// 3) Заповнюємо EditVm
-        /// 4) Виставляємо CancelTarget:
-        ///    - якщо відкрили edit з профілю => Cancel поверне у Profile
-        ///    - інакше => Cancel поверне у List
-        /// 5) Переходимо у Edit секцію
-        /// </summary>
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
         internal Task EditSelectedAsync(CancellationToken ct = default)
         {
             var id = GetCurrentContainerId();
@@ -143,17 +154,17 @@ namespace WPFApp.ViewModel.Container.Edit
         }
 
 
-        /// <summary>
-        /// SaveAsync — зберегти контейнер (create або update).
-        ///
-        /// Потік:
-        /// 1) очистити помилки EditVm
-        /// 2) зібрати модель з EditVm.ToModel()
-        /// 3) validate (поки лишаємо просту перевірку Name)
-        /// 4) create або update через сервіс
-        /// 5) reload список контейнерів і виділити створений/оновлений
-        /// 6) повернутись туди, звідки зайшли (CancelTarget)
-        /// </summary>
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
         internal Task SaveAsync(CancellationToken ct = default)
         {
             EditVm.ClearValidationErrors();
@@ -211,16 +222,16 @@ namespace WPFApp.ViewModel.Container.Edit
         }
 
 
-        /// <summary>
-        /// DeleteSelectedAsync — видалити поточний контейнер.
-        ///
-        /// Потік:
-        /// 1) визначаємо id
-        /// 2) confirm
-        /// 3) delete
-        /// 4) reload список контейнерів
-        /// 5) повертаємось в List
-        /// </summary>
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
         internal async Task DeleteSelectedAsync(CancellationToken ct = default)
         {
             var currentId = GetCurrentContainerId();
@@ -256,16 +267,16 @@ namespace WPFApp.ViewModel.Container.Edit
                 successDelayMs: 900);
         }
 
-        /// <summary>
-        /// OpenProfileAsync — відкрити профіль контейнера (шапка + schedule list).
-        ///
-        /// Потік:
-        /// 1) беремо SelectedItem зі списку
-        /// 2) тягнемо latest з сервісу
-        /// 3) заповнюємо ProfileVm
-        /// 4) вантажимо schedules для цього контейнера
-        /// 5) ставимо CancelTarget=List і переходимо в Profile
-        /// </summary>
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
         internal Task OpenProfileAsync(CancellationToken ct = default)
         {
             var selected = ListVm.SelectedItem;
@@ -297,14 +308,14 @@ namespace WPFApp.ViewModel.Container.Edit
 
 
 
-        // =========================================================
-        // Завантаження даних (списки)
-        // =========================================================
+        
+        
+        
 
-        /// <summary>
-        /// LoadContainersAsync — завантажити всі контейнери в ListVm.
-        /// Опційно: selectId — виділити контейнер в списку.
-        /// </summary>
+        
+        
+        
+        
         private async Task LoadContainersAsync(CancellationToken ct, int? selectId = null)
         {
             var list = await _containerService.GetAllAsync(ct).ConfigureAwait(false);
@@ -327,10 +338,10 @@ namespace WPFApp.ViewModel.Container.Edit
             }
         }
 
-        /// <summary>
-        /// LoadSchedulesAsync — завантажити schedules конкретного контейнера у ProfileVm.ScheduleListVm.
-        /// Це потрібно при відкритті профілю контейнера і після операцій зі schedule.
-        /// </summary>
+        
+        
+        
+        
         private async Task LoadSchedulesAsync(int containerId, string? search, CancellationToken ct)
         {
             ClearScheduleDetailsCache();
@@ -351,17 +362,17 @@ namespace WPFApp.ViewModel.Container.Edit
         }
 
 
-        // =========================================================
-        // Валідація контейнера (поки проста)
-        // =========================================================
+        
+        
+        
 
-        /// <summary>
-        /// ValidateContainer — мінімальна перевірка ContainerModel перед Save.
-        /// Ключі словника — імена властивостей у ContainerEditViewModel.
-        ///
-        /// Пізніше це можна замінити на ContainerValidationRules (як у ScheduleValidationRules),
-        /// але навіть у поточному вигляді метод коректний.
-        /// </summary>
+        
+        
+        
+        
+        
+        
+        
         private static Dictionary<string, string> ValidateContainer(ContainerModel model)
         {
             var errors = new Dictionary<string, string>();

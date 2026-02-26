@@ -1,4 +1,9 @@
-﻿using BusinessLogicLayer.Generators;
+/*
+  Опис файлу: цей модуль містить реалізацію компонента ContainerViewModel у шарі WPFApp.
+  Призначення: інкапсулювати поведінку UI або прикладної логіки без зміни доменної моделі.
+  Примітка: коментарі описують спостережуваний потік даних, очікувані обмеження та точки взаємодії.
+*/
+using BusinessLogicLayer.Generators;
 using BusinessLogicLayer.Services.Abstractions;
 using BusinessLogicLayer.Contracts.Models;
 using System;
@@ -20,40 +25,43 @@ using WPFApp.ViewModel.Shared;
 
 namespace WPFApp.ViewModel.Container.Edit
 {
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
     /// <summary>
-    /// ContainerViewModel — “головний координатор” модуля Container.
-    ///
-    /// Важливе про архітектуру:
-    /// - Це partial-class: майже вся логіка винесена в окремі файли (Navigation, Lookups, Schedules, Preview, UI тощо).
-    /// - Цей файл спеціально залишений дуже коротким і виконує 2 ролі:
-    ///
-    ///   1) Зберігає DI-залежності (сервіси), які потрібні різним partial-модулям.
-    ///   2) Створює під-ViewModel-и (List/Edit/Profile/ScheduleEdit/ScheduleProfile)
-    ///      і задає стартовий екран (CurrentSection).
-    ///
-    /// Таким чином:
-    /// - “композиція” (що з чого складається екран) живе тут
-    /// - “поведінка” (як воно працює) живе в інших partial-файлах
+    /// Визначає публічний елемент `public sealed partial class ContainerViewModel : ViewModelBase` та контракт його використання у шарі WPFApp.
     /// </summary>
     public sealed partial class ContainerViewModel : ViewModelBase
     {
-        // =========================================================
-        // 1) СЕРВІСИ (DI)
-        // =========================================================
-        //
-        // Це залежності, які передає DI-контейнер (або фабрика) при створенні ContainerViewModel.
-        // Вони зберігаються в полях, щоб ними користувалися різні partial-файли:
-        //
-        // - _containerService: CRUD контейнерів
-        // - _scheduleService: CRUD schedule + detail loading
-        // - _availabilityGroupService: робота з групами доступності (load members/days)
-        // - _shopService: довідник магазинів
-        // - _employeeService: довідник працівників
-        // - _generator: генерація слотів schedule
-        // - _colorPickerService: діалог вибору кольору для стилів клітинок
-        //
-        // ВАЖЛИВО:
-        // - ці поля тут "protected by design": вони private readonly, і їх використовують частини partial-класу.
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
         private readonly IContainerService _containerService;
         private readonly IScheduleService _scheduleService;
         private readonly IAvailabilityGroupService _availabilityGroupService;
@@ -65,31 +73,34 @@ namespace WPFApp.ViewModel.Container.Edit
         private readonly IDatabaseChangeNotifier _databaseChangeNotifier;
                 private readonly ConcurrentDictionary<int, Lazy<Task<ScheduleModel?>>> _scheduleDetailsCache = new();
 
-        // =========================================================
-        // 2) ВНУТРІШНІ СТАНИ ДЛЯ ВСЬОГО МОДУЛЯ
-        // =========================================================
+        
+        
+        
 
-        /// <summary>
-        /// Прапорець “ініціалізація вже виконана”.
-        /// Використовується в EnsureInitializedAsync (в іншому partial-файлі),
-        /// щоб стартові дані (список контейнерів) не завантажувати повторно.
-        /// </summary>
+        
+        
+        
+        
+        
         private bool _initialized;
 
-        /// <summary>
-        /// Id контейнера, профіль якого зараз відкритий.
-        /// Потрібно для навігації та коректного повернення у Profile після Save/Edit.
-        /// (Логіка використання живе в Containers partial).
-        /// </summary>
+        
+        
+        
+        
+        
         private int? _openedProfileContainerId;
 
-        /// <summary>
-        /// Максимальна кількість відкритих schedule-табів в ScheduleEdit.
-        /// Константа, бо це “правило UI”, а не дані.
-        /// </summary>
+        
+        
+        
+        
         private const int MaxOpenedSchedules = 20;
 
         private bool _isNavStatusVisible;
+        /// <summary>
+        /// Визначає публічний елемент `public bool IsNavStatusVisible` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public bool IsNavStatusVisible
         {
             get => _isNavStatusVisible;
@@ -97,6 +108,9 @@ namespace WPFApp.ViewModel.Container.Edit
         }
 
         private UIStatusKind _navStatus = UIStatusKind.Success;
+        /// <summary>
+        /// Визначає публічний елемент `public UIStatusKind NavStatus` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public UIStatusKind NavStatus
         {
             get => _navStatus;
@@ -140,36 +154,54 @@ namespace WPFApp.ViewModel.Container.Edit
             await HideNavStatusAsync().ConfigureAwait(false);
         }
 
-        // =========================================================
-        // 3) ПІД-ВЮ МОДЕЛИ (КОМПОЗИЦІЯ UI)
-        // =========================================================
-        //
-        // Ці ViewModel-и живуть довго (поки живе ContainerViewModel)
-        // і між ними відбувається перемикання через CurrentSection (Navigation partial).
-        //
-        // Вони приймають "this" (owner), щоб делегувати складні дії назад у ContainerViewModel.
-        // Це стандартний патерн: child VM -> owner VM -> services.
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        /// <summary>
+        /// Визначає публічний елемент `public ContainerListViewModel ListVm { get; }` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public ContainerListViewModel ListVm { get; }
+        /// <summary>
+        /// Визначає публічний елемент `public ContainerEditViewModel EditVm { get; }` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public ContainerEditViewModel EditVm { get; }
+        /// <summary>
+        /// Визначає публічний елемент `public ContainerProfileViewModel ProfileVm { get; }` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public ContainerProfileViewModel ProfileVm { get; }
+        /// <summary>
+        /// Визначає публічний елемент `public ContainerScheduleEditViewModel ScheduleEditVm { get; }` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public ContainerScheduleEditViewModel ScheduleEditVm { get; }
+        /// <summary>
+        /// Визначає публічний елемент `public ContainerScheduleProfileViewModel ScheduleProfileVm { get; }` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public ContainerScheduleProfileViewModel ScheduleProfileVm { get; }
 
-        // =========================================================
-        // 4) КОНСТРУКТОР (ЗБІРКА ВСЬОГО МОДУЛЯ)
-        // =========================================================
+        
+        
+        
 
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
         /// <summary>
-        /// Конструктор ContainerViewModel.
-        ///
-        /// Що робить:
-        /// 1) приймає всі DI-залежності (сервіси) і зберігає їх у полях
-        /// 2) створює під-ViewModel-и (List/Edit/Profile/ScheduleEdit/ScheduleProfile)
-        /// 3) встановлює стартовий екран: CurrentSection = ListVm
-        ///
-        /// Чому створення child VM робиться тут:
-        /// - це “композиція” (хто з ким пов’язаний)
-        /// - так легше підтримувати: один погляд на цей файл дає розуміння структури модуля
+        /// Визначає публічний елемент `public ContainerViewModel(` та контракт його використання у шарі WPFApp.
         /// </summary>
         public ContainerViewModel(
             IContainerService containerService,
@@ -183,9 +215,9 @@ namespace WPFApp.ViewModel.Container.Edit
             IDatabaseChangeNotifier databaseChangeNotifier
             )
         {
-            // Null-guards:
-            // Якщо DI-контейнер налаштований неправильно, ми хочемо отримати помилку одразу тут,
-            // а не десь глибоко в логіці при першому зверненні.
+            
+            
+            
             ArgumentNullException.ThrowIfNull(containerService);
             ArgumentNullException.ThrowIfNull(scheduleService);
             ArgumentNullException.ThrowIfNull(availabilityGroupService);
@@ -206,11 +238,11 @@ namespace WPFApp.ViewModel.Container.Edit
             _scheduleExportService = scheduleExportService;
             _databaseChangeNotifier = databaseChangeNotifier;
 
-            // Створюємо “дочірні” VM-и.
-            // Вони отримують owner (this), щоб викликати методи типу:
-            // - SearchAsync / SaveAsync / OpenProfileAsync
-            // - StartScheduleAddAsync / GenerateScheduleAsync / SaveScheduleAsync
-            // - TryPickScheduleCellColor / RunOnUiThreadAsync / Confirm / ShowError ...
+            
+            
+            
+            
+            
             ListVm = new ContainerListViewModel(this);
             EditVm = new ContainerEditViewModel(this);
             ProfileVm = new ContainerProfileViewModel(this);
@@ -225,8 +257,8 @@ namespace WPFApp.ViewModel.Container.Edit
 
             _databaseChangeNotifier.DatabaseChanged += OnDatabaseChanged;
 
-            // Стартова секція — список контейнерів.
-            // CurrentSection визначений у Navigation partial-файлі.
+            
+            
             CurrentSection = ListVm;
         }
 

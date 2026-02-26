@@ -1,3 +1,8 @@
+/*
+  Опис файлу: цей модуль містить реалізацію компонента ContainerViewModel.Export у шарі WPFApp.
+  Призначення: інкапсулювати поведінку UI або прикладної логіки без зміни доменної моделі.
+  Примітка: коментарі описують спостережуваний потік даних, очікувані обмеження та точки взаємодії.
+*/
 using BusinessLogicLayer.Contracts.Models;
 using System.Threading;
 using System.Threading.Tasks;
@@ -5,6 +10,9 @@ using WPFApp.Applications.Export;
 
 namespace WPFApp.ViewModel.Container.Edit
 {
+    /// <summary>
+    /// Визначає публічний елемент `public sealed partial class ContainerViewModel` та контракт його використання у шарі WPFApp.
+    /// </summary>
     public sealed partial class ContainerViewModel
     {
         internal Task ExportScheduleToExcelAsync(ScheduleExportContext context, string filePath, CancellationToken ct = default)
