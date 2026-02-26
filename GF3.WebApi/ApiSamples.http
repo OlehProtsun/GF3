@@ -155,3 +155,24 @@ Accept: application/json
 
 ### Cell styles - Delete by id
 DELETE {{host}}/api/containers/1/graphs/1/cell-styles/1
+
+### Graphs - Generate (dry run)
+POST {{host}}/api/containers/1/graphs/10/generate
+Content-Type: application/json
+
+{
+  "overwrite": true,
+  "dryRun": true,
+  "returnSlots": true
+}
+
+### Graphs - Generate (write to DB)
+POST {{host}}/api/containers/1/graphs/10/generate
+Content-Type: application/json
+
+{
+  "overwrite": true,
+  "dryRun": false,
+  "returnSlots": false
+}
+

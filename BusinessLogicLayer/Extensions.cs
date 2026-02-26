@@ -1,5 +1,6 @@
 ﻿using BusinessLogicLayer.Services;
 using BusinessLogicLayer.Services.Abstractions;
+using BusinessLogicLayer.Generators;
 using DataAccessLayer.Administration;
 using DataAccessLayer.Models.DataBaseContext;
 using Microsoft.Extensions.DependencyInjection;
@@ -22,6 +23,7 @@ namespace BusinessLogicLayer
             serviceCollection.AddScoped<IEmployeeFacade, EmployeeFacade>();
             serviceCollection.AddScoped<IScheduleExportDataBuilder, Services.Export.ScheduleExportDataBuilder>();
             serviceCollection.AddScoped<ISqliteAdminFacade, SqliteAdminFacade>();
+            serviceCollection.AddTransient<IScheduleGenerator, ScheduleGenerator>();
 
             return serviceCollection;
         }
