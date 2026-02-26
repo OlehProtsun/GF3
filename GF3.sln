@@ -11,6 +11,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WPFApp", "WPFApp\WPFApp.csp
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ArchitectureTests", "ArchitectureTests\ArchitectureTests.csproj", "{5D8D6388-7A69-4CE4-BE89-846388AB31F8}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GF3.WebApi", "GF3.WebApi\GF3.WebApi.csproj", "{9FA1695A-EC1A-4507-94B5-1DCB388CBE4D}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -33,6 +35,10 @@ Global
 		{5D8D6388-7A69-4CE4-BE89-846388AB31F8}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{5D8D6388-7A69-4CE4-BE89-846388AB31F8}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{5D8D6388-7A69-4CE4-BE89-846388AB31F8}.Release|Any CPU.Build.0 = Release|Any CPU
+		{9FA1695A-EC1A-4507-94B5-1DCB388CBE4D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9FA1695A-EC1A-4507-94B5-1DCB388CBE4D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9FA1695A-EC1A-4507-94B5-1DCB388CBE4D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9FA1695A-EC1A-4507-94B5-1DCB388CBE4D}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
