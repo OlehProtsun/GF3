@@ -5,7 +5,7 @@ namespace WebApi.Mappers;
 
 public static class ShopMapper
 {
-    public static ShopDto ToApiDto(this BusinessLogicLayer.Contracts.Shops.ShopDto dto) => new()
+    public static Contracts.Shops.ShopDto ToApiDto(this BusinessLogicLayer.Contracts.Shops.ShopDto dto) => new()
     {
         Id = dto.Id,
         Name = dto.Name,
