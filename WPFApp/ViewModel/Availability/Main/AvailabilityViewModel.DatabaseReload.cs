@@ -1,3 +1,8 @@
+/*
+  Опис файлу: цей модуль містить реалізацію компонента AvailabilityViewModel.DatabaseReload у шарі WPFApp.
+  Призначення: інкапсулювати поведінку UI або прикладної логіки без зміни доменної моделі.
+  Примітка: коментарі описують спостережуваний потік даних, очікувані обмеження та точки взаємодії.
+*/
 using System;
 using System.Threading;
 using System.Threading.Tasks;
@@ -6,6 +11,9 @@ using WPFApp.Applications.Notifications;
 
 namespace WPFApp.ViewModel.Availability.Main
 {
+    /// <summary>
+    /// Визначає публічний елемент `public sealed partial class AvailabilityViewModel` та контракт його використання у шарі WPFApp.
+    /// </summary>
     public sealed partial class AvailabilityViewModel
     {
         private int _databaseReloadInProgress;

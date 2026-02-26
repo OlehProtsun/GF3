@@ -1,4 +1,9 @@
-﻿using BusinessLogicLayer.Contracts.Models;
+/*
+  Опис файлу: цей модуль містить реалізацію компонента ContainerProfileViewModel у шарі WPFApp.
+  Призначення: інкапсулювати поведінку UI або прикладної логіки без зміни доменної моделі.
+  Примітка: коментарі описують спостережуваний потік даних, очікувані обмеження та точки взаємодії.
+*/
+using BusinessLogicLayer.Contracts.Models;
 using Microsoft.Win32;
 using System;
 using System.Collections.Generic;
@@ -25,13 +30,19 @@ using WPFApp.Applications.Matrix.Schedule;
 
 namespace WPFApp.ViewModel.Container.Profile
 {
+    /// <summary>
+    /// Визначає публічний елемент `public sealed class ContainerProfileViewModel : ViewModelBase` та контракт його використання у шарі WPFApp.
+    /// </summary>
     public sealed class ContainerProfileViewModel : ViewModelBase
     {
         private readonly ContainerViewModel _owner;
 
-        // ===================== Profile fields =====================
+        
 
         private bool _isExportStatusVisible;
+        /// <summary>
+        /// Визначає публічний елемент `public bool IsExportStatusVisible` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public bool IsExportStatusVisible
         {
             get => _isExportStatusVisible;
@@ -39,6 +50,9 @@ namespace WPFApp.ViewModel.Container.Profile
         }
 
         private UIStatusKind _exportStatus = UIStatusKind.Success;
+        /// <summary>
+        /// Визначає публічний елемент `public UIStatusKind ExportStatus` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public UIStatusKind ExportStatus
         {
             get => _exportStatus;
@@ -49,6 +63,9 @@ namespace WPFApp.ViewModel.Container.Profile
 
 
         private int _containerId;
+        /// <summary>
+        /// Визначає публічний елемент `public int ContainerId` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public int ContainerId
         {
             get => _containerId;
@@ -56,6 +73,9 @@ namespace WPFApp.ViewModel.Container.Profile
         }
 
         private string _name = string.Empty;
+        /// <summary>
+        /// Визначає публічний елемент `public string Name` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public string Name
         {
             get => _name;
@@ -63,33 +83,66 @@ namespace WPFApp.ViewModel.Container.Profile
         }
 
         private string? _note;
+        /// <summary>
+        /// Визначає публічний елемент `public string? Note` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public string? Note
         {
             get => _note;
             private set => SetProperty(ref _note, value);
         }
 
-        // ===================== Nested schedule list =====================
+        
+        /// <summary>
+        /// Визначає публічний елемент `public ContainerScheduleListViewModel ScheduleListVm { get; }` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public ContainerScheduleListViewModel ScheduleListVm { get; }
 
         private ContainerModel? _currentContainer;
 
-        // ===================== Commands =====================
+        
+        /// <summary>
+        /// Визначає публічний елемент `public AsyncRelayCommand BackCommand { get; }` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public AsyncRelayCommand BackCommand { get; }
+        /// <summary>
+        /// Визначає публічний елемент `public AsyncRelayCommand CancelProfileCommand { get; }` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public AsyncRelayCommand CancelProfileCommand { get; }
+        /// <summary>
+        /// Визначає публічний елемент `public AsyncRelayCommand EditCommand { get; }` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public AsyncRelayCommand EditCommand { get; }
+        /// <summary>
+        /// Визначає публічний елемент `public AsyncRelayCommand DeleteCommand { get; }` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public AsyncRelayCommand DeleteCommand { get; }
+        /// <summary>
+        /// Визначає публічний елемент `public AsyncRelayCommand ExportToExcelCommand { get; }` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public AsyncRelayCommand ExportToExcelCommand { get; }
+        /// <summary>
+        /// Визначає публічний елемент `public AsyncRelayCommand ExportToCodeCommand { get; }` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public AsyncRelayCommand ExportToCodeCommand { get; }
 
-        // ===================== OPTIONAL loaders (кращий шлях для точних даних) =====================
-        // Якщо ScheduleListVm.Items не містить employees/slots, то встанови ці делегати з owner/repo
-        // і статистика сама підтягне деталі по кожному schedule.
+        
+        
+        
+        /// <summary>
+        /// Визначає публічний елемент `public Func<int, CancellationToken, Task<IReadOnlyList<ScheduleEmployeeModel>>>? EmployeesLoader { get; set; }` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public Func<int, CancellationToken, Task<IReadOnlyList<ScheduleEmployeeModel>>>? EmployeesLoader { get; set; }
+        /// <summary>
+        /// Визначає публічний елемент `public Func<int, CancellationToken, Task<IReadOnlyList<ScheduleSlotModel>>>? SlotsLoader { get; set; }` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public Func<int, CancellationToken, Task<IReadOnlyList<ScheduleSlotModel>>>? SlotsLoader { get; set; }
 
-        // ===================== Container Statistic: Top fields =====================
+        
         private int _cellStyleRevision;
+        /// <summary>
+        /// Визначає публічний елемент `public int CellStyleRevision` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public int CellStyleRevision
         {
             get => _cellStyleRevision;
@@ -98,6 +151,9 @@ namespace WPFApp.ViewModel.Container.Profile
 
 
         private int _totalEmployees;
+        /// <summary>
+        /// Визначає публічний елемент `public int TotalEmployees` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public int TotalEmployees
         {
             get => _totalEmployees;
@@ -105,6 +161,9 @@ namespace WPFApp.ViewModel.Container.Profile
         }
 
         private int _totalShops;
+        /// <summary>
+        /// Визначає публічний елемент `public int TotalShops` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public int TotalShops
         {
             get => _totalShops;
@@ -112,6 +171,9 @@ namespace WPFApp.ViewModel.Container.Profile
         }
 
         private string _totalEmployeesListText = string.Empty;
+        /// <summary>
+        /// Визначає публічний елемент `public string TotalEmployeesListText` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public string TotalEmployeesListText
         {
             get => _totalEmployeesListText;
@@ -119,6 +181,9 @@ namespace WPFApp.ViewModel.Container.Profile
         }
 
         private string _totalShopsListText = string.Empty;
+        /// <summary>
+        /// Визначає публічний елемент `public string TotalShopsListText` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public string TotalShopsListText
         {
             get => _totalShopsListText;
@@ -126,18 +191,33 @@ namespace WPFApp.ViewModel.Container.Profile
         }
 
         private string _totalHoursText = "0h 0m";
+        /// <summary>
+        /// Визначає публічний елемент `public string TotalHoursText` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public string TotalHoursText
         {
             get => _totalHoursText;
             private set => SetProperty(ref _totalHoursText, value);
         }
 
-        // ===================== Grid #1: Employee | HoursSum | Shop1 | Shop2 | ... =====================
+        
+        /// <summary>
+        /// Визначає публічний елемент `public sealed class ShopHeader` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public sealed class ShopHeader
         {
-            public string Key { get; }   // stable dictionary key
-            public string Name { get; }  // shown in header
+            /// <summary>
+            /// Визначає публічний елемент `public string Key { get; }` та контракт його використання у шарі WPFApp.
+            /// </summary>
+            public string Key { get; }   
+            /// <summary>
+            /// Визначає публічний елемент `public string Name { get; }` та контракт його використання у шарі WPFApp.
+            /// </summary>
+            public string Name { get; }  
 
+            /// <summary>
+            /// Визначає публічний елемент `public ShopHeader(string key, string name)` та контракт його використання у шарі WPFApp.
+            /// </summary>
             public ShopHeader(string key, string name)
             {
                 Key = key ?? string.Empty;
@@ -145,18 +225,42 @@ namespace WPFApp.ViewModel.Container.Profile
             }
         }
 
+        /// <summary>
+        /// Визначає публічний елемент `public ObservableCollection<ShopHeader> ShopHeaders { get; } = new();` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public ObservableCollection<ShopHeader> ShopHeaders { get; } = new();
 
+        /// <summary>
+        /// Визначає публічний елемент `public sealed class EmployeeShopHoursRow` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public sealed class EmployeeShopHoursRow
         {
+            /// <summary>
+            /// Визначає публічний елемент `public string Employee { get; }` та контракт його використання у шарі WPFApp.
+            /// </summary>
             public string Employee { get; }
+            /// <summary>
+            /// Визначає публічний елемент `public int WorkDays { get; }` та контракт його використання у шарі WPFApp.
+            /// </summary>
             public int WorkDays { get; }
+            /// <summary>
+            /// Визначає публічний елемент `public int FreeDays { get; }` та контракт його використання у шарі WPFApp.
+            /// </summary>
             public int FreeDays { get; }
+            /// <summary>
+            /// Визначає публічний елемент `public string HoursSum { get; }` та контракт його використання у шарі WPFApp.
+            /// </summary>
             public string HoursSum { get; }
 
-            // Key = ShopHeader.Key, Value = formatted hours cell
+            
+            /// <summary>
+            /// Визначає публічний елемент `public Dictionary<string, string> HoursByShop { get; }` та контракт його використання у шарі WPFApp.
+            /// </summary>
             public Dictionary<string, string> HoursByShop { get; }
 
+            /// <summary>
+            /// Визначає публічний елемент `public EmployeeShopHoursRow(` та контракт його використання у шарі WPFApp.
+            /// </summary>
             public EmployeeShopHoursRow(
                 string employee,
                 int workDays,
@@ -171,7 +275,10 @@ namespace WPFApp.ViewModel.Container.Profile
                 HoursByShop = hoursByShop ?? new Dictionary<string, string>(StringComparer.Ordinal);
             }
 
-            // ✅ SAFE INDEXER
+            
+            /// <summary>
+            /// Визначає публічний елемент `public string this[string shopKey]` та контракт його використання у шарі WPFApp.
+            /// </summary>
             public string this[string shopKey]
                 => (shopKey != null && HoursByShop != null && HoursByShop.TryGetValue(shopKey, out var v))
                     ? (v ?? string.Empty)
@@ -180,15 +287,33 @@ namespace WPFApp.ViewModel.Container.Profile
 
 
 
+        /// <summary>
+        /// Визначає публічний елемент `public ObservableCollection<EmployeeShopHoursRow> EmployeeShopHoursRows { get; } = new();` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public ObservableCollection<EmployeeShopHoursRow> EmployeeShopHoursRows { get; } = new();
 
-        // ===================== Grid #2: Employee | WorkDays | FreeDays =====================
+        
+        /// <summary>
+        /// Визначає публічний елемент `public sealed class EmployeeWorkFreeStatRow` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public sealed class EmployeeWorkFreeStatRow
         {
+            /// <summary>
+            /// Визначає публічний елемент `public string Employee { get; }` та контракт його використання у шарі WPFApp.
+            /// </summary>
             public string Employee { get; }
+            /// <summary>
+            /// Визначає публічний елемент `public int WorkDays { get; }` та контракт його використання у шарі WPFApp.
+            /// </summary>
             public int WorkDays { get; }
+            /// <summary>
+            /// Визначає публічний елемент `public int FreeDays { get; }` та контракт його використання у шарі WPFApp.
+            /// </summary>
             public int FreeDays { get; }
 
+            /// <summary>
+            /// Визначає публічний елемент `public EmployeeWorkFreeStatRow(string employee, int workDays, int freeDays)` та контракт його використання у шарі WPFApp.
+            /// </summary>
             public EmployeeWorkFreeStatRow(string employee, int workDays, int freeDays)
             {
                 Employee = employee ?? string.Empty;
@@ -197,31 +322,40 @@ namespace WPFApp.ViewModel.Container.Profile
             }
         }
 
+        /// <summary>
+        /// Визначає публічний елемент `public ObservableCollection<EmployeeWorkFreeStatRow> EmployeeWorkFreeStats { get; } = new();` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public ObservableCollection<EmployeeWorkFreeStatRow> EmployeeWorkFreeStats { get; } = new();
 
-        // Notify View to rebuild dynamic columns
+        
+        /// <summary>
+        /// Визначає публічний елемент `public event EventHandler? StatisticsChanged;` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public event EventHandler? StatisticsChanged;
 
-        // ===================== background guards =====================
+        
         private CancellationTokenSource? _statsCts;
         private int _statsVersion;
 
-        // ===================== Auto refresh hooks =====================
+        
         private bool _autoHooked;
         private int _autoQueued;
 
-        // ===================== Helpers =====================
+        
         private static readonly Regex SummaryHoursRegex =
             new(@"^\s*(?:(\d+)\s*h)?\s*(?:(\d+)\s*m)?\s*$",
                 RegexOptions.Compiled | RegexOptions.CultureInvariant | RegexOptions.IgnoreCase);
 
+        /// <summary>
+        /// Визначає публічний елемент `public ContainerProfileViewModel(ContainerViewModel owner)` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public ContainerProfileViewModel(ContainerViewModel owner)
         {
             _owner = owner;
 
             ScheduleListVm = new ContainerScheduleListViewModel(owner);
 
-            // warnings-free async lambdas
+            
             BackCommand = new AsyncRelayCommand(async () => await _owner.CancelAsync());
             CancelProfileCommand = BackCommand;
 
@@ -236,6 +370,9 @@ namespace WPFApp.ViewModel.Container.Profile
         private bool CanExport()
             => _currentContainer != null && ScheduleListVm.Items.Count > 0;
 
+        /// <summary>
+        /// Визначає публічний елемент `public void SetProfile(ContainerModel model)` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public void SetProfile(ContainerModel model)
         {
             IsExportStatusVisible = false;
@@ -246,22 +383,37 @@ namespace WPFApp.ViewModel.Container.Profile
             Name = model.Name;
             Note = model.Note;
 
-            // якщо schedules вже завантажені — пробуємо порахувати
+            
             ExportToExcelCommand.RaiseCanExecuteChanged();
             ExportToCodeCommand.RaiseCanExecuteChanged();
             _ = QueueAutoStatsRebuildAsync();
         }
 
-        // =====================================================================
-        // PUBLIC API: sources (schedule + employees + slots)
-        // =====================================================================
+        
+        
+        
 
+        /// <summary>
+        /// Визначає публічний елемент `public sealed class ScheduleStatsSource` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public sealed class ScheduleStatsSource
         {
+            /// <summary>
+            /// Визначає публічний елемент `public ScheduleModel Schedule { get; }` та контракт його використання у шарі WPFApp.
+            /// </summary>
             public ScheduleModel Schedule { get; }
+            /// <summary>
+            /// Визначає публічний елемент `public IReadOnlyList<ScheduleEmployeeModel> Employees { get; }` та контракт його використання у шарі WPFApp.
+            /// </summary>
             public IReadOnlyList<ScheduleEmployeeModel> Employees { get; }
+            /// <summary>
+            /// Визначає публічний елемент `public IReadOnlyList<ScheduleSlotModel> Slots { get; }` та контракт його використання у шарі WPFApp.
+            /// </summary>
             public IReadOnlyList<ScheduleSlotModel> Slots { get; }
 
+            /// <summary>
+            /// Визначає публічний елемент `public ScheduleStatsSource(` та контракт його використання у шарі WPFApp.
+            /// </summary>
             public ScheduleStatsSource(
                 ScheduleModel schedule,
                 IEnumerable<ScheduleEmployeeModel>? employees,
@@ -269,14 +421,17 @@ namespace WPFApp.ViewModel.Container.Profile
             {
                 Schedule = schedule;
 
-                // snapshot -> IReadOnlyList (прибирає CS1503 з Calculate)
+                
                 Employees = employees?.ToList() ?? new List<ScheduleEmployeeModel>();
                 Slots = slots?.ToList() ?? new List<ScheduleSlotModel>();
             }
         }
 
+        
+        
+        
         /// <summary>
-        /// Ядро підрахунку: приймає повні дані по кожному schedule.
+        /// Визначає публічний елемент `public async Task SetStatisticsAsync(IList<ScheduleStatsSource>? sources, CancellationToken ct = default)` та контракт його використання у шарі WPFApp.
         /// </summary>
         public async Task SetStatisticsAsync(IList<ScheduleStatsSource>? sources, CancellationToken ct = default)
         {
@@ -310,7 +465,7 @@ namespace WPFApp.ViewModel.Container.Profile
                 {
                     token.ThrowIfCancellationRequested();
 
-                    // --------- Collect unique shops ----------
+                    
                     var shopKeyToName = new Dictionary<string, string>(StringComparer.Ordinal);
                     foreach (var s in sources)
                     {
@@ -319,19 +474,19 @@ namespace WPFApp.ViewModel.Container.Profile
                             shopKeyToName[shopKey] = shopName;
                     }
 
-                    // --------- Accumulators ----------
+                    
                     var empIdToName = new Dictionary<int, string>();
-                    var empShopDur = new Dictionary<int, Dictionary<string, TimeSpan>>();   // empId -> (shopKey -> duration)
-                    var empTotalDur = new Dictionary<int, TimeSpan>();                      // empId -> total duration
+                    var empShopDur = new Dictionary<int, Dictionary<string, TimeSpan>>();   
+                    var empTotalDur = new Dictionary<int, TimeSpan>();                      
                     var empWorkDays = new Dictionary<int, int>();
                     var empFreeDays = new Dictionary<int, int>();
-                    // ✅ totals only per shop (shopKey -> duration)
+                    
                     var shopTotalDur = new Dictionary<string, TimeSpan>(StringComparer.Ordinal);
 
 
                     TimeSpan totalAll = TimeSpan.Zero;
 
-                    // --------- Per schedule ----------
+                    
                     foreach (var src in sources)
                     {
                         token.ThrowIfCancellationRequested();
@@ -339,12 +494,12 @@ namespace WPFApp.ViewModel.Container.Profile
                         var schedule = src.Schedule;
                         var (shopKey, _) = GetShopKeyName(schedule);
 
-                        // totals from existing calculator
+                        
                         var totals = ScheduleTotalsCalculator.Calculate(src.Employees, src.Slots);
 
                         totalAll += totals.TotalDuration;
 
-                        // employee names (best-effort)
+                        
                         foreach (var emp in src.Employees)
                         {
                             var id = emp.EmployeeId;
@@ -352,7 +507,7 @@ namespace WPFApp.ViewModel.Container.Profile
                                 empIdToName[id] = GetEmployeeDisplayName(emp);
                         }
 
-                        // per-employee duration -> add to pivot accumulators
+                        
                         foreach (var kv in totals.PerEmployeeDuration)
                         {
                             var empId = kv.Key;
@@ -371,16 +526,16 @@ namespace WPFApp.ViewModel.Container.Profile
                             shopMap.TryGetValue(shopKey, out var curS);
                             shopMap[shopKey] = curS + dur;
 
-                            // ✅ accumulate total per shop
+                            
                             shopTotalDur.TryGetValue(shopKey, out var curShopTotal);
                             shopTotalDur[shopKey] = curShopTotal + dur;
                         }
 
 
-                        // Work/Free days (sum across schedules)
+                        
                         var daysInMonth = DateTime.DaysInMonth(schedule.Year, schedule.Month);
 
-                        // slots -> empId -> distinct day set
+                        
                         var workedDaysByEmp = new Dictionary<int, HashSet<int>>();
                         foreach (var slot in src.Slots)
                         {
@@ -401,7 +556,7 @@ namespace WPFApp.ViewModel.Container.Profile
                             set.Add(day);
                         }
 
-                        // apply per employee in this schedule
+                        
                         foreach (var empId in workedDaysByEmp.Keys)
                         {
                             var wd = workedDaysByEmp[empId].Count;
@@ -413,24 +568,24 @@ namespace WPFApp.ViewModel.Container.Profile
                             empWorkDays[empId] = curWd + wd;
                             empFreeDays[empId] = curFd + fd;
 
-                            // ensure name exists if came only from slots
+                            
                             if (!empIdToName.ContainsKey(empId))
                                 empIdToName[empId] = $"Employee {empId}";
                         }
                     }
 
-                    // Ensure all employees in duration map exist in name map
+                    
                     foreach (var empId in empTotalDur.Keys)
                         if (!empIdToName.ContainsKey(empId))
                             empIdToName[empId] = $"Employee {empId}";
 
-                    // --------- Build ShopHeaders ----------
+                    
                     var shopHeaders = shopKeyToName
                         .Select(kv => new ShopHeader(kv.Key, kv.Value))
                         .OrderBy(h => h.Name, StringComparer.CurrentCultureIgnoreCase)
                         .ToList();
 
-                    // --------- Build pivot rows ----------
+                    
                     var allShopKeys = shopHeaders.Select(h => h.Key).ToList();
 
                     var pivotRows = new List<EmployeeShopHoursRow>(empIdToName.Count + 1);
@@ -466,7 +621,7 @@ namespace WPFApp.ViewModel.Container.Profile
                             hoursByShop: byShopText));
                     }
 
-                    // ✅ TOTAL row: totals for ALL columns (додаємо 1 раз в самому кінці)
+                    
                     var totalWorkDays = empWorkDays.Values.Sum();
                     var totalFreeDays = empFreeDays.Values.Sum();
 
@@ -487,7 +642,7 @@ namespace WPFApp.ViewModel.Container.Profile
 
 
 
-                    // --------- Work/Free rows ----------
+                    
                     var wfRows = new List<EmployeeWorkFreeStatRow>(empIdToName.Count);
                     foreach (var emp in empIdToName.OrderBy(kv => kv.Value, StringComparer.CurrentCultureIgnoreCase))
                     {
@@ -553,7 +708,7 @@ namespace WPFApp.ViewModel.Container.Profile
             }
             catch (OperationCanceledException)
             {
-                // ok
+                
             }
         }
 
@@ -589,10 +744,13 @@ namespace WPFApp.ViewModel.Container.Profile
             await HideExportStatusAsync().ConfigureAwait(false);
         }
 
+        
+        
+        
+        
+        
         /// <summary>
-        /// Основна “корисна” функція: бере всі schedules, що зараз в ScheduleListVm.Items,
-        /// підтягує employees/slots (через делегати або з об’єктів),
-        /// і запускає SetStatisticsAsync.
+        /// Визначає публічний елемент `public async Task RefreshStatisticsFromContainerSchedulesAsync(CancellationToken ct = default)` та контракт його використання у шарі WPFApp.
         /// </summary>
         public async Task RefreshStatisticsFromContainerSchedulesAsync(CancellationToken ct = default)
         {
@@ -607,18 +765,45 @@ namespace WPFApp.ViewModel.Container.Profile
             _statsCts = null;
         }
 
-        // ===================== DTO =====================
+        
         private sealed class BuildStatsResult
         {
+            /// <summary>
+            /// Визначає публічний елемент `public string TotalHoursText { get; }` та контракт його використання у шарі WPFApp.
+            /// </summary>
             public string TotalHoursText { get; }
+            /// <summary>
+            /// Визначає публічний елемент `public int TotalEmployees { get; }` та контракт його використання у шарі WPFApp.
+            /// </summary>
             public int TotalEmployees { get; }
+            /// <summary>
+            /// Визначає публічний елемент `public int TotalShops { get; }` та контракт його використання у шарі WPFApp.
+            /// </summary>
             public int TotalShops { get; }
+            /// <summary>
+            /// Визначає публічний елемент `public string TotalEmployeesListText { get; }` та контракт його використання у шарі WPFApp.
+            /// </summary>
             public string TotalEmployeesListText { get; }
+            /// <summary>
+            /// Визначає публічний елемент `public string TotalShopsListText { get; }` та контракт його використання у шарі WPFApp.
+            /// </summary>
             public string TotalShopsListText { get; }
+            /// <summary>
+            /// Визначає публічний елемент `public List<ShopHeader> ShopHeaders { get; }` та контракт його використання у шарі WPFApp.
+            /// </summary>
             public List<ShopHeader> ShopHeaders { get; }
+            /// <summary>
+            /// Визначає публічний елемент `public List<EmployeeShopHoursRow> PivotRows { get; }` та контракт його використання у шарі WPFApp.
+            /// </summary>
             public List<EmployeeShopHoursRow> PivotRows { get; }
+            /// <summary>
+            /// Визначає публічний елемент `public List<EmployeeWorkFreeStatRow> WorkFreeRows { get; }` та контракт його використання у шарі WPFApp.
+            /// </summary>
             public List<EmployeeWorkFreeStatRow> WorkFreeRows { get; }
 
+            /// <summary>
+            /// Визначає публічний елемент `public BuildStatsResult(string totalHoursText, int totalEmployees, int totalShops,` та контракт його використання у шарі WPFApp.
+            /// </summary>
             public BuildStatsResult(string totalHoursText, int totalEmployees, int totalShops,
                                     string totalEmployeesListText, string totalShopsListText,
                                     List<ShopHeader> shopHeaders,
@@ -636,19 +821,19 @@ namespace WPFApp.ViewModel.Container.Profile
             }
         }
 
-        // ===================== Auto hook =====================
+        
         private void HookScheduleListForAutoStatistics()
         {
             if (_autoHooked) return;
             _autoHooked = true;
 
-            // якщо Items = ObservableCollection -> ловимо зміну
+            
             if (ScheduleListVm.Items is INotifyCollectionChanged ncc)
             {
                 ncc.CollectionChanged += (_, __) => _ = QueueAutoStatsRebuildAsync();
             }
 
-            // перший запуск (на випадок якщо Items вже заповнений)
+            
             ExportToExcelCommand.RaiseCanExecuteChanged();
             ExportToCodeCommand.RaiseCanExecuteChanged();
             _ = QueueAutoStatsRebuildAsync();
@@ -666,7 +851,7 @@ namespace WPFApp.ViewModel.Container.Profile
             }
             catch
             {
-                // не валимо UI через background exceptions
+                
             }
             finally
             {
@@ -699,7 +884,7 @@ namespace WPFApp.ViewModel.Container.Profile
 
             try
             {
-                // важке завантаження даних контейнера — тепер під Working
+                
                 var chartData = await BuildChartExportDataAsync(uiToken).ConfigureAwait(false);
                 if (chartData.Count == 0)
                 {
@@ -724,11 +909,11 @@ namespace WPFApp.ViewModel.Container.Profile
 
                 await _owner.ExportContainerToExcelAsync(context, dialog.FileName, uiToken).ConfigureAwait(false);
 
-                // Success toast + auto hide
+                
                 await ShowExportSuccessThenAutoHideAsync(uiToken, 1400).ConfigureAwait(false);
 
-                // якщо хочеш ще й MessageBox — розкоментуй:
-                // _owner.ShowInfo($"Excel export saved to:{Environment.NewLine}{dialog.FileName}");
+                
+                
             }
             catch (OperationCanceledException)
             {
@@ -780,7 +965,7 @@ namespace WPFApp.ViewModel.Container.Profile
 
                 await ShowExportSuccessThenAutoHideAsync(uiToken, 1400).ConfigureAwait(false);
 
-                // _owner.ShowInfo($"SQLite export saved to:{Environment.NewLine}{dialog.FileName}");
+                
             }
             catch (OperationCanceledException)
             {
@@ -916,7 +1101,7 @@ namespace WPFApp.ViewModel.Container.Profile
                     }
                 }
 
-                var sumText = FormatHoursCell(sum); // "132" або "145h 30m" як у UI
+                var sumText = FormatHoursCell(sum); 
                 var workDays = dayCells.Count(c =>
                     !string.IsNullOrWhiteSpace(c.From) ||
                     !string.IsNullOrWhiteSpace(c.To) ||
@@ -1016,14 +1201,29 @@ namespace WPFApp.ViewModel.Container.Profile
 
         private sealed class NullScheduleMatrixStyleProvider : IScheduleMatrixStyleProvider
         {
+            /// <summary>
+            /// Визначає публічний елемент `public int CellStyleRevision => 0;` та контракт його використання у шарі WPFApp.
+            /// </summary>
             public int CellStyleRevision => 0;
+            /// <summary>
+            /// Визначає публічний елемент `public Brush? GetCellBackgroundBrush(ScheduleMatrixCellRef cellRef) => null;` та контракт його використання у шарі WPFApp.
+            /// </summary>
             public Brush? GetCellBackgroundBrush(ScheduleMatrixCellRef cellRef) => null;
+            /// <summary>
+            /// Визначає публічний елемент `public Brush? GetCellForegroundBrush(ScheduleMatrixCellRef cellRef) => null;` та контракт його використання у шарі WPFApp.
+            /// </summary>
             public Brush? GetCellForegroundBrush(ScheduleMatrixCellRef cellRef) => null;
+            /// <summary>
+            /// Визначає публічний елемент `public bool TryBuildCellReference(object? rowData, string? columnName, out ScheduleMatrixCellRef cellRef)` та контракт його використання у шарі WPFApp.
+            /// </summary>
             public bool TryBuildCellReference(object? rowData, string? columnName, out ScheduleMatrixCellRef cellRef)
             {
                 cellRef = default;
                 return false;
             }
+            /// <summary>
+            /// Визначає публічний елемент `public bool TryGetCellStyle(ScheduleMatrixCellRef cellRef, out ScheduleCellStyleModel style)` та контракт його використання у шарі WPFApp.
+            /// </summary>
             public bool TryGetCellStyle(ScheduleMatrixCellRef cellRef, out ScheduleCellStyleModel style)
             {
                 style = null!;
@@ -1031,7 +1231,7 @@ namespace WPFApp.ViewModel.Container.Profile
             }
         }
 
-        // ===================== Build sources from ScheduleListVm.Items =====================
+        
         private async Task<List<ScheduleStatsSource>> BuildSourcesFromScheduleListAsync(CancellationToken ct)
         {
             ct.ThrowIfCancellationRequested();
@@ -1049,14 +1249,14 @@ namespace WPFApp.ViewModel.Container.Profile
                 if (!TryExtractScheduleModel(row, out var schedule))
                     continue;
 
-                // 1) спроба взяти прямо з row або schedule (якщо там вже є повні дані)
+                
                 var employees = TryGetEnumerable<ScheduleEmployeeModel>(row, "Employees", "ScheduleEmployees")
                              ?? TryGetEnumerable<ScheduleEmployeeModel>(schedule, "Employees", "ScheduleEmployees");
 
                 var slots = TryGetEnumerable<ScheduleSlotModel>(row, "Slots", "ScheduleSlots")
                          ?? TryGetEnumerable<ScheduleSlotModel>(schedule, "Slots", "ScheduleSlots");
 
-                // 2) якщо немає — пробуємо підтягнути через loader (найкращий шлях)
+                
                 var scheduleId = schedule.Id;
 
                 if ((employees == null || !employees.Any()) && EmployeesLoader != null)
@@ -1087,7 +1287,7 @@ namespace WPFApp.ViewModel.Container.Profile
                 return true;
             }
 
-            // найчастіші варіанти: row.Schedule / row.Model / row.Source / row.Entity
+            
             var possible = new[] { "Schedule", "Model", "Source", "Entity", "Data" };
             foreach (var name in possible)
             {
@@ -1113,7 +1313,7 @@ namespace WPFApp.ViewModel.Container.Profile
             return null;
         }
 
-        // ===================== Formatting =====================
+        
         private static string FormatHoursMinutes(TimeSpan ts)
         {
             var totalMinutes = (int)Math.Round(ts.TotalMinutes);
@@ -1160,7 +1360,7 @@ namespace WPFApp.ViewModel.Container.Profile
                 : text;
         }
 
-        // ===================== Shop helpers =====================
+        
         private static (string Key, string Name) GetShopKeyName(ScheduleModel schedule)
         {
             var shop = schedule.Shop;
@@ -1175,7 +1375,7 @@ namespace WPFApp.ViewModel.Container.Profile
             return (key, name);
         }
 
-        // ===================== Slot reflection: EmployeeId + Day =====================
+        
         private static bool TryGetSlotEmployeeId(ScheduleSlotModel slot, out int employeeId)
         {
             employeeId = 0;
@@ -1230,7 +1430,7 @@ namespace WPFApp.ViewModel.Container.Profile
             return false;
         }
 
-        // ===================== Employee display name =====================
+        
         private static bool TryGetFirstLast(object obj, out string fullName)
         {
             fullName = string.Empty;

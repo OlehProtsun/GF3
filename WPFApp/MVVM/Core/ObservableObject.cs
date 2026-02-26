@@ -1,27 +1,35 @@
-﻿using System.Runtime.CompilerServices;
+/*
+  Опис файлу: цей модуль містить реалізацію компонента ObservableObject у шарі WPFApp.
+  Призначення: інкапсулювати поведінку UI або прикладної логіки без зміни доменної моделі.
+  Примітка: коментарі описують спостережуваний потік даних, очікувані обмеження та точки взаємодії.
+*/
+using System.Runtime.CompilerServices;
 
 namespace WPFApp.MVVM.Core
 {
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
     /// <summary>
-    /// ObservableObject — сумісний alias базового класу для VM.
-    ///
-    /// ВАЖЛИВО:
-    /// Раніше у вас були два майже однакові базові класи:
-    /// - ObservableObject (SetProperty + Raise)
-    /// - ViewModelBase (SetProperty + OnPropertyChanged + OnPropertiesChanged)
-    ///
-    /// Це створювало дублювання і ризики “роз’їзду” поведінки.
-    ///
-    /// Тепер:
-    /// - ViewModelBase є канонічною реалізацією.
-    /// - ObservableObject просто наслідує ViewModelBase і залишає метод Raise(...) для існуючого коду.
+    /// Визначає публічний елемент `public abstract class ObservableObject : ViewModelBase` та контракт його використання у шарі WPFApp.
     /// </summary>
     public abstract class ObservableObject : ViewModelBase
     {
-        /// <summary>
-        /// Raise — історичний alias для OnPropertyChanged.
-        /// Залишаємо його, щоб не ламати існуючі VM, які викликають Raise(...).
-        /// </summary>
+        
+        
+        
+        
         protected void Raise([CallerMemberName] string? propName = null)
             => OnPropertyChanged(propName);
     }

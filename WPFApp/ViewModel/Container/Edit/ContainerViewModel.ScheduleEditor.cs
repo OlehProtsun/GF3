@@ -1,4 +1,9 @@
-﻿using BusinessLogicLayer.Contracts.Models;
+/*
+  Опис файлу: цей модуль містить реалізацію компонента ContainerViewModel.ScheduleEditor у шарі WPFApp.
+  Призначення: інкапсулювати поведінку UI або прикладної логіки без зміни доменної моделі.
+  Примітка: коментарі описують спостережуваний потік даних, очікувані обмеження та точки взаємодії.
+*/
+using BusinessLogicLayer.Contracts.Models;
 using System;
 using System.Linq;
 using System.Threading;
@@ -8,36 +13,39 @@ using WPFApp.ViewModel.Shared;
 
 namespace WPFApp.ViewModel.Container.Edit
 {
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
     /// <summary>
-    /// ContainerViewModel.ScheduleEditor — частина (partial) ContainerViewModel,
-    /// яка відповідає ТІЛЬКИ за дії всередині ScheduleEditVm:
-    ///
-    /// 1) Робота з працівниками в поточному блоці:
-    ///    - додати працівника
-    ///    - прибрати працівника
-    ///
-    /// 2) Робота з “табами/блоками” (кілька відкритих schedule одночасно):
-    ///    - додати новий блок
-    ///    - вибрати блок
-    ///    - закрити блок
-    ///
-    /// Чому винесено:
-    /// - це не CRUD контейнера і не навігація
-    /// - це “логіка редактора schedule”
-    /// - так головний ContainerViewModel стає читабельніший
+    /// Визначає публічний елемент `public sealed partial class ContainerViewModel` та контракт його використання у шарі WPFApp.
     /// </summary>
     public sealed partial class ContainerViewModel
     {
-        /// <summary>
-        /// Додати працівника в поточний блок schedule.
-        ///
-        /// Потік логіки:
-        /// 1) Перевірити, що є SelectedBlock
-        /// 2) Перевірити, що користувач вибрав Employee
-        /// 3) Перевірити, що такого працівника ще немає в block.Employees
-        /// 4) Додати ScheduleEmployeeModel
-        /// 5) Перерахувати матрицю і preview
-        /// </summary>
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
         internal async Task AddScheduleEmployeeAsync(CancellationToken ct = default)
         {
             if (ScheduleEditVm.SelectedBlock is null)
@@ -52,38 +60,38 @@ namespace WPFApp.ViewModel.Container.Edit
                 return;
             }
 
-            // Захист від дублювання
+            
             if (block.Employees.Any(e => e.EmployeeId == employee.Id))
             {
                 ShowInfo("This employee is already added.");
                 return;
             }
 
-            // Додаємо в колекцію блоку
+            
             block.Employees.Add(new ScheduleEmployeeModel
             {
                 EmployeeId = employee.Id,
                 Employee = employee
             });
 
-            // Оновлюємо UI-матрицю
+            
             await ScheduleEditVm.RefreshScheduleMatrixAsync(ct);
 
-            // Оновлюємо preview availability, бо список employees впливає на preview відображення
+            
             await UpdateAvailabilityPreviewAsync(ct);
         }
 
-        /// <summary>
-        /// Прибрати працівника з поточного блока schedule.
-        ///
-        /// Потік логіки:
-        /// 1) Перевірити SelectedBlock
-        /// 2) Перевірити, що вибрано SelectedScheduleEmployee
-        /// 3) Знайти відповідний ScheduleEmployeeModel у block.Employees і видалити
-        /// 4) Видалити всі slots цього працівника (щоб матриця не показувала “висячі” дані)
-        /// 5) Видалити стилі клітинок для цього працівника (фон/текст)
-        /// 6) Refresh матриці + preview
-        /// </summary>
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
         internal async Task RemoveScheduleEmployeeAsync(CancellationToken ct = default)
         {
             if (ScheduleEditVm.SelectedBlock is null)
@@ -105,10 +113,10 @@ namespace WPFApp.ViewModel.Container.Edit
                 return;
             }
 
-            // 1) Видаляємо працівника з блоку
+            
             block.Employees.Remove(toRemove);
 
-            // 2) Видаляємо всі слоти цього працівника
+            
             var slotsToRemove = block.Slots
                 .Where(s => s.EmployeeId == selected.EmployeeId)
                 .ToList();
@@ -116,28 +124,28 @@ namespace WPFApp.ViewModel.Container.Edit
             foreach (var slot in slotsToRemove)
                 block.Slots.Remove(slot);
 
-            // 3) Видаляємо стилі клітинок працівника (щоб не лишалось “мертвих” стилів)
+            
             ScheduleEditVm.RemoveCellStylesForEmployee(selected.EmployeeId);
 
-            // 4) Refresh матриці і preview
+            
             await ScheduleEditVm.RefreshScheduleMatrixAsync(ct);
             await UpdateAvailabilityPreviewAsync(ct);
         }
 
-        /// <summary>
-        /// Додати новий “блок” schedule у режимі створення (IsEdit == false).
-        ///
-        /// Обмеження:
-        /// - у Edit режимі (коли редагуємо існуючі schedule) блоки додаються через MultiOpen,
-        ///   а не через “Add block”.
-        ///
-        /// Потік:
-        /// 1) перевірити режим і SelectedBlock
-        /// 2) перевірити ліміт MaxOpenedSchedules
-        /// 3) створити блок через CreateDefaultBlock(containerId)
-        /// 4) додати його в ScheduleEditVm.Blocks і зробити SelectedBlock
-        /// 5) refresh матриці + preview
-        /// </summary>
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
         internal async Task AddScheduleBlockAsync(CancellationToken ct = default)
         {
             if (ScheduleEditVm.IsEdit)
@@ -152,7 +160,7 @@ namespace WPFApp.ViewModel.Container.Edit
                 return;
             }
 
-            // Беремо containerId з поточного блока (він точно правильний)
+            
             var containerId = ScheduleEditVm.SelectedBlock.Model.ContainerId;
 
             var block = CreateDefaultBlock(containerId);
@@ -163,15 +171,15 @@ namespace WPFApp.ViewModel.Container.Edit
             await UpdateAvailabilityPreviewAsync(ct);
         }
 
-        /// <summary>
-        /// Перемкнутися на інший блок у ScheduleEditVm.Blocks.
-        ///
-        /// Потік:
-        /// 1) перевірити, що блок існує в колекції Blocks
-        /// 2) зробити його SelectedBlock
-        /// 3) очистити/поставити помилки (якщо ти їх зберігаєш по блоках)
-        /// 4) refresh матриці і preview
-        /// </summary>
+        
+        
+        
+        
+        
+        
+        
+        
+        
         internal Task SelectScheduleBlockAsync(ScheduleBlockViewModel block, CancellationToken ct = default)
         {
             if (block is null || !ScheduleEditVm.Blocks.Contains(block))
@@ -203,20 +211,20 @@ namespace WPFApp.ViewModel.Container.Edit
         }
 
 
-        /// <summary>
-        /// Закрити блок (таб) schedule у редакторі.
-        ///
-        /// Потік:
-        /// 1) перевірити, що блок існує
-        /// 2) confirm
-        /// 3) видалити блок з Blocks
-        /// 4) якщо блоків не лишилось:
-        ///    - SelectedBlock = null
-        ///    - очистити матрицю і preview
-        /// 5) інакше:
-        ///    - вибрати “сусідній” блок (по індексу)
-        ///    - оновити preview
-        /// </summary>
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
         internal async Task CloseScheduleBlockAsync(ScheduleBlockViewModel block, CancellationToken ct = default)
         {
             if (!ScheduleEditVm.Blocks.Contains(block))
@@ -228,14 +236,14 @@ namespace WPFApp.ViewModel.Container.Edit
             var index = ScheduleEditVm.Blocks.IndexOf(block);
             ScheduleEditVm.Blocks.Remove(block);
 
-            // Якщо блоків не лишилось — очищаємо UI
+            
             if (ScheduleEditVm.Blocks.Count == 0)
             {
                 ScheduleEditVm.SelectedBlock = null;
 
                 await ScheduleEditVm.RefreshScheduleMatrixAsync(ct);
 
-                // Очищаємо preview: передаємо empty списки + CLEAR ключ
+                
                 await ScheduleEditVm.RefreshAvailabilityPreviewMatrixAsync(
                     block.Model.Year, block.Model.Month,
                     new System.Collections.Generic.List<ScheduleSlotModel>(),
@@ -246,7 +254,7 @@ namespace WPFApp.ViewModel.Container.Edit
                 return;
             }
 
-            // Вибираємо наступний блок: той самий індекс (або останній, якщо видалили останній)
+            
             var nextIndex = Math.Max(0, Math.Min(index, ScheduleEditVm.Blocks.Count - 1));
             var next = ScheduleEditVm.Blocks[nextIndex];
 

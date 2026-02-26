@@ -1,4 +1,9 @@
-﻿using BusinessLogicLayer.Contracts.Models;
+/*
+  Опис файлу: цей модуль містить реалізацію компонента AvailabilityViewModel.Initialization у шарі WPFApp.
+  Призначення: інкапсулювати поведінку UI або прикладної логіки без зміни доменної моделі.
+  Примітка: коментарі описують спостережуваний потік даних, очікувані обмеження та точки взаємодії.
+*/
+using BusinessLogicLayer.Contracts.Models;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -7,51 +12,57 @@ using System.Threading.Tasks;
 
 namespace WPFApp.ViewModel.Availability.Main
 {
+    
+    
+    
     /// <summary>
-    /// Initialization — стартове завантаження довідників/списків.
+    /// Визначає публічний елемент `public sealed partial class AvailabilityViewModel` та контракт його використання у шарі WPFApp.
     /// </summary>
     public sealed partial class AvailabilityViewModel
     {
-        // Прапорець “успішно ініціалізовано”.
+        
         private bool _initialized;
 
-        // Поточний init-task (щоб конкурентні виклики не запускали ініціалізацію вдруге).
+        
         private Task? _initializeTask;
 
-        // Лок для створення init-task.
+        
         private readonly object _initLock = new();
 
+        
+        
+        
+        
+        
+        
         /// <summary>
-        /// EnsureInitializedAsync — гарантує одноразове завантаження:
-        /// - груп (List)
-        /// - працівників (Edit lookup)
-        /// - bind-ів (Edit binds)
+        /// Визначає публічний елемент `public Task EnsureInitializedAsync(CancellationToken ct = default)` та контракт його використання у шарі WPFApp.
         /// </summary>
         public Task EnsureInitializedAsync(CancellationToken ct = default)
         {
-            // 1) Якщо вже успішно ініціалізовано — виходимо.
+            
             if (_initialized)
                 return Task.CompletedTask;
 
-            // 2) Якщо init-task вже створено — просто повертаємо його (усі чекатимуть одне).
+            
             if (_initializeTask != null)
                 return _initializeTask;
 
-            // 3) Створюємо init-task під lock, щоб не створити 2 task-и паралельно.
+            
             lock (_initLock)
             {
-                // 4) Могло змінитись, поки чекали lock.
+                
                 if (_initialized)
                     return Task.CompletedTask;
 
-                // 5) Якщо task вже створено — повертаємо.
+                
                 if (_initializeTask != null)
                     return _initializeTask;
 
-                // 6) Створюємо реальний task ініціалізації.
+                
                 _initializeTask = InitializeCoreAsync(ct);
 
-                // 7) Повертаємо його.
+                
                 return _initializeTask;
             }
         }
@@ -60,37 +71,37 @@ namespace WPFApp.ViewModel.Availability.Main
         {
             try
             {
-                // 1) Завантажуємо список груп (для List).
+                
                 await LoadAllGroupsAsync(ct);
 
-                // 2) Завантажуємо працівників (для Edit lookup і фільтра).
+                
                 await LoadEmployeesAsync(ct);
 
-                // 3) Завантажуємо bind-и (для Edit).
+                
                 await LoadBindsAsync(ct);
 
-                // 4) Фіксуємо успішну ініціалізацію.
+                
                 _initialized = true;
             }
             catch
             {
-                // 5) Якщо щось впало — дозволяємо повторний init:
-                //    - скидаємо task
-                //    - скидаємо прапорець
+                
+                
+                
                 lock (_initLock)
                 {
                     _initializeTask = null;
                     _initialized = false;
                 }
 
-                // 6) Прокидуємо виняток вище (щоб UI/логіка могла показати помилку).
+                
                 throw;
             }
         }
 
-        // =========================================================
-        // Завантаження даних (списки)
-        // =========================================================
+        
+        
+        
 
         private async Task LoadAllGroupsAsync(CancellationToken ct = default)
         {

@@ -1,3 +1,8 @@
+/*
+  Опис файлу: цей модуль містить реалізацію компонента ContainerListView у шарі WPFApp.
+  Призначення: інкапсулювати поведінку UI або прикладної логіки без зміни доменної моделі.
+  Примітка: коментарі описують спостережуваний потік даних, очікувані обмеження та точки взаємодії.
+*/
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -6,15 +11,21 @@ using WPFApp.ViewModel.Container.List;
 
 namespace WPFApp.View.Container
 {
+    
+    
+    
+    
+    
     /// <summary>
-    /// List screen for containers.
-    /// Code-behind keeps only UI interactions that are hard to express in pure XAML:
-    /// row hit-area selection and double-click open behavior.
+    /// Визначає публічний елемент `public partial class ContainerListView : UserControl` та контракт його використання у шарі WPFApp.
     /// </summary>
     public partial class ContainerListView : UserControl
     {
+        
+        
+        
         /// <summary>
-        /// Initializes the view and wires DataGrid double-click to the VM command.
+        /// Визначає публічний елемент `public ContainerListView()` та контракт його використання у шарі WPFApp.
         /// </summary>
         public ContainerListView()
         {
@@ -22,19 +33,19 @@ namespace WPFApp.View.Container
             dataGridContainerList.MouseDoubleClick += DataGridContainerList_MouseDoubleClick;
         }
 
-        /// <summary>
-        /// Opens the selected container profile on row double-click.
-        /// </summary>
+        
+        
+        
         private void DataGridContainerList_MouseDoubleClick(object sender, MouseButtonEventArgs e)
         {
             if (DataContext is ContainerListViewModel vm && vm.OpenProfileCommand.CanExecute(null))
                 vm.OpenProfileCommand.Execute(null);
         }
 
-        /// <summary>
-        /// Makes the whole custom row layout clickable (not only the text content).
-        /// This keeps DataGrid selection behavior predictable when using card-style rows.
-        /// </summary>
+        
+        
+        
+        
         private void RowHitArea_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
             var dep = (DependencyObject)sender;
