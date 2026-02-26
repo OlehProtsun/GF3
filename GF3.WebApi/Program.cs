@@ -1,10 +1,12 @@
 using BusinessLogicLayer;
 using DataAccessLayer.Models.DataBaseContext;
+using GF3.WebApi.Middleware;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers();
+builder.Services.AddProblemDetails();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
@@ -34,6 +36,7 @@ using (var scope = app.Services.CreateScope())
 app.UseSwagger();
 app.UseSwaggerUI();
 
+app.UseMiddleware<ApiExceptionMiddleware>();
 app.MapControllers();
 
 app.Run();
