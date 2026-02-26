@@ -10,14 +10,19 @@ namespace DataAccessLayer.Models.DataBaseContext
     {
         public AppDbContext CreateDbContext(string[] args)
         {
-            var root = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                "GF3");
+            var connectionString = Environment.GetEnvironmentVariable("GF3_CONNECTION_STRING");
 
-            Directory.CreateDirectory(root);
+            if (string.IsNullOrWhiteSpace(connectionString))
+            {
+                var root = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                    "GF3");
 
-            var dbPath = Path.Combine(root, "SQLite.db");
-            var connectionString = $"Data Source={dbPath}";
+                Directory.CreateDirectory(root);
+
+                var dbPath = Path.Combine(root, "SQLite.db");
+                connectionString = $"Data Source={dbPath}";
+            }
 
             var optionsBuilder = new DbContextOptionsBuilder<AppDbContext>();
             optionsBuilder.UseSqlite(connectionString);
