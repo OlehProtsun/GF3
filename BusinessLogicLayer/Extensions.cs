@@ -25,6 +25,7 @@ namespace BusinessLogicLayer
             serviceCollection.AddScoped<IShopFacade, ShopFacade>();
             serviceCollection.AddScoped<IEmployeeFacade, EmployeeFacade>();
             serviceCollection.AddScoped<IScheduleExportDataBuilder, Services.Export.ScheduleExportDataBuilder>();
+            serviceCollection.AddScoped<IScheduleExcelContextBuilder, Services.Export.ScheduleExcelContextBuilder>();
             serviceCollection.AddScoped<IGraphExportService, GraphExportService>();
             serviceCollection.AddScoped<IGraphTemplateExportService, GraphTemplateExportService>();
             serviceCollection.AddSingleton<IExcelTemplateLocator, ExcelTemplateLocator>();
