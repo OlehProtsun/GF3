@@ -30,6 +30,8 @@ public sealed class GraphTemplateExportService : IGraphTemplateExportService
         var graphData = await LoadGraphDataAsync(containerId, graphId, includeStyles, includeEmployees, ct).ConfigureAwait(false);
         using var wb = new XLWorkbook(_templateLocator.GetScheduleTemplatePath());
         AddGraphSheets(wb, graphData, graphData.Graph.Name);
+        DeleteTemplateSheets(wb, MatrixTemplateSheetNames);
+        DeleteTemplateSheets(wb, StatisticTemplateSheetNames);
         using var ms = new MemoryStream();
         wb.SaveAs(ms);
         return (ms.ToArray(), $"GF3_Graph_{graphId}_{DateTime.UtcNow:yyyyMMdd_HHmm}.xlsx");
@@ -50,6 +52,7 @@ public sealed class GraphTemplateExportService : IGraphTemplateExportService
         var imported = containerTemplate.CopyTo(wb, MakeUniqueSheetName(wb, "__ContainerTemplate__"));
         var containerSheet = imported.CopyTo(MakeUniqueSheetName(wb, "Container"));
         FillContainerSheet(containerSheet, container, graphs);
+        NormalizeGray125(containerSheet);
 
         foreach (var graph in graphs)
         {
@@ -57,6 +60,8 @@ public sealed class GraphTemplateExportService : IGraphTemplateExportService
             AddGraphSheets(wb, graphData, graph.Name);
         }
 
+        DeleteTemplateSheets(wb, MatrixTemplateSheetNames);
+        DeleteTemplateSheets(wb, StatisticTemplateSheetNames);
         imported.Delete();
         using var ms = new MemoryStream();
         wb.SaveAs(ms);
@@ -89,12 +94,17 @@ public sealed class GraphTemplateExportService : IGraphTemplateExportService
         var statSheet = statTemplate.CopyTo(MakeUniqueSheetName(wb, SanitizeWorksheetName($"{sheetBaseName} - Statistic", "Schedule - Statistic")));
 
         FillMatrixSheet(matrixSheet, data);
+        NormalizeGray125(matrixSheet);
         FillStatisticSheet(statSheet, data);
+        NormalizeGray125(statSheet);
+    }
 
-        if (wb.Worksheets.Count(x => MatrixTemplateSheetNames.Contains(x.Name, StringComparer.OrdinalIgnoreCase)) > 1)
+    private static void DeleteTemplateSheets(XLWorkbook wb, IEnumerable<string> templateSheetNames)
+    {
+        foreach (var sheetName in templateSheetNames)
         {
-            matrixTemplate.Delete();
-            statTemplate.Delete();
+            if (wb.Worksheets.TryGetWorksheet(sheetName, out _))
+                wb.Worksheets.Delete(sheetName);
         }
     }
 
@@ -245,6 +255,36 @@ public sealed class GraphTemplateExportService : IGraphTemplateExportService
 
     private static IXLWorksheet? FindTemplateSheet(XLWorkbook wb, IEnumerable<string> names)
         => wb.Worksheets.FirstOrDefault(x => names.Contains(x.Name, StringComparer.OrdinalIgnoreCase));
+
+    private static void NormalizeGray125(IXLWorksheet sheet, string? rangeAddress = null)
+    {
+        var range = !string.IsNullOrWhiteSpace(rangeAddress)
+            ? sheet.Range(rangeAddress)
+            : sheet.RangeUsed();
+
+        if (range is not null)
+        {
+            foreach (var cell in range.Cells())
+            {
+                if (cell.Style.Fill.PatternType == XLFillPatternValues.Gray125)
+                {
+                    cell.Style.Fill.PatternType = XLFillPatternValues.Gray125;
+                    cell.Style.Fill.BackgroundColor = XLColor.White;
+                    cell.Style.Fill.PatternColor = XLColor.Black;
+                }
+            }
+        }
+
+        foreach (var conditionalFormat in sheet.ConditionalFormats)
+        {
+            if (conditionalFormat.Style.Fill.PatternType == XLFillPatternValues.Gray125)
+            {
+                conditionalFormat.Style.Fill.PatternType = XLFillPatternValues.Gray125;
+                conditionalFormat.Style.Fill.BackgroundColor = XLColor.White;
+                conditionalFormat.Style.Fill.PatternColor = XLColor.Black;
+            }
+        }
+    }
 
     private static string MakeUniqueSheetName(XLWorkbook wb, string baseName)
     {
