@@ -48,6 +48,54 @@ public sealed class GraphExportService : IGraphExportService
         return Encoding.UTF8.GetBytes(script);
     }
 
+    public async Task<byte[]> ExportContainerSqlAsync(int containerId, bool includeEmployees, bool includeStyles, CancellationToken ct = default)
+    {
+        var container = await _containerService.GetAsync(containerId, ct).ConfigureAwait(false)
+            ?? throw new KeyNotFoundException($"Container with id {containerId} was not found.");
+
+        var graphs = await _containerService.GetGraphsAsync(containerId, ct).ConfigureAwait(false);
+        var sb = new StringBuilder(64_000);
+        sb.AppendLine("-- GF3 Container export");
+        sb.AppendLine($"-- Generated: {DateTime.UtcNow:yyyy-MM-dd HH:mm:ss} UTC");
+        sb.AppendLine("BEGIN TRANSACTION;");
+        sb.AppendLine();
+
+        sb.AppendLine(SqlInsert("container",
+            ("id", container.Id),
+            ("name", container.Name),
+            ("note", container.Note)));
+
+        foreach (var graph in graphs.OrderBy(x => x.Id))
+        {
+            var employees = includeEmployees
+                ? await _containerService.GetGraphEmployeesAsync(containerId, graph.Id, ct).ConfigureAwait(false)
+                : [];
+            var slots = await _containerService.GetGraphSlotsAsync(containerId, graph.Id, ct).ConfigureAwait(false);
+            var styles = includeStyles
+                ? await _containerService.GetGraphCellStylesAsync(containerId, graph.Id, ct).ConfigureAwait(false)
+                : [];
+
+            AvailabilityGroupModel? group = null;
+            List<AvailabilityGroupMemberModel> members = [];
+            List<AvailabilityGroupDayModel> days = [];
+
+            if (graph.AvailabilityGroupId is int availabilityGroupId && availabilityGroupId > 0)
+            {
+                var full = await _availabilityGroupService.LoadFullAsync(availabilityGroupId, ct).ConfigureAwait(false);
+                group = full.group;
+                members = full.members;
+                days = full.days;
+            }
+
+            var graphSql = BuildSqlScript(graph, employees, slots, styles, group, members, days, includeEmployees, includeStyles);
+            sb.AppendLine(graphSql.Replace("BEGIN TRANSACTION;", string.Empty, StringComparison.Ordinal)
+                .Replace("COMMIT;", string.Empty, StringComparison.Ordinal));
+        }
+
+        sb.AppendLine("COMMIT;");
+        return Encoding.UTF8.GetBytes(sb.ToString());
+    }
+
     public async Task<byte[]> ExportGraphExcelCsvAsync(int containerId, int graphId, bool includeEmployees, bool includeStyles, CancellationToken ct = default)
     {
         var graph = await _containerService.GetGraphByIdAsync(containerId, graphId, ct).ConfigureAwait(false)

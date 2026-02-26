@@ -3,6 +3,9 @@ using BusinessLogicLayer.Services.Abstractions;
 using BusinessLogicLayer.Generators;
 using DataAccessLayer.Administration;
 using DataAccessLayer.Models.DataBaseContext;
+using BusinessLogicLayer.Options;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Options;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace BusinessLogicLayer
@@ -23,6 +26,8 @@ namespace BusinessLogicLayer
             serviceCollection.AddScoped<IEmployeeFacade, EmployeeFacade>();
             serviceCollection.AddScoped<IScheduleExportDataBuilder, Services.Export.ScheduleExportDataBuilder>();
             serviceCollection.AddScoped<IGraphExportService, GraphExportService>();
+            serviceCollection.AddScoped<IGraphTemplateExportService, GraphTemplateExportService>();
+            serviceCollection.AddSingleton<IExcelTemplateLocator, ExcelTemplateLocator>();
             serviceCollection.AddScoped<ISqliteAdminFacade, SqliteAdminFacade>();
             serviceCollection.AddScoped<IAdminDbService, AdminDbService>();
             serviceCollection.AddTransient<IScheduleGenerator, ScheduleGenerator>();
@@ -59,6 +64,7 @@ namespace BusinessLogicLayer
             serviceCollection.AddDataAccess(connectionString);
             serviceCollection.AddBusinessLogicLayer();
             serviceCollection.AddSingleton<ISqliteAdminService>(_ => new SqliteAdminService(connectionString, databasePath));
+            serviceCollection.AddOptions<ExportTemplatesOptions>();
 
             return serviceCollection;
         }

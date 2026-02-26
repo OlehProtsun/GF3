@@ -18,4 +18,8 @@
     <ProjectReference Include="..\DataAccessLayer\DataAccessLayer.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Folder Include="Resources\ExcelTemplate\" />
+  </ItemGroup>
+
 </Project>
