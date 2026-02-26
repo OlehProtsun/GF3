@@ -1,0 +1,100 @@
+@host = http://localhost:5055
+
+### Employees - Get all
+GET {{host}}/api/employees
+Accept: application/json
+
+### Shops - Create
+POST {{host}}/api/shops
+Content-Type: application/json
+
+{
+  "name": "Downtown Shop",
+  "address": "Main street 10",
+  "description": "Main branch"
+}
+
+### Shops - Get all
+GET {{host}}/api/shops
+Accept: application/json
+
+### Shops - Get by id
+GET {{host}}/api/shops/1
+Accept: application/json
+
+### Shops - Update
+PUT {{host}}/api/shops/1
+Content-Type: application/json
+
+{
+  "name": "Downtown Shop Updated",
+  "address": "Main street 12",
+  "description": "Updated description"
+}
+
+### Shops - Delete
+DELETE {{host}}/api/shops/1
+
+### Containers - Create
+POST {{host}}/api/containers
+Content-Type: application/json
+
+{
+  "name": "Main Container",
+  "note": "Container used in monthly schedules"
+}
+
+### Containers - Get all
+GET {{host}}/api/containers
+Accept: application/json
+
+### Containers - Get by id
+GET {{host}}/api/containers/1
+Accept: application/json
+
+### Containers - Update
+PUT {{host}}/api/containers/1
+Content-Type: application/json
+
+{
+  "name": "Main Container Updated",
+  "note": "Note changed"
+}
+
+### Containers - Delete
+DELETE {{host}}/api/containers/1
+
+### AvailabilityGroups - Create
+POST {{host}}/api/availability-groups
+Content-Type: application/json
+
+{
+  "name": "April Team A",
+  "year": 2026,
+  "month": 4
+}
+
+### AvailabilityGroups - Get all
+GET {{host}}/api/availability-groups
+Accept: application/json
+
+### AvailabilityGroups - Get by id
+GET {{host}}/api/availability-groups/1
+Accept: application/json
+
+### AvailabilityGroups - Update
+PUT {{host}}/api/availability-groups/1
+Content-Type: application/json
+
+{
+  "name": "April Team A Updated",
+  "year": 2026,
+  "month": 4
+}
+
+### AvailabilityGroups - Get items (relation endpoint)
+GET {{host}}/api/availability-groups/1/items
+Accept: application/json
+
+### AvailabilityGroups - Delete
+DELETE {{host}}/api/availability-groups/1
