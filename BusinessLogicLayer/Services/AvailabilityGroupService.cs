@@ -1,4 +1,3 @@
-using BusinessLogicLayer.Contracts.Enums;
 using BusinessLogicLayer.Contracts.Models;
 using BusinessLogicLayer.Mappers;
 using BusinessLogicLayer.Services.Abstractions;
@@ -49,6 +48,91 @@ public class AvailabilityGroupService : IAvailabilityGroupService
         var members = full.Members?.Select(m => m.ToContract()).ToList() ?? new List<AvailabilityGroupMemberModel>();
         var days = (await _dayRepo.GetByGroupIdAsync(groupId, ct).ConfigureAwait(false)).Select(d => d.ToContract()).ToList();
         return (full.ToContract(), members, days);
+    }
+
+    public async Task<List<AvailabilityGroupMemberModel>> GetMembersAsync(int groupId, CancellationToken ct = default)
+    {
+        await EnsureGroupExistsAsync(groupId, ct).ConfigureAwait(false);
+        return (await _memberRepo.GetByGroupIdAsync(groupId, ct).ConfigureAwait(false)).Select(x => x.ToContract()).ToList();
+    }
+
+    public async Task<AvailabilityGroupMemberModel> CreateMemberAsync(int groupId, AvailabilityGroupMemberModel model, CancellationToken ct = default)
+    {
+        await EnsureGroupExistsAsync(groupId, ct).ConfigureAwait(false);
+        model.AvailabilityGroupId = groupId;
+        var created = await _memberRepo.AddAsync(new DataAccessLayer.Models.AvailabilityGroupMemberModel
+        {
+            AvailabilityGroupId = model.AvailabilityGroupId,
+            EmployeeId = model.EmployeeId
+        }, ct).ConfigureAwait(false);
+        return created.ToContract();
+    }
+
+    public async Task UpdateMemberAsync(int groupId, int memberId, AvailabilityGroupMemberModel model, CancellationToken ct = default)
+    {
+        await EnsureGroupExistsAsync(groupId, ct).ConfigureAwait(false);
+        var existing = await _memberRepo.GetByIdAsync(memberId, ct).ConfigureAwait(false)
+            ?? throw new KeyNotFoundException($"Availability group member with id {memberId} was not found.");
+
+        if (existing.AvailabilityGroupId != groupId)
+            throw new KeyNotFoundException($"Availability group member with id {memberId} was not found in group {groupId}.");
+
+        await _memberRepo.UpdateAsync(new DataAccessLayer.Models.AvailabilityGroupMemberModel
+        {
+            Id = memberId,
+            AvailabilityGroupId = groupId,
+            EmployeeId = model.EmployeeId
+        }, ct).ConfigureAwait(false);
+    }
+
+    public async Task DeleteMemberAsync(int groupId, int memberId, CancellationToken ct = default)
+    {
+        await EnsureGroupExistsAsync(groupId, ct).ConfigureAwait(false);
+        var existing = await _memberRepo.GetByIdAsync(memberId, ct).ConfigureAwait(false)
+            ?? throw new KeyNotFoundException($"Availability group member with id {memberId} was not found.");
+
+        if (existing.AvailabilityGroupId != groupId)
+            throw new KeyNotFoundException($"Availability group member with id {memberId} was not found in group {groupId}.");
+
+        await _memberRepo.DeleteAsync(memberId, ct).ConfigureAwait(false);
+    }
+
+    public async Task<List<AvailabilityGroupDayModel>> GetSlotsAsync(int groupId, CancellationToken ct = default)
+    {
+        await EnsureGroupExistsAsync(groupId, ct).ConfigureAwait(false);
+        return (await _dayRepo.GetByGroupIdAsync(groupId, ct).ConfigureAwait(false)).Select(x => x.ToContract()).ToList();
+    }
+
+    public async Task<AvailabilityGroupDayModel> CreateSlotAsync(int groupId, AvailabilityGroupDayModel model, CancellationToken ct = default)
+    {
+        await EnsureGroupExistsAsync(groupId, ct).ConfigureAwait(false);
+        await EnsureMemberBelongsToGroupAsync(groupId, model.AvailabilityGroupMemberId, ct).ConfigureAwait(false);
+
+        var created = await _dayRepo.AddAsync(model.ToDal(), ct).ConfigureAwait(false);
+        return created.ToContract();
+    }
+
+    public async Task UpdateSlotAsync(int groupId, int slotId, AvailabilityGroupDayModel model, CancellationToken ct = default)
+    {
+        await EnsureGroupExistsAsync(groupId, ct).ConfigureAwait(false);
+        var existing = await _dayRepo.GetByIdAsync(slotId, ct).ConfigureAwait(false)
+            ?? throw new KeyNotFoundException($"Availability slot with id {slotId} was not found.");
+
+        await EnsureMemberBelongsToGroupAsync(groupId, existing.AvailabilityGroupMemberId, ct).ConfigureAwait(false);
+        await EnsureMemberBelongsToGroupAsync(groupId, model.AvailabilityGroupMemberId, ct).ConfigureAwait(false);
+
+        model.Id = slotId;
+        await _dayRepo.UpdateAsync(model.ToDal(), ct).ConfigureAwait(false);
+    }
+
+    public async Task DeleteSlotAsync(int groupId, int slotId, CancellationToken ct = default)
+    {
+        await EnsureGroupExistsAsync(groupId, ct).ConfigureAwait(false);
+        var existing = await _dayRepo.GetByIdAsync(slotId, ct).ConfigureAwait(false)
+            ?? throw new KeyNotFoundException($"Availability slot with id {slotId} was not found.");
+
+        await EnsureMemberBelongsToGroupAsync(groupId, existing.AvailabilityGroupMemberId, ct).ConfigureAwait(false);
+        await _dayRepo.DeleteAsync(slotId, ct).ConfigureAwait(false);
     }
 
     public async Task SaveGroupAsync(
@@ -108,12 +192,26 @@ public class AvailabilityGroupService : IAvailabilityGroupService
             {
                 d.Id = 0;
                 d.AvailabilityGroupMemberId = memberId;
-
-                if (d.Kind != AvailabilityKind.INT.ToDal())
-                    d.IntervalStr = null;
             }
 
-            await _dayRepo.AddRangeAsync(dalDays, ct).ConfigureAwait(false);
+            if (dalDays.Count > 0)
+                await _dayRepo.AddRangeAsync(dalDays, ct).ConfigureAwait(false);
         }
+    }
+
+    private async Task EnsureGroupExistsAsync(int groupId, CancellationToken ct)
+    {
+        var exists = await _groupRepo.GetByIdAsync(groupId, ct).ConfigureAwait(false);
+        if (exists is null)
+            throw new KeyNotFoundException($"Availability group with id {groupId} was not found.");
+    }
+
+    private async Task EnsureMemberBelongsToGroupAsync(int groupId, int memberId, CancellationToken ct)
+    {
+        var member = await _memberRepo.GetByIdAsync(memberId, ct).ConfigureAwait(false)
+            ?? throw new KeyNotFoundException($"Availability group member with id {memberId} was not found.");
+
+        if (member.AvailabilityGroupId != groupId)
+            throw new KeyNotFoundException($"Availability group member with id {memberId} was not found in group {groupId}.");
     }
 }

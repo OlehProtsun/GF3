@@ -98,3 +98,102 @@ Accept: application/json
 
 ### AvailabilityGroups - Delete
 DELETE {{host}}/api/availability-groups/1
+
+### AvailabilityGroups - Create member
+POST {{host}}/api/availability-groups/1/members
+Content-Type: application/json
+
+{
+  "employeeId": 1
+}
+
+### AvailabilityGroups - Get members
+GET {{host}}/api/availability-groups/1/members
+Accept: application/json
+
+### AvailabilityGroups - Update member
+PUT {{host}}/api/availability-groups/1/members/1
+Content-Type: application/json
+
+{
+  "employeeId": 2
+}
+
+### AvailabilityGroups - Delete member
+DELETE {{host}}/api/availability-groups/1/members/1
+
+### AvailabilityGroups - Create slot
+POST {{host}}/api/availability-groups/1/slots
+Content-Type: application/json
+
+{
+  "availabilityGroupMemberId": 1,
+  "dayOfMonth": 5,
+  "kind": 1,
+  "intervalStr": "09:00-18:00"
+}
+
+### AvailabilityGroups - Get slots
+GET {{host}}/api/availability-groups/1/slots
+Accept: application/json
+
+### AvailabilityGroups - Update slot
+PUT {{host}}/api/availability-groups/1/slots/1
+Content-Type: application/json
+
+{
+  "availabilityGroupMemberId": 1,
+  "dayOfMonth": 6,
+  "kind": 2,
+  "intervalStr": "10:00-16:00"
+}
+
+### AvailabilityGroups - Delete slot
+DELETE {{host}}/api/availability-groups/1/slots/1
+
+### Containers - Create graph
+POST {{host}}/api/containers/1/graphs
+Content-Type: application/json
+
+{
+  "shopId": 1,
+  "name": "April Graph",
+  "year": 2026,
+  "month": 4,
+  "peoplePerShift": 2,
+  "shift1Time": "08:00 - 16:00",
+  "shift2Time": "16:00 - 23:00",
+  "maxHoursPerEmpMonth": 180,
+  "maxConsecutiveDays": 5,
+  "maxConsecutiveFull": 3,
+  "maxFullPerMonth": 10,
+  "note": "Nested graph sample",
+  "availabilityGroupId": 1
+}
+
+### Containers - Get graphs
+GET {{host}}/api/containers/1/graphs
+Accept: application/json
+
+### Containers - Update graph
+PUT {{host}}/api/containers/1/graphs/1
+Content-Type: application/json
+
+{
+  "shopId": 1,
+  "name": "April Graph Updated",
+  "year": 2026,
+  "month": 4,
+  "peoplePerShift": 3,
+  "shift1Time": "08:00 - 16:00",
+  "shift2Time": "16:00 - 23:00",
+  "maxHoursPerEmpMonth": 170,
+  "maxConsecutiveDays": 4,
+  "maxConsecutiveFull": 2,
+  "maxFullPerMonth": 9,
+  "note": "Updated nested graph",
+  "availabilityGroupId": 1
+}
+
+### Containers - Delete graph
+DELETE {{host}}/api/containers/1/graphs/1

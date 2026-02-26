@@ -1,7 +1,4 @@
 ﻿using BusinessLogicLayer.Contracts.Models;
-using System;
-using System.Collections.Generic;
-using System.Text;
 
 namespace BusinessLogicLayer.Services.Abstractions
 {
@@ -16,6 +13,15 @@ namespace BusinessLogicLayer.Services.Abstractions
 
         Task<(AvailabilityGroupModel group, List<AvailabilityGroupMemberModel> members, List<AvailabilityGroupDayModel> days)>
             LoadFullAsync(int groupId, CancellationToken ct = default);
-    }
 
+        Task<List<AvailabilityGroupMemberModel>> GetMembersAsync(int groupId, CancellationToken ct = default);
+        Task<AvailabilityGroupMemberModel> CreateMemberAsync(int groupId, AvailabilityGroupMemberModel model, CancellationToken ct = default);
+        Task UpdateMemberAsync(int groupId, int memberId, AvailabilityGroupMemberModel model, CancellationToken ct = default);
+        Task DeleteMemberAsync(int groupId, int memberId, CancellationToken ct = default);
+
+        Task<List<AvailabilityGroupDayModel>> GetSlotsAsync(int groupId, CancellationToken ct = default);
+        Task<AvailabilityGroupDayModel> CreateSlotAsync(int groupId, AvailabilityGroupDayModel model, CancellationToken ct = default);
+        Task UpdateSlotAsync(int groupId, int slotId, AvailabilityGroupDayModel model, CancellationToken ct = default);
+        Task DeleteSlotAsync(int groupId, int slotId, CancellationToken ct = default);
+    }
 }
