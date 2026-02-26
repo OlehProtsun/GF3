@@ -18,23 +18,6 @@ Content-Type: application/json
 GET {{host}}/api/shops
 Accept: application/json
 
-### Shops - Get by id
-GET {{host}}/api/shops/1
-Accept: application/json
-
-### Shops - Update
-PUT {{host}}/api/shops/1
-Content-Type: application/json
-
-{
-  "name": "Downtown Shop Updated",
-  "address": "Main street 12",
-  "description": "Updated description"
-}
-
-### Shops - Delete
-DELETE {{host}}/api/shops/1
-
 ### Containers - Create
 POST {{host}}/api/containers
 Content-Type: application/json
@@ -48,22 +31,6 @@ Content-Type: application/json
 GET {{host}}/api/containers
 Accept: application/json
 
-### Containers - Get by id
-GET {{host}}/api/containers/1
-Accept: application/json
-
-### Containers - Update
-PUT {{host}}/api/containers/1
-Content-Type: application/json
-
-{
-  "name": "Main Container Updated",
-  "note": "Note changed"
-}
-
-### Containers - Delete
-DELETE {{host}}/api/containers/1
-
 ### AvailabilityGroups - Create
 POST {{host}}/api/availability-groups
 Content-Type: application/json
@@ -74,84 +41,7 @@ Content-Type: application/json
   "month": 4
 }
 
-### AvailabilityGroups - Get all
-GET {{host}}/api/availability-groups
-Accept: application/json
-
-### AvailabilityGroups - Get by id
-GET {{host}}/api/availability-groups/1
-Accept: application/json
-
-### AvailabilityGroups - Update
-PUT {{host}}/api/availability-groups/1
-Content-Type: application/json
-
-{
-  "name": "April Team A Updated",
-  "year": 2026,
-  "month": 4
-}
-
-### AvailabilityGroups - Get items (relation endpoint)
-GET {{host}}/api/availability-groups/1/items
-Accept: application/json
-
-### AvailabilityGroups - Delete
-DELETE {{host}}/api/availability-groups/1
-
-### AvailabilityGroups - Create member
-POST {{host}}/api/availability-groups/1/members
-Content-Type: application/json
-
-{
-  "employeeId": 1
-}
-
-### AvailabilityGroups - Get members
-GET {{host}}/api/availability-groups/1/members
-Accept: application/json
-
-### AvailabilityGroups - Update member
-PUT {{host}}/api/availability-groups/1/members/1
-Content-Type: application/json
-
-{
-  "employeeId": 2
-}
-
-### AvailabilityGroups - Delete member
-DELETE {{host}}/api/availability-groups/1/members/1
-
-### AvailabilityGroups - Create slot
-POST {{host}}/api/availability-groups/1/slots
-Content-Type: application/json
-
-{
-  "availabilityGroupMemberId": 1,
-  "dayOfMonth": 5,
-  "kind": 1,
-  "intervalStr": "09:00-18:00"
-}
-
-### AvailabilityGroups - Get slots
-GET {{host}}/api/availability-groups/1/slots
-Accept: application/json
-
-### AvailabilityGroups - Update slot
-PUT {{host}}/api/availability-groups/1/slots/1
-Content-Type: application/json
-
-{
-  "availabilityGroupMemberId": 1,
-  "dayOfMonth": 6,
-  "kind": 2,
-  "intervalStr": "10:00-16:00"
-}
-
-### AvailabilityGroups - Delete slot
-DELETE {{host}}/api/availability-groups/1/slots/1
-
-### Containers - Create graph
+### Graphs - Create graph (schedule)
 POST {{host}}/api/containers/1/graphs
 Content-Type: application/json
 
@@ -167,15 +57,19 @@ Content-Type: application/json
   "maxConsecutiveDays": 5,
   "maxConsecutiveFull": 3,
   "maxFullPerMonth": 10,
-  "note": "Nested graph sample",
+  "note": "Schedule graph sample",
   "availabilityGroupId": 1
 }
 
-### Containers - Get graphs
+### Graphs - List graphs in container
 GET {{host}}/api/containers/1/graphs
 Accept: application/json
 
-### Containers - Update graph
+### Graphs - Get graph by id
+GET {{host}}/api/containers/1/graphs/1
+Accept: application/json
+
+### Graphs - Update graph
 PUT {{host}}/api/containers/1/graphs/1
 Content-Type: application/json
 
@@ -191,9 +85,73 @@ Content-Type: application/json
   "maxConsecutiveDays": 4,
   "maxConsecutiveFull": 2,
   "maxFullPerMonth": 9,
-  "note": "Updated nested graph",
+  "note": "Updated graph",
   "availabilityGroupId": 1
 }
 
-### Containers - Delete graph
-DELETE {{host}}/api/containers/1/graphs/1
+### Slots - Create slot
+POST {{host}}/api/containers/1/graphs/1/slots
+Content-Type: application/json
+
+{
+  "dayOfMonth": 5,
+  "slotNo": 1,
+  "fromTime": "08:00",
+  "toTime": "16:00",
+  "employeeId": null,
+  "status": "UNFURNISHED"
+}
+
+### Slots - Get slots
+GET {{host}}/api/containers/1/graphs/1/slots
+Accept: application/json
+
+### Slots - Update slot (assign employee/status)
+PUT {{host}}/api/containers/1/graphs/1/slots/1
+Content-Type: application/json
+
+{
+  "dayOfMonth": 5,
+  "slotNo": 1,
+  "fromTime": "08:00",
+  "toTime": "16:00",
+  "employeeId": 1,
+  "status": "ASSIGNED"
+}
+
+### Slots - Delete slot
+DELETE {{host}}/api/containers/1/graphs/1/slots/1
+
+### Graph employees - Add employee to graph
+POST {{host}}/api/containers/1/graphs/1/employees
+Content-Type: application/json
+
+{
+  "employeeId": 1,
+  "minHoursMonth": 120
+}
+
+### Graph employees - Get employees in graph
+GET {{host}}/api/containers/1/graphs/1/employees
+Accept: application/json
+
+### Graph employees - Delete from graph
+DELETE {{host}}/api/containers/1/graphs/1/employees/1
+
+### Cell styles - Upsert
+PUT {{host}}/api/containers/1/graphs/1/cell-styles
+Content-Type: application/json
+
+{
+  "dayOfMonth": 5,
+  "employeeId": 1,
+  "backgroundColorArgb": -16776961,
+  "textColorArgb": -1
+}
+
+### Cell styles - Get all
+GET {{host}}/api/containers/1/graphs/1/cell-styles
+Accept: application/json
+
+### Cell styles - Delete by id
+DELETE {{host}}/api/containers/1/graphs/1/cell-styles/1
