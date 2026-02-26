@@ -1,9 +1,9 @@
 using BusinessLogicLayer.Services.Abstractions;
-using GF3.WebApi.Contracts.Employees;
-using GF3.WebApi.Mappers;
+using WebApi.Contracts.Employees;
+using WebApi.Mappers;
 using Microsoft.AspNetCore.Mvc;
 
-namespace GF3.WebApi.Controllers;
+namespace WebApi.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]

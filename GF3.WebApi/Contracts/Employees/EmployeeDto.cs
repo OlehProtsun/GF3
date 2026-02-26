@@ -1,4 +1,4 @@
-namespace GF3.WebApi.Contracts.Employees;
+namespace WebApi.Contracts.Employees;
 
 public sealed class EmployeeDto
 {

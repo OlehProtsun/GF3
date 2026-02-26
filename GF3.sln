@@ -11,7 +11,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WPFApp", "WPFApp\WPFApp.csp
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ArchitectureTests", "ArchitectureTests\ArchitectureTests.csproj", "{5D8D6388-7A69-4CE4-BE89-846388AB31F8}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GF3.WebApi", "GF3.WebApi\GF3.WebApi.csproj", "{9FA1695A-EC1A-4507-94B5-1DCB388CBE4D}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WebApi", "GF3.WebApi\WebApi.csproj", "{9FA1695A-EC1A-4507-94B5-1DCB388CBE4D}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

@@ -1,11 +1,11 @@
 using BusinessLogicLayer.Contracts.Employees;
-using GF3.WebApi.Contracts.Employees;
+using WebApi.Contracts.Employees;
 
-namespace GF3.WebApi.Mappers;
+namespace WebApi.Mappers;
 
 public static class EmployeeMapper
 {
-    public static EmployeeDto ToApiDto(this BusinessLogicLayer.Contracts.Employees.EmployeeDto dto) => new()
+    public static Contracts.Employees.EmployeeDto ToApiDto(this BusinessLogicLayer.Contracts.Employees.EmployeeDto dto) => new()
     {
         Id = dto.Id,
         FirstName = dto.FirstName,

@@ -1,6 +1,6 @@
 using BusinessLogicLayer;
 using DataAccessLayer.Models.DataBaseContext;
-using GF3.WebApi.Middleware;
+using WebApi.Middleware;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);

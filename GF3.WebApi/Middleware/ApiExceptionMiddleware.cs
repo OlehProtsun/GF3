@@ -3,7 +3,7 @@ using System.Text.Json;
 using BusinessLogicLayer.Common;
 using Microsoft.AspNetCore.Mvc;
 
-namespace GF3.WebApi.Middleware;
+namespace WebApi.Middleware;
 
 public sealed class ApiExceptionMiddleware
 {
@@ -21,7 +21,7 @@ public sealed class ApiExceptionMiddleware
         {
             await _next(context).ConfigureAwait(false);
         }
-        catch (ValidationException ex)
+        catch (System.ComponentModel.DataAnnotations.ValidationException ex)
         {
             await WriteValidationAsync(context, ex).ConfigureAwait(false);
         }
@@ -79,7 +79,7 @@ public sealed class ApiExceptionMiddleware
 
     private static object BuildValidationErrors(Exception ex)
     {
-        if (ex is ValidationException dataAnnotationsEx && dataAnnotationsEx.ValidationResult is { } result)
+        if (ex is System.ComponentModel.DataAnnotations.ValidationException dataAnnotationsEx && dataAnnotationsEx.ValidationResult is { } result)
         {
             var members = result.MemberNames?.ToArray() ?? [];
             if (members.Length == 0)
