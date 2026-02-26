@@ -60,8 +60,7 @@ public sealed class ExcelTemplateLocator : IExcelTemplateLocator
         {
             Path.Combine(baseDir, "Resources", "Excel", fileName),
             Path.Combine(baseDir, "Resources", "ExcelTemplate", fileName),
-            Path.Combine(Directory.GetCurrentDirectory(), "GF3.WebApi", "Resources", "ExcelTemplate", fileName),
-            Path.Combine(Directory.GetCurrentDirectory(), "WPFApp", "Resources", "Excel", fileName)
+            Path.Combine(Directory.GetCurrentDirectory(), "GF3.WebApi", "Resources", "ExcelTemplate", fileName)
         };
 
         return candidates.FirstOrDefault(File.Exists);
