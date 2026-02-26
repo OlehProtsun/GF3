@@ -7,6 +7,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Threading;
+using WPFApp.Applications.Diagnostics;
 using WPFApp.Applications.Notifications;
 using WPFApp.MVVM.Core;
 using WPFApp.MVVM.Validation.Rules;

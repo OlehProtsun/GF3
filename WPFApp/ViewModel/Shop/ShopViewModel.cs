@@ -10,6 +10,7 @@ using WPFApp.View.Dialogs;
 using WPFApp.ViewModel.Dialogs;
 using WPFApp.ViewModel.Shop.Helpers;
 using WPFApp.ViewModel.Shared;
+using WPFApp.Applications.Diagnostics;
 
 namespace WPFApp.ViewModel.Shop
 {
