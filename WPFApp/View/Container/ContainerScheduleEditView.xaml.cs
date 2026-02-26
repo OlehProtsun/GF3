@@ -1,4 +1,9 @@
-﻿using System;
+/*
+  Опис файлу: цей модуль містить реалізацію компонента ContainerScheduleEditView у шарі WPFApp.
+  Призначення: інкапсулювати поведінку UI або прикладної логіки без зміни доменної моделі.
+  Примітка: коментарі описують спостережуваний потік даних, очікувані обмеження та точки взаємодії.
+*/
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Data;
@@ -21,51 +26,54 @@ using WPFApp.ViewModel.Dialogs;
 
 namespace WPFApp.View.Container
 {
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
     /// <summary>
-    /// ContainerScheduleEditView — code-behind для UserControl редагування schedule.
-    ///
-    /// Важливо:
-    /// - Ми НЕ переносимо бізнес-логіку сюди (вона вже у ViewModel та Infrastructure).
-    /// - Тут лишається “UI glue”:
-    ///   1) оптимізація DataGrid (virtualization)
-    ///   2) керування динамічними колонками (перебудова при зміні схеми DataTable)
-    ///   3) UX-деталі: paint режим (Alt+drag), pause refresh при відкритих ComboBox, тощо
-    ///   4) коректне “відпускання” важких DataView/DataRowView при Unloaded
-    ///
-    /// Цей файл спеціально написаний так, щоб:
-    /// - мінімізувати фрізи UI
-    /// - уникати “старих контейнерів” DataGrid після зміни ItemsSource/columns
-    /// - не плодити зайві алокації (особливо в частих подіях)
+    /// Визначає публічний елемент `public partial class ContainerScheduleEditView : UserControl` та контракт його використання у шарі WPFApp.
     /// </summary>
     public partial class ContainerScheduleEditView : UserControl
     {
-        // ============================
-        // 1) Посилання на ViewModel
-        // ============================
+        
+        
+        
 
-        /// <summary>
-        /// Поточний ViewModel, з яким пов’язаний цей view.
-        /// Ми підписуємось на _vm.MatrixChanged і робимо “smart refresh” DataGrid.
-        /// </summary>
+        
+        
+        
+        
         private ContainerScheduleEditViewModel? _vm;
 
-        // ============================
-        // 2) Стан редагування клітинки
-        // ============================
+        
+        
+        
 
-        /// <summary>
-        /// Попереднє значення клітинки до редагування (щоб повернути його, якщо введення невалідне).
-        /// Заповнюється у PreparingCellForEdit.
-        /// </summary>
+        
+        
+        
+        
         private string? _previousCellValue;
 
-        // ============================
-        // 3) Paint режим (Alt+drag)
-        // ============================
+        
+        
+        
 
-        /// <summary>
-        /// Чи зараз йде процес “малювання” (Alt+LMB + move).
-        /// </summary>
+        
+        
+        
         private bool _isPainting;
 
         private bool _isDayRowDragSelecting;
@@ -73,72 +81,75 @@ namespace WPFApp.View.Container
         private int _dayRowDragLastIndex = -1;
         private bool _dayRowDragKeepExisting;
 
-        /// <summary>
-        /// Остання клітинка, яку ми пофарбували під час drag,
-        /// щоб не застосовувати paint повторно на тій самій клітинці.
-        /// </summary>
+        
+        
+        
+        
         private ScheduleMatrixCellRef? _lastPaintedCell;
 
-        // ============================
-        // 4) Smart refresh матриць + схема колонок
-        // ============================
-
-        /// <summary>
-        /// Хеш схеми колонок schedule-матриці.
-        /// Якщо хеш змінився — треба перебудувати колонки.
-        /// Якщо не змінився — НЕ чіпаємо колонки (це швидше і без миготіння).
-        /// </summary>
-        private int? _scheduleSchemaHash;
-
-        /// <summary>
-        /// Хеш схеми колонок preview-матриці (availability preview).
-        /// </summary>
-        private int? _previewSchemaHash;
-
-        // ============================
-        // 5) Logging/Perf (обмежено)
-        // ============================
+        
+        
+        
 
         
-        // ============================
-        // 6) UX: пауза refresh при відкритих ComboBox
-        // ============================
+        
+        
+        
+        
+        private int? _scheduleSchemaHash;
 
-        /// <summary>
-        /// True, коли Shop ComboBox відкритий (потрібно для scroll-log/UX паузи).
-        /// </summary>
+        
+        
+        
+        private int? _previewSchemaHash;
+
+        
+        
+        
+
+        
+        
+        
+        
+
+        
+        
+        
         private bool _shopComboOpen;
 
-        /// <summary>
-        /// True, коли Availability ComboBox відкритий.
-        /// </summary>
+        
+        
+        
         private bool _availabilityComboOpen;
 
-        /// <summary>
-        /// Якщо true — ми не робимо RefreshMatricesSmart одразу при MatrixChanged,
-        /// а лише ставимо прапорець _pendingMatrixRefresh.
-        ///
-        /// Це потрібно, щоб DataGrid не “фрізив” UI, коли користувач взаємодіє з ComboBox.
-        /// </summary>
+        
+        
+        
+        
+        
+        
         private bool _suspendMatrixRefresh;
 
-        /// <summary>
-        /// Якщо під час паузи приходили MatrixChanged — запам’ятовуємо, що refresh потрібен.
-        /// Коли ResumeMatrixRefresh() викликається — виконаємо refresh 1 раз.
-        /// </summary>
+        
+        
+        
+        
         private bool _pendingMatrixRefresh;
 
-        /// <summary>
-        /// Coalescing: якщо MatrixChanged приходить “бурстом” (генерація/refresh/lookup),
-        /// ми не робимо 10 refresh-ів, а робимо лише 1, запланований через Dispatcher.
-        /// </summary>
+        
+        
+        
+        
         private bool _refreshQueued;
         private readonly DispatcherTimer _matrixRefreshThrottleTimer;
         private bool _matrixRefreshRequested;
 
+        
+        
+        
+        
         /// <summary>
-        /// Initializes the view, enables DataGrid virtualization and wires UI events
-        /// (selection, paint mode, combo-box UX and scroll diagnostics).
+        /// Визначає публічний елемент `public ContainerScheduleEditView()` та контракт його використання у шарі WPFApp.
         /// </summary>
         public ContainerScheduleEditView()
         {
@@ -150,16 +161,16 @@ namespace WPFApp.View.Container
                 MatrixRefreshThrottleTimer_Tick,
                 Dispatcher);
 
-            // 1) Примусово вмикаємо virtualization (навіть якщо стилі її вимикають)
+            
             ConfigureGridPerformance(dataGridScheduleMatrix);
             ConfigureGridPerformance(dataGridAvailabilityPreview);
 
-            // 2) Загальні lifecycle події
+            
             Loaded += ContainerScheduleEditView_Loaded;
             Unloaded += ContainerScheduleEditView_Unloaded;
             DataContextChanged += ContainerScheduleEditView_DataContextChanged;
 
-            // 3) Події DataGrid для UX/логіки (виділення/paint/scroll)
+            
             dataGridScheduleMatrix.PreparingCellForEdit += ScheduleMatrix_PreparingCellForEdit;
             dataGridScheduleMatrix.CurrentCellChanged += ScheduleMatrix_CurrentCellChanged;
             dataGridScheduleMatrix.SelectedCellsChanged += ScheduleMatrix_SelectedCellsChanged;
@@ -170,9 +181,9 @@ namespace WPFApp.View.Container
 
         }
 
-        // =========================================================
-        // Lifecycle: attach/detach VM
-        // =========================================================
+        
+        
+        
 
         private void ContainerScheduleEditView_DataContextChanged(object sender, DependencyPropertyChangedEventArgs e)
         {
@@ -189,32 +200,32 @@ namespace WPFApp.View.Container
             DetachViewModel();
         }
 
-        /// <summary>
-        /// AttachViewModel:
-        /// - відписатися від старого _vm.MatrixChanged
-        /// - підписатися на новий
-        /// - синхронізувати ItemsSource і колонки, якщо схема вже є
-        /// </summary>
+        
+        
+        
+        
+        
+        
         private void AttachViewModel(ContainerScheduleEditViewModel? viewModel)
         {
             if (ReferenceEquals(_vm, viewModel))
                 return;
 
-            // при переході на інший VM скидаємо локальні прапорці
+            
             ResetInteractionState(commitPendingSelections: false);
 
-            // ---- unsubscribe old vm ----
+            
             if (_vm != null)
                 _vm.MatrixChanged -= VmOnMatrixChanged;
 
             _vm = viewModel;
 
-            // ---- subscribe new vm + init grid ----
+            
             if (_vm != null)
             {
                 _vm.MatrixChanged += VmOnMatrixChanged;
 
-                // Будуємо колонки тільки якщо таблиця вже існує (не чіпаємо порожній стан)
+                
                 if (_vm.ScheduleMatrix?.Table != null)
                 {
                     ScheduleMatrixColumnBuilder.BuildScheduleMatrixColumns(
@@ -243,13 +254,13 @@ namespace WPFApp.View.Container
                     _previewSchemaHash = null;
                 }
 
-                // Assign ItemsSource (DataView)
+                
                 dataGridScheduleMatrix.ItemsSource = _vm.ScheduleMatrix;
                 dataGridAvailabilityPreview.ItemsSource = _vm.AvailabilityPreviewMatrix;
             }
             else
             {
-                // якщо VM став null (наприклад навігація) — очищаємо гріди
+                
                 SwapItemsSource(dataGridScheduleMatrix, null);
                 SwapItemsSource(dataGridAvailabilityPreview, null);
                 dataGridScheduleMatrix.Columns.Clear();
@@ -259,27 +270,27 @@ namespace WPFApp.View.Container
             }
         }
 
-        /// <summary>
-        /// DetachViewModel:
-        /// - відписка від подій VM
-        /// - скасування фонового білду у VM
-        /// - повне “відпускання” ItemsSource/Columns у DataGrid
-        ///
-        /// Це важливо для пам’яті, бо DataView/DataRowView можуть бути великими.
-        /// </summary>
+        
+        
+        
+        
+        
+        
+        
+        
         private void DetachViewModel()
         {
             if (_vm == null) return;
 
-            // перед закриттям view комітимо pending selection, щоб VM не лишився в "pending" стані
+            
             ResetInteractionState(commitPendingSelections: true);
 
             _vm.MatrixChanged -= VmOnMatrixChanged;
 
-            // якщо VM має CTS/Task.Run — зупиняємо
+            
             _vm.CancelBackgroundWork();
 
-            // ключове: відпускаємо важкі DataView/DataRowView зі сторони DataGrid
+            
             SwapItemsSource(dataGridScheduleMatrix, null);
             SwapItemsSource(dataGridAvailabilityPreview, null);
             dataGridScheduleMatrix.Columns.Clear();
@@ -291,10 +302,10 @@ namespace WPFApp.View.Container
             _vm = null;
         }
 
-        /// <summary>
-        /// Скидає “локальний UI стан” (комбо, флаги refresh, лог).
-        /// Якщо commitPendingSelections=true — просимо VM підтвердити pending вибори.
-        /// </summary>
+        
+        
+        
+        
         private void ResetInteractionState(bool commitPendingSelections)
         {
             _shopComboOpen = false;
@@ -311,15 +322,15 @@ namespace WPFApp.View.Container
             }
         }
 
-        // =========================================================
-        // DataGrid performance/refresh helpers
-        // =========================================================
+        
+        
+        
 
-        /// <summary>
-        /// Важливо:
-        /// - WPF DataGrid інколи вимикає virtualization стилями
-        /// - ми тут примусово її вмикаємо для великих таблиць (31 день × N працівників)
-        /// </summary>
+        
+        
+        
+        
+        
         private static void ConfigureGridPerformance(DataGrid grid)
         {
             if (grid == null) return;
@@ -330,41 +341,41 @@ namespace WPFApp.View.Container
             VirtualizingPanel.SetIsVirtualizing(grid, true);
             VirtualizingPanel.SetVirtualizationMode(grid, VirtualizationMode.Recycling);
 
-            // тримаємо CanContentScroll=true, інакше virtualization перестає працювати
+            
             grid.SetValue(ScrollViewer.CanContentScrollProperty, true);
 
-            // deferred scrolling інколи робить UX гіршим (підвисання під час thumb drag)
+            
             grid.SetValue(ScrollViewer.IsDeferredScrollingEnabledProperty, false);
 
-            // оптимізація scroll unit
+            
             grid.SetValue(VirtualizingPanel.ScrollUnitProperty, ScrollUnit.Pixel);
 
-            // невеликий кеш “на сторінку” для зменшення churn при прокрутці
+            
             VirtualizingPanel.SetCacheLengthUnit(grid, VirtualizationCacheLengthUnit.Page);
             VirtualizingPanel.SetCacheLength(grid, new VirtualizationCacheLength(1));
         }
 
-        /// <summary>
-        /// ResetGridColumns:
-        /// - спочатку ItemsSource=null (важливо!)
-        /// - потім Columns.Clear()
-        ///
-        /// Так WPF відпускає старі binding-и та контейнери.
-        /// </summary>
+        
+        
+        
+        
+        
+        
+        
         private static void ResetGridColumns(DataGrid grid)
         {
             grid.ItemsSource = null;
             grid.Columns.Clear();
         }
 
-        /// <summary>
-        /// HardResetGrid:
-        /// - зупиняє редагування
-        /// - прибирає selection/current cell
-        ///
-        /// Це допомагає уникати ситуацій, коли DataGrid тримає посилання на DataRowView,
-        /// і GC не може прибрати стару таблицю.
-        /// </summary>
+        
+        
+        
+        
+        
+        
+        
+        
         private static void HardResetGrid(DataGrid grid)
         {
             grid.CancelEdit(DataGridEditingUnit.Cell);
@@ -376,14 +387,14 @@ namespace WPFApp.View.Container
             grid.CurrentCell = new DataGridCellInfo();
         }
 
-        /// <summary>
-        /// SwapItemsSource:
-        /// - робить HardResetGrid
-        /// - потім ItemsSource=null
-        /// - потім ItemsSource=source
-        ///
-        /// Саме “null -> new” часто критично для коректного перевідображення.
-        /// </summary>
+        
+        
+        
+        
+        
+        
+        
+        
         private static void SwapItemsSource(DataGrid grid, IEnumerable? source)
         {
             HardResetGrid(grid);
@@ -391,16 +402,16 @@ namespace WPFApp.View.Container
             grid.ItemsSource = source;
         }
 
-        // =========================================================
-        // VM -> View refresh (MatrixChanged)
-        // =========================================================
+        
+        
+        
 
-        /// <summary>
-        /// MatrixChanged може приходити часто (серіями).
-        /// Ми:
-        /// - якщо refresh “на паузі” -> ставимо _pendingMatrixRefresh
-        /// - інакше -> плануємо рівно 1 refresh через Dispatcher (coalesce)
-        /// </summary>
+        
+        
+        
+        
+        
+        
         private void VmOnMatrixChanged(object? sender, EventArgs e)
         {
             if (_vm is null) return;
@@ -416,25 +427,25 @@ namespace WPFApp.View.Container
                 _matrixRefreshThrottleTimer.Start();
         }
 
-        /// <summary>
-        /// Smart refresh:
-        /// - перебудовує колонки тільки якщо схема змінилась
-        /// - ItemsSource міняє тільки якщо DataView instance змінився
-        /// - інакше не робить зайвих дій (менше фрізів/миготіння)
-        /// </summary>
+        
+        
+        
+        
+        
+        
         private void RefreshMatricesSmart()
         {
             if (_vm is null)
                 return;
 
-            // -------------------------
-            // Schedule matrix
-            // -------------------------
+            
+            
+            
             var scheduleTable = _vm.ScheduleMatrix?.Table;
 
             if (scheduleTable == null || scheduleTable.Columns.Count == 0)
             {
-                // Якщо VM каже “матриці нема”, а грід ще щось тримає — очищаємо
+                
                 if (dataGridScheduleMatrix.ItemsSource != null || dataGridScheduleMatrix.Columns.Count > 0)
                 {
                     ResetGridColumns(dataGridScheduleMatrix);
@@ -445,7 +456,7 @@ namespace WPFApp.View.Container
             {
                 var scheduleHash = BuildSchemaHash(scheduleTable);
 
-                // Якщо схема змінилася — повністю перебудовуємо колонки
+                
                 if (scheduleHash != _scheduleSchemaHash)
                 {
                     ResetGridColumns(dataGridScheduleMatrix);
@@ -458,14 +469,14 @@ namespace WPFApp.View.Container
                     _scheduleSchemaHash = scheduleHash;
                 }
 
-                // Якщо DataView instance змінився — перепризначаємо ItemsSource
+                
                 if (!ReferenceEquals(dataGridScheduleMatrix.ItemsSource, _vm.ScheduleMatrix))
                     SwapItemsSource(dataGridScheduleMatrix, _vm.ScheduleMatrix);
             }
 
-            // -------------------------
-            // Preview matrix
-            // -------------------------
+            
+            
+            
             var previewTable = _vm.AvailabilityPreviewMatrix?.Table;
 
             if (previewTable == null || previewTable.Columns.Count == 0)
@@ -497,15 +508,15 @@ namespace WPFApp.View.Container
             }
         }
 
-        /// <summary>
-        /// Швидкий хеш схеми DataTable без побудови довгих string (менше алокацій).
-        /// Враховує:
-        /// - ColumnName
-        /// - DataType
-        ///
-        /// Якщо у вас Caption використовується як “частина схеми”, можна додати і її,
-        /// але це зайве для більшості випадків.
-        /// </summary>
+        
+        
+        
+        
+        
+        
+        
+        
+        
         private static int BuildSchemaHash(DataTable table)
         {
             unchecked
@@ -521,13 +532,13 @@ namespace WPFApp.View.Container
             }
         }
 
-        // =========================================================
-        // DataGrid selection -> VM selection
-        // =========================================================
+        
+        
+        
 
         private void ScheduleMatrix_PreparingCellForEdit(object sender, DataGridPreparingCellForEditEventArgs e)
         {
-            // Запам’ятовуємо попереднє значення, щоб мати можливість “відкотитись”
+            
             if (e.EditingElement is TextBox tb)
                 _previousCellValue = tb.Text;
         }
@@ -545,8 +556,8 @@ namespace WPFApp.View.Container
                 return;
             }
 
-            // Важливо: беремо SortMemberPath як “істинне” ім’я колонки.
-            // Header може бути людино-читабельним і НЕ збігатися з columnName DataTable.
+            
+            
             var columnName = col.SortMemberPath ?? col.Header?.ToString();
 
             if (_vm.TryBuildCellReference(item, columnName, out var cellRef))
@@ -567,7 +578,7 @@ namespace WPFApp.View.Container
                 return;
             }
 
-            // Попередньо виділяємо capacity, щоб менше алокацій
+            
             var refs = new List<ScheduleMatrixCellRef>(selectedCells.Count);
 
             foreach (var cellInfo in selectedCells)
@@ -586,17 +597,17 @@ namespace WPFApp.View.Container
             _vm.UpdateSelectedCellRefs(refs);
         }
 
-        // =========================================================
-        // Paint mode (Alt + drag)
-        // =========================================================
+        
+        
+        
 
         private void ScheduleMatrix_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
             if (_vm is null) return;
 
-            // ---------------------------
-            // A) DAY row drag select (NO Alt)
-            // ---------------------------
+            
+            
+            
             if (!Keyboard.Modifiers.HasFlag(ModifierKeys.Alt))
             {
                 var cell = FindParent<DataGridCell>(e.OriginalSource as DependencyObject);
@@ -609,7 +620,7 @@ namespace WPFApp.View.Container
                 {
                     _dayRowDragKeepExisting = Keyboard.Modifiers.HasFlag(ModifierKeys.Control);
 
-                    // Row index anchor
+                    
                     var row = FindParent<DataGridRow>(cell)
                               ?? (dataGridScheduleMatrix.ItemContainerGenerator.ContainerFromItem(cell.DataContext) as DataGridRow);
 
@@ -622,20 +633,20 @@ namespace WPFApp.View.Container
                     dataGridScheduleMatrix.Focus();
                     dataGridScheduleMatrix.CaptureMouse();
 
-                    // Select initial single row (full row = all columns)
+                    
                     SelectWholeRowsRange(_dayRowDragAnchorIndex, _dayRowDragAnchorIndex, _dayRowDragKeepExisting);
 
                     e.Handled = true;
                     return;
                 }
 
-                // не Day — нічого не робимо (даємо DataGrid своїм дефолтом)
+                
                 return;
             }
 
-            // ---------------------------
-            // B) твоє існуюче Alt+paint (drag single cells)
-            // ---------------------------
+            
+            
+            
             if (_vm.ActivePaintMode == ContainerScheduleEditViewModel.SchedulePaintMode.None)
                 return;
 
@@ -658,15 +669,15 @@ namespace WPFApp.View.Container
         {
             if (_vm is null) return;
 
-            // ===========================
-            // A) Day-row drag selection (NO Alt)
-            // ===========================
+            
+            
+            
             if (_isDayRowDragSelecting &&
                 e.LeftButton == MouseButtonState.Pressed &&
                 !Keyboard.Modifiers.HasFlag(ModifierKeys.Alt))
             {
-                // важливо: при MouseCapture OriginalSource часто "не той",
-                // тому беремо рядок через hit-test по позиції миші
+                
+                
                 if (TryGetRowIndexUnderMouse(e, out int idx))
                 {
                     if (idx != _dayRowDragLastIndex)
@@ -680,9 +691,9 @@ namespace WPFApp.View.Container
                 return;
             }
 
-            // ===========================
-            // B) Alt+paint (твій існуючий)
-            // ===========================
+            
+            
+            
             if (!_isPainting) return;
 
             var paintCell = FindParent<DataGridCell>(e.OriginalSource as DependencyObject);
@@ -702,10 +713,10 @@ namespace WPFApp.View.Container
         {
             rowIndex = -1;
 
-            // позиція миші відносно DataGrid
+            
             var pos = e.GetPosition(dataGridScheduleMatrix);
 
-            // hit-test по цій позиції
+            
             var hit = dataGridScheduleMatrix.InputHitTest(pos) as DependencyObject;
             if (hit == null) return false;
 
@@ -731,14 +742,14 @@ namespace WPFApp.View.Container
                 if (col.Visibility != Visibility.Visible)
                     continue;
 
-                // Якщо НЕ хочеш включати Conflict у виділення — розкоментуй:
-                // var name = col.SortMemberPath ?? col.Header?.ToString();
-                // if (name == ContainerScheduleEditViewModel.ConflictColumnName) continue;
+                
+                
+                
 
                 dataGridScheduleMatrix.SelectedCells.Add(new DataGridCellInfo(rowItem, col));
             }
 
-            // Повертаємо CurrentCell на Day (щоб SelectedCellRef/CurrentCell логіка лишалась прогнозованою)
+            
             var dayCol = dataGridScheduleMatrix.Columns.FirstOrDefault(c =>
                 string.Equals(c.SortMemberPath ?? c.Header?.ToString(),
                               ContainerScheduleEditViewModel.DayColumnName,
@@ -778,7 +789,7 @@ namespace WPFApp.View.Container
                     dataGridScheduleMatrix.SelectedCells.Add(new DataGridCellInfo(item, col));
             }
 
-            // легкий UX: тримаємо в полі зору останній рядок
+            
             dataGridScheduleMatrix.ScrollIntoView(dataGridScheduleMatrix.Items[end]);
         }
 
@@ -831,28 +842,28 @@ namespace WPFApp.View.Container
             return null;
         }
 
-        // =========================================================
-        // Edit cell commit (викликається з XAML: CellEditEnding="...")
-        // =========================================================
+        
+        
+        
 
-        /// <summary>
-        /// Обробник DataGrid.CellEditEnding:
-        /// - ловить commit
-        /// - бере введений raw текст
-        /// - просить VM нормалізувати/валідувати (TryApplyMatrixEdit)
-        /// - якщо помилка — відкатити старе значення і показати повідомлення
-        ///
-        /// Увага:
-        /// - цей метод має бути підключений у XAML (CellEditEnding="ScheduleMatrix_CellEditEnding")
-        ///   або в коді. Підключай лише в одному місці, щоб не було подвійного виклику.
-        /// </summary>
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
         private void ScheduleMatrix_CellEditEnding(object sender, DataGridCellEditEndingEventArgs e)
         {
             if (_vm is null) return;
             if (e.EditAction != DataGridEditAction.Commit) return;
             if (e.Row.Item is not DataRowView rowView) return;
 
-            // Найстабільніше ім’я колонки — SortMemberPath (ти його виставляєш у builder’і)
+            
             var columnName = e.Column?.SortMemberPath;
             if (string.IsNullOrWhiteSpace(columnName)) return;
 
@@ -867,11 +878,11 @@ namespace WPFApp.View.Container
 
             Dispatcher.BeginInvoke(new Action(() =>
             {
-                // 1) Дотиснути коміт WPF-редагування (щоб рядок вийшов з edit-mode)
+                
                 dataGridScheduleMatrix.CommitEdit(DataGridEditingUnit.Cell, true);
                 dataGridScheduleMatrix.CommitEdit(DataGridEditingUnit.Row, true);
 
-                // 2) Застосувати бізнес-логіку (слоти + totals + conflict)
+                
                 if (!_vm.TryApplyMatrixEdit(columnName, day, raw, out var normalized, out var error))
                 {
                     rowView[columnName] = _previousCellValue ?? ContainerScheduleEditViewModel.EmptyMark;
@@ -882,10 +893,10 @@ namespace WPFApp.View.Container
                     return;
                 }
 
-                // 3) Закріпити нормалізоване значення
+                
                 rowView[columnName] = normalized;
 
-                // 4) (опційно) легкий “пінок” перемальовки рядка — корисно при Recycling
+                
                 if (dataGridScheduleMatrix.ItemContainerGenerator.ContainerFromItem(rowView) is DataGridRow dgRow)
                     dgRow.InvalidateVisual();
 
@@ -893,9 +904,9 @@ namespace WPFApp.View.Container
         }
 
 
-        // =========================================================
-        // Opened schedules list / buttons
-        // =========================================================
+        
+        
+        
 
         private async void OpenedSchedulesListBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
@@ -903,7 +914,7 @@ namespace WPFApp.View.Container
 
             if (sender is ListBox lb && lb.SelectedItem is ScheduleBlockViewModel block)
             {
-                // якщо той самий блок — нічого не робимо
+                
                 if (ReferenceEquals(_vm.ActiveSchedule, block))
                     return;
 
@@ -929,14 +940,14 @@ namespace WPFApp.View.Container
             await _vm.CloseBlockAsync(block);
         }
 
-        // =========================================================
-        // ComboBox UX: pause/resume refresh
-        // =========================================================
+        
+        
+        
 
-        /// <summary>
-        /// Пауза ДО того, як DataGrid закомітить поточну клітинку (CellEditEnding),
-        /// щоб не було фрізів при різкій зміні selection + перебудові матриці.
-        /// </summary>
+        
+        
+        
+        
         private void LookupComboBox_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
             PauseMatrixRefresh();
@@ -983,14 +994,14 @@ namespace WPFApp.View.Container
             if (sender is not ComboBox comboBox)
                 return;
 
-            // Якщо дропдаун відкритий — дозволяємо ScrollViewer всередині Popup обробити wheel
+            
             if (comboBox.IsDropDownOpen)
             {
                 e.Handled = false;
                 return;
             }
 
-            // Якщо дропдаун ЗАКРИТИЙ — (опційно) блокуємо зміну вибору колесом
+            
             e.Handled = true;
         }
 
@@ -1003,7 +1014,7 @@ namespace WPFApp.View.Container
         {
             _suspendMatrixRefresh = false;
 
-            // Якщо під час паузи були MatrixChanged — виконуємо 1 refresh після закриття ComboBox
+            
             if (_pendingMatrixRefresh)
             {
                 _pendingMatrixRefresh = false;
@@ -1027,8 +1038,8 @@ namespace WPFApp.View.Container
 
         private void MinHoursCell_TargetUpdated(object sender, DataTransferEventArgs e)
         {
-            // Важливо: ValidationRule не спрацьовує на старті,
-            // тому примусово “проганяємо” source update — отримаємо Validation.HasError одразу.
+            
+            
             if (sender is DependencyObject d)
             {
                 var be = BindingOperations.GetBindingExpression(d, NumericUpDown.ValueProperty);

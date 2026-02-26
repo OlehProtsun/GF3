@@ -1,4 +1,9 @@
-﻿using ClosedXML.Excel;
+/*
+  Опис файлу: цей модуль містить реалізацію компонента ScheduleExportService у шарі WPFApp.
+  Призначення: інкапсулювати поведінку UI або прикладної логіки без зміни доменної моделі.
+  Примітка: коментарі описують спостережуваний потік даних, очікувані обмеження та точки взаємодії.
+*/
+using ClosedXML.Excel;
 using BusinessLogicLayer.Contracts.Models;
 using System;
 using System.Collections.Generic;
@@ -18,71 +23,125 @@ namespace WPFApp.Applications.Export
 {
     #region DTO / CONTEXT OBJECTS (дані для експорту)
 
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
     /// <summary>
-    /// Контекст експорту ОДНОГО розкладу (schedule) у Excel.
-    ///
-    /// Ідея: сервіс експорту НЕ повинен лазити у ViewModel/DB напряму — йому передають
-    /// "готовий пакет даних" у вигляді цього контексту.
-    ///
-    /// Вміст:
-    /// - Метадані розкладу (назва, місяць/рік, магазин, адреса, зміни, підсумки)
-    /// - Матриця розкладу (DataView) — таблиця "День x Працівник" (або навпаки)
-    /// - Summary дані для статистичного листа (заголовки днів, рядки працівників, work/free stats)
-    /// - StyleProvider — постачальник стилів (поки тут зберігається як dependency)
-    ///
-    /// Цей клас — immutable-подібний: тільки get; і ініціалізація в конструкторі.
-    /// Це зменшує ризик "підміни" даних під час виконання експорту.
+    /// Визначає публічний елемент `public sealed class ScheduleExportContext` та контракт його використання у шарі WPFApp.
     /// </summary>
     public sealed class ScheduleExportContext
     {
+        /// <summary>
+        /// Визначає публічний елемент `public string ScheduleName { get; }` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public string ScheduleName { get; }
+        /// <summary>
+        /// Визначає публічний елемент `public int ScheduleMonth { get; }` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public int ScheduleMonth { get; }
+        /// <summary>
+        /// Визначає публічний елемент `public int ScheduleYear { get; }` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public int ScheduleYear { get; }
+        /// <summary>
+        /// Визначає публічний елемент `public string ShopName { get; }` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public string ShopName { get; }
+        /// <summary>
+        /// Визначає публічний елемент `public string ShopAddress { get; }` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public string ShopAddress { get; }
+        /// <summary>
+        /// Визначає публічний елемент `public string TotalHoursText { get; }` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public string TotalHoursText { get; }
+        /// <summary>
+        /// Визначає публічний елемент `public int TotalEmployees { get; }` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public int TotalEmployees { get; }
+        /// <summary>
+        /// Визначає публічний елемент `public int TotalDays { get; }` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public int TotalDays { get; }
+        /// <summary>
+        /// Визначає публічний елемент `public string Shift1 { get; }` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public string Shift1 { get; }
+        /// <summary>
+        /// Визначає публічний елемент `public string Shift2 { get; }` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public string Shift2 { get; }
+        /// <summary>
+        /// Визначає публічний елемент `public string TotalEmployeesListText { get; }` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public string TotalEmployeesListText { get; }
 
+        
+        
+        
+        
+        
+        
+        
         /// <summary>
-        /// Матриця розкладу у вигляді DataView (джерело даних для "Matrix" листа).
-        /// Очікується, що DataView містить колонки:
-        /// - Day (або іншу колонку дати/дня)
-        /// - колонки працівників/слотів
-        /// Також можуть бути службові колонки типу Conflict/Weekend — вони відфільтровуються.
+        /// Визначає публічний елемент `public DataView ScheduleMatrix { get; }` та контракт його використання у шарі WPFApp.
         /// </summary>
         public DataView ScheduleMatrix { get; }
 
+        
+        
+        
+        
         /// <summary>
-        /// Заголовки днів для статистичного листа (наприклад: "Mon 01", "Tue 02"...).
-        /// Важливо: у шаблоні кожен день займає 3 колонки (From/To/Hours).
+        /// Визначає публічний елемент `public IReadOnlyList<ContainerScheduleProfileViewModel.SummaryDayHeader> SummaryDayHeaders { get; }` та контракт його використання у шарі WPFApp.
         /// </summary>
         public IReadOnlyList<ContainerScheduleProfileViewModel.SummaryDayHeader> SummaryDayHeaders { get; }
 
+        
+        
+        
+        
+        
+        
         /// <summary>
-        /// Рядки "Summary" по працівниках:
-        /// - Employee (ім'я)
-        /// - Sum (сума годин/інший підсумок)
-        /// - Days (масив із клітинок From/To/Hours по кожному дню)
+        /// Визначає публічний елемент `public IReadOnlyList<ContainerScheduleProfileViewModel.SummaryEmployeeRow> SummaryRows { get; }` та контракт його використання у шарі WPFApp.
         /// </summary>
         public IReadOnlyList<ContainerScheduleProfileViewModel.SummaryEmployeeRow> SummaryRows { get; }
 
+        
+        
+        
+        
         /// <summary>
-        /// Додаткова статистика: скільки робочих/вільних днів у працівника.
-        /// Використовується для заповнення колонок WorkDays / FreeDays у статистичному листі.
+        /// Визначає публічний елемент `public IReadOnlyList<ContainerScheduleProfileViewModel.EmployeeWorkFreeStatRow> EmployeeWorkFreeStats { get; }` та контракт його використання у шарі WPFApp.
         /// </summary>
         public IReadOnlyList<ContainerScheduleProfileViewModel.EmployeeWorkFreeStatRow> EmployeeWorkFreeStats { get; }
 
+        
+        
+        
+        
+        
         /// <summary>
-        /// Провайдер стилів для матриці (наприклад: кольори/заливки/текстові стилі).
-        /// У цьому файлі він не застосовується напряму у FillMatrixSheetFromTemplate (бо тут
-        /// принцип "не чіпати стилі шаблону"), але dependency залишили для сумісності/розширень.
+        /// Визначає публічний елемент `public IScheduleMatrixStyleProvider StyleProvider { get; }` та контракт його використання у шарі WPFApp.
         /// </summary>
         public IScheduleMatrixStyleProvider StyleProvider { get; }
 
+        /// <summary>
+        /// Визначає публічний елемент `public ScheduleExportContext(` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public ScheduleExportContext(
             string scheduleName,
             int scheduleMonth,
@@ -101,7 +160,7 @@ namespace WPFApp.Applications.Export
             IReadOnlyList<ContainerScheduleProfileViewModel.EmployeeWorkFreeStatRow> employeeWorkFreeStats,
             IScheduleMatrixStyleProvider styleProvider)
         {
-            // Нормалізація null -> "", щоб код експорту не робив постійно null-checks.
+            
             ScheduleName = scheduleName ?? string.Empty;
             ScheduleMonth = scheduleMonth;
             ScheduleYear = scheduleYear;
@@ -114,34 +173,49 @@ namespace WPFApp.Applications.Export
             Shift2 = shift2 ?? string.Empty;
             TotalEmployeesListText = totalEmployeesListText ?? string.Empty;
 
-            // Навіть якщо scheduleMatrix не передали — даємо пустий DataView, щоб уникнути NRE.
+            
             ScheduleMatrix = scheduleMatrix ?? new DataView();
 
-            // Для колекцій теж робимо safe fallback: порожні масиви.
+            
             SummaryDayHeaders = summaryDayHeaders ?? Array.Empty<ContainerScheduleProfileViewModel.SummaryDayHeader>();
             SummaryRows = summaryRows ?? Array.Empty<ContainerScheduleProfileViewModel.SummaryEmployeeRow>();
             EmployeeWorkFreeStats = employeeWorkFreeStats ?? Array.Empty<ContainerScheduleProfileViewModel.EmployeeWorkFreeStatRow>();
 
-            // Провайдер стилів тут критичний (dependency): якщо його немає — це помилка конфігурації.
+            
             StyleProvider = styleProvider ?? throw new ArgumentNullException(nameof(styleProvider));
         }
     }
 
+    
+    
+    
+    
+    
+    
+    
+    
+    
     /// <summary>
-    /// Дані про "групу доступності" (availability group), які можуть додатково
-    /// експортуватись у SQL (і/або використовуватись для аналітики).
-    ///
-    /// Містить:
-    /// - Group: метадані групи (місяць/рік/назва)
-    /// - Members: учасники (зв'язок employee->group)
-    /// - Days: дні доступності (тип: work/free/interval тощо)
+    /// Визначає публічний елемент `public sealed class AvailabilityGroupExportData` та контракт його використання у шарі WPFApp.
     /// </summary>
     public sealed class AvailabilityGroupExportData
     {
+        /// <summary>
+        /// Визначає публічний елемент `public AvailabilityGroupModel Group { get; }` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public AvailabilityGroupModel Group { get; }
+        /// <summary>
+        /// Визначає публічний елемент `public IReadOnlyList<AvailabilityGroupMemberModel> Members { get; }` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public IReadOnlyList<AvailabilityGroupMemberModel> Members { get; }
+        /// <summary>
+        /// Визначає публічний елемент `public IReadOnlyList<AvailabilityGroupDayModel> Days { get; }` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public IReadOnlyList<AvailabilityGroupDayModel> Days { get; }
 
+        /// <summary>
+        /// Визначає публічний елемент `public AvailabilityGroupExportData(` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public AvailabilityGroupExportData(
             AvailabilityGroupModel group,
             IReadOnlyList<AvailabilityGroupMemberModel> members,
@@ -153,17 +227,29 @@ namespace WPFApp.Applications.Export
         }
     }
 
+    
+    
+    
+    
+    
+    
     /// <summary>
-    /// Опис одного "графіку/чарту" для контейнерного експорту в Excel.
-    ///
-    /// Тут "ChartName" — ім'я, яке піде в назву листа Excel.
-    /// ScheduleContext — повний контекст одного розкладу для заповнення Matrix/Statistic листів.
+    /// Визначає публічний елемент `public sealed class ContainerExcelExportChartContext` та контракт його використання у шарі WPFApp.
     /// </summary>
     public sealed class ContainerExcelExportChartContext
     {
+        /// <summary>
+        /// Визначає публічний елемент `public string ChartName { get; }` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public string ChartName { get; }
+        /// <summary>
+        /// Визначає публічний елемент `public ScheduleExportContext ScheduleContext { get; }` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public ScheduleExportContext ScheduleContext { get; }
 
+        /// <summary>
+        /// Визначає публічний елемент `public ContainerExcelExportChartContext(string chartName, ScheduleExportContext scheduleContext)` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public ContainerExcelExportChartContext(string chartName, ScheduleExportContext scheduleContext)
         {
             ChartName = chartName ?? string.Empty;
@@ -171,32 +257,74 @@ namespace WPFApp.Applications.Export
         }
     }
 
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
     /// <summary>
-    /// Контекст експорту КОНТЕЙНЕРА в Excel:
-    /// - Загальна статистика по контейнеру (employees/shops/hours)
-    /// - Дані для "Container" листа (shop headers, employee rows, work/free stats)
-    /// - Набір Charts (кожен chart -> окремий schedule -> окремі листи Matrix + Statistic)
-    ///
-    /// Важливо: Container export використовує ДВА шаблони:
-    /// - ScheduleTemplate.xlsx (матриця + статистика)
-    /// - ContainerTemplate.xlsx (лист Container)
+    /// Визначає публічний елемент `public sealed class ContainerExcelExportContext` та контракт його використання у шарі WPFApp.
     /// </summary>
     public sealed class ContainerExcelExportContext
     {
+        /// <summary>
+        /// Визначає публічний елемент `public int ContainerId { get; }` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public int ContainerId { get; }
 
+        /// <summary>
+        /// Визначає публічний елемент `public string ContainerName { get; }` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public string ContainerName { get; }
+        /// <summary>
+        /// Визначає публічний елемент `public string ContainerNote { get; }` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public string ContainerNote { get; }
+        /// <summary>
+        /// Визначає публічний елемент `public int TotalEmployees { get; }` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public int TotalEmployees { get; }
+        /// <summary>
+        /// Визначає публічний елемент `public int TotalShops { get; }` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public int TotalShops { get; }
+        /// <summary>
+        /// Визначає публічний елемент `public string TotalEmployeesListText { get; }` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public string TotalEmployeesListText { get; }
+        /// <summary>
+        /// Визначає публічний елемент `public string TotalShopsListText { get; }` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public string TotalShopsListText { get; }
+        /// <summary>
+        /// Визначає публічний елемент `public string TotalHoursText { get; }` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public string TotalHoursText { get; }
+        /// <summary>
+        /// Визначає публічний елемент `public IReadOnlyList<ContainerProfileViewModel.ShopHeader> ShopHeaders { get; }` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public IReadOnlyList<ContainerProfileViewModel.ShopHeader> ShopHeaders { get; }
+        /// <summary>
+        /// Визначає публічний елемент `public IReadOnlyList<ContainerProfileViewModel.EmployeeShopHoursRow> EmployeeShopHoursRows { get; }` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public IReadOnlyList<ContainerProfileViewModel.EmployeeShopHoursRow> EmployeeShopHoursRows { get; }
+        /// <summary>
+        /// Визначає публічний елемент `public IReadOnlyList<ContainerProfileViewModel.EmployeeWorkFreeStatRow> EmployeeWorkFreeStats { get; }` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public IReadOnlyList<ContainerProfileViewModel.EmployeeWorkFreeStatRow> EmployeeWorkFreeStats { get; }
+        /// <summary>
+        /// Визначає публічний елемент `public IReadOnlyList<ContainerExcelExportChartContext> Charts { get; }` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public IReadOnlyList<ContainerExcelExportChartContext> Charts { get; }
 
+        /// <summary>
+        /// Визначає публічний елемент `public ContainerExcelExportContext(` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public ContainerExcelExportContext(
             int containerId,
             string containerName,
@@ -226,34 +354,55 @@ namespace WPFApp.Applications.Export
         }
     }
 
+    
+    
+    
+    
     /// <summary>
-    /// Контекст експорту ОДНОГО schedule у SQL в рамках контейнера.
-    /// Тут просто обгортка, щоб у ContainerSqlExportContext тримати список schedules ("Charts").
+    /// Визначає публічний елемент `public sealed class ContainerSqlExportScheduleContext` та контракт його використання у шарі WPFApp.
     /// </summary>
     public sealed class ContainerSqlExportScheduleContext
     {
+        /// <summary>
+        /// Визначає публічний елемент `public ScheduleSqlExportContext Schedule { get; }` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public ScheduleSqlExportContext Schedule { get; }
 
+        /// <summary>
+        /// Визначає публічний елемент `public ContainerSqlExportScheduleContext(ScheduleSqlExportContext schedule)` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public ContainerSqlExportScheduleContext(ScheduleSqlExportContext schedule)
         {
             Schedule = schedule ?? throw new ArgumentNullException(nameof(schedule));
         }
     }
 
+    
+    
+    
+    
+    
+    
+    
+    
+    
     /// <summary>
-    /// Контекст експорту контейнера в SQL.
-    /// Містить:
-    /// - ContainerModel (контейнер)
-    /// - Charts (набір schedule контекстів, які треба також інсертити)
-    ///
-    /// Реалізація BuildContainerSqlScript далі збирає всі сутності (shops/employees/availability/slots/styles)
-    /// і пише INSERT OR IGNORE, щоб скрипт був ідемпотентний.
+    /// Визначає публічний елемент `public sealed class ContainerSqlExportContext` та контракт його використання у шарі WPFApp.
     /// </summary>
     public sealed class ContainerSqlExportContext
     {
+        /// <summary>
+        /// Визначає публічний елемент `public ContainerModel Container { get; }` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public ContainerModel Container { get; }
+        /// <summary>
+        /// Визначає публічний елемент `public IReadOnlyList<ContainerSqlExportScheduleContext> Charts { get; }` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public IReadOnlyList<ContainerSqlExportScheduleContext> Charts { get; }
 
+        /// <summary>
+        /// Визначає публічний елемент `public ContainerSqlExportContext(ContainerModel container, IReadOnlyList<ContainerSqlExportScheduleContext> charts)` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public ContainerSqlExportContext(ContainerModel container, IReadOnlyList<ContainerSqlExportScheduleContext> charts)
         {
             Container = container ?? throw new ArgumentNullException(nameof(container));
@@ -261,24 +410,45 @@ namespace WPFApp.Applications.Export
         }
     }
 
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
     /// <summary>
-    /// Контекст експорту розкладу в SQL.
-    ///
-    /// Містить основні сутності, які потрібні, щоб відновити schedule у БД:
-    /// - Schedule
-    /// - Employees (зв'язки schedule_employee)
-    /// - Slots (schedule_slot — призначення по днях/слотах)
-    /// - CellStyles (schedule_cell_style — кольори/оформлення клітинок)
-    /// - AvailabilityGroupData (необов’язково) — дані доступності
+    /// Визначає публічний елемент `public sealed class ScheduleSqlExportContext` та контракт його використання у шарі WPFApp.
     /// </summary>
     public sealed class ScheduleSqlExportContext
     {
+        /// <summary>
+        /// Визначає публічний елемент `public ScheduleModel Schedule { get; }` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public ScheduleModel Schedule { get; }
+        /// <summary>
+        /// Визначає публічний елемент `public IReadOnlyList<ScheduleEmployeeModel> Employees { get; }` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public IReadOnlyList<ScheduleEmployeeModel> Employees { get; }
+        /// <summary>
+        /// Визначає публічний елемент `public IReadOnlyList<ScheduleSlotModel> Slots { get; }` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public IReadOnlyList<ScheduleSlotModel> Slots { get; }
+        /// <summary>
+        /// Визначає публічний елемент `public IReadOnlyList<ScheduleCellStyleModel> CellStyles { get; }` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public IReadOnlyList<ScheduleCellStyleModel> CellStyles { get; }
+        /// <summary>
+        /// Визначає публічний елемент `public AvailabilityGroupExportData? AvailabilityGroupData { get; }` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public AvailabilityGroupExportData? AvailabilityGroupData { get; }
 
+        /// <summary>
+        /// Визначає публічний елемент `public ScheduleSqlExportContext(` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public ScheduleSqlExportContext(
             ScheduleModel schedule,
             IReadOnlyList<ScheduleEmployeeModel> employees,
@@ -296,120 +466,126 @@ namespace WPFApp.Applications.Export
 
     #endregion
 
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
     /// <summary>
-    /// Основний сервіс експорту:
-    /// - ExportToExcelAsync: один schedule -> Excel (Matrix + Statistic)
-    /// - ExportToSqlAsync: один schedule -> SQL-скрипт (INSERT OR IGNORE)
-    /// - ExportContainerToExcelAsync: container -> Excel (Container + багато schedules)
-    /// - ExportContainerToSqlAsync: container -> SQL-скрипт
-    ///
-    /// Дизайн-принципи:
-    /// 1) Використовує Excel-шаблони (template workbooks) для збереження 1:1 стилів:
-    ///    - ширини колонок/висоти рядків
-    ///    - merge cells
-    ///    - conditional formatting
-    ///    - повернуті (rotated) заголовки
-    /// 2) Код заповнює ПЕРЕВАЖНО тільки значення (values), не чіпаючи стилі.
-    /// 3) Є "санітизація" імен листів/файлів (Excel має обмеження 31 символ + заборонені символи).
-    /// 4) Є workaround для PatternType=Gray125 (ClosedXML інколи робить roundtrip у чорний).
+    /// Визначає публічний елемент `public sealed class ScheduleExportService : IScheduleExportService` та контракт його використання у шарі WPFApp.
     /// </summary>
     public sealed class ScheduleExportService : IScheduleExportService
     {
-        /// <summary>
-        /// Імена листів, які можуть бути у ContainerTemplate.xlsx.
-        /// Це робить код стійким до того, що шаблон назвали по-різному.
-        /// </summary>
+        
+        
+        
+        
         private static readonly string[] ContainerTemplateSheetNames = { "ContainerTemplate", "Sheet1", "Container" };
 
-        /// <summary>
-        /// Дефолтні назви листів, якщо ScheduleName порожній або невалідний.
-        /// </summary>
+        
+        
+        
         private const string DefaultSheetName = "Schedule";
         private const string DefaultStatisticSheetName = "Schedule - Statistic";
 
-        // ===================== TEMPLATE CONFIG =====================
+        
 
-        /// <summary>
-        /// Відносний шлях до шаблону schedule (Matrix + Statistic).
-        /// У проєкті шаблон має бути з Build Action: Content і Copy to Output Directory: Copy if newer/always,
-        /// щоб файл був у вихідній директорії разом з exe.
-        /// </summary>
+        
+        
+        
+        
+        
         private const string ExcelTemplateRelativePath = @"Resources\Excel\ScheduleTemplate.xlsx";
 
-        /// <summary>
-        /// Окремий шаблон для контейнера (лист "Container").
-        /// </summary>
+        
+        
+        
         private const string ContainerExcelTemplateRelativePath = @"Resources\Excel\ContainerTemplate.xlsx";
 
-        /// <summary>
-        /// Перелік можливих назв листа-матриці в шаблоні.
-        /// Підтримує варіації імен, щоб не падати при перейменуванні шаблону.
-        /// </summary>
+        
+        
+        
+        
         private static readonly string[] MatrixTemplateSheetNames = { "ScheduleName", "R_FL_35", "MatrixTemplate" };
 
-        /// <summary>
-        /// Перелік можливих назв листа статистики в шаблоні.
-        /// </summary>
+        
+        
+        
         private static readonly string[] StatisticTemplateSheetNames = { "ScheduleStatistic", "Schedule Statistic", "StatisticTemplate" };
 
-        // ===================== MATRIX TEMPLATE LAYOUT =====================
-        // Тут "мапа" очікуваного layout'у шаблону.
-        //
-        // Очікування:
-        // - B1  = ShopName
-        // - Row 1: C1..AA1 = заголовки працівників (часто повернуті/злиті/високі)
-        // - Col B: B2..B32 = дати
-        // - Matrix body: C2..AA32 = значення розкладу (слоти/позначки)
-        //
-        // Важливо: код очищає ТІЛЬКИ значення (Contents), зберігаючи стилі.
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
 
         private const string MatrixClearRange = "B1:AA32";
         private const int M_ShopRow = 1;
-        private const int M_ShopCol = 2;         // B1
+        private const int M_ShopCol = 2;         
         private const int M_HeaderRow = 1;
-        private const int M_DateCol = 2;         // B
-        private const int M_FirstDataCol = 3;    // C
-        private const int M_LastDataCol = 27;    // AA (25 cols)
+        private const int M_DateCol = 2;         
+        private const int M_FirstDataCol = 3;    
+        private const int M_LastDataCol = 27;    
         private const int M_FirstDayRow = 2;
         private const int M_DayCount = 31;
 
-        // ===================== STAT TEMPLATE LAYOUT =====================
-        // Лист статистики також має фіксований layout:
-        // - B2..B11: основні поля (ScheduleName, Month, Year, ShopName, Address, Hours, Employees, Days, Shifts)
-        // - A12: рядок "Total employees (...) : list"
-        // - Row 14: заголовки днів (кожен день займає 3 колонки)
-        // - Row 16..: таблиця по працівниках
+        
+        
+        
+        
+        
+        
 
-        private const int S_ValueCol = 2;                // B
-        private const int S_EmployeesLineRow = 12;       // рядок з Total employees list (в A12)
-        private const int S_DayHeaderRow = 14;           // заголовки днів (кожен день у 3 колонки)
-        private const int S_BodyFirstRow = 16;           // перший рядок працівника
-        private const int S_MaxSummaryRows = 10;         // скільки рядків у шаблоні стилізовано "з коробки" (16..25)
+        private const int S_ValueCol = 2;                
+        private const int S_EmployeesLineRow = 12;       
+        private const int S_DayHeaderRow = 14;           
+        private const int S_BodyFirstRow = 16;           
+        private const int S_MaxSummaryRows = 10;         
 
-        // Колонки в summary-таблиці:
-        private const int S_EmployeeCol = 1;            // A: Employee
-        private const int S_WorkDaysCol = 2;            // B: WorkDays
-        private const int S_FreeDaysCol = 3;            // C: FreeDays
-        private const int S_SumCol = 4;                 // D: Sum
+        
+        private const int S_EmployeeCol = 1;            
+        private const int S_WorkDaysCol = 2;            
+        private const int S_FreeDaysCol = 3;            
+        private const int S_SumCol = 4;                 
 
-        // День починається з колонки E (5), кожен день = 3 колонки: From, To, Hours.
+        
         private const int S_FirstDayCol = 5;
-        private const int S_DaysCapacity = 31;          // 31 day blocks
+        private const int S_DaysCapacity = 31;          
 
-        // ===================== PUBLIC API =====================
+        
 
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
         /// <summary>
-        /// Експорт одного розкладу в Excel:
-        /// - завантажує шаблон ScheduleTemplate.xlsx
-        /// - знаходить листи MatrixTemplate та StatisticTemplate
-        /// - копіює їх у нові листи під назвою розкладу
-        /// - видаляє оригінальні шаблонні листи (щоб у фінальному файлі не було "Template")
-        /// - заповнює значення
-        /// - виконує FixGray125Fills (workaround)
-        /// - SaveAs(filePath)
-        ///
-        /// Виконання відбувається у Task.Run (CPU/IO-bound + ClosedXML не асинхронний).
-        /// CancellationToken перевіряється до початку і в контейнерному циклі.
+        /// Визначає публічний елемент `public Task ExportToExcelAsync(ScheduleExportContext context, string filePath, CancellationToken ct = default)` та контракт його використання у шарі WPFApp.
         /// </summary>
         public Task ExportToExcelAsync(ScheduleExportContext context, string filePath, CancellationToken ct = default)
         {
@@ -420,52 +596,55 @@ namespace WPFApp.Applications.Export
             {
                 ct.ThrowIfCancellationRequested();
 
-                // 1) Знаходимо фізичний файл шаблону у output directory.
+                
                 var templatePath = ResolveExcelTemplatePath();
 
-                // 2) Відкриваємо workbook на основі шаблону.
+                
                 using var workbook = new XLWorkbook(templatePath);
 
-                // 3) Знаходимо аркуші, які виступають як шаблони для копіювання.
+                
                 var matrixTemplate = FindTemplateSheet(workbook, MatrixTemplateSheetNames)
                     ?? throw new InvalidOperationException($"Matrix template sheet not found. Expected one of: {string.Join(", ", MatrixTemplateSheetNames)}");
 
                 var statTemplate = FindTemplateSheet(workbook, StatisticTemplateSheetNames)
                     ?? throw new InvalidOperationException($"Statistic template sheet not found. Expected one of: {string.Join(", ", StatisticTemplateSheetNames)}");
 
-                // 4) Ім'я листа для матриці = назва розкладу (але sanitized).
+                
                 var scheduleName = SanitizeWorksheetName(context.ScheduleName, DefaultSheetName);
 
-                // CopyTo важливий: переносить стилі 1:1 (включаючи row height, column width, CF, pattern fills).
+                
                 var matrixSheet = matrixTemplate.CopyTo(scheduleName);
 
-                // 5) Лист статистики: базове ім'я + унікалізація, якщо збігається з існуючим.
+                
                 var statisticNameBase = SanitizeWorksheetName($"{scheduleName} - Statistic", DefaultStatisticSheetName);
                 var statisticName = MakeUniqueSheetName(workbook, statisticNameBase);
                 var statSheet = statTemplate.CopyTo(statisticName);
 
-                // 6) Видаляємо шаблонні листи, щоб у фінальному файлі залишилися лише готові листи.
+                
                 matrixTemplate.Delete();
                 statTemplate.Delete();
 
-                // 7) Заповнюємо тільки значення, не ламаючи оформлення шаблону.
+                
                 FillMatrixSheetFromTemplate(matrixSheet, context);
                 FillStatisticSheetFromTemplate(statSheet, context);
 
-                // 8) Workaround для Gray125, щоб Excel не показував як чорний.
+                
                 FixGray125Fills(matrixSheet, "B2:AA32");
                 FixGray125Fills(statSheet);
 
-                // 9) Зберігаємо результат.
+                
                 workbook.SaveAs(filePath);
             }, ct);
         }
 
+        
+        
+        
+        
+        
+        
         /// <summary>
-        /// Експорт одного розкладу у SQL-скрипт (SQLite-стиль, INSERT OR IGNORE).
-        /// Реалізація:
-        /// - будує текст скрипта BuildSqlScript(context)
-        /// - пише його в файл як UTF-8
+        /// Визначає публічний елемент `public async Task ExportToSqlAsync(ScheduleSqlExportContext context, string filePath, CancellationToken ct = default)` та контракт його використання у шарі WPFApp.
         /// </summary>
         public async Task ExportToSqlAsync(ScheduleSqlExportContext context, string filePath, CancellationToken ct = default)
         {
@@ -476,16 +655,19 @@ namespace WPFApp.Applications.Export
             await File.WriteAllTextAsync(filePath, script, Encoding.UTF8, ct).ConfigureAwait(false);
         }
 
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
         /// <summary>
-        /// Експорт контейнера в Excel.
-        ///
-        /// Відмінність від ExportToExcelAsync:
-        /// - Використовує ScheduleTemplate.xlsx для matrix/stat, як і одиночний export
-        /// - ДОДАТКОВО відкриває ContainerTemplate.xlsx та копіює з нього лист "ContainerTemplate"
-        ///   у поточний workbook (залежить від версії ClosedXML, але тут використано CopyTo(workbook,...))
-        /// - Створює лист "Container" і заповнює агреговану таблицю
-        /// - Далі для кожного Chart: створює пару листів Matrix+Statistic
-        /// - Видаляє всі template листи
+        /// Визначає публічний елемент `public Task ExportContainerToExcelAsync(ContainerExcelExportContext context, string filePath, CancellationToken ct = def` та контракт його використання у шарі WPFApp.
         /// </summary>
         public Task ExportContainerToExcelAsync(ContainerExcelExportContext context, string filePath, CancellationToken ct = default)
         {
@@ -496,7 +678,7 @@ namespace WPFApp.Applications.Export
             {
                 ct.ThrowIfCancellationRequested();
 
-                // 1) Шаблон schedule (Matrix + Statistic)
+                
                 var templatePath = ResolveExcelTemplatePath();
                 using var workbook = new XLWorkbook(templatePath);
 
@@ -506,39 +688,39 @@ namespace WPFApp.Applications.Export
                 var statTemplate = FindTemplateSheet(workbook, StatisticTemplateSheetNames)
                     ?? throw new InvalidOperationException($"Statistic template sheet not found. Expected one of: {string.Join(", ", StatisticTemplateSheetNames)}");
 
-                // 2) Шаблон контейнера (інший файл!)
+                
                 var containerTemplatePath = ResolveContainerTemplatePath();
                 using var containerWb = new XLWorkbook(containerTemplatePath);
 
                 var containerSrc = FindTemplateSheet(containerWb, ContainerTemplateSheetNames)
                     ?? throw new InvalidOperationException($"Container template sheet not found in ContainerTemplate.xlsx. Expected one of: {string.Join(", ", ContainerTemplateSheetNames)}");
 
-                // 3) Копіюємо container template sheet у workbook, щоб далі робити CopyTo вже всередині одного workbook.
+                
                 var containerTemplateName = MakeUniqueSheetName(workbook, "__ContainerTemplate__");
 
-                // NOTE: залежить від версії ClosedXML.
-                // У новіших версіях є CopyTo(XLWorkbook, string). Якщо раптом не компілюється — потрібно інший overload.
+                
+                
                 var containerTemplate = containerSrc.CopyTo(workbook, containerTemplateName);
 
-                // 4) Створюємо реальний лист "Container" з шаблону
+                
                 var containerSheetName = MakeUniqueSheetName(workbook, SanitizeWorksheetName("Container", "Container"));
                 var containerSheet = containerTemplate.CopyTo(containerSheetName);
                 FillContainerTemplateSheetFromTemplate(containerSheet, context);
 
-                // 5) Для кожного chart: матриця + статистика
+                
                 foreach (var chart in context.Charts)
                 {
                     ct.ThrowIfCancellationRequested();
 
-                    // Унікалізуємо назву (щоб не було колізій).
+                    
                     var scheduleName = MakeUniqueSheetName(workbook, SanitizeWorksheetName(chart.ChartName, DefaultSheetName));
 
-                    // Matrix
+                    
                     var matrixSheet = matrixTemplate.CopyTo(scheduleName);
                     FillMatrixSheetFromTemplate(matrixSheet, chart.ScheduleContext);
                     FixGray125Fills(matrixSheet, "B2:AA32");
 
-                    // Statistic
+                    
                     var statNameBase = SanitizeWorksheetName($"{scheduleName} - Statistic", DefaultStatisticSheetName);
                     var statName = MakeUniqueSheetName(workbook, statNameBase);
                     var statSheet = statTemplate.CopyTo(statName);
@@ -546,7 +728,7 @@ namespace WPFApp.Applications.Export
                     FixGray125Fills(statSheet);
                 }
 
-                // 6) Видаляємо всі template sheets (щоб у фінальному файлі їх не було)
+                
                 matrixTemplate.Delete();
                 statTemplate.Delete();
                 containerTemplate.Delete();
@@ -555,9 +737,12 @@ namespace WPFApp.Applications.Export
             }, ct);
         }
 
+        
+        
+        
+        
         /// <summary>
-        /// Експорт контейнера у SQL-скрипт.
-        /// Скрипт включає контейнер + всі сутності з усіх schedules (shops, employees, availability, slots, styles).
+        /// Визначає публічний елемент `public async Task ExportContainerToSqlAsync(ContainerSqlExportContext context, string filePath, CancellationToken ct = d` та контракт його використання у шарі WPFApp.
         /// </summary>
         public async Task ExportContainerToSqlAsync(ContainerSqlExportContext context, string filePath, CancellationToken ct = default)
         {
@@ -568,13 +753,13 @@ namespace WPFApp.Applications.Export
             await File.WriteAllTextAsync(filePath, script, Encoding.UTF8, ct).ConfigureAwait(false);
         }
 
-        // ===================== TEMPLATE HELPERS =====================
+        
 
-        /// <summary>
-        /// Обчислює абсолютний шлях до ScheduleTemplate.xlsx у output-папці додатка.
-        /// Якщо файл не знайдено — кидає FileNotFoundException з поясненням,
-        /// щоб відразу було зрозуміло, що проблема в deployment/copy-to-output.
-        /// </summary>
+        
+        
+        
+        
+        
         private static string ResolveExcelTemplatePath()
         {
             var baseDir = AppDomain.CurrentDomain.BaseDirectory;
@@ -586,9 +771,9 @@ namespace WPFApp.Applications.Export
             return path;
         }
 
-        /// <summary>
-        /// Абсолютний шлях до ContainerTemplate.xlsx у output-папці.
-        /// </summary>
+        
+        
+        
         private static string ResolveContainerTemplatePath()
         {
             var baseDir = AppDomain.CurrentDomain.BaseDirectory;
@@ -600,10 +785,10 @@ namespace WPFApp.Applications.Export
             return path;
         }
 
-        /// <summary>
-        /// Шукає перший аркуш у workbook, назва якого відповідає одному з варіантів "names"
-        /// (case-insensitive). Повертає null, якщо нічого не знайдено.
-        /// </summary>
+        
+        
+        
+        
         private static IXLWorksheet? FindTemplateSheet(XLWorkbook wb, IEnumerable<string> names)
         {
             foreach (var n in names)
@@ -614,11 +799,11 @@ namespace WPFApp.Applications.Export
             return null;
         }
 
-        /// <summary>
-        /// Робить унікальне ім'я листа в рамках workbook:
-        /// - якщо baseName вже існує, додає " (1)", " (2)", ...
-        /// - враховує обмеження Excel: максимум 31 символ
-        /// </summary>
+        
+        
+        
+        
+        
         private static string MakeUniqueSheetName(XLWorkbook wb, string baseName)
         {
             var name = baseName;
@@ -628,7 +813,7 @@ namespace WPFApp.Applications.Export
                 var suffix = $" ({i++})";
                 var trimmed = baseName;
 
-                // Excel sheet name length <= 31, тому при додаванні суфікса підрізаємо.
+                
                 if (trimmed.Length + suffix.Length > 31)
                     trimmed = trimmed.Substring(0, 31 - suffix.Length);
 
@@ -637,10 +822,13 @@ namespace WPFApp.Applications.Export
             return name;
         }
 
+        
+        
+        
+        
+        
         /// <summary>
-        /// "Санітизація" назви файлу під файлову систему:
-        /// - якщо name порожній -> fallback
-        /// - замінює недопустимі символи на '_'
+        /// Визначає публічний елемент `public static string SanitizeFileName(string? name, string fallback)` та контракт його використання у шарі WPFApp.
         /// </summary>
         public static string SanitizeFileName(string? name, string fallback)
         {
@@ -650,12 +838,12 @@ namespace WPFApp.Applications.Export
             return string.IsNullOrWhiteSpace(safe) ? fallback : safe;
         }
 
-        /// <summary>
-        /// "Санітизація" назви листа Excel:
-        /// - Excel забороняє: [ ] * ? / \ :
-        /// - довжина максимум 31 символ
-        /// - якщо порожньо -> fallback
-        /// </summary>
+        
+        
+        
+        
+        
+        
         private static string SanitizeWorksheetName(string? name, string fallback)
         {
             var safe = string.IsNullOrWhiteSpace(name) ? fallback : name.Trim();
@@ -670,23 +858,23 @@ namespace WPFApp.Applications.Export
             return string.IsNullOrWhiteSpace(safe) ? fallback : safe;
         }
 
-        /// <summary>
-        /// Workaround: ClosedXML (та інші writers) інколи неправильно "roundtrip"-лять
-        /// PatternType=Gray125 (12.5% сірий патерн), і Excel показує його як чорний.
-        ///
-        /// Тому тут:
-        /// - для клітинок (direct style) та для conditional formats:
-        ///   якщо PatternType == Gray125, примусово задаємо BackgroundColor/PatternColor.
-        ///
-        /// rangeAddress:
-        /// - якщо задано: працюємо лише по цьому діапазону (швидше)
-        /// - якщо null: по всьому used range (може бути повільніше)
-        /// </summary>
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
         private static void FixGray125Fills(IXLWorksheet sheet, string? rangeAddress = null)
         {
             if (sheet is null) return;
 
-            // 1) Direct cell styles
+            
             var range = !string.IsNullOrWhiteSpace(rangeAddress) ? sheet.Range(rangeAddress) : sheet.RangeUsed();
             if (range != null)
             {
@@ -694,15 +882,15 @@ namespace WPFApp.Applications.Export
                 {
                     if (cell.Style.Fill.PatternType == XLFillPatternValues.Gray125)
                     {
-                        // Зберігаємо Gray125, але фіксуємо explicit кольори.
+                        
                         cell.Style.Fill.PatternType = XLFillPatternValues.Gray125;
                         cell.Style.Fill.BackgroundColor = XLColor.White;
-                        cell.Style.Fill.PatternColor = XLColor.Black; // foreground pattern
+                        cell.Style.Fill.PatternColor = XLColor.Black; 
                     }
                 }
             }
 
-            // 2) Conditional formats
+            
             foreach (var cf in sheet.ConditionalFormats)
             {
                 if (cf.Style.Fill.PatternType == XLFillPatternValues.Gray125)
@@ -714,57 +902,57 @@ namespace WPFApp.Applications.Export
             }
         }
 
-        // ===================== EXCEL FILL: MATRIX =====================
+        
 
-        /// <summary>
-        /// Заповнює лист матриці (Matrix) на основі шаблону.
-        ///
-        /// Критичний принцип: "НЕ ЛАМАТИ стилі" — тому очищаємо тільки Contents.
-        ///
-        /// Вхідні дані:
-        /// - context.ScheduleMatrix: DataView -> Table -> Columns/Rows
-        ///
-        /// Очікувана поведінка:
-        /// 1) B1 = ShopName
-        /// 2) Row 1 (C..): заголовки працівників (по колонках DataTable, окрім службових)
-        /// 3) Col B (rows 2..32): дати
-        /// 4) Body (C..AA): значення з DataView або "-" як placeholder
-        /// 5) Для "неіснуючих" днів (наприклад 30-31 у лютому) — записуємо " " (текст),
-        ///    щоб Excel формули/CF не інтерпретували це як "0" або дату.
-        /// </summary>
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
         private static void FillMatrixSheetFromTemplate(IXLWorksheet sheet, ScheduleExportContext context)
         {
-            // Очищаємо ТІЛЬКИ значення (Contents), стиль залишається як у шаблоні.
+            
             sheet.Range(MatrixClearRange).Clear(XLClearOptions.Contents);
 
-            // B1 = ShopName
+            
             sheet.Cell(M_ShopRow, M_ShopCol).Value = context.ShopName;
 
-            // Якщо DataView/Table пусті — немає що заповнювати.
+            
             var table = context.ScheduleMatrix?.Table;
             if (table is null) return;
 
-            // Фільтруємо службові колонки, які не мають потрапляти в Excel.
-            // ConflictColumnName / WeekendColumnName — з ScheduleMatrixConstants.
+            
+            
             var visibleCols = table.Columns.Cast<DataColumn>()
                 .Where(c => c.ColumnName != ScheduleMatrixConstants.ConflictColumnName
                          && c.ColumnName != ScheduleMatrixConstants.WeekendColumnName)
                 .ToList();
 
-            // Визначаємо "day column": спеціальна колонка Day, або fallback на першу.
+            
             var dayCol = visibleCols.FirstOrDefault(c => c.ColumnName == ScheduleMatrixConstants.DayColumnName)
                          ?? visibleCols.FirstOrDefault();
 
-            // Все, що не dayCol — це "дані" (колонки працівників/слотів).
+            
             var dataCols = visibleCols.Where(c => !ReferenceEquals(c, dayCol)).ToList();
 
-            // Перевіряємо, чи помістяться всі колонки у шаблон (C..AA).
+            
             var capacity = M_LastDataCol - M_FirstDataCol + 1;
             if (dataCols.Count > capacity)
                 throw new InvalidOperationException($"Template supports max {capacity} employee columns (C..AA). Current: {dataCols.Count}.");
 
-            // Пишемо заголовки працівників у row 1, починаючи з колонки C.
-            // Caption використовується, якщо є (часто він більш "людяний" ніж ColumnName).
+            
+            
             for (int i = 0; i < dataCols.Count; i++)
             {
                 var col = dataCols[i];
@@ -772,33 +960,33 @@ namespace WPFApp.Applications.Export
                     string.IsNullOrWhiteSpace(col.Caption) ? col.ColumnName : col.Caption;
             }
 
-            // Колонки, які є в шаблоні, але не мають працівника — заповнюємо "0"
-            // (це, ймовірно, потрібно для формул/умовного форматування в шаблоні).
+            
+            
             for (int c = M_FirstDataCol + dataCols.Count; c <= M_LastDataCol; c++)
                 sheet.Cell(M_HeaderRow, c).Value = "0";
 
-            // Скільки днів реально у місяці.
+            
             var daysInMonth = DateTime.DaysInMonth(context.ScheduleYear, context.ScheduleMonth);
 
-            // Скільки рядків можемо читати з DataView (але не більше 31).
+            
             var maxRows = Math.Min(M_DayCount, context.ScheduleMatrix.Count);
 
-            // Заповнюємо 31 рядок (2..32) незалежно від місяця, бо шаблон саме такий.
+            
             for (int r = 0; r < M_DayCount; r++)
             {
                 var excelRow = M_FirstDayRow + r;
                 DataRowView? rowView = r < maxRows ? (DataRowView)context.ScheduleMatrix[r] : null;
 
-                // === Заповнення дати у колонці B ===
-                // Важливо: якщо день існує у місяці — кладемо DateTime, щоб Excel міг форматувати як дату.
-                // Якщо день НЕ існує (наприклад 30-31 у лютому) — кладемо текст " ",
-                // щоб Excel не застосував weekend CF/формули некоректно.
+                
+                
+                
+                
                 var dateCell = sheet.Cell(excelRow, M_DateCol);
 
                 if (r < daysInMonth)
                 {
-                    // Якщо в даних є день/дата — пробуємо відновити DateTime.
-                    // Якщо нема — беремо просто календарну дату (year/month/(r+1)).
+                    
+                    
                     var date = rowView != null ? TryBuildDate(context, dayCol, rowView) : null;
                     date ??= SafeDate(context.ScheduleYear, context.ScheduleMonth, r + 1);
 
@@ -812,43 +1000,43 @@ namespace WPFApp.Applications.Export
                     dateCell.Value = " ";
                 }
 
-                // === Заповнення основних даних по працівниках ===
+                
                 for (int i = 0; i < dataCols.Count; i++)
                 {
                     var col = dataCols[i];
                     var cell = sheet.Cell(excelRow, M_FirstDataCol + i);
 
-                    // Якщо DataView не має цього рядка — ставимо "-" для "порожньої" клітинки.
+                    
                     if (rowView == null)
                     {
                         cell.Value = "-";
                         continue;
                     }
 
-                    // Якщо значення null/empty — теж "-".
+                    
                     SetDashIfEmpty(cell, rowView[col.ColumnName]);
                 }
 
-                // Порожні "placeholder" колонки (до AA) -> "-"
+                
                 for (int c = M_FirstDataCol + dataCols.Count; c <= M_LastDataCol; c++)
                     sheet.Cell(excelRow, c).Value = "-";
             }
 
-            // Настройки друку:
-            // - повторювати заголовок (row 1) на кожній сторінці
-            // - повторювати колонку днів (col B) зліва
+            
+            
+            
             sheet.PageSetup.SetRowsToRepeatAtTop(M_HeaderRow, M_HeaderRow);
             sheet.PageSetup.SetColumnsToRepeatAtLeft(M_DateCol, M_DateCol);
 
-            // Опційно: обмежити Print Area тільки матрицею.
+            
             sheet.PageSetup.PrintAreas.Clear();
-            sheet.PageSetup.PrintAreas.Add(MatrixClearRange); // B1:AA32
+            sheet.PageSetup.PrintAreas.Add(MatrixClearRange); 
         }
 
-        /// <summary>
-        /// Записує "-" якщо значення null/DBNull/empty.
-        /// Це стабілізує вигляд матриці і прибирає "порожні" клітинки.
-        /// </summary>
+        
+        
+        
+        
         private static void SetDashIfEmpty(IXLCell cell, object? value)
         {
             if (value is null || value == DBNull.Value)
@@ -861,18 +1049,18 @@ namespace WPFApp.Applications.Export
             cell.Value = string.IsNullOrWhiteSpace(text) ? "-" : text;
         }
 
-        // ===== helpers =====
+        
 
-        /// <summary>
-        /// Пробує побудувати дату для рядка матриці.
-        ///
-        /// Підтримує формати:
-        /// - raw вже DateTime
-        /// - day-of-month як int або як string ("1", "02")
-        /// - повний date string, який парситься під CurrentCulture
-        ///
-        /// Якщо нічого не вийшло — повертає null.
-        /// </summary>
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
         private static DateTime? TryBuildDate(ScheduleExportContext context, DataColumn? dayCol, DataRowView rowView)
         {
             if (dayCol is null) return null;
@@ -880,19 +1068,19 @@ namespace WPFApp.Applications.Export
             var raw = rowView[dayCol.ColumnName];
             if (raw is null || raw == DBNull.Value) return null;
 
-            // Already typed DateTime
+            
             if (raw is DateTime dt) return dt.Date;
 
-            // Day-of-month as int
+            
             if (raw is int d && d >= 1 && d <= 31)
                 return SafeDate(context.ScheduleYear, context.ScheduleMonth, d);
 
-            // Day-of-month as string
+            
             var s = raw.ToString()?.Trim();
             if (int.TryParse(s, out var parsed) && parsed >= 1 && parsed <= 31)
                 return SafeDate(context.ScheduleYear, context.ScheduleMonth, parsed);
 
-            // Full date string parse (optional)
+            
             if (!string.IsNullOrWhiteSpace(s) &&
                 DateTime.TryParse(s, CultureInfo.CurrentCulture, DateTimeStyles.None, out var parsedDt))
                 return parsedDt.Date;
@@ -900,31 +1088,31 @@ namespace WPFApp.Applications.Export
             return null;
         }
 
-        /// <summary>
-        /// Safe-конструктор DateTime: повертає null, якщо рік/місяць/день невалідні.
-        /// </summary>
+        
+        
+        
         private static DateTime? SafeDate(int year, int month, int day)
         {
             try { return new DateTime(year, month, day); }
             catch { return null; }
         }
 
-        // ===================== EXCEL FILL: STATISTIC =====================
+        
 
-        /// <summary>
-        /// Заповнює лист статистики (Statistic) з контексту schedule.
-        ///
-        /// Важливо:
-        /// - Шаблон має вже готові стилі/merge/CF.
-        /// - Ми просто вставляємо значення у правильні клітинки.
-        ///
-        /// Фішка:
-        /// - Якщо SummaryRows більше ніж S_MaxSummaryRows (10),
-        ///   то вставляємо додаткові рядки і копіюємо формат з останнього "шаблонного" рядка.
-        /// </summary>
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
         private static void FillStatisticSheetFromTemplate(IXLWorksheet sheet, ScheduleExportContext context)
         {
-            // === Header fields (B2..B11) ===
+            
             sheet.Cell(2, S_ValueCol).Value = context.ScheduleName;
             sheet.Cell(3, S_ValueCol).Value = context.ScheduleMonth.ToString("D2", CultureInfo.InvariantCulture);
             sheet.Cell(4, S_ValueCol).Value = context.ScheduleYear.ToString(CultureInfo.InvariantCulture);
@@ -936,16 +1124,16 @@ namespace WPFApp.Applications.Export
             sheet.Cell(10, S_ValueCol).Value = context.Shift1;
             sheet.Cell(11, S_ValueCol).Value = context.Shift2;
 
-            // A12: список працівників у одному рядку (зручно для швидкого перегляду).
+            
             sheet.Cell(S_EmployeesLineRow, 1).Value =
                 $"Total employees ({context.TotalEmployees}): {context.TotalEmployeesListText}";
 
-            // === Day headers (Row 14) ===
-            // Кожен день = 3 колонки. Починаємо з E (5).
-            // Наприклад:
-            // Day1 header -> E14
-            // Day2 header -> H14
-            // Day3 header -> K14
+            
+            
+            
+            
+            
+            
             for (int i = 0; i < S_DaysCapacity; i++)
             {
                 var col = S_FirstDayCol + i * 3;
@@ -953,30 +1141,30 @@ namespace WPFApp.Applications.Export
                 sheet.Cell(S_DayHeaderRow, col).Value = text;
             }
 
-            // === Map Work/Free stats by employee name ===
-            // Групуємо по Employee (case-insensitive) і беремо перший запис.
-            // Це дозволяє швидко знайти WorkDays/FreeDays для кожного summaryRow.
+            
+            
+            
             var wfByEmployee = (context.EmployeeWorkFreeStats ?? Array.Empty<ContainerScheduleProfileViewModel.EmployeeWorkFreeStatRow>())
                 .Where(x => !string.IsNullOrWhiteSpace(x.Employee))
                 .GroupBy(x => x.Employee!, StringComparer.OrdinalIgnoreCase)
                 .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
 
-            // === SUMMARY: auto-expand rows if needed ===
-            // Якщо у нас більше працівників, ніж у шаблоні передбачено стилізованих рядків — додаємо рядки.
+            
+            
             var summaryNeeded = context.SummaryRows.Count;
             var summaryExtra = Math.Max(0, summaryNeeded - S_MaxSummaryRows);
 
-            // Остання колонка "summary area":
-            // S_FirstDayCol + (31-1)*3 + 2 (бо 3 колонки на день: +0 +1 +2)
+            
+            
             var summaryLastCol = S_FirstDayCol + (S_DaysCapacity - 1) * 3 + 2;
 
             if (summaryExtra > 0)
             {
-                // insertAfter — останній стилізований рядок (25)
+                
                 var insertAfter = S_BodyFirstRow + S_MaxSummaryRows - 1;
                 sheet.Row(insertAfter).InsertRowsBelow(summaryExtra);
 
-                // Копіюємо форматування з останнього стилізованого рядка на нові рядки.
+                
                 var templateRange = sheet.Range(insertAfter, 1, insertAfter, summaryLastCol);
                 var templateHeight = sheet.Row(insertAfter).Height;
 
@@ -987,17 +1175,17 @@ namespace WPFApp.Applications.Export
                 }
             }
 
-            // summaryTotalRows = максимум з (стилізованих рядків) та (реально потрібних).
-            // Це дозволяє:
-            // - якщо людей менше 10: почистити зайві рядки
-            // - якщо людей більше 10: заповнити всі додані рядки
+            
+            
+            
+            
             var summaryTotalRows = Math.Max(S_MaxSummaryRows, summaryNeeded);
 
             for (int r = 0; r < summaryTotalRows; r++)
             {
                 var row = S_BodyFirstRow + r;
 
-                // Якщо рядок "зайвий" (працівників менше), чистимо Contents, залишаючи стиль.
+                
                 if (r >= summaryNeeded)
                 {
                     sheet.Cell(row, S_EmployeeCol).Clear(XLClearOptions.Contents);
@@ -1015,14 +1203,14 @@ namespace WPFApp.Applications.Export
                     continue;
                 }
 
-                // Реальний рядок summary по працівнику.
+                
                 var summaryRow = context.SummaryRows[r];
                 var employeeName = summaryRow.Employee ?? string.Empty;
 
-                // A: Employee name
+                
                 sheet.Cell(row, S_EmployeeCol).Value = employeeName;
 
-                // B/C: WorkDays/FreeDays (беремо з wfByEmployee)
+                
                 if (wfByEmployee.TryGetValue(employeeName, out var wf))
                 {
                     sheet.Cell(row, S_WorkDaysCol).Value = wf.WorkDays.ToString(CultureInfo.InvariantCulture);
@@ -1030,15 +1218,15 @@ namespace WPFApp.Applications.Export
                 }
                 else
                 {
-                    // Якщо немає stats по працівнику — просто очищаємо (не ставимо 0, щоб не вводити в оману).
+                    
                     sheet.Cell(row, S_WorkDaysCol).Clear(XLClearOptions.Contents);
                     sheet.Cell(row, S_FreeDaysCol).Clear(XLClearOptions.Contents);
                 }
 
-                // D: Sum (наприклад "160h")
+                
                 sheet.Cell(row, S_SumCol).Value = summaryRow.Sum ?? string.Empty;
 
-                // Денні клітинки (From/To/Hours). Якщо даних менше 31 — решта буде пусто.
+                
                 var dayCells = summaryRow.Days?.ToList()
                               ?? new List<ContainerScheduleProfileViewModel.SummaryDayCell>();
 
@@ -1053,27 +1241,27 @@ namespace WPFApp.Applications.Export
                 }
             }
 
-            // Примітка: "нижню mini-таблицю" прибрано — коментар у коді означає,
-            // що раніше, ймовірно, було ще одне місце заповнення, але зараз воно видалене.
+            
+            
         }
 
-        /// <summary>
-        /// Заповнює лист "Container" на основі ContainerTemplate.xlsx.
-        ///
-        /// Алгоритм:
-        /// 1) Проходимо по всіх used cells і замінюємо плейсхолдери виду "{Name}", "{Total Hours}" тощо.
-        /// 2) Знаходимо headerRow таблиці по працівниках (рядок, де в колонці 1 "Employee" і в колонці 4 "Hours Sum").
-        /// 3) Знаходимо templateRow (перший рядок, де є "{Employee}") — з нього копіюється формат у додані рядки.
-        /// 4) Визначаємо shop-колонки (послідовність колонок із "{Shop}" у headerRow).
-        /// 5) Записуємо назви магазинів у заголовки.
-        /// 6) Заповнюємо рядки працівників і години по магазинах (HoursByShop).
-        /// 7) Накладаємо borders на всю таблицю.
-        /// 8) Додатково стилізуємо рядок TOTAL (жирний + top border).
-        /// </summary>
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
         private static void FillContainerTemplateSheetFromTemplate(IXLWorksheet sheet, ContainerExcelExportContext context)
         {
-            // 1) Replace placeholders everywhere.
-            // Map: ключ — шаблонний токен, значення — реальні дані.
+            
+            
             var map = new Dictionary<string, string>(StringComparer.Ordinal)
             {
                 ["{Id}"] = context.ContainerId.ToString(CultureInfo.InvariantCulture),
@@ -1088,8 +1276,8 @@ namespace WPFApp.Applications.Export
                 ["{Total Shops}"] = context.TotalShopsListText ?? string.Empty,
             };
 
-            // Замінюємо токени у всіх used cells.
-            // Оптимізація: пропускаємо рядки без '{' щоб не робити зайвих Replace.
+            
+            
             foreach (var cell in sheet.CellsUsed())
             {
                 var s = cell.GetString();
@@ -1102,8 +1290,8 @@ namespace WPFApp.Applications.Export
                 cell.Value = s;
             }
 
-            // 2) Locate table header row: "Employee" + "Hours Sum"
-            // Це "якір", щоб не залежати від конкретного номера рядка в шаблоні.
+            
+            
             var headerRow = sheet.RowsUsed()
                 .Select(r => r.RowNumber())
                 .FirstOrDefault(r =>
@@ -1112,16 +1300,16 @@ namespace WPFApp.Applications.Export
 
             if (headerRow <= 0) return;
 
-            // Data template row: перший рядок, де є "{Employee}".
-            // Якщо не знайшли — беремо headerRow + 1 як fallback.
+            
+            
             var templateRow = sheet.RowsUsed()
                 .Select(r => r.RowNumber())
                 .FirstOrDefault(r => sheet.Cell(r, 1).GetString().Contains("{Employee}", StringComparison.OrdinalIgnoreCase));
 
             if (templateRow <= 0) templateRow = headerRow + 1;
 
-            // 3) Find shop columns in header row (cells with "{Shop}")
-            // Шукаємо першу колонку, де у headerRow є "{Shop}".
+            
+            
             int firstShopCol = 0, lastShopCol = 0;
             var lastUsedCol = sheet.LastColumnUsed()?.ColumnNumber() ?? 50;
 
@@ -1135,7 +1323,7 @@ namespace WPFApp.Applications.Export
             }
             if (firstShopCol <= 0) return;
 
-            // lastShopCol — кінець contiguous блоку "{Shop}" колонок.
+            
             lastShopCol = firstShopCol;
             while (lastShopCol <= lastUsedCol &&
                    sheet.Cell(headerRow, lastShopCol).GetString().Contains("{Shop}", StringComparison.OrdinalIgnoreCase))
@@ -1145,22 +1333,22 @@ namespace WPFApp.Applications.Export
             var shopCapacity = lastShopCol - firstShopCol + 1;
             var shops = context.ShopHeaders?.ToList() ?? new List<ContainerProfileViewModel.ShopHeader>();
 
-            // Якщо магазинів більше, ніж колонок {Shop} у шаблоні — це конфігураційна помилка.
+            
             if (shops.Count > shopCapacity)
                 throw new InvalidOperationException($"ContainerTemplate supports max {shopCapacity} shops. Add more {{Shop}} columns to the template.");
 
-            // 4) Write shop headers
-            // Записуємо назви магазинів у заголовки; якщо магазинів менше capacity — решта порожня.
+            
+            
             for (int i = 0; i < shopCapacity; i++)
             {
                 sheet.Cell(headerRow, firstShopCol + i).Value = i < shops.Count ? shops[i].Name : string.Empty;
             }
 
-            // 5) Fill employee rows
+            
             var rows = context.EmployeeShopHoursRows?.ToList() ?? new List<ContainerProfileViewModel.EmployeeShopHoursRow>();
 
-            // Гарантуємо, що рядок TOTAL (якщо існує) буде внизу таблиці.
-            // Тут OrderBy повертає 0 для звичайних і 1 для TOTAL -> TOTAL опиниться останнім.
+            
+            
             if (rows.Count > 1)
             {
                 rows = rows
@@ -1168,15 +1356,15 @@ namespace WPFApp.Applications.Export
                     .ToList();
             }
 
-            // Якщо рядків немає — очищаємо templateRow і виходимо.
+            
             if (rows.Count == 0)
             {
                 sheet.Range(templateRow, 1, templateRow, lastShopCol).Clear(XLClearOptions.Contents);
                 return;
             }
 
-            // Якщо рядків більше 1 — вставляємо (rows.Count - 1) рядків під templateRow
-            // і копіюємо форматування з templateRow у всі нові рядки.
+            
+            
             if (rows.Count > 1)
             {
                 sheet.Row(templateRow).InsertRowsBelow(rows.Count - 1);
@@ -1186,85 +1374,85 @@ namespace WPFApp.Applications.Export
                     templateRange.CopyTo(sheet.Range(templateRow + i, 1, templateRow + i, lastShopCol));
             }
 
-            // Заповнюємо кожен рядок працівника.
+            
             for (int i = 0; i < rows.Count; i++)
             {
                 var r = templateRow + i;
                 var item = rows[i];
 
-                // A: Employee
+                
                 sheet.Cell(r, 1).Value = item.Employee ?? string.Empty;
 
-                // B/C: WorkDays / FreeDays
-                // Тут типи можуть бути int/string — залежить від ViewModel.
+                
+                
                 sheet.Cell(r, 2).Value = item.WorkDays;
                 sheet.Cell(r, 3).Value = item.FreeDays;
 
-                // D: Hours Sum (fallback "0")
+                
                 sheet.Cell(r, 4).Value = item.HoursSum ?? "0";
 
-                // Shops: години по кожному магазину.
+                
                 for (int s = 0; s < shopCapacity; s++)
                 {
                     if (s >= shops.Count)
                     {
-                        // Якщо магазинів менше ніж capacity, то залишаємо порожньо.
+                        
                         sheet.Cell(r, firstShopCol + s).Value = string.Empty;
                         continue;
                     }
 
                     var shopKey = shops[s].Key;
 
-                    // HoursByShop: Dictionary<shopKey, string>
+                    
                     item.HoursByShop.TryGetValue(shopKey, out var val);
 
-                    // Нормалізація: якщо пусто -> "0"
+                    
                     sheet.Cell(r, firstShopCol + s).Value = string.IsNullOrWhiteSpace(val) ? "0" : val;
                 }
             }
 
-            // 6) Apply "All Borders" for whole table (header + all data rows + shops columns)
+            
             var lastDataRow = templateRow + rows.Count - 1;
 
-            // endCol — остання "реальна" shop-колонка (не capacity, а фактично заповнена),
-            // але з fallback мінімум 1, щоб не зламати Range.
+            
+            
             var endCol = firstShopCol + Math.Max(shops.Count, 1) - 1;
             var tableRange = sheet.Range(headerRow, 1, lastDataRow, endCol);
 
-            // All borders: зовнішній + внутрішній.
+            
             tableRange.Style.Border.OutsideBorder = XLBorderStyleValues.Thin;
             tableRange.Style.Border.InsideBorder = XLBorderStyleValues.Thin;
 
-            // ✅ Re-apply TOTAL styling AFTER borders
-            // Важливо: якщо спочатку зробити border, а потім "TOTAL border top", воно буде видно.
-            // Якщо навпаки — може перезатертись.
+            
+            
+            
             var totalIndex = rows.FindIndex(x => string.Equals(x.Employee, "TOTAL", StringComparison.OrdinalIgnoreCase));
             if (totalIndex >= 0)
             {
                 var totalRow = templateRow + totalIndex;
 
-                // Жирний шрифт на всьому рядку TOTAL.
+                
                 sheet.Row(totalRow).Style.Font.Bold = true;
 
-                // Top-border (Medium) по всій ширині таблиці, щоб відділити TOTAL від інших.
+                
                 tableRange.Worksheet.Range(totalRow, 1, totalRow, tableRange.LastColumn().ColumnNumber())
-                    .Style.Border.TopBorder = XLBorderStyleValues.Medium; // можна змінити на Thin, якщо треба менш контрастно
+                    .Style.Border.TopBorder = XLBorderStyleValues.Medium; 
             }
         }
 
-        // ===================== SQL EXPORT =====================
+        
 
-        /// <summary>
-        /// Будує SQL-скрипт для контейнера (і його schedules).
-        ///
-        /// Стратегія:
-        /// - Пише BEGIN TRANSACTION; ... COMMIT;
-        /// - Робить INSERT OR IGNORE для ідемпотентності (повторний запуск не створює дублі)
-        /// - Збирає всі сутності зі всіх charts, дедуплікує їх по Id (shops, employees, availability*)
-        /// - Сортує перед вставкою (OrderBy(Id)), щоб результат був стабільний/детермінований
-        ///
-        /// Під БД тут очевидно мається на увазі SQLite (бо INSERT OR IGNORE).
-        /// </summary>
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
         private static string BuildContainerSqlScript(ContainerSqlExportContext context)
         {
             var sb = new StringBuilder(8192);
@@ -1275,13 +1463,13 @@ namespace WPFApp.Applications.Export
 
             var container = context.Container;
 
-            // container
+            
             sb.AppendLine(SqlInsert("container",
                 ("id", container.Id),
                 ("name", container.Name),
                 ("note", container.Note)));
 
-            // Підготовка колекцій для дедуплікації по ID.
+            
             var shops = new Dictionary<int, ShopModel>();
             var employees = new Dictionary<int, EmployeeModel>();
             var availabilityGroups = new Dictionary<int, AvailabilityGroupModel>();
@@ -1292,25 +1480,25 @@ namespace WPFApp.Applications.Export
             var slots = new List<ScheduleSlotModel>();
             var styles = new List<ScheduleCellStyleModel>();
 
-            // Збираємо дані з усіх schedules ("charts").
+            
             foreach (var chart in context.Charts)
             {
                 var scheduleCtx = chart.Schedule;
                 var schedule = scheduleCtx.Schedule;
                 schedules.Add(schedule);
 
-                // Shop
+                
                 if (schedule.Shop != null && !shops.ContainsKey(schedule.Shop.Id))
                     shops.Add(schedule.Shop.Id, schedule.Shop);
 
-                // Employees — збираємо з schedule_employee + availability members.
+                
                 foreach (var employee in CollectEmployees(scheduleCtx))
                 {
                     if (!employees.ContainsKey(employee.Id))
                         employees.Add(employee.Id, employee);
                 }
 
-                // Availability group (optional)
+                
                 if (scheduleCtx.AvailabilityGroupData is not null)
                 {
                     var grp = scheduleCtx.AvailabilityGroupData.Group;
@@ -1330,13 +1518,13 @@ namespace WPFApp.Applications.Export
                     }
                 }
 
-                // Додаємо schedule-specific таблиці як є (можуть повторюватися по різних schedules по Id? зазвичай ні).
+                
                 scheduleEmployees.AddRange(scheduleCtx.Employees ?? Array.Empty<ScheduleEmployeeModel>());
                 slots.AddRange(scheduleCtx.Slots ?? Array.Empty<ScheduleSlotModel>());
                 styles.AddRange(scheduleCtx.CellStyles ?? Array.Empty<ScheduleCellStyleModel>());
             }
 
-            // Вставляємо shops, employees, availability* — відсортовано, щоб скрипт був детермінований.
+            
             foreach (var shop in shops.Values.OrderBy(s => s.Id))
                 sb.AppendLine(SqlInsert("shop", ("id", shop.Id), ("name", shop.Name), ("address", shop.Address), ("description", shop.Description)));
 
@@ -1352,19 +1540,19 @@ namespace WPFApp.Applications.Export
             foreach (var day in availabilityDays.Values.OrderBy(d => d.Id))
                 sb.AppendLine(SqlInsert("availability_group_day", ("id", day.Id), ("availability_group_member_id", day.AvailabilityGroupMemberId), ("day_of_month", day.DayOfMonth), ("kind", day.Kind.ToString()), ("interval_str", day.IntervalStr)));
 
-            // schedules
+            
             foreach (var schedule in schedules.OrderBy(s => s.Id))
                 sb.AppendLine(SqlInsert("schedule", ("id", schedule.Id), ("container_id", schedule.ContainerId), ("shop_id", schedule.ShopId), ("name", schedule.Name), ("year", schedule.Year), ("month", schedule.Month), ("people_per_shift", schedule.PeoplePerShift), ("shift1_time", schedule.Shift1Time), ("shift2_time", schedule.Shift2Time), ("max_hours_per_emp_month", schedule.MaxHoursPerEmpMonth), ("max_consecutive_days", schedule.MaxConsecutiveDays), ("max_consecutive_full", schedule.MaxConsecutiveFull), ("max_full_per_month", schedule.MaxFullPerMonth), ("note", schedule.Note), ("availability_group_id", schedule.AvailabilityGroupId)));
 
-            // schedule_employee
+            
             foreach (var se in scheduleEmployees.OrderBy(e => e.Id))
                 sb.AppendLine(SqlInsert("schedule_employee", ("id", se.Id), ("schedule_id", se.ScheduleId), ("employee_id", se.EmployeeId), ("min_hours_month", se.MinHoursMonth)));
 
-            // schedule_slot
+            
             foreach (var slot in slots.OrderBy(s => s.Id))
                 sb.AppendLine(SqlInsert("schedule_slot", ("id", slot.Id), ("schedule_id", slot.ScheduleId), ("day_of_month", slot.DayOfMonth), ("slot_no", slot.SlotNo), ("employee_id", slot.EmployeeId), ("status", slot.Status.ToString()), ("from_time", slot.FromTime), ("to_time", slot.ToTime)));
 
-            // schedule_cell_style
+            
             foreach (var style in styles.OrderBy(s => s.Id))
                 sb.AppendLine(SqlInsert("schedule_cell_style", ("id", style.Id), ("schedule_id", style.ScheduleId), ("day_of_month", style.DayOfMonth), ("employee_id", style.EmployeeId), ("background_color_argb", style.BackgroundColorArgb), ("text_color_argb", style.TextColorArgb)));
 
@@ -1373,20 +1561,20 @@ namespace WPFApp.Applications.Export
             return sb.ToString();
         }
 
-        /// <summary>
-        /// Будує SQL-скрипт для ОДНОГО schedule.
-        /// Порядок вставок:
-        /// - container (якщо є)
-        /// - shop (якщо є)
-        /// - employee (зібрані)
-        /// - availability_group* (якщо є)
-        /// - schedule
-        /// - schedule_employee
-        /// - schedule_slot
-        /// - schedule_cell_style
-        ///
-        /// Використовується INSERT OR IGNORE, тому скрипт ідемпотентний.
-        /// </summary>
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
         private static string BuildSqlScript(ScheduleSqlExportContext context)
         {
             var schedule = context.Schedule;
@@ -1404,7 +1592,7 @@ namespace WPFApp.Applications.Export
             sb.AppendLine("BEGIN TRANSACTION;");
             sb.AppendLine();
 
-            // container (optional)
+            
             if (container != null)
             {
                 sb.AppendLine(SqlInsert("container",
@@ -1413,7 +1601,7 @@ namespace WPFApp.Applications.Export
                     ("note", container.Note)));
             }
 
-            // shop (optional)
+            
             if (shop != null)
             {
                 sb.AppendLine(SqlInsert("shop",
@@ -1423,7 +1611,7 @@ namespace WPFApp.Applications.Export
                     ("description", shop.Description)));
             }
 
-            // employees
+            
             foreach (var employee in employees.OrderBy(e => e.Id))
             {
                 sb.AppendLine(SqlInsert("employee",
@@ -1434,7 +1622,7 @@ namespace WPFApp.Applications.Export
                     ("email", employee.Email)));
             }
 
-            // availability group (optional)
+            
             if (context.AvailabilityGroupData is not null)
             {
                 var group = context.AvailabilityGroupData.Group;
@@ -1463,7 +1651,7 @@ namespace WPFApp.Applications.Export
                 }
             }
 
-            // schedule
+            
             sb.AppendLine(SqlInsert("schedule",
                 ("id", schedule.Id),
                 ("container_id", schedule.ContainerId),
@@ -1481,7 +1669,7 @@ namespace WPFApp.Applications.Export
                 ("note", schedule.Note),
                 ("availability_group_id", schedule.AvailabilityGroupId)));
 
-            // schedule_employee
+            
             foreach (var scheduleEmployee in scheduleEmployees.OrderBy(e => e.Id))
             {
                 sb.AppendLine(SqlInsert("schedule_employee",
@@ -1491,7 +1679,7 @@ namespace WPFApp.Applications.Export
                     ("min_hours_month", scheduleEmployee.MinHoursMonth)));
             }
 
-            // schedule_slot
+            
             foreach (var slot in slots.OrderBy(s => s.Id))
             {
                 sb.AppendLine(SqlInsert("schedule_slot",
@@ -1505,7 +1693,7 @@ namespace WPFApp.Applications.Export
                     ("to_time", slot.ToTime)));
             }
 
-            // schedule_cell_style
+            
             foreach (var style in cellStyles.OrderBy(s => s.Id))
             {
                 sb.AppendLine(SqlInsert("schedule_cell_style",
@@ -1522,15 +1710,15 @@ namespace WPFApp.Applications.Export
             return sb.ToString();
         }
 
-        /// <summary>
-        /// Збирає EmployeeModel зі ScheduleSqlExportContext.
-        ///
-        /// Джерела:
-        /// - schedule_employee.Employee
-        /// - availability_group_member.Employee (якщо availability є)
-        ///
-        /// Дедуплікація по Employee.Id.
-        /// </summary>
+        
+        
+        
+        
+        
+        
+        
+        
+        
         private static List<EmployeeModel> CollectEmployees(ScheduleSqlExportContext context)
         {
             var employees = new Dictionary<int, EmployeeModel>();
@@ -1555,15 +1743,15 @@ namespace WPFApp.Applications.Export
             return employees.Values.ToList();
         }
 
-        /// <summary>
-        /// Будує SQL INSERT OR IGNORE.
-        ///
-        /// INSERT OR IGNORE:
-        /// - Якщо запис з таким PK/UNIQUE уже існує — вставка ігнорується без помилки.
-        /// Це дає "ідемпотентність" скрипта.
-        ///
-        /// values: params масив пар (Column, Value).
-        /// </summary>
+        
+        
+        
+        
+        
+        
+        
+        
+        
         private static string SqlInsert(string table, params (string Column, object? Value)[] values)
         {
             var columns = string.Join(", ", values.Select(v => v.Column));
@@ -1572,21 +1760,21 @@ namespace WPFApp.Applications.Export
             return $"INSERT OR IGNORE INTO {table} ({columns}) VALUES ({vals});";
         }
 
-        /// <summary>
-        /// Перетворює .NET-значення у SQL literal (для вставки у текст скрипта).
-        ///
-        /// Правила:
-        /// - null -> NULL
-        /// - string -> '...' з екрануванням апострофів
-        /// - bool -> 1/0 (SQLite-стиль)
-        /// - DateTime -> 'yyyy-MM-dd HH:mm:ss'
-        /// - Enum -> 'EnumValue'
-        /// - IFormattable -> InvariantCulture (щоб не було коми/крапки залежно від локалі)
-        ///
-        /// IMPORTANT (практичний нюанс):
-        /// Це "ручне" формування SQL. Для великих систем краще параметризовані запити,
-        /// але тут мета — саме експорт скрипта у файл.
-        /// </summary>
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
         private static string ToSqlLiteral(object? value)
         {
             if (value is null) return "NULL";
@@ -1602,22 +1790,22 @@ namespace WPFApp.Applications.Export
             return $"'{EscapeSqlString(value.ToString() ?? string.Empty)}'";
         }
 
-        /// <summary>
-        /// Екранує апострофи для SQL string literal:
-        /// ' -> '' (подвійний апостроф)
-        /// </summary>
+        
+        
+        
+        
         private static string EscapeSqlString(string value) => value.Replace("'", "''");
 
-        // ===================== EXISTING HELPERS =====================
+        
 
-        /// <summary>
-        /// Safe helper для читання bool з DataRowView:
-        /// - перевіряє існування таблиці/колонки
-        /// - підтримує вже bool або рядок "true/false"
-        /// - null/DBNull -> false
-        ///
-        /// У цьому файлі наразі НЕ використовується, але залишений як helper.
-        /// </summary>
+        
+        
+        
+        
+        
+        
+        
+        
         private static bool GetBoolValue(DataRowView rowView, string columnName)
         {
             if (rowView?.Row?.Table == null) return false;

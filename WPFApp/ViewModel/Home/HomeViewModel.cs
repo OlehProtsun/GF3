@@ -1,3 +1,8 @@
+/*
+  Опис файлу: цей модуль містить реалізацію компонента HomeViewModel у шарі WPFApp.
+  Призначення: інкапсулювати поведінку UI або прикладної логіки без зміни доменної моделі.
+  Примітка: коментарі описують спостережуваний потік даних, очікувані обмеження та точки взаємодії.
+*/
 using BusinessLogicLayer.Services.Abstractions;
 using BusinessLogicLayer.Contracts.Models;
 using System;
@@ -17,18 +22,21 @@ using WPFApp.MVVM.Commands;
 using WPFApp.MVVM.Core;
 using WPFApp.UI.Helpers;
 using WPFApp.View.Dialogs;
-using WPFApp.ViewModel.Container.Edit.Helpers; // UIStatusKind
+using WPFApp.ViewModel.Container.Edit.Helpers; 
 using WPFApp.ViewModel.Container.ScheduleEdit.Helpers;
 
 
 namespace WPFApp.ViewModel.Home
 {
+    
+    
+    
+    
+    
+    
+    
     /// <summary>
-    /// HomeViewModel follows the same shell/module patterns used in the app:
-    /// - async loading through AsyncRelayCommand + cancellation tokens
-    /// - ObservableCollections for DataGrid sections
-    /// - UI-friendly status/error properties (without blocking the UI thread)
-    /// - periodic current-time updates via DispatcherTimer
+    /// Визначає публічний елемент `public sealed class HomeViewModel : ViewModelBase` та контракт його використання у шарі WPFApp.
     /// </summary>
     public sealed class HomeViewModel : ViewModelBase
     {
@@ -49,6 +57,9 @@ namespace WPFApp.ViewModel.Home
         private int _todayAssignmentsCount;
         private int _activeShopsCount;
 
+        /// <summary>
+        /// Визначає публічний елемент `public HomeViewModel(` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public HomeViewModel(
             IScheduleService scheduleService,
             IContainerService containerService,
@@ -78,10 +89,19 @@ namespace WPFApp.ViewModel.Home
             _ = EnsureInitializedAsync();
         }
 
+        /// <summary>
+        /// Визначає публічний елемент `public ObservableCollection<WhoWorksTodayRowViewModel> WhoWorksTodayItems { get; }` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public ObservableCollection<WhoWorksTodayRowViewModel> WhoWorksTodayItems { get; }
 
+        /// <summary>
+        /// Визначає публічний елемент `public ObservableCollection<HomeScheduleCardViewModel> ActiveSchedules { get; }` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public ObservableCollection<HomeScheduleCardViewModel> ActiveSchedules { get; }
 
+        /// <summary>
+        /// Визначає публічний елемент `public AsyncRelayCommand RefreshCommand { get; }` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public AsyncRelayCommand RefreshCommand { get; }
 
         private string _currentMonthContainerName = "-";
@@ -97,72 +117,108 @@ namespace WPFApp.ViewModel.Home
         private int _overallTotalContainers;
         private int _overallTotalShops;
 
+        /// <summary>
+        /// Визначає публічний елемент `public string CurrentMonthContainerName` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public string CurrentMonthContainerName
         {
             get => _currentMonthContainerName;
             private set => SetProperty(ref _currentMonthContainerName, value);
         }
 
+        /// <summary>
+        /// Визначає публічний елемент `public string CurrentMonthLabel` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public string CurrentMonthLabel
         {
             get => _currentMonthLabel;
             private set => SetProperty(ref _currentMonthLabel, value);
         }
 
+        /// <summary>
+        /// Визначає публічний елемент `public ObservableCollection<string> CurrentMonthScheduleNames` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public ObservableCollection<string> CurrentMonthScheduleNames
         {
             get => _currentMonthScheduleNames;
             private set => SetProperty(ref _currentMonthScheduleNames, value);
         }
 
+        /// <summary>
+        /// Визначає публічний елемент `public int CurrentMonthTotalEmployees` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public int CurrentMonthTotalEmployees
         {
             get => _currentMonthTotalEmployees;
             private set => SetProperty(ref _currentMonthTotalEmployees, value);
         }
 
+        /// <summary>
+        /// Визначає публічний елемент `public int CurrentMonthTotalSchedules` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public int CurrentMonthTotalSchedules
         {
             get => _currentMonthTotalSchedules;
             private set => SetProperty(ref _currentMonthTotalSchedules, value);
         }
 
+        /// <summary>
+        /// Визначає публічний елемент `public double CurrentMonthTotalHours` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public double CurrentMonthTotalHours
         {
             get => _currentMonthTotalHours;
             private set => SetProperty(ref _currentMonthTotalHours, value);
         }
 
+        /// <summary>
+        /// Визначає публічний елемент `public int CurrentMonthTotalShops` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public int CurrentMonthTotalShops
         {
             get => _currentMonthTotalShops;
             private set => SetProperty(ref _currentMonthTotalShops, value);
         }
 
+        /// <summary>
+        /// Визначає публічний елемент `public int OverallTotalEmployees` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public int OverallTotalEmployees
         {
             get => _overallTotalEmployees;
             private set => SetProperty(ref _overallTotalEmployees, value);
         }
 
+        /// <summary>
+        /// Визначає публічний елемент `public int OverallTotalContainers` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public int OverallTotalContainers
         {
             get => _overallTotalContainers;
             private set => SetProperty(ref _overallTotalContainers, value);
         }
 
+        /// <summary>
+        /// Визначає публічний елемент `public int OverallTotalShops` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public int OverallTotalShops
         {
             get => _overallTotalShops;
             private set => SetProperty(ref _overallTotalShops, value);
         }
 
+        /// <summary>
+        /// Визначає публічний елемент `public string CurrentTimeText` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public string CurrentTimeText
         {
             get => _currentTimeText;
             private set => SetProperty(ref _currentTimeText, value);
         }
 
+        /// <summary>
+        /// Визначає публічний елемент `public string StatusText` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public string StatusText
         {
             get => _statusText;
@@ -170,6 +226,9 @@ namespace WPFApp.ViewModel.Home
         }
 
         private ObservableCollection<string> _currentMonthShopNames = new();
+        /// <summary>
+        /// Визначає публічний елемент `public ObservableCollection<string> CurrentMonthShopNames` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public ObservableCollection<string> CurrentMonthShopNames
         {
             get => _currentMonthShopNames;
@@ -177,12 +236,18 @@ namespace WPFApp.ViewModel.Home
         }
 
         private ObservableCollection<string> _currentMonthEmployeeNames = new();
+        /// <summary>
+        /// Визначає публічний елемент `public ObservableCollection<string> CurrentMonthEmployeeNames` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public ObservableCollection<string> CurrentMonthEmployeeNames
         {
             get => _currentMonthEmployeeNames;
             private set => SetProperty(ref _currentMonthEmployeeNames, value);
         }
 
+        /// <summary>
+        /// Визначає публічний елемент `public bool IsLoading` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public bool IsLoading
         {
             get => _isLoading;
@@ -193,30 +258,45 @@ namespace WPFApp.ViewModel.Home
             }
         }
 
+        /// <summary>
+        /// Визначає публічний елемент `public int MonthSchedulesCount` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public int MonthSchedulesCount
         {
             get => _monthSchedulesCount;
             private set => SetProperty(ref _monthSchedulesCount, value);
         }
 
+        /// <summary>
+        /// Визначає публічний елемент `public int TotalContainersCount` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public int TotalContainersCount
         {
             get => _totalContainersCount;
             private set => SetProperty(ref _totalContainersCount, value);
         }
 
+        /// <summary>
+        /// Визначає публічний елемент `public int TodayAssignmentsCount` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public int TodayAssignmentsCount
         {
             get => _todayAssignmentsCount;
             private set => SetProperty(ref _todayAssignmentsCount, value);
         }
 
+        /// <summary>
+        /// Визначає публічний елемент `public int ActiveShopsCount` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public int ActiveShopsCount
         {
             get => _activeShopsCount;
             private set => SetProperty(ref _activeShopsCount, value);
         }
 
+        /// <summary>
+        /// Визначає публічний елемент `public Task EnsureInitializedAsync(CancellationToken ct = default)` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public Task EnsureInitializedAsync(CancellationToken ct = default)
         {
             if (_initialized)
@@ -238,8 +318,11 @@ namespace WPFApp.ViewModel.Home
             }
         }
 
-        // ---- Overlay (Working / Success) for manual refresh
+        
         private bool _isNavStatusVisible;
+        /// <summary>
+        /// Визначає публічний елемент `public bool IsNavStatusVisible` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public bool IsNavStatusVisible
         {
             get => _isNavStatusVisible;
@@ -247,6 +330,9 @@ namespace WPFApp.ViewModel.Home
         }
 
         private UIStatusKind _navStatus = UIStatusKind.Success;
+        /// <summary>
+        /// Визначає публічний елемент `public UIStatusKind NavStatus` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public UIStatusKind NavStatus
         {
             get => _navStatus;
@@ -317,7 +403,7 @@ namespace WPFApp.ViewModel.Home
             _lastLoadSuccessful = false;
 
 
-            // Helper: parse "08:00", "8:00", "08:00:00" (and tolerant formats)
+            
             static bool TryParseTime(string? value, out TimeSpan ts)
             {
                 ts = default;
@@ -383,7 +469,7 @@ namespace WPFApp.ViewModel.Home
                         return parsed;
 
                     try { return Convert.ToInt32(v); }
-                    catch { /* ignore */ }
+                    catch {  }
                 }
                 return 0;
             }
@@ -435,7 +521,7 @@ namespace WPFApp.ViewModel.Home
                 return null;
             }
 
-            // Extract employees snapshot (prefer detailed.Employees if exists; otherwise derive from slots)
+            
             static List<ScheduleEmployeeModel> ExtractEmployeesSnapshot(object detailed, List<ScheduleSlotModel> slotsSnapshot)
             {
                 var empObj = GetObjProp(detailed, "Employees", "ScheduleEmployees", "Staff");
@@ -448,7 +534,7 @@ namespace WPFApp.ViewModel.Home
                         .ToList();
                 }
 
-                // fallback: derive from slots
+                
                 var derived = slotsSnapshot
                     .Where(s => s.EmployeeId.HasValue && s.EmployeeId.Value > 0)
                     .GroupBy(s => s.EmployeeId!.Value)
@@ -466,7 +552,7 @@ namespace WPFApp.ViewModel.Home
                 return derived;
             }
 
-            // Extract cell styles snapshot (if service returns them in detailed)
+            
             static List<ScheduleCellStyleModel> ExtractStylesSnapshot(object detailed)
             {
                 var stObj = GetObjProp(detailed, "CellStyles", "ScheduleCellStyles", "Styles");
@@ -480,7 +566,7 @@ namespace WPFApp.ViewModel.Home
             {
                 var now = DateTime.Now;
 
-                // Load base lists
+                
                 var schedules = await _scheduleService.GetAllAsync(ct).ConfigureAwait(false);
 
                 var monthSchedules = schedules
@@ -494,7 +580,7 @@ namespace WPFApp.ViewModel.Home
                 var todayRows = new List<WhoWorksTodayRowViewModel>();
                 var scheduleCards = new List<HomeScheduleCardViewModel>();
 
-                // ---- Information aggregates (This month)
+                
                 var monthEmployeeIds = new HashSet<int>();
                 var monthEmployeeNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
                 var monthShopIds = new HashSet<int>();
@@ -517,20 +603,20 @@ namespace WPFApp.ViewModel.Home
                     var employeesSnapshot = ExtractEmployeesSnapshot(detailed, slotsSnapshot);
                     var stylesSnapshot = ExtractStylesSnapshot(detailed);
 
-                    // Schedule name list
+                    
                     if (!string.IsNullOrWhiteSpace(detailed.Name))
                         monthScheduleNames.Add(detailed.Name);
 
-                    // ShopId
+                    
                     if (detailed.ShopId > 0)
                         monthShopIds.Add(detailed.ShopId);
 
-                    // Shop name list
+                    
                     var shopName = detailed.Shop?.Name;
                     if (!string.IsNullOrWhiteSpace(shopName))
                         monthShopNames.Add(shopName);
 
-                    // ---- Who works today
+                    
                     if (year == now.Year && month == now.Month)
                     {
                         var todaySlots = slotsSnapshot
@@ -556,7 +642,7 @@ namespace WPFApp.ViewModel.Home
                         }
                     }
 
-                    // ---- Month totals (employees + hours)
+                    
                     foreach (var slot in slotsSnapshot.Where(s => s.EmployeeId.HasValue))
                     {
                         monthEmployeeIds.Add(slot.EmployeeId!.Value);
@@ -580,7 +666,7 @@ namespace WPFApp.ViewModel.Home
                         }
                     }
 
-                    // ---- Active schedule card matrix (IDENTICAL data shape to ContainerScheduleProfile)
+                    
                     var table = ScheduleMatrixEngine.BuildScheduleTable(
                         year,
                         month,
@@ -589,7 +675,7 @@ namespace WPFApp.ViewModel.Home
                         out var colMap,
                         ct);
 
-                    // recompute conflicts WITH staffing (same as ContainerScheduleProfileViewModel)
+                    
                     var peoplePerShift = ReadInt(detailed, "PeoplePerShift", "MinPeoplePerShift", "StaffPerShift");
                     var shift1Time = ReadString(detailed, "Shift1Time", "Shift1");
                     var shift2Time = ReadString(detailed, "Shift2Time", "Shift2");
@@ -607,7 +693,7 @@ namespace WPFApp.ViewModel.Home
                         table.Rows[day - 1][ScheduleMatrixConstants.ConflictColumnName] = conflict;
                     }
 
-                    // totals for header tooltips / second-line headers (optional but consistent)
+                    
                     var totals = ScheduleTotalsCalculator.Calculate(employeesSnapshot, slotsSnapshot);
 
                     var perEmpText = new Dictionary<int, string>(capacity: Math.Max(8, totals.TotalEmployees));
@@ -634,7 +720,7 @@ namespace WPFApp.ViewModel.Home
                     scheduleCards.Add(card);
                 }
 
-                // Deduplicate today
+                
                 var dedupedToday = todayRows
                     .GroupBy(r => new { r.Date, r.Employee, r.Shift, r.Shop })
                     .Select(g => g.First())
@@ -643,7 +729,7 @@ namespace WPFApp.ViewModel.Home
                     .ThenBy(r => r.Employee)
                     .ToList();
 
-                // ---- Container name for current month
+                
                 string currentContainerName = "-";
 
                 var monthContainerId = monthSchedules
@@ -690,7 +776,7 @@ namespace WPFApp.ViewModel.Home
                         currentContainerName = name!;
                 }
 
-                // Overall
+                
                 var overallTotalContainers = containers.Count;
 
                 var overallTotalShops = schedules
@@ -703,12 +789,12 @@ namespace WPFApp.ViewModel.Home
                     ? monthEmployeeIds.Count
                     : monthEmployeeNames.Count;
 
-                // Lists for UI
+                
                 var monthScheduleList = monthScheduleNames.Where(x => !string.IsNullOrWhiteSpace(x)).OrderBy(x => x).ToList();
                 var monthShopList = monthShopNames.Where(x => !string.IsNullOrWhiteSpace(x)).OrderBy(x => x).ToList();
                 var monthEmployeeList = monthEmployeeNames.Where(x => !string.IsNullOrWhiteSpace(x)).OrderBy(x => x).ToList();
 
-                // ---- Apply to UI
+                
                 UI(() =>
                 {
                     WhoWorksTodayItems.Clear();
@@ -724,7 +810,7 @@ namespace WPFApp.ViewModel.Home
                     TodayAssignmentsCount = dedupedToday.Count;
                     ActiveShopsCount = monthSchedules.Select(s => s.ShopId).Where(id => id > 0).Distinct().Count();
 
-                    // Information - This month
+                    
                     CurrentMonthContainerName = currentContainerName;
                     CurrentMonthLabel = now.ToString("MM.yyyy", CultureInfo.InvariantCulture);
 
@@ -737,7 +823,7 @@ namespace WPFApp.ViewModel.Home
                     CurrentMonthTotalHours = Math.Round(monthTotalHours, 1);
                     CurrentMonthTotalShops = monthShopIds.Count;
 
-                    // Information - Overall
+                    
                     OverallTotalEmployees = overallTotalEmployees;
                     OverallTotalContainers = overallTotalContainers;
                     OverallTotalShops = overallTotalShops;
@@ -784,8 +870,8 @@ namespace WPFApp.ViewModel.Home
             {
                 await LoadDataAsync(uiToken);
 
-                // Якщо LoadDataAsync зловив exception всередині (він не кидає назовні),
-                // то не показуємо Success при fail.
+                
+                
                 if (_lastLoadSuccessful)
                 {
                     await Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
@@ -808,19 +894,40 @@ namespace WPFApp.ViewModel.Home
 
     }
 
+    /// <summary>
+    /// Визначає публічний елемент `public sealed class WhoWorksTodayRowViewModel` та контракт його використання у шарі WPFApp.
+    /// </summary>
     public sealed class WhoWorksTodayRowViewModel
     {
+        /// <summary>
+        /// Визначає публічний елемент `public DateTime Date { get; init; }` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public DateTime Date { get; init; }
+        /// <summary>
+        /// Визначає публічний елемент `public string Employee { get; init; } = string.Empty;` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public string Employee { get; init; } = string.Empty;
+        /// <summary>
+        /// Визначає публічний елемент `public string Shift { get; init; } = string.Empty;` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public string Shift { get; init; } = string.Empty;
+        /// <summary>
+        /// Визначає публічний елемент `public string Shop { get; init; } = string.Empty;` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public string Shop { get; init; } = string.Empty;
     }
 
+    
+    
+    
     /// <summary>
-    /// Card VM for Active Schedules (DataGrid matrix) + style provider (cell colors like Schedule Profile).
+    /// Визначає публічний елемент `public sealed class HomeScheduleCardViewModel : ViewModelBase, IScheduleMatrixStyleProvider` та контракт його використання у шарі WPFApp.
     /// </summary>
     public sealed class HomeScheduleCardViewModel : ViewModelBase, IScheduleMatrixStyleProvider
     {
+        /// <summary>
+        /// Визначає публічний елемент `public HomeScheduleCardViewModel(string title, string shopName, string monthLabel)` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public HomeScheduleCardViewModel(string title, string shopName, string monthLabel)
         {
             Title = title ?? "-";
@@ -828,12 +935,24 @@ namespace WPFApp.ViewModel.Home
             MonthLabel = monthLabel ?? "-";
         }
 
+        /// <summary>
+        /// Визначає публічний елемент `public string Title { get; }` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public string Title { get; }
+        /// <summary>
+        /// Визначає публічний елемент `public string ShopName { get; }` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public string ShopName { get; }
+        /// <summary>
+        /// Визначає публічний елемент `public string MonthLabel { get; }` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public string MonthLabel { get; }
 
-        // optional (if you later want header “Total hours: ...”)
+        
         private string _totalHoursText = "0h 0m";
+        /// <summary>
+        /// Визначає публічний елемент `public string TotalHoursText` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public string TotalHoursText
         {
             get => _totalHoursText;
@@ -841,6 +960,9 @@ namespace WPFApp.ViewModel.Home
         }
 
         private DataView _scheduleMatrix = new DataView();
+        /// <summary>
+        /// Визначає публічний елемент `public DataView ScheduleMatrix` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public DataView ScheduleMatrix
         {
             get => _scheduleMatrix;
@@ -848,6 +970,9 @@ namespace WPFApp.ViewModel.Home
         }
 
         private int _cellStyleRevision;
+        /// <summary>
+        /// Визначає публічний елемент `public int CellStyleRevision` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public int CellStyleRevision
         {
             get => _cellStyleRevision;
@@ -859,6 +984,9 @@ namespace WPFApp.ViewModel.Home
         private readonly Dictionary<int, Brush> _brushCache = new();
         private readonly Dictionary<int, string> _employeeTotalHoursText = new();
 
+        /// <summary>
+        /// Визначає публічний елемент `public void ApplyBuild(` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public void ApplyBuild(
             DataView view,
             Dictionary<string, int> colMap,
@@ -886,10 +1014,13 @@ namespace WPFApp.ViewModel.Home
 
             TotalHoursText = string.IsNullOrWhiteSpace(totalHoursText) ? "0h 0m" : totalHoursText;
 
-            // trigger WPF to re-evaluate styles
+            
             CellStyleRevision++;
         }
 
+        /// <summary>
+        /// Визначає публічний елемент `public string GetEmployeeTotalHoursText(string columnName)` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public string GetEmployeeTotalHoursText(string columnName)
         {
             if (string.IsNullOrWhiteSpace(columnName))
@@ -910,6 +1041,9 @@ namespace WPFApp.ViewModel.Home
                 || columnName == ScheduleMatrixConstants.WeekendColumnName;
         }
 
+        /// <summary>
+        /// Визначає публічний елемент `public bool TryBuildCellReference(object? rowData, string? columnName, out ScheduleMatrixCellRef cellRef)` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public bool TryBuildCellReference(object? rowData, string? columnName, out ScheduleMatrixCellRef cellRef)
         {
             cellRef = default;
@@ -941,6 +1075,9 @@ namespace WPFApp.ViewModel.Home
             return true;
         }
 
+        /// <summary>
+        /// Визначає публічний елемент `public Brush? GetCellBackgroundBrush(ScheduleMatrixCellRef cellRef)` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public Brush? GetCellBackgroundBrush(ScheduleMatrixCellRef cellRef)
         {
             if (!TryGetCellStyle(cellRef, out var style))
@@ -952,6 +1089,9 @@ namespace WPFApp.ViewModel.Home
             return ToBrushCached(argb);
         }
 
+        /// <summary>
+        /// Визначає публічний елемент `public Brush? GetCellForegroundBrush(ScheduleMatrixCellRef cellRef)` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public Brush? GetCellForegroundBrush(ScheduleMatrixCellRef cellRef)
         {
             if (!TryGetCellStyle(cellRef, out var style))
@@ -963,6 +1103,9 @@ namespace WPFApp.ViewModel.Home
             return ToBrushCached(argb);
         }
 
+        /// <summary>
+        /// Визначає публічний елемент `public bool TryGetCellStyle(ScheduleMatrixCellRef cellRef, out ScheduleCellStyleModel style)` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public bool TryGetCellStyle(ScheduleMatrixCellRef cellRef, out ScheduleCellStyleModel style)
             => _cellStyleStore.TryGetStyle(cellRef, out style);
 
@@ -981,10 +1124,22 @@ namespace WPFApp.ViewModel.Home
         }
     }
 
+    /// <summary>
+    /// Визначає публічний елемент `public sealed class HomeScheduleEntryViewModel` та контракт його використання у шарі WPFApp.
+    /// </summary>
     public sealed class HomeScheduleEntryViewModel
     {
+        /// <summary>
+        /// Визначає публічний елемент `public int Day { get; init; }` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public int Day { get; init; }
+        /// <summary>
+        /// Визначає публічний елемент `public string Employee { get; init; } = string.Empty;` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public string Employee { get; init; } = string.Empty;
+        /// <summary>
+        /// Визначає публічний елемент `public string Shift { get; init; } = string.Empty;` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public string Shift { get; init; } = string.Empty;
     }
 }

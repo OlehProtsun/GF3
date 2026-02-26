@@ -1,3 +1,8 @@
+/*
+  Опис файлу: цей модуль містить реалізацію компонента HomeView у шарі WPFApp.
+  Призначення: інкапсулювати поведінку UI або прикладної логіки без зміни доменної моделі.
+  Примітка: коментарі описують спостережуваний потік даних, очікувані обмеження та точки взаємодії.
+*/
 using System;
 using System.Data;
 using System.Linq;
@@ -9,14 +14,20 @@ using WPFApp.ViewModel.Home;
 
 namespace WPFApp.View.Home
 {
+    /// <summary>
+    /// Визначає публічний елемент `public partial class HomeView : UserControl` та контракт його використання у шарі WPFApp.
+    /// </summary>
     public partial class HomeView : UserControl
     {
+        /// <summary>
+        /// Визначає публічний елемент `public HomeView()` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public HomeView()
         {
             InitializeComponent();
         }
 
-        // Same perf tuning as in ContainerScheduleProfileView
+        
         private static void ConfigureGridPerformance(DataGrid grid)
         {
             grid.EnableRowVirtualization = true;
@@ -33,7 +44,7 @@ namespace WPFApp.View.Home
             VirtualizingPanel.SetCacheLength(grid, new VirtualizationCacheLength(1));
         }
 
-        // Rebuild columns (schema-driven) like ContainerScheduleProfileView
+        
         private void ActiveScheduleMatrixGrid_Loaded(object sender, RoutedEventArgs e)
         {
             if (sender is not DataGrid grid)
@@ -41,7 +52,7 @@ namespace WPFApp.View.Home
 
             ConfigureGridPerformance(grid);
 
-            // Rebuild on load + on DC changes (important when Refresh replaces items)
+            
             grid.DataContextChanged -= Grid_DataContextChanged;
             grid.DataContextChanged += Grid_DataContextChanged;
 
@@ -69,10 +80,10 @@ namespace WPFApp.View.Home
 
             grid.Columns.Clear();
 
-            // Build columns EXACTLY like profile (same helper)
+            
             ScheduleMatrixColumnBuilder.BuildScheduleMatrixColumns(table, grid, isReadOnly: true);
 
-            // Fix headers: use DataColumn.Caption (employee display name)
+            
             foreach (var col in grid.Columns)
             {
                 if (col.SortMemberPath == null) continue;

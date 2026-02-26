@@ -1,4 +1,9 @@
-﻿using System.Collections.ObjectModel;
+/*
+  Опис файлу: цей модуль містить реалізацію компонента ColorPickerDialog у шарі WPFApp.
+  Призначення: інкапсулювати поведінку UI або прикладної логіки без зміни доменної моделі.
+  Примітка: коментарі описують спостережуваний потік даних, очікувані обмеження та точки взаємодії.
+*/
+using System.Collections.ObjectModel;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -7,14 +12,26 @@ using WPFApp.UI.Helpers;
 
 namespace WPFApp.View.Dialogs
 {
+    /// <summary>
+    /// Визначає публічний елемент `public partial class ColorPickerDialog : Window` та контракт його використання у шарі WPFApp.
+    /// </summary>
     public partial class ColorPickerDialog : Window
     {
         private bool _allowClose;
 
+        /// <summary>
+        /// Визначає публічний елемент `public ObservableCollection<ColorSwatch> Swatches { get; } = new();` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public ObservableCollection<ColorSwatch> Swatches { get; } = new();
 
+        /// <summary>
+        /// Визначає публічний елемент `public Color SelectedColor { get; private set; }` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public Color SelectedColor { get; private set; }
 
+        /// <summary>
+        /// Визначає публічний елемент `public ColorPickerDialog(Color? initialColor = null)` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public ColorPickerDialog(Color? initialColor = null)
         {
             InitializeComponent();
@@ -84,14 +101,14 @@ namespace WPFApp.View.Dialogs
 
         private void Window_Closing(object? sender, System.ComponentModel.CancelEventArgs e)
         {
-            // Забороняємо Alt+F4 / системне закриття
+            
             if (!_allowClose)
                 e.Cancel = true;
         }
 
         private void Window_PreviewKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
         {
-            // Escape = Cancel
+            
             if (e.Key == System.Windows.Input.Key.Escape)
             {
                 _allowClose = true;
@@ -110,8 +127,14 @@ namespace WPFApp.View.Dialogs
 
     }
 
+    /// <summary>
+    /// Визначає публічний елемент `public sealed class ColorSwatch` та контракт його використання у шарі WPFApp.
+    /// </summary>
     public sealed class ColorSwatch
     {
+        /// <summary>
+        /// Визначає публічний елемент `public ColorSwatch(Color color)` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public ColorSwatch(Color color)
         {
             Color = color;
@@ -120,8 +143,17 @@ namespace WPFApp.View.Dialogs
             Hex = ColorHelpers.ToHex(color);
         }
 
+        /// <summary>
+        /// Визначає публічний елемент `public Color Color { get; }` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public Color Color { get; }
+        /// <summary>
+        /// Визначає публічний елемент `public SolidColorBrush Brush { get; }` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public SolidColorBrush Brush { get; }
+        /// <summary>
+        /// Визначає публічний елемент `public string Hex { get; }` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public string Hex { get; }
     }
 }
