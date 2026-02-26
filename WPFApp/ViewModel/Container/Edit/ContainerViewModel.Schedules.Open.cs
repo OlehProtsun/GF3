@@ -1,4 +1,9 @@
-﻿using System;
+/*
+  Опис файлу: цей модуль містить реалізацію компонента ContainerViewModel.Schedules.Open у шарі WPFApp.
+  Призначення: інкапсулювати поведінку UI або прикладної логіки без зміни доменної моделі.
+  Примітка: коментарі описують спостережуваний потік даних, очікувані обмеження та точки взаємодії.
+*/
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -11,25 +16,28 @@ using WPFApp.ViewModel.Shared;
 
 namespace WPFApp.ViewModel.Container.Edit
 {
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
     /// <summary>
-    /// ContainerViewModel.Schedules.Open — частина (partial) ContainerViewModel,
-    /// яка відповідає ТІЛЬКИ за “відкриття/перехід” у сценаріях schedule:
-    ///
-    /// 1) Пошук schedule для контейнера (SearchScheduleAsync)
-    /// 2) Старт створення нового schedule (StartScheduleAddAsync)
-    /// 3) Відкриття редагування одного schedule (EditSelectedScheduleAsync)
-    /// 4) Мультивідкриття (MultiOpenSchedulesAsync) — кілька schedule у табах
-    /// 5) Відкриття профілю schedule (OpenScheduleProfileAsync)
-    /// 6) Видалення schedule (DeleteSelectedScheduleAsync)
-    ///
-    /// Тут немає генерації і немає save — це буде окремий файл.
+    /// Визначає публічний елемент `public sealed partial class ContainerViewModel` та контракт його використання у шарі WPFApp.
     /// </summary>
     public sealed partial class ContainerViewModel
     {
-        /// <summary>
-        /// Завантажити schedules для поточного контейнера з фільтром (якщо є).
-        /// Викликається з Profile екрану (кнопка Search).
-        /// </summary>
+        
+        
+        
+        
         internal async Task SearchScheduleAsync(CancellationToken ct = default)
         {
             var containerId = GetCurrentContainerId();
@@ -42,17 +50,17 @@ namespace WPFApp.ViewModel.Container.Edit
             await LoadSchedulesAsync(containerId, ProfileVm.ScheduleListVm.SearchText, ct);
         }
 
-        /// <summary>
-        /// Старт створення нового schedule:
-        /// 1) перевіряємо containerId
-        /// 2) вантажимо lookups (shops/groups/employees)
-        /// 3) скидаємо фільтри
-        /// 4) готуємо ScheduleEditVm під Add режим
-        /// 5) створюємо 1 дефолтний блок і робимо його SelectedBlock
-        /// 6) refresh матриці
-        /// 7) очищаємо preview
-        /// 8) переходимо в ScheduleEdit
-        /// </summary>
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
         internal Task StartScheduleAddAsync(CancellationToken ct = default)
         {
             var containerId = GetCurrentContainerId();
@@ -98,9 +106,9 @@ namespace WPFApp.ViewModel.Container.Edit
         }
 
 
-        /// <summary>
-        /// Prepares shared ScheduleEdit state before open/add flows (cancel background work, load lookups, reset filters/errors).
-        /// </summary>
+        
+        
+        
         private async Task PrepareScheduleEditContextAsync(CancellationToken uiToken)
         {
             ScheduleEditVm.CancelBackgroundWork();
@@ -111,17 +119,17 @@ namespace WPFApp.ViewModel.Container.Edit
             ScheduleEditVm.ClearValidationErrors();
         }
 
-        /// <summary>
-        /// Відкрити редагування одного schedule (SelectedItem у ProfileVm.ScheduleListVm).
-        ///
-        /// Логіка:
-        /// 1) вантажимо lookups
-        /// 2) тягнемо detailed schedule (employees/slots/styles)
-        /// 3) перевіряємо що schedule має згенеровані дані (інакше редагувати нема що)
-        /// 4) будуємо block і кладемо в ScheduleEditVm
-        /// 5) refresh матриці + preview
-        /// 6) переходимо в ScheduleEdit
-        /// </summary>
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
         internal Task EditSelectedScheduleAsync(CancellationToken ct = default)
         {
             var schedule = ProfileVm.ScheduleListVm.SelectedItem?.Model;
@@ -178,14 +186,14 @@ namespace WPFApp.ViewModel.Container.Edit
                 successDelayMs: 900);
         }
 
-        /// <summary>
-        /// Відкрити кілька schedules у табах редактора.
-        ///
-        /// Поведінка:
-        /// - якщо schedule вже відкритий — не дублюємо, а додаємо як openedBlocks (щоб можна було активувати)
-        /// - якщо перевищили ліміт MaxOpenedSchedules — пропускаємо і показуємо повідомлення
-        /// - schedules без generated data — пропускаємо і показуємо повідомлення
-        /// </summary>
+        
+        
+        
+        
+        
+        
+        
+        
         internal Task MultiOpenSchedulesAsync(IReadOnlyList<ScheduleModel> schedules, CancellationToken ct = default)
         {
             if (schedules is null || schedules.Count == 0)
@@ -282,9 +290,9 @@ namespace WPFApp.ViewModel.Container.Edit
                 successDelayMs: 900);
         }
 
-        /// <summary>
-        /// Відкрити профіль schedule (read-only перегляд).
-        /// </summary>
+        
+        
+        
         internal Task OpenScheduleProfileAsync(CancellationToken ct = default)
         {
             var schedule = ProfileVm.ScheduleListVm.SelectedItem?.Model;
@@ -326,9 +334,9 @@ namespace WPFApp.ViewModel.Container.Edit
         }
 
 
-        /// <summary>
-        /// Видалити вибраний schedule з контейнера.
-        /// </summary>
+        
+        
+        
         internal Task DeleteSelectedScheduleAsync(CancellationToken ct = default)
         {
             var schedule = ProfileVm.ScheduleListVm.SelectedItem?.Model;

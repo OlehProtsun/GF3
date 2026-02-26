@@ -1,14 +1,25 @@
+/*
+  Опис файлу: цей модуль містить реалізацію компонента ShopDisplayHelper у шарі WPFApp.
+  Призначення: інкапсулювати поведінку UI або прикладної логіки без зміни доменної моделі.
+  Примітка: коментарі описують спостережуваний потік даних, очікувані обмеження та точки взаємодії.
+*/
 using BusinessLogicLayer.Contracts.Shops;
 ﻿
 namespace WPFApp.ViewModel.Shop.Helpers
 {
+    
+    
+    
     /// <summary>
-    /// ShopDisplayHelper — helper для “відображення” полів Shop у read-only UI.
+    /// Визначає публічний елемент `public static class ShopDisplayHelper` та контракт його використання у шарі WPFApp.
     /// </summary>
     public static class ShopDisplayHelper
     {
+        
+        
+        
         /// <summary>
-        /// Якщо значення null/whitespace — повертає "—", інакше повертає Trim().
+        /// Визначає публічний елемент `public static string TextOrDash(string? value)` та контракт його використання у шарі WPFApp.
         /// </summary>
         public static string TextOrDash(string? value)
         {
@@ -18,8 +29,11 @@ namespace WPFApp.ViewModel.Shop.Helpers
             return value.Trim();
         }
 
+        
+        
+        
         /// <summary>
-        /// Витягнути Name з null-safe.
+        /// Визначає публічний елемент `public static string NameOrEmpty(ShopDto? model)` та контракт його використання у шарі WPFApp.
         /// </summary>
         public static string NameOrEmpty(ShopDto? model)
             => model?.Name?.Trim() ?? string.Empty;

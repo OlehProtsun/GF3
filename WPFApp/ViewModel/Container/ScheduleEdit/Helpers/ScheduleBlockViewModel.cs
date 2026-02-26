@@ -1,4 +1,9 @@
-﻿using System;
+/*
+  Опис файлу: цей модуль містить реалізацію компонента ScheduleBlockViewModel у шарі WPFApp.
+  Призначення: інкапсулювати поведінку UI або прикладної логіки без зміни доменної моделі.
+  Примітка: коментарі описують спостережуваний потік даних, очікувані обмеження та точки взаємодії.
+*/
+using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using BusinessLogicLayer.Contracts.Models;
@@ -6,69 +11,90 @@ using WPFApp.MVVM.Core;
 
 namespace WPFApp.ViewModel.Container.ScheduleEdit.Helpers
 {
+    
+    
+    
+    
+    
+    
+    
+    
+    
     /// <summary>
-    /// ScheduleBlockViewModel — ViewModel одного “блоку” розкладу.
-    ///
-    /// У твоєму UI, судячи з логіки:
-    /// - можна відкривати кілька розкладів (Blocks / OpenedSchedules)
-    /// - кожен блок має свою модель, працівників, слоти, стилі
-    ///
-    /// Тобто це “пакет даних” для одного таба/картки/вкладки.
+    /// Визначає публічний елемент `public sealed class ScheduleBlockViewModel : ObservableObject` та контракт його використання у шарі WPFApp.
     /// </summary>
     public sealed class ScheduleBlockViewModel : ObservableObject
     {
+        
+        
+        
+        
+        
+        
+        
         /// <summary>
-        /// Внутрішній GUID-ідентифікатор блока.
-        ///
-        /// Навіщо:
-        /// - навіть якщо ScheduleId (Model.Id) ще 0 (новий schedule),
-        ///   блок у UI все одно має мати стабільний ідентифікатор (наприклад для selection).
+        /// Визначає публічний елемент `public Guid Id { get; } = Guid.NewGuid();` та контракт його використання у шарі WPFApp.
         /// </summary>
         public Guid Id { get; } = Guid.NewGuid();
 
-        /// <summary>
-        /// Основна модель розкладу (дані, які потім зберігаються в БД).
-        /// Приклад: Name, Year, Month, PeoplePerShift, Shift1/Shift2 тощо.
-        ///
-        /// Це “джерело правди” для властивостей Schedule* у головному VM.
-        /// </summary>
+        
+        
+        
+        
+        
+        
         private ScheduleModel _model = new();
+        /// <summary>
+        /// Визначає публічний елемент `public ScheduleModel Model` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public ScheduleModel Model
         {
             get => _model;
             set => SetProperty(ref _model, value);
         }
 
+        
+        
+        
+        
+        
         /// <summary>
-        /// Працівники, які беруть участь у цьому розкладі.
-        ///
-        /// Тип: ScheduleEmployeeModel (зв’язка schedule <-> employee).
+        /// Визначає публічний елемент `public ObservableCollection<ScheduleEmployeeModel> Employees { get; } = new();` та контракт його використання у шарі WPFApp.
         /// </summary>
         public ObservableCollection<ScheduleEmployeeModel> Employees { get; } = new();
 
+        
+        
+        
+        
+        
+        
+        
         /// <summary>
-        /// Слоти розкладу (коли/хто працює).
-        ///
-        /// Це те, що:
-        /// - генерується генератором
-        /// - редагується через матрицю (cell edit)
+        /// Визначає публічний елемент `public ObservableCollection<ScheduleSlotModel> Slots { get; } = new();` та контракт його використання у шарі WPFApp.
         /// </summary>
         public ObservableCollection<ScheduleSlotModel> Slots { get; } = new();
 
+        
+        
+        
+        
         /// <summary>
-        /// Стилі клітинок (фон/текст).
-        /// Зберігаються окремо, бо це UI-декорація, але ти її теж зберігаєш як дані.
+        /// Визначає публічний елемент `public ObservableCollection<ScheduleCellStyleModel> CellStyles { get; } = new();` та контракт його використання у шарі WPFApp.
         /// </summary>
         public ObservableCollection<ScheduleCellStyleModel> CellStyles { get; } = new();
 
-        /// <summary>
-        /// Вибрана група доступності (AvailabilityGroup) для цього блока.
-        ///
-        /// Чому в Block, а не тільки в головному VM:
-        /// - у тебе може бути кілька блоків відкрито
-        /// - кожен блок може мати свою групу
-        /// </summary>
+        
+        
+        
+        
+        
+        
+        
         private int _selectedAvailabilityGroupId;
+        /// <summary>
+        /// Визначає публічний елемент `public int SelectedAvailabilityGroupId` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public int SelectedAvailabilityGroupId
         {
             get => _selectedAvailabilityGroupId;

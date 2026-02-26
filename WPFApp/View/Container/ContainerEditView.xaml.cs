@@ -1,16 +1,27 @@
-﻿using System.Windows.Controls;
+/*
+  Опис файлу: цей модуль містить реалізацію компонента ContainerEditView у шарі WPFApp.
+  Призначення: інкапсулювати поведінку UI або прикладної логіки без зміни доменної моделі.
+  Примітка: коментарі описують спостережуваний потік даних, очікувані обмеження та точки взаємодії.
+*/
+using System.Windows.Controls;
 
 
 namespace WPFApp.View.Container
 {
+    
+    
+    
+    
     /// <summary>
-    /// Create/Edit form for a container.
-    /// No business logic is placed here: validation/save/cancel live in the ViewModel.
+    /// Визначає публічний елемент `public partial class ContainerEditView : UserControl` та контракт його використання у шарі WPFApp.
     /// </summary>
     public partial class ContainerEditView : UserControl
     {
+        
+        
+        
         /// <summary>
-        /// Initializes visual tree and binds XAML elements to the current DataContext.
+        /// Визначає публічний елемент `public ContainerEditView()` та контракт його використання у шарі WPFApp.
         /// </summary>
         public ContainerEditView()
         {

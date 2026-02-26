@@ -1,29 +1,49 @@
-﻿using System;
+/*
+  Опис файлу: цей модуль містить реалізацію компонента AvailabilityValidationRules у шарі WPFApp.
+  Призначення: інкапсулювати поведінку UI або прикладної логіки без зміни доменної моделі.
+  Примітка: коментарі описують спостережуваний потік даних, очікувані обмеження та точки взаємодії.
+*/
+using System;
 using System.Collections.Generic;
 
 namespace WPFApp.MVVM.Validation.Rules
 {
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
     /// <summary>
-    /// AvailabilityValidationRules — єдине місце з правилами валідації для форми редагування AvailabilityGroup.
-    ///
-    /// Чому окремий файл:
-    /// - ViewModel не роздувається правилами.
-    /// - Правила можна повторно використати (owner/service/tests).
-    /// - Легко тестувати без WPF.
-    ///
-    /// Формат помилок:
-    /// key   = ім'я властивості ViewModel (щоб INotifyDataErrorInfo підсвітив правильне поле)
-    /// value = текст помилки
+    /// Визначає публічний елемент `public static class AvailabilityValidationRules` та контракт його використання у шарі WPFApp.
     /// </summary>
     public static class AvailabilityValidationRules
     {
-        // Ключі мають збігатися з назвами властивостей AvailabilityEditViewModel
+        
+        /// <summary>
+        /// Визначає публічний елемент `public const string K_AvailabilityName = "AvailabilityName";` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public const string K_AvailabilityName = "AvailabilityName";
+        /// <summary>
+        /// Визначає публічний елемент `public const string K_AvailabilityMonth = "AvailabilityMonth";` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public const string K_AvailabilityMonth = "AvailabilityMonth";
+        /// <summary>
+        /// Визначає публічний елемент `public const string K_AvailabilityYear = "AvailabilityYear";` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public const string K_AvailabilityYear = "AvailabilityYear";
 
+        
+        
+        
         /// <summary>
-        /// Повна валідація (перед Save).
+        /// Визначає публічний елемент `public static IReadOnlyDictionary<string, string> ValidateAll(string? name, int year, int month)` та контракт його використання у шарі WPFApp.
         /// </summary>
         public static IReadOnlyDictionary<string, string> ValidateAll(string? name, int year, int month)
         {
@@ -36,8 +56,11 @@ namespace WPFApp.MVVM.Validation.Rules
             return errors;
         }
 
+        
+        
+        
         /// <summary>
-        /// Валідація одного поля (inline-валидація у setter'і).
+        /// Визначає публічний елемент `public static string? ValidateProperty(string? name, int year, int month, string vmPropertyName)` та контракт його використання у шарі WPFApp.
         /// </summary>
         public static string? ValidateProperty(string? name, int year, int month, string vmPropertyName)
         {
@@ -53,9 +76,9 @@ namespace WPFApp.MVVM.Validation.Rules
             };
         }
 
-        // -----------------------
-        // Конкретні правила
-        // -----------------------
+        
+        
+        
 
         private static string? ValidateName(string? name)
         {
@@ -67,7 +90,7 @@ namespace WPFApp.MVVM.Validation.Rules
             if (name.Length < 2)
                 return "Name is too short (min 2 chars).";
 
-            // Ліміт зробив таким самим як у container/schedule правилах (практичний дефолт)
+            
             if (name.Length > 100)
                 return "Name is too long (max 100 chars).";
 
@@ -84,7 +107,7 @@ namespace WPFApp.MVVM.Validation.Rules
 
         private static string? ValidateYear(int year)
         {
-            // Залишив твій діапазон (2000..3000), бо так було в VM.
+            
             if (year < 2000 || year > 3000)
                 return "Year must be in range 2000..3000.";
 

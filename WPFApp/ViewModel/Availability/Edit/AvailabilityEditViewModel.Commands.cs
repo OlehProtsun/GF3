@@ -1,33 +1,71 @@
-﻿using System.Threading.Tasks;
+/*
+  Опис файлу: цей модуль містить реалізацію компонента AvailabilityEditViewModel.Commands у шарі WPFApp.
+  Призначення: інкапсулювати поведінку UI або прикладної логіки без зміни доменної моделі.
+  Примітка: коментарі описують спостережуваний потік даних, очікувані обмеження та точки взаємодії.
+*/
+using System.Threading.Tasks;
 using System.Windows;
 using WPFApp.MVVM.Commands;
 
 namespace WPFApp.ViewModel.Availability.Edit
 {
+    
+    
+    
     /// <summary>
-    /// Команди: лише оголошення properties + реалізація handlers.
+    /// Визначає публічний елемент `public sealed partial class AvailabilityEditViewModel` та контракт його використання у шарі WPFApp.
     /// </summary>
     public sealed partial class AvailabilityEditViewModel
     {
-        // Публічні команди (ініціалізуються у constructor в основному файлі).
+        
+        /// <summary>
+        /// Визначає публічний елемент `public AsyncRelayCommand SaveCommand { get; }` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public AsyncRelayCommand SaveCommand { get; }
+        /// <summary>
+        /// Визначає публічний елемент `public AsyncRelayCommand CancelCommand { get; }` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public AsyncRelayCommand CancelCommand { get; }
+        /// <summary>
+        /// Визначає публічний елемент `public AsyncRelayCommand CancelInformationCommand { get; }` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public AsyncRelayCommand CancelInformationCommand { get; }
+        /// <summary>
+        /// Визначає публічний елемент `public AsyncRelayCommand CancelEmployeeCommand { get; }` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public AsyncRelayCommand CancelEmployeeCommand { get; }
+        /// <summary>
+        /// Визначає публічний елемент `public AsyncRelayCommand CancelBindCommand { get; }` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public AsyncRelayCommand CancelBindCommand { get; }
+        /// <summary>
+        /// Визначає публічний елемент `public AsyncRelayCommand AddEmployeeCommand { get; }` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public AsyncRelayCommand AddEmployeeCommand { get; }
+        /// <summary>
+        /// Визначає публічний елемент `public AsyncRelayCommand RemoveEmployeeCommand { get; }` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public AsyncRelayCommand RemoveEmployeeCommand { get; }
+        /// <summary>
+        /// Визначає публічний елемент `public AsyncRelayCommand SearchEmployeeCommand { get; }` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public AsyncRelayCommand SearchEmployeeCommand { get; }
+        /// <summary>
+        /// Визначає публічний елемент `public AsyncRelayCommand AddBindCommand { get; }` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public AsyncRelayCommand AddBindCommand { get; }
+        /// <summary>
+        /// Визначає публічний елемент `public AsyncRelayCommand DeleteBindCommand { get; }` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public AsyncRelayCommand DeleteBindCommand { get; }
 
-        // ----------------------------
-        // Command handlers
-        // ----------------------------
+        
+        
+        
 
         private async Task SaveWithValidationAsync()
         {
-            // Валідацію виконуємо на UI thread (щоб візуалка WPF оновилась стабільно)
+            
             var ok = await Application.Current.Dispatcher
                 .InvokeAsync(() => ValidateBeforeSave(showDialog: true));
 
@@ -39,59 +77,59 @@ namespace WPFApp.ViewModel.Availability.Edit
 
         private async Task AddEmployeeAsync()
         {
-            // 1) Беремо id вибраного працівника.
+            
             int empId = SelectedEmployee?.Id ?? 0;
 
-            // 2) Якщо не вибрано — показуємо помилку.
+            
             if (empId <= 0)
             {
                 _owner.ShowError("Select employee first.");
                 return;
             }
 
-            // 3) Підбираємо header (caption) для колонки.
+            
             var header = _employeeNames.TryGetValue(empId, out var name)
                 ? name
                 : $"Employee #{empId}";
 
-            // 4) Пробуємо додати колонку.
+            
             if (!TryAddEmployeeColumn(empId, header))
             {
                 _owner.ShowInfo("This employee is already added.");
                 return;
             }
 
-            // 5) Показуємо короткий Working -> Success popup
+            
             await _owner.FlashNavWorkingSuccessAsync();
         }
 
 
         private async Task RemoveEmployeeAsync()
         {
-            // 1) Беремо id вибраного працівника.
+            
             int empId = SelectedEmployee?.Id ?? 0;
 
-            // 2) Якщо не вибрано — повідомляємо.
+            
             if (empId <= 0)
             {
                 _owner.ShowError("Select employee first.");
                 return;
             }
 
-            // 3) Пробуємо видалити колонку.
+            
             if (!RemoveEmployeeColumn(empId))
             {
                 _owner.ShowInfo("This employee is not in the group.");
                 return;
             }
 
-            // 4) Показуємо короткий Working -> Success popup
+            
             await _owner.FlashNavWorkingSuccessAsync();
         }
         private Task SearchEmployeeAsync()
         {
-            // 1) Делегуємо фільтрацію в owner.
-            //    Owner — центральне місце логіки пошуку/фільтрації.
+            
+            
             _owner.ApplyEmployeeFilter(EmployeeSearchText);
 
             return Task.CompletedTask;

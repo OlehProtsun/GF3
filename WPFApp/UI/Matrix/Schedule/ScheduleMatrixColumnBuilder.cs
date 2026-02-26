@@ -1,4 +1,9 @@
-﻿using System.Data;
+/*
+  Опис файлу: цей модуль містить реалізацію компонента ScheduleMatrixColumnBuilder у шарі WPFApp.
+  Призначення: інкапсулювати поведінку UI або прикладної логіки без зміни доменної моделі.
+  Примітка: коментарі описують спостережуваний потік даних, очікувані обмеження та точки взаємодії.
+*/
+using System.Data;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
@@ -8,11 +13,17 @@ using WPFApp.ViewModel.Container.ScheduleEdit;
 
 namespace WPFApp.UI.Matrix.Schedule
 {
+    /// <summary>
+    /// Визначає публічний елемент `public static class ScheduleMatrixColumnBuilder` та контракт його використання у шарі WPFApp.
+    /// </summary>
     public static class ScheduleMatrixColumnBuilder
     {
+        /// <summary>
+        /// Визначає публічний елемент `public static void BuildScheduleMatrixColumns(DataTable? table, DataGrid grid, bool isReadOnly)` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public static void BuildScheduleMatrixColumns(DataTable? table, DataGrid grid, bool isReadOnly)
         {
-            // НЕ чіпаємо ItemsSource — він має лишатись у XAML binding!
+            
             grid.AutoGenerateColumns = false;
             grid.Columns.Clear();
             grid.FrozenColumnCount = 1;
@@ -34,7 +45,7 @@ namespace WPFApp.UI.Matrix.Schedule
 
             foreach (DataColumn column in table.Columns)
             {
-                // приховуємо технічні колонки
+                
                 if (column.ColumnName == conflictColName || column.ColumnName == weekendColName)
                     continue;
 

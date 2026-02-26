@@ -1,4 +1,9 @@
-﻿using BusinessLogicLayer.Contracts.Employees;
+/*
+  Опис файлу: цей модуль містить реалізацію компонента EmployeeViewModel у шарі WPFApp.
+  Призначення: інкапсулювати поведінку UI або прикладної логіки без зміни доменної моделі.
+  Примітка: коментарі описують спостережуваний потік даних, очікувані обмеження та точки взаємодії.
+*/
+using BusinessLogicLayer.Contracts.Employees;
 using BusinessLogicLayer.Services.Abstractions;
 using System;
 using System.Collections.Generic;
@@ -19,6 +24,9 @@ using WPFApp.ViewModel.Shared;
 
 namespace WPFApp.ViewModel.Employee
 {
+    /// <summary>
+    /// Визначає публічний елемент `public enum EmployeeSection` та контракт його використання у шарі WPFApp.
+    /// </summary>
     public enum EmployeeSection
     {
         List,
@@ -26,21 +34,24 @@ namespace WPFApp.ViewModel.Employee
         Profile
     }
 
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
     /// <summary>
-    /// EmployeeViewModel — owner/coordinator модуля Employee.
-    ///
-    /// Відповідальність:
-    /// - тримати 3 під-VM (List/Edit/Profile)
-    /// - керувати навігацією (CurrentSection + Mode + CancelTarget)
-    /// - виконувати CRUD через IEmployeeFacade
-    /// - показувати повідомлення користувачу
-    ///
-    /// Покращення порівняно з початковим варіантом:
-    /// 1) EnsureInitializedAsync:
-    ///    - не виставляємо _initialized=true ДО успішного завершення
-    ///    - конкурентні виклики чекають один task (без дублювання Load)
-    /// 2) Валідація: використовуємо EmployeeValidationRules (без залежності від EditVM.Regex).
-    /// 3) Менше дублювання форматування імен: EmployeeDisplayHelper.
+    /// Визначає публічний елемент `public sealed class EmployeeViewModel : ViewModelBase` та контракт його використання у шарі WPFApp.
     /// </summary>
     public sealed class EmployeeViewModel : ViewModelBase
     {
@@ -48,18 +59,21 @@ namespace WPFApp.ViewModel.Employee
         private readonly IDatabaseChangeNotifier _databaseChangeNotifier;
                 private int _databaseReloadInProgress;
 
-        // ----------------------------
-        // Initialization (safe)
-        // ----------------------------
+        
+        
+        
 
         private bool _initialized;
         private Task? _initializeTask;
         private readonly object _initLock = new();
 
-        // Пам’ятаємо id відкритого профілю (щоб після Save повернутись і refreshнути).
+        
         private int? _openedProfileEmployeeId;
 
         private bool _isNavStatusVisible;
+        /// <summary>
+        /// Визначає публічний елемент `public bool IsNavStatusVisible` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public bool IsNavStatusVisible
         {
             get => _isNavStatusVisible;
@@ -67,6 +81,9 @@ namespace WPFApp.ViewModel.Employee
         }
 
         private UIStatusKind _navStatus = UIStatusKind.Success;
+        /// <summary>
+        /// Визначає публічний елемент `public UIStatusKind NavStatus` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public UIStatusKind NavStatus
         {
             get => _navStatus;
@@ -107,11 +124,14 @@ namespace WPFApp.ViewModel.Employee
             await HideNavStatusAsync().ConfigureAwait(false);
         }
 
-        // ----------------------------
-        // Navigation state
-        // ----------------------------
+        
+        
+        
 
         private object _currentSection = null!;
+        /// <summary>
+        /// Визначає публічний елемент `public object CurrentSection` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public object CurrentSection
         {
             get => _currentSection;
@@ -119,22 +139,40 @@ namespace WPFApp.ViewModel.Employee
         }
 
         private EmployeeSection _mode = EmployeeSection.List;
+        /// <summary>
+        /// Визначає публічний елемент `public EmployeeSection Mode` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public EmployeeSection Mode
         {
             get => _mode;
             private set => SetProperty(ref _mode, value);
         }
 
+        /// <summary>
+        /// Визначає публічний елемент `public EmployeeSection CancelTarget { get; private set; } = EmployeeSection.List;` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public EmployeeSection CancelTarget { get; private set; } = EmployeeSection.List;
 
-        // ----------------------------
-        // Child VMs
-        // ----------------------------
+        
+        
+        
 
+        /// <summary>
+        /// Визначає публічний елемент `public EmployeeListViewModel ListVm { get; }` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public EmployeeListViewModel ListVm { get; }
+        /// <summary>
+        /// Визначає публічний елемент `public EmployeeEditViewModel EditVm { get; }` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public EmployeeEditViewModel EditVm { get; }
+        /// <summary>
+        /// Визначає публічний елемент `public EmployeeProfileViewModel ProfileVm { get; }` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public EmployeeProfileViewModel ProfileVm { get; }
 
+        /// <summary>
+        /// Визначає публічний елемент `public EmployeeViewModel(` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public EmployeeViewModel(
             IEmployeeFacade employeeService,
             IDatabaseChangeNotifier databaseChangeNotifier
@@ -151,21 +189,24 @@ namespace WPFApp.ViewModel.Employee
             CurrentSection = ListVm;
         }
 
-        // =========================================================
-        // Initialization
-        // =========================================================
+        
+        
+        
 
+        /// <summary>
+        /// Визначає публічний елемент `public Task EnsureInitializedAsync(CancellationToken ct = default)` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public Task EnsureInitializedAsync(CancellationToken ct = default)
         {
-            // 1) Якщо вже ініціалізовано — ок.
+            
             if (_initialized)
                 return Task.CompletedTask;
 
-            // 2) Якщо task вже існує — повертаємо його (усі чекатимуть одне).
+            
             if (_initializeTask != null)
                 return _initializeTask;
 
-            // 3) Під lock створюємо init-task один раз.
+            
             lock (_initLock)
             {
                 if (_initialized)
@@ -183,15 +224,15 @@ namespace WPFApp.ViewModel.Employee
         {
             try
             {
-                // 1) Завантажуємо список працівників.
+                
                 await LoadEmployeesAsync(ct, selectId: null);
 
-                // 2) Фіксуємо успішну ініціалізацію.
+                
                 _initialized = true;
             }
             catch
             {
-                // Якщо впали — дозволяємо повторити init.
+                
                 lock (_initLock)
                 {
                     _initializeTask = null;
@@ -202,9 +243,9 @@ namespace WPFApp.ViewModel.Employee
             }
         }
 
-        // =========================================================
-        // List flows
-        // =========================================================
+        
+        
+        
 
         internal async Task SearchAsync(CancellationToken ct = default)
         {
@@ -270,9 +311,9 @@ namespace WPFApp.ViewModel.Employee
                 successDelayMs: 700);
         }
 
-        // =========================================================
-        // Save/Delete/Profile flows
-        // =========================================================
+        
+        
+        
 
         internal async Task SaveAsync(CancellationToken ct = default)
         {
@@ -346,15 +387,15 @@ namespace WPFApp.ViewModel.Employee
 
         internal async Task DeleteSelectedAsync(CancellationToken ct = default)
         {
-            // 1) Визначаємо “поточний id” залежно від режиму (Profile або List).
+            
             var currentId = GetCurrentEmployeeId();
             if (currentId <= 0)
                 return;
 
-            // 2) Формуємо “поточне ім’я” для confirm.
+            
             var currentName = GetCurrentEmployeeName();
 
-            // 3) Confirm.
+            
             if (!Confirm(string.IsNullOrWhiteSpace(currentName)
                 ? "Delete employee?"
                 : $"Delete {currentName}?"))
@@ -414,10 +455,10 @@ namespace WPFApp.ViewModel.Employee
 
         internal Task CancelAsync()
         {
-            // 1) При Cancel очищаємо помилки форми (щоб не “прилипали”).
+            
             EditVm.ClearValidationErrors();
 
-            // 2) Навігація залежить від Mode і CancelTarget.
+            
             return Mode switch
             {
                 EmployeeSection.Edit => CancelTarget == EmployeeSection.Profile
@@ -428,9 +469,9 @@ namespace WPFApp.ViewModel.Employee
             };
         }
 
-        // =========================================================
-        // Load + navigation helpers
-        // =========================================================
+        
+        
+        
 
         private async Task LoadEmployeesAsync(CancellationToken ct, int? selectId)
         {
@@ -476,11 +517,11 @@ namespace WPFApp.ViewModel.Employee
 
         private string GetCurrentEmployeeName()
         {
-            // У профілі вже є “готовий” FullName.
+            
             if (Mode == EmployeeSection.Profile)
                 return ProfileVm.FullName;
 
-            // У списку — беремо з SelectedItem.
+            
             return EmployeeDisplayHelper.GetFullName(ListVm.SelectedItem);
         }
 
@@ -551,9 +592,9 @@ namespace WPFApp.ViewModel.Employee
             return d.InvokeAsync(action).Task;
         }
 
-        // =========================================================
-        // UI messaging (залишив твою схему)
-        // =========================================================
+        
+        
+        
 
         internal void ShowInfo(string text)
             => CustomMessageBox.Show("Info", text, CustomMessageBoxIcon.Info, okText: "OK");

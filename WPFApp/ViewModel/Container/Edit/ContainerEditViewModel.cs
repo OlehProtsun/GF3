@@ -1,4 +1,9 @@
-﻿using System;
+/*
+  Опис файлу: цей модуль містить реалізацію компонента ContainerEditViewModel у шарі WPFApp.
+  Призначення: інкапсулювати поведінку UI або прикладної логіки без зміни доменної моделі.
+  Примітка: коментарі описують спостережуваний потік даних, очікувані обмеження та точки взаємодії.
+*/
+using System;
 using System.Collections;
 using System.ComponentModel;
 using BusinessLogicLayer.Contracts.Models;
@@ -9,43 +14,49 @@ using WPFApp.MVVM.Validation.Rules;
 
 namespace WPFApp.ViewModel.Container.Edit
 {
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
     /// <summary>
-    /// ContainerEditViewModel — VM форми “Add/Edit Container”.
-    ///
-    /// Основні задачі:
-    /// 1) Тримати поля контейнера (ContainerId, Name, Note)
-    /// 2) Тримати режим форми (IsEdit) і текстові заголовки (FormTitle/FormSubtitle)
-    /// 3) Давати команди Save/Cancel, які делегуються owner’у
-    /// 4) Показувати валідаційні помилки через INotifyDataErrorInfo
-    ///
-    /// Важливий принцип:
-    /// - ViewModel НЕ зберігає помилки вручну (Dictionary),
-    ///   а використовує спільний інфраструктурний клас ValidationErrors.
+    /// Визначає публічний елемент `public sealed class ContainerEditViewModel : ViewModelBase, INotifyDataErrorInfo` та контракт його використання у шарі WPFApp.
     /// </summary>
     public sealed class ContainerEditViewModel : ViewModelBase, INotifyDataErrorInfo
     {
-        /// <summary>
-        /// Owner (ContainerViewModel) — керує реальними діями:
-        /// - SaveAsync()
-        /// - CancelAsync()
-        /// VM лише викликає ці методи командами.
-        /// </summary>
+        
+        
+        
+        
+        
+        
         private readonly ContainerViewModel _owner;
 
-        /// <summary>
-        /// Єдине сховище помилок валідації.
-        /// Воно:
-        /// - зберігає помилки по propertyName
-        /// - піднімає ErrorsChanged
-        /// - дає HasErrors/GetErrors
-        /// </summary>
+        
+        
+        
+        
+        
+        
+        
         private readonly ValidationErrors _validation = new();
 
-        // ------------------------
-        // 1) Поля контейнера
-        // ------------------------
+        
+        
+        
 
         private int _containerId;
+        /// <summary>
+        /// Визначає публічний елемент `public int ContainerId` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public int ContainerId
         {
             get => _containerId;
@@ -53,6 +64,9 @@ namespace WPFApp.ViewModel.Container.Edit
         }
 
         private string _name = string.Empty;
+        /// <summary>
+        /// Визначає публічний елемент `public string Name` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public string Name
         {
             get => _name;
@@ -60,17 +74,20 @@ namespace WPFApp.ViewModel.Container.Edit
             {
                 if (SetProperty(ref _name, value))
                 {
-                    // Inline-валидація:
-                    // 1) прибираємо стару помилку
+                    
+                    
                     ClearValidationErrors(nameof(Name));
 
-                    // 2) перевіряємо нове значення через правила
+                    
                     ValidateProperty(nameof(Name));
                 }
             }
         }
 
         private string? _note;
+        /// <summary>
+        /// Визначає публічний елемент `public string? Note` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public string? Note
         {
             get => _note;
@@ -84,11 +101,14 @@ namespace WPFApp.ViewModel.Container.Edit
             }
         }
 
-        // ------------------------
-        // 2) Режим форми (Add/Edit)
-        // ------------------------
+        
+        
+        
 
         private bool _isEdit;
+        /// <summary>
+        /// Визначає публічний елемент `public bool IsEdit` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public bool IsEdit
         {
             get => _isEdit;
@@ -99,49 +119,76 @@ namespace WPFApp.ViewModel.Container.Edit
             }
         }
 
+        /// <summary>
+        /// Визначає публічний елемент `public string FormTitle => IsEdit ? "Edit Container" : "Add Container";` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public string FormTitle => IsEdit ? "Edit Container" : "Add Container";
 
+        /// <summary>
+        /// Визначає публічний елемент `public string FormSubtitle => IsEdit` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public string FormSubtitle => IsEdit
             ? "Update the container information and press Save."
             : "Fill the form and press Save.";
 
-        // ------------------------
-        // 3) Команди
-        // ------------------------
+        
+        
+        
 
+        /// <summary>
+        /// Визначає публічний елемент `public AsyncRelayCommand SaveCommand { get; }` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public AsyncRelayCommand SaveCommand { get; }
+        /// <summary>
+        /// Визначає публічний елемент `public AsyncRelayCommand CancelCommand { get; }` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public AsyncRelayCommand CancelCommand { get; }
 
+        /// <summary>
+        /// Визначає публічний елемент `public ContainerEditViewModel(ContainerViewModel owner)` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public ContainerEditViewModel(ContainerViewModel owner)
         {
             _owner = owner;
 
-            // Save обгортаємо повною валідацією:
-            // - якщо є помилки => не викликаємо owner.SaveAsync()
+            
+            
             SaveCommand = new AsyncRelayCommand(SaveWithValidationAsync);
 
             CancelCommand = new AsyncRelayCommand(() => _owner.CancelAsync());
         }
 
-        // ------------------------
-        // 4) INotifyDataErrorInfo (проксі на ValidationErrors)
-        // ------------------------
+        
+        
+        
 
+        /// <summary>
+        /// Визначає публічний елемент `public bool HasErrors => _validation.HasErrors;` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public bool HasErrors => _validation.HasErrors;
 
+        /// <summary>
+        /// Визначає публічний елемент `public event EventHandler<DataErrorsChangedEventArgs>? ErrorsChanged` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public event EventHandler<DataErrorsChangedEventArgs>? ErrorsChanged
         {
             add => _validation.ErrorsChanged += value;
             remove => _validation.ErrorsChanged -= value;
         }
 
+        /// <summary>
+        /// Визначає публічний елемент `public IEnumerable GetErrors(string? propertyName)` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public IEnumerable GetErrors(string? propertyName)
             => _validation.GetErrors(propertyName);
 
-        // ------------------------
-        // 5) Життєвий цикл / заповнення
-        // ------------------------
+        
+        
+        
 
+        /// <summary>
+        /// Визначає публічний елемент `public void ResetForNew()` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public void ResetForNew()
         {
             ContainerId = 0;
@@ -152,6 +199,9 @@ namespace WPFApp.ViewModel.Container.Edit
             ClearValidationErrors();
         }
 
+        /// <summary>
+        /// Визначає публічний елемент `public void SetContainer(ContainerModel model)` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public void SetContainer(ContainerModel model)
         {
             ContainerId = model.Id;
@@ -162,11 +212,14 @@ namespace WPFApp.ViewModel.Container.Edit
             ClearValidationErrors();
         }
 
+        
+        
+        
+        
+        
+        
         /// <summary>
-        /// Перетворити VM-стан у модель для збереження.
-        /// Тут ми також нормалізуємо значення:
-        /// - Name trim
-        /// - Note trim або null якщо порожній
+        /// Визначає публічний елемент `public ContainerModel ToModel()` та контракт його використання у шарі WPFApp.
         /// </summary>
         public ContainerModel ToModel()
         {
@@ -178,17 +231,17 @@ namespace WPFApp.ViewModel.Container.Edit
             };
         }
 
-        // ------------------------
-        // 6) Валідація (операції)
-        // ------------------------
+        
+        
+        
 
-        /// <summary>
-        /// Повна перевірка перед Save.
-        ///
-        /// Навіщо:
-        /// - inline-валидація працює тільки коли користувач змінює поля
-        /// - але перед Save треба бути впевненим, що всі правила виконані
-        /// </summary>
+        
+        
+        
+        
+        
+        
+        
         private bool ValidateBeforeSave()
         {
             var model = ToModel();
@@ -198,9 +251,9 @@ namespace WPFApp.ViewModel.Container.Edit
             return !HasErrors;
         }
 
-        /// <summary>
-        /// Валідація одного поля (inline) за поточним станом VM.
-        /// </summary>
+        
+        
+        
         private void ValidateProperty(string propertyName)
         {
             var model = ToModel();
@@ -210,9 +263,12 @@ namespace WPFApp.ViewModel.Container.Edit
                 _validation.Add(propertyName, msg);
         }
 
+        
+        
+        
+        
         /// <summary>
-        /// Встановити багато помилок “пакетом”.
-        /// Наприклад, коли сервер повернув помилки.
+        /// Визначає публічний елемент `public void SetValidationErrors(IReadOnlyDictionary<string, string> errors)` та контракт його використання у шарі WPFApp.
         /// </summary>
         public void SetValidationErrors(IReadOnlyDictionary<string, string> errors)
         {
@@ -220,8 +276,11 @@ namespace WPFApp.ViewModel.Container.Edit
             OnPropertyChanged(nameof(HasErrors));
         }
 
+        
+        
+        
         /// <summary>
-        /// Очистити всі помилки.
+        /// Визначає публічний елемент `public void ClearValidationErrors()` та контракт його використання у шарі WPFApp.
         /// </summary>
         public void ClearValidationErrors()
         {
@@ -229,24 +288,24 @@ namespace WPFApp.ViewModel.Container.Edit
             OnPropertyChanged(nameof(HasErrors));
         }
 
-        /// <summary>
-        /// Очистити помилки для конкретної властивості.
-        /// </summary>
+        
+        
+        
         private void ClearValidationErrors(string propertyName)
         {
             _validation.Clear(propertyName);
             OnPropertyChanged(nameof(HasErrors));
         }
 
-        // ------------------------
-        // 7) Save wrapper
-        // ------------------------
+        
+        
+        
 
-        /// <summary>
-        /// Обгортка над Save:
-        /// - спочатку валідимо
-        /// - якщо ок — викликаємо owner.SaveAsync()
-        /// </summary>
+        
+        
+        
+        
+        
         private Task SaveWithValidationAsync()
         {
             if (!ValidateBeforeSave())

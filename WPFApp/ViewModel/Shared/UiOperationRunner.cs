@@ -1,18 +1,23 @@
+/*
+  Опис файлу: цей модуль містить реалізацію компонента UiOperationRunner у шарі WPFApp.
+  Призначення: інкапсулювати поведінку UI або прикладної логіки без зміни доменної моделі.
+  Примітка: коментарі описують спостережуваний потік даних, очікувані обмеження та точки взаємодії.
+*/
 using System;
 using System.Threading;
 using System.Threading.Tasks;
 
 namespace WPFApp.ViewModel.Shared
 {
-    /// <summary>
-    /// Shared wrapper for UI navigation status orchestration (working/success/hide/error).
-    /// Keeps flow steps consistent across ViewModel modules without changing business logic.
-    /// </summary>
+    
+    
+    
+    
     internal static class UiOperationRunner
     {
-        /// <summary>
-        /// Executes a navigation flow where the body always completes successfully unless it throws/cancels.
-        /// </summary>
+        
+        
+        
         internal static async Task RunNavStatusFlowAsync(
             CancellationToken outerToken,
             Func<CancellationToken, CancellationToken> createUiToken,
@@ -46,9 +51,9 @@ namespace WPFApp.ViewModel.Shared
             }
         }
 
-        /// <summary>
-        /// Executes a navigation flow where the body can return <c>false</c> for a non-error early exit.
-        /// </summary>
+        
+        
+        
         internal static async Task RunNavStatusFlowAsync(
             CancellationToken outerToken,
             Func<CancellationToken, CancellationToken> createUiToken,
