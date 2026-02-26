@@ -5,16 +5,24 @@ using BusinessLogicLayer.Contracts.Enums;
 using BusinessLogicLayer.Contracts.Models;
 using BusinessLogicLayer.Schedule;
 using BusinessLogicLayer.Services.Abstractions;
+using Microsoft.Extensions.Logging;
 
 namespace BusinessLogicLayer.Services.Export;
 
 public sealed class ScheduleExcelContextBuilder : IScheduleExcelContextBuilder
 {
     private static readonly Regex TimeRegex = new(@"\b\d{1,2}:\d{2}\b", RegexOptions.Compiled | RegexOptions.CultureInvariant);
+    private readonly ILogger<ScheduleExcelContextBuilder>? _logger;
+
+    public ScheduleExcelContextBuilder(ILogger<ScheduleExcelContextBuilder>? logger = null)
+    {
+        _logger = logger;
+    }
 
     public ScheduleExcelContext BuildScheduleContext(ScheduleModel graph, ShopModel? shop, IReadOnlyList<ScheduleEmployeeModel> employees, IReadOnlyList<ScheduleSlotModel> slots)
     {
         var table = ScheduleMatrixEngine.BuildScheduleTable(graph.Year, graph.Month, slots, employees, out var colMap, CancellationToken.None);
+        LogDebugDiagnostics(graph, slots, employees, table, colMap);
         var daysInMonth = DateTime.DaysInMonth(graph.Year, graph.Month);
         for (var day = 1; day <= daysInMonth; day++)
         {
@@ -49,6 +57,38 @@ public sealed class ScheduleExcelContextBuilder : IScheduleExcelContextBuilder
             summary.Headers,
             summary.Rows,
             workFree);
+    }
+
+    private void LogDebugDiagnostics(ScheduleModel graph, IReadOnlyList<ScheduleSlotModel> slots, IReadOnlyList<ScheduleEmployeeModel> employees, DataTable table, Dictionary<string, int> colMap)
+    {
+        var isDebugEnabled = string.Equals(Environment.GetEnvironmentVariable("GF3_EXPORT_DEBUG"), "true", StringComparison.OrdinalIgnoreCase);
+        if (!isDebugEnabled)
+            return;
+
+        var columnNames = table.Columns.Cast<DataColumn>().Select(c => c.ColumnName).ToArray();
+        var nonEmptyEmployeeCellCount = 0;
+        foreach (DataRow row in table.Rows)
+        {
+            foreach (var employeeColumn in colMap.Keys)
+            {
+                if (!table.Columns.Contains(employeeColumn))
+                    continue;
+
+                var raw = row[employeeColumn];
+                var text = raw is null or DBNull ? string.Empty : raw.ToString()?.Trim() ?? string.Empty;
+                if (!string.IsNullOrWhiteSpace(text) && !string.Equals(text, ScheduleMatrixConstants.EmptyMark, StringComparison.Ordinal))
+                    nonEmptyEmployeeCellCount++;
+            }
+        }
+
+        _logger?.LogInformation(
+            "GF3 export debug graphId={GraphId}: slots={SlotsCount}, employees={EmployeesCount}, rows={RowCount}, cols=[{Columns}], nonEmptyEmployeeCells={NonEmptyEmployeeCellCount}",
+            graph.Id,
+            slots.Count,
+            employees.Count,
+            table.Rows.Count,
+            string.Join(", ", columnNames),
+            nonEmptyEmployeeCellCount);
     }
 
     public ContainerExcelContext BuildContainerContext(ContainerModel container, IReadOnlyList<GraphExcelContext> graphs)

@@ -136,9 +136,8 @@ public sealed class GraphTemplateExportService : IGraphTemplateExportService
         var graph = await _containerService.GetGraphByIdAsync(containerId, graphId, ct).ConfigureAwait(false)
             ?? throw new KeyNotFoundException($"Graph with id {graphId} was not found.");
         var slots = await _containerService.GetGraphSlotsAsync(containerId, graphId, ct).ConfigureAwait(false);
-        var employees = includeEmployees
-            ? await _containerService.GetGraphEmployeesAsync(containerId, graphId, ct).ConfigureAwait(false)
-            : [];
+        // Excel matrix export must always be built from real schedule employees to stay 1:1 with WPF behavior.
+        var employees = await _containerService.GetGraphEmployeesAsync(containerId, graphId, ct).ConfigureAwait(false);
 
         _ = includeStyles
             ? await _containerService.GetGraphCellStylesAsync(containerId, graphId, ct).ConfigureAwait(false)
