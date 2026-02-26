@@ -181,7 +181,7 @@ public sealed class ScheduleExcelContextBuilder : IScheduleExcelContextBuilder
         return false;
     }
 
-    private static (List<SummaryDayHeader> Headers, List<SummaryEmployeeRow> Rows) BuildSummaryFromMatrix(DataTable table, Dictionary<string, int> colMap, IList<ScheduleEmployeeModel> employees, int year, int month)
+    private static (List<SummaryDayHeader> Headers, List<SummaryEmployeeRow> Rows) BuildSummaryFromMatrix(DataTable table, Dictionary<string, int> colMap, IReadOnlyList<ScheduleEmployeeModel> employees, int year, int month)
     {
         var daysInMonth = DateTime.DaysInMonth(year, month);
         var rowsByDay = table.Rows.Cast<DataRow>()
