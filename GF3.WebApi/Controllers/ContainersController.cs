@@ -92,6 +92,29 @@ public class ContainersController(IContainerService containerService) : Controll
         return NoContent();
     }
 
+    [HttpPost("{containerId:int}/graphs/{graphId:int}/generate")]
+    [ProducesResponseType(typeof(GenerateGraphResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
+    public async Task<ActionResult<GenerateGraphResponse>> GenerateGraph(int containerId, int graphId, [FromBody] GenerateGraphRequest request, CancellationToken cancellationToken)
+    {
+        var result = await containerService
+            .GenerateGraphAsync(containerId, graphId, request.Overwrite, request.DryRun, progress: null, cancellationToken)
+            .ConfigureAwait(false);
+
+        var includeSlots = request.DryRun || request.ReturnSlots;
+
+        return Ok(new GenerateGraphResponse
+        {
+            ContainerId = result.ContainerId,
+            GraphId = result.GraphId,
+            GeneratedSlotsCount = result.GeneratedSlotsCount,
+            WrittenSlotsCount = result.WrittenSlotsCount,
+            Slots = includeSlots ? result.Slots.Select(x => x.ToGraphSlotDto()) : null
+        });
+    }
+
     [HttpGet("{containerId:int}/graphs/{graphId:int}/slots")]
     [ProducesResponseType(typeof(IEnumerable<GraphSlotDto>), StatusCodes.Status200OK)]
     public async Task<ActionResult<IEnumerable<GraphSlotDto>>> GetGraphSlots(int containerId, int graphId, CancellationToken cancellationToken)

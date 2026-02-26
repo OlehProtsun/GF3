@@ -1,9 +1,11 @@
 using BusinessLogicLayer.Common;
 using BusinessLogicLayer.Contracts.Models;
+using BusinessLogicLayer.Generators;
 using BusinessLogicLayer.Mappers;
 using BusinessLogicLayer.Services.Abstractions;
 using DataAccessLayer.Repositories.Abstractions;
 using Microsoft.EntityFrameworkCore;
+using System.Collections.Concurrent;
 
 namespace BusinessLogicLayer.Services;
 
@@ -14,19 +16,27 @@ public class ContainerService : IContainerService
     private readonly IScheduleSlotRepository _slotRepo;
     private readonly IScheduleEmployeeRepository _employeeRepo;
     private readonly IScheduleCellStyleRepository _cellStyleRepo;
+    private readonly IAvailabilityGroupRepository _availabilityGroupRepo;
+    private readonly IScheduleGenerator _scheduleGenerator;
+
+    private static readonly ConcurrentDictionary<int, SemaphoreSlim> GenerateLocks = new();
 
     public ContainerService(
         IContainerRepository repo,
         IScheduleRepository scheduleRepo,
         IScheduleSlotRepository slotRepo,
         IScheduleEmployeeRepository employeeRepo,
-        IScheduleCellStyleRepository cellStyleRepo)
+        IScheduleCellStyleRepository cellStyleRepo,
+        IAvailabilityGroupRepository availabilityGroupRepo,
+        IScheduleGenerator scheduleGenerator)
     {
         _repo = repo;
         _scheduleRepo = scheduleRepo;
         _slotRepo = slotRepo;
         _employeeRepo = employeeRepo;
         _cellStyleRepo = cellStyleRepo;
+        _availabilityGroupRepo = availabilityGroupRepo;
+        _scheduleGenerator = scheduleGenerator;
     }
 
     public async Task<ContainerModel?> GetAsync(int id, CancellationToken ct = default)
@@ -79,6 +89,75 @@ public class ContainerService : IContainerService
     {
         await EnsureGraphOwnershipAsync(containerId, graphId, ct).ConfigureAwait(false);
         await _scheduleRepo.DeleteAsync(graphId, ct).ConfigureAwait(false);
+    }
+
+    public async Task<GenerateGraphResult> GenerateGraphAsync(
+        int containerId,
+        int graphId,
+        bool overwrite,
+        bool dryRun,
+        IProgress<int>? progress,
+        CancellationToken ct = default)
+    {
+        var semaphore = GenerateLocks.GetOrAdd(graphId, _ => new SemaphoreSlim(1, 1));
+        await semaphore.WaitAsync(ct).ConfigureAwait(false);
+
+        try
+        {
+            var graph = await EnsureGraphOwnershipAsync(containerId, graphId, ct).ConfigureAwait(false);
+            var schedule = graph.ToContract();
+
+            var employees = (await _employeeRepo.GetByScheduleAsync(graphId, ct).ConfigureAwait(false))
+                .Select(x => x.ToContract())
+                .ToList();
+
+            var availabilities = new List<AvailabilityGroupModel>();
+            if (schedule.AvailabilityGroupId is int availabilityGroupId && availabilityGroupId > 0)
+            {
+                var group = await _availabilityGroupRepo.GetFullByIdAsync(availabilityGroupId, ct).ConfigureAwait(false)
+                    ?? throw new KeyNotFoundException($"Availability group with id {availabilityGroupId} was not found.");
+                availabilities.Add(group.ToContract());
+            }
+
+            var generatedSlots = (await _scheduleGenerator
+                .GenerateAsync(schedule, availabilities, employees, progress, ct)
+                .ConfigureAwait(false))
+                .Select(x =>
+                {
+                    x.ScheduleId = graphId;
+                    x.Id = 0;
+                    return x;
+                })
+                .ToList();
+
+            var writtenSlotsCount = 0;
+            if (!dryRun)
+            {
+                try
+                {
+                    writtenSlotsCount = await _slotRepo
+                        .ReplaceForScheduleAsync(graphId, generatedSlots.Select(x => x.ToDal()), overwrite, ct)
+                        .ConfigureAwait(false);
+                }
+                catch (DbUpdateException)
+                {
+                    throw new ValidationException("Duplicate slot constraint violated. Try overwrite=true.");
+                }
+            }
+
+            return new GenerateGraphResult
+            {
+                ContainerId = containerId,
+                GraphId = graphId,
+                GeneratedSlotsCount = generatedSlots.Count,
+                WrittenSlotsCount = dryRun ? 0 : writtenSlotsCount,
+                Slots = generatedSlots
+            };
+        }
+        finally
+        {
+            semaphore.Release();
+        }
     }
 
     public async Task<List<ScheduleSlotModel>> GetGraphSlotsAsync(int containerId, int graphId, CancellationToken ct = default)
