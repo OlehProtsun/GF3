@@ -71,12 +71,13 @@ public sealed class AdminDbController : ControllerBase
     }
 
     [HttpPost("import")]
+    [Consumes("multipart/form-data")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
-    public async Task<IActionResult> Import([FromForm] IFormFile file, CancellationToken cancellationToken)
+    public async Task<IActionResult> Import(IFormFile file, CancellationToken cancellationToken)
     {
         EnsureWriteEnabled();
 

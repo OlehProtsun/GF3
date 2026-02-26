@@ -255,7 +255,9 @@ public sealed class GraphExportService : IGraphExportService
         }
 
         var text = Convert.ToString(value, CultureInfo.InvariantCulture) ?? string.Empty;
-        if (text.Contains([',', '"', '\n', '\r']))
+
+        // Check for any CSV special characters using IndexOfAny with a char array.
+        if (text.IndexOfAny(new[] { ',', '"', '\n', '\r' }) >= 0)
         {
             return $"\"{text.Replace("\"", "\"\"")}\"";
         }
