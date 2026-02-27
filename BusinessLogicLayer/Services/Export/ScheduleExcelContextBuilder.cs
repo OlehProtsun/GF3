@@ -89,6 +89,21 @@ public sealed class ScheduleExcelContextBuilder : IScheduleExcelContextBuilder
             table.Rows.Count,
             string.Join(", ", columnNames),
             nonEmptyEmployeeCellCount);
+
+        if (nonEmptyEmployeeCellCount == 0)
+        {
+            var colMapDump = string.Join(", ", colMap.Select(kv => $"{kv.Key}=>{kv.Value}"));
+            var firstSlotsDump = string.Join(
+                " | ",
+                slots.Take(10).Select(s => $"day={s.DayOfMonth}, from={s.FromTime}, to={s.ToTime}, employeeId={s.EmployeeId}"));
+
+            _logger?.LogWarning(
+                "GF3 export debug graphId={GraphId}: empty matrix after build; employeeColumns=[{EmployeeColumns}], colMap=[{ColMap}], firstSlots=[{FirstSlots}]",
+                graph.Id,
+                string.Join(", ", colMap.Keys),
+                colMapDump,
+                firstSlotsDump);
+        }
     }
 
     public ContainerExcelContext BuildContainerContext(ContainerModel container, IReadOnlyList<GraphExcelContext> graphs)
