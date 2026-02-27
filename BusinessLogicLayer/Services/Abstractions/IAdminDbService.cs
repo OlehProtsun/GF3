@@ -1,5 +1,5 @@
 using BusinessLogicLayer.Contracts.Database;
-
+//
 namespace BusinessLogicLayer.Services.Abstractions;
 
 public interface IAdminDbService
