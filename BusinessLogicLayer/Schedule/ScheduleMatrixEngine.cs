@@ -10,11 +10,16 @@ namespace BusinessLogicLayer.Schedule
         public static bool TryParseTime(string? s, out TimeSpan t)
         {
             s = (s ?? string.Empty).Trim();
-            return TimeSpan.TryParseExact(
+            if (TimeSpan.TryParseExact(
                 s,
                 ScheduleMatrixConstants.TimeFormats,
                 CultureInfo.InvariantCulture,
-                out t);
+                out t))
+            {
+                return true;
+            }
+
+            return TimeSpan.TryParse(s, CultureInfo.InvariantCulture, out t);
         }
 
         public static DataTable BuildScheduleTable(
