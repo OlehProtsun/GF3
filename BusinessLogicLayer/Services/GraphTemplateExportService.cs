@@ -5,6 +5,7 @@ using BusinessLogicLayer.Schedule;
 using BusinessLogicLayer.Services.Abstractions;
 using BusinessLogicLayer.Services.Export;
 using ClosedXML.Excel;
+using Microsoft.Extensions.Logging;
 
 namespace BusinessLogicLayer.Services;
 
@@ -40,13 +41,20 @@ public sealed class GraphTemplateExportService : IGraphTemplateExportService
     private readonly IShopService _shopService;
     private readonly IExcelTemplateLocator _templateLocator;
     private readonly IScheduleExcelContextBuilder _contextBuilder;
+    private readonly ILogger<GraphTemplateExportService>? _logger;
 
-    public GraphTemplateExportService(IContainerService containerService, IShopService shopService, IExcelTemplateLocator templateLocator, IScheduleExcelContextBuilder contextBuilder)
+    public GraphTemplateExportService(
+        IContainerService containerService,
+        IShopService shopService,
+        IExcelTemplateLocator templateLocator,
+        IScheduleExcelContextBuilder contextBuilder,
+        ILogger<GraphTemplateExportService>? logger = null)
     {
         _containerService = containerService;
         _shopService = shopService;
         _templateLocator = templateLocator;
         _contextBuilder = contextBuilder;
+        _logger = logger;
     }
 
     public async Task<(byte[] content, string fileName)> ExportGraphToXlsxAsync(int containerId, int graphId, bool includeStyles, bool includeEmployees, CancellationToken ct = default)
@@ -133,11 +141,16 @@ public sealed class GraphTemplateExportService : IGraphTemplateExportService
 
     private async Task<GraphExcelContext> LoadGraphDataAsync(int containerId, int graphId, bool includeStyles, bool includeEmployees, CancellationToken ct)
     {
+        var debugEnabled = IsExportDebugEnabled();
         var graph = await _containerService.GetGraphByIdAsync(containerId, graphId, ct).ConfigureAwait(false)
             ?? throw new KeyNotFoundException($"Graph with id {graphId} was not found.");
         var slots = await _containerService.GetGraphSlotsAsync(containerId, graphId, ct).ConfigureAwait(false);
         // Excel matrix export must always be built from real schedule employees to stay 1:1 with WPF behavior.
         var employees = await _containerService.GetGraphEmployeesAsync(containerId, graphId, ct).ConfigureAwait(false);
+
+        NormalizeLegacySlotEmployeeIds(slots, employees, debugEnabled, graphId, _logger);
+        if (debugEnabled)
+            LogIntersectionDiagnostics(containerId, graphId, slots, employees);
 
         _ = includeStyles
             ? await _containerService.GetGraphCellStylesAsync(containerId, graphId, ct).ConfigureAwait(false)
@@ -146,6 +159,74 @@ public sealed class GraphTemplateExportService : IGraphTemplateExportService
         var shop = await _shopService.GetAsync(graph.ShopId, ct).ConfigureAwait(false);
         var scheduleContext = _contextBuilder.BuildScheduleContext(graph, shop, employees, slots);
         return new GraphExcelContext(graph, shop, employees, slots, scheduleContext);
+    }
+
+    private static bool IsExportDebugEnabled()
+        => string.Equals(Environment.GetEnvironmentVariable("GF3_EXPORT_DEBUG"), "true", StringComparison.OrdinalIgnoreCase);
+
+    internal static void NormalizeLegacySlotEmployeeIds(
+        IReadOnlyList<ScheduleSlotModel> slots,
+        IReadOnlyList<ScheduleEmployeeModel> employees,
+        bool debugEnabled,
+        int graphId,
+        ILogger? logger = null)
+    {
+        var employeeIds = employees.Select(x => x.EmployeeId).Where(x => x > 0).ToHashSet();
+        var slotEmployeeIds = slots.Where(x => x.EmployeeId.HasValue && x.EmployeeId.Value > 0).Select(x => x.EmployeeId!.Value).ToHashSet();
+        if (slotEmployeeIds.Count == 0 || slotEmployeeIds.Overlaps(employeeIds))
+            return;
+
+        var scheduleEmployeeIdToEmployeeId = employees
+            .Where(x => x.Id > 0 && x.EmployeeId > 0)
+            .GroupBy(x => x.Id)
+            .ToDictionary(g => g.Key, g => g.First().EmployeeId);
+
+        var rewrittenCount = 0;
+        foreach (var slot in slots)
+        {
+            if (!slot.EmployeeId.HasValue)
+                continue;
+
+            if (!scheduleEmployeeIdToEmployeeId.TryGetValue(slot.EmployeeId.Value, out var employeeId))
+                continue;
+
+            slot.EmployeeId = employeeId;
+            if (slot.Employee is not null)
+                slot.Employee.Id = employeeId;
+            rewrittenCount++;
+        }
+
+        if (debugEnabled)
+        {
+            logger?.LogInformation(
+                "GF3 export debug graphId={GraphId}: remapped legacy slot employee ids; rewritten={RewrittenCount}",
+                graphId,
+                rewrittenCount);
+        }
+    }
+
+    private void LogIntersectionDiagnostics(int containerId, int graphId, IReadOnlyList<ScheduleSlotModel> slots, IReadOnlyList<ScheduleEmployeeModel> employees)
+    {
+        var employeesEmpIds = employees.Select(e => e.EmployeeId).Where(x => x > 0).Distinct().ToList();
+        var slotsEmpIds = slots.Where(s => s.EmployeeId.HasValue && s.EmployeeId.Value > 0).Select(s => s.EmployeeId!.Value).Distinct().ToList();
+        var employeesSet = employeesEmpIds.ToHashSet();
+        var intersectionCount = slotsEmpIds.Count(employeesSet.Contains);
+        var firstBadSlots = slots
+            .Where(s => s.EmployeeId.HasValue && !employeesSet.Contains(s.EmployeeId.Value))
+            .Take(10)
+            .Select(s => $"day={s.DayOfMonth}, from={s.FromTime}, to={s.ToTime}, employeeId={s.EmployeeId}, status={s.Status}")
+            .ToArray();
+
+        _logger?.LogInformation(
+            "GF3 export debug before context: containerId={ContainerId}, graphId={GraphId}, slots={SlotsCount}, employees={EmployeesCount}, firstEmployeeIds=[{EmployeeIds}], firstSlotEmployeeIds=[{SlotEmployeeIds}], intersectionCount={IntersectionCount}, firstBadSlots=[{FirstBadSlots}]",
+            containerId,
+            graphId,
+            slots.Count,
+            employees.Count,
+            string.Join(", ", employeesEmpIds.Take(10)),
+            string.Join(", ", slotsEmpIds.Take(20)),
+            intersectionCount,
+            string.Join(" | ", firstBadSlots));
     }
 
     private static IXLWorksheet? FindTemplateSheet(XLWorkbook wb, IEnumerable<string> names)
