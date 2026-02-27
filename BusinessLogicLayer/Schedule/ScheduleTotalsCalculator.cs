@@ -11,18 +11,25 @@ namespace BusinessLogicLayer.Schedule
             public IReadOnlyDictionary<int, TimeSpan> PerEmployeeDuration { get; init; } = new Dictionary<int, TimeSpan>();
         }
 
+        // ScheduleTotalsCalculator.cs
+
         public static TotalsResult Calculate(IReadOnlyList<ScheduleEmployeeModel> employees, IReadOnlyList<ScheduleSlotModel> slots)
         {
-            var empIds = new HashSet<int>(employees.Select(x => x.EmployeeId));
+            static int GetEmpId(ScheduleEmployeeModel e)
+                => (e.Employee?.Id is int navId && navId > 0) ? navId : e.EmployeeId;
+
+            var empIds = new HashSet<int>(employees.Select(GetEmpId));
             var total = TimeSpan.Zero;
             var perEmp = new Dictionary<int, TimeSpan>(Math.Max(8, empIds.Count));
 
             foreach (var s in slots)
             {
-                if (!s.EmployeeId.HasValue || !empIds.Contains(s.EmployeeId.Value))
+                var slotEmpId = s.EmployeeId ?? (s.Employee?.Id);
+                if (!slotEmpId.HasValue || !empIds.Contains(slotEmpId.Value))
                     continue;
 
-                if (!ScheduleMatrixEngine.TryParseTime(s.FromTime, out var from) || !ScheduleMatrixEngine.TryParseTime(s.ToTime, out var to))
+                if (!ScheduleMatrixEngine.TryParseTime(s.FromTime, out var from) ||
+                    !ScheduleMatrixEngine.TryParseTime(s.ToTime, out var to))
                     continue;
 
                 var dur = to - from;
@@ -30,7 +37,7 @@ namespace BusinessLogicLayer.Schedule
                     dur += TimeSpan.FromHours(24);
 
                 total += dur;
-                perEmp[s.EmployeeId.Value] = perEmp.TryGetValue(s.EmployeeId.Value, out var curr) ? curr + dur : dur;
+                perEmp[slotEmpId.Value] = perEmp.TryGetValue(slotEmpId.Value, out var curr) ? curr + dur : dur;
             }
 
             return new TotalsResult { TotalEmployees = empIds.Count, TotalDuration = total, PerEmployeeDuration = perEmp };

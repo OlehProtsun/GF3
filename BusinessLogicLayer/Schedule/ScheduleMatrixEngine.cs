@@ -34,30 +34,38 @@ namespace BusinessLogicLayer.Schedule
 
             var orderedEmployees = (employees ?? Array.Empty<ScheduleEmployeeModel>())
                 .Where(e => e != null)
-                .OrderBy(e => (e.Employee?.LastName ?? string.Empty).Trim(), StringComparer.CurrentCultureIgnoreCase)
-                .ThenBy(e => (e.Employee?.FirstName ?? string.Empty).Trim(), StringComparer.CurrentCultureIgnoreCase)
-                .ThenBy(e => e.EmployeeId)
+                .Select(e => new
+                {
+                    Emp = e,
+                    EffectiveEmpId = (e.Employee?.Id is int navId && navId > 0) ? navId : e.EmployeeId
+                })
+                .OrderBy(x => (x.Emp.Employee?.LastName ?? string.Empty).Trim(), StringComparer.CurrentCultureIgnoreCase)
+                .ThenBy(x => (x.Emp.Employee?.FirstName ?? string.Empty).Trim(), StringComparer.CurrentCultureIgnoreCase)
+                .ThenBy(x => x.EffectiveEmpId)
                 .ToList();
 
             var seenEmpIds = new HashSet<int>();
-            foreach (var emp in orderedEmployees)
+            foreach (var x in orderedEmployees)
             {
-                if (!seenEmpIds.Add(emp.EmployeeId))
+                var emp = x.Emp;
+                var empId = x.EffectiveEmpId;
+
+                if (!seenEmpIds.Add(empId))
                     continue;
 
                 var displayName = $"{emp.Employee?.FirstName} {emp.Employee?.LastName}".Trim();
                 var baseName = string.IsNullOrWhiteSpace(displayName)
-                    ? $"Employee {emp.EmployeeId}"
+                    ? $"Employee {empId}"
                     : displayName;
 
-                var columnName = $"emp_{emp.EmployeeId}";
+                var columnName = $"emp_{empId}";
                 var suffix = 1;
                 while (table.Columns.Contains(columnName))
-                    columnName = $"emp_{emp.EmployeeId}_{++suffix}";
+                    columnName = $"emp_{empId}_{++suffix}";
 
                 var col = table.Columns.Add(columnName, typeof(string));
                 col.Caption = baseName;
-                colNameToEmpId[columnName] = emp.EmployeeId;
+                colNameToEmpId[columnName] = empId;
             }
 
             var daysInMonth = DateTime.DaysInMonth(year, month);

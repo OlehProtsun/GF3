@@ -239,8 +239,7 @@ public sealed class ScheduleExcelContextBuilder : IScheduleExcelContextBuilder
 
         foreach (var emp in employees)
         {
-            var empId = emp.EmployeeId;
-            if (!colByEmpId.TryGetValue(empId, out var colName)) continue;
+            var empId = (emp.Employee?.Id is int navId && navId > 0) ? navId : emp.EmployeeId; if (!colByEmpId.TryGetValue(empId, out var colName)) continue;
 
             var displayName = GetEmployeeDisplayName(emp);
             var dayCells = new List<SummaryDayCell>(daysInMonth);
