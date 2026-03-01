@@ -9,7 +9,9 @@
       "DOM.Iterable"
     ],
     "module": "ESNext",
-    "types": [],
+    "types": [
+      "vite/client"
+    ],
     "skipLibCheck": true,
     "moduleResolution": "bundler",
     "allowImportingTsExtensions": true,

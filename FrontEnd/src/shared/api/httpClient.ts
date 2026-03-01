@@ -24,19 +24,11 @@ export class ApiError extends Error {
 
 type RequestMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 
-type Primitive = string | number | boolean;
-type QueryParams = Record<string, Primitive | Primitive[] | null | undefined>;
-
-type ResponseType = "json" | "text" | "blob";
-
-export type RequestOptions = {
+type RequestOptions = {
   method?: RequestMethod;
   body?: unknown;
   headers?: HeadersInit;
   signal?: AbortSignal;
-  query?: QueryParams;
-  responseType?: ResponseType;
-  credentials?: RequestCredentials;
 };
 
 type ProblemDetailsResponse = {
@@ -49,43 +41,21 @@ type ProblemDetailsResponse = {
 
 const defaultBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim() || "/api";
 
-function getAccessToken(): string | null {
-  return localStorage.getItem("access_token");
-}
-
-function withQuery(path: string, query?: QueryParams): string {
-  if (!query) return path;
-
-  const searchParams = new URLSearchParams();
-  Object.entries(query).forEach(([key, value]) => {
-    if (value === undefined || value === null) return;
-
-    if (Array.isArray(value)) {
-      value.forEach((item) => searchParams.append(key, String(item)));
-      return;
-    }
-
-    searchParams.set(key, String(value));
-  });
-
-  const queryString = searchParams.toString();
-  if (!queryString) return path;
-  return `${path}${path.includes("?") ? "&" : "?"}${queryString}`;
-}
-
 function buildUrl(path: string): string {
   if (path.startsWith("http://") || path.startsWith("https://")) {
     return path;
   }
 
+  if (defaultBaseUrl.startsWith("http://") || defaultBaseUrl.startsWith("https://")) {
+    return `${defaultBaseUrl.replace(/\/$/, "")}/${path.replace(/^\//, "")}`;
+  }
+
   return `${defaultBaseUrl.replace(/\/$/, "")}/${path.replace(/^\//, "")}`;
 }
 
-async function parseResponse(response: Response, responseType: ResponseType): Promise<unknown> {
-  if (responseType === "blob") return response.blob();
-  if (responseType === "text") return response.text();
-
+async function parseBody(response: Response): Promise<unknown> {
   const contentType = response.headers.get("content-type") ?? "";
+
   if (contentType.includes("application/json") || contentType.includes("+json")) {
     try {
       return await response.json();
@@ -100,9 +70,11 @@ async function parseResponse(response: Response, responseType: ResponseType): Pr
 
 function toApiError(status: number, payload: unknown): ApiError {
   const problem = (payload ?? {}) as ProblemDetailsResponse;
+  const fallbackMessage = `Request failed with status ${status}`;
+
   return new ApiError({
     status,
-    message: problem.detail ?? problem.title ?? `Request failed with status ${status}`,
+    message: problem.detail ?? problem.title ?? fallbackMessage,
     details: payload,
     traceId: problem.traceId,
     validationErrors: problem.errors,
@@ -112,41 +84,26 @@ function toApiError(status: number, payload: unknown): ApiError {
 export async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const method = options.method ?? "GET";
   const hasBody = options.body !== undefined;
-  const responseType = options.responseType ?? "json";
 
   const headers = new Headers(options.headers);
   headers.set("Accept", "application/json");
-
-  const token = getAccessToken();
-  if (token && !headers.has("Authorization")) {
-    headers.set("Authorization", `Bearer ${token}`);
+  if (hasBody && !headers.has("Content-Type")) {
+    headers.set("Content-Type", "application/json");
   }
 
-  let body: BodyInit | undefined;
-  if (hasBody) {
-    if (options.body instanceof FormData || options.body instanceof Blob || typeof options.body === "string") {
-      body = options.body as BodyInit;
-    } else {
-      if (!headers.has("Content-Type")) {
-        headers.set("Content-Type", "application/json");
-      }
-      body = JSON.stringify(options.body);
-    }
-  }
-
-  const response = await fetch(buildUrl(withQuery(path, options.query)), {
+  const response = await fetch(buildUrl(path), {
     method,
     headers,
-    body,
     signal: options.signal,
-    credentials: options.credentials,
+    body: hasBody ? JSON.stringify(options.body) : undefined,
   });
 
   if (response.status === 204) {
     return undefined as T;
   }
 
-  const payload = await parseResponse(response, responseType);
+  const payload = await parseBody(response);
+
   if (!response.ok) {
     throw toApiError(response.status, payload);
   }
