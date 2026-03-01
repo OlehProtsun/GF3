@@ -12,3 +12,7 @@ export type SaveEmployeeInput = {
   phone?: string;
   email?: string;
 };
+
+export type EmployeesListParams = {
+  search?: string;
+};

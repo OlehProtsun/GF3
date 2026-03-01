@@ -1,7 +1,7 @@
 export const queryKeys = {
   employees: {
     all: ["employees"] as const,
-    list: () => ["employees", "list"] as const,
+    list: (search = "") => ["employees", "list", search] as const,
     byId: (id: number) => ["employees", "byId", id] as const,
   },
   shops: {

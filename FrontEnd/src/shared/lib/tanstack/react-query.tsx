@@ -4,6 +4,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import type { PropsWithChildren } from "react";
@@ -97,10 +98,15 @@ export function useQueryClient(): QueryClient {
 export function useQuery<TData>(options: QueryOptions<TData>) {
   const client = useQueryClient();
   const keyString = useMemo(() => JSON.stringify(options.queryKey), [options.queryKey]);
+  const queryFnRef = useRef(options.queryFn);
+  const queryKeyRef = useRef(options.queryKey);
   const [data, setData] = useState<TData | undefined>(undefined);
   const [error, setError] = useState<unknown>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [bump, setBump] = useState(client.getBump(keyString));
+
+  queryFnRef.current = options.queryFn;
+  queryKeyRef.current = options.queryKey;
 
   useEffect(() => {
     return client.subscribe((updatedKey) => {
@@ -110,6 +116,8 @@ export function useQuery<TData>(options: QueryOptions<TData>) {
     });
   }, [client, keyString]);
 
+  // We refetch only when query key / invalidation changes.
+  // Before this fix, inline queryFn identity changed each render and caused a refetch loop + UI freeze.
   useEffect(() => {
     if (options.enabled === false) return;
 
@@ -117,13 +125,13 @@ export function useQuery<TData>(options: QueryOptions<TData>) {
     setIsLoading(true);
     setError(null);
 
-    options
-      .queryFn({ signal: controller.signal })
+    queryFnRef
+      .current({ signal: controller.signal })
       .then((value) => setData(value))
       .catch((reason) => {
         setError(reason);
         if (!controller.signal.aborted) {
-          client.queryCache?.config.onError?.(reason, { queryKey: options.queryKey });
+          client.queryCache?.config.onError?.(reason, { queryKey: queryKeyRef.current });
         }
       })
       .finally(() => {
@@ -131,7 +139,7 @@ export function useQuery<TData>(options: QueryOptions<TData>) {
       });
 
     return () => controller.abort();
-  }, [bump, keyString, options.enabled, options.queryFn, client, options.queryKey]);
+  }, [bump, keyString, options.enabled, client]);
 
   return { data, error, isLoading };
 }
