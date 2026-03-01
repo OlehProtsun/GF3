@@ -79,16 +79,22 @@ app.UseWhen(ctx => ctx.Request.Path.StartsWithSegments("/api"), branch =>
 
 app.MapControllers();
 
-// ✅ DEV: React через Vite (проксі). Ти відкриваєш URL бекенда, а UI береться з Vite.
+// ✅ DEV: React через Vite (проксі) тільки для не-API/non-swagger запитів.
 if (app.Environment.IsDevelopment())
 {
-    app.UseSpa(spa =>
+    app.MapWhen(ctx =>
     {
-        // Папка React проекту відносно GF3.WebApi
-        spa.Options.SourcePath = @"..\FrontEnd";
-
-        // Порт Vite (зазвичай 5173)
-        spa.UseProxyToSpaDevelopmentServer("http://localhost:5173");
+        var path = ctx.Request.Path;
+        return !path.StartsWithSegments("/api")
+            && !path.StartsWithSegments("/swagger")
+            && !path.StartsWithSegments("/health");
+    }, spaApp =>
+    {
+        spaApp.UseSpa(spa =>
+        {
+            spa.Options.SourcePath = @"..\FrontEnd";
+            spa.UseProxyToSpaDevelopmentServer("http://localhost:5173");
+        });
     });
 }
 // ✅ PROD: віддавати build з wwwroot (коли зробиш npm run build і скопіюєш dist -> wwwroot)
