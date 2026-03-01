@@ -10,8 +10,10 @@
 
 	<PropertyGroup>
 		<SpaRoot>..\FrontEnd\</SpaRoot>
+		<SpaProxyWorkingDirectory>$(SpaRoot)</SpaProxyWorkingDirectory>
 		<SpaProxyLaunchCommand>npm run dev</SpaProxyLaunchCommand>
 		<SpaProxyServerUrl>http://localhost:5173</SpaProxyServerUrl>
+		<SpaProxyTimeoutInSeconds>180</SpaProxyTimeoutInSeconds>
 	</PropertyGroup>
 
   <ItemGroup>
