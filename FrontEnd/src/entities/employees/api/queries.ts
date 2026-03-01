@@ -4,12 +4,14 @@ import {
   useQueryClient,
 } from "@tanstack/react-query";
 import { queryKeys } from "@shared/api/queryKeys";
-import type { SaveEmployeeInput } from "@entities/employees/model/types";
+import type { EmployeesListParams, SaveEmployeeInput } from "@entities/employees/model/types";
 import { employeesApi } from "./employeesApi";
 
-export function useEmployeesListQuery() {
+export function useEmployeesListQuery(params?: EmployeesListParams) {
+  const search = params?.search?.trim() ?? "";
+
   return useQuery({
-    queryKey: queryKeys.employees.list(),
+    queryKey: queryKeys.employees.list(search),
     queryFn: ({ signal }) => employeesApi.list(signal),
   });
 }
