@@ -12,6 +12,17 @@ builder.Services.AddProblemDetails();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("FrontendDev", policy =>
+    {
+        policy
+            .WithOrigins("http://localhost:5173", "https://localhost:5173")
+            .AllowAnyHeader()
+            .AllowAnyMethod();
+    });
+});
+
 builder.Services.Configure<AdminToolsOptions>(builder.Configuration.GetSection("AdminTools"));
 builder.Services.PostConfigure<AdminToolsOptions>(options =>
 {
@@ -53,6 +64,11 @@ using (var scope = app.Services.CreateScope())
 
 app.UseSwagger();
 app.UseSwaggerUI();
+
+if (app.Environment.IsDevelopment())
+{
+    app.UseCors("FrontendDev");
+}
 
 // ✅ Middleware краще вішати тільки на /api, щоб не чіпати SPA (/)
 app.UseWhen(ctx => ctx.Request.Path.StartsWithSegments("/api"), branch =>
