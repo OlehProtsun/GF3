@@ -1,53 +1,115 @@
 import { ReactNode, useState } from "react";
 import styles from "./OverlaySidebarLayout.module.css";
+import {
+  InfoIcon,
+  EmployeeIcon,
+  ShopIcon,
+  AvailabilityIcon,
+  ContainerIcon,
+  HomeIcon,
+  DatabaseIcon,
+  ArrowIcon,
+} from "@shared/ui/icons";
 
 type OverlaySidebarLayoutProps = {
   children: ReactNode;
 };
+
+function NavItem({
+  label,
+  icon,
+  onClick,
+}: {
+  label: string;
+  icon: React.ReactNode;
+  onClick?: () => void;
+}) {
+  return (
+    <div className={styles.navItem}>
+      <button
+        type="button"
+        className={styles.navButton}
+        onClick={onClick}
+        aria-label={label}
+      >
+        {icon}
+      </button>
+
+      <div className={styles.navLabel} aria-hidden="true">
+        {label}
+      </div>
+    </div>
+  );
+}
 
 export function OverlaySidebarLayout({ children }: OverlaySidebarLayoutProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
 
   return (
     <div className={styles.layout}>
-      <aside className={`${styles.sidebar} ${isCollapsed ? styles.collapsed : styles.expanded}`}>
-        <div className={styles.handle}>
-          <button
-            type="button"
-            className={styles.controlButton}
-            onClick={() => setIsCollapsed((value) => !value)}
-          >
-            {isCollapsed ? "Show" : "Hide"}
-          </button>
+      <button
+        type="button"
+        className={`${styles.openTab} ${
+          isCollapsed ? styles.openTabVisible : styles.openTabHidden
+        }`}
+        onClick={() => setIsCollapsed(false)}
+        aria-label="Open sidebar"
+      >
+        <span className={styles.navIcon}>
+          <ArrowIcon size={20} className={styles.arrowDown} />
+        </span>      
+      </button>
+
+      <aside
+        className={`${styles.sidebar} ${
+          isCollapsed ? styles.collapsed : styles.expanded
+        }`}
+        aria-hidden={isCollapsed}
+      >
+        <div className={styles.nav}>
+          <NavItem
+            label="Home"
+            icon={
+              <span className={`${styles.navIcon} ${styles.navIconHome}`}>
+                <HomeIcon size={26} />
+              </span>
+            }
+          />
+          <NavItem label="Employee" icon={<EmployeeIcon size={22} style={{ transform: "scaleY(-1)" }} />} />
+          <NavItem label="Shop" icon={<ShopIcon size={28} style={{ transform: "scaleY(-1)" }} />} />
+          <NavItem label="Availability" icon={<AvailabilityIcon size={22} style={{ transform: "scaleY(-1)" }} />} />
+          <NavItem label="Container" icon={<ContainerIcon size={25} />} />
+          <NavItem label="Information" icon={<InfoIcon size={26} />} />
         </div>
 
-        <div className={styles.buttonList}>
-          <button type="button" className={styles.controlButton}>
-            Button 1
-          </button>
-          <button type="button" className={styles.controlButton}>
-            Button 2
-          </button>
-          <button type="button" className={styles.controlButton}>
-            Button 3
-          </button>
-          <button type="button" className={styles.controlButton}>
-            Button 4
-          </button>
+        <div className={`${styles.section} ${styles.sectionBottom}`}>
+          <div className={styles.sectionTitle}>Settings</div>
+          <div className={styles.nav}>
+            <NavItem label="DataBase" icon={<DatabaseIcon size={30} style={{ transform: "scaleY(-1)" }} />} />
+          </div>
         </div>
 
-        {!isCollapsed && (
+        <div className={styles.sidebarFooter}>
           <button
             type="button"
-            className={`${styles.controlButton} ${styles.hideButton}`}
+            className={styles.powerButton}
             onClick={() => setIsCollapsed(true)}
+            aria-label="Power Off"
           >
-            Hide
+            <span className={styles.navIcon}>
+              <ArrowIcon size={20} className={styles.arrowLeft} style={{ transform: "scaleY(-1)translateX(2px) translateY(2px)" }} />
+            </span>          
           </button>
-        )}
+        </div>
       </aside>
 
-      <main className={styles.content}>{children}</main>
+      <main
+        className={`${styles.content} ${
+          isCollapsed ? styles.contentExpanded : styles.contentShifted
+        }`}
+      >
+        <div className="container">{children}</div>
+      </main>
     </div>
   );
 }
