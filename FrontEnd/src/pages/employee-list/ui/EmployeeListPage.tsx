@@ -18,8 +18,12 @@ export function EmployeeListPage() {
   };
 
   return (
-    <div>
-      <PageHeader title="Employee List" subtitle="Browse and search employee records" backTo="/" />
+    <div className={styles.page}>
+      {/* Header in a separate white rounded section (with Back button) */}
+      <section className={styles.headerCard}>
+        <PageHeader title="Employee List" subtitle="Browse and search employee records" backTo="/" />
+      </section>
+
       <section className={styles.card}>
         <form className={styles.toolbar} onSubmit={onSearch}>
           <input value={searchInput} onChange={(event) => setSearchInput(event.target.value)} placeholder="Search employee" />
@@ -56,3 +60,4 @@ export function EmployeeListPage() {
     </div>
   );
 }
+
