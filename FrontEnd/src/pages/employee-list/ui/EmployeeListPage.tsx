@@ -19,10 +19,7 @@ export function EmployeeListPage() {
 
   return (
     <div className={styles.page}>
-      {/* Header in a separate white rounded section (with Back button) */}
-      <section className={styles.headerCard}>
-        <PageHeader title="Employee List" subtitle="Browse and search employee records" backTo="/" />
-      </section>
+      <PageHeader title="Employee List" subtitle="Browse and search employee records" backTo="/" />
 
       <section className={styles.card}>
         <form className={styles.toolbar} onSubmit={onSearch}>
