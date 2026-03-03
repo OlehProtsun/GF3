@@ -1,0 +1,4 @@
+.card { background:#fff; border-radius:12px; padding:1rem; }
+.grid { display:grid; grid-template-columns: 160px 1fr; gap:0.5rem; }
+.actions { display:flex; gap:0.5rem; margin-top:1rem; }
+.error { color:#dc2626; }

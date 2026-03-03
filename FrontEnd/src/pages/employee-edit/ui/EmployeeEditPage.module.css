@@ -1,0 +1,4 @@
+.card { background:#fff; border-radius:12px; padding:1rem; }
+.form { display:grid; gap:0.75rem; max-width:500px; }
+.error { color:#dc2626; font-size:0.875rem; }
+.actions { display:flex; gap:0.5rem; margin-top:0.5rem; }
