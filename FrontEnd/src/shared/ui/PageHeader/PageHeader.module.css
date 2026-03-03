@@ -1,9 +1,24 @@
-.header {
-  position: sticky;
-  top: env(safe-area-inset-top); /* завжди “в самий верх”, без +10px */
-  z-index: 999;
+.headerSpacer {
   width: 100%;
+  pointer-events: none;
+}
+
+.headerRoot {
+  position: fixed;
+  top: env(safe-area-inset-top);
+  left: 0;
+  right: 0;
+  z-index: 999;
   box-sizing: border-box;
+  padding-inline: var(--page-header-gutter, 14px);
+  pointer-events: none;
+}
+
+.header {
+  width: min(100%, 1100px);
+  margin-inline: auto;
+  box-sizing: border-box;
+  pointer-events: auto;
 }
 
 /* 2 колонки: ліва (контент), права (пошук знизу) */
@@ -91,20 +106,20 @@
   inset: 0;
   border-radius: inherit;
   pointer-events: none;
-  background: rgba(255, 255, 255, 0.55);
-  border: 1px solid rgba(0, 0, 0, 0.08);
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.7), rgba(255, 255, 255, 0.4));
+  border: 1px solid rgba(255, 255, 255, 0.5);
   box-shadow:
-    0 10px 30px rgba(0, 0, 0, 0.08),
-    0 1px 0 rgba(255, 255, 255, 0.35) inset;
-  backdrop-filter: blur(24px) saturate(180%);
-  -webkit-backdrop-filter: blur(24px) saturate(180%);
+    0 16px 36px rgba(15, 23, 42, 0.16),
+    0 1px 0 rgba(255, 255, 255, 0.5) inset;
+  backdrop-filter: blur(28px) saturate(180%);
+  -webkit-backdrop-filter: blur(28px) saturate(180%);
   z-index: -1;
 }
 
 .fullBleed.variantCard {
-  width: calc(100vw - (2 * var(--page-header-gutter)));
-  margin-left: calc(50% - 50vw + var(--page-header-gutter));
-  margin-right: calc(50% - 50vw + var(--page-header-gutter));
+  width: 100%;
+  margin-left: 0;
+  margin-right: 0;
 }
 
 .variantPlain {
@@ -139,15 +154,41 @@
   align-items: center;
   gap: 0.375rem;
   padding: 0.25rem 0.625rem;
-  transition: background-color 150ms ease, border-color 150ms ease;
+  transition:
+    transform 180ms ease,
+    background-color 180ms ease,
+    border-color 180ms ease,
+    box-shadow 220ms ease;
 }
 
 .backButton:hover {
-  background: #e5e7eb;
+  background: rgba(255, 255, 255, 0.75);
+  border-color: rgba(17, 24, 39, 0.22);
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.12);
+  transform: translateX(-18px) translateY(-1px);
 }
 
 .backButton:active {
-  background: #d1d5db;
+  background: rgba(229, 231, 235, 0.9);
+  transform: translateX(-18px) scale(0.98);
+}
+
+.backButton:focus-visible {
+  outline: none;
+  border-color: rgba(0, 47, 255, 0.35);
+  box-shadow: 0 0 0 4px rgba(0, 47, 255, 0.2);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .backButton {
+    transition: background-color 120ms ease, border-color 120ms ease;
+  }
+
+  .backButton:hover,
+  .backButton:active {
+    transform: translateX(-18px);
+    box-shadow: none;
+  }
 }
 
 .backIcon {

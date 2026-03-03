@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import styles from "./ConfirmDialog.module.css";
 
@@ -12,6 +13,8 @@ type ConfirmDialogProps = {
   footerSlot?: ReactNode;
 };
 
+const EXIT_ANIMATION_MS = 220;
+
 export function ConfirmDialog({
   open,
   title,
@@ -22,11 +25,28 @@ export function ConfirmDialog({
   cancelText = "Cancel",
   footerSlot,
 }: ConfirmDialogProps) {
-  if (!open) return null;
+  const [isMounted, setIsMounted] = useState(open);
+
+  useEffect(() => {
+    if (open) {
+      setIsMounted(true);
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => setIsMounted(false), EXIT_ANIMATION_MS);
+    return () => window.clearTimeout(timeoutId);
+  }, [open]);
+
+  if (!isMounted) return null;
 
   return (
-    <div className={styles.overlay} role="dialog" aria-modal="true" aria-label={title}>
-      <div className={styles.dialog}>
+    <div
+      className={`${styles.overlay} ${open ? styles.overlayOpen : styles.overlayClosing}`}
+      role="dialog"
+      aria-modal="true"
+      aria-label={title}
+    >
+      <div className={`${styles.dialog} ${open ? styles.dialogOpen : styles.dialogClosing}`}>
         <h3>{title}</h3>
         <p>{message}</p>
         <div className={styles.footer}>
