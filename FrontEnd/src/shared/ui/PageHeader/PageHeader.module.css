@@ -1,0 +1,24 @@
+.header {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: flex-start;
+  margin-bottom: 1.25rem;
+}
+
+.title {
+  margin: 0.25rem 0;
+  font-size: 1.8rem;
+}
+
+.subtitle {
+  margin: 0;
+  color: #6b7280;
+}
+
+.backButton {
+  border: 1px solid #d1d5db;
+  background: #fff;
+  border-radius: 8px;
+  cursor: pointer;
+}

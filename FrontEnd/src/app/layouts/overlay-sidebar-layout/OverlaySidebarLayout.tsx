@@ -1,4 +1,6 @@
-import { ReactNode, useState } from "react";
+import { useState } from "react";
+import type { ReactNode } from "react";
+import { NavLink } from "react-router-dom";
 import styles from "./OverlaySidebarLayout.module.css";
 import {
   InfoIcon,
@@ -18,22 +20,21 @@ type OverlaySidebarLayoutProps = {
 function NavItem({
   label,
   icon,
-  onClick,
+  to,
 }: {
   label: string;
   icon: React.ReactNode;
-  onClick?: () => void;
+  to: string;
 }) {
   return (
     <div className={styles.navItem}>
-      <button
-        type="button"
-        className={styles.navButton}
-        onClick={onClick}
+      <NavLink
+        to={to}
+        className={({ isActive }) => `${styles.navButton} ${isActive ? styles.navButtonActive : ""}`}
         aria-label={label}
       >
         {icon}
-      </button>
+      </NavLink>
 
       <div className={styles.navLabel} aria-hidden="true">
         {label}
@@ -57,7 +58,7 @@ export function OverlaySidebarLayout({ children }: OverlaySidebarLayoutProps) {
       >
         <span className={styles.navIcon}>
           <ArrowIcon size={20} className={styles.arrowDown} />
-        </span>      
+        </span>
       </button>
 
       <aside
@@ -69,23 +70,24 @@ export function OverlaySidebarLayout({ children }: OverlaySidebarLayoutProps) {
         <div className={styles.nav}>
           <NavItem
             label="Home"
+            to="/"
             icon={
               <span className={`${styles.navIcon} ${styles.navIconHome}`}>
                 <HomeIcon size={26} />
               </span>
             }
           />
-          <NavItem label="Employee" icon={<EmployeeIcon size={22} style={{ transform: "scaleY(-1)" }} />} />
-          <NavItem label="Shop" icon={<ShopIcon size={28} style={{ transform: "scaleY(-1)" }} />} />
-          <NavItem label="Availability" icon={<AvailabilityIcon size={22} style={{ transform: "scaleY(-1)" }} />} />
-          <NavItem label="Container" icon={<ContainerIcon size={25} />} />
-          <NavItem label="Information" icon={<InfoIcon size={26} />} />
+          <NavItem label="Employee" to="/employee" icon={<EmployeeIcon size={22} style={{ transform: "scaleY(-1)" }} />} />
+          <NavItem label="Shop" to="/shop" icon={<ShopIcon size={28} style={{ transform: "scaleY(-1)" }} />} />
+          <NavItem label="Availability" to="/availability" icon={<AvailabilityIcon size={22} style={{ transform: "scaleY(-1)" }} />} />
+          <NavItem label="Container" to="/container" icon={<ContainerIcon size={25} />} />
+          <NavItem label="Information" to="/information" icon={<InfoIcon size={26} />} />
         </div>
 
         <div className={`${styles.section} ${styles.sectionBottom}`}>
           <div className={styles.sectionTitle}>Settings</div>
           <div className={styles.nav}>
-            <NavItem label="DataBase" icon={<DatabaseIcon size={30} style={{ transform: "scaleY(-1)" }} />} />
+            <NavItem label="DataBase" to="/database" icon={<DatabaseIcon size={30} style={{ transform: "scaleY(-1)" }} />} />
           </div>
         </div>
 
@@ -98,7 +100,7 @@ export function OverlaySidebarLayout({ children }: OverlaySidebarLayoutProps) {
           >
             <span className={styles.navIcon}>
               <ArrowIcon size={20} className={styles.arrowLeft} style={{ transform: "scaleY(-1)translateX(2px) translateY(2px)" }} />
-            </span>          
+            </span>
           </button>
         </div>
       </aside>

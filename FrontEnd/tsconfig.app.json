@@ -47,6 +47,9 @@
       ],
       "@tanstack/react-query-devtools": [
         "src/shared/lib/tanstack/react-query-devtools.tsx"
+      ],
+      "react-router-dom": [
+        "src/shared/lib/react-router-dom.tsx"
       ]
     }
   },

@@ -15,6 +15,7 @@ export default defineConfig({
       "@shared": path.resolve(__dirname, "src/shared"),
       "@tanstack/react-query": path.resolve(__dirname, "src/shared/lib/tanstack/react-query.tsx"),
       "@tanstack/react-query-devtools": path.resolve(__dirname, "src/shared/lib/tanstack/react-query-devtools.tsx"),
+      "react-router-dom": path.resolve(__dirname, "src/shared/lib/react-router-dom.tsx"),
     },
   },
   server: {
