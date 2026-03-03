@@ -75,7 +75,10 @@
 
 .backButton {
   border: 1px solid #d1d5db;
-  background: #fff;
+  background: #f3f4f6;      /* сірий фон */
+  color: #111827;
+  height: 38px;
+  transform: translateX(-18px);
   border-radius: 9999px;
   cursor: pointer;
   margin-top: 12px;
@@ -83,10 +86,27 @@
   align-items: center;
   gap: 0.375rem;
   padding: 0.25rem 0.625rem;
+
+  transition: background-color 150ms ease, border-color 150ms ease;
+}
+
+.backButton:hover {
+  background: #e5e7eb;
+}
+
+.backButton:active {
+  background: #d1d5db;
 }
 
 .backIcon {
   width: 0.9rem;
   height: 0.9rem;
   display: block;
+
+  /* щоб не обрізало stroke по краях svg */
+  overflow: visible;
+
+  /* мікро-відступ (дає трішки місця “справа” в блоці іконки) */
+  padding-right: 2px;
+  box-sizing: content-box;
 }
