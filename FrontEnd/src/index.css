@@ -4,9 +4,22 @@
   background-color: #f3f4f6;
 }
 
+html {
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+}
+
 body {
   margin: 0;
+  overflow-x: hidden;
 }
+
+@supports not (scrollbar-gutter: stable) {
+  html {
+    overflow-y: scroll;
+  }
+}
+
 
 main {
   max-width: 1100px;

@@ -1,9 +1,31 @@
 .overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.35);
+  z-index: 1200;
   display: grid;
   place-items: center;
+  background: rgba(10, 15, 28, 0.08);
+  backdrop-filter: blur(0px);
+  -webkit-backdrop-filter: blur(0px);
+  transition:
+    opacity 220ms ease,
+    background-color 220ms ease,
+    backdrop-filter 220ms ease,
+    -webkit-backdrop-filter 220ms ease;
+}
+
+.overlayOpen {
+  opacity: 1;
+  background: rgba(10, 15, 28, 0.36);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.overlayClosing {
+  opacity: 0;
+  background: rgba(10, 15, 28, 0.08);
+  backdrop-filter: blur(0px);
+  -webkit-backdrop-filter: blur(0px);
 }
 
 .dialog {
@@ -11,10 +33,28 @@
   border-radius: 12px;
   padding: 1rem;
   width: min(420px, 90vw);
+  transition: transform 220ms ease, opacity 220ms ease;
+}
+
+.dialogOpen {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+.dialogClosing {
+  opacity: 0;
+  transform: translateY(8px) scale(0.98);
 }
 
 .footer {
   display: flex;
   justify-content: flex-end;
   gap: 0.5rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .overlay,
+  .dialog {
+    transition: none;
+  }
 }
