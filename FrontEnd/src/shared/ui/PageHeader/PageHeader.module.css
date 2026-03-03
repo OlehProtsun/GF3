@@ -1,28 +1,42 @@
 .header {
   position: sticky;
-  top: calc(env(safe-area-inset-top) + 10px);
-  z-index: 60;
+  top: env(safe-area-inset-top); /* завжди “в самий верх”, без +10px */
+  z-index: 999;
   width: 100%;
   box-sizing: border-box;
 }
 
-.headerRow {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
+/* 2 колонки: ліва (контент), права (пошук знизу) */
+.headerGrid {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 16px;
+  width: 100%;
+  align-items: stretch; /* важливо: дає правій колонці “висоту” щоб опустити пошук вниз */
 }
 
-.content {
+.leftCol {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   text-align: left;
   gap: 0.5rem;
-  flex: 1;
   min-width: 0;
 }
 
+.rightCol {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 10px;
+}
+
+.rightSlot {
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* CARD */
 .variantCard {
   position: relative;
   isolation: isolate;
@@ -32,11 +46,19 @@
 
   --page-header-gutter: 14px;
 
-  padding: 20px clamp(16px, 4vw, 28px);
+  --padY: 20px;
+  --padX: clamp(16px, 4vw, 28px);
+
+  padding-top: var(--padY);
+  padding-left: var(--padX);
+  padding-right: var(--padX);
+  padding-bottom: 8px; /* ще нижче до краю */
+
   min-height: 150px;
   overflow: hidden;
 
-  --s: 35px;
+  /* маска як у вас була */
+  --s: 50px;
   --x: 38px;
   --y: -40px;
 
@@ -112,12 +134,11 @@
   transform: translateX(-18px);
   border-radius: 9999px;
   cursor: pointer;
-  margin-top: 12px;
+  margin-top: 28px;
   display: inline-flex;
   align-items: center;
   gap: 0.375rem;
   padding: 0.25rem 0.625rem;
-
   transition: background-color 150ms ease, border-color 150ms ease;
 }
 
@@ -138,26 +159,34 @@
   box-sizing: content-box;
 }
 
+/* Search */
 .searchPill {
   display: flex;
   align-items: center;
   gap: 8px;
   border-radius: 9999px;
-  padding: 6px 10px;
+  padding: 6px 6px 6px 10px;
   border: 1px solid rgba(0, 0, 0, 0.08);
   background: rgba(255, 255, 255, 0.72);
   box-shadow: 0 1px 0 rgba(255, 255, 255, 0.35) inset;
   backdrop-filter: blur(20px) saturate(180%);
   -webkit-backdrop-filter: blur(20px) saturate(180%);
-  width: min(100%, 360px);
-  min-width: 140px;
+  width: 650px;
+  max-width: 65vw;
 }
 
 .searchPill:focus-within {
-  border-color: rgba(0, 47, 255, 0.35);
+  border-color: rgba(0, 170, 255, 0.35);
   box-shadow:
-    0 0 0 3px rgba(0, 47, 255, 0.2),
+    0 0 0 1px rgba(0, 47, 255, 0.2),
     0 1px 0 rgba(255, 255, 255, 0.35) inset;
+}
+
+.searchRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: auto; /* головне: прибиває форму до низу колонки */
 }
 
 .searchIcon {
@@ -165,6 +194,7 @@
   height: 14px;
   color: rgba(17, 24, 39, 0.7);
   flex-shrink: 0;
+  transform: scaleY(-1); /* переворот іконки */
 }
 
 .searchInput {
@@ -182,7 +212,17 @@
 }
 
 @media (max-width: 680px) {
+  .headerGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .rightCol {
+    align-items: stretch;
+  }
+
   .searchPill {
-    max-width: 220px;
+    width: 100%;
+    max-width: 100%;
   }
 }
+
