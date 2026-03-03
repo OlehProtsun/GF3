@@ -1,9 +1,16 @@
 .header {
+  position: sticky;
+  top: calc(env(safe-area-inset-top) + 10px);
+  z-index: 60;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.headerRow {
   display: flex;
   justify-content: space-between;
-  gap: 1rem;
-  align-items: flex-start;
-  box-sizing: border-box;
+  align-items: center;
+  gap: 12px;
 }
 
 .content {
@@ -12,10 +19,13 @@
   align-items: flex-start;
   text-align: left;
   gap: 0.5rem;
+  flex: 1;
+  min-width: 0;
 }
 
 .variantCard {
-  background: #fff;
+  position: relative;
+  isolation: isolate;
 
   --r: 28px;
   border-radius: var(--r);
@@ -53,6 +63,22 @@
   mask-repeat: no-repeat;
 }
 
+.variantCard::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: rgba(255, 255, 255, 0.55);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  box-shadow:
+    0 10px 30px rgba(0, 0, 0, 0.08),
+    0 1px 0 rgba(255, 255, 255, 0.35) inset;
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  z-index: -1;
+}
+
 .fullBleed.variantCard {
   width: calc(100vw - (2 * var(--page-header-gutter)));
   margin-left: calc(50% - 50vw + var(--page-header-gutter));
@@ -66,6 +92,11 @@
 .title {
   margin: 0;
   font-size: 1.8rem;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .subtitle {
@@ -75,7 +106,7 @@
 
 .backButton {
   border: 1px solid #d1d5db;
-  background: #f3f4f6;      /* сірий фон */
+  background: #f3f4f6;
   color: #111827;
   height: 38px;
   transform: translateX(-18px);
@@ -102,11 +133,56 @@
   width: 0.9rem;
   height: 0.9rem;
   display: block;
-
-  /* щоб не обрізало stroke по краях svg */
   overflow: visible;
-
-  /* мікро-відступ (дає трішки місця “справа” в блоці іконки) */
   padding-right: 2px;
   box-sizing: content-box;
+}
+
+.searchPill {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-radius: 9999px;
+  padding: 6px 10px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  background: rgba(255, 255, 255, 0.72);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.35) inset;
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  width: min(100%, 360px);
+  min-width: 140px;
+}
+
+.searchPill:focus-within {
+  border-color: rgba(0, 47, 255, 0.35);
+  box-shadow:
+    0 0 0 3px rgba(0, 47, 255, 0.2),
+    0 1px 0 rgba(255, 255, 255, 0.35) inset;
+}
+
+.searchIcon {
+  width: 14px;
+  height: 14px;
+  color: rgba(17, 24, 39, 0.7);
+  flex-shrink: 0;
+}
+
+.searchInput {
+  border: none;
+  outline: none;
+  background: transparent;
+  font-size: 0.95rem;
+  width: 100%;
+  min-width: 0;
+  color: #111827;
+}
+
+.searchInput::placeholder {
+  color: rgba(17, 24, 39, 0.55);
+}
+
+@media (max-width: 680px) {
+  .searchPill {
+    max-width: 220px;
+  }
 }

@@ -1,5 +1,4 @@
 import { useState } from "react";
-import type { FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { useEmployeesQuery } from "@entities/employees/model/queries";
 import { PageHeader } from "@shared/ui/PageHeader";
@@ -7,26 +6,28 @@ import styles from "./EmployeeListPage.module.css";
 
 export function EmployeeListPage() {
   const navigate = useNavigate();
-  const [searchInput, setSearchInput] = useState("");
-  const [searchText, setSearchText] = useState("");
-  const employeesQuery = useEmployeesQuery(searchText);
+  const [query, setQuery] = useState("");
+  const employeesQuery = useEmployeesQuery(query);
   const employees = employeesQuery.data ?? [];
-
-  const onSearch = (event: FormEvent) => {
-    event.preventDefault();
-    setSearchText(searchInput);
-  };
 
   return (
     <div className={styles.page}>
-      <PageHeader title="Employee List" subtitle="Browse and search employee records" backTo="/" />
+      <PageHeader
+        title="Employee List"
+        subtitle="Browse and search employee records"
+        backTo="/"
+        search={{
+          value: query,
+          onChange: setQuery,
+          placeholder: "Search employee",
+          ariaLabel: "Search employee",
+        }}
+      />
 
       <section className={styles.card}>
-        <form className={styles.toolbar} onSubmit={onSearch}>
-          <input value={searchInput} onChange={(event) => setSearchInput(event.target.value)} placeholder="Search employee" />
-          <button type="submit">Search</button>
+        <div className={styles.actionsRow}>
           <button type="button" onClick={() => navigate("/employee/new")}>Add New</button>
-        </form>
+        </div>
 
         <div className={styles.badge}>Total: {employees.length}</div>
 
@@ -57,4 +58,3 @@ export function EmployeeListPage() {
     </div>
   );
 }
-
