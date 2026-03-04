@@ -1,0 +1,65 @@
+.button {
+  --btn-bg: #2563eb;
+  --btn-bg-hover: color-mix(in srgb, var(--btn-bg) 88%, #000);
+  --btn-border: var(--btn-bg);
+  --btn-shadow: color-mix(in srgb, var(--btn-bg) 35%, transparent);
+  --btn-focus: color-mix(in srgb, var(--btn-bg) 35%, transparent);
+
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 43px;
+  padding: 0.55rem 0.85rem;
+  border-radius: 999px;
+  border: 1px solid var(--btn-border);
+  background: var(--btn-bg);
+  color: #fff;
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: 0 10px 22px var(--btn-shadow);
+  transition: transform 120ms ease, box-shadow 120ms ease, background 120ms ease;
+}
+
+.button:hover:not(:disabled) {
+  background: var(--btn-bg-hover);
+}
+
+.button:active:not(:disabled) {
+  transform: translateY(1px);
+  box-shadow: 0 6px 14px color-mix(in srgb, var(--btn-bg) 28%, transparent);
+}
+
+.button:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--btn-focus), 0 10px 22px var(--btn-shadow);
+}
+
+.button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.icon {
+  width: 18px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.icon :global(svg) {
+  width: 18px;
+  height: 18px;
+}
+
+.primary {
+  --btn-bg: #2563eb;
+  --btn-border: #2563eb;
+}
+
+.secondary {
+  --btn-bg: #6b7280;
+  --btn-border: #6b7280;
+}
