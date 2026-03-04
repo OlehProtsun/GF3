@@ -5,108 +5,24 @@
   align-items: stretch;
 }
 
-.card {
-  background: #fff;
-  border-radius: 32px; /* iOS-like rounding */
-  padding: 1rem;
-  overflow: hidden;
-  border: 1px solid #e5e5ea;
-  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.08);
-}
-
-.cardTopBar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 0.75rem;
-}
-
-.totalBadge {
-  display: inline-flex;
-  align-items: center;
-
-  padding: 0.35rem 0.6rem;
-  border-radius: 999px;
-
-  background: #f2f2f7; /* iOS system gray */
-  border: 1px solid #e5e5ea;
-  color: #111827;
-
-  font-weight: 600;
-  font-size: 0.9rem;
-}
-
-.addButton {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  height: 43px;
-  border: 1px solid #2563eb;
-  background: #2563eb;
-  color: #fff;
-
-  padding: 0.55rem 0.85rem;
-  border-radius: 999px;
-
-  font-weight: 600;
-  line-height: 1;
-  cursor: pointer;
-
-  box-shadow: 0 10px 22px rgba(37, 99, 235, 0.28);
-  transition: transform 120ms ease, box-shadow 120ms ease, background 120ms ease;
-}
-
-.addButton:hover {
-  background: #1d4ed8;
-}
-
-.addButton:active {
-  transform: translateY(1px);
-  box-shadow: 0 6px 14px rgba(37, 99, 235, 0.22);
-}
-
-.addButton:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.35), 0 10px 22px rgba(37, 99, 235, 0.28);
-}
-
-.addButtonIcon {
-  width: 18px;
-  height: 18px;
-  stroke: currentColor;
-  stroke-width: 2.5;
-  fill: none;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-
-.actionsRow {
-  display: flex;
-  justify-content: flex-end;
-  margin-bottom: 1rem;
-}
-
 .table {
   width: 100%;
   border-collapse: separate;
-  border-spacing: 0 14px; /* більший відступ між рядками */
+  border-spacing: 0 14px;
 }
 
-/* header як iOS-like pill-row */
 .table thead th {
   background: #f2f2f7;
   border: 1px solid #e5e5ea;
   padding: 0.65rem 0.9rem;
   text-align: left;
-
   font-size: 0.85rem;
   font-weight: 700;
   color: #374151;
 }
 
 .table thead th + th {
-  border-left: none; /* щоб не було подвійних бордерів посередині */
+  border-left: none;
 }
 
 .table thead th:first-child {
@@ -117,13 +33,11 @@
   border-radius: 0 16px 16px 0;
 }
 
-/* body rows як “окремі картки” */
 .table tbody td {
   background: #ffffff;
   border: 1px solid #e5e5ea;
   padding: 0.85rem 0.9rem;
   text-align: left;
-
   transition: background 140ms ease, border-color 140ms ease, color 140ms ease, transform 120ms ease;
 }
 
@@ -143,15 +57,6 @@
   cursor: pointer;
 }
 
-.badge {
-  display: inline-block;
-  padding: 0.25rem 0.5rem;
-  border-radius: 999px;
-  background: #eef2ff;
-  margin-bottom: 0.75rem;
-}
-
-
 .row:hover td {
   background: #f3f6ff;
 }
@@ -160,7 +65,6 @@
   transform: translateY(1px);
 }
 
-/* виділення при кліку */
 .rowSelected td {
   background: #2563eb;
   border-color: #2563eb;
@@ -172,56 +76,7 @@
   border-color: #1d4ed8;
 }
 
-/* keyboard focus (tab на рядок) */
 .row:focus-visible td {
   outline: none;
   box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.35);
-}
-
-/* iOS-like error banner */
-.errorWrap {
-  display: flex;
-  justify-content: center;
-  margin: 0.25rem 0 0.9rem;
-}
-
-.errorBanner {
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-
-  padding: 0.6rem 0.9rem;
-  border-radius: 999px;
-
-  background: rgba(255, 59, 48, 0.14); /* iOS red tint */
-  border: 1px solid rgba(255, 59, 48, 0.28);
-  color: #b42318;
-
-  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.12);
-  backdrop-filter: blur(10px);
-
-  max-width: min(720px, calc(100% - 24px));
-}
-
-.errorIcon {
-  width: 18px;
-  height: 18px;
-  flex: 0 0 auto;
-
-  stroke: currentColor;
-  stroke-width: 2.25;
-  fill: none;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-
-  opacity: 0.95;
-}
-
-.errorText {
-  font-weight: 700;
-  font-size: 0.92rem;
-  line-height: 1.1;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
