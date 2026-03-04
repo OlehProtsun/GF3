@@ -104,7 +104,6 @@ export function OverlaySidebarLayout({ children }: OverlaySidebarLayoutProps) {
           </button>
         </div>
       </aside>
-
       <main
         className={`${styles.content} ${
           isCollapsed ? styles.contentExpanded : styles.contentShifted
@@ -112,6 +111,15 @@ export function OverlaySidebarLayout({ children }: OverlaySidebarLayoutProps) {
       >
         <div className="container">{children}</div>
       </main>
+
+      <div
+        className={`${styles.backdrop} ${
+          isCollapsed ? styles.backdropHidden : styles.backdropVisible
+        }`}
+        onClick={() => setIsCollapsed(true)}
+        aria-hidden="true"
+      />
+
     </div>
   );
 }

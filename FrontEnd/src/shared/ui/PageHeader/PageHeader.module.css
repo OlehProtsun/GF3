@@ -8,7 +8,7 @@
   top: env(safe-area-inset-top);
   left: 0;
   right: 0;
-  z-index: 999;
+  z-index: 850;
   box-sizing: border-box;
   padding-inline: var(--page-header-gutter, 14px);
   pointer-events: none;
@@ -72,9 +72,27 @@
   min-height: 150px;
   overflow: hidden;
 
+  /* ✅ GLASS як у .sidebar + легкий тонований градієнт */
+  background:
+    linear-gradient(
+      to bottom,
+      rgba(255, 255, 255, 0.18),
+      rgba(255, 255, 255, 0)
+    ),
+    rgba(255, 255, 255, 0.45);
+
+  border: 1px solid var(--border, rgba(0, 0, 0, 0.08));
+
+  box-shadow:
+    var(--shadow, 0 10px 30px rgba(0, 0, 0, 0.08)),
+    0 1px 0 rgba(255, 255, 255, 0.35) inset;
+
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+
   /* маска як у вас була */
   --s: 50px;
-  --x: 38px;
+  --x: 25px;
   --y: -40px;
 
   --_m: /calc(2 * var(--r)) calc(2 * var(--r)) radial-gradient(#000 70%, #0000 72%);
@@ -98,22 +116,6 @@
     var(--_g) calc(var(--_d) + var(--x)) 0,
     var(--_g) 0 calc(var(--_d) + var(--y));
   mask-repeat: no-repeat;
-}
-
-.variantCard::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  pointer-events: none;
-  background: linear-gradient(160deg, rgba(255, 255, 255, 0.7), rgba(255, 255, 255, 0.4));
-  border: 1px solid rgba(255, 255, 255, 0.5);
-  box-shadow:
-    0 16px 36px rgba(15, 23, 42, 0.16),
-    0 1px 0 rgba(255, 255, 255, 0.5) inset;
-  backdrop-filter: blur(28px) saturate(180%);
-  -webkit-backdrop-filter: blur(28px) saturate(180%);
-  z-index: -1;
 }
 
 .fullBleed.variantCard {
