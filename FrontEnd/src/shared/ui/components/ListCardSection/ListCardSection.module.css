@@ -1,0 +1,69 @@
+.card {
+  background: #fff;
+  border-radius: 32px;
+  padding: 1rem;
+  overflow: hidden;
+  border: 1px solid #e5e5ea;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.08);
+}
+
+.topBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 0.75rem;
+}
+
+.totalBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.35rem 0.6rem;
+  border-radius: 999px;
+  background: #f2f2f7;
+  border: 1px solid #e5e5ea;
+  color: #111827;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.errorWrap {
+  display: flex;
+  justify-content: center;
+  margin: 0.25rem 0 0.9rem;
+}
+
+.errorBanner {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0.6rem 0.9rem;
+  border-radius: 999px;
+  background: rgba(255, 59, 48, 0.14);
+  border: 1px solid rgba(255, 59, 48, 0.28);
+  color: #b42318;
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.12);
+  backdrop-filter: blur(10px);
+  max-width: min(720px, calc(100% - 24px));
+}
+
+.errorIcon {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+  stroke: currentColor;
+  stroke-width: 2.25;
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0.95;
+}
+
+.errorText {
+  font-weight: 700;
+  font-size: 0.92rem;
+  line-height: 1.1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
