@@ -1,7 +1,10 @@
-import { useState } from "react";
+import { useCallback, useMemo, useState, type KeyboardEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { useEmployeesQuery } from "@entities/employees/model/queries";
 import { PageHeader } from "@shared/ui/PageHeader";
+import { PlusIcon } from "@shared/ui/icons";
+import { IosButton } from "@shared/ui/components/IosButton";
+import { ListCardSection } from "@shared/ui/components/ListCardSection";
 import styles from "./EmployeeListPage.module.css";
 
 export function EmployeeListPage() {
@@ -9,17 +12,31 @@ export function EmployeeListPage() {
   const [query, setQuery] = useState("");
   const [selectedId, setSelectedId] = useState<string | number | null>(null);
   const employeesQuery = useEmployeesQuery(query);
-  const employees = employeesQuery.data ?? [];
 
-  const hasEmployees = (employees?.length ?? 0) > 0;
+  const employees = useMemo(() => employeesQuery.data ?? [], [employeesQuery.data]);
+  const hasEmployees = employees.length > 0;
 
-  // показуємо помилку тільки коли:
-  // - реально error
-  // - НЕ йде завантаження/рефетч
-  // - і при цьому немає даних
-  const showEmployeesError =
-    Boolean(employeesQuery.error) && !employeesQuery.isFetching && !hasEmployees;
+  const handleAddEmployee = useCallback(() => {
+    navigate("/employee/new");
+  }, [navigate]);
 
+  const handleEmployeeOpen = useCallback(
+    (employeeId: string | number) => {
+      navigate(`/employee/${employeeId}`);
+    },
+    [navigate]
+  );
+
+  const handleEmployeeKeyDown = useCallback(
+    (event: KeyboardEvent<HTMLTableRowElement>, employeeId: string | number) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        setSelectedId(employeeId);
+        handleEmployeeOpen(employeeId);
+      }
+    },
+    [handleEmployeeOpen]
+  );
 
   return (
     <div className={styles.page}>
@@ -35,40 +52,16 @@ export function EmployeeListPage() {
         }}
       />
 
-      <section className={styles.card}>
-        <div className={styles.cardTopBar}>
-          <button
-            type="button"
-            className={styles.addButton}
-            onClick={() => navigate("/employee/new")}
-          >
-            <svg
-              className={styles.addButtonIcon}
-              viewBox="0 0 24 24"
-              aria-hidden="true"
-              focusable="false"
-            >
-              <path d="M12 5v14M5 12h14" />
-            </svg>
-            <span>Add New</span>
-          </button>
-
-          <div className={styles.totalBadge}>Total: {employees.length}</div>
-        </div>
-
+      <ListCardSection
+        totalCount={employees.length}
+        error={employeesQuery.error}
+        isFetching={employeesQuery.isLoading}
+        hasData={hasEmployees}
+        errorMessage="Could not load employees."
+        actionSlot={<IosButton label="Add New" icon={<PlusIcon size={18} />} onClick={handleAddEmployee} />}
+      >
         {employeesQuery.isLoading ? <p>Loading...</p> : null}
-        {showEmployeesError ? (
-          <div className={styles.errorWrap}>
-            <div className={styles.errorBanner} role="alert" aria-live="polite">
-              <svg className={styles.errorIcon} viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                <path d="M12 9v4M12 17h.01" />
-                <path d="M10.29 3.86 2.17 17.92A2 2 0 0 0 3.9 21h16.2a2 2 0 0 0 1.73-3.08L13.71 3.86a2 2 0 0 0-3.42 0Z" />
-              </svg>
 
-              <span className={styles.errorText}>Could not load employees.</span>
-            </div>
-          </div>
-        ) : null}
         <table className={styles.table}>
           <thead>
             <tr>
@@ -86,22 +79,16 @@ export function EmployeeListPage() {
                   selectedId === employee.id ? styles.rowSelected : ""
                 }`}
                 onMouseDown={() => setSelectedId(employee.id)}
-                onClick={() => navigate(`/employee/${employee.id}`)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
-                    setSelectedId(employee.id);
-                    navigate(`/employee/${employee.id}`);
-                  }
-                }}
+                onClick={() => handleEmployeeOpen(employee.id)}
+                onKeyDown={(event) => handleEmployeeKeyDown(event, employee.id)}
               >
                 <td>{employee.firstName}</td>
                 <td>{employee.lastName}</td>
-              </tr>            
+              </tr>
             ))}
           </tbody>
         </table>
-      </section>
+      </ListCardSection>
     </div>
   );
 }
