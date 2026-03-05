@@ -12,7 +12,7 @@
 }
 
 .table thead th {
-  background: #f2f2f7;
+  background: #f4f4f5;
   border: 1px solid #e5e5ea;
   padding: 0.65rem 0.9rem;
   text-align: left;
@@ -58,7 +58,7 @@
 }
 
 .row:hover td {
-  background: #f3f6ff;
+  background: #f4f4f5;
 }
 
 .row:active td {

@@ -1,4 +1,248 @@
-.card { background:#fff; border-radius:12px; padding:1rem; }
-.form { display:grid; gap:0.75rem; max-width:500px; }
-.error { color:#dc2626; font-size:0.875rem; }
-.actions { display:flex; gap:0.5rem; margin-top:0.5rem; }
+.page {
+  width: min(100%, 1100px);
+  margin-inline: auto;
+  padding-inline: 14px;
+
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  align-items: stretch;
+}
+
+/* iOS / glass card (в стилі PageHeader) */
+.card {
+  position: relative;
+  isolation: isolate;
+  width: min(100%, 760px);
+  margin-inline: auto;
+  border-radius: 32px;
+  padding: 18px;
+  padding-bottom: 0px;
+  overflow: hidden;
+
+  background:
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0)),
+    rgba(255, 255, 255, 0.65);
+
+  border: 1px solid rgba(0, 0, 0, 0.08);
+
+  box-shadow:
+    0 12px 30px rgba(0, 0, 0, 0.08),
+    0 1px 0 rgba(255, 255, 255, 0.35) inset;
+
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+}
+
+.loading {
+  color: #6b7280;
+  font-weight: 600;
+  margin: 0.25rem 0 0.75rem;
+}
+
+/* form layout */
+.form {
+  display: grid;
+  gap: 14px;
+  width: 100%;
+  max-width: 100%;
+}
+
+.row2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+@media (max-width: 680px) {
+  .row2 {
+    grid-template-columns: 1fr;
+  }
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.label {
+  font-size: 0.85rem;
+  font-weight: 800;
+  color: #000000;
+  padding-left: 2px;
+}
+
+.input {
+  height: 44px;
+  border-radius: 16px;
+  border: 1px solid #e5e5ea;
+  background: #f4f4f4;
+  padding: 0 14px;
+  font-size: 0.95rem;
+  color: #111827;
+  outline: none;
+  transition: background 140ms ease, border-color 140ms ease, box-shadow 140ms ease;
+}
+
+.input:focus {
+  background: #ffffff;
+  border-color: rgba(0, 47, 255, 0.35);
+  box-shadow: 0 0 0 1px rgba(0, 47, 255, 0.18);
+}
+
+.fieldError {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+
+  margin-top: 6px;
+  padding: 6px 10px;
+  border-radius: 12px;
+
+  background: rgba(255, 59, 48, 0.12);
+  border: 1px solid rgba(255, 59, 48, 0.22);
+  color: #b42318;
+
+  font-size: 0.82rem;
+  font-weight: 800;
+  line-height: 1.15;
+
+  box-shadow:
+    0 10px 20px rgba(0, 0, 0, 0.08),
+    0 1px 0 rgba(255, 255, 255, 0.35) inset;
+
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.fieldError::before {
+  content: "!";
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+
+  background: rgba(255, 59, 48, 0.18);
+  border: 1px solid rgba(255, 59, 48, 0.28);
+
+  font-weight: 900;
+  font-size: 0.85rem;
+  line-height: 1;
+}
+
+/* actions */
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 6px;
+}
+
+/* iOS-like error banner (copy of ListCardSection) */
+.errorWrap {
+  display: flex;
+  justify-content: center;
+  margin: 0.25rem 0 0.9rem;
+}
+
+.errorBanner {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0.6rem 0.9rem;
+  border-radius: 999px;
+  background: rgba(255, 59, 48, 0.14);
+  border: 1px solid rgba(255, 59, 48, 0.28);
+  color: #b42318;
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.12);
+  backdrop-filter: blur(10px);
+  max-width: min(720px, calc(100% - 24px));
+}
+
+.errorIcon {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+  stroke: currentColor;
+  stroke-width: 2.25;
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0.95;
+}
+
+.errorText {
+  font-weight: 800;
+  font-size: 0.92rem;
+  line-height: 1.1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sectionHeader {
+  display: flex;
+  align-items: center;
+  margin-bottom: 10px;
+  padding: 2px 4px;
+}
+
+.sectionTitle {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 1.05rem;
+  font-weight: 900;
+  color: #111827;
+}
+
+.sectionTitle :global(svg) {
+  opacity: 0.85;
+}
+
+.cancelBtn {
+  /* перевизначаємо змінні кнопки (працює навіть якщо secondary підтягується пізніше) */
+  --btn-bg: rgba(17, 24, 39, 0.06) !important;
+  --btn-bg-hover: rgba(17, 24, 39, 0.09) !important;
+  --btn-border: rgba(17, 24, 39, 0.12) !important;
+
+  /* щоб текст/іконка були темні */
+  color: #111827 !important;
+
+  /* за бажанням — прибрати “важку” тінь у light-кнопки */
+  box-shadow: none !important;
+}
+
+.cancelBtn:active:not(:disabled) {
+  /* щоб при натисканні не було синього/темного “провалу” */
+  transform: translateY(1px);
+  box-shadow: none !important;
+}
+
+.infoIcon {
+  color: #000000 !important; /* чорний/майже чорний */
+  opacity: 1 !important;     /* якщо раніше зменшував opacity */
+}
+
+/* iOS-like invalid state */
+.input[aria-invalid="true"] {
+  background: rgba(255, 59, 48, 0.06);
+  border-color: rgba(255, 59, 48, 0.45);
+
+  box-shadow:
+    0 0 0 1px rgba(255, 59, 48, 0.14);
+}
+
+/* якщо поле невалідне і в фокусі — червоне кільце замість синього */
+.input[aria-invalid="true"]:focus {
+  background: #ffffff;
+  border-color: rgba(255, 59, 48, 0.65);
+
+  box-shadow:
+    0 0 0 1px rgba(255, 59, 48, 0.20),
+    0 0 0 4px rgba(255, 59, 48, 0.10);
+}

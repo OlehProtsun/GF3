@@ -25,5 +25,6 @@ export { EyeOffIcon } from "./EyeOffIcon";
 export { HomeIcon } from "./HomeIcon";
 export { DatabaseIcon } from "./DatabaseIcon";
 export { ArrowIcon } from "./ArrowIcon";
-
 export { PlusIcon } from "./PlusIcon";
+export { CheckIcon } from "./CheckIcon";
+export { CloseIcon } from "./CloseIcon";

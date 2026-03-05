@@ -8,6 +8,8 @@ import {
 } from "@entities/employees/api/queries";
 import { PageHeader } from "@shared/ui/PageHeader";
 import styles from "./EmployeeEditPage.module.css";
+import { IosButton } from "@shared/ui/components/IosButton";
+import { CheckIcon, CloseIcon, InformationIcon } from "@shared/ui/icons";
 
 type FormState = { firstName: string; lastName: string; email: string; phone: string };
 
@@ -67,42 +69,133 @@ export function EmployeeEditPage() {
     );
   };
 
-  return (
-    <div>
-      <PageHeader
-        title={isCreate ? "Add Employee" : "Edit Employee"}
-        subtitle={isCreate ? "Create new employee record" : "Update employee information"}
-        backTo={backTo}
-      />
-      <section className={styles.card}>
-        {!isCreate && employeeQuery.isLoading ? <p>Loading...</p> : null}
-        <form className={styles.form} onSubmit={onSubmit}>
-          <label>
-            First Name
-            <input value={form.firstName} onChange={(event) => setForm((prev) => ({ ...prev, firstName: event.target.value }))} />
-            {errors.firstName ? <div className={styles.error}>{errors.firstName}</div> : null}
-          </label>
-          <label>
-            Last Name
-            <input value={form.lastName} onChange={(event) => setForm((prev) => ({ ...prev, lastName: event.target.value }))} />
-            {errors.lastName ? <div className={styles.error}>{errors.lastName}</div> : null}
-          </label>
-          <label>
-            Email
-            <input value={form.email} onChange={(event) => setForm((prev) => ({ ...prev, email: event.target.value }))} />
-            {errors.email ? <div className={styles.error}>{errors.email}</div> : null}
-          </label>
-          <label>
-            Phone
-            <input value={form.phone} onChange={(event) => setForm((prev) => ({ ...prev, phone: event.target.value }))} />
-          </label>
-          <div className={styles.actions}>
-            <button type="submit" disabled={createMutation.isPending || updateMutation.isPending}>
-              {createMutation.isPending || updateMutation.isPending ? "Saving..." : "Save"}
-            </button>
+return (
+  <div className={styles.page}>
+    <PageHeader
+      title={isCreate ? "Add Employee" : "Edit Employee"}
+      subtitle={isCreate ? "Create new employee record" : "Update employee information"}
+      backTo={backTo}
+    />
+
+    <section className={styles.card}>
+      <div className={styles.sectionHeader}>
+        <div className={styles.sectionTitle}>
+          <InformationIcon size={18} className={styles.infoIcon}/>
+          <span>Details</span>
+        </div>
+      </div>
+      {!isCreate && employeeQuery.isLoading ? <div className={styles.loading}>Loading...</div> : null}
+
+      {/* iOS-like error banner як у ListCardSection */}
+      {!isCreate && employeeQuery.error && !employeeQuery.isLoading && !employeeQuery.data ? (
+        <div className={styles.errorWrap}>
+          <div className={styles.errorBanner} role="alert" aria-live="polite">
+            <svg className={styles.errorIcon} viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <path d="M12 9v4M12 17h.01" />
+              <path d="M10.29 3.86 2.17 17.92A2 2 0 0 0 3.9 21h16.2a2 2 0 0 0 1.73-3.08L13.71 3.86a2 2 0 0 0-3.42 0Z" />
+            </svg>
+            <span className={styles.errorText}>Could not load employee.</span>
           </div>
-        </form>
-      </section>
-    </div>
-  );
-}
+        </div>
+      ) : null}
+
+      <form className={styles.form} onSubmit={onSubmit}>
+        <div className={styles.row2}>
+          <div className={styles.field}>
+            <label className={styles.label} htmlFor="firstName">
+              First Name
+            </label>
+              <input
+                id="firstName"
+                className={styles.input}
+                value={form.firstName}
+                placeholder="Example: John"
+                onChange={(event) => setForm((prev) => ({ ...prev, firstName: event.target.value }))}
+                aria-invalid={Boolean(errors.firstName)}
+                aria-describedby={errors.firstName ? "firstName-error" : undefined}
+              />
+              {errors.firstName ? (
+                <div id="firstName-error" className={styles.fieldError}>
+                  {errors.firstName}
+                </div>
+              ) : null}
+          </div>
+
+          <div className={styles.field}>
+            <label className={styles.label} htmlFor="lastName">
+              Last Name
+            </label>
+              <input
+                id="lastName"
+                className={styles.input}
+                value={form.lastName}
+                placeholder="Example: Doe"
+                onChange={(event) => setForm((prev) => ({ ...prev, lastName: event.target.value }))}
+                aria-invalid={Boolean(errors.lastName)}
+                aria-describedby={errors.lastName ? "lastName-error" : undefined}
+              />
+              {errors.lastName ? (
+                <div id="lastName-error" className={styles.fieldError}>
+                  {errors.lastName}
+                </div>
+              ) : null}          
+              </div>
+        </div>
+
+        <div className={styles.field}>
+          <label className={styles.label} htmlFor="email">
+            Email
+          </label>
+            <input
+              id="email"
+              className={styles.input}
+              type="email"
+              placeholder="Example: john.doe@example.com"
+              value={form.email}
+              onChange={(event) => setForm((prev) => ({ ...prev, email: event.target.value }))}
+              aria-invalid={Boolean(errors.email)}
+              aria-describedby={errors.email ? "email-error" : undefined}
+            />
+            {errors.email ? (
+              <div id="email-error" className={styles.fieldError}>
+                {errors.email}
+              </div>
+            ) : null}        
+        </div>
+
+        <div className={styles.field}>
+          <label className={styles.label} htmlFor="phone">
+            Phone
+          </label>
+          <input
+            id="phone"
+            className={styles.input}
+            type="tel"
+            placeholder="Example: +1 (555) 123-4567"
+            value={form.phone}
+            onChange={(event) => setForm((prev) => ({ ...prev, phone: event.target.value }))}
+          />
+        </div>
+
+        <div className={styles.actions}>
+          <IosButton
+            label="Cancel"
+            variant="secondary"
+            icon={<CloseIcon size={18} />}
+            onClick={() => navigate(backTo)}
+            disabled={createMutation.isPending || updateMutation.isPending}
+            className={styles.cancelBtn}
+          />
+
+          <IosButton
+            label={createMutation.isPending || updateMutation.isPending ? "Saving..." : "Save"}
+            variant="primary"
+            icon={<CheckIcon size={18} />}
+            type="submit"
+            disabled={createMutation.isPending || updateMutation.isPending}
+          />
+        </div>
+      </form>
+    </section>
+  </div>
+);}
