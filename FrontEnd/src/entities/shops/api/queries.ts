@@ -1,11 +1,13 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+﻿import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { queryKeys } from "@shared/api/queryKeys";
-import type { SaveShopInput } from "@entities/shops/model/types";
+import type { SaveShopInput, ShopsListParams } from "@entities/shops/model/types";
 import { shopsApi } from "./shopsApi";
 
-export function useShopsListQuery() {
+export function useShopsListQuery(params?: ShopsListParams) {
+  const search = params?.search?.trim() ?? "";
+
   return useQuery({
-    queryKey: queryKeys.shops.list(),
+    queryKey: queryKeys.shops.list(search),
     queryFn: ({ signal }) => shopsApi.list(signal),
   });
 }

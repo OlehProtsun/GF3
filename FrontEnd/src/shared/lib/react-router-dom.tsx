@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useMemo, useState } from "react";
+﻿import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import type { AnchorHTMLAttributes, PropsWithChildren, ReactNode } from "react";
 
 type NavigateTo = string | number;
@@ -58,8 +58,18 @@ export function useParams<T extends Record<string, string>>() {
   const parts = pathname.split("/").filter(Boolean);
 
   const params = {} as Record<string, string>;
-  if (parts[0] === "employee" && parts[1] && parts[1] !== "new") {
-    params.employeeId = parts[1];
+  const entityId = parts[1];
+
+  if (!entityId || entityId === "new") {
+    return params as T;
+  }
+
+  if (parts[0] === "employee") {
+    params.employeeId = entityId;
+  }
+
+  if (parts[0] === "shop") {
+    params.shopId = entityId;
   }
 
   return params as T;

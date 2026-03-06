@@ -1,7 +1,7 @@
-.button {
+﻿.button {
   --btn-bg: #2563eb;
   --btn-bg-hover: color-mix(in srgb, var(--btn-bg) 88%, #000);
-  --btn-border: var(--btn-bg);
+  --btn-border: color-mix(in srgb, var(--btn-bg) 76%, #ffffff 24%);
   --btn-shadow: color-mix(in srgb, var(--btn-bg) 35%, transparent);
   --btn-focus: color-mix(in srgb, var(--btn-bg) 35%, transparent);
 
@@ -18,11 +18,12 @@
   line-height: 1;
   cursor: pointer;
   box-shadow: 0 10px 22px var(--btn-shadow);
-  transition: transform 120ms ease, box-shadow 120ms ease, background 120ms ease;
+  transition: transform 120ms ease, box-shadow 120ms ease, background 120ms ease, border-color 120ms ease;
 }
 
 .button:hover:not(:disabled) {
   background: var(--btn-bg-hover);
+  border-color: color-mix(in srgb, var(--btn-border) 82%, #ffffff 18%);
 }
 
 .button:active:not(:disabled) {
@@ -56,10 +57,8 @@
 
 .primary {
   --btn-bg: #2563eb;
-  --btn-border: #2563eb;
 }
 
 .secondary {
   --btn-bg: #6b7280;
-  --btn-border: #6b7280;
 }

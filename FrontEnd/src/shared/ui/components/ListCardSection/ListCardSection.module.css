@@ -1,69 +1,46 @@
-.card {
-  background: #fff;
-  border-radius: 32px;
-  padding: 1rem;
-  overflow: hidden;
-  border: 1px solid #e5e5ea;
-  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.08);
-}
-
-.topBar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 0.75rem;
-}
-
-.totalBadge {
-  display: inline-flex;
-  align-items: center;
-  padding: 0.35rem 0.6rem;
-  border-radius: 999px;
-  background: #f4f4f5;
-  border: 1px solid #e5e5ea;
-  color: #111827;
-  font-weight: 600;
-  font-size: 0.9rem;
-}
-
-.errorWrap {
-  display: flex;
-  justify-content: center;
-  margin: 0.25rem 0 0.9rem;
+﻿.card {
+  padding: 0;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  overflow: visible;
 }
 
 .errorBanner {
-  display: inline-flex;
-  align-items: center;
+  margin: 0.25rem 0;
+}
+
+.state {
+  display: grid;
+  justify-items: center;
   gap: 10px;
-  padding: 0.6rem 0.9rem;
-  border-radius: 999px;
-  background: rgba(255, 59, 48, 0.14);
-  border: 1px solid rgba(255, 59, 48, 0.28);
-  color: #b42318;
-  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.12);
-  backdrop-filter: blur(10px);
-  max-width: min(720px, calc(100% - 24px));
+  min-height: 240px;
+  padding: 22px 14px;
+  text-align: center;
+  align-content: center;
+  border-radius: 28px;
+  border: 1px dashed rgba(113, 113, 122, 0.14);
+  background: rgba(255, 255, 255, 0.32);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.34) inset;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
 }
 
-.errorIcon {
-  width: 18px;
-  height: 18px;
-  flex: 0 0 auto;
-  stroke: currentColor;
-  stroke-width: 2.25;
-  fill: none;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  opacity: 0.95;
+.stateTitle {
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: #111827;
 }
 
-.errorText {
-  font-weight: 700;
-  font-size: 0.92rem;
-  line-height: 1.1;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+.stateDescription {
+  max-width: 540px;
+  color: #6b7280;
+  line-height: 1.55;
+}
+
+.stateActions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
 }

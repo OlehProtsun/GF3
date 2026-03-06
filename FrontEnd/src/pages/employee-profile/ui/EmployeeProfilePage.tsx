@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useDeleteEmployeeMutation, useEmployeeByIdQuery } from "@entities/employees/api/queries";
+import { EmployeeProfileCard } from "@entities/employees/ui/EmployeeProfileCard";
 import { ConfirmDialog } from "@shared/ui/ConfirmDialog";
 import { PageHeader } from "@shared/ui/PageHeader";
 import styles from "./EmployeeProfilePage.module.css";
@@ -15,37 +16,41 @@ export function EmployeeProfilePage() {
   const deleteMutation = useDeleteEmployeeMutation();
 
   const employee = employeeQuery.data;
+  const hasValidId = Number.isFinite(id);
+  const isEmployeeLoading = hasValidId && !employee && (employeeQuery.isLoading || employeeQuery.isFetching);
+  const hasLoadError = !employee && (!hasValidId || (!isEmployeeLoading && (employeeQuery.isError || Boolean(employeeQuery.error))));
+
+  const handleDeleteConfirm = () => {
+    if (!id) return;
+
+    deleteMutation.mutate(id, {
+      onSuccess: () => navigate("/employee"),
+    });
+  };
 
   return (
-    <div>
-      <PageHeader title="Employee Profile" subtitle="View employee details and actions" backTo="/employee" />
-      <section className={styles.card}>
-        {employeeQuery.isLoading ? <p>Loading...</p> : null}
-        {employeeQuery.error ? <p className={styles.error}>Failed to load employee.</p> : null}
-        {employee ? (
-          <>
-            <div className={styles.grid}>
-              <strong>Employee ID</strong><span>{employee.id}</span>
-              <strong>Full Name</strong><span>{employee.firstName} {employee.lastName}</span>
-              <strong>Email</strong><span>{employee.email ?? "-"}</span>
-              <strong>Phone</strong><span>{employee.phone ?? "-"}</span>
-            </div>
-            <div className={styles.actions}>
-              <button type="button" onClick={() => navigate(`/employee/${employee.id}/edit`)}>Edit</button>
-              <button type="button" onClick={() => setIsDeleteOpen(true)} disabled={deleteMutation.isPending}>Delete</button>
-            </div>
-          </>
-        ) : null}
-      </section>
+    <div className={styles.page}>
+      <PageHeader
+        title="Employee Profile"
+        subtitle="View employee details, contact information and record status"
+        backTo="/employee"
+      />
+
+      <EmployeeProfileCard
+        employee={employee}
+        isLoading={isEmployeeLoading}
+        hasLoadError={hasLoadError}
+        isDeleting={deleteMutation.isPending}
+        onEditEmployee={employeeIdValue => navigate(`/employee/${employeeIdValue}/edit`)}
+        onDeleteEmployee={() => setIsDeleteOpen(true)}
+      />
+
       <ConfirmDialog
         open={isDeleteOpen}
         title="Delete employee"
-        message="Are you sure you want to delete this employee?"
+        message="Are you sure you want to delete this employee? This action cannot be undone."
         onCancel={() => setIsDeleteOpen(false)}
-        onConfirm={() => {
-          if (!id) return;
-          deleteMutation.mutate(id, { onSuccess: () => navigate("/employee") });
-        }}
+        onConfirm={handleDeleteConfirm}
         confirmText={deleteMutation.isPending ? "Deleting..." : "Delete"}
       />
     </div>

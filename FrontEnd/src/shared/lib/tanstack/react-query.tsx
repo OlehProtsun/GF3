@@ -1,4 +1,4 @@
-import {
+﻿import {
   createContext,
   useCallback,
   useContext,
@@ -141,7 +141,13 @@ export function useQuery<TData>(options: QueryOptions<TData>) {
     return () => controller.abort();
   }, [bump, keyString, options.enabled, client]);
 
-  return { data, error, isLoading };
+  return {
+    data,
+    error,
+    isLoading,
+    isFetching: isLoading,
+    isError: Boolean(error),
+  };
 }
 
 export function useMutation<TData, TVariables>(options: MutationOptions<TData, TVariables>) {

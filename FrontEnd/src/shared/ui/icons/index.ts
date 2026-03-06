@@ -28,3 +28,4 @@ export { ArrowIcon } from "./ArrowIcon";
 export { PlusIcon } from "./PlusIcon";
 export { CheckIcon } from "./CheckIcon";
 export { CloseIcon } from "./CloseIcon";
+export { PinIcon } from "./PinIcon";

@@ -1,7 +1,9 @@
-import { BrowserRouter, Navigate, useLocation } from "react-router-dom";
+﻿import { BrowserRouter, Navigate, useLocation } from "react-router-dom";
 import { OverlaySidebarLayout } from "@app/layouts/overlay-sidebar-layout";
 import { HomePage } from "@pages/home";
-import { ShopPage } from "@pages/shop";
+import { ShopListPage } from "@pages/shop-list";
+import { ShopProfilePage } from "@pages/shop-profile";
+import { ShopEditPage } from "@pages/shop-edit";
 import { AvailabilityPage } from "@pages/availability";
 import { ContainerPage } from "@pages/container";
 import { InformationPage } from "@pages/information";
@@ -15,7 +17,10 @@ function RoutedContent() {
   const { pathname } = useLocation();
 
   if (pathname === "/") return <HomePage />;
-  if (pathname === "/shop") return <ShopPage />;
+  if (pathname === "/shop") return <ShopListPage />;
+  if (pathname === "/shop/new") return <ShopEditPage />;
+  if (matchPath(pathname, "/shop/:shopId/edit")) return <ShopEditPage />;
+  if (matchPath(pathname, "/shop/:shopId")) return <ShopProfilePage />;
   if (pathname === "/availability") return <AvailabilityPage />;
   if (pathname === "/container") return <ContainerPage />;
   if (pathname === "/information") return <InformationPage />;

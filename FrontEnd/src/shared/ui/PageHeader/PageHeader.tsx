@@ -1,14 +1,17 @@
-import { useLayoutEffect, useRef, useState } from "react";
+﻿import { useLayoutEffect, useRef, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { BackIcon, SearchIcon } from "@shared/ui/icons";
 import styles from "./PageHeader.module.css";
 
 type PageHeaderProps = {
+  eyebrow?: string;
   title: string;
   subtitle?: string;
-  backTo?: string | number;
+  backTo?: string | number | null;
+  backLabel?: string;
   rightSlot?: ReactNode;
+  searchMeta?: ReactNode;
   search?: {
     value: string;
     onChange: (value: string) => void;
@@ -24,10 +27,13 @@ type PageHeaderProps = {
 };
 
 export function PageHeader({
+  eyebrow,
   title,
   subtitle,
-  backTo = -1,
+  backTo = null,
+  backLabel = "Back",
   rightSlot,
+  searchMeta,
   search,
   variant = "card",
   fullBleed = true,
@@ -44,7 +50,7 @@ export function PageHeader({
 
     const updateHeight = () => {
       const nextHeight = Math.ceil(headerElement.getBoundingClientRect().height);
-      setHeaderHeight((prev) => (prev !== nextHeight ? nextHeight : prev));
+      setHeaderHeight(prev => (prev !== nextHeight ? nextHeight : prev));
     };
 
     updateHeight();
@@ -55,7 +61,7 @@ export function PageHeader({
     return () => {
       observer.disconnect();
     };
-  }, [subtitle, title, rightSlot, search, variant, fullBleed, gutter]);
+  }, [eyebrow, title, subtitle, backTo, rightSlot, searchMeta, search, variant, fullBleed, gutter]);
 
   const headerClassName = [
     styles.header,
@@ -66,50 +72,68 @@ export function PageHeader({
     .filter(Boolean)
     .join(" ");
 
+  const hasSearchCluster = Boolean(search || searchMeta);
+
   return (
     <>
       <div className={styles.headerSpacer} style={{ height: `${headerHeight}px` }} aria-hidden="true" />
+
       <header
-        className={styles.headerRoot}
         ref={headerRef}
+        className={styles.headerRoot}
         style={{ "--page-header-gutter": `${gutter}px` } as CSSProperties}
       >
         <div className={headerClassName}>
-          <div className={styles.headerGrid}>
-            <div className={styles.leftCol}>
-              <button type="button" className={styles.backButton} onClick={() => navigate(backTo)}>
-                <BackIcon className={styles.backIcon} />
-                <span>Back</span>
-              </button>
-
-              <h1 className={styles.title}>{title}</h1>
-              {subtitle ? <p className={styles.subtitle}>{subtitle}</p> : null}
-            </div>
-
-            <div className={styles.rightCol}>
-              {rightSlot ? <div className={styles.rightSlot}>{rightSlot}</div> : null}
-
-              {search ? (
-                <form
-                  className={styles.searchRow}
-                  role="search"
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    search.onSubmit?.();
-                  }}
-                >
-                  <div className={styles.searchPill}>
-                    <SearchIcon className={styles.searchIcon} />
-                    <input
-                      className={styles.searchInput}
-                      value={search.value}
-                      onChange={(e) => search.onChange(e.target.value)}
-                      placeholder={search.placeholder ?? "Search"}
-                      aria-label={search.ariaLabel ?? "Search"}
-                    />
-                  </div>
-                </form>
+          <div className={styles.headerInner}>
+            <div className={styles.headerRow}>
+              {backTo !== null && backTo !== undefined ? (
+                <div className={styles.backRow}>
+                  <button
+                    type="button"
+                    className={styles.backButton}
+                    onClick={() => navigate(backTo)}
+                  >
+                    <BackIcon className={styles.backIcon} />
+                    <span>{backLabel}</span>
+                  </button>
+                </div>
               ) : null}
+
+              <div className={styles.titleBlock}>
+                {eyebrow ? <span className={styles.eyebrow}>{eyebrow}</span> : null}
+                <h1 className={styles.title}>{title}</h1>
+                {subtitle ? <p className={styles.subtitle}>{subtitle}</p> : null}
+              </div>
+
+              {hasSearchCluster ? (
+                <div className={styles.utilityGroup}>
+                  {search ? (
+                    <form
+                      className={styles.searchForm}
+                      role="search"
+                      onSubmit={event => {
+                        event.preventDefault();
+                        search.onSubmit?.();
+                      }}
+                    >
+                      <div className={styles.searchField}>
+                        <SearchIcon className={styles.searchIcon} />
+                        <input
+                          className={styles.searchInput}
+                          value={search.value}
+                          onChange={event => search.onChange(event.target.value)}
+                          placeholder={search.placeholder ?? "Search"}
+                          aria-label={search.ariaLabel ?? "Search"}
+                        />
+                      </div>
+                    </form>
+                  ) : null}
+
+                  {searchMeta ? <div className={styles.meta}>{searchMeta}</div> : null}
+                </div>
+              ) : null}
+
+              {rightSlot ? <div className={styles.actions}>{rightSlot}</div> : null}
             </div>
           </div>
         </div>

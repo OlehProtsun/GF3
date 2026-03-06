@@ -1,41 +1,27 @@
-import { useCallback, useMemo, useState, type KeyboardEvent } from "react";
+﻿import { useCallback, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useEmployeesQuery } from "@entities/employees/model/queries";
+import { EmployeeListCard } from "@entities/employees/ui/EmployeeListCard";
+import { IosButton } from "@shared/ui/components/IosButton";
 import { PageHeader } from "@shared/ui/PageHeader";
 import { PlusIcon } from "@shared/ui/icons";
-import { IosButton } from "@shared/ui/components/IosButton";
-import { ListCardSection } from "@shared/ui/components/ListCardSection";
 import styles from "./EmployeeListPage.module.css";
 
 export function EmployeeListPage() {
   const navigate = useNavigate();
   const [query, setQuery] = useState("");
-  const [selectedId, setSelectedId] = useState<string | number | null>(null);
   const employeesQuery = useEmployeesQuery(query);
-
-  const employees = useMemo(() => employeesQuery.data ?? [], [employeesQuery.data]);
-  const hasEmployees = employees.length > 0;
+  const employees = employeesQuery.data ?? [];
 
   const handleAddEmployee = useCallback(() => {
     navigate("/employee/new");
   }, [navigate]);
 
   const handleEmployeeOpen = useCallback(
-    (employeeId: string | number) => {
+    (employeeId: number) => {
       navigate(`/employee/${employeeId}`);
     },
     [navigate]
-  );
-
-  const handleEmployeeKeyDown = useCallback(
-    (event: KeyboardEvent<HTMLTableRowElement>, employeeId: string | number) => {
-      if (event.key === "Enter" || event.key === " ") {
-        event.preventDefault();
-        setSelectedId(employeeId);
-        handleEmployeeOpen(employeeId);
-      }
-    },
-    [handleEmployeeOpen]
   );
 
   return (
@@ -44,6 +30,10 @@ export function EmployeeListPage() {
         title="Employee List"
         subtitle="Browse and search employee records"
         backTo="/"
+        rightSlot={
+          <IosButton label="Add New" icon={<PlusIcon size={18} />} onClick={handleAddEmployee} />
+        }
+        searchMeta={`Total: ${employees.length}`}
         search={{
           value: query,
           onChange: setQuery,
@@ -52,43 +42,15 @@ export function EmployeeListPage() {
         }}
       />
 
-      <ListCardSection
-        totalCount={employees.length}
+      <EmployeeListCard
+        employees={employees}
         error={employeesQuery.error}
-        isFetching={employeesQuery.isLoading}
-        hasData={hasEmployees}
-        errorMessage="Could not load employees."
-        actionSlot={<IosButton label="Add New" icon={<PlusIcon size={18} />} onClick={handleAddEmployee} />}
-      >
-        {employeesQuery.isLoading ? <p>Loading...</p> : null}
-
-        <table className={styles.table}>
-          <thead>
-            <tr>
-              <th>First Name</th>
-              <th>Last Name</th>
-            </tr>
-          </thead>
-          <tbody>
-            {employees.map((employee) => (
-              <tr
-                key={employee.id}
-                tabIndex={0}
-                role="button"
-                className={`${styles.row} ${styles.clickable} ${
-                  selectedId === employee.id ? styles.rowSelected : ""
-                }`}
-                onMouseDown={() => setSelectedId(employee.id)}
-                onClick={() => handleEmployeeOpen(employee.id)}
-                onKeyDown={(event) => handleEmployeeKeyDown(event, employee.id)}
-              >
-                <td>{employee.firstName}</td>
-                <td>{employee.lastName}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </ListCardSection>
+        isLoading={employeesQuery.isLoading}
+        searchQuery={query}
+        onClearSearch={() => setQuery("")}
+        onAddEmployee={handleAddEmployee}
+        onEmployeeOpen={handleEmployeeOpen}
+      />
     </div>
   );
 }
