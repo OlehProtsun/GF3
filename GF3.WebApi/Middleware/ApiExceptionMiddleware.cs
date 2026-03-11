@@ -21,6 +21,13 @@ public sealed class ApiExceptionMiddleware
         {
             await _next(context).ConfigureAwait(false);
         }
+        catch (OperationCanceledException) when (context.RequestAborted.IsCancellationRequested)
+        {
+            if (!context.Response.HasStarted)
+            {
+                context.Response.StatusCode = 499;
+            }
+        }
         catch (System.ComponentModel.DataAnnotations.ValidationException ex)
         {
             await WriteValidationAsync(context, ex).ConfigureAwait(false);

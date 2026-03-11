@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
-import type { ReactNode } from "react";
+import { useEffect, useId, useState, type MouseEvent, type ReactNode } from "react";
+import { IosButton } from "@shared/ui/components/IosButton";
+import { CloseIcon, WarnIcon } from "@shared/ui/icons";
 import styles from "./ConfirmDialog.module.css";
 
 type ConfirmDialogProps = {
@@ -11,6 +12,8 @@ type ConfirmDialogProps = {
   confirmText?: string;
   cancelText?: string;
   footerSlot?: ReactNode;
+  confirmDisabled?: boolean;
+  cancelDisabled?: boolean;
 };
 
 const EXIT_ANIMATION_MS = 220;
@@ -24,8 +27,12 @@ export function ConfirmDialog({
   confirmText = "Confirm",
   cancelText = "Cancel",
   footerSlot,
+  confirmDisabled = false,
+  cancelDisabled = false,
 }: ConfirmDialogProps) {
   const [isMounted, setIsMounted] = useState(open);
+  const titleId = useId();
+  const messageId = useId();
 
   useEffect(() => {
     if (open) {
@@ -37,6 +44,29 @@ export function ConfirmDialog({
     return () => window.clearTimeout(timeoutId);
   }, [open]);
 
+  useEffect(() => {
+    if (!isMounted) {
+      return;
+    }
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && !cancelDisabled) {
+        onCancel();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [cancelDisabled, isMounted, onCancel]);
+
+  const handleOverlayMouseDown = (event: MouseEvent<HTMLDivElement>) => {
+    if (event.target !== event.currentTarget || cancelDisabled) {
+      return;
+    }
+
+    onCancel();
+  };
+
   if (!isMounted) return null;
 
   return (
@@ -44,19 +74,43 @@ export function ConfirmDialog({
       className={`${styles.overlay} ${open ? styles.overlayOpen : styles.overlayClosing}`}
       role="dialog"
       aria-modal="true"
-      aria-label={title}
+      aria-labelledby={titleId}
+      aria-describedby={messageId}
+      onMouseDown={handleOverlayMouseDown}
     >
       <div className={`${styles.dialog} ${open ? styles.dialogOpen : styles.dialogClosing}`}>
-        <h3>{title}</h3>
-        <p>{message}</p>
+        <div className={styles.hero}>
+          <div className={styles.iconShell} aria-hidden="true">
+            <WarnIcon size={22} />
+          </div>
+
+          <div className={styles.copy}>
+            <h3 id={titleId}>{title}</h3>
+            <p id={messageId}>{message}</p>
+          </div>
+        </div>
+
         <div className={styles.footer}>
-          {footerSlot}
-          <button type="button" onClick={onCancel}>
-            {cancelText}
-          </button>
-          <button type="button" onClick={onConfirm}>
-            {confirmText}
-          </button>
+          {footerSlot ? <div className={styles.footerSlot}>{footerSlot}</div> : null}
+
+          <IosButton
+            label={cancelText}
+            icon={<CloseIcon size={16} />}
+            variant="secondary"
+            customColor="#e5e7eb"
+            customBorderColor="#d1d5db"
+            onClick={onCancel}
+            disabled={cancelDisabled}
+          />
+
+          <IosButton
+            label={confirmText}
+            icon={<WarnIcon size={16} />}
+            customColor="#dc2626"
+            customBorderColor="#dc2626"
+            onClick={onConfirm}
+            disabled={confirmDisabled}
+          />
         </div>
       </div>
     </div>

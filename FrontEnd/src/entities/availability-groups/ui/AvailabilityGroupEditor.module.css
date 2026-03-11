@@ -1,0 +1,374 @@
+.layout {
+  display: flex;
+  gap: 12px;
+  align-items: stretch;
+  flex: 1 1 0;
+  width: 100%;
+  min-height: 0;
+  padding: 0;
+  overflow: visible;
+  box-sizing: border-box;
+}
+
+.layoutAllCollapsed {
+  gap: 4px;
+}
+
+.sidebarColumn {
+  flex: 0 0 392px;
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  direction: rtl;
+  padding: 2px 10px 0 6px;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.sidebarColumnAllCollapsed {
+  flex-basis: 46px;
+  padding: 8px 0 0 0;
+  overflow: clip;
+  overflow-clip-margin: 12px;
+}
+
+.sidebarColumn::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+.sidebar {
+  display: grid;
+  gap: 22px;
+  align-content: start;
+  direction: ltr;
+  padding: 0;
+}
+
+.sidebarAllCollapsed {
+  gap: 18px;
+}
+
+.sidebar > * {
+  width: auto;
+  margin: 2px 6px 0 6px;
+}
+
+.sidebarAllCollapsed > * {
+  margin: 6px 0 0 0;
+}
+
+.sidebar > *:last-child {
+  margin-bottom: 0;
+}
+
+.sidebarAllCollapsed > *:last-child {
+  margin-bottom: 0;
+}
+
+.sectionShell {
+  position: relative;
+  min-width: 0;
+}
+
+.sectionShellExpanded {
+  min-height: 0;
+}
+
+.sectionShellCollapsed {
+  min-height: 54px;
+  left: -28px;
+  padding-left: 28px;
+}
+
+.sidebarAllCollapsed .sectionShellCollapsed {
+  left: -10px;
+  padding-left: 10px;
+}
+
+.sectionCardWrap {
+  min-width: 0;
+  transition:
+    transform 260ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    opacity 180ms ease;
+}
+
+.sectionCardWrap > * {
+  width: 100%;
+}
+
+.sectionShellCollapsed .sectionCardWrap {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(calc(-100% - 18px));
+}
+
+.sectionExpandButton {
+  position: absolute;
+  left: -2px;
+  top: 10px;
+  z-index: 2;
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  border: 1px solid rgba(113, 113, 122, 0.14);
+  background: rgba(255, 255, 255, 0.88);
+  color: #111827;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.12);
+  cursor: pointer;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(-10px);
+  transition:
+    opacity 220ms ease,
+    transform 220ms ease,
+    background-color 180ms ease,
+    box-shadow 180ms ease;
+}
+
+.sectionShellCollapsed .sectionExpandButton {
+  left: 0;
+  width: 42px;
+  border-radius: 0 999px 999px 0;
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateX(0);
+}
+
+.sectionExpandButton:hover,
+.sectionCollapseButton:hover {
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.14);
+}
+
+.sectionExpandButton:focus-visible,
+.sectionCollapseButton:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.18);
+}
+
+.sectionCollapseButton {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  border: 1px solid rgba(113, 113, 122, 0.14);
+  background: rgba(255, 255, 255, 0.82);
+  color: #111827;
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.1);
+  cursor: pointer;
+  transition:
+    background-color 180ms ease,
+    box-shadow 180ms ease,
+    transform 120ms ease;
+}
+
+.sectionCollapseButton:active,
+.sectionExpandButton:active {
+  transform: scale(0.98);
+}
+
+.sectionCollapseArrow {
+  position: relative;
+  transform: translate(-2px, 1px) rotate(90deg);
+  transform-origin: center;
+}
+
+.sectionExpandArrow {
+  transform: rotate(-90deg);
+}
+
+.mainColumn {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  overflow-y: visible;
+  overflow-x: clip;
+}
+
+.mainColumnAllCollapsed {
+  flex-basis: 0;
+}
+
+.mainColumnAllCollapsed .mainBlock > * {
+  margin-left: 0;
+}
+
+.mainBlock {
+  min-width: 0;
+  min-height: 0;
+  flex: 1 1 0;
+  display: flex;
+  flex-direction: column;
+  padding: 0 8px 12px 0;
+  overflow: visible;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+}
+
+.mainBlock > * {
+  width: auto;
+  margin: 2px 0 0 4px;
+}
+
+.scheduleCard {
+  flex: 1 1 0;
+  min-height: 0;
+  height: auto;
+  align-self: stretch;
+  box-shadow:
+    0 6px 14px rgba(0, 0, 0, 0.06),
+    0 1px 0 rgba(255, 255, 255, 0.35) inset;
+}
+
+.scheduleHeaderMessage {
+  max-width: min(560px, 100%);
+  padding: 10px 16px;
+  border-radius: 999px;
+  background: rgba(255, 59, 48, 0.14);
+  border: 1px solid rgba(255, 59, 48, 0.24);
+  color: #b42318;
+  font-size: 0.86rem;
+  font-weight: 800;
+  line-height: 1.25;
+  text-align: center;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+}
+
+.scheduleSaveButton {
+  white-space: nowrap;
+}
+
+.state {
+  display: grid;
+  place-items: center;
+  min-height: 320px;
+  border-radius: 28px;
+  border: 1px dashed rgba(113, 113, 122, 0.16);
+  background: rgba(255, 255, 255, 0.34);
+  color: rgba(17, 24, 39, 0.62);
+  font-weight: 700;
+}
+
+.banner {
+  margin: 0;
+}
+
+@media (max-width: 1180px) {
+  .layout {
+    gap: 10px;
+  }
+
+  .sidebarColumn {
+    flex-basis: 368px;
+  }
+
+  .mainBlock > * {
+    margin-right: 0;
+  }
+}
+
+@media (max-width: 960px) {
+  .layout {
+    flex-direction: column;
+    gap: 18px;
+    overflow: visible;
+  }
+
+  .layoutAllCollapsed {
+    gap: 18px;
+  }
+
+  .sidebarColumn {
+    flex: none;
+    overflow: visible;
+    direction: ltr;
+    padding: 0;
+    scrollbar-gutter: auto;
+  }
+
+  .sidebarColumnAllCollapsed {
+    flex-basis: auto;
+    padding: 0;
+  }
+
+  .sidebar > *,
+  .sidebarAllCollapsed > *,
+  .mainBlock > *,
+  .mainColumnAllCollapsed .mainBlock > * {
+    width: 100%;
+    margin: 0;
+  }
+
+  .sectionExpandButton,
+  .sectionCollapseButton {
+    display: none;
+  }
+
+  .sectionShellCollapsed {
+    min-height: 0;
+    left: 0;
+    padding-left: 0;
+  }
+
+  .sidebarAllCollapsed .sectionShellCollapsed {
+    left: 0;
+    padding-left: 0;
+  }
+
+  .sectionShellCollapsed .sectionCardWrap {
+    position: relative;
+    top: auto;
+    left: auto;
+    right: auto;
+    opacity: 1;
+    pointer-events: auto;
+    transform: none;
+  }
+
+  .mainBlock {
+    min-height: auto;
+  }
+
+  .scheduleCard {
+    height: auto;
+  }
+}
+
+@media (max-width: 640px) {
+  .scheduleHeaderMessage {
+    max-width: 100%;
+    border-radius: 20px;
+  }
+
+  .scheduleSaveButton {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -1,4 +1,4 @@
-﻿import {
+import {
   createContext,
   useCallback,
   useContext,
@@ -102,7 +102,7 @@ export function useQuery<TData>(options: QueryOptions<TData>) {
   const queryKeyRef = useRef(options.queryKey);
   const [data, setData] = useState<TData | undefined>(undefined);
   const [error, setError] = useState<unknown>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(options.enabled !== false);
   const [bump, setBump] = useState(client.getBump(keyString));
 
   queryFnRef.current = options.queryFn;
@@ -119,7 +119,10 @@ export function useQuery<TData>(options: QueryOptions<TData>) {
   // We refetch only when query key / invalidation changes.
   // Before this fix, inline queryFn identity changed each render and caused a refetch loop + UI freeze.
   useEffect(() => {
-    if (options.enabled === false) return;
+    if (options.enabled === false) {
+      setIsLoading(false);
+      return;
+    }
 
     const controller = new AbortController();
     setIsLoading(true);
@@ -127,12 +130,21 @@ export function useQuery<TData>(options: QueryOptions<TData>) {
 
     queryFnRef
       .current({ signal: controller.signal })
-      .then((value) => setData(value))
-      .catch((reason) => {
-        setError(reason);
-        if (!controller.signal.aborted) {
-          client.queryCache?.config.onError?.(reason, { queryKey: queryKeyRef.current });
+      .then((value) => {
+        if (controller.signal.aborted) {
+          return;
         }
+
+        setData(value);
+        setError(null);
+      })
+      .catch((reason) => {
+        if (controller.signal.aborted) {
+          return;
+        }
+
+        setError(reason);
+        client.queryCache?.config.onError?.(reason, { queryKey: queryKeyRef.current });
       })
       .finally(() => {
         if (!controller.signal.aborted) setIsLoading(false);

@@ -1,4 +1,4 @@
-export type ValidationErrors = Record<string, string[]>;
+﻿export type ValidationErrors = Record<string, string[]>;
 
 export class ApiError extends Error {
   public readonly status: number;
@@ -23,12 +23,16 @@ export class ApiError extends Error {
 }
 
 type RequestMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
+type QueryValue = string | number | boolean | null | undefined;
+type ResponseType = "json" | "blob";
 
 type RequestOptions = {
   method?: RequestMethod;
   body?: unknown;
   headers?: HeadersInit;
   signal?: AbortSignal;
+  query?: Record<string, QueryValue>;
+  responseType?: ResponseType;
 };
 
 type ProblemDetailsResponse = {
@@ -41,19 +45,44 @@ type ProblemDetailsResponse = {
 
 const defaultBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim() || "/api";
 
-function buildUrl(path: string): string {
-  if (path.startsWith("http://") || path.startsWith("https://")) {
-    return path;
+function withQueryString(url: string, query?: Record<string, QueryValue>) {
+  if (!query) {
+    return url;
   }
 
-  if (defaultBaseUrl.startsWith("http://") || defaultBaseUrl.startsWith("https://")) {
-    return `${defaultBaseUrl.replace(/\/$/, "")}/${path.replace(/^\//, "")}`;
+  const searchParams = new URLSearchParams();
+
+  Object.entries(query).forEach(([key, value]) => {
+    if (value === undefined || value === null) {
+      return;
+    }
+
+    searchParams.set(key, String(value));
+  });
+
+  const queryString = searchParams.toString();
+  if (!queryString) {
+    return url;
   }
 
-  return `${defaultBaseUrl.replace(/\/$/, "")}/${path.replace(/^\//, "")}`;
+  return `${url}${url.includes("?") ? "&" : "?"}${queryString}`;
 }
 
-async function parseBody(response: Response): Promise<unknown> {
+function buildUrl(path: string, query?: Record<string, QueryValue>): string {
+  if (path.startsWith("http://") || path.startsWith("https://")) {
+    return withQueryString(path, query);
+  }
+
+  const base = defaultBaseUrl.replace(/\/$/, "");
+  const relativePath = path.replace(/^\//, "");
+  return withQueryString(`${base}/${relativePath}`, query);
+}
+
+async function parseBody(response: Response, responseType: ResponseType): Promise<unknown> {
+  if (responseType === "blob") {
+    return response.blob();
+  }
+
   const contentType = response.headers.get("content-type") ?? "";
 
   if (contentType.includes("application/json") || contentType.includes("+json")) {
@@ -84,14 +113,15 @@ function toApiError(status: number, payload: unknown): ApiError {
 export async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const method = options.method ?? "GET";
   const hasBody = options.body !== undefined;
+  const responseType = options.responseType ?? "json";
 
   const headers = new Headers(options.headers);
-  headers.set("Accept", "application/json");
+  headers.set("Accept", responseType === "blob" ? "*/*" : "application/json");
   if (hasBody && !headers.has("Content-Type")) {
     headers.set("Content-Type", "application/json");
   }
 
-  const response = await fetch(buildUrl(path), {
+  const response = await fetch(buildUrl(path, options.query), {
     method,
     headers,
     signal: options.signal,
@@ -102,7 +132,7 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
     return undefined as T;
   }
 
-  const payload = await parseBody(response);
+  const payload = await parseBody(response, responseType);
 
   if (!response.ok) {
     throw toApiError(response.status, payload);

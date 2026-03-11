@@ -5,14 +5,13 @@ import {
   getEmployeeFullName,
   getEmployeeInitials,
 } from "@entities/employees/model/presentation";
-import { ErrorBanner } from "@shared/ui/components/ErrorBanner";
 import { IosButton } from "@shared/ui/components/IosButton";
 import {
-  ProfileSummaryCard,
-  type ProfileSummaryDetail,
-} from "@shared/ui/components/ProfileSummaryCard";
+  RecordProfileCard,
+  renderRecordDetailValue,
+} from "@shared/ui/components/RecordProfileCard";
+import { type ProfileSummaryDetail } from "@shared/ui/components/ProfileSummaryCard";
 import { EmployeeIcon } from "@shared/ui/icons";
-import styles from "./EmployeeProfileCard.module.css";
 
 type EmployeeProfileCardProps = {
   employee?: Employee;
@@ -22,22 +21,6 @@ type EmployeeProfileCardProps = {
   onEditEmployee: (employeeId: Employee["id"]) => void;
   onDeleteEmployee: () => void;
 };
-
-function renderContactValue(value?: string | null, href?: string) {
-  if (!value) {
-    return <span className={styles.mutedValue}>Not provided</span>;
-  }
-
-  if (!href) {
-    return value;
-  }
-
-  return (
-    <a className={styles.valueLink} href={href}>
-      {value}
-    </a>
-  );
-}
 
 export function EmployeeProfileCard({
   employee,
@@ -54,21 +37,19 @@ export function EmployeeProfileCard({
     ? getEmployeeContactDetails(employee).map(item => ({
         key: item.key,
         label: item.label,
-        value: renderContactValue(item.value, item.href),
+        value: renderRecordDetailValue(item.value, item.href),
       }))
     : [];
 
   return (
-    <ProfileSummaryCard
+    <RecordProfileCard
       sectionTitle="Employee Profile"
-      icon={<EmployeeIcon size={18} />}
+      icon={<EmployeeIcon size={18} style={{ transform: "scaleY(-1)" }} />}
       headerMeta={employee ? `ID ${employee.id}` : undefined}
-      statusContent={
-        <>
-          {isLoading ? <p className={styles.loading}>Loading employee details...</p> : null}
-          {hasLoadError ? <ErrorBanner>Could not load employee.</ErrorBanner> : null}
-        </>
-      }
+      isLoading={isLoading}
+      hasLoadError={hasLoadError}
+      loadingMessage="Loading employee details..."
+      errorMessage="Could not load employee."
       avatar={employee ? initials : undefined}
       name={employee ? fullName : undefined}
       subtitle={employee ? contactState : undefined}

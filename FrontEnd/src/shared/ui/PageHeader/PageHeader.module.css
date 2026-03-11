@@ -1,6 +1,7 @@
-﻿.headerSpacer {
+.headerSpacer {
   width: 100%;
   pointer-events: none;
+  transition: height 280ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
 .headerRoot {
@@ -13,11 +14,35 @@
   pointer-events: none;
 }
 
+.headerStack {
+  display: grid;
+  width: min(100%, 1100px);
+  margin-inline: auto;
+}
+
 .header {
   width: min(100%, 1100px);
   margin-inline: auto;
   box-sizing: border-box;
   pointer-events: auto;
+}
+
+.headerPanel,
+.collapsedDock {
+  grid-area: 1 / 1;
+  will-change: transform, opacity;
+}
+
+.headerPanel {
+  transition:
+    transform 320ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    opacity 180ms ease;
+}
+
+.headerPanelCollapsed {
+  transform: translateY(calc(-100% - 18px));
+  opacity: 0;
+  pointer-events: none;
 }
 
 .fullBleed.variantCard {
@@ -32,7 +57,7 @@
     linear-gradient(to bottom, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0.02)),
     rgba(255, 255, 255, 0.68);
   box-shadow:
-    0 20px 50px rgba(15, 23, 42, 0.1),
+    0 12px 28px rgba(15, 23, 42, 0.07),
     0 1px 0 rgba(255, 255, 255, 0.45) inset;
   backdrop-filter: blur(24px) saturate(170%);
   -webkit-backdrop-filter: blur(24px) saturate(170%);
@@ -53,18 +78,27 @@
   flex-wrap: wrap;
 }
 
+.leadingGroup {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 0 0 auto;
+  min-width: 0;
+}
+
 .backRow {
   display: flex;
   align-items: center;
   flex: 0 0 auto;
 }
 
-.backButton {
+.headerToggleButton,
+.backButton,
+.collapsedButton {
   display: inline-flex;
   align-items: center;
   gap: 8px;
   min-height: 38px;
-  padding: 8px 13px;
   border-radius: 999px;
   border: 1px solid rgba(113, 113, 122, 0.14);
   background: rgba(255, 255, 255, 0.5);
@@ -76,30 +110,108 @@
     transform 0.08s ease,
     box-shadow 0.2s ease,
     background 0.2s ease,
-    border-color 0.2s ease;
+    border-color 0.2s ease,
+    opacity 0.2s ease;
 }
 
-.backButton:hover {
+.headerToggleButton,
+.backButton {
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.38) inset;
+}
+
+.headerToggleButton {
+  width: 38px;
+  min-width: 38px;
+  padding: 0;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.backButton {
+  padding: 8px 13px;
+}
+
+.collapsedDock {
+  justify-self: start;
+  align-self: start;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(calc(-100% - 14px));
+  transition:
+    transform 320ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    opacity 180ms ease;
+}
+
+.collapsedDockVisible {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
+.collapsedDockHidden {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(calc(-100% - 14px));
+}
+
+.collapsedButton {
+  padding: 8px 14px;
+  border-radius: 0 0 24px 24px;
+  border-top: none;
+  background:
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.03)),
+    rgba(255, 255, 255, 0.78);
+  box-shadow:
+    0 10px 22px rgba(15, 23, 42, 0.08),
+    0 1px 0 rgba(255, 255, 255, 0.45) inset;
+  backdrop-filter: blur(20px) saturate(170%);
+  -webkit-backdrop-filter: blur(20px) saturate(170%);
+}
+
+.collapsedTitle {
+  max-width: min(48vw, 280px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 800;
+}
+
+.headerToggleButton:hover,
+.backButton:hover,
+.collapsedButton:hover {
   background: rgba(255, 255, 255, 0.72);
   border-color: rgba(113, 113, 122, 0.18);
-  box-shadow: 0 12px 24px rgba(17, 17, 17, 0.08);
+  box-shadow: 0 8px 18px rgba(17, 17, 17, 0.05);
 }
 
-.backButton:active {
+.headerToggleButton:active,
+.backButton:active,
+.collapsedButton:active {
   transform: scale(0.98);
   box-shadow: none;
 }
 
-.backButton:focus-visible {
+.headerToggleButton:focus-visible,
+.backButton:focus-visible,
+.collapsedButton:focus-visible {
   outline: none;
   border-color: rgba(0, 102, 204, 0.28);
   box-shadow: 0 0 0 4px var(--focus, rgba(0, 102, 204, 0.18));
 }
 
-.backIcon {
+.backIcon,
+.toggleIcon {
   width: 14px;
   height: 14px;
   display: block;
+}
+
+.toggleIconUp {
+  transform: rotate(90deg);
+}
+
+.toggleIconDown {
+  transform: rotate(-90deg);
 }
 
 .titleBlock {
@@ -248,6 +360,7 @@
     align-items: stretch;
   }
 
+  .leadingGroup,
   .titleBlock,
   .utilityGroup,
   .actions {
@@ -261,4 +374,9 @@
   .title {
     font-size: clamp(1.1rem, 7vw, 1.35rem);
   }
+
+  .collapsedTitle {
+    max-width: min(62vw, 220px);
+  }
 }
+

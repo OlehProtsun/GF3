@@ -1,4 +1,4 @@
-﻿import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import type { AnchorHTMLAttributes, PropsWithChildren, ReactNode } from "react";
 
 type NavigateTo = string | number;
@@ -72,6 +72,10 @@ export function useParams<T extends Record<string, string>>() {
     params.shopId = entityId;
   }
 
+  if (parts[0] === "availability") {
+    params.availabilityId = entityId;
+  }
+
   return params as T;
 }
 
@@ -142,3 +146,4 @@ export function renderMatched(pathname: string, routes: Array<{ path: string; el
 
   return matched.element;
 }
+

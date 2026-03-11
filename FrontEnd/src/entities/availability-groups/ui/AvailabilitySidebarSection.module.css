@@ -1,0 +1,160 @@
+.sectionShell {
+  position: relative;
+  min-width: 0;
+}
+
+.sectionShellExpanded {
+  min-height: 0;
+}
+
+.sectionShellCollapsedDefault,
+.sectionShellCollapsedCompact,
+.sectionShellCollapsedFlush {
+  min-height: 54px;
+}
+
+.sectionShellCollapsedDefault {
+  left: -28px;
+  padding-left: 28px;
+}
+
+.sectionShellCollapsedCompact {
+  left: -10px;
+  padding-left: 10px;
+}
+
+.sectionShellCollapsedFlush {
+  left: 0;
+  padding-left: 0;
+}
+
+.sectionCardWrap {
+  min-width: 0;
+  transition:
+    transform 260ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    opacity 180ms ease;
+}
+
+.sectionCardWrap > * {
+  width: 100%;
+}
+
+.sectionShellCollapsedDefault .sectionCardWrap,
+.sectionShellCollapsedCompact .sectionCardWrap,
+.sectionShellCollapsedFlush .sectionCardWrap {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(calc(-100% - 18px));
+}
+
+.sectionExpandButton {
+  position: absolute;
+  left: -2px;
+  top: 10px;
+  z-index: 2;
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  border: 1px solid rgba(113, 113, 122, 0.14);
+  background: rgba(255, 255, 255, 0.88);
+  color: #111827;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.12);
+  cursor: pointer;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(-10px);
+  transition:
+    opacity 220ms ease,
+    transform 220ms ease,
+    background-color 180ms ease,
+    box-shadow 180ms ease;
+}
+
+.sectionShellCollapsedDefault .sectionExpandButton,
+.sectionShellCollapsedCompact .sectionExpandButton,
+.sectionShellCollapsedFlush .sectionExpandButton {
+  left: 0;
+  width: 42px;
+  border-radius: 0 999px 999px 0;
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateX(0);
+}
+
+.sectionCollapseButton {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  border: 1px solid rgba(113, 113, 122, 0.14);
+  background: rgba(255, 255, 255, 0.82);
+  color: #111827;
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.1);
+  cursor: pointer;
+  transition:
+    background-color 180ms ease,
+    box-shadow 180ms ease,
+    transform 120ms ease;
+}
+
+.sectionExpandButton:hover,
+.sectionCollapseButton:hover {
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.14);
+}
+
+.sectionExpandButton:focus-visible,
+.sectionCollapseButton:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.18);
+}
+
+.sectionCollapseButton:active,
+.sectionExpandButton:active {
+  transform: scale(0.98);
+}
+
+.sectionCollapseArrow {
+  position: relative;
+  transform: translate(-2px, 1px) rotate(90deg);
+  transform-origin: center;
+}
+
+.sectionExpandArrow {
+  transform: rotate(-90deg);
+}
+
+@media (max-width: 960px) {
+  .sectionExpandButton,
+  .sectionCollapseButton {
+    display: none;
+  }
+
+  .sectionShellCollapsedDefault,
+  .sectionShellCollapsedCompact,
+  .sectionShellCollapsedFlush {
+    min-height: 0;
+    left: 0;
+    padding-left: 0;
+  }
+
+  .sectionShellCollapsedDefault .sectionCardWrap,
+  .sectionShellCollapsedCompact .sectionCardWrap,
+  .sectionShellCollapsedFlush .sectionCardWrap {
+    position: relative;
+    top: auto;
+    left: auto;
+    right: auto;
+    opacity: 1;
+    pointer-events: auto;
+    transform: none;
+  }
+}
+

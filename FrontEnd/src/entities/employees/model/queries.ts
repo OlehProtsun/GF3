@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import { useEmployeesListQuery } from "@entities/employees/api/queries";
 
 export function useEmployeesQuery(searchText: string) {
-  const query = useEmployeesListQuery({ search: searchText });
+  const query = useEmployeesListQuery();
 
   const data = useMemo(() => {
     const employees = query.data ?? [];

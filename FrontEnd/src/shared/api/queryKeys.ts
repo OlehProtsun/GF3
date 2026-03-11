@@ -9,4 +9,35 @@
     list: (search = "") => ["shops", "list", search] as const,
     byId: (id: number) => ["shops", "byId", id] as const,
   },
+  health: {
+    status: () => ["health", "status"] as const,
+  },
+  adminDb: {
+    metadata: () => ["adminDb", "metadata"] as const,
+    hash: () => ["adminDb", "hash"] as const,
+  },
+  containers: {
+    all: ["containers"] as const,
+    list: () => ["containers", "list"] as const,
+    byId: (id: number) => ["containers", "byId", id] as const,
+    graphs: (containerId: number) => ["containers", containerId, "graphs"] as const,
+    graphById: (containerId: number, graphId: number) => ["containers", containerId, "graphs", graphId] as const,
+    graphSlots: (containerId: number, graphId: number) => ["containers", containerId, "graphs", graphId, "slots"] as const,
+    graphEmployees: (containerId: number, graphId: number) => ["containers", containerId, "graphs", graphId, "employees"] as const,
+    graphCellStyles: (containerId: number, graphId: number) => ["containers", containerId, "graphs", graphId, "cellStyles"] as const,
+  },
+  availabilityBinds: {
+    all: ["availabilityBinds"] as const,
+    list: () => ["availabilityBinds", "list"] as const,
+    active: () => ["availabilityBinds", "active"] as const,
+    byId: (id: number) => ["availabilityBinds", "byId", id] as const,
+  },
+  availabilityGroups: {
+    all: ["availabilityGroups"] as const,
+    list: () => ["availabilityGroups", "list"] as const,
+    byId: (id: number) => ["availabilityGroups", "byId", id] as const,
+    items: (id: number) => ["availabilityGroups", "items", id] as const,
+    members: (id: number) => ["availabilityGroups", id, "members"] as const,
+    slots: (id: number) => ["availabilityGroups", id, "slots"] as const,
+  },
 };

@@ -1,0 +1,203 @@
+.card {
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding-bottom: 18px;
+}
+
+.layout {
+  display: grid;
+  gap: 12px;
+}
+
+.titleWrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.titleMeta {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(17, 24, 39, 0.08);
+  color: rgba(17, 24, 39, 0.58);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.errorMessage {
+  padding: 12px 14px;
+  border-radius: 18px;
+  border: 1px solid rgba(239, 68, 68, 0.18);
+  background: rgba(254, 242, 242, 0.88);
+  color: #b91c1c;
+  font-size: 0.88rem;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+.placeholderTable {
+  overflow: hidden;
+  border-radius: 18px;
+  border: 1px solid rgba(113, 113, 122, 0.12);
+  background: rgba(255, 255, 255, 0.78);
+}
+
+.headerRow,
+.bindRow,
+.emptyRow {
+  display: grid;
+  grid-template-columns: minmax(88px, 0.88fr) minmax(108px, 1fr) 56px;
+  gap: 8px;
+  align-items: center;
+  padding: 10px 12px;
+}
+
+.headerRow {
+  background: rgba(244, 244, 245, 0.92);
+  color: rgba(17, 24, 39, 0.68);
+  font-size: 0.74rem;
+  font-weight: 800;
+}
+
+.body {
+  display: grid;
+}
+
+.bindRow {
+  border-top: 1px solid rgba(113, 113, 122, 0.08);
+  cursor: pointer;
+  transition: background-color 160ms ease, box-shadow 160ms ease;
+}
+
+.bindRow:hover,
+.bindRow:focus-within {
+  background: rgba(244, 244, 245, 0.72);
+}
+
+.bindRowSelected {
+  background: rgba(239, 246, 255, 0.92);
+  box-shadow: inset 3px 0 0 #2563eb;
+}
+
+.keyInput,
+.valueInput {
+  width: 100%;
+  min-width: 0;
+  min-height: 38px;
+  padding: 0 10px;
+  border-radius: 14px;
+  border: 1px solid rgba(113, 113, 122, 0.12);
+  background: rgba(255, 255, 255, 0.94);
+  color: #111827;
+  font: inherit;
+  font-size: 0.9rem;
+  box-sizing: border-box;
+}
+
+.keyInput {
+  cursor: pointer;
+  font-weight: 800;
+}
+
+.keyInput::placeholder,
+.valueInput::placeholder {
+  color: rgba(17, 24, 39, 0.46);
+}
+
+.keyInput:focus,
+.valueInput:focus {
+  outline: none;
+  border-color: rgba(37, 99, 235, 0.28);
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.12);
+}
+
+.toggleCell {
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.toggleCell input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.toggleTrack {
+  width: 42px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  padding: 6px; /* було 3px */
+  border-radius: 999px;
+  background: rgba(209, 213, 219, 0.92);
+  transition: background-color 160ms ease;
+}
+
+.toggleThumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  background: #ffffff;
+  box-shadow: 0 4px 10px rgba(15, 23, 42, 0.16);
+  transition: transform 160ms ease;
+}
+
+.toggleCell input:checked + .toggleTrack {
+  background: #2563eb;
+}
+
+.toggleCell input:checked + .toggleTrack .toggleThumb {
+  transform: translateX(22px);
+}
+
+.emptyRow {
+  min-height: 64px;
+  color: rgba(17, 24, 39, 0.58);
+  font-size: 0.84rem;
+  line-height: 1.4;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.actions :global(button) {
+  height: 40px;
+  padding-inline: 0.8rem;
+}
+
+.actions :global(button:last-child) {
+  margin-left: auto;
+}
+
+@media (max-width: 780px) {
+  .headerRow,
+  .bindRow,
+  .emptyRow {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .actions :global(button) {
+    width: 100%;
+    text-align: center;
+    justify-content: center;
+    margin-left: 0;
+  }
+}
+

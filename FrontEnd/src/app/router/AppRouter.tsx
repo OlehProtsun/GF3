@@ -1,10 +1,12 @@
-﻿import { BrowserRouter, Navigate, useLocation } from "react-router-dom";
+import { BrowserRouter, Navigate, useLocation } from "react-router-dom";
 import { OverlaySidebarLayout } from "@app/layouts/overlay-sidebar-layout";
 import { HomePage } from "@pages/home";
 import { ShopListPage } from "@pages/shop-list";
 import { ShopProfilePage } from "@pages/shop-profile";
 import { ShopEditPage } from "@pages/shop-edit";
 import { AvailabilityPage } from "@pages/availability";
+import { AvailabilityEditPage } from "@pages/availability-edit";
+import { AvailabilityProfilePage } from "@pages/availability-profile";
 import { ContainerPage } from "@pages/container";
 import { InformationPage } from "@pages/information";
 import { DataBasePage } from "@pages/database";
@@ -22,6 +24,9 @@ function RoutedContent() {
   if (matchPath(pathname, "/shop/:shopId/edit")) return <ShopEditPage />;
   if (matchPath(pathname, "/shop/:shopId")) return <ShopProfilePage />;
   if (pathname === "/availability") return <AvailabilityPage />;
+  if (pathname === "/availability/new") return <AvailabilityEditPage />;
+  if (matchPath(pathname, "/availability/:availabilityId/edit")) return <AvailabilityEditPage />;
+  if (matchPath(pathname, "/availability/:availabilityId")) return <AvailabilityProfilePage />;
   if (pathname === "/container") return <ContainerPage />;
   if (pathname === "/information") return <InformationPage />;
   if (pathname === "/database") return <DataBasePage />;

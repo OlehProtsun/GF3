@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { ReactNode } from "react";
-import { NavLink } from "react-router-dom";
+import { NavLink, useLocation } from "react-router-dom";
 import styles from "./OverlaySidebarLayout.module.css";
 import {
   InfoIcon,
@@ -12,6 +12,7 @@ import {
   DatabaseIcon,
   ArrowIcon,
 } from "@shared/ui/icons";
+import { matchPath } from "@shared/lib/react-router-dom";
 
 type OverlaySidebarLayoutProps = {
   children: ReactNode;
@@ -45,6 +46,16 @@ function NavItem({
 
 export function OverlaySidebarLayout({ children }: OverlaySidebarLayoutProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const { pathname } = useLocation();
+  const isWideContent =
+    pathname === "/availability/new" ||
+    Boolean(matchPath(pathname, "/availability/:availabilityId/edit")) ||
+    Boolean(matchPath(pathname, "/availability/:availabilityId"));
+  const contentClassName = [
+    styles.content,
+    isCollapsed ? styles.contentExpanded : styles.contentShifted,
+    isWideContent ? styles.contentWide : "",
+  ].filter(Boolean).join(" ");
 
   return (
     <div className={styles.layout}>
@@ -104,11 +115,7 @@ export function OverlaySidebarLayout({ children }: OverlaySidebarLayoutProps) {
           </button>
         </div>
       </aside>
-      <main
-        className={`${styles.content} ${
-          isCollapsed ? styles.contentExpanded : styles.contentShifted
-        }`}
-      >
+      <main className={contentClassName}>
         <div className="container">{children}</div>
       </main>
 

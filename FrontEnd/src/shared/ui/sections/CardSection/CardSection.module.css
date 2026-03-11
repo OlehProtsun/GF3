@@ -1,4 +1,4 @@
-.card {
+﻿.card {
   position: relative;
   isolation: isolate;
   width: min(100%, 760px);
@@ -6,6 +6,7 @@
   border-radius: 32px;
   padding: 18px;
   padding-bottom: 0;
+  box-sizing: border-box;
   overflow: hidden;
 
   background:
@@ -31,6 +32,12 @@
   padding: 2px 4px;
 }
 
+.sectionHeaderCentered {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+}
+
 .sectionTitle {
   min-width: 0;
   display: inline-flex;
@@ -45,9 +52,40 @@
   opacity: 0.85;
 }
 
+.headerCenter {
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
 .headerRight {
   display: inline-flex;
   align-items: center;
   justify-content: flex-end;
   flex-shrink: 0;
+}
+
+.sectionHeaderCentered .headerRight {
+  justify-self: end;
+}
+
+@media (max-width: 840px) {
+  .sectionHeaderCentered {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
+  }
+
+  .sectionHeaderCentered .headerCenter,
+  .sectionHeaderCentered .headerRight {
+    justify-self: stretch;
+  }
+
+  .sectionHeaderCentered .headerCenter {
+    order: 2;
+  }
+
+  .sectionHeaderCentered .headerRight {
+    order: 3;
+  }
 }

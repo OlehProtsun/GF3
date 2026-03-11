@@ -5,14 +5,10 @@ import {
   getShopInitials,
   getShopProfileDetails,
 } from "@entities/shops/model/presentation";
-import { ErrorBanner } from "@shared/ui/components/ErrorBanner";
 import { IosButton } from "@shared/ui/components/IosButton";
-import {
-  ProfileSummaryCard,
-  type ProfileSummaryDetail,
-} from "@shared/ui/components/ProfileSummaryCard";
+import { RecordProfileCard, renderRecordDetailValue } from "@shared/ui/components/RecordProfileCard";
+import { type ProfileSummaryDetail } from "@shared/ui/components/ProfileSummaryCard";
 import { ShopIcon } from "@shared/ui/icons";
-import styles from "./ShopProfileCard.module.css";
 
 type ShopProfileCardProps = {
   shop?: Shop;
@@ -22,14 +18,6 @@ type ShopProfileCardProps = {
   onEditShop: (shopId: Shop["id"]) => void;
   onDeleteShop: () => void;
 };
-
-function renderDetailValue(value?: string | null) {
-  if (!value) {
-    return <span className={styles.mutedValue}>Not provided</span>;
-  }
-
-  return value;
-}
 
 export function ShopProfileCard({
   shop,
@@ -46,21 +34,19 @@ export function ShopProfileCard({
     ? getShopProfileDetails(shop).map(item => ({
         key: item.key,
         label: item.label,
-        value: renderDetailValue(item.value),
+        value: renderRecordDetailValue(item.value),
       }))
     : [];
 
   return (
-    <ProfileSummaryCard
+    <RecordProfileCard
       sectionTitle="Shop Profile"
-      icon={<ShopIcon size={18} />}
+      icon={<ShopIcon size={18} style={{ transform: "scaleY(-1)" }} />}
       headerMeta={shop ? `ID ${shop.id}` : undefined}
-      statusContent={
-        <>
-          {isLoading ? <p className={styles.loading}>Loading shop details...</p> : null}
-          {hasLoadError ? <ErrorBanner>Could not load shop.</ErrorBanner> : null}
-        </>
-      }
+      isLoading={isLoading}
+      hasLoadError={hasLoadError}
+      loadingMessage="Loading shop details..."
+      errorMessage="Could not load shop."
       avatar={shop ? initials : undefined}
       name={shop ? displayName : undefined}
       subtitle={shop ? detailsState : undefined}

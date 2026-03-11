@@ -1,12 +1,8 @@
-﻿import type { ChangeEvent, FormEvent } from "react";
+import type { ChangeEvent, FormEvent } from "react";
 import type { ShopFormErrors, ShopFormFieldElement, ShopFormState } from "@entities/shops/model/form";
-import { ErrorBanner } from "@shared/ui/components/ErrorBanner";
-import { IosButton } from "@shared/ui/components/IosButton";
+import { RecordDetailsFormCard } from "@shared/ui/components/RecordDetailsFormCard";
 import { LabeledField, TextArea, TextInput } from "@shared/ui/forms/Field";
-import { FormActions, FormGrid, FormRow } from "@shared/ui/forms/FormLayout";
-import { CheckIcon, CloseIcon, InformationIcon } from "@shared/ui/icons";
-import { CardSection } from "@shared/ui/sections/CardSection";
-import styles from "./ShopDetailsForm.module.css";
+import { FormRow } from "@shared/ui/forms/FormLayout";
 
 type ShopDetailsFormProps = {
   form: ShopFormState;
@@ -30,67 +26,48 @@ export function ShopDetailsForm({
   onSubmit,
 }: ShopDetailsFormProps) {
   return (
-    <CardSection title="Details" icon={<InformationIcon size={18} className={styles.infoIcon} />}>
-      {isLoading ? <div className={styles.loading}>Loading...</div> : null}
+    <RecordDetailsFormCard
+      isLoading={isLoading}
+      hasLoadError={hasLoadError}
+      isSaving={isSaving}
+      loadingMessage="Loading..."
+      errorMessage="Could not load shop."
+      onCancel={onCancel}
+      onSubmit={onSubmit}
+    >
+      <FormRow>
+        <LabeledField id="name" label="Name" error={errors.name}>
+          <TextInput
+            id="name"
+            value={form.name}
+            placeholder="Example: Central Store"
+            onChange={onFieldChange("name")}
+            aria-invalid={Boolean(errors.name)}
+            aria-describedby={errors.name ? "name-error" : undefined}
+          />
+        </LabeledField>
 
-      {hasLoadError ? <ErrorBanner className={styles.errorBanner}>Could not load shop.</ErrorBanner> : null}
+        <LabeledField id="address" label="Address" error={errors.address}>
+          <TextInput
+            id="address"
+            value={form.address}
+            placeholder="Example: 123 Main Street"
+            onChange={onFieldChange("address")}
+            aria-invalid={Boolean(errors.address)}
+            aria-describedby={errors.address ? "address-error" : undefined}
+          />
+        </LabeledField>
+      </FormRow>
 
-      <form onSubmit={onSubmit}>
-        <FormGrid>
-          <FormRow>
-            <LabeledField id="name" label="Name" error={errors.name}>
-              <TextInput
-                id="name"
-                value={form.name}
-                placeholder="Example: Central Store"
-                onChange={onFieldChange("name")}
-                aria-invalid={Boolean(errors.name)}
-                aria-describedby={errors.name ? "name-error" : undefined}
-              />
-            </LabeledField>
-
-            <LabeledField id="address" label="Address" error={errors.address}>
-              <TextInput
-                id="address"
-                value={form.address}
-                placeholder="Example: 123 Main Street"
-                onChange={onFieldChange("address")}
-                aria-invalid={Boolean(errors.address)}
-                aria-describedby={errors.address ? "address-error" : undefined}
-              />
-            </LabeledField>
-          </FormRow>
-
-          <LabeledField id="description" label="Description">
-            <TextArea
-              id="description"
-              rows={5}
-              placeholder="Example: Main retail location with warehouse pickup"
-              value={form.description}
-              onChange={onFieldChange("description")}
-            />
-          </LabeledField>
-
-          <FormActions>
-            <IosButton
-              label="Cancel"
-              variant="secondary"
-              icon={<CloseIcon size={18} />}
-              onClick={onCancel}
-              disabled={isSaving}
-              className={styles.cancelBtn}
-            />
-
-            <IosButton
-              label={isSaving ? "Saving..." : "Save"}
-              variant="primary"
-              icon={<CheckIcon size={18} />}
-              type="submit"
-              disabled={isSaving}
-            />
-          </FormActions>
-        </FormGrid>
-      </form>
-    </CardSection>
+      <LabeledField id="description" label="Description">
+        <TextArea
+          id="description"
+          rows={5}
+          placeholder="Example: Main retail location with warehouse pickup"
+          value={form.description}
+          onChange={onFieldChange("description")}
+        />
+      </LabeledField>
+    </RecordDetailsFormCard>
   );
 }

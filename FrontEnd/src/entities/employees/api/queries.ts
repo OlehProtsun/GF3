@@ -7,12 +7,11 @@ import { queryKeys } from "@shared/api/queryKeys";
 import type { EmployeesListParams, SaveEmployeeInput } from "@entities/employees/model/types";
 import { employeesApi } from "./employeesApi";
 
-export function useEmployeesListQuery(params?: EmployeesListParams) {
-  const search = params?.search?.trim() ?? "";
-
+export function useEmployeesListQuery(_params?: EmployeesListParams) {
   return useQuery({
-    queryKey: queryKeys.employees.list(search),
-    queryFn: ({ signal }) => employeesApi.list(signal),
+    queryKey: queryKeys.employees.list(),
+    // Keep the employees list request alive through StrictMode remounts in dev.
+    queryFn: () => employeesApi.list(),
   });
 }
 

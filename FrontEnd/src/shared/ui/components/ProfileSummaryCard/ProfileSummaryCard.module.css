@@ -6,6 +6,14 @@
   padding-bottom: 18px;
 }
 
+.headerRightStack {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
 .headerMetaBadge {
   display: inline-flex;
   align-items: center;
@@ -113,6 +121,10 @@
   .card {
     width: 100%;
     max-width: 100%;
+  }
+
+  .headerRightStack {
+    justify-content: stretch;
   }
 
   .identityBlock {
