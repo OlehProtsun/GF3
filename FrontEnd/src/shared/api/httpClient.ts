@@ -22,6 +22,13 @@ export class ApiError extends Error {
   }
 }
 
+export class RequestCanceledError extends Error {
+  constructor(message = "Request was canceled.") {
+    super(message);
+    this.name = "RequestCanceledError";
+  }
+}
+
 type RequestMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 type QueryValue = string | number | boolean | null | undefined;
 type ResponseType = "json" | "blob";
@@ -42,6 +49,18 @@ type ProblemDetailsResponse = {
   traceId?: string;
   errors?: Record<string, string[]>;
 };
+
+function hasErrorName(value: unknown): value is { name: string } {
+  return typeof value === "object" && value !== null && "name" in value && typeof (value as { name: unknown }).name === "string";
+}
+
+export function isRequestCanceledError(error: unknown): boolean {
+  if (error instanceof RequestCanceledError) {
+    return true;
+  }
+
+  return hasErrorName(error) && error.name === "AbortError";
+}
 
 const defaultBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim() || "/api";
 
@@ -121,12 +140,22 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
     headers.set("Content-Type", "application/json");
   }
 
-  const response = await fetch(buildUrl(path, options.query), {
-    method,
-    headers,
-    signal: options.signal,
-    body: hasBody ? JSON.stringify(options.body) : undefined,
-  });
+  let response: Response;
+
+  try {
+    response = await fetch(buildUrl(path, options.query), {
+      method,
+      headers,
+      signal: options.signal,
+      body: hasBody ? JSON.stringify(options.body) : undefined,
+    });
+  } catch (error) {
+    if (options.signal?.aborted || isRequestCanceledError(error)) {
+      throw new RequestCanceledError();
+    }
+
+    throw error;
+  }
 
   if (response.status === 204) {
     return undefined as T;

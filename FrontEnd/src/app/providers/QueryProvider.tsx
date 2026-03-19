@@ -7,6 +7,7 @@ import {
   QueryClientProvider,
 } from "@tanstack/react-query";
 import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
+import { isRequestCanceledError } from "@shared/api/httpClient";
 import { isDev } from "@shared/lib/isDev";
 
 function createQueryClient() {
@@ -23,14 +24,14 @@ function createQueryClient() {
     },
     queryCache: new QueryCache({
       onError: (error, query) => {
-        if (isDev) {
+        if (isDev && !isRequestCanceledError(error)) {
           console.error("[Query error]", query.queryKey, error);
         }
       },
     }),
     mutationCache: new MutationCache({
       onError: (error, _variables, _context, mutation) => {
-        if (isDev) {
+        if (isDev && !isRequestCanceledError(error)) {
           console.error("[Mutation error]", mutation.options.mutationKey, error);
         }
       },
