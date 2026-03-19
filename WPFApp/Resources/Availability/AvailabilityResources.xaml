@@ -1,0 +1,186 @@
+﻿<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:sys="clr-namespace:System.Windows;assembly=PresentationFramework">
+
+    <!-- Module-only brush -->
+    <SolidColorBrush x:Key="AvailabilityOverlayDimBrush" Color="#40000000" />
+
+    <!-- ========================= -->
+    <!-- Page title / subtitle     -->
+    <!-- ========================= -->
+    <Style x:Key="AvailabilityPageTitleTextStyle" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{StaticResource DefaultFontFamily}" />
+        <Setter Property="FontSize" Value="{StaticResource FontSizePageTitle}" />
+        <Setter Property="Foreground" Value="Black" />
+    </Style>
+
+    <Style x:Key="AvailabilityPageSubtitleTextStyle" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{StaticResource DefaultFontFamily}" />
+        <Setter Property="FontSize" Value="17" />
+        <Setter Property="Foreground" Value="{StaticResource SecondaryTextBrush}" />
+    </Style>
+
+    <!-- ========================= -->
+    <!-- Section headers (icon+txt) -->
+    <!-- ========================= -->
+    <Style x:Key="AvailabilitySectionHeaderStackStyle" TargetType="StackPanel">
+        <Setter Property="Orientation" Value="Horizontal" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+
+    <Style x:Key="AvailabilitySectionHeaderIconViewboxStyle" TargetType="Viewbox">
+        <Setter Property="Width" Value="20" />
+        <Setter Property="Height" Value="20" />
+        <Setter Property="Margin" Value="0,0,8,0" />
+    </Style>
+
+    <Style x:Key="AvailabilityHeaderIconPathStyle" TargetType="Path">
+        <Setter Property="Fill" Value="Black" />
+        <Setter Property="Stretch" Value="Uniform" />
+    </Style>
+
+    <Style x:Key="AvailabilityHeaderIconPathFlippedStyle"
+           TargetType="Path"
+           BasedOn="{StaticResource AvailabilityHeaderIconPathStyle}">
+        <Setter Property="RenderTransformOrigin" Value="0.5,0.5" />
+        <Setter Property="RenderTransform">
+            <Setter.Value>
+                <ScaleTransform ScaleX="1" ScaleY="-1" />
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style x:Key="AvailabilitySectionHeaderTitleTextStyle" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{StaticResource DefaultFontFamily}" />
+        <Setter Property="FontSize" Value="{StaticResource FontSizeTitle}" />
+        <Setter Property="FontWeight" Value="Bold" />
+        <Setter Property="Foreground" Value="Black" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+
+    <!-- ========================= -->
+    <!-- Availability collapsible cards (EditView) -->
+    <!-- ========================= -->
+    <Style x:Key="AvailabilitySectionCardStyle"
+           TargetType="Border"
+           BasedOn="{StaticResource CardStyle}">
+        <Setter Property="Margin" Value="7,0,7,16" />
+    </Style>
+
+    <Style x:Key="AvailabilitySectionHeaderGridStyle" TargetType="Grid">
+        <Setter Property="Margin" Value="15,10,10,10" />
+    </Style>
+
+    <Style x:Key="AvailabilitySectionBodyGridStyle" TargetType="Grid">
+        <Setter Property="Margin" Value="10,0,10,10" />
+    </Style>
+
+    <!-- ========================= -->
+    <!-- Grid containers inside cards -->
+    <!-- ========================= -->
+    <Style x:Key="AvailabilityGridContainerBaseStyle" TargetType="Border">
+        <Setter Property="Background" Value="{StaticResource SurfaceBrush}" />
+        <Setter Property="BorderBrush" Value="{StaticResource CardBorderBrush}" />
+        <Setter Property="BorderThickness" Value="2" />
+        <Setter Property="CornerRadius" Value="{StaticResource Cr20}" />
+        <Setter Property="ClipToBounds" Value="True" />
+    </Style>
+
+    <Style x:Key="AvailabilityGridContainerStyle"
+           TargetType="Border"
+           BasedOn="{StaticResource AvailabilityGridContainerBaseStyle}">
+        <Setter Property="Padding" Value="6" />
+    </Style>
+
+    <Style x:Key="AvailabilityGridContainerCompactStyle"
+           TargetType="Border"
+           BasedOn="{StaticResource AvailabilityGridContainerBaseStyle}">
+        <Setter Property="Padding" Value="5" />
+    </Style>
+
+    <!-- ========================= -->
+    <!-- Badge (Total: N) -->
+    <!-- ========================= -->
+    <Style x:Key="AvailabilityTotalBadgeBorderStyle" TargetType="Border">
+        <Setter Property="Background" Value="{StaticResource BadgeBackgroundBrush}" />
+        <Setter Property="CornerRadius" Value="{StaticResource Cr10}" />
+        <Setter Property="Padding" Value="10,4" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+
+    <Style x:Key="AvailabilityTotalBadgeTextStyle" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{StaticResource DefaultFontFamily}" />
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="Foreground" Value="{StaticResource MutedTextBrush}" />
+    </Style>
+
+    <!-- ========================= -->
+    <!-- Label / value typography -->
+    <!-- ========================= -->
+    <Style x:Key="AvailabilityLabelTextStyle" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{StaticResource DefaultFontFamily}" />
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="Foreground" Value="{StaticResource MutedTextBrush}" />
+    </Style>
+
+    <Style x:Key="AvailabilityValueTextStyle" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{StaticResource DefaultFontFamily}" />
+        <Setter Property="FontSize" Value="16" />
+        <Setter Property="Foreground" Value="Black" />
+    </Style>
+
+    <Style x:Key="AvailabilityMetaTextStyle" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{StaticResource DefaultFontFamily}" />
+        <Setter Property="FontSize" Value="11" />
+    </Style>
+
+    <!-- Optional reusable DataGrid resources (profile matrix no selection) -->
+    <ResourceDictionary x:Key="AvailabilityNoSelectionMatrixGridResources">
+        <SolidColorBrush x:Key="{x:Static sys:SystemColors.HighlightBrushKey}" Color="Transparent" />
+        <SolidColorBrush x:Key="{x:Static sys:SystemColors.InactiveSelectionHighlightBrushKey}" Color="Transparent" />
+
+        <SolidColorBrush x:Key="{x:Static sys:SystemColors.HighlightTextBrushKey}"
+                         Color="{DynamicResource {x:Static sys:SystemColors.ControlTextColorKey}}" />
+        <SolidColorBrush x:Key="{x:Static sys:SystemColors.InactiveSelectionHighlightTextBrushKey}"
+                         Color="{DynamicResource {x:Static sys:SystemColors.ControlTextColorKey}}" />
+
+        <Style TargetType="TextBlock" BasedOn="{StaticResource MatrixTextBlockStyle}" />
+        <Style TargetType="CheckBox" BasedOn="{StaticResource CenterCheckBoxStyle}" />
+    </ResourceDictionary>
+
+
+    <!-- ========================================================= -->
+    <!-- Aliases / variants used by current Availability views     -->
+    <!-- ========================================================= -->
+
+    <Style x:Key="AvailabilitySectionHeaderTextStyle"
+           TargetType="TextBlock"
+           BasedOn="{StaticResource AvailabilitySectionHeaderTitleTextStyle}" />
+
+    <Style x:Key="AvailabilityBadgeBorderStyle"
+           TargetType="Border"
+           BasedOn="{StaticResource AvailabilityTotalBadgeBorderStyle}" />
+
+    <Style x:Key="AvailabilityBadgeTextStyle"
+           TargetType="TextBlock"
+           BasedOn="{StaticResource AvailabilityTotalBadgeTextStyle}" />
+
+    <Style x:Key="AvailabilityGridContainerBorderStyle"
+           TargetType="Border"
+           BasedOn="{StaticResource AvailabilityGridContainerStyle}" />
+
+    <Style x:Key="AvailabilityCancelButtonStyle"
+           TargetType="Button"
+           BasedOn="{StaticResource RoundedButtonStyle}">
+        <Setter Property="Background" Value="{StaticResource CancelButtonBackgroundBrush}" />
+        <Setter Property="Foreground" Value="{StaticResource MutedTextBrush}" />
+    </Style>
+
+    <Style x:Key="AvailabilityDangerButtonStyle"
+           TargetType="Button"
+           BasedOn="{StaticResource RoundedButtonStyle}">
+        <Setter Property="Background" Value="{StaticResource DangerBrush}" />
+        <Setter Property="Foreground" Value="White" />
+    </Style>
+
+</ResourceDictionary>

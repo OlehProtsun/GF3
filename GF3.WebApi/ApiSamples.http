@@ -1,0 +1,228 @@
+@host = http://localhost:5055
+
+### Employees - Get all
+GET {{host}}/api/employees
+Accept: application/json
+
+### Shops - Create
+POST {{host}}/api/shops
+Content-Type: application/json
+
+{
+  "name": "Downtown Shop",
+  "address": "Main street 10",
+  "description": "Main branch"
+}
+
+### Shops - Get all
+GET {{host}}/api/shops
+Accept: application/json
+
+### Containers - Create
+POST {{host}}/api/containers
+Content-Type: application/json
+
+{
+  "name": "Main Container",
+  "note": "Container used in monthly schedules"
+}
+
+### Containers - Get all
+GET {{host}}/api/containers
+Accept: application/json
+
+### AvailabilityGroups - Create
+POST {{host}}/api/availability-groups
+Content-Type: application/json
+
+{
+  "name": "April Team A",
+  "year": 2026,
+  "month": 4
+}
+
+### Graphs - Create graph (schedule)
+POST {{host}}/api/containers/1/graphs
+Content-Type: application/json
+
+{
+  "shopId": 1,
+  "name": "April Graph",
+  "year": 2026,
+  "month": 4,
+  "peoplePerShift": 2,
+  "shift1Time": "08:00 - 16:00",
+  "shift2Time": "16:00 - 23:00",
+  "maxHoursPerEmpMonth": 180,
+  "maxConsecutiveDays": 5,
+  "maxConsecutiveFull": 3,
+  "maxFullPerMonth": 10,
+  "note": "Schedule graph sample",
+  "availabilityGroupId": 1
+}
+
+### Graphs - List graphs in container
+GET {{host}}/api/containers/1/graphs
+Accept: application/json
+
+### Graphs - Get graph by id
+GET {{host}}/api/containers/1/graphs/1
+Accept: application/json
+
+### Graphs - Update graph
+PUT {{host}}/api/containers/1/graphs/1
+Content-Type: application/json
+
+{
+  "shopId": 1,
+  "name": "April Graph Updated",
+  "year": 2026,
+  "month": 4,
+  "peoplePerShift": 3,
+  "shift1Time": "08:00 - 16:00",
+  "shift2Time": "16:00 - 23:00",
+  "maxHoursPerEmpMonth": 170,
+  "maxConsecutiveDays": 4,
+  "maxConsecutiveFull": 2,
+  "maxFullPerMonth": 9,
+  "note": "Updated graph",
+  "availabilityGroupId": 1
+}
+
+### Slots - Create slot
+POST {{host}}/api/containers/1/graphs/1/slots
+Content-Type: application/json
+
+{
+  "dayOfMonth": 5,
+  "slotNo": 1,
+  "fromTime": "08:00",
+  "toTime": "16:00",
+  "employeeId": null,
+  "status": "UNFURNISHED"
+}
+
+### Slots - Get slots
+GET {{host}}/api/containers/1/graphs/1/slots
+Accept: application/json
+
+### Slots - Update slot (assign employee/status)
+PUT {{host}}/api/containers/1/graphs/1/slots/1
+Content-Type: application/json
+
+{
+  "dayOfMonth": 5,
+  "slotNo": 1,
+  "fromTime": "08:00",
+  "toTime": "16:00",
+  "employeeId": 1,
+  "status": "ASSIGNED"
+}
+
+### Slots - Delete slot
+DELETE {{host}}/api/containers/1/graphs/1/slots/1
+
+### Graph employees - Add employee to graph
+POST {{host}}/api/containers/1/graphs/1/employees
+Content-Type: application/json
+
+{
+  "employeeId": 1,
+  "minHoursMonth": 120
+}
+
+### Graph employees - Get employees in graph
+GET {{host}}/api/containers/1/graphs/1/employees
+Accept: application/json
+
+### Graph employees - Delete from graph
+DELETE {{host}}/api/containers/1/graphs/1/employees/1
+
+### Cell styles - Upsert
+PUT {{host}}/api/containers/1/graphs/1/cell-styles
+Content-Type: application/json
+
+{
+  "dayOfMonth": 5,
+  "employeeId": 1,
+  "backgroundColorArgb": -16776961,
+  "textColorArgb": -1
+}
+
+### Cell styles - Get all
+GET {{host}}/api/containers/1/graphs/1/cell-styles
+Accept: application/json
+
+### Cell styles - Delete by id
+DELETE {{host}}/api/containers/1/graphs/1/cell-styles/1
+
+### Graphs - Generate (dry run)
+POST {{host}}/api/containers/1/graphs/10/generate
+Content-Type: application/json
+
+{
+  "overwrite": true,
+  "dryRun": true,
+  "returnSlots": true
+}
+
+### Graphs - Generate (write to DB)
+POST {{host}}/api/containers/1/graphs/10/generate
+Content-Type: application/json
+
+{
+  "overwrite": true,
+  "dryRun": false,
+  "returnSlots": false
+}
+
+
+### Graph export - Excel-compatible CSV
+GET {{host}}/api/containers/1/graphs/1/export/excel?includeStyles=true&includeEmployees=true
+Accept: text/csv
+
+### Graph export - SQL script
+GET {{host}}/api/containers/1/graphs/1/export/sql?includeStyles=true&includeEmployees=true
+Accept: text/plain
+
+@adminToken = someSecret
+
+### Admin DB - metadata (requires localhost + X-Admin-Token + enabled tools)
+GET {{host}}/api/admin/db/metadata
+X-Admin-Token: {{adminToken}}
+Accept: application/json
+
+### Admin DB - hash
+GET {{host}}/api/admin/db/hash
+X-Admin-Token: {{adminToken}}
+Accept: application/json
+
+### Admin DB - query (read-only)
+POST {{host}}/api/admin/db/query
+X-Admin-Token: {{adminToken}}
+Content-Type: application/json
+
+{
+  "sql": "SELECT 1 AS value"
+}
+
+### Admin DB - execute (works only if AllowWriteSql=true)
+POST {{host}}/api/admin/db/execute
+X-Admin-Token: {{adminToken}}
+Content-Type: application/json
+
+{
+  "sql": "UPDATE schedule SET note = 'updated via admin endpoint' WHERE id = 1"
+}
+
+### Admin DB - import SQL file multipart (works only if AllowWriteSql=true)
+POST {{host}}/api/admin/db/import
+X-Admin-Token: {{adminToken}}
+Content-Type: multipart/form-data; boundary=boundary
+
+--boundary
+Content-Disposition: form-data; name="file"; filename="import.sql"
+Content-Type: application/sql
+
+SELECT 1;
+--boundary--

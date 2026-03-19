@@ -1,35 +1,56 @@
-﻿using System;
+/*
+  Опис файлу: цей модуль містить реалізацію компонента ContainerScheduleProfileView у шарі WPFApp.
+  Призначення: інкапсулювати поведінку UI або прикладної логіки без зміни доменної моделі.
+  Примітка: коментарі описують спостережуваний потік даних, очікувані обмеження та точки взаємодії.
+*/
+using System;
 using System.Data;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Threading;
 using WPFApp.ViewModel.Container.ScheduleProfile;
-using WPFApp.ViewModel.Container.Profile;
-using WPFApp.Infrastructure.ScheduleMatrix; // якщо тут лежить ScheduleMatrixColumnBuilder - лишаємо
+using WPFApp.UI.Matrix.Schedule;
 
 namespace WPFApp.View.Container
 {
+    
+    
+    
+    
+    
     /// <summary>
-    /// Interaction logic for ContainerScheduleProfileView.xaml
+    /// Визначає публічний елемент `public partial class ContainerScheduleProfileView : UserControl` та контракт його використання у шарі WPFApp.
     /// </summary>
     public partial class ContainerScheduleProfileView : UserControl
     {
         private ContainerScheduleProfileViewModel? _vm;
 
-        // ---- Matrix(DataGrid) rebuild guards ----
+        
         private string? _schemaSig;
-        private bool _refreshQueued;
+        private readonly DispatcherTimer _refreshThrottleTimer;
+        private bool _refreshRequested;
 
-        // ---- Summary scroll sync guards ----
-        private bool _summarySync;   // захист від рекурсії під час ScrollChanged
-        private bool _summarySyncH;  // захист від рекурсії під час ValueChanged нижнього ScrollBar
+        
+        private bool _summarySync;   
+        private bool _summarySyncH;  
 
+        
+        
+        
+        /// <summary>
+        /// Визначає публічний елемент `public ContainerScheduleProfileView()` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public ContainerScheduleProfileView()
         {
             InitializeComponent();
+
+            _refreshThrottleTimer = new DispatcherTimer(
+                TimeSpan.FromMilliseconds(16),
+                DispatcherPriority.Background,
+                RefreshThrottleTimer_Tick,
+                Dispatcher);
 
             ConfigureGridPerformance(dataGridScheduleProfile);
 
@@ -38,9 +59,9 @@ namespace WPFApp.View.Container
             Unloaded += ContainerScheduleProfileView_Unloaded;
         }
 
-        // =========================================================
-        // 1) DataGrid performance
-        // =========================================================
+        
+        
+        
         private static void ConfigureGridPerformance(DataGrid grid)
         {
             grid.EnableRowVirtualization = true;
@@ -52,14 +73,14 @@ namespace WPFApp.View.Container
             grid.SetValue(ScrollViewer.CanContentScrollProperty, true);
             grid.SetValue(ScrollViewer.IsDeferredScrollingEnabledProperty, false);
 
-            grid.SetValue(VirtualizingPanel.ScrollUnitProperty, ScrollUnit.Item);
+            grid.SetValue(VirtualizingPanel.ScrollUnitProperty, ScrollUnit.Pixel);
             VirtualizingPanel.SetCacheLengthUnit(grid, VirtualizationCacheLengthUnit.Page);
             VirtualizingPanel.SetCacheLength(grid, new VirtualizationCacheLength(1));
         }
 
-        // =========================================================
-        // 2) VM attach/detach
-        // =========================================================
+        
+        
+        
         private void ContainerScheduleProfileView_DataContextChanged(object sender, DependencyPropertyChangedEventArgs e)
             => AttachViewModel(DataContext as ContainerScheduleProfileViewModel);
 
@@ -71,6 +92,13 @@ namespace WPFApp.View.Container
 
         private void AttachViewModel(ContainerScheduleProfileViewModel? viewModel)
         {
+            if (ReferenceEquals(_vm, viewModel))
+            {
+                
+                Dispatcher.BeginInvoke(new Action(UpdateSummaryHorizontalBar), DispatcherPriority.Loaded);
+                return;
+            }
+
             if (_vm != null)
                 _vm.MatrixChanged -= VmOnMatrixChanged;
 
@@ -80,10 +108,7 @@ namespace WPFApp.View.Container
             {
                 _vm.MatrixChanged += VmOnMatrixChanged;
 
-                // одразу перебудувати DataGrid columns при першому attach
                 RefreshGridSmart();
-
-                // summary scrollbar може потребувати апдейту після layout
                 Dispatcher.BeginInvoke(new Action(UpdateSummaryHorizontalBar), DispatcherPriority.Loaded);
             }
         }
@@ -100,28 +125,35 @@ namespace WPFApp.View.Container
         private void VmOnMatrixChanged(object? sender, EventArgs e)
         {
             if (_vm is null) return;
-            if (_refreshQueued) return;
 
-            _refreshQueued = true;
-
-            Dispatcher.BeginInvoke(new Action(() =>
-            {
-                _refreshQueued = false;
-                RefreshGridSmart();
-
-                // після оновлення SummaryRows / headers — оновити max нижнього H-scroll
-                UpdateSummaryHorizontalBar();
-
-            }), DispatcherPriority.Background);
+            _refreshRequested = true;
+            if (!_refreshThrottleTimer.IsEnabled)
+                _refreshThrottleTimer.Start();
         }
 
-        // =========================================================
-        // 3) Schedule Matrix DataGrid columns builder (schema-driven)
-        // =========================================================
+        private void RefreshThrottleTimer_Tick(object? sender, EventArgs e)
+        {
+            if (!_refreshRequested)
+            {
+                _refreshThrottleTimer.Stop();
+                return;
+            }
+
+            _refreshRequested = false;
+            RefreshGridSmart();
+            UpdateSummaryHorizontalBar();
+
+            if (!_refreshRequested)
+                _refreshThrottleTimer.Stop();
+        }
+
+        
+        
+        
         private static void ResetGridColumns(DataGrid grid)
         {
-            // ВАЖЛИВО: НЕ робимо grid.ItemsSource = null;
-            // бо ItemsSource у тебе біндиться в XAML, і це зносить binding.
+            
+            
             grid.Columns.Clear();
         }
 
@@ -132,26 +164,26 @@ namespace WPFApp.View.Container
             var table = _vm.ScheduleMatrix?.Table;
             if (table == null) return;
 
-            var sig = string.Join("|", table.Columns.Cast<DataColumn>().Select(c => c.ColumnName));
-            if (sig == _schemaSig)
+            var sig = string.Join("|", table.Columns.Cast<DataColumn>()
+                .Select(c => $"{c.ColumnName}:{c.DataType.FullName}")); if (sig == _schemaSig)
                 return;
 
             ResetGridColumns(dataGridScheduleProfile);
 
-            // Будуємо колонки під поточну DataTable схему
+            
             ScheduleMatrixColumnBuilder.BuildScheduleMatrixColumns(table, dataGridScheduleProfile, isReadOnly: true);
 
             _schemaSig = sig;
         }
 
-        // =========================================================
-        // 4) SUMMARY TABLE SCROLL SYNC (Frozen left + Frozen headers)
-        // =========================================================
+        
+        
+        
 
-        /// <summary>
-        /// Main body ScrollViewer -> синхронізує Header (X) та Left (Y),
-        /// і тримає нижній ScrollBar у відповідності.
-        /// </summary>
+        
+        
+        
+        
         private void SummaryBodyScroll_ScrollChanged(object sender, ScrollChangedEventArgs e)
         {
             if (_summarySync) return;
@@ -160,16 +192,17 @@ namespace WPFApp.View.Container
             {
                 _summarySync = true;
 
-                // Sync X: body -> header
+                
                 if (e.HorizontalChange != 0)
                     SummaryHeaderScroll?.ScrollToHorizontalOffset(e.HorizontalOffset);
 
-                // Sync Y: body -> left (Employee/Sum)
+                
                 if (e.VerticalChange != 0)
                     SummaryLeftScroll?.ScrollToVerticalOffset(e.VerticalOffset);
 
-                // Sync external bottom scrollbar
-                UpdateSummaryHorizontalBar();
+                
+                if (e.HorizontalChange != 0 || e.ExtentWidthChange != 0 || e.ViewportWidthChange != 0)
+                    UpdateSummaryHorizontalBar();
             }
             finally
             {
@@ -177,35 +210,26 @@ namespace WPFApp.View.Container
             }
         }
 
-        /// <summary>
-        /// Колесо миші над шапкою: скролимо вертикально Body (шапка лишається sticky).
-        /// </summary>
+        
+        
+        
         private void SummaryHeaderScroll_PreviewMouseWheel(object sender, MouseWheelEventArgs e)
-        {
-            if (SummaryBodyScroll == null) return;
+            => ForwardWheelToSummaryBody(e);
 
-            SummaryBodyScroll.ScrollToVerticalOffset(SummaryBodyScroll.VerticalOffset - e.Delta);
-            e.Handled = true;
-        }
+        
+        
+        
 
-        /// <summary>
-        /// Колесо миші над лівою колонкою: скролимо вертикально Body.
-        /// </summary>
         private void SummaryLeftScroll_PreviewMouseWheel(object sender, MouseWheelEventArgs e)
-        {
-            if (SummaryBodyScroll == null) return;
+            => ForwardWheelToSummaryBody(e);
 
-            SummaryBodyScroll.ScrollToVerticalOffset(SummaryBodyScroll.VerticalOffset - e.Delta);
-            e.Handled = true;
-        }
+        
+        
+        
 
-        // =========================================================
-        // 5) Bottom horizontal scrollbar (external)
-        // =========================================================
-
-        /// <summary>
-        /// Нижній горизонтальний ScrollBar керує горизонтальним offset для Body + Header.
-        /// </summary>
+        
+        
+        
         private void SummaryHScroll_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
         {
             if (_summarySyncH) return;
@@ -223,27 +247,27 @@ namespace WPFApp.View.Container
             }
         }
 
-        /// <summary>
-        /// Оновити межі/viewport для нижнього H-scrollbar.
-        /// Викликаємо при:
-        /// - body scroll changed,
-        /// - body loaded,
-        /// - body size changed,
-        /// - matrix changed (бо змінився контент).
-        /// </summary>
+        
+        
+        
+        
+        
+        
+        
+        
         private void UpdateSummaryHorizontalBar()
         {
             if (SummaryBodyScroll == null || SummaryHScroll == null)
                 return;
 
-            // ExtentWidth = повна ширина контенту
-            // ViewportWidth = видима ширина
+            
+            
             var max = Math.Max(0, SummaryBodyScroll.ExtentWidth - SummaryBodyScroll.ViewportWidth);
 
             SummaryHScroll.Minimum = 0;
             SummaryHScroll.Maximum = max;
 
-            // “довжина повзунка” — відносно viewport
+            
             SummaryHScroll.ViewportSize = SummaryBodyScroll.ViewportWidth;
 
             SummaryHScroll.LargeChange = SummaryBodyScroll.ViewportWidth;
@@ -252,7 +276,7 @@ namespace WPFApp.View.Container
             if (!_summarySyncH)
                 SummaryHScroll.Value = SummaryBodyScroll.HorizontalOffset;
 
-            // (необов’язково) ховати якщо нема що скролити
+            
             SummaryHScroll.Visibility = max > 0 ? Visibility.Visible : Visibility.Collapsed;
         }
 
@@ -261,5 +285,13 @@ namespace WPFApp.View.Container
 
         private void SummaryBodyScroll_SizeChanged(object sender, SizeChangedEventArgs e)
             => UpdateSummaryHorizontalBar();
+
+        private void ForwardWheelToSummaryBody(MouseWheelEventArgs e)
+        {
+            if (SummaryBodyScroll == null) return;
+
+            SummaryBodyScroll.ScrollToVerticalOffset(SummaryBodyScroll.VerticalOffset - e.Delta);
+            e.Handled = true;
+        }
     }
 }

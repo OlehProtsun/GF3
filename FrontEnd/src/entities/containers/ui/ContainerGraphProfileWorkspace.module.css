@@ -1,0 +1,375 @@
+.workspace {
+  width: 100%;
+  display: grid;
+  gap: 18px;
+  min-height: 0;
+  padding: 29px 12px 0;
+  align-items: start;
+  box-sizing: border-box;
+}
+
+.workspaceHeaderCollapsed {
+  padding-top: 12px;
+}
+
+.topRow {
+  display: grid;
+  grid-template-columns: minmax(320px, 392px) minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.topRowCollapsed {
+  grid-template-columns: 42px minmax(0, 1fr);
+  gap: 0.875px;
+}
+
+.sidebar {
+  min-width: 0;
+  min-height: 0;
+  align-self: start;
+}
+
+.sidebarCollapsed {
+  overflow: visible;
+}
+
+.mainColumn {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  align-self: start;
+}
+
+.summaryCard,
+.matrixCard,
+.summaryCardSection {
+  width: 100%;
+}
+
+.summaryCard {
+  max-width: none;
+  height: 100%;
+  margin-inline: 0;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(248, 250, 252, 0.96));
+}
+
+.summaryCardMeasure {
+  width: 100%;
+}
+
+.summaryCardSection {
+  max-width: none;
+  margin-inline: 0;
+  margin-top: 4px;
+  min-width: 0;
+}
+
+.matrixCardShell {
+  width: 100%;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  padding: 0;
+  box-sizing: border-box;
+  overflow: visible;
+}
+
+.matrixCard {
+  max-width: none;
+  margin-inline: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  height: auto;
+  overflow: hidden;
+}
+
+.summaryContent {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  min-height: 0;
+}
+
+.noteList,
+.metricsList {
+  margin-top: 0;
+}
+
+.noteList {
+  flex: 1 1 auto;
+}
+
+.metricsList {
+  margin-top: 6px;
+}
+
+.profileNoteItem,
+.profileMetricItem {
+  min-height: 0;
+}
+
+.profileNoteItemEmpty {
+  min-height: 13rem;
+}
+
+.profileNoteValue {
+  max-height: 12rem;
+  overflow: auto;
+  padding-right: 4px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.profileNoteValueEmpty {
+  min-height: 10rem;
+}
+
+.profileMetricValue {
+  font-size: 0.95rem;
+  line-height: 1.35;
+}
+
+.mutedValue {
+  color: rgba(71, 85, 105, 0.76);
+}
+
+.badges,
+.summaryMeta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.badge,
+.metaBadge {
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: rgba(241, 245, 249, 0.88);
+  color: rgba(51, 65, 85, 0.88);
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+
+.summaryTableScroll {
+  --summary-employee-cell-width: 220px;
+  --summary-stat-cell-width: 92px;
+  --summary-sticky-employee-offset: 241px;
+  --summary-sticky-stat-offset: 113px;
+  overflow: auto;
+  margin-bottom: 18px;
+  border-radius: 24px;
+  border: 1px solid rgba(113, 113, 122, 0.12);
+  background: rgba(255, 255, 255, 0.8);
+  scrollbar-gutter: stable;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  will-change: scroll-position;
+}
+
+.summaryTable {
+  width: max(100%, 1480px);
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.summaryTable th,
+.summaryTable td {
+  padding: 12px 10px;
+  border-right: 1px solid rgba(113, 113, 122, 0.08);
+  border-bottom: 1px solid rgba(113, 113, 122, 0.08);
+  background: #ffffff;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.summaryTable thead th {
+  position: sticky;
+  top: 0;
+  z-index: 4;
+  background: #f8fafc;
+  color: #0f172a;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.summaryTable .subColumn {
+  z-index: 3;
+  font-size: 0.72rem;
+  color: rgba(51, 65, 85, 0.78);
+}
+
+.employeeColumn {
+  width: var(--summary-employee-cell-width);
+  min-width: var(--summary-employee-cell-width);
+  max-width: var(--summary-employee-cell-width);
+}
+
+.statColumn {
+  width: var(--summary-stat-cell-width);
+  min-width: var(--summary-stat-cell-width);
+  max-width: var(--summary-stat-cell-width);
+}
+
+.employeeValue {
+  text-align: left;
+  font-weight: 700;
+}
+
+.statValue {
+  font-weight: 700;
+}
+
+.stickyColumn,
+.stickyColumnSecondary,
+.stickyColumnTertiary,
+.stickyColumnQuaternary {
+  position: sticky;
+  background-clip: padding-box;
+  box-shadow: inset -1px 0 0 rgba(113, 113, 122, 0.12);
+}
+
+.summaryTable thead .stickyColumn {
+  z-index: 9;
+}
+
+.summaryTable thead .stickyColumnSecondary {
+  z-index: 8;
+}
+
+.summaryTable thead .stickyColumnTertiary {
+  z-index: 7;
+}
+
+.summaryTable thead .stickyColumnQuaternary {
+  z-index: 6;
+}
+
+.summaryTable tbody .stickyColumn {
+  z-index: 8;
+}
+
+.summaryTable tbody .stickyColumnSecondary {
+  z-index: 7;
+}
+
+.summaryTable tbody .stickyColumnTertiary {
+  z-index: 6;
+}
+
+.summaryTable tbody .stickyColumnQuaternary {
+  z-index: 5;
+}
+
+.stickyColumn {
+  left: 0;
+}
+
+.stickyColumnSecondary {
+  left: var(--summary-sticky-employee-offset);
+}
+
+.stickyColumnTertiary {
+  left: calc(var(--summary-sticky-employee-offset) + var(--summary-sticky-stat-offset));
+}
+
+.stickyColumnQuaternary {
+  left: calc(var(--summary-sticky-employee-offset) + (var(--summary-sticky-stat-offset) * 2));
+}
+
+.summaryTable tbody .stickyColumn,
+.summaryTable tbody .stickyColumnSecondary,
+.summaryTable tbody .stickyColumnTertiary,
+.summaryTable tbody .stickyColumnQuaternary {
+  background: #ffffff;
+}
+
+.summaryTable tbody .stickyColumn {
+  width: var(--summary-employee-cell-width);
+  min-width: var(--summary-employee-cell-width);
+  max-width: var(--summary-employee-cell-width);
+}
+
+.summaryTable tbody .stickyColumnSecondary,
+.summaryTable tbody .stickyColumnTertiary,
+.summaryTable tbody .stickyColumnQuaternary {
+  width: var(--summary-stat-cell-width);
+  min-width: var(--summary-stat-cell-width);
+  max-width: var(--summary-stat-cell-width);
+}
+
+.emptyState {
+  min-height: 220px;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  border-radius: 24px;
+  border: 1px dashed rgba(113, 113, 122, 0.16);
+  color: rgba(51, 65, 85, 0.78);
+  text-align: center;
+}
+
+.state {
+  padding: 28px;
+  text-align: center;
+  color: rgba(71, 85, 105, 0.84);
+}
+
+.banner {
+  width: 100%;
+}
+
+@media (max-width: 1180px) {
+  .topRow,
+  .topRowCollapsed {
+    grid-template-columns: 1fr;
+    gap: 18px;
+  }
+
+  .matrixCardShell {
+    min-height: 0;
+    height: auto;
+  }
+
+  .matrixCard {
+    height: auto;
+  }
+}
+
+@media (max-width: 960px) {
+  .workspace,
+  .workspaceHeaderCollapsed {
+    padding: 0;
+  }
+
+  .summaryCardSection {
+    margin-top: 0;
+  }
+}
+
+@media (max-width: 720px) {
+  .badge,
+  .metaBadge {
+    width: 100%;
+    justify-content: center;
+    text-align: center;
+  }
+
+  .profileNoteValue {
+    max-height: 10rem;
+  }
+
+  .profileNoteItemEmpty {
+    min-height: 11rem;
+  }
+
+  .profileNoteValueEmpty {
+    min-height: 8rem;
+  }
+}

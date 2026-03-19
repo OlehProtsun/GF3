@@ -1,15 +1,24 @@
+/*
+  Опис файлу: цей модуль містить реалізацію компонента ContainerViewModel.DatabaseReload у шарі WPFApp.
+  Призначення: інкапсулювати поведінку UI або прикладної логіки без зміни доменної моделі.
+  Примітка: коментарі описують спостережуваний потік даних, очікувані обмеження та точки взаємодії.
+*/
 using System;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using WPFApp.Applications.Notifications;
 
 namespace WPFApp.ViewModel.Container.Edit
 {
+    /// <summary>
+    /// Визначає публічний елемент `public sealed partial class ContainerViewModel` та контракт його використання у шарі WPFApp.
+    /// </summary>
     public sealed partial class ContainerViewModel
     {
         private int _databaseReloadInProgress;
 
-        private void OnDatabaseChanged(object? sender, Service.DatabaseChangedEventArgs e)
+        private void OnDatabaseChanged(object? sender, DatabaseChangedEventArgs e)
         {
             _ = ReloadAfterDatabaseChangeAsync(e.Source);
         }
@@ -32,7 +41,7 @@ namespace WPFApp.ViewModel.Container.Edit
 
                 await System.Windows.Application.Current.Dispatcher.InvokeAsync(async () =>
                 {
-                    // 1) reload containers (UI-safe: метод нижче теж зробимо UI-safe)
+                    
                     await LoadContainersAsync(CancellationToken.None, selectedContainerId);
 
                     var activeContainerId = selectedContainerId ?? GetCurrentContainerId();
@@ -49,11 +58,11 @@ namespace WPFApp.ViewModel.Container.Edit
 
                     _openedProfileContainerId = latest.Id;
 
-                    // 2) profile + selection
+                    
                     ProfileVm.SetProfile(latest);
                     ListVm.SelectedItem = ListVm.Items.FirstOrDefault(x => x.Id == latest.Id);
 
-                    // 3) reload schedules (UI-safe: метод нижче теж зробимо UI-safe)
+                    
                     await LoadSchedulesAsync(latest.Id, search: null, CancellationToken.None);
 
                     if (selectedScheduleId.HasValue)
@@ -62,8 +71,8 @@ namespace WPFApp.ViewModel.Container.Edit
                             .FirstOrDefault(x => x.Model.Id == selectedScheduleId.Value);
                     }
 
-                    // 4) КРИТИЧНО: якщо ти зараз у ScheduleProfile — треба перевідкрити профіль,
-                    // інакше графіки можуть лишитися пустими після перезавантаження списку/кешів.
+                    
+                    
                     if (Mode == Helpers.ContainerSection.ScheduleProfile && selectedScheduleId.HasValue)
                     {
                         var detailed = await _scheduleService.GetDetailedAsync(selectedScheduleId.Value, CancellationToken.None);

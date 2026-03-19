@@ -1,7 +1,10 @@
-﻿using BusinessLogicLayer.Services.Abstractions;
-using DataAccessLayer.Models;
-using DocumentFormat.OpenXml.Spreadsheet;
-using DocumentFormat.OpenXml.Wordprocessing;
+/*
+  Опис файлу: цей модуль містить реалізацію компонента EmployeeViewModel у шарі WPFApp.
+  Призначення: інкапсулювати поведінку UI або прикладної логіки без зміни доменної моделі.
+  Примітка: коментарі описують спостережуваний потік даних, очікувані обмеження та точки взаємодії.
+*/
+using BusinessLogicLayer.Contracts.Employees;
+using BusinessLogicLayer.Services.Abstractions;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -9,15 +12,21 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Threading;
-using WPFApp.Infrastructure;
-using WPFApp.Infrastructure.Validation;
-using WPFApp.Service;
+using WPFApp.Applications.Diagnostics;
+using WPFApp.Applications.Notifications;
+using WPFApp.MVVM.Core;
+using WPFApp.MVVM.Validation.Rules;
+using WPFApp.UI.Dialogs;
 using WPFApp.View.Dialogs;
 using WPFApp.ViewModel.Dialogs;
 using WPFApp.ViewModel.Employee.Helpers;
+using WPFApp.ViewModel.Shared;
 
 namespace WPFApp.ViewModel.Employee
 {
+    /// <summary>
+    /// Визначає публічний елемент `public enum EmployeeSection` та контракт його використання у шарі WPFApp.
+    /// </summary>
     public enum EmployeeSection
     {
         List,
@@ -25,41 +34,46 @@ namespace WPFApp.ViewModel.Employee
         Profile
     }
 
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
     /// <summary>
-    /// EmployeeViewModel — owner/coordinator модуля Employee.
-    ///
-    /// Відповідальність:
-    /// - тримати 3 під-VM (List/Edit/Profile)
-    /// - керувати навігацією (CurrentSection + Mode + CancelTarget)
-    /// - виконувати CRUD через IEmployeeService
-    /// - показувати повідомлення користувачу
-    ///
-    /// Покращення порівняно з початковим варіантом:
-    /// 1) EnsureInitializedAsync:
-    ///    - не виставляємо _initialized=true ДО успішного завершення
-    ///    - конкурентні виклики чекають один task (без дублювання Load)
-    /// 2) Валідація: використовуємо EmployeeValidationRules (без залежності від EditVM.Regex).
-    /// 3) Менше дублювання форматування імен: EmployeeDisplayHelper.
+    /// Визначає публічний елемент `public sealed class EmployeeViewModel : ViewModelBase` та контракт його використання у шарі WPFApp.
     /// </summary>
     public sealed class EmployeeViewModel : ViewModelBase
     {
-        private readonly IEmployeeService _employeeService;
+        private readonly IEmployeeFacade _employeeService;
         private readonly IDatabaseChangeNotifier _databaseChangeNotifier;
-        private readonly ILoggerService _logger;
-        private int _databaseReloadInProgress;
+                private int _databaseReloadInProgress;
 
-        // ----------------------------
-        // Initialization (safe)
-        // ----------------------------
+        
+        
+        
 
         private bool _initialized;
         private Task? _initializeTask;
         private readonly object _initLock = new();
 
-        // Пам’ятаємо id відкритого профілю (щоб після Save повернутись і refreshнути).
+        
         private int? _openedProfileEmployeeId;
 
         private bool _isNavStatusVisible;
+        /// <summary>
+        /// Визначає публічний елемент `public bool IsNavStatusVisible` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public bool IsNavStatusVisible
         {
             get => _isNavStatusVisible;
@@ -67,6 +81,9 @@ namespace WPFApp.ViewModel.Employee
         }
 
         private UIStatusKind _navStatus = UIStatusKind.Success;
+        /// <summary>
+        /// Визначає публічний елемент `public UIStatusKind NavStatus` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public UIStatusKind NavStatus
         {
             get => _navStatus;
@@ -107,11 +124,14 @@ namespace WPFApp.ViewModel.Employee
             await HideNavStatusAsync().ConfigureAwait(false);
         }
 
-        // ----------------------------
-        // Navigation state
-        // ----------------------------
+        
+        
+        
 
         private object _currentSection = null!;
+        /// <summary>
+        /// Визначає публічний елемент `public object CurrentSection` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public object CurrentSection
         {
             get => _currentSection;
@@ -119,30 +139,47 @@ namespace WPFApp.ViewModel.Employee
         }
 
         private EmployeeSection _mode = EmployeeSection.List;
+        /// <summary>
+        /// Визначає публічний елемент `public EmployeeSection Mode` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public EmployeeSection Mode
         {
             get => _mode;
             private set => SetProperty(ref _mode, value);
         }
 
+        /// <summary>
+        /// Визначає публічний елемент `public EmployeeSection CancelTarget { get; private set; } = EmployeeSection.List;` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public EmployeeSection CancelTarget { get; private set; } = EmployeeSection.List;
 
-        // ----------------------------
-        // Child VMs
-        // ----------------------------
+        
+        
+        
 
+        /// <summary>
+        /// Визначає публічний елемент `public EmployeeListViewModel ListVm { get; }` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public EmployeeListViewModel ListVm { get; }
+        /// <summary>
+        /// Визначає публічний елемент `public EmployeeEditViewModel EditVm { get; }` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public EmployeeEditViewModel EditVm { get; }
+        /// <summary>
+        /// Визначає публічний елемент `public EmployeeProfileViewModel ProfileVm { get; }` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public EmployeeProfileViewModel ProfileVm { get; }
 
+        /// <summary>
+        /// Визначає публічний елемент `public EmployeeViewModel(` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public EmployeeViewModel(
-            IEmployeeService employeeService,
-            IDatabaseChangeNotifier databaseChangeNotifier,
-            ILoggerService logger)
+            IEmployeeFacade employeeService,
+            IDatabaseChangeNotifier databaseChangeNotifier
+            )
         {
             _employeeService = employeeService;
             _databaseChangeNotifier = databaseChangeNotifier;
-            _logger = logger;
 
             ListVm = new EmployeeListViewModel(this);
             EditVm = new EmployeeEditViewModel(this);
@@ -152,21 +189,24 @@ namespace WPFApp.ViewModel.Employee
             CurrentSection = ListVm;
         }
 
-        // =========================================================
-        // Initialization
-        // =========================================================
+        
+        
+        
 
+        /// <summary>
+        /// Визначає публічний елемент `public Task EnsureInitializedAsync(CancellationToken ct = default)` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public Task EnsureInitializedAsync(CancellationToken ct = default)
         {
-            // 1) Якщо вже ініціалізовано — ок.
+            
             if (_initialized)
                 return Task.CompletedTask;
 
-            // 2) Якщо task вже існує — повертаємо його (усі чекатимуть одне).
+            
             if (_initializeTask != null)
                 return _initializeTask;
 
-            // 3) Під lock створюємо init-task один раз.
+            
             lock (_initLock)
             {
                 if (_initialized)
@@ -184,15 +224,15 @@ namespace WPFApp.ViewModel.Employee
         {
             try
             {
-                // 1) Завантажуємо список працівників.
+                
                 await LoadEmployeesAsync(ct, selectId: null);
 
-                // 2) Фіксуємо успішну ініціалізацію.
+                
                 _initialized = true;
             }
             catch
             {
-                // Якщо впали — дозволяємо повторити init.
+                
                 lock (_initLock)
                 {
                     _initializeTask = null;
@@ -203,9 +243,9 @@ namespace WPFApp.ViewModel.Employee
             }
         }
 
-        // =========================================================
-        // List flows
-        // =========================================================
+        
+        
+        
 
         internal async Task SearchAsync(CancellationToken ct = default)
         {
@@ -218,36 +258,26 @@ namespace WPFApp.ViewModel.Employee
             ListVm.SetItems(list);
         }
 
-        internal async Task StartAddAsync(CancellationToken ct = default)
-        {
-            var uiToken = ResetNavUiCts(ct);
-
-            await ShowNavWorkingAsync();
-            await Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
-
-            try
-            {
-                await RunOnUiThreadAsync(() =>
+        internal Task StartAddAsync(CancellationToken ct = default)
+            => UiOperationRunner.RunNavStatusFlowAsync(
+                ct,
+                ResetNavUiCts,
+                ShowNavWorkingAsync,
+                WaitForUiIdleAsync,
+                async uiToken =>
                 {
-                    EditVm.ResetForNew();
-                    CancelTarget = EmployeeSection.List;
-                });
+                    await RunOnUiThreadAsync(() =>
+                    {
+                        EditVm.ResetForNew();
+                        CancelTarget = EmployeeSection.List;
+                    });
 
-                await SwitchToEditAsync();
-
-                await Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
-                await ShowNavSuccessThenAutoHideAsync(uiToken, 700);
-            }
-            catch (OperationCanceledException)
-            {
-                await HideNavStatusAsync();
-            }
-            catch (Exception ex)
-            {
-                await HideNavStatusAsync();
-                ShowError(ex);
-            }
-        }
+                    await SwitchToEditAsync();
+                },
+                ShowNavSuccessThenAutoHideAsync,
+                HideNavStatusAsync,
+                ShowError,
+                successDelayMs: 700);
 
         internal async Task EditSelectedAsync(CancellationToken ct = default)
         {
@@ -255,140 +285,117 @@ namespace WPFApp.ViewModel.Employee
             if (selected is null)
                 return;
 
-            var uiToken = ResetNavUiCts(ct);
-
-            await ShowNavWorkingAsync();
-            await Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
-
-            try
-            {
-                var latest = await _employeeService.GetAsync(selected.Id, uiToken) ?? selected;
-
-                await RunOnUiThreadAsync(() =>
+            await UiOperationRunner.RunNavStatusFlowAsync(
+                ct,
+                ResetNavUiCts,
+                ShowNavWorkingAsync,
+                WaitForUiIdleAsync,
+                async uiToken =>
                 {
-                    EditVm.SetEmployee(latest);
+                    var latest = await _employeeService.GetAsync(selected.Id, uiToken) ?? selected;
 
-                    CancelTarget = Mode == EmployeeSection.Profile
-                        ? EmployeeSection.Profile
-                        : EmployeeSection.List;
-                });
+                    await RunOnUiThreadAsync(() =>
+                    {
+                        EditVm.SetEmployee(latest);
 
-                await SwitchToEditAsync();
+                        CancelTarget = Mode == EmployeeSection.Profile
+                            ? EmployeeSection.Profile
+                            : EmployeeSection.List;
+                    });
 
-                await Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
-                await ShowNavSuccessThenAutoHideAsync(uiToken, 700);
-            }
-            catch (OperationCanceledException)
-            {
-                await HideNavStatusAsync();
-            }
-            catch (Exception ex)
-            {
-                await HideNavStatusAsync();
-                ShowError(ex);
-            }
+                    await SwitchToEditAsync();
+                },
+                ShowNavSuccessThenAutoHideAsync,
+                HideNavStatusAsync,
+                ShowError,
+                successDelayMs: 700);
         }
 
-        // =========================================================
-        // Save/Delete/Profile flows
-        // =========================================================
+        
+        
+        
 
         internal async Task SaveAsync(CancellationToken ct = default)
         {
-            var model = EditVm.ToModel();
-            var raw = EmployeeValidationRules.ValidateAll(model);
+            var request = EditVm.ToRequest();
+            var raw = EmployeeValidationRules.ValidateAll(request);
 
             if (raw.Count > 0)
             {
-                // те саме нормалізування ключів, але через EditVm helper
-                var errors = new Dictionary<string, string>(StringComparer.Ordinal);
-
-                foreach (var kv in raw)
-                {
-                    var vmKey = typeof(EmployeeEditViewModel)
-                        .GetMethod("MapValidationKeyToVm", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)!
-                        .Invoke(null, new object[] { kv.Key }) as string;
-
-                    if (!string.IsNullOrWhiteSpace(vmKey) && !errors.ContainsKey(vmKey))
-                        errors[vmKey] = kv.Value;
-                }
-
+                var errors = ValidationDictionaryHelper.RemapFirstErrors(raw, EmployeeEditViewModel.MapValidationKeyToVm);
                 EditVm.SetValidationErrors(errors);
                 return;
             }
 
 
-            var uiToken = ResetNavUiCts(ct);
-
-            await ShowNavWorkingAsync();
-            await Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
-
-            try
-            {
-                if (EditVm.IsEdit)
+            await UiOperationRunner.RunNavStatusFlowAsync(
+                ct,
+                ResetNavUiCts,
+                ShowNavWorkingAsync,
+                WaitForUiIdleAsync,
+                async uiToken =>
                 {
-                    await _employeeService.UpdateAsync(model, uiToken);
-                }
-                else
-                {
-                    var created = await _employeeService.CreateAsync(model, uiToken);
+                    var savedEmployeeId = request.Id;
+                    EmployeeDto? createdEmployee = null;
 
-                    await RunOnUiThreadAsync(() => EditVm.EmployeeId = created.Id);
-
-                    model = created;
-                }
-
-                _databaseChangeNotifier.NotifyDatabaseChanged("Employee.Save");
-
-                await LoadEmployeesAsync(uiToken, selectId: model.Id);
-
-                if (CancelTarget == EmployeeSection.Profile)
-                {
-                    var profileId = _openedProfileEmployeeId ?? model.Id;
-
-                    if (profileId > 0)
+                    if (EditVm.IsEdit)
                     {
-                        var latest = await _employeeService.GetAsync(profileId, uiToken) ?? model;
+                        await _employeeService.UpdateAsync(request, uiToken);
+                    }
+                    else
+                    {
+                        createdEmployee = await _employeeService.CreateAsync(request, uiToken);
+                        savedEmployeeId = createdEmployee.Id;
 
-                        await RunOnUiThreadAsync(() =>
-                        {
-                            ProfileVm.SetProfile(latest);
-                            ListVm.SelectedItem = latest;
-                        });
+                        await RunOnUiThreadAsync(() => EditVm.EmployeeId = savedEmployeeId);
                     }
 
-                    await SwitchToProfileAsync();
-                }
-                else
-                {
-                    await SwitchToListAsync();
-                }
+                    _databaseChangeNotifier.NotifyDatabaseChanged("Employee.Save");
 
-                await Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
-                await ShowNavSuccessThenAutoHideAsync(uiToken, 900);
-            }
-            catch (OperationCanceledException)
-            {
-                await HideNavStatusAsync();
-            }
-            catch (Exception ex)
-            {
-                await HideNavStatusAsync();
-                ShowError(ex);
-            }
+                    await LoadEmployeesAsync(uiToken, selectId: savedEmployeeId);
+
+                    if (CancelTarget == EmployeeSection.Profile)
+                    {
+                        var profileId = _openedProfileEmployeeId ?? savedEmployeeId;
+
+                        if (profileId > 0)
+                        {
+                            var latest = await _employeeService.GetAsync(profileId, uiToken) ?? createdEmployee;
+
+                            if (latest is not null)
+                            {
+                                await RunOnUiThreadAsync(() =>
+                                {
+                                    ProfileVm.SetProfile(latest);
+                                    ListVm.SelectedItem = latest;
+                                });
+                            }
+                        }
+
+                        await SwitchToProfileAsync();
+                    }
+                    else
+                    {
+                        await SwitchToListAsync();
+                    }
+                },
+                ShowNavSuccessThenAutoHideAsync,
+                HideNavStatusAsync,
+                ShowError,
+                successDelayMs: 900);
         }
 
         internal async Task DeleteSelectedAsync(CancellationToken ct = default)
         {
-            // 1) Визначаємо “поточний id” залежно від режиму (Profile або List).
+            
             var currentId = GetCurrentEmployeeId();
             if (currentId <= 0)
                 return;
 
-            // 2) Формуємо “поточне ім’я” для confirm.
+            
             var currentName = GetCurrentEmployeeName();
 
-            // 3) Confirm.
+            
             if (!Confirm(string.IsNullOrWhiteSpace(currentName)
                 ? "Delete employee?"
                 : $"Delete {currentName}?"))
@@ -396,31 +403,23 @@ namespace WPFApp.ViewModel.Employee
                 return;
             }
 
-            var uiToken = ResetNavUiCts(ct);
+            await UiOperationRunner.RunNavStatusFlowAsync(
+                ct,
+                ResetNavUiCts,
+                ShowNavWorkingAsync,
+                WaitForUiIdleAsync,
+                async uiToken =>
+                {
+                    await _employeeService.DeleteAsync(currentId, uiToken);
 
-            await ShowNavWorkingAsync();
-            await Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
-
-            try
-            {
-                await _employeeService.DeleteAsync(currentId, uiToken);
-
-                _databaseChangeNotifier.NotifyDatabaseChanged("Employee.Delete");
-                await LoadEmployeesAsync(uiToken, selectId: null);
-                await SwitchToListAsync();
-
-                await Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
-                await ShowNavSuccessThenAutoHideAsync(uiToken, 900);
-            }
-            catch (OperationCanceledException)
-            {
-                await HideNavStatusAsync();
-            }
-            catch (Exception ex)
-            {
-                await HideNavStatusAsync();
-                ShowError(ex);
-            }
+                    _databaseChangeNotifier.NotifyDatabaseChanged("Employee.Delete");
+                    await LoadEmployeesAsync(uiToken, selectId: null);
+                    await SwitchToListAsync();
+                },
+                ShowNavSuccessThenAutoHideAsync,
+                HideNavStatusAsync,
+                ShowError,
+                successDelayMs: 900);
         }
 
         internal async Task OpenProfileAsync(CancellationToken ct = default)
@@ -429,45 +428,37 @@ namespace WPFApp.ViewModel.Employee
             if (selected is null)
                 return;
 
-            var uiToken = ResetNavUiCts(ct);
-
-            await ShowNavWorkingAsync();
-            await Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
-
-            try
-            {
-                var latest = await _employeeService.GetAsync(selected.Id, uiToken) ?? selected;
-
-                await RunOnUiThreadAsync(() =>
+            await UiOperationRunner.RunNavStatusFlowAsync(
+                ct,
+                ResetNavUiCts,
+                ShowNavWorkingAsync,
+                WaitForUiIdleAsync,
+                async uiToken =>
                 {
-                    _openedProfileEmployeeId = latest.Id;
-                    ProfileVm.SetProfile(latest);
-                    ListVm.SelectedItem = latest;
-                    CancelTarget = EmployeeSection.List;
-                });
+                    var latest = await _employeeService.GetAsync(selected.Id, uiToken) ?? selected;
 
-                await SwitchToProfileAsync();
+                    await RunOnUiThreadAsync(() =>
+                    {
+                        _openedProfileEmployeeId = latest.Id;
+                        ProfileVm.SetProfile(latest);
+                        ListVm.SelectedItem = latest;
+                        CancelTarget = EmployeeSection.List;
+                    });
 
-                await Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
-                await ShowNavSuccessThenAutoHideAsync(uiToken, 900);
-            }
-            catch (OperationCanceledException)
-            {
-                await HideNavStatusAsync();
-            }
-            catch (Exception ex)
-            {
-                await HideNavStatusAsync();
-                ShowError(ex);
-            }
+                    await SwitchToProfileAsync();
+                },
+                ShowNavSuccessThenAutoHideAsync,
+                HideNavStatusAsync,
+                ShowError,
+                successDelayMs: 900);
         }
 
         internal Task CancelAsync()
         {
-            // 1) При Cancel очищаємо помилки форми (щоб не “прилипали”).
+            
             EditVm.ClearValidationErrors();
 
-            // 2) Навігація залежить від Mode і CancelTarget.
+            
             return Mode switch
             {
                 EmployeeSection.Edit => CancelTarget == EmployeeSection.Profile
@@ -478,9 +469,9 @@ namespace WPFApp.ViewModel.Employee
             };
         }
 
-        // =========================================================
-        // Load + navigation helpers
-        // =========================================================
+        
+        
+        
 
         private async Task LoadEmployeesAsync(CancellationToken ct, int? selectId)
         {
@@ -526,11 +517,11 @@ namespace WPFApp.ViewModel.Employee
 
         private string GetCurrentEmployeeName()
         {
-            // У профілі вже є “готовий” FullName.
+            
             if (Mode == EmployeeSection.Profile)
                 return ProfileVm.FullName;
 
-            // У списку — беремо з SelectedItem.
+            
             return EmployeeDisplayHelper.GetFullName(ListVm.SelectedItem);
         }
 
@@ -553,8 +544,7 @@ namespace WPFApp.ViewModel.Employee
             {
                 if (Mode == EmployeeSection.Edit)
                 {
-                    _logger.Log($"[DB-CHANGE] Employee reload skipped in edit mode. Source={source}.");
-                    return;
+                                        return;
                 }
 
                 var selectedId = Mode == EmployeeSection.Profile ? ProfileVm.EmployeeId : ListVm.SelectedItem?.Id;
@@ -577,17 +567,18 @@ namespace WPFApp.ViewModel.Employee
                     }
                 }).Task.Unwrap();
 
-                _logger.Log($"[DB-CHANGE] Employee module reloaded. Source={source}.");
-            }
+                            }
             catch (Exception ex)
             {
-                _logger.Log($"[DB-CHANGE] Employee reload failed: {ex.Message}");
-            }
+                            }
             finally
             {
                 Interlocked.Exchange(ref _databaseReloadInProgress, 0);
             }
         }
+
+        private Task WaitForUiIdleAsync()
+            => Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle).Task;
 
         internal Task RunOnUiThreadAsync(Action action)
         {
@@ -601,9 +592,9 @@ namespace WPFApp.ViewModel.Employee
             return d.InvokeAsync(action).Task;
         }
 
-        // =========================================================
-        // UI messaging (залишив твою схему)
-        // =========================================================
+        
+        
+        
 
         internal void ShowInfo(string text)
             => CustomMessageBox.Show("Info", text, CustomMessageBoxIcon.Info, okText: "OK");

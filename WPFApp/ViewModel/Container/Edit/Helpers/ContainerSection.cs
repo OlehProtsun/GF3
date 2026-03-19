@@ -1,32 +1,40 @@
-﻿using System;
+/*
+  Опис файлу: цей модуль містить реалізацію компонента ContainerSection у шарі WPFApp.
+  Призначення: інкапсулювати поведінку UI або прикладної логіки без зміни доменної моделі.
+  Примітка: коментарі описують спостережуваний потік даних, очікувані обмеження та точки взаємодії.
+*/
+using System;
 using System.Collections.Generic;
 using System.Text;
 
 namespace WPFApp.ViewModel.Container.Edit.Helpers
 {
+    
+    
+    
+    
+    
+    
+    
+    
     /// <summary>
-    /// ContainerSection — перелік “екранів/секцій”, між якими перемикається ContainerViewModel.
-    ///
-    /// Навіщо:
-    /// - UI може відображати різні ViewModel (ListVm/EditVm/ProfileVm/ScheduleEditVm/ScheduleProfileVm)
-    /// - а ContainerViewModel тримає CurrentSection + Mode
-    /// - Mode зберігається як enum, щоб логіка Cancel/Back була проста і читабельна.
+    /// Визначає публічний елемент `public enum ContainerSection` та контракт його використання у шарі WPFApp.
     /// </summary>
     public enum ContainerSection
     {
-        /// <summary>Список контейнерів.</summary>
+        
         List,
 
-        /// <summary>Форма додавання/редагування контейнера.</summary>
+        
         Edit,
 
-        /// <summary>Профіль контейнера (шапка + список schedule).</summary>
+        
         Profile,
 
-        /// <summary>Форма редагування schedule (матриця/генерація/стилі).</summary>
+        
         ScheduleEdit,
 
-        /// <summary>Профіль schedule (read-only/перегляд матриці).</summary>
+        
         ScheduleProfile
     }
 }

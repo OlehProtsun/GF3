@@ -1,3 +1,8 @@
+/*
+  Опис файлу: цей модуль містить реалізацію компонента EmployeeListView у шарі WPFApp.
+  Призначення: інкапсулювати поведінку UI або прикладної логіки без зміни доменної моделі.
+  Примітка: коментарі описують спостережуваний потік даних, очікувані обмеження та точки взаємодії.
+*/
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -6,11 +11,17 @@ using WPFApp.ViewModel.Employee;
 
 namespace WPFApp.View.Employee
 {
+    
+    
+    
     /// <summary>
-    /// Interaction logic for EmployeeListView.xaml
+    /// Визначає публічний елемент `public partial class EmployeeListView : UserControl` та контракт його використання у шарі WPFApp.
     /// </summary>
     public partial class EmployeeListView : UserControl
     {
+        /// <summary>
+        /// Визначає публічний елемент `public EmployeeListView()` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public EmployeeListView()
         {
             InitializeComponent();

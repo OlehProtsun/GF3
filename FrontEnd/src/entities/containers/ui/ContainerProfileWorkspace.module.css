@@ -1,0 +1,386 @@
+.workspace {
+  width: 100%;
+  display: grid;
+  gap: 18px;
+  padding-top: 6px;
+  align-items: start;
+}
+
+.topRow {
+  display: grid;
+  grid-template-columns: minmax(320px, 380px) minmax(0, 1fr);
+  gap: 18px;
+  align-items: stretch;
+}
+
+.sidebar,
+.scheduleColumn,
+.statisticsCard {
+  min-width: 0;
+}
+
+.sidebar {
+  position: static;
+  min-height: 0;
+}
+
+.summaryCard {
+  width: 100%;
+  max-width: none;
+  height: 100%;
+  margin-inline: 0;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(248, 250, 252, 0.96));
+}
+
+.summaryDetails {
+  display: grid;
+  gap: 12px;
+}
+
+.noteList,
+.metricsList {
+  margin-top: 0;
+}
+
+.profileNoteItem,
+.profileMetricItem {
+  min-height: 0;
+}
+
+.profileNoteItemEmpty {
+  min-height: 13rem;
+}
+
+.profileNoteValue {
+  max-height: 10rem;
+  overflow: auto;
+  padding-right: 4px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.profileNoteValueEmpty {
+  min-height: 10rem;
+}
+
+.profileMetricValue {
+  font-size: 0.95rem;
+  line-height: 1.35;
+}
+
+.scheduleColumn {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+}
+
+.scheduleCardShell {
+  width: 100%;
+  min-width: 0;
+}
+
+.sectionCard {
+  width: 100%;
+  max-width: none;
+  margin-inline: 0;
+  min-width: 0;
+}
+
+.scheduleCard {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.scheduleBody {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.scheduleContent {
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.scheduleGrid {
+  padding: 12px 26px 24px;
+  box-sizing: border-box;
+  row-gap: 22px;
+  align-items: start;
+}
+
+.scheduleHeaderActions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.statisticsCard {
+  width: 100%;
+  margin-top: 4px;
+}
+
+.headerBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 32px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.16);
+  color: #475569;
+  font-size: 0.84rem;
+  font-weight: 700;
+}
+
+.searchRow {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.searchField {
+  position: relative;
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.searchIcon {
+  position: absolute;
+  top: 50%;
+  left: 14px;
+  transform: translateY(-50%);
+  color: #64748b;
+}
+
+.searchInput {
+  width: 100%;
+  min-height: 46px;
+  padding: 0 16px 0 46px;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  border-radius: 18px;
+  background: rgba(248, 250, 252, 0.9);
+  color: #0f172a;
+  font: inherit;
+  box-sizing: border-box;
+}
+
+.searchInput:focus {
+  outline: none;
+  border-color: rgba(59, 130, 246, 0.65);
+  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.12);
+}
+
+
+
+.metricRow {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.metricCard {
+  display: grid;
+  gap: 4px;
+  padding: 16px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 20px;
+  background: linear-gradient(180deg, rgba(248, 250, 252, 0.96), rgba(241, 245, 249, 0.9));
+}
+
+.metricLabel {
+  color: #64748b;
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.metricValue {
+  color: #0f172a;
+  font-size: 1.2rem;
+  font-weight: 800;
+}
+
+.summaryMeta {
+  display: grid;
+  gap: 8px;
+  margin-top: 16px;
+  color: #334155;
+}
+
+.summaryMeta p {
+  margin: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.summaryMetaLabel {
+  color: #64748b;
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.tableWrap {
+  margin-top: 16px;
+  margin-bottom: 18px;
+  overflow-x: auto;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 20px;
+}
+
+.table {
+  width: 100%;
+  min-width: 760px;
+  border-collapse: collapse;
+  background: rgba(255, 255, 255, 0.96);
+}
+
+
+.table th,
+.table td {
+  padding: 14px 16px;
+  border-bottom: 1px solid rgba(226, 232, 240, 0.9);
+  text-align: left;
+  vertical-align: top;
+  white-space: nowrap;
+}
+
+.table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: #f8fafc;
+  color: #475569;
+  font-size: 0.8rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.table tbody tr:nth-child(even) {
+  background: rgba(248, 250, 252, 0.8);
+}
+
+.totalRow {
+  background: rgba(219, 234, 254, 0.55) !important;
+  font-weight: 800;
+}
+
+
+.state,
+.emptyState {
+  display: grid;
+  gap: 8px;
+  place-items: start;
+  padding: 24px;
+  border: 1px dashed rgba(148, 163, 184, 0.35);
+  border-radius: 20px;
+  background: rgba(248, 250, 252, 0.75);
+  color: #475569;
+}
+
+.emptyTitle {
+  color: #0f172a;
+  font-size: 1rem;
+  font-weight: 800;
+}
+
+.emptyDescription {
+  max-width: 54ch;
+  line-height: 1.55;
+}
+
+.scheduleEmptyState {
+  flex: 1 1 auto;
+  min-height: calc(100% - 18px);
+  margin: 0 26px 18px;
+  box-sizing: border-box;
+  align-content: start;
+}
+
+.statisticsEmptyState {
+  margin-bottom: 24px;
+}
+
+.banner,
+.inlineBanner {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.mutedValue {
+  color: #94a3b8;
+}
+
+@media (max-width: 1200px) {
+  .metricRow {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 960px) {
+  .topRow {
+    grid-template-columns: 1fr;
+  }
+
+  .scheduleCardShell {
+    height: auto;
+  }
+
+  .scheduleCard {
+    height: auto;
+  }
+
+  .scheduleContent {
+    overflow: visible;
+  }
+}
+
+@media (max-width: 680px) {
+  .searchRow {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .profileNoteValue {
+    max-height: 8.5rem;
+  }
+
+  .profileNoteItemEmpty {
+    min-height: 11.5rem;
+  }
+
+  .profileNoteValueEmpty {
+    min-height: 8.5rem;
+  }
+
+  .scheduleEmptyState {
+    margin: 0 12px 14px;
+    min-height: 200px;
+  }
+
+  .metricRow {
+    grid-template-columns: 1fr;
+  }
+
+  .table th,
+  .table td {
+    padding: 12px 14px;
+  }
+}

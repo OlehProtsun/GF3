@@ -1,15 +1,26 @@
-﻿using System.Windows;
+/*
+  Опис файлу: цей модуль містить реалізацію компонента UIStatus у шарі WPFApp.
+  Призначення: інкапсулювати поведінку UI або прикладної логіки без зміни доменної моделі.
+  Примітка: коментарі описують спостережуваний потік даних, очікувані обмеження та точки взаємодії.
+*/
+using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 
 namespace WPFApp.View.Dialogs
 {
+    /// <summary>
+    /// Визначає публічний елемент `public enum UIStatusKind` та контракт його використання у шарі WPFApp.
+    /// </summary>
     public enum UIStatusKind
     {
         Success = 0,
         Working = 1
     }
 
+    /// <summary>
+    /// Визначає публічний елемент `public partial class UIStatus : UserControl` та контракт його використання у шарі WPFApp.
+    /// </summary>
     public partial class UIStatus : UserControl
     {
         private static readonly SolidColorBrush Neutral = BrushFrom("#14161A");
@@ -18,18 +29,27 @@ namespace WPFApp.View.Dialogs
         private static readonly SolidColorBrush SuccessGreen = BrushFrom("#1E7A3B");
         private static readonly SolidColorBrush BorderGreen = BrushFrom("#33C36B");
 
+        /// <summary>
+        /// Визначає публічний елемент `public UIStatus()` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public UIStatus()
         {
             InitializeComponent();
             ApplyStatusVisuals();
         }
 
+        /// <summary>
+        /// Визначає публічний елемент `public UIStatusKind Status` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public UIStatusKind Status
         {
             get => (UIStatusKind)GetValue(StatusProperty);
             set => SetValue(StatusProperty, value);
         }
 
+        /// <summary>
+        /// Визначає публічний елемент `public static readonly DependencyProperty StatusProperty =` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public static readonly DependencyProperty StatusProperty =
             DependencyProperty.Register(
                 nameof(Status),
@@ -37,13 +57,19 @@ namespace WPFApp.View.Dialogs
                 typeof(UIStatus),
                 new PropertyMetadata(UIStatusKind.Success, OnAnyChanged));
 
-        // NEW: custom message
+        
+        /// <summary>
+        /// Визначає публічний елемент `public string? Message` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public string? Message
         {
             get => (string?)GetValue(MessageProperty);
             set => SetValue(MessageProperty, value);
         }
 
+        /// <summary>
+        /// Визначає публічний елемент `public static readonly DependencyProperty MessageProperty =` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public static readonly DependencyProperty MessageProperty =
             DependencyProperty.Register(
                 nameof(Message),

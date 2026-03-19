@@ -1,4 +1,9 @@
-﻿using System;
+/*
+  Опис файлу: цей модуль містить реалізацію компонента ContainerProfileView у шарі WPFApp.
+  Призначення: інкапсулювати поведінку UI або прикладної логіки без зміни доменної моделі.
+  Примітка: коментарі описують спостережуваний потік даних, очікувані обмеження та точки взаємодії.
+*/
+using System;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
@@ -7,15 +12,30 @@ using System.Windows.Media;
 using System.Windows.Threading;
 using WPFApp.ViewModel.Container.Profile;
 using WPFApp.ViewModel.Container.ScheduleList;
-using WPFApp.ViewModel.Container.List;
 
 namespace WPFApp.View.Container
 {
+    
+    
+    
+    
+    
+    
+    
+    /// <summary>
+    /// Визначає публічний елемент `public partial class ContainerProfileView : UserControl` та контракт його використання у шарі WPFApp.
+    /// </summary>
     public partial class ContainerProfileView : UserControl
     {
         private ContainerProfileViewModel? _vm;
         private bool _rebuildQueued;
 
+        
+        
+        
+        /// <summary>
+        /// Визначає публічний елемент `public ContainerProfileView()` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public ContainerProfileView()
         {
             InitializeComponent();
@@ -36,7 +56,7 @@ namespace WPFApp.View.Container
             {
                 _vm.StatisticsChanged += VmOnStatisticsChanged;
 
-                // одразу побудувати колонки (якщо дані вже є)
+                
                 QueueRebuildStatsColumns();
             }
         }
@@ -73,7 +93,7 @@ namespace WPFApp.View.Container
 
             dataGridContainerEmployeeShopHours.Columns.Clear();
 
-            // Employee
+            
             dataGridContainerEmployeeShopHours.Columns.Add(new DataGridTextColumn
             {
                 Header = "Employee",
@@ -84,7 +104,7 @@ namespace WPFApp.View.Container
                 Width = new DataGridLength(240)
             });
 
-            // Work Days
+            
             dataGridContainerEmployeeShopHours.Columns.Add(new DataGridTextColumn
             {
                 Header = "Work Days",
@@ -95,7 +115,7 @@ namespace WPFApp.View.Container
                 Width = new DataGridLength(90)
             });
 
-            // Free Days
+            
             dataGridContainerEmployeeShopHours.Columns.Add(new DataGridTextColumn
             {
                 Header = "Free Days",
@@ -106,7 +126,7 @@ namespace WPFApp.View.Container
                 Width = new DataGridLength(90)
             });
 
-            // Sum
+            
             dataGridContainerEmployeeShopHours.Columns.Add(new DataGridTextColumn
             {
                 Header = "Sum",
@@ -117,7 +137,7 @@ namespace WPFApp.View.Container
                 Width = new DataGridLength(90)
             });
 
-            // Dynamic shop columns
+            
             foreach (var shop in _vm.ShopHeaders)
             {
                 var b = new Binding($"[{shop.Key}]")
@@ -138,7 +158,7 @@ namespace WPFApp.View.Container
             dataGridContainerEmployeeShopHours.FrozenColumnCount = 4;
         }
 
-        // ====== твої існуючі handlers (залишаю як були) ======
+        
         private void DataGridSchedules_MouseDoubleClick(object sender, MouseButtonEventArgs e)
         {
             if (DataContext is not ContainerProfileViewModel vm) return;
@@ -232,7 +252,7 @@ namespace WPFApp.View.Container
             if (dataGridSchedules?.DataContext is not ContainerScheduleListViewModel vm)
                 return;
 
-            // Працює ТІЛЬКИ в MultiOpen режимі
+            
             if (!vm.IsMultiOpenEnabled)
                 return;
 
@@ -240,16 +260,16 @@ namespace WPFApp.View.Container
             if (original == null)
                 return;
 
-            // Якщо клік прямо по чекбоксу — не чіпаємо (даємо йому самому переключитись)
+            
             if (FindAncestor<CheckBox>(original) != null)
                 return;
 
-            // Знаходимо рядок під кліком
+            
             var row = FindAncestor<DataGridRow>(original);
             if (row?.DataContext is ScheduleRowVm item)
                 vm.ToggleRowSelection(item);
 
-            // щоб DataGrid не робив стандартний selection (ти керуєш вибором через IsChecked)
+            
             dataGridSchedules.UnselectAll();
             dataGridSchedules.Focus();
 

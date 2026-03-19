@@ -456,7 +456,6 @@
         </Setter>
     </Style>
 
-    <!-- 1) Спільний "chrome" як у Hide/Show (підходить і Button і ToggleButton) -->
     <Style x:Key="HideShowChromeButtonBaseStyle" TargetType="{x:Type ButtonBase}">
         <!-- якщо в твоєму HideShowToggleStyle є інші Setters (Cursor, FocusVisualStyle, BorderThickness...) — додай їх сюди -->
         <Setter Property="Cursor" Value="Hand"/>
@@ -501,7 +500,6 @@
         </Setter>
     </Style>
 
-    <!-- 2) Стиль для великих кнопок export: такий самий chrome, але інші розміри -->
     <Style x:Key="TopExportButtonStyle"
        TargetType="Button"
        BasedOn="{StaticResource AnimatedButtonBaseStyle}">
@@ -552,5 +550,27 @@
         </Setter>
     </Style>
 
+    <!-- Small button variant used across Availability cards -->
+    <Style x:Key="RoundedButtonSmallStyle"
+       TargetType="Button"
+       BasedOn="{StaticResource RoundedButtonStyle}">
+        <Setter Property="Height" Value="33" />
+    </Style>
+
+    <!-- Neutral/cancel action -->
+    <Style x:Key="RoundedButtonCancelStyle"
+       TargetType="Button"
+       BasedOn="{StaticResource RoundedButtonSmallStyle}">
+        <Setter Property="Background" Value="{StaticResource CancelButtonBackgroundBrush}" />
+        <Setter Property="Foreground" Value="{StaticResource MutedTextBrush}" />
+    </Style>
+
+    <!-- Danger action -->
+    <Style x:Key="RoundedButtonDangerStyle"
+       TargetType="Button"
+       BasedOn="{StaticResource RoundedButtonSmallStyle}">
+        <Setter Property="Background" Value="{StaticResource DangerBrush}" />
+        <Setter Property="Foreground" Value="White" />
+    </Style>
 
 </ResourceDictionary>

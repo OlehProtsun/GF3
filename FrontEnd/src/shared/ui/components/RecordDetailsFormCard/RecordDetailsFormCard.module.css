@@ -1,0 +1,28 @@
+.loading {
+  color: #6b7280;
+  font-weight: 600;
+  margin: 0.25rem 0 0.75rem;
+}
+
+.errorBanner {
+  margin: 0.25rem 0 0.9rem;
+}
+
+.cancelBtn {
+  --btn-bg: rgba(17, 24, 39, 0.06) !important;
+  --btn-bg-hover: rgba(17, 24, 39, 0.09) !important;
+  --btn-border: rgba(17, 24, 39, 0.12) !important;
+
+  color: #111827 !important;
+  box-shadow: none !important;
+}
+
+.cancelBtn:active:not(:disabled) {
+  transform: translateY(1px);
+  box-shadow: none !important;
+}
+
+.infoIcon {
+  color: #000000 !important;
+  opacity: 1 !important;
+}

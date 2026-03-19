@@ -1,22 +1,365 @@
+using BusinessLogicLayer.Common;
+using BusinessLogicLayer.Contracts.Models;
+using BusinessLogicLayer.Generators;
+using BusinessLogicLayer.Mappers;
 using BusinessLogicLayer.Services.Abstractions;
-using DataAccessLayer.Models;
 using DataAccessLayer.Repositories.Abstractions;
-using System.Collections.Generic;
-using System.Threading;
-using System.Threading.Tasks;
+using Microsoft.EntityFrameworkCore;
+using System.Collections.Concurrent;
+namespace BusinessLogicLayer.Services;
 
-namespace BusinessLogicLayer.Services
+public class ContainerService : IContainerService
 {
-    public class ContainerService : GenericService<ContainerModel>, IContainerService
-    {
-        private readonly IContainerRepository _repo;
+    private readonly IContainerRepository _repo;
+    private readonly IScheduleRepository _scheduleRepo;
+    private readonly ISchedulePresetRepository _schedulePresetRepo;
+    private readonly IScheduleSlotRepository _slotRepo;
+    private readonly IScheduleEmployeeRepository _employeeRepo;
+    private readonly IScheduleCellStyleRepository _cellStyleRepo;
+    private readonly IAvailabilityGroupRepository _availabilityGroupRepo;
+    private readonly IScheduleGenerator _scheduleGenerator;
 
-        public ContainerService(IContainerRepository repo) : base(repo)
+    private static readonly ConcurrentDictionary<int, SemaphoreSlim> GenerateLocks = new();
+
+    public ContainerService(
+        IContainerRepository repo,
+        IScheduleRepository scheduleRepo,
+        ISchedulePresetRepository schedulePresetRepo,
+        IScheduleSlotRepository slotRepo,
+        IScheduleEmployeeRepository employeeRepo,
+        IScheduleCellStyleRepository cellStyleRepo,
+        IAvailabilityGroupRepository availabilityGroupRepo,
+        IScheduleGenerator scheduleGenerator)
+    {
+        _repo = repo;
+        _scheduleRepo = scheduleRepo;
+        _schedulePresetRepo = schedulePresetRepo;
+        _slotRepo = slotRepo;
+        _employeeRepo = employeeRepo;
+        _cellStyleRepo = cellStyleRepo;
+        _availabilityGroupRepo = availabilityGroupRepo;
+        _scheduleGenerator = scheduleGenerator;
+    }
+
+    public async Task<ContainerModel?> GetAsync(int id, CancellationToken ct = default)
+        => await ServiceMappingHelper.GetMappedAsync(token => _repo.GetByIdAsync(id, token), x => x.ToContract(), ct).ConfigureAwait(false);
+
+    public async Task<List<ContainerModel>> GetAllAsync(CancellationToken ct = default)
+        => await ServiceMappingHelper.GetMappedListAsync(_repo.GetAllAsync, x => x.ToContract(), ct).ConfigureAwait(false);
+
+    public async Task<ContainerModel> CreateAsync(ContainerModel entity, CancellationToken ct = default)
+        => await ServiceMappingHelper.CreateMappedAsync(entity.ToDal(), _repo.AddAsync, x => x.ToContract(), ct).ConfigureAwait(false);
+
+    public Task UpdateAsync(ContainerModel entity, CancellationToken ct = default)
+        => _repo.UpdateAsync(entity.ToDal(), ct);
+
+    public Task DeleteAsync(int id, CancellationToken ct = default)
+        => _repo.DeleteAsync(id, ct);
+
+    public async Task<List<ContainerModel>> GetByValueAsync(string value, CancellationToken ct = default)
+        => await ServiceMappingHelper.GetMappedListAsync(token => _repo.GetByValueAsync(value, token), x => x.ToContract(), ct).ConfigureAwait(false);
+
+    public async Task<List<ScheduleModel>> GetGraphsAsync(int containerId, CancellationToken ct = default)
+    {
+        await EnsureContainerExistsAsync(containerId, ct).ConfigureAwait(false);
+        return (await _scheduleRepo.GetByContainerAsync(containerId, null, ct).ConfigureAwait(false)).Select(x => x.ToContract()).ToList();
+    }
+
+    public async Task<ScheduleModel?> GetGraphByIdAsync(int containerId, int graphId, CancellationToken ct = default)
+    {
+        var graph = await EnsureGraphOwnershipAsync(containerId, graphId, ct).ConfigureAwait(false);
+        return graph.ToContract();
+    }
+
+    public async Task<ScheduleModel> CreateGraphAsync(int containerId, ScheduleModel model, CancellationToken ct = default)
+    {
+        await EnsureContainerExistsAsync(containerId, ct).ConfigureAwait(false);
+        model.ContainerId = containerId;
+        var created = await _scheduleRepo.AddAsync(model.ToDal(), ct).ConfigureAwait(false);
+        return created.ToContract();
+    }
+
+    public async Task UpdateGraphAsync(int containerId, int graphId, ScheduleModel model, CancellationToken ct = default)
+    {
+        await EnsureGraphOwnershipAsync(containerId, graphId, ct).ConfigureAwait(false);
+        model.Id = graphId;
+        model.ContainerId = containerId;
+        await _scheduleRepo.UpdateAsync(model.ToDal(), ct).ConfigureAwait(false);
+    }
+
+    public async Task DeleteGraphAsync(int containerId, int graphId, CancellationToken ct = default)
+    {
+        await EnsureGraphOwnershipAsync(containerId, graphId, ct).ConfigureAwait(false);
+        await _scheduleRepo.DeleteAsync(graphId, ct).ConfigureAwait(false);
+    }
+
+    public async Task<List<SchedulePresetModel>> GetSchedulePresetsAsync(int containerId, CancellationToken ct = default)
+    {
+        await EnsureContainerExistsAsync(containerId, ct).ConfigureAwait(false);
+        return (await _schedulePresetRepo.GetByContainerAsync(containerId, ct).ConfigureAwait(false))
+            .Select(x => x.ToContract())
+            .ToList();
+    }
+
+    public async Task<SchedulePresetModel> CreateSchedulePresetAsync(int containerId, SchedulePresetModel model, CancellationToken ct = default)
+    {
+        await EnsureContainerExistsAsync(containerId, ct).ConfigureAwait(false);
+
+        model.ContainerId = containerId;
+        model.Name = model.Name.Trim();
+        model.ScheduleName = model.ScheduleName.Trim();
+        model.Employees = model.Employees
+            .Where(x => x.EmployeeId > 0)
+            .GroupBy(x => x.EmployeeId)
+            .Select(x => x.Last())
+            .ToList();
+
+        if (await _schedulePresetRepo.ExistsByNameAsync(containerId, model.Name, null, ct).ConfigureAwait(false))
         {
-            _repo = repo;
+            throw new System.ComponentModel.DataAnnotations.ValidationException(
+                new System.ComponentModel.DataAnnotations.ValidationResult(
+                    "A preset with this name already exists in the current container.",
+                    new[] { nameof(model.Name) }),
+                validatingAttribute: null,
+                value: model.Name);
         }
 
-        public Task<List<ContainerModel>> GetByValueAsync(string value, CancellationToken ct = default)
-            => _repo.GetByValueAsync(value, ct);
+        var created = await _schedulePresetRepo.AddAsync(model.ToDal(), ct).ConfigureAwait(false);
+        return created.ToContract();
+    }
+
+    public async Task<GenerateGraphResult> GenerateGraphAsync(
+        int containerId,
+        int graphId,
+        bool overwrite,
+        bool dryRun,
+        IProgress<int>? progress,
+        CancellationToken ct = default)
+    {
+        var semaphore = GenerateLocks.GetOrAdd(graphId, _ => new SemaphoreSlim(1, 1));
+        await semaphore.WaitAsync(ct).ConfigureAwait(false);
+
+        try
+        {
+            var graph = await EnsureGraphOwnershipAsync(containerId, graphId, ct).ConfigureAwait(false);
+            var schedule = graph.ToContract();
+
+            var employees = (await _employeeRepo.GetByScheduleAsync(graphId, ct).ConfigureAwait(false))
+                .Select(x => x.ToContract())
+                .ToList();
+
+            var availabilities = new List<AvailabilityGroupModel>();
+            if (schedule.AvailabilityGroupId is int availabilityGroupId && availabilityGroupId > 0)
+            {
+                var group = await _availabilityGroupRepo.GetFullByIdAsync(availabilityGroupId, ct).ConfigureAwait(false)
+                    ?? throw new KeyNotFoundException($"Availability group with id {availabilityGroupId} was not found.");
+                availabilities.Add(group.ToContract());
+            }
+
+            var generatedSlots = (await _scheduleGenerator
+                .GenerateAsync(schedule, availabilities, employees, progress, ct)
+                .ConfigureAwait(false))
+                .Select(x =>
+                {
+                    x.ScheduleId = graphId;
+                    x.Id = 0;
+                    return x;
+                })
+                .ToList();
+
+            var writtenSlotsCount = 0;
+            if (!dryRun)
+            {
+                try
+                {
+                    writtenSlotsCount = await _slotRepo
+                        .ReplaceForScheduleAsync(graphId, generatedSlots.Select(x => x.ToDal()), overwrite, ct)
+                        .ConfigureAwait(false);
+                }
+                catch (DbUpdateException)
+                {
+                    throw new ValidationException("Duplicate slot constraint violated. Try overwrite=true.");
+                }
+            }
+
+            return new GenerateGraphResult
+            {
+                ContainerId = containerId,
+                GraphId = graphId,
+                GeneratedSlotsCount = generatedSlots.Count,
+                WrittenSlotsCount = dryRun ? 0 : writtenSlotsCount,
+                Slots = generatedSlots
+            };
+        }
+        finally
+        {
+            semaphore.Release();
+        }
+    }
+
+    public async Task<List<ScheduleSlotModel>> GetGraphSlotsAsync(int containerId, int graphId, CancellationToken ct = default)
+    {
+        await EnsureGraphOwnershipAsync(containerId, graphId, ct).ConfigureAwait(false);
+        return (await _slotRepo.GetByScheduleAsync(graphId, ct).ConfigureAwait(false)).Select(x => x.ToContract()).ToList();
+    }
+
+    public async Task<ScheduleSlotModel> CreateGraphSlotAsync(int containerId, int graphId, ScheduleSlotModel model, CancellationToken ct = default)
+    {
+        await EnsureGraphOwnershipAsync(containerId, graphId, ct).ConfigureAwait(false);
+        model.ScheduleId = graphId;
+
+        try
+        {
+            var created = await _slotRepo.AddAsync(model.ToDal(), ct).ConfigureAwait(false);
+            return created.ToContract();
+        }
+        catch (DbUpdateException)
+        {
+            throw new ValidationException("Duplicate slot for the same time/day");
+        }
+    }
+
+    public async Task UpdateGraphSlotAsync(int containerId, int graphId, int slotId, ScheduleSlotModel model, CancellationToken ct = default)
+    {
+        await EnsureGraphOwnershipAsync(containerId, graphId, ct).ConfigureAwait(false);
+
+        var existing = await _slotRepo.GetByIdAsync(slotId, ct).ConfigureAwait(false)
+            ?? throw new KeyNotFoundException($"Slot with id {slotId} was not found.");
+
+        if (existing.ScheduleId != graphId)
+            throw new KeyNotFoundException("Slot not found in graph.");
+
+        model.Id = slotId;
+        model.ScheduleId = graphId;
+
+        try
+        {
+            await _slotRepo.UpdateAsync(model.ToDal(), ct).ConfigureAwait(false);
+        }
+        catch (DbUpdateException)
+        {
+            throw new ValidationException("Duplicate slot for the same time/day");
+        }
+    }
+
+    public async Task DeleteGraphSlotAsync(int containerId, int graphId, int slotId, CancellationToken ct = default)
+    {
+        await EnsureGraphOwnershipAsync(containerId, graphId, ct).ConfigureAwait(false);
+
+        var existing = await _slotRepo.GetByIdAsync(slotId, ct).ConfigureAwait(false)
+            ?? throw new KeyNotFoundException($"Slot with id {slotId} was not found.");
+
+        if (existing.ScheduleId != graphId)
+            throw new KeyNotFoundException("Slot not found in graph.");
+
+        await _slotRepo.DeleteAsync(slotId, ct).ConfigureAwait(false);
+    }
+
+    public async Task<List<ScheduleEmployeeModel>> GetGraphEmployeesAsync(int containerId, int graphId, CancellationToken ct = default)
+    {
+        await EnsureGraphOwnershipAsync(containerId, graphId, ct).ConfigureAwait(false);
+        return (await _employeeRepo.GetByScheduleAsync(graphId, ct).ConfigureAwait(false))
+            .Select(x => x.ToContract())
+            .OrderBy(x => x.DisplayOrder)
+            .ThenBy(x => x.Employee?.FirstName ?? string.Empty)
+            .ThenBy(x => x.Employee?.LastName ?? string.Empty)
+            .ThenBy(x => x.EmployeeId)
+            .ToList();
+    }
+
+    public async Task<ScheduleEmployeeModel> AddGraphEmployeeAsync(int containerId, int graphId, ScheduleEmployeeModel model, CancellationToken ct = default)
+    {
+        await EnsureGraphOwnershipAsync(containerId, graphId, ct).ConfigureAwait(false);
+        model.ScheduleId = graphId;
+        var created = await _employeeRepo.AddAsync(model.ToDal(), ct).ConfigureAwait(false);
+        return created.ToContract();
+    }
+
+    public async Task UpdateGraphEmployeeAsync(int containerId, int graphId, int graphEmployeeId, ScheduleEmployeeModel model, CancellationToken ct = default)
+    {
+        await EnsureGraphOwnershipAsync(containerId, graphId, ct).ConfigureAwait(false);
+
+        var existing = await _employeeRepo.GetByIdAsync(graphEmployeeId, ct).ConfigureAwait(false)
+            ?? throw new KeyNotFoundException($"Graph employee with id {graphEmployeeId} was not found.");
+
+        if (existing.ScheduleId != graphId)
+            throw new KeyNotFoundException("Graph employee not found in graph.");
+
+        model.Id = graphEmployeeId;
+        model.ScheduleId = graphId;
+        await _employeeRepo.UpdateAsync(model.ToDal(), ct).ConfigureAwait(false);
+    }
+
+    public async Task RemoveGraphEmployeeAsync(int containerId, int graphId, int graphEmployeeId, CancellationToken ct = default)
+    {
+        await EnsureGraphOwnershipAsync(containerId, graphId, ct).ConfigureAwait(false);
+
+        var existing = await _employeeRepo.GetByIdAsync(graphEmployeeId, ct).ConfigureAwait(false)
+            ?? throw new KeyNotFoundException($"Graph employee with id {graphEmployeeId} was not found.");
+
+        if (existing.ScheduleId != graphId)
+            throw new KeyNotFoundException("Graph employee not found in graph.");
+
+        await _employeeRepo.DeleteAsync(graphEmployeeId, ct).ConfigureAwait(false);
+    }
+
+    public async Task<List<ScheduleCellStyleModel>> GetGraphCellStylesAsync(int containerId, int graphId, CancellationToken ct = default)
+    {
+        await EnsureGraphOwnershipAsync(containerId, graphId, ct).ConfigureAwait(false);
+        return (await _cellStyleRepo.GetByScheduleAsync(graphId, ct).ConfigureAwait(false)).Select(x => x.ToContract()).ToList();
+    }
+
+    public async Task<ScheduleCellStyleModel> UpsertGraphCellStyleAsync(int containerId, int graphId, ScheduleCellStyleModel model, CancellationToken ct = default)
+    {
+        await EnsureGraphOwnershipAsync(containerId, graphId, ct).ConfigureAwait(false);
+
+        var existing = (await _cellStyleRepo.GetByScheduleAsync(graphId, ct).ConfigureAwait(false))
+            .FirstOrDefault(x => x.DayOfMonth == model.DayOfMonth && x.EmployeeId == model.EmployeeId);
+
+        if (existing is null)
+        {
+            model.ScheduleId = graphId;
+            var created = await _cellStyleRepo.AddAsync(model.ToDal(), ct).ConfigureAwait(false);
+            return created.ToContract();
+        }
+
+        existing.BackgroundColorArgb = model.BackgroundColorArgb;
+        existing.TextColorArgb = model.TextColorArgb;
+
+        await _cellStyleRepo.UpdateAsync(existing, ct).ConfigureAwait(false);
+        return existing.ToContract();
+    }
+
+    public async Task DeleteGraphCellStyleAsync(int containerId, int graphId, int styleId, CancellationToken ct = default)
+    {
+        await EnsureGraphOwnershipAsync(containerId, graphId, ct).ConfigureAwait(false);
+
+        var existing = await _cellStyleRepo.GetByIdAsync(styleId, ct).ConfigureAwait(false)
+            ?? throw new KeyNotFoundException($"Cell style with id {styleId} was not found.");
+
+        if (existing.ScheduleId != graphId)
+            throw new KeyNotFoundException("Cell style not found in graph.");
+
+        await _cellStyleRepo.DeleteAsync(styleId, ct).ConfigureAwait(false);
+    }
+
+    private async Task EnsureContainerExistsAsync(int containerId, CancellationToken ct)
+    {
+        var container = await _repo.GetByIdAsync(containerId, ct).ConfigureAwait(false);
+        if (container is null)
+            throw new KeyNotFoundException($"Container with id {containerId} was not found.");
+    }
+
+    private async Task<DataAccessLayer.Models.ScheduleModel> EnsureGraphOwnershipAsync(int containerId, int graphId, CancellationToken ct)
+    {
+        await EnsureContainerExistsAsync(containerId, ct).ConfigureAwait(false);
+        var existing = await _scheduleRepo.GetByIdAsync(graphId, ct).ConfigureAwait(false)
+            ?? throw new KeyNotFoundException($"Graph with id {graphId} was not found.");
+
+        if (existing.ContainerId != containerId)
+            throw new KeyNotFoundException("Graph not found in container");
+
+        return existing;
     }
 }
+    

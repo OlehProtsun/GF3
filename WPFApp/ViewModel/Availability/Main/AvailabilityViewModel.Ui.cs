@@ -1,17 +1,25 @@
-﻿using System;
+/*
+  Опис файлу: цей модуль містить реалізацію компонента AvailabilityViewModel.Ui у шарі WPFApp.
+  Призначення: інкапсулювати поведінку UI або прикладної логіки без зміни доменної моделі.
+  Примітка: коментарі описують спостережуваний потік даних, очікувані обмеження та точки взаємодії.
+*/
+using System;
 using System.Threading.Tasks;
 using System.Windows;
-using WPFApp.Infrastructure;
-using WPFApp.Service;
+using WPFApp.Applications.Diagnostics;
+using WPFApp.UI.Dialogs;
 using WPFApp.ViewModel.Dialogs;
 
 namespace WPFApp.ViewModel.Availability.Main
 {
+    
+    
+    
+    
+    
+    
     /// <summary>
-    /// Ui — централізовані повідомлення користувачу.
-    /// Виносимо в окремий partial, щоб:
-    /// - CRUD/навігація не змішувались з діалогами
-    /// - “як показувати помилку” було одноманітним
+    /// Визначає публічний елемент `public sealed partial class AvailabilityViewModel` та контракт його використання у шарі WPFApp.
     /// </summary>
     public sealed partial class AvailabilityViewModel
     {

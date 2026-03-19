@@ -1,0 +1,168 @@
+.tile {
+  display: grid;
+  gap: 12px;
+  min-height: 0;
+  padding: 18px;
+  border: 1px solid rgba(113, 113, 122, 0.14);
+  border-radius: 30px;
+  background:
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0)),
+    rgba(255, 255, 255, 0.92);
+  box-shadow: 0 16px 36px rgba(15, 23, 42, 0.08);
+  text-align: left;
+  align-content: start;
+}
+
+.tileInteractive {
+  cursor: pointer;
+  transition:
+    transform 0.12s ease,
+    box-shadow 0.2s ease,
+    border-color 0.2s ease,
+    background 0.2s ease;
+}
+
+.tileInteractive:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 22px 48px rgba(15, 23, 42, 0.12);
+  border-color: rgba(59, 130, 246, 0.16);
+  background:
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0)),
+    rgba(255, 255, 255, 0.94);
+}
+
+.tileInteractive:active {
+  transform: translateY(-1px);
+}
+
+.tileInteractive:focus-visible {
+  outline: none;
+  box-shadow:
+    0 0 0 4px rgba(37, 99, 235, 0.18),
+    0 22px 48px rgba(15, 23, 42, 0.12);
+}
+
+.head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.headActions {
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.titleWrap {
+  min-width: 0;
+  flex: 1;
+}
+
+.title {
+  font-size: 1.25rem;
+  line-height: 1.15;
+  font-weight: 900;
+  letter-spacing: -0.03em;
+  color: #111827;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(37, 99, 235, 0.1);
+  border: 1px solid rgba(37, 99, 235, 0.18);
+  color: #1d4ed8;
+  font-size: 0.75rem;
+  font-weight: 800;
+}
+
+.pinButton {
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  padding: 0;
+  border-radius: 999px;
+  border: 1px solid rgba(113, 113, 122, 0.18);
+  background: rgba(244, 244, 245, 0.92);
+  color: rgba(39, 39, 42, 0.68);
+  cursor: pointer;
+  transition:
+    transform 0.12s ease,
+    border-color 0.2s ease,
+    background 0.2s ease,
+    color 0.2s ease;
+}
+
+.pinButton:hover {
+  transform: translateY(-1px);
+  border-color: rgba(59, 130, 246, 0.22);
+  background: rgba(239, 246, 255, 0.92);
+  color: #1d4ed8;
+}
+
+.pinButton:focus-visible {
+  outline: none;
+  border-color: rgba(37, 99, 235, 0.32);
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.14);
+}
+
+.pinButtonActive {
+  border-color: rgba(37, 99, 235, 0.24);
+  background: rgba(219, 234, 254, 0.92);
+  color: #1d4ed8;
+}
+
+.pinIcon {
+  display: block;
+}
+
+.description {
+  color: rgba(17, 24, 39, 0.66);
+  line-height: 1.55;
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.metaRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  margin-top: 2px;
+}
+
+.metaItem {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 5px 8px;
+  border-radius: 12px;
+  border: 1px solid rgba(113, 113, 122, 0.12);
+  background: rgba(244, 244, 245, 0.76);
+  color: rgba(17, 24, 39, 0.66);
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+
+.metaLabel {
+  font-weight: 800;
+  color: rgba(17, 24, 39, 0.52);
+}
+
+.metaValue {
+  color: rgba(17, 24, 39, 0.72);
+  word-break: break-word;
+}

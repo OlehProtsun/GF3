@@ -1,3 +1,8 @@
+/*
+  Опис файлу: цей модуль містить реалізацію компонента DatabaseViewModel у шарі WPFApp.
+  Призначення: інкапсулювати поведінку UI або прикладної логіки без зміни доменної моделі.
+  Примітка: коментарі описують спостережуваний потік даних, очікувані обмеження та точки взаємодії.
+*/
 using Microsoft.Win32;
 using System;
 using System.Data;
@@ -5,17 +10,21 @@ using System.Globalization;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
-using WPFApp.Infrastructure;
-using WPFApp.Service;
+using WPFApp.Applications.Notifications;
+using WPFApp.MVVM.Commands;
+using WPFApp.MVVM.Core;
+using BusinessLogicLayer.Services.Abstractions;
 
 namespace WPFApp.ViewModel.Database
 {
+    /// <summary>
+    /// Визначає публічний елемент `public sealed class DatabaseViewModel : ViewModelBase` та контракт його використання у шарі WPFApp.
+    /// </summary>
     public sealed class DatabaseViewModel : ViewModelBase
     {
-        private readonly ISqliteAdminService _sqliteAdminService;
+        private readonly ISqliteAdminFacade _sqliteAdminService;
         private readonly IDatabaseChangeNotifier _databaseChangeNotifier;
-        private readonly ILoggerService _logger;
-        private bool _autoQueryExecuted;
+                private bool _autoQueryExecuted;
 
         private string _executorSql = "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name;";
         private DataView? _queryResult;
@@ -37,14 +46,16 @@ namespace WPFApp.ViewModel.Database
         private string _schemaVersion = "0";
         private string _tablesSummary = "No tables.";
 
+        /// <summary>
+        /// Визначає публічний елемент `public DatabaseViewModel(` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public DatabaseViewModel(
-            ISqliteAdminService sqliteAdminService,
-            IDatabaseChangeNotifier databaseChangeNotifier,
-            ILoggerService logger)
+            ISqliteAdminFacade sqliteAdminService,
+            IDatabaseChangeNotifier databaseChangeNotifier
+            )
         {
             _sqliteAdminService = sqliteAdminService;
             _databaseChangeNotifier = databaseChangeNotifier;
-            _logger = logger;
 
             ExecuteSqlCommand = new AsyncRelayCommand(ExecuteSqlAsync);
             ClearExecutorOutputCommand = new RelayCommand(ClearExecutorOutput);
@@ -60,119 +71,185 @@ namespace WPFApp.ViewModel.Database
             if (_autoQueryExecuted) return;
             _autoQueryExecuted = true;
 
-            // якщо хочеш — спочатку онови інфу
+            
             await RefreshDatabaseInfoAsync(CancellationToken.None);
 
-            // виконається запит з ExecutorSql (він у тебе вже заданий дефолтом)
+            
             await ExecuteSqlAsync(CancellationToken.None);
         }
 
+        /// <summary>
+        /// Визначає публічний елемент `public string ExecutorSql` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public string ExecutorSql
         {
             get => _executorSql;
             set => SetProperty(ref _executorSql, value);
         }
 
+        /// <summary>
+        /// Визначає публічний елемент `public DataView? QueryResult` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public DataView? QueryResult
         {
             get => _queryResult;
             private set => SetProperty(ref _queryResult, value);
         }
 
+        /// <summary>
+        /// Визначає публічний елемент `public string ExecutorOutput` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public string ExecutorOutput
         {
             get => _executorOutput;
             private set => SetProperty(ref _executorOutput, value);
         }
 
+        /// <summary>
+        /// Визначає публічний елемент `public bool HasQueryResult` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public bool HasQueryResult
         {
             get => _hasQueryResult;
             private set => SetProperty(ref _hasQueryResult, value);
         }
 
+        /// <summary>
+        /// Визначає публічний елемент `public bool IsExecutorError` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public bool IsExecutorError
         {
             get => _isExecutorError;
             private set => SetProperty(ref _isExecutorError, value);
         }
 
+        /// <summary>
+        /// Визначає публічний елемент `public string ImportFilePath` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public string ImportFilePath
         {
             get => _importFilePath;
             private set => SetProperty(ref _importFilePath, value);
         }
 
+        /// <summary>
+        /// Визначає публічний елемент `public string ImportFileSize` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public string ImportFileSize
         {
             get => _importFileSize;
             private set => SetProperty(ref _importFileSize, value);
         }
 
+        /// <summary>
+        /// Визначає публічний елемент `public string ImportFileModified` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public string ImportFileModified
         {
             get => _importFileModified;
             private set => SetProperty(ref _importFileModified, value);
         }
 
+        /// <summary>
+        /// Визначає публічний елемент `public string ImportFileHash` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public string ImportFileHash
         {
             get => _importFileHash;
             private set => SetProperty(ref _importFileHash, value);
         }
 
+        /// <summary>
+        /// Визначає публічний елемент `public string ImportScript` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public string ImportScript
         {
             get => _importScript;
             set => SetProperty(ref _importScript, value);
         }
 
+        /// <summary>
+        /// Визначає публічний елемент `public string ImportOutput` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public string ImportOutput
         {
             get => _importOutput;
             private set => SetProperty(ref _importOutput, value);
         }
 
+        /// <summary>
+        /// Визначає публічний елемент `public bool IsImportError` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public bool IsImportError
         {
             get => _isImportError;
             private set => SetProperty(ref _isImportError, value);
         }
 
+        /// <summary>
+        /// Визначає публічний елемент `public string DatabasePath` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public string DatabasePath
         {
             get => _databasePath;
             private set => SetProperty(ref _databasePath, value);
         }
 
+        /// <summary>
+        /// Визначає публічний елемент `public string DatabaseSize` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public string DatabaseSize
         {
             get => _databaseSize;
             private set => SetProperty(ref _databaseSize, value);
         }
 
+        /// <summary>
+        /// Визначає публічний елемент `public string DatabaseLastUpdated` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public string DatabaseLastUpdated
         {
             get => _databaseLastUpdated;
             private set => SetProperty(ref _databaseLastUpdated, value);
         }
 
+        /// <summary>
+        /// Визначає публічний елемент `public string SchemaVersion` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public string SchemaVersion
         {
             get => _schemaVersion;
             private set => SetProperty(ref _schemaVersion, value);
         }
 
+        /// <summary>
+        /// Визначає публічний елемент `public string TablesSummary` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public string TablesSummary
         {
             get => _tablesSummary;
             private set => SetProperty(ref _tablesSummary, value);
         }
 
+        /// <summary>
+        /// Визначає публічний елемент `public AsyncRelayCommand ExecuteSqlCommand { get; }` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public AsyncRelayCommand ExecuteSqlCommand { get; }
+        /// <summary>
+        /// Визначає публічний елемент `public RelayCommand ClearExecutorOutputCommand { get; }` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public RelayCommand ClearExecutorOutputCommand { get; }
+        /// <summary>
+        /// Визначає публічний елемент `public AsyncRelayCommand ChooseImportFileCommand { get; }` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public AsyncRelayCommand ChooseImportFileCommand { get; }
+        /// <summary>
+        /// Визначає публічний елемент `public AsyncRelayCommand ExecuteImportScriptCommand { get; }` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public AsyncRelayCommand ExecuteImportScriptCommand { get; }
+        /// <summary>
+        /// Визначає публічний елемент `public AsyncRelayCommand RefreshInfoCommand { get; }` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public AsyncRelayCommand RefreshInfoCommand { get; }
 
         private async Task ExecuteSqlAsync(CancellationToken ct)
@@ -249,8 +326,7 @@ namespace WPFApp.ViewModel.Database
             {
                 await _sqliteAdminService.ImportSqlScriptAsync(ImportScript, ct);
                 _databaseChangeNotifier.NotifyDatabaseChanged("DatabaseView.ImportSqlScript");
-                _logger.Log("[DB-CHANGE] Import SQL completed; change event emitted.");
-                IsImportError = false;
+                                IsImportError = false;
                 ImportOutput = "Import script executed successfully against the current application database.";
                 await RefreshDatabaseInfoAsync(ct);
 

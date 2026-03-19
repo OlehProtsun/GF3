@@ -1,3 +1,8 @@
+/*
+  Опис файлу: цей модуль містить реалізацію компонента ShopListView у шарі WPFApp.
+  Призначення: інкапсулювати поведінку UI або прикладної логіки без зміни доменної моделі.
+  Примітка: коментарі описують спостережуваний потік даних, очікувані обмеження та точки взаємодії.
+*/
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -6,11 +11,17 @@ using WPFApp.ViewModel.Shop;
 
 namespace WPFApp.View.Shop
 {
+    
+    
+    
     /// <summary>
-    /// Interaction logic for ShopListView.xaml
+    /// Визначає публічний елемент `public partial class ShopListView : UserControl` та контракт його використання у шарі WPFApp.
     /// </summary>
     public partial class ShopListView : UserControl
     {
+        /// <summary>
+        /// Визначає публічний елемент `public ShopListView()` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public ShopListView()
         {
             InitializeComponent();

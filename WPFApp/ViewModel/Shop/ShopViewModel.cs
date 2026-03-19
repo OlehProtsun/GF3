@@ -1,21 +1,27 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
+/*
+  Опис файлу: цей модуль містить реалізацію компонента ShopViewModel у шарі WPFApp.
+  Призначення: інкапсулювати поведінку UI або прикладної логіки без зміни доменної моделі.
+  Примітка: коментарі описують спостережуваний потік даних, очікувані обмеження та точки взаємодії.
+*/
 using System.Windows;
 using System.Windows.Threading;
+using BusinessLogicLayer.Contracts.Shops;
 using BusinessLogicLayer.Services.Abstractions;
-using DataAccessLayer.Models;
-using WPFApp.Infrastructure;
-using WPFApp.Infrastructure.Validation;
-using WPFApp.Service;
+using WPFApp.Applications.Notifications;
+using WPFApp.MVVM.Core;
+using WPFApp.MVVM.Validation.Rules;
+using WPFApp.UI.Dialogs;
 using WPFApp.View.Dialogs;
 using WPFApp.ViewModel.Dialogs;
 using WPFApp.ViewModel.Shop.Helpers;
+using WPFApp.ViewModel.Shared;
+using WPFApp.Applications.Diagnostics;
 
 namespace WPFApp.ViewModel.Shop
 {
+    /// <summary>
+    /// Визначає публічний елемент `public enum ShopSection` та контракт його використання у шарі WPFApp.
+    /// </summary>
     public enum ShopSection
     {
         List,
@@ -23,44 +29,49 @@ namespace WPFApp.ViewModel.Shop
         Profile
     }
 
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
     /// <summary>
-    /// ShopViewModel — owner/coordinator модуля Shop.
-    ///
-    /// Відповідальність:
-    /// - тримати 3 під-VM: List/Edit/Profile
-    /// - керувати навігацією: CurrentSection + Mode + CancelTarget
-    /// - виконувати CRUD через IShopService
-    /// - показувати повідомлення користувачу
-    ///
-    /// Оптимізації:
-    /// 1) EnsureInitializedAsync:
-    ///    - конкурентні виклики чекають один init-task
-    ///    - _initialized стає true лише після успішного завершення
-    /// 2) Валідація перенесена в ShopValidationRules
-    /// 3) Після Save:
-    ///    - робимо reload списку
-    ///    - відновлюємо selection
-    ///    - якщо повертаємось у Profile — refresh profile
+    /// Визначає публічний елемент `public sealed class ShopViewModel : ViewModelBase` та контракт його використання у шарі WPFApp.
     /// </summary>
     public sealed class ShopViewModel : ViewModelBase
     {
-        private readonly IShopService _shopService;
+        private readonly IShopFacade _shopService;
         private readonly IDatabaseChangeNotifier _databaseChangeNotifier;
-        private readonly ILoggerService _logger;
-        private int _databaseReloadInProgress;
+                private int _databaseReloadInProgress;
 
-        // ----------------------------
-        // Initialization (safe, без гонок)
-        // ----------------------------
+        
+        
+        
 
         private bool _initialized;
         private Task? _initializeTask;
         private readonly object _initLock = new();
 
-        // Id профілю, який зараз відкрито (щоб після Save можна було refresh).
+        
         private int? _openedProfileShopId;
 
         private bool _isNavStatusVisible;
+        /// <summary>
+        /// Визначає публічний елемент `public bool IsNavStatusVisible` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public bool IsNavStatusVisible
         {
             get => _isNavStatusVisible;
@@ -68,6 +79,9 @@ namespace WPFApp.ViewModel.Shop
         }
 
         private UIStatusKind _navStatus = UIStatusKind.Success;
+        /// <summary>
+        /// Визначає публічний елемент `public UIStatusKind NavStatus` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public UIStatusKind NavStatus
         {
             get => _navStatus;
@@ -108,11 +122,14 @@ namespace WPFApp.ViewModel.Shop
             await HideNavStatusAsync().ConfigureAwait(false);
         }
 
-        // ----------------------------
-        // Navigation state
-        // ----------------------------
+        
+        
+        
 
         private object _currentSection = null!;
+        /// <summary>
+        /// Визначає публічний елемент `public object CurrentSection` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public object CurrentSection
         {
             get => _currentSection;
@@ -120,33 +137,50 @@ namespace WPFApp.ViewModel.Shop
         }
 
         private ShopSection _mode = ShopSection.List;
+        /// <summary>
+        /// Визначає публічний елемент `public ShopSection Mode` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public ShopSection Mode
         {
             get => _mode;
             private set => SetProperty(ref _mode, value);
         }
 
+        
+        
+        
         /// <summary>
-        /// CancelTarget — куди повертаємось з Edit при Cancel (List або Profile).
+        /// Визначає публічний елемент `public ShopSection CancelTarget { get; private set; } = ShopSection.List;` та контракт його використання у шарі WPFApp.
         /// </summary>
         public ShopSection CancelTarget { get; private set; } = ShopSection.List;
 
-        // ----------------------------
-        // Child VMs
-        // ----------------------------
+        
+        
+        
 
+        /// <summary>
+        /// Визначає публічний елемент `public ShopListViewModel ListVm { get; }` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public ShopListViewModel ListVm { get; }
+        /// <summary>
+        /// Визначає публічний елемент `public ShopEditViewModel EditVm { get; }` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public ShopEditViewModel EditVm { get; }
+        /// <summary>
+        /// Визначає публічний елемент `public ShopProfileViewModel ProfileVm { get; }` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public ShopProfileViewModel ProfileVm { get; }
 
+        /// <summary>
+        /// Визначає публічний елемент `public ShopViewModel(` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public ShopViewModel(
-            IShopService shopService,
-            IDatabaseChangeNotifier databaseChangeNotifier,
-            ILoggerService logger)
+            IShopFacade shopService,
+            IDatabaseChangeNotifier databaseChangeNotifier
+            )
         {
             _shopService = shopService;
             _databaseChangeNotifier = databaseChangeNotifier;
-            _logger = logger;
 
             ListVm = new ShopListViewModel(this);
             EditVm = new ShopEditViewModel(this);
@@ -156,31 +190,34 @@ namespace WPFApp.ViewModel.Shop
             CurrentSection = ListVm;
         }
 
-        // =========================================================
-        // Initialization
-        // =========================================================
+        
+        
+        
 
+        /// <summary>
+        /// Визначає публічний елемент `public Task EnsureInitializedAsync(CancellationToken ct = default)` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public Task EnsureInitializedAsync(CancellationToken ct = default)
         {
-            // 1) Якщо вже ініціалізовано — ок.
+            
             if (_initialized)
                 return Task.CompletedTask;
 
-            // 2) Якщо task вже існує — повертаємо його.
+            
             if (_initializeTask != null)
                 return _initializeTask;
 
-            // 3) Створюємо init-task під lock, щоб не запускати двічі.
+            
             lock (_initLock)
             {
-                // 4) Перевірка повторно, бо поки чекали lock стан міг змінитись.
+                
                 if (_initialized)
                     return Task.CompletedTask;
 
                 if (_initializeTask != null)
                     return _initializeTask;
 
-                // 5) Створюємо реальний init-task.
+                
                 _initializeTask = InitializeCoreAsync(ct);
 
                 return _initializeTask;
@@ -191,15 +228,15 @@ namespace WPFApp.ViewModel.Shop
         {
             try
             {
-                // 1) Завантажуємо початковий список.
+                
                 await LoadShopsAsync(ct, selectId: null);
 
-                // 2) Тільки тут ставимо _initialized=true (після успіху).
+                
                 _initialized = true;
             }
             catch
             {
-                // 3) Якщо впали — дозволяємо повторити init.
+                
                 lock (_initLock)
                 {
                     _initializeTask = null;
@@ -210,54 +247,44 @@ namespace WPFApp.ViewModel.Shop
             }
         }
 
-        // =========================================================
-        // List flows
-        // =========================================================
+        
+        
+        
 
         internal async Task SearchAsync(CancellationToken ct = default)
         {
-            // 1) Беремо search term.
+            
             var term = ListVm.SearchText;
 
-            // 2) Якщо пусто — беремо все, інакше — фільтр.
+            
             var list = string.IsNullOrWhiteSpace(term)
                 ? await _shopService.GetAllAsync(ct)
                 : await _shopService.GetByValueAsync(term, ct);
 
-            // 3) Віддаємо в ListVm.
+            
             ListVm.SetItems(list);
         }
 
-        internal async Task StartAddAsync(CancellationToken ct = default)
-        {
-            var uiToken = ResetNavUiCts(ct);
-
-            await ShowNavWorkingAsync();
-            await Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
-
-            try
-            {
-                await RunOnUiThreadAsync(() =>
+        internal Task StartAddAsync(CancellationToken ct = default)
+            => UiOperationRunner.RunNavStatusFlowAsync(
+                ct,
+                ResetNavUiCts,
+                ShowNavWorkingAsync,
+                WaitForUiIdleAsync,
+                async uiToken =>
                 {
-                    EditVm.ResetForNew();
-                    CancelTarget = ShopSection.List;
-                });
+                    await RunOnUiThreadAsync(() =>
+                    {
+                        EditVm.ResetForNew();
+                        CancelTarget = ShopSection.List;
+                    });
 
-                await SwitchToEditAsync();
-
-                await Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
-                await ShowNavSuccessThenAutoHideAsync(uiToken, 700);
-            }
-            catch (OperationCanceledException)
-            {
-                await HideNavStatusAsync();
-            }
-            catch (Exception ex)
-            {
-                await HideNavStatusAsync();
-                ShowError(ex);
-            }
-        }
+                    await SwitchToEditAsync();
+                },
+                ShowNavSuccessThenAutoHideAsync,
+                HideNavStatusAsync,
+                ShowError,
+                successDelayMs: 700);
 
         internal async Task EditSelectedAsync(CancellationToken ct = default)
         {
@@ -265,50 +292,42 @@ namespace WPFApp.ViewModel.Shop
             if (selected is null)
                 return;
 
-            var uiToken = ResetNavUiCts(ct);
-
-            await ShowNavWorkingAsync();
-            await Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
-
-            try
-            {
-                var latest = await _shopService.GetAsync(selected.Id, uiToken) ?? selected;
-
-                await RunOnUiThreadAsync(() =>
+            await UiOperationRunner.RunNavStatusFlowAsync(
+                ct,
+                ResetNavUiCts,
+                ShowNavWorkingAsync,
+                WaitForUiIdleAsync,
+                async uiToken =>
                 {
-                    EditVm.SetShop(latest);
+                    var latest = await _shopService.GetAsync(selected.Id, uiToken) ?? selected;
 
-                    CancelTarget = Mode == ShopSection.Profile
-                        ? ShopSection.Profile
-                        : ShopSection.List;
-                });
+                    await RunOnUiThreadAsync(() =>
+                    {
+                        EditVm.SetShop(latest);
 
-                await SwitchToEditAsync();
+                        CancelTarget = Mode == ShopSection.Profile
+                            ? ShopSection.Profile
+                            : ShopSection.List;
+                    });
 
-                await Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
-                await ShowNavSuccessThenAutoHideAsync(uiToken, 700);
-            }
-            catch (OperationCanceledException)
-            {
-                await HideNavStatusAsync();
-            }
-            catch (Exception ex)
-            {
-                await HideNavStatusAsync();
-                ShowError(ex);
-            }
+                    await SwitchToEditAsync();
+                },
+                ShowNavSuccessThenAutoHideAsync,
+                HideNavStatusAsync,
+                ShowError,
+                successDelayMs: 700);
         }
 
-        // =========================================================
-        // Save / Delete / Profile flows
-        // =========================================================
+        
+        
+        
 
         internal async Task SaveAsync(CancellationToken ct = default)
         {
             EditVm.ClearValidationErrors();
 
-            var model = EditVm.ToModel();
-            var errors = ShopValidationRules.ValidateAll(model);
+            var request = EditVm.ToRequest();
+            var errors = ShopValidationRules.ValidateAll(request);
 
             if (errors.Count > 0)
             {
@@ -316,79 +335,79 @@ namespace WPFApp.ViewModel.Shop
                 return;
             }
 
-            var uiToken = ResetNavUiCts(ct);
-
-            await ShowNavWorkingAsync();
-            await Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
-
-            try
-            {
-                if (EditVm.IsEdit)
+            await UiOperationRunner.RunNavStatusFlowAsync(
+                ct,
+                ResetNavUiCts,
+                ShowNavWorkingAsync,
+                WaitForUiIdleAsync,
+                async uiToken =>
                 {
-                    await _shopService.UpdateAsync(model, uiToken);
-                }
-                else
-                {
-                    var created = await _shopService.CreateAsync(model, uiToken);
-                    await RunOnUiThreadAsync(() => EditVm.ShopId = created.Id);
-                    model = created;
-                }
+                    ShopDto? createdShop = null;
 
-                _databaseChangeNotifier.NotifyDatabaseChanged("Shop.Save");
-
-                await LoadShopsAsync(uiToken, selectId: model.Id);
-
-                if (CancelTarget == ShopSection.Profile)
-                {
-                    var profileId = _openedProfileShopId ?? model.Id;
-
-                    if (profileId > 0)
+                    if (EditVm.IsEdit)
                     {
-                        var latest = await _shopService.GetAsync(profileId, uiToken) ?? model;
-
-                        await RunOnUiThreadAsync(() =>
-                        {
-                            ProfileVm.SetProfile(latest);
-                            ListVm.SelectedItem = latest;
-                        });
+                        await _shopService.UpdateAsync(request, uiToken);
+                    }
+                    else
+                    {
+                        createdShop = await _shopService.CreateAsync(request, uiToken);
+                        await RunOnUiThreadAsync(() => EditVm.ShopId = createdShop.Id);
                     }
 
-                    await SwitchToProfileAsync();
-                }
-                else
-                {
-                    await SwitchToListAsync();
-                }
+                    var savedShopId = createdShop?.Id ?? request.Id;
 
-                await Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
-                await ShowNavSuccessThenAutoHideAsync(uiToken, 900);
-            }
-            catch (OperationCanceledException)
-            {
-                await HideNavStatusAsync();
-            }
-            catch (Exception ex)
-            {
-                await HideNavStatusAsync();
-                ShowError(ex);
-            }
+                    _databaseChangeNotifier.NotifyDatabaseChanged("Shop.Save");
+
+                    await LoadShopsAsync(uiToken, selectId: savedShopId);
+
+                    if (CancelTarget == ShopSection.Profile)
+                    {
+                        var profileId = _openedProfileShopId ?? savedShopId;
+
+                        if (profileId > 0)
+                        {
+                            var latest = await _shopService.GetAsync(profileId, uiToken)
+                                         ?? createdShop
+                                         ?? ListVm.SelectedItem;
+
+                            if (latest != null)
+                            {
+                                await RunOnUiThreadAsync(() =>
+                                {
+                                    ProfileVm.SetProfile(latest);
+                                    ListVm.SelectedItem = latest;
+                                });
+                            }
+                        }
+
+                        await SwitchToProfileAsync();
+                    }
+                    else
+                    {
+                        await SwitchToListAsync();
+                    }
+                },
+                ShowNavSuccessThenAutoHideAsync,
+                HideNavStatusAsync,
+                ShowError,
+                successDelayMs: 900);
         }
 
         internal async Task DeleteSelectedAsync(CancellationToken ct = default)
         {
-            // 1) Визначаємо currentId (із профілю або зі списку).
+            
             var currentId = GetCurrentShopId();
             if (currentId <= 0)
                 return;
 
-            // 2) Для confirm беремо ім’я:
-            //    - якщо у Profile — там вже є Name
-            //    - якщо у List — беремо зі SelectedItem
+            
+            
+            
             var currentName = Mode == ShopSection.Profile
                 ? ProfileVm.Name
                 : ShopDisplayHelper.NameOrEmpty(ListVm.SelectedItem);
 
-            // 3) Confirm.
+            
             if (!Confirm(string.IsNullOrWhiteSpace(currentName)
                     ? "Delete shop?"
                     : $"Delete {currentName}?"))
@@ -396,31 +415,23 @@ namespace WPFApp.ViewModel.Shop
                 return;
             }
 
-            var uiToken = ResetNavUiCts(ct);
+            await UiOperationRunner.RunNavStatusFlowAsync(
+                ct,
+                ResetNavUiCts,
+                ShowNavWorkingAsync,
+                WaitForUiIdleAsync,
+                async uiToken =>
+                {
+                    await _shopService.DeleteAsync(currentId, uiToken);
 
-            await ShowNavWorkingAsync();
-            await Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
-
-            try
-            {
-                await _shopService.DeleteAsync(currentId, uiToken);
-
-                _databaseChangeNotifier.NotifyDatabaseChanged("Shop.Delete");
-                await LoadShopsAsync(uiToken, selectId: null);
-                await SwitchToListAsync();
-
-                await Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
-                await ShowNavSuccessThenAutoHideAsync(uiToken, 900);
-            }
-            catch (OperationCanceledException)
-            {
-                await HideNavStatusAsync();
-            }
-            catch (Exception ex)
-            {
-                await HideNavStatusAsync();
-                ShowError(ex);
-            }
+                    _databaseChangeNotifier.NotifyDatabaseChanged("Shop.Delete");
+                    await LoadShopsAsync(uiToken, selectId: null);
+                    await SwitchToListAsync();
+                },
+                ShowNavSuccessThenAutoHideAsync,
+                HideNavStatusAsync,
+                ShowError,
+                successDelayMs: 900);
         }
 
         internal async Task OpenProfileAsync(CancellationToken ct = default)
@@ -429,45 +440,37 @@ namespace WPFApp.ViewModel.Shop
             if (selected is null)
                 return;
 
-            var uiToken = ResetNavUiCts(ct);
-
-            await ShowNavWorkingAsync();
-            await Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
-
-            try
-            {
-                var latest = await _shopService.GetAsync(selected.Id, uiToken) ?? selected;
-
-                await RunOnUiThreadAsync(() =>
+            await UiOperationRunner.RunNavStatusFlowAsync(
+                ct,
+                ResetNavUiCts,
+                ShowNavWorkingAsync,
+                WaitForUiIdleAsync,
+                async uiToken =>
                 {
-                    _openedProfileShopId = latest.Id;
-                    ProfileVm.SetProfile(latest);
-                    ListVm.SelectedItem = latest;
-                    CancelTarget = ShopSection.List;
-                });
+                    var latest = await _shopService.GetAsync(selected.Id, uiToken) ?? selected;
 
-                await SwitchToProfileAsync();
+                    await RunOnUiThreadAsync(() =>
+                    {
+                        _openedProfileShopId = latest.Id;
+                        ProfileVm.SetProfile(latest);
+                        ListVm.SelectedItem = latest;
+                        CancelTarget = ShopSection.List;
+                    });
 
-                await Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
-                await ShowNavSuccessThenAutoHideAsync(uiToken, 900);
-            }
-            catch (OperationCanceledException)
-            {
-                await HideNavStatusAsync();
-            }
-            catch (Exception ex)
-            {
-                await HideNavStatusAsync();
-                ShowError(ex);
-            }
+                    await SwitchToProfileAsync();
+                },
+                ShowNavSuccessThenAutoHideAsync,
+                HideNavStatusAsync,
+                ShowError,
+                successDelayMs: 900);
         }
 
         internal Task CancelAsync()
         {
-            // 1) При Cancel чистимо помилки Edit.
+            
             EditVm.ClearValidationErrors();
 
-            // 2) Навігація залежить від Mode та CancelTarget.
+            
             return Mode switch
             {
                 ShopSection.Edit => CancelTarget == ShopSection.Profile
@@ -478,9 +481,9 @@ namespace WPFApp.ViewModel.Shop
             };
         }
 
-        // =========================================================
-        // Load + navigation helpers
-        // =========================================================
+        
+        
+        
 
         private async Task LoadShopsAsync(CancellationToken ct, int? selectId)
         {
@@ -518,11 +521,11 @@ namespace WPFApp.ViewModel.Shop
 
         private int GetCurrentShopId()
         {
-            // Якщо ми в профілі — беремо ShopId з ProfileVm.
+            
             if (Mode == ShopSection.Profile)
                 return ProfileVm.ShopId;
 
-            // Інакше — зі списку.
+            
             return ListVm.SelectedItem?.Id ?? 0;
         }
 
@@ -544,8 +547,7 @@ namespace WPFApp.ViewModel.Shop
             {
                 if (Mode == ShopSection.Edit)
                 {
-                    _logger.Log($"[DB-CHANGE] Shop reload skipped in edit mode. Source={source}.");
-                    return;
+                                        return;
                 }
 
                 var selectedId = Mode == ShopSection.Profile ? ProfileVm.ShopId : ListVm.SelectedItem?.Id;
@@ -568,17 +570,19 @@ namespace WPFApp.ViewModel.Shop
                     }
                 }).Task.Unwrap();
 
-                _logger.Log($"[DB-CHANGE] Shop module reloaded. Source={source}.");
-            }
+                            }
             catch (Exception ex)
             {
-                _logger.Log($"[DB-CHANGE] Shop reload failed: {ex.Message}");
-            }
+                            }
             finally
             {
                 Interlocked.Exchange(ref _databaseReloadInProgress, 0);
             }
         }
+
+
+        private Task WaitForUiIdleAsync()
+            => Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle).Task;
 
         internal Task RunOnUiThreadAsync(Action action)
         {
@@ -592,9 +596,9 @@ namespace WPFApp.ViewModel.Shop
             return d.InvokeAsync(action).Task;
         }
 
-        // =========================================================
-        // UI messaging (як у твоєму проєкті)
-        // =========================================================
+        
+        
+        
 
         internal void ShowInfo(string text)
             => CustomMessageBox.Show("Info", text, CustomMessageBoxIcon.Info, okText: "OK");

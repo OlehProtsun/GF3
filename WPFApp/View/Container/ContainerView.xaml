@@ -6,10 +6,14 @@
              xmlns:dialogs="clr-namespace:WPFApp.View.Dialogs"
              mc:Ignorable="d" 
              d:DesignHeight="450" d:DesignWidth="800">
+    <!-- Shell view for Container module:
+         shows current sub-view and a global status overlay during navigation -->
     <Grid>
         <ContentControl Content="{Binding CurrentSection}" />
+
+        <!-- Dim layer behind the status indicator -->
         <Border Panel.ZIndex="9998"
-        Background="#40000000"
+        Background="{StaticResource ContainerOverlayDimBrush}"
         Visibility="{Binding IsNavStatusVisible, Converter={StaticResource BoolToVis}}"
         IsHitTestVisible="True"/>
 

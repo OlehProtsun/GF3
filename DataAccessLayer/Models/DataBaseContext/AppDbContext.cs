@@ -16,6 +16,8 @@ namespace DataAccessLayer.Models.DataBaseContext
         public DbSet<EmployeeModel> Employees => Set<EmployeeModel>();
         public DbSet<ShopModel> Shops => Set<ShopModel>();
         public DbSet<ScheduleModel> Schedules => Set<ScheduleModel>();
+        public DbSet<SchedulePresetModel> SchedulePresets => Set<SchedulePresetModel>();
+        public DbSet<SchedulePresetEmployeeModel> SchedulePresetEmployees => Set<SchedulePresetEmployeeModel>();
         public DbSet<ScheduleEmployeeModel> ScheduleEmployees => Set<ScheduleEmployeeModel>();
         public DbSet<ScheduleSlotModel> ScheduleSlots => Set<ScheduleSlotModel>();
         public DbSet<ScheduleCellStyleModel> ScheduleCellStyles => Set<ScheduleCellStyleModel>();
@@ -99,6 +101,76 @@ namespace DataAccessLayer.Models.DataBaseContext
 
             });
 
+            // ----- SchedulePreset
+            modelBuilder.Entity<SchedulePresetModel>(e =>
+            {
+                e.HasOne<ContainerModel>()
+                 .WithMany()
+                 .HasForeignKey(x => x.ContainerId)
+                 .OnDelete(DeleteBehavior.Cascade);
+
+                e.HasOne<ShopModel>()
+                 .WithMany()
+                 .HasForeignKey(x => x.ShopId)
+                 .OnDelete(DeleteBehavior.Restrict);
+
+                e.HasOne<AvailabilityGroupModel>()
+                 .WithMany()
+                 .HasForeignKey(x => x.AvailabilityGroupId)
+                 .OnDelete(DeleteBehavior.SetNull);
+
+                e.HasIndex(x => new { x.ContainerId, x.Name })
+                 .IsUnique()
+                 .HasDatabaseName("ux_schedule_preset_container_name");
+
+                e.HasIndex(x => x.ContainerId)
+                 .HasDatabaseName("ix_schedule_preset_container");
+
+                e.HasIndex(x => x.ShopId)
+                 .HasDatabaseName("ix_schedule_preset_shop");
+
+                e.HasIndex(x => x.AvailabilityGroupId)
+                 .HasDatabaseName("ix_schedule_preset_avail_group");
+
+                e.ToTable(t =>
+                {
+                    t.HasCheckConstraint("ck_schedule_preset_month", "month BETWEEN 1 AND 12");
+                    t.HasCheckConstraint("ck_schedule_preset_people_per_shift", "people_per_shift >= 1");
+                    t.HasCheckConstraint("ck_schedule_preset_max_hours_per_emp_month", "max_hours_per_emp_month >= 1");
+                    t.HasCheckConstraint("ck_schedule_preset_max_consecutive_days", "max_consecutive_days >= 1");
+                    t.HasCheckConstraint("ck_schedule_preset_max_consecutive_full", "max_consecutive_full >= 1");
+                    t.HasCheckConstraint("ck_schedule_preset_max_full_per_month", "max_full_per_month >= 1");
+                    t.HasCheckConstraint("ck_schedule_preset_shift1_format", "shift1_time LIKE '__:__ - __:__'");
+                    t.HasCheckConstraint("ck_schedule_preset_shift2_format", "shift2_time LIKE '__:__ - __:__'");
+                });
+            });
+
+            // ----- SchedulePresetEmployee
+            modelBuilder.Entity<SchedulePresetEmployeeModel>(e =>
+            {
+                e.HasOne(x => x.SchedulePreset)
+                 .WithMany(x => x.Employees)
+                 .HasForeignKey(x => x.SchedulePresetId)
+                 .OnDelete(DeleteBehavior.Cascade);
+
+                e.HasOne<EmployeeModel>()
+                 .WithMany()
+                 .HasForeignKey(x => x.EmployeeId)
+                 .OnDelete(DeleteBehavior.Cascade);
+
+                e.HasIndex(x => new { x.SchedulePresetId, x.EmployeeId })
+                 .IsUnique()
+                 .HasDatabaseName("ux_schedule_preset_employee");
+
+                e.HasIndex(x => x.EmployeeId)
+                 .HasDatabaseName("ix_schedule_preset_employee_employee");
+
+                e.ToTable(t =>
+                {
+                    t.HasCheckConstraint("ck_schedule_preset_employee_min_hours", "min_hours_month >= 0");
+                });
+            });
+
             // ----- ScheduleEmployee
             modelBuilder.Entity<ScheduleEmployeeModel>(e =>
             {
@@ -111,6 +183,9 @@ namespace DataAccessLayer.Models.DataBaseContext
                  .WithMany(emp => emp.ScheduleEmployees)
                  .HasForeignKey(se => se.EmployeeId)
                  .OnDelete(DeleteBehavior.Cascade);
+
+                e.Property(se => se.DisplayOrder)
+                 .HasDefaultValue(0);
 
                 e.HasIndex(se => new { se.ScheduleId, se.EmployeeId }).IsUnique();
             });
@@ -233,6 +308,9 @@ namespace DataAccessLayer.Models.DataBaseContext
                  .WithMany() // або зробиш Employee.AvailabilityGroupMembers
                  .HasForeignKey(m => m.EmployeeId)
                  .OnDelete(DeleteBehavior.Cascade);
+
+                e.Property(m => m.DisplayOrder)
+                 .HasDefaultValue(0);
 
                 e.HasIndex(m => new { m.AvailabilityGroupId, m.EmployeeId })
                  .IsUnique()

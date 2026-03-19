@@ -1,4 +1,9 @@
-﻿using System;
+/*
+  Опис файлу: цей модуль містить реалізацію компонента EmployeeTotalHoursHeaderConverter у шарі WPFApp.
+  Призначення: інкапсулювати поведінку UI або прикладної логіки без зміни доменної моделі.
+  Примітка: коментарі описують спостережуваний потік даних, очікувані обмеження та точки взаємодії.
+*/
+using System;
 using System.Collections.Concurrent;
 using System.Globalization;
 using System.Reflection;
@@ -7,6 +12,9 @@ using System.Windows.Data;
 
 namespace WPFApp.Converters
 {
+    /// <summary>
+    /// Визначає публічний елемент `public sealed class EmployeeTotalHoursHeaderConverter : IMultiValueConverter` та контракт його використання у шарі WPFApp.
+    /// </summary>
     public sealed class EmployeeTotalHoursHeaderConverter : IMultiValueConverter
     {
         private static readonly ConcurrentDictionary<Type, MethodInfo?> MethodCache = new();
@@ -17,10 +25,13 @@ namespace WPFApp.Converters
         private static readonly Regex MinutesRegex =
             new(@"(\d+)\s*m", RegexOptions.Compiled | RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
 
+        /// <summary>
+        /// Визначає публічний елемент `public object Convert(object[] values, Type targetType, object parameter, CultureInfo culture)` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public object Convert(object[] values, Type targetType, object parameter, CultureInfo culture)
         {
-            // values[0] = VM (DataGrid.DataContext)
-            // values[1] = columnName (Column.SortMemberPath)
+            
+            
             if (values == null || values.Length < 2)
                 return string.Empty;
 
@@ -30,7 +41,7 @@ namespace WPFApp.Converters
             if (vm == null || string.IsNullOrWhiteSpace(columnName))
                 return string.Empty;
 
-            // Шукаємо метод: string GetEmployeeTotalHoursText(string columnName)
+            
             var method = MethodCache.GetOrAdd(vm.GetType(),
                 t => t.GetMethod("GetEmployeeTotalHoursText", BindingFlags.Instance | BindingFlags.Public,
                                  binder: null, types: new[] { typeof(string) }, modifiers: null));
@@ -51,7 +62,7 @@ namespace WPFApp.Converters
             if (string.IsNullOrWhiteSpace(raw))
                 return string.Empty;
 
-            // raw типово: "Total hours: 6h 30m"
+            
             int h = 0, m = 0;
 
             var hm = HoursRegex.Match(raw);
@@ -63,6 +74,9 @@ namespace WPFApp.Converters
             return $"Total Hours: h: {h} m: {m}";
         }
 
+        /// <summary>
+        /// Визначає публічний елемент `public object[] ConvertBack(object value, Type[] targetTypes, object parameter, CultureInfo culture)` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public object[] ConvertBack(object value, Type[] targetTypes, object parameter, CultureInfo culture)
             => throw new NotSupportedException();
     }

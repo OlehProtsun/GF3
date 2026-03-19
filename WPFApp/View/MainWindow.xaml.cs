@@ -1,4 +1,9 @@
-﻿using System.Text;
+/*
+  Опис файлу: цей модуль містить реалізацію компонента MainWindow у шарі WPFApp.
+  Призначення: інкапсулювати поведінку UI або прикладної логіки без зміни доменної моделі.
+  Примітка: коментарі описують спостережуваний потік даних, очікувані обмеження та точки взаємодії.
+*/
+using System.Text;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
@@ -12,10 +17,16 @@ using WPFApp.ViewModel.Main;
 
 namespace WPFApp.View
 {
+    /// <summary>
+    /// Визначає публічний елемент `public partial class MainWindow : Window` та контракт його використання у шарі WPFApp.
+    /// </summary>
     public partial class MainWindow : Window
     {
         private readonly MainViewModel _vm;
 
+        /// <summary>
+        /// Визначає публічний елемент `public MainWindow(MainViewModel vm)` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public MainWindow(MainViewModel vm)
         {
             InitializeComponent();
@@ -24,7 +35,7 @@ namespace WPFApp.View
 
             Loaded += (_, __) =>
             {
-                // Якщо ще нічого не відкрито — відкриваємо Home як стартову сторінку
+                
                 if (_vm.CurrentViewModel == null)
                     _vm.ShowHomeCommand.Execute(null);
             };
@@ -34,7 +45,7 @@ namespace WPFApp.View
 
         private void Root_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
-            // Дозволяє перетягувати borderless window (аналог user32 drag)
+            
             if (e.ButtonState == MouseButtonState.Pressed)
                 DragMove();
         }

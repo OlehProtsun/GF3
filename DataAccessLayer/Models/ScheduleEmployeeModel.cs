@@ -36,5 +36,10 @@ namespace DataAccessLayer.Models
 
         [Column("min_hours_month")]
         public int? MinHoursMonth { get; set; }
+
+
+        [Required]
+        [Column("display_order")]
+        public int DisplayOrder { get; set; }
     }
 }

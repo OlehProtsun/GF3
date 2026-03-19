@@ -1,27 +1,38 @@
-﻿using System.Threading.Tasks;
+/*
+  Опис файлу: цей модуль містить реалізацію компонента AvailabilityViewModel.Navigation у шарі WPFApp.
+  Призначення: інкапсулювати поведінку UI або прикладної логіки без зміни доменної моделі.
+  Примітка: коментарі описують спостережуваний потік даних, очікувані обмеження та точки взаємодії.
+*/
+using System.Threading.Tasks;
 
 namespace WPFApp.ViewModel.Availability.Main
 {
+    
+    
+    
+    
+    
+    
+    
     /// <summary>
-    /// Navigation — відповідає лише за:
-    /// - CurrentSection (що показує ContentControl)
-    /// - Mode (enum для простих switch-ів)
-    /// - CancelTarget (куди повернутися з Edit)
-    /// - SwitchTo* методи
+    /// Визначає публічний елемент `public sealed partial class AvailabilityViewModel` та контракт його використання у шарі WPFApp.
     /// </summary>
     public sealed partial class AvailabilityViewModel
     {
-        // backing field для CurrentSection (тип object, бо DataTemplate підбирається по типу VM).
+        
         private object _currentSection = null!;
 
-        // backing field для Mode.
+        
         private AvailabilitySection _mode = AvailabilitySection.List;
 
-        // Id групи, відкритої в Profile (щоб після Save можна було перезавантажити profile).
+        
         private int? _openedProfileGroupId;
 
+        
+        
+        
         /// <summary>
-        /// Поточний VM секції, який показує UI.
+        /// Визначає публічний елемент `public object CurrentSection` та контракт його використання у шарі WPFApp.
         /// </summary>
         public object CurrentSection
         {
@@ -29,8 +40,11 @@ namespace WPFApp.ViewModel.Availability.Main
             private set => SetProperty(ref _currentSection, value);
         }
 
+        
+        
+        
         /// <summary>
-        /// Поточний режим (List/Edit/Profile).
+        /// Визначає публічний елемент `public AvailabilitySection Mode` та контракт його використання у шарі WPFApp.
         /// </summary>
         public AvailabilitySection Mode
         {
@@ -38,14 +52,17 @@ namespace WPFApp.ViewModel.Availability.Main
             private set => SetProperty(ref _mode, value);
         }
 
+        
+        
+        
         /// <summary>
-        /// Куди повернутися при Cancel з Edit.
+        /// Визначає публічний елемент `public AvailabilitySection CancelTarget { get; private set; } = AvailabilitySection.List;` та контракт його використання у шарі WPFApp.
         /// </summary>
         public AvailabilitySection CancelTarget { get; private set; } = AvailabilitySection.List;
 
-        /// <summary>
-        /// Перемкнутися на список.
-        /// </summary>
+        
+        
+        
         private Task SwitchToListAsync()
         {
             CurrentSection = ListVm;
@@ -53,9 +70,9 @@ namespace WPFApp.ViewModel.Availability.Main
             return Task.CompletedTask;
         }
 
-        /// <summary>
-        /// Перемкнутися на форму редагування.
-        /// </summary>
+        
+        
+        
         private Task SwitchToEditAsync()
         {
             CurrentSection = EditVm;
@@ -63,9 +80,9 @@ namespace WPFApp.ViewModel.Availability.Main
             return Task.CompletedTask;
         }
 
-        /// <summary>
-        /// Перемкнутися на профіль.
-        /// </summary>
+        
+        
+        
         private Task SwitchToProfileAsync()
         {
             CurrentSection = ProfileVm;

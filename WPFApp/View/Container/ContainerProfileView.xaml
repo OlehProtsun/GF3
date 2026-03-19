@@ -103,53 +103,6 @@
             </Style.Triggers>
         </Style>
 
-        <Style x:Key="ContainerStatsGridStyle"
-               TargetType="DataGrid"
-               BasedOn="{StaticResource AvailabilityBaseGridStyle}">
-            <Setter Property="HeadersVisibility" Value="Column" />
-            <Setter Property="RowHeaderWidth" Value="0" />
-            <Setter Property="SelectionUnit" Value="FullRow" />
-            <Setter Property="SelectionMode" Value="Single" />
-            <Setter Property="CanUserAddRows" Value="False" />
-            <Setter Property="CanUserDeleteRows" Value="False" />
-            <Setter Property="CanUserResizeRows" Value="False" />
-            <Setter Property="GridLinesVisibility" Value="All" />
-            <Setter Property="HorizontalGridLinesBrush" Value="Gainsboro" />
-            <Setter Property="VerticalGridLinesBrush" Value="Gainsboro" />
-            <Setter Property="Background" Value="{StaticResource SurfaceBrush}" />
-            <Setter Property="BorderThickness" Value="0" />
-            <Setter Property="RowHeight" Value="35" />
-            <Setter Property="ColumnHeaderHeight" Value="45" />
-            <Setter Property="FontSize" Value="16" />
-            <Setter Property="FontFamily" Value="{StaticResource DefaultFontFamily}" />
-            <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Auto" />
-            <Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Auto" />
-            <Setter Property="CellStyle">
-                <Setter.Value>
-                    <Style TargetType="DataGridCell">
-                        <Setter Property="BorderThickness" Value="0" />
-                        <Setter Property="Padding" Value="10,0" />
-                        <Setter Property="HorizontalContentAlignment" Value="Center" />
-                        <Setter Property="VerticalContentAlignment" Value="Center" />
-                    </Style>
-                </Setter.Value>
-            </Setter>
-            <Setter Property="ColumnHeaderStyle">
-                <Setter.Value>
-                    <Style TargetType="DataGridColumnHeader">
-                        <Setter Property="Background" Value="{StaticResource SurfaceBrush}" />
-                        <Setter Property="Foreground" Value="Black" />
-                        <Setter Property="BorderThickness" Value="0" />
-                        <Setter Property="HorizontalContentAlignment" Value="Center" />
-                        <Setter Property="VerticalContentAlignment" Value="Center" />
-                        <Setter Property="FontFamily" Value="{StaticResource DefaultFontFamily}" />
-                        <Setter Property="FontSize" Value="14" />
-                        <Setter Property="Padding" Value="6,0" />
-                    </Style>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
     </UserControl.Resources>
 
     <Grid ClipToBounds="False">
@@ -188,19 +141,16 @@
                         </StackPanel>
                     </Button>
 
+                    <!-- Page title -->
                     <TextBlock Grid.Row="1"
                                Margin="0,10,0,0"
                                Text="Container Profile"
-                               FontFamily="{StaticResource DefaultFontFamily}"
-                               FontSize="{StaticResource FontSizePageTitle}"
-                               Foreground="Black" />
+                               Style="{StaticResource ContainerPageTitleTextStyle}" />
 
                     <TextBlock Grid.Row="2"
                                Margin="0,6,0,0"
                                Text="Here you can see container profile details"
-                               FontFamily="{StaticResource DefaultFontFamily}"
-                               FontSize="17"
-                               Foreground="{StaticResource SecondaryTextBrush}" />
+                               Style="{StaticResource ContainerPageSubtitleTextStyle}" />
                 </Grid>
 
                 <StackPanel Grid.Column="1"
@@ -735,7 +685,7 @@
         <!-- Export overlay (dims background) -->
         <Border Grid.RowSpan="2"
         Panel.ZIndex="9998"
-        Background="#40000000"
+        Background="{StaticResource ContainerOverlayDimBrush}"
         Visibility="{Binding IsExportStatusVisible, Converter={StaticResource BoolToVis}}"
         IsHitTestVisible="True"/>
 

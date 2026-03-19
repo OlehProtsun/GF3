@@ -1,0 +1,191 @@
+.card {
+  width: min(100%, 960px);
+  max-width: 960px;
+  margin-inline: auto;
+  align-self: center;
+  padding-bottom: 18px;
+}
+
+.headerBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 32px;
+  padding: 0.35rem 0.75rem;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 800;
+  color: #1d4ed8;
+  background: rgba(37, 99, 235, 0.1);
+  border: 1px solid rgba(37, 99, 235, 0.18);
+}
+
+.layout {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.stateText {
+  margin: 0;
+  color: #6b7280;
+  font-weight: 600;
+}
+
+.emptyState {
+  display: grid;
+  gap: 8px;
+  padding: 8px 4px 6px;
+}
+
+.emptyState h3 {
+  margin: 0;
+  font-size: 1.2rem;
+  color: #111827;
+}
+
+.emptyState p {
+  margin: 0;
+  color: rgba(17, 24, 39, 0.66);
+  line-height: 1.5;
+}
+
+.hero {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  align-items: flex-start;
+}
+
+.heroText {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.name {
+  margin: 0;
+  font-size: clamp(1.5rem, 2vw, 2rem);
+  line-height: 1.08;
+  color: #111827;
+}
+
+.subtitle {
+  margin: 0;
+  color: #6b7280;
+  font-size: 0.98rem;
+}
+
+.periodPill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 34px;
+  padding: 0.35rem 0.8rem;
+  border-radius: 999px;
+  border: 1px solid rgba(113, 113, 122, 0.16);
+  background: rgba(244, 244, 245, 0.9);
+  color: rgba(17, 24, 39, 0.74);
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.detailList {
+  gap: 10px;
+}
+
+.detailItem {
+  min-height: 0;
+  gap: 6px;
+  padding: 10px 12px;
+  border-radius: 18px;
+  border-color: rgba(113, 113, 122, 0.12);
+  background:
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.42), rgba(255, 255, 255, 0)),
+    rgba(244, 244, 245, 0.82);
+  box-shadow: none;
+}
+
+.detailValue {
+  font-size: 0.95rem;
+  line-height: 1.3;
+}
+
+.membersBlock {
+  display: grid;
+  gap: 10px;
+}
+
+.membersHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  color: #111827;
+  font-size: 0.85rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.memberList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.memberChip {
+  display: inline-flex;
+  align-items: center;
+  padding: 8px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(113, 113, 122, 0.12);
+  background: rgba(244, 244, 245, 0.86);
+  color: rgba(17, 24, 39, 0.74);
+  font-size: 0.88rem;
+  font-weight: 700;
+}
+
+.memberEmpty {
+  margin: 0;
+  color: rgba(17, 24, 39, 0.66);
+  line-height: 1.5;
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+@media (max-width: 900px) {
+  .detailList {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 680px) {
+  .card {
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .hero {
+    flex-direction: column;
+  }
+
+  .detailList {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .actions {
+    justify-content: stretch;
+  }
+
+  .actions :global(button) {
+    width: 100%;
+    justify-content: center;
+  }
+}

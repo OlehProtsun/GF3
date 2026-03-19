@@ -1,0 +1,46 @@
+﻿.card {
+  padding: 0;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  overflow: visible;
+}
+
+.errorBanner {
+  margin: 0.25rem 0;
+}
+
+.state {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  min-height: 240px;
+  padding: 22px 14px;
+  text-align: center;
+  align-content: center;
+  border-radius: 28px;
+  border: 1px dashed rgba(113, 113, 122, 0.14);
+  background: rgba(255, 255, 255, 0.32);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.34) inset;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.stateTitle {
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: #111827;
+}
+
+.stateDescription {
+  max-width: 540px;
+  color: #6b7280;
+  line-height: 1.55;
+}
+
+.stateActions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+}

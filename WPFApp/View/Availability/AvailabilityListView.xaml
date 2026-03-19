@@ -3,14 +3,16 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-             xmlns:dt="clr-namespace:WPFApp.View.Availability.DesignTime"
              mc:Ignorable="d"
-             d:DesignHeight="830" d:DesignWidth="852"
+             d:DesignHeight="830"
+             d:DesignWidth="852"
              Background="{StaticResource PageBackgroundBrush}">
 
-    <UserControl.Resources>
-    </UserControl.Resources>
-
+    <!--
+        Availability list page:
+        - верхня картка: title + subtitle + search + add
+        - нижня картка: список availability (DataGrid у card-режимі)
+    -->
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
@@ -18,7 +20,9 @@
         </Grid.RowDefinitions>
 
         <!-- Top card -->
-        <Border Grid.Row="0" Style="{StaticResource TopCardStyle}" Margin="9,8,9,0">
+        <Border Grid.Row="0"
+                Style="{StaticResource TopCardStyle}"
+                Margin="9,8,9,0">
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
@@ -26,21 +30,20 @@
                     <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
 
+                <!-- Page title -->
                 <TextBlock Grid.Row="0"
                            Text="Availability List"
-                           FontFamily="{StaticResource DefaultFontFamily}"
-                           FontSize="{StaticResource FontSizePageTitle}"
-                           Foreground="Black" />
+                           Style="{StaticResource AvailabilityPageTitleTextStyle}" />
 
+                <!-- Page subtitle -->
                 <TextBlock Grid.Row="1"
                            Margin="0,6,0,10"
                            Text="Here you will see a list of all existing availability"
-                           FontFamily="{StaticResource DefaultFontFamily}"
-                           FontSize="17"
-                           Foreground="{StaticResource SecondaryTextBrush}" />
+                           Style="{StaticResource AvailabilityPageSubtitleTextStyle}" />
 
                 <!-- Search row -->
-                <Grid Grid.Row="2" Height="37">
+                <Grid Grid.Row="2"
+                      Height="37">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="37" />
                         <ColumnDefinition Width="8" />
@@ -49,22 +52,19 @@
                         <ColumnDefinition Width="100" />
                     </Grid.ColumnDefinitions>
 
+                    <!-- Search command button -->
                     <Button Grid.Column="0"
                             Style="{StaticResource IconButtonStyle}"
                             ToolTip="Search"
                             Command="{Binding SearchCommand}">
-                        <Viewbox Width="15" Height="15">
+                        <Viewbox Width="15"
+                                Height="15">
                             <Path Data="{StaticResource SearchIcon}"
-                                  Fill="Black"
-                                  Stretch="Uniform"
-                                  RenderTransformOrigin="0.5,0.5">
-                                <Path.RenderTransform>
-                                    <ScaleTransform ScaleX="1" ScaleY="-1" />
-                                </Path.RenderTransform>
-                            </Path>
+                                  Style="{StaticResource AvailabilityHeaderIconPathFlippedStyle}" />
                         </Viewbox>
                     </Button>
 
+                    <!-- Search text -->
                     <TextBox Grid.Column="2"
                              Style="{StaticResource CompactRoundedTextBoxWithPlaceholderStyle}"
                              Tag="Enter search value"
@@ -74,12 +74,14 @@
                         </TextBox.InputBindings>
                     </TextBox>
 
+                    <!-- Add new -->
                     <Button Grid.Column="4"
                             Style="{StaticResource RoundedButtonStyle}"
                             Height="37"
                             Padding="10,0"
                             Command="{Binding AddNewCommand}">
-                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <StackPanel Orientation="Horizontal"
+                                    VerticalAlignment="Center">
                             <TextBlock Text="＋" FontSize="14" Margin="0,0,6,0" />
                             <TextBlock Text="Add New" FontSize="12" />
                         </StackPanel>
@@ -88,7 +90,7 @@
             </Grid>
         </Border>
 
-        <!-- Availability card (header + grid like in EditView) -->
+        <!-- Availability list card -->
         <Border Grid.Row="1"
                 Margin="7,21,7,7"
                 Background="{StaticResource SurfaceBrush}"
@@ -105,8 +107,9 @@
                     <RowDefinition Height="*" />
                 </Grid.RowDefinitions>
 
-                <!-- HEADER -->
-                <Grid Grid.Row="0" Margin="0,0,0,12">
+                <!-- Card header -->
+                <Grid Grid.Row="0"
+                      Margin="0,0,0,12">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />
@@ -115,44 +118,24 @@
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                         <Viewbox Width="20" Height="20" Margin="0,0,8,0">
                             <Path Data="{StaticResource IconAvailability}"
-                                  Fill="Black"
-                                  Stretch="Uniform"
-                                  RenderTransformOrigin="0.5,0.5">
-                                <Path.RenderTransform>
-                                    <ScaleTransform ScaleX="1" ScaleY="-1" />
-                                </Path.RenderTransform>
-                            </Path>
+                                  Style="{StaticResource AvailabilityHeaderIconPathFlippedStyle}" />
                         </Viewbox>
 
                         <TextBlock Text="Availability"
-                                   FontFamily="{StaticResource DefaultFontFamily}"
-                                   FontSize="{StaticResource FontSizeTitle}"
-                                   FontWeight="Bold"
-                                   Foreground="Black"
-                                   VerticalAlignment="Center" />
+                                   Style="{StaticResource AvailabilitySectionHeaderTextStyle}" />
                     </StackPanel>
 
+                    <!-- Total items badge -->
                     <Border Grid.Column="1"
-                            Background="{StaticResource BadgeBackgroundBrush}"
-                            CornerRadius="{StaticResource Cr10}"
-                            Padding="10,4"
-                            VerticalAlignment="Center">
-                        <TextBlock FontFamily="{StaticResource DefaultFontFamily}"
-                                   FontSize="12"
-                                   Foreground="{StaticResource MutedTextBrush}"
+                            Style="{StaticResource AvailabilityBadgeBorderStyle}">
+                        <TextBlock Style="{StaticResource AvailabilityBadgeTextStyle}"
                                    Text="{Binding Items.Count, StringFormat=Total: {0}}" />
                     </Border>
                 </Grid>
 
-                <!-- GRID CONTAINER -->
+                <!-- Grid container -->
                 <Border Grid.Row="1"
-                        Background="{StaticResource SurfaceBrush}"
-                        BorderBrush="{StaticResource CardBorderBrush}"
-                        BorderThickness="2"
-                        CornerRadius="{StaticResource Cr20}"
-                        Padding="6"
-                        ClipToBounds="True">
-
+                        Style="{StaticResource AvailabilityGridContainerBorderStyle}">
                     <DataGrid x:Name="dataGridAvailabilityList"
                               Style="{StaticResource AvailabilityListCardGridStyle}"
                               Background="Transparent"
@@ -165,7 +148,6 @@
                                                 Width="*" />
                         </DataGrid.Columns>
                     </DataGrid>
-
                 </Border>
             </Grid>
         </Border>

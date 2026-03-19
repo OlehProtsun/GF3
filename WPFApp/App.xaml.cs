@@ -1,5 +1,10 @@
-﻿using BusinessLogicLayer;
-using DataAccessLayer.Models.DataBaseContext;
+/*
+  Опис файлу: цей модуль містить реалізацію компонента App у шарі WPFApp.
+  Призначення: інкапсулювати поведінку UI або прикладної логіки без зміни доменної моделі.
+  Примітка: коментарі описують спостережуваний потік даних, очікувані обмеження та точки взаємодії.
+*/
+using BusinessLogicLayer;
+using BusinessLogicLayer.Services.Abstractions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using System;
@@ -19,13 +24,24 @@ using WPFApp.ViewModel.Shop;
 using WPFApp.ViewModel.Database;
 using WPFApp.ViewModel.Home;
 using WPFApp.ViewModel.Information;
+using WPFApp.UI.Dialogs;
+using WPFApp.Applications.Configuration;
+using WPFApp.Applications.Notifications;
+using WPFApp.Applications.Export;
+
 
 namespace WPFApp
 {
+    /// <summary>
+    /// Визначає публічний елемент `public partial class App : Application` та контракт його використання у шарі WPFApp.
+    /// </summary>
     public partial class App : Application
     {
         private IHost? _host;
 
+        /// <summary>
+        /// Визначає публічний елемент `public App()` та контракт його використання у шарі WPFApp.
+        /// </summary>
         public App()
         {
             _host = Host.CreateDefaultBuilder()
@@ -38,18 +54,16 @@ namespace WPFApp
 
         private static void ConfigureServices(IServiceCollection services)
         {
-            // 1) DAL/BLL як у WinForms
-            var dbPathProvider = new WPFApp.Service.DatabasePathProvider();
-            services.AddSingleton<WPFApp.Service.IDatabasePathProvider>(dbPathProvider);
-            services.AddDataAccess(dbPathProvider.ConnectionString);
+            
+            var dbPathProvider = new DatabasePathProvider();
+            services.AddSingleton<IDatabasePathProvider>(dbPathProvider);
+            services.AddBusinessLogicStack(dbPathProvider.ConnectionString, dbPathProvider.DatabaseFilePath);
 
-            services.AddBusinessLogicLayer();
-
-            // Те, що ти реєстрував вручну
+            
             services.AddSingleton<BusinessLogicLayer.Generators.IScheduleGenerator,
                                   BusinessLogicLayer.Generators.ScheduleGenerator>();
 
-            // 2) Реєстрація ViewModels
+            
             services.AddSingleton<MainViewModel>();
             services.AddTransient<HomeViewModel>();
             services.AddTransient<EmployeeViewModel>();
@@ -59,16 +73,14 @@ namespace WPFApp
             services.AddTransient<InformationViewModel>();
             services.AddTransient<DatabaseViewModel>();
 
-            // 3) Реєстрація Views (Windows/UserControls)
+            
             services.AddSingleton<MainWindow>();
 
-            services.AddSingleton<WPFApp.Service.IColorPickerService, WPFApp.Service.ColorPickerService>();
-            services.AddSingleton<WPFApp.Service.ISqliteAdminService, WPFApp.Service.SqliteAdminService>();
-            services.AddSingleton<WPFApp.Service.ILoggerService>(_ => WPFApp.Service.LoggerService.Instance);
-            services.AddSingleton<WPFApp.Service.IScheduleExportService, WPFApp.Service.ScheduleExportService>();
-            services.AddSingleton<WPFApp.Service.IDatabaseChangeNotifier, WPFApp.Service.DatabaseChangeNotifier>();
+            services.AddSingleton<IColorPickerService, ColorPickerService>();
+            services.AddSingleton<IScheduleExportService, ScheduleExportService>();
+            services.AddSingleton<IDatabaseChangeNotifier, DatabaseChangeNotifier>();
 
-            // Якщо робиш навігацію через UserControl-и:
+            
             services.AddTransient<HomeView>();
             services.AddTransient<EmployeeView>();
             services.AddTransient<AvailabilityView>();
@@ -77,8 +89,8 @@ namespace WPFApp
             services.AddTransient<InformationView>();
             services.AddTransient<DatabaseView>();
 
-            // 4) Навігація / фабрики (заміна твого MdiViewFactory)
-            //services.AddSingleton<Service.NavigationService>();
+            
+            
         }
 
         protected override void OnStartup(StartupEventArgs e)
@@ -89,7 +101,7 @@ namespace WPFApp
             {
                 _host!.StartAsync().GetAwaiter().GetResult();
 
-                // Відкриваємо головне вікно через DI
+                
                 var mainWindow = _host.Services.GetRequiredService<View.MainWindow>();
                 mainWindow.Show();
             }
