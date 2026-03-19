@@ -13,6 +13,7 @@
 
 .input,
 .textArea {
+  box-sizing: border-box;
   border-radius: 16px;
   border: 1px solid #e5e5ea;
   background: #f4f4f4;

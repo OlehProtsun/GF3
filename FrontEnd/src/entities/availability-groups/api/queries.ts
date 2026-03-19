@@ -68,6 +68,7 @@ async function syncAvailabilityGroupGraph({
   }
 
   const selectedEmployeeIds = [...new Set(employeeIds)];
+  const displayOrderByEmployeeId = new Map(selectedEmployeeIds.map((employeeId, index) => [employeeId, index]));
   const selectedEmployeeIdSet = new Set(selectedEmployeeIds);
   const removedMembers = existingMembers.filter(member => !selectedEmployeeIdSet.has(member.employeeId));
   const removedMemberIdSet = new Set(removedMembers.map(member => member.id));
@@ -82,7 +83,10 @@ async function syncAvailabilityGroupGraph({
   if (membersToCreate.length > 0) {
     const createdMembers = await Promise.all(
       membersToCreate.map(employeeId =>
-        availabilityGroupsApi.createMember(groupId as number, { employeeId } satisfies SaveAvailabilityGroupMemberDto)
+        availabilityGroupsApi.createMember(groupId as number, {
+          employeeId,
+          displayOrder: displayOrderByEmployeeId.get(employeeId) ?? 0,
+        } satisfies SaveAvailabilityGroupMemberDto)
       )
     );
 
@@ -90,6 +94,22 @@ async function syncAvailabilityGroupGraph({
       memberByEmployeeId.set(member.employeeId, member);
     });
   }
+
+  const membersToUpdate = selectedEmployeeIds.flatMap(employeeId => {
+    const member = memberByEmployeeId.get(employeeId);
+    const displayOrder = displayOrderByEmployeeId.get(employeeId);
+
+    if (!member || displayOrder === undefined || member.displayOrder === displayOrder) {
+      return [];
+    }
+
+    return [
+      availabilityGroupsApi.updateMember(groupId as number, member.id, {
+        employeeId,
+        displayOrder,
+      } satisfies SaveAvailabilityGroupMemberDto),
+    ];
+  });
 
   const daysInMonth = new Date(payload.year, payload.month, 0).getDate();
   const desiredSlots = selectedEmployeeIds.flatMap(employeeId => {
@@ -129,6 +149,10 @@ async function syncAvailabilityGroupGraph({
 
   if (removedMembers.length > 0) {
     await Promise.all(removedMembers.map(member => availabilityGroupsApi.removeMember(groupId as number, member.id)));
+  }
+
+  if (membersToUpdate.length > 0) {
+    await Promise.all(membersToUpdate);
   }
 
   const slotCreates: Promise<unknown>[] = [];
@@ -220,7 +244,10 @@ export function useCreateAvailabilityGroupMemberMutation() {
   return useMutation({
     mutationFn: ({ groupId, payload }: { groupId: number; payload: SaveAvailabilityGroupMemberDto }) =>
       availabilityGroupsApi.createMember(groupId, payload),
-    onSuccess: (_, variables) => qc.invalidateQueries({ queryKey: queryKeys.availabilityGroups.members(variables.groupId) }),
+    onSuccess: (_, variables) => {
+      qc.invalidateQueries({ queryKey: queryKeys.availabilityGroups.members(variables.groupId) });
+      qc.invalidateQueries({ queryKey: queryKeys.availabilityGroups.items(variables.groupId) });
+    },
   });
 }
 
@@ -229,7 +256,10 @@ export function useUpdateAvailabilityGroupMemberMutation() {
   return useMutation({
     mutationFn: ({ groupId, memberId, payload }: { groupId: number; memberId: number; payload: SaveAvailabilityGroupMemberDto }) =>
       availabilityGroupsApi.updateMember(groupId, memberId, payload),
-    onSuccess: (_, variables) => qc.invalidateQueries({ queryKey: queryKeys.availabilityGroups.members(variables.groupId) }),
+    onSuccess: (_, variables) => {
+      qc.invalidateQueries({ queryKey: queryKeys.availabilityGroups.members(variables.groupId) });
+      qc.invalidateQueries({ queryKey: queryKeys.availabilityGroups.items(variables.groupId) });
+    },
   });
 }
 
@@ -238,7 +268,10 @@ export function useDeleteAvailabilityGroupMemberMutation() {
   return useMutation({
     mutationFn: ({ groupId, memberId }: { groupId: number; memberId: number }) =>
       availabilityGroupsApi.removeMember(groupId, memberId),
-    onSuccess: (_, variables) => qc.invalidateQueries({ queryKey: queryKeys.availabilityGroups.members(variables.groupId) }),
+    onSuccess: (_, variables) => {
+      qc.invalidateQueries({ queryKey: queryKeys.availabilityGroups.members(variables.groupId) });
+      qc.invalidateQueries({ queryKey: queryKeys.availabilityGroups.items(variables.groupId) });
+    },
   });
 }
 
@@ -254,7 +287,10 @@ export function useCreateAvailabilitySlotMutation() {
   return useMutation({
     mutationFn: ({ groupId, payload }: { groupId: number; payload: SaveAvailabilitySlotDto }) =>
       availabilityGroupsApi.createSlot(groupId, payload),
-    onSuccess: (_, variables) => qc.invalidateQueries({ queryKey: queryKeys.availabilityGroups.slots(variables.groupId) }),
+    onSuccess: (_, variables) => {
+      qc.invalidateQueries({ queryKey: queryKeys.availabilityGroups.slots(variables.groupId) });
+      qc.invalidateQueries({ queryKey: queryKeys.availabilityGroups.items(variables.groupId) });
+    },
   });
 }
 
@@ -263,7 +299,10 @@ export function useUpdateAvailabilitySlotMutation() {
   return useMutation({
     mutationFn: ({ groupId, slotId, payload }: { groupId: number; slotId: number; payload: SaveAvailabilitySlotDto }) =>
       availabilityGroupsApi.updateSlot(groupId, slotId, payload),
-    onSuccess: (_, variables) => qc.invalidateQueries({ queryKey: queryKeys.availabilityGroups.slots(variables.groupId) }),
+    onSuccess: (_, variables) => {
+      qc.invalidateQueries({ queryKey: queryKeys.availabilityGroups.slots(variables.groupId) });
+      qc.invalidateQueries({ queryKey: queryKeys.availabilityGroups.items(variables.groupId) });
+    },
   });
 }
 
@@ -272,7 +311,10 @@ export function useDeleteAvailabilitySlotMutation() {
   return useMutation({
     mutationFn: ({ groupId, slotId }: { groupId: number; slotId: number }) =>
       availabilityGroupsApi.removeSlot(groupId, slotId),
-    onSuccess: (_, variables) => qc.invalidateQueries({ queryKey: queryKeys.availabilityGroups.slots(variables.groupId) }),
+    onSuccess: (_, variables) => {
+      qc.invalidateQueries({ queryKey: queryKeys.availabilityGroups.slots(variables.groupId) });
+      qc.invalidateQueries({ queryKey: queryKeys.availabilityGroups.items(variables.groupId) });
+    },
   });
 }
 

@@ -47,7 +47,14 @@ function NavItem({
 export function OverlaySidebarLayout({ children }: OverlaySidebarLayoutProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const { pathname } = useLocation();
+  const isContainerWideContent = pathname === "/container";
+  const isContainerGraphWideContent =
+    Boolean(matchPath(pathname, "/container/:containerId/graphs/new")) ||
+    Boolean(matchPath(pathname, "/container/:containerId/graphs/:graphId/edit")) ||
+    Boolean(matchPath(pathname, "/container/:containerId/graphs/:graphId"));
   const isWideContent =
+    isContainerWideContent ||
+    isContainerGraphWideContent ||
     pathname === "/availability/new" ||
     Boolean(matchPath(pathname, "/availability/:availabilityId/edit")) ||
     Boolean(matchPath(pathname, "/availability/:availabilityId"));
@@ -55,6 +62,7 @@ export function OverlaySidebarLayout({ children }: OverlaySidebarLayoutProps) {
     styles.content,
     isCollapsed ? styles.contentExpanded : styles.contentShifted,
     isWideContent ? styles.contentWide : "",
+    isContainerWideContent ? styles.contentWideScrollable : "",
   ].filter(Boolean).join(" ");
 
   return (
@@ -130,3 +138,5 @@ export function OverlaySidebarLayout({ children }: OverlaySidebarLayoutProps) {
     </div>
   );
 }
+
+

@@ -5,6 +5,7 @@ using WebApi.Contracts.Containers.Graphs;
 using WebApi.Contracts.Containers.Graphs.CellStyles;
 using WebApi.Contracts.Containers.Graphs.Employees;
 using WebApi.Contracts.Containers.Graphs.Slots;
+using WebApi.Contracts.Containers.SchedulePresets;
 using WebApi.Mappers;
 
 namespace WebApi.Controllers;
@@ -45,6 +46,28 @@ public class ContainersController(IContainerService containerService) : Controll
     {
         var graphs = await containerService.GetGraphsAsync(containerId, cancellationToken).ConfigureAwait(false);
         return Ok(graphs.Select(x => x.ToGraphDto()));
+    }
+
+    [HttpGet("{containerId:int}/schedule-presets")]
+    [ProducesResponseType(typeof(IEnumerable<SchedulePresetDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
+    public async Task<ActionResult<IEnumerable<SchedulePresetDto>>> GetSchedulePresets(int containerId, CancellationToken cancellationToken)
+    {
+        var presets = await containerService.GetSchedulePresetsAsync(containerId, cancellationToken).ConfigureAwait(false);
+        return Ok(presets.Select(x => x.ToSchedulePresetDto()));
+    }
+
+    [HttpPost("{containerId:int}/schedule-presets")]
+    [ProducesResponseType(typeof(SchedulePresetDto), StatusCodes.Status201Created)]
+    [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
+    public async Task<ActionResult<SchedulePresetDto>> CreateSchedulePreset(int containerId, [FromBody] CreateSchedulePresetRequest request, CancellationToken cancellationToken)
+    {
+        var created = await containerService.CreateSchedulePresetAsync(containerId, request.ToCreateModel(containerId), cancellationToken).ConfigureAwait(false);
+        var dto = created.ToSchedulePresetDto();
+        return CreatedAtAction(nameof(GetSchedulePresets), new { containerId }, dto);
     }
 
     [HttpGet("{containerId:int}/graphs/{graphId:int}")]

@@ -3,18 +3,61 @@ import type { AnchorHTMLAttributes, PropsWithChildren, ReactNode } from "react";
 
 type NavigateTo = string | number;
 
-type RouterContextValue = {
+type RouterLocation = {
   pathname: string;
+  search: string;
+  hash: string;
+};
+
+type RouterContextValue = {
+  location: RouterLocation;
   navigate: (to: NavigateTo) => void;
 };
 
 const RouterContext = createContext<RouterContextValue | null>(null);
 
+const PARAM_ROUTE_PATTERNS = [
+  "/availability/new",
+  "/availability/:availabilityId/edit",
+  "/availability/:availabilityId",
+  "/container/:containerId/graphs/new",
+  "/container/:containerId/graphs/:graphId/edit",
+  "/container/:containerId/graphs/:graphId",
+  "/employee/new",
+  "/employee/:employeeId/edit",
+  "/employee/:employeeId",
+  "/shop/new",
+  "/shop/:shopId/edit",
+  "/shop/:shopId",
+] as const;
+
+function readLocation(): RouterLocation {
+  return {
+    pathname: window.location.pathname,
+    search: window.location.search,
+    hash: window.location.hash,
+  };
+}
+
+function resolveLocation(to: string): RouterLocation {
+  const url = new URL(to, window.location.href);
+
+  return {
+    pathname: url.pathname,
+    search: url.search,
+    hash: url.hash,
+  };
+}
+
+function toLocationHref(location: RouterLocation) {
+  return `${location.pathname}${location.search}${location.hash}`;
+}
+
 export function BrowserRouter({ children }: PropsWithChildren) {
-  const [pathname, setPathname] = useState(window.location.pathname);
+  const [location, setLocation] = useState<RouterLocation>(() => readLocation());
 
   useEffect(() => {
-    const onPopState = () => setPathname(window.location.pathname);
+    const onPopState = () => setLocation(readLocation());
     window.addEventListener("popstate", onPopState);
     return () => window.removeEventListener("popstate", onPopState);
   }, []);
@@ -25,13 +68,18 @@ export function BrowserRouter({ children }: PropsWithChildren) {
       return;
     }
 
-    if (to === window.location.pathname) return;
+    const nextLocation = resolveLocation(to);
+    const nextHref = toLocationHref(nextLocation);
 
-    window.history.pushState({}, "", to);
-    setPathname(to);
+    if (nextHref === toLocationHref(readLocation())) {
+      return;
+    }
+
+    window.history.pushState({}, "", nextHref);
+    setLocation(nextLocation);
   };
 
-  const value = useMemo(() => ({ pathname, navigate }), [pathname]);
+  const value = useMemo(() => ({ location, navigate }), [location]);
 
   return <RouterContext.Provider value={value}>{children}</RouterContext.Provider>;
 }
@@ -50,33 +98,51 @@ export function useNavigate() {
 }
 
 export function useLocation() {
-  return { pathname: useRouterContext().pathname };
+  return useRouterContext().location;
 }
 
-export function useParams<T extends Record<string, string>>() {
-  const { pathname } = useRouterContext();
-  const parts = pathname.split("/").filter(Boolean);
+function extractRouteParams(pathname: string, path: string) {
+  const pathParts = path.split("/").filter(Boolean);
+  const currentParts = pathname.split("/").filter(Boolean);
 
-  const params = {} as Record<string, string>;
-  const entityId = parts[1];
-
-  if (!entityId || entityId === "new") {
-    return params as T;
+  if (pathParts.length !== currentParts.length) {
+    return null;
   }
 
-  if (parts[0] === "employee") {
-    params.employeeId = entityId;
+  const params: Record<string, string> = {};
+
+  for (let index = 0; index < pathParts.length; index += 1) {
+    const routePart = pathParts[index];
+    const currentPart = currentParts[index];
+
+    if (!currentPart) {
+      return null;
+    }
+
+    if (routePart.startsWith(":")) {
+      params[routePart.slice(1)] = decodeURIComponent(currentPart);
+      continue;
+    }
+
+    if (routePart !== currentPart) {
+      return null;
+    }
   }
 
-  if (parts[0] === "shop") {
-    params.shopId = entityId;
+  return params;
+}
+
+export function useParams<T extends Record<string, string | undefined>>() {
+  const { pathname } = useRouterContext().location;
+
+  for (const pattern of PARAM_ROUTE_PATTERNS) {
+    const params = extractRouteParams(pathname, pattern);
+    if (params) {
+      return params as T;
+    }
   }
 
-  if (parts[0] === "availability") {
-    params.availabilityId = entityId;
-  }
-
-  return params as T;
+  return {} as T;
 }
 
 type NavLinkProps = Omit<AnchorHTMLAttributes<HTMLAnchorElement>, "className" | "href"> & {
@@ -86,7 +152,8 @@ type NavLinkProps = Omit<AnchorHTMLAttributes<HTMLAnchorElement>, "className" | 
 };
 
 export function NavLink({ to, className, children, ...rest }: NavLinkProps) {
-  const { pathname, navigate } = useRouterContext();
+  const { location, navigate } = useRouterContext();
+  const { pathname } = location;
   const isActive = pathname === to;
   const resolvedClassName = typeof className === "function" ? className({ isActive }) : className;
 
@@ -132,12 +199,7 @@ export function Route(_props: { path?: string; element?: ReactNode; children?: R
 }
 
 export function matchPath(pathname: string, path: string): boolean {
-  if (path === pathname) return true;
-  const pathParts = path.split("/").filter(Boolean);
-  const currentParts = pathname.split("/").filter(Boolean);
-  if (pathParts.length !== currentParts.length) return false;
-
-  return pathParts.every((part, index) => part.startsWith(":") || part === currentParts[index]);
+  return extractRouteParams(pathname, path) !== null;
 }
 
 export function renderMatched(pathname: string, routes: Array<{ path: string; element: ReactNode }>) {

@@ -1,4 +1,4 @@
-﻿import { useRef, type KeyboardEvent, type ReactNode } from "react";
+import { useEffect, useRef, useState, type DragEvent, type KeyboardEvent, type ReactNode } from "react";
 import {
   AVAILABILITY_ANY_MARK,
   AVAILABILITY_NONE_MARK,
@@ -34,6 +34,7 @@ type AvailabilityScheduleMatrixProps = {
   headerCenterSlot?: ReactNode;
   headerRightSlot?: ReactNode;
   bindValueByKey?: ReadonlyMap<string, string>;
+  onColumnMove?: (employeeId: number, targetEmployeeId: number) => void;
   onCellChange?: (employeeId: number, dayOfMonth: number, value: string) => void;
 };
 
@@ -52,9 +53,12 @@ export function AvailabilityScheduleMatrix({
   headerCenterSlot,
   headerRightSlot,
   bindValueByKey,
+  onColumnMove,
   onCellChange,
 }: AvailabilityScheduleMatrixProps) {
   const inputRefs = useRef<Record<string, HTMLInputElement | null>>({});
+  const [draggedEmployeeId, setDraggedEmployeeId] = useState<number | null>(null);
+  const [dropTargetEmployeeId, setDropTargetEmployeeId] = useState<number | null>(null);
   const days = Array.from({ length: getDaysInMonth(year, month) }, (_, index) => {
     const dayOfMonth = index + 1;
 
@@ -69,6 +73,22 @@ export function AvailabilityScheduleMatrix({
     (readOnly
       ? "No employees are assigned to this availability group yet."
       : "Add at least one employee to start filling the schedule.");
+  const canReorderColumns = !readOnly && Boolean(onColumnMove);
+
+  useEffect(() => {
+    if (draggedEmployeeId === null && dropTargetEmployeeId === null) {
+      return;
+    }
+
+    const existingEmployeeIds = new Set(columns.map(column => column.employeeId));
+    if (
+      (draggedEmployeeId !== null && !existingEmployeeIds.has(draggedEmployeeId)) ||
+      (dropTargetEmployeeId !== null && !existingEmployeeIds.has(dropTargetEmployeeId))
+    ) {
+      setDraggedEmployeeId(null);
+      setDropTargetEmployeeId(null);
+    }
+  }, [columns, draggedEmployeeId, dropTargetEmployeeId]);
 
   const handleCellKeyDown = (event: KeyboardEvent<HTMLInputElement>, employeeId: number, dayOfMonth: number) => {
     if (readOnly || !onCellChange || !bindValueByKey || bindValueByKey.size === 0) {
@@ -104,6 +124,58 @@ export function AvailabilityScheduleMatrix({
     }
   };
 
+  const handleHeaderDragStart = (event: DragEvent<HTMLTableCellElement>, employeeId: number) => {
+    if (!canReorderColumns) {
+      return;
+    }
+
+    setDraggedEmployeeId(employeeId);
+    setDropTargetEmployeeId(employeeId);
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("text/plain", String(employeeId));
+  };
+
+  const handleHeaderDragEnter = (employeeId: number) => {
+    if (!canReorderColumns || draggedEmployeeId === null || draggedEmployeeId === employeeId) {
+      return;
+    }
+
+    setDropTargetEmployeeId(employeeId);
+  };
+
+  const handleHeaderDragOver = (event: DragEvent<HTMLTableCellElement>, employeeId: number) => {
+    if (!canReorderColumns || draggedEmployeeId === null || draggedEmployeeId === employeeId) {
+      return;
+    }
+
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "move";
+    setDropTargetEmployeeId(employeeId);
+  };
+
+  const handleHeaderDrop = (event: DragEvent<HTMLTableCellElement>, targetEmployeeId: number) => {
+    if (!canReorderColumns || draggedEmployeeId === null) {
+      return;
+    }
+
+    event.preventDefault();
+
+    const sourceEmployeeId = draggedEmployeeId;
+    setDraggedEmployeeId(null);
+    setDropTargetEmployeeId(null);
+
+    if (sourceEmployeeId === targetEmployeeId) {
+      return;
+    }
+
+    onColumnMove?.(sourceEmployeeId, targetEmployeeId);
+  };
+
+  const handleHeaderDragEnd = () => {
+    setDraggedEmployeeId(null);
+    setDropTargetEmployeeId(null);
+  };
+
   return (
     <CardSection
       className={cardClassName}
@@ -124,9 +196,33 @@ export function AvailabilityScheduleMatrix({
                 <thead>
                   <tr>
                     <th className={styles.dayHeader}>Day</th>
-                    {columns.map(column => (
-                      <th key={column.employeeId}>{column.label}</th>
-                    ))}
+                    {columns.map(column => {
+                      const isDragSource = draggedEmployeeId === column.employeeId;
+                      const isDropTarget =
+                        dropTargetEmployeeId === column.employeeId &&
+                        draggedEmployeeId !== null &&
+                        draggedEmployeeId !== column.employeeId;
+
+                      return (
+                        <th
+                          key={column.employeeId}
+                          className={[
+                            canReorderColumns ? styles.draggableHeader : "",
+                            isDragSource ? styles.draggingHeader : "",
+                            isDropTarget ? styles.dropTargetHeader : "",
+                          ].filter(Boolean).join(" ")}
+                          draggable={canReorderColumns}
+                          onDragStart={event => handleHeaderDragStart(event, column.employeeId)}
+                          onDragEnter={() => handleHeaderDragEnter(column.employeeId)}
+                          onDragOver={event => handleHeaderDragOver(event, column.employeeId)}
+                          onDrop={event => handleHeaderDrop(event, column.employeeId)}
+                          onDragEnd={handleHeaderDragEnd}
+                          title={canReorderColumns ? column.label : undefined}
+                        >
+                          <span className={styles.headerLabel}>{column.label}</span>
+                        </th>
+                      );
+                    })}
                   </tr>
                 </thead>
 
@@ -192,7 +288,3 @@ export function AvailabilityScheduleMatrix({
     </CardSection>
   );
 }
-
-
-
-

@@ -55,6 +55,7 @@ type AvailabilityGroupEditorProps = {
   onRemoveEmployee: () => void;
   onAddBind: () => void;
   onDeleteBind: () => void;
+  onColumnMove: (employeeId: number, targetEmployeeId: number) => void;
   onCellChange: (employeeId: number, dayOfMonth: number, value: string) => void;
   onSave: () => void;
 };
@@ -100,6 +101,7 @@ export function AvailabilityGroupEditor({
   onRemoveEmployee,
   onAddBind,
   onDeleteBind,
+  onColumnMove,
   onCellChange,
   onSave,
 }: AvailabilityGroupEditorProps) {
@@ -235,6 +237,7 @@ export function AvailabilityGroupEditor({
             />
           }
           bindValueByKey={bindValueByKey}
+          onColumnMove={onColumnMove}
           onCellChange={onCellChange}
         />
       }

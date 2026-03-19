@@ -184,13 +184,14 @@ public sealed class GraphExportService : IGraphExportService
 
         if (includeEmployees)
         {
-            foreach (var scheduleEmployee in employees.OrderBy(x => x.Id))
+            foreach (var scheduleEmployee in employees.OrderBy(x => x.DisplayOrder).ThenBy(x => x.Id))
             {
                 sb.AppendLine(SqlInsert("schedule_employee",
                     ("id", scheduleEmployee.Id),
                     ("schedule_id", scheduleEmployee.ScheduleId),
                     ("employee_id", scheduleEmployee.EmployeeId),
-                    ("min_hours_month", scheduleEmployee.MinHoursMonth)));
+                    ("min_hours_month", scheduleEmployee.MinHoursMonth),
+                    ("display_order", scheduleEmployee.DisplayOrder)));
             }
         }
 
@@ -229,12 +230,13 @@ public sealed class GraphExportService : IGraphExportService
                 ("year", group.Year),
                 ("month", group.Month)));
 
-            foreach (var member in members.OrderBy(x => x.Id))
+            foreach (var member in members.OrderBy(x => x.DisplayOrder).ThenBy(x => x.Id))
             {
                 sb.AppendLine(SqlInsert("availability_group_member",
                     ("id", member.Id),
                     ("availability_group_id", member.AvailabilityGroupId),
-                    ("employee_id", member.EmployeeId)));
+                    ("employee_id", member.EmployeeId),
+                    ("display_order", member.DisplayOrder)));
             }
 
             foreach (var day in days.OrderBy(x => x.Id))

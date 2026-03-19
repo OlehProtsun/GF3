@@ -45,7 +45,12 @@ public class AvailabilityGroupService : IAvailabilityGroupService
         var full = await _groupRepo.GetFullByIdAsync(groupId, ct).ConfigureAwait(false)
                    ?? throw new InvalidOperationException($"AvailabilityGroup with Id={groupId} not found.");
 
-        var members = full.Members?.Select(m => m.ToContract()).ToList() ?? new List<AvailabilityGroupMemberModel>();
+        var members = (full.Members?.Select(m => m.ToContract()).ToList() ?? new List<AvailabilityGroupMemberModel>())
+            .OrderBy(m => m.DisplayOrder)
+            .ThenBy(m => m.Employee?.FirstName ?? string.Empty)
+            .ThenBy(m => m.Employee?.LastName ?? string.Empty)
+            .ThenBy(m => m.EmployeeId)
+            .ToList();
         var days = (await _dayRepo.GetByGroupIdAsync(groupId, ct).ConfigureAwait(false)).Select(d => d.ToContract()).ToList();
         return (full.ToContract(), members, days);
     }
@@ -60,11 +65,7 @@ public class AvailabilityGroupService : IAvailabilityGroupService
     {
         await EnsureGroupExistsAsync(groupId, ct).ConfigureAwait(false);
         model.AvailabilityGroupId = groupId;
-        var created = await _memberRepo.AddAsync(new DataAccessLayer.Models.AvailabilityGroupMemberModel
-        {
-            AvailabilityGroupId = model.AvailabilityGroupId,
-            EmployeeId = model.EmployeeId
-        }, ct).ConfigureAwait(false);
+        var created = await _memberRepo.AddAsync(model.ToDal(), ct).ConfigureAwait(false);
         return created.ToContract();
     }
 
@@ -77,12 +78,9 @@ public class AvailabilityGroupService : IAvailabilityGroupService
         if (existing.AvailabilityGroupId != groupId)
             throw new KeyNotFoundException($"Availability group member with id {memberId} was not found in group {groupId}.");
 
-        await _memberRepo.UpdateAsync(new DataAccessLayer.Models.AvailabilityGroupMemberModel
-        {
-            Id = memberId,
-            AvailabilityGroupId = groupId,
-            EmployeeId = model.EmployeeId
-        }, ct).ConfigureAwait(false);
+        model.Id = memberId;
+        model.AvailabilityGroupId = groupId;
+        await _memberRepo.UpdateAsync(model.ToDal(), ct).ConfigureAwait(false);
     }
 
     public async Task DeleteMemberAsync(int groupId, int memberId, CancellationToken ct = default)
@@ -170,18 +168,35 @@ public class AvailabilityGroupService : IAvailabilityGroupService
                 await _memberRepo.DeleteAsync(m.Id, ct).ConfigureAwait(false);
         }
 
-        foreach (var (employeeId, days) in payload)
+        foreach (var (item, displayOrder) in payload.Select((value, index) => (value, index)))
         {
+            var employeeId = item.employeeId;
+            var days = item.days;
+
             if (!memberByEmployee.TryGetValue(employeeId, out var member))
             {
                 member = await _memberRepo.AddAsync(new DataAccessLayer.Models.AvailabilityGroupMemberModel
                 {
                     Id = 0,
                     AvailabilityGroupId = groupId,
-                    EmployeeId = employeeId
+                    EmployeeId = employeeId,
+                    DisplayOrder = displayOrder,
                 }, ct).ConfigureAwait(false);
 
                 memberByEmployee[employeeId] = member;
+            }
+            else if (member.DisplayOrder != displayOrder)
+            {
+                member = new DataAccessLayer.Models.AvailabilityGroupMemberModel
+                {
+                    Id = member.Id,
+                    AvailabilityGroupId = groupId,
+                    EmployeeId = employeeId,
+                    DisplayOrder = displayOrder,
+                };
+
+                memberByEmployee[employeeId] = member;
+                await _memberRepo.UpdateAsync(member, ct).ConfigureAwait(false);
             }
 
             var memberId = member.Id;

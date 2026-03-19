@@ -36,6 +36,7 @@ namespace BusinessLogicLayer.Contracts.Export
         public int ScheduleId { get; init; }
         public int EmployeeId { get; init; }
         public int MinHoursMonth { get; init; }
+        public int DisplayOrder { get; init; }
     }
 
     public sealed class ScheduleSlotSqlDto
@@ -73,6 +74,7 @@ namespace BusinessLogicLayer.Contracts.Export
         public int Id { get; init; }
         public int AvailabilityGroupId { get; init; }
         public int EmployeeId { get; init; }
+        public int DisplayOrder { get; init; }
     }
 
     public sealed class AvailabilityGroupDaySqlDto

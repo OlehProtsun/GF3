@@ -102,6 +102,20 @@ function runMutation<TData, TVariables>(
   });
 }
 
+function reorderEmployeeIds(employeeIds: number[], sourceEmployeeId: number, targetEmployeeId: number) {
+  const sourceIndex = employeeIds.indexOf(sourceEmployeeId);
+  const targetIndex = employeeIds.indexOf(targetEmployeeId);
+
+  if (sourceIndex < 0 || targetIndex < 0 || sourceIndex === targetIndex) {
+    return employeeIds;
+  }
+
+  const nextEmployeeIds = [...employeeIds];
+  const [movedEmployeeId] = nextEmployeeIds.splice(sourceIndex, 1);
+  nextEmployeeIds.splice(targetIndex, 0, movedEmployeeId);
+  return nextEmployeeIds;
+}
+
 export function AvailabilityEditPage() {
   const navigate = useNavigate();
   const { availabilityId } = useParams<{ availabilityId: string }>();
@@ -233,19 +247,22 @@ export function AvailabilityEditPage() {
     return [selectedEmployee, ...baseEmployees];
   }, [employeeSearchText, employees, selectedEmployeeId]);
 
-  const existingMemberIdByEmployeeId = useMemo(() => {
-    return new Map((membersQuery.data ?? []).map(member => [member.employeeId, member.id]));
+  const existingMemberByEmployeeId = useMemo(() => {
+    return new Map((membersQuery.data ?? []).map(member => [member.employeeId, member]));
   }, [membersQuery.data]);
 
   const columns = useMemo(() => {
-    return [...selectedEmployeeIds]
-      .map(employeeId => ({
+    return selectedEmployeeIds.map((employeeId, index) => {
+      const member = existingMemberByEmployeeId.get(employeeId);
+
+      return {
         employeeId,
-        memberId: existingMemberIdByEmployeeId.get(employeeId) ?? null,
+        memberId: member?.id ?? null,
+        displayOrder: member?.displayOrder ?? index,
         label: employeeNameById.get(employeeId) ?? `Employee #${employeeId}`,
-      }))
-      .sort((left, right) => left.label.localeCompare(right.label));
-  }, [employeeNameById, existingMemberIdByEmployeeId, selectedEmployeeIds]);
+      };
+    });
+  }, [employeeNameById, existingMemberByEmployeeId, selectedEmployeeIds]);
 
   const assignedEmployees = useMemo(() => {
     return columns.map(column => ({ id: column.employeeId, label: column.label }));
@@ -358,6 +375,11 @@ export function AvailabilityEditPage() {
       delete nextErrors[cellKey];
       return nextErrors;
     });
+  };
+
+  const handleColumnMove = (sourceEmployeeId: number, targetEmployeeId: number) => {
+    setSelectedEmployeeIds(currentEmployeeIds => reorderEmployeeIds(currentEmployeeIds, sourceEmployeeId, targetEmployeeId));
+    setEditorError(undefined);
   };
 
   const handleBindFieldChange = (clientId: string, patch: Partial<Pick<EditableAvailabilityBind, "key" | "value" | "isActive">>) => {
@@ -610,6 +632,7 @@ export function AvailabilityEditPage() {
         onRemoveEmployee={handleRemoveEmployee}
         onAddBind={handleAddBind}
         onDeleteBind={handleDeleteBind}
+        onColumnMove={handleColumnMove}
         onCellChange={handleCellChange}
         onSave={handleSave}
       />

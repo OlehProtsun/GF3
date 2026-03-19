@@ -10,14 +10,16 @@ public static class GraphEmployeeMapper
         Id = model.Id,
         ScheduleId = model.ScheduleId,
         EmployeeId = model.EmployeeId,
-        MinHoursMonth = model.MinHoursMonth
+        MinHoursMonth = model.MinHoursMonth,
+        DisplayOrder = model.DisplayOrder
     };
 
     public static ScheduleEmployeeModel ToAddModel(this AddGraphEmployeeRequest request, int graphId) => new()
     {
         ScheduleId = graphId,
         EmployeeId = request.EmployeeId,
-        MinHoursMonth = request.MinHoursMonth
+        MinHoursMonth = request.MinHoursMonth,
+        DisplayOrder = request.DisplayOrder
     };
 
     public static ScheduleEmployeeModel ToUpdateModel(this UpdateGraphEmployeeRequest request, int graphId, int graphEmployeeId) => new()
@@ -25,6 +27,7 @@ public static class GraphEmployeeMapper
         Id = graphEmployeeId,
         ScheduleId = graphId,
         EmployeeId = request.EmployeeId,
-        MinHoursMonth = request.MinHoursMonth
+        MinHoursMonth = request.MinHoursMonth,
+        DisplayOrder = request.DisplayOrder
     };
 }

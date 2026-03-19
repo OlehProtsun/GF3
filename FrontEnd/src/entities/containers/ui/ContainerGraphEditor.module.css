@@ -1,0 +1,968 @@
+.workspaceLayout {
+  --availability-workspace-gap: 4px;
+  --availability-workspace-gap-narrow: 4px;
+  --availability-workspace-gap-mobile: 18px;
+}
+
+.sidebarCard {
+  /* Schedule Details sizing: edit these values manually to tune field widths. */
+  --schedule-details-wide-main-column: 1.7fr;
+  --schedule-details-wide-side-min-width: 132px;
+  --schedule-details-medium-control-width: 164px;
+  --schedule-details-compact-control-width: 136px;
+  --schedule-details-min-hours-input-width: 152px;
+  --schedule-details-min-hours-list-height: 396px;
+  --employee-list-height: 332px;
+}
+
+.layoutCollapsed {
+  min-height: 0;
+  gap: 4px;
+}
+
+.sidebarColumn {
+  flex: 0 0 392px;
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: clip;
+  overflow-clip-margin: 18px;
+  direction: rtl;
+  margin-top: calc(-1 * var(--schedule-edit-header-underlap, 0px));
+  padding: calc(2px + var(--schedule-edit-header-underlap, 0px)) 8px 0 6px;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.sidebarColumnCollapsed {
+  flex-basis: 46px;
+  margin-top: calc(-1 * var(--schedule-edit-header-underlap, 0px));
+  padding: calc(8px + var(--schedule-edit-header-underlap, 0px)) 0 0 0;
+  overflow: clip;
+  overflow-clip-margin: 12px;
+}
+
+.sidebar {
+  display: grid;
+  gap: 22px;
+  align-content: start;
+  direction: ltr;
+  padding: 0;
+}
+
+.sidebarCollapsed {
+  gap: 18px;
+}
+
+.sidebarColumn::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+.sidebar > * {
+  width: auto;
+  margin: 2px 2px 0 6px;
+}
+
+.sidebarCollapsed > * {
+  margin: 6px 0 0 0;
+}
+
+.sidebar > *:last-child,
+.sidebarCollapsed > *:last-child {
+  margin-bottom: 0;
+}
+
+.mainColumn {
+  flex: 1 1 0;
+  min-height: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  overflow-y: auto;
+  overflow-x: clip;
+  overflow-clip-margin: 28px;
+  margin-top: calc(-1 * var(--schedule-edit-header-underlap, 0px));
+  padding: calc(2px + var(--schedule-edit-header-underlap, 0px)) 6px 0 2px;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.mainColumnCollapsed {
+  flex-basis: 0;
+}
+
+.mainColumn::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+.mainColumnCollapsed .mainBlock > * {
+  margin-left: 0;
+}
+
+.mainBlock {
+  direction: ltr;
+  min-width: 0;
+  min-height: 0;
+  flex: 1 1 0;
+  display: flex;
+  flex-direction: column;
+  padding: 0 8px 12px 2px;
+  overflow: visible;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+}
+
+.mainBlock > * {
+  width: auto;
+  margin: 2px 6px 0 0;
+}
+
+.mainStack {
+  display: grid;
+  gap: 18px;
+  min-height: 0;
+  align-content: start;
+}
+
+.matrixWorkspace {
+  display: grid;
+  gap: 18px;
+  min-height: 0;
+  align-content: start;
+}
+
+.matrixWorkspaceSplit {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: stretch;
+}
+
+.sidebarCard,
+.matrixCard,
+.previewCard {
+  width: 100%;
+  box-shadow:
+    0 7px 17px rgba(0, 0, 0, 0.046),
+    0 1px 0 rgba(255, 255, 255, 0.35) inset;
+}
+
+.matrixCardShell {
+  width: 100%;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  padding: 0;
+  box-sizing: border-box;
+  overflow: visible;
+}
+
+.scheduleMatrixCardShell {
+  --schedule-matrix-shadow-gutter: 12px;
+  width: calc(100% + var(--schedule-matrix-shadow-gutter));
+  min-width: calc(100% + var(--schedule-matrix-shadow-gutter));
+  margin-left: calc(-1 * var(--schedule-matrix-shadow-gutter));
+  padding-left: var(--schedule-matrix-shadow-gutter);
+  position: relative;
+  z-index: 1;
+}
+
+.matrixCardShellCompact {
+  display: block;
+  min-height: auto;
+  height: auto;
+}
+
+.previewCardShell {
+  width: 100%;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  padding: 0;
+  box-sizing: border-box;
+  overflow: visible;
+}
+
+.formStack,
+.employeeSection {
+  display: grid;
+  gap: 14px;
+}
+
+.employeeSection {
+  padding-bottom: 18px;
+}
+
+.detailsForm {
+  gap: 16px;
+}
+
+.detailsTopSlot {
+  width: 100%;
+}
+
+.detailsRow {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  align-items: start;
+}
+
+.detailsRowWideCompact {
+  grid-template-columns:
+    minmax(0, var(--schedule-details-wide-main-column))
+    minmax(var(--schedule-details-wide-side-min-width), 0.72fr);
+}
+
+.detailsRowBalanced {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.detailsFieldFull,
+.detailsFieldCompact,
+.detailsFieldCompactSingle {
+  min-width: 0;
+}
+
+.detailsFieldSpanFull {
+  grid-column: 1 / -1;
+}
+
+.controlFull {
+  width: 100%;
+  max-width: none;
+}
+
+.controlMedium {
+  width: min(100%, var(--schedule-details-medium-control-width));
+}
+
+.controlCompact {
+  width: min(100%, var(--schedule-details-compact-control-width));
+}
+
+.numberInput {
+  width: 100%;
+}
+
+.numberInputInvalid {
+  background: rgba(255, 59, 48, 0.06);
+  border-color: rgba(255, 59, 48, 0.45);
+  box-shadow: 0 0 0 1px rgba(255, 59, 48, 0.14);
+}
+
+.numberInputInvalid:focus-within {
+  border-color: rgba(255, 59, 48, 0.65);
+  box-shadow:
+    0 0 0 1px rgba(255, 59, 48, 0.2),
+    0 0 0 4px rgba(255, 59, 48, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.72),
+    0 10px 24px rgba(15, 23, 42, 0.07);
+}
+
+.detailsMinHoursBlock {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border-radius: 22px;
+  border: 1px solid rgba(113, 113, 122, 0.12);
+  background: rgba(248, 250, 252, 0.76);
+}
+
+.detailsMinHoursHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.detailsMinHoursTitle {
+  color: #0f172a;
+  font-size: 0.88rem;
+  font-weight: 800;
+}
+
+.detailsMinHoursMeta {
+  color: rgba(71, 85, 105, 0.78);
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+.detailsMinHoursEmpty {
+  min-height: 72px;
+  display: grid;
+  place-items: center;
+  padding: 12px;
+  border-radius: 18px;
+  border: 1px dashed rgba(113, 113, 122, 0.16);
+  color: rgba(71, 85, 105, 0.78);
+  text-align: center;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.detailsMinHoursList {
+  display: grid;
+  gap: 0;
+  min-height: var(--schedule-details-min-hours-list-height);
+  max-height: var(--schedule-details-min-hours-list-height);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  contain: layout paint;
+  will-change: scroll-position;
+  scrollbar-gutter: stable;
+  padding-right: 4px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.58);
+  scrollbar-width: thin;
+  scrollbar-color: #d6dbe3 transparent;
+}
+
+.detailsMinHoursList::-webkit-scrollbar {
+  width: 8px;
+}
+
+.detailsMinHoursList::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background: #d6dbe3;
+  background-clip: padding-box;
+}
+
+.detailsMinHoursItem {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 9px 10px;
+  border-top: 1px solid rgba(148, 163, 184, 0.14);
+  border-bottom: 1px solid rgba(148, 163, 184, 0.14);
+}
+
+.detailsMinHoursName {
+  color: #0f172a;
+  font-size: 0.86rem;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.detailsMinHoursInput {
+  width: var(--schedule-details-min-hours-input-width);
+  min-width: var(--schedule-details-min-hours-input-width);
+}
+
+.detailsActions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 4px;
+  padding-bottom: 18px;
+}
+
+.generateButton {
+  min-width: 0;
+}
+
+.select {
+  width: 100%;
+  min-height: 48px;
+  padding: 0 14px;
+  border-radius: 16px;
+  border: 1px solid rgba(113, 113, 122, 0.16);
+  background: rgba(255, 255, 255, 0.9);
+  color: #0f172a;
+  font: inherit;
+}
+
+.noteInput {
+  min-height: 280px;
+  resize: vertical;
+}
+
+.noteField {
+  padding-bottom: 18px;
+}
+
+.employeeControls {
+  display: grid;
+  gap: 10px;
+}
+
+.employeeRosterBlock {
+  gap: 12px;
+}
+
+.employeeActionRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: end;
+}
+
+.employeeList {
+  display: grid;
+  gap: 8px;
+  min-height: var(--employee-list-height);
+  max-height: var(--employee-list-height);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  contain: layout paint;
+  will-change: scroll-position;
+  scrollbar-gutter: stable;
+  padding-right: 4px;
+  scrollbar-width: thin;
+  scrollbar-color: #d6dbe3 transparent;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.58);
+}
+
+.employeeList::-webkit-scrollbar {
+  width: 8px;
+}
+
+.employeeList::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background: #d6dbe3;
+  background-clip: padding-box;
+}
+
+.employeeRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 12px 14px;
+  border-radius: 18px;
+  border: 1px solid rgba(113, 113, 122, 0.12);
+  background: rgba(255, 255, 255, 0.74);
+  content-visibility: auto;
+  contain-intrinsic-size: 53px;
+}
+
+.employeeName {
+  color: #0f172a;
+  font-size: 0.92rem;
+  font-weight: 700;
+  line-height: 1.3;
+  min-width: 0;
+}
+
+.employeeRowActions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+}
+
+.minHoursInput {
+  text-align: center;
+}
+
+.employeeEmpty {
+  min-height: var(--employee-list-height);
+  max-height: var(--employee-list-height);
+  display: grid;
+  place-items: center;
+  border-radius: 20px;
+  border: 1px dashed rgba(113, 113, 122, 0.16);
+  color: rgba(71, 85, 105, 0.78);
+  text-align: center;
+  padding: 18px;
+}
+
+.matrixToolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.toolbarGroup {
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  border-radius: 16px;
+  background: rgba(248, 250, 252, 0.92);
+}
+
+.toolbarLabel {
+  color: rgba(71, 85, 105, 0.8);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.toolbarValue {
+  color: #0f172a;
+}
+
+.toolbarHint {
+  color: rgba(71, 85, 105, 0.84);
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
+.splitColorButton {
+  display: inline-grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: stretch;
+  gap: 4px;
+  padding: 3px;
+  border-radius: 20px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(248, 250, 252, 0.9));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.76),
+    0 14px 28px rgba(15, 23, 42, 0.08);
+}
+
+.splitColorApply,
+.splitColorPicker {
+  border: 1px solid transparent;
+  background: transparent;
+  color: #0f172a;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  transition:
+    background 120ms ease,
+    border-color 120ms ease,
+    transform 120ms ease,
+    box-shadow 120ms ease,
+    color 120ms ease;
+}
+
+.splitColorApply:hover:not(:disabled),
+.splitColorPicker:hover:not(:disabled) {
+  background: rgba(241, 245, 249, 0.82);
+  border-color: rgba(148, 163, 184, 0.2);
+}
+
+.splitColorApply:active:not(:disabled),
+.splitColorPicker:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.splitColorApply:focus-visible,
+.splitColorPicker:focus-visible {
+  z-index: 1;
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.16);
+}
+
+.splitColorApply:disabled,
+.splitColorPicker:disabled {
+  opacity: 0.56;
+  cursor: not-allowed;
+}
+
+.splitColorApply {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 42px;
+  padding: 0 12px;
+  min-width: 136px;
+  border-radius: 16px;
+  justify-content: flex-start;
+}
+
+.splitColorPicker {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  min-width: 40px;
+  padding: 0;
+  border-radius: 16px;
+  color: rgba(51, 65, 85, 0.92);
+  background: rgba(248, 250, 252, 0.86);
+  border-color: rgba(148, 163, 184, 0.16);
+}
+
+.splitColorSwatch {
+  width: 15px;
+  height: 15px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.84);
+  box-shadow:
+    0 0 0 1px rgba(15, 23, 42, 0.08),
+    0 8px 16px rgba(15, 23, 42, 0.12);
+}
+
+.splitColorText {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  text-align: left;
+}
+
+.splitColorLabel {
+  color: #0f172a;
+  font-size: 0.8rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.splitColorValue {
+  color: rgba(71, 85, 105, 0.84);
+  font-size: 0.67rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  line-height: 1;
+}
+
+.splitColorDots {
+  position: relative;
+  width: 3px;
+  height: 3px;
+  border-radius: 999px;
+  background: currentColor;
+  box-shadow:
+    0 -6px 0 currentColor,
+    0 6px 0 currentColor;
+}
+
+.toolbarActionButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 42px;
+  padding: 0 13px;
+  border-radius: 16px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(248, 250, 252, 0.9));
+  color: rgba(51, 65, 85, 0.94);
+  font: inherit;
+  font-size: 0.79rem;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.76),
+    0 14px 28px rgba(15, 23, 42, 0.06);
+  transition:
+    background 120ms ease,
+    border-color 120ms ease,
+    transform 120ms ease,
+    box-shadow 120ms ease,
+    color 120ms ease;
+}
+
+.toolbarActionButton:hover:not(:disabled) {
+  background: rgba(241, 245, 249, 0.86);
+  border-color: rgba(148, 163, 184, 0.22);
+  color: #0f172a;
+}
+
+.toolbarActionButton:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.toolbarActionButton:focus-visible {
+  outline: none;
+  box-shadow:
+    0 0 0 3px rgba(37, 99, 235, 0.14),
+    0 14px 28px rgba(15, 23, 42, 0.08);
+}
+
+.toolbarActionButton:disabled {
+  opacity: 0.54;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.toolbarActionIcon {
+  width: 14px;
+  height: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(71, 85, 105, 0.88);
+  flex-shrink: 0;
+}
+
+.toolbarActionIcon :global(svg) {
+  width: 14px;
+  height: 14px;
+}
+
+.stylingHint {
+  padding: 10px 12px;
+  border-radius: 16px;
+  background: rgba(226, 232, 240, 0.76);
+  color: #475569;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.regenerationPill {
+  padding: 10px 12px;
+  border-radius: 16px;
+  background: rgba(254, 249, 195, 0.84);
+  color: #854d0e;
+  font-size: 0.84rem;
+  font-weight: 700;
+}
+
+.matrixHeaderActions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.previewHeaderActions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.previewLayoutButton {
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 999px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(248, 250, 252, 0.9));
+  color: rgba(51, 65, 85, 0.88);
+  cursor: pointer;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.76),
+    0 12px 24px rgba(15, 23, 42, 0.06);
+  transition:
+    background 120ms ease,
+    border-color 120ms ease,
+    box-shadow 120ms ease,
+    transform 120ms ease,
+    color 120ms ease;
+}
+
+.previewLayoutButton:hover:not(:disabled) {
+  background: rgba(241, 245, 249, 0.9);
+  border-color: rgba(148, 163, 184, 0.24);
+  color: #0f172a;
+}
+
+.previewLayoutButton:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.previewLayoutButton:focus-visible {
+  outline: none;
+  box-shadow:
+    0 0 0 3px rgba(37, 99, 235, 0.14),
+    0 12px 24px rgba(15, 23, 42, 0.08);
+}
+
+.previewLayoutButtonActive {
+  background: rgba(219, 234, 254, 0.98);
+  border-color: rgba(96, 165, 250, 0.34);
+  color: #1d4ed8;
+}
+
+.previewLayoutGlyph {
+  width: 15px;
+  height: 12px;
+  display: grid;
+  gap: 2px;
+}
+
+.previewLayoutGlyphSide {
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
+}
+
+.previewLayoutGlyphStacked {
+  grid-template-rows: repeat(2, minmax(0, 1fr));
+}
+
+.previewLayoutGlyph span {
+  display: block;
+  min-width: 0;
+  min-height: 0;
+  border-radius: 4px;
+  background: currentColor;
+  opacity: 0.9;
+}
+
+.headerBadge,
+.previewBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: rgba(241, 245, 249, 0.88);
+  color: rgba(51, 65, 85, 0.88);
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+
+.previewBadge {
+  justify-content: center;
+}
+
+.matrixCard {
+  max-width: none;
+  margin-inline: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  height: auto;
+  overflow: hidden;
+}
+
+.trimmedMatrixCard {
+  clip-path: inset(-28px -28px 0 0 round 32px);
+}
+
+.matrixCardCompact {
+  flex: 0 0 auto;
+  min-height: auto;
+  height: auto;
+  overflow: visible;
+}
+
+.previewCard {
+  max-width: none;
+  margin-inline: 0;
+  min-height: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  overflow: hidden;
+}
+
+.state {
+  padding: 28px;
+  text-align: center;
+  color: rgba(71, 85, 105, 0.84);
+}
+
+.banner {
+  width: 100%;
+}
+
+@media (max-width: 1180px) {
+  .sidebarColumn {
+    flex-basis: 368px;
+  }
+
+  .mainBlock > * {
+    margin-right: 0;
+  }
+}
+
+@media (max-width: 960px) {
+  .sidebarColumn,
+  .sidebarColumnCollapsed {
+    flex-basis: auto;
+    margin-top: 0;
+    overflow: visible;
+    direction: ltr;
+    padding: 0;
+    scrollbar-gutter: auto;
+  }
+
+  .sidebar > *,
+  .sidebarCollapsed > *,
+  .mainBlock > *,
+  .mainColumnCollapsed .mainBlock > * {
+    width: 100%;
+    margin: 0;
+  }
+
+  .mainColumn,
+  .mainColumnCollapsed {
+    margin-top: 0;
+    overflow: visible;
+    padding: 0;
+  }
+
+  .employeeActionRow,
+  .employeeRow {
+    grid-template-columns: 1fr;
+  }
+
+  .employeeRowActions {
+    justify-content: stretch;
+  }
+
+  .employeeRowActions :global(button) {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .detailsRow {
+    grid-template-columns: 1fr;
+  }
+
+  .detailsRowWideCompact,
+  .detailsRowBalanced,
+  .detailsMinHoursItem {
+    grid-template-columns: 1fr;
+  }
+
+  .detailsMinHoursList {
+    min-height: auto;
+    max-height: none;
+    overflow: visible;
+    padding-right: 0;
+  }
+
+  .detailsMinHoursInput {
+    width: 100%;
+    min-width: 100%;
+  }
+
+  .detailsActions {
+    justify-content: stretch;
+  }
+
+  .detailsActions :global(button) {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .matrixHeaderActions,
+  .matrixToolbar {
+    justify-content: flex-start;
+  }
+
+  .mainBlock {
+    min-height: auto;
+  }
+
+  .matrixWorkspace,
+  .matrixWorkspaceSplit {
+    grid-template-columns: 1fr;
+  }
+
+  .scheduleMatrixCardShell {
+    width: 100%;
+    min-width: 0;
+    margin-left: 0;
+    padding-left: 0;
+  }
+
+  .matrixCardShell,
+  .previewCardShell,
+  .matrixCard,
+  .previewCard {
+    height: auto;
+  }
+}

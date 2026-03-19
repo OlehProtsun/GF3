@@ -21,6 +21,7 @@
     list: () => ["containers", "list"] as const,
     byId: (id: number) => ["containers", "byId", id] as const,
     graphs: (containerId: number) => ["containers", containerId, "graphs"] as const,
+    schedulePresets: (containerId: number) => ["containers", containerId, "schedulePresets"] as const,
     graphById: (containerId: number, graphId: number) => ["containers", containerId, "graphs", graphId] as const,
     graphSlots: (containerId: number, graphId: number) => ["containers", containerId, "graphs", graphId, "slots"] as const,
     graphEmployees: (containerId: number, graphId: number) => ["containers", containerId, "graphs", graphId, "employees"] as const,

@@ -51,16 +51,12 @@
 
 .variantCard {
   border-radius: 0 0 30px 30px;
-  border: 1px solid rgba(255, 255, 255, 0.42);
+  border: 1px solid rgba(0, 0, 0, 0.08);
   border-top: none;
-  background:
-    linear-gradient(to bottom, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0.02)),
-    rgba(255, 255, 255, 0.68);
-  box-shadow:
-    0 12px 28px rgba(15, 23, 42, 0.07),
-    0 1px 0 rgba(255, 255, 255, 0.45) inset;
-  backdrop-filter: blur(24px) saturate(170%);
-  -webkit-backdrop-filter: blur(24px) saturate(170%);
+  background: rgba(255, 255, 255, 0.16);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
 }
 
 .variantPlain {
@@ -158,14 +154,10 @@
   padding: 8px 14px;
   border-radius: 0 0 24px 24px;
   border-top: none;
-  background:
-    linear-gradient(to bottom, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.03)),
-    rgba(255, 255, 255, 0.78);
-  box-shadow:
-    0 10px 22px rgba(15, 23, 42, 0.08),
-    0 1px 0 rgba(255, 255, 255, 0.45) inset;
-  backdrop-filter: blur(20px) saturate(170%);
-  -webkit-backdrop-filter: blur(20px) saturate(170%);
+  background: rgba(255, 255, 255, 0.34);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
 }
 
 .collapsedTitle {

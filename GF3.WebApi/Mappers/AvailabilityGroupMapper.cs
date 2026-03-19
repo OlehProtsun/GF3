@@ -40,6 +40,7 @@ public static class AvailabilityGroupMapper
             {
                 MemberId = day.AvailabilityGroupMemberId,
                 EmployeeId = membersById[day.AvailabilityGroupMemberId].EmployeeId,
+                DisplayOrder = membersById[day.AvailabilityGroupMemberId].DisplayOrder,
                 DayId = day.Id,
                 DayOfMonth = day.DayOfMonth,
                 Kind = day.Kind,

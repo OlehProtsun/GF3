@@ -1,6 +1,6 @@
 ﻿.layout {
   display: flex;
-  gap: 12px;
+  gap: var(--availability-workspace-gap, 12px);
   align-items: stretch;
   flex: 1 1 0;
   width: 100%;
@@ -52,7 +52,7 @@
 
 @media (max-width: 1180px) {
   .layout {
-    gap: 10px;
+    gap: var(--availability-workspace-gap-narrow, 10px);
   }
 
   .sidebarColumn {
@@ -67,7 +67,7 @@
 @media (max-width: 960px) {
   .layout {
     flex-direction: column;
-    gap: 18px;
+    gap: var(--availability-workspace-gap-mobile, 18px);
     overflow: visible;
   }
 

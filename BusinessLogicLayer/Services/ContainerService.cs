@@ -6,13 +6,13 @@ using BusinessLogicLayer.Services.Abstractions;
 using DataAccessLayer.Repositories.Abstractions;
 using Microsoft.EntityFrameworkCore;
 using System.Collections.Concurrent;
-
 namespace BusinessLogicLayer.Services;
 
 public class ContainerService : IContainerService
 {
     private readonly IContainerRepository _repo;
     private readonly IScheduleRepository _scheduleRepo;
+    private readonly ISchedulePresetRepository _schedulePresetRepo;
     private readonly IScheduleSlotRepository _slotRepo;
     private readonly IScheduleEmployeeRepository _employeeRepo;
     private readonly IScheduleCellStyleRepository _cellStyleRepo;
@@ -24,6 +24,7 @@ public class ContainerService : IContainerService
     public ContainerService(
         IContainerRepository repo,
         IScheduleRepository scheduleRepo,
+        ISchedulePresetRepository schedulePresetRepo,
         IScheduleSlotRepository slotRepo,
         IScheduleEmployeeRepository employeeRepo,
         IScheduleCellStyleRepository cellStyleRepo,
@@ -32,6 +33,7 @@ public class ContainerService : IContainerService
     {
         _repo = repo;
         _scheduleRepo = scheduleRepo;
+        _schedulePresetRepo = schedulePresetRepo;
         _slotRepo = slotRepo;
         _employeeRepo = employeeRepo;
         _cellStyleRepo = cellStyleRepo;
@@ -89,6 +91,41 @@ public class ContainerService : IContainerService
     {
         await EnsureGraphOwnershipAsync(containerId, graphId, ct).ConfigureAwait(false);
         await _scheduleRepo.DeleteAsync(graphId, ct).ConfigureAwait(false);
+    }
+
+    public async Task<List<SchedulePresetModel>> GetSchedulePresetsAsync(int containerId, CancellationToken ct = default)
+    {
+        await EnsureContainerExistsAsync(containerId, ct).ConfigureAwait(false);
+        return (await _schedulePresetRepo.GetByContainerAsync(containerId, ct).ConfigureAwait(false))
+            .Select(x => x.ToContract())
+            .ToList();
+    }
+
+    public async Task<SchedulePresetModel> CreateSchedulePresetAsync(int containerId, SchedulePresetModel model, CancellationToken ct = default)
+    {
+        await EnsureContainerExistsAsync(containerId, ct).ConfigureAwait(false);
+
+        model.ContainerId = containerId;
+        model.Name = model.Name.Trim();
+        model.ScheduleName = model.ScheduleName.Trim();
+        model.Employees = model.Employees
+            .Where(x => x.EmployeeId > 0)
+            .GroupBy(x => x.EmployeeId)
+            .Select(x => x.Last())
+            .ToList();
+
+        if (await _schedulePresetRepo.ExistsByNameAsync(containerId, model.Name, null, ct).ConfigureAwait(false))
+        {
+            throw new System.ComponentModel.DataAnnotations.ValidationException(
+                new System.ComponentModel.DataAnnotations.ValidationResult(
+                    "A preset with this name already exists in the current container.",
+                    new[] { nameof(model.Name) }),
+                validatingAttribute: null,
+                value: model.Name);
+        }
+
+        var created = await _schedulePresetRepo.AddAsync(model.ToDal(), ct).ConfigureAwait(false);
+        return created.ToContract();
     }
 
     public async Task<GenerateGraphResult> GenerateGraphAsync(
@@ -221,7 +258,13 @@ public class ContainerService : IContainerService
     public async Task<List<ScheduleEmployeeModel>> GetGraphEmployeesAsync(int containerId, int graphId, CancellationToken ct = default)
     {
         await EnsureGraphOwnershipAsync(containerId, graphId, ct).ConfigureAwait(false);
-        return (await _employeeRepo.GetByScheduleAsync(graphId, ct).ConfigureAwait(false)).Select(x => x.ToContract()).ToList();
+        return (await _employeeRepo.GetByScheduleAsync(graphId, ct).ConfigureAwait(false))
+            .Select(x => x.ToContract())
+            .OrderBy(x => x.DisplayOrder)
+            .ThenBy(x => x.Employee?.FirstName ?? string.Empty)
+            .ThenBy(x => x.Employee?.LastName ?? string.Empty)
+            .ThenBy(x => x.EmployeeId)
+            .ToList();
     }
 
     public async Task<ScheduleEmployeeModel> AddGraphEmployeeAsync(int containerId, int graphId, ScheduleEmployeeModel model, CancellationToken ct = default)
@@ -319,3 +362,4 @@ public class ContainerService : IContainerService
         return existing;
     }
 }
+    

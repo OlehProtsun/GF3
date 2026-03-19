@@ -8,6 +8,8 @@ import { AvailabilityPage } from "@pages/availability";
 import { AvailabilityEditPage } from "@pages/availability-edit";
 import { AvailabilityProfilePage } from "@pages/availability-profile";
 import { ContainerPage } from "@pages/container";
+import { ContainerGraphProfilePage } from "@pages/container-graph-profile";
+import { ContainerGraphEditPage } from "@pages/container-graph-edit";
 import { InformationPage } from "@pages/information";
 import { DataBasePage } from "@pages/database";
 import { EmployeeListPage } from "@pages/employee-list";
@@ -27,6 +29,9 @@ function RoutedContent() {
   if (pathname === "/availability/new") return <AvailabilityEditPage />;
   if (matchPath(pathname, "/availability/:availabilityId/edit")) return <AvailabilityEditPage />;
   if (matchPath(pathname, "/availability/:availabilityId")) return <AvailabilityProfilePage />;
+  if (matchPath(pathname, "/container/:containerId/graphs/new")) return <ContainerGraphEditPage />;
+  if (matchPath(pathname, "/container/:containerId/graphs/:graphId/edit")) return <ContainerGraphEditPage />;
+  if (matchPath(pathname, "/container/:containerId/graphs/:graphId")) return <ContainerGraphProfilePage />;
   if (pathname === "/container") return <ContainerPage />;
   if (pathname === "/information") return <InformationPage />;
   if (pathname === "/database") return <DataBasePage />;

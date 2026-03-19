@@ -1,4 +1,4 @@
-﻿import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { queryKeys } from "@shared/api/queryKeys";
 import type { SaveShopInput, ShopsListParams } from "@entities/shops/model/types";
 import { shopsApi } from "./shopsApi";
@@ -8,7 +8,8 @@ export function useShopsListQuery(params?: ShopsListParams) {
 
   return useQuery({
     queryKey: queryKeys.shops.list(search),
-    queryFn: ({ signal }) => shopsApi.list(signal),
+    // Keep the shops list request alive through StrictMode remounts in dev.
+    queryFn: () => shopsApi.list(),
   });
 }
 
@@ -53,3 +54,4 @@ export function useDeleteShopMutation() {
     },
   });
 }
+

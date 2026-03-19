@@ -9,4 +9,7 @@ public sealed class AddGraphEmployeeRequest
     public int EmployeeId { get; set; }
 
     public int? MinHoursMonth { get; set; }
+
+    [Range(0, int.MaxValue)]
+    public int DisplayOrder { get; set; }
 }

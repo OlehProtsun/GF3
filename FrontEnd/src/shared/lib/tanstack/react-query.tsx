@@ -16,6 +16,7 @@ type QueryOptions<TData> = {
   queryKey: QueryKey;
   queryFn: (context: { signal: AbortSignal }) => Promise<TData>;
   enabled?: boolean;
+  cancelOnUnmount?: boolean;
 };
 
 type MutationOptions<TData, TVariables> = {
@@ -125,13 +126,14 @@ export function useQuery<TData>(options: QueryOptions<TData>) {
     }
 
     const controller = new AbortController();
+    let isActive = true;
     setIsLoading(true);
     setError(null);
 
     queryFnRef
       .current({ signal: controller.signal })
       .then((value) => {
-        if (controller.signal.aborted) {
+        if (!isActive || controller.signal.aborted) {
           return;
         }
 
@@ -139,7 +141,7 @@ export function useQuery<TData>(options: QueryOptions<TData>) {
         setError(null);
       })
       .catch((reason) => {
-        if (controller.signal.aborted) {
+        if (!isActive || controller.signal.aborted) {
           return;
         }
 
@@ -147,11 +149,20 @@ export function useQuery<TData>(options: QueryOptions<TData>) {
         client.queryCache?.config.onError?.(reason, { queryKey: queryKeyRef.current });
       })
       .finally(() => {
-        if (!controller.signal.aborted) setIsLoading(false);
+        if (!isActive || controller.signal.aborted) {
+          return;
+        }
+
+        setIsLoading(false);
       });
 
-    return () => controller.abort();
-  }, [bump, keyString, options.enabled, client]);
+    return () => {
+      isActive = false;
+      if (options.cancelOnUnmount !== false) {
+        controller.abort();
+      }
+    };
+  }, [bump, keyString, options.cancelOnUnmount, options.enabled, client]);
 
   return {
     data,
@@ -191,3 +202,4 @@ export function useMutation<TData, TVariables>(options: MutationOptions<TData, T
 
   return { mutate, isPending, error };
 }
+

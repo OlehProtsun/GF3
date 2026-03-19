@@ -72,6 +72,12 @@ namespace DataAccessLayer.Migrations
                         .HasColumnType("INTEGER")
                         .HasColumnName("employee_id");
 
+                    b.Property<int>("DisplayOrder")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER")
+                        .HasDefaultValue(0)
+                        .HasColumnName("display_order");
+
                     b.HasKey("Id");
 
                     b.HasIndex("EmployeeId");
@@ -251,6 +257,12 @@ namespace DataAccessLayer.Migrations
                         .HasColumnType("INTEGER")
                         .HasColumnName("id");
 
+                    b.Property<int>("DisplayOrder")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER")
+                        .HasDefaultValue(0)
+                        .HasColumnName("display_order");
+
                     b.Property<int>("EmployeeId")
                         .HasColumnType("INTEGER")
                         .HasColumnName("employee_id");
@@ -376,6 +388,142 @@ namespace DataAccessLayer.Migrations
                             t.HasCheckConstraint("ck_schedule_shift1_format", "shift1_time LIKE '__:__ - __:__'");
 
                             t.HasCheckConstraint("ck_schedule_shift2_format", "shift2_time LIKE '__:__ - __:__'");
+                        });
+                });
+
+            modelBuilder.Entity("DataAccessLayer.Models.SchedulePresetEmployeeModel", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("id");
+
+                    b.Property<int>("EmployeeId")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("employee_id");
+
+                    b.Property<int>("MinHoursMonth")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("min_hours_month");
+
+                    b.Property<int>("SchedulePresetId")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("schedule_preset_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EmployeeId")
+                        .HasDatabaseName("ix_schedule_preset_employee_employee");
+
+                    b.HasIndex("SchedulePresetId", "EmployeeId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_schedule_preset_employee");
+
+                    b.ToTable("schedule_preset_employee", t =>
+                        {
+                            t.HasCheckConstraint("ck_schedule_preset_employee_min_hours", "min_hours_month >= 0");
+                        });
+                });
+
+            modelBuilder.Entity("DataAccessLayer.Models.SchedulePresetModel", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("id");
+
+                    b.Property<int?>("AvailabilityGroupId")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("availability_group_id");
+
+                    b.Property<int>("ContainerId")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("container_id");
+
+                    b.Property<int>("MaxConsecutiveDays")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("max_consecutive_days");
+
+                    b.Property<int>("MaxConsecutiveFull")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("max_consecutive_full");
+
+                    b.Property<int>("MaxFullPerMonth")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("max_full_per_month");
+
+                    b.Property<int>("MaxHoursPerEmpMonth")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("max_hours_per_emp_month");
+
+                    b.Property<int>("Month")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("month");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("TEXT")
+                        .HasColumnName("name");
+
+                    b.Property<int>("PeoplePerShift")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("people_per_shift");
+
+                    b.Property<string>("ScheduleName")
+                        .IsRequired()
+                        .HasColumnType("TEXT")
+                        .HasColumnName("schedule_name");
+
+                    b.Property<string>("Shift1Time")
+                        .IsRequired()
+                        .HasColumnType("TEXT")
+                        .HasColumnName("shift1_time");
+
+                    b.Property<string>("Shift2Time")
+                        .IsRequired()
+                        .HasColumnType("TEXT")
+                        .HasColumnName("shift2_time");
+
+                    b.Property<int>("ShopId")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("shop_id");
+
+                    b.Property<int>("Year")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("year");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AvailabilityGroupId")
+                        .HasDatabaseName("ix_schedule_preset_avail_group");
+
+                    b.HasIndex("ContainerId")
+                        .HasDatabaseName("ix_schedule_preset_container");
+
+                    b.HasIndex("ShopId")
+                        .HasDatabaseName("ix_schedule_preset_shop");
+
+                    b.HasIndex("ContainerId", "Name")
+                        .IsUnique()
+                        .HasDatabaseName("ux_schedule_preset_container_name");
+
+                    b.ToTable("schedule_preset", t =>
+                        {
+                            t.HasCheckConstraint("ck_schedule_preset_max_consecutive_days", "max_consecutive_days >= 1");
+
+                            t.HasCheckConstraint("ck_schedule_preset_max_consecutive_full", "max_consecutive_full >= 1");
+
+                            t.HasCheckConstraint("ck_schedule_preset_max_full_per_month", "max_full_per_month >= 1");
+
+                            t.HasCheckConstraint("ck_schedule_preset_max_hours_per_emp_month", "max_hours_per_emp_month >= 1");
+
+                            t.HasCheckConstraint("ck_schedule_preset_month", "month BETWEEN 1 AND 12");
+
+                            t.HasCheckConstraint("ck_schedule_preset_people_per_shift", "people_per_shift >= 1");
+
+                            t.HasCheckConstraint("ck_schedule_preset_shift1_format", "shift1_time LIKE '__:__ - __:__'");
+
+                            t.HasCheckConstraint("ck_schedule_preset_shift2_format", "shift2_time LIKE '__:__ - __:__'");
                         });
                 });
 
@@ -573,6 +721,43 @@ namespace DataAccessLayer.Migrations
                     b.Navigation("Shop");
                 });
 
+            modelBuilder.Entity("DataAccessLayer.Models.SchedulePresetEmployeeModel", b =>
+                {
+                    b.HasOne("DataAccessLayer.Models.EmployeeModel")
+                        .WithMany()
+                        .HasForeignKey("EmployeeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("DataAccessLayer.Models.SchedulePresetModel", "SchedulePreset")
+                        .WithMany("Employees")
+                        .HasForeignKey("SchedulePresetId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("SchedulePreset");
+                });
+
+            modelBuilder.Entity("DataAccessLayer.Models.SchedulePresetModel", b =>
+                {
+                    b.HasOne("DataAccessLayer.Models.AvailabilityGroupModel")
+                        .WithMany()
+                        .HasForeignKey("AvailabilityGroupId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("DataAccessLayer.Models.ContainerModel")
+                        .WithMany()
+                        .HasForeignKey("ContainerId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("DataAccessLayer.Models.ShopModel")
+                        .WithMany()
+                        .HasForeignKey("ShopId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("DataAccessLayer.Models.ScheduleSlotModel", b =>
                 {
                     b.HasOne("DataAccessLayer.Models.EmployeeModel", "Employee")
@@ -620,6 +805,11 @@ namespace DataAccessLayer.Migrations
                     b.Navigation("Employees");
 
                     b.Navigation("Slots");
+                });
+
+            modelBuilder.Entity("DataAccessLayer.Models.SchedulePresetModel", b =>
+                {
+                    b.Navigation("Employees");
                 });
 
             modelBuilder.Entity("DataAccessLayer.Models.ShopModel", b =>

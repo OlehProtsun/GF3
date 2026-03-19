@@ -10,6 +10,7 @@ export type AvailabilityMatrixColumn = {
   employeeId: number;
   memberId?: number | null;
   label: string;
+  displayOrder?: number | null;
 };
 
 export type AvailabilityMatrixCellMap = Record<string, string>;
@@ -19,6 +20,32 @@ export type AvailabilityCodeParseResult = {
   kind: number;
   intervalStr: string | null;
 };
+
+function normalizeAvailabilityDisplayOrder(displayOrder?: number | null) {
+  if (Number.isInteger(displayOrder) && (displayOrder as number) >= 0) {
+    return displayOrder as number;
+  }
+
+  return Number.MAX_SAFE_INTEGER;
+}
+
+export function sortAvailabilityColumns<T extends AvailabilityMatrixColumn>(columns: T[]) {
+  return [...columns].sort((left, right) => {
+    const orderDifference =
+      normalizeAvailabilityDisplayOrder(left.displayOrder) - normalizeAvailabilityDisplayOrder(right.displayOrder);
+
+    if (orderDifference !== 0) {
+      return orderDifference;
+    }
+
+    const labelDifference = left.label.localeCompare(right.label);
+    if (labelDifference !== 0) {
+      return labelDifference;
+    }
+
+    return left.employeeId - right.employeeId;
+  });
+}
 
 export function getAvailabilityCellKey(employeeId: number, dayOfMonth: number) {
   return `${employeeId}:${dayOfMonth}`;
@@ -200,13 +227,15 @@ export function buildAvailabilityColumns(
   members: AvailabilityGroupMember[],
   employeeNameById: Map<number, string>
 ): AvailabilityMatrixColumn[] {
-  return [...members]
+  return sortAvailabilityColumns(
+    [...members]
     .map(member => ({
       employeeId: member.employeeId,
       memberId: member.id,
+      displayOrder: member.displayOrder,
       label: employeeNameById.get(member.employeeId) ?? `Employee #${member.employeeId}`,
     }))
-    .sort((left, right) => left.label.localeCompare(right.label));
+  );
 }
 
 export function buildAvailabilityCellMap(
@@ -234,24 +263,27 @@ export function buildAvailabilityColumnsFromItems(
   items: AvailabilityGroupItem[],
   employeeNameById: Map<number, string>
 ): AvailabilityMatrixColumn[] {
-  const memberById = new Map<number, { employeeId: number; memberId: number }>();
+  const memberById = new Map<number, { employeeId: number; memberId: number; displayOrder: number }>();
 
   items.forEach(item => {
     if (!memberById.has(item.memberId)) {
       memberById.set(item.memberId, {
         employeeId: item.employeeId,
         memberId: item.memberId,
+        displayOrder: item.displayOrder,
       });
     }
   });
 
-  return [...memberById.values()]
+  return sortAvailabilityColumns(
+    [...memberById.values()]
     .map(member => ({
       employeeId: member.employeeId,
       memberId: member.memberId,
+      displayOrder: member.displayOrder,
       label: employeeNameById.get(member.employeeId) ?? `Employee #${member.employeeId}`,
     }))
-    .sort((left, right) => left.label.localeCompare(right.label));
+  );
 }
 
 export function buildAvailabilityCellMapFromItems(

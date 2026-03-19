@@ -19,7 +19,8 @@ namespace BusinessLogicLayer.Services.Export
             {
                 Schedule = Map(schedule),
                 Employees = (employees ?? Array.Empty<ScheduleEmployeeModel>())
-                    .OrderBy(e => e.EmployeeId)
+                    .OrderBy(e => e.DisplayOrder)
+                    .ThenBy(e => e.EmployeeId)
                     .Select(Map)
                     .ToList(),
                 Slots = (slots ?? Array.Empty<ScheduleSlotModel>())
@@ -32,7 +33,8 @@ namespace BusinessLogicLayer.Services.Export
                     .ToList(),
                 AvailabilityGroup = availabilityGroup is null ? null : Map(availabilityGroup),
                 AvailabilityMembers = (availabilityMembers ?? Array.Empty<AvailabilityGroupMemberModel>())
-                    .OrderBy(m => m.EmployeeId)
+                    .OrderBy(m => m.DisplayOrder)
+                    .ThenBy(m => m.EmployeeId)
                     .Select(Map)
                     .ToList(),
                 AvailabilityDays = (availabilityDays ?? Array.Empty<AvailabilityGroupDayModel>())
@@ -66,7 +68,8 @@ namespace BusinessLogicLayer.Services.Export
             Id = source.Id,
             ScheduleId = source.ScheduleId,
             EmployeeId = source.EmployeeId,
-            MinHoursMonth = (int)source.MinHoursMonth
+            MinHoursMonth = (int)source.MinHoursMonth,
+            DisplayOrder = source.DisplayOrder
         };
 
         private static ScheduleSlotSqlDto Map(ScheduleSlotModel source) => new()
@@ -103,7 +106,8 @@ namespace BusinessLogicLayer.Services.Export
         {
             Id = source.Id,
             AvailabilityGroupId = source.AvailabilityGroupId,
-            EmployeeId = source.EmployeeId
+            EmployeeId = source.EmployeeId,
+            DisplayOrder = source.DisplayOrder
         };
 
         private static AvailabilityGroupDaySqlDto Map(AvailabilityGroupDayModel source) => new()

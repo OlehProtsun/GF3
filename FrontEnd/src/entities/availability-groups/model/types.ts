@@ -10,6 +10,7 @@ export type AvailabilityGroup = {
 export type AvailabilityGroupItem = {
   memberId: number;
   employeeId: number;
+  displayOrder: number;
   dayId: number;
   dayOfMonth: number;
   kind: AvailabilityKind;
@@ -20,6 +21,7 @@ export type AvailabilityGroupMember = {
   id: number;
   availabilityGroupId: number;
   employeeId: number;
+  displayOrder: number;
 };
 
 export type AvailabilitySlot = {

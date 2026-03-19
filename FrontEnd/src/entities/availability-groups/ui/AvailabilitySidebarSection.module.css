@@ -80,6 +80,7 @@
 .sectionShellCollapsedCompact .sectionExpandButton,
 .sectionShellCollapsedFlush .sectionExpandButton {
   left: 0;
+  top: 5px;
   width: 42px;
   border-radius: 0 999px 999px 0;
   opacity: 1;

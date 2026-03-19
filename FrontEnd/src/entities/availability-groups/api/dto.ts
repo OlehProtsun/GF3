@@ -6,7 +6,7 @@ export type AvailabilityGroupMemberDto = AvailabilityGroupMember;
 export type AvailabilitySlotDto = AvailabilitySlot;
 
 export type SaveAvailabilityGroupDto = { name: string; year: number; month: number };
-export type SaveAvailabilityGroupMemberDto = { employeeId: number };
+export type SaveAvailabilityGroupMemberDto = { employeeId: number; displayOrder: number };
 export type SaveAvailabilitySlotDto = {
   availabilityGroupMemberId: number;
   dayOfMonth: number;

@@ -19,6 +19,7 @@ namespace DataAccessLayer.Models.DataBaseContext
             serviceCollection.AddScoped<IEmployeeRepository, EmployeeRepository>();
             serviceCollection.AddScoped<IShopRepository, ShopRepository>();
             serviceCollection.AddScoped<IScheduleRepository, ScheduleRepository>();
+            serviceCollection.AddScoped<ISchedulePresetRepository, SchedulePresetRepository>();
             serviceCollection.AddScoped<IScheduleEmployeeRepository, ScheduleEmployeeRepository>();
             serviceCollection.AddScoped<IScheduleSlotRepository, ScheduleSlotRepository>();
             serviceCollection.AddScoped<IScheduleCellStyleRepository, ScheduleCellStyleRepository>();

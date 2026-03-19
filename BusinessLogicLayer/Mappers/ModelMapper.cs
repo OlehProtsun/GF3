@@ -99,8 +99,17 @@ internal static class ModelMapper
         Id = model.Id,
         AvailabilityGroupId = model.AvailabilityGroupId,
         EmployeeId = model.EmployeeId,
+        DisplayOrder = model.DisplayOrder,
         Employee = model.Employee is null ? null : model.Employee.ToContract(),
         Days = model.Days?.Select(ToContract).ToList() ?? new List<AvailabilityGroupDayModel>()
+    };
+
+    internal static Dal.AvailabilityGroupMemberModel ToDal(this AvailabilityGroupMemberModel model) => new()
+    {
+        Id = model.Id,
+        AvailabilityGroupId = model.AvailabilityGroupId,
+        EmployeeId = model.EmployeeId,
+        DisplayOrder = model.DisplayOrder,
     };
 
     internal static AvailabilityGroupModel ToContract(this Dal.AvailabilityGroupModel model) => new()
@@ -126,7 +135,8 @@ internal static class ModelMapper
         ScheduleId = model.ScheduleId,
         EmployeeId = model.EmployeeId,
         Employee = model.Employee is null ? null : model.Employee.ToContract(),
-        MinHoursMonth = model.MinHoursMonth
+        MinHoursMonth = model.MinHoursMonth,
+        DisplayOrder = model.DisplayOrder
     };
 
     internal static Dal.ScheduleEmployeeModel ToDal(this ScheduleEmployeeModel model) => new()
@@ -134,7 +144,8 @@ internal static class ModelMapper
         Id = model.Id,
         ScheduleId = model.ScheduleId,
         EmployeeId = model.EmployeeId,
-        MinHoursMonth = model.MinHoursMonth
+        MinHoursMonth = model.MinHoursMonth,
+        DisplayOrder = model.DisplayOrder
     };
 
     internal static ScheduleSlotModel ToContract(this Dal.ScheduleSlotModel model) => new()
@@ -180,6 +191,62 @@ internal static class ModelMapper
         EmployeeId = model.EmployeeId,
         BackgroundColorArgb = model.BackgroundColorArgb,
         TextColorArgb = model.TextColorArgb
+    };
+
+    internal static SchedulePresetEmployeeModel ToContract(this Dal.SchedulePresetEmployeeModel model) => new()
+    {
+        Id = model.Id,
+        SchedulePresetId = model.SchedulePresetId,
+        EmployeeId = model.EmployeeId,
+        MinHoursMonth = model.MinHoursMonth
+    };
+
+    internal static Dal.SchedulePresetEmployeeModel ToDal(this SchedulePresetEmployeeModel model) => new()
+    {
+        Id = model.Id,
+        SchedulePresetId = model.SchedulePresetId,
+        EmployeeId = model.EmployeeId,
+        MinHoursMonth = model.MinHoursMonth
+    };
+
+    internal static SchedulePresetModel ToContract(this Dal.SchedulePresetModel model) => new()
+    {
+        Id = model.Id,
+        ContainerId = model.ContainerId,
+        Name = model.Name,
+        ScheduleName = model.ScheduleName,
+        ShopId = model.ShopId,
+        Year = model.Year,
+        Month = model.Month,
+        PeoplePerShift = model.PeoplePerShift,
+        Shift1Time = model.Shift1Time,
+        Shift2Time = model.Shift2Time,
+        MaxHoursPerEmpMonth = model.MaxHoursPerEmpMonth,
+        MaxConsecutiveDays = model.MaxConsecutiveDays,
+        MaxConsecutiveFull = model.MaxConsecutiveFull,
+        MaxFullPerMonth = model.MaxFullPerMonth,
+        AvailabilityGroupId = model.AvailabilityGroupId,
+        Employees = model.Employees?.Select(ToContract).ToList() ?? new List<SchedulePresetEmployeeModel>()
+    };
+
+    internal static Dal.SchedulePresetModel ToDal(this SchedulePresetModel model) => new()
+    {
+        Id = model.Id,
+        ContainerId = model.ContainerId,
+        Name = model.Name,
+        ScheduleName = model.ScheduleName,
+        ShopId = model.ShopId,
+        Year = model.Year,
+        Month = model.Month,
+        PeoplePerShift = model.PeoplePerShift,
+        Shift1Time = model.Shift1Time,
+        Shift2Time = model.Shift2Time,
+        MaxHoursPerEmpMonth = model.MaxHoursPerEmpMonth,
+        MaxConsecutiveDays = model.MaxConsecutiveDays,
+        MaxConsecutiveFull = model.MaxConsecutiveFull,
+        MaxFullPerMonth = model.MaxFullPerMonth,
+        AvailabilityGroupId = model.AvailabilityGroupId,
+        Employees = model.Employees?.Select(ToDal).ToList() ?? new List<Dal.SchedulePresetEmployeeModel>()
     };
 
     internal static ScheduleModel ToContract(this Dal.ScheduleModel model) => new()

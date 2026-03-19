@@ -11,6 +11,8 @@ namespace BusinessLogicLayer.Services.Abstractions
         Task<ScheduleModel> CreateGraphAsync(int containerId, ScheduleModel model, CancellationToken ct = default);
         Task UpdateGraphAsync(int containerId, int graphId, ScheduleModel model, CancellationToken ct = default);
         Task DeleteGraphAsync(int containerId, int graphId, CancellationToken ct = default);
+        Task<List<SchedulePresetModel>> GetSchedulePresetsAsync(int containerId, CancellationToken ct = default);
+        Task<SchedulePresetModel> CreateSchedulePresetAsync(int containerId, SchedulePresetModel model, CancellationToken ct = default);
 
         Task<GenerateGraphResult> GenerateGraphAsync(
             int containerId,

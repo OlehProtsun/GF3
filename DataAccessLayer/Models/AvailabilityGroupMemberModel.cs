@@ -28,6 +28,10 @@ namespace DataAccessLayer.Models
 
         public EmployeeModel Employee { get; set; } = null!;
 
+        [Required]
+        [Column("display_order")]
+        public int DisplayOrder { get; set; }
+
         public ICollection<AvailabilityGroupDayModel> Days { get; set; } = new List<AvailabilityGroupDayModel>();
     }
 }

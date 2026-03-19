@@ -10,7 +10,9 @@ import type {
   SaveContainerDto,
   SaveGraphDto,
   SaveGraphEmployeeDto,
+  SaveSchedulePresetDto,
   SaveGraphSlotDto,
+  SchedulePresetDto,
   UpsertGraphCellStyleDto,
 } from "./dto";
 
@@ -29,6 +31,10 @@ export const containersApi = {
   updateGraph: (containerId: number, graphId: number, payload: SaveGraphDto) =>
     request<void>(`${endpoint}/${containerId}/graphs/${graphId}`, { method: "PUT", body: payload }),
   removeGraph: (containerId: number, graphId: number) => request<void>(`${endpoint}/${containerId}/graphs/${graphId}`, { method: "DELETE" }),
+  listSchedulePresets: (containerId: number, signal?: AbortSignal) =>
+    request<SchedulePresetDto[]>(`${endpoint}/${containerId}/schedule-presets`, { signal }),
+  createSchedulePreset: (containerId: number, payload: SaveSchedulePresetDto) =>
+    request<SchedulePresetDto>(`${endpoint}/${containerId}/schedule-presets`, { method: "POST", body: payload }),
   generateGraph: (containerId: number, graphId: number, payload: GenerateGraphRequestDto) =>
     request<GenerateGraphResponseDto>(`${endpoint}/${containerId}/graphs/${graphId}/generate`, { method: "POST", body: payload }),
 

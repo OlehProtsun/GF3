@@ -29,6 +29,10 @@ namespace DataAccessLayer.Repositories
                 .AsNoTracking()
                 .Include(m => m.Employee)
                 .Where(m => m.AvailabilityGroupId == groupId)
+                .OrderBy(m => m.DisplayOrder)
+                .ThenBy(m => m.Employee != null ? m.Employee.FirstName : string.Empty)
+                .ThenBy(m => m.Employee != null ? m.Employee.LastName : string.Empty)
+                .ThenBy(m => m.EmployeeId)
                 .ToListAsync(ct)
                 .ConfigureAwait(false);
         }

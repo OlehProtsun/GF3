@@ -10,20 +10,23 @@ public static class AvailabilityGroupNestedMapper
     {
         Id = model.Id,
         AvailabilityGroupId = model.AvailabilityGroupId,
-        EmployeeId = model.EmployeeId
+        EmployeeId = model.EmployeeId,
+        DisplayOrder = model.DisplayOrder,
     };
 
     public static AvailabilityGroupMemberModel ToCreateMemberModel(this CreateAvailabilityGroupMemberRequest request, int groupId) => new()
     {
         AvailabilityGroupId = groupId,
-        EmployeeId = request.EmployeeId
+        EmployeeId = request.EmployeeId,
+        DisplayOrder = request.DisplayOrder,
     };
 
     public static AvailabilityGroupMemberModel ToUpdateMemberModel(this UpdateAvailabilityGroupMemberRequest request, int groupId, int memberId) => new()
     {
         Id = memberId,
         AvailabilityGroupId = groupId,
-        EmployeeId = request.EmployeeId
+        EmployeeId = request.EmployeeId,
+        DisplayOrder = request.DisplayOrder,
     };
 
     public static AvailabilitySlotDto ToSlotDto(this AvailabilityGroupDayModel model) => new()

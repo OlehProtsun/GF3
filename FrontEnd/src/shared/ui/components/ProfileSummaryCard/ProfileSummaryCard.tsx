@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import { DetailItem, DetailList } from "@shared/ui/components/DetailList";
 import { CardSection } from "@shared/ui/sections/CardSection";
 import styles from "./ProfileSummaryCard.module.css";
@@ -19,9 +19,11 @@ type ProfileSummaryCardProps = {
   name?: ReactNode;
   subtitle?: ReactNode;
   details?: ProfileSummaryDetail[];
+  contentAfterIdentity?: ReactNode;
   detailColumns?: 1 | 2 | 3;
   actions?: ReactNode;
   className?: string;
+  style?: CSSProperties;
 };
 
 export function ProfileSummaryCard({
@@ -34,13 +36,20 @@ export function ProfileSummaryCard({
   name,
   subtitle,
   details = [],
+  contentAfterIdentity,
   detailColumns = 2,
   actions,
   className,
+  style,
 }: ProfileSummaryCardProps) {
   const cardClassName = [styles.card, className ?? ""].filter(Boolean).join(" ");
   const hasProfileContent =
-    avatar != null || name != null || subtitle != null || details.length > 0 || actions != null;
+    avatar != null ||
+    name != null ||
+    subtitle != null ||
+    details.length > 0 ||
+    contentAfterIdentity != null ||
+    actions != null;
   const identityClassName = [
     styles.identityBlock,
     avatar == null ? styles.identityBlockNoAvatar : "",
@@ -59,6 +68,7 @@ export function ProfileSummaryCard({
   return (
     <CardSection
       className={cardClassName}
+      style={style}
       title={sectionTitle}
       icon={icon}
       headerRightSlot={resolvedHeaderRightSlot}
@@ -94,6 +104,8 @@ export function ProfileSummaryCard({
                 ) : null}
               </div>
             </div>
+
+            {contentAfterIdentity}
 
             {actions ? <div className={styles.actions}>{actions}</div> : null}
           </>

@@ -6,4 +6,5 @@ public sealed class GraphEmployeeDto
     public int ScheduleId { get; set; }
     public int EmployeeId { get; set; }
     public int? MinHoursMonth { get; set; }
+    public int DisplayOrder { get; set; }
 }

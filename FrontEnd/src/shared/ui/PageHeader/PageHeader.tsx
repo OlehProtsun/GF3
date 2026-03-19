@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { BackIcon, SearchIcon } from "@shared/ui/icons";
@@ -9,6 +9,7 @@ type PageHeaderProps = {
   title: string;
   subtitle?: string;
   backTo?: string | number | null;
+  onBack?: () => void;
   backLabel?: string;
   rightSlot?: ReactNode;
   searchMeta?: ReactNode;
@@ -24,6 +25,7 @@ type PageHeaderProps = {
   fullBleed?: boolean;
   gutter?: number;
   className?: string;
+  onCollapseChange?: (isCollapsed: boolean) => void;
 };
 
 export function PageHeader({
@@ -31,6 +33,7 @@ export function PageHeader({
   title,
   subtitle,
   backTo = null,
+  onBack,
   backLabel = "Back",
   rightSlot,
   searchMeta,
@@ -39,6 +42,7 @@ export function PageHeader({
   fullBleed = true,
   gutter = 14,
   className,
+  onCollapseChange,
 }: PageHeaderProps) {
   const navigate = useNavigate();
   const headerRef = useRef<HTMLElement | null>(null);
@@ -50,7 +54,9 @@ export function PageHeader({
   useLayoutEffect(() => {
     const headerElement = headerRef.current;
     const collapsedElement = collapsedRef.current;
-    if (!headerElement || !collapsedElement) return;
+    if (!headerElement || !collapsedElement) {
+      return;
+    }
 
     const updateHeaderHeight = () => {
       const nextHeight = Math.ceil(headerElement.getBoundingClientRect().height);
@@ -74,7 +80,11 @@ export function PageHeader({
       headerObserver.disconnect();
       collapsedObserver.disconnect();
     };
-  }, [eyebrow, title, subtitle, backTo, rightSlot, searchMeta, search, variant, fullBleed, gutter, className]);
+  }, [eyebrow, title, subtitle, backTo, onBack, rightSlot, searchMeta, search, variant, fullBleed, gutter, className]);
+
+  useEffect(() => {
+    onCollapseChange?.(isCollapsed);
+  }, [isCollapsed, onCollapseChange]);
 
   const headerClassName = [
     styles.header,
@@ -96,6 +106,18 @@ export function PageHeader({
 
   const hasSearchCluster = Boolean(search || searchMeta);
   const spacerHeight = isCollapsed ? (collapsedHeight || 48) : headerHeight;
+  const hasBackAction = onBack != null || (backTo !== null && backTo !== undefined);
+
+  const handleBackClick = () => {
+    if (onBack) {
+      onBack();
+      return;
+    }
+
+    if (backTo !== null && backTo !== undefined) {
+      navigate(backTo);
+    }
+  };
 
   return (
     <>
@@ -120,12 +142,12 @@ export function PageHeader({
                     <BackIcon className={`${styles.toggleIcon} ${styles.toggleIconUp}`} />
                   </button>
 
-                  {backTo !== null && backTo !== undefined ? (
+                  {hasBackAction ? (
                     <div className={styles.backRow}>
                       <button
                         type="button"
                         className={styles.backButton}
-                        onClick={() => navigate(backTo)}
+                        onClick={handleBackClick}
                       >
                         <BackIcon className={styles.backIcon} />
                         <span>{backLabel}</span>

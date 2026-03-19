@@ -24,6 +24,31 @@ export type Graph = {
   availabilityGroupId?: number | null;
 };
 
+export type SchedulePresetEmployee = {
+  id: number;
+  employeeId: number;
+  minHoursMonth: number;
+};
+
+export type SchedulePreset = {
+  id: number;
+  containerId: number;
+  name: string;
+  scheduleName: string;
+  shopId: number;
+  year: number;
+  month: number;
+  peoplePerShift: number;
+  shift1Time: string;
+  shift2Time: string;
+  maxHoursPerEmpMonth: number;
+  maxConsecutiveDays: number;
+  maxConsecutiveFull: number;
+  maxFullPerMonth: number;
+  availabilityGroupId?: number | null;
+  employees: SchedulePresetEmployee[];
+};
+
 export type GraphSlot = {
   id: number;
   scheduleId: number;
@@ -40,6 +65,7 @@ export type GraphEmployee = {
   scheduleId: number;
   employeeId: number;
   minHoursMonth?: number | null;
+  displayOrder: number;
 };
 
 export type GraphCellStyle = {
