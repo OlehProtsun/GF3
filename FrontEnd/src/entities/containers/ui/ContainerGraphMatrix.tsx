@@ -465,9 +465,11 @@ export function ContainerGraphMatrix({
     [compactSize, style],
   );
   const hasToolbar = Boolean(toolbar);
+  const isEmpty = columns.length === 0;
   const layoutClassName = joinClassNames(
     styles.layout,
     hasToolbar && styles.layoutWithToolbar,
+    isEmpty && styles.layoutEmpty,
     useCompactShell && styles.layoutCompact,
   );
   const orderedEmployeeIds = useMemo(() => columns.map(column => column.employeeId), [columns]);
@@ -970,7 +972,7 @@ export function ContainerGraphMatrix({
 
         {hasToolbar ? <div className={styles.toolbar}>{toolbar}</div> : null}
 
-        {columns.length === 0 ? (
+        {isEmpty ? (
           <div className={styles.emptyState}>{resolvedEmptyMessage}</div>
         ) : (
           <div className={joinClassNames(styles.tableShell, useCompactShell && styles.tableShellCompact)}>

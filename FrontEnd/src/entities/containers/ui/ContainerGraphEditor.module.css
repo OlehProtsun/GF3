@@ -13,6 +13,7 @@
   --schedule-details-min-hours-input-width: 152px;
   --schedule-details-min-hours-list-height: 396px;
   --employee-list-height: 332px;
+  --employee-empty-height: 92px;
 }
 
 .layoutCollapsed {
@@ -307,6 +308,12 @@
 .detailsMinHoursList {
   display: grid;
   gap: 0;
+  align-content: start;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.58);
+}
+
+.detailsMinHoursListScrollable {
   min-height: var(--schedule-details-min-hours-list-height);
   max-height: var(--schedule-details-min-hours-list-height);
   overflow-y: auto;
@@ -316,17 +323,15 @@
   will-change: scroll-position;
   scrollbar-gutter: stable;
   padding-right: 4px;
-  border-radius: 18px;
-  background: rgba(255, 255, 255, 0.58);
   scrollbar-width: thin;
   scrollbar-color: #d6dbe3 transparent;
 }
 
-.detailsMinHoursList::-webkit-scrollbar {
+.detailsMinHoursListScrollable::-webkit-scrollbar {
   width: 8px;
 }
 
-.detailsMinHoursList::-webkit-scrollbar-thumb {
+.detailsMinHoursListScrollable::-webkit-scrollbar-thumb {
   border-radius: 999px;
   border: 2px solid transparent;
   background: #d6dbe3;
@@ -358,7 +363,7 @@
 .detailsActions {
   display: flex;
   justify-content: flex-end;
-  margin-top: 4px;
+  margin-top: 18px;
   padding-bottom: 18px;
 }
 
@@ -405,6 +410,12 @@
 .employeeList {
   display: grid;
   gap: 8px;
+  align-content: start;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.58);
+}
+
+.employeeListScrollable {
   min-height: var(--employee-list-height);
   max-height: var(--employee-list-height);
   overflow-y: auto;
@@ -416,15 +427,13 @@
   padding-right: 4px;
   scrollbar-width: thin;
   scrollbar-color: #d6dbe3 transparent;
-  border-radius: 18px;
-  background: rgba(255, 255, 255, 0.58);
 }
 
-.employeeList::-webkit-scrollbar {
+.employeeListScrollable::-webkit-scrollbar {
   width: 8px;
 }
 
-.employeeList::-webkit-scrollbar-thumb {
+.employeeListScrollable::-webkit-scrollbar-thumb {
   border-radius: 999px;
   border: 2px solid transparent;
   background: #d6dbe3;
@@ -463,8 +472,8 @@
 }
 
 .employeeEmpty {
-  min-height: var(--employee-list-height);
-  max-height: var(--employee-list-height);
+  min-height: var(--employee-empty-height);
+  max-height: none;
   display: grid;
   place-items: center;
   border-radius: 20px;
@@ -896,6 +905,14 @@
   .employeeActionRow,
   .employeeRow {
     grid-template-columns: 1fr;
+  }
+
+  .employeeList,
+  .employeeListScrollable {
+    min-height: auto;
+    max-height: none;
+    overflow: visible;
+    padding-right: 0;
   }
 
   .employeeRowActions {

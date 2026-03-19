@@ -80,6 +80,7 @@ export function ContainerGraphDetailsFields({
   onFieldChange,
   onEmployeeMinHoursChange,
 }: ContainerGraphDetailsFieldsProps) {
+  const hasScrollableMinHoursList = graphEmployeeRows.length > 5;
   const employeeById = useMemo(
     () => new Map(employees.map(employee => [employee.id, employee])),
     [employees],
@@ -132,6 +133,9 @@ export function ContainerGraphDetailsFields({
               id={`${idPrefix}-name`}
               className={styles.controlCompact}
               value={form.name}
+              placeholder="Example: March 2026 Main Shop"
+              aria-invalid={Boolean(formErrors.name)}
+              aria-describedby={formErrors.name ? `${idPrefix}-name-error` : undefined}
               onChange={event => onFieldChange("name")(event.target.value)}
             />
           </LabeledField>
@@ -204,6 +208,8 @@ export function ContainerGraphDetailsFields({
             id={`${idPrefix}-shift1`}
             className={styles.controlCompact}
             value={form.shift1Time}
+            aria-invalid={Boolean(formErrors.shift1Time)}
+            aria-describedby={formErrors.shift1Time ? `${idPrefix}-shift1-error` : undefined}
             onChange={event => onFieldChange("shift1Time")(event.target.value)}
           />
         </LabeledField>
@@ -213,6 +219,8 @@ export function ContainerGraphDetailsFields({
             id={`${idPrefix}-shift2`}
             className={styles.controlCompact}
             value={form.shift2Time}
+            aria-invalid={Boolean(formErrors.shift2Time)}
+            aria-describedby={formErrors.shift2Time ? `${idPrefix}-shift2-error` : undefined}
             onChange={event => onFieldChange("shift2Time")(event.target.value)}
           />
         </LabeledField>
@@ -339,7 +347,12 @@ export function ContainerGraphDetailsFields({
           {graphEmployeeRows.length === 0 ? (
             <div className={styles.detailsMinHoursEmpty}>Add employees first to set monthly minimum hours.</div>
           ) : (
-            <div className={styles.detailsMinHoursList}>
+            <div
+              className={joinClassNames(
+                styles.detailsMinHoursList,
+                hasScrollableMinHoursList && styles.detailsMinHoursListScrollable,
+              )}
+            >
               {graphEmployeeRows.map(row => {
                 const employee = employeeById.get(row.employeeId);
                 const employeeName = getEmployeeFullName(employee, `Employee ${row.employeeId}`);

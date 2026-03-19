@@ -449,6 +449,8 @@ const REGENERATION_FIELDS = new Set<keyof ContainerGraphFormState>([
   "availabilityGroupId",
 ]);
 
+const GENERATE_AVAILABILITY_GROUP_REQUIRED_MESSAGE = "Select an availability group before generating a schedule.";
+
 export function ContainerGraphEditPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -1092,9 +1094,13 @@ export function ContainerGraphEditPage() {
     setSubmitError(undefined);
   };
 
-  const handleValidate = () => {
+  const handleValidate = ({ requireAvailabilityGroup = false }: { requireAvailabilityGroup?: boolean } = {}) => {
     const nextFormErrors = buildGraphFormErrors(form, shopIdSet, availabilityGroupIdSet);
     const nextCellErrors = draftSlots.errors;
+
+    if (requireAvailabilityGroup && !form.availabilityGroupId) {
+      nextFormErrors.availabilityGroupId = GENERATE_AVAILABILITY_GROUP_REQUIRED_MESSAGE;
+    }
 
     setFormErrors(nextFormErrors);
     setCellErrors(nextCellErrors);
@@ -1105,7 +1111,17 @@ export function ContainerGraphEditPage() {
     }
 
     if (Object.keys(nextFormErrors).length > 0 || Object.keys(nextCellErrors).length > 0) {
-      setSubmitError("Check highlighted fields before continuing.");
+      const shouldShowAvailabilityMessage =
+        requireAvailabilityGroup &&
+        nextFormErrors.availabilityGroupId === GENERATE_AVAILABILITY_GROUP_REQUIRED_MESSAGE &&
+        Object.keys(nextFormErrors).length === 1 &&
+        Object.keys(nextCellErrors).length === 0;
+
+      setSubmitError(
+        shouldShowAvailabilityMessage
+          ? GENERATE_AVAILABILITY_GROUP_REQUIRED_MESSAGE
+          : "Check highlighted fields before continuing.",
+      );
       return false;
     }
 
@@ -1149,12 +1165,7 @@ export function ContainerGraphEditPage() {
   };
 
   const handleGenerate = async () => {
-    if (!containerId || !handleValidate()) {
-      return;
-    }
-
-    if (!form.availabilityGroupId) {
-      setSubmitError("Select an availability group before generating a schedule.");
+    if (!containerId || !handleValidate({ requireAvailabilityGroup: true })) {
       return;
     }
 

@@ -377,6 +377,7 @@ export function ContainerGraphEditor({
       .filter(employee => !assignedEmployeeIdSet.has(employee.id) || employee.id === selectedEmployeeId)
       .sort((left, right) => getEmployeeFullName(left).localeCompare(getEmployeeFullName(right)));
   }, [employees, graphEmployeeRows, selectedEmployeeId]);
+  const hasScrollableEmployeeList = graphEmployeeRows.length > 5;
   const employeeOptions = useMemo<SearchableSelectOption[]>(
     () =>
       availableEmployees.map(employee => ({
@@ -591,7 +592,12 @@ export function ContainerGraphEditor({
                       <span className={styles.detailsMinHoursTitle}>Employees in schedule</span>
                       <span className={styles.detailsMinHoursMeta}>{`${graphEmployeeRows.length} assigned`}</span>
                     </div>
-                    <div className={styles.employeeList}>
+                    <div
+                      className={joinClassNames(
+                        styles.employeeList,
+                        hasScrollableEmployeeList && styles.employeeListScrollable,
+                      )}
+                    >
                       {graphEmployeeRows.map(row => {
                         const employee = employeeById.get(row.employeeId);
 
