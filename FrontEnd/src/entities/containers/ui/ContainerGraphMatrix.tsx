@@ -21,6 +21,8 @@ import { CardSection } from "@shared/ui/sections/CardSection";
 import styles from "./ContainerGraphMatrix.module.css";
 
 export type GraphMatrixSelectionMode = "replace" | "toggle" | "range";
+export type ContainerGraphMatrixEditMode = "deferred" | "inline";
+export type ContainerGraphMatrixEmptyCellVariant = "neutral" | "danger";
 
 type ContainerGraphMatrixProps = {
   graph: Pick<Graph, "year" | "month">;
@@ -35,7 +37,11 @@ type ContainerGraphMatrixProps = {
   emptyMessage?: string;
   className?: string;
   style?: CSSProperties;
+  icon?: ReactNode;
   compactSize?: boolean;
+  preserveShellHeightOnCompact?: boolean;
+  editMode?: ContainerGraphMatrixEditMode;
+  emptyCellVariant?: ContainerGraphMatrixEmptyCellVariant;
   cellErrors?: Record<string, string>;
   toolbar?: ReactNode;
   headerCenterSlot?: ReactNode;
@@ -84,6 +90,9 @@ type MatrixValueCellProps = {
   isSelected: boolean;
   isEditing: boolean;
   readOnly: boolean;
+  isWeekend: boolean;
+  editMode: ContainerGraphMatrixEditMode;
+  emptyCellVariant: ContainerGraphMatrixEmptyCellVariant;
   highlightReadOnlyEmpty: boolean;
   backgroundColor?: string | null;
   textColor?: string | null;
@@ -91,6 +100,7 @@ type MatrixValueCellProps = {
   onFocusTargetRef?: (element: HTMLButtonElement | HTMLInputElement | null) => void;
   onEditorValueChange: (value: string) => void;
   onEditorBlur: () => void;
+  onInlineValueChange?: (value: string) => void;
 };
 
 type MatrixDayCellProps = {
@@ -278,6 +288,9 @@ const MatrixValueCell = memo(function MatrixValueCell({
   isSelected,
   isEditing,
   readOnly,
+  isWeekend,
+  editMode,
+  emptyCellVariant,
   highlightReadOnlyEmpty,
   backgroundColor,
   textColor,
@@ -285,19 +298,26 @@ const MatrixValueCell = memo(function MatrixValueCell({
   onFocusTargetRef,
   onEditorValueChange,
   onEditorBlur,
+  onInlineValueChange,
 }: MatrixValueCellProps) {
   const inlineStyle = {
     ...(backgroundColor ? { backgroundColor } : {}),
     ...(textColor ? { color: textColor } : {}),
   } satisfies CSSProperties;
   const cellTitle = getCellTitle(error, value);
+  const isInlineEditing = !readOnly && editMode === "inline";
+  const isDangerEmpty = isEmpty && emptyCellVariant === "danger";
 
   return (
     <td
       className={joinClassNames(
         styles.matrixCell,
         isEmpty && styles.emptyCell,
+        isDangerEmpty && styles.emptyCellDanger,
+        isDangerEmpty && isWeekend && styles.emptyCellDangerWeekend,
         readOnly && isEmpty && highlightReadOnlyEmpty && styles.readonlyEmptyCell,
+        readOnly && isDangerEmpty && styles.readonlyEmptyCellDanger,
+        readOnly && isDangerEmpty && isWeekend && styles.readonlyEmptyCellDangerWeekend,
         error && styles.errorCell,
         isSelected && styles.selectedCell,
         isEditing && styles.editingCell,
@@ -314,11 +334,27 @@ const MatrixValueCell = memo(function MatrixValueCell({
             className={joinClassNames(
               styles.readonlyValue,
               isEmpty && styles.cellValueEmpty,
+              isDangerEmpty && styles.dangerEmptyValue,
             )}
             title={cellTitle}
           >
             {value}
           </span>
+        ) : isInlineEditing ? (
+          <input
+            ref={onFocusTargetRef}
+            className={joinClassNames(
+              styles.cellEditor,
+              isEmpty && styles.cellValueEmpty,
+              isDangerEmpty && styles.dangerEmptyValue,
+            )}
+            value={value}
+            onChange={event => onInlineValueChange?.(event.target.value)}
+            aria-label={`${columnLabel} day ${dayOfMonth}`}
+            aria-invalid={Boolean(error)}
+            title={cellTitle}
+            data-matrix-editor="true"
+          />
         ) : isEditing ? (
           <input
             autoFocus
@@ -326,6 +362,7 @@ const MatrixValueCell = memo(function MatrixValueCell({
             className={joinClassNames(
               styles.cellEditor,
               isEmpty && styles.cellValueEmpty,
+              isDangerEmpty && styles.dangerEmptyValue,
             )}
             value={editorValue ?? value}
             onChange={event => onEditorValueChange(event.target.value)}
@@ -342,6 +379,7 @@ const MatrixValueCell = memo(function MatrixValueCell({
             className={joinClassNames(
               styles.cellButton,
               isEmpty && styles.cellValueEmpty,
+              isDangerEmpty && styles.dangerEmptyValue,
             )}
             aria-label={`${columnLabel} day ${dayOfMonth}`}
             aria-invalid={Boolean(error)}
@@ -368,7 +406,11 @@ export function ContainerGraphMatrix({
   emptyMessage,
   className,
   style,
+  icon = <ScheduleIcon size={18} />,
   compactSize = false,
+  preserveShellHeightOnCompact = false,
+  editMode = "deferred",
+  emptyCellVariant = "neutral",
   cellErrors = {},
   toolbar,
   headerCenterSlot,
@@ -411,7 +453,9 @@ export function ContainerGraphMatrix({
       }),
     [dayConflictMap, graph.month, graph.year],
   );
-  const cardClassName = [styles.card, compactSize ? styles.cardCompact : "", className ?? ""].filter(Boolean).join(" ");
+  const useCompactShell = compactSize && !preserveShellHeightOnCompact;
+  const effectiveEditMode: ContainerGraphMatrixEditMode = readOnly ? "deferred" : editMode;
+  const cardClassName = [styles.card, useCompactShell ? styles.cardCompact : "", className ?? ""].filter(Boolean).join(" ");
   const cardStyle = useMemo(
     () =>
       ({
@@ -424,7 +468,7 @@ export function ContainerGraphMatrix({
   const layoutClassName = joinClassNames(
     styles.layout,
     hasToolbar && styles.layoutWithToolbar,
-    compactSize && styles.layoutCompact,
+    useCompactShell && styles.layoutCompact,
   );
   const orderedEmployeeIds = useMemo(() => columns.map(column => column.employeeId), [columns]);
   const reorderableColumnIds = useMemo(
@@ -435,6 +479,7 @@ export function ContainerGraphMatrix({
     () =>
       ({
         "--matrix-column-count": String(columns.length),
+        "--matrix-value-column-width": `calc((100% - var(--matrix-day-column-width)) / ${Math.max(columns.length, 1)})`,
       }) as CSSProperties,
     [columns.length],
   );
@@ -773,7 +818,7 @@ export function ContainerGraphMatrix({
   };
 
   const handleTableDoubleClick = (event: MouseEvent<HTMLTableElement>) => {
-    if (readOnly) {
+    if (readOnly || effectiveEditMode === "inline") {
       return;
     }
 
@@ -803,6 +848,10 @@ export function ContainerGraphMatrix({
     }
 
     if (isEditorTarget) {
+      if (effectiveEditMode === "inline") {
+        return;
+      }
+
       if (event.key === "Escape") {
         event.preventDefault();
         cancelEditingCell();
@@ -912,7 +961,7 @@ export function ContainerGraphMatrix({
       className={cardClassName}
       style={cardStyle}
       title={title}
-      icon={<ScheduleIcon size={18} />}
+      icon={icon}
       headerCenterSlot={headerCenterSlot}
       headerRightSlot={headerRightSlot}
     >
@@ -924,8 +973,8 @@ export function ContainerGraphMatrix({
         {columns.length === 0 ? (
           <div className={styles.emptyState}>{resolvedEmptyMessage}</div>
         ) : (
-          <div className={joinClassNames(styles.tableShell, compactSize && styles.tableShellCompact)}>
-            <div className={joinClassNames(styles.tableScroll, compactSize && styles.tableScrollCompact)}>
+          <div className={joinClassNames(styles.tableShell, useCompactShell && styles.tableShellCompact)}>
+            <div className={joinClassNames(styles.tableScroll, useCompactShell && styles.tableScrollCompact)}>
               <table
                 className={styles.table}
                 style={tableStyle}
@@ -1033,6 +1082,9 @@ export function ContainerGraphMatrix({
                             isSelected={isSelected}
                             isEditing={isEditing}
                             readOnly={readOnly}
+                            isWeekend={day.isWeekend}
+                            editMode={effectiveEditMode}
+                            emptyCellVariant={emptyCellVariant}
                             highlightReadOnlyEmpty={highlightReadOnlyEmpty}
                             backgroundColor={cellStyle?.backgroundColor}
                             textColor={cellStyle?.textColor}
@@ -1042,6 +1094,7 @@ export function ContainerGraphMatrix({
                             }}
                             onEditorValueChange={setEditingValue}
                             onEditorBlur={isEditing ? flushEditingCell : NOOP}
+                            onInlineValueChange={nextValue => onCellChange?.(column.employeeId, day.dayOfMonth, nextValue)}
                           />
                         );
                       })}

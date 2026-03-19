@@ -21,9 +21,9 @@ public sealed class ApiExceptionMiddleware
         {
             await _next(context).ConfigureAwait(false);
         }
-        catch (OperationCanceledException) when (context.RequestAborted.IsCancellationRequested)
+        catch (OperationCanceledException ex) when (IsRequestCancellation(context, ex))
         {
-            if (!context.Response.HasStarted)
+            if (!context.Response.HasStarted && context.RequestAborted.IsCancellationRequested)
             {
                 context.Response.StatusCode = 499;
             }
@@ -52,6 +52,11 @@ public sealed class ApiExceptionMiddleware
 
     private static Task WriteValidationAsync(HttpContext context, Exception ex)
     {
+        if (context.RequestAborted.IsCancellationRequested || context.Response.HasStarted)
+        {
+            return Task.CompletedTask;
+        }
+
         var errors = BuildValidationErrors(ex);
 
         var payload = new
@@ -69,6 +74,11 @@ public sealed class ApiExceptionMiddleware
 
     private static async Task WriteProblemAsync(HttpContext context, int statusCode, string title, string detail, string type)
     {
+        if (context.RequestAborted.IsCancellationRequested || context.Response.HasStarted)
+        {
+            return;
+        }
+
         context.Response.StatusCode = statusCode;
         context.Response.ContentType = "application/problem+json";
 
@@ -82,6 +92,16 @@ public sealed class ApiExceptionMiddleware
         };
 
         await context.Response.WriteAsync(JsonSerializer.Serialize(problem, JsonOptions)).ConfigureAwait(false);
+    }
+
+    private static bool IsRequestCancellation(HttpContext context, OperationCanceledException exception)
+    {
+        if (context.RequestAborted.IsCancellationRequested)
+        {
+            return true;
+        }
+
+        return exception.CancellationToken.CanBeCanceled && exception.CancellationToken.IsCancellationRequested;
     }
 
     private static object BuildValidationErrors(Exception ex)

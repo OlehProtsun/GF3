@@ -1,3 +1,5 @@
+/* eslint-disable react-refresh/only-export-components */
+/* eslint-disable react-hooks/set-state-in-effect */
 import {
   createContext,
   useCallback,
@@ -8,6 +10,7 @@ import {
   useState,
 } from "react";
 import type { PropsWithChildren } from "react";
+import { isRequestCanceledError } from "@shared/api/httpClient";
 
 type QueryKey = readonly unknown[];
 type QueryFilters = { queryKey?: QueryKey };
@@ -103,11 +106,13 @@ export function useQuery<TData>(options: QueryOptions<TData>) {
   const queryKeyRef = useRef(options.queryKey);
   const [data, setData] = useState<TData | undefined>(undefined);
   const [error, setError] = useState<unknown>(null);
-  const [isLoading, setIsLoading] = useState(options.enabled !== false);
+  const [loadingState, setLoadingState] = useState(options.enabled !== false);
   const [bump, setBump] = useState(client.getBump(keyString));
 
-  queryFnRef.current = options.queryFn;
-  queryKeyRef.current = options.queryKey;
+  useEffect(() => {
+    queryFnRef.current = options.queryFn;
+    queryKeyRef.current = options.queryKey;
+  }, [options.queryFn, options.queryKey]);
 
   useEffect(() => {
     return client.subscribe((updatedKey) => {
@@ -121,13 +126,12 @@ export function useQuery<TData>(options: QueryOptions<TData>) {
   // Before this fix, inline queryFn identity changed each render and caused a refetch loop + UI freeze.
   useEffect(() => {
     if (options.enabled === false) {
-      setIsLoading(false);
       return;
     }
 
     const controller = new AbortController();
     let isActive = true;
-    setIsLoading(true);
+    setLoadingState(true);
     setError(null);
 
     queryFnRef
@@ -141,7 +145,7 @@ export function useQuery<TData>(options: QueryOptions<TData>) {
         setError(null);
       })
       .catch((reason) => {
-        if (!isActive || controller.signal.aborted) {
+        if (!isActive || controller.signal.aborted || isRequestCanceledError(reason)) {
           return;
         }
 
@@ -153,16 +157,18 @@ export function useQuery<TData>(options: QueryOptions<TData>) {
           return;
         }
 
-        setIsLoading(false);
+        setLoadingState(false);
       });
 
     return () => {
       isActive = false;
-      if (options.cancelOnUnmount !== false) {
+      if (options.cancelOnUnmount === true) {
         controller.abort();
       }
     };
   }, [bump, keyString, options.cancelOnUnmount, options.enabled, client]);
+
+  const isLoading = options.enabled === false ? false : loadingState;
 
   return {
     data,

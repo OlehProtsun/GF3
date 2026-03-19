@@ -14,7 +14,6 @@ import {
   buildAvailabilityCellMap,
   clampAvailabilityMonth,
   clampAvailabilityYear,
-  filterAvailabilityEmployees,
   getAvailabilityCellKey,
   parseAvailabilityCode,
   sanitizeAvailabilityCellMap,
@@ -47,6 +46,15 @@ type AvailabilityEditorInformationErrors = {
   month?: string;
   year?: string;
 };
+
+type CompactSizeHeaderToggleProps = {
+  checked: boolean;
+  onToggle: () => void;
+};
+
+function joinClassNames(...values: Array<string | false | undefined>) {
+  return values.filter(Boolean).join(" ");
+}
 
 function toErrorMessage(error: unknown) {
   if (error instanceof Error) {
@@ -116,6 +124,23 @@ function reorderEmployeeIds(employeeIds: number[], sourceEmployeeId: number, tar
   return nextEmployeeIds;
 }
 
+function CompactSizeHeaderToggle({ checked, onToggle }: CompactSizeHeaderToggleProps) {
+  return (
+    <button
+      type="button"
+      className={joinClassNames(styles.compactToggle, checked && styles.compactToggleActive)}
+      aria-pressed={checked}
+      onClick={onToggle}
+    >
+      <span className={styles.compactToggleTitle}>Compact Size</span>
+
+      <span className={styles.compactToggleTrack} aria-hidden="true">
+        <span className={styles.compactToggleThumb} />
+      </span>
+    </button>
+  );
+}
+
 export function AvailabilityEditPage() {
   const navigate = useNavigate();
   const { availabilityId } = useParams<{ availabilityId: string }>();
@@ -137,7 +162,6 @@ export function AvailabilityEditPage() {
   const [name, setName] = useState("");
   const [month, setMonth] = useState(defaults.month);
   const [year, setYear] = useState(defaults.year);
-  const [employeeSearchText, setEmployeeSearchText] = useState("");
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<number | null>(null);
   const [selectedEmployeeIds, setSelectedEmployeeIds] = useState<number[]>([]);
   const [cellMap, setCellMap] = useState<AvailabilityMatrixCellMap>({});
@@ -151,6 +175,8 @@ export function AvailabilityEditPage() {
   const [selectedBindClientId, setSelectedBindClientId] = useState<string | null>(null);
   const [hasLocalBindChanges, setHasLocalBindChanges] = useState(false);
   const [bindDeleteTarget, setBindDeleteTarget] = useState<EditableAvailabilityBind | null>(null);
+  const [isHeaderCollapsed, setIsHeaderCollapsed] = useState(false);
+  const [isCompactMatrix, setIsCompactMatrix] = useState(false);
 
   const employees = employeesQuery.data ?? [];
   const employeeNameById = useMemo(() => {
@@ -166,7 +192,6 @@ export function AvailabilityEditPage() {
       setName("");
       setMonth(defaults.month);
       setYear(defaults.year);
-      setEmployeeSearchText("");
       setSelectedEmployeeId(null);
       setSelectedEmployeeIds([]);
       setCellMap({});
@@ -192,7 +217,6 @@ export function AvailabilityEditPage() {
     setName(groupQuery.data.name);
     setMonth(groupQuery.data.month);
     setYear(groupQuery.data.year);
-    setEmployeeSearchText("");
     setSelectedEmployeeId(nextSelectedEmployeeIds[0] ?? null);
     setSelectedEmployeeIds(nextSelectedEmployeeIds);
     setCellMap(buildAvailabilityCellMap(membersQuery.data, slotsQuery.data));
@@ -232,20 +256,6 @@ export function AvailabilityEditPage() {
     setCellMap(currentCellMap => sanitizeAvailabilityCellMap(currentCellMap, selectedEmployeeIds, year, month));
     setCellErrors(currentErrors => sanitizeAvailabilityCellMap(currentErrors, selectedEmployeeIds, year, month));
   }, [month, selectedEmployeeIds, year]);
-
-  const filteredEmployees = useMemo(() => {
-    const baseEmployees = filterAvailabilityEmployees(employees, employeeSearchText);
-    if (!selectedEmployeeId || baseEmployees.some(employee => employee.id === selectedEmployeeId)) {
-      return baseEmployees;
-    }
-
-    const selectedEmployee = employees.find(employee => employee.id === selectedEmployeeId);
-    if (!selectedEmployee) {
-      return baseEmployees;
-    }
-
-    return [selectedEmployee, ...baseEmployees];
-  }, [employeeSearchText, employees, selectedEmployeeId]);
 
   const existingMemberByEmployeeId = useMemo(() => {
     return new Map((membersQuery.data ?? []).map(member => [member.employeeId, member]));
@@ -577,16 +587,24 @@ export function AvailabilityEditPage() {
         title={isCreate ? "Add Availability" : "Availability Edit"}
         subtitle={isCreate ? "Create a new monthly availability schedule" : "Update availability information, employees and day codes"}
         backTo={backTo}
+        onCollapseChange={setIsHeaderCollapsed}
+        rightSlot={(
+          <CompactSizeHeaderToggle
+            checked={isCompactMatrix}
+            onToggle={() => setIsCompactMatrix(current => !current)}
+          />
+        )}
       />
 
       <AvailabilityGroupEditor
         name={name}
         month={month}
         year={year}
+        isHeaderCollapsed={isHeaderCollapsed}
+        compactSize={isCompactMatrix}
         informationErrors={informationErrors}
         employeeError={employeeError}
-        employees={filteredEmployees}
-        employeeSearchText={employeeSearchText}
+        employees={employees}
         selectedEmployeeId={selectedEmployeeId}
         assignedEmployees={assignedEmployees}
         columns={columns}
@@ -617,7 +635,6 @@ export function AvailabilityEditPage() {
           clearInformationError("year");
           setEditorError(undefined);
         }}
-        onEmployeeSearchTextChange={setEmployeeSearchText}
         onSelectedEmployeeIdChange={value => {
           setSelectedEmployeeId(value);
           setEditorError(undefined);
