@@ -4,6 +4,7 @@ import { ContainerGraphMatrix } from "@entities/containers";
 import {
   AVAILABILITY_ANY_MARK,
   AVAILABILITY_NONE_MARK,
+  normalizeAvailabilityCellValue,
   parseAvailabilityCode,
   type AvailabilityMatrixCellMap,
   type AvailabilityMatrixColumn,
@@ -101,6 +102,7 @@ export function AvailabilityScheduleMatrix({
       headerCenterSlot={headerCenterSlot}
       headerRightSlot={headerRightSlot}
       bindValueByKey={normalizedBindValueByKey}
+      normalizeCellValue={(_, value) => normalizeAvailabilityCellValue(value)}
       onColumnMove={onColumnMove}
       onCellChange={onCellChange}
     />

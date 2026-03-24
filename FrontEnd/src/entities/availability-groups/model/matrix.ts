@@ -1,4 +1,5 @@
 import type { AvailabilityGroupItem, AvailabilityGroupMember, AvailabilityKind, AvailabilitySlot } from "./types";
+import { parseFlexibleTimeRange } from "@shared/lib/timeRange";
 
 export const AVAILABILITY_ANY_MARK = "+";
 export const AVAILABILITY_NONE_MARK = "-";
@@ -132,50 +133,7 @@ export function getAvailabilityCodeFromKind(kind: AvailabilityKind, intervalStr?
 }
 
 function tryNormalizeInterval(value: string) {
-  const parts = value
-    .split("-")
-    .map(part => part.trim())
-    .filter(Boolean);
-
-  if (parts.length !== 2) {
-    return null;
-  }
-
-  const start = normalizeTimeSegment(parts[0]);
-  const end = normalizeTimeSegment(parts[1]);
-
-  if (!start || !end) {
-    return null;
-  }
-
-  if (end.totalMinutes <= start.totalMinutes) {
-    return null;
-  }
-
-  return `${start.label} - ${end.label}`;
-}
-
-function normalizeTimeSegment(value: string) {
-  const match = value.match(/^(\d{1,2}):(\d{2})$/);
-  if (!match) {
-    return null;
-  }
-
-  const hours = Number(match[1]);
-  const minutes = Number(match[2]);
-
-  if (!Number.isInteger(hours) || !Number.isInteger(minutes)) {
-    return null;
-  }
-
-  if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) {
-    return null;
-  }
-
-  return {
-    totalMinutes: hours * 60 + minutes,
-    label: `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`,
-  };
+  return parseFlexibleTimeRange(value)?.label ?? null;
 }
 
 export function parseAvailabilityCode(input: string):
@@ -209,7 +167,7 @@ export function parseAvailabilityCode(input: string):
   if (!normalizedInterval) {
     return {
       ok: false,
-      error: "Use +, -, or a valid time range like 08:00 - 16:00.",
+      error: "Use +, -, or a valid time range like 09:00 - 15:00.",
     };
   }
 
@@ -221,6 +179,11 @@ export function parseAvailabilityCode(input: string):
       intervalStr: normalizedInterval,
     },
   };
+}
+
+export function normalizeAvailabilityCellValue(input: string) {
+  const parsed = parseAvailabilityCode(input);
+  return parsed.ok ? parsed.value.normalizedCode : input.trim();
 }
 
 export function buildAvailabilityColumns(

@@ -55,7 +55,7 @@ export function AvailabilityEmployeeCard({
     <CardSection
       className={styles.card}
       title="Employee"
-      icon={<EmployeeIcon size={18} style={{ transform: "scaleY(-1)" }} />}
+      icon={<EmployeeIcon size={18} />}
       headerRightSlot={headerRightSlot}
     >
       <div className={styles.layout}>

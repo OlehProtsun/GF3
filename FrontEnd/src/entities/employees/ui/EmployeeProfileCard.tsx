@@ -44,7 +44,7 @@ export function EmployeeProfileCard({
   return (
     <RecordProfileCard
       sectionTitle="Employee Profile"
-      icon={<EmployeeIcon size={18} style={{ transform: "scaleY(-1)" }} />}
+      icon={<EmployeeIcon size={18} />}
       headerMeta={employee ? `ID ${employee.id}` : undefined}
       isLoading={isLoading}
       hasLoadError={hasLoadError}

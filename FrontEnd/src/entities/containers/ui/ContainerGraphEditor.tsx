@@ -16,6 +16,7 @@ import type {
   GraphMatrixStyleMap,
   GraphTotals,
 } from "@entities/containers/model/graphWorkspace";
+import { normalizeGraphCellValue } from "@entities/containers/model/graphWorkspace";
 import type { SaveSchedulePresetDto } from "@entities/containers/api/dto";
 import type { Graph, SchedulePreset } from "@entities/containers/model/types";
 import type { Shop } from "@entities/shops/model/types";
@@ -405,8 +406,12 @@ export function ContainerGraphEditor({
         minHoursMonth: null,
         totalMinutes: 0,
         totalText: "",
-      })),
+    })),
     [previewColumns],
+  );
+  const scheduleColumnKindByEmployeeId = useMemo(
+    () => new Map(scheduleColumns.map(column => [column.employeeId, column.kind])),
+    [scheduleColumns],
   );
 
   if (isLoading) {
@@ -716,6 +721,11 @@ export function ContainerGraphEditor({
                   onColumnLabelChange={onManualColumnLabelChange}
                   selectedCellKeys={selectedCellKeys}
                   bindValueByKey={bindValueByKey}
+                  normalizeCellValue={(employeeId, value) => (
+                    scheduleColumnKindByEmployeeId.get(employeeId) === "employee"
+                      ? normalizeGraphCellValue(value)
+                      : value
+                  )}
                   onSelectedCellKeysChange={onSelectedCellKeysChange}
                   onCellChange={onCellChange}
                   toolbar={
