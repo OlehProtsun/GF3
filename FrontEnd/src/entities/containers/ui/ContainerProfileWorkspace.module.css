@@ -98,13 +98,13 @@
 }
 
 .scheduleBody {
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
+  display: flex;
   flex: 1 1 auto;
   min-height: 0;
 }
 
 .scheduleContent {
+  width: 100%;
   min-height: 0;
   overflow: auto;
   display: flex;
@@ -112,6 +112,7 @@
 }
 
 .scheduleGrid {
+  width: 100%;
   padding: 12px 26px 24px;
   box-sizing: border-box;
   row-gap: 22px;
@@ -129,6 +130,9 @@
 .statisticsCard {
   width: 100%;
   margin-top: 4px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 
 .headerBadge {
@@ -144,11 +148,12 @@
   font-weight: 700;
 }
 
-.searchRow {
+.scheduleHeaderRow {
   display: flex;
   gap: 12px;
   align-items: center;
-  margin-bottom: 16px;
+  width: 100%;
+  min-width: 0;
 }
 
 .searchField {
@@ -239,9 +244,13 @@
 .tableWrap {
   margin-top: 16px;
   margin-bottom: 18px;
-  overflow-x: auto;
+  overflow: auto;
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: clamp(240px, calc(100dvh - 320px), 460px);
   border: 1px solid rgba(148, 163, 184, 0.18);
   border-radius: 20px;
+  scrollbar-gutter: stable both-edges;
 }
 
 .table {
@@ -350,10 +359,14 @@
   .scheduleContent {
     overflow: visible;
   }
+
+  .tableWrap {
+    max-height: none;
+  }
 }
 
 @media (max-width: 680px) {
-  .searchRow {
+  .scheduleHeaderRow {
     flex-direction: column;
     align-items: stretch;
   }

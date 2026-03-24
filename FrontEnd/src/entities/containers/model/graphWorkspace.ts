@@ -1,5 +1,6 @@
 import type { Employee } from "@entities/employees/model/types";
 import { getEmployeeFullName } from "@entities/employees/model/presentation";
+import { parseFlexibleTimeSegment } from "@shared/lib/timeRange";
 import { buildPreviewList, formatHoursMinutes, getSlotDurationMinutes } from "./statistics";
 import type { Graph, GraphCellStyle, GraphEmployee, GraphSlot, SlotStatus } from "./types";
 
@@ -332,19 +333,19 @@ export function tryParseGraphIntervals(input: string):
   for (const part of parts) {
     const segments = part
       .replace(/[–—]/g, "-")
-      .split("-", 2)
+      .split("-")
       .map(segment => segment.trim())
       .filter(Boolean);
 
     if (segments.length !== 2) {
-      return { ok: false, error: "Format: HH:mm - HH:mm (comma separated allowed)." };
+      return { ok: false, error: "Use time ranges like 09:00 - 15:00. Comma-separated ranges are allowed." };
     }
 
     const from = normalizeGraphTime(segments[0]);
     const to = normalizeGraphTime(segments[1]);
 
     if (!from || !to) {
-      return { ok: false, error: "Time must be HH:mm (e.g. 09:00 - 14:30)." };
+      return { ok: false, error: "Use time ranges like 09:00 - 15:00." };
     }
 
     if ((parseGraphTimeMinutes(to) ?? 0) <= (parseGraphTimeMinutes(from) ?? 0)) {
@@ -371,6 +372,11 @@ export function tryParseGraphIntervals(input: string):
   });
 
   return { ok: true, value: intervals };
+}
+
+export function normalizeGraphCellValue(input: string) {
+  const parsed = tryParseGraphIntervals(input);
+  return parsed.ok ? formatGraphIntervals(parsed.value) : input.trim();
 }
 
 export function sanitizeGraphCellMap(
@@ -773,7 +779,7 @@ function tryParseGraphShiftRange(value?: string | null) {
   }
 
   const parts = normalized
-    .split("-", 2)
+    .split("-")
     .map(part => part.trim())
     .filter(Boolean);
 
@@ -873,19 +879,7 @@ function getEmployeeLabel(employeeId: number, employeesById?: Map<number, Employ
 }
 
 function normalizeGraphTime(value: string) {
-  const match = value.trim().match(/^(\d{1,2}):(\d{2})$/);
-  if (!match) {
-    return null;
-  }
-
-  const hours = Number(match[1]);
-  const minutes = Number(match[2]);
-
-  if (!Number.isInteger(hours) || !Number.isInteger(minutes) || hours < 0 || hours > 23 || minutes < 0 || minutes > 59) {
-    return null;
-  }
-
-  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+  return parseFlexibleTimeSegment(value)?.label ?? null;
 }
 
 function parseGraphTimeMinutes(value: string) {

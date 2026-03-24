@@ -2,12 +2,15 @@
 import { useNavigate } from "react-router-dom";
 import { useShopsQuery } from "@entities/shops/model/queries";
 import { ShopListCard } from "@entities/shops/ui/ShopListCard";
+import { usePageScrollbarHidden } from "@shared/lib/usePageScrollbarHidden";
 import { IosButton } from "@shared/ui/components/IosButton";
 import { PageHeader } from "@shared/ui/PageHeader";
 import { PlusIcon } from "@shared/ui/icons";
 import styles from "./ShopListPage.module.css";
 
 export function ShopListPage() {
+  usePageScrollbarHidden();
+
   const navigate = useNavigate();
   const [query, setQuery] = useState("");
   const shopsQuery = useShopsQuery(query);

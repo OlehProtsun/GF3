@@ -210,14 +210,7 @@ export function ContainerProfileWorkspace({
               title="Schedules"
               icon={<ScheduleIcon size={18} />}
               headerRightSlot={
-                <div className={styles.scheduleHeaderActions}>
-                  <IosButton label="Add New" icon={<PlusIcon size={18} />} onClick={onAddGraph} />
-                  <span className={styles.headerBadge}>{`Total: ${totalGraphsCount}`}</span>
-                </div>
-              }
-            >
-              <div className={styles.scheduleBody}>
-                <div className={styles.searchRow}>
+                <div className={styles.scheduleHeaderRow}>
                   <label className={styles.searchField} htmlFor="container-graphs-search">
                     <SearchIcon className={styles.searchIcon} />
                     <input
@@ -233,8 +226,15 @@ export function ContainerProfileWorkspace({
                   {graphSearchQuery.trim() ? (
                     <IosButton label="Clear" variant="secondary" onClick={onClearGraphSearch} />
                   ) : null}
-                </div>
 
+                  <div className={styles.scheduleHeaderActions}>
+                    <IosButton label="Add New" icon={<PlusIcon size={18} />} onClick={onAddGraph} />
+                    <span className={styles.headerBadge}>{`Total: ${totalGraphsCount}`}</span>
+                  </div>
+                </div>
+              }
+            >
+              <div className={styles.scheduleBody}>
                 <div className={styles.scheduleContent}>
                   {isGraphsLoading && totalGraphsCount === 0 ? (
                     <div className={styles.state}>Loading schedules...</div>

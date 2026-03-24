@@ -10,20 +10,14 @@
   padding: 0 0 28px;
   overflow: auto;
   box-sizing: border-box;
-  scrollbar-width: thin;
-  scrollbar-color: #d6dbe3 transparent;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
 }
 
 .page::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-
-.page::-webkit-scrollbar-thumb {
-  border-radius: 999px;
-  border: 2px solid transparent;
-  background: #d6dbe3;
-  background-clip: padding-box;
+  display: none;
+  width: 0;
+  height: 0;
 }
 
 .headerActions {

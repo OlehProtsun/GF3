@@ -96,7 +96,7 @@ export function OverlaySidebarLayout({ children }: OverlaySidebarLayoutProps) {
               </span>
             }
           />
-          <NavItem label="Employee" to="/employee" icon={<EmployeeIcon size={22} style={{ transform: "scaleY(-1)" }} />} />
+          <NavItem label="Employee" to="/employee" icon={<EmployeeIcon size={22} />} />
           <NavItem label="Shop" to="/shop" icon={<ShopIcon size={28} style={{ transform: "scaleY(-1)" }} />} />
           <NavItem label="Availability" to="/availability" icon={<AvailabilityIcon size={22} style={{ transform: "scaleY(-1)" }} />} />
           <NavItem label="Container" to="/container" icon={<ContainerIcon size={25} />} />

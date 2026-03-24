@@ -27,6 +27,7 @@ import {
 import { useEmployeesListQuery } from "@entities/employees/api/queries";
 import { useShopsListQuery } from "@entities/shops/api/queries";
 import { ApiError } from "@shared/api/httpClient";
+import { usePageScrollbarHidden } from "@shared/lib/usePageScrollbarHidden";
 import { ConfirmDialog } from "@shared/ui/ConfirmDialog";
 import { IosButton } from "@shared/ui/components/IosButton";
 import { PlusIcon } from "@shared/ui/icons";
@@ -255,6 +256,8 @@ export function ContainerPage() {
   const [graphForm, setGraphForm] = useState<ContainerGraphFormState>(() => createInitialGraphForm());
   const [graphErrors, setGraphErrors] = useState<ContainerGraphFormErrors>({});
   const [graphSubmitError, setGraphSubmitError] = useState<string | null>(null);
+
+  usePageScrollbarHidden(mode === "list" || mode === "profile");
 
   const containersQuery = useContainersListQuery();
   const availabilityGroupsQuery = useAvailabilityGroupsListQuery();

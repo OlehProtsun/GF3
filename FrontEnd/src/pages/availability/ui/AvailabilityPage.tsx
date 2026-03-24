@@ -2,12 +2,15 @@ import { useCallback, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAvailabilityGroupsQuery } from "@entities/availability-groups";
 import { AvailabilityGroupListCard } from "@entities/availability-groups/ui";
+import { usePageScrollbarHidden } from "@shared/lib/usePageScrollbarHidden";
 import { IosButton } from "@shared/ui/components/IosButton";
 import { PageHeader } from "@shared/ui/PageHeader";
 import { PlusIcon } from "@shared/ui/icons";
 import styles from "./AvailabilityPage.module.css";
 
 export function AvailabilityPage() {
+  usePageScrollbarHidden();
+
   const navigate = useNavigate();
   const [query, setQuery] = useState("");
   const groupsQuery = useAvailabilityGroupsQuery(query);

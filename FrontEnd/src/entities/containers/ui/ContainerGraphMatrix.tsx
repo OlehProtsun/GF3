@@ -48,6 +48,7 @@ type ContainerGraphMatrixProps = {
   headerRightSlot?: ReactNode;
   bindValueByKey?: ReadonlyMap<string, string>;
   selectedCellKeys?: string[];
+  normalizeCellValue?: (employeeId: number, value: string) => string;
   onSelectedCellKeysChange?: (keys: string[]) => void;
   onColumnMove?: (employeeId: number, targetEmployeeId: number) => void;
   onColumnLabelChange?: (columnId: number, value: string) => void;
@@ -101,6 +102,7 @@ type MatrixValueCellProps = {
   onEditorValueChange: (value: string) => void;
   onEditorBlur: () => void;
   onInlineValueChange?: (value: string) => void;
+  onInlineValueCommit?: (value: string) => void;
 };
 
 type MatrixDayCellProps = {
@@ -299,6 +301,7 @@ const MatrixValueCell = memo(function MatrixValueCell({
   onEditorValueChange,
   onEditorBlur,
   onInlineValueChange,
+  onInlineValueCommit,
 }: MatrixValueCellProps) {
   const inlineStyle = {
     ...(backgroundColor ? { backgroundColor } : {}),
@@ -350,6 +353,7 @@ const MatrixValueCell = memo(function MatrixValueCell({
             )}
             value={value}
             onChange={event => onInlineValueChange?.(event.target.value)}
+            onBlur={event => onInlineValueCommit?.(event.target.value)}
             aria-label={`${columnLabel} day ${dayOfMonth}`}
             aria-invalid={Boolean(error)}
             title={cellTitle}
@@ -417,6 +421,7 @@ export function ContainerGraphMatrix({
   headerRightSlot,
   bindValueByKey,
   selectedCellKeys = [],
+  normalizeCellValue,
   onSelectedCellKeysChange,
   onColumnMove,
   onColumnLabelChange,
@@ -436,6 +441,7 @@ export function ContainerGraphMatrix({
   const onSelectedCellKeysChangeRef = useRef(onSelectedCellKeysChange);
   const cellMapRef = useRef(cellMap);
   const onCellChangeRef = useRef(onCellChange);
+  const normalizeCellValueRef = useRef(normalizeCellValue);
   const cellFocusTargetRefs = useRef<Record<string, HTMLButtonElement | HTMLInputElement | null>>({});
   const editingCellKeyRef = useRef<string | null>(null);
   const editingValueRef = useRef(editingValue);
@@ -540,6 +546,10 @@ export function ContainerGraphMatrix({
   }, [onCellChange]);
 
   useEffect(() => {
+    normalizeCellValueRef.current = normalizeCellValue;
+  }, [normalizeCellValue]);
+
+  useEffect(() => {
     editingCellKeyRef.current = editingCellKey;
   }, [editingCellKey]);
 
@@ -623,6 +633,16 @@ export function ContainerGraphMatrix({
     });
   };
 
+  const commitCellValue = (employeeId: number, dayOfMonth: number, value: string) => {
+    const nextValue = normalizeCellValueRef.current?.(employeeId, value) ?? value;
+    const cellKey = getGraphCellKey(employeeId, dayOfMonth);
+    const currentValue = cellMapRef.current[cellKey] ?? GRAPH_EMPTY_MARK;
+
+    if (nextValue !== currentValue) {
+      onCellChangeRef.current?.(employeeId, dayOfMonth, nextValue);
+    }
+  };
+
   const flushEditingCell = () => {
     const currentEditingCellKey = editingCellKeyRef.current;
     if (!currentEditingCellKey) {
@@ -630,15 +650,10 @@ export function ContainerGraphMatrix({
     }
 
     const { employeeId, dayOfMonth } = parseSelectedCellKey(currentEditingCellKey);
-    const nextValue = editingValueRef.current;
-    const currentValue = cellMapRef.current[currentEditingCellKey] ?? GRAPH_EMPTY_MARK;
 
     editingCellKeyRef.current = null;
     setEditingCellKey(null);
-
-    if (nextValue !== currentValue) {
-      onCellChangeRef.current?.(employeeId, dayOfMonth, nextValue);
-    }
+    commitCellValue(employeeId, dayOfMonth, editingValueRef.current);
   };
 
   const cancelEditingCell = () => {
@@ -686,7 +701,7 @@ export function ContainerGraphMatrix({
       setEditingValue(GRAPH_EMPTY_MARK);
     }
 
-    onCellChangeRef.current(target.employeeId, target.dayOfMonth, bindValue);
+    commitCellValue(target.employeeId, target.dayOfMonth, bindValue);
 
     const nextCellKey =
       target.dayOfMonth < days.length
@@ -1097,6 +1112,7 @@ export function ContainerGraphMatrix({
                             onEditorValueChange={setEditingValue}
                             onEditorBlur={isEditing ? flushEditingCell : NOOP}
                             onInlineValueChange={nextValue => onCellChange?.(column.employeeId, day.dayOfMonth, nextValue)}
+                            onInlineValueCommit={nextValue => commitCellValue(column.employeeId, day.dayOfMonth, nextValue)}
                           />
                         );
                       })}
