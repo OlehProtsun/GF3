@@ -1,73 +1,101 @@
-﻿using DataAccessLayer.Models;
+using DataAccessLayer.Models;
 using DataAccessLayer.Models.DataBaseContext;
 using DataAccessLayer.Repositories.Abstractions;
 using Microsoft.EntityFrameworkCore;
-using System;
-using System.Collections.Generic;
-using System.Text;
 
-namespace DataAccessLayer.Repositories
+namespace DataAccessLayer.Repositories;
+
+/// <summary>
+/// Repository for key/value binds.
+/// Binds behave more like configuration entries than regular domain rows, so this repository
+/// exposes a natural-key upsert flow in addition to the generic CRUD baseline.
+/// </summary>
+public class BindRepository : GenericRepository<BindModel>, IBindRepository
 {
-    public class BindRepository : GenericRepository<BindModel>, IBindRepository
+    public BindRepository(AppDbContext db)
+        : base(db)
     {
-        public BindRepository(AppDbContext db) : base(db) { }
+    }
 
-        public override async Task<List<BindModel>> GetAllAsync(CancellationToken ct = default)
-            => await _set.AsNoTracking()
-                         .OrderBy(x => x.Key)
-                         .ToListAsync(ct)
-                         .ConfigureAwait(false);
+    /// <inheritdoc />
+    public override async Task<List<BindModel>> GetAllAsync(CancellationToken ct = default)
+        => await _set
+            .AsNoTracking()
+            .OrderBy(bind => bind.Key)
+            .ToListAsync(ct)
+            .ConfigureAwait(false);
 
-        public Task<BindModel?> GetByKeyAsync(string key, CancellationToken ct = default)
+    /// <inheritdoc />
+    public Task<BindModel?> GetByKeyAsync(string key, CancellationToken ct = default)
+    {
+        var normalizedKey = NormalizeRequiredText(key);
+        return _set.AsNoTracking().FirstOrDefaultAsync(bind => bind.Key == normalizedKey, ct);
+    }
+
+    /// <inheritdoc />
+    public Task<List<BindModel>> GetActiveAsync(CancellationToken ct = default)
+        => _set
+            .AsNoTracking()
+            .Where(bind => bind.IsActive)
+            .OrderBy(bind => bind.Key)
+            .ToListAsync(ct);
+
+    /// <inheritdoc />
+    public async Task<BindModel> UpsertByKeyAsync(BindModel model, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(model);
+
+        NormalizeModel(model);
+
+        if (model.Id > 0)
         {
-            key = (key ?? string.Empty).Trim();
-            return _set.AsNoTracking().FirstOrDefaultAsync(x => x.Key == key, ct);
-        }
-
-        public Task<List<BindModel>> GetActiveAsync(CancellationToken ct = default)
-            => _set.AsNoTracking()
-                   .Where(x => x.IsActive)
-                   .OrderBy(x => x.Key)
-                   .ToListAsync(ct);
-
-        public async Task<BindModel> UpsertByKeyAsync(BindModel model, CancellationToken ct = default)
-        {
-            model.Key = (model.Key ?? string.Empty).Trim();
-            model.Value = (model.Value ?? string.Empty).Trim();
-
-            if (string.IsNullOrWhiteSpace(model.Key))
-                throw new ArgumentException("Bind Key is empty.");
-            if (string.IsNullOrWhiteSpace(model.Value))
-                throw new ArgumentException("Bind Value is empty.");
-
-            // якщо редагуємо існуючий (по Id) — просто Update,
-            // але перевіримо, що новий Key не зайнятий іншим записом
-            if (model.Id > 0)
-            {
-                bool keyTaken = await _set.AsNoTracking()
-                    .AnyAsync(x => x.Key == model.Key && x.Id != model.Id, ct)
-                    .ConfigureAwait(false);
-
-                if (keyTaken)
-                    throw new InvalidOperationException($"Key '{model.Key}' already exists.");
-
-                await UpdateAsync(model, ct).ConfigureAwait(false);
-                return model;
-            }
-
-            // створюємо/оновлюємо по Key
-            var existing = await _set.AsNoTracking()
-                .FirstOrDefaultAsync(x => x.Key == model.Key, ct)
-                .ConfigureAwait(false);
-
-            if (existing is null)
-            {
-                return await AddAsync(model, ct).ConfigureAwait(false);
-            }
-
-            model.Id = existing.Id;
+            await EnsureKeyIsUniqueForUpdateAsync(model, ct).ConfigureAwait(false);
             await UpdateAsync(model, ct).ConfigureAwait(false);
             return model;
         }
+
+        var existing = await _set
+            .AsNoTracking()
+            .FirstOrDefaultAsync(bind => bind.Key == model.Key, ct)
+            .ConfigureAwait(false);
+
+        if (existing is null)
+        {
+            return await AddAsync(model, ct).ConfigureAwait(false);
+        }
+
+        model.Id = existing.Id;
+        await UpdateAsync(model, ct).ConfigureAwait(false);
+        return model;
+    }
+
+    private async Task EnsureKeyIsUniqueForUpdateAsync(BindModel model, CancellationToken ct)
+    {
+        var keyTaken = await _set
+            .AsNoTracking()
+            .AnyAsync(bind => bind.Key == model.Key && bind.Id != model.Id, ct)
+            .ConfigureAwait(false);
+
+        if (keyTaken)
+        {
+            throw new InvalidOperationException($"Key '{model.Key}' already exists.");
+        }
+    }
+
+    private static void NormalizeModel(BindModel model)
+    {
+        model.Key = NormalizeRequiredText(model.Key, "Bind Key is empty.");
+        model.Value = NormalizeRequiredText(model.Value, "Bind Value is empty.");
+    }
+
+    private static string NormalizeRequiredText(string? value, string errorMessage = "Value is empty.")
+    {
+        var normalized = (value ?? string.Empty).Trim();
+        if (string.IsNullOrWhiteSpace(normalized))
+        {
+            throw new ArgumentException(errorMessage);
+        }
+
+        return normalized;
     }
 }

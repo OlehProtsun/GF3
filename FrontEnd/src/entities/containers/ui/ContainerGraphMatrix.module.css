@@ -30,6 +30,14 @@
   grid-template-rows: auto auto minmax(0, 1fr);
 }
 
+.layoutEmpty {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+  padding-bottom: 18px;
+}
+
 .layoutCompact,
 .layoutCompact.layoutWithToolbar {
   grid-template-rows: auto auto auto;
@@ -51,7 +59,10 @@
 
 .emptyState {
   display: grid;
+  flex: 1 1 0;
   place-items: center;
+  align-self: stretch;
+  width: 100%;
   min-height: 260px;
   padding: 20px;
   box-sizing: border-box;
@@ -99,11 +110,16 @@
 .tableScrollCompact {
   flex: 0 0 auto;
   min-height: auto;
+  scrollbar-gutter: auto;
 }
 
 .tableScroll::-webkit-scrollbar {
   width: 8px;
   height: 8px;
+}
+
+.tableScrollCompact::-webkit-scrollbar {
+  height: 6px;
 }
 
 .tableScroll::-webkit-scrollbar-thumb {
@@ -410,11 +426,24 @@
   background: rgba(254, 179, 179, 0.96);
 }
 
-.selectedCell {
+.selectedCell,
+.editingCell {
+  z-index: 1;
+}
+
+.selectedCell::after,
+.editingCell::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.selectedCell::after {
   box-shadow: inset 0 0 0 2px rgba(37, 99, 235, 0.42);
 }
 
-.editingCell {
+.editingCell::after {
   box-shadow: inset 0 0 0 2px rgba(37, 99, 235, 0.56);
 }
 
@@ -451,6 +480,41 @@
   line-height: 1.2;
 }
 
+.visualHintShell {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 6px;
+  text-align: center;
+  pointer-events: none;
+  user-select: none;
+  line-height: 1.2;
+}
+
+.visualHintButton {
+  max-width: 100%;
+  min-width: 0;
+  padding: 0 4px;
+  border: none;
+  border-radius: 12px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  line-height: inherit;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.visualHintButton:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.24);
+}
+
 .cellButton:focus-visible {
   outline: none;
   box-shadow: inset 0 0 0 2px rgba(37, 99, 235, 0.32);
@@ -477,9 +541,16 @@
   color: rgba(153, 27, 27, 0.9);
 }
 
+.visualHintValue {
+  color: rgba(29, 78, 216, 0.94);
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+}
+
 .readonlyValue {
   font-weight: 700;
-  cursor: pointer;
+  cursor: default;
 }
 
 .table tr:last-child td,

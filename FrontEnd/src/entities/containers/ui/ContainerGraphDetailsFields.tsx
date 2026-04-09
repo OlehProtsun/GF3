@@ -80,6 +80,7 @@ export function ContainerGraphDetailsFields({
   onFieldChange,
   onEmployeeMinHoursChange,
 }: ContainerGraphDetailsFieldsProps) {
+  const hasScrollableMinHoursList = graphEmployeeRows.length > 5;
   const employeeById = useMemo(
     () => new Map(employees.map(employee => [employee.id, employee])),
     [employees],
@@ -127,11 +128,14 @@ export function ContainerGraphDetailsFields({
 
       <div className={joinClassNames(styles.detailsRow, styles.detailsRowBalanced)}>
         {showNameField ? (
-          <LabeledField id={`${idPrefix}-name`} label="Name" error={formErrors.name} className={styles.detailsFieldCompact}>
+          <LabeledField id={`${idPrefix}-name`} label="Name*" error={formErrors.name} className={styles.detailsFieldCompact}>
             <TextInput
               id={`${idPrefix}-name`}
               className={styles.controlCompact}
               value={form.name}
+              placeholder="Example: March 2026 Main Shop"
+              aria-invalid={Boolean(formErrors.name)}
+              aria-describedby={formErrors.name ? `${idPrefix}-name-error` : undefined}
               onChange={event => onFieldChange("name")(event.target.value)}
             />
           </LabeledField>
@@ -139,7 +143,7 @@ export function ContainerGraphDetailsFields({
 
         <LabeledField
           id={`${idPrefix}-people`}
-          label="People / shift"
+          label="People / shift*"
           error={formErrors.peoplePerShift}
           className={joinClassNames(
             styles.detailsFieldCompact,
@@ -162,7 +166,7 @@ export function ContainerGraphDetailsFields({
       </div>
 
       <div className={joinClassNames(styles.detailsRow, styles.detailsRowBalanced)}>
-        <LabeledField id={`${idPrefix}-month`} label="Month" error={formErrors.month} className={styles.detailsFieldCompact}>
+        <LabeledField id={`${idPrefix}-month`} label="Month*" error={formErrors.month} className={styles.detailsFieldCompact}>
           <SearchableSelect
             id={`${idPrefix}-month`}
             className={styles.controlMedium}
@@ -181,7 +185,7 @@ export function ContainerGraphDetailsFields({
           />
         </LabeledField>
 
-        <LabeledField id={`${idPrefix}-year`} label="Year" error={formErrors.year} className={styles.detailsFieldCompact}>
+        <LabeledField id={`${idPrefix}-year`} label="Year*" error={formErrors.year} className={styles.detailsFieldCompact}>
           <NumberStepperInput
             id={`${idPrefix}-year`}
             className={joinClassNames(
@@ -199,20 +203,24 @@ export function ContainerGraphDetailsFields({
       </div>
 
       <div className={joinClassNames(styles.detailsRow, styles.detailsRowBalanced)}>
-        <LabeledField id={`${idPrefix}-shift1`} label="Shift 1" error={formErrors.shift1Time} className={styles.detailsFieldCompact}>
+        <LabeledField id={`${idPrefix}-shift1`} label="Shift 1*" error={formErrors.shift1Time} className={styles.detailsFieldCompact}>
           <TextInput
             id={`${idPrefix}-shift1`}
             className={styles.controlCompact}
             value={form.shift1Time}
+            aria-invalid={Boolean(formErrors.shift1Time)}
+            aria-describedby={formErrors.shift1Time ? `${idPrefix}-shift1-error` : undefined}
             onChange={event => onFieldChange("shift1Time")(event.target.value)}
           />
         </LabeledField>
 
-        <LabeledField id={`${idPrefix}-shift2`} label="Shift 2" error={formErrors.shift2Time} className={styles.detailsFieldCompact}>
+        <LabeledField id={`${idPrefix}-shift2`} label="Shift 2*" error={formErrors.shift2Time} className={styles.detailsFieldCompact}>
           <TextInput
             id={`${idPrefix}-shift2`}
             className={styles.controlCompact}
             value={form.shift2Time}
+            aria-invalid={Boolean(formErrors.shift2Time)}
+            aria-describedby={formErrors.shift2Time ? `${idPrefix}-shift2-error` : undefined}
             onChange={event => onFieldChange("shift2Time")(event.target.value)}
           />
         </LabeledField>
@@ -283,7 +291,7 @@ export function ContainerGraphDetailsFields({
       <div className={joinClassNames(styles.detailsRow, styles.detailsRowBalanced)}>
         <LabeledField
           id={`${idPrefix}-shop`}
-          label="Shop"
+          label="Shop*"
           error={formErrors.shopId}
           className={joinClassNames(
             styles.detailsFieldFull,
@@ -339,7 +347,12 @@ export function ContainerGraphDetailsFields({
           {graphEmployeeRows.length === 0 ? (
             <div className={styles.detailsMinHoursEmpty}>Add employees first to set monthly minimum hours.</div>
           ) : (
-            <div className={styles.detailsMinHoursList}>
+            <div
+              className={joinClassNames(
+                styles.detailsMinHoursList,
+                hasScrollableMinHoursList && styles.detailsMinHoursListScrollable,
+              )}
+            >
               {graphEmployeeRows.map(row => {
                 const employee = employeeById.get(row.employeeId);
                 const employeeName = getEmployeeFullName(employee, `Employee ${row.employeeId}`);

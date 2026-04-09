@@ -5,20 +5,26 @@ using DalEnums = DataAccessLayer.Models.Enums;
 
 namespace BusinessLogicLayer.Mappers;
 
+/// <summary>
+/// Centralized contract-to-DAL mapping helpers used by business services.
+/// Keeping these conversions in one place prevents field drift between services and makes the persistence
+/// boundary explicit: services operate on business contracts, repositories operate on EF models.
+/// </summary>
 internal static class ModelMapper
 {
+    // Core catalog entities
     internal static ContainerModel ToContract(this Dal.ContainerModel model) => new()
     {
         Id = model.Id,
         Name = model.Name,
-        Note = model.Note
+        Note = model.Note,
     };
 
     internal static Dal.ContainerModel ToDal(this ContainerModel model) => new()
     {
         Id = model.Id,
         Name = model.Name,
-        Note = model.Note
+        Note = model.Note,
     };
 
     internal static EmployeeModel ToContract(this Dal.EmployeeModel model) => new()
@@ -27,7 +33,7 @@ internal static class ModelMapper
         FirstName = model.FirstName,
         LastName = model.LastName,
         Phone = model.Phone,
-        Email = model.Email
+        Email = model.Email,
     };
 
     internal static Dal.EmployeeModel ToDal(this EmployeeModel model) => new()
@@ -36,7 +42,7 @@ internal static class ModelMapper
         FirstName = model.FirstName,
         LastName = model.LastName,
         Phone = model.Phone,
-        Email = model.Email
+        Email = model.Email,
     };
 
     internal static ShopModel ToContract(this Dal.ShopModel model) => new()
@@ -44,7 +50,7 @@ internal static class ModelMapper
         Id = model.Id,
         Name = model.Name,
         Address = model.Address,
-        Description = model.Description
+        Description = model.Description,
     };
 
     internal static Dal.ShopModel ToDal(this ShopModel model) => new()
@@ -52,7 +58,7 @@ internal static class ModelMapper
         Id = model.Id,
         Name = model.Name,
         Address = model.Address,
-        Description = model.Description
+        Description = model.Description,
     };
 
     internal static BindModel ToContract(this Dal.BindModel model) => new()
@@ -60,7 +66,7 @@ internal static class ModelMapper
         Id = model.Id,
         Key = model.Key,
         Value = model.Value,
-        IsActive = model.IsActive
+        IsActive = model.IsActive,
     };
 
     internal static Dal.BindModel ToDal(this BindModel model) => new()
@@ -68,21 +74,23 @@ internal static class ModelMapper
         Id = model.Id,
         Key = model.Key,
         Value = model.Value,
-        IsActive = model.IsActive
+        IsActive = model.IsActive,
     };
 
+    // Enum bridges
     internal static AvailabilityKind ToContract(this DalEnums.AvailabilityKind value) => (AvailabilityKind)(int)value;
     internal static DalEnums.AvailabilityKind ToDal(this AvailabilityKind value) => (DalEnums.AvailabilityKind)(int)value;
     internal static SlotStatus ToContract(this DalEnums.SlotStatus value) => (SlotStatus)(int)value;
     internal static DalEnums.SlotStatus ToDal(this SlotStatus value) => (DalEnums.SlotStatus)(int)value;
 
+    // Availability groups
     internal static AvailabilityGroupDayModel ToContract(this Dal.AvailabilityGroupDayModel model) => new()
     {
         Id = model.Id,
         AvailabilityGroupMemberId = model.AvailabilityGroupMemberId,
         DayOfMonth = model.DayOfMonth,
         Kind = model.Kind.ToContract(),
-        IntervalStr = model.IntervalStr
+        IntervalStr = model.IntervalStr,
     };
 
     internal static Dal.AvailabilityGroupDayModel ToDal(this AvailabilityGroupDayModel model) => new()
@@ -91,7 +99,7 @@ internal static class ModelMapper
         AvailabilityGroupMemberId = model.AvailabilityGroupMemberId,
         DayOfMonth = model.DayOfMonth,
         Kind = model.Kind.ToDal(),
-        IntervalStr = model.IntervalStr
+        IntervalStr = model.IntervalStr,
     };
 
     internal static AvailabilityGroupMemberModel ToContract(this Dal.AvailabilityGroupMemberModel model) => new()
@@ -101,7 +109,7 @@ internal static class ModelMapper
         EmployeeId = model.EmployeeId,
         DisplayOrder = model.DisplayOrder,
         Employee = model.Employee is null ? null : model.Employee.ToContract(),
-        Days = model.Days?.Select(ToContract).ToList() ?? new List<AvailabilityGroupDayModel>()
+        Days = model.Days?.Select(ToContract).ToList() ?? [],
     };
 
     internal static Dal.AvailabilityGroupMemberModel ToDal(this AvailabilityGroupMemberModel model) => new()
@@ -118,7 +126,7 @@ internal static class ModelMapper
         Name = model.Name,
         Year = model.Year,
         Month = model.Month,
-        Members = model.Members?.Select(ToContract).ToList() ?? new List<AvailabilityGroupMemberModel>()
+        Members = model.Members?.Select(ToContract).ToList() ?? [],
     };
 
     internal static Dal.AvailabilityGroupModel ToDal(this AvailabilityGroupModel model) => new()
@@ -126,9 +134,10 @@ internal static class ModelMapper
         Id = model.Id,
         Name = model.Name,
         Year = model.Year,
-        Month = model.Month
+        Month = model.Month,
     };
 
+    // Schedule employees and slots
     internal static ScheduleEmployeeModel ToContract(this Dal.ScheduleEmployeeModel model) => new()
     {
         Id = model.Id,
@@ -136,7 +145,7 @@ internal static class ModelMapper
         EmployeeId = model.EmployeeId,
         Employee = model.Employee is null ? null : model.Employee.ToContract(),
         MinHoursMonth = model.MinHoursMonth,
-        DisplayOrder = model.DisplayOrder
+        DisplayOrder = model.DisplayOrder,
     };
 
     internal static Dal.ScheduleEmployeeModel ToDal(this ScheduleEmployeeModel model) => new()
@@ -145,7 +154,7 @@ internal static class ModelMapper
         ScheduleId = model.ScheduleId,
         EmployeeId = model.EmployeeId,
         MinHoursMonth = model.MinHoursMonth,
-        DisplayOrder = model.DisplayOrder
+        DisplayOrder = model.DisplayOrder,
     };
 
     internal static ScheduleSlotModel ToContract(this Dal.ScheduleSlotModel model) => new()
@@ -158,7 +167,7 @@ internal static class ModelMapper
         Employee = model.Employee is null ? null : model.Employee.ToContract(),
         Status = model.Status.ToContract(),
         FromTime = model.FromTime,
-        ToTime = model.ToTime
+        ToTime = model.ToTime,
     };
 
     internal static Dal.ScheduleSlotModel ToDal(this ScheduleSlotModel model) => new()
@@ -170,7 +179,7 @@ internal static class ModelMapper
         EmployeeId = model.EmployeeId,
         Status = model.Status.ToDal(),
         FromTime = model.FromTime,
-        ToTime = model.ToTime
+        ToTime = model.ToTime,
     };
 
     internal static ScheduleCellStyleModel ToContract(this Dal.ScheduleCellStyleModel model) => new()
@@ -180,7 +189,7 @@ internal static class ModelMapper
         DayOfMonth = model.DayOfMonth,
         EmployeeId = model.EmployeeId,
         BackgroundColorArgb = model.BackgroundColorArgb,
-        TextColorArgb = model.TextColorArgb
+        TextColorArgb = model.TextColorArgb,
     };
 
     internal static Dal.ScheduleCellStyleModel ToDal(this ScheduleCellStyleModel model) => new()
@@ -190,15 +199,16 @@ internal static class ModelMapper
         DayOfMonth = model.DayOfMonth,
         EmployeeId = model.EmployeeId,
         BackgroundColorArgb = model.BackgroundColorArgb,
-        TextColorArgb = model.TextColorArgb
+        TextColorArgb = model.TextColorArgb,
     };
 
+    // Schedule presets
     internal static SchedulePresetEmployeeModel ToContract(this Dal.SchedulePresetEmployeeModel model) => new()
     {
         Id = model.Id,
         SchedulePresetId = model.SchedulePresetId,
         EmployeeId = model.EmployeeId,
-        MinHoursMonth = model.MinHoursMonth
+        MinHoursMonth = model.MinHoursMonth,
     };
 
     internal static Dal.SchedulePresetEmployeeModel ToDal(this SchedulePresetEmployeeModel model) => new()
@@ -206,7 +216,7 @@ internal static class ModelMapper
         Id = model.Id,
         SchedulePresetId = model.SchedulePresetId,
         EmployeeId = model.EmployeeId,
-        MinHoursMonth = model.MinHoursMonth
+        MinHoursMonth = model.MinHoursMonth,
     };
 
     internal static SchedulePresetModel ToContract(this Dal.SchedulePresetModel model) => new()
@@ -226,7 +236,7 @@ internal static class ModelMapper
         MaxConsecutiveFull = model.MaxConsecutiveFull,
         MaxFullPerMonth = model.MaxFullPerMonth,
         AvailabilityGroupId = model.AvailabilityGroupId,
-        Employees = model.Employees?.Select(ToContract).ToList() ?? new List<SchedulePresetEmployeeModel>()
+        Employees = model.Employees?.Select(ToContract).ToList() ?? [],
     };
 
     internal static Dal.SchedulePresetModel ToDal(this SchedulePresetModel model) => new()
@@ -246,9 +256,10 @@ internal static class ModelMapper
         MaxConsecutiveFull = model.MaxConsecutiveFull,
         MaxFullPerMonth = model.MaxFullPerMonth,
         AvailabilityGroupId = model.AvailabilityGroupId,
-        Employees = model.Employees?.Select(ToDal).ToList() ?? new List<Dal.SchedulePresetEmployeeModel>()
+        Employees = model.Employees?.Select(ToDal).ToList() ?? [],
     };
 
+    // Full schedule aggregate
     internal static ScheduleModel ToContract(this Dal.ScheduleModel model) => new()
     {
         Id = model.Id,
@@ -269,9 +280,9 @@ internal static class ModelMapper
         Note = model.Note,
         AvailabilityGroupId = model.AvailabilityGroupId,
         AvailabilityGroup = model.AvailabilityGroup is null ? null : model.AvailabilityGroup.ToContract(),
-        Employees = model.Employees?.Select(ToContract).ToList() ?? new List<ScheduleEmployeeModel>(),
-        Slots = model.Slots?.Select(ToContract).ToList() ?? new List<ScheduleSlotModel>(),
-        CellStyles = model.CellStyles?.Select(ToContract).ToList() ?? new List<ScheduleCellStyleModel>()
+        Employees = model.Employees?.Select(ToContract).ToList() ?? [],
+        Slots = model.Slots?.Select(ToContract).ToList() ?? [],
+        CellStyles = model.CellStyles?.Select(ToContract).ToList() ?? [],
     };
 
     internal static Dal.ScheduleModel ToDal(this ScheduleModel model) => new()
@@ -290,6 +301,6 @@ internal static class ModelMapper
         MaxConsecutiveFull = model.MaxConsecutiveFull,
         MaxFullPerMonth = model.MaxFullPerMonth,
         Note = model.Note,
-        AvailabilityGroupId = model.AvailabilityGroupId
+        AvailabilityGroupId = model.AvailabilityGroupId,
     };
 }

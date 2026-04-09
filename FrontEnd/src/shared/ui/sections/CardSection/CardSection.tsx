@@ -1,4 +1,4 @@
-import type { CSSProperties, ReactNode } from "react";
+import type { CSSProperties, ReactNode, Ref } from "react";
 import styles from "./CardSection.module.css";
 
 type CardSectionProps = {
@@ -9,14 +9,15 @@ type CardSectionProps = {
   children: ReactNode;
   className?: string;
   style?: CSSProperties;
+  elementRef?: Ref<HTMLElement>;
 };
 
-export function CardSection({ icon, title, headerCenterSlot, headerRightSlot, children, className, style }: CardSectionProps) {
+export function CardSection({ icon, title, headerCenterSlot, headerRightSlot, children, className, style, elementRef }: CardSectionProps) {
   const cardClassName = className ? `${styles.card} ${className}` : styles.card;
   const headerClassName = headerCenterSlot ? `${styles.sectionHeader} ${styles.sectionHeaderCentered}` : styles.sectionHeader;
 
   return (
-    <section className={cardClassName} style={style}>
+    <section ref={elementRef} className={cardClassName} style={style}>
       {icon || title || headerCenterSlot || headerRightSlot ? (
         <div className={headerClassName}>
           <div className={styles.sectionTitle}>

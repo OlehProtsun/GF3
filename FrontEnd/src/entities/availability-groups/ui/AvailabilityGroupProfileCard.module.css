@@ -40,6 +40,8 @@
 }
 
 .matrixCard {
+  --matrix-card-padding-bottom: 18px;
+  --matrix-layout-padding-bottom: 0px;
   min-width: 0;
   min-height: 0;
   flex: 1 1 0;

@@ -24,9 +24,12 @@ export type SaveAvailabilityGroupGraphResult = {
   id: number;
 };
 
-export const useAvailabilityGroupsListQuery = () =>
+export const useAvailabilityGroupsListQuery = (refreshKey?: string) =>
   useQuery({
-    queryKey: queryKeys.availabilityGroups.list(),
+    queryKey: refreshKey
+      ? [...queryKeys.availabilityGroups.list(), refreshKey]
+      : queryKeys.availabilityGroups.list(),
+    staleTime: 300_000,
     queryFn: ({ signal }) => availabilityGroupsApi.list(signal),
   });
 

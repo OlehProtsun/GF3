@@ -1,14 +1,22 @@
+using System.Globalization;
 using BusinessLogicLayer.Common;
 using BusinessLogicLayer.Contracts.Models;
 using BusinessLogicLayer.Mappers;
 using BusinessLogicLayer.Services.Abstractions;
 using DataAccessLayer.Repositories.Abstractions;
-using System.Globalization;
 
 namespace BusinessLogicLayer.Services;
 
+/// <summary>
+/// Manages persisted schedules together with their nested details.
+/// The service treats a schedule as an aggregate root: when we save the full schedule payload,
+/// employees, slots, and cell styles are replaced as a whole so the final database state matches
+/// the editor state exactly.
+/// </summary>
 public class ScheduleService : IScheduleService
 {
+    private const string SaveBeforeGenerationMessage = "You can't save a schedule until something has been generated. Please run generation first.";
+
     private readonly IScheduleRepository _scheduleRepo;
     private readonly IScheduleEmployeeRepository _employeeRepo;
     private readonly IScheduleSlotRepository _slotRepo;
@@ -61,51 +69,106 @@ public class ScheduleService : IScheduleService
         CancellationToken ct = default)
     {
         NormalizeSchedule(schedule);
-        EnsureGenerated(schedule, slots);
 
-        var employeeList = employees?.ToList() ?? new List<ScheduleEmployeeModel>();
-        var slotList = slots?.ToList() ?? new List<ScheduleSlotModel>();
-        var normalizedStyles = (cellStyles ?? Enumerable.Empty<ScheduleCellStyleModel>())
-            .Where(cs => cs.BackgroundColorArgb.HasValue || cs.TextColorArgb.HasValue)
-            .ToList();
+        var employeeList = employees?.ToList() ?? [];
+        var slotList = slots?.ToList() ?? [];
+        EnsureGenerated(schedule, slotList);
 
+        var normalizedStyles = NormalizeStyles(cellStyles);
+        var scheduleId = await UpsertScheduleAsync(schedule, ct).ConfigureAwait(false);
+
+        await ReplaceScheduleEmployeesAsync(scheduleId, employeeList, ct).ConfigureAwait(false);
+        await ReplaceScheduleSlotsAsync(scheduleId, slotList, ct).ConfigureAwait(false);
+        await ReplaceScheduleCellStylesAsync(scheduleId, normalizedStyles, ct).ConfigureAwait(false);
+    }
+
+    public async Task<ScheduleModel?> GetDetailedAsync(int id, CancellationToken ct = default)
+    {
+        var schedule = await _scheduleRepo.GetDetailedAsync(id, ct).ConfigureAwait(false);
+        if (schedule is null)
+        {
+            return null;
+        }
+
+        schedule.Employees = (await _employeeRepo.GetByScheduleAsync(id, ct).ConfigureAwait(false)).ToList();
+        schedule.Slots = (await _slotRepo.GetByScheduleAsync(id, ct).ConfigureAwait(false)).ToList();
+        schedule.CellStyles = (await _cellStyleRepo.GetByScheduleAsync(id, ct).ConfigureAwait(false)).ToList();
+
+        return schedule.ToContract();
+    }
+
+    private async Task<int> UpsertScheduleAsync(ScheduleModel schedule, CancellationToken ct)
+    {
         var dalSchedule = schedule.ToDal();
         if (dalSchedule.Id == 0)
-            dalSchedule = await _scheduleRepo.AddAsync(dalSchedule, ct).ConfigureAwait(false);
-        else
-            await _scheduleRepo.UpdateAsync(dalSchedule, ct).ConfigureAwait(false);
-
-        var scheduleId = dalSchedule.Id;
-
-        var existingEmployees = await _employeeRepo.GetByScheduleAsync(scheduleId, ct).ConfigureAwait(false);
-        foreach (var e in existingEmployees)
-            await _employeeRepo.DeleteAsync(e.Id, ct).ConfigureAwait(false);
-
-        foreach (var e in employeeList)
         {
-            var dal = e.ToDal();
+            dalSchedule = await _scheduleRepo.AddAsync(dalSchedule, ct).ConfigureAwait(false);
+        }
+        else
+        {
+            await _scheduleRepo.UpdateAsync(dalSchedule, ct).ConfigureAwait(false);
+        }
+
+        return dalSchedule.Id;
+    }
+
+    /// <summary>
+    /// The editor submits the full employee collection for a schedule. Replacing it entirely
+    /// keeps the persistence model simple and avoids subtle "partial patch" bugs where removed
+    /// employees would otherwise remain attached to the schedule.
+    /// </summary>
+    private async Task ReplaceScheduleEmployeesAsync(
+        int scheduleId,
+        IReadOnlyList<ScheduleEmployeeModel> employees,
+        CancellationToken ct)
+    {
+        var existingEmployees = await _employeeRepo.GetByScheduleAsync(scheduleId, ct).ConfigureAwait(false);
+        foreach (var employee in existingEmployees)
+        {
+            await _employeeRepo.DeleteAsync(employee.Id, ct).ConfigureAwait(false);
+        }
+
+        foreach (var employee in employees)
+        {
+            var dal = employee.ToDal();
             dal.Id = 0;
             dal.ScheduleId = scheduleId;
             await _employeeRepo.AddAsync(dal, ct).ConfigureAwait(false);
         }
+    }
 
+    private async Task ReplaceScheduleSlotsAsync(
+        int scheduleId,
+        IReadOnlyList<ScheduleSlotModel> slots,
+        CancellationToken ct)
+    {
         var existingSlots = await _slotRepo.GetByScheduleAsync(scheduleId, ct).ConfigureAwait(false);
-        foreach (var s in existingSlots)
-            await _slotRepo.DeleteAsync(s.Id, ct).ConfigureAwait(false);
-
-        foreach (var s in slotList)
+        foreach (var slot in existingSlots)
         {
-            var dal = s.ToDal();
+            await _slotRepo.DeleteAsync(slot.Id, ct).ConfigureAwait(false);
+        }
+
+        foreach (var slot in slots)
+        {
+            var dal = slot.ToDal();
             dal.Id = 0;
             dal.ScheduleId = scheduleId;
             await _slotRepo.AddAsync(dal, ct).ConfigureAwait(false);
         }
+    }
 
+    private async Task ReplaceScheduleCellStylesAsync(
+        int scheduleId,
+        IReadOnlyList<ScheduleCellStyleModel> styles,
+        CancellationToken ct)
+    {
         var existingStyles = await _cellStyleRepo.GetByScheduleAsync(scheduleId, ct).ConfigureAwait(false);
         foreach (var style in existingStyles)
+        {
             await _cellStyleRepo.DeleteAsync(style.Id, ct).ConfigureAwait(false);
+        }
 
-        foreach (var style in normalizedStyles)
+        foreach (var style in styles)
         {
             var dal = style.ToDal();
             dal.Id = 0;
@@ -114,17 +177,11 @@ public class ScheduleService : IScheduleService
         }
     }
 
-    public async Task<ScheduleModel?> GetDetailedAsync(int id, CancellationToken ct = default)
+    private static List<ScheduleCellStyleModel> NormalizeStyles(IEnumerable<ScheduleCellStyleModel> cellStyles)
     {
-        var schedule = await _scheduleRepo.GetDetailedAsync(id, ct).ConfigureAwait(false);
-        if (schedule is null)
-            return null;
-
-        schedule.Employees = (await _employeeRepo.GetByScheduleAsync(id, ct).ConfigureAwait(false)).ToList();
-        schedule.Slots = (await _slotRepo.GetByScheduleAsync(id, ct).ConfigureAwait(false)).ToList();
-        schedule.CellStyles = (await _cellStyleRepo.GetByScheduleAsync(id, ct).ConfigureAwait(false)).ToList();
-
-        return schedule.ToContract();
+        return (cellStyles ?? Enumerable.Empty<ScheduleCellStyleModel>())
+            .Where(style => style.BackgroundColorArgb.HasValue || style.TextColorArgb.HasValue)
+            .ToList();
     }
 
     private static void NormalizeSchedule(ScheduleModel schedule)
@@ -134,18 +191,27 @@ public class ScheduleService : IScheduleService
         schedule.Shift2Time = NormalizeShift(schedule.Shift2Time, "Shift2");
     }
 
+    /// <summary>
+    /// Shift values are accepted in a forgiving user-facing format, but they are always persisted
+    /// in one canonical representation: <c>HH:mm - HH:mm</c>. That gives the rest of the codebase
+    /// a stable shape for comparisons, exports, and generation logic.
+    /// </summary>
     private static string NormalizeShift(string? value, string label)
     {
         if (string.IsNullOrWhiteSpace(value))
             throw new ValidationException($"{label} is required.");
 
-        var s = value.Trim().Replace('–', '-').Replace('—', '-').Replace('−', '-');
-        var parts = s.Split('-', 2, StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+        var normalized = value.Trim()
+            .Replace('\u2013', '-')
+            .Replace('\u2014', '-')
+            .Replace('\u2212', '-');
+
+        var parts = normalized.Split('-', 2, StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
         if (parts.Length != 2)
             throw new ValidationException($"{label} format must be HH:mm - HH:mm.");
 
-        if (!TimeSpan.TryParseExact(parts[0], new[] { @"h\:mm", @"hh\:mm" }, CultureInfo.InvariantCulture, out var from) ||
-            !TimeSpan.TryParseExact(parts[1], new[] { @"h\:mm", @"hh\:mm" }, CultureInfo.InvariantCulture, out var to))
+        if (!TimeSpan.TryParseExact(parts[0], [@"h\:mm", @"hh\:mm"], CultureInfo.InvariantCulture, out var from) ||
+            !TimeSpan.TryParseExact(parts[1], [@"h\:mm", @"hh\:mm"], CultureInfo.InvariantCulture, out var to))
             throw new ValidationException($"{label} format must be HH:mm - HH:mm.");
 
         if (to <= from)
@@ -154,12 +220,12 @@ public class ScheduleService : IScheduleService
         return $"{from:hh\\:mm} - {to:hh\\:mm}";
     }
 
-    private static void EnsureGenerated(ScheduleModel schedule, IEnumerable<ScheduleSlotModel> slots)
+    private static void EnsureGenerated(ScheduleModel schedule, IReadOnlyCollection<ScheduleSlotModel> slots)
     {
         if (schedule.AvailabilityGroupId is null || schedule.AvailabilityGroupId <= 0)
-            throw new ValidationException("You can’t save a schedule until something has been generated. Please run generation first.");
+            throw new ValidationException(SaveBeforeGenerationMessage);
 
-        if (slots == null || !slots.Any())
-            throw new ValidationException("You can’t save a schedule until something has been generated. Please run generation first.");
+        if (slots.Count == 0)
+            throw new ValidationException(SaveBeforeGenerationMessage);
     }
 }

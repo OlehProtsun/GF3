@@ -1,5 +1,6 @@
 import type { Employee } from "@entities/employees/model/types";
 import { getEmployeeFullName } from "@entities/employees/model/presentation";
+import { parseFlexibleTimeSegment } from "@shared/lib/timeRange";
 import { buildPreviewList, formatHoursMinutes, getSlotDurationMinutes } from "./statistics";
 import type { Graph, GraphCellStyle, GraphEmployee, GraphSlot, SlotStatus } from "./types";
 
@@ -17,6 +18,32 @@ export type GraphMatrixColumn = {
 };
 
 export type GraphMatrixCellMap = Record<string, string>;
+export type GraphMatrixVisualHintMap = Record<string, string>;
+export type GraphRelatedScheduleHintDayValue = {
+  dayOfMonth: number;
+  weekdayLabel: string;
+  value: string;
+  isWorked: boolean;
+  isWeekend: boolean;
+};
+export type GraphRelatedScheduleHintEntry = {
+  graphId: number;
+  graphName: string;
+  intervals: Array<{ from: string; to: string }>;
+  intervalsText: string;
+  dayValues: GraphRelatedScheduleHintDayValue[];
+};
+export type GraphRelatedScheduleHintDetail = {
+  employeeId: number;
+  dayOfMonth: number;
+  visualHint: string;
+  relatedGraphs: GraphRelatedScheduleHintEntry[];
+};
+export type GraphRelatedScheduleHintDetailMap = Record<string, GraphRelatedScheduleHintDetail>;
+export type GraphRelatedScheduleHintData = {
+  visualHintMap: GraphMatrixVisualHintMap;
+  detailMap: GraphRelatedScheduleHintDetailMap;
+};
 
 export type GraphMatrixStyle = {
   id: number | null;
@@ -66,6 +93,12 @@ export type GraphSlotDiffResult = {
   update: GraphSlot[];
   remove: GraphSlot[];
 };
+
+export type GraphCellContent =
+  | { kind: "empty"; value: [] }
+  | { kind: "intervals"; value: Array<{ from: string; to: string }> }
+  | { kind: "text"; value: string }
+  | { kind: "invalid"; error: string };
 
 export function getGraphCellKey(employeeId: number, dayOfMonth: number) {
   return `${employeeId}:${dayOfMonth}`;
@@ -205,6 +238,147 @@ export function buildGraphCellMap(slots: GraphSlot[]) {
   return cellMap;
 }
 
+export function buildGraphRelatedScheduleHintData(params: {
+  currentGraph: Pick<Graph, "id" | "year" | "month">;
+  columns: Array<Pick<GraphMatrixColumn, "employeeId" | "kind">>;
+  cellMap: GraphMatrixCellMap;
+  relatedGraphs: Array<{
+    graph: Pick<Graph, "id" | "name" | "year" | "month">;
+    slots: GraphSlot[];
+  }>;
+}) {
+  const { currentGraph, columns, cellMap, relatedGraphs } = params;
+  const employeeIdSet = new Set(
+    columns
+      .filter(column => column.kind === "employee" && column.employeeId > 0)
+      .map(column => column.employeeId),
+  );
+
+  if (employeeIdSet.size === 0 || relatedGraphs.length === 0) {
+    return {
+      visualHintMap: {} satisfies GraphMatrixVisualHintMap,
+      detailMap: {} satisfies GraphRelatedScheduleHintDetailMap,
+    } satisfies GraphRelatedScheduleHintData;
+  }
+
+  const detailByCellKey = new Map<string, GraphRelatedScheduleHintDetail>();
+
+  relatedGraphs.forEach(({ graph, slots }) => {
+    if (
+      graph.id === currentGraph.id ||
+      graph.year !== currentGraph.year ||
+      graph.month !== currentGraph.month
+    ) {
+      return;
+    }
+
+    const graphName = graph.name.trim();
+    if (!graphName) {
+      return;
+    }
+
+    const relatedGraphCellMap = buildGraphCellMap(slots);
+    const dayValuesByEmployeeId = new Map<number, GraphRelatedScheduleHintDayValue[]>();
+    const slotsByCellKey = new Map<string, GraphSlot[]>();
+
+    slots.forEach(slot => {
+      if (!slot.employeeId || !employeeIdSet.has(slot.employeeId)) {
+        return;
+      }
+
+      const cellKey = getGraphCellKey(slot.employeeId, slot.dayOfMonth);
+      if (!isGraphCellEmptyValue(cellMap[cellKey])) {
+        return;
+      }
+
+      const cellSlots = slotsByCellKey.get(cellKey) ?? [];
+      cellSlots.push(slot);
+      slotsByCellKey.set(cellKey, cellSlots);
+    });
+
+    slotsByCellKey.forEach((cellSlots, cellKey) => {
+      const [employeeIdValue, dayOfMonthValue] = cellKey.split(":");
+      const employeeId = Number(employeeIdValue);
+      const dayOfMonth = Number(dayOfMonthValue);
+
+      if (!Number.isInteger(employeeId) || !Number.isInteger(dayOfMonth)) {
+        return;
+      }
+
+      const mergedIntervals = mergeGraphIntervalsForDisplay(cellSlots);
+      const dayValues = dayValuesByEmployeeId.get(employeeId) ?? buildGraphRelatedScheduleHintDayValues({
+        year: graph.year,
+        month: graph.month,
+        employeeId,
+        cellMap: relatedGraphCellMap,
+      });
+      if (!dayValuesByEmployeeId.has(employeeId)) {
+        dayValuesByEmployeeId.set(employeeId, dayValues);
+      }
+      const nextEntry = {
+        graphId: graph.id,
+        graphName,
+        intervals: mergedIntervals,
+        intervalsText: formatGraphIntervals(mergedIntervals),
+        dayValues,
+      } satisfies GraphRelatedScheduleHintEntry;
+      const currentDetail = detailByCellKey.get(cellKey) ?? {
+        employeeId,
+        dayOfMonth,
+        visualHint: "",
+        relatedGraphs: [],
+      };
+
+      if (currentDetail.relatedGraphs.some(item => item.graphId === nextEntry.graphId)) {
+        return;
+      }
+
+      currentDetail.relatedGraphs.push(nextEntry);
+      detailByCellKey.set(cellKey, currentDetail);
+    });
+  });
+
+  return [...detailByCellKey.entries()].reduce<GraphRelatedScheduleHintData>((accumulator, [cellKey, detail]) => {
+    const orderedRelatedGraphs = [...detail.relatedGraphs].sort((left, right) => {
+      const nameDifference = left.graphName.localeCompare(right.graphName);
+      if (nameDifference !== 0) {
+        return nameDifference;
+      }
+
+      return left.graphId - right.graphId;
+    });
+    const visualHint = [...new Set(orderedRelatedGraphs.map(item => item.graphName))].join(", ");
+
+    if (!visualHint) {
+      return accumulator;
+    }
+
+    accumulator.visualHintMap[cellKey] = visualHint;
+    accumulator.detailMap[cellKey] = {
+      ...detail,
+      visualHint,
+      relatedGraphs: orderedRelatedGraphs,
+    };
+
+    return accumulator;
+  }, {
+    visualHintMap: {} satisfies GraphMatrixVisualHintMap,
+    detailMap: {} satisfies GraphRelatedScheduleHintDetailMap,
+  });
+}
+
+export function buildGraphRelatedScheduleHintMap(params: {
+  currentGraph: Pick<Graph, "id" | "year" | "month">;
+  columns: Array<Pick<GraphMatrixColumn, "employeeId" | "kind">>;
+  cellMap: GraphMatrixCellMap;
+  relatedGraphs: Array<{
+    graph: Pick<Graph, "id" | "name" | "year" | "month">;
+    slots: GraphSlot[];
+  }>;
+}) {
+  return buildGraphRelatedScheduleHintData(params).visualHintMap;
+}
+
 export function buildGraphStyleMap(styles: GraphCellStyle[]): GraphMatrixStyleMap {
   return styles.reduce<GraphMatrixStyleMap>((accumulator, style) => {
     accumulator[getGraphStyleKey(style.employeeId, style.dayOfMonth)] = {
@@ -332,19 +506,19 @@ export function tryParseGraphIntervals(input: string):
   for (const part of parts) {
     const segments = part
       .replace(/[–—]/g, "-")
-      .split("-", 2)
+      .split("-")
       .map(segment => segment.trim())
       .filter(Boolean);
 
     if (segments.length !== 2) {
-      return { ok: false, error: "Format: HH:mm - HH:mm (comma separated allowed)." };
+      return { ok: false, error: "Use time ranges like 09:00 - 15:00. Comma-separated ranges are allowed." };
     }
 
     const from = normalizeGraphTime(segments[0]);
     const to = normalizeGraphTime(segments[1]);
 
     if (!from || !to) {
-      return { ok: false, error: "Time must be HH:mm (e.g. 09:00 - 14:30)." };
+      return { ok: false, error: "Use time ranges like 09:00 - 15:00." };
     }
 
     if ((parseGraphTimeMinutes(to) ?? 0) <= (parseGraphTimeMinutes(from) ?? 0)) {
@@ -371,6 +545,20 @@ export function tryParseGraphIntervals(input: string):
   });
 
   return { ok: true, value: intervals };
+}
+
+export function normalizeGraphCellValue(input: string) {
+  const parsed = parseGraphCellContent(input);
+
+  if (parsed.kind === "empty") {
+    return GRAPH_EMPTY_MARK;
+  }
+
+  if (parsed.kind === "intervals") {
+    return formatGraphIntervals(parsed.value);
+  }
+
+  return input.trim();
 }
 
 export function sanitizeGraphCellMap(
@@ -412,8 +600,8 @@ export function validateGraphCellMap(
   employeeIds.forEach(employeeId => {
     for (let dayOfMonth = 1; dayOfMonth <= daysInMonth; dayOfMonth += 1) {
       const key = getGraphCellKey(employeeId, dayOfMonth);
-      const parsed = tryParseGraphIntervals(cellMap[key] ?? GRAPH_EMPTY_MARK);
-      if (!parsed.ok) {
+      const parsed = parseGraphCellContent(cellMap[key] ?? GRAPH_EMPTY_MARK);
+      if (parsed.kind === "invalid") {
         errors[key] = parsed.error;
       }
     }
@@ -564,18 +752,24 @@ export function buildGraphDraftSlots(params: {
 
   employeeIds.forEach(employeeId => {
     for (let dayOfMonth = 1; dayOfMonth <= daysInMonth; dayOfMonth += 1) {
-      const parsed = tryParseGraphIntervals(cellMap[getGraphCellKey(employeeId, dayOfMonth)] ?? GRAPH_EMPTY_MARK);
-      if (!parsed.ok) {
+      const parsed = parseGraphCellContent(cellMap[getGraphCellKey(employeeId, dayOfMonth)] ?? GRAPH_EMPTY_MARK);
+      if (parsed.kind === "invalid") {
         errors[getGraphCellKey(employeeId, dayOfMonth)] = parsed.error;
         continue;
       }
 
-      applyIntervalsToGraphSlots(scheduleId, nextSlots, dayOfMonth, employeeId, parsed.value);
+      applyIntervalsToGraphSlots(
+        scheduleId,
+        nextSlots,
+        dayOfMonth,
+        employeeId,
+        parsed.kind === "intervals" ? parsed.value : [],
+      );
     }
   });
 
   return {
-    slots: nextSlots,
+    slots: reuseExistingAssignedSlotIds(existingSlots, nextSlots),
     errors,
   } satisfies GraphDraftSlotBuildResult;
 }
@@ -598,6 +792,43 @@ export function diffGraphSlots(existingSlots: GraphSlot[], nextSlots: GraphSlot[
   return { create, update, remove };
 }
 
+function reuseExistingAssignedSlotIds(existingSlots: GraphSlot[], nextSlots: GraphSlot[]) {
+  const reusableSlotsByKey = new Map<string, GraphSlot[]>();
+
+  existingSlots.forEach(slot => {
+    if (slot.id <= 0 || !slot.employeeId || slot.employeeId <= 0) {
+      return;
+    }
+
+    const key = getAssignedSlotReuseKey(slot);
+    const list = reusableSlotsByKey.get(key) ?? [];
+    list.push(slot);
+    reusableSlotsByKey.set(key, list);
+  });
+
+  return nextSlots.map(slot => {
+    if (slot.id > 0 || !slot.employeeId || slot.employeeId <= 0) {
+      return slot;
+    }
+
+    const key = getAssignedSlotReuseKey(slot);
+    const reusableSlot = reusableSlotsByKey.get(key)?.shift();
+    if (!reusableSlot) {
+      return slot;
+    }
+
+    return {
+      ...slot,
+      id: reusableSlot.id,
+      scheduleId: reusableSlot.scheduleId,
+    };
+  });
+}
+
+function getAssignedSlotReuseKey(slot: Pick<GraphSlot, "dayOfMonth" | "fromTime" | "toTime" | "employeeId">) {
+  return `${slot.dayOfMonth}:${slot.fromTime}:${slot.toTime}:${slot.employeeId ?? 0}`;
+}
+
 export function applyIntervalsToGraphSlots(
   scheduleId: number,
   slots: GraphSlot[],
@@ -605,14 +836,7 @@ export function applyIntervalsToGraphSlots(
   employeeId: number,
   intervals: Array<{ from: string; to: string }>,
 ) {
-  let preservedStatus: SlotStatus = 0;
-
-  for (const slot of slots) {
-    if (slot.dayOfMonth === dayOfMonth && slot.employeeId === employeeId) {
-      preservedStatus = slot.status;
-      break;
-    }
-  }
+  const preservedStatus: SlotStatus = 1;
 
   for (let index = slots.length - 1; index >= 0; index -= 1) {
     const slot = slots[index];
@@ -645,6 +869,7 @@ export function applyIntervalsToGraphSlots(
 
     if (vacantSlot) {
       vacantSlot.employeeId = employeeId;
+      vacantSlot.status = 1;
       return;
     }
 
@@ -736,34 +961,66 @@ function computeConflictForDayWithStaffing(
   }
 
   for (const shift of shifts) {
-    const coveredEmployeeIds = new Set<number>();
-    assignedSlots.forEach(slot => {
-      if (!slot.employeeId) {
-        return;
-      }
-
-      const fromMinutes = parseGraphTimeMinutes(slot.fromTime);
-      let toMinutes = parseGraphTimeMinutes(slot.toTime);
-
-      if (fromMinutes === null || toMinutes === null) {
-        return;
-      }
-
-      if (toMinutes < fromMinutes) {
-        toMinutes += 24 * 60;
-      }
-
-      if (fromMinutes <= shift.fromMinutes && toMinutes >= shift.toMinutes) {
-        coveredEmployeeIds.add(slot.employeeId);
-      }
-    });
-
-    if (coveredEmployeeIds.size < normalizedPeoplePerShift) {
+    if (!hasRequiredGraphStaffingCoverage(intervalsByEmployeeId, shift, normalizedPeoplePerShift)) {
       return true;
     }
   }
 
   return false;
+}
+
+function hasRequiredGraphStaffingCoverage(
+  intervalsByEmployeeId: Map<number, Array<{ fromMinutes: number; toMinutes: number }>>,
+  shift: { fromMinutes: number; toMinutes: number },
+  requiredPeople: number,
+) {
+  const relevantIntervalsByEmployeeId = new Map<number, Array<{ fromMinutes: number; toMinutes: number }>>();
+  const coveragePoints = new Set<number>([shift.fromMinutes, shift.toMinutes]);
+
+  intervalsByEmployeeId.forEach((intervals, employeeId) => {
+    intervals.forEach(interval => {
+      const fromMinutes = Math.max(interval.fromMinutes, shift.fromMinutes);
+      const toMinutes = Math.min(interval.toMinutes, shift.toMinutes);
+
+      if (toMinutes <= fromMinutes) {
+        return;
+      }
+
+      coveragePoints.add(fromMinutes);
+      coveragePoints.add(toMinutes);
+
+      const relevantIntervals = relevantIntervalsByEmployeeId.get(employeeId) ?? [];
+      relevantIntervals.push({ fromMinutes, toMinutes });
+      relevantIntervalsByEmployeeId.set(employeeId, relevantIntervals);
+    });
+  });
+
+  const orderedCoveragePoints = [...coveragePoints].sort((left, right) => left - right);
+  for (let index = 0; index < orderedCoveragePoints.length - 1; index += 1) {
+    const segmentStart = orderedCoveragePoints[index];
+    const segmentEnd = orderedCoveragePoints[index + 1];
+
+    if (segmentEnd <= segmentStart) {
+      continue;
+    }
+
+    let activeEmployees = 0;
+    for (const intervals of relevantIntervalsByEmployeeId.values()) {
+      const coversSegment = intervals.some(interval =>
+        interval.fromMinutes <= segmentStart && interval.toMinutes >= segmentEnd,
+      );
+
+      if (coversSegment) {
+        activeEmployees += 1;
+      }
+    }
+
+    if (activeEmployees < requiredPeople) {
+      return false;
+    }
+  }
+
+  return true;
 }
 
 function tryParseGraphShiftRange(value?: string | null) {
@@ -773,7 +1030,7 @@ function tryParseGraphShiftRange(value?: string | null) {
   }
 
   const parts = normalized
-    .split("-", 2)
+    .split("-")
     .map(part => part.trim())
     .filter(Boolean);
 
@@ -872,20 +1129,35 @@ function getEmployeeLabel(employeeId: number, employeesById?: Map<number, Employ
   return getEmployeeFullName(employeesById?.get(employeeId), `Employee ${employeeId}`);
 }
 
+function containsAlphabeticCharacter(value: string) {
+  return [...value].some(character => character.toLowerCase() !== character.toUpperCase());
+}
+
+function looksLikeGraphTimeAttempt(value: string) {
+  return /[:.,]/.test(value) || /[-–—]/.test(value);
+}
+
+export function parseGraphCellContent(input: string): GraphCellContent {
+  const trimmed = input.trim();
+  const parsed = tryParseGraphIntervals(trimmed);
+
+  if (parsed.ok) {
+    if (parsed.value.length === 0) {
+      return { kind: "empty", value: [] };
+    }
+
+    return { kind: "intervals", value: parsed.value };
+  }
+
+  if (containsAlphabeticCharacter(trimmed) || !looksLikeGraphTimeAttempt(trimmed)) {
+    return { kind: "text", value: trimmed };
+  }
+
+  return { kind: "invalid", error: parsed.error };
+}
+
 function normalizeGraphTime(value: string) {
-  const match = value.trim().match(/^(\d{1,2}):(\d{2})$/);
-  if (!match) {
-    return null;
-  }
-
-  const hours = Number(match[1]);
-  const minutes = Number(match[2]);
-
-  if (!Number.isInteger(hours) || !Number.isInteger(minutes) || hours < 0 || hours > 23 || minutes < 0 || minutes > 59) {
-    return null;
-  }
-
-  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+  return parseFlexibleTimeSegment(value)?.label ?? null;
 }
 
 function parseGraphTimeMinutes(value: string) {
@@ -896,6 +1168,34 @@ function parseGraphTimeMinutes(value: string) {
 
   const [hours, minutes] = normalized.split(":").map(Number);
   return hours * 60 + minutes;
+}
+
+function isGraphCellEmptyValue(value: string | undefined) {
+  const trimmed = value?.trim() ?? "";
+  return trimmed.length === 0 || trimmed === GRAPH_EMPTY_MARK;
+}
+
+function buildGraphRelatedScheduleHintDayValues(params: {
+  year: number;
+  month: number;
+  employeeId: number;
+  cellMap: GraphMatrixCellMap;
+}) {
+  const { year, month, employeeId, cellMap } = params;
+  const daysInMonth = getGraphDaysInMonth(year, month);
+
+  return Array.from({ length: daysInMonth }, (_, index) => {
+    const dayOfMonth = index + 1;
+    const value = cellMap[getGraphCellKey(employeeId, dayOfMonth)] ?? GRAPH_EMPTY_MARK;
+
+    return {
+      dayOfMonth,
+      weekdayLabel: getGraphWeekdayLabel(year, month, dayOfMonth),
+      value,
+      isWorked: value.trim() !== GRAPH_EMPTY_MARK,
+      isWeekend: isGraphWeekend(year, month, dayOfMonth),
+    } satisfies GraphRelatedScheduleHintDayValue;
+  });
 }
 
 function minutesToTimeLabel(totalMinutes: number) {

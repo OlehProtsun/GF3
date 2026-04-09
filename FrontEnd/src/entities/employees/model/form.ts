@@ -1,5 +1,6 @@
-﻿import { useEffect, useState } from "react";
+import { useMemo } from "react";
 import type { ChangeEvent } from "react";
+import { useSyncedDraft } from "@shared/lib/useSyncedDraft";
 import type { Employee } from "./types";
 
 export type EmployeeFormState = {
@@ -52,31 +53,42 @@ export function validateEmployeeForm(form: EmployeeFormState): EmployeeFormError
 }
 
 export function useEmployeeForm(employee?: EmployeeFormSource | null, isCreate = false) {
-  const [form, setForm] = useState<EmployeeFormState>(EMPTY_FORM);
-  const [errors, setErrors] = useState<EmployeeFormErrors>({});
-
-  useEffect(() => {
-    if (employee) {
-      setForm(createEmployeeFormState(employee));
-      setErrors({});
-      return;
-    }
-
-    if (isCreate) {
-      setForm(EMPTY_FORM);
-      setErrors({});
-    }
-  }, [employee, isCreate]);
+  const sourceKey = useMemo(
+    () =>
+      employee
+        ? `employee:${employee.firstName}:${employee.lastName}:${employee.email ?? ""}:${employee.phone ?? ""}`
+        : isCreate
+          ? "create"
+          : "empty",
+    [employee, isCreate],
+  );
+  const initialDraft = useMemo(
+    () => ({
+      form: createEmployeeFormState(employee),
+      errors: {} as EmployeeFormErrors,
+    }),
+    [employee],
+  );
+  const { value: draft, setValue: setDraft } = useSyncedDraft(sourceKey, initialDraft);
+  const { form, errors } = draft;
 
   const handleFieldChange =
     (field: keyof EmployeeFormState) =>
     (event: ChangeEvent<HTMLInputElement>): void => {
-      setForm((prev) => ({ ...prev, [field]: event.target.value }));
+      setDraft((current) => ({
+        form: { ...current.form, [field]: event.target.value },
+        errors: current.errors,
+      }));
     };
 
   const validate = () => {
     const nextErrors = validateEmployeeForm(form);
-    setErrors(nextErrors);
+
+    setDraft((current) => ({
+      ...current,
+      errors: nextErrors,
+    }));
+
     return Object.keys(nextErrors).length === 0;
   };
 

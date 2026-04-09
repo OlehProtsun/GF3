@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import type { SVGProps, ReactNode } from "react";
 
 export type IconProps = Omit<SVGProps<SVGSVGElement>, "children"> & {
@@ -8,6 +9,7 @@ export type IconProps = Omit<SVGProps<SVGSVGElement>, "children"> & {
 export type CreateIconOptions = {
   viewBox?: string;
   fillRule?: "evenodd" | "nonzero";
+  flipY?: boolean;
 };
 
 export type IconPathDef = {
@@ -17,6 +19,25 @@ export type IconPathDef = {
 
 function getPathRules(fillRule?: CreateIconOptions["fillRule"]) {
   return fillRule ? { fillRule, clipRule: fillRule } : null;
+}
+
+function getFlipYTransform(viewBox: string, flipY?: boolean) {
+  if (!flipY) {
+    return undefined;
+  }
+
+  const parts = viewBox.trim().split(/\s+/);
+  if (parts.length !== 4) {
+    return undefined;
+  }
+
+  const minY = Number(parts[1]);
+  const height = Number(parts[3]);
+  if (Number.isNaN(minY) || Number.isNaN(height)) {
+    return undefined;
+  }
+
+  return `translate(0 ${minY * 2 + height}) scale(1 -1)`;
 }
 
 function SvgWrapper({
@@ -48,11 +69,18 @@ function SvgWrapper({
 export function createIcon(d: string, options: CreateIconOptions = {}) {
   const viewBox = options.viewBox ?? "0 0 24 24";
   const rules = getPathRules(options.fillRule);
+  const flipYTransform = getFlipYTransform(viewBox, options.flipY);
 
   return function Icon({ size = 22, title, ...props }: IconProps) {
     return (
       <SvgWrapper size={size} title={title} viewBox={viewBox} {...props}>
-        <path d={d} {...(rules ?? {})} />
+        {flipYTransform ? (
+          <g transform={flipYTransform}>
+            <path d={d} {...(rules ?? {})} />
+          </g>
+        ) : (
+          <path d={d} {...(rules ?? {})} />
+        )}
       </SvgWrapper>
     );
   };
@@ -64,18 +92,32 @@ export function createIconPaths(
 ) {
   const viewBox = options.viewBox ?? "0 0 24 24";
   const rules = getPathRules(options.fillRule);
+  const flipYTransform = getFlipYTransform(viewBox, options.flipY);
 
   return function Icon({ size = 22, title, ...props }: IconProps) {
     return (
       <SvgWrapper size={size} title={title} viewBox={viewBox} {...props}>
-        {paths.map((p, idx) => (
-          <path
-            key={idx}
-            d={p.d}
-            transform={p.transform}
-            {...(rules ?? {})}
-          />
-        ))}
+        {flipYTransform ? (
+          <g transform={flipYTransform}>
+            {paths.map((p, idx) => (
+              <path
+                key={idx}
+                d={p.d}
+                transform={p.transform}
+                {...(rules ?? {})}
+              />
+            ))}
+          </g>
+        ) : (
+          paths.map((p, idx) => (
+            <path
+              key={idx}
+              d={p.d}
+              transform={p.transform}
+              {...(rules ?? {})}
+            />
+          ))
+        )}
       </SvgWrapper>
     );
   };

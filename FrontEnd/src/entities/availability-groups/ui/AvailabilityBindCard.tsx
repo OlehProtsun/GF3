@@ -4,6 +4,7 @@ import {
   isCommonEditorShortcut,
   isModifierOnlyKey,
 } from "@entities/availability-binds";
+import { ErrorBanner } from "@shared/ui/components/ErrorBanner";
 import { BindIcon, CloseIcon, PlusIcon } from "@shared/ui/icons";
 import { CardSection } from "@shared/ui/sections/CardSection";
 import { IosButton } from "@shared/ui/components/IosButton";
@@ -97,7 +98,15 @@ export function AvailabilityBindCard({
       headerRightSlot={headerRightSlot}
     >
       <div className={styles.layout}>
-        {errorMessage ? <div className={styles.errorMessage}>{errorMessage}</div> : null}
+        {errorMessage ? (
+          <ErrorBanner
+            className={styles.errorMessageWrap}
+            bannerClassName={styles.errorMessage}
+            textClassName={styles.errorMessageText}
+          >
+            {errorMessage}
+          </ErrorBanner>
+        ) : null}
 
         <div className={styles.placeholderTable}>
           <div className={styles.headerRow}>

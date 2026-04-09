@@ -1,6 +1,6 @@
 .layout {
   min-height: 100vh;
-  background: var(--bg, #f5f5f7);
+  background: var(--app-page-background, var(--bg, #f5f5f7));
   color: var(--text, #111111);
 
   /* ÃÂ±ÃÂ°ÃÂ·ÃÂ¾ÃÂ²Ã‘â€“ Ã‘â‚¬ÃÂ¾ÃÂ·ÃÂ¼Ã‘â€“Ã‘â‚¬ÃÂ¸ (ÃÂ¼ÃÂ¾ÃÂ¶ÃÂµÃ‘Ë† ÃÂ¼Ã‘â€“ÃÂ½Ã‘ÂÃ‘â€šÃÂ¸ ÃÂ¿Ã‘â€“ÃÂ´ Ã‘ÂÃÂ²Ã‘â€“ÃÂ¹ Ã‘ÂÃÂºÃ‘â‚¬Ã‘â€“ÃÂ½) */
@@ -257,6 +257,7 @@
   min-height: 100vh;
   min-width: 0;
   padding: 0;
+  background: var(--app-page-background, #f3f4f6);
   --page-header-fixed-offset: 0px;
 }
 
@@ -268,6 +269,7 @@
   max-width: none;
   margin: 0;
   padding: 4px 0 0 0;
+  background: var(--app-page-background, #f3f4f6);
   overflow: clip;
   overflow-clip-margin: 24px;
   box-sizing: border-box;
@@ -278,14 +280,20 @@
   flex: 1 1 auto;
   width: 100%;
   min-height: 0;
+  background: var(--app-page-background, #f3f4f6);
   overflow: visible;
 }
 .contentWideScrollable {
   height: auto;
   min-height: 100vh;
   padding-top: 10px;
+  background: var(--app-page-background, #f3f4f6);
   overflow: visible;
   overflow-clip-margin: 0;
+}
+
+.contentWideHeaderAligned {
+  padding-top: 10px;
 }
 
 .contentWideScrollable :global(.container) {
@@ -416,6 +424,10 @@
   pointer-events: none;
 }
 @media (max-width: 960px) {
+  .contentExpanded {
+    --page-header-fixed-offset: calc(var(--sidebar-w) + 12px);
+  }
+
   .contentWide {
     height: auto;
     min-height: 100vh;

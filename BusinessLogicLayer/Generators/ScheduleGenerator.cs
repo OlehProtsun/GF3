@@ -9,6 +9,12 @@ using BusinessLogicLayer.Contracts.Enums;
 
 namespace BusinessLogicLayer.Generators
 {
+    /// <summary>
+    /// Core scheduling engine that transforms employee availability and graph configuration
+    /// into a concrete set of schedule slots for one month.
+    /// The generator is intentionally kept self-contained because most of the logic is algorithmic:
+    /// it builds normalized matrices up front, scores candidate assignments, and then emits slots.
+    /// </summary>
     public sealed class ScheduleGenerator : IScheduleGenerator
     {
         private const double EPS = 1e-9;
@@ -25,6 +31,58 @@ namespace BusinessLogicLayer.Generators
             public double Hours { get; init; }          // duration in hours (template)
         }
 
+        private readonly struct CandidatePriority
+        {
+            public CandidatePriority(
+                bool hasHardNeed,
+                bool isCriticalHardNeed,
+                double hardSlack,
+                double hardCriticality,
+                double hardCoverage,
+                double hardDeficit,
+                double softGap,
+                double softCoverage,
+                double gainHours,
+                double totalHours,
+                int fullDays,
+                int scarcity,
+                int roundRobinDistance)
+            {
+                HasHardNeed = hasHardNeed;
+                IsCriticalHardNeed = isCriticalHardNeed;
+                HardSlack = hardSlack;
+                HardCriticality = hardCriticality;
+                HardCoverage = hardCoverage;
+                HardDeficit = hardDeficit;
+                SoftGap = softGap;
+                SoftCoverage = softCoverage;
+                GainHours = gainHours;
+                TotalHours = totalHours;
+                FullDays = fullDays;
+                Scarcity = scarcity;
+                RoundRobinDistance = roundRobinDistance;
+            }
+
+            public bool HasHardNeed { get; }
+            public bool IsCriticalHardNeed { get; }
+            public double HardSlack { get; }
+            public double HardCriticality { get; }
+            public double HardCoverage { get; }
+            public double HardDeficit { get; }
+            public double SoftGap { get; }
+            public double SoftCoverage { get; }
+            public double GainHours { get; }
+            public double TotalHours { get; }
+            public int FullDays { get; }
+            public int Scarcity { get; }
+            public int RoundRobinDistance { get; }
+        }
+
+        /// <summary>
+        /// Asynchronously generates schedule slots for the supplied graph definition.
+        /// The public API stays async because callers often invoke generation from web requests
+        /// or background jobs, even though the internal algorithm itself is CPU-bound.
+        /// </summary>
         public Task<IList<ScheduleSlotModel>> GenerateAsync(
             ScheduleModel schedule,
             IEnumerable<AvailabilityGroupModel> availabilities,
@@ -33,6 +91,11 @@ namespace BusinessLogicLayer.Generators
             CancellationToken ct = default)
             => Task.Run(() => GenerateCore(schedule, availabilities, employees, progress, ct), ct);
 
+        /// <summary>
+        /// Synchronous implementation of the generation pipeline.
+        /// The method proceeds in clearly separated phases: normalize inputs, build availability
+        /// matrices, choose assignments, and finally emit slot models for persistence/export.
+        /// </summary>
         private static IList<ScheduleSlotModel> GenerateCore(
             ScheduleModel schedule,
             IEnumerable<AvailabilityGroupModel> availabilities,
@@ -196,6 +259,27 @@ namespace BusinessLogicLayer.Generators
                 availableByDay[day] = arr;
             }
 
+            var remainingPotentialHours = new double[n * stride];
+            var totalPotentialHours = new double[n];
+            BuildPotentialHours(
+                daysInMonth,
+                shifts,
+                unavailable,
+                availStartMin,
+                availEndMin,
+                stride,
+                n,
+                remainingPotentialHours,
+                totalPotentialHours);
+
+            var desiredHours = BuildDesiredHours(
+                minHours,
+                totalPotentialHours,
+                schedule.MaxHoursPerEmpMonth,
+                shifts,
+                daysInMonth,
+                pps);
+
             // 4) Internal schedule storage: assigned slot -> empIdx or -1
             var totalSlots = daysInMonth * shiftCount * pps;
             var assigned = new int[totalSlots];
@@ -264,6 +348,8 @@ namespace BusinessLogicLayer.Generators
                             preferNoSecondShift,
                             schedule,
                             minHours,
+                            desiredHours,
+                            remainingPotentialHours,
                             scarcityDays,
                             totalHours,
                             fullDaysCount,
@@ -273,6 +359,7 @@ namespace BusinessLogicLayer.Generators
                             lastFullDay,
                             consecutiveFullDays,
                             shiftCount,
+                            stride,
                             assigned,
                             slotFromMin,
                             slotToMin,
@@ -327,6 +414,8 @@ namespace BusinessLogicLayer.Generators
                 schedule,
                 shifts,
                 availableByDay,
+                minHours,
+                desiredHours,
                 unavailable,
                 availStartMin,
                 availEndMin,
@@ -342,6 +431,7 @@ namespace BusinessLogicLayer.Generators
                 pps,
                 stride,
                 scarcityDays,
+                remainingPotentialHours,
                 ref rrCursor,
                 ct);
 
@@ -354,6 +444,7 @@ namespace BusinessLogicLayer.Generators
                 availStartMin,
                 availEndMin,
                 minHours,
+                desiredHours,
                 assigned,
                 slotFromMin,
                 slotToMin,
@@ -365,6 +456,7 @@ namespace BusinessLogicLayer.Generators
                 shiftCount,
                 pps,
                 stride,
+                remainingPotentialHours,
                 n,
                 ct);
 
@@ -412,6 +504,8 @@ namespace BusinessLogicLayer.Generators
             ScheduleModel schedule,
             List<ShiftTemplate> shifts,
             int[][] availableByDay,
+            double[] minHours,
+            double[] desiredHours,
             bool[] unavailable,
             int[] availStartMin,
             int[] availEndMin,
@@ -427,6 +521,7 @@ namespace BusinessLogicLayer.Generators
             int pps,
             int stride,
             int[] scarcityDays,
+            double[] remainingPotentialHours,
             ref int rrCursor,
             CancellationToken ct)
         {
@@ -467,6 +562,9 @@ namespace BusinessLogicLayer.Generators
                             slot,
                             restrictSecondShift: preferNoSecondShift,
                             schedule,
+                            minHours,
+                            desiredHours,
+                            remainingPotentialHours,
                             unavailable,
                             availStartMin,
                             availEndMin,
@@ -497,6 +595,9 @@ namespace BusinessLogicLayer.Generators
                                 slot,
                                 restrictSecondShift: false,
                                 schedule,
+                                minHours,
+                                desiredHours,
+                                remainingPotentialHours,
                                 unavailable,
                                 availStartMin,
                                 availEndMin,
@@ -550,6 +651,9 @@ namespace BusinessLogicLayer.Generators
             int slotIdx,
             bool restrictSecondShift,
             ScheduleModel schedule,
+            double[] minHours,
+            double[] desiredHours,
+            double[] remainingPotentialHours,
             bool[] unavailable,
             int[] availStartMin,
             int[] availEndMin,
@@ -572,11 +676,7 @@ namespace BusinessLogicLayer.Generators
             int rrCursor)
         {
             var best = -1;
-            var bestNeed = -1.0;
-            var bestTotal = double.MaxValue;
-            var bestFull = int.MaxValue;
-            var bestScar = int.MaxValue;
-            var bestRR = int.MaxValue;
+            CandidatePriority? bestPriority = null;
 
             for (var k = 0; k < availableToday.Length; k++)
             {
@@ -640,30 +740,25 @@ namespace BusinessLogicLayer.Generators
                         daysInMonth, shiftCount, stride))
                     continue;
 
-                // phase2A is purely fairness-based (hours + full days + scarcity + RR).
-                var need = 0.0;
+                var priority = BuildCandidatePriority(
+                    emp,
+                    day,
+                    empHours,
+                    minHours,
+                    desiredHours,
+                    remainingPotentialHours,
+                    totalHours,
+                    fullDaysCount,
+                    scarcityDays,
+                    rrCursor,
+                    n,
+                    stride);
 
-                var total = totalHours[emp];
-                var full = fullDaysCount[emp];
-                var scar = scarcityDays[emp] <= 0 ? int.MaxValue : scarcityDays[emp];
-                var rrDist = emp >= rrCursor ? (emp - rrCursor) : (emp + n - rrCursor);
-
-                var better =
-                    best < 0
-                    || need > bestNeed + EPS
-                    || (Math.Abs(need - bestNeed) <= EPS && total < bestTotal - EPS)
-                    || (Math.Abs(need - bestNeed) <= EPS && Math.Abs(total - bestTotal) <= EPS && full < bestFull)
-                    || (Math.Abs(need - bestNeed) <= EPS && Math.Abs(total - bestTotal) <= EPS && full == bestFull && scar < bestScar)
-                    || (Math.Abs(need - bestNeed) <= EPS && Math.Abs(total - bestTotal) <= EPS && full == bestFull && scar == bestScar && rrDist < bestRR);
-
-                if (!better) continue;
+                if (bestPriority.HasValue && !IsBetterCandidate(priority, bestPriority.Value))
+                    continue;
 
                 best = emp;
-                bestNeed = need;
-                bestTotal = total;
-                bestFull = full;
-                bestScar = scar;
-                bestRR = rrDist;
+                bestPriority = priority;
             }
 
             return best;
@@ -679,6 +774,7 @@ namespace BusinessLogicLayer.Generators
             int[] availStartMin,
             int[] availEndMin,
             double[] minHours,
+            double[] desiredHours,
             int[] assigned,
             int[] slotFromMin,
             int[] slotToMin,
@@ -690,6 +786,7 @@ namespace BusinessLogicLayer.Generators
             int shiftCount,
             int pps,
             int stride,
+            double[] remainingPotentialHours,
             int n,
             CancellationToken ct)
         {
@@ -758,6 +855,8 @@ namespace BusinessLogicLayer.Generators
                 var bestSlot = -1;
                 var bestHours = 0.0;
                 var bestCreatesFull = true;
+                var bestHardCriticality = -1.0;
+                var bestUsefulGain = -1.0;
 
                 for (var day = 1; day <= daysInMonth; day++)
                 {
@@ -825,17 +924,24 @@ namespace BusinessLogicLayer.Generators
                                 continue;
 
                             var createsFull = (shiftCount >= 2 && cur == 1); // would make day full (1->2)
+                            var hardGap = Math.Max(0.0, minHours[emp] - totalHours[emp]);
+                            var usefulGain = Math.Min(empHours, hardGap > EPS ? hardGap : Math.Max(0.0, desiredHours[emp] - totalHours[emp]));
+                            var hardCriticality = ComputeHardCriticality(emp, day, minHours, totalHours, remainingPotentialHours, stride);
 
-                            // prefer: not creating full day, then longer hours
+                            // Prefer the most fragile deficit first, then avoid unnecessary full days.
                             if (bestDay < 0
-                                || (!createsFull && bestCreatesFull)
-                                || (createsFull == bestCreatesFull && empHours > bestHours + EPS))
+                                || hardCriticality > bestHardCriticality + EPS
+                                || (Math.Abs(hardCriticality - bestHardCriticality) <= EPS && !createsFull && bestCreatesFull)
+                                || (Math.Abs(hardCriticality - bestHardCriticality) <= EPS && createsFull == bestCreatesFull && usefulGain > bestUsefulGain + EPS)
+                                || (Math.Abs(hardCriticality - bestHardCriticality) <= EPS && createsFull == bestCreatesFull && Math.Abs(usefulGain - bestUsefulGain) <= EPS && empHours > bestHours + EPS))
                             {
                                 bestDay = day;
                                 bestShift = s;
                                 bestSlot = slot;
                                 bestHours = empHours;
                                 bestCreatesFull = createsFull;
+                                bestHardCriticality = hardCriticality;
+                                bestUsefulGain = usefulGain;
                             }
                         }
                     }
@@ -867,8 +973,11 @@ namespace BusinessLogicLayer.Generators
                 var bestSlot = -1;
                 var bestReceiverHours = 0.0;
                 var bestDonor = -1;
-                var bestDonorSurplus = -1.0;
+                var bestDonorHardSurplus = -1.0;
+                var bestDonorSoftSurplus = double.NegativeInfinity;
                 var bestCreatesFull = true;
+                var bestHardCriticality = -1.0;
+                var bestUsefulGain = -1.0;
 
                 for (var day = 1; day <= daysInMonth; day++)
                 {
@@ -941,21 +1050,31 @@ namespace BusinessLogicLayer.Generators
                                     daysInMonth, shiftCount, stride))
                                 continue;
 
-                            var donorSurplus = totalHours[donor] - minHours[donor];
+                            var hardGap = Math.Max(0.0, minHours[emp] - totalHours[emp]);
+                            var usefulGain = Math.Min(empHours, hardGap > EPS ? hardGap : Math.Max(0.0, desiredHours[emp] - totalHours[emp]));
+                            var hardCriticality = ComputeHardCriticality(emp, day, minHours, totalHours, remainingPotentialHours, stride);
+                            var donorHardSurplus = totalHours[donor] - donorRemovedHours - minHours[donor];
+                            var donorSoftSurplus = totalHours[donor] - donorRemovedHours - desiredHours[donor];
                             var createsFull = (shiftCount >= 2 && cur == 1);
 
                             if (bestDay < 0
-                                || donorSurplus > bestDonorSurplus + EPS
-                                || (Math.Abs(donorSurplus - bestDonorSurplus) <= EPS && (!createsFull && bestCreatesFull))
-                                || (Math.Abs(donorSurplus - bestDonorSurplus) <= EPS && createsFull == bestCreatesFull && empHours > bestReceiverHours + EPS))
+                                || hardCriticality > bestHardCriticality + EPS
+                                || (Math.Abs(hardCriticality - bestHardCriticality) <= EPS && donorSoftSurplus > bestDonorSoftSurplus + EPS)
+                                || (Math.Abs(hardCriticality - bestHardCriticality) <= EPS && Math.Abs(donorSoftSurplus - bestDonorSoftSurplus) <= EPS && donorHardSurplus > bestDonorHardSurplus + EPS)
+                                || (Math.Abs(hardCriticality - bestHardCriticality) <= EPS && Math.Abs(donorSoftSurplus - bestDonorSoftSurplus) <= EPS && Math.Abs(donorHardSurplus - bestDonorHardSurplus) <= EPS && !createsFull && bestCreatesFull)
+                                || (Math.Abs(hardCriticality - bestHardCriticality) <= EPS && Math.Abs(donorSoftSurplus - bestDonorSoftSurplus) <= EPS && Math.Abs(donorHardSurplus - bestDonorHardSurplus) <= EPS && createsFull == bestCreatesFull && usefulGain > bestUsefulGain + EPS)
+                                || (Math.Abs(hardCriticality - bestHardCriticality) <= EPS && Math.Abs(donorSoftSurplus - bestDonorSoftSurplus) <= EPS && Math.Abs(donorHardSurplus - bestDonorHardSurplus) <= EPS && createsFull == bestCreatesFull && Math.Abs(usefulGain - bestUsefulGain) <= EPS && empHours > bestReceiverHours + EPS))
                             {
                                 bestDay = day;
                                 bestShift = s;
                                 bestSlot = slot;
                                 bestReceiverHours = empHours;
                                 bestDonor = donor;
-                                bestDonorSurplus = donorSurplus;
+                                bestDonorHardSurplus = donorHardSurplus;
+                                bestDonorSoftSurplus = donorSoftSurplus;
                                 bestCreatesFull = createsFull;
+                                bestHardCriticality = hardCriticality;
+                                bestUsefulGain = usefulGain;
                             }
                         }
                     }
@@ -1060,6 +1179,269 @@ namespace BusinessLogicLayer.Generators
             return cnt;
         }
 
+        private static void BuildPotentialHours(
+            int daysInMonth,
+            List<ShiftTemplate> shifts,
+            bool[] unavailable,
+            int[] availStartMin,
+            int[] availEndMin,
+            int stride,
+            int n,
+            double[] remainingPotentialHours,
+            double[] totalPotentialHours)
+        {
+            var dailyPotentialHours = new double[n * stride];
+
+            for (var day = 1; day <= daysInMonth; day++)
+            {
+                for (var emp = 0; emp < n; emp++)
+                {
+                    var idx = day * n + emp;
+                    if (unavailable[idx])
+                        continue;
+
+                    var aStart = availStartMin[idx];
+                    var aEnd = availEndMin[idx];
+                    var total = 0.0;
+
+                    for (var s = 0; s < shifts.Count; s++)
+                    {
+                        var shift = shifts[s];
+                        var from = Math.Max(shift.StartMin, aStart);
+                        var to = Math.Min(shift.EndMin, aEnd);
+                        if (to > from)
+                            total += (to - from) / 60d;
+                    }
+
+                    dailyPotentialHours[emp * stride + day] = total;
+                }
+            }
+
+            for (var emp = 0; emp < n; emp++)
+            {
+                var suffix = 0.0;
+                for (var day = daysInMonth; day >= 1; day--)
+                {
+                    suffix += dailyPotentialHours[emp * stride + day];
+                    remainingPotentialHours[emp * stride + day] = suffix;
+                }
+
+                totalPotentialHours[emp] = suffix;
+            }
+        }
+
+        private static double[] BuildDesiredHours(
+            double[] minHours,
+            double[] totalPotentialHours,
+            int maxHoursPerEmpMonth,
+            List<ShiftTemplate> shifts,
+            int daysInMonth,
+            int pps)
+        {
+            var n = minHours.Length;
+            var desired = new double[n];
+            var cappedPotential = new double[n];
+            var totalDemand = 0.0;
+
+            for (var i = 0; i < shifts.Count; i++)
+                totalDemand += shifts[i].Hours * daysInMonth * pps;
+
+            for (var emp = 0; emp < n; emp++)
+            {
+                var cap = totalPotentialHours[emp];
+                if (maxHoursPerEmpMonth > 0)
+                    cap = Math.Min(cap, maxHoursPerEmpMonth);
+
+                cappedPotential[emp] = Math.Max(0.0, cap);
+                desired[emp] = Math.Min(Math.Max(0.0, minHours[emp]), cappedPotential[emp]);
+                totalDemand -= desired[emp];
+            }
+
+            if (totalDemand <= EPS)
+                return desired;
+
+            while (totalDemand > EPS)
+            {
+                var totalHeadroom = 0.0;
+                for (var emp = 0; emp < n; emp++)
+                    totalHeadroom += Math.Max(0.0, cappedPotential[emp] - desired[emp]);
+
+                if (totalHeadroom <= EPS)
+                    break;
+
+                var distributed = 0.0;
+                for (var emp = 0; emp < n; emp++)
+                {
+                    var headroom = Math.Max(0.0, cappedPotential[emp] - desired[emp]);
+                    if (headroom <= EPS)
+                        continue;
+
+                    var share = totalDemand * (headroom / totalHeadroom);
+                    var add = Math.Min(headroom, share);
+                    if (add <= EPS)
+                        continue;
+
+                    desired[emp] += add;
+                    distributed += add;
+                }
+
+                if (distributed <= EPS)
+                    break;
+
+                totalDemand -= distributed;
+            }
+
+            return desired;
+        }
+
+        private static CandidatePriority BuildCandidatePriority(
+            int emp,
+            int day,
+            double gainHours,
+            double[] minHours,
+            double[] desiredHours,
+            double[] remainingPotentialHours,
+            double[] totalHours,
+            int[] fullDaysCount,
+            int[] scarcityDays,
+            int rrCursor,
+            int n,
+            int stride)
+        {
+            var hardTarget = Math.Max(0.0, minHours[emp]);
+            var hardDeficit = Math.Max(0.0, hardTarget - totalHours[emp]);
+            var remainingPotential = Math.Max(EPS, remainingPotentialHours[emp * stride + day]);
+            var hardCoverage = hardTarget > EPS ? totalHours[emp] / hardTarget : 1.0;
+            var hardSlack = remainingPotential - hardDeficit;
+            var isCriticalHardNeed = hardDeficit > EPS && hardSlack <= gainHours + EPS;
+            var hardCriticality = hardDeficit > EPS ? hardDeficit / remainingPotential : 0.0;
+
+            var softTarget = Math.Max(0.0, desiredHours[emp]);
+            var softGap = Math.Max(0.0, softTarget - totalHours[emp]);
+            var softCoverage = softTarget > EPS
+                ? totalHours[emp] / softTarget
+                : (totalHours[emp] > EPS ? double.MaxValue : 0.0);
+
+            var total = totalHours[emp];
+            var full = fullDaysCount[emp];
+            var scar = scarcityDays[emp] <= 0 ? int.MaxValue : scarcityDays[emp];
+            var rrDist = emp >= rrCursor ? (emp - rrCursor) : (emp + n - rrCursor);
+
+            return new CandidatePriority(
+                hasHardNeed: hardDeficit > EPS,
+                isCriticalHardNeed: isCriticalHardNeed,
+                hardSlack: hardSlack,
+                hardCriticality: hardCriticality,
+                hardCoverage: hardCoverage,
+                hardDeficit: hardDeficit,
+                softGap: softGap,
+                softCoverage: softCoverage,
+                gainHours: gainHours,
+                totalHours: total,
+                fullDays: full,
+                scarcity: scar,
+                roundRobinDistance: rrDist);
+        }
+
+        private static bool IsBetterCandidate(CandidatePriority candidate, CandidatePriority best)
+        {
+            if (candidate.HasHardNeed != best.HasHardNeed)
+                return candidate.HasHardNeed;
+
+            if (candidate.IsCriticalHardNeed != best.IsCriticalHardNeed)
+                return candidate.IsCriticalHardNeed;
+
+            if (candidate.HasHardNeed && candidate.IsCriticalHardNeed)
+            {
+                if (candidate.HardSlack < best.HardSlack - EPS)
+                    return true;
+
+                if (Math.Abs(candidate.HardSlack - best.HardSlack) <= EPS
+                    && candidate.HardCriticality > best.HardCriticality + EPS)
+                    return true;
+
+                if (Math.Abs(candidate.HardSlack - best.HardSlack) <= EPS
+                    && Math.Abs(candidate.HardCriticality - best.HardCriticality) <= EPS
+                    && candidate.HardCoverage < best.HardCoverage - EPS)
+                    return true;
+            }
+
+            if (candidate.HasHardNeed)
+            {
+                if (candidate.HardCoverage < best.HardCoverage - EPS)
+                    return true;
+
+                if (Math.Abs(candidate.HardCoverage - best.HardCoverage) <= EPS
+                    && candidate.HardCriticality > best.HardCriticality + EPS)
+                    return true;
+
+                if (Math.Abs(candidate.HardCoverage - best.HardCoverage) <= EPS
+                    && Math.Abs(candidate.HardCriticality - best.HardCriticality) <= EPS
+                    && candidate.HardDeficit > best.HardDeficit + EPS)
+                    return true;
+            }
+
+            if (candidate.SoftGap > best.SoftGap + EPS)
+                return true;
+
+            if (Math.Abs(candidate.SoftGap - best.SoftGap) <= EPS
+                && candidate.SoftCoverage < best.SoftCoverage - EPS)
+                return true;
+
+            if (Math.Abs(candidate.SoftGap - best.SoftGap) <= EPS
+                && Math.Abs(candidate.SoftCoverage - best.SoftCoverage) <= EPS
+                && candidate.GainHours > best.GainHours + EPS)
+                return true;
+
+            if (Math.Abs(candidate.SoftGap - best.SoftGap) <= EPS
+                && Math.Abs(candidate.SoftCoverage - best.SoftCoverage) <= EPS
+                && Math.Abs(candidate.GainHours - best.GainHours) <= EPS
+                && candidate.TotalHours < best.TotalHours - EPS)
+                return true;
+
+            if (Math.Abs(candidate.SoftGap - best.SoftGap) <= EPS
+                && Math.Abs(candidate.SoftCoverage - best.SoftCoverage) <= EPS
+                && Math.Abs(candidate.GainHours - best.GainHours) <= EPS
+                && Math.Abs(candidate.TotalHours - best.TotalHours) <= EPS
+                && candidate.FullDays < best.FullDays)
+                return true;
+
+            if (Math.Abs(candidate.SoftGap - best.SoftGap) <= EPS
+                && Math.Abs(candidate.SoftCoverage - best.SoftCoverage) <= EPS
+                && Math.Abs(candidate.GainHours - best.GainHours) <= EPS
+                && Math.Abs(candidate.TotalHours - best.TotalHours) <= EPS
+                && candidate.FullDays == best.FullDays
+                && candidate.Scarcity < best.Scarcity)
+                return true;
+
+            if (Math.Abs(candidate.SoftGap - best.SoftGap) <= EPS
+                && Math.Abs(candidate.SoftCoverage - best.SoftCoverage) <= EPS
+                && Math.Abs(candidate.GainHours - best.GainHours) <= EPS
+                && Math.Abs(candidate.TotalHours - best.TotalHours) <= EPS
+                && candidate.FullDays == best.FullDays
+                && candidate.Scarcity == best.Scarcity
+                && candidate.RoundRobinDistance < best.RoundRobinDistance)
+                return true;
+
+            return false;
+        }
+
+        private static double ComputeHardCriticality(
+            int emp,
+            int day,
+            double[] minHours,
+            double[] totalHours,
+            double[] remainingPotentialHours,
+            int stride)
+        {
+            var hardDeficit = Math.Max(0.0, minHours[emp] - totalHours[emp]);
+            if (hardDeficit <= EPS)
+                return 0.0;
+
+            var remainingPotential = Math.Max(EPS, remainingPotentialHours[emp * stride + day]);
+            return hardDeficit / remainingPotential;
+        }
+
         // =========================
         // Phase 1: fast candidate selection + constraints (O(1))
         // =========================
@@ -1071,6 +1453,8 @@ namespace BusinessLogicLayer.Generators
             bool preferNoSecondShift,
             ScheduleModel schedule,
             double[] minHours,
+            double[] desiredHours,
+            double[] remainingPotentialHours,
             int[] scarcityDays,
             double[] totalHours,
             int[] fullDaysCount,
@@ -1080,6 +1464,7 @@ namespace BusinessLogicLayer.Generators
             int[] lastFullDay,
             int[] consecutiveFullDays,
             int shiftCount,
+            int stride,
             int[] assigned,
             int[] slotFromMin,
             int[] slotToMin,
@@ -1101,6 +1486,8 @@ namespace BusinessLogicLayer.Generators
                 restrictSecondShift: preferNoSecondShift,
                 schedule,
                 minHours,
+                desiredHours,
+                remainingPotentialHours,
                 scarcityDays,
                 totalHours,
                 fullDaysCount,
@@ -1110,6 +1497,7 @@ namespace BusinessLogicLayer.Generators
                 lastFullDay,
                 consecutiveFullDays,
                 shiftCount,
+                stride,
                 assigned,
                 slotFromMin,
                 slotToMin,
@@ -1136,6 +1524,8 @@ namespace BusinessLogicLayer.Generators
                     restrictSecondShift: false,
                     schedule,
                     minHours,
+                    desiredHours,
+                    remainingPotentialHours,
                     scarcityDays,
                     totalHours,
                     fullDaysCount,
@@ -1145,6 +1535,7 @@ namespace BusinessLogicLayer.Generators
                     lastFullDay,
                     consecutiveFullDays,
                     shiftCount,
+                    stride,
                     assigned,
                     slotFromMin,
                     slotToMin,
@@ -1170,6 +1561,8 @@ namespace BusinessLogicLayer.Generators
             bool restrictSecondShift,
             ScheduleModel schedule,
             double[] minHours,
+            double[] desiredHours,
+            double[] remainingPotentialHours,
             int[] scarcityDays,
             double[] totalHours,
             int[] fullDaysCount,
@@ -1179,6 +1572,7 @@ namespace BusinessLogicLayer.Generators
             int[] lastFullDay,
             int[] consecutiveFullDays,
             int shiftCount,
+            int stride,
             int[] assigned,
             int[] slotFromMin,
             int[] slotToMin,
@@ -1193,11 +1587,7 @@ namespace BusinessLogicLayer.Generators
             int rrCursor)
         {
             var best = -1;
-            var bestNeed = -1.0;
-            var bestTotal = double.MaxValue;
-            var bestFull = int.MaxValue;
-            var bestScar = int.MaxValue;
-            var bestRR = int.MaxValue;
+            CandidatePriority? bestPriority = null;
 
             for (var k = 0; k < availableToday.Length; k++)
             {
@@ -1264,30 +1654,25 @@ namespace BusinessLogicLayer.Generators
                         shiftCount))
                     continue;
 
-                var need = minHours[emp] - totalHours[emp];
-                if (need < 0) need = 0;
+                var priority = BuildCandidatePriority(
+                    emp,
+                    day,
+                    empHours,
+                    minHours,
+                    desiredHours,
+                    remainingPotentialHours,
+                    totalHours,
+                    fullDaysCount,
+                    scarcityDays,
+                    rrCursor,
+                    n,
+                    stride);
 
-                var total = totalHours[emp];
-                var full = fullDaysCount[emp];
-                var scar = scarcityDays[emp] <= 0 ? int.MaxValue : scarcityDays[emp];
-                var rrDist = emp >= rrCursor ? (emp - rrCursor) : (emp + n - rrCursor);
-
-                var better =
-                    best < 0
-                    || need > bestNeed + EPS
-                    || (Math.Abs(need - bestNeed) <= EPS && total < bestTotal - EPS)
-                    || (Math.Abs(need - bestNeed) <= EPS && Math.Abs(total - bestTotal) <= EPS && full < bestFull)
-                    || (Math.Abs(need - bestNeed) <= EPS && Math.Abs(total - bestTotal) <= EPS && full == bestFull && scar < bestScar)
-                    || (Math.Abs(need - bestNeed) <= EPS && Math.Abs(total - bestTotal) <= EPS && full == bestFull && scar == bestScar && rrDist < bestRR);
-
-                if (!better) continue;
+                if (bestPriority.HasValue && !IsBetterCandidate(priority, bestPriority.Value))
+                    continue;
 
                 best = emp;
-                bestNeed = need;
-                bestTotal = total;
-                bestFull = full;
-                bestScar = scar;
-                bestRR = rrDist;
+                bestPriority = priority;
             }
 
             return best;
@@ -1557,6 +1942,14 @@ namespace BusinessLogicLayer.Generators
             pairedDelta = 0;
 
             if (candidateEmp < 0) return false;
+
+            if (shiftCount > 1)
+            {
+                var otherShiftIdx = shiftIdx == 0 ? 1 : 0;
+                var otherShiftSlotIdx = FindEmployeeSlotIndexInShift(assigned, day, otherShiftIdx, pps, shiftCount, candidateEmp);
+                if (otherShiftSlotIdx >= 0 && otherShiftSlotIdx != slotIdx)
+                    return false;
+            }
 
             var idx = day * n + candidateEmp;
             var aStart = availStartMin[idx];
@@ -1874,6 +2267,18 @@ namespace BusinessLogicLayer.Generators
                     return true;
             }
             return false;
+        }
+
+        private static int FindEmployeeSlotIndexInShift(int[] assigned, int day, int shiftIdx, int pps, int shiftCount, int emp)
+        {
+            var basePos = SlotBase(day, shiftIdx, pps, shiftCount);
+            for (var i = 0; i < pps; i++)
+            {
+                if (assigned[basePos + i] == emp)
+                    return i;
+            }
+
+            return -1;
         }
 
         // =========================

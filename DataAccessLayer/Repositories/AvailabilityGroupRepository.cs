@@ -1,71 +1,80 @@
-﻿using DataAccessLayer.Models;
+using DataAccessLayer.Models;
 using DataAccessLayer.Models.DataBaseContext;
 using DataAccessLayer.Repositories.Abstractions;
 using Microsoft.EntityFrameworkCore;
-using System;
-using System.Collections.Generic;
-using System.Text;
 
-namespace DataAccessLayer.Repositories
+namespace DataAccessLayer.Repositories;
+
+/// <summary>
+/// Repository for availability groups.
+/// Availability data is often consumed as a rich object graph, so this repository exposes both
+/// lightweight list queries and fully expanded reads for edit/generation flows.
+/// </summary>
+public class AvailabilityGroupRepository : GenericRepository<AvailabilityGroupModel>, IAvailabilityGroupRepository
 {
-    public class AvailabilityGroupRepository
-        : GenericRepository<AvailabilityGroupModel>, IAvailabilityGroupRepository
+    public AvailabilityGroupRepository(AppDbContext db)
+        : base(db)
     {
-        public AvailabilityGroupRepository(AppDbContext db) : base(db) { }
-
-        public override async Task<List<AvailabilityGroupModel>> GetAllAsync(CancellationToken ct = default)
-        {
-            return await _set
-                .AsNoTracking()
-                .Include(g => g.Members)
-                    .ThenInclude(m => m.Employee)
-                .ToListAsync(ct)
-                .ConfigureAwait(false);
-        }
-
-        public async Task<List<AvailabilityGroupModel>> GetByValueAsync(string value, CancellationToken ct = default)
-        {
-            if (string.IsNullOrWhiteSpace(value))
-                return await GetAllAsync(ct).ConfigureAwait(false);
-
-            value = value.ToLower().Trim();
-            bool hasInt = int.TryParse(value, out var intValue);
-
-            var query = _set
-                .AsNoTracking()
-                .Include(g => g.Members)
-                    .ThenInclude(m => m.Employee)
-                .Where(g =>
-                    g.Name.ToLower().Contains(value) ||
-                    g.Members.Any(m =>
-                        m.Employee.FirstName.ToLower().Contains(value) ||
-                        m.Employee.LastName.ToLower().Contains(value)
-                    ) ||
-                    (hasInt && (g.Year == intValue || g.Month == intValue || g.Id == intValue))
-                );
-
-            return await query.ToListAsync(ct).ConfigureAwait(false);
-        }
-
-        public async Task<AvailabilityGroupModel?> GetFullByIdAsync(int id, CancellationToken ct = default)
-        {
-            return await _set
-                .AsNoTracking()
-                .Include(g => g.Members).ThenInclude(m => m.Employee)
-                .Include(g => g.Members).ThenInclude(m => m.Days)
-                .SingleOrDefaultAsync(g => g.Id == id, ct)
-                .ConfigureAwait(false);
-        }
-
-        public Task<bool> ExistsByNameAsync(string name, int year, int month, int? excludeId = null, CancellationToken ct = default)
-        {
-            var normalized = (name ?? string.Empty).Trim().ToLower();
-
-            return _set.AsNoTracking().AnyAsync(group =>
-                (excludeId == null || group.Id != excludeId.Value) &&
-                group.Year == year &&
-                group.Month == month &&
-                group.Name.ToLower().Trim() == normalized, ct);
-        }
     }
+
+    /// <inheritdoc />
+    public override async Task<List<AvailabilityGroupModel>> GetAllAsync(CancellationToken ct = default)
+        => await CreateListQuery()
+            .ToListAsync(ct)
+            .ConfigureAwait(false);
+
+    /// <inheritdoc />
+    public async Task<List<AvailabilityGroupModel>> GetByValueAsync(string value, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return await GetAllAsync(ct).ConfigureAwait(false);
+        }
+
+        var normalized = NormalizeSearchValue(value);
+        var hasNumericValue = int.TryParse(normalized, out var numericValue);
+
+        return await CreateListQuery()
+            .Where(group =>
+                group.Name.ToLower().Contains(normalized) ||
+                group.Members.Any(member =>
+                    member.Employee.FirstName.ToLower().Contains(normalized) ||
+                    member.Employee.LastName.ToLower().Contains(normalized)) ||
+                (hasNumericValue && (group.Year == numericValue || group.Month == numericValue || group.Id == numericValue)))
+            .ToListAsync(ct)
+            .ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
+    public async Task<AvailabilityGroupModel?> GetFullByIdAsync(int id, CancellationToken ct = default)
+        => await _set
+            .AsNoTracking()
+            .Include(group => group.Members)
+                .ThenInclude(member => member.Employee)
+            .Include(group => group.Members)
+                .ThenInclude(member => member.Days)
+            .SingleOrDefaultAsync(group => group.Id == id, ct)
+            .ConfigureAwait(false);
+
+    /// <inheritdoc />
+    public Task<bool> ExistsByNameAsync(string name, int year, int month, int? excludeId = null, CancellationToken ct = default)
+    {
+        var normalized = NormalizeSearchValue(name);
+
+        return _set.AsNoTracking().AnyAsync(group =>
+            (!excludeId.HasValue || group.Id != excludeId.Value) &&
+            group.Year == year &&
+            group.Month == month &&
+            group.Name.ToLower().Trim() == normalized,
+            ct);
+    }
+
+    private IQueryable<AvailabilityGroupModel> CreateListQuery()
+        => _set
+            .AsNoTracking()
+            .Include(group => group.Members)
+                .ThenInclude(member => member.Employee);
+
+    private static string NormalizeSearchValue(string? value)
+        => (value ?? string.Empty).Trim().ToLower();
 }

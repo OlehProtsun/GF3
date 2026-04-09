@@ -3,6 +3,10 @@ using WebApi.Contracts.Containers.Graphs;
 
 namespace WebApi.Mappers;
 
+/// <summary>
+/// Thin adapter around <see cref="GraphMapper"/> for container-scoped graph endpoints.
+/// The extra methods keep controller code intention-revealing without duplicating mapping logic.
+/// </summary>
 public static class ContainerGraphMapper
 {
     public static GraphDto ToContainerGraphDto(this ScheduleModel model) => model.ToGraphDto();

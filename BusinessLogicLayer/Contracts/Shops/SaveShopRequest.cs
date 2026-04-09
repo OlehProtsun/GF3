@@ -1,10 +1,27 @@
-﻿namespace BusinessLogicLayer.Contracts.Shops
+namespace BusinessLogicLayer.Contracts.Shops;
+
+/// <summary>
+/// Command-style DTO used by shop create and update flows in the business layer.
+/// </summary>
+public sealed class SaveShopRequest
 {
-    public sealed class SaveShopRequest
-    {
-        public int Id { get; set; } // 0 = create, >0 = update
-        public string Name { get; set; } = string.Empty;
-        public string Address { get; set; } = string.Empty;
-        public string? Description { get; set; }
-    }
+    /// <summary>
+    /// <c>0</c> means create; a positive value means update the existing shop with that identifier.
+    /// </summary>
+    public int Id { get; set; }
+
+    /// <summary>
+    /// Human-readable shop name.
+    /// </summary>
+    public string Name { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Physical address of the shop or location.
+    /// </summary>
+    public string Address { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Optional additional description shown in management screens.
+    /// </summary>
+    public string? Description { get; set; }
 }

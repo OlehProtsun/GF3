@@ -361,3 +361,19 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+
+# Local workspace and tooling temp files
+.codex-temp/
+.codex_tmp_*.xlsx
+.dotnet/
+.dotnet-cli/
+.edge-test-profile/
+scratch/
+tmp-edge-profile/
+tmp-edge-profile-graph-new/
+FrontEnd/dist/
+edge-*.html
+edge-*.png
+tmp-inspect-*.html
+tmp-inspect-*.png
+tmp-schedule-profile.png

@@ -1,16 +1,20 @@
-﻿import { useCallback, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useCallback, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useShopsQuery } from "@entities/shops/model/queries";
 import { ShopListCard } from "@entities/shops/ui/ShopListCard";
+import { usePageScrollbarHidden } from "@shared/lib/usePageScrollbarHidden";
 import { IosButton } from "@shared/ui/components/IosButton";
 import { PageHeader } from "@shared/ui/PageHeader";
 import { PlusIcon } from "@shared/ui/icons";
 import styles from "./ShopListPage.module.css";
 
 export function ShopListPage() {
+  usePageScrollbarHidden();
+
+  const location = useLocation();
   const navigate = useNavigate();
   const [query, setQuery] = useState("");
-  const shopsQuery = useShopsQuery(query);
+  const shopsQuery = useShopsQuery(query, location.key);
   const shops = shopsQuery.data ?? [];
 
   const handleAddShop = useCallback(() => {

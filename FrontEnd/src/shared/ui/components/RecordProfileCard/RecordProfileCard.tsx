@@ -5,7 +5,6 @@ import {
   type ProfileSummaryDetail,
 } from "@shared/ui/components/ProfileSummaryCard";
 import styles from "./RecordProfileCard.module.css";
-
 type RecordProfileCardProps = {
   sectionTitle: ReactNode;
   icon?: ReactNode;
@@ -20,22 +19,6 @@ type RecordProfileCardProps = {
   details?: ProfileSummaryDetail[];
   actions?: ReactNode;
 };
-
-export function renderRecordDetailValue(value?: string | null, href?: string) {
-  if (!value) {
-    return <span className={styles.mutedValue}>Not provided</span>;
-  }
-
-  if (!href) {
-    return value;
-  }
-
-  return (
-    <a className={styles.valueLink} href={href}>
-      {value}
-    </a>
-  );
-}
 
 export function RecordProfileCard({
   sectionTitle,

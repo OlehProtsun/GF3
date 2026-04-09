@@ -1,1 +1,2 @@
-export { RecordProfileCard, renderRecordDetailValue } from "./RecordProfileCard";
+export { RecordProfileCard } from "./RecordProfileCard";
+export { renderRecordDetailValue } from "./renderRecordDetailValue";

@@ -9,6 +9,11 @@ namespace WebApi.Controllers;
 
 [ApiController]
 [Route("api/availability-groups")]
+/// <summary>
+/// HTTP surface for the availability-group aggregate.
+/// The controller deliberately stays thin: it validates route-level existence where needed,
+/// delegates business rules to the service layer, and only maps contracts to API DTOs.
+/// </summary>
 public class AvailabilityGroupsController(IAvailabilityGroupService availabilityGroupService) : ControllerBase
 {
     [HttpGet]
@@ -26,11 +31,7 @@ public class AvailabilityGroupsController(IAvailabilityGroupService availability
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult<AvailabilityGroupDto>> GetById(int id, CancellationToken cancellationToken)
     {
-        var group = await availabilityGroupService.GetAsync(id, cancellationToken).ConfigureAwait(false);
-        if (group is null)
-        {
-            throw new KeyNotFoundException($"Availability group with id {id} was not found.");
-        }
+        var group = await RequireGroupAsync(id, cancellationToken).ConfigureAwait(false);
 
         return Ok(group.ToApiDto());
     }
@@ -41,11 +42,7 @@ public class AvailabilityGroupsController(IAvailabilityGroupService availability
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult<IEnumerable<AvailabilityGroupItemDto>>> GetItems(int id, CancellationToken cancellationToken)
     {
-        var group = await availabilityGroupService.GetAsync(id, cancellationToken).ConfigureAwait(false);
-        if (group is null)
-        {
-            throw new KeyNotFoundException($"Availability group with id {id} was not found.");
-        }
+        _ = await RequireGroupAsync(id, cancellationToken).ConfigureAwait(false);
 
         var (_, members, days) = await availabilityGroupService.LoadFullAsync(id, cancellationToken).ConfigureAwait(false);
         return Ok(members.ToItemDtos(days));
@@ -155,11 +152,7 @@ public class AvailabilityGroupsController(IAvailabilityGroupService availability
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> Update(int id, [FromBody] UpdateAvailabilityGroupRequest request, CancellationToken cancellationToken)
     {
-        var existing = await availabilityGroupService.GetAsync(id, cancellationToken).ConfigureAwait(false);
-        if (existing is null)
-        {
-            throw new KeyNotFoundException($"Availability group with id {id} was not found.");
-        }
+        _ = await RequireGroupAsync(id, cancellationToken).ConfigureAwait(false);
 
         await availabilityGroupService.UpdateAsync(request.ToUpdateModel(id), cancellationToken).ConfigureAwait(false);
         return NoContent();
@@ -171,13 +164,20 @@ public class AvailabilityGroupsController(IAvailabilityGroupService availability
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> Delete(int id, CancellationToken cancellationToken)
     {
-        var existing = await availabilityGroupService.GetAsync(id, cancellationToken).ConfigureAwait(false);
-        if (existing is null)
-        {
-            throw new KeyNotFoundException($"Availability group with id {id} was not found.");
-        }
+        _ = await RequireGroupAsync(id, cancellationToken).ConfigureAwait(false);
 
         await availabilityGroupService.DeleteAsync(id, cancellationToken).ConfigureAwait(false);
         return NoContent();
+    }
+
+    private async Task<BusinessLogicLayer.Contracts.Models.AvailabilityGroupModel> RequireGroupAsync(int groupId, CancellationToken cancellationToken)
+    {
+        var group = await availabilityGroupService.GetAsync(groupId, cancellationToken).ConfigureAwait(false);
+        if (group is null)
+        {
+            throw new KeyNotFoundException($"Availability group with id {groupId} was not found.");
+        }
+
+        return group;
     }
 }

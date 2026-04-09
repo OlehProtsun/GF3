@@ -80,16 +80,28 @@
   box-shadow: 0 0 0 1px rgba(255, 59, 48, 0.14);
 }
 
+.submitErrorWrap {
+  justify-content: stretch;
+}
+
 .submitError {
+  width: 100%;
+  max-width: none;
   margin: 0;
-  padding: 10px 12px;
   border-radius: 16px;
   border: 1px solid rgba(239, 68, 68, 0.16);
   background: rgba(254, 226, 226, 0.7);
   color: #b91c1c;
+  box-shadow: none;
+}
+
+.submitErrorText {
   font-size: 0.9rem;
   font-weight: 700;
   line-height: 1.45;
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
 }
 
 .footer {

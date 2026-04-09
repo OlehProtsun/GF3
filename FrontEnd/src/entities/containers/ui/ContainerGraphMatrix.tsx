@@ -8,6 +8,8 @@ import {
   isGraphWeekend,
   type GraphMatrixCellMap,
   type GraphMatrixColumn,
+  type GraphRelatedScheduleHintDetail,
+  type GraphRelatedScheduleHintDetailMap,
   type GraphMatrixStyleMap,
 } from "@entities/containers/model/graphWorkspace";
 import {
@@ -28,6 +30,8 @@ type ContainerGraphMatrixProps = {
   graph: Pick<Graph, "year" | "month">;
   columns: GraphMatrixColumn[];
   cellMap: GraphMatrixCellMap;
+  visualHintMap?: GraphMatrixCellMap;
+  visualHintDetailMap?: GraphRelatedScheduleHintDetailMap;
   styleMap?: GraphMatrixStyleMap;
   dayConflictMap?: Record<number, boolean>;
   title?: string;
@@ -48,10 +52,13 @@ type ContainerGraphMatrixProps = {
   headerRightSlot?: ReactNode;
   bindValueByKey?: ReadonlyMap<string, string>;
   selectedCellKeys?: string[];
+  enableSelectionWhenReadOnly?: boolean;
+  normalizeCellValue?: (employeeId: number, value: string) => string;
   onSelectedCellKeysChange?: (keys: string[]) => void;
   onColumnMove?: (employeeId: number, targetEmployeeId: number) => void;
   onColumnLabelChange?: (columnId: number, value: string) => void;
   onCellChange?: (employeeId: number, dayOfMonth: number, value: string) => void;
+  onVisualHintClick?: (detail: GraphRelatedScheduleHintDetail) => void;
 };
 
 type MatrixDay = {
@@ -85,6 +92,7 @@ type MatrixValueCellProps = {
   dayOfMonth: number;
   columnLabel: string;
   value: string;
+  visualHint?: string;
   error?: string;
   isEmpty: boolean;
   isSelected: boolean;
@@ -94,6 +102,8 @@ type MatrixValueCellProps = {
   editMode: ContainerGraphMatrixEditMode;
   emptyCellVariant: ContainerGraphMatrixEmptyCellVariant;
   highlightReadOnlyEmpty: boolean;
+  interactionEnabled: boolean;
+  selectionEnabled: boolean;
   backgroundColor?: string | null;
   textColor?: string | null;
   editorValue?: string;
@@ -101,11 +111,13 @@ type MatrixValueCellProps = {
   onEditorValueChange: (value: string) => void;
   onEditorBlur: () => void;
   onInlineValueChange?: (value: string) => void;
+  onInlineValueCommit?: (value: string) => void;
+  onVisualHintClick?: () => void;
 };
 
 type MatrixDayCellProps = {
   day: MatrixDay;
-  readOnly: boolean;
+  selectionEnabled: boolean;
   isSelected: boolean;
   inlineStyle: CSSProperties;
 };
@@ -244,13 +256,9 @@ function getSelectionTarget(target: EventTarget | null) {
   return null;
 }
 
-function getCellTitle(error: string | undefined, value: string) {
-  return error ?? value;
-}
-
 const MatrixDayCell = memo(function MatrixDayCell({
   day,
-  readOnly,
+  selectionEnabled,
   isSelected,
   inlineStyle,
 }: MatrixDayCellProps) {
@@ -262,8 +270,8 @@ const MatrixDayCell = memo(function MatrixDayCell({
         isSelected && styles.dayCellSelected,
       )}
       style={inlineStyle}
-      data-matrix-target={readOnly ? undefined : "day"}
-      data-day-of-month={readOnly ? undefined : day.dayOfMonth}
+      data-matrix-target={selectionEnabled ? "day" : undefined}
+      data-day-of-month={selectionEnabled ? day.dayOfMonth : undefined}
     >
       <span
         className={joinClassNames(
@@ -283,6 +291,7 @@ const MatrixValueCell = memo(function MatrixValueCell({
   dayOfMonth,
   columnLabel,
   value,
+  visualHint,
   error,
   isEmpty,
   isSelected,
@@ -292,6 +301,8 @@ const MatrixValueCell = memo(function MatrixValueCell({
   editMode,
   emptyCellVariant,
   highlightReadOnlyEmpty,
+  interactionEnabled,
+  selectionEnabled,
   backgroundColor,
   textColor,
   editorValue,
@@ -299,14 +310,62 @@ const MatrixValueCell = memo(function MatrixValueCell({
   onEditorValueChange,
   onEditorBlur,
   onInlineValueChange,
+  onInlineValueCommit,
+  onVisualHintClick,
 }: MatrixValueCellProps) {
+  const visualHintClickTimeoutRef = useRef<number | null>(null);
   const inlineStyle = {
     ...(backgroundColor ? { backgroundColor } : {}),
     ...(textColor ? { color: textColor } : {}),
   } satisfies CSSProperties;
-  const cellTitle = getCellTitle(error, value);
+  const hasVisualHint = isEmpty && Boolean(visualHint?.trim());
+  const renderedValue = hasVisualHint ? visualHint?.trim() ?? value : value;
+  const cellTitle = error ?? (hasVisualHint ? `Also works in: ${renderedValue}` : value);
+  const interactiveCellTitle =
+    hasVisualHint && onVisualHintClick
+      ? `${cellTitle}. Click for details.`
+      : cellTitle;
   const isInlineEditing = !readOnly && editMode === "inline";
+  const isSelectionOnlyReadOnlyCell = readOnly && selectionEnabled;
   const isDangerEmpty = isEmpty && emptyCellVariant === "danger";
+  const isInteractiveVisualHint = hasVisualHint && Boolean(onVisualHintClick);
+  const clearVisualHintClickTimeout = () => {
+    if (visualHintClickTimeoutRef.current !== null) {
+      window.clearTimeout(visualHintClickTimeoutRef.current);
+      visualHintClickTimeoutRef.current = null;
+    }
+  };
+
+  useEffect(() => () => {
+    clearVisualHintClickTimeout();
+  }, []);
+
+  const handleVisualHintButtonClick = (event: MouseEvent<HTMLButtonElement>) => {
+    if (!onVisualHintClick) {
+      return;
+    }
+
+    if (event.shiftKey || event.ctrlKey || event.metaKey || event.altKey) {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+    clearVisualHintClickTimeout();
+
+    if (event.detail > 1) {
+      return;
+    }
+
+    visualHintClickTimeoutRef.current = window.setTimeout(() => {
+      visualHintClickTimeoutRef.current = null;
+      onVisualHintClick();
+    }, 180);
+  };
+
+  const handleVisualHintButtonDoubleClick = () => {
+    clearVisualHintClickTimeout();
+  };
 
   return (
     <td
@@ -323,23 +382,49 @@ const MatrixValueCell = memo(function MatrixValueCell({
         isEditing && styles.editingCell,
       )}
       style={inlineStyle}
-      data-matrix-target={readOnly ? undefined : "cell"}
-      data-employee-id={readOnly ? undefined : employeeId}
-      data-day-of-month={readOnly ? undefined : dayOfMonth}
-      data-cell-key={readOnly ? undefined : cellKey}
+      data-matrix-target={interactionEnabled ? "cell" : undefined}
+      data-employee-id={interactionEnabled ? employeeId : undefined}
+      data-day-of-month={interactionEnabled ? dayOfMonth : undefined}
+      data-cell-key={interactionEnabled ? cellKey : undefined}
     >
       <div className={styles.cellSurface}>
-        {readOnly ? (
-          <span
-            className={joinClassNames(
-              styles.readonlyValue,
-              isEmpty && styles.cellValueEmpty,
-              isDangerEmpty && styles.dangerEmptyValue,
-            )}
-            title={cellTitle}
-          >
-            {value}
-          </span>
+        {readOnly && !isSelectionOnlyReadOnlyCell ? (
+          isInteractiveVisualHint ? (
+            <div
+              className={joinClassNames(
+                styles.visualHintShell,
+                styles.readonlyValue,
+                isEmpty && styles.cellValueEmpty,
+                isDangerEmpty && styles.dangerEmptyValue,
+                hasVisualHint && styles.visualHintValue,
+              )}
+              title={interactiveCellTitle}
+            >
+              <button
+                type="button"
+                ref={onFocusTargetRef}
+                className={styles.visualHintButton}
+                aria-label={`${columnLabel} day ${dayOfMonth}`}
+                title={interactiveCellTitle}
+                onClick={handleVisualHintButtonClick}
+                onDoubleClick={handleVisualHintButtonDoubleClick}
+              >
+                {renderedValue}
+              </button>
+            </div>
+          ) : (
+            <span
+              className={joinClassNames(
+                styles.readonlyValue,
+                isEmpty && styles.cellValueEmpty,
+                isDangerEmpty && styles.dangerEmptyValue,
+                hasVisualHint && styles.visualHintValue,
+              )}
+              title={interactiveCellTitle}
+            >
+              {renderedValue}
+            </span>
+          )
         ) : isInlineEditing ? (
           <input
             ref={onFocusTargetRef}
@@ -350,9 +435,10 @@ const MatrixValueCell = memo(function MatrixValueCell({
             )}
             value={value}
             onChange={event => onInlineValueChange?.(event.target.value)}
+            onBlur={event => onInlineValueCommit?.(event.target.value)}
             aria-label={`${columnLabel} day ${dayOfMonth}`}
             aria-invalid={Boolean(error)}
-            title={cellTitle}
+            title={interactiveCellTitle}
             data-matrix-editor="true"
           />
         ) : isEditing ? (
@@ -369,23 +455,48 @@ const MatrixValueCell = memo(function MatrixValueCell({
             onBlur={onEditorBlur}
             aria-label={`${columnLabel} day ${dayOfMonth}`}
             aria-invalid={Boolean(error)}
-            title={cellTitle}
+            title={interactiveCellTitle}
             data-matrix-editor="true"
           />
+        ) : isInteractiveVisualHint ? (
+          <div
+            className={joinClassNames(
+              styles.visualHintShell,
+              isEmpty && styles.cellValueEmpty,
+              isDangerEmpty && styles.dangerEmptyValue,
+              hasVisualHint && styles.visualHintValue,
+            )}
+            title={interactiveCellTitle}
+          >
+            <button
+              type="button"
+              ref={onFocusTargetRef}
+              className={styles.visualHintButton}
+              aria-label={`${columnLabel} day ${dayOfMonth}`}
+              aria-invalid={Boolean(error)}
+              title={interactiveCellTitle}
+              onClick={handleVisualHintButtonClick}
+              onDoubleClick={handleVisualHintButtonDoubleClick}
+            >
+              {renderedValue}
+            </button>
+          </div>
         ) : (
           <button
             type="button"
             ref={onFocusTargetRef}
             className={joinClassNames(
               styles.cellButton,
+              readOnly && styles.readonlyValue,
               isEmpty && styles.cellValueEmpty,
               isDangerEmpty && styles.dangerEmptyValue,
+              hasVisualHint && styles.visualHintValue,
             )}
             aria-label={`${columnLabel} day ${dayOfMonth}`}
             aria-invalid={Boolean(error)}
-            title={cellTitle}
+            title={interactiveCellTitle}
           >
-            {value}
+            {renderedValue}
           </button>
         )}
       </div>
@@ -397,6 +508,8 @@ export function ContainerGraphMatrix({
   graph,
   columns,
   cellMap,
+  visualHintMap = {},
+  visualHintDetailMap = {},
   styleMap = {},
   dayConflictMap = {},
   title = "Schedule Matrix",
@@ -417,10 +530,13 @@ export function ContainerGraphMatrix({
   headerRightSlot,
   bindValueByKey,
   selectedCellKeys = [],
+  enableSelectionWhenReadOnly = false,
+  normalizeCellValue,
   onSelectedCellKeysChange,
   onColumnMove,
   onColumnLabelChange,
   onCellChange,
+  onVisualHintClick,
 }: ContainerGraphMatrixProps) {
   const [editingCellKey, setEditingCellKey] = useState<string | null>(null);
   const [editingValue, setEditingValue] = useState(GRAPH_EMPTY_MARK);
@@ -436,6 +552,7 @@ export function ContainerGraphMatrix({
   const onSelectedCellKeysChangeRef = useRef(onSelectedCellKeysChange);
   const cellMapRef = useRef(cellMap);
   const onCellChangeRef = useRef(onCellChange);
+  const normalizeCellValueRef = useRef(normalizeCellValue);
   const cellFocusTargetRefs = useRef<Record<string, HTMLButtonElement | HTMLInputElement | null>>({});
   const editingCellKeyRef = useRef<string | null>(null);
   const editingValueRef = useRef(editingValue);
@@ -455,6 +572,8 @@ export function ContainerGraphMatrix({
   );
   const useCompactShell = compactSize && !preserveShellHeightOnCompact;
   const effectiveEditMode: ContainerGraphMatrixEditMode = readOnly ? "deferred" : editMode;
+  const selectionEnabled = Boolean(onSelectedCellKeysChange) && (!readOnly || enableSelectionWhenReadOnly);
+  const cellInteractionEnabled = !readOnly || selectionEnabled;
   const cardClassName = [styles.card, useCompactShell ? styles.cardCompact : "", className ?? ""].filter(Boolean).join(" ");
   const cardStyle = useMemo(
     () =>
@@ -465,9 +584,11 @@ export function ContainerGraphMatrix({
     [compactSize, style],
   );
   const hasToolbar = Boolean(toolbar);
+  const isEmpty = columns.length === 0;
   const layoutClassName = joinClassNames(
     styles.layout,
     hasToolbar && styles.layoutWithToolbar,
+    isEmpty && styles.layoutEmpty,
     useCompactShell && styles.layoutCompact,
   );
   const orderedEmployeeIds = useMemo(() => columns.map(column => column.employeeId), [columns]);
@@ -487,10 +608,13 @@ export function ContainerGraphMatrix({
   const selectedCellKeySet = useMemo(() => new Set(effectiveSelectedCellKeys), [effectiveSelectedCellKeys]);
   const dayStyleMetaByDay = useMemo(() => {
     return days.reduce<Record<number, MatrixDayStyleMeta>>((accumulator, day) => {
+      const explicitDayStyle = styleMap[getGraphCellKey(0, day.dayOfMonth)];
       const rowCellKeys = columns.map(column => getGraphCellKey(column.employeeId, day.dayOfMonth));
       const rowStyles = rowCellKeys.map(cellKey => styleMap[cellKey]);
-      const backgroundColor = getUniformStyleValue(rowStyles.map(styleRecord => styleRecord?.backgroundColor));
-      const textColor = getUniformStyleValue(rowStyles.map(styleRecord => styleRecord?.textColor));
+      const backgroundColor =
+        explicitDayStyle?.backgroundColor ?? getUniformStyleValue(rowStyles.map(styleRecord => styleRecord?.backgroundColor));
+      const textColor =
+        explicitDayStyle?.textColor ?? getUniformStyleValue(rowStyles.map(styleRecord => styleRecord?.textColor));
 
       accumulator[day.dayOfMonth] = {
         inlineStyle: {
@@ -536,6 +660,10 @@ export function ContainerGraphMatrix({
   useEffect(() => {
     onCellChangeRef.current = onCellChange;
   }, [onCellChange]);
+
+  useEffect(() => {
+    normalizeCellValueRef.current = normalizeCellValue;
+  }, [normalizeCellValue]);
 
   useEffect(() => {
     editingCellKeyRef.current = editingCellKey;
@@ -621,6 +749,16 @@ export function ContainerGraphMatrix({
     });
   };
 
+  const commitCellValue = (employeeId: number, dayOfMonth: number, value: string) => {
+    const nextValue = normalizeCellValueRef.current?.(employeeId, value) ?? value;
+    const cellKey = getGraphCellKey(employeeId, dayOfMonth);
+    const currentValue = cellMapRef.current[cellKey] ?? GRAPH_EMPTY_MARK;
+
+    if (nextValue !== currentValue) {
+      onCellChangeRef.current?.(employeeId, dayOfMonth, nextValue);
+    }
+  };
+
   const flushEditingCell = () => {
     const currentEditingCellKey = editingCellKeyRef.current;
     if (!currentEditingCellKey) {
@@ -628,15 +766,10 @@ export function ContainerGraphMatrix({
     }
 
     const { employeeId, dayOfMonth } = parseSelectedCellKey(currentEditingCellKey);
-    const nextValue = editingValueRef.current;
-    const currentValue = cellMapRef.current[currentEditingCellKey] ?? GRAPH_EMPTY_MARK;
 
     editingCellKeyRef.current = null;
     setEditingCellKey(null);
-
-    if (nextValue !== currentValue) {
-      onCellChangeRef.current?.(employeeId, dayOfMonth, nextValue);
-    }
+    commitCellValue(employeeId, dayOfMonth, editingValueRef.current);
   };
 
   const cancelEditingCell = () => {
@@ -684,7 +817,7 @@ export function ContainerGraphMatrix({
       setEditingValue(GRAPH_EMPTY_MARK);
     }
 
-    onCellChangeRef.current(target.employeeId, target.dayOfMonth, bindValue);
+    commitCellValue(target.employeeId, target.dayOfMonth, bindValue);
 
     const nextCellKey =
       target.dayOfMonth < days.length
@@ -787,11 +920,15 @@ export function ContainerGraphMatrix({
   };
 
   const handleTableMouseDown = (event: MouseEvent<HTMLTableElement>) => {
-    if (readOnly || event.button !== 0) {
+    if (!selectionEnabled || event.button !== 0) {
       return;
     }
 
-    if (event.target instanceof HTMLElement && event.target.closest("[data-matrix-editor='true']")) {
+    const isInlineEditorTarget =
+      event.target instanceof HTMLElement &&
+      Boolean(event.target.closest("[data-matrix-editor='true']"));
+
+    if (isInlineEditorTarget && effectiveEditMode !== "inline") {
       return;
     }
 
@@ -800,12 +937,15 @@ export function ContainerGraphMatrix({
       return;
     }
 
-    event.preventDefault();
+    if (!isInlineEditorTarget) {
+      event.preventDefault();
+    }
+
     startSelection(target, resolveSelectionMode(event));
   };
 
   const handleTableMouseMove = (event: MouseEvent<HTMLTableElement>) => {
-    if (readOnly || !isPointerSelectingRef.current) {
+    if (!selectionEnabled || !isPointerSelectingRef.current) {
       return;
     }
 
@@ -836,6 +976,10 @@ export function ContainerGraphMatrix({
   };
 
   const handleTableKeyDown = (event: KeyboardEvent<HTMLTableElement>) => {
+    if (!cellInteractionEnabled) {
+      return;
+    }
+
     const target = getSelectionTarget(event.target);
     if (!target || target.type !== "cell") {
       return;
@@ -867,7 +1011,7 @@ export function ContainerGraphMatrix({
       return;
     }
 
-    if (event.key === "Enter" || event.key === "F2") {
+    if (!readOnly && (event.key === "Enter" || event.key === "F2")) {
       event.preventDefault();
       beginEditingCell(target.cellKey);
       return;
@@ -970,7 +1114,7 @@ export function ContainerGraphMatrix({
 
         {hasToolbar ? <div className={styles.toolbar}>{toolbar}</div> : null}
 
-        {columns.length === 0 ? (
+        {isEmpty ? (
           <div className={styles.emptyState}>{resolvedEmptyMessage}</div>
         ) : (
           <div className={joinClassNames(styles.tableShell, useCompactShell && styles.tableShellCompact)}>
@@ -1055,7 +1199,7 @@ export function ContainerGraphMatrix({
                     >
                       <MatrixDayCell
                         day={day}
-                        readOnly={readOnly}
+                        selectionEnabled={selectionEnabled}
                         isSelected={selectedDaySet.has(day.dayOfMonth)}
                         inlineStyle={dayStyleMetaByDay[day.dayOfMonth]?.inlineStyle ?? EMPTY_STYLE}
                       />
@@ -1063,6 +1207,8 @@ export function ContainerGraphMatrix({
                       {columns.map(column => {
                         const cellKey = getGraphCellKey(column.employeeId, day.dayOfMonth);
                         const cellValue = cellMap[cellKey] ?? GRAPH_EMPTY_MARK;
+                        const visualHint = visualHintMap[cellKey];
+                        const visualHintDetail = visualHintDetailMap[cellKey];
                         const error = cellErrors[cellKey];
                         const isEmpty = cellValue.trim() === GRAPH_EMPTY_MARK;
                         const isSelected = selectedCellKeySet.has(cellKey);
@@ -1077,6 +1223,7 @@ export function ContainerGraphMatrix({
                             dayOfMonth={day.dayOfMonth}
                             columnLabel={column.label}
                             value={cellValue}
+                            visualHint={visualHint}
                             error={error}
                             isEmpty={isEmpty}
                             isSelected={isSelected}
@@ -1086,6 +1233,8 @@ export function ContainerGraphMatrix({
                             editMode={effectiveEditMode}
                             emptyCellVariant={emptyCellVariant}
                             highlightReadOnlyEmpty={highlightReadOnlyEmpty}
+                            interactionEnabled={cellInteractionEnabled}
+                            selectionEnabled={selectionEnabled}
                             backgroundColor={cellStyle?.backgroundColor}
                             textColor={cellStyle?.textColor}
                             editorValue={isEditing ? editingValue : undefined}
@@ -1095,6 +1244,10 @@ export function ContainerGraphMatrix({
                             onEditorValueChange={setEditingValue}
                             onEditorBlur={isEditing ? flushEditingCell : NOOP}
                             onInlineValueChange={nextValue => onCellChange?.(column.employeeId, day.dayOfMonth, nextValue)}
+                            onInlineValueCommit={nextValue => commitCellValue(column.employeeId, day.dayOfMonth, nextValue)}
+                            onVisualHintClick={visualHintDetail && onVisualHintClick
+                              ? () => onVisualHintClick(visualHintDetail)
+                              : undefined}
                           />
                         );
                       })}

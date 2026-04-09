@@ -1,5 +1,6 @@
-﻿import { useEffect, useState } from "react";
+import { useMemo } from "react";
 import type { ChangeEvent } from "react";
+import { useSyncedDraft } from "@shared/lib/useSyncedDraft";
 import type { Shop } from "./types";
 
 export type ShopFormFieldElement = HTMLInputElement | HTMLTextAreaElement;
@@ -47,31 +48,42 @@ export function validateShopForm(form: ShopFormState): ShopFormErrors {
 }
 
 export function useShopForm(shop?: ShopFormSource | null, isCreate = false) {
-  const [form, setForm] = useState<ShopFormState>(EMPTY_FORM);
-  const [errors, setErrors] = useState<ShopFormErrors>({});
-
-  useEffect(() => {
-    if (shop) {
-      setForm(createShopFormState(shop));
-      setErrors({});
-      return;
-    }
-
-    if (isCreate) {
-      setForm(EMPTY_FORM);
-      setErrors({});
-    }
-  }, [shop, isCreate]);
+  const sourceKey = useMemo(
+    () =>
+      shop
+        ? `shop:${shop.name}:${shop.address}:${shop.description ?? ""}`
+        : isCreate
+          ? "create"
+          : "empty",
+    [isCreate, shop],
+  );
+  const initialDraft = useMemo(
+    () => ({
+      form: createShopFormState(shop),
+      errors: {} as ShopFormErrors,
+    }),
+    [shop],
+  );
+  const { value: draft, setValue: setDraft } = useSyncedDraft(sourceKey, initialDraft);
+  const { form, errors } = draft;
 
   const handleFieldChange =
     (field: keyof ShopFormState) =>
     (event: ChangeEvent<ShopFormFieldElement>): void => {
-      setForm((prev) => ({ ...prev, [field]: event.target.value }));
+      setDraft((current) => ({
+        form: { ...current.form, [field]: event.target.value },
+        errors: current.errors,
+      }));
     };
 
   const validate = () => {
     const nextErrors = validateShopForm(form);
-    setErrors(nextErrors);
+
+    setDraft((current) => ({
+      ...current,
+      errors: nextErrors,
+    }));
+
     return Object.keys(nextErrors).length === 0;
   };
 

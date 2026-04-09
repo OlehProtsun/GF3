@@ -1,38 +1,49 @@
+using BusinessLogicLayer.Common;
 using BusinessLogicLayer.Services.Abstractions;
-using WebApi.Contracts.Employees;
-using WebApi.Mappers;
 using Microsoft.AspNetCore.Mvc;
+using WebApi.Contracts.Employees;
+using WebApi.Infrastructure;
+using WebApi.Mappers;
 
 namespace WebApi.Controllers;
 
+/// <summary>
+/// CRUD endpoints for employees.
+/// The controller intentionally stays thin: it validates resource existence, delegates business
+/// rules to the facade layer, and translates domain delete failures into HTTP problem responses.
+/// </summary>
 [ApiController]
 [Route("api/[controller]")]
 public class EmployeesController(IEmployeeFacade employeeFacade) : ControllerBase
 {
+    /// <summary>
+    /// Returns all employees as API DTOs.
+    /// </summary>
     [HttpGet]
     [ProducesResponseType(typeof(IEnumerable<EmployeeDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult<IEnumerable<EmployeeDto>>> GetAll(CancellationToken cancellationToken)
     {
         var employees = await employeeFacade.GetAllAsync(cancellationToken).ConfigureAwait(false);
-        return Ok(employees.Select(x => x.ToApiDto()));
+        return Ok(employees.Select(employee => employee.ToApiDto()));
     }
 
+    /// <summary>
+    /// Returns one employee by id or fails with a not-found problem.
+    /// </summary>
     [HttpGet("{id:int}")]
     [ProducesResponseType(typeof(EmployeeDto), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult<EmployeeDto>> GetById(int id, CancellationToken cancellationToken)
     {
-        var employee = await employeeFacade.GetAsync(id, cancellationToken).ConfigureAwait(false);
-        if (employee is null)
-        {
-            throw new KeyNotFoundException($"Employee with id {id} was not found.");
-        }
-
+        var employee = await GetRequiredEmployeeAsync(id, cancellationToken).ConfigureAwait(false);
         return Ok(employee.ToApiDto());
     }
 
+    /// <summary>
+    /// Creates a new employee and returns its canonical API representation.
+    /// </summary>
     [HttpPost]
     [ProducesResponseType(typeof(EmployeeDto), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
@@ -44,6 +55,11 @@ public class EmployeesController(IEmployeeFacade employeeFacade) : ControllerBas
         return CreatedAtAction(nameof(GetById), new { id = dto.Id }, dto);
     }
 
+    /// <summary>
+    /// Updates an existing employee.
+    /// The explicit existence check keeps the HTTP contract predictable: missing employees return 404
+    /// instead of relying on deeper infrastructure to infer the failure mode.
+    /// </summary>
     [HttpPut("{id:int}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
@@ -51,16 +67,16 @@ public class EmployeesController(IEmployeeFacade employeeFacade) : ControllerBas
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> Update(int id, [FromBody] UpdateEmployeeRequest request, CancellationToken cancellationToken)
     {
-        var existing = await employeeFacade.GetAsync(id, cancellationToken).ConfigureAwait(false);
-        if (existing is null)
-        {
-            throw new KeyNotFoundException($"Employee with id {id} was not found.");
-        }
-
+        await EnsureEmployeeExistsAsync(id, cancellationToken).ConfigureAwait(false);
         await employeeFacade.UpdateAsync(request.ToSaveRequest(id), cancellationToken).ConfigureAwait(false);
         return NoContent();
     }
 
+    /// <summary>
+    /// Deletes an employee when no dependent data still references it.
+    /// Instead of throwing for expected business-rule failures, the controller returns a structured
+    /// validation problem so the frontend can show a friendly, stable error state.
+    /// </summary>
     [HttpDelete("{id:int}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
@@ -68,13 +84,27 @@ public class EmployeesController(IEmployeeFacade employeeFacade) : ControllerBas
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> Delete(int id, CancellationToken cancellationToken)
     {
-        var existing = await employeeFacade.GetAsync(id, cancellationToken).ConfigureAwait(false);
-        if (existing is null)
+        await EnsureEmployeeExistsAsync(id, cancellationToken).ConfigureAwait(false);
+
+        var result = await employeeFacade.TryDeleteAsync(id, cancellationToken).ConfigureAwait(false);
+        if (!result.Succeeded)
         {
-            throw new KeyNotFoundException($"Employee with id {id} was not found.");
+            return CreateDeleteValidationResult(result);
         }
 
-        await employeeFacade.DeleteAsync(id, cancellationToken).ConfigureAwait(false);
         return NoContent();
     }
+
+    private async Task EnsureEmployeeExistsAsync(int id, CancellationToken cancellationToken)
+        => _ = await GetRequiredEmployeeAsync(id, cancellationToken).ConfigureAwait(false);
+
+    private async Task<BusinessLogicLayer.Contracts.Employees.EmployeeDto> GetRequiredEmployeeAsync(int id, CancellationToken cancellationToken)
+        => await employeeFacade.GetAsync(id, cancellationToken).ConfigureAwait(false)
+            ?? throw new KeyNotFoundException($"Employee with id {id} was not found.");
+
+    private BadRequestObjectResult CreateDeleteValidationResult(DeleteOperationResult result)
+        => BadRequest(ApiProblemDetailsFactory.CreateValidationProblem(
+            HttpContext,
+            result.Errors,
+            result.Message));
 }
