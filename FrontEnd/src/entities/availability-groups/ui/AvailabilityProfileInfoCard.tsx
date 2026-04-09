@@ -33,7 +33,7 @@ export function AvailabilityProfileInfoCard({
     <ProfileSummaryCard
       className={styles.card}
       sectionTitle="Availability Information"
-      icon={<AvailabilityIcon size={18} style={{ transform: "scaleY(-1)" }} />}
+      icon={<AvailabilityIcon size={18} />}
       headerMeta={`ID ${group.id}`}
       headerRightWrap="nowrap"
       headerRightSlot={headerRightSlot}

@@ -12,20 +12,9 @@
   width: 100%;
   min-height: 0;
   max-width: none;
+  background: var(--app-page-background, #f3f4f6);
   overflow: visible;
   box-sizing: border-box;
-}
-
-.page::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  z-index: -1;
-  pointer-events: none;
-  background:
-    radial-gradient(circle at top left, rgba(244, 196, 48, 0.14), transparent 32%),
-    radial-gradient(circle at 85% 10%, rgba(59, 130, 246, 0.12), transparent 28%),
-    linear-gradient(180deg, rgba(248, 250, 252, 0.96), rgba(243, 244, 246, 0.92));
 }
 
 .banner {

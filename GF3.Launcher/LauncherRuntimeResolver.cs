@@ -106,8 +106,9 @@ internal static class LauncherRuntimeResolver
             ["ASPNETCORE_ENVIRONMENT"] = environmentName,
             ["DOTNET_ENVIRONMENT"] = environmentName,
             ["ASPNETCORE_URLS"] = $"http://127.0.0.1:{backendPort}",
-            ["GF3_ADMIN_ENABLED"] = bool.FalseString,
-            ["GF3_ADMIN_ALLOW_WRITE"] = bool.FalseString,
+            // Launcher runs only the local desktop instance, so keep admin/database tooling fully available.
+            ["GF3_ADMIN_ENABLED"] = bool.TrueString,
+            ["GF3_ADMIN_ALLOW_WRITE"] = bool.TrueString,
             ["GF3_DATABASE_PATH"] = databasePath,
             ["GF3_CONNECTION_STRING"] = connectionString,
             ["ConnectionStrings__Default"] = connectionString,
