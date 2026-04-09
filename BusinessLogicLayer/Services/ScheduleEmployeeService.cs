@@ -5,6 +5,11 @@ using DataAccessLayer.Repositories.Abstractions;
 
 namespace BusinessLogicLayer.Services;
 
+/// <summary>
+/// Thin service wrapper for schedule employees.
+/// Most schedule-employee invariants are enforced at aggregate level in container/schedule flows,
+/// so this service remains a focused repository-to-contract adapter.
+/// </summary>
 public class ScheduleEmployeeService : IScheduleEmployeeService
 {
     private readonly IScheduleEmployeeRepository _repo;

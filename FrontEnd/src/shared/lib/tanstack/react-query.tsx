@@ -1,3 +1,5 @@
+/* eslint-disable react-refresh/only-export-components */
+/* eslint-disable react-hooks/set-state-in-effect */
 import {
   createContext,
   useCallback,
@@ -8,15 +10,21 @@ import {
   useState,
 } from "react";
 import type { PropsWithChildren } from "react";
+import { isRequestCanceledError } from "@shared/api/httpClient";
 
 type QueryKey = readonly unknown[];
 type QueryFilters = { queryKey?: QueryKey };
+type QueryEvent =
+  | { type: "invalidate"; key: string }
+  | { type: "setData"; key: string; data: unknown };
 
 type QueryOptions<TData> = {
   queryKey: QueryKey;
   queryFn: (context: { signal: AbortSignal }) => Promise<TData>;
   enabled?: boolean;
   cancelOnUnmount?: boolean;
+  staleTime?: number;
+  retry?: number;
 };
 
 type MutationOptions<TData, TVariables> = {
@@ -35,8 +43,17 @@ type QueryClientOptions = {
   mutationCache?: MutationCache;
 };
 
+type CacheRecord = {
+  queryKey: QueryKey;
+  data?: unknown;
+  updatedAt: number;
+  promise?: Promise<unknown>;
+  controller?: AbortController;
+};
+
 export class QueryCache {
   public readonly config;
+
   constructor(config: { onError?: (error: unknown, query: { queryKey: QueryKey }) => void } = {}) {
     this.config = config;
   }
@@ -44,6 +61,7 @@ export class QueryCache {
 
 export class MutationCache {
   public readonly config;
+
   constructor(
     config: {
       onError?: (error: unknown, variables: unknown, context: unknown, mutation: { options: { mutationKey?: QueryKey } }) => void;
@@ -53,9 +71,42 @@ export class MutationCache {
   }
 }
 
+function hashQueryKey(queryKey: QueryKey): string {
+  return JSON.stringify(queryKey);
+}
+
+function isQueryKeyPrefix(prefix: QueryKey | undefined, queryKey: QueryKey): boolean {
+  if (!prefix || prefix.length === 0) {
+    return true;
+  }
+
+  if (prefix.length > queryKey.length) {
+    return false;
+  }
+
+  return prefix.every((segment, index) => Object.is(segment, queryKey[index]));
+}
+
+async function runWithRetry<TData>(queryFn: () => Promise<TData>, retry: number): Promise<TData> {
+  let attempt = 0;
+
+  while (true) {
+    try {
+      return await queryFn();
+    } catch (error) {
+      if (isRequestCanceledError(error) || attempt >= retry) {
+        throw error;
+      }
+
+      attempt += 1;
+    }
+  }
+}
+
 export class QueryClient {
-  private listeners: Set<(key: string) => void> = new Set();
+  private listeners: Set<(event: QueryEvent) => void> = new Set();
   private bumps: Map<string, number> = new Map();
+  private records: Map<string, CacheRecord> = new Map();
   public readonly defaults;
   public readonly queryCache;
   public readonly mutationCache;
@@ -66,21 +117,143 @@ export class QueryClient {
     this.mutationCache = options.mutationCache;
   }
 
-  subscribe(listener: (key: string) => void): () => void {
+  private ensureRecord(queryKey: QueryKey): CacheRecord {
+    const key = hashQueryKey(queryKey);
+    const existing = this.records.get(key);
+
+    if (existing) {
+      if (existing.queryKey !== queryKey) {
+        existing.queryKey = queryKey;
+      }
+
+      return existing;
+    }
+
+    const created: CacheRecord = {
+      queryKey,
+      updatedAt: 0,
+    };
+
+    this.records.set(key, created);
+    return created;
+  }
+
+  subscribe(listener: (event: QueryEvent) => void): () => void {
     this.listeners.add(listener);
     return () => {
       this.listeners.delete(listener);
     };
   }
 
+  trackQuery(queryKey: QueryKey): void {
+    this.ensureRecord(queryKey);
+  }
+
   getBump(key: string): number {
     return this.bumps.get(key) ?? 0;
   }
 
+  getQueryState<TData>(queryKey: QueryKey): { data: TData | undefined; updatedAt: number } {
+    const record = this.ensureRecord(queryKey);
+
+    return {
+      data: record.data as TData | undefined,
+      updatedAt: record.updatedAt,
+    };
+  }
+
   invalidateQueries(filters: QueryFilters): void {
-    const key = JSON.stringify(filters.queryKey ?? []);
-    this.bumps.set(key, this.getBump(key) + 1);
-    this.listeners.forEach((listener) => listener(key));
+    const matchingKeys = [...this.records.entries()]
+      .filter(([, record]) => isQueryKeyPrefix(filters.queryKey, record.queryKey))
+      .map(([key]) => key);
+
+    if (matchingKeys.length === 0 && filters.queryKey) {
+      const fallbackKey = hashQueryKey(filters.queryKey);
+      this.ensureRecord(filters.queryKey);
+      matchingKeys.push(fallbackKey);
+    }
+
+    matchingKeys.forEach((key) => {
+      this.bumps.set(key, this.getBump(key) + 1);
+      this.listeners.forEach((listener) => listener({ type: "invalidate", key }));
+    });
+  }
+
+  setQueryData<TData>(queryKey: QueryKey, data: TData): void {
+    const key = hashQueryKey(queryKey);
+    const record = this.ensureRecord(queryKey);
+
+    record.data = data;
+    record.updatedAt = Date.now();
+
+    this.listeners.forEach((listener) => listener({ type: "setData", key, data }));
+  }
+
+  fetchQuery<TData>(
+    queryKey: QueryKey,
+    queryFn: (context: { signal: AbortSignal }) => Promise<TData>,
+    options: { retry?: number } = {},
+  ): Promise<TData> {
+    const key = hashQueryKey(queryKey);
+    const record = this.ensureRecord(queryKey);
+
+    if (record.promise) {
+      if (record.controller?.signal.aborted) {
+        record.promise = undefined;
+        record.controller = undefined;
+      } else {
+        return record.promise as Promise<TData>;
+      }
+    }
+
+    if (record.controller?.signal.aborted) {
+      record.controller = undefined;
+      record.promise = undefined;
+    }
+
+    if (record.promise) {
+      return record.promise as Promise<TData>;
+    }
+
+    const controller = new AbortController();
+    const retry = Math.max(0, options.retry ?? this.defaults?.queries?.retry ?? 0);
+
+    const promise = runWithRetry(
+      () => queryFn({ signal: controller.signal }),
+      retry,
+    )
+      .then((data) => {
+        this.setQueryData(queryKey, data);
+        return data;
+      })
+      .finally(() => {
+        const activeRecord = this.records.get(key);
+
+        if (!activeRecord || activeRecord.promise !== promise) {
+          return;
+        }
+
+        activeRecord.promise = undefined;
+        activeRecord.controller = undefined;
+      });
+
+    record.promise = promise;
+    record.controller = controller;
+
+    return promise;
+  }
+
+  cancelQuery(queryKey: QueryKey): void {
+    const record = this.records.get(hashQueryKey(queryKey));
+
+    if (!record) {
+      return;
+    }
+
+    const controller = record.controller;
+    record.promise = undefined;
+    record.controller = undefined;
+    controller?.abort();
   }
 }
 
@@ -92,56 +265,112 @@ export function QueryClientProvider({ client, children }: PropsWithChildren<{ cl
 
 export function useQueryClient(): QueryClient {
   const client = useContext(QueryClientContext);
-  if (!client) throw new Error("QueryClientProvider is missing");
+
+  if (!client) {
+    throw new Error("QueryClientProvider is missing");
+  }
+
   return client;
+}
+
+function isStale(updatedAt: number, staleTime: number, hasData: boolean): boolean {
+  if (!hasData) {
+    return true;
+  }
+
+  if (staleTime <= 0) {
+    return true;
+  }
+
+  return Date.now() - updatedAt >= staleTime;
 }
 
 export function useQuery<TData>(options: QueryOptions<TData>) {
   const client = useQueryClient();
-  const keyString = useMemo(() => JSON.stringify(options.queryKey), [options.queryKey]);
+  const keyString = useMemo(() => hashQueryKey(options.queryKey), [options.queryKey]);
+  const staleTime = options.staleTime ?? client.defaults?.queries?.staleTime ?? 0;
+  const retry = options.retry ?? client.defaults?.queries?.retry ?? 0;
+  const initialState = client.getQueryState<TData>(options.queryKey);
   const queryFnRef = useRef(options.queryFn);
   const queryKeyRef = useRef(options.queryKey);
-  const [data, setData] = useState<TData | undefined>(undefined);
+  const lastSyncRef = useRef<{ key: string; bump: number } | null>(null);
+  const [data, setData] = useState<TData | undefined>(initialState.data);
   const [error, setError] = useState<unknown>(null);
-  const [isLoading, setIsLoading] = useState(options.enabled !== false);
+  const [isLoading, setIsLoading] = useState(options.enabled !== false && initialState.data === undefined);
+  const [isFetching, setIsFetching] = useState(false);
   const [bump, setBump] = useState(client.getBump(keyString));
 
-  queryFnRef.current = options.queryFn;
-  queryKeyRef.current = options.queryKey;
+  useEffect(() => {
+    queryFnRef.current = options.queryFn;
+    queryKeyRef.current = options.queryKey;
+    client.trackQuery(options.queryKey);
+  }, [client, options.queryFn, options.queryKey]);
 
   useEffect(() => {
-    return client.subscribe((updatedKey) => {
-      if (updatedKey === keyString) {
-        setBump(client.getBump(updatedKey));
+    setBump(client.getBump(keyString));
+    lastSyncRef.current = null;
+  }, [client, keyString]);
+
+  useEffect(() => {
+    return client.subscribe((event) => {
+      if (event.key !== keyString) {
+        return;
       }
+
+      if (event.type === "invalidate") {
+        setBump(client.getBump(event.key));
+        return;
+      }
+
+      setData(event.data as TData);
+      setError(null);
+      setIsLoading(false);
+      setIsFetching(false);
     });
   }, [client, keyString]);
 
-  // We refetch only when query key / invalidation changes.
-  // Before this fix, inline queryFn identity changed each render and caused a refetch loop + UI freeze.
   useEffect(() => {
+    client.trackQuery(options.queryKey);
+
+    const snapshot = client.getQueryState<TData>(options.queryKey);
+    setData(snapshot.data);
+    setError(null);
+    setIsFetching(false);
+
     if (options.enabled === false) {
       setIsLoading(false);
+      setIsFetching(false);
       return;
     }
 
-    const controller = new AbortController();
+    setIsLoading(snapshot.data === undefined);
+  }, [client, keyString, options.enabled, options.queryKey]);
+
+  useEffect(() => {
+    if (options.enabled === false) {
+      return;
+    }
+
+    const snapshot = client.getQueryState<TData>(queryKeyRef.current);
+    const hasData = snapshot.data !== undefined;
+    const wasInvalidated = lastSyncRef.current?.key === keyString && lastSyncRef.current.bump !== bump;
+
+    if (!wasInvalidated && !isStale(snapshot.updatedAt, staleTime, hasData)) {
+      setIsLoading(false);
+      setIsFetching(false);
+      lastSyncRef.current = { key: keyString, bump };
+      return;
+    }
+
     let isActive = true;
-    setIsLoading(true);
     setError(null);
+    setIsFetching(true);
+    setIsLoading(!hasData);
 
-    queryFnRef
-      .current({ signal: controller.signal })
-      .then((value) => {
-        if (!isActive || controller.signal.aborted) {
-          return;
-        }
-
-        setData(value);
-        setError(null);
-      })
+    client
+      .fetchQuery(queryKeyRef.current, queryFnRef.current, { retry })
       .catch((reason) => {
-        if (!isActive || controller.signal.aborted) {
+        if (!isActive || isRequestCanceledError(reason)) {
           return;
         }
 
@@ -149,26 +378,29 @@ export function useQuery<TData>(options: QueryOptions<TData>) {
         client.queryCache?.config.onError?.(reason, { queryKey: queryKeyRef.current });
       })
       .finally(() => {
-        if (!isActive || controller.signal.aborted) {
+        if (!isActive) {
           return;
         }
 
+        setIsFetching(false);
         setIsLoading(false);
+        lastSyncRef.current = { key: keyString, bump };
       });
 
     return () => {
       isActive = false;
-      if (options.cancelOnUnmount !== false) {
-        controller.abort();
+
+      if (options.cancelOnUnmount === true) {
+        client.cancelQuery(queryKeyRef.current);
       }
     };
-  }, [bump, keyString, options.cancelOnUnmount, options.enabled, client]);
+  }, [bump, client, keyString, options.cancelOnUnmount, options.enabled, retry, staleTime]);
 
   return {
     data,
     error,
     isLoading,
-    isFetching: isLoading,
+    isFetching,
     isError: Boolean(error),
   };
 }
@@ -202,4 +434,3 @@ export function useMutation<TData, TVariables>(options: MutationOptions<TData, T
 
   return { mutate, isPending, error };
 }
-

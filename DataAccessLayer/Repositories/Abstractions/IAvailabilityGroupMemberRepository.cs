@@ -1,13 +1,19 @@
-﻿using DataAccessLayer.Models;
-using System;
-using System.Collections.Generic;
-using System.Text;
+using DataAccessLayer.Models;
 
-namespace DataAccessLayer.Repositories.Abstractions
+namespace DataAccessLayer.Repositories.Abstractions;
+
+/// <summary>
+/// Persistence contract for availability-group members.
+/// </summary>
+public interface IAvailabilityGroupMemberRepository : IBaseRepository<AvailabilityGroupMemberModel>
 {
-    public interface IAvailabilityGroupMemberRepository : IBaseRepository<AvailabilityGroupMemberModel>
-    {
-        Task<List<AvailabilityGroupMemberModel>> GetByGroupIdAsync(int groupId, CancellationToken ct = default);
-        Task<AvailabilityGroupMemberModel?> GetByGroupAndEmployeeAsync(int groupId, int employeeId, CancellationToken ct = default);
-    }
+    /// <summary>
+    /// Returns all members of one availability group ordered for stable rendering and editing.
+    /// </summary>
+    Task<List<AvailabilityGroupMemberModel>> GetByGroupIdAsync(int groupId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Returns one member record for a specific group/employee pair.
+    /// </summary>
+    Task<AvailabilityGroupMemberModel?> GetByGroupAndEmployeeAsync(int groupId, int employeeId, CancellationToken ct = default);
 }

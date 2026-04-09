@@ -3,7 +3,7 @@
   display: flex;
   flex-direction: column;
   flex: 1 1 auto;
-  gap: 10px;
+  gap: 12px;
   align-items: stretch;
   width: 100%;
   height: 100%;
@@ -22,6 +22,30 @@
   display: none;
   width: 0;
   height: 0;
+}
+
+.headerActions,
+.headerControls {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.headerActionCluster {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: nowrap;
+  min-width: 0;
+  margin-left: auto;
+}
+
+.sessionSection {
+  flex: 0 0 auto;
+  min-width: 0;
 }
 
 .compactToggle {
@@ -119,6 +143,28 @@
   transform: translateX(16px);
 }
 
+.dialogList {
+  display: grid;
+  gap: 6px;
+  max-width: min(100%, 260px);
+}
+
+.dialogListTitle {
+  color: #64748b;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.dialogListValue {
+  color: #0f172a;
+  font-size: 0.88rem;
+  font-weight: 700;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
 @media (max-width: 960px) {
   .page {
     height: auto;
@@ -126,6 +172,22 @@
     overflow-clip-margin: 0;
     overflow: visible;
     padding-bottom: 0;
+  }
+
+  .headerActions,
+  .headerControls,
+  .headerActionCluster {
+    width: 100%;
+  }
+
+  .headerActionCluster {
+    flex-wrap: wrap;
+    justify-content: flex-start;
+  }
+
+  .sessionSection {
+    width: 100%;
+    min-width: 0;
   }
 
   .compactToggle {

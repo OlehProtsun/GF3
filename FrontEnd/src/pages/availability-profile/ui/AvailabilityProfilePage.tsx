@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import {
   buildAvailabilityCellMap,
   buildAvailabilityCellMapFromItems,
@@ -19,6 +19,7 @@ import { PageHeader } from "@shared/ui/PageHeader";
 import styles from "./AvailabilityProfilePage.module.css";
 
 export function AvailabilityProfilePage() {
+  const location = useLocation();
   const navigate = useNavigate();
   const { availabilityId } = useParams<{ availabilityId: string }>();
   const parsedId = availabilityId ? Number(availabilityId) : null;
@@ -29,7 +30,7 @@ export function AvailabilityProfilePage() {
   const itemsQuery = useAvailabilityGroupItemsQuery(groupId);
   const membersQuery = useAvailabilityGroupMembersQuery(groupId);
   const slotsQuery = useAvailabilityGroupSlotsQuery(groupId);
-  const employeesQuery = useEmployeesListQuery();
+  const employeesQuery = useEmployeesListQuery({ refreshKey: location.key });
   const deleteMutation = useDeleteAvailabilityGroupMutation();
 
   const employeeNameById = useMemo(() => {

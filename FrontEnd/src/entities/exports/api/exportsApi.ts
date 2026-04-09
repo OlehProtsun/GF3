@@ -1,5 +1,5 @@
-import { request } from "@shared/api/httpClient";
-import type { ExportFile, ExportOptions } from "@entities/exports/model/types";
+import { requestFile } from "@shared/api/httpClient";
+import type { ExportOptions } from "@entities/exports/model/types";
 
 function toQuery(options?: ExportOptions) {
   return {
@@ -10,11 +10,11 @@ function toQuery(options?: ExportOptions) {
 
 export const exportsApi = {
   exportGraphExcel: (containerId: number, graphId: number, options?: ExportOptions) =>
-    request<ExportFile>(`exports/containers/${containerId}/graphs/${graphId}/export/excel`, { query: toQuery(options), responseType: "blob" }),
+    requestFile(`containers/${containerId}/graphs/${graphId}/export/excel`, { query: toQuery(options) }),
   exportGraphSql: (containerId: number, graphId: number, options?: ExportOptions) =>
-    request<ExportFile>(`exports/containers/${containerId}/graphs/${graphId}/export/sql`, { query: toQuery(options), responseType: "blob" }),
+    requestFile(`containers/${containerId}/graphs/${graphId}/export/sql`, { query: toQuery(options) }),
   exportContainerExcel: (containerId: number, options?: ExportOptions) =>
-    request<ExportFile>(`exports/containers/${containerId}/export/excel`, { query: toQuery(options), responseType: "blob" }),
+    requestFile(`containers/${containerId}/export/excel`, { query: toQuery(options) }),
   exportContainerSql: (containerId: number, options?: ExportOptions) =>
-    request<ExportFile>(`exports/containers/${containerId}/export/sql`, { query: toQuery(options), responseType: "blob" }),
+    requestFile(`containers/${containerId}/export/sql`, { query: toQuery(options) }),
 };

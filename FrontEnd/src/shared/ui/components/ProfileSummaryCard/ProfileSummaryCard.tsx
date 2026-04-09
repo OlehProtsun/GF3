@@ -14,6 +14,7 @@ type ProfileSummaryCardProps = {
   icon?: ReactNode;
   headerMeta?: ReactNode;
   headerRightSlot?: ReactNode;
+  headerRightWrap?: "wrap" | "nowrap";
   statusContent?: ReactNode;
   avatar?: ReactNode;
   name?: ReactNode;
@@ -31,6 +32,7 @@ export function ProfileSummaryCard({
   icon,
   headerMeta,
   headerRightSlot,
+  headerRightWrap = "wrap",
   statusContent,
   avatar,
   name,
@@ -59,7 +61,12 @@ export function ProfileSummaryCard({
 
   const resolvedHeaderRightSlot =
     headerMeta != null || headerRightSlot != null ? (
-      <div className={styles.headerRightStack}>
+      <div
+        className={[
+          styles.headerRightStack,
+          headerRightWrap === "nowrap" ? styles.headerRightStackNoWrap : "",
+        ].filter(Boolean).join(" ")}
+      >
         {headerMeta != null ? <span className={styles.headerMetaBadge}>{headerMeta}</span> : null}
         {headerRightSlot}
       </div>

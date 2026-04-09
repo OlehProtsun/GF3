@@ -7,7 +7,9 @@ import {
   QueryClientProvider,
 } from "@tanstack/react-query";
 import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
+import { isRequestCanceledError } from "@shared/api/httpClient";
 import { isDev } from "@shared/lib/isDev";
+import { pushErrorAlertFromError } from "@shared/ui/feedback/error-alerts/errorAlerts";
 
 function createQueryClient() {
   return new QueryClient({
@@ -23,6 +25,12 @@ function createQueryClient() {
     },
     queryCache: new QueryCache({
       onError: (error, query) => {
+        if (isRequestCanceledError(error)) {
+          return;
+        }
+
+        pushErrorAlertFromError(error, "Could not load data from the server.");
+
         if (isDev) {
           console.error("[Query error]", query.queryKey, error);
         }
@@ -30,6 +38,12 @@ function createQueryClient() {
     }),
     mutationCache: new MutationCache({
       onError: (error, _variables, _context, mutation) => {
+        if (isRequestCanceledError(error)) {
+          return;
+        }
+
+        pushErrorAlertFromError(error, "Could not complete the requested action.");
+
         if (isDev) {
           console.error("[Mutation error]", mutation.options.mutationKey, error);
         }

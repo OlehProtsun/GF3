@@ -15,4 +15,5 @@ export type SaveEmployeeInput = {
 
 export type EmployeesListParams = {
   search?: string;
+  refreshKey?: string;
 };

@@ -1,348 +1,353 @@
-﻿using DataAccessLayer.Models.Enums;
+using DataAccessLayer.Models.Enums;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
-using System;
-using System.Collections.Generic;
-using System.ComponentModel;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
-namespace DataAccessLayer.Models.DataBaseContext
+namespace DataAccessLayer.Models.DataBaseContext;
+
+/// <summary>
+/// Central EF Core model for the whole application.
+/// The context does two jobs:
+/// 1. exposes aggregate roots as <see cref="DbSet{TEntity}"/>,
+/// 2. defines relational invariants that must stay true regardless of which API/service writes data.
+/// </summary>
+public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(options)
 {
-    public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(options)
+    public DbSet<ContainerModel> Containers => Set<ContainerModel>();
+    public DbSet<EmployeeModel> Employees => Set<EmployeeModel>();
+    public DbSet<ShopModel> Shops => Set<ShopModel>();
+    public DbSet<ScheduleModel> Schedules => Set<ScheduleModel>();
+    public DbSet<SchedulePresetModel> SchedulePresets => Set<SchedulePresetModel>();
+    public DbSet<SchedulePresetEmployeeModel> SchedulePresetEmployees => Set<SchedulePresetEmployeeModel>();
+    public DbSet<ScheduleEmployeeModel> ScheduleEmployees => Set<ScheduleEmployeeModel>();
+    public DbSet<ScheduleSlotModel> ScheduleSlots => Set<ScheduleSlotModel>();
+    public DbSet<ScheduleCellStyleModel> ScheduleCellStyles => Set<ScheduleCellStyleModel>();
+    public DbSet<BindModel> AvailabilityBinds => Set<BindModel>();
+    public DbSet<AvailabilityGroupModel> AvailabilityGroups => Set<AvailabilityGroupModel>();
+    public DbSet<AvailabilityGroupMemberModel> AvailabilityGroupMembers => Set<AvailabilityGroupMemberModel>();
+    public DbSet<AvailabilityGroupDayModel> AvailabilityGroupDays => Set<AvailabilityGroupDayModel>();
+
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
-        public DbSet<ContainerModel> Containers => Set<ContainerModel>();
-        public DbSet<EmployeeModel> Employees => Set<EmployeeModel>();
-        public DbSet<ShopModel> Shops => Set<ShopModel>();
-        public DbSet<ScheduleModel> Schedules => Set<ScheduleModel>();
-        public DbSet<SchedulePresetModel> SchedulePresets => Set<SchedulePresetModel>();
-        public DbSet<SchedulePresetEmployeeModel> SchedulePresetEmployees => Set<SchedulePresetEmployeeModel>();
-        public DbSet<ScheduleEmployeeModel> ScheduleEmployees => Set<ScheduleEmployeeModel>();
-        public DbSet<ScheduleSlotModel> ScheduleSlots => Set<ScheduleSlotModel>();
-        public DbSet<ScheduleCellStyleModel> ScheduleCellStyles => Set<ScheduleCellStyleModel>();
-        public DbSet<BindModel> AvailabilityBinds => Set<BindModel>();
-        public DbSet<AvailabilityGroupModel> AvailabilityGroups => Set<AvailabilityGroupModel>();
-        public DbSet<AvailabilityGroupMemberModel> AvailabilityGroupMembers => Set<AvailabilityGroupMemberModel>();
-        public DbSet<AvailabilityGroupDayModel> AvailabilityGroupDays => Set<AvailabilityGroupDayModel>();
+        ConfigureContainer(modelBuilder);
+        ConfigureEmployee(modelBuilder);
+        ConfigureShop(modelBuilder);
+        ConfigureSchedule(modelBuilder);
+        ConfigureSchedulePreset(modelBuilder);
+        ConfigureSchedulePresetEmployee(modelBuilder);
+        ConfigureScheduleEmployee(modelBuilder);
+        ConfigureScheduleSlot(modelBuilder);
+        ConfigureScheduleCellStyle(modelBuilder);
+        ConfigureAvailabilityBind(modelBuilder);
+        ConfigureAvailabilityGroup(modelBuilder);
+        ConfigureAvailabilityGroupMember(modelBuilder);
+        ConfigureAvailabilityGroupDay(modelBuilder);
+    }
 
-
-
-        protected override void OnModelCreating(ModelBuilder modelBuilder) 
+    private static void ConfigureContainer(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<ContainerModel>(entity =>
         {
-            // ----- Container
-            modelBuilder.Entity<ContainerModel>(e =>
+            entity.Property(property => property.Name).IsRequired();
+            entity.HasIndex(property => property.Name).IsUnique();
+        });
+    }
+
+    private static void ConfigureEmployee(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<EmployeeModel>(entity =>
+        {
+            entity.Property(property => property.FirstName).IsRequired();
+            entity.Property(property => property.LastName).IsRequired();
+            entity.HasIndex(property => new { property.FirstName, property.LastName })
+                .IsUnique()
+                .HasDatabaseName("ux_employee_full_name");
+        });
+    }
+
+    private static void ConfigureShop(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<ShopModel>(entity =>
+        {
+            entity.Property(property => property.Name).IsRequired();
+            entity.Property(property => property.Address).IsRequired();
+            entity.Property(property => property.Description).IsRequired(false);
+            entity.HasIndex(property => property.Name)
+                .IsUnique()
+                .HasDatabaseName("ux_shop_name");
+        });
+    }
+
+    private static void ConfigureSchedule(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<ScheduleModel>(entity =>
+        {
+            entity.HasOne(schedule => schedule.Container)
+                .WithMany(container => container.Schedules)
+                .HasForeignKey(schedule => schedule.ContainerId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(schedule => schedule.Shop)
+                .WithMany(shop => shop.Schedules)
+                .HasForeignKey(schedule => schedule.ShopId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(schedule => schedule.AvailabilityGroup)
+                .WithMany()
+                .HasForeignKey(schedule => schedule.AvailabilityGroupId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            entity.HasIndex(schedule => schedule.ContainerId).HasDatabaseName("ix_sched_container");
+            entity.HasIndex(schedule => new { schedule.ShopId, schedule.Year, schedule.Month }).HasDatabaseName("ix_sched_shop_month");
+            entity.HasIndex(schedule => new { schedule.ContainerId, schedule.ShopId }).HasDatabaseName("ix_sched_container_shop");
+            entity.HasIndex(schedule => schedule.AvailabilityGroupId).HasDatabaseName("ix_sched_avail_group");
+
+            entity.Property(schedule => schedule.Note).IsRequired(false);
+
+            entity.ToTable(table =>
             {
-                e.Property(p => p.Name).IsRequired();
-                e.HasIndex(p => p.Name).IsUnique();
+                table.HasCheckConstraint("ck_schedule_month", "month BETWEEN 1 AND 12");
+                table.HasCheckConstraint("ck_schedule_people_per_shift", "people_per_shift >= 1");
+                table.HasCheckConstraint("ck_schedule_max_hours_per_emp_month", "max_hours_per_emp_month >= 0");
+                table.HasCheckConstraint("ck_schedule_max_consecutive_days", "max_consecutive_days >= 1");
+                table.HasCheckConstraint("ck_schedule_max_consecutive_full", "max_consecutive_full >= 1");
+                table.HasCheckConstraint("ck_schedule_max_full_per_month", "max_full_per_month >= 0");
+                table.HasCheckConstraint("ck_schedule_shift1_format", "shift1_time LIKE '__:__ - __:__'");
+                table.HasCheckConstraint("ck_schedule_shift2_format", "shift2_time LIKE '__:__ - __:__'");
             });
 
-            // ----- Employee
-            modelBuilder.Entity<EmployeeModel>(e =>
+            // Time-order correctness is also enforced by database triggers because SQLite check
+            // constraints are intentionally kept string-based and simple here.
+        });
+    }
+
+    private static void ConfigureSchedulePreset(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<SchedulePresetModel>(entity =>
+        {
+            entity.HasOne<ContainerModel>()
+                .WithMany()
+                .HasForeignKey(preset => preset.ContainerId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne<ShopModel>()
+                .WithMany()
+                .HasForeignKey(preset => preset.ShopId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne<AvailabilityGroupModel>()
+                .WithMany()
+                .HasForeignKey(preset => preset.AvailabilityGroupId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            entity.HasIndex(preset => new { preset.ContainerId, preset.Name })
+                .IsUnique()
+                .HasDatabaseName("ux_schedule_preset_container_name");
+
+            entity.HasIndex(preset => preset.ContainerId).HasDatabaseName("ix_schedule_preset_container");
+            entity.HasIndex(preset => preset.ShopId).HasDatabaseName("ix_schedule_preset_shop");
+            entity.HasIndex(preset => preset.AvailabilityGroupId).HasDatabaseName("ix_schedule_preset_avail_group");
+
+            entity.ToTable(table =>
             {
-                e.Property(p => p.FirstName).IsRequired();
-                e.Property(p => p.LastName).IsRequired();
-                e.HasIndex(p => new { p.FirstName, p.LastName })
-                    .IsUnique()
-                    .HasDatabaseName("ux_employee_full_name");
+                table.HasCheckConstraint("ck_schedule_preset_month", "month BETWEEN 1 AND 12");
+                table.HasCheckConstraint("ck_schedule_preset_people_per_shift", "people_per_shift >= 1");
+                table.HasCheckConstraint("ck_schedule_preset_max_hours_per_emp_month", "max_hours_per_emp_month >= 1");
+                table.HasCheckConstraint("ck_schedule_preset_max_consecutive_days", "max_consecutive_days >= 1");
+                table.HasCheckConstraint("ck_schedule_preset_max_consecutive_full", "max_consecutive_full >= 1");
+                table.HasCheckConstraint("ck_schedule_preset_max_full_per_month", "max_full_per_month >= 1");
+                table.HasCheckConstraint("ck_schedule_preset_shift1_format", "shift1_time LIKE '__:__ - __:__'");
+                table.HasCheckConstraint("ck_schedule_preset_shift2_format", "shift2_time LIKE '__:__ - __:__'");
             });
+        });
+    }
 
-            // ----- Shop
-            modelBuilder.Entity<ShopModel>(e =>
+    private static void ConfigureSchedulePresetEmployee(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<SchedulePresetEmployeeModel>(entity =>
+        {
+            entity.HasOne(presetEmployee => presetEmployee.SchedulePreset)
+                .WithMany(preset => preset.Employees)
+                .HasForeignKey(presetEmployee => presetEmployee.SchedulePresetId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne<EmployeeModel>()
+                .WithMany()
+                .HasForeignKey(presetEmployee => presetEmployee.EmployeeId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasIndex(presetEmployee => new { presetEmployee.SchedulePresetId, presetEmployee.EmployeeId })
+                .IsUnique()
+                .HasDatabaseName("ux_schedule_preset_employee");
+
+            entity.HasIndex(presetEmployee => presetEmployee.EmployeeId)
+                .HasDatabaseName("ix_schedule_preset_employee_employee");
+
+            entity.ToTable(table =>
             {
-                e.Property(p => p.Name).IsRequired();
-                e.Property(p => p.Address).IsRequired();
-                e.Property(p => p.Description).IsRequired(false);
-                e.HasIndex(p => p.Name)
-                    .IsUnique()
-                    .HasDatabaseName("ux_shop_name");
+                table.HasCheckConstraint("ck_schedule_preset_employee_min_hours", "min_hours_month >= 0");
             });
+        });
+    }
 
-            // ----- Schedule
-            modelBuilder.Entity<ScheduleModel>(e =>
+    private static void ConfigureScheduleEmployee(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<ScheduleEmployeeModel>(entity =>
+        {
+            entity.HasOne(scheduleEmployee => scheduleEmployee.Schedule)
+                .WithMany(schedule => schedule.Employees)
+                .HasForeignKey(scheduleEmployee => scheduleEmployee.ScheduleId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(scheduleEmployee => scheduleEmployee.Employee)
+                .WithMany(employee => employee.ScheduleEmployees)
+                .HasForeignKey(scheduleEmployee => scheduleEmployee.EmployeeId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.Property(scheduleEmployee => scheduleEmployee.DisplayOrder)
+                .HasDefaultValue(0);
+
+            entity.HasIndex(scheduleEmployee => new { scheduleEmployee.ScheduleId, scheduleEmployee.EmployeeId })
+                .IsUnique();
+        });
+    }
+
+    private static void ConfigureScheduleSlot(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<ScheduleSlotModel>(entity =>
+        {
+            entity.HasOne(slot => slot.Schedule)
+                .WithMany(schedule => schedule.Slots)
+                .HasForeignKey(slot => slot.ScheduleId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(slot => slot.Employee)
+                .WithMany(employee => employee.ScheduleSlots)
+                .HasForeignKey(slot => slot.EmployeeId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            entity.Property(slot => slot.Status)
+                .HasConversion<string>()
+                .HasDefaultValue(SlotStatus.UNFURNISHED);
+
+            entity.Property(slot => slot.FromTime).IsRequired();
+            entity.Property(slot => slot.ToTime).IsRequired();
+
+            entity.HasIndex(slot => new { slot.ScheduleId, slot.DayOfMonth, slot.FromTime, slot.ToTime, slot.SlotNo })
+                .IsUnique();
+
+            entity.HasIndex(slot => new { slot.ScheduleId, slot.DayOfMonth, slot.FromTime, slot.ToTime, slot.EmployeeId })
+                .IsUnique()
+                .HasDatabaseName("ux_slot_unique_emp_per_time")
+                .HasFilter("employee_id IS NOT NULL");
+
+            entity.ToTable(table =>
             {
-                e.HasOne(s => s.Container)
-                 .WithMany(c => c.Schedules)
-                 .HasForeignKey(s => s.ContainerId)
-                 .OnDelete(DeleteBehavior.Restrict);
-
-                e.HasOne(s => s.Shop)
-                 .WithMany(c => c.Schedules)
-                 .HasForeignKey(s => s.ShopId)
-                 .OnDelete(DeleteBehavior.Restrict);
-
-                e.HasIndex(s => s.ContainerId).HasDatabaseName("ix_sched_container");
-                e.HasIndex(s => new { s.ShopId, s.Year, s.Month }).HasDatabaseName("ix_sched_shop_month");
-                e.HasIndex(s => new { s.ContainerId, s.ShopId }).HasDatabaseName("ix_sched_container_shop");
-
-                e.Property(s => s.Note).IsRequired(false);
-
-                e.ToTable(t =>
-                {
-                    t.HasCheckConstraint("ck_schedule_month", "month BETWEEN 1 AND 12");
-                    t.HasCheckConstraint("ck_schedule_people_per_shift", "people_per_shift >= 1");
-                    t.HasCheckConstraint("ck_schedule_max_hours_per_emp_month", "max_hours_per_emp_month >= 0");
-                    t.HasCheckConstraint("ck_schedule_max_consecutive_days", "max_consecutive_days >= 1");
-                    t.HasCheckConstraint("ck_schedule_max_consecutive_full", "max_consecutive_full >= 1");
-                    t.HasCheckConstraint("ck_schedule_max_full_per_month", "max_full_per_month >= 0");
-                    t.HasCheckConstraint("ck_schedule_shift1_format", "shift1_time LIKE '__:__ - __:__'");
-                    t.HasCheckConstraint("ck_schedule_shift2_format", "shift2_time LIKE '__:__ - __:__'");
-                });
-                // тригери в БД додатково перевіряють коректність часу зміни
-
-                // AppDbContext.cs -> modelBuilder.Entity<ScheduleModel>(e => { ... })
-
-                e.HasOne(s => s.AvailabilityGroup)
-                 .WithMany()
-                 .HasForeignKey(s => s.AvailabilityGroupId)
-                 .OnDelete(DeleteBehavior.SetNull);
-
-                e.HasIndex(s => s.AvailabilityGroupId).HasDatabaseName("ix_sched_avail_group");
-
+                table.HasCheckConstraint("ck_schedule_slot_dom", "day_of_month BETWEEN 1 AND 31");
+                table.HasCheckConstraint("ck_schedule_slot_slot_no", "slot_no >= 1");
+                table.HasCheckConstraint(
+                    "ck_schedule_slot_status_pair",
+                    "((status='UNFURNISHED' AND employee_id IS NULL) OR (status='ASSIGNED' AND employee_id IS NOT NULL))");
+                table.HasCheckConstraint("ck_schedule_slot_time_format", "from_time LIKE '__:__' AND to_time LIKE '__:__'");
+                table.HasCheckConstraint("ck_schedule_slot_time_order", "from_time < to_time");
             });
+        });
+    }
 
-            // ----- SchedulePreset
-            modelBuilder.Entity<SchedulePresetModel>(e =>
+    private static void ConfigureScheduleCellStyle(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<ScheduleCellStyleModel>(entity =>
+        {
+            entity.HasOne(style => style.Schedule)
+                .WithMany(schedule => schedule.CellStyles)
+                .HasForeignKey(style => style.ScheduleId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(style => style.Employee)
+                .WithMany()
+                .HasForeignKey(style => style.EmployeeId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasIndex(style => new { style.ScheduleId, style.DayOfMonth, style.EmployeeId })
+                .IsUnique()
+                .HasDatabaseName("ux_sched_cell_style");
+
+            entity.ToTable(table =>
             {
-                e.HasOne<ContainerModel>()
-                 .WithMany()
-                 .HasForeignKey(x => x.ContainerId)
-                 .OnDelete(DeleteBehavior.Cascade);
-
-                e.HasOne<ShopModel>()
-                 .WithMany()
-                 .HasForeignKey(x => x.ShopId)
-                 .OnDelete(DeleteBehavior.Restrict);
-
-                e.HasOne<AvailabilityGroupModel>()
-                 .WithMany()
-                 .HasForeignKey(x => x.AvailabilityGroupId)
-                 .OnDelete(DeleteBehavior.SetNull);
-
-                e.HasIndex(x => new { x.ContainerId, x.Name })
-                 .IsUnique()
-                 .HasDatabaseName("ux_schedule_preset_container_name");
-
-                e.HasIndex(x => x.ContainerId)
-                 .HasDatabaseName("ix_schedule_preset_container");
-
-                e.HasIndex(x => x.ShopId)
-                 .HasDatabaseName("ix_schedule_preset_shop");
-
-                e.HasIndex(x => x.AvailabilityGroupId)
-                 .HasDatabaseName("ix_schedule_preset_avail_group");
-
-                e.ToTable(t =>
-                {
-                    t.HasCheckConstraint("ck_schedule_preset_month", "month BETWEEN 1 AND 12");
-                    t.HasCheckConstraint("ck_schedule_preset_people_per_shift", "people_per_shift >= 1");
-                    t.HasCheckConstraint("ck_schedule_preset_max_hours_per_emp_month", "max_hours_per_emp_month >= 1");
-                    t.HasCheckConstraint("ck_schedule_preset_max_consecutive_days", "max_consecutive_days >= 1");
-                    t.HasCheckConstraint("ck_schedule_preset_max_consecutive_full", "max_consecutive_full >= 1");
-                    t.HasCheckConstraint("ck_schedule_preset_max_full_per_month", "max_full_per_month >= 1");
-                    t.HasCheckConstraint("ck_schedule_preset_shift1_format", "shift1_time LIKE '__:__ - __:__'");
-                    t.HasCheckConstraint("ck_schedule_preset_shift2_format", "shift2_time LIKE '__:__ - __:__'");
-                });
+                table.HasCheckConstraint("ck_schedule_cell_style_dom", "day_of_month BETWEEN 1 AND 31");
             });
+        });
+    }
 
-            // ----- SchedulePresetEmployee
-            modelBuilder.Entity<SchedulePresetEmployeeModel>(e =>
+    private static void ConfigureAvailabilityBind(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<BindModel>(entity =>
+        {
+            entity.Property(bind => bind.Key).IsRequired();
+            entity.Property(bind => bind.Value).IsRequired();
+            entity.HasIndex(bind => bind.Key).IsUnique();
+        });
+    }
+
+    private static void ConfigureAvailabilityGroup(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<AvailabilityGroupModel>(entity =>
+        {
+            entity.Property(group => group.Name).IsRequired();
+            entity.HasIndex(group => new { group.Year, group.Month, group.Name })
+                .IsUnique()
+                .HasDatabaseName("ux_avail_group_year_month_name");
+
+            entity.ToTable(table =>
             {
-                e.HasOne(x => x.SchedulePreset)
-                 .WithMany(x => x.Employees)
-                 .HasForeignKey(x => x.SchedulePresetId)
-                 .OnDelete(DeleteBehavior.Cascade);
-
-                e.HasOne<EmployeeModel>()
-                 .WithMany()
-                 .HasForeignKey(x => x.EmployeeId)
-                 .OnDelete(DeleteBehavior.Cascade);
-
-                e.HasIndex(x => new { x.SchedulePresetId, x.EmployeeId })
-                 .IsUnique()
-                 .HasDatabaseName("ux_schedule_preset_employee");
-
-                e.HasIndex(x => x.EmployeeId)
-                 .HasDatabaseName("ix_schedule_preset_employee_employee");
-
-                e.ToTable(t =>
-                {
-                    t.HasCheckConstraint("ck_schedule_preset_employee_min_hours", "min_hours_month >= 0");
-                });
+                table.HasCheckConstraint("ck_availability_group_month", "month BETWEEN 1 AND 12");
             });
+        });
+    }
 
-            // ----- ScheduleEmployee
-            modelBuilder.Entity<ScheduleEmployeeModel>(e =>
+    private static void ConfigureAvailabilityGroupMember(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<AvailabilityGroupMemberModel>(entity =>
+        {
+            entity.HasOne(member => member.AvailabilityGroup)
+                .WithMany(group => group.Members)
+                .HasForeignKey(member => member.AvailabilityGroupId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(member => member.Employee)
+                .WithMany()
+                .HasForeignKey(member => member.EmployeeId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.Property(member => member.DisplayOrder)
+                .HasDefaultValue(0);
+
+            entity.HasIndex(member => new { member.AvailabilityGroupId, member.EmployeeId })
+                .IsUnique()
+                .HasDatabaseName("ux_avail_group_member_group_emp");
+        });
+    }
+
+    private static void ConfigureAvailabilityGroupDay(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<AvailabilityGroupDayModel>(entity =>
+        {
+            entity.HasOne(day => day.AvailabilityGroupMember)
+                .WithMany(member => member.Days)
+                .HasForeignKey(day => day.AvailabilityGroupMemberId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.Property(day => day.Kind).HasConversion<string>();
+
+            entity.HasIndex(day => new { day.AvailabilityGroupMemberId, day.DayOfMonth })
+                .IsUnique()
+                .HasDatabaseName("ux_avail_group_day_member_dom");
+
+            entity.ToTable(table =>
             {
-                e.HasOne(se => se.Schedule)
-                 .WithMany(s => s.Employees)
-                 .HasForeignKey(se => se.ScheduleId)
-                 .OnDelete(DeleteBehavior.Cascade);
-
-                e.HasOne(se => se.Employee)
-                 .WithMany(emp => emp.ScheduleEmployees)
-                 .HasForeignKey(se => se.EmployeeId)
-                 .OnDelete(DeleteBehavior.Cascade);
-
-                e.Property(se => se.DisplayOrder)
-                 .HasDefaultValue(0);
-
-                e.HasIndex(se => new { se.ScheduleId, se.EmployeeId }).IsUnique();
+                table.HasCheckConstraint("ck_avail_group_day_dom", "day_of_month BETWEEN 1 AND 31");
+                table.HasCheckConstraint(
+                    "ck_avail_group_day_kind_interval",
+                    "((kind = 'INT' AND interval_str IS NOT NULL AND length(trim(interval_str)) >= 11) OR (kind = 'ANY' AND interval_str IS NULL) OR kind = 'NONE')");
             });
-
-            // ----- ScheduleSlot
-            modelBuilder.Entity<ScheduleSlotModel>(e =>
-            {
-                e.HasOne(sl => sl.Schedule)
-                 .WithMany(s => s.Slots)
-                 .HasForeignKey(sl => sl.ScheduleId)
-                 .OnDelete(DeleteBehavior.Cascade);
-
-                e.HasOne(sl => sl.Employee)
-                 .WithMany(emp => emp.ScheduleSlots)
-                 .HasForeignKey(sl => sl.EmployeeId)
-                 .OnDelete(DeleteBehavior.SetNull);
-
-                e.Property(sl => sl.Status)
-                 .HasConversion<string>()
-                 .HasDefaultValue(SlotStatus.UNFURNISHED);
-
-                e.Property(sl => sl.FromTime).IsRequired();
-                e.Property(sl => sl.ToTime).IsRequired();
-
-                e.HasIndex(sl => new { sl.ScheduleId, sl.DayOfMonth, sl.FromTime, sl.ToTime, sl.SlotNo })
-                 .IsUnique();
-
-                e.HasIndex(sl => new { sl.ScheduleId, sl.DayOfMonth, sl.FromTime, sl.ToTime, sl.EmployeeId })
-                 .IsUnique()
-                 .HasDatabaseName("ux_slot_unique_emp_per_time")
-                 .HasFilter("employee_id IS NOT NULL");
-
-                e.ToTable(t =>
-                {
-                    t.HasCheckConstraint("ck_schedule_slot_dom", "day_of_month BETWEEN 1 AND 31");
-                    t.HasCheckConstraint("ck_schedule_slot_slot_no", "slot_no >= 1");
-                    t.HasCheckConstraint(
-                        "ck_schedule_slot_status_pair",
-                        "((status='UNFURNISHED' AND employee_id IS NULL) OR (status='ASSIGNED' AND employee_id IS NOT NULL))"
-                    );
-                    t.HasCheckConstraint(
-                        "ck_schedule_slot_time_format",
-                        "from_time LIKE '__:__' AND to_time LIKE '__:__'"
-                    );
-                    t.HasCheckConstraint(
-                        "ck_schedule_slot_time_order",
-                        "from_time < to_time"
-                    );
-                });
-
-
-            });
-
-            // ----- ScheduleCellStyle
-            modelBuilder.Entity<ScheduleCellStyleModel>(e =>
-            {
-                e.HasOne(cs => cs.Schedule)
-                 .WithMany(s => s.CellStyles)
-                 .HasForeignKey(cs => cs.ScheduleId)
-                 .OnDelete(DeleteBehavior.Cascade);
-
-                e.HasOne(cs => cs.Employee)
-                 .WithMany()
-                 .HasForeignKey(cs => cs.EmployeeId)
-                 .OnDelete(DeleteBehavior.Cascade);
-
-                e.HasIndex(cs => new { cs.ScheduleId, cs.DayOfMonth, cs.EmployeeId })
-                 .IsUnique();
-
-                e.ToTable(t =>
-                {
-                    t.HasCheckConstraint("ck_schedule_cell_style_dom", "day_of_month BETWEEN 1 AND 31");
-                });
-            });
-
-            // ----- ScheduleCellStyle
-            modelBuilder.Entity<ScheduleCellStyleModel>(e =>
-            {
-                e.HasOne(sc => sc.Schedule)
-                 .WithMany(s => s.CellStyles)
-                 .HasForeignKey(sc => sc.ScheduleId)
-                 .OnDelete(DeleteBehavior.Cascade);
-
-                e.HasIndex(sc => new { sc.ScheduleId, sc.DayOfMonth, sc.EmployeeId })
-                 .IsUnique()
-                 .HasDatabaseName("ux_sched_cell_style");
-            });
-
-            // ----- AvailabilityBind
-            modelBuilder.Entity<BindModel>(e =>
-            {
-                e.Property(x => x.Key).IsRequired();
-                e.Property(x => x.Value).IsRequired();
-                e.HasIndex(x => x.Key).IsUnique();   // щоб не було двох однакових хоткеїв
-            });
-
-            // ----- AvailabilityGroup
-            modelBuilder.Entity<AvailabilityGroupModel>(e =>
-            {
-                e.Property(x => x.Name).IsRequired();
-                e.HasIndex(x => new { x.Year, x.Month, x.Name })
-                    .IsUnique()
-                    .HasDatabaseName("ux_avail_group_year_month_name");
-
-                e.ToTable(t =>
-                {
-                    t.HasCheckConstraint("ck_availability_group_month", "month BETWEEN 1 AND 12");
-                });
-            });
-
-            // ----- AvailabilityGroupMember
-            modelBuilder.Entity<AvailabilityGroupMemberModel>(e =>
-            {
-                e.HasOne(m => m.AvailabilityGroup)
-                 .WithMany(g => g.Members)
-                 .HasForeignKey(m => m.AvailabilityGroupId)
-                 .OnDelete(DeleteBehavior.Cascade);
-
-                e.HasOne(m => m.Employee)
-                 .WithMany() // або зробиш Employee.AvailabilityGroupMembers
-                 .HasForeignKey(m => m.EmployeeId)
-                 .OnDelete(DeleteBehavior.Cascade);
-
-                e.Property(m => m.DisplayOrder)
-                 .HasDefaultValue(0);
-
-                e.HasIndex(m => new { m.AvailabilityGroupId, m.EmployeeId })
-                 .IsUnique()
-                 .HasDatabaseName("ux_avail_group_member_group_emp");
-            });
-
-            // ----- AvailabilityGroupDay
-            modelBuilder.Entity<AvailabilityGroupDayModel>(e =>
-            {
-                e.HasOne(d => d.AvailabilityGroupMember)
-                 .WithMany(m => m.Days)
-                 .HasForeignKey(d => d.AvailabilityGroupMemberId)
-                 .OnDelete(DeleteBehavior.Cascade);
-
-                e.Property(d => d.Kind).HasConversion<string>();
-
-                e.HasIndex(d => new { d.AvailabilityGroupMemberId, d.DayOfMonth })
-                 .IsUnique()
-                 .HasDatabaseName("ux_avail_group_day_member_dom");
-
-                e.ToTable(t =>
-                {
-                    t.HasCheckConstraint("ck_avail_group_day_dom", "day_of_month BETWEEN 1 AND 31");
-                    t.HasCheckConstraint(
-                        "ck_avail_group_day_kind_interval",
-                        "((kind = 'INT' AND interval_str IS NOT NULL AND length(trim(interval_str)) >= 11) OR (kind IN ('ANY','NONE') AND interval_str IS NULL))"
-                    );
-                });
-            });
-
-
-
-        }
+        });
     }
 }

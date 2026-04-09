@@ -3,40 +3,235 @@
   flex-direction: column;
   flex: 1 1 auto;
   gap: 12px;
-  align-items: stretch;
   width: 100%;
   min-height: 0;
-  max-width: none;
-  padding: 0 0 28px;
-  overflow: auto;
+  align-items: stretch;
   box-sizing: border-box;
-  scrollbar-width: thin;
-  scrollbar-color: #d6dbe3 transparent;
 }
 
-.page::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+.content {
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+  padding: 0 14px 24px;
+  box-sizing: border-box;
 }
 
-.page::-webkit-scrollbar-thumb {
-  border-radius: 999px;
-  border: 2px solid transparent;
-  background: #d6dbe3;
-  background-clip: padding-box;
+.contentWide {
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding-top: 0;
+  padding-left: 10px;
+  padding-right: 10px;
+  padding-bottom: 28px;
+}
+
+.banner {
+  margin: 0 0 14px;
 }
 
 .headerActions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
+  display: inline-flex;
+  align-items: center;
   justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.headerActionCluster {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: nowrap;
+  min-width: 0;
+  margin-left: auto;
+}
+
+.headerControls {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: nowrap;
+  gap: 8px;
+}
+
+.sessionSection {
+  flex: 0 0 auto;
+  min-width: 0;
+}
+
+.compactToggle {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  min-height: 42px;
+  padding: 0 58px 0 16px;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(248, 250, 252, 0.92));
+  box-shadow:
+    0 14px 30px rgba(15, 23, 42, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.74);
+  transition:
+    border-color 120ms ease,
+    box-shadow 120ms ease,
+    background 120ms ease,
+    transform 120ms ease;
+}
+
+.compactToggle:hover {
+  background: rgba(255, 255, 255, 0.9);
+  border-color: rgba(148, 163, 184, 0.22);
+}
+
+.compactToggle:active {
+  transform: translateY(1px);
+}
+
+.compactToggle:focus-visible {
+  outline: none;
+  box-shadow:
+    0 0 0 4px rgba(37, 99, 235, 0.14),
+    0 10px 24px rgba(15, 23, 42, 0.1);
+}
+
+.compactToggleActive {
+  border-color: rgba(96, 165, 250, 0.34);
+  background:
+    linear-gradient(180deg, rgba(239, 246, 255, 0.98), rgba(219, 234, 254, 0.9));
+}
+
+.compactToggleTitle {
+  color: #0f172a;
+  display: block;
+  width: 100%;
+  font-size: 0.8rem;
+  font-weight: 800;
+  line-height: 1;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.compactToggleTrack {
+  position: absolute;
+  top: 50%;
+  right: 12px;
+  display: inline-flex;
+  align-items: center;
+  width: 38px;
+  min-width: 38px;
+  height: 22px;
+  padding: 2px;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.24);
+  box-shadow:
+    inset 0 1px 2px rgba(15, 23, 42, 0.1),
+    0 6px 16px rgba(15, 23, 42, 0.08);
+  transform: translateY(-50%);
+  transition: background 120ms ease, box-shadow 120ms ease;
+}
+
+.compactToggleActive .compactToggleTrack {
+  background: #2563eb;
+  box-shadow:
+    inset 0 1px 2px rgba(29, 78, 216, 0.32),
+    0 8px 18px rgba(37, 99, 235, 0.2);
+}
+
+.compactToggleThumb {
+  display: block;
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  background: #ffffff;
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.18);
+  transform: translateX(0);
+  transition: transform 120ms ease;
+}
+
+.compactToggleActive .compactToggleThumb {
+  transform: translateX(16px);
+}
+
+.dialogList {
+  display: grid;
+  gap: 6px;
+  max-width: min(100%, 260px);
+}
+
+.dialogListTitle {
+  color: #64748b;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.dialogListValue {
+  color: #0f172a;
+  font-size: 0.88rem;
+  font-weight: 700;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
 }
 
 @media (max-width: 960px) {
-  .page {
-    min-height: 0;
-    overflow: visible;
-    padding: 0 0 12px;
+  .banner {
+    margin-bottom: 12px;
+  }
+
+  .headerActions {
+    width: 100%;
+  }
+
+  .headerActionCluster {
+    width: 100%;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+  }
+
+  .headerControls {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .sessionSection {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .compactToggle {
+    width: 100%;
+  }
+}
+
+@media (min-width: 1101px) {
+  .contentWide {
+    padding-left: 8px;
+    padding-right: 8px;
+  }
+}
+
+@media (max-width: 1100px) {
+  .content {
+    padding-inline: 14px;
+  }
+
+  .contentWide {
+    padding-inline: 12px;
+  }
+}
+
+@media (max-width: 680px) {
+  .content {
+    padding-inline: 12px;
+    padding-bottom: 18px;
+  }
+
+  .contentWide {
+    padding-inline: 10px;
   }
 }

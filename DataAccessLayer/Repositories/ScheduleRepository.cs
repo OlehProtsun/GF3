@@ -2,82 +2,90 @@ using DataAccessLayer.Models;
 using DataAccessLayer.Models.DataBaseContext;
 using DataAccessLayer.Repositories.Abstractions;
 using Microsoft.EntityFrameworkCore;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
 
-namespace DataAccessLayer.Repositories
+namespace DataAccessLayer.Repositories;
+
+/// <summary>
+/// Repository for saved schedule graphs.
+/// Besides CRUD, this repository centralizes the rich includes and search filters used by list,
+/// detail, edit, and export flows.
+/// </summary>
+public class ScheduleRepository : GenericRepository<ScheduleModel>, IScheduleRepository
 {
-    public class ScheduleRepository : GenericRepository<ScheduleModel>, IScheduleRepository
+    public ScheduleRepository(AppDbContext db)
+        : base(db)
     {
-        public ScheduleRepository(AppDbContext db) : base(db) { }
-
-        public override async Task<List<ScheduleModel>> GetAllAsync(CancellationToken ct = default)
-        {
-            return await _set
-                .AsNoTracking()
-                .Include(s => s.Container)
-                .Include(s => s.Shop)
-                .ToListAsync(ct)
-                .ConfigureAwait(false);
-        }
-
-        public async Task<List<ScheduleModel>> GetByContainerAsync(int containerId, string? value = null, CancellationToken ct = default)
-        {
-            var query = _set
-                .AsNoTracking()
-                .Include(s => s.Container)
-                .Include(s => s.Shop)
-                .Where(s => s.ContainerId == containerId);
-
-            if (!string.IsNullOrWhiteSpace(value))
-            {
-                value = value.Trim().ToLower();
-                bool hasInt = int.TryParse(value, out var intVal);
-
-                query = query.Where(s =>
-                    s.Name.ToLower().Contains(value) ||
-                    (s.Note != null && s.Note.ToLower().Contains(value)) ||
-                    (hasInt && (s.Year == intVal || s.Month == intVal)));
-            }
-
-            return await query.ToListAsync(ct).ConfigureAwait(false);
-        }
-
-        public async Task<List<ScheduleModel>> GetByValueAsync(string value, CancellationToken ct = default)
-        {
-            if (string.IsNullOrWhiteSpace(value))
-                return await GetAllAsync(ct).ConfigureAwait(false);
-
-            value = value.Trim().ToLower();
-            bool hasInt = int.TryParse(value, out var intVal);
-
-            return await _set
-                .AsNoTracking()
-                .Include(s => s.Container)
-                .Include(s => s.Shop)
-                .Where(s =>
-                    s.Name.ToLower().Contains(value) ||
-                    (s.Note != null && s.Note.ToLower().Contains(value)) ||
-                    s.Container.Name.ToLower().Contains(value) ||
-                    s.Shop.Name.ToLower().Contains(value) ||
-                    (hasInt && (s.Year == intVal || s.Month == intVal)))
-                .ToListAsync(ct)
-                .ConfigureAwait(false);
-        }
-
-        public async Task<ScheduleModel?> GetDetailedAsync(int id, CancellationToken ct = default)
-        {
-            return await _set
-                .AsNoTracking()
-                .Include(s => s.Container)
-                .Include(s => s.Shop)
-                .Include(s => s.Slots)
-                .Include(s => s.Employees)
-                .ThenInclude(e => e.Employee)
-                .FirstOrDefaultAsync(s => s.Id == id, ct)
-                .ConfigureAwait(false);
-        }
     }
+
+    /// <inheritdoc />
+    public override async Task<List<ScheduleModel>> GetAllAsync(CancellationToken ct = default)
+        => await CreateListQuery()
+            .ToListAsync(ct)
+            .ConfigureAwait(false);
+
+    /// <inheritdoc />
+    public async Task<List<ScheduleModel>> GetByContainerAsync(int containerId, string? value = null, CancellationToken ct = default)
+    {
+        var query = CreateListQuery()
+            .Where(schedule => schedule.ContainerId == containerId);
+
+        if (!string.IsNullOrWhiteSpace(value))
+        {
+            query = ApplyScheduleSearch(query, value);
+        }
+
+        return await query.ToListAsync(ct).ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
+    public async Task<List<ScheduleModel>> GetByValueAsync(string value, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return await GetAllAsync(ct).ConfigureAwait(false);
+        }
+
+        return await ApplyScheduleSearch(CreateListQuery(), value)
+            .ToListAsync(ct)
+            .ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
+    public async Task<ScheduleModel?> GetDetailedAsync(int id, CancellationToken ct = default)
+        => await _set
+            .AsNoTracking()
+            .Include(schedule => schedule.Container)
+            .Include(schedule => schedule.Shop)
+            .Include(schedule => schedule.Slots)
+            .Include(schedule => schedule.Employees)
+                .ThenInclude(scheduleEmployee => scheduleEmployee.Employee)
+            .FirstOrDefaultAsync(schedule => schedule.Id == id, ct)
+            .ConfigureAwait(false);
+
+    private IQueryable<ScheduleModel> CreateListQuery()
+        => _set
+            .AsNoTracking()
+            .Include(schedule => schedule.Container)
+            .Include(schedule => schedule.Shop);
+
+    /// <summary>
+    /// Applies the shared schedule search logic used by both global lists and container-scoped lists.
+    /// Numeric search tokens can match year/month, while textual tokens match graph, note, container,
+    /// and shop names.
+    /// </summary>
+    private static IQueryable<ScheduleModel> ApplyScheduleSearch(IQueryable<ScheduleModel> query, string rawValue)
+    {
+        var normalized = NormalizeSearchValue(rawValue);
+        var hasNumericValue = int.TryParse(normalized, out var numericValue);
+
+        return query.Where(schedule =>
+            schedule.Name.ToLower().Contains(normalized) ||
+            (schedule.Note != null && schedule.Note.ToLower().Contains(normalized)) ||
+            schedule.Container.Name.ToLower().Contains(normalized) ||
+            schedule.Shop.Name.ToLower().Contains(normalized) ||
+            (hasNumericValue && (schedule.Year == numericValue || schedule.Month == numericValue)));
+    }
+
+    private static string NormalizeSearchValue(string? value)
+        => (value ?? string.Empty).Trim().ToLower();
 }

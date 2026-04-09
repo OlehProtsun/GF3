@@ -5,7 +5,7 @@ import { IosButton } from "@shared/ui/components/IosButton";
 import { RecordGrid } from "@shared/ui/components/RecordGrid";
 import { RecordTile } from "@shared/ui/components/RecordTile";
 import { ProfileSummaryCard, type ProfileSummaryDetail } from "@shared/ui/components/ProfileSummaryCard";
-import { SearchIcon, ContainerInfoIcon, InformationIcon, PlusIcon, ScheduleIcon } from "@shared/ui/icons";
+import { CheckIcon, SearchIcon, ContainerInfoIcon, InformationIcon, PlusIcon, ScheduleIcon } from "@shared/ui/icons";
 import { CardSection } from "@shared/ui/sections/CardSection";
 import type { Container } from "@entities/containers/model/types";
 import { getGraphVisibleNote } from "@entities/containers/model/graphNote";
@@ -28,8 +28,13 @@ type ContainerProfileWorkspaceProps = {
   isGraphsLoading: boolean;
   hasGraphsError: boolean;
   graphSearchQuery: string;
+  isMultiOpenEnabled: boolean;
+  selectedGraphIds: number[];
   onGraphSearchChange: (value: string) => void;
   onClearGraphSearch: () => void;
+  onToggleMultiOpen: () => void;
+  onToggleGraphSelection: (graphId: number) => void;
+  onOpenSelectedGraphs: () => void;
   onAddGraph: () => void;
   onOpenGraph: (graphId: number) => void;
   onEditContainer: (containerId: number) => void;
@@ -40,6 +45,28 @@ const DESKTOP_MEDIA_QUERY = "(min-width: 961px)";
 
 function joinClassNames(...values: Array<string | false | null | undefined>) {
   return values.filter(Boolean).join(" ");
+}
+
+type MultiOpenHeaderToggleProps = {
+  checked: boolean;
+  onToggle: () => void;
+};
+
+function MultiOpenHeaderToggle({ checked, onToggle }: MultiOpenHeaderToggleProps) {
+  return (
+    <button
+      type="button"
+      className={joinClassNames(styles.multiOpenToggle, checked && styles.multiOpenToggleActive)}
+      aria-pressed={checked}
+      onClick={onToggle}
+    >
+      <span className={styles.multiOpenToggleTitle}>MultiOpen</span>
+
+      <span className={styles.multiOpenToggleTrack} aria-hidden="true">
+        <span className={styles.multiOpenToggleThumb} />
+      </span>
+    </button>
+  );
 }
 
 export function ContainerProfileWorkspace({
@@ -53,8 +80,13 @@ export function ContainerProfileWorkspace({
   isGraphsLoading,
   hasGraphsError,
   graphSearchQuery,
+  isMultiOpenEnabled,
+  selectedGraphIds,
   onGraphSearchChange,
   onClearGraphSearch,
+  onToggleMultiOpen,
+  onToggleGraphSelection,
+  onOpenSelectedGraphs,
   onAddGraph,
   onOpenGraph,
   onEditContainer,
@@ -93,7 +125,6 @@ export function ContainerProfileWorkspace({
 
   useLayoutEffect(() => {
     if (!isDesktopLayout) {
-      setScheduleCardHeight(null);
       return;
     }
 
@@ -144,6 +175,8 @@ export function ContainerProfileWorkspace({
   const showGraphsEmpty = !isGraphsLoading && !hasGraphsError && totalGraphsCount === 0;
   const showSearchEmpty = !isGraphsLoading && totalGraphsCount > 0 && graphs.length === 0;
   const showStatisticsEmpty = statistics.pivotRows.length === 0;
+  const selectedGraphIdSet = new Set(selectedGraphIds);
+  const hasSelectedGraphs = selectedGraphIds.length > 0;
   const scheduleCardShellStyle =
     isDesktopLayout && scheduleCardHeight !== null
       ? { height: `${scheduleCardHeight}px` }
@@ -210,14 +243,7 @@ export function ContainerProfileWorkspace({
               title="Schedules"
               icon={<ScheduleIcon size={18} />}
               headerRightSlot={
-                <div className={styles.scheduleHeaderActions}>
-                  <IosButton label="Add New" icon={<PlusIcon size={18} />} onClick={onAddGraph} />
-                  <span className={styles.headerBadge}>{`Total: ${totalGraphsCount}`}</span>
-                </div>
-              }
-            >
-              <div className={styles.scheduleBody}>
-                <div className={styles.searchRow}>
+                <div className={styles.scheduleHeaderRow}>
                   <label className={styles.searchField} htmlFor="container-graphs-search">
                     <SearchIcon className={styles.searchIcon} />
                     <input
@@ -233,8 +259,25 @@ export function ContainerProfileWorkspace({
                   {graphSearchQuery.trim() ? (
                     <IosButton label="Clear" variant="secondary" onClick={onClearGraphSearch} />
                   ) : null}
-                </div>
 
+                  <div className={styles.scheduleHeaderActions}>
+                    <IosButton label="Add New" icon={<PlusIcon size={18} />} onClick={onAddGraph} />
+                    <MultiOpenHeaderToggle checked={isMultiOpenEnabled} onToggle={onToggleMultiOpen} />
+                    {isMultiOpenEnabled ? (
+                      <>
+                        <IosButton
+                          label={hasSelectedGraphs ? `Open (${selectedGraphIds.length})` : "Open"}
+                          disabled={!hasSelectedGraphs}
+                          onClick={onOpenSelectedGraphs}
+                        />
+                      </>
+                    ) : null}
+                    <span className={styles.headerBadge}>{`Total: ${totalGraphsCount}`}</span>
+                  </div>
+                </div>
+              }
+            >
+              <div className={styles.scheduleBody}>
                 <div className={styles.scheduleContent}>
                   {isGraphsLoading && totalGraphsCount === 0 ? (
                     <div className={styles.state}>Loading schedules...</div>
@@ -270,15 +313,42 @@ export function ContainerProfileWorkspace({
                           title={summary.graph.name}
                           description={getGraphVisibleNote(summary.graph.note).trim() || undefined}
                           badge={summary.monthYearLabel}
-                          onClick={() => onOpenGraph(summary.graph.id)}
-                          ariaLabel={`Open schedule ${summary.graph.name}`}
+                          headerSlot={
+                            null
+                          }
+                          cornerSlot={
+                            isMultiOpenEnabled ? (
+                              <span
+                                className={joinClassNames(
+                                  styles.selectionMark,
+                                  selectedGraphIdSet.has(summary.graph.id) && styles.selectionMarkActive,
+                                )}
+                                aria-hidden="true"
+                              >
+                                {selectedGraphIdSet.has(summary.graph.id) ? <CheckIcon size={14} /> : null}
+                              </span>
+                            ) : null
+                          }
+                          isSelected={isMultiOpenEnabled && selectedGraphIdSet.has(summary.graph.id)}
+                          onClick={() => {
+                            if (isMultiOpenEnabled) {
+                              onToggleGraphSelection(summary.graph.id);
+                              return;
+                            }
+
+                            onOpenGraph(summary.graph.id);
+                          }}
+                          ariaLabel={
+                            isMultiOpenEnabled
+                              ? `${selectedGraphIdSet.has(summary.graph.id) ? "Deselect" : "Select"} schedule ${summary.graph.name}`
+                              : `Open schedule ${summary.graph.name}`
+                          }
                           metaItems={[
                             { key: "shop", label: "Shop", value: summary.shopName },
                             { key: "employees", label: "Employees", value: String(summary.employeeCount) },
                             { key: "hours", label: "Hours", value: summary.assignedHoursText },
                             { key: "days", label: "Days", value: String(summary.coverageDays) },
                           ]}
-
                         />
                       ))}
                     </RecordGrid>
@@ -312,17 +382,6 @@ export function ContainerProfileWorkspace({
             <span className={styles.metricLabel}>Schedules</span>
             <strong className={styles.metricValue}>{totalGraphsCount}</strong>
           </div>
-        </div>
-
-        <div className={styles.summaryMeta}>
-          <p>
-            <span className={styles.summaryMetaLabel}>Employees:</span>
-            <span>{statistics.totalEmployeesListText}</span>
-          </p>
-          <p>
-            <span className={styles.summaryMetaLabel}>Shops:</span>
-            <span>{statistics.totalShopsListText}</span>
-          </p>
         </div>
 
         {showStatisticsEmpty ? (

@@ -1,15 +1,24 @@
-﻿using DataAccessLayer.Models;
-using System;
-using System.Collections.Generic;
-using System.Text;
+using DataAccessLayer.Models;
 
-namespace DataAccessLayer.Repositories.Abstractions
+namespace DataAccessLayer.Repositories.Abstractions;
+
+/// <summary>
+/// Persistence contract for availability groups and their richer read models.
+/// </summary>
+public interface IAvailabilityGroupRepository : IBaseRepository<AvailabilityGroupModel>
 {
-    public interface IAvailabilityGroupRepository : IBaseRepository<AvailabilityGroupModel>
-    {
-        Task<List<AvailabilityGroupModel>> GetByValueAsync(string value, CancellationToken ct = default);
-        Task<AvailabilityGroupModel?> GetFullByIdAsync(int id, CancellationToken ct = default);
-        Task<bool> ExistsByNameAsync(string name, int year, int month, int? excludeId = null, CancellationToken ct = default);
+    /// <summary>
+    /// Searches availability groups by name, related employee names, and numeric year/month/id tokens.
+    /// </summary>
+    Task<List<AvailabilityGroupModel>> GetByValueAsync(string value, CancellationToken ct = default);
 
-    }
+    /// <summary>
+    /// Returns one group with members and member-day entries fully loaded.
+    /// </summary>
+    Task<AvailabilityGroupModel?> GetFullByIdAsync(int id, CancellationToken ct = default);
+
+    /// <summary>
+    /// Returns whether another group already uses the same normalized name within the same month.
+    /// </summary>
+    Task<bool> ExistsByNameAsync(string name, int year, int month, int? excludeId = null, CancellationToken ct = default);
 }

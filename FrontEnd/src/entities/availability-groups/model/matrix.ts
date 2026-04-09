@@ -1,4 +1,5 @@
 import type { AvailabilityGroupItem, AvailabilityGroupMember, AvailabilityKind, AvailabilitySlot } from "./types";
+import { parseFlexibleTimeRange } from "@shared/lib/timeRange";
 
 export const AVAILABILITY_ANY_MARK = "+";
 export const AVAILABILITY_NONE_MARK = "-";
@@ -119,63 +120,33 @@ function normalizeAvailabilityKind(kind: AvailabilityKind) {
 
 export function getAvailabilityCodeFromKind(kind: AvailabilityKind, intervalStr?: string | null) {
   const normalizedKind = normalizeAvailabilityKind(kind);
+  const trimmedIntervalStr = (intervalStr ?? "").trim();
 
   if (normalizedKind === AVAILABILITY_KIND_ANY) {
     return AVAILABILITY_ANY_MARK;
   }
 
   if (normalizedKind === AVAILABILITY_KIND_INTERVAL) {
-    return (intervalStr ?? "").trim() || AVAILABILITY_NONE_MARK;
+    return trimmedIntervalStr || AVAILABILITY_NONE_MARK;
+  }
+
+  if (trimmedIntervalStr && trimmedIntervalStr !== AVAILABILITY_NONE_MARK) {
+    return trimmedIntervalStr;
   }
 
   return AVAILABILITY_NONE_MARK;
 }
 
 function tryNormalizeInterval(value: string) {
-  const parts = value
-    .split("-")
-    .map(part => part.trim())
-    .filter(Boolean);
-
-  if (parts.length !== 2) {
-    return null;
-  }
-
-  const start = normalizeTimeSegment(parts[0]);
-  const end = normalizeTimeSegment(parts[1]);
-
-  if (!start || !end) {
-    return null;
-  }
-
-  if (end.totalMinutes <= start.totalMinutes) {
-    return null;
-  }
-
-  return `${start.label} - ${end.label}`;
+  return parseFlexibleTimeRange(value)?.label ?? null;
 }
 
-function normalizeTimeSegment(value: string) {
-  const match = value.match(/^(\d{1,2}):(\d{2})$/);
-  if (!match) {
-    return null;
-  }
+function containsAlphabeticCharacter(value: string) {
+  return [...value].some(character => character.toLowerCase() !== character.toUpperCase());
+}
 
-  const hours = Number(match[1]);
-  const minutes = Number(match[2]);
-
-  if (!Number.isInteger(hours) || !Number.isInteger(minutes)) {
-    return null;
-  }
-
-  if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) {
-    return null;
-  }
-
-  return {
-    totalMinutes: hours * 60 + minutes,
-    label: `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`,
-  };
+function looksLikeAvailabilityTimeAttempt(value: string) {
+  return /[:.,]/.test(value) || value.includes("-");
 }
 
 export function parseAvailabilityCode(input: string):
@@ -206,21 +177,37 @@ export function parseAvailabilityCode(input: string):
   }
 
   const normalizedInterval = tryNormalizeInterval(trimmed);
-  if (!normalizedInterval) {
+  if (normalizedInterval) {
     return {
-      ok: false,
-      error: "Use +, -, or a valid time range like 08:00 - 16:00.",
+      ok: true,
+      value: {
+        normalizedCode: normalizedInterval,
+        kind: AVAILABILITY_KIND_INTERVAL,
+        intervalStr: normalizedInterval,
+      },
+    };
+  }
+
+  if (containsAlphabeticCharacter(trimmed) || !looksLikeAvailabilityTimeAttempt(trimmed)) {
+    return {
+      ok: true,
+      value: {
+        normalizedCode: trimmed,
+        kind: AVAILABILITY_KIND_NONE,
+        intervalStr: trimmed,
+      },
     };
   }
 
   return {
-    ok: true,
-    value: {
-      normalizedCode: normalizedInterval,
-      kind: AVAILABILITY_KIND_INTERVAL,
-      intervalStr: normalizedInterval,
-    },
+    ok: false,
+    error: "Use +, -, text, or a valid time range like 09:00 - 15:00.",
   };
+}
+
+export function normalizeAvailabilityCellValue(input: string) {
+  const parsed = parseAvailabilityCode(input);
+  return parsed.ok ? parsed.value.normalizedCode : input.trim();
 }
 
 export function buildAvailabilityColumns(
@@ -302,14 +289,16 @@ export function buildAvailabilityCellMapFromItems(
 export function summarizeAvailabilityCellMap(cellMap: AvailabilityMatrixCellMap) {
   return Object.values(cellMap).reduce(
     (summary, value) => {
-      const trimmedValue = value.trim();
+      const parsed = parseAvailabilityCode(value);
 
-      if (!trimmedValue || trimmedValue === AVAILABILITY_NONE_MARK) {
+      if (!parsed.ok) {
         summary.none += 1;
-      } else if (trimmedValue === AVAILABILITY_ANY_MARK) {
+      } else if (parsed.value.kind === AVAILABILITY_KIND_ANY) {
         summary.any += 1;
-      } else {
+      } else if (parsed.value.kind === AVAILABILITY_KIND_INTERVAL) {
         summary.interval += 1;
+      } else {
+        summary.none += 1;
       }
 
       return summary;

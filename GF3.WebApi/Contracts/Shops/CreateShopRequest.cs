@@ -2,6 +2,9 @@ using System.ComponentModel.DataAnnotations;
 
 namespace WebApi.Contracts.Shops;
 
+/// <summary>
+/// Request payload used to create a new shop.
+/// </summary>
 public sealed class CreateShopRequest
 {
     [Required]

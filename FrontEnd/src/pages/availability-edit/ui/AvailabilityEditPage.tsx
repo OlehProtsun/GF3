@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useMemo, useState } from "react";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import {
   buildActiveAvailabilityBindMap,
   normalizeBindKey,
@@ -14,7 +14,6 @@ import {
   buildAvailabilityCellMap,
   clampAvailabilityMonth,
   clampAvailabilityYear,
-  filterAvailabilityEmployees,
   getAvailabilityCellKey,
   parseAvailabilityCode,
   sanitizeAvailabilityCellMap,
@@ -27,6 +26,7 @@ import {
 import { AvailabilityGroupEditor } from "@entities/availability-groups/ui";
 import { useEmployeesListQuery } from "@entities/employees/api/queries";
 import { getEmployeeFullName } from "@entities/employees/model/presentation";
+import { useSyncedDraft } from "@shared/lib/useSyncedDraft";
 import { ConfirmDialog } from "@shared/ui/ConfirmDialog";
 import { PageHeader } from "@shared/ui/PageHeader";
 import styles from "./AvailabilityEditPage.module.css";
@@ -47,6 +47,37 @@ type AvailabilityEditorInformationErrors = {
   month?: string;
   year?: string;
 };
+
+type AvailabilityEditorState = {
+  name: string;
+  month: number;
+  year: number;
+  selectedEmployeeId: number | null;
+  selectedEmployeeIds: number[];
+  cellMap: AvailabilityMatrixCellMap;
+  cellErrors: Record<string, string>;
+  informationErrors: AvailabilityEditorInformationErrors;
+  employeeError?: string;
+  editorError?: string;
+};
+
+type AvailabilityGroupSource = {
+  name: string;
+  month: number;
+  year: number;
+} | null | undefined;
+
+type AvailabilityMembersSource = Parameters<typeof buildAvailabilityCellMap>[0] | null | undefined;
+type AvailabilitySlotsSource = Parameters<typeof buildAvailabilityCellMap>[1] | null | undefined;
+
+type CompactSizeHeaderToggleProps = {
+  checked: boolean;
+  onToggle: () => void;
+};
+
+function joinClassNames(...values: Array<string | false | undefined>) {
+  return values.filter(Boolean).join(" ");
+}
 
 function toErrorMessage(error: unknown) {
   if (error instanceof Error) {
@@ -116,7 +147,114 @@ function reorderEmployeeIds(employeeIds: number[], sourceEmployeeId: number, tar
   return nextEmployeeIds;
 }
 
+function sanitizeAvailabilityEditorMatrices(
+  cellMap: AvailabilityMatrixCellMap,
+  cellErrors: Record<string, string>,
+  selectedEmployeeIds: number[],
+  year: number,
+  month: number,
+) {
+  return {
+    cellMap: sanitizeAvailabilityCellMap(cellMap, selectedEmployeeIds, year, month),
+    cellErrors: sanitizeAvailabilityCellMap(cellErrors, selectedEmployeeIds, year, month),
+  };
+}
+
+function createAvailabilityEditorState({
+  defaults,
+  isCreate,
+  group,
+  members,
+  slots,
+}: {
+  defaults: ReturnType<typeof getDefaultDateParts>;
+  isCreate: boolean;
+  group: AvailabilityGroupSource;
+  members: AvailabilityMembersSource;
+  slots: AvailabilitySlotsSource;
+}): AvailabilityEditorState {
+  if (isCreate || !group || !members || !slots) {
+    return {
+      name: "",
+      month: defaults.month,
+      year: defaults.year,
+      selectedEmployeeId: null,
+      selectedEmployeeIds: [],
+      cellMap: {},
+      cellErrors: {},
+      informationErrors: {},
+      employeeError: undefined,
+      editorError: undefined,
+    };
+  }
+
+  const selectedEmployeeIds = members.map(member => member.employeeId);
+  const hydratedCellMap = buildAvailabilityCellMap(members, slots);
+
+  return {
+    name: group.name,
+    month: group.month,
+    year: group.year,
+    selectedEmployeeId: selectedEmployeeIds[0] ?? null,
+    selectedEmployeeIds,
+    cellMap: sanitizeAvailabilityCellMap(hydratedCellMap, selectedEmployeeIds, group.year, group.month),
+    cellErrors: {},
+    informationErrors: {},
+    employeeError: undefined,
+    editorError: undefined,
+  };
+}
+
+function buildAvailabilityEditorSourceKey({
+  defaults,
+  isCreate,
+  groupId,
+  group,
+  members,
+  slots,
+}: {
+  defaults: ReturnType<typeof getDefaultDateParts>;
+  isCreate: boolean;
+  groupId: number | null;
+  group: AvailabilityGroupSource;
+  members: AvailabilityMembersSource;
+  slots: AvailabilitySlotsSource;
+}) {
+  if (isCreate) {
+    return `create:${defaults.month}:${defaults.year}`;
+  }
+
+  if (!groupId || !group || !members || !slots) {
+    return `loading:${groupId ?? "new"}`;
+  }
+
+  const memberKey = members.map(member => `${member.id}:${member.employeeId}:${member.displayOrder}`).join("|");
+  const slotKey = slots
+    .map(slot => `${slot.id}:${slot.availabilityGroupMemberId}:${slot.dayOfMonth}:${slot.kind}:${slot.intervalStr ?? ""}`)
+    .join("|");
+
+  return `group:${groupId}:${group.name}:${group.month}:${group.year}:${memberKey}:${slotKey}`;
+}
+
+function CompactSizeHeaderToggle({ checked, onToggle }: CompactSizeHeaderToggleProps) {
+  return (
+    <button
+      type="button"
+      className={joinClassNames(styles.compactToggle, checked && styles.compactToggleActive)}
+      aria-pressed={checked}
+      onClick={onToggle}
+    >
+      <span className={styles.compactToggleTitle}>Compact Size</span>
+
+      <span className={styles.compactToggleTrack} aria-hidden="true">
+        <span className={styles.compactToggleThumb} />
+      </span>
+    </button>
+  );
+}
+
 export function AvailabilityEditPage() {
+  const location = useLocation();
   const navigate = useNavigate();
   const { availabilityId } = useParams<{ availabilityId: string }>();
   const parsedId = availabilityId ? Number(availabilityId) : null;
@@ -127,125 +265,70 @@ export function AvailabilityEditPage() {
   const groupQuery = useAvailabilityGroupByIdQuery(groupId);
   const membersQuery = useAvailabilityGroupMembersQuery(groupId);
   const slotsQuery = useAvailabilityGroupSlotsQuery(groupId);
-  const employeesQuery = useEmployeesListQuery();
+  const employeesQuery = useEmployeesListQuery({ refreshKey: location.key });
   const bindsQuery = useAvailabilityBindsListQuery();
   const saveMutation = useSaveAvailabilityGroupGraphMutation();
   const createBindMutation = useCreateAvailabilityBindMutation();
   const updateBindMutation = useUpdateAvailabilityBindMutation();
   const deleteBindMutation = useDeleteAvailabilityBindMutation();
 
-  const [name, setName] = useState("");
-  const [month, setMonth] = useState(defaults.month);
-  const [year, setYear] = useState(defaults.year);
-  const [employeeSearchText, setEmployeeSearchText] = useState("");
-  const [selectedEmployeeId, setSelectedEmployeeId] = useState<number | null>(null);
-  const [selectedEmployeeIds, setSelectedEmployeeIds] = useState<number[]>([]);
-  const [cellMap, setCellMap] = useState<AvailabilityMatrixCellMap>({});
-  const [cellErrors, setCellErrors] = useState<Record<string, string>>({});
-  const [informationErrors, setInformationErrors] = useState<AvailabilityEditorInformationErrors>({});
-  const [employeeError, setEmployeeError] = useState<string | undefined>();
-  const [editorError, setEditorError] = useState<string | undefined>();
+  const editorSourceKey = useMemo(
+    () => buildAvailabilityEditorSourceKey({
+      defaults,
+      isCreate,
+      groupId,
+      group: groupQuery.data,
+      members: membersQuery.data,
+      slots: slotsQuery.data,
+    }),
+    [defaults, groupId, groupQuery.data, isCreate, membersQuery.data, slotsQuery.data],
+  );
+  const initialEditorState = useMemo(
+    () => createAvailabilityEditorState({
+      defaults,
+      isCreate,
+      group: groupQuery.data,
+      members: membersQuery.data,
+      slots: slotsQuery.data,
+    }),
+    [defaults, groupQuery.data, isCreate, membersQuery.data, slotsQuery.data],
+  );
+  const {
+    value: editorState,
+    setValue: setEditorState,
+  } = useSyncedDraft(editorSourceKey, initialEditorState);
+  const {
+    name,
+    month,
+    year,
+    selectedEmployeeId,
+    selectedEmployeeIds,
+    cellMap,
+    cellErrors,
+    informationErrors,
+    employeeError,
+    editorError,
+  } = editorState;
   const [bindError, setBindError] = useState<string | undefined>();
-  const [hydratedKey, setHydratedKey] = useState<string | null>(null);
-  const [bindRows, setBindRows] = useState<EditableAvailabilityBind[]>([]);
+  const remoteBindRows = useMemo(
+    () => (bindsQuery.data ?? []).map(toEditableAvailabilityBind),
+    [bindsQuery.data],
+  );
+  const [localBindRows, setLocalBindRows] = useState<EditableAvailabilityBind[] | null>(null);
+  const bindRows = localBindRows ?? remoteBindRows;
   const [selectedBindClientId, setSelectedBindClientId] = useState<string | null>(null);
-  const [hasLocalBindChanges, setHasLocalBindChanges] = useState(false);
   const [bindDeleteTarget, setBindDeleteTarget] = useState<EditableAvailabilityBind | null>(null);
+  const [isHeaderCollapsed, setIsHeaderCollapsed] = useState(false);
+  const [isCompactMatrix, setIsCompactMatrix] = useState(false);
 
-  const employees = employeesQuery.data ?? [];
+  const employees = useMemo(() => employeesQuery.data ?? [], [employeesQuery.data]);
   const employeeNameById = useMemo(() => {
     return new Map(employees.map(employee => [employee.id, getEmployeeFullName(employee)]));
   }, [employees]);
-
-  useEffect(() => {
-    if (isCreate) {
-      if (hydratedKey === "create") {
-        return;
-      }
-
-      setName("");
-      setMonth(defaults.month);
-      setYear(defaults.year);
-      setEmployeeSearchText("");
-      setSelectedEmployeeId(null);
-      setSelectedEmployeeIds([]);
-      setCellMap({});
-      setCellErrors({});
-      setInformationErrors({});
-      setEmployeeError(undefined);
-      setEditorError(undefined);
-      setHydratedKey("create");
-      return;
-    }
-
-    if (!groupId || !groupQuery.data || !membersQuery.data || !slotsQuery.data) {
-      return;
-    }
-
-    const nextHydratedKey = `${groupId}`;
-    if (hydratedKey === nextHydratedKey) {
-      return;
-    }
-
-    const nextSelectedEmployeeIds = membersQuery.data.map(member => member.employeeId);
-
-    setName(groupQuery.data.name);
-    setMonth(groupQuery.data.month);
-    setYear(groupQuery.data.year);
-    setEmployeeSearchText("");
-    setSelectedEmployeeId(nextSelectedEmployeeIds[0] ?? null);
-    setSelectedEmployeeIds(nextSelectedEmployeeIds);
-    setCellMap(buildAvailabilityCellMap(membersQuery.data, slotsQuery.data));
-    setCellErrors({});
-    setInformationErrors({});
-    setEmployeeError(undefined);
-    setEditorError(undefined);
-    setHydratedKey(nextHydratedKey);
-  }, [
-    defaults.month,
-    defaults.year,
-    groupId,
-    groupQuery.data,
-    hydratedKey,
-    isCreate,
-    membersQuery.data,
-    slotsQuery.data,
-  ]);
-
-  useEffect(() => {
-    if (!bindsQuery.data || hasLocalBindChanges) {
-      return;
-    }
-
-    const nextBindRows = bindsQuery.data.map(toEditableAvailabilityBind);
-    setBindRows(nextBindRows);
-    setSelectedBindClientId(currentSelection => {
-      if (currentSelection && nextBindRows.some(bind => bind.clientId === currentSelection)) {
-        return currentSelection;
-      }
-
-      return nextBindRows[0]?.clientId ?? null;
-    });
-  }, [bindsQuery.data, hasLocalBindChanges]);
-
-  useEffect(() => {
-    setCellMap(currentCellMap => sanitizeAvailabilityCellMap(currentCellMap, selectedEmployeeIds, year, month));
-    setCellErrors(currentErrors => sanitizeAvailabilityCellMap(currentErrors, selectedEmployeeIds, year, month));
-  }, [month, selectedEmployeeIds, year]);
-
-  const filteredEmployees = useMemo(() => {
-    const baseEmployees = filterAvailabilityEmployees(employees, employeeSearchText);
-    if (!selectedEmployeeId || baseEmployees.some(employee => employee.id === selectedEmployeeId)) {
-      return baseEmployees;
-    }
-
-    const selectedEmployee = employees.find(employee => employee.id === selectedEmployeeId);
-    if (!selectedEmployee) {
-      return baseEmployees;
-    }
-
-    return [selectedEmployee, ...baseEmployees];
-  }, [employeeSearchText, employees, selectedEmployeeId]);
+  const resolvedSelectedBindClientId =
+    selectedBindClientId && bindRows.some(bind => bind.clientId === selectedBindClientId)
+      ? selectedBindClientId
+      : bindRows[0]?.clientId ?? null;
 
   const existingMemberByEmployeeId = useMemo(() => {
     return new Map((membersQuery.data ?? []).map(member => [member.employeeId, member]));
@@ -269,8 +352,8 @@ export function AvailabilityEditPage() {
   }, [columns]);
 
   const selectedBindRow = useMemo(
-    () => bindRows.find(bind => bind.clientId === selectedBindClientId) ?? null,
-    [bindRows, selectedBindClientId],
+    () => bindRows.find(bind => bind.clientId === resolvedSelectedBindClientId) ?? null,
+    [bindRows, resolvedSelectedBindClientId],
   );
 
   const activeBindValueByKey = useMemo(() => buildActiveAvailabilityBindMap(bindRows), [bindRows]);
@@ -288,13 +371,14 @@ export function AvailabilityEditPage() {
     (!Number.isFinite(parsedId) || (!isLoading && (hasGroupLoadError || hasMembersLoadError || hasSlotsLoadError)));
 
   const updateBindRows = (nextRows: EditableAvailabilityBind[]) => {
-    setHasLocalBindChanges(true);
-    setBindRows(nextRows);
+    setLocalBindRows(nextRows);
   };
 
   const replaceBindRow = (clientId: string, updater: (row: EditableAvailabilityBind) => EditableAvailabilityBind) => {
-    setHasLocalBindChanges(true);
-    setBindRows(currentRows => currentRows.map(row => (row.clientId === clientId ? updater(row) : row)));
+    setLocalBindRows(currentRows => {
+      const baseRows = currentRows ?? bindRows;
+      return baseRows.map(row => (row.clientId === clientId ? updater(row) : row));
+    });
   };
 
   const removeBindRowLocally = (clientId: string) => {
@@ -303,7 +387,7 @@ export function AvailabilityEditPage() {
 
     updateBindRows(nextRows);
 
-    if (selectedBindClientId !== clientId) {
+    if (resolvedSelectedBindClientId !== clientId) {
       return;
     }
 
@@ -311,75 +395,106 @@ export function AvailabilityEditPage() {
     setSelectedBindClientId(nextSelectedBind?.clientId ?? null);
   };
 
-  const clearInformationError = (field: keyof AvailabilityEditorInformationErrors) => {
-    setInformationErrors(currentErrors => {
-      if (!currentErrors[field]) {
-        return currentErrors;
+  const handleAddEmployee = () => {
+    setEditorState((current) => {
+      if (!current.selectedEmployeeId) {
+        return {
+          ...current,
+          employeeError: undefined,
+          editorError: "Select employee first.",
+        };
       }
 
-      const nextErrors = { ...currentErrors };
-      delete nextErrors[field];
-      return nextErrors;
+      if (current.selectedEmployeeIds.includes(current.selectedEmployeeId)) {
+        return {
+          ...current,
+          employeeError: undefined,
+          editorError: "This employee is already added.",
+        };
+      }
+
+      const nextSelectedEmployeeIds = [...current.selectedEmployeeIds, current.selectedEmployeeId];
+
+      return {
+        ...current,
+        selectedEmployeeIds: nextSelectedEmployeeIds,
+        employeeError: undefined,
+        editorError: undefined,
+        ...sanitizeAvailabilityEditorMatrices(
+          current.cellMap,
+          current.cellErrors,
+          nextSelectedEmployeeIds,
+          current.year,
+          current.month,
+        ),
+      };
     });
   };
 
-  const handleAddEmployee = () => {
-    setEditorError(undefined);
-    setEmployeeError(undefined);
-
-    if (!selectedEmployeeId) {
-      setEditorError("Select employee first.");
-      return;
-    }
-
-    if (selectedEmployeeIds.includes(selectedEmployeeId)) {
-      setEditorError("This employee is already added.");
-      return;
-    }
-
-    setSelectedEmployeeIds(currentIds => [...currentIds, selectedEmployeeId]);
-  };
-
   const handleRemoveEmployee = () => {
-    setEditorError(undefined);
-    setEmployeeError(undefined);
+    setEditorState((current) => {
+      if (!current.selectedEmployeeId) {
+        return {
+          ...current,
+          employeeError: undefined,
+          editorError: "Select employee first.",
+        };
+      }
 
-    if (!selectedEmployeeId) {
-      setEditorError("Select employee first.");
-      return;
-    }
+      if (!current.selectedEmployeeIds.includes(current.selectedEmployeeId)) {
+        return {
+          ...current,
+          employeeError: undefined,
+          editorError: "This employee is not in the group.",
+        };
+      }
 
-    if (!selectedEmployeeIds.includes(selectedEmployeeId)) {
-      setEditorError("This employee is not in the group.");
-      return;
-    }
+      const nextSelectedEmployeeIds = current.selectedEmployeeIds.filter(
+        employeeId => employeeId !== current.selectedEmployeeId,
+      );
 
-    setSelectedEmployeeIds(currentIds => currentIds.filter(employeeId => employeeId !== selectedEmployeeId));
-    setSelectedEmployeeId(null);
+      return {
+        ...current,
+        selectedEmployeeId: null,
+        selectedEmployeeIds: nextSelectedEmployeeIds,
+        employeeError: undefined,
+        editorError: undefined,
+        ...sanitizeAvailabilityEditorMatrices(
+          current.cellMap,
+          current.cellErrors,
+          nextSelectedEmployeeIds,
+          current.year,
+          current.month,
+        ),
+      };
+    });
   };
 
   const handleCellChange = (employeeId: number, dayOfMonth: number, value: string) => {
     const cellKey = getAvailabilityCellKey(employeeId, dayOfMonth);
 
-    setCellMap(currentCellMap => ({
-      ...currentCellMap,
-      [cellKey]: value,
-    }));
+    setEditorState((current) => {
+      const nextErrors = current.cellErrors[cellKey]
+        ? Object.fromEntries(Object.entries(current.cellErrors).filter(([key]) => key !== cellKey))
+        : current.cellErrors;
 
-    setCellErrors(currentErrors => {
-      if (!currentErrors[cellKey]) {
-        return currentErrors;
-      }
-
-      const nextErrors = { ...currentErrors };
-      delete nextErrors[cellKey];
-      return nextErrors;
+      return {
+        ...current,
+        cellMap: {
+          ...current.cellMap,
+          [cellKey]: value,
+        },
+        cellErrors: nextErrors,
+      };
     });
   };
 
   const handleColumnMove = (sourceEmployeeId: number, targetEmployeeId: number) => {
-    setSelectedEmployeeIds(currentEmployeeIds => reorderEmployeeIds(currentEmployeeIds, sourceEmployeeId, targetEmployeeId));
-    setEditorError(undefined);
+    setEditorState((current) => ({
+      ...current,
+      selectedEmployeeIds: reorderEmployeeIds(current.selectedEmployeeIds, sourceEmployeeId, targetEmployeeId),
+      editorError: undefined,
+    }));
   };
 
   const handleBindFieldChange = (clientId: string, patch: Partial<Pick<EditableAvailabilityBind, "key" | "value" | "isActive">>) => {
@@ -443,9 +558,11 @@ export function AvailabilityEditPage() {
     if (bind.id === null) {
       void runMutation(createBindMutation.mutate, payload)
         .then(createdBind => {
-          setHasLocalBindChanges(true);
           const nextBind = toEditableAvailabilityBind(createdBind);
-          setBindRows(currentRows => currentRows.map(row => (row.clientId === clientId ? nextBind : row)));
+          setLocalBindRows(currentRows => {
+            const baseRows = currentRows ?? bindRows;
+            return baseRows.map(row => (row.clientId === clientId ? nextBind : row));
+          });
           setSelectedBindClientId(currentSelection => (currentSelection === clientId ? nextBind.clientId : currentSelection));
         })
         .catch(error => {
@@ -536,16 +653,25 @@ export function AvailabilityEditPage() {
       }
     });
 
-    setInformationErrors(nextInformationErrors);
-    setEmployeeError(nextEmployeeError);
-    setCellErrors(nextCellErrors);
+    setEditorState((current) => ({
+      ...current,
+      informationErrors: nextInformationErrors,
+      employeeError: nextEmployeeError,
+      cellErrors: nextCellErrors,
+    }));
 
     if (Object.keys(nextInformationErrors).length > 0 || nextEmployeeError || Object.keys(nextCellErrors).length > 0) {
-      setEditorError("Check highlighted fields before saving.");
+      setEditorState((current) => ({
+        ...current,
+        editorError: "Check highlighted fields before saving.",
+      }));
       return;
     }
 
-    setEditorError(undefined);
+    setEditorState((current) => ({
+      ...current,
+      editorError: undefined,
+    }));
 
     saveMutation.mutate(
       {
@@ -565,7 +691,10 @@ export function AvailabilityEditPage() {
           navigate(`/availability/${result.id}`);
         },
         onError: error => {
-          setEditorError(toErrorMessage(error));
+          setEditorState((current) => ({
+            ...current,
+            editorError: toErrorMessage(error),
+          }));
         },
       }
     );
@@ -577,23 +706,31 @@ export function AvailabilityEditPage() {
         title={isCreate ? "Add Availability" : "Availability Edit"}
         subtitle={isCreate ? "Create a new monthly availability schedule" : "Update availability information, employees and day codes"}
         backTo={backTo}
+        onCollapseChange={setIsHeaderCollapsed}
+        rightSlot={(
+          <CompactSizeHeaderToggle
+            checked={isCompactMatrix}
+            onToggle={() => setIsCompactMatrix(current => !current)}
+          />
+        )}
       />
 
       <AvailabilityGroupEditor
         name={name}
         month={month}
         year={year}
+        isHeaderCollapsed={isHeaderCollapsed}
+        compactSize={isCompactMatrix}
         informationErrors={informationErrors}
         employeeError={employeeError}
-        employees={filteredEmployees}
-        employeeSearchText={employeeSearchText}
+        employees={employees}
         selectedEmployeeId={selectedEmployeeId}
         assignedEmployees={assignedEmployees}
         columns={columns}
         cellMap={cellMap}
         cellErrors={cellErrors}
         binds={bindRows}
-        selectedBindClientId={selectedBindClientId}
+        selectedBindClientId={resolvedSelectedBindClientId}
         bindValueByKey={activeBindValueByKey}
         isLoading={isLoading}
         hasLoadError={hasLoadError}
@@ -603,24 +740,68 @@ export function AvailabilityEditPage() {
         errorMessage={editorError}
         bindErrorMessage={bindError ?? (bindsQuery.isError && bindRows.length === 0 ? "Could not load bind information." : undefined)}
         onNameChange={value => {
-          setName(value);
-          clearInformationError("name");
-          setEditorError(undefined);
+          setEditorState((current) => {
+            const nextInformationErrors = { ...current.informationErrors };
+            delete nextInformationErrors.name;
+
+            return {
+              ...current,
+              name: value,
+              informationErrors: nextInformationErrors,
+              editorError: undefined,
+            };
+          });
         }}
         onMonthChange={value => {
-          setMonth(clampAvailabilityMonth(value));
-          clearInformationError("month");
-          setEditorError(undefined);
+          const nextMonth = clampAvailabilityMonth(value);
+
+          setEditorState((current) => {
+            const nextInformationErrors = { ...current.informationErrors };
+            delete nextInformationErrors.month;
+
+            return {
+              ...current,
+              month: nextMonth,
+              informationErrors: nextInformationErrors,
+              editorError: undefined,
+              ...sanitizeAvailabilityEditorMatrices(
+                current.cellMap,
+                current.cellErrors,
+                current.selectedEmployeeIds,
+                current.year,
+                nextMonth,
+              ),
+            };
+          });
         }}
         onYearChange={value => {
-          setYear(clampAvailabilityYear(value));
-          clearInformationError("year");
-          setEditorError(undefined);
+          const nextYear = clampAvailabilityYear(value);
+
+          setEditorState((current) => {
+            const nextInformationErrors = { ...current.informationErrors };
+            delete nextInformationErrors.year;
+
+            return {
+              ...current,
+              year: nextYear,
+              informationErrors: nextInformationErrors,
+              editorError: undefined,
+              ...sanitizeAvailabilityEditorMatrices(
+                current.cellMap,
+                current.cellErrors,
+                current.selectedEmployeeIds,
+                nextYear,
+                current.month,
+              ),
+            };
+          });
         }}
-        onEmployeeSearchTextChange={setEmployeeSearchText}
         onSelectedEmployeeIdChange={value => {
-          setSelectedEmployeeId(value);
-          setEditorError(undefined);
+          setEditorState((current) => ({
+            ...current,
+            selectedEmployeeId: value,
+            editorError: undefined,
+          }));
         }}
         onSelectedBindChange={clientId => {
           setSelectedBindClientId(clientId);

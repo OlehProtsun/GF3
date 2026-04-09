@@ -1,0 +1,428 @@
+.page {
+  --home-ink: #172033;
+  --home-muted: rgba(23, 32, 51, 0.62);
+  --home-surface: rgba(255, 255, 255, 0.92);
+  --home-border: rgba(148, 163, 184, 0.18);
+  --home-shadow: 0 22px 52px rgba(15, 23, 42, 0.08);
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 12px;
+  padding: 0 clamp(8px, 0.9vw, 14px) 24px;
+  width: 100%;
+  min-height: 0;
+  max-width: none;
+  background: var(--app-page-background, #f3f4f6);
+  overflow: visible;
+  box-sizing: border-box;
+}
+
+.banner {
+  margin: 0;
+}
+
+.clockPanel {
+  min-width: 156px;
+  padding: 8px 10px;
+  border-radius: 16px;
+  border: 1px solid rgba(191, 219, 254, 0.88);
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.96), rgba(239, 246, 255, 0.94));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72);
+  display: grid;
+  gap: 0;
+}
+
+.clockLabel {
+  font-size: 0.71rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(37, 99, 235, 0.78);
+}
+
+.clockValue {
+  color: var(--home-ink);
+  font-size: 0.92rem;
+  font-weight: 800;
+}
+
+.todayCard,
+.activeSchedulesCard {
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding-bottom: 18px;
+  border-radius: 30px;
+  box-shadow: var(--home-shadow);
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.monthCard,
+.overallCard {
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding-bottom: 18px;
+  border-radius: 30px;
+  box-shadow: var(--home-shadow);
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.todayCard {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+.todayCard > :last-child {
+  min-height: 0;
+}
+
+.topGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(340px, 0.85fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.sideColumn {
+  display: grid;
+  gap: 16px;
+  align-content: start;
+}
+
+.sectionBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.14);
+  color: rgba(15, 23, 42, 0.68);
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.stateBlock {
+  min-height: 160px;
+  border-radius: 24px;
+  border: 1px dashed rgba(148, 163, 184, 0.32);
+  background: rgba(248, 250, 252, 0.86);
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  text-align: center;
+  color: var(--home-muted);
+}
+
+.tableShell {
+  border-radius: 24px;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  background: rgba(248, 250, 252, 0.76);
+  min-height: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  overflow: hidden;
+}
+
+.tableScroll {
+  width: 100%;
+  max-width: 100%;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  background: #ffffff;
+  scrollbar-width: thin;
+  scrollbar-color: #d6dbe3 transparent;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-gutter: stable both-edges;
+  will-change: scroll-position;
+  touch-action: pan-x pan-y;
+}
+
+.tableScroll::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.tableScroll::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background: #d6dbe3;
+  background-clip: padding-box;
+}
+
+.todayTable {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.todayTable th,
+.todayTable td {
+  padding: 14px 16px;
+  text-align: left;
+  border-bottom: 1px solid rgba(226, 232, 240, 0.92);
+}
+
+.todayTable th {
+  background: rgba(241, 245, 249, 0.92);
+  color: rgba(15, 23, 42, 0.72);
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.todayTable td {
+  color: var(--home-ink);
+  font-size: 0.95rem;
+}
+
+.clickableRow {
+  cursor: pointer;
+  transition: background 120ms ease, transform 120ms ease;
+}
+
+.clickableRow:hover {
+  background: rgba(219, 234, 254, 0.36);
+}
+
+.clickableRow:last-child td {
+  border-bottom: none;
+}
+
+.monthContent {
+  display: grid;
+  gap: 9px;
+}
+
+.summaryHeader {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  padding: 0;
+}
+
+.summaryCard {
+  padding: 9px 11px;
+  border-radius: 18px;
+  border: 1px solid rgba(226, 232, 240, 0.86);
+  background: rgba(248, 250, 252, 0.82);
+}
+
+.summaryLabel,
+.totalLabel {
+  display: block;
+  color: var(--home-muted);
+  font-size: 0.66rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.summaryValue {
+  margin-top: 3px;
+  display: block;
+  color: var(--home-ink);
+  font-size: 0.84rem;
+  font-weight: 800;
+}
+
+.totalGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.totalCard,
+.overallMetric {
+  border-radius: 18px;
+  border: 1px solid rgba(226, 232, 240, 0.86);
+  background: rgba(248, 250, 252, 0.82);
+}
+
+.totalCard {
+  padding: 9px 11px;
+}
+
+.overallMetric {
+  padding: 11px 13px;
+}
+
+.totalValue,
+.overallValue {
+  display: block;
+  color: var(--home-ink);
+  font-weight: 800;
+}
+
+.totalValue {
+  margin-top: 4px;
+  font-size: 1rem;
+}
+
+.pillSection {
+  display: grid;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 18px;
+  border: 1px solid rgba(226, 232, 240, 0.86);
+  background: rgba(255, 255, 255, 0.76);
+}
+
+.pillSectionTitle {
+  margin: 0;
+  color: var(--home-ink);
+  font-size: 0.86rem;
+  font-weight: 800;
+}
+
+.pillWrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.pill {
+  max-width: 100%;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(241, 245, 249, 0.95);
+  color: rgba(30, 41, 59, 0.88);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.emptyInline {
+  color: var(--home-muted);
+  font-size: 0.8rem;
+}
+
+.overallGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.overallMetric .totalLabel {
+  font-size: 0.76rem;
+  letter-spacing: 0.08em;
+}
+
+.overallValue {
+  margin-top: 8px;
+  font-size: 1.35rem;
+}
+
+.activeSchedulesCard {
+  margin: 0;
+}
+
+.scheduleGrid {
+  display: grid;
+  gap: 22px;
+}
+
+.scheduleCard {
+  display: grid;
+  gap: 10px;
+  padding: 0;
+  border: none;
+  background: transparent;
+}
+
+.scheduleMatrix {
+  --matrix-day-column-width: 58px;
+  --matrix-cell-min-width: 138px;
+  --matrix-card-padding-bottom: 0px;
+  --matrix-layout-padding-bottom: 0px;
+}
+
+.matrixHeaderActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.matrixBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(226, 232, 240, 0.9);
+  color: rgba(15, 23, 42, 0.72);
+  font-size: 0.76rem;
+  font-weight: 800;
+}
+
+.matrixIconButton {
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  background: rgba(255, 255, 255, 0.92);
+  color: rgba(15, 23, 42, 0.82);
+  cursor: pointer;
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.08);
+  transition: background 120ms ease, border-color 120ms ease, transform 120ms ease, box-shadow 120ms ease;
+}
+
+.matrixIconButton:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.98);
+  border-color: rgba(100, 116, 139, 0.42);
+}
+
+.matrixIconButton:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.matrixIconButton:focus-visible {
+  outline: none;
+  box-shadow:
+    0 0 0 4px rgba(37, 99, 235, 0.14),
+    0 8px 18px rgba(15, 23, 42, 0.1);
+}
+
+.matrixIconButton:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+@media (max-width: 1240px) {
+  .topGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .overallGrid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 900px) {
+  .clockPanel {
+    min-width: 0;
+  }
+
+  .summaryHeader,
+  .totalGrid,
+  .overallGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 720px) {
+  .todayTable {
+    min-width: 620px;
+  }
+}

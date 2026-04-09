@@ -19,16 +19,19 @@
   min-width: 0;
   min-height: 0;
   overflow-y: auto;
-  overflow-x: hidden;
+  overflow-x: clip;
+  overflow-clip-margin: 18px;
   direction: rtl;
-  padding: 2px 10px 0 6px;
+  margin-top: calc(-1 * var(--availability-edit-header-underlap, 0px));
+  padding: calc(2px + var(--availability-edit-header-underlap, 0px)) 8px 0 6px;
   scrollbar-width: none;
   -ms-overflow-style: none;
 }
 
 .sidebarColumnAllCollapsed {
   flex-basis: 46px;
-  padding: 8px 0 0 0;
+  margin-top: calc(-1 * var(--availability-edit-header-underlap, 0px));
+  padding: calc(8px + var(--availability-edit-header-underlap, 0px)) 0 0 0;
   overflow: clip;
   overflow-clip-margin: 12px;
 }
@@ -44,28 +47,20 @@
   gap: 22px;
   align-content: start;
   direction: ltr;
-  padding: 0;
+  padding: 2px 6px 0;
 }
 
 .sidebarAllCollapsed {
   gap: 18px;
+  padding: 6px 0 0;
 }
 
 .sidebar > * {
-  width: auto;
-  margin: 2px 6px 0 6px;
+  width: 100%;
 }
 
 .sidebarAllCollapsed > * {
-  margin: 6px 0 0 0;
-}
-
-.sidebar > *:last-child {
-  margin-bottom: 0;
-}
-
-.sidebarAllCollapsed > *:last-child {
-  margin-bottom: 0;
+  width: auto;
 }
 
 .sectionShell {
@@ -194,12 +189,23 @@
   display: flex;
   flex-direction: column;
   gap: 18px;
-  overflow-y: visible;
+  overflow-y: auto;
   overflow-x: clip;
+  overflow-clip-margin: 28px;
+  margin-top: calc(-1 * var(--availability-edit-header-underlap, 0px));
+  padding: calc(2px + var(--availability-edit-header-underlap, 0px)) 6px 0 2px;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
 }
 
 .mainColumnAllCollapsed {
   flex-basis: 0;
+}
+
+.mainColumn::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
 }
 
 .mainColumnAllCollapsed .mainBlock > * {
@@ -207,12 +213,13 @@
 }
 
 .mainBlock {
+  direction: ltr;
   min-width: 0;
   min-height: 0;
   flex: 1 1 0;
   display: flex;
   flex-direction: column;
-  padding: 0 8px 12px 0;
+  padding: 0 8px 12px 2px;
   overflow: visible;
   background: transparent;
   border: none;
@@ -221,17 +228,54 @@
 
 .mainBlock > * {
   width: auto;
-  margin: 2px 0 0 4px;
+  margin: 2px 6px 0 0;
 }
 
-.scheduleCard {
+.matrixCardShell {
+  width: 100%;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  padding: 0;
+  box-sizing: border-box;
+  overflow: visible;
+}
+
+.scheduleMatrixCardShell {
+  --schedule-matrix-shadow-gutter: 12px;
+  width: calc(100% + var(--schedule-matrix-shadow-gutter));
+  min-width: calc(100% + var(--schedule-matrix-shadow-gutter));
+  margin-left: calc(-1 * var(--schedule-matrix-shadow-gutter));
+  padding-left: var(--schedule-matrix-shadow-gutter);
+  position: relative;
+  z-index: 1;
+}
+
+.matrixCardShellCompact {
+  align-items: stretch;
+}
+
+.matrixCard {
   flex: 1 1 0;
   min-height: 0;
   height: auto;
   align-self: stretch;
+  max-width: none;
+  margin-inline: 0;
+  display: flex;
+  flex-direction: column;
   box-shadow:
-    0 6px 14px rgba(0, 0, 0, 0.06),
+    0 7px 17px rgba(0, 0, 0, 0.046),
     0 1px 0 rgba(255, 255, 255, 0.35) inset;
+  overflow: hidden;
+}
+
+.trimmedMatrixCard {
+  clip-path: inset(-28px -28px 0 0 round 32px);
+}
+
+.matrixCardCompact {
+  height: 100%;
 }
 
 .scheduleHeaderMessage {
@@ -242,10 +286,16 @@
   border: 1px solid rgba(255, 59, 48, 0.24);
   color: #b42318;
   font-size: 0.86rem;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+}
+
+.scheduleHeaderMessageText {
   font-weight: 800;
   line-height: 1.25;
   text-align: center;
-  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
 }
 
 .scheduleSaveButton {
@@ -296,12 +346,14 @@
     flex: none;
     overflow: visible;
     direction: ltr;
+    margin-top: 0;
     padding: 0;
     scrollbar-gutter: auto;
   }
 
   .sidebarColumnAllCollapsed {
     flex-basis: auto;
+    margin-top: 0;
     padding: 0;
   }
 
@@ -310,7 +362,6 @@
   .mainBlock > *,
   .mainColumnAllCollapsed .mainBlock > * {
     width: 100%;
-    margin: 0;
   }
 
   .sectionExpandButton,
@@ -343,7 +394,22 @@
     min-height: auto;
   }
 
-  .scheduleCard {
+  .mainColumn,
+  .mainColumnAllCollapsed {
+    margin-top: 0;
+    overflow: visible;
+    padding: 0;
+  }
+
+  .scheduleMatrixCardShell {
+    width: 100%;
+    min-width: 0;
+    margin-left: 0;
+    padding-left: 0;
+  }
+
+  .matrixCardShell,
+  .matrixCard {
     height: auto;
   }
 }

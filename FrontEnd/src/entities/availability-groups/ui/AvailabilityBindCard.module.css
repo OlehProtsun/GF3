@@ -33,15 +33,28 @@
   text-transform: uppercase;
 }
 
+.errorMessageWrap {
+  justify-content: stretch;
+}
+
 .errorMessage {
+  width: 100%;
+  max-width: none;
   padding: 12px 14px;
   border-radius: 18px;
   border: 1px solid rgba(239, 68, 68, 0.18);
   background: rgba(254, 242, 242, 0.88);
   color: #b91c1c;
+  box-shadow: none;
+}
+
+.errorMessageText {
   font-size: 0.88rem;
   font-weight: 700;
   line-height: 1.45;
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
 }
 
 .placeholderTable {

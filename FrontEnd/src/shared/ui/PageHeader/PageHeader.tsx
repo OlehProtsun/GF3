@@ -24,6 +24,7 @@ type PageHeaderProps = {
   variant?: "card" | "plain";
   fullBleed?: boolean;
   gutter?: number;
+  maxWidth?: string;
   className?: string;
   onCollapseChange?: (isCollapsed: boolean) => void;
 };
@@ -41,6 +42,7 @@ export function PageHeader({
   variant = "card",
   fullBleed = true,
   gutter = 14,
+  maxWidth = "1100px",
   className,
   onCollapseChange,
 }: PageHeaderProps) {
@@ -125,7 +127,10 @@ export function PageHeader({
 
       <div
         className={styles.headerRoot}
-        style={{ "--page-header-gutter": `${gutter}px` } as CSSProperties}
+        style={{
+          "--page-header-gutter": `${gutter}px`,
+          "--page-header-max-width": maxWidth,
+        } as CSSProperties}
       >
         <div className={styles.headerStack}>
           <header ref={headerRef} className={headerClassName} aria-hidden={isCollapsed}>

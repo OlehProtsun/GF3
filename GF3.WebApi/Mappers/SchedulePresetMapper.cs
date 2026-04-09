@@ -3,6 +3,9 @@ using WebApi.Contracts.Containers.SchedulePresets;
 
 namespace WebApi.Mappers;
 
+/// <summary>
+/// Maps schedule preset API contracts to the business-layer preset model and back.
+/// </summary>
 public static class SchedulePresetMapper
 {
     public static SchedulePresetDto ToSchedulePresetDto(this SchedulePresetModel model) => new()
@@ -22,14 +25,14 @@ public static class SchedulePresetMapper
         MaxConsecutiveFull = model.MaxConsecutiveFull,
         MaxFullPerMonth = model.MaxFullPerMonth,
         AvailabilityGroupId = model.AvailabilityGroupId,
-        Employees = model.Employees.Select(x => x.ToSchedulePresetEmployeeDto()).ToList()
+        Employees = model.Employees.Select(employee => employee.ToSchedulePresetEmployeeDto()).ToList(),
     };
 
     public static SchedulePresetEmployeeDto ToSchedulePresetEmployeeDto(this SchedulePresetEmployeeModel model) => new()
     {
         Id = model.Id,
         EmployeeId = model.EmployeeId,
-        MinHoursMonth = model.MinHoursMonth
+        MinHoursMonth = model.MinHoursMonth,
     };
 
     public static SchedulePresetModel ToCreateModel(this CreateSchedulePresetRequest request, int containerId) => new()
@@ -49,13 +52,13 @@ public static class SchedulePresetMapper
         MaxFullPerMonth = request.MaxFullPerMonth,
         AvailabilityGroupId = request.AvailabilityGroupId,
         Employees = request.Employees
-            .Select(x => x.ToCreateModel())
-            .ToList()
+            .Select(employee => employee.ToCreateModel())
+            .ToList(),
     };
 
     public static SchedulePresetEmployeeModel ToCreateModel(this CreateSchedulePresetEmployeeRequest request) => new()
     {
         EmployeeId = request.EmployeeId,
-        MinHoursMonth = request.MinHoursMonth
+        MinHoursMonth = request.MinHoursMonth,
     };
 }

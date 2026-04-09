@@ -1,18 +1,27 @@
 using System.ComponentModel.DataAnnotations;
 using System.Text.Json;
-using BusinessLogicLayer.Common;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using WebApi.Infrastructure;
+using BusinessLogicValidationException = BusinessLogicLayer.Common.ValidationException;
 
 namespace WebApi.Middleware;
 
+/// <summary>
+/// Last-chance exception translator for API requests.
+/// MVC filters already convert most expected exceptions, but this middleware still protects
+/// non-MVC paths and ensures every unhandled backend failure becomes a structured problem response.
+/// </summary>
 public sealed class ApiExceptionMiddleware
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     private readonly RequestDelegate _next;
+    private readonly ILogger<ApiExceptionMiddleware> _logger;
 
-    public ApiExceptionMiddleware(RequestDelegate next)
+    public ApiExceptionMiddleware(RequestDelegate next, ILogger<ApiExceptionMiddleware> logger)
     {
         _next = next;
+        _logger = logger;
     }
 
     public async Task InvokeAsync(HttpContext context)
@@ -21,82 +30,122 @@ public sealed class ApiExceptionMiddleware
         {
             await _next(context).ConfigureAwait(false);
         }
-        catch (OperationCanceledException) when (context.RequestAborted.IsCancellationRequested)
+        catch (OperationCanceledException ex) when (ApiProblemDetailsFactory.IsRequestCancellation(context, ex))
         {
-            if (!context.Response.HasStarted)
-            {
-                context.Response.StatusCode = 499;
-            }
+            HandleClientCancellation(context);
         }
-        catch (System.ComponentModel.DataAnnotations.ValidationException ex)
+        catch (ValidationException ex)
         {
-            await WriteValidationAsync(context, ex).ConfigureAwait(false);
+            await HandleValidationExceptionAsync(context, ex, ApiProblemDetailsFactory.BuildValidationErrors(ex)).ConfigureAwait(false);
         }
-        catch (BusinessLogicLayer.Common.ValidationException ex)
+        catch (BusinessLogicValidationException ex)
         {
-            await WriteValidationAsync(context, ex).ConfigureAwait(false);
+            await HandleValidationExceptionAsync(context, ex, ApiProblemDetailsFactory.BuildValidationErrors(ex)).ConfigureAwait(false);
         }
         catch (KeyNotFoundException ex)
         {
-            await WriteProblemAsync(context, StatusCodes.Status404NotFound, "Not Found", ex.Message, "not_found").ConfigureAwait(false);
+            await HandleNotFoundExceptionAsync(context, ex).ConfigureAwait(false);
         }
         catch (InvalidOperationException ex)
         {
-            await WriteProblemAsync(context, StatusCodes.Status404NotFound, "Not Found", ex.Message, "not_found").ConfigureAwait(false);
+            await HandleNotFoundExceptionAsync(context, ex).ConfigureAwait(false);
         }
-        catch (Exception)
+        catch (BadHttpRequestException ex)
         {
-            await WriteProblemAsync(context, StatusCodes.Status500InternalServerError, "Server Error", "An unexpected error occurred.", "server_error").ConfigureAwait(false);
+            _logger.LogWarning(ex, "Bad request for {Method} {Path}", context.Request.Method, context.Request.Path);
+            await WriteProblemAsync(
+                context,
+                ApiProblemDetailsFactory.CreateProblem(
+                    context,
+                    StatusCodes.Status400BadRequest,
+                    "Bad Request",
+                    ex.Message,
+                    "bad_request")).ConfigureAwait(false);
+        }
+        catch (DbUpdateConcurrencyException ex)
+        {
+            _logger.LogWarning(ex, "Database concurrency conflict for {Method} {Path}", context.Request.Method, context.Request.Path);
+            await WriteProblemAsync(
+                context,
+                CreateDatabaseConflictProblem(
+                    context,
+                    "The requested change could not be completed because the underlying data changed.")).ConfigureAwait(false);
+        }
+        catch (DbUpdateException ex)
+        {
+            _logger.LogWarning(ex, "Database update conflict for {Method} {Path}", context.Request.Method, context.Request.Path);
+            await WriteProblemAsync(
+                context,
+                CreateDatabaseConflictProblem(
+                    context,
+                    "The requested change could not be completed because related data still exists or the database rejected the operation.")).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unhandled API error for {Method} {Path}", context.Request.Method, context.Request.Path);
+            await WriteProblemAsync(
+                context,
+                ApiProblemDetailsFactory.CreateProblem(
+                    context,
+                    StatusCodes.Status500InternalServerError,
+                    "Server Error",
+                    "An unexpected error occurred.",
+                    "server_error")).ConfigureAwait(false);
         }
     }
 
-    private static Task WriteValidationAsync(HttpContext context, Exception ex)
+    private void HandleClientCancellation(HttpContext context)
     {
-        var errors = BuildValidationErrors(ex);
-
-        var payload = new
+        if (!context.Response.HasStarted && context.RequestAborted.IsCancellationRequested)
         {
-            type = "validation_error",
-            title = "Validation failed",
-            status = StatusCodes.Status400BadRequest,
-            errors
-        };
-
-        context.Response.StatusCode = StatusCodes.Status400BadRequest;
-        context.Response.ContentType = "application/json";
-        return context.Response.WriteAsync(JsonSerializer.Serialize(payload, JsonOptions));
+            context.Response.StatusCode = 499;
+        }
     }
 
-    private static async Task WriteProblemAsync(HttpContext context, int statusCode, string title, string detail, string type)
+    private async Task HandleValidationExceptionAsync(
+        HttpContext context,
+        Exception exception,
+        IReadOnlyDictionary<string, string[]> errors)
     {
-        context.Response.StatusCode = statusCode;
+        _logger.LogWarning(exception, "Validation error for {Method} {Path}", context.Request.Method, context.Request.Path);
+        await WriteProblemAsync(
+            context,
+            ApiProblemDetailsFactory.CreateValidationProblem(
+                context,
+                errors,
+                exception.Message)).ConfigureAwait(false);
+    }
+
+    private async Task HandleNotFoundExceptionAsync(HttpContext context, Exception exception)
+    {
+        _logger.LogInformation(exception, "Resource not found for {Method} {Path}", context.Request.Method, context.Request.Path);
+        await WriteProblemAsync(
+            context,
+            ApiProblemDetailsFactory.CreateProblem(
+                context,
+                StatusCodes.Status404NotFound,
+                "Not Found",
+                exception.Message,
+                "not_found")).ConfigureAwait(false);
+    }
+
+    private static ProblemDetails CreateDatabaseConflictProblem(HttpContext context, string detail)
+        => ApiProblemDetailsFactory.CreateProblem(
+            context,
+            StatusCodes.Status409Conflict,
+            "Conflict",
+            detail,
+            "database_conflict");
+
+    private static Task WriteProblemAsync(HttpContext context, ProblemDetails problem)
+    {
+        if (context.RequestAborted.IsCancellationRequested || context.Response.HasStarted)
+        {
+            return Task.CompletedTask;
+        }
+
+        context.Response.StatusCode = problem.Status ?? StatusCodes.Status500InternalServerError;
         context.Response.ContentType = "application/problem+json";
-
-        var problem = new ProblemDetails
-        {
-            Type = type,
-            Title = title,
-            Status = statusCode,
-            Detail = detail,
-            Instance = context.Request.Path
-        };
-
-        await context.Response.WriteAsync(JsonSerializer.Serialize(problem, JsonOptions)).ConfigureAwait(false);
-    }
-
-    private static object BuildValidationErrors(Exception ex)
-    {
-        if (ex is System.ComponentModel.DataAnnotations.ValidationException dataAnnotationsEx && dataAnnotationsEx.ValidationResult is { } result)
-        {
-            var members = result.MemberNames?.ToArray() ?? [];
-            if (members.Length == 0)
-            {
-                return new[] { result.ErrorMessage ?? ex.Message };
-            }
-
-            return members.ToDictionary(x => x, _ => new[] { result.ErrorMessage ?? ex.Message });
-        }
-
-        return new[] { ex.Message };
+        return context.Response.WriteAsync(JsonSerializer.Serialize(problem, JsonOptions));
     }
 }

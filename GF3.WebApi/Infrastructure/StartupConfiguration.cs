@@ -1,0 +1,72 @@
+using Microsoft.AspNetCore.Http;
+using WebApi.Options;
+
+namespace WebApi.Infrastructure;
+
+/// <summary>
+/// Small, testable startup decisions extracted from Program.cs.
+/// This keeps environment-sensitive configuration readable and lets tests verify the behavior
+/// without having to boot the full web host pipeline every time.
+/// </summary>
+public static class StartupConfiguration
+{
+    private const string AdminEnabledVariable = "GF3_ADMIN_ENABLED";
+    private const string AdminAllowWriteVariable = "GF3_ADMIN_ALLOW_WRITE";
+    private const string ApplicationDataFolderName = "GF3";
+    private const string DatabaseFileName = "SQLite.db";
+
+    public static void ApplyAdminToolsEnvironmentOverrides(
+        AdminToolsOptions options,
+        Func<string, string?>? readEnvironmentVariable = null)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+
+        readEnvironmentVariable ??= Environment.GetEnvironmentVariable;
+        ApplyBooleanOverride(AdminEnabledVariable, value => options.Enabled = value, readEnvironmentVariable);
+        ApplyBooleanOverride(AdminAllowWriteVariable, value => options.AllowWriteSql = value, readEnvironmentVariable);
+    }
+
+    public static string ResolveConnectionString(
+        string? configuredConnectionString,
+        string? localApplicationDataRoot = null,
+        Action<string>? ensureDirectory = null)
+    {
+        if (!string.IsNullOrWhiteSpace(configuredConnectionString))
+        {
+            return configuredConnectionString;
+        }
+
+        var root = Path.Combine(
+            localApplicationDataRoot ?? Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            ApplicationDataFolderName);
+
+        ensureDirectory ??= path => _ = Directory.CreateDirectory(path);
+        ensureDirectory(root);
+
+        return $"Data Source={Path.Combine(root, DatabaseFileName)}";
+    }
+
+    public static bool IsApiRequest(PathString path)
+        => path.StartsWithSegments("/api");
+
+    /// <summary>
+    /// In development we proxy everything except API, swagger, and health traffic to Vite.
+    /// That keeps backend routes explicit while letting the SPA own all browser navigation paths.
+    /// </summary>
+    public static bool ShouldUseSpaProxy(PathString path)
+        => !path.StartsWithSegments("/api")
+           && !path.StartsWithSegments("/swagger")
+           && !path.StartsWithSegments("/health");
+
+    private static void ApplyBooleanOverride(
+        string variableName,
+        Action<bool> applyValue,
+        Func<string, string?> readEnvironmentVariable)
+    {
+        var rawValue = readEnvironmentVariable(variableName);
+        if (bool.TryParse(rawValue, out var parsed))
+        {
+            applyValue(parsed);
+        }
+    }
+}

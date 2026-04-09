@@ -5,7 +5,7 @@
   width: 100%;
   max-width: none;
   margin: 0;
-  padding-bottom: 0;
+  padding-bottom: var(--matrix-card-padding-bottom, 0px);
   min-height: 0;
   display: flex;
   flex-direction: column;
@@ -22,12 +22,20 @@
   flex: 1 1 auto;
   min-height: 0;
   height: auto;
-  padding-bottom: 6px;
+  padding-bottom: var(--matrix-layout-padding-bottom, 6px);
   box-sizing: border-box;
 }
 
 .layoutWithToolbar {
   grid-template-rows: auto auto minmax(0, 1fr);
+}
+
+.layoutEmpty {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+  padding-bottom: 18px;
 }
 
 .layoutCompact,
@@ -51,7 +59,10 @@
 
 .emptyState {
   display: grid;
+  flex: 1 1 0;
   place-items: center;
+  align-self: stretch;
+  width: 100%;
   min-height: 260px;
   padding: 20px;
   box-sizing: border-box;
@@ -99,11 +110,16 @@
 .tableScrollCompact {
   flex: 0 0 auto;
   min-height: auto;
+  scrollbar-gutter: auto;
 }
 
 .tableScroll::-webkit-scrollbar {
   width: 8px;
   height: 8px;
+}
+
+.tableScrollCompact::-webkit-scrollbar {
+  height: 6px;
 }
 
 .tableScroll::-webkit-scrollbar-thumb {
@@ -114,9 +130,9 @@
 }
 
 .table {
-  width: calc(var(--matrix-day-column-width) + (var(--matrix-cell-min-width) * var(--matrix-column-count, 1)));
+  width: 100%;
   min-width: calc(var(--matrix-day-column-width) + (var(--matrix-cell-min-width) * var(--matrix-column-count, 1)));
-  max-width: calc(var(--matrix-day-column-width) + (var(--matrix-cell-min-width) * var(--matrix-column-count, 1)));
+  max-width: none;
   table-layout: fixed;
   border-collapse: separate;
   border-spacing: 0;
@@ -129,9 +145,9 @@
 }
 
 .valueColumn {
-  width: var(--matrix-cell-min-width);
-  min-width: var(--matrix-cell-min-width);
-  max-width: var(--matrix-cell-min-width);
+  width: var(--matrix-value-column-width);
+  min-width: var(--matrix-value-column-width);
+  max-width: var(--matrix-value-column-width);
 }
 
 .table th,
@@ -145,9 +161,9 @@
   position: sticky;
   top: 0;
   z-index: 5;
-  width: var(--matrix-cell-min-width);
-  min-width: var(--matrix-cell-min-width);
-  max-width: var(--matrix-cell-min-width);
+  width: var(--matrix-value-column-width);
+  min-width: var(--matrix-value-column-width);
+  max-width: var(--matrix-value-column-width);
   padding: 12px 10px;
   background: #f5f5f5;
   color: #111827;
@@ -301,9 +317,9 @@
 
 .table tbody td {
   padding: 0;
-  width: var(--matrix-cell-min-width);
-  min-width: var(--matrix-cell-min-width);
-  max-width: var(--matrix-cell-min-width);
+  width: var(--matrix-value-column-width);
+  min-width: var(--matrix-value-column-width);
+  max-width: var(--matrix-value-column-width);
   height: var(--matrix-cell-min-height);
   position: relative;
   overflow: hidden;
@@ -312,9 +328,9 @@
 
 .matrixCell {
   padding: 0;
-  width: var(--matrix-cell-min-width);
-  min-width: var(--matrix-cell-min-width);
-  max-width: var(--matrix-cell-min-width);
+  width: var(--matrix-value-column-width);
+  min-width: var(--matrix-value-column-width);
+  max-width: var(--matrix-value-column-width);
   height: var(--matrix-cell-min-height);
   position: relative;
   overflow: hidden;
@@ -324,8 +340,8 @@
 .cellSurface {
   position: relative;
   width: 100%;
-  min-width: var(--matrix-cell-min-width);
-  max-width: var(--matrix-cell-min-width);
+  min-width: 100%;
+  max-width: 100%;
   min-height: var(--matrix-cell-min-height);
   height: 100%;
   overflow: hidden;
@@ -359,15 +375,75 @@
   background: rgba(254, 226, 226, 0.96);
 }
 
-.errorCell {
-  background: rgba(254, 226, 226, 0.9);
+.emptyCellDanger {
+  background: rgba(254, 205, 211, 0.96);
 }
 
-.selectedCell {
+.emptyCellDanger .cellSurface,
+.emptyCellDanger .cellButton,
+.emptyCellDanger .cellEditor,
+.emptyCellDanger .readonlyValue {
+  background: rgba(254, 205, 211, 0.96);
+}
+
+.emptyCellDangerWeekend {
+  background: rgba(254, 186, 186, 0.94);
+}
+
+.emptyCellDangerWeekend .cellSurface,
+.emptyCellDangerWeekend .cellButton,
+.emptyCellDangerWeekend .cellEditor,
+.emptyCellDangerWeekend .readonlyValue {
+  background: rgba(254, 186, 186, 0.94);
+}
+
+.readonlyEmptyCellDanger {
+  background: rgba(252, 165, 165, 0.92);
+}
+
+.readonlyEmptyCellDanger .cellSurface,
+.readonlyEmptyCellDanger .readonlyValue {
+  background: rgba(252, 165, 165, 0.92);
+}
+
+.readonlyEmptyCellDangerWeekend {
+  background: rgba(252, 140, 140, 0.9);
+}
+
+.readonlyEmptyCellDangerWeekend .cellSurface,
+.readonlyEmptyCellDangerWeekend .readonlyValue {
+  background: rgba(252, 140, 140, 0.9);
+}
+
+.errorCell {
+  background: rgba(254, 179, 179, 0.96);
+}
+
+.errorCell .cellSurface,
+.errorCell .cellButton,
+.errorCell .cellEditor,
+.errorCell .readonlyValue {
+  background: rgba(254, 179, 179, 0.96);
+}
+
+.selectedCell,
+.editingCell {
+  z-index: 1;
+}
+
+.selectedCell::after,
+.editingCell::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.selectedCell::after {
   box-shadow: inset 0 0 0 2px rgba(37, 99, 235, 0.42);
 }
 
-.editingCell {
+.editingCell::after {
   box-shadow: inset 0 0 0 2px rgba(37, 99, 235, 0.56);
 }
 
@@ -404,6 +480,41 @@
   line-height: 1.2;
 }
 
+.visualHintShell {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 6px;
+  text-align: center;
+  pointer-events: none;
+  user-select: none;
+  line-height: 1.2;
+}
+
+.visualHintButton {
+  max-width: 100%;
+  min-width: 0;
+  padding: 0 4px;
+  border: none;
+  border-radius: 12px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  line-height: inherit;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.visualHintButton:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.24);
+}
+
 .cellButton:focus-visible {
   outline: none;
   box-shadow: inset 0 0 0 2px rgba(37, 99, 235, 0.32);
@@ -426,9 +537,20 @@
   color: rgba(107, 114, 128, 0.92);
 }
 
+.dangerEmptyValue {
+  color: rgba(153, 27, 27, 0.9);
+}
+
+.visualHintValue {
+  color: rgba(29, 78, 216, 0.94);
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+}
+
 .readonlyValue {
   font-weight: 700;
-  cursor: pointer;
+  cursor: default;
 }
 
 .table tr:last-child td,
