@@ -86,7 +86,7 @@ export function AvailabilityScheduleMatrix({
       className={className}
       style={style}
       title={title}
-      icon={<AvailabilityIcon size={18} style={{ transform: "scaleY(-1)" }} />}
+      icon={<AvailabilityIcon size={18} />}
       helperText={helperText}
       graph={{ year, month }}
       columns={graphColumns}

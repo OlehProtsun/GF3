@@ -1,11 +1,14 @@
 :root {
+  --app-page-background: #f3f4f6;
   font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
   color: #1f2937;
-  background-color: #f3f4f6;
+  background-color: var(--app-page-background);
 }
 
 html {
   overflow-y: auto;
+  min-height: 100%;
+  background-color: var(--app-page-background);
   scrollbar-width: thin;
   scrollbar-color: #d6dbe3 transparent;
 }
@@ -51,7 +54,14 @@ body.page-scrollbar-hidden::-webkit-scrollbar {
 
 body {
   margin: 0;
+  min-height: 100vh;
   overflow-x: hidden;
+  background-color: var(--app-page-background);
+}
+
+#root {
+  min-height: 100vh;
+  background-color: var(--app-page-background);
 }
 
 main {

@@ -112,7 +112,7 @@ export function OverlaySidebarLayout({ children }: OverlaySidebarLayoutProps) {
           />
           <NavItem label="Employee" to="/employee" icon={<EmployeeIcon size={22} />} />
           <NavItem label="Shop" to="/shop" icon={<ShopIcon size={28} style={{ transform: "scaleY(-1)" }} />} />
-          <NavItem label="Availability" to="/availability" icon={<AvailabilityIcon size={22} style={{ transform: "scaleY(-1)" }} />} />
+          <NavItem label="Availability" to="/availability" icon={<AvailabilityIcon size={22} />} />
           <NavItem label="Container" to="/container" icon={<ContainerIcon size={25} />} />
           <NavItem label="Information" to="/information" icon={<InfoIcon size={26} />} />
         </div>
@@ -120,7 +120,7 @@ export function OverlaySidebarLayout({ children }: OverlaySidebarLayoutProps) {
         <div className={`${styles.section} ${styles.sectionBottom}`}>
           <div className={styles.sectionTitle}>Settings</div>
           <div className={styles.nav}>
-            <NavItem label="DataBase" to="/database" icon={<DatabaseIcon size={30} style={{ transform: "scaleY(-1)" }} />} />
+            <NavItem label="DataBase" to="/database" icon={<DatabaseIcon size={30} />} />
           </div>
         </div>
 
