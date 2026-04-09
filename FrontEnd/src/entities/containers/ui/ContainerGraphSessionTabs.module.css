@@ -1,0 +1,170 @@
+.root {
+  /* Session sizing controls */
+  --session-shell-padding-inline: 6px;
+  --session-shell-padding-block: 4px;
+  --session-shell-gap: 6px;
+  --session-shell-radius: 20px;
+  --session-shell-border: rgba(148, 163, 184, 0.14);
+  --session-shell-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+  --session-tab-width: 116px;
+  --session-tab-height: 36px;
+  --session-tab-padding-inline: 12px;
+  --session-tab-gap: 6px;
+  --session-tab-radius: 14px;
+  --session-action-radius: 10px;
+  --session-tab-font-size: 0.82rem;
+  --session-edge-fade: 10px;
+  --session-visible-tab-count: 3;
+  --session-visible-tabs-width: calc(
+    (var(--session-tab-width) * var(--session-visible-tab-count)) +
+    (var(--session-tab-gap) * (var(--session-visible-tab-count) - 1))
+  );
+  --session-action-space: 140px;
+
+  display: grid;
+  grid-template-columns: minmax(0, var(--session-visible-tabs-width)) auto;
+  align-items: center;
+  gap: var(--session-shell-gap);
+  width: fit-content;
+  max-width: min(100%, calc(var(--session-visible-tabs-width) + var(--session-action-space)));
+  min-width: 0;
+  padding: var(--session-shell-padding-block) var(--session-shell-padding-inline);
+  border-radius: var(--session-shell-radius);
+  border: 1px solid var(--session-shell-border);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.86), rgba(248, 250, 252, 0.92));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.74),
+    var(--session-shell-shadow);
+}
+
+.tabsRail {
+  position: relative;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-snap-type: x proximity;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  mask-image: linear-gradient(
+    to right,
+    transparent 0,
+    #000 var(--session-edge-fade),
+    #000 calc(100% - var(--session-edge-fade)),
+    transparent 100%
+  );
+  -webkit-mask-image: linear-gradient(
+    to right,
+    transparent 0,
+    #000 var(--session-edge-fade),
+    #000 calc(100% - var(--session-edge-fade)),
+    transparent 100%
+  );
+}
+
+.tabsRail::-webkit-scrollbar {
+  display: none;
+}
+
+.tabs {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: var(--session-tab-width);
+  align-items: center;
+  gap: var(--session-tab-gap);
+  width: max-content;
+  min-width: var(--session-visible-tabs-width);
+}
+
+.tab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--session-tab-width);
+  min-width: var(--session-tab-width);
+  max-width: var(--session-tab-width);
+  height: var(--session-tab-height);
+  padding: 0 var(--session-tab-padding-inline);
+  border: 1px solid transparent;
+  border-radius: var(--session-tab-radius);
+  background: rgba(241, 245, 249, 0.94);
+  color: rgba(15, 23, 42, 0.62);
+  font: inherit;
+  font-size: var(--session-tab-font-size);
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72);
+  scroll-snap-align: start;
+  transition:
+    border-color 140ms ease,
+    background 140ms ease,
+    color 140ms ease,
+    box-shadow 140ms ease,
+    transform 140ms ease;
+}
+
+.tab:hover {
+  border-color: rgba(96, 165, 250, 0.2);
+  background: rgba(226, 232, 240, 0.9);
+  color: #1e293b;
+}
+
+.tab:focus-visible {
+  outline: none;
+  border-color: rgba(59, 130, 246, 0.34);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.72),
+    0 0 0 3px rgba(37, 99, 235, 0.12);
+}
+
+.tabActive {
+  border-color: rgba(96, 165, 250, 0.34);
+  background: linear-gradient(180deg, rgba(239, 246, 255, 0.98), rgba(219, 234, 254, 0.92));
+  color: #0f172a;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.8),
+    0 8px 18px rgba(37, 99, 235, 0.1);
+}
+
+.tabLabel {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  line-height: 1;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex: 0 0 auto;
+  min-width: max-content;
+  --ios-button-height: var(--session-tab-height);
+  --ios-button-padding-block: 0.4rem;
+  --ios-button-padding-inline: 0.88rem;
+  --ios-button-gap: 6px;
+  --ios-button-font-size: 0.92rem;
+  --ios-button-radius: var(--session-action-radius);
+}
+
+@media (max-width: 1100px) {
+  .root {
+    width: 100%;
+    max-width: none;
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+}
+
+@media (max-width: 960px) {
+  .root {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .actions {
+    justify-content: flex-start;
+  }
+}

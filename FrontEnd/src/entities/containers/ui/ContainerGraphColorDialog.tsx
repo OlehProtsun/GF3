@@ -1,4 +1,5 @@
-import { useEffect, useId, useState, type MouseEvent } from "react";
+import { useEffect, useId, useMemo, type MouseEvent } from "react";
+import { useSyncedDraft } from "@shared/lib/useSyncedDraft";
 import { IosButton } from "@shared/ui/components/IosButton";
 import { LabeledField, TextInput } from "@shared/ui/forms/Field";
 import { CheckIcon, CloseIcon } from "@shared/ui/icons";
@@ -95,17 +96,22 @@ export function ContainerGraphColorDialog({
 }: ContainerGraphColorDialogProps) {
   const titleId = useId();
   const descriptionId = useId();
-  const [draftValue, setDraftValue] = useState(value);
-  const [inputError, setInputError] = useState<string | undefined>();
-
-  useEffect(() => {
-    if (!open || mode === null) {
-      return;
-    }
-
-    setDraftValue(value);
-    setInputError(undefined);
-  }, [mode, open, value]);
+  const dialogSourceKey = useMemo(
+    () => `${open ? "open" : "closed"}:${mode ?? "none"}:${value}`,
+    [mode, open, value],
+  );
+  const initialDialogState = useMemo(
+    () => ({
+      draftValue: value,
+      inputError: undefined as string | undefined,
+    }),
+    [value],
+  );
+  const {
+    value: dialogState,
+    setValue: setDialogState,
+  } = useSyncedDraft(dialogSourceKey, initialDialogState);
+  const { draftValue, inputError } = dialogState;
 
   useEffect(() => {
     if (!open || mode === null) {
@@ -138,7 +144,10 @@ export function ContainerGraphColorDialog({
 
   const submit = () => {
     if (!normalizedDraftValue) {
-      setInputError("Enter a valid hex color like #2563EB.");
+      setDialogState((current) => ({
+        ...current,
+        inputError: "Enter a valid hex color like #2563EB.",
+      }));
       return;
     }
 
@@ -154,8 +163,10 @@ export function ContainerGraphColorDialog({
   };
 
   const handleSwatchSelect = (nextValue: string) => {
-    setDraftValue(nextValue);
-    setInputError(undefined);
+    setDialogState({
+      draftValue: nextValue,
+      inputError: undefined,
+    });
   };
 
   return (
@@ -239,10 +250,10 @@ export function ContainerGraphColorDialog({
               autoCapitalize="characters"
               aria-invalid={inputError ? true : undefined}
               onChange={event => {
-                setDraftValue(event.target.value);
-                if (inputError) {
-                  setInputError(undefined);
-                }
+                setDialogState((current) => ({
+                  draftValue: event.target.value,
+                  inputError: current.inputError ? undefined : current.inputError,
+                }));
               }}
               onKeyDown={event => {
                 if (event.key === "Enter") {

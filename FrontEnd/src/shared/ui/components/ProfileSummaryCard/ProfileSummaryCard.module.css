@@ -14,6 +14,10 @@
   flex-wrap: wrap;
 }
 
+.headerRightStackNoWrap {
+  flex-wrap: nowrap;
+}
+
 .headerMetaBadge {
   display: inline-flex;
   align-items: center;
@@ -23,6 +27,10 @@
   border-radius: 999px;
   font-size: 0.8rem;
   font-weight: 800;
+  line-height: 1;
+  text-align: center;
+  white-space: nowrap;
+  flex-shrink: 0;
   color: #1d4ed8;
   background: rgba(37, 99, 235, 0.1);
   border: 1px solid rgba(37, 99, 235, 0.18);
@@ -125,6 +133,10 @@
 
   .headerRightStack {
     justify-content: stretch;
+  }
+
+  .headerRightStackNoWrap {
+    flex-wrap: wrap;
   }
 
   .identityBlock {

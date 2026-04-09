@@ -1,8 +1,10 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo } from "react";
 import type { KeyboardEvent } from "react";
 import type { SaveAvailabilityGroupDto } from "@entities/availability-groups/api/dto";
 import type { AvailabilityGroup } from "@entities/availability-groups/model/types";
 import { availabilityMonthOptions } from "@entities/availability-groups/model/presentation";
+import { useSyncedDraft } from "@shared/lib/useSyncedDraft";
+import { ErrorBanner } from "@shared/ui/components/ErrorBanner";
 import { IosButton } from "@shared/ui/components/IosButton";
 import { LabeledField, TextInput } from "@shared/ui/forms";
 import styles from "./AvailabilityGroupFormDialog.module.css";
@@ -56,6 +58,16 @@ function validateFormState(formState: FormState) {
   return { errors, payload: { name: trimmedName, year, month } };
 }
 
+function clearFieldError(errors: FormErrors, field: keyof FormErrors) {
+  if (!errors[field]) {
+    return errors;
+  }
+
+  const nextErrors = { ...errors };
+  delete nextErrors[field];
+  return nextErrors;
+}
+
 export function AvailabilityGroupFormDialog({
   open,
   mode,
@@ -65,17 +77,23 @@ export function AvailabilityGroupFormDialog({
   onCancel,
   onSave,
 }: AvailabilityGroupFormDialogProps) {
-  const [formState, setFormState] = useState<FormState>(() => createFormState(initialGroup));
-  const [errors, setErrors] = useState<FormErrors>({});
-
-  useEffect(() => {
-    if (!open) {
-      return;
-    }
-
-    setFormState(createFormState(initialGroup));
-    setErrors({});
-  }, [initialGroup, open]);
+  const dialogSourceKey = useMemo(
+    () =>
+      `${open ? "open" : "closed"}:${mode}:${initialGroup?.id ?? "new"}:${initialGroup?.name ?? ""}:${initialGroup?.year ?? ""}:${initialGroup?.month ?? ""}`,
+    [initialGroup?.id, initialGroup?.month, initialGroup?.name, initialGroup?.year, mode, open],
+  );
+  const initialDialogState = useMemo(
+    () => ({
+      formState: createFormState(initialGroup),
+      errors: {} as FormErrors,
+    }),
+    [initialGroup],
+  );
+  const {
+    value: dialogState,
+    setValue: setDialogState,
+  } = useSyncedDraft(dialogSourceKey, initialDialogState);
+  const { formState, errors } = dialogState;
 
   useEffect(() => {
     if (!open) {
@@ -102,7 +120,11 @@ export function AvailabilityGroupFormDialog({
 
   const submit = () => {
     const result = validateFormState(formState);
-    setErrors(result.errors);
+
+    setDialogState((current) => ({
+      ...current,
+      errors: result.errors,
+    }));
 
     if (Object.keys(result.errors).length > 0) {
       return;
@@ -133,7 +155,10 @@ export function AvailabilityGroupFormDialog({
             <TextInput
               id="availability-group-name"
               value={formState.name}
-              onChange={event => setFormState(current => ({ ...current, name: event.target.value }))}
+              onChange={(event) => setDialogState((current) => ({
+                formState: { ...current.formState, name: event.target.value },
+                errors: clearFieldError(current.errors, "name"),
+              }))}
               placeholder="For example: Main Team"
               aria-invalid={errors.name ? true : undefined}
             />
@@ -145,10 +170,13 @@ export function AvailabilityGroupFormDialog({
                 id="availability-group-month"
                 className={styles.select}
                 value={formState.month}
-                onChange={event => setFormState(current => ({ ...current, month: event.target.value }))}
+                onChange={(event) => setDialogState((current) => ({
+                  formState: { ...current.formState, month: event.target.value },
+                  errors: clearFieldError(current.errors, "month"),
+                }))}
                 aria-invalid={errors.month ? true : undefined}
               >
-                {availabilityMonthOptions.map(option => (
+                {availabilityMonthOptions.map((option) => (
                   <option key={option.value} value={option.value}>
                     {option.label}
                   </option>
@@ -164,14 +192,25 @@ export function AvailabilityGroupFormDialog({
                 min={1}
                 max={9999}
                 value={formState.year}
-                onChange={event => setFormState(current => ({ ...current, year: event.target.value }))}
+                onChange={(event) => setDialogState((current) => ({
+                  formState: { ...current.formState, year: event.target.value },
+                  errors: clearFieldError(current.errors, "year"),
+                }))}
                 placeholder="2026"
                 aria-invalid={errors.year ? true : undefined}
               />
             </LabeledField>
           </div>
 
-          {submitError ? <p className={styles.submitError}>{submitError}</p> : null}
+          {submitError ? (
+            <ErrorBanner
+              className={styles.submitErrorWrap}
+              bannerClassName={styles.submitError}
+              textClassName={styles.submitErrorText}
+            >
+              {submitError}
+            </ErrorBanner>
+          ) : null}
         </div>
 
         <div className={styles.footer}>

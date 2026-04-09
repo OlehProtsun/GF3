@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useAvailabilityGroupsQuery } from "@entities/availability-groups";
 import { AvailabilityGroupListCard } from "@entities/availability-groups/ui";
 import { usePageScrollbarHidden } from "@shared/lib/usePageScrollbarHidden";
@@ -11,9 +11,10 @@ import styles from "./AvailabilityPage.module.css";
 export function AvailabilityPage() {
   usePageScrollbarHidden();
 
+  const location = useLocation();
   const navigate = useNavigate();
   const [query, setQuery] = useState("");
-  const groupsQuery = useAvailabilityGroupsQuery(query);
+  const groupsQuery = useAvailabilityGroupsQuery(query, location.key);
   const groups = groupsQuery.data ?? [];
 
   const handleAddGroup = useCallback(() => {

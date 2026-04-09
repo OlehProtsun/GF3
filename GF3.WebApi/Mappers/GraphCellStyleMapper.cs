@@ -3,6 +3,9 @@ using WebApi.Contracts.Containers.Graphs.CellStyles;
 
 namespace WebApi.Mappers;
 
+/// <summary>
+/// Maps per-cell style override contracts between the API layer and the business layer.
+/// </summary>
 public static class GraphCellStyleMapper
 {
     public static GraphCellStyleDto ToGraphCellStyleDto(this ScheduleCellStyleModel model) => new()
@@ -12,15 +15,16 @@ public static class GraphCellStyleMapper
         DayOfMonth = model.DayOfMonth,
         EmployeeId = model.EmployeeId,
         BackgroundColorArgb = model.BackgroundColorArgb,
-        TextColorArgb = model.TextColorArgb
+        TextColorArgb = model.TextColorArgb,
     };
 
-    public static ScheduleCellStyleModel ToUpsertModel(this UpsertGraphCellStyleRequest request, int graphId) => new()
-    {
-        ScheduleId = graphId,
-        DayOfMonth = request.DayOfMonth,
-        EmployeeId = request.EmployeeId,
-        BackgroundColorArgb = request.BackgroundColorArgb,
-        TextColorArgb = request.TextColorArgb
-    };
+    public static ScheduleCellStyleModel ToUpsertModel(this UpsertGraphCellStyleRequest request, int graphId)
+        => new()
+        {
+            ScheduleId = graphId,
+            DayOfMonth = request.DayOfMonth,
+            EmployeeId = request.EmployeeId,
+            BackgroundColorArgb = request.BackgroundColorArgb,
+            TextColorArgb = request.TextColorArgb,
+        };
 }

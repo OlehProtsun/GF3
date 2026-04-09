@@ -1,10 +1,19 @@
 using DataAccessLayer.Models;
 
-namespace DataAccessLayer.Repositories.Abstractions
+namespace DataAccessLayer.Repositories.Abstractions;
+
+/// <summary>
+/// Persistence contract for schedule presets.
+/// </summary>
+public interface ISchedulePresetRepository : IBaseRepository<SchedulePresetModel>
 {
-    public interface ISchedulePresetRepository : IBaseRepository<SchedulePresetModel>
-    {
-        Task<List<SchedulePresetModel>> GetByContainerAsync(int containerId, CancellationToken ct = default);
-        Task<bool> ExistsByNameAsync(int containerId, string name, int? excludeId = null, CancellationToken ct = default);
-    }
+    /// <summary>
+    /// Returns presets that belong to one container.
+    /// </summary>
+    Task<List<SchedulePresetModel>> GetByContainerAsync(int containerId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Returns whether another preset in the same container already uses the same normalized name.
+    /// </summary>
+    Task<bool> ExistsByNameAsync(int containerId, string name, int? excludeId = null, CancellationToken ct = default);
 }

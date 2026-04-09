@@ -14,7 +14,7 @@ namespace DataAccessLayer.Migrations
         protected override void BuildModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
-            modelBuilder.HasAnnotation("ProductVersion", "10.0.1");
+            modelBuilder.HasAnnotation("ProductVersion", "10.0.0");
 
             modelBuilder.Entity("DataAccessLayer.Models.AvailabilityGroupDayModel", b =>
                 {
@@ -53,7 +53,7 @@ namespace DataAccessLayer.Migrations
                         {
                             t.HasCheckConstraint("ck_avail_group_day_dom", "day_of_month BETWEEN 1 AND 31");
 
-                            t.HasCheckConstraint("ck_avail_group_day_kind_interval", "((kind = 'INT' AND interval_str IS NOT NULL AND length(trim(interval_str)) >= 11) OR (kind IN ('ANY','NONE') AND interval_str IS NULL))");
+                            t.HasCheckConstraint("ck_avail_group_day_kind_interval", "((kind = 'INT' AND interval_str IS NOT NULL AND length(trim(interval_str)) >= 11) OR (kind = 'ANY' AND interval_str IS NULL) OR kind = 'NONE')");
                         });
                 });
 
@@ -68,15 +68,15 @@ namespace DataAccessLayer.Migrations
                         .HasColumnType("INTEGER")
                         .HasColumnName("availability_group_id");
 
-                    b.Property<int>("EmployeeId")
-                        .HasColumnType("INTEGER")
-                        .HasColumnName("employee_id");
-
                     b.Property<int>("DisplayOrder")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER")
                         .HasDefaultValue(0)
                         .HasColumnName("display_order");
+
+                    b.Property<int>("EmployeeId")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("employee_id");
 
                     b.HasKey("Id");
 
@@ -579,10 +579,6 @@ namespace DataAccessLayer.Migrations
                     b.HasIndex("ScheduleId", "DayOfMonth", "FromTime", "ToTime", "SlotNo")
                         .IsUnique();
 
-                    b.HasIndex(new[] { "ScheduleId", "DayOfMonth", "FromTime", "ToTime", "EmployeeId" }, "ux_slot_unique_emp_per_time")
-                        .IsUnique()
-                        .HasDatabaseName("ux_slot_unique_emp_per_time1");
-
                     b.ToTable("schedule_slot", t =>
                         {
                             t.HasCheckConstraint("ck_schedule_slot_dom", "day_of_month BETWEEN 1 AND 31");
@@ -723,7 +719,7 @@ namespace DataAccessLayer.Migrations
 
             modelBuilder.Entity("DataAccessLayer.Models.SchedulePresetEmployeeModel", b =>
                 {
-                    b.HasOne("DataAccessLayer.Models.EmployeeModel")
+                    b.HasOne("DataAccessLayer.Models.EmployeeModel", null)
                         .WithMany()
                         .HasForeignKey("EmployeeId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -740,18 +736,18 @@ namespace DataAccessLayer.Migrations
 
             modelBuilder.Entity("DataAccessLayer.Models.SchedulePresetModel", b =>
                 {
-                    b.HasOne("DataAccessLayer.Models.AvailabilityGroupModel")
+                    b.HasOne("DataAccessLayer.Models.AvailabilityGroupModel", null)
                         .WithMany()
                         .HasForeignKey("AvailabilityGroupId")
                         .OnDelete(DeleteBehavior.SetNull);
 
-                    b.HasOne("DataAccessLayer.Models.ContainerModel")
+                    b.HasOne("DataAccessLayer.Models.ContainerModel", null)
                         .WithMany()
                         .HasForeignKey("ContainerId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("DataAccessLayer.Models.ShopModel")
+                    b.HasOne("DataAccessLayer.Models.ShopModel", null)
                         .WithMany()
                         .HasForeignKey("ShopId")
                         .OnDelete(DeleteBehavior.Restrict)

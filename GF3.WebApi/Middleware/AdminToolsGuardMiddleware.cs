@@ -4,10 +4,14 @@ using WebApi.Options;
 
 namespace WebApi.Middleware;
 
+/// <summary>
+/// Protects admin-only database endpoints from accidental exposure.
+/// The middleware currently allows access only when the feature is enabled and the caller comes
+/// from the local machine.
+/// </summary>
 public sealed class AdminToolsGuardMiddleware
 {
     private const string AdminPathPrefix = "/api/admin/db";
-    private const string HeaderName = "X-Admin-Token";
 
     private readonly RequestDelegate _next;
     private readonly IOptionsMonitor<AdminToolsOptions> _options;
@@ -20,7 +24,7 @@ public sealed class AdminToolsGuardMiddleware
 
     public async Task InvokeAsync(HttpContext context)
     {
-        if (!context.Request.Path.StartsWithSegments(AdminPathPrefix, StringComparison.OrdinalIgnoreCase))
+        if (!IsAdminToolsRequest(context.Request.Path))
         {
             await _next(context).ConfigureAwait(false);
             return;
@@ -33,20 +37,21 @@ public sealed class AdminToolsGuardMiddleware
             return;
         }
 
-        var remoteIp = context.Connection.RemoteIpAddress;
-        if (remoteIp is null || !IPAddress.IsLoopback(remoteIp))
-        {
-            context.Response.StatusCode = StatusCodes.Status403Forbidden;
-            return;
-        }
-
-        var token = context.Request.Headers[HeaderName].ToString();
-        if (string.IsNullOrWhiteSpace(options.Token) || !string.Equals(token, options.Token, StringComparison.Ordinal))
+        if (!IsLocalRequest(context))
         {
             context.Response.StatusCode = StatusCodes.Status403Forbidden;
             return;
         }
 
         await _next(context).ConfigureAwait(false);
+    }
+
+    private static bool IsAdminToolsRequest(PathString requestPath)
+        => requestPath.StartsWithSegments(AdminPathPrefix, StringComparison.OrdinalIgnoreCase);
+
+    private static bool IsLocalRequest(HttpContext context)
+    {
+        var remoteIp = context.Connection.RemoteIpAddress;
+        return remoteIp is not null && IPAddress.IsLoopback(remoteIp);
     }
 }

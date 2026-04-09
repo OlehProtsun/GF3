@@ -1,0 +1,697 @@
+.page {
+  --page-ink: #172033;
+  --page-muted: rgba(23, 32, 51, 0.62);
+  --page-surface: rgba(255, 255, 255, 0.92);
+  --page-shadow: 0 22px 52px rgba(15, 23, 42, 0.08);
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  max-width: none;
+  min-height: 0;
+  padding: 0 10px 28px;
+  box-sizing: border-box;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.page::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+.page::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at top left, rgba(59, 130, 246, 0.14), transparent 28%),
+    radial-gradient(circle at 86% 12%, rgba(16, 185, 129, 0.1), transparent 26%),
+    linear-gradient(180deg, rgba(248, 250, 252, 0.98), rgba(241, 245, 249, 0.94));
+}
+
+.workspaceGrid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 16px;
+  align-items: start;
+}
+
+.card {
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding-bottom: 18px;
+  border-radius: 30px;
+  background: var(--page-surface);
+  box-shadow: var(--page-shadow);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.overviewCard {
+  grid-column: span 3;
+  min-height: 0;
+  order: 3;
+}
+
+.schemaCard {
+  grid-column: span 3;
+  order: 4;
+}
+
+.executorCard,
+.importCard {
+  grid-column: span 3;
+  height: clamp(760px, calc(100vh - 156px), 920px);
+}
+
+.executorCard {
+  order: 1;
+}
+
+.importCard {
+  order: 2;
+}
+
+.schemaCard .cardBody,
+.executorCard .cardBody,
+.importCard .cardBody {
+  overflow: hidden;
+}
+
+.cardBody {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 14px;
+  min-height: 0;
+}
+
+.overviewHero,
+.overviewPanel {
+  padding: 14px 16px;
+  border-radius: 24px;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  background: rgba(248, 250, 252, 0.76);
+}
+
+.overviewHero {
+  display: grid;
+  gap: 10px;
+}
+
+.overviewHeroRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.overviewPanels {
+  display: grid;
+  gap: 12px;
+}
+
+.overviewPanel {
+  gap: 10px;
+}
+
+.overviewMiniGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.overviewMiniTile {
+  display: grid;
+  gap: 5px;
+  min-height: 58px;
+  padding: 11px 12px;
+  border-radius: 18px;
+  border: 1px solid rgba(226, 232, 240, 0.86);
+  background: rgba(255, 255, 255, 0.8);
+}
+
+.overviewMiniTileWide {
+  grid-column: 1 / -1;
+}
+
+.accessGrid {
+  display: grid;
+  gap: 14px;
+}
+
+.accessIntro {
+  display: grid;
+  gap: 12px;
+}
+
+.accessCopy,
+.accessNote,
+.sectionCaption,
+.emptyInline,
+.importHint {
+  margin: 0;
+  color: var(--page-muted);
+}
+
+.accessCopy,
+.accessNote,
+.importHint {
+  line-height: 1.55;
+}
+
+.accessNote,
+.importHint {
+  font-size: 0.93rem;
+}
+
+.importHint {
+  padding: 14px 16px;
+  border-radius: 22px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  background: rgba(248, 250, 252, 0.86);
+}
+
+.fieldLabel {
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(15, 23, 42, 0.72);
+}
+
+.searchShell {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  padding: 0 14px;
+  border-radius: 18px;
+  border: 1px solid rgba(148, 163, 184, 0.26);
+  background: rgba(255, 255, 255, 0.96);
+}
+
+.searchInput {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  height: 44px;
+  border: none;
+  background: transparent;
+  color: var(--page-ink);
+  padding: 0;
+  outline: none;
+}
+
+.searchIcon {
+  color: rgba(15, 23, 42, 0.48);
+}
+
+.buttonRowCompact,
+.pillRow,
+.presetRow,
+.inlineMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.buttonRowCompact {
+  justify-content: flex-end;
+}
+
+.statusBadge,
+.infoPill,
+.metaBadge,
+.previewBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 0.38rem 0.82rem;
+  border-radius: 999px;
+  font-size: 0.79rem;
+  font-weight: 800;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.statusBadgeSuccess {
+  color: #047857;
+  background: rgba(16, 185, 129, 0.12);
+  border: 1px solid rgba(16, 185, 129, 0.2);
+}
+
+.statusBadgeWarning {
+  color: #b45309;
+  background: rgba(245, 158, 11, 0.12);
+  border: 1px solid rgba(245, 158, 11, 0.2);
+}
+
+.infoPill,
+.metaBadge {
+  color: rgba(15, 23, 42, 0.7);
+  background: rgba(241, 245, 249, 0.95);
+  border: 1px solid rgba(226, 232, 240, 0.9);
+}
+
+.metaBadgeError {
+  color: #b42318;
+  background: rgba(255, 59, 48, 0.09);
+  border-color: rgba(255, 59, 48, 0.24);
+}
+
+.presetButton,
+.schemaItem {
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  background: rgba(248, 250, 252, 0.88);
+  color: var(--page-ink);
+}
+
+.presetButton {
+  padding: 8px 12px;
+  border-radius: 999px;
+  font: inherit;
+  font-size: 0.83rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease, transform 120ms ease;
+}
+
+.presetButton:hover {
+  background: rgba(255, 255, 255, 0.96);
+  border-color: rgba(100, 116, 139, 0.32);
+}
+
+.presetButton:active {
+  transform: translateY(1px);
+}
+
+.codeArea,
+.sqlPreview {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  border-radius: 24px;
+  border: 1px solid rgba(148, 163, 184, 0.26);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(248, 250, 252, 0.94));
+  color: #0f172a;
+  font-family: "JetBrains Mono", "Fira Code", Consolas, "Courier New", monospace;
+  font-size: 0.88rem;
+  line-height: 1.55;
+}
+
+.codeArea {
+  min-height: 220px;
+  padding: 16px 18px;
+  resize: vertical;
+  outline: none;
+  transition: border-color 140ms ease, box-shadow 140ms ease;
+}
+
+.codeArea:focus {
+  border-color: rgba(37, 99, 235, 0.38);
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.1);
+}
+
+.importArea {
+  min-height: 0;
+  flex: 1 1 auto;
+}
+
+.resultBox,
+.emptyState {
+  border-radius: 22px;
+  padding: 14px 16px;
+  font-size: 0.92rem;
+  line-height: 1.5;
+}
+
+.resultBox {
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  background: rgba(248, 250, 252, 0.86);
+  color: var(--page-ink);
+}
+
+.resultBoxSuccess {
+  color: #065f46;
+  border-color: rgba(16, 185, 129, 0.24);
+  background: rgba(236, 253, 245, 0.88);
+}
+
+.resultBoxError {
+  color: #b42318;
+  border-color: rgba(255, 59, 48, 0.24);
+  background: rgba(255, 241, 242, 0.92);
+}
+
+.emptyState {
+  display: grid;
+  place-items: center;
+  min-height: 120px;
+  border: 1px dashed rgba(148, 163, 184, 0.32);
+  background: rgba(248, 250, 252, 0.82);
+  color: var(--page-muted);
+  text-align: center;
+}
+
+.tableShell,
+.schemaList,
+.viewerPanel {
+  min-height: 0;
+  border-radius: 24px;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  background: rgba(248, 250, 252, 0.76);
+  overflow: hidden;
+}
+
+.tableShell {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.tableScroll {
+  max-height: 460px;
+  overflow: auto;
+  background: rgba(255, 255, 255, 0.96);
+}
+
+.executorCard .tableScroll {
+  height: 100%;
+  max-height: none;
+}
+
+.resultTable {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.resultTable th,
+.resultTable td {
+  padding: 12px 14px;
+  text-align: left;
+  vertical-align: top;
+  border-bottom: 1px solid rgba(226, 232, 240, 0.92);
+}
+
+.resultTable th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: rgba(241, 245, 249, 0.96);
+  color: rgba(15, 23, 42, 0.72);
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.resultTable td {
+  color: var(--page-ink);
+  font-size: 0.9rem;
+}
+
+.emptyTableCell {
+  text-align: center;
+  color: var(--page-muted);
+}
+
+.detailsGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.detailTile {
+  display: grid;
+  gap: 6px;
+  min-height: 76px;
+  padding: 12px 14px;
+  border-radius: 20px;
+  border: 1px solid rgba(226, 232, 240, 0.86);
+  background: rgba(248, 250, 252, 0.82);
+}
+
+.detailTileWide {
+  grid-column: 1 / -1;
+}
+
+.detailLabel {
+  color: var(--page-muted);
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.detailValue,
+.detailValueHash {
+  color: var(--page-ink);
+  font-weight: 700;
+}
+
+.detailValue {
+  font-size: 0.92rem;
+}
+
+.detailValueHash {
+  font-size: 0.83rem;
+  line-height: 1.45;
+  word-break: break-all;
+}
+
+.limitError {
+  color: #b42318;
+}
+
+.sectionCaption {
+  margin-bottom: 8px;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.schemaCardBody {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  overflow: hidden;
+}
+
+.viewerLayout {
+  display: grid;
+  grid-template-columns: minmax(220px, 280px) minmax(0, 1fr);
+  gap: 14px;
+  min-height: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+}
+
+.schemaList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+  padding: 10px;
+  overflow: auto;
+}
+
+.schemaItem {
+  display: grid;
+  gap: 4px;
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: 18px;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+  transition: border-color 120ms ease, background 120ms ease, transform 120ms ease;
+}
+
+.schemaItem:hover {
+  background: rgba(255, 255, 255, 0.96);
+  border-color: rgba(100, 116, 139, 0.3);
+}
+
+.schemaItemActive {
+  border-color: rgba(37, 99, 235, 0.35);
+  background: rgba(219, 234, 254, 0.42);
+  box-shadow: inset 0 0 0 1px rgba(37, 99, 235, 0.12);
+}
+
+.schemaType {
+  color: rgba(37, 99, 235, 0.82);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.schemaName {
+  color: var(--page-ink);
+  font-size: 0.93rem;
+  font-weight: 700;
+}
+
+.viewerPanel {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  gap: 12px;
+  padding: 14px;
+  min-height: 0;
+  overflow: auto;
+}
+
+.previewHeader {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.previewBadge {
+  color: #1d4ed8;
+  background: rgba(37, 99, 235, 0.1);
+  border: 1px solid rgba(37, 99, 235, 0.18);
+}
+
+.previewTitle {
+  margin: 0;
+  font-size: 1.2rem;
+  color: var(--page-ink);
+}
+
+.viewerSummaryGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.viewerActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.viewerLimitButtonActive {
+  border-color: rgba(37, 99, 235, 0.4);
+  background: rgba(219, 234, 254, 0.54);
+  box-shadow: inset 0 0 0 1px rgba(37, 99, 235, 0.14);
+}
+
+.viewerTableShell {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: none;
+}
+
+.viewerTableScroll {
+  height: 100%;
+  max-height: none;
+}
+
+.viewerSqlSection {
+  display: grid;
+  gap: 8px;
+  min-height: 0;
+}
+
+.viewerSqlSection .sqlPreview {
+  flex: 1 1 auto;
+  min-height: 180px;
+  max-height: 240px;
+}
+
+.sqlPreview {
+  flex: 1 1 auto;
+  min-height: 0;
+  margin: 0;
+  padding: 18px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.hiddenInput {
+  display: none;
+}
+
+@media (max-width: 1600px) {
+  .workspaceGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .overviewCard,
+  .schemaCard {
+    grid-column: span 1;
+  }
+
+  .executorCard,
+  .importCard {
+    grid-column: span 1;
+  }
+}
+
+@media (max-width: 1180px) {
+  .workspaceGrid,
+  .viewerLayout,
+  .detailsGrid,
+  .viewerSummaryGrid,
+  .overviewMiniGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .overviewCard,
+  .executorCard,
+  .importCard,
+  .schemaCard {
+    grid-column: auto;
+    height: auto;
+  }
+
+  .detailTileWide {
+    grid-column: auto;
+  }
+
+  .overviewMiniTileWide {
+    grid-column: auto;
+  }
+}
+
+@media (max-width: 760px) {
+  .page {
+    padding-inline: 8px;
+    padding-bottom: 22px;
+  }
+
+  .overviewHero,
+  .overviewPanel {
+    padding: 12px 14px;
+  }
+
+  .buttonRowCompact {
+    justify-content: stretch;
+  }
+
+  .buttonRowCompact :global(button) {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .tableScroll {
+    max-height: 320px;
+  }
+}

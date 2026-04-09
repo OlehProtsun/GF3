@@ -1,4 +1,4 @@
-﻿.wrap {
+.wrap {
   display: flex;
   justify-content: center;
 }
@@ -15,6 +15,7 @@
   box-shadow: 0 10px 22px rgba(0, 0, 0, 0.12);
   backdrop-filter: blur(10px);
   max-width: min(720px, calc(100% - 24px));
+  min-width: 0;
 }
 
 .icon {
@@ -30,10 +31,44 @@
 }
 
 .text {
+  flex: 1 1 auto;
+  min-width: 0;
   font-weight: 800;
   font-size: 0.92rem;
   line-height: 1.1;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.dismissButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 auto;
+  padding: 0;
+  border: none;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.56);
+  color: currentColor;
+  cursor: pointer;
+  transition:
+    background-color 140ms ease,
+    transform 120ms ease,
+    box-shadow 140ms ease;
+}
+
+.dismissButton:hover {
+  background: rgba(255, 255, 255, 0.78);
+}
+
+.dismissButton:active {
+  transform: scale(0.96);
+}
+
+.dismissButton:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(180, 35, 24, 0.16);
 }

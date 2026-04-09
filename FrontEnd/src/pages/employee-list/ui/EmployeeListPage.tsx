@@ -1,5 +1,5 @@
-﻿import { useCallback, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useCallback, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useEmployeesQuery } from "@entities/employees/model/queries";
 import { EmployeeListCard } from "@entities/employees/ui/EmployeeListCard";
 import { usePageScrollbarHidden } from "@shared/lib/usePageScrollbarHidden";
@@ -11,9 +11,10 @@ import styles from "./EmployeeListPage.module.css";
 export function EmployeeListPage() {
   usePageScrollbarHidden();
 
+  const location = useLocation();
   const navigate = useNavigate();
   const [query, setQuery] = useState("");
-  const employeesQuery = useEmployeesQuery(query);
+  const employeesQuery = useEmployeesQuery(query, location.key);
   const employees = employeesQuery.data ?? [];
 
   const handleAddEmployee = useCallback(() => {

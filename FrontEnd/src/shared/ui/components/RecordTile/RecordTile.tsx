@@ -13,8 +13,11 @@ type RecordTileProps = {
   description?: ReactNode;
   badge?: ReactNode;
   metaItems?: RecordTileMetaItem[];
+  headerSlot?: ReactNode;
+  cornerSlot?: ReactNode;
   onClick?: () => void;
   isPinned?: boolean;
+  isSelected?: boolean;
   onTogglePin?: () => void;
   pinLabel?: string;
   ariaLabel?: string;
@@ -26,8 +29,11 @@ export function RecordTile({
   description,
   badge,
   metaItems = [],
+  headerSlot,
+  cornerSlot,
   onClick,
   isPinned = false,
+  isSelected = false,
   onTogglePin,
   pinLabel = "Toggle pin",
   ariaLabel,
@@ -37,6 +43,8 @@ export function RecordTile({
   const tileClassName = [
     styles.tile,
     isInteractive ? styles.tileInteractive : "",
+    isSelected ? styles.tileSelected : "",
+    cornerSlot ? styles.tileWithCornerSlot : "",
     className ?? "",
   ]
     .filter(Boolean)
@@ -78,8 +86,9 @@ export function RecordTile({
           <div className={styles.title}>{title}</div>
         </div>
 
-        {badge || onTogglePin ? (
+        {headerSlot || badge || onTogglePin ? (
           <div className={styles.headActions}>
+            {headerSlot ? <div className={styles.headerSlot}>{headerSlot}</div> : null}
             {badge ? <span className={styles.badge}>{badge}</span> : null}
             {onTogglePin ? (
               <button
@@ -111,6 +120,8 @@ export function RecordTile({
           ))}
         </div>
       ) : null}
+
+      {cornerSlot ? <div className={styles.cornerSlot}>{cornerSlot}</div> : null}
     </article>
   );
 }

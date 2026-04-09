@@ -1,5 +1,6 @@
 using BusinessLogicLayer.Services.Abstractions;
 using Microsoft.AspNetCore.Mvc;
+using WebApi.Infrastructure;
 using WebApi.Contracts.Containers;
 using WebApi.Contracts.Containers.Graphs;
 using WebApi.Contracts.Containers.Graphs.CellStyles;
@@ -12,6 +13,11 @@ namespace WebApi.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
+/// <summary>
+/// Main HTTP API for containers and all nested graph resources.
+/// This controller intentionally mirrors the aggregate structure from the business layer,
+/// which makes the route tree predictable for frontend code and keeps ownership boundaries explicit.
+/// </summary>
 public class ContainersController(IContainerService containerService) : ControllerBase
 {
     [HttpGet]
@@ -32,7 +38,7 @@ public class ContainersController(IContainerService containerService) : Controll
         var container = await containerService.GetAsync(id, cancellationToken).ConfigureAwait(false);
         if (container is null)
         {
-            throw new KeyNotFoundException($"Container with id {id} was not found.");
+            return NotFound(CreateNotFoundProblem($"Container with id {id} was not found."));
         }
 
         return Ok(container.ToApiDto());
@@ -45,6 +51,11 @@ public class ContainersController(IContainerService containerService) : Controll
     public async Task<ActionResult<IEnumerable<GraphDto>>> GetGraphs(int containerId, CancellationToken cancellationToken)
     {
         var graphs = await containerService.GetGraphsAsync(containerId, cancellationToken).ConfigureAwait(false);
+        if (graphs is null)
+        {
+            return NotFound(CreateNotFoundProblem($"Container with id {containerId} was not found."));
+        }
+
         return Ok(graphs.Select(x => x.ToGraphDto()));
     }
 
@@ -55,6 +66,11 @@ public class ContainersController(IContainerService containerService) : Controll
     public async Task<ActionResult<IEnumerable<SchedulePresetDto>>> GetSchedulePresets(int containerId, CancellationToken cancellationToken)
     {
         var presets = await containerService.GetSchedulePresetsAsync(containerId, cancellationToken).ConfigureAwait(false);
+        if (presets is null)
+        {
+            return NotFound(CreateNotFoundProblem($"Container with id {containerId} was not found."));
+        }
+
         return Ok(presets.Select(x => x.ToSchedulePresetDto()));
     }
 
@@ -76,8 +92,11 @@ public class ContainersController(IContainerService containerService) : Controll
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult<GraphDto>> GetGraphById(int containerId, int graphId, CancellationToken cancellationToken)
     {
-        var graph = await containerService.GetGraphByIdAsync(containerId, graphId, cancellationToken).ConfigureAwait(false)
-            ?? throw new KeyNotFoundException($"Graph with id {graphId} was not found.");
+        var graph = await containerService.GetGraphByIdAsync(containerId, graphId, cancellationToken).ConfigureAwait(false);
+        if (graph is null)
+        {
+            return NotFound(CreateNotFoundProblem($"Graph with id {graphId} was not found."));
+        }
 
         return Ok(graph.ToGraphDto());
     }
@@ -115,6 +134,37 @@ public class ContainersController(IContainerService containerService) : Controll
         return NoContent();
     }
 
+    [HttpPost("{containerId:int}/graphs/generate-preview")]
+    [ProducesResponseType(typeof(GenerateGraphResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
+    public async Task<ActionResult<GenerateGraphResponse>> GenerateGraphPreview(
+        int containerId,
+        [FromBody] GenerateGraphPreviewRequest request,
+        CancellationToken cancellationToken)
+    {
+        // Preview never writes to the database. It reuses the generation pipeline and returns
+        // the in-memory slot set so the editor can show the result before persisting anything.
+        var result = await containerService
+            .GenerateGraphPreviewAsync(
+                containerId,
+                request.ToPreviewModel(containerId),
+                request.Employees.Select(x => x.ToPreviewModel(request.GraphId ?? 0)),
+                progress: null,
+                cancellationToken)
+            .ConfigureAwait(false);
+
+        return Ok(new GenerateGraphResponse
+        {
+            ContainerId = result.ContainerId,
+            GraphId = result.GraphId,
+            GeneratedSlotsCount = result.GeneratedSlotsCount,
+            WrittenSlotsCount = result.WrittenSlotsCount,
+            Slots = result.Slots.Select(x => x.ToGraphSlotDto())
+        });
+    }
+
     [HttpPost("{containerId:int}/graphs/{graphId:int}/generate")]
     [ProducesResponseType(typeof(GenerateGraphResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
@@ -126,6 +176,8 @@ public class ContainersController(IContainerService containerService) : Controll
             .GenerateGraphAsync(containerId, graphId, request.Overwrite, request.DryRun, progress: null, cancellationToken)
             .ConfigureAwait(false);
 
+        // Returning slots is optional for persisted generation because some callers only care
+        // about counts. Dry-run always returns slots because there is no database write to inspect later.
         var includeSlots = request.DryRun || request.ReturnSlots;
 
         return Ok(new GenerateGraphResponse
@@ -140,10 +192,25 @@ public class ContainersController(IContainerService containerService) : Controll
 
     [HttpGet("{containerId:int}/graphs/{graphId:int}/slots")]
     [ProducesResponseType(typeof(IEnumerable<GraphSlotDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     public async Task<ActionResult<IEnumerable<GraphSlotDto>>> GetGraphSlots(int containerId, int graphId, CancellationToken cancellationToken)
     {
         var slots = await containerService.GetGraphSlotsAsync(containerId, graphId, cancellationToken).ConfigureAwait(false);
+        if (slots is null)
+        {
+            return NotFound(CreateNotFoundProblem($"Graph with id {graphId} was not found."));
+        }
+
         return Ok(slots.Select(x => x.ToGraphSlotDto()));
+    }
+
+    [HttpPut("{containerId:int}/graphs/{graphId:int}/slots")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> ReplaceGraphSlots(int containerId, int graphId, [FromBody] ReplaceGraphSlotsRequest request, CancellationToken cancellationToken)
+    {
+        await containerService.ReplaceGraphSlotsAsync(containerId, graphId, request.ToReplaceModels(graphId), cancellationToken).ConfigureAwait(false);
+        return NoContent();
     }
 
     [HttpPost("{containerId:int}/graphs/{graphId:int}/slots")]
@@ -174,9 +241,15 @@ public class ContainersController(IContainerService containerService) : Controll
 
     [HttpGet("{containerId:int}/graphs/{graphId:int}/employees")]
     [ProducesResponseType(typeof(IEnumerable<GraphEmployeeDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     public async Task<ActionResult<IEnumerable<GraphEmployeeDto>>> GetGraphEmployees(int containerId, int graphId, CancellationToken cancellationToken)
     {
         var employees = await containerService.GetGraphEmployeesAsync(containerId, graphId, cancellationToken).ConfigureAwait(false);
+        if (employees is null)
+        {
+            return NotFound(CreateNotFoundProblem($"Graph with id {graphId} was not found."));
+        }
+
         return Ok(employees.Select(x => x.ToGraphEmployeeDto()));
     }
 
@@ -206,9 +279,15 @@ public class ContainersController(IContainerService containerService) : Controll
 
     [HttpGet("{containerId:int}/graphs/{graphId:int}/cell-styles")]
     [ProducesResponseType(typeof(IEnumerable<GraphCellStyleDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     public async Task<ActionResult<IEnumerable<GraphCellStyleDto>>> GetGraphCellStyles(int containerId, int graphId, CancellationToken cancellationToken)
     {
         var styles = await containerService.GetGraphCellStylesAsync(containerId, graphId, cancellationToken).ConfigureAwait(false);
+        if (styles is null)
+        {
+            return NotFound(CreateNotFoundProblem($"Graph with id {graphId} was not found."));
+        }
+
         return Ok(styles.Select(x => x.ToGraphCellStyleDto()));
     }
 
@@ -259,6 +338,7 @@ public class ContainersController(IContainerService containerService) : Controll
     [HttpDelete("{id:int}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> Delete(int id, CancellationToken cancellationToken)
     {
@@ -268,7 +348,25 @@ public class ContainersController(IContainerService containerService) : Controll
             throw new KeyNotFoundException($"Container with id {id} was not found.");
         }
 
-        await containerService.DeleteAsync(id, cancellationToken).ConfigureAwait(false);
+        var result = await containerService.TryDeleteAsync(id, cancellationToken).ConfigureAwait(false);
+        if (!result.Succeeded)
+        {
+            return BadRequest(ApiProblemDetailsFactory.CreateValidationProblem(
+                HttpContext,
+                result.Errors,
+                result.Message));
+        }
+
         return NoContent();
     }
+
+    private ProblemDetails CreateNotFoundProblem(string detail)
+        => new()
+        {
+            Type = "not_found",
+            Title = "Not Found",
+            Status = StatusCodes.Status404NotFound,
+            Detail = detail,
+            Instance = HttpContext.Request.Path
+        };
 }

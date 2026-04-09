@@ -1,12 +1,13 @@
-﻿import { useMemo } from "react";
+import { useDeferredValue, useMemo } from "react";
 import { useShopsListQuery } from "@entities/shops/api/queries";
 
-export function useShopsQuery(searchText: string) {
-  const query = useShopsListQuery({ search: searchText });
+export function useShopsQuery(searchText: string, refreshKey?: string) {
+  const query = useShopsListQuery({ search: searchText, refreshKey });
+  const deferredSearchText = useDeferredValue(searchText);
 
   const data = useMemo(() => {
     const shops = query.data ?? [];
-    const search = searchText.trim().toLowerCase();
+    const search = deferredSearchText.trim().toLowerCase();
     if (!search) return shops;
 
     return shops.filter((shop) =>
@@ -14,7 +15,7 @@ export function useShopsQuery(searchText: string) {
         value.toLowerCase().includes(search),
       ),
     );
-  }, [query.data, searchText]);
+  }, [deferredSearchText, query.data]);
 
   return { ...query, data };
 }

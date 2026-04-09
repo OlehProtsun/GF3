@@ -2,6 +2,9 @@ using System.ComponentModel.DataAnnotations;
 
 namespace WebApi.Contracts.Containers;
 
+/// <summary>
+/// Request payload used to update an existing container.
+/// </summary>
 public sealed class UpdateContainerRequest
 {
     [Required]

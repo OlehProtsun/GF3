@@ -1,12 +1,10 @@
-﻿using BusinessLogicLayer.Contracts.Models;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using BusinessLogicLayer.Contracts.Models;
 
-namespace BusinessLogicLayer.Services.Abstractions
+namespace BusinessLogicLayer.Services.Abstractions;
+
+/// <summary>
+/// Business operations for concrete slot rows inside a persisted schedule graph.
+/// </summary>
+public interface IScheduleSlotService : IBaseService<ScheduleSlotModel>
 {
-    public interface IScheduleSlotService : IBaseService<ScheduleSlotModel> { }
 }
-

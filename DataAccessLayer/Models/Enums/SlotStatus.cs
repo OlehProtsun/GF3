@@ -1,10 +1,18 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+namespace DataAccessLayer.Models.Enums;
 
-namespace DataAccessLayer.Models.Enums
+/// <summary>
+/// Storage-level status of one schedule slot.
+/// This enum captures whether the slot still needs staffing or is already assigned to an employee.
+/// </summary>
+public enum SlotStatus
 {
-    public enum SlotStatus { UNFURNISHED, ASSIGNED }
+    /// <summary>
+    /// The slot exists but no employee has been assigned yet.
+    /// </summary>
+    UNFURNISHED,
+
+    /// <summary>
+    /// The slot is fully assigned to an employee.
+    /// </summary>
+    ASSIGNED,
 }

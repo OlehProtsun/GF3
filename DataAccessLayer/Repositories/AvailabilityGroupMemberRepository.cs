@@ -1,50 +1,48 @@
-﻿using DataAccessLayer.Models;
+using DataAccessLayer.Models;
 using DataAccessLayer.Models.DataBaseContext;
 using DataAccessLayer.Repositories.Abstractions;
 using Microsoft.EntityFrameworkCore;
-using System;
-using System.Collections.Generic;
-using System.Text;
 
-namespace DataAccessLayer.Repositories
+namespace DataAccessLayer.Repositories;
+
+/// <summary>
+/// Repository for members that belong to an availability group.
+/// </summary>
+public class AvailabilityGroupMemberRepository : GenericRepository<AvailabilityGroupMemberModel>, IAvailabilityGroupMemberRepository
 {
-    public class AvailabilityGroupMemberRepository
-        : GenericRepository<AvailabilityGroupMemberModel>, IAvailabilityGroupMemberRepository
+    public AvailabilityGroupMemberRepository(AppDbContext db)
+        : base(db)
     {
-        public AvailabilityGroupMemberRepository(AppDbContext db) : base(db) { }
-
-        public override async Task<List<AvailabilityGroupMemberModel>> GetAllAsync(CancellationToken ct = default)
-        {
-            return await _set
-                .AsNoTracking()
-                .Include(m => m.Employee)
-                .Include(m => m.AvailabilityGroup)
-                .ToListAsync(ct)
-                .ConfigureAwait(false);
-        }
-
-        public async Task<List<AvailabilityGroupMemberModel>> GetByGroupIdAsync(int groupId, CancellationToken ct = default)
-        {
-            return await _set
-                .AsNoTracking()
-                .Include(m => m.Employee)
-                .Where(m => m.AvailabilityGroupId == groupId)
-                .OrderBy(m => m.DisplayOrder)
-                .ThenBy(m => m.Employee != null ? m.Employee.FirstName : string.Empty)
-                .ThenBy(m => m.Employee != null ? m.Employee.LastName : string.Empty)
-                .ThenBy(m => m.EmployeeId)
-                .ToListAsync(ct)
-                .ConfigureAwait(false);
-        }
-
-        public async Task<AvailabilityGroupMemberModel?> GetByGroupAndEmployeeAsync(int groupId, int employeeId, CancellationToken ct = default)
-        {
-            return await _set
-                .AsNoTracking()
-                .SingleOrDefaultAsync(m =>
-                    m.AvailabilityGroupId == groupId &&
-                    m.EmployeeId == employeeId, ct)
-                .ConfigureAwait(false);
-        }
     }
+
+    /// <inheritdoc />
+    public override async Task<List<AvailabilityGroupMemberModel>> GetAllAsync(CancellationToken ct = default)
+        => await _set
+            .AsNoTracking()
+            .Include(member => member.Employee)
+            .Include(member => member.AvailabilityGroup)
+            .ToListAsync(ct)
+            .ConfigureAwait(false);
+
+    /// <inheritdoc />
+    public async Task<List<AvailabilityGroupMemberModel>> GetByGroupIdAsync(int groupId, CancellationToken ct = default)
+        => await _set
+            .AsNoTracking()
+            .Include(member => member.Employee)
+            .Where(member => member.AvailabilityGroupId == groupId)
+            .OrderBy(member => member.DisplayOrder)
+            .ThenBy(member => member.Employee != null ? member.Employee.FirstName : string.Empty)
+            .ThenBy(member => member.Employee != null ? member.Employee.LastName : string.Empty)
+            .ThenBy(member => member.EmployeeId)
+            .ToListAsync(ct)
+            .ConfigureAwait(false);
+
+    /// <inheritdoc />
+    public async Task<AvailabilityGroupMemberModel?> GetByGroupAndEmployeeAsync(int groupId, int employeeId, CancellationToken ct = default)
+        => await _set
+            .AsNoTracking()
+            .SingleOrDefaultAsync(
+                member => member.AvailabilityGroupId == groupId && member.EmployeeId == employeeId,
+                ct)
+            .ConfigureAwait(false);
 }

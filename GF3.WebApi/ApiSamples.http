@@ -185,21 +185,16 @@ Accept: text/csv
 GET {{host}}/api/containers/1/graphs/1/export/sql?includeStyles=true&includeEmployees=true
 Accept: text/plain
 
-@adminToken = someSecret
-
-### Admin DB - metadata (requires localhost + X-Admin-Token + enabled tools)
+### Admin DB - metadata (requires localhost + enabled tools)
 GET {{host}}/api/admin/db/metadata
-X-Admin-Token: {{adminToken}}
 Accept: application/json
 
 ### Admin DB - hash
 GET {{host}}/api/admin/db/hash
-X-Admin-Token: {{adminToken}}
 Accept: application/json
 
 ### Admin DB - query (read-only)
 POST {{host}}/api/admin/db/query
-X-Admin-Token: {{adminToken}}
 Content-Type: application/json
 
 {
@@ -208,7 +203,6 @@ Content-Type: application/json
 
 ### Admin DB - execute (works only if AllowWriteSql=true)
 POST {{host}}/api/admin/db/execute
-X-Admin-Token: {{adminToken}}
 Content-Type: application/json
 
 {
@@ -217,7 +211,6 @@ Content-Type: application/json
 
 ### Admin DB - import SQL file multipart (works only if AllowWriteSql=true)
 POST {{host}}/api/admin/db/import
-X-Admin-Token: {{adminToken}}
 Content-Type: multipart/form-data; boundary=boundary
 
 --boundary

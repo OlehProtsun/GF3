@@ -48,21 +48,35 @@ export function OverlaySidebarLayout({ children }: OverlaySidebarLayoutProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const { pathname } = useLocation();
   const isContainerWideContent = pathname === "/container";
-  const isContainerGraphWideContent =
+  const isHomeWideContent = pathname === "/";
+  const isDatabaseWideContent = pathname === "/database";
+  const isContainerGraphEditorContent =
     Boolean(matchPath(pathname, "/container/:containerId/graphs/new")) ||
-    Boolean(matchPath(pathname, "/container/:containerId/graphs/:graphId/edit")) ||
+    Boolean(matchPath(pathname, "/container/:containerId/graphs/:graphId/edit"));
+  const isContainerGraphProfileContent =
+    !isContainerGraphEditorContent &&
     Boolean(matchPath(pathname, "/container/:containerId/graphs/:graphId"));
+  const isContainerGraphWideContent = isContainerGraphProfileContent || isContainerGraphEditorContent;
   const isWideContent =
+    isHomeWideContent ||
     isContainerWideContent ||
+    isDatabaseWideContent ||
     isContainerGraphWideContent ||
     pathname === "/availability/new" ||
     Boolean(matchPath(pathname, "/availability/:availabilityId/edit")) ||
     Boolean(matchPath(pathname, "/availability/:availabilityId"));
+  const isWideScrollableContent =
+    isHomeWideContent ||
+    isContainerWideContent ||
+    isDatabaseWideContent ||
+    isContainerGraphProfileContent;
+  const isContainerGraphHeaderAligned = isContainerGraphEditorContent;
   const contentClassName = [
     styles.content,
     isCollapsed ? styles.contentExpanded : styles.contentShifted,
     isWideContent ? styles.contentWide : "",
-    isContainerWideContent ? styles.contentWideScrollable : "",
+    isWideScrollableContent ? styles.contentWideScrollable : "",
+    isContainerGraphHeaderAligned ? styles.contentWideHeaderAligned : "",
   ].filter(Boolean).join(" ");
 
   return (

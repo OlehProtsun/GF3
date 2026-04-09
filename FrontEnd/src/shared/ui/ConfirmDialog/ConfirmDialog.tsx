@@ -1,12 +1,13 @@
-import { useEffect, useId, useState, type MouseEvent, type ReactNode } from "react";
+import { useEffect, useId, type MouseEvent, type ReactNode } from "react";
 import { IosButton } from "@shared/ui/components/IosButton";
-import { CloseIcon, WarnIcon } from "@shared/ui/icons";
+import { CheckIcon, CloseIcon, WarnIcon } from "@shared/ui/icons";
 import styles from "./ConfirmDialog.module.css";
 
 type ConfirmDialogProps = {
   open: boolean;
   title: string;
   message: string;
+  variant?: "warning" | "confirm";
   onConfirm: () => void;
   onCancel: () => void;
   confirmText?: string;
@@ -16,12 +17,11 @@ type ConfirmDialogProps = {
   cancelDisabled?: boolean;
 };
 
-const EXIT_ANIMATION_MS = 220;
-
 export function ConfirmDialog({
   open,
   title,
   message,
+  variant = "warning",
   onConfirm,
   onCancel,
   confirmText = "Confirm",
@@ -30,22 +30,11 @@ export function ConfirmDialog({
   confirmDisabled = false,
   cancelDisabled = false,
 }: ConfirmDialogProps) {
-  const [isMounted, setIsMounted] = useState(open);
   const titleId = useId();
   const messageId = useId();
 
   useEffect(() => {
-    if (open) {
-      setIsMounted(true);
-      return;
-    }
-
-    const timeoutId = window.setTimeout(() => setIsMounted(false), EXIT_ANIMATION_MS);
-    return () => window.clearTimeout(timeoutId);
-  }, [open]);
-
-  useEffect(() => {
-    if (!isMounted) {
+    if (!open) {
       return;
     }
 
@@ -57,7 +46,7 @@ export function ConfirmDialog({
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [cancelDisabled, isMounted, onCancel]);
+  }, [cancelDisabled, onCancel, open]);
 
   const handleOverlayMouseDown = (event: MouseEvent<HTMLDivElement>) => {
     if (event.target !== event.currentTarget || cancelDisabled) {
@@ -66,22 +55,30 @@ export function ConfirmDialog({
 
     onCancel();
   };
-
-  if (!isMounted) return null;
+  const isConfirmVariant = variant === "confirm";
 
   return (
     <div
       className={`${styles.overlay} ${open ? styles.overlayOpen : styles.overlayClosing}`}
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby={titleId}
-      aria-describedby={messageId}
+      role={open ? "dialog" : undefined}
+      aria-modal={open ? true : undefined}
+      aria-hidden={open ? undefined : true}
+      aria-labelledby={open ? titleId : undefined}
+      aria-describedby={open ? messageId : undefined}
       onMouseDown={handleOverlayMouseDown}
     >
-      <div className={`${styles.dialog} ${open ? styles.dialogOpen : styles.dialogClosing}`}>
+      <div
+        className={[
+          styles.dialog,
+          open ? styles.dialogOpen : styles.dialogClosing,
+          isConfirmVariant ? styles.dialogConfirm : styles.dialogWarning,
+        ]
+          .filter(Boolean)
+          .join(" ")}
+      >
         <div className={styles.hero}>
           <div className={styles.iconShell} aria-hidden="true">
-            <WarnIcon size={22} />
+            {isConfirmVariant ? <CheckIcon size={22} /> : <WarnIcon size={22} />}
           </div>
 
           <div className={styles.copy}>
@@ -105,9 +102,9 @@ export function ConfirmDialog({
 
           <IosButton
             label={confirmText}
-            icon={<WarnIcon size={16} />}
-            customColor="#dc2626"
-            customBorderColor="#dc2626"
+            icon={isConfirmVariant ? <CheckIcon size={16} /> : <WarnIcon size={16} />}
+            customColor={isConfirmVariant ? "#2563eb" : "#dc2626"}
+            customBorderColor={isConfirmVariant ? "#2563eb" : "#dc2626"}
             onClick={onConfirm}
             disabled={confirmDisabled}
           />

@@ -286,10 +286,16 @@
   border: 1px solid rgba(255, 59, 48, 0.24);
   color: #b42318;
   font-size: 0.86rem;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+}
+
+.scheduleHeaderMessageText {
   font-weight: 800;
   line-height: 1.25;
   text-align: center;
-  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
 }
 
 .scheduleSaveButton {

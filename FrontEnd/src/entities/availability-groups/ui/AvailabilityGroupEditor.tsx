@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import type { Employee } from "@entities/employees/model/types";
 import type { AvailabilityMatrixCellMap, AvailabilityMatrixColumn } from "@entities/availability-groups/model/editor";
@@ -69,6 +69,29 @@ function joinClassNames(...values: Array<string | undefined>) {
   return values.filter(Boolean).join(" ");
 }
 
+function sanitizeSelectedCellKeys(
+  selectedCellKeys: string[],
+  columns: AvailabilityMatrixColumn[],
+  year: number,
+  month: number,
+) {
+  const daysInMonth = new Date(year, month, 0).getDate();
+  const availableEmployeeIds = new Set(columns.map(column => column.employeeId));
+
+  return selectedCellKeys.filter(cellKey => {
+    const [employeeIdValue, dayOfMonthValue] = cellKey.split(":");
+    const employeeId = Number(employeeIdValue);
+    const dayOfMonth = Number(dayOfMonthValue);
+
+    return (
+      availableEmployeeIds.has(employeeId) &&
+      Number.isInteger(dayOfMonth) &&
+      dayOfMonth >= 1 &&
+      dayOfMonth <= daysInMonth
+    );
+  });
+}
+
 export function AvailabilityGroupEditor({
   name,
   month,
@@ -116,7 +139,12 @@ export function AvailabilityGroupEditor({
   const [isDesktopLayout, setIsDesktopLayout] = useState(false);
   const [viewportHeight, setViewportHeight] = useState(0);
   const [compactMatrixMeasurement, setCompactMatrixMeasurement] = useState<{ key: string; height: number } | null>(null);
+  const [selectedCellKeys, setSelectedCellKeys] = useState<string[]>([]);
   const matrixCardShellRef = useRef<HTMLDivElement | null>(null);
+  const sanitizedSelectedCellKeys = useMemo(
+    () => sanitizeSelectedCellKeys(selectedCellKeys, columns, year, month),
+    [columns, month, selectedCellKeys, year],
+  );
 
   const allSectionsCollapsed = Object.values(collapsedSections).every(Boolean);
   const compactMatrixMeasurementKey = [
@@ -359,9 +387,12 @@ export function AvailabilityGroupEditor({
             cellErrors={cellErrors}
             headerCenterSlot={
               errorMessage ? (
-                <div className={styles.scheduleHeaderMessage} role="alert" aria-live="polite">
+                <ErrorBanner
+                  bannerClassName={styles.scheduleHeaderMessage}
+                  textClassName={styles.scheduleHeaderMessageText}
+                >
                   {errorMessage}
-                </div>
+                </ErrorBanner>
               ) : null
             }
             headerRightSlot={
@@ -374,7 +405,11 @@ export function AvailabilityGroupEditor({
               />
             }
             bindValueByKey={bindValueByKey}
+            selectedCellKeys={sanitizedSelectedCellKeys}
             onColumnMove={onColumnMove}
+            onSelectedCellKeysChange={(nextSelectedCellKeys) => {
+              setSelectedCellKeys(sanitizeSelectedCellKeys(nextSelectedCellKeys, columns, year, month));
+            }}
             onCellChange={onCellChange}
           />
         </div>

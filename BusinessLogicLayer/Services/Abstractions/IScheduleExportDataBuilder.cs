@@ -1,17 +1,22 @@
 using BusinessLogicLayer.Contracts.Export;
 using BusinessLogicLayer.Contracts.Models;
 
-namespace BusinessLogicLayer.Services.Abstractions
+namespace BusinessLogicLayer.Services.Abstractions;
+
+/// <summary>
+/// Builds the normalized SQL-export payload for one schedule graph.
+/// </summary>
+public interface IScheduleExportDataBuilder
 {
-    public interface IScheduleExportDataBuilder
-    {
-        ScheduleSqlExportData BuildSqlData(
-            ScheduleModel schedule,
-            IReadOnlyList<ScheduleEmployeeModel> employees,
-            IReadOnlyList<ScheduleSlotModel> slots,
-            IReadOnlyList<ScheduleCellStyleModel> cellStyles,
-            AvailabilityGroupModel? availabilityGroup,
-            IReadOnlyList<AvailabilityGroupMemberModel>? availabilityMembers,
-            IReadOnlyList<AvailabilityGroupDayModel>? availabilityDays);
-    }
+    /// <summary>
+    /// Produces a full export payload that combines the schedule graph with optional availability data.
+    /// </summary>
+    ScheduleSqlExportData BuildSqlData(
+        ScheduleModel schedule,
+        IReadOnlyList<ScheduleEmployeeModel> employees,
+        IReadOnlyList<ScheduleSlotModel> slots,
+        IReadOnlyList<ScheduleCellStyleModel> cellStyles,
+        AvailabilityGroupModel? availabilityGroup,
+        IReadOnlyList<AvailabilityGroupMemberModel>? availabilityMembers,
+        IReadOnlyList<AvailabilityGroupDayModel>? availabilityDays);
 }

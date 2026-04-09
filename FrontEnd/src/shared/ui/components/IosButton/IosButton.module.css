@@ -1,24 +1,43 @@
-﻿.button {
+.button {
   --btn-bg: #2563eb;
   --btn-bg-hover: color-mix(in srgb, var(--btn-bg) 88%, #000);
   --btn-border: color-mix(in srgb, var(--btn-bg) 76%, #ffffff 24%);
   --btn-shadow: color-mix(in srgb, var(--btn-bg) 35%, transparent);
   --btn-focus: color-mix(in srgb, var(--btn-bg) 35%, transparent);
+  --ios-button-height: 43px;
+  --ios-button-padding-block: 0.55rem;
+  --ios-button-padding-inline: 0.85rem;
+  --ios-button-gap: 8px;
+  --ios-button-font-size: inherit;
+  --ios-button-radius: 999px;
 
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  height: 43px;
-  padding: 0.55rem 0.85rem;
-  border-radius: 999px;
+  justify-content: center;
+  gap: var(--ios-button-gap);
+  height: var(--ios-button-height);
+  padding: var(--ios-button-padding-block) var(--ios-button-padding-inline);
+  border-radius: var(--ios-button-radius);
   border: 1px solid var(--btn-border);
   background: var(--btn-bg);
   color: #fff;
+  font-size: var(--ios-button-font-size);
   font-weight: 600;
   line-height: 1;
   cursor: pointer;
   box-shadow: 0 10px 22px var(--btn-shadow);
   transition: transform 120ms ease, box-shadow 120ms ease, background 120ms ease, border-color 120ms ease;
+}
+
+.default {
+}
+
+.compact {
+  --ios-button-height: 37px;
+  --ios-button-padding-block: 0.45rem;
+  --ios-button-padding-inline: 0.78rem;
+  --ios-button-gap: 7px;
+  --ios-button-font-size: 0.95rem;
 }
 
 .button:hover:not(:disabled) {

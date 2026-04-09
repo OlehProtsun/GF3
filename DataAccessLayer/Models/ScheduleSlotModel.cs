@@ -1,47 +1,63 @@
-﻿using Microsoft.EntityFrameworkCore;
+using DataAccessLayer.Models.Enums;
+using Microsoft.EntityFrameworkCore;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
-using DataAccessLayer.Models.Enums;
 
-namespace DataAccessLayer.Models
+namespace DataAccessLayer.Models;
+
+/// <summary>
+/// Stores a single shift cell inside a schedule.
+/// <see cref="SlotNo"/> distinguishes multiple positions inside the same time interval when more than one employee
+/// is required for a shift.
+/// </summary>
+[Table("schedule_slot")]
+[Index(nameof(ScheduleId), nameof(DayOfMonth), nameof(FromTime), nameof(ToTime), nameof(SlotNo), IsUnique = true)]
+public class ScheduleSlotModel
 {
-    [Table("schedule_slot")]
-    [Index(nameof(ScheduleId), nameof(DayOfMonth), nameof(FromTime), nameof(ToTime), nameof(SlotNo), IsUnique = true)]
-    [Index(nameof(ScheduleId), nameof(DayOfMonth), nameof(FromTime), nameof(ToTime), nameof(EmployeeId), IsUnique = true, Name = "ux_slot_unique_emp_per_time")]
-    public class ScheduleSlotModel
-    {
-        [Key]
-        [Column("id")]
-        public int Id { get; set; }
+    [Key]
+    [Column("id")]
+    public int Id { get; set; }
 
-        [Required]
-        [Column("schedule_id")]
-        public int ScheduleId { get; set; }
-        public ScheduleModel Schedule { get; set; } = null!;
+    [Required]
+    [Column("schedule_id")]
+    public int ScheduleId { get; set; }
 
-        [Required]
-        [Column("day_of_month")]
-        public int DayOfMonth { get; set; }
+    /// <summary>
+    /// Parent schedule that owns the slot.
+    /// </summary>
+    public ScheduleModel Schedule { get; set; } = null!;
 
-        [Required]
-        [Column("slot_no")]
-        public int SlotNo { get; set; }
+    [Required]
+    [Column("day_of_month")]
+    public int DayOfMonth { get; set; }
 
-        [Column("employee_id")]
-        public int? EmployeeId { get; set; }
-        public EmployeeModel? Employee { get; set; }
+    [Required]
+    [Column("slot_no")]
+    public int SlotNo { get; set; }
 
-        [Required]
-        [Column("status")]
-        public SlotStatus Status { get; set; } = SlotStatus.UNFURNISHED;
+    [Column("employee_id")]
+    public int? EmployeeId { get; set; }
 
-        // 🔥 нові поля часу
-        [Required]
-        [Column("from_time")]
-        public string FromTime { get; set; } = null!;   // "HH:mm"
+    /// <summary>
+    /// Assigned employee, or <see langword="null"/> when the slot is unassigned.
+    /// </summary>
+    public EmployeeModel? Employee { get; set; }
 
-        [Required]
-        [Column("to_time")]
-        public string ToTime { get; set; } = null!;     // "HH:mm"
-    }
+    [Required]
+    [Column("status")]
+    public SlotStatus Status { get; set; } = SlotStatus.UNFURNISHED;
+
+    /// <summary>
+    /// Start time in <c>HH:mm</c> format.
+    /// </summary>
+    [Required]
+    [Column("from_time")]
+    public string FromTime { get; set; } = null!;
+
+    /// <summary>
+    /// End time in <c>HH:mm</c> format.
+    /// </summary>
+    [Required]
+    [Column("to_time")]
+    public string ToTime { get; set; } = null!;
 }

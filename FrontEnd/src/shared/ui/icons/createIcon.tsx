@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import type { SVGProps, ReactNode } from "react";
 
 export type IconProps = Omit<SVGProps<SVGSVGElement>, "children"> & {

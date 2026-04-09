@@ -2,6 +2,7 @@ import { request } from "@shared/api/httpClient";
 import type {
   ContainerDto,
   GenerateGraphRequestDto,
+  GenerateGraphPreviewRequestDto,
   GenerateGraphResponseDto,
   GraphCellStyleDto,
   GraphDto,
@@ -10,6 +11,7 @@ import type {
   SaveContainerDto,
   SaveGraphDto,
   SaveGraphEmployeeDto,
+  ReplaceGraphSlotsDto,
   SaveSchedulePresetDto,
   SaveGraphSlotDto,
   SchedulePresetDto,
@@ -35,11 +37,15 @@ export const containersApi = {
     request<SchedulePresetDto[]>(`${endpoint}/${containerId}/schedule-presets`, { signal }),
   createSchedulePreset: (containerId: number, payload: SaveSchedulePresetDto) =>
     request<SchedulePresetDto>(`${endpoint}/${containerId}/schedule-presets`, { method: "POST", body: payload }),
+  generateGraphPreview: (containerId: number, payload: GenerateGraphPreviewRequestDto) =>
+    request<GenerateGraphResponseDto>(`${endpoint}/${containerId}/graphs/generate-preview`, { method: "POST", body: payload }),
   generateGraph: (containerId: number, graphId: number, payload: GenerateGraphRequestDto) =>
     request<GenerateGraphResponseDto>(`${endpoint}/${containerId}/graphs/${graphId}/generate`, { method: "POST", body: payload }),
 
   listGraphSlots: (containerId: number, graphId: number, signal?: AbortSignal) =>
     request<GraphSlotDto[]>(`${endpoint}/${containerId}/graphs/${graphId}/slots`, { signal }),
+  replaceGraphSlots: (containerId: number, graphId: number, payload: ReplaceGraphSlotsDto) =>
+    request<void>(`${endpoint}/${containerId}/graphs/${graphId}/slots`, { method: "PUT", body: payload }),
   createGraphSlot: (containerId: number, graphId: number, payload: SaveGraphSlotDto) =>
     request<GraphSlotDto>(`${endpoint}/${containerId}/graphs/${graphId}/slots`, { method: "POST", body: payload }),
   updateGraphSlot: (containerId: number, graphId: number, slotId: number, payload: SaveGraphSlotDto) =>

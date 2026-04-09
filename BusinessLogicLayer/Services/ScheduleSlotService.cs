@@ -5,6 +5,11 @@ using DataAccessLayer.Repositories.Abstractions;
 
 namespace BusinessLogicLayer.Services;
 
+/// <summary>
+/// Thin service wrapper for schedule slots.
+/// It intentionally stays small because container/graph workflows own the richer slot rules,
+/// while this service simply provides a reusable CRUD entry point for direct slot access.
+/// </summary>
 public class ScheduleSlotService : IScheduleSlotService
 {
     private readonly IScheduleSlotRepository _repo;
