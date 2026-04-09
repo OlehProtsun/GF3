@@ -2,11 +2,13 @@ import type { ButtonHTMLAttributes, CSSProperties, ReactNode } from "react";
 import styles from "./IosButton.module.css";
 
 type IosButtonVariant = "primary" | "secondary";
+type IosButtonSize = "default" | "compact";
 
 type IosButtonProps = {
   label: string;
   icon?: ReactNode;
   variant?: IosButtonVariant;
+  size?: IosButtonSize;
   disabled?: boolean;
   className?: string;
   customColor?: string;
@@ -20,13 +22,14 @@ export function IosButton({
   onClick,
   icon,
   variant = "primary",
+  size = "default",
   disabled = false,
   className,
   customColor,
   customBorderColor,
   type = "button",
 }: IosButtonProps) {
-  const classes = [styles.button, styles[variant], className].filter(Boolean).join(" ");
+  const classes = [styles.button, styles[variant], styles[size], className].filter(Boolean).join(" ");
   const style = {
     ...(customColor ? { "--btn-bg": customColor } : {}),
     ...(customBorderColor ? { "--btn-border": customBorderColor } : {}),

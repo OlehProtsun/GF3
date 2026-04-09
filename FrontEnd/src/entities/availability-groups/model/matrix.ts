@@ -120,13 +120,18 @@ function normalizeAvailabilityKind(kind: AvailabilityKind) {
 
 export function getAvailabilityCodeFromKind(kind: AvailabilityKind, intervalStr?: string | null) {
   const normalizedKind = normalizeAvailabilityKind(kind);
+  const trimmedIntervalStr = (intervalStr ?? "").trim();
 
   if (normalizedKind === AVAILABILITY_KIND_ANY) {
     return AVAILABILITY_ANY_MARK;
   }
 
   if (normalizedKind === AVAILABILITY_KIND_INTERVAL) {
-    return (intervalStr ?? "").trim() || AVAILABILITY_NONE_MARK;
+    return trimmedIntervalStr || AVAILABILITY_NONE_MARK;
+  }
+
+  if (trimmedIntervalStr && trimmedIntervalStr !== AVAILABILITY_NONE_MARK) {
+    return trimmedIntervalStr;
   }
 
   return AVAILABILITY_NONE_MARK;
@@ -134,6 +139,14 @@ export function getAvailabilityCodeFromKind(kind: AvailabilityKind, intervalStr?
 
 function tryNormalizeInterval(value: string) {
   return parseFlexibleTimeRange(value)?.label ?? null;
+}
+
+function containsAlphabeticCharacter(value: string) {
+  return [...value].some(character => character.toLowerCase() !== character.toUpperCase());
+}
+
+function looksLikeAvailabilityTimeAttempt(value: string) {
+  return /[:.,]/.test(value) || value.includes("-");
 }
 
 export function parseAvailabilityCode(input: string):
@@ -164,20 +177,31 @@ export function parseAvailabilityCode(input: string):
   }
 
   const normalizedInterval = tryNormalizeInterval(trimmed);
-  if (!normalizedInterval) {
+  if (normalizedInterval) {
     return {
-      ok: false,
-      error: "Use +, -, or a valid time range like 09:00 - 15:00.",
+      ok: true,
+      value: {
+        normalizedCode: normalizedInterval,
+        kind: AVAILABILITY_KIND_INTERVAL,
+        intervalStr: normalizedInterval,
+      },
+    };
+  }
+
+  if (containsAlphabeticCharacter(trimmed) || !looksLikeAvailabilityTimeAttempt(trimmed)) {
+    return {
+      ok: true,
+      value: {
+        normalizedCode: trimmed,
+        kind: AVAILABILITY_KIND_NONE,
+        intervalStr: trimmed,
+      },
     };
   }
 
   return {
-    ok: true,
-    value: {
-      normalizedCode: normalizedInterval,
-      kind: AVAILABILITY_KIND_INTERVAL,
-      intervalStr: normalizedInterval,
-    },
+    ok: false,
+    error: "Use +, -, text, or a valid time range like 09:00 - 15:00.",
   };
 }
 
@@ -265,14 +289,16 @@ export function buildAvailabilityCellMapFromItems(
 export function summarizeAvailabilityCellMap(cellMap: AvailabilityMatrixCellMap) {
   return Object.values(cellMap).reduce(
     (summary, value) => {
-      const trimmedValue = value.trim();
+      const parsed = parseAvailabilityCode(value);
 
-      if (!trimmedValue || trimmedValue === AVAILABILITY_NONE_MARK) {
+      if (!parsed.ok) {
         summary.none += 1;
-      } else if (trimmedValue === AVAILABILITY_ANY_MARK) {
+      } else if (parsed.value.kind === AVAILABILITY_KIND_ANY) {
         summary.any += 1;
-      } else {
+      } else if (parsed.value.kind === AVAILABILITY_KIND_INTERVAL) {
         summary.interval += 1;
+      } else {
+        summary.none += 1;
       }
 
       return summary;

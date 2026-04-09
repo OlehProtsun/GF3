@@ -288,6 +288,10 @@
   overflow-clip-margin: 0;
 }
 
+.contentWideHeaderAligned {
+  padding-top: 10px;
+}
+
 .contentWideScrollable :global(.container) {
   min-height: auto;
 }
@@ -416,6 +420,10 @@
   pointer-events: none;
 }
 @media (max-width: 960px) {
+  .contentExpanded {
+    --page-header-fixed-offset: calc(var(--sidebar-w) + 12px);
+  }
+
   .contentWide {
     height: auto;
     min-height: 100vh;

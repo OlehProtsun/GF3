@@ -128,7 +128,7 @@ export function ContainerGraphDetailsFields({
 
       <div className={joinClassNames(styles.detailsRow, styles.detailsRowBalanced)}>
         {showNameField ? (
-          <LabeledField id={`${idPrefix}-name`} label="Name" error={formErrors.name} className={styles.detailsFieldCompact}>
+          <LabeledField id={`${idPrefix}-name`} label="Name*" error={formErrors.name} className={styles.detailsFieldCompact}>
             <TextInput
               id={`${idPrefix}-name`}
               className={styles.controlCompact}
@@ -143,7 +143,7 @@ export function ContainerGraphDetailsFields({
 
         <LabeledField
           id={`${idPrefix}-people`}
-          label="People / shift"
+          label="People / shift*"
           error={formErrors.peoplePerShift}
           className={joinClassNames(
             styles.detailsFieldCompact,
@@ -166,7 +166,7 @@ export function ContainerGraphDetailsFields({
       </div>
 
       <div className={joinClassNames(styles.detailsRow, styles.detailsRowBalanced)}>
-        <LabeledField id={`${idPrefix}-month`} label="Month" error={formErrors.month} className={styles.detailsFieldCompact}>
+        <LabeledField id={`${idPrefix}-month`} label="Month*" error={formErrors.month} className={styles.detailsFieldCompact}>
           <SearchableSelect
             id={`${idPrefix}-month`}
             className={styles.controlMedium}
@@ -185,7 +185,7 @@ export function ContainerGraphDetailsFields({
           />
         </LabeledField>
 
-        <LabeledField id={`${idPrefix}-year`} label="Year" error={formErrors.year} className={styles.detailsFieldCompact}>
+        <LabeledField id={`${idPrefix}-year`} label="Year*" error={formErrors.year} className={styles.detailsFieldCompact}>
           <NumberStepperInput
             id={`${idPrefix}-year`}
             className={joinClassNames(
@@ -203,7 +203,7 @@ export function ContainerGraphDetailsFields({
       </div>
 
       <div className={joinClassNames(styles.detailsRow, styles.detailsRowBalanced)}>
-        <LabeledField id={`${idPrefix}-shift1`} label="Shift 1" error={formErrors.shift1Time} className={styles.detailsFieldCompact}>
+        <LabeledField id={`${idPrefix}-shift1`} label="Shift 1*" error={formErrors.shift1Time} className={styles.detailsFieldCompact}>
           <TextInput
             id={`${idPrefix}-shift1`}
             className={styles.controlCompact}
@@ -214,7 +214,7 @@ export function ContainerGraphDetailsFields({
           />
         </LabeledField>
 
-        <LabeledField id={`${idPrefix}-shift2`} label="Shift 2" error={formErrors.shift2Time} className={styles.detailsFieldCompact}>
+        <LabeledField id={`${idPrefix}-shift2`} label="Shift 2*" error={formErrors.shift2Time} className={styles.detailsFieldCompact}>
           <TextInput
             id={`${idPrefix}-shift2`}
             className={styles.controlCompact}
@@ -291,7 +291,7 @@ export function ContainerGraphDetailsFields({
       <div className={joinClassNames(styles.detailsRow, styles.detailsRowBalanced)}>
         <LabeledField
           id={`${idPrefix}-shop`}
-          label="Shop"
+          label="Shop*"
           error={formErrors.shopId}
           className={joinClassNames(
             styles.detailsFieldFull,

@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
 import type { SchedulePreset } from "@entities/containers/model/types";
 import type { Shop } from "@entities/shops/model/types";
@@ -40,13 +40,13 @@ function getMonthLabel(month: number) {
 
 function getPresetHint(preset: SchedulePreset, shopNameById: Map<number, string>) {
   const shopName = shopNameById.get(preset.shopId) ?? `Shop ${preset.shopId}`;
-  return `${preset.scheduleName} · ${shopName} · ${getMonthLabel(preset.month)} ${preset.year}`;
+  return `${preset.scheduleName} - ${shopName} - ${getMonthLabel(preset.month)} ${preset.year}`;
 }
 
 function getPresetMeta(preset: SchedulePreset) {
   const employeeOverrides = preset.employees.length;
   const employeeLabel = employeeOverrides === 1 ? "1 employee override" : `${employeeOverrides} employee overrides`;
-  return `${preset.shift1Time} / ${preset.shift2Time} · ${preset.peoplePerShift} per shift · ${employeeLabel}`;
+  return `${preset.shift1Time} / ${preset.shift2Time} - ${preset.peoplePerShift} per shift - ${employeeLabel}`;
 }
 
 export function ContainerGraphPresetSelect({
@@ -89,6 +89,14 @@ export function ContainerGraphPresetSelect({
       .toLowerCase()
       .includes(normalizedSearchText));
   }, [presets, searchText, shopNameById]);
+  const closeDropdown = useCallback(() => {
+    setIsOpen(false);
+    setSearchText("");
+  }, []);
+  const openDropdown = useCallback(() => {
+    setSearchText("");
+    setIsOpen(true);
+  }, []);
 
   useLayoutEffect(() => {
     if (!isOpen || !triggerRef.current) {
@@ -119,7 +127,6 @@ export function ContainerGraphPresetSelect({
 
   useEffect(() => {
     if (!isOpen) {
-      setSearchText("");
       return;
     }
 
@@ -133,13 +140,13 @@ export function ContainerGraphPresetSelect({
       const insideTrigger = triggerRef.current?.contains(event.target);
       const insideDropdown = dropdownRef.current?.contains(event.target);
       if (!insideTrigger && !insideDropdown) {
-        setIsOpen(false);
+        closeDropdown();
       }
     };
 
     const handleEscape = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
-        setIsOpen(false);
+        closeDropdown();
       }
     };
 
@@ -149,11 +156,11 @@ export function ContainerGraphPresetSelect({
       window.removeEventListener("mousedown", handlePointerDown);
       window.removeEventListener("keydown", handleEscape);
     };
-  }, [isOpen]);
+  }, [closeDropdown, isOpen]);
 
   const handleSelect = (presetId: number) => {
     onSelect(presetId);
-    setIsOpen(false);
+    closeDropdown();
   };
 
   const triggerLabel = selectedPreset?.name ?? "Apply preset";
@@ -229,7 +236,7 @@ export function ContainerGraphPresetSelect({
               label="Add preset"
               icon={<PlusIcon size={16} />}
               onClick={() => {
-                setIsOpen(false);
+                closeDropdown();
                 onAddPreset();
               }}
             />
@@ -246,7 +253,14 @@ export function ContainerGraphPresetSelect({
         <button
           type="button"
           className={styles.trigger}
-          onClick={() => setIsOpen(current => !current)}
+          onClick={() => {
+            if (isOpen) {
+              closeDropdown();
+              return;
+            }
+
+            openDropdown();
+          }}
           aria-haspopup="listbox"
           aria-expanded={isOpen}
           aria-label="Open schedule preset list"

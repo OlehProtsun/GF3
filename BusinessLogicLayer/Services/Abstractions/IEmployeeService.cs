@@ -1,14 +1,20 @@
-﻿using BusinessLogicLayer.Contracts.Models;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using BusinessLogicLayer.Common;
+using BusinessLogicLayer.Contracts.Models;
 
-namespace BusinessLogicLayer.Services.Abstractions
+namespace BusinessLogicLayer.Services.Abstractions;
+
+/// <summary>
+/// Business operations for employees.
+/// </summary>
+public interface IEmployeeService : IBaseService<EmployeeModel>
 {
-    public interface IEmployeeService : IBaseService<EmployeeModel> 
-    {
-        Task<List<EmployeeModel>> GetByValueAsync(string value, CancellationToken ct = default);
-    }
+    /// <summary>
+    /// Searches employees by user-facing fields such as name, email, and phone.
+    /// </summary>
+    Task<List<EmployeeModel>> GetByValueAsync(string value, CancellationToken ct = default);
+
+    /// <summary>
+    /// Attempts to delete an employee without throwing for expected dependency-related failures.
+    /// </summary>
+    Task<DeleteOperationResult> TryDeleteAsync(int id, CancellationToken ct = default);
 }

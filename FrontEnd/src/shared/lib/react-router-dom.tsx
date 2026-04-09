@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import type { AnchorHTMLAttributes, PropsWithChildren, ReactNode } from "react";
 
@@ -7,6 +8,7 @@ type RouterLocation = {
   pathname: string;
   search: string;
   hash: string;
+  key: string;
 };
 
 type RouterContextValue = {
@@ -15,6 +17,8 @@ type RouterContextValue = {
 };
 
 const RouterContext = createContext<RouterContextValue | null>(null);
+
+let locationSequence = 0;
 
 const PARAM_ROUTE_PATTERNS = [
   "/availability/new",
@@ -32,20 +36,25 @@ const PARAM_ROUTE_PATTERNS = [
 ] as const;
 
 function readLocation(): RouterLocation {
+  locationSequence += 1;
+
   return {
     pathname: window.location.pathname,
     search: window.location.search,
     hash: window.location.hash,
+    key: String(locationSequence),
   };
 }
 
 function resolveLocation(to: string): RouterLocation {
   const url = new URL(to, window.location.href);
+  locationSequence += 1;
 
   return {
     pathname: url.pathname,
     search: url.search,
     hash: url.hash,
+    key: String(locationSequence),
   };
 }
 
@@ -194,7 +203,7 @@ export function Routes({ children }: PropsWithChildren) {
   return <>{children}</>;
 }
 
-export function Route(_props: { path?: string; element?: ReactNode; children?: ReactNode }) {
+export function Route() {
   return null;
 }
 
@@ -202,7 +211,7 @@ export function matchPath(pathname: string, path: string): boolean {
   return extractRouteParams(pathname, path) !== null;
 }
 
-export function renderMatched(pathname: string, routes: Array<{ path: string; element: ReactNode }>) {
+export function renderMatched(pathname: string, routes: ReadonlyArray<{ path: string; element: ReactNode }>) {
   const matched = routes.find((route) => matchPath(pathname, route.path));
   if (!matched) return null;
 

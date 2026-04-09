@@ -127,6 +127,114 @@
   flex-wrap: wrap;
 }
 
+.multiOpenToggle {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  min-height: 42px;
+  padding: 0 58px 0 16px;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(248, 250, 252, 0.92));
+  box-shadow:
+    0 14px 30px rgba(15, 23, 42, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.74);
+  transition:
+    border-color 120ms ease,
+    box-shadow 120ms ease,
+    background 120ms ease,
+    transform 120ms ease;
+}
+
+.multiOpenToggle:hover {
+  background: rgba(255, 255, 255, 0.9);
+  border-color: rgba(148, 163, 184, 0.22);
+}
+
+.multiOpenToggle:active {
+  transform: translateY(1px);
+}
+
+.multiOpenToggle:focus-visible {
+  outline: none;
+  box-shadow:
+    0 0 0 4px rgba(37, 99, 235, 0.14),
+    0 10px 24px rgba(15, 23, 42, 0.1);
+}
+
+.multiOpenToggleActive {
+  border-color: rgba(96, 165, 250, 0.34);
+  background:
+    linear-gradient(180deg, rgba(239, 246, 255, 0.98), rgba(219, 234, 254, 0.9));
+}
+
+.multiOpenToggleTitle {
+  color: #0f172a;
+  display: block;
+  width: 100%;
+  font-size: 0.8rem;
+  font-weight: 800;
+  line-height: 1;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.multiOpenToggleTrack {
+  position: absolute;
+  top: 50%;
+  right: 12px;
+  display: inline-flex;
+  align-items: center;
+  width: 38px;
+  min-width: 38px;
+  height: 22px;
+  padding: 2px;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.24);
+  box-shadow:
+    inset 0 1px 2px rgba(15, 23, 42, 0.1),
+    0 6px 16px rgba(15, 23, 42, 0.08);
+  transform: translateY(-50%);
+  transition: background 120ms ease, box-shadow 120ms ease;
+}
+
+.multiOpenToggleActive .multiOpenToggleTrack {
+  background: #2563eb;
+  box-shadow:
+    inset 0 1px 2px rgba(29, 78, 216, 0.32),
+    0 8px 18px rgba(37, 99, 235, 0.2);
+}
+
+.multiOpenToggleThumb {
+  display: block;
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  background: #ffffff;
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.18);
+  transform: translateX(0);
+  transition: transform 120ms ease;
+}
+
+.multiOpenToggleActive .multiOpenToggleThumb {
+  transform: translateX(16px);
+}
+
+.selectionBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 32px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(37, 99, 235, 0.18);
+  background: rgba(219, 234, 254, 0.72);
+  color: #1d4ed8;
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
 .statisticsCard {
   width: 100%;
   margin-top: 4px;
@@ -146,6 +254,28 @@
   color: #475569;
   font-size: 0.84rem;
   font-weight: 700;
+}
+
+.selectionMark {
+  width: 26px;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  background: rgba(255, 255, 255, 0.92);
+  color: transparent;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+
+.selectionMarkActive {
+  border-color: rgba(37, 99, 235, 0.24);
+  background: linear-gradient(180deg, rgba(239, 246, 255, 0.98), rgba(219, 234, 254, 0.9));
+  color: #1d4ed8;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.82),
+    0 10px 18px rgba(37, 99, 235, 0.14);
 }
 
 .scheduleHeaderRow {
@@ -218,27 +348,6 @@
   color: #0f172a;
   font-size: 1.2rem;
   font-weight: 800;
-}
-
-.summaryMeta {
-  display: grid;
-  gap: 8px;
-  margin-top: 16px;
-  color: #334155;
-}
-
-.summaryMeta p {
-  margin: 0;
-  display: grid;
-  gap: 4px;
-}
-
-.summaryMetaLabel {
-  color: #64748b;
-  font-size: 0.82rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
 }
 
 .tableWrap {
@@ -369,6 +478,10 @@
   .scheduleHeaderRow {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .scheduleHeaderActions {
+    justify-content: flex-start;
   }
 
   .profileNoteValue {

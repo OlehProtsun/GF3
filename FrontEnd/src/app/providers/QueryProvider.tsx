@@ -9,6 +9,7 @@ import {
 import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 import { isRequestCanceledError } from "@shared/api/httpClient";
 import { isDev } from "@shared/lib/isDev";
+import { pushErrorAlertFromError } from "@shared/ui/feedback/error-alerts/errorAlerts";
 
 function createQueryClient() {
   return new QueryClient({
@@ -24,14 +25,26 @@ function createQueryClient() {
     },
     queryCache: new QueryCache({
       onError: (error, query) => {
-        if (isDev && !isRequestCanceledError(error)) {
+        if (isRequestCanceledError(error)) {
+          return;
+        }
+
+        pushErrorAlertFromError(error, "Could not load data from the server.");
+
+        if (isDev) {
           console.error("[Query error]", query.queryKey, error);
         }
       },
     }),
     mutationCache: new MutationCache({
       onError: (error, _variables, _context, mutation) => {
-        if (isDev && !isRequestCanceledError(error)) {
+        if (isRequestCanceledError(error)) {
+          return;
+        }
+
+        pushErrorAlertFromError(error, "Could not complete the requested action.");
+
+        if (isDev) {
           console.error("[Mutation error]", mutation.options.mutationKey, error);
         }
       },

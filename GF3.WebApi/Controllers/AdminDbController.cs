@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using BusinessLogicLayer.Contracts.Database;
 using BusinessLogicLayer.Services.Abstractions;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
@@ -7,17 +8,22 @@ using WebApi.Options;
 
 namespace WebApi.Controllers;
 
+/// <summary>
+/// Provides operational endpoints for inspecting and maintaining the SQLite database.
+/// The controller stays intentionally conservative: write operations are guarded by configuration and all
+/// SQL requests are validated before execution so accidental misuse fails fast with a clear problem response.
+/// </summary>
 [ApiController]
 [Route("api/admin/db")]
 public sealed class AdminDbController : ControllerBase
 {
     private readonly IAdminDbService _adminDbService;
-    private readonly IOptions<AdminToolsOptions> _adminOptions;
+    private readonly AdminToolsOptions _options;
 
     public AdminDbController(IAdminDbService adminDbService, IOptions<AdminToolsOptions> adminOptions)
     {
         _adminDbService = adminDbService;
-        _adminOptions = adminOptions;
+        _options = adminOptions.Value;
     }
 
     [HttpGet("metadata")]
@@ -26,15 +32,18 @@ public sealed class AdminDbController : ControllerBase
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> Metadata(CancellationToken cancellationToken)
-        => Ok(await _adminDbService.GetMetadataAsync(cancellationToken).ConfigureAwait(false));
+    {
+        var metadata = await _adminDbService.GetMetadataAsync(cancellationToken).ConfigureAwait(false);
+        return Ok(CreateMetadataResponse(metadata));
+    }
 
     [HttpGet("hash")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
-    public async Task<IActionResult> Hash(CancellationToken cancellationToken)
-        => Ok(new { hash = await _adminDbService.GetDbHashAsync(cancellationToken).ConfigureAwait(false) });
+    public async Task<IActionResult> Hash(CancellationToken cancellationToken) =>
+        Ok(new { hash = await _adminDbService.GetDbHashAsync(cancellationToken).ConfigureAwait(false) });
 
     [HttpPost("query")]
     [ProducesResponseType(StatusCodes.Status200OK)]
@@ -45,8 +54,9 @@ public sealed class AdminDbController : ControllerBase
     public async Task<IActionResult> Query([FromBody] AdminDbSqlRequest request, CancellationToken cancellationToken)
     {
         EnsureSqlProvided(request.Sql);
+
         var result = await _adminDbService
-            .ExecuteQueryAsync(request.Sql, _adminOptions.Value.MaxSqlLength, cancellationToken)
+            .ExecuteQueryAsync(request.Sql, _options.MaxSqlLength, cancellationToken)
             .ConfigureAwait(false);
 
         return Ok(result);
@@ -63,11 +73,11 @@ public sealed class AdminDbController : ControllerBase
         EnsureWriteEnabled();
         EnsureSqlProvided(request.Sql);
 
-        var affected = await _adminDbService
-            .ExecuteNonQueryAsync(request.Sql, _adminOptions.Value.MaxSqlLength, cancellationToken)
+        var affectedRows = await _adminDbService
+            .ExecuteNonQueryAsync(request.Sql, _options.MaxSqlLength, cancellationToken)
             .ConfigureAwait(false);
 
-        return Ok(new { affectedRows = affected });
+        return Ok(new { affectedRows });
     }
 
     [HttpPost("import")]
@@ -86,15 +96,34 @@ public sealed class AdminDbController : ControllerBase
             throw new ValidationException("SQL file is required.");
         }
 
-        await using var stream = file.OpenReadStream();
-        using var memory = new MemoryStream();
-        await stream.CopyToAsync(memory, cancellationToken).ConfigureAwait(false);
-
+        var bytes = await ReadAllBytesAsync(file, cancellationToken).ConfigureAwait(false);
         var result = await _adminDbService
-            .ImportSqlAsync(memory.ToArray(), _adminOptions.Value.MaxImportBytes, cancellationToken)
+            .ImportSqlAsync(bytes, _options.MaxImportBytes, cancellationToken)
             .ConfigureAwait(false);
 
         return Ok(result);
+    }
+
+    private object CreateMetadataResponse(AdminDbMetadataDto metadata) => new
+    {
+        metadata.SqliteVersion,
+        metadata.DatabasePath,
+        metadata.FileSizeBytes,
+        metadata.LastModifiedUtc,
+        metadata.UserVersion,
+        metadata.Tables,
+        metadata.Objects,
+        allowWriteSql = _options.AllowWriteSql,
+        maxSqlLength = _options.MaxSqlLength,
+        maxImportBytes = _options.MaxImportBytes,
+    };
+
+    private static async Task<byte[]> ReadAllBytesAsync(IFormFile file, CancellationToken cancellationToken)
+    {
+        await using var stream = file.OpenReadStream();
+        using var memory = new MemoryStream();
+        await stream.CopyToAsync(memory, cancellationToken).ConfigureAwait(false);
+        return memory.ToArray();
     }
 
     private static void EnsureSqlProvided(string sql)
@@ -107,7 +136,7 @@ public sealed class AdminDbController : ControllerBase
 
     private void EnsureWriteEnabled()
     {
-        if (!_adminOptions.Value.AllowWriteSql)
+        if (!_options.AllowWriteSql)
         {
             throw new ValidationException("Write SQL operations are disabled.");
         }

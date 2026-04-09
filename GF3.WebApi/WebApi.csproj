@@ -20,6 +20,10 @@
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.0" />
     <PackageReference Include="Microsoft.AspNetCore.SpaProxy" Version="10.0.3" />
     <PackageReference Include="Microsoft.AspNetCore.SpaServices.Extensions" Version="10.0.3" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.5">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
     <PackageReference Include="Swashbuckle.AspNetCore" Version="10.0.1" />
   </ItemGroup>
 
@@ -31,5 +35,23 @@
   <ItemGroup>
     <Folder Include="Resources\ExcelTemplate\" />
   </ItemGroup>
+
+  <Target Name="PublishFrontendAssets" BeforeTargets="ComputeFilesToPublish">
+    <Exec
+      WorkingDirectory="$(SpaRoot)"
+      Command="npm install"
+      Condition="!Exists('$(SpaRoot)node_modules')" />
+    <Exec
+      WorkingDirectory="$(SpaRoot)"
+      Command="npm run build" />
+
+    <ItemGroup>
+      <FrontendDistFiles Include="$(SpaRoot)dist\**" />
+      <ResolvedFileToPublish Include="@(FrontendDistFiles->'%(FullPath)')" Exclude="@(ResolvedFileToPublish)">
+        <RelativePath>wwwroot\%(RecursiveDir)%(Filename)%(Extension)</RelativePath>
+        <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+      </ResolvedFileToPublish>
+    </ItemGroup>
+  </Target>
 
 </Project>

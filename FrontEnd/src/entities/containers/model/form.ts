@@ -1,5 +1,6 @@
-﻿import { useEffect, useState } from "react";
+import { useMemo } from "react";
 import type { ChangeEvent } from "react";
+import { useSyncedDraft } from "@shared/lib/useSyncedDraft";
 import type { Container } from "./types";
 
 export type ContainerFormState = {
@@ -29,37 +30,49 @@ function buildValidationErrors(form: ContainerFormState): ContainerFormErrors {
 }
 
 export function useContainerForm(container?: Container | null, isCreate = false) {
-  const [form, setForm] = useState<ContainerFormState>(() => buildInitialState(container));
-  const [errors, setErrors] = useState<ContainerFormErrors>({});
-
-  useEffect(() => {
-    setForm(buildInitialState(container));
-    setErrors({});
-  }, [container?.id, container?.name, container?.note, isCreate]);
+  const sourceKey = useMemo(
+    () =>
+      isCreate
+        ? "create"
+        : `container:${container?.id ?? "new"}:${container?.name ?? ""}:${container?.note ?? ""}`,
+    [container?.id, container?.name, container?.note, isCreate],
+  );
+  const initialDraft = useMemo(
+    () => ({
+      form: buildInitialState(container),
+      errors: {} as ContainerFormErrors,
+    }),
+    [container],
+  );
+  const { value: draft, setValue: setDraft } = useSyncedDraft(sourceKey, initialDraft);
+  const { form, errors } = draft;
 
   const handleFieldChange =
     (field: keyof ContainerFormState) => (event: ChangeEvent<ContainerFormFieldElement>) => {
       const value = event.target.value;
 
-      setForm(prev => ({
-        ...prev,
-        [field]: value,
-      }));
-
-      setErrors(prev => {
-        if (!prev[field]) {
-          return prev;
-        }
-
-        const nextErrors = { ...prev };
+      setDraft((current) => {
+        const nextErrors = { ...current.errors };
         delete nextErrors[field];
-        return nextErrors;
+
+        return {
+          form: {
+            ...current.form,
+            [field]: value,
+          },
+          errors: nextErrors,
+        };
       });
     };
 
   const validate = () => {
     const nextErrors = buildValidationErrors(form);
-    setErrors(nextErrors);
+
+    setDraft((current) => ({
+      ...current,
+      errors: nextErrors,
+    }));
+
     return Object.keys(nextErrors).length === 0;
   };
 
@@ -81,13 +94,18 @@ export function useContainerForm(container?: Container | null, isCreate = false)
     }
 
     if (Object.keys(nextErrors).length > 0) {
-      setErrors(nextErrors);
+      setDraft((current) => ({
+        ...current,
+        errors: nextErrors,
+      }));
     }
   };
 
   const reset = (nextContainer?: Container | null) => {
-    setForm(buildInitialState(nextContainer));
-    setErrors({});
+    setDraft({
+      form: buildInitialState(nextContainer),
+      errors: {},
+    });
   };
 
   return {

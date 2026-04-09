@@ -4,10 +4,11 @@ import type { SaveShopInput, ShopsListParams } from "@entities/shops/model/types
 import { shopsApi } from "./shopsApi";
 
 export function useShopsListQuery(params?: ShopsListParams) {
-  const search = params?.search?.trim() ?? "";
-
   return useQuery({
-    queryKey: queryKeys.shops.list(search),
+    queryKey: params?.refreshKey
+      ? [...queryKeys.shops.list(), params.refreshKey]
+      : queryKeys.shops.list(),
+    staleTime: 300_000,
     // Keep the shops list request alive through StrictMode remounts in dev.
     queryFn: () => shopsApi.list(),
   });
@@ -54,4 +55,3 @@ export function useDeleteShopMutation() {
     },
   });
 }
-

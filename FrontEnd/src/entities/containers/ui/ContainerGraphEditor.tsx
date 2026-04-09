@@ -13,6 +13,7 @@ import type {
 import type {
   GraphMatrixCellMap,
   GraphMatrixColumn,
+  GraphRelatedScheduleHintDetailMap,
   GraphMatrixStyleMap,
   GraphTotals,
 } from "@entities/containers/model/graphWorkspace";
@@ -39,6 +40,7 @@ import { ContainerGraphDetailsFields } from "./ContainerGraphDetailsFields";
 import { ContainerGraphManualColumnsCard } from "./ContainerGraphManualColumnsCard";
 import { ContainerGraphMatrix } from "./ContainerGraphMatrix";
 import { ContainerGraphPresetDialog } from "./ContainerGraphPresetDialog";
+import { ContainerGraphRelatedHintDialog } from "./ContainerGraphRelatedHintDialog";
 import { ContainerGraphPresetSelect } from "./ContainerGraphPresetSelect";
 import styles from "./ContainerGraphEditor.module.css";
 
@@ -90,9 +92,10 @@ type ContainerGraphEditorProps = {
   manualColumns: EditableGraphManualColumn[];
   selectedEmployeeId: number | null;
   selectedBindClientId: string | null;
-  employeeSearchText: string;
   scheduleColumns: GraphMatrixColumn[];
   cellMap: GraphMatrixCellMap;
+  visualHintMap?: GraphMatrixCellMap;
+  visualHintDetailMap?: GraphRelatedScheduleHintDetailMap;
   cellErrors: Record<string, string>;
   styleMap: GraphMatrixStyleMap;
   dayConflictMap: Record<number, boolean>;
@@ -101,8 +104,11 @@ type ContainerGraphEditorProps = {
   previewCellMap: AvailabilityMatrixCellMap;
   previewYear: number;
   previewMonth: number;
+  previewAvailabilitySelection: string;
+  previewAvailabilityOptions: SearchableSelectOption[];
   bindValueByKey: ReadonlyMap<string, string>;
   selectedCellKeys: string[];
+  previewSelectedCellKeys: string[];
   fillColor: string;
   textColor: string;
   isLoading: boolean;
@@ -110,15 +116,15 @@ type ContainerGraphEditorProps = {
   isSaving: boolean;
   isGenerating: boolean;
   isStylingBusy: boolean;
+  showMatrixSaveAction?: boolean;
   isBindsLoading: boolean;
   isBindBusy: boolean;
   isSchedulePresetsLoading: boolean;
   submitError?: string;
   bindErrorMessage?: string;
-  needsRegeneration: boolean;
   onFieldChange: (field: keyof ContainerGraphFormState) => (value: string) => void;
-  onEmployeeSearchTextChange: (value: string) => void;
   onSelectedEmployeeIdChange: (value: number | null) => void;
+  onPreviewAvailabilitySelectionChange: (value: string) => void;
   onSelectedBindChange: (clientId: string | null) => void;
   onApplySchedulePreset: (presetId: number) => void;
   onCreateSchedulePreset: (payload: SaveSchedulePresetDto) => Promise<void>;
@@ -135,6 +141,7 @@ type ContainerGraphEditorProps = {
   onColumnMove: (employeeId: number, targetEmployeeId: number) => void;
   onCellChange: (employeeId: number, dayOfMonth: number, value: string) => void;
   onSelectedCellKeysChange: (keys: string[]) => void;
+  onPreviewSelectedCellKeysChange: (keys: string[]) => void;
   onFillColorChange: (value: string) => void;
   onTextColorChange: (value: string) => void;
   onApplyFillColor: () => void;
@@ -147,6 +154,15 @@ type ContainerGraphEditorProps = {
 
 function joinClassNames(...values: Array<string | undefined | false>) {
   return values.filter(Boolean).join(" ");
+}
+
+function formatGraphHintDateLabel(year: number, month: number, dayOfMonth: number) {
+  return new Intl.DateTimeFormat("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(new Date(Date.UTC(year, month - 1, dayOfMonth)));
 }
 
 type SplitColorButtonProps = {
@@ -260,6 +276,8 @@ export function ContainerGraphEditor({
   selectedBindClientId,
   scheduleColumns,
   cellMap,
+  visualHintMap,
+  visualHintDetailMap = {},
   cellErrors,
   styleMap,
   dayConflictMap,
@@ -268,8 +286,11 @@ export function ContainerGraphEditor({
   previewCellMap,
   previewYear,
   previewMonth,
+  previewAvailabilitySelection,
+  previewAvailabilityOptions,
   bindValueByKey,
   selectedCellKeys,
+  previewSelectedCellKeys,
   fillColor,
   textColor,
   isLoading,
@@ -277,14 +298,15 @@ export function ContainerGraphEditor({
   isSaving,
   isGenerating,
   isStylingBusy,
+  showMatrixSaveAction = true,
   isBindsLoading,
   isBindBusy,
   isSchedulePresetsLoading,
   submitError,
   bindErrorMessage,
-  needsRegeneration,
   onFieldChange,
   onSelectedEmployeeIdChange,
+  onPreviewAvailabilitySelectionChange,
   onSelectedBindChange,
   onApplySchedulePreset,
   onCreateSchedulePreset,
@@ -301,6 +323,7 @@ export function ContainerGraphEditor({
   onColumnMove,
   onCellChange,
   onSelectedCellKeysChange,
+  onPreviewSelectedCellKeysChange,
   onFillColorChange,
   onTextColorChange,
   onApplyFillColor,
@@ -320,6 +343,8 @@ export function ContainerGraphEditor({
   const [colorDialogMode, setColorDialogMode] = useState<ColorDialogMode | null>(null);
   const [isPresetDialogOpen, setIsPresetDialogOpen] = useState(false);
   const [previewLayoutMode, setPreviewLayoutMode] = useState<PreviewLayoutMode>("stacked");
+  const [isGenerationOverlayArmed, setIsGenerationOverlayArmed] = useState(false);
+  const [activeRelatedHintCellKey, setActiveRelatedHintCellKey] = useState<string | null>(null);
   const [viewportHeight, setViewportHeight] = useState(() => {
     if (typeof window === "undefined") {
       return 0;
@@ -366,6 +391,21 @@ export function ContainerGraphEditor({
       mediaQuery.removeListener(handleChange);
     };
   }, []);
+
+  useEffect(() => {
+    if (!isGenerating) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setIsGenerationOverlayArmed(true);
+    }, 550);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+      setIsGenerationOverlayArmed(false);
+    };
+  }, [isGenerating]);
 
   const employeeById = useMemo(
     () => new Map(employees.map(employee => [employee.id, employee])),
@@ -459,11 +499,26 @@ export function ContainerGraphEditor({
       ? { height: "100%", maxHeight: "100%" }
       : undefined;
   const hasSelection = selectedCellKeys.length > 0;
-  const canPersistStyles = Boolean(graph && graph.id > 0);
-  const canApplySelectedStyles = hasSelection && canPersistStyles && !isStylingBusy;
+  const canApplySelectedStyles = hasSelection && !isStylingBusy;
   const hasStyledCells = Object.keys(styleMap).length > 0;
   const activeColorValue = colorDialogMode === "text" ? textColor : fillColor;
   const isSplitPreviewLayout = isDesktopLayout && previewLayoutMode === "side";
+  const showGenerationOverlay = isGenerating && isGenerationOverlayArmed;
+  const displayGraphYear = Number(form.year) || graph?.year || new Date().getFullYear();
+  const displayGraphMonth = Number(form.month) || graph?.month || 1;
+  const displayGraphName = form.name.trim() || graph?.name?.trim() || "Current schedule";
+  const activeRelatedHint =
+    activeRelatedHintCellKey
+      ? visualHintDetailMap[activeRelatedHintCellKey] ?? null
+      : null;
+  const activeHintEmployeeName =
+    activeRelatedHint
+      ? getEmployeeFullName(employeeById.get(activeRelatedHint.employeeId), `Employee ${activeRelatedHint.employeeId}`)
+      : "";
+  const activeHintDayLabel =
+    activeRelatedHint
+      ? formatGraphHintDateLabel(displayGraphYear, displayGraphMonth, activeRelatedHint.dayOfMonth)
+      : "";
 
   const setSectionCollapsed = (section: SidebarSectionKey, collapsed: boolean) => {
     setCollapsedSections(current => (
@@ -479,6 +534,10 @@ export function ContainerGraphEditor({
     }
 
     setColorDialogMode(null);
+  };
+  const handleGenerate = () => {
+    setIsGenerationOverlayArmed(false);
+    onGenerate();
   };
 
   const renderCollapseButton = (label: string, section: SidebarSectionKey) => (
@@ -536,7 +595,7 @@ export function ContainerGraphEditor({
                     className={styles.generateButton}
                     label={isGenerating ? "Generating..." : "Generate"}
                     disabled={isGenerating || isSaving}
-                    onClick={onGenerate}
+                    onClick={handleGenerate}
                   />
                 </div>
               </CardSection>
@@ -714,6 +773,8 @@ export function ContainerGraphEditor({
                   }}
                   columns={scheduleColumns}
                   cellMap={cellMap}
+                  visualHintMap={visualHintMap}
+                  visualHintDetailMap={visualHintDetailMap}
                   cellErrors={cellErrors}
                   styleMap={styleMap}
                   dayConflictMap={dayConflictMap}
@@ -728,6 +789,7 @@ export function ContainerGraphEditor({
                   )}
                   onSelectedCellKeysChange={onSelectedCellKeysChange}
                   onCellChange={onCellChange}
+                  onVisualHintClick={detail => setActiveRelatedHintCellKey(`${detail.employeeId}:${detail.dayOfMonth}`)}
                   toolbar={
                     <div className={styles.matrixToolbar}>
                       <SplitColorButton
@@ -747,37 +809,32 @@ export function ContainerGraphEditor({
                         onOpenDialog={() => setColorDialogMode("text")}
                       />
                       <ToolbarActionButton
-                        label="Clear Selected"
+                        label="C. Selected"
                         icon={<ClearFormatIcon size={15} />}
                         disabled={!hasSelection || isStylingBusy}
                         onClick={onClearCellStyle}
                       />
                       <ToolbarActionButton
-                        label="Clear All Styles"
+                        label="C. All"
                         icon={<ClearFormatAllIcon size={15} />}
                         disabled={!hasStyledCells || isStylingBusy}
                         onClick={onClearAllCellStyles}
                       />
 
-                      {!canPersistStyles ? (
-                        <span className={styles.stylingHint}>Save this schedule once to enable persistent matrix styling.</span>
-                      ) : null}
-
-                      {needsRegeneration ? (
-                        <span className={styles.regenerationPill}>Schedule fields changed. Generate again to refresh the auto-filled plan.</span>
-                      ) : null}
                     </div>
                   }
                   headerRightSlot={
                     <div className={styles.matrixHeaderActions}>
                       <span className={styles.headerBadge}>{`Employees: ${totals.totalEmployees}`}</span>
                       <span className={styles.headerBadge}>{`Hours: ${totals.totalHoursText}`}</span>
-                      <IosButton
-                        label={isSaving ? "Saving..." : "Save"}
-                        icon={<SaveIcon size={18} />}
-                        disabled={isSaving || isGenerating}
-                        onClick={onSave}
-                      />
+                      {showMatrixSaveAction ? (
+                        <IosButton
+                          label={isSaving ? "Saving..." : "Save"}
+                          icon={<SaveIcon size={18} />}
+                          disabled={isSaving || isGenerating}
+                          onClick={onSave}
+                        />
+                      ) : null}
                     </div>
                   }
                 />
@@ -804,20 +861,40 @@ export function ContainerGraphEditor({
                   columns={previewGraphColumns}
                   cellMap={previewCellMap}
                   readOnly
+                  enableSelectionWhenReadOnly
                   highlightReadOnlyEmpty
                   emptyMessage="No availability preview is available for the selected group yet."
+                  selectedCellKeys={previewSelectedCellKeys}
+                  onSelectedCellKeysChange={onPreviewSelectedCellKeysChange}
                   headerRightSlot={
                     <div className={styles.previewHeaderActions}>
-                      <PreviewLayoutButton
-                        mode="side"
-                        active={previewLayoutMode === "side"}
-                        onClick={() => setPreviewLayoutMode("side")}
+                      <SearchableSelect
+                        id="graph-preview-availability"
+                        className={styles.previewAvailabilitySelect}
+                        size="compact"
+                        value={previewAvailabilitySelection}
+                        options={previewAvailabilityOptions}
+                        placeholder="Select preview availability..."
+                        dropdownTitle="Availability Preview"
+                        searchPlaceholder="Search availability..."
+                        emptyMessage="No availability groups match your search."
+                        showSelectedHint={false}
+                        ariaLabel="availability preview groups"
+                        onChange={onPreviewAvailabilitySelectionChange}
                       />
-                      <PreviewLayoutButton
-                        mode="stacked"
-                        active={previewLayoutMode === "stacked"}
-                        onClick={() => setPreviewLayoutMode("stacked")}
-                      />
+
+                      <div className={styles.previewLayoutActions}>
+                        <PreviewLayoutButton
+                          mode="side"
+                          active={previewLayoutMode === "side"}
+                          onClick={() => setPreviewLayoutMode("side")}
+                        />
+                        <PreviewLayoutButton
+                          mode="stacked"
+                          active={previewLayoutMode === "stacked"}
+                          onClick={() => setPreviewLayoutMode("stacked")}
+                        />
+                      </div>
                     </div>
                   }
                 />
@@ -841,6 +918,33 @@ export function ContainerGraphEditor({
         onCancel={() => setIsPresetDialogOpen(false)}
         onSave={onCreateSchedulePreset}
       />
+      <ContainerGraphRelatedHintDialog
+        open={activeRelatedHint !== null}
+        graphName={displayGraphName}
+        employeeName={activeHintEmployeeName}
+        year={displayGraphYear}
+        month={displayGraphMonth}
+        dayLabel={activeHintDayLabel}
+        currentCellMap={cellMap}
+        detail={activeRelatedHint}
+        onCancel={() => setActiveRelatedHintCellKey(null)}
+      />
+      {showGenerationOverlay ? (
+        <div className={styles.generationOverlay} role="status" aria-live="polite" aria-label="Generating schedule">
+          <div className={styles.generationOverlayCard}>
+            <div className={styles.generationOverlaySpinner} aria-hidden="true">
+              <span />
+              <span />
+              <span />
+            </div>
+            <div className={styles.generationOverlayEyebrow}>Schedule Generator</div>
+            <div className={styles.generationOverlayTitle}>Generating schedule...</div>
+            <div className={styles.generationOverlayText}>
+              We are filling the grid using availability and workload limits. The matrix will refresh automatically when it is ready.
+            </div>
+          </div>
+        </div>
+      ) : null}
     </>
   );
 }

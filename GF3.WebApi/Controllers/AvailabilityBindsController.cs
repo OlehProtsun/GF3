@@ -1,10 +1,16 @@
-﻿using BusinessLogicLayer.Services.Abstractions;
+using BusinessLogicLayer.Contracts.Models;
+using BusinessLogicLayer.Services.Abstractions;
 using Microsoft.AspNetCore.Mvc;
 using WebApi.Contracts.AvailabilityBinds;
 using WebApi.Mappers;
 
 namespace WebApi.Controllers;
 
+/// <summary>
+/// Exposes CRUD endpoints for availability hotkey bindings.
+/// These bindings are small reference records, so the controller intentionally stays thin and delegates
+/// validation and duplicate checks to the business service.
+/// </summary>
 [ApiController]
 [Route("api/availability-binds")]
 public sealed class AvailabilityBindsController(IBindService bindService) : ControllerBase
@@ -15,7 +21,7 @@ public sealed class AvailabilityBindsController(IBindService bindService) : Cont
     public async Task<ActionResult<IEnumerable<AvailabilityBindDto>>> GetAll(CancellationToken cancellationToken)
     {
         var binds = await bindService.GetAllAsync(cancellationToken).ConfigureAwait(false);
-        return Ok(binds.Select(x => x.ToApiDto()));
+        return Ok(binds.Select(bind => bind.ToApiDto()));
     }
 
     [HttpGet("active")]
@@ -24,7 +30,7 @@ public sealed class AvailabilityBindsController(IBindService bindService) : Cont
     public async Task<ActionResult<IEnumerable<AvailabilityBindDto>>> GetActive(CancellationToken cancellationToken)
     {
         var binds = await bindService.GetActiveAsync(cancellationToken).ConfigureAwait(false);
-        return Ok(binds.Select(x => x.ToApiDto()));
+        return Ok(binds.Select(bind => bind.ToApiDto()));
     }
 
     [HttpGet("{id:int}")]
@@ -33,12 +39,7 @@ public sealed class AvailabilityBindsController(IBindService bindService) : Cont
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult<AvailabilityBindDto>> GetById(int id, CancellationToken cancellationToken)
     {
-        var bind = await bindService.GetAsync(id, cancellationToken).ConfigureAwait(false);
-        if (bind is null)
-        {
-            throw new KeyNotFoundException($"Availability bind with id {id} was not found.");
-        }
-
+        var bind = await GetExistingBindOrThrowAsync(id, cancellationToken).ConfigureAwait(false);
         return Ok(bind.ToApiDto());
     }
 
@@ -60,12 +61,7 @@ public sealed class AvailabilityBindsController(IBindService bindService) : Cont
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> Update(int id, [FromBody] UpdateAvailabilityBindRequest request, CancellationToken cancellationToken)
     {
-        var existing = await bindService.GetAsync(id, cancellationToken).ConfigureAwait(false);
-        if (existing is null)
-        {
-            throw new KeyNotFoundException($"Availability bind with id {id} was not found.");
-        }
-
+        _ = await GetExistingBindOrThrowAsync(id, cancellationToken).ConfigureAwait(false);
         await bindService.UpdateAsync(request.ToUpdateModel(id), cancellationToken).ConfigureAwait(false);
         return NoContent();
     }
@@ -76,13 +72,14 @@ public sealed class AvailabilityBindsController(IBindService bindService) : Cont
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> Delete(int id, CancellationToken cancellationToken)
     {
-        var existing = await bindService.GetAsync(id, cancellationToken).ConfigureAwait(false);
-        if (existing is null)
-        {
-            throw new KeyNotFoundException($"Availability bind with id {id} was not found.");
-        }
-
+        _ = await GetExistingBindOrThrowAsync(id, cancellationToken).ConfigureAwait(false);
         await bindService.DeleteAsync(id, cancellationToken).ConfigureAwait(false);
         return NoContent();
+    }
+
+    private async Task<BindModel> GetExistingBindOrThrowAsync(int id, CancellationToken cancellationToken)
+    {
+        var bind = await bindService.GetAsync(id, cancellationToken).ConfigureAwait(false);
+        return bind ?? throw new KeyNotFoundException($"Availability bind with id {id} was not found.");
     }
 }

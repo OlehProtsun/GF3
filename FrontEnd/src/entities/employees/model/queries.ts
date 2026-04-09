@@ -1,18 +1,19 @@
-import { useMemo } from "react";
+import { useDeferredValue, useMemo } from "react";
 import { useEmployeesListQuery } from "@entities/employees/api/queries";
 
-export function useEmployeesQuery(searchText: string) {
-  const query = useEmployeesListQuery();
+export function useEmployeesQuery(searchText: string, refreshKey?: string) {
+  const query = useEmployeesListQuery({ search: searchText, refreshKey });
+  const deferredSearchText = useDeferredValue(searchText);
 
   const data = useMemo(() => {
     const employees = query.data ?? [];
-    const search = searchText.trim().toLowerCase();
+    const search = deferredSearchText.trim().toLowerCase();
     if (!search) return employees;
 
     return employees.filter((employee) =>
       `${employee.firstName} ${employee.lastName}`.toLowerCase().includes(search),
     );
-  }, [query.data, searchText]);
+  }, [deferredSearchText, query.data]);
 
   return { ...query, data };
 }

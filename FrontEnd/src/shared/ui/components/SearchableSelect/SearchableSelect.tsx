@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
 import { ArrowIcon, CheckIcon, SearchIcon } from "@shared/ui/icons";
 import styles from "./SearchableSelect.module.css";
@@ -20,6 +20,7 @@ type SearchableSelectProps = {
   searchPlaceholder?: string;
   emptyMessage?: string;
   fallbackHint?: string;
+  showSelectedHint?: boolean;
   searchEnabled?: boolean;
   invalid?: boolean;
   disabled?: boolean;
@@ -45,6 +46,7 @@ export function SearchableSelect({
   searchPlaceholder = "Search...",
   emptyMessage = "No matching options found.",
   fallbackHint,
+  showSelectedHint = true,
   searchEnabled = true,
   invalid = false,
   disabled = false,
@@ -80,6 +82,14 @@ export function SearchableSelect({
         .includes(normalizedSearchText)
     ));
   }, [options, searchEnabled, searchText]);
+  const closeDropdown = useCallback(() => {
+    setIsOpen(false);
+    setSearchText("");
+  }, []);
+  const openDropdown = useCallback(() => {
+    setSearchText("");
+    setIsOpen(true);
+  }, []);
 
   useLayoutEffect(() => {
     if (!isOpen || !triggerRef.current || !dropdownRef.current) {
@@ -121,7 +131,6 @@ export function SearchableSelect({
 
   useEffect(() => {
     if (!isOpen) {
-      setSearchText("");
       return;
     }
 
@@ -137,13 +146,13 @@ export function SearchableSelect({
       const insideTrigger = triggerRef.current?.contains(event.target);
       const insideDropdown = dropdownRef.current?.contains(event.target);
       if (!insideTrigger && !insideDropdown) {
-        setIsOpen(false);
+        closeDropdown();
       }
     };
 
     const handleEscape = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
-        setIsOpen(false);
+        closeDropdown();
       }
     };
 
@@ -153,14 +162,16 @@ export function SearchableSelect({
       window.removeEventListener("mousedown", handlePointerDown);
       window.removeEventListener("keydown", handleEscape);
     };
-  }, [isOpen, searchEnabled]);
+  }, [closeDropdown, isOpen, searchEnabled]);
 
   const handleSelect = (nextValue: string) => {
     onChange(nextValue);
-    setIsOpen(false);
+    closeDropdown();
   };
 
-  const resolvedHint = selectedOption?.hint ?? fallbackHint ?? `${options.length} options available`;
+  const resolvedHint = showSelectedHint
+    ? (selectedOption?.hint ?? fallbackHint ?? `${options.length} options available`)
+    : "";
   const rootClassName = joinClassNames(styles.root, className);
   const dropdown = isOpen ? createPortal(
     <div ref={dropdownRef} className={styles.dropdownPortal} style={dropdownStyle}>
@@ -229,7 +240,18 @@ export function SearchableSelect({
             shadow === "soft" && styles.selectButtonShadowSoft,
             invalid && styles.selectButtonInvalid,
           )}
-          onClick={() => !disabled && setIsOpen(current => !current)}
+          onClick={() => {
+            if (disabled) {
+              return;
+            }
+
+            if (isOpen) {
+              closeDropdown();
+              return;
+            }
+
+            openDropdown();
+          }}
           aria-haspopup="listbox"
           aria-expanded={isOpen}
           aria-invalid={invalid}

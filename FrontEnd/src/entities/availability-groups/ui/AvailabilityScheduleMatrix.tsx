@@ -27,7 +27,9 @@ type AvailabilityScheduleMatrixProps = {
   headerCenterSlot?: ReactNode;
   headerRightSlot?: ReactNode;
   bindValueByKey?: ReadonlyMap<string, string>;
+  selectedCellKeys?: string[];
   onColumnMove?: (employeeId: number, targetEmployeeId: number) => void;
+  onSelectedCellKeysChange?: (keys: string[]) => void;
   onCellChange?: (employeeId: number, dayOfMonth: number, value: string) => void;
 };
 
@@ -37,7 +39,7 @@ export function AvailabilityScheduleMatrix({
   columns,
   cellMap,
   title = "Availability Schedule",
-  helperText = `Use ${AVAILABILITY_ANY_MARK} for any shift, ${AVAILABILITY_NONE_MARK} for unavailable, or a time interval like 08:00 - 16:00.`,
+  helperText = `Use ${AVAILABILITY_ANY_MARK} for any shift, ${AVAILABILITY_NONE_MARK} for unavailable, a time interval like 08:00 - 16:00, or any text note. Text notes stay visible but are treated as unavailable during schedule generation.`,
   readOnly = false,
   emptyMessage,
   cellErrors = {},
@@ -47,7 +49,9 @@ export function AvailabilityScheduleMatrix({
   headerCenterSlot,
   headerRightSlot,
   bindValueByKey,
+  selectedCellKeys,
   onColumnMove,
+  onSelectedCellKeysChange,
   onCellChange,
 }: AvailabilityScheduleMatrixProps) {
   const graphColumns = useMemo<GraphMatrixColumn[]>(
@@ -102,8 +106,10 @@ export function AvailabilityScheduleMatrix({
       headerCenterSlot={headerCenterSlot}
       headerRightSlot={headerRightSlot}
       bindValueByKey={normalizedBindValueByKey}
+      selectedCellKeys={selectedCellKeys}
       normalizeCellValue={(_, value) => normalizeAvailabilityCellValue(value)}
       onColumnMove={onColumnMove}
+      onSelectedCellKeysChange={onSelectedCellKeysChange}
       onCellChange={onCellChange}
     />
   );

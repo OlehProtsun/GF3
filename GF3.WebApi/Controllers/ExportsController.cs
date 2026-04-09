@@ -5,8 +5,16 @@ namespace WebApi.Controllers;
 
 [ApiController]
 [Route("api")]
+/// <summary>
+/// Exposes export endpoints for SQL and Excel representations of graphs and containers.
+/// Export generation lives in business services; the controller only selects the correct
+/// content type and file name for the HTTP response.
+/// </summary>
 public sealed class ExportsController : ControllerBase
 {
+    private const string ExcelContentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+    private const string SqlContentType = "text/plain; charset=utf-8";
+
     private readonly IGraphExportService _graphExportService;
     private readonly IGraphTemplateExportService _graphTemplateExportService;
 
@@ -24,7 +32,7 @@ public sealed class ExportsController : ControllerBase
             .ExportGraphToXlsxAsync(containerId, graphId, includeStyles, includeEmployees, cancellationToken)
             .ConfigureAwait(false);
 
-        return File(bytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", fileName);
+        return File(bytes, ExcelContentType, fileName);
     }
 
     [HttpGet("containers/{containerId:int}/graphs/{graphId:int}/export/sql")]
@@ -36,7 +44,7 @@ public sealed class ExportsController : ControllerBase
             .ConfigureAwait(false);
 
         var fileName = $"GF3_Graph_{graphId}_{DateTime.UtcNow:yyyyMMdd_HHmm}.sql";
-        return File(bytes, "text/plain; charset=utf-8", fileName);
+        return File(bytes, SqlContentType, fileName);
     }
 
     [HttpGet("containers/{containerId:int}/export/excel")]
@@ -47,7 +55,7 @@ public sealed class ExportsController : ControllerBase
             .ExportContainerToXlsxAsync(containerId, includeStyles, includeEmployees, cancellationToken)
             .ConfigureAwait(false);
 
-        return File(bytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", fileName);
+        return File(bytes, ExcelContentType, fileName);
     }
 
     [HttpGet("containers/{containerId:int}/export/sql")]
@@ -59,6 +67,6 @@ public sealed class ExportsController : ControllerBase
             .ConfigureAwait(false);
 
         var fileName = $"GF3_Container_{containerId}_{DateTime.UtcNow:yyyyMMdd_HHmm}.sql";
-        return File(bytes, "text/plain; charset=utf-8", fileName);
+        return File(bytes, SqlContentType, fileName);
     }
 }

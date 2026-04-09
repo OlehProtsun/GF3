@@ -34,6 +34,16 @@ export type SaveGraphDto = {
 };
 
 export type GenerateGraphRequestDto = { overwrite?: boolean; dryRun?: boolean; returnSlots?: boolean };
+export type GenerateGraphPreviewEmployeeDto = {
+  employeeId: number;
+  minHoursMonth?: number | null;
+  displayOrder: number;
+};
+export type GenerateGraphPreviewRequestDto = {
+  graphId?: number | null;
+  graph: SaveGraphDto;
+  employees: GenerateGraphPreviewEmployeeDto[];
+};
 export type GenerateGraphResponseDto = {
   containerId: number;
   graphId: number;
@@ -49,6 +59,10 @@ export type SaveGraphSlotDto = {
   toTime: string;
   employeeId?: number | null;
   status: number | string;
+};
+
+export type ReplaceGraphSlotsDto = {
+  slots: SaveGraphSlotDto[];
 };
 
 export type SaveGraphEmployeeDto = {

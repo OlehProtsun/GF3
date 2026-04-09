@@ -1,63 +1,111 @@
 using BusinessLogicLayer.Contracts.Models;
 
-namespace BusinessLogicLayer.Schedule
+namespace BusinessLogicLayer.Schedule;
+
+/// <summary>
+/// Calculates aggregate duration statistics for schedules and exports.
+/// </summary>
+public static class ScheduleTotalsCalculator
 {
-    public static class ScheduleTotalsCalculator
+    /// <summary>
+    /// Immutable summary returned by <see cref="Calculate"/>.
+    /// </summary>
+    public sealed class TotalsResult
     {
-        public sealed class TotalsResult
+        public int TotalEmployees { get; init; }
+        public TimeSpan TotalDuration { get; init; }
+        public IReadOnlyDictionary<int, TimeSpan> PerEmployeeDuration { get; init; } = new Dictionary<int, TimeSpan>();
+    }
+
+    /// <summary>
+    /// Calculates total and per-employee duration across all assigned slots that belong to the
+    /// supplied employee set.
+    /// </summary>
+    public static TotalsResult Calculate(IReadOnlyList<ScheduleEmployeeModel> employees, IReadOnlyList<ScheduleSlotModel> slots)
+    {
+        var employeeIds = new HashSet<int>(employees.Select(GetEffectiveEmployeeId));
+        var totalDuration = TimeSpan.Zero;
+        var durationByEmployee = new Dictionary<int, TimeSpan>(Math.Max(8, employeeIds.Count));
+
+        var assignedSlotsCount = 0;
+        var matchedSlotsCount = 0;
+        var parseOkCount = 0;
+
+        foreach (var slot in slots)
         {
-            public int TotalEmployees { get; init; }
-            public TimeSpan TotalDuration { get; init; }
-            public IReadOnlyDictionary<int, TimeSpan> PerEmployeeDuration { get; init; } = new Dictionary<int, TimeSpan>();
-        }
-
-        // ScheduleTotalsCalculator.cs
-
-        public static TotalsResult Calculate(IReadOnlyList<ScheduleEmployeeModel> employees, IReadOnlyList<ScheduleSlotModel> slots)
-        {
-            static int GetEmpId(ScheduleEmployeeModel e)
-                => (e.Employee?.Id is int navId && navId > 0) ? navId : e.EmployeeId;
-
-            var empIds = new HashSet<int>(employees.Select(GetEmpId));
-            var total = TimeSpan.Zero;
-            var perEmp = new Dictionary<int, TimeSpan>(Math.Max(8, empIds.Count));
-            var assignedSlotsCount = 0;
-            var matchedSlotsCount = 0;
-            var parseOkCount = 0;
-
-            foreach (var s in slots)
+            var slotEmployeeId = slot.EmployeeId ?? slot.Employee?.Id;
+            if (slotEmployeeId.HasValue)
             {
-                var slotEmpId = s.EmployeeId ?? (s.Employee?.Id);
-                if (slotEmpId.HasValue)
-                    assignedSlotsCount++;
-
-                if (!slotEmpId.HasValue || !empIds.Contains(slotEmpId.Value))
-                    continue;
-
-                matchedSlotsCount++;
-
-                if (!ScheduleMatrixEngine.TryParseTime(s.FromTime, out var from) ||
-                    !ScheduleMatrixEngine.TryParseTime(s.ToTime, out var to))
-                    continue;
-
-                parseOkCount++;
-
-                var dur = to - from;
-                if (dur < TimeSpan.Zero)
-                    dur += TimeSpan.FromHours(24);
-
-                total += dur;
-                perEmp[slotEmpId.Value] = perEmp.TryGetValue(slotEmpId.Value, out var curr) ? curr + dur : dur;
+                assignedSlotsCount++;
             }
 
-            if (string.Equals(Environment.GetEnvironmentVariable("GF3_EXPORT_DEBUG"), "true", StringComparison.OrdinalIgnoreCase))
+            if (!slotEmployeeId.HasValue || !employeeIds.Contains(slotEmployeeId.Value))
             {
-                Console.WriteLine($"GF3 export debug totals: empIds.Count={empIds.Count}, assignedSlotsCount={assignedSlotsCount}, matchedSlotsCount={matchedSlotsCount}, parseOkCount={parseOkCount}");
+                continue;
             }
 
-            return new TotalsResult { TotalEmployees = empIds.Count, TotalDuration = total, PerEmployeeDuration = perEmp };
+            matchedSlotsCount++;
+
+            if (!TryParseSlotDuration(slot, out var duration))
+            {
+                continue;
+            }
+
+            parseOkCount++;
+            totalDuration += duration;
+            durationByEmployee[slotEmployeeId.Value] = durationByEmployee.TryGetValue(slotEmployeeId.Value, out var current)
+                ? current + duration
+                : duration;
         }
 
-        public static string FormatHoursMinutes(TimeSpan t) => $"{(int)t.TotalHours}h {t.Minutes}m";
+        LogDebugDiagnostics(employeeIds.Count, assignedSlotsCount, matchedSlotsCount, parseOkCount);
+
+        return new TotalsResult
+        {
+            TotalEmployees = employeeIds.Count,
+            TotalDuration = totalDuration,
+            PerEmployeeDuration = durationByEmployee,
+        };
+    }
+
+    /// <summary>
+    /// Formats duration in the compact `Xh Ym` shape used by exports and admin summaries.
+    /// </summary>
+    public static string FormatHoursMinutes(TimeSpan duration)
+        => $"{(int)duration.TotalHours}h {duration.Minutes}m";
+
+    private static int GetEffectiveEmployeeId(ScheduleEmployeeModel employee)
+        => employee.Employee?.Id is int navigationId && navigationId > 0
+            ? navigationId
+            : employee.EmployeeId;
+
+    private static bool TryParseSlotDuration(ScheduleSlotModel slot, out TimeSpan duration)
+    {
+        duration = TimeSpan.Zero;
+
+        if (!ScheduleMatrixEngine.TryParseTime(slot.FromTime, out var fromTime)
+            || !ScheduleMatrixEngine.TryParseTime(slot.ToTime, out var toTime))
+        {
+            return false;
+        }
+
+        duration = toTime - fromTime;
+        if (duration < TimeSpan.Zero)
+        {
+            duration += TimeSpan.FromHours(24);
+        }
+
+        return true;
+    }
+
+    private static void LogDebugDiagnostics(int employeeCount, int assignedSlotsCount, int matchedSlotsCount, int parseOkCount)
+    {
+        if (!string.Equals(Environment.GetEnvironmentVariable("GF3_EXPORT_DEBUG"), "true", StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        Console.WriteLine(
+            $"GF3 export debug totals: empIds.Count={employeeCount}, assignedSlotsCount={assignedSlotsCount}, matchedSlotsCount={matchedSlotsCount}, parseOkCount={parseOkCount}");
     }
 }

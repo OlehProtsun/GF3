@@ -1,12 +1,12 @@
 ﻿export const queryKeys = {
   employees: {
     all: ["employees"] as const,
-    list: (search = "") => ["employees", "list", search] as const,
+    list: () => ["employees", "list"] as const,
     byId: (id: number) => ["employees", "byId", id] as const,
   },
   shops: {
     all: ["shops"] as const,
-    list: (search = "") => ["shops", "list", search] as const,
+    list: () => ["shops", "list"] as const,
     byId: (id: number) => ["shops", "byId", id] as const,
   },
   health: {
@@ -24,6 +24,8 @@
     schedulePresets: (containerId: number) => ["containers", containerId, "schedulePresets"] as const,
     graphById: (containerId: number, graphId: number) => ["containers", containerId, "graphs", graphId] as const,
     graphSlots: (containerId: number, graphId: number) => ["containers", containerId, "graphs", graphId, "slots"] as const,
+    graphSlotsBatch: (containerId: number, graphIds: readonly number[]) =>
+      ["containers", containerId, "graphs", "slotsBatch", ...graphIds] as const,
     graphEmployees: (containerId: number, graphId: number) => ["containers", containerId, "graphs", graphId, "employees"] as const,
     graphCellStyles: (containerId: number, graphId: number) => ["containers", containerId, "graphs", graphId, "cellStyles"] as const,
   },

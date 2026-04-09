@@ -13,4 +13,5 @@ export type SaveShopInput = {
 
 export type ShopsListParams = {
   search?: string;
+  refreshKey?: string;
 };

@@ -4,6 +4,11 @@ using DataAccessLayer.Administration;
 
 namespace BusinessLogicLayer.Services;
 
+/// <summary>
+/// Lightweight facade over the low-level SQLite admin service.
+/// It exposes storage-oriented diagnostics to the business layer using DTO contracts,
+/// while leaving the actual SQL execution mechanics in the DataAccess layer.
+/// </summary>
 public sealed class SqliteAdminFacade : ISqliteAdminFacade
 {
     private readonly ISqliteAdminService _service;

@@ -5,15 +5,32 @@ using BusinessLogicLayer.Schedule;
 using BusinessLogicLayer.Services.Abstractions;
 using BusinessLogicLayer.Services.Export;
 using ClosedXML.Excel;
+using ClosedXML.Graphics;
 using Microsoft.Extensions.Logging;
 
 namespace BusinessLogicLayer.Services;
 
+/// <summary>
+/// Produces human-readable Excel exports for a single graph or for the whole container.
+/// Unlike the SQL exporter, this service is presentation-oriented: it renders schedule data
+/// into a predesigned workbook template that business users can inspect, print, or share.
+/// </summary>
 public sealed class GraphTemplateExportService : IGraphTemplateExportService
 {
+    private sealed record LoadedGraphExportData(
+        ScheduleModel Graph,
+        ShopModel? Shop,
+        IReadOnlyList<ScheduleEmployeeModel> Employees,
+        IReadOnlyList<ScheduleSlotModel> Slots);
+
+    // ClosedXML needs a deterministic fallback font in headless and CI environments.
+    // We load the embedded font once and reuse it for every workbook to keep export behavior stable
+    // across developer machines, sandbox runs, and production deployments.
+    private const string EmbeddedFallbackFontResource = "ClosedXML.Graphics.Fonts.CarlitoBare-Regular.ttf";
     private static readonly string[] MatrixTemplateSheetNames = ["ScheduleName", "R_FL_35", "MatrixTemplate"];
     private static readonly string[] StatisticTemplateSheetNames = ["ScheduleStatistic", "Schedule Statistic", "StatisticTemplate"];
     private static readonly string[] ContainerTemplateSheetNames = ["ContainerTemplate", "Sheet1", "Container"];
+    private static readonly Lazy<IXLGraphicEngine> EmbeddedGraphicEngine = new(CreateEmbeddedGraphicEngine);
 
     private const string MatrixClearRange = "B1:AA32";
     private const int M_ShopRow = 1;
@@ -59,8 +76,10 @@ public sealed class GraphTemplateExportService : IGraphTemplateExportService
 
     public async Task<(byte[] content, string fileName)> ExportGraphToXlsxAsync(int containerId, int graphId, bool includeStyles, bool includeEmployees, CancellationToken ct = default)
     {
-        var graphData = await LoadGraphDataAsync(containerId, graphId, includeStyles, includeEmployees, ct).ConfigureAwait(false);
-        using var workbook = new XLWorkbook(_templateLocator.GetScheduleTemplatePath());
+        var loadedGraphData = await LoadGraphDataAsync(containerId, graphId, includeStyles, includeEmployees, ct).ConfigureAwait(false);
+        var relatedGraphSources = await LoadRelatedGraphHintSourcesAsync(containerId, loadedGraphData.Graph, ct).ConfigureAwait(false);
+        var graphData = BuildGraphExcelContext(loadedGraphData, relatedGraphSources);
+        using var workbook = OpenWorkbook(_templateLocator.GetScheduleTemplatePath());
 
         var matrixTemplate = FindTemplateSheet(workbook, MatrixTemplateSheetNames)
             ?? throw new InvalidOperationException($"Matrix template sheet not found. Expected one of: {string.Join(", ", MatrixTemplateSheetNames)}");
@@ -88,20 +107,35 @@ public sealed class GraphTemplateExportService : IGraphTemplateExportService
         return (ms.ToArray(), $"GF3_Graph_{graphId}_{DateTime.UtcNow:yyyyMMdd_HHmm}.xlsx");
     }
 
+    /// <summary>
+    /// Container export is essentially "container summary + one graph workbook page set per chart".
+    /// We reuse the same template workbook for every graph, then inject a separate container sheet
+    /// that aggregates hours and employee distribution across all child graphs.
+    /// </summary>
     public async Task<(byte[] content, string fileName)> ExportContainerToXlsxAsync(int containerId, bool includeStyles, bool includeEmployees, CancellationToken ct = default)
     {
         var container = await _containerService.GetAsync(containerId, ct).ConfigureAwait(false)
             ?? throw new KeyNotFoundException($"Container with id {containerId} was not found.");
-        var graphs = await _containerService.GetGraphsAsync(containerId, ct).ConfigureAwait(false);
+        var graphs = await _containerService.GetGraphsAsync(containerId, ct).ConfigureAwait(false)
+            ?? throw new KeyNotFoundException($"Container with id {containerId} was not found.");
 
-        var graphContexts = new List<GraphExcelContext>(graphs.Count);
+        var loadedGraphData = new List<LoadedGraphExportData>(graphs.Count);
         foreach (var graph in graphs)
-            graphContexts.Add(await LoadGraphDataAsync(containerId, graph.Id, includeStyles, includeEmployees, ct).ConfigureAwait(false));
+            loadedGraphData.Add(await LoadGraphDataAsync(containerId, graph.Id, includeStyles, includeEmployees, ct).ConfigureAwait(false));
+
+        var graphContexts = loadedGraphData
+            .Select(graphData => BuildGraphExcelContext(
+                graphData,
+                loadedGraphData
+                    .Where(relatedGraph => relatedGraph.Graph.Id != graphData.Graph.Id)
+                    .Select(relatedGraph => new GraphRelatedScheduleHintSource(relatedGraph.Graph, relatedGraph.Slots))
+                    .ToList()))
+            .ToList();
 
         var containerContext = _contextBuilder.BuildContainerContext(container, graphContexts);
 
-        using var workbook = new XLWorkbook(_templateLocator.GetScheduleTemplatePath());
-        using var containerWb = new XLWorkbook(_templateLocator.GetContainerTemplatePath());
+        using var workbook = OpenWorkbook(_templateLocator.GetScheduleTemplatePath());
+        using var containerWb = OpenWorkbook(_templateLocator.GetContainerTemplatePath());
 
         var matrixTemplate = FindTemplateSheet(workbook, MatrixTemplateSheetNames)
             ?? throw new InvalidOperationException($"Matrix template sheet not found. Expected one of: {string.Join(", ", MatrixTemplateSheetNames)}");
@@ -139,14 +173,16 @@ public sealed class GraphTemplateExportService : IGraphTemplateExportService
         return (ms.ToArray(), $"GF3_Container_{containerId}_{DateTime.UtcNow:yyyyMMdd_HHmm}.xlsx");
     }
 
-    private async Task<GraphExcelContext> LoadGraphDataAsync(int containerId, int graphId, bool includeStyles, bool includeEmployees, CancellationToken ct)
+    private async Task<LoadedGraphExportData> LoadGraphDataAsync(int containerId, int graphId, bool includeStyles, bool includeEmployees, CancellationToken ct)
     {
         var debugEnabled = IsExportDebugEnabled();
         var graph = await _containerService.GetGraphByIdAsync(containerId, graphId, ct).ConfigureAwait(false)
             ?? throw new KeyNotFoundException($"Graph with id {graphId} was not found.");
-        var slots = await _containerService.GetGraphSlotsAsync(containerId, graphId, ct).ConfigureAwait(false);
-        // Excel matrix export must always be built from real schedule employees to stay 1:1 with WPF behavior.
-        var employees = await _containerService.GetGraphEmployeesAsync(containerId, graphId, ct).ConfigureAwait(false);
+        var slots = await _containerService.GetGraphSlotsAsync(containerId, graphId, ct).ConfigureAwait(false)
+            ?? throw new KeyNotFoundException($"Graph with id {graphId} was not found.");
+        // Excel matrix export must always be built from real schedule employees to stay 1:1 with the persisted schedule data.
+        var employees = await _containerService.GetGraphEmployeesAsync(containerId, graphId, ct).ConfigureAwait(false)
+            ?? throw new KeyNotFoundException($"Graph with id {graphId} was not found.");
 
         NormalizeLegacySlotEmployeeIds(slots, employees, debugEnabled, graphId, _logger);
         if (debugEnabled)
@@ -154,11 +190,102 @@ public sealed class GraphTemplateExportService : IGraphTemplateExportService
 
         _ = includeStyles
             ? await _containerService.GetGraphCellStylesAsync(containerId, graphId, ct).ConfigureAwait(false)
+                ?? throw new KeyNotFoundException($"Graph with id {graphId} was not found.")
             : [];
 
         var shop = await _shopService.GetAsync(graph.ShopId, ct).ConfigureAwait(false);
-        var scheduleContext = _contextBuilder.BuildScheduleContext(graph, shop, employees, slots);
-        return new GraphExcelContext(graph, shop, employees, slots, scheduleContext);
+        return new LoadedGraphExportData(graph, shop, employees, slots);
+    }
+
+    private GraphExcelContext BuildGraphExcelContext(
+        LoadedGraphExportData graphData,
+        IReadOnlyList<GraphRelatedScheduleHintSource> relatedGraphSources)
+    {
+        var noteMetadata = GraphNoteExportMetadataParser.Parse(graphData.Graph.Note);
+        var dynamicTextCells = GraphRelatedScheduleHintExportBuilder.BuildTextCells(
+            graphData.Graph,
+            graphData.Employees,
+            graphData.Slots,
+            noteMetadata.TextCells,
+            relatedGraphSources);
+        var effectiveTextCells = GraphRelatedScheduleHintExportBuilder.MergeTextCells(noteMetadata.TextCells, dynamicTextCells);
+        var effectiveGraph = CloneGraphWithNote(
+            graphData.Graph,
+            GraphNoteSqlExportBuilder.BuildPortableNote(graphData.Graph.Note, effectiveTextCells));
+        var scheduleContext = _contextBuilder.BuildScheduleContext(effectiveGraph, graphData.Shop, graphData.Employees, graphData.Slots);
+        return new GraphExcelContext(effectiveGraph, graphData.Shop, graphData.Employees, graphData.Slots, scheduleContext);
+    }
+
+    private async Task<List<GraphRelatedScheduleHintSource>> LoadRelatedGraphHintSourcesAsync(int containerId, ScheduleModel graph, CancellationToken ct)
+    {
+        var graphs = await _containerService.GetGraphsAsync(containerId, ct).ConfigureAwait(false)
+            ?? throw new KeyNotFoundException($"Container with id {containerId} was not found.");
+        var relatedGraphSources = new List<GraphRelatedScheduleHintSource>();
+
+        foreach (var relatedGraph in graphs.Where(relatedGraph =>
+                     relatedGraph.Id != graph.Id
+                     && relatedGraph.Year == graph.Year
+                     && relatedGraph.Month == graph.Month))
+        {
+            var relatedSlots = await _containerService.GetGraphSlotsAsync(containerId, relatedGraph.Id, ct).ConfigureAwait(false)
+                ?? throw new KeyNotFoundException($"Graph with id {relatedGraph.Id} was not found.");
+
+            relatedGraphSources.Add(new GraphRelatedScheduleHintSource(relatedGraph, relatedSlots));
+        }
+
+        return relatedGraphSources;
+    }
+
+    private static ScheduleModel CloneGraphWithNote(ScheduleModel graph, string? note)
+    {
+        return new ScheduleModel
+        {
+            Id = graph.Id,
+            ContainerId = graph.ContainerId,
+            Container = graph.Container,
+            ShopId = graph.ShopId,
+            Shop = graph.Shop,
+            Name = graph.Name,
+            Year = graph.Year,
+            Month = graph.Month,
+            PeoplePerShift = graph.PeoplePerShift,
+            Shift1Time = graph.Shift1Time,
+            Shift2Time = graph.Shift2Time,
+            MaxHoursPerEmpMonth = graph.MaxHoursPerEmpMonth,
+            MaxConsecutiveDays = graph.MaxConsecutiveDays,
+            MaxConsecutiveFull = graph.MaxConsecutiveFull,
+            MaxFullPerMonth = graph.MaxFullPerMonth,
+            Note = note,
+            AvailabilityGroupId = graph.AvailabilityGroupId,
+            AvailabilityGroup = graph.AvailabilityGroup,
+        };
+    }
+
+    private static XLWorkbook OpenWorkbook(string path)
+    {
+        LoadOptions.DefaultGraphicEngine = EmbeddedGraphicEngine.Value;
+        var loadOptions = new LoadOptions
+        {
+            GraphicEngine = EmbeddedGraphicEngine.Value,
+        };
+
+        return new XLWorkbook(path, loadOptions);
+    }
+
+    private static IXLGraphicEngine CreateEmbeddedGraphicEngine()
+    {
+        var assembly = typeof(XLWorkbook).Assembly;
+        using var resource = assembly.GetManifestResourceStream(EmbeddedFallbackFontResource)
+            ?? throw new InvalidOperationException($"ClosedXML embedded fallback font '{EmbeddedFallbackFontResource}' was not found.");
+        var fontBytes = ReadFully(resource);
+        return DefaultGraphicEngine.CreateOnlyWithFonts(new MemoryStream(fontBytes, writable: false));
+    }
+
+    private static byte[] ReadFully(Stream stream)
+    {
+        using var buffer = new MemoryStream();
+        stream.CopyTo(buffer);
+        return buffer.ToArray();
     }
 
     private static bool IsExportDebugEnabled()
@@ -171,6 +298,8 @@ public sealed class GraphTemplateExportService : IGraphTemplateExportService
         int graphId,
         ILogger? logger = null)
     {
+        // Historical exports sometimes stored slot.EmployeeId as schedule_employee.id instead of employee.id.
+        // We repair that here so the workbook builder always sees a canonical employee identity model.
         var employeeIds = employees.Select(x => x.EmployeeId).Where(x => x > 0).ToHashSet();
         var slotEmployeeIds = slots.Where(x => x.EmployeeId.HasValue && x.EmployeeId.Value > 0).Select(x => x.EmployeeId!.Value).ToHashSet();
         if (slotEmployeeIds.Count == 0 || slotEmployeeIds.Overlaps(employeeIds))
@@ -296,9 +425,12 @@ public sealed class GraphTemplateExportService : IGraphTemplateExportService
         sheet.Range(MatrixClearRange).Clear(XLClearOptions.Contents);
         sheet.Cell(M_ShopRow, M_ShopCol).Value = context.ShopName;
 
-        var table = context.ScheduleMatrix?.Table;
-        if (table is null) return;
+        var matrixView = context.ScheduleMatrix;
+        var table = matrixView?.Table;
+        if (table is null || matrixView is null) return;
 
+        // The matrix template contains one date column plus a fixed employee-capacity window.
+        // We hide technical columns from the context table and map only display-ready employee columns.
         var visibleCols = table.Columns.Cast<DataColumn>()
             .Where(c => c.ColumnName != ScheduleMatrixConstants.ConflictColumnName && c.ColumnName != ScheduleMatrixConstants.WeekendColumnName)
             .ToList();
@@ -321,12 +453,12 @@ public sealed class GraphTemplateExportService : IGraphTemplateExportService
             sheet.Cell(M_HeaderRow, c).Value = "0";
 
         var daysInMonth = DateTime.DaysInMonth(context.ScheduleYear, context.ScheduleMonth);
-        var maxRows = Math.Min(M_DayCount, context.ScheduleMatrix.Count);
+        var maxRows = Math.Min(M_DayCount, matrixView.Count);
 
         for (var r = 0; r < M_DayCount; r++)
         {
             var excelRow = M_FirstDayRow + r;
-            DataRowView? rowView = r < maxRows ? (DataRowView)context.ScheduleMatrix[r] : null;
+            DataRowView? rowView = r < maxRows ? matrixView[r] : null;
             var dateCell = sheet.Cell(excelRow, M_DateCol);
 
             if (r < daysInMonth)
@@ -495,6 +627,9 @@ public sealed class GraphTemplateExportService : IGraphTemplateExportService
 
     private static void FillContainerTemplateSheetFromTemplate(IXLWorksheet sheet, ContainerExcelContext context)
     {
+        // The container template is a semi-structured worksheet with placeholders and a dynamic table.
+        // We first replace static tokens, then locate the employee/shop table anchors and expand rows
+        // according to the aggregated context size.
         var map = new Dictionary<string, string>(StringComparer.Ordinal)
         {
             ["{Id}"] = context.ContainerId.ToString(CultureInfo.InvariantCulture),

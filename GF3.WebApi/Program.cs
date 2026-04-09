@@ -2,107 +2,80 @@ using BusinessLogicLayer;
 using DataAccessLayer.Models.DataBaseContext;
 using Microsoft.AspNetCore.SpaServices.Extensions;
 using Microsoft.EntityFrameworkCore;
+using WebApi.Infrastructure;
 using WebApi.Middleware;
-using WebApi.Options;
 
 var builder = WebApplication.CreateBuilder(args);
-
-builder.Services.AddControllers();
-builder.Services.AddProblemDetails();
-builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
-
-builder.Services.AddCors(options =>
-{
-    options.AddPolicy("FrontendDev", policy =>
-    {
-        policy
-            .WithOrigins("http://localhost:5173", "https://localhost:5173")
-            .AllowAnyHeader()
-            .AllowAnyMethod();
-    });
-});
-
-builder.Services.Configure<AdminToolsOptions>(builder.Configuration.GetSection("AdminTools"));
-builder.Services.PostConfigure<AdminToolsOptions>(options =>
-{
-    var enabled = Environment.GetEnvironmentVariable("GF3_ADMIN_ENABLED");
-    if (bool.TryParse(enabled, out var enabledValue))
-        options.Enabled = enabledValue;
-
-    var token = Environment.GetEnvironmentVariable("GF3_ADMIN_TOKEN");
-    if (!string.IsNullOrWhiteSpace(token))
-        options.Token = token;
-
-    var allowWrite = Environment.GetEnvironmentVariable("GF3_ADMIN_ALLOW_WRITE");
-    if (bool.TryParse(allowWrite, out var allowWriteValue))
-        options.AllowWriteSql = allowWriteValue;
-});
-
-var cs = builder.Configuration.GetConnectionString("Default");
-if (string.IsNullOrWhiteSpace(cs))
-{
-    var root = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-        "GF3");
-
-    Directory.CreateDirectory(root);
-
-    var dbPath = Path.Combine(root, "SQLite.db");
-    cs = $"Data Source={dbPath}";
-}
-
-builder.Services.AddBusinessLogicStack(cs);
+builder.Services.AddWebApiCore(builder.Configuration);
 
 var app = builder.Build();
 
-using (var scope = app.Services.CreateScope())
+ApplyDatabaseMigrations(app);
+ConfigureCommonMiddleware(app);
+ConfigureFrontendHosting(app);
+
+app.Run();
+
+/// <summary>
+/// Applies pending EF Core migrations during startup.
+/// We do this once on boot so the API always operates against the expected schema.
+/// </summary>
+static void ApplyDatabaseMigrations(WebApplication app)
 {
+    using var scope = app.Services.CreateScope();
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     db.Database.Migrate();
 }
 
-app.UseSwagger();
-app.UseSwaggerUI();
-
-if (app.Environment.IsDevelopment())
+/// <summary>
+/// Configures middleware shared by all environments.
+/// API-only middleware is intentionally scoped to API routes so SPA requests keep their own flow.
+/// </summary>
+static void ConfigureCommonMiddleware(WebApplication app)
 {
-    app.UseCors("FrontendDev");
-}
+    app.UseSwagger();
+    app.UseSwaggerUI();
 
-// ✅ Middleware краще вішати тільки на /api, щоб не чіпати SPA (/)
-app.UseWhen(ctx => ctx.Request.Path.StartsWithSegments("/api"), branch =>
-{
-    branch.UseMiddleware<ApiExceptionMiddleware>();
-    branch.UseMiddleware<AdminToolsGuardMiddleware>();
-});
-
-app.MapControllers();
-
-// ✅ DEV: React через Vite (проксі) тільки для не-API/non-swagger запитів.
-if (app.Environment.IsDevelopment())
-{
-    app.MapWhen(ctx =>
+    if (app.Environment.IsDevelopment())
     {
-        var path = ctx.Request.Path;
-        return !path.StartsWithSegments("/api")
-            && !path.StartsWithSegments("/swagger")
-            && !path.StartsWithSegments("/health");
-    }, spaApp =>
-    {
-        spaApp.UseSpa(spa =>
+        app.UseCors("FrontendDev");
+    }
+
+    app.UseWhen(
+        context => StartupConfiguration.IsApiRequest(context.Request.Path),
+        apiBranch =>
         {
-            spa.Options.SourcePath = @"..\FrontEnd";
-            spa.UseProxyToSpaDevelopmentServer("http://localhost:5173");
+            apiBranch.UseMiddleware<ApiExceptionMiddleware>();
+            apiBranch.UseMiddleware<AdminToolsGuardMiddleware>();
         });
-    });
+
+    app.MapControllers();
 }
-// ✅ PROD: віддавати build з wwwroot (коли зробиш npm run build і скопіюєш dist -> wwwroot)
-else
+
+/// <summary>
+/// Configures how the frontend is served.
+/// In development we proxy non-API requests to the Vite dev server; in production we serve the
+/// built frontend files from <c>wwwroot</c>.
+/// </summary>
+static void ConfigureFrontendHosting(WebApplication app)
 {
-    app.UseDefaultFiles();    // шукає index.html
-    app.UseStaticFiles();     // віддає wwwroot/*
+    if (app.Environment.IsDevelopment())
+    {
+        app.MapWhen(
+            context => StartupConfiguration.ShouldUseSpaProxy(context.Request.Path),
+            spaApp =>
+            {
+                spaApp.UseSpa(spa =>
+                {
+                    spa.Options.SourcePath = @"..\FrontEnd";
+                    spa.UseProxyToSpaDevelopmentServer("http://localhost:5173");
+                });
+            });
+
+        return;
+    }
+
+    app.UseDefaultFiles();
+    app.UseStaticFiles();
     app.MapFallbackToFile("index.html");
 }
-
-app.Run();

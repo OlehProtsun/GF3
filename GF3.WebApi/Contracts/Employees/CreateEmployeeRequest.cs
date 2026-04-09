@@ -2,6 +2,11 @@ using System.ComponentModel.DataAnnotations;
 
 namespace WebApi.Contracts.Employees;
 
+/// <summary>
+/// Request payload used to create a new employee.
+/// Validation attributes document the API contract and are enforced before the request reaches
+/// the business layer.
+/// </summary>
 public sealed class CreateEmployeeRequest
 {
     [Required]
