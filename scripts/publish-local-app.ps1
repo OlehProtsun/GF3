@@ -42,42 +42,21 @@ if ([string]::IsNullOrWhiteSpace($OutputRoot)) {
 
 $bundleRoot = Join-Path $OutputRoot "app"
 $backendOutput = Join-Path $bundleRoot "backend"
-$backendWwwroot = Join-Path $backendOutput "wwwroot"
 $launcherProject = Join-Path $workspaceRoot "GF3.Launcher\GF3.Launcher.csproj"
 $backendProject = Join-Path $workspaceRoot "GF3.WebApi\WebApi.csproj"
 $frontendRoot = Join-Path $workspaceRoot "FrontEnd"
-$frontendOutput = Join-Path $frontendRoot "dist"
-$launcherBuildOutput = Join-Path $workspaceRoot "GF3.Launcher\bin\$Configuration\net10.0-windows\$Runtime"
-$launcherFallbackOutput = Join-Path $workspaceRoot "GF3.Launcher\bin\$Configuration\net10.0-windows"
-$backendBuildOutput = Join-Path $workspaceRoot "GF3.WebApi\bin\$Configuration\net10.0"
 $templatesSource = Join-Path $workspaceRoot "GF3.WebApi\Resources\ExcelTemplate"
 $templatesTarget = Join-Path $backendOutput "Resources\ExcelTemplate"
+$dotnetCliHome = Join-Path $workspaceRoot ".dotnet-cli"
+
+$env:DOTNET_CLI_HOME = $dotnetCliHome
+New-Item -ItemType Directory -Path $dotnetCliHome -Force | Out-Null
 
 if (Test-Path $bundleRoot) {
     Remove-Item $bundleRoot -Recurse -Force
 }
 
 New-Item -ItemType Directory -Path $backendOutput -Force | Out-Null
-
-Write-Host "==> Building launcher"
-dotnet build $launcherProject `
-    -c $Configuration `
-    -r $Runtime `
-    /p:UseAppHost=true
-Assert-LastExitCode "Launcher build"
-
-Write-Host "==> Building backend"
-dotnet build $backendProject `
-    -c $Configuration `
-    /p:UseAppHost=true
-if ($LASTEXITCODE -ne 0) {
-    $existingBackendExecutable = Join-Path $backendBuildOutput "WebApi.exe"
-    if (-not (Test-Path $existingBackendExecutable)) {
-        Assert-LastExitCode "Backend build"
-    }
-
-    Write-Warning "Backend build failed in the current environment. Reusing the existing backend output from $backendBuildOutput."
-}
 
 if (-not (Test-Path (Join-Path $frontendRoot "node_modules"))) {
     Write-Host "==> Installing frontend dependencies"
@@ -91,46 +70,25 @@ if (-not (Test-Path (Join-Path $frontendRoot "node_modules"))) {
     }
 }
 
-Write-Host "==> Building frontend"
-Push-Location $frontendRoot
-try {
-    npm run build
-    if ($LASTEXITCODE -ne 0) {
-        if (-not (Test-Path (Join-Path $frontendOutput "index.html"))) {
-            Assert-LastExitCode "Frontend build"
-        }
+Write-Host "==> Publishing launcher (self-contained)"
+dotnet publish $launcherProject `
+    -c $Configuration `
+    -r $Runtime `
+    --self-contained true `
+    /p:UseAppHost=true `
+    /p:PublishSingleFile=false `
+    -o $bundleRoot
+Assert-LastExitCode "Launcher publish"
 
-        Write-Warning "Frontend build failed in the current environment. Reusing the existing frontend output from $frontendOutput."
-    }
-}
-finally {
-    Pop-Location
-}
-
-if (-not (Test-Path $launcherBuildOutput)) {
-    if (-not (Test-Path $launcherFallbackOutput)) {
-        throw "Launcher build output was not found."
-    }
-
-    $launcherBuildOutput = $launcherFallbackOutput
-}
-
-if (-not (Test-Path $backendBuildOutput)) {
-    throw "Backend build output was not found."
-}
-
-if (-not (Test-Path $frontendOutput)) {
-    throw "Frontend build output was not found."
-}
-
-Write-Host "==> Copying launcher bundle"
-Copy-DirectoryContents -SourceDirectory $launcherBuildOutput -TargetDirectory $bundleRoot
-
-Write-Host "==> Copying backend bundle"
-Copy-DirectoryContents -SourceDirectory $backendBuildOutput -TargetDirectory $backendOutput
-
-Write-Host "==> Copying frontend bundle into backend\\wwwroot"
-Copy-DirectoryContents -SourceDirectory $frontendOutput -TargetDirectory $backendWwwroot
+Write-Host "==> Publishing backend (self-contained)"
+dotnet publish $backendProject `
+    -c $Configuration `
+    -r $Runtime `
+    --self-contained true `
+    /p:UseAppHost=true `
+    /p:PublishSingleFile=false `
+    -o $backendOutput
+Assert-LastExitCode "Backend publish"
 
 if (Test-Path $templatesSource) {
     Write-Host "==> Copying Excel templates to $templatesTarget"
