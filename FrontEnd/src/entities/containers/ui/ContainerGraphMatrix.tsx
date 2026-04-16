@@ -1,5 +1,5 @@
 import { memo, useEffect, useMemo, useRef, useState } from "react";
-import type { CSSProperties, DragEvent, KeyboardEvent, MouseEvent, ReactNode } from "react";
+import type { CSSProperties, ClipboardEvent, DragEvent, FocusEvent, KeyboardEvent, MouseEvent, ReactNode } from "react";
 import {
   GRAPH_EMPTY_MARK,
   getGraphCellKey,
@@ -86,6 +86,14 @@ type MatrixDayStyleMeta = {
   inlineStyle: CSSProperties;
 };
 
+type MatrixColumnResizeSession = {
+  employeeId: number;
+  startClientX: number;
+  startWidth: number;
+};
+
+type MatrixEditorSelectionBehavior = "select-all" | "caret-end";
+
 type MatrixValueCellProps = {
   cellKey: string;
   employeeId: number;
@@ -107,6 +115,7 @@ type MatrixValueCellProps = {
   backgroundColor?: string | null;
   textColor?: string | null;
   editorValue?: string;
+  editorSelectionBehavior?: MatrixEditorSelectionBehavior;
   onFocusTargetRef?: (element: HTMLButtonElement | HTMLInputElement | null) => void;
   onEditorValueChange: (value: string) => void;
   onEditorBlur: () => void;
@@ -124,6 +133,7 @@ type MatrixDayCellProps = {
 
 const EMPTY_STYLE = {} as CSSProperties;
 const NOOP = () => {};
+const MATRIX_CELL_MIN_WIDTH_PX = 135;
 
 function joinClassNames(...values: Array<string | undefined | false>) {
   return values.filter(Boolean).join(" ");
@@ -182,6 +192,39 @@ function buildDayRangeSelectionKeys(anchorKey: string, targetDayOfMonth: number,
   }
 
   return cellKeys;
+}
+
+function getNextColumnCellKey(employeeId: number, dayOfMonth: number, lastDayOfMonth: number) {
+  const nextDayOfMonth = dayOfMonth < lastDayOfMonth ? dayOfMonth + 1 : dayOfMonth;
+  return getGraphCellKey(employeeId, nextDayOfMonth);
+}
+
+function isDirectCellInputKey(event: KeyboardEvent<HTMLTableElement>) {
+  return !event.ctrlKey && !event.metaKey && !event.altKey && event.key.length === 1 && event.key !== " ";
+}
+
+function normalizePastedCellValue(value: string) {
+  return value.replace(/\r\n|\r|\n/g, " ");
+}
+
+function resolveCellNavigationDirection(key: string) {
+  if (key === "ArrowUp") {
+    return "up" as const;
+  }
+
+  if (key === "ArrowDown") {
+    return "down" as const;
+  }
+
+  if (key === "ArrowLeft") {
+    return "left" as const;
+  }
+
+  if (key === "ArrowRight") {
+    return "right" as const;
+  }
+
+  return null;
 }
 
 function toggleSelection(currentSelection: string[], keys: string[]) {
@@ -306,6 +349,7 @@ const MatrixValueCell = memo(function MatrixValueCell({
   backgroundColor,
   textColor,
   editorValue,
+  editorSelectionBehavior = "select-all",
   onFocusTargetRef,
   onEditorValueChange,
   onEditorBlur,
@@ -365,6 +409,16 @@ const MatrixValueCell = memo(function MatrixValueCell({
 
   const handleVisualHintButtonDoubleClick = () => {
     clearVisualHintClickTimeout();
+  };
+
+  const handleEditorFocus = (event: FocusEvent<HTMLInputElement>) => {
+    if (editorSelectionBehavior === "caret-end") {
+      const { value: currentValue } = event.currentTarget;
+      event.currentTarget.setSelectionRange(currentValue.length, currentValue.length);
+      return;
+    }
+
+    event.currentTarget.select();
   };
 
   return (
@@ -436,6 +490,7 @@ const MatrixValueCell = memo(function MatrixValueCell({
             value={value}
             onChange={event => onInlineValueChange?.(event.target.value)}
             onBlur={event => onInlineValueCommit?.(event.target.value)}
+            onFocus={handleEditorFocus}
             aria-label={`${columnLabel} day ${dayOfMonth}`}
             aria-invalid={Boolean(error)}
             title={interactiveCellTitle}
@@ -453,6 +508,7 @@ const MatrixValueCell = memo(function MatrixValueCell({
             value={editorValue ?? value}
             onChange={event => onEditorValueChange(event.target.value)}
             onBlur={onEditorBlur}
+            onFocus={handleEditorFocus}
             aria-label={`${columnLabel} day ${dayOfMonth}`}
             aria-invalid={Boolean(error)}
             title={interactiveCellTitle}
@@ -540,9 +596,12 @@ export function ContainerGraphMatrix({
 }: ContainerGraphMatrixProps) {
   const [editingCellKey, setEditingCellKey] = useState<string | null>(null);
   const [editingValue, setEditingValue] = useState(GRAPH_EMPTY_MARK);
+  const [editingSelectionBehavior, setEditingSelectionBehavior] = useState<MatrixEditorSelectionBehavior>("select-all");
   const [draftSelectedCellKeys, setDraftSelectedCellKeys] = useState<string[] | null>(null);
   const [draggedEmployeeId, setDraggedEmployeeId] = useState<number | null>(null);
   const [dropTargetEmployeeId, setDropTargetEmployeeId] = useState<number | null>(null);
+  const [columnWidthOverrides, setColumnWidthOverrides] = useState<Record<number, number>>({});
+  const [resizingEmployeeId, setResizingEmployeeId] = useState<number | null>(null);
   const isPointerSelectingRef = useRef(false);
   const lastDraggedSelectionKeyRef = useRef<string | null>(null);
   const selectionAnchorKeyRef = useRef<string | null>(selectedCellKeys[0] ?? null);
@@ -556,6 +615,7 @@ export function ContainerGraphMatrix({
   const cellFocusTargetRefs = useRef<Record<string, HTMLButtonElement | HTMLInputElement | null>>({});
   const editingCellKeyRef = useRef<string | null>(null);
   const editingValueRef = useRef(editingValue);
+  const activeResizeSessionRef = useRef<MatrixColumnResizeSession | null>(null);
 
   const days = useMemo<MatrixDay[]>(
     () =>
@@ -596,13 +656,25 @@ export function ContainerGraphMatrix({
     () => new Set(columns.map(column => column.employeeId)),
     [columns],
   );
+  const fixedWidthSum = useMemo(
+    () => columns.reduce((totalWidth, column) => totalWidth + (columnWidthOverrides[column.employeeId] ?? 0), 0),
+    [columnWidthOverrides, columns],
+  );
+  const autoWidthColumnCount = useMemo(
+    () => columns.reduce((count, column) => count + (columnWidthOverrides[column.employeeId] === undefined ? 1 : 0), 0),
+    [columnWidthOverrides, columns],
+  );
   const tableStyle = useMemo(
     () =>
       ({
         "--matrix-column-count": String(columns.length),
-        "--matrix-value-column-width": `calc((100% - var(--matrix-day-column-width)) / ${Math.max(columns.length, 1)})`,
+        "--matrix-auto-column-width":
+          autoWidthColumnCount > 0
+            ? `max(var(--matrix-cell-min-width), calc((100% - var(--matrix-day-column-width) - ${fixedWidthSum}px) / ${autoWidthColumnCount}))`
+            : "var(--matrix-cell-min-width)",
+        "--matrix-table-min-width": `calc(var(--matrix-day-column-width) + ${fixedWidthSum}px + (var(--matrix-cell-min-width) * ${autoWidthColumnCount}))`,
       }) as CSSProperties,
-    [columns.length],
+    [autoWidthColumnCount, columns.length, fixedWidthSum],
   );
   const effectiveSelectedCellKeys = draftSelectedCellKeys ?? selectedCellKeys;
   const selectedCellKeySet = useMemo(() => new Set(effectiveSelectedCellKeys), [effectiveSelectedCellKeys]);
@@ -700,6 +772,81 @@ export function ContainerGraphMatrix({
     }
   }, [draggedEmployeeId, dropTargetEmployeeId, reorderableColumnIds]);
 
+  useEffect(() => {
+    const activeEmployeeIdSet = new Set(columns.map(column => column.employeeId));
+
+    setColumnWidthOverrides(currentOverrides => {
+      let changed = false;
+      const nextOverrides = Object.entries(currentOverrides).reduce<Record<number, number>>((accumulator, [employeeIdKey, width]) => {
+        const employeeId = Number(employeeIdKey);
+        if (!activeEmployeeIdSet.has(employeeId)) {
+          changed = true;
+          return accumulator;
+        }
+
+        accumulator[employeeId] = width;
+        return accumulator;
+      }, {});
+
+      return changed ? nextOverrides : currentOverrides;
+    });
+
+    if (resizingEmployeeId !== null && !activeEmployeeIdSet.has(resizingEmployeeId)) {
+      activeResizeSessionRef.current = null;
+      setResizingEmployeeId(null);
+    }
+  }, [columns, resizingEmployeeId]);
+
+  useEffect(() => {
+    if (resizingEmployeeId === null) {
+      return;
+    }
+
+    const handleResizeMove = (event: globalThis.MouseEvent) => {
+      const activeResizeSession = activeResizeSessionRef.current;
+      if (!activeResizeSession) {
+        return;
+      }
+
+      const nextWidth = Math.max(
+        MATRIX_CELL_MIN_WIDTH_PX,
+        Math.round(activeResizeSession.startWidth + (event.clientX - activeResizeSession.startClientX)),
+      );
+
+      setColumnWidthOverrides(currentOverrides => (
+        currentOverrides[activeResizeSession.employeeId] === nextWidth
+          ? currentOverrides
+          : {
+            ...currentOverrides,
+            [activeResizeSession.employeeId]: nextWidth,
+          }
+      ));
+    };
+
+    const stopResize = () => {
+      activeResizeSessionRef.current = null;
+      setResizingEmployeeId(null);
+    };
+
+    const previousCursor = document.body.style.cursor;
+    const previousUserSelect = document.body.style.userSelect;
+
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+
+    window.addEventListener("mousemove", handleResizeMove);
+    window.addEventListener("mouseup", stopResize);
+    window.addEventListener("blur", stopResize);
+
+    return () => {
+      document.body.style.cursor = previousCursor;
+      document.body.style.userSelect = previousUserSelect;
+      window.removeEventListener("mousemove", handleResizeMove);
+      window.removeEventListener("mouseup", stopResize);
+      window.removeEventListener("blur", stopResize);
+    };
+  }, [resizingEmployeeId]);
+
   const resolveSelectionMode = (event: { shiftKey: boolean; ctrlKey: boolean; metaKey: boolean }): GraphMatrixSelectionMode => {
     if (event.shiftKey) {
       return "range";
@@ -749,6 +896,58 @@ export function ContainerGraphMatrix({
     });
   };
 
+  const moveFocusToCellBelow = (employeeId: number, dayOfMonth: number) => {
+    const nextCellKey = getNextColumnCellKey(employeeId, dayOfMonth, days.length);
+    commitSelection([nextCellKey], nextCellKey);
+    focusCell(nextCellKey);
+  };
+
+  const moveFocusToCell = (employeeId: number, dayOfMonth: number) => {
+    const nextCellKey = getGraphCellKey(employeeId, dayOfMonth);
+    commitSelection([nextCellKey], nextCellKey);
+    focusCell(nextCellKey);
+  };
+
+  const moveFocusByDirection = (
+    employeeId: number,
+    dayOfMonth: number,
+    direction: "up" | "down" | "left" | "right",
+  ) => {
+    if (orderedEmployeeIds.length === 0) {
+      return;
+    }
+
+    const employeeIndex = orderedEmployeeIds.indexOf(employeeId);
+    if (employeeIndex < 0) {
+      return;
+    }
+
+    if (direction === "up") {
+      moveFocusToCell(employeeId, Math.max(1, dayOfMonth - 1));
+      return;
+    }
+
+    if (direction === "down") {
+      moveFocusToCell(employeeId, Math.min(days.length, dayOfMonth + 1));
+      return;
+    }
+
+    if (direction === "left") {
+      moveFocusToCell(orderedEmployeeIds[Math.max(0, employeeIndex - 1)], dayOfMonth);
+      return;
+    }
+
+    moveFocusToCell(orderedEmployeeIds[Math.min(orderedEmployeeIds.length - 1, employeeIndex + 1)], dayOfMonth);
+  };
+
+  const startDirectCellEditing = (cellKey: string, initialValue: string) => {
+    commitSelection([cellKey], cellKey);
+    beginEditingCell(cellKey, {
+      initialValue,
+      selectionBehavior: "caret-end",
+    });
+  };
+
   const commitCellValue = (employeeId: number, dayOfMonth: number, value: string) => {
     const nextValue = normalizeCellValueRef.current?.(employeeId, value) ?? value;
     const cellKey = getGraphCellKey(employeeId, dayOfMonth);
@@ -757,6 +956,14 @@ export function ContainerGraphMatrix({
     if (nextValue !== currentValue) {
       onCellChangeRef.current?.(employeeId, dayOfMonth, nextValue);
     }
+  };
+
+  const clearCellValues = (cellKeys: string[]) => {
+    const uniqueCellKeys = [...new Set(cellKeys)];
+    uniqueCellKeys.forEach(cellKey => {
+      const { employeeId, dayOfMonth } = parseSelectedCellKey(cellKey);
+      commitCellValue(employeeId, dayOfMonth, "");
+    });
   };
 
   const flushEditingCell = () => {
@@ -769,21 +976,30 @@ export function ContainerGraphMatrix({
 
     editingCellKeyRef.current = null;
     setEditingCellKey(null);
+    setEditingSelectionBehavior("select-all");
     commitCellValue(employeeId, dayOfMonth, editingValueRef.current);
   };
 
   const cancelEditingCell = () => {
     editingCellKeyRef.current = null;
     setEditingCellKey(null);
+    setEditingSelectionBehavior("select-all");
     setEditingValue(GRAPH_EMPTY_MARK);
   };
 
-  const beginEditingCell = (cellKey: string) => {
+  const beginEditingCell = (
+    cellKey: string,
+    options?: {
+      initialValue?: string;
+      selectionBehavior?: MatrixEditorSelectionBehavior;
+    },
+  ) => {
     flushEditingCell();
     editingCellKeyRef.current = cellKey;
     const currentValue = cellMapRef.current[cellKey] ?? GRAPH_EMPTY_MARK;
     setEditingCellKey(cellKey);
-    setEditingValue(currentValue);
+    setEditingSelectionBehavior(options?.selectionBehavior ?? "select-all");
+    setEditingValue(options?.initialValue ?? currentValue);
   };
 
   const applyBindShortcut = (
@@ -819,13 +1035,7 @@ export function ContainerGraphMatrix({
 
     commitCellValue(target.employeeId, target.dayOfMonth, bindValue);
 
-    const nextCellKey =
-      target.dayOfMonth < days.length
-        ? getGraphCellKey(target.employeeId, target.dayOfMonth + 1)
-        : target.cellKey;
-
-    commitSelection([nextCellKey], nextCellKey);
-    focusCell(nextCellKey);
+    moveFocusToCellBelow(target.employeeId, target.dayOfMonth);
     return true;
   };
 
@@ -942,6 +1152,10 @@ export function ContainerGraphMatrix({
     }
 
     startSelection(target, resolveSelectionMode(event));
+
+    if (!isInlineEditorTarget && target.type === "cell") {
+      focusCell(target.cellKey);
+    }
   };
 
   const handleTableMouseMove = (event: MouseEvent<HTMLTableElement>) => {
@@ -992,11 +1206,18 @@ export function ContainerGraphMatrix({
     }
 
     if (isEditorTarget) {
-      if (effectiveEditMode === "inline") {
+      const navigationDirection = resolveCellNavigationDirection(event.key);
+      if (effectiveEditMode === "inline" && navigationDirection) {
+        event.preventDefault();
+        moveFocusByDirection(target.employeeId, target.dayOfMonth, navigationDirection);
         return;
       }
 
       if (event.key === "Escape") {
+        if (effectiveEditMode === "inline") {
+          return;
+        }
+
         event.preventDefault();
         cancelEditingCell();
         return;
@@ -1004,16 +1225,48 @@ export function ContainerGraphMatrix({
 
       if (event.key === "Enter") {
         event.preventDefault();
-        flushEditingCell();
-        commitSelection([target.cellKey], target.cellKey);
+        if (effectiveEditMode !== "inline") {
+          flushEditingCell();
+        }
+
+        moveFocusToCellBelow(target.employeeId, target.dayOfMonth);
       }
 
       return;
     }
 
-    if (!readOnly && (event.key === "Enter" || event.key === "F2")) {
+    const navigationDirection = resolveCellNavigationDirection(event.key);
+    if (navigationDirection) {
+      event.preventDefault();
+      moveFocusByDirection(target.employeeId, target.dayOfMonth, navigationDirection);
+      return;
+    }
+
+    if (!readOnly && event.key === "Delete") {
+      event.preventDefault();
+      const cellKeysToClear =
+        selectedCellKeysRef.current.length > 0 && selectedCellKeysRef.current.includes(target.cellKey)
+          ? selectedCellKeysRef.current
+          : [target.cellKey];
+      clearCellValues(cellKeysToClear);
+      return;
+    }
+
+    if (event.key === "Enter") {
+      event.preventDefault();
+      moveFocusToCellBelow(target.employeeId, target.dayOfMonth);
+      return;
+    }
+
+    if (!readOnly && event.key === "F2") {
       event.preventDefault();
       beginEditingCell(target.cellKey);
+      return;
+    }
+
+    if (!readOnly && effectiveEditMode !== "inline" && isDirectCellInputKey(event)) {
+      event.preventDefault();
+      startDirectCellEditing(target.cellKey, event.key);
       return;
     }
 
@@ -1038,8 +1291,31 @@ export function ContainerGraphMatrix({
     }
   };
 
+  const handleTablePaste = (event: ClipboardEvent<HTMLTableElement>) => {
+    if (readOnly || effectiveEditMode === "inline") {
+      return;
+    }
+
+    if (event.target instanceof HTMLInputElement && event.target.dataset.matrixEditor === "true") {
+      return;
+    }
+
+    const target = getSelectionTarget(event.target);
+    if (!target || target.type !== "cell") {
+      return;
+    }
+
+    const pastedValue = normalizePastedCellValue(event.clipboardData.getData("text"));
+    if (!pastedValue) {
+      return;
+    }
+
+    event.preventDefault();
+    startDirectCellEditing(target.cellKey, pastedValue);
+  };
+
   const handleHeaderDragStart = (event: DragEvent<HTMLTableCellElement>, employeeId: number) => {
-    if (!canReorderColumns || !reorderableColumnIds.has(employeeId)) {
+    if (!canReorderColumns || activeResizeSessionRef.current !== null || !reorderableColumnIds.has(employeeId)) {
       return;
     }
 
@@ -1100,6 +1376,31 @@ export function ContainerGraphMatrix({
     setDropTargetEmployeeId(null);
   };
 
+  const handleColumnResizeStart = (event: MouseEvent<HTMLSpanElement>, employeeId: number) => {
+    event.preventDefault();
+    event.stopPropagation();
+
+    const currentWidth = columnWidthOverrides[employeeId];
+    const fallbackWidth = Math.max(
+      MATRIX_CELL_MIN_WIDTH_PX,
+      Math.round((event.currentTarget.closest("th")?.getBoundingClientRect().width ?? MATRIX_CELL_MIN_WIDTH_PX)),
+    );
+
+    activeResizeSessionRef.current = {
+      employeeId,
+      startClientX: event.clientX,
+      startWidth: currentWidth ?? fallbackWidth,
+    };
+    setResizingEmployeeId(employeeId);
+  };
+
+  const getColumnStyle = (employeeId: number) =>
+    ({
+      "--matrix-column-width": columnWidthOverrides[employeeId] !== undefined
+        ? `${columnWidthOverrides[employeeId]}px`
+        : "var(--matrix-auto-column-width)",
+    }) as CSSProperties;
+
   return (
     <CardSection
       className={cardClassName}
@@ -1126,11 +1427,16 @@ export function ContainerGraphMatrix({
                 onMouseMove={handleTableMouseMove}
                 onDoubleClick={handleTableDoubleClick}
                 onKeyDown={handleTableKeyDown}
+                onPaste={handleTablePaste}
               >
                 <colgroup>
                   <col className={styles.dayColumn} />
                   {columns.map(column => (
-                    <col key={`col-${column.employeeId}`} className={styles.valueColumn} />
+                    <col
+                      key={`col-${column.employeeId}`}
+                      className={styles.valueColumn}
+                      style={getColumnStyle(column.employeeId)}
+                    />
                   ))}
                 </colgroup>
                 <thead>
@@ -1153,10 +1459,13 @@ export function ContainerGraphMatrix({
                         <th
                           key={column.employeeId}
                           className={joinClassNames(
+                            styles.valueHeader,
                             isReorderableColumn && styles.draggableHeader,
                             isDragSource && styles.draggingHeader,
                             isDropTarget && styles.dropTargetHeader,
+                            resizingEmployeeId === column.employeeId && styles.resizingHeader,
                           )}
+                          style={getColumnStyle(column.employeeId)}
                           draggable={isReorderableColumn}
                           onDragStart={isReorderableColumn ? event => handleHeaderDragStart(event, column.employeeId) : undefined}
                           onDragEnter={isReorderableColumn ? () => handleHeaderDragEnter(column.employeeId) : undefined}
@@ -1182,6 +1491,16 @@ export function ContainerGraphMatrix({
                               {column.totalText ? <span className={styles.headerMeta}>{column.totalText}</span> : null}
                             </div>
                           )}
+
+                          <span
+                            className={joinClassNames(
+                              styles.columnResizeHandle,
+                              resizingEmployeeId === column.employeeId && styles.columnResizeHandleActive,
+                            )}
+                            role="presentation"
+                            draggable={false}
+                            onMouseDown={event => handleColumnResizeStart(event, column.employeeId)}
+                          />
                         </th>
                       );
                     })}
@@ -1238,6 +1557,7 @@ export function ContainerGraphMatrix({
                             backgroundColor={cellStyle?.backgroundColor}
                             textColor={cellStyle?.textColor}
                             editorValue={isEditing ? editingValue : undefined}
+                            editorSelectionBehavior={isEditing ? editingSelectionBehavior : undefined}
                             onFocusTargetRef={element => {
                               cellFocusTargetRefs.current[cellKey] = element;
                             }}
