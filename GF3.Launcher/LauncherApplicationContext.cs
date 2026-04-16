@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Drawing;
+using System.Net;
 using System.Net.Http.Json;
 using System.Net.Sockets;
 using System.Text.Json.Serialization;
@@ -9,6 +10,7 @@ namespace GF3.Launcher;
 
 internal sealed class LauncherApplicationContext : ApplicationContext
 {
+    private const int PreferredBackendPort = 55706;
     private static readonly TimeSpan BackendStartupTimeout = TimeSpan.FromSeconds(90);
     private static readonly TimeSpan FrontendStartupTimeout = TimeSpan.FromSeconds(90);
     private static readonly TimeSpan HealthProbeDelay = TimeSpan.FromMilliseconds(500);
@@ -19,6 +21,7 @@ internal sealed class LauncherApplicationContext : ApplicationContext
 
     private readonly NotifyIcon _notifyIcon;
     private readonly ToolStripMenuItem _openMenuItem;
+    private readonly ToolStripMenuItem _remoteAccessMenuItem;
     private readonly LauncherOptions _options;
     private readonly SynchronizationContext _uiContext;
     private readonly CancellationTokenSource _shutdownCts = new();
@@ -49,9 +52,14 @@ internal sealed class LauncherApplicationContext : ApplicationContext
         {
             Enabled = false,
         };
+        _remoteAccessMenuItem = new ToolStripMenuItem("Remote Access")
+        {
+            Enabled = false,
+        };
 
         var exitMenuItem = new ToolStripMenuItem("Exit", null, (_, _) => ExitThread());
         contextMenu.Items.Add(_openMenuItem);
+        contextMenu.Items.Add(_remoteAccessMenuItem);
         contextMenu.Items.Add(new ToolStripSeparator());
         contextMenu.Items.Add(exitMenuItem);
 
@@ -79,6 +87,7 @@ internal sealed class LauncherApplicationContext : ApplicationContext
 
             LauncherStateStore.Save(_baseUrl);
             PrepareLogFiles(runtimePlan);
+            WriteConnectionInfo(runtimePlan);
             _jobTracker = new ProcessJobTracker();
 
             if (runtimePlan.Frontend is not null)
@@ -105,6 +114,7 @@ internal sealed class LauncherApplicationContext : ApplicationContext
             _uiContext.Post(_ =>
             {
                 _openMenuItem.Enabled = true;
+                ConfigureRemoteAccessMenu(runtimePlan.RemoteBaseUrls);
                 _notifyIcon.Text = $"GF3 - Running ({runtimePlan.ModeLabel})";
             }, null);
 
@@ -112,6 +122,8 @@ internal sealed class LauncherApplicationContext : ApplicationContext
             {
                 OpenApplicationInBrowser();
             }
+
+            _uiContext.Post(_ => ShowRemoteAccessHint(runtimePlan), null);
         }
         catch (Exception exception)
         {
@@ -121,16 +133,45 @@ internal sealed class LauncherApplicationContext : ApplicationContext
 
     private static int ReserveFreeTcpPort()
     {
-        var listener = new TcpListener(System.Net.IPAddress.Loopback, 0);
+        if (TryReservePort(PreferredBackendPort, out var preferredPort))
+        {
+            return preferredPort;
+        }
+
+        var listener = new TcpListener(IPAddress.Any, 0);
         listener.Start();
 
         try
         {
-            return ((System.Net.IPEndPoint)listener.LocalEndpoint).Port;
+            return ((IPEndPoint)listener.LocalEndpoint).Port;
         }
         finally
         {
             listener.Stop();
+        }
+    }
+
+    private static bool TryReservePort(int port, out int reservedPort)
+    {
+        try
+        {
+            var listener = new TcpListener(IPAddress.Any, port);
+            listener.Start();
+
+            try
+            {
+                reservedPort = ((IPEndPoint)listener.LocalEndpoint).Port;
+                return true;
+            }
+            finally
+            {
+                listener.Stop();
+            }
+        }
+        catch (SocketException)
+        {
+            reservedPort = 0;
+            return false;
         }
     }
 
@@ -160,6 +201,35 @@ internal sealed class LauncherApplicationContext : ApplicationContext
             _frontendStdoutLogPath = Path.Combine(_logDirectory, runtimePlan.Frontend.StdoutLogFileName);
             _frontendStderrLogPath = Path.Combine(_logDirectory, runtimePlan.Frontend.StderrLogFileName);
         }
+    }
+
+    private void WriteConnectionInfo(LauncherRuntimePlan runtimePlan)
+    {
+        if (string.IsNullOrWhiteSpace(_logDirectory))
+        {
+            return;
+        }
+
+        var lines = new List<string>
+        {
+            $"Local URL: {runtimePlan.BaseUrl}",
+            string.Empty,
+            "Remote URLs:",
+        };
+
+        if (runtimePlan.RemoteBaseUrls.Count == 0)
+        {
+            lines.Add("  (none detected)");
+        }
+        else
+        {
+            foreach (var remoteUrl in runtimePlan.RemoteBaseUrls)
+            {
+                lines.Add($"  {remoteUrl}");
+            }
+        }
+
+        File.WriteAllLines(Path.Combine(_logDirectory, "connection-info.txt"), lines);
     }
 
     private Process StartManagedProcess(ProcessLaunchConfiguration launchConfiguration, bool isBackendProcess)
@@ -399,6 +469,66 @@ internal sealed class LauncherApplicationContext : ApplicationContext
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Warning);
         }
+    }
+
+    private void ConfigureRemoteAccessMenu(IReadOnlyList<string> remoteBaseUrls)
+    {
+        _remoteAccessMenuItem.DropDownItems.Clear();
+
+        if (remoteBaseUrls.Count == 0)
+        {
+            _remoteAccessMenuItem.DropDownItems.Add(new ToolStripMenuItem("No LAN address detected")
+            {
+                Enabled = false,
+            });
+            _remoteAccessMenuItem.Enabled = false;
+            return;
+        }
+
+        foreach (var remoteUrl in remoteBaseUrls)
+        {
+            var url = remoteUrl;
+            _remoteAccessMenuItem.DropDownItems.Add(
+                new ToolStripMenuItem(url, null, (_, _) => CopyRemoteUrl(url)));
+        }
+
+        _remoteAccessMenuItem.Enabled = true;
+    }
+
+    private void CopyRemoteUrl(string remoteUrl)
+    {
+        try
+        {
+            Clipboard.SetText(remoteUrl);
+            _notifyIcon.ShowBalloonTip(
+                3000,
+                "GF3 Remote Access",
+                $"Remote URL copied:{Environment.NewLine}{remoteUrl}",
+                ToolTipIcon.Info);
+        }
+        catch (Exception exception)
+        {
+            MessageBox.Show(
+                $"The remote URL could not be copied.{Environment.NewLine}{Environment.NewLine}{exception.Message}",
+                "GF3 Launcher",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Warning);
+        }
+    }
+
+    private void ShowRemoteAccessHint(LauncherRuntimePlan runtimePlan)
+    {
+        var preferredRemoteUrl = runtimePlan.RemoteBaseUrls.FirstOrDefault();
+        if (string.IsNullOrWhiteSpace(preferredRemoteUrl))
+        {
+            return;
+        }
+
+        _notifyIcon.ShowBalloonTip(
+            5000,
+            "GF3 Remote Access",
+            $"Open from another machine:{Environment.NewLine}{preferredRemoteUrl}",
+            ToolTipIcon.Info);
     }
 
     private void OnManagedProcessExited(string processName, string? stderrLogPath, int? exitCode)

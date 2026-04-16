@@ -19,5 +19,6 @@ internal sealed record ProcessLaunchConfiguration(
 internal sealed record LauncherRuntimePlan(
     string ModeLabel,
     string BaseUrl,
+    IReadOnlyList<string> RemoteBaseUrls,
     ProcessLaunchConfiguration Backend,
     ProcessLaunchConfiguration? Frontend);
