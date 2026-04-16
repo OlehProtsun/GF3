@@ -131,7 +131,7 @@
 
 .table {
   width: 100%;
-  min-width: calc(var(--matrix-day-column-width) + (var(--matrix-cell-min-width) * var(--matrix-column-count, 1)));
+  min-width: var(--matrix-table-min-width, calc(var(--matrix-day-column-width) + (var(--matrix-cell-min-width) * var(--matrix-column-count, 1))));
   max-width: none;
   table-layout: fixed;
   border-collapse: separate;
@@ -145,9 +145,9 @@
 }
 
 .valueColumn {
-  width: var(--matrix-value-column-width);
-  min-width: var(--matrix-value-column-width);
-  max-width: var(--matrix-value-column-width);
+  width: var(--matrix-column-width, var(--matrix-auto-column-width));
+  min-width: var(--matrix-column-width, var(--matrix-auto-column-width));
+  max-width: var(--matrix-column-width, var(--matrix-auto-column-width));
 }
 
 .table th,
@@ -161,15 +161,19 @@
   position: sticky;
   top: 0;
   z-index: 5;
-  width: var(--matrix-value-column-width);
-  min-width: var(--matrix-value-column-width);
-  max-width: var(--matrix-value-column-width);
   padding: 12px 10px;
   background: #f5f5f5;
   color: #111827;
   font-size: 0.92rem;
   font-weight: 800;
   text-align: center;
+}
+
+.valueHeader {
+  width: var(--matrix-column-width, var(--matrix-auto-column-width));
+  min-width: var(--matrix-column-width, var(--matrix-auto-column-width));
+  max-width: var(--matrix-column-width, var(--matrix-auto-column-width));
+  padding-right: 16px;
 }
 
 .table thead th.draggableHeader {
@@ -247,6 +251,39 @@
   font-weight: 700;
 }
 
+.columnResizeHandle {
+  position: absolute;
+  top: 0;
+  right: -4px;
+  width: 12px;
+  height: 100%;
+  cursor: col-resize;
+  z-index: 3;
+}
+
+.columnResizeHandle::before {
+  content: "";
+  position: absolute;
+  top: 9px;
+  bottom: 9px;
+  left: 50%;
+  width: 2px;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.26);
+  transform: translateX(-50%);
+  transition: background 120ms ease, box-shadow 120ms ease;
+}
+
+.valueHeader:hover .columnResizeHandle::before,
+.columnResizeHandleActive::before {
+  background: rgba(59, 130, 246, 0.6);
+  box-shadow: 0 0 0 1px rgba(191, 219, 254, 0.85);
+}
+
+.resizingHeader {
+  background: #eff6ff;
+}
+
 .table thead th.dayHeader,
 .table tbody th.dayCell {
   position: sticky;
@@ -317,9 +354,6 @@
 
 .table tbody td {
   padding: 0;
-  width: var(--matrix-value-column-width);
-  min-width: var(--matrix-value-column-width);
-  max-width: var(--matrix-value-column-width);
   height: var(--matrix-cell-min-height);
   position: relative;
   overflow: hidden;
@@ -328,9 +362,6 @@
 
 .matrixCell {
   padding: 0;
-  width: var(--matrix-value-column-width);
-  min-width: var(--matrix-value-column-width);
-  max-width: var(--matrix-value-column-width);
   height: var(--matrix-cell-min-height);
   position: relative;
   overflow: hidden;
@@ -340,8 +371,6 @@
 .cellSurface {
   position: relative;
   width: 100%;
-  min-width: 100%;
-  max-width: 100%;
   min-height: var(--matrix-cell-min-height);
   height: 100%;
   overflow: hidden;
