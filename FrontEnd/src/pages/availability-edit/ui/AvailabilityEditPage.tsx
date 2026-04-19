@@ -26,9 +26,12 @@ import {
 import { AvailabilityGroupEditor } from "@entities/availability-groups/ui";
 import { useEmployeesListQuery } from "@entities/employees/api/queries";
 import { getEmployeeFullName } from "@entities/employees/model/presentation";
+import { stableSerialize } from "@shared/lib/stableSerialize";
 import { useSyncedDraft } from "@shared/lib/useSyncedDraft";
+import { useUnsavedChangesPrompt } from "@shared/lib/useUnsavedChangesPrompt";
 import { ConfirmDialog } from "@shared/ui/ConfirmDialog";
 import { PageHeader } from "@shared/ui/PageHeader";
+import { SavingOverlay } from "@shared/ui/SavingOverlay";
 import styles from "./AvailabilityEditPage.module.css";
 
 type EditableAvailabilityBind = {
@@ -236,6 +239,38 @@ function buildAvailabilityEditorSourceKey({
   return `group:${groupId}:${group.name}:${group.month}:${group.year}:${memberKey}:${slotKey}`;
 }
 
+function buildAvailabilityEditorSnapshot({
+  name,
+  month,
+  year,
+  selectedEmployeeIds,
+  cellMap,
+}: Pick<AvailabilityEditorState, "name" | "month" | "year" | "selectedEmployeeIds" | "cellMap">) {
+  const sanitizedCellMap = sanitizeAvailabilityCellMap(cellMap, selectedEmployeeIds, year, month);
+
+  return stableSerialize({
+    name,
+    month,
+    year,
+    selectedEmployeeIds,
+    cellMap: Object.entries(sanitizedCellMap).sort(([leftKey], [rightKey]) => leftKey.localeCompare(rightKey)),
+  });
+}
+
+function hasPendingBindDraftChanges(bindRows: EditableAvailabilityBind[]) {
+  return bindRows.some(bind => {
+    if (bind.id === null) {
+      return bind.key.trim().length > 0 || bind.value.trim().length > 0 || bind.isActive !== true;
+    }
+
+    return (
+      bind.key !== bind.persistedKey ||
+      bind.value !== bind.persistedValue ||
+      bind.isActive !== bind.persistedIsActive
+    );
+  });
+}
+
 function CompactSizeHeaderToggle({ checked, onToggle }: CompactSizeHeaderToggleProps) {
   return (
     <button
@@ -369,6 +404,51 @@ export function AvailabilityEditPage() {
   const hasLoadError =
     !isCreate &&
     (!Number.isFinite(parsedId) || (!isLoading && (hasGroupLoadError || hasMembersLoadError || hasSlotsLoadError)));
+  const initialEditorSnapshot = useMemo(
+    () => buildAvailabilityEditorSnapshot(initialEditorState),
+    [initialEditorState],
+  );
+  const currentEditorSnapshot = useMemo(
+    () =>
+      buildAvailabilityEditorSnapshot({
+        name,
+        month,
+        year,
+        selectedEmployeeIds,
+        cellMap,
+      }),
+    [cellMap, month, name, selectedEmployeeIds, year],
+  );
+  const hasUnsavedChanges = useMemo(() => {
+    if (isLoading || hasLoadError) {
+      return false;
+    }
+
+    const hasEditorChanges = currentEditorSnapshot !== initialEditorSnapshot;
+    const hasPendingBindChanges = hasPendingBindDraftChanges(bindRows);
+
+    if (isCreate) {
+      return hasEditorChanges || hasPendingBindChanges;
+    }
+
+    return Boolean(groupQuery.data && membersQuery.data && slotsQuery.data) && (hasEditorChanges || hasPendingBindChanges);
+  }, [
+    bindRows,
+    currentEditorSnapshot,
+    groupQuery.data,
+    hasLoadError,
+    initialEditorSnapshot,
+    isCreate,
+    isLoading,
+    membersQuery.data,
+    slotsQuery.data,
+  ]);
+  const {
+    dialog: unsavedChangesDialog,
+    runWithoutPrompt,
+  } = useUnsavedChangesPrompt({
+    when: hasUnsavedChanges && !saveMutation.isPending,
+  });
 
   const updateBindRows = (nextRows: EditableAvailabilityBind[]) => {
     setLocalBindRows(nextRows);
@@ -688,7 +768,7 @@ export function AvailabilityEditPage() {
       },
       {
         onSuccess: result => {
-          navigate(`/availability/${result.id}`);
+          runWithoutPrompt(() => navigate(`/availability/${result.id}`));
         },
         onError: error => {
           setEditorState((current) => ({
@@ -828,6 +908,9 @@ export function AvailabilityEditPage() {
         confirmDisabled={deleteBindMutation.isPending}
         cancelDisabled={deleteBindMutation.isPending}
       />
+
+      <SavingOverlay active={saveMutation.isPending} />
+      {unsavedChangesDialog}
     </div>
   );
 }

@@ -1,10 +1,12 @@
 import { request } from "@shared/api/httpClient";
 import type {
   AdminDbExecuteResponse,
+  AdminDbFileEntry,
   AdminDbHashResponse,
   AdminDbImportResponse,
   AdminDbMetadataResponse,
   AdminDbQueryResponse,
+  AdminDbSelectDatabaseRequest,
   AdminDbSqlRequest,
 } from "@entities/admin-db/model/types";
 
@@ -34,4 +36,13 @@ export const adminDbApi = {
       body: form,
     });
   },
+  createManualCopy: () =>
+    request<AdminDbFileEntry>(`${endpoint}/manual-copy`, {
+      method: "POST",
+    }),
+  selectDatabase: (payload: AdminDbSelectDatabaseRequest) =>
+    request<AdminDbFileEntry>(`${endpoint}/select`, {
+      method: "POST",
+      body: payload,
+    }),
 };

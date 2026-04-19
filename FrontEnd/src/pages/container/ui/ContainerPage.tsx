@@ -9,6 +9,7 @@ import {
   buildGraphSessionSearch,
   buildContainerGraphSummaries,
   buildContainerStatistics,
+  createContainerFormState,
   filterGraphSummaries,
   containersApi,
   matchesContainerSearch,
@@ -33,7 +34,10 @@ import {
 import { useShopsListQuery } from "@entities/shops/api/queries";
 import { ApiError } from "@shared/api/httpClient";
 import { usePageScrollbarHidden } from "@shared/lib/usePageScrollbarHidden";
+import { stableSerialize } from "@shared/lib/stableSerialize";
+import { useUnsavedChangesPrompt } from "@shared/lib/useUnsavedChangesPrompt";
 import { ConfirmDialog } from "@shared/ui/ConfirmDialog";
+import { SavingOverlay } from "@shared/ui/SavingOverlay";
 import { ErrorBanner } from "@shared/ui/components/ErrorBanner";
 import { IosButton } from "@shared/ui/components/IosButton";
 import { PlusIcon } from "@shared/ui/icons";
@@ -216,6 +220,33 @@ export function ContainerPage() {
     !editingContainer &&
     !isEditLoading &&
     (editContainerQuery.isError || Boolean(editContainerQuery.error));
+  const initialFormSnapshot = useMemo(
+    () => stableSerialize(createContainerFormState(editingContainer)),
+    [editingContainer],
+  );
+  const currentFormSnapshot = useMemo(() => stableSerialize(form), [form]);
+  const hasUnsavedChanges = useMemo(() => {
+    if (mode !== "edit" || isEditLoading || hasEditLoadError) {
+      return false;
+    }
+
+    if (isCreateMode) {
+      return currentFormSnapshot !== initialFormSnapshot;
+    }
+
+    return Boolean(editingContainer) && currentFormSnapshot !== initialFormSnapshot;
+  }, [
+    currentFormSnapshot,
+    editingContainer,
+    hasEditLoadError,
+    initialFormSnapshot,
+    isCreateMode,
+    isEditLoading,
+    mode,
+  ]);
+  const { confirmIfNeeded, dialog: unsavedChangesDialog } = useUnsavedChangesPrompt({
+    when: hasUnsavedChanges && !isSaving,
+  });
 
   useEffect(() => {
     if (location.pathname !== "/container") {
@@ -318,16 +349,18 @@ export function ContainerPage() {
   };
 
   const handleCancelEdit = () => {
-    setSubmitError(null);
+    confirmIfNeeded(() => {
+      setSubmitError(null);
 
-    if (editingContainerId !== null) {
+      if (editingContainerId !== null) {
+        setProfileExportError(null);
+        setMode("profile");
+        return;
+      }
+
       setProfileExportError(null);
-      setMode("profile");
-      return;
-    }
-
-    setProfileExportError(null);
-    setMode("list");
+      setMode("list");
+    });
   };
 
   const handleMutationError = (error: unknown) => {
@@ -581,6 +614,9 @@ export function ContainerPage() {
         onConfirm={handleDeleteConfirm}
         confirmText={deleteMutation.isPending ? "Deleting..." : "Delete"}
       />
+
+      <SavingOverlay active={mode === "edit" && isSaving} />
+      {unsavedChangesDialog}
     </div>
   );
 }

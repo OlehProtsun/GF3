@@ -12,7 +12,7 @@ export type ContainerFormErrors = Partial<Record<keyof ContainerFormState, strin
 
 export type ContainerFormFieldElement = HTMLInputElement | HTMLTextAreaElement;
 
-function buildInitialState(container?: Container | null): ContainerFormState {
+export function createContainerFormState(container?: Container | null): ContainerFormState {
   return {
     name: container?.name ?? "",
     note: container?.note ?? "",
@@ -39,7 +39,7 @@ export function useContainerForm(container?: Container | null, isCreate = false)
   );
   const initialDraft = useMemo(
     () => ({
-      form: buildInitialState(container),
+      form: createContainerFormState(container),
       errors: {} as ContainerFormErrors,
     }),
     [container],
@@ -103,7 +103,7 @@ export function useContainerForm(container?: Container | null, isCreate = false)
 
   const reset = (nextContainer?: Container | null) => {
     setDraft({
-      form: buildInitialState(nextContainer),
+      form: createContainerFormState(nextContainer),
       errors: {},
     });
   };

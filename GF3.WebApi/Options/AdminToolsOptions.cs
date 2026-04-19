@@ -11,6 +11,13 @@ public sealed class AdminToolsOptions
     public bool Enabled { get; set; }
 
     /// <summary>
+    /// Allows admin database endpoints to be called from remote machines.
+    /// Keeping this disabled by default preserves the safer local-only posture unless the
+    /// launcher explicitly opts into LAN access.
+    /// </summary>
+    public bool AllowRemoteAccess { get; set; }
+
+    /// <summary>
     /// Indicates whether write-oriented SQL operations are allowed.
     /// </summary>
     public bool AllowWriteSql { get; set; }

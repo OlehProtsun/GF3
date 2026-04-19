@@ -104,6 +104,39 @@ public sealed class AdminDbController : ControllerBase
         return Ok(result);
     }
 
+    [HttpPost("manual-copy")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> CreateManualCopy(CancellationToken cancellationToken)
+    {
+        var createdCopy = await _adminDbService.CreateManualCopyAsync(cancellationToken).ConfigureAwait(false);
+        return Ok(CreateFileEntryResponse(createdCopy));
+    }
+
+    [HttpPost("select")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> SelectDatabase(
+        [FromBody] AdminDbSelectDatabaseRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (request is null || string.IsNullOrWhiteSpace(request.DatabasePath))
+        {
+            throw new ValidationException("Database path is required.");
+        }
+
+        var selectedDatabase = await _adminDbService
+            .SelectDatabaseAsync(request.DatabasePath, cancellationToken)
+            .ConfigureAwait(false);
+
+        return Ok(CreateFileEntryResponse(selectedDatabase));
+    }
+
     private object CreateMetadataResponse(AdminDbMetadataDto metadata) => new
     {
         metadata.SqliteVersion,
@@ -113,9 +146,29 @@ public sealed class AdminDbController : ControllerBase
         metadata.UserVersion,
         metadata.Tables,
         metadata.Objects,
+        storageWorkspace = new
+        {
+            metadata.StorageWorkspace.WorkspaceRootPath,
+            metadata.StorageWorkspace.AutomaticBackupDirectoryPath,
+            metadata.StorageWorkspace.ManualCopyDirectoryPath,
+            metadata.StorageWorkspace.AutomaticBackupRetentionLimit,
+            availableDatabases = metadata.StorageWorkspace.AvailableDatabases.Select(CreateFileEntryResponse),
+            automaticBackups = metadata.StorageWorkspace.AutomaticBackups.Select(CreateFileEntryResponse),
+            manualCopies = metadata.StorageWorkspace.ManualCopies.Select(CreateFileEntryResponse),
+        },
         allowWriteSql = _options.AllowWriteSql,
         maxSqlLength = _options.MaxSqlLength,
         maxImportBytes = _options.MaxImportBytes,
+    };
+
+    private static object CreateFileEntryResponse(AdminDbFileEntryDto fileEntry) => new
+    {
+        fileEntry.Name,
+        fileEntry.Path,
+        fileEntry.Category,
+        fileEntry.FileSizeBytes,
+        fileEntry.LastModifiedUtc,
+        fileEntry.IsActive,
     };
 
     private static async Task<byte[]> ReadAllBytesAsync(IFormFile file, CancellationToken cancellationToken)
