@@ -5,8 +5,10 @@ using System.Text;
 using BusinessLogicLayer.Common;
 using BusinessLogicLayer.Contracts.Database;
 using BusinessLogicLayer.Services.Abstractions;
+using DataAccessLayer.Administration;
 using DataAccessLayer.Models.DataBaseContext;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace BusinessLogicLayer.Services;
 
@@ -24,11 +26,19 @@ public sealed class AdminDbService : IAdminDbService
 
     private readonly AppDbContext _dbContext;
     private readonly ISqliteAdminFacade _sqliteAdminFacade;
+    private readonly ISqliteDatabaseWorkspace _databaseWorkspace;
+    private readonly IServiceScopeFactory _serviceScopeFactory;
 
-    public AdminDbService(AppDbContext dbContext, ISqliteAdminFacade sqliteAdminFacade)
+    public AdminDbService(
+        AppDbContext dbContext,
+        ISqliteAdminFacade sqliteAdminFacade,
+        ISqliteDatabaseWorkspace databaseWorkspace,
+        IServiceScopeFactory serviceScopeFactory)
     {
         _dbContext = dbContext;
         _sqliteAdminFacade = sqliteAdminFacade;
+        _databaseWorkspace = databaseWorkspace;
+        _serviceScopeFactory = serviceScopeFactory;
     }
 
     public async Task<AdminDbMetadataDto> GetMetadataAsync(CancellationToken ct = default)
@@ -37,6 +47,7 @@ public sealed class AdminDbService : IAdminDbService
         var databaseInfo = await _sqliteAdminFacade.GetDatabaseInfoAsync(ct).ConfigureAwait(false);
         var sqliteVersion = await ExecuteScalarAsync(connection, "SELECT sqlite_version();", ct).ConfigureAwait(false) ?? string.Empty;
         var objects = await LoadDatabaseObjectsAsync(connection, ct).ConfigureAwait(false);
+        var workspaceState = _databaseWorkspace.GetWorkspaceState();
 
         return new AdminDbMetadataDto
         {
@@ -46,7 +57,8 @@ public sealed class AdminDbService : IAdminDbService
             LastModifiedUtc = databaseInfo.LastModifiedUtc == DateTime.MinValue ? null : databaseInfo.LastModifiedUtc,
             UserVersion = databaseInfo.UserVersion,
             Tables = databaseInfo.Tables,
-            Objects = objects
+            Objects = objects,
+            StorageWorkspace = MapWorkspaceState(workspaceState),
         };
     }
 
@@ -139,6 +151,56 @@ public sealed class AdminDbService : IAdminDbService
         return progress.ToSucceededResult(serviceStatementsSkipped);
     }
 
+    public async Task<AdminDbFileEntryDto> CreateManualCopyAsync(CancellationToken ct = default)
+    {
+        var fileEntry = await _databaseWorkspace.CreateManualCopyAsync(ct).ConfigureAwait(false);
+        return MapFileEntry(fileEntry);
+    }
+
+    public async Task<AdminDbFileEntryDto> SelectDatabaseAsync(string databasePath, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(databasePath))
+        {
+            throw new ValidationException("Database path is required.");
+        }
+
+        var normalizedPath = Path.GetFullPath(databasePath.Trim());
+        if (!File.Exists(normalizedPath))
+        {
+            throw new ValidationException("Selected database file does not exist.");
+        }
+
+        var previousPath = _databaseWorkspace.DatabasePath;
+        _databaseWorkspace.SetDatabasePath(normalizedPath);
+
+        try
+        {
+            await EnsureSelectedDatabaseIsReadyAsync(ct).ConfigureAwait(false);
+            SqliteDatabaseSelectionStore.Save(normalizedPath);
+        }
+        catch
+        {
+            _databaseWorkspace.SetDatabasePath(previousPath);
+            throw;
+        }
+
+        var workspaceState = _databaseWorkspace.GetWorkspaceState();
+        var selectedFile = workspaceState.AvailableDatabases.FirstOrDefault(entry =>
+            string.Equals(entry.Path, normalizedPath, StringComparison.OrdinalIgnoreCase));
+
+        return selectedFile is not null
+            ? MapFileEntry(selectedFile)
+            : new AdminDbFileEntryDto
+            {
+                Name = Path.GetFileName(normalizedPath),
+                Path = normalizedPath,
+                Category = "database",
+                FileSizeBytes = new FileInfo(normalizedPath).Length,
+                LastModifiedUtc = File.GetLastWriteTimeUtc(normalizedPath),
+                IsActive = true,
+            };
+    }
+
     private async Task<DbConnection> GetOpenConnectionAsync(CancellationToken ct)
     {
         // The DbContext owns the connection lifetime; this service only ensures it is open
@@ -150,6 +212,13 @@ public sealed class AdminDbService : IAdminDbService
         }
 
         return connection;
+    }
+
+    private async Task EnsureSelectedDatabaseIsReadyAsync(CancellationToken ct)
+    {
+        await using var scope = _serviceScopeFactory.CreateAsyncScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        await dbContext.Database.MigrateAsync(ct).ConfigureAwait(false);
     }
 
     private static void ValidateImportFile(byte[] fileBytes, int maxImportBytes)
@@ -417,6 +486,29 @@ public sealed class AdminDbService : IAdminDbService
         var value = await command.ExecuteScalarAsync(ct).ConfigureAwait(false);
         return Convert.ToString(value);
     }
+
+    private static AdminDbStorageWorkspaceDto MapWorkspaceState(SqliteDatabaseWorkspaceState workspaceState)
+        => new()
+        {
+            WorkspaceRootPath = workspaceState.WorkspaceRootPath,
+            AutomaticBackupDirectoryPath = workspaceState.AutomaticBackupDirectoryPath,
+            ManualCopyDirectoryPath = workspaceState.ManualCopyDirectoryPath,
+            AutomaticBackupRetentionLimit = workspaceState.AutomaticBackupRetentionLimit,
+            AvailableDatabases = workspaceState.AvailableDatabases.Select(MapFileEntry).ToArray(),
+            AutomaticBackups = workspaceState.AutomaticBackups.Select(MapFileEntry).ToArray(),
+            ManualCopies = workspaceState.ManualCopies.Select(MapFileEntry).ToArray(),
+        };
+
+    private static AdminDbFileEntryDto MapFileEntry(SqliteDatabaseFileEntry entry)
+        => new()
+        {
+            Name = entry.Name,
+            Path = entry.Path,
+            Category = entry.Category,
+            FileSizeBytes = entry.FileSizeBytes,
+            LastModifiedUtc = entry.LastModifiedUtc,
+            IsActive = entry.IsActive,
+        };
 
     private sealed class ImportProgress
     {

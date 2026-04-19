@@ -36,6 +36,7 @@ public static class WebApiServiceCollectionExtensions
             ensureDirectory);
 
         services.AddBusinessLogicStack(connectionString);
+        services.AddHostedService<DatabaseAutoBackupHostedService>();
         return services;
     }
 

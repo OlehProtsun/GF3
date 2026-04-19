@@ -1242,7 +1242,7 @@ export function ContainerGraphMatrix({
       return;
     }
 
-    if (!readOnly && event.key === "Delete") {
+    if (!readOnly && (event.key === "Delete" || event.key === "Backspace")) {
       event.preventDefault();
       const cellKeysToClear =
         selectedCellKeysRef.current.length > 0 && selectedCellKeysRef.current.includes(target.cellKey)

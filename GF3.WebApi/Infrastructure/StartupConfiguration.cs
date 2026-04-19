@@ -1,3 +1,4 @@
+using DataAccessLayer.Administration;
 using Microsoft.AspNetCore.Http;
 using WebApi.Options;
 
@@ -11,6 +12,7 @@ namespace WebApi.Infrastructure;
 public static class StartupConfiguration
 {
     private const string AdminEnabledVariable = "GF3_ADMIN_ENABLED";
+    private const string AdminAllowRemoteVariable = "GF3_ADMIN_ALLOW_REMOTE";
     private const string AdminAllowWriteVariable = "GF3_ADMIN_ALLOW_WRITE";
     private const string ApplicationDataFolderName = "GF3";
     private const string DatabaseFileName = "SQLite.db";
@@ -23,6 +25,7 @@ public static class StartupConfiguration
 
         readEnvironmentVariable ??= Environment.GetEnvironmentVariable;
         ApplyBooleanOverride(AdminEnabledVariable, value => options.Enabled = value, readEnvironmentVariable);
+        ApplyBooleanOverride(AdminAllowRemoteVariable, value => options.AllowRemoteAccess = value, readEnvironmentVariable);
         ApplyBooleanOverride(AdminAllowWriteVariable, value => options.AllowWriteSql = value, readEnvironmentVariable);
     }
 
@@ -40,10 +43,13 @@ public static class StartupConfiguration
             localApplicationDataRoot ?? Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             ApplicationDataFolderName);
 
-        ensureDirectory ??= path => _ = Directory.CreateDirectory(path);
-        ensureDirectory(root);
+        var defaultDatabasePath = Path.Combine(root, DatabaseFileName);
+        var databasePath = SqliteDatabaseSelectionStore.ResolveDatabasePath(
+            defaultDatabasePath,
+            localApplicationDataRoot,
+            ensureDirectory);
 
-        return $"Data Source={Path.Combine(root, DatabaseFileName)}";
+        return $"Data Source={databasePath}";
     }
 
     public static bool IsApiRequest(PathString path)

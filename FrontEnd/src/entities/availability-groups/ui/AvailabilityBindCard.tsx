@@ -45,6 +45,30 @@ export function AvailabilityBindCard({
   onAddBind,
   onDeleteBind,
 }: AvailabilityBindCardProps) {
+  const shouldCaptureKeyStroke = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.ctrlKey || event.altKey || event.metaKey) {
+      return true;
+    }
+
+    if (/^F\d{1,2}$/i.test(event.key)) {
+      return true;
+    }
+
+    return [
+      " ",
+      "Spacebar",
+      "ArrowUp",
+      "ArrowDown",
+      "ArrowLeft",
+      "ArrowRight",
+      "Home",
+      "End",
+      "PageUp",
+      "PageDown",
+      "Insert",
+    ].includes(event.key);
+  };
+
   const handleRowBlur = (event: FocusEvent<HTMLDivElement>, clientId: string) => {
     if (event.relatedTarget instanceof Node && event.currentTarget.contains(event.relatedTarget)) {
       return;
@@ -64,13 +88,11 @@ export function AvailabilityBindCard({
       return;
     }
 
-    if (event.key === "Backspace" || event.key === "Delete") {
-      event.preventDefault();
-      onBindFieldChange(clientId, { key: "" });
+    if (isCommonEditorShortcut(event) || isModifierOnlyKey(event.key)) {
       return;
     }
 
-    if (isCommonEditorShortcut(event) || isModifierOnlyKey(event.key)) {
+    if (!shouldCaptureKeyStroke(event)) {
       return;
     }
 
@@ -133,9 +155,11 @@ export function AvailabilityBindCard({
                     <input
                       className={styles.keyInput}
                       value={bind.key}
-                      readOnly
-                      placeholder="Press shortcut..."
+                      placeholder="Press shortcut or type manually..."
+                      spellCheck={false}
+                      autoComplete="off"
                       onFocus={() => onSelectedBindChange(bind.clientId)}
+                      onChange={event => onBindFieldChange(bind.clientId, { key: event.target.value })}
                       onKeyDown={event => handleKeyCapture(event, bind.clientId)}
                     />
 
