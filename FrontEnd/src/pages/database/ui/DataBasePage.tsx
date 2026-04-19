@@ -1,6 +1,7 @@
 import { useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { ChangeEvent } from "react";
 import {
+  type AdminDbFileEntry,
   type AdminDbImportResponse,
   type AdminDbObject,
   type AdminDbQueryResponse,
@@ -8,8 +9,10 @@ import {
   useAdminDbExecuteMutation,
   useAdminDbHashQuery,
   useAdminDbImportMutation,
+  useAdminDbManualCopyMutation,
   useAdminDbMetadataQuery,
   useAdminDbQueryMutation,
+  useAdminDbSelectDatabaseMutation,
 } from "@entities/admin-db";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiError } from "@shared/api/httpClient";
@@ -110,7 +113,7 @@ function getObjectCount(objects: AdminDbObject[], type: string) {
 function describeApiError(error: unknown, fallbackMessage: string) {
   if (error instanceof ApiError) {
     if (error.status === 403) {
-      return "Admin DB access is limited to requests coming from this machine. Open the UI locally and try again.";
+      return "Admin DB access is blocked by the current backend policy. Start GF3 through the launcher or enable remote admin access on the host machine.";
     }
 
     if (error.status === 404) {
@@ -185,6 +188,27 @@ function getDefaultObjectKey(objects: AdminDbObject[]) {
   return preferredObject ? getObjectKey(preferredObject) : "";
 }
 
+function getDatabaseCategoryLabel(category: string) {
+  switch (category) {
+    case "backup":
+      return "Auto backup";
+    case "manualCopy":
+      return "Manual copy";
+    default:
+      return "Database";
+  }
+}
+
+function buildDatabaseOptionLabel(entry: AdminDbFileEntry) {
+  const parts = [entry.name, getDatabaseCategoryLabel(entry.category)];
+
+  if (entry.lastModifiedUtc) {
+    parts.push(formatDateTime(entry.lastModifiedUtc));
+  }
+
+  return parts.join(" • ");
+}
+
 export function DataBasePage() {
   usePageScrollbarHidden();
 
@@ -199,9 +223,14 @@ export function DataBasePage() {
   const [importScript, setImportScript] = useState("");
   const [importMessage, setImportMessage] = useState("Ready. Load a file or paste a SQL script to begin.");
   const [importTone, setImportTone] = useState<ResultTone>("neutral");
+  const [databaseActionMessage, setDatabaseActionMessage] = useState(
+    "AutoBackup creates a fresh SQLite snapshot every hour while the application stays open. The last selected database is restored on the next launch.",
+  );
+  const [databaseActionTone, setDatabaseActionTone] = useState<ResultTone>("neutral");
   const [schemaSearch, setSchemaSearch] = useState("");
   const deferredSchemaSearch = useDeferredValue(schemaSearch);
   const [selectedObjectKey, setSelectedObjectKey] = useState("");
+  const [selectedDatabasePath, setSelectedDatabasePath] = useState("");
   const [viewerLimit, setViewerLimit] = useState(100);
   const [isWideViewerRow, setIsWideViewerRow] = useState(() => {
     if (typeof window === "undefined") {
@@ -217,10 +246,16 @@ export function DataBasePage() {
   const queryMutation = useAdminDbQueryMutation();
   const executeMutation = useAdminDbExecuteMutation();
   const importMutation = useAdminDbImportMutation();
+  const manualCopyMutation = useAdminDbManualCopyMutation();
+  const selectDatabaseMutation = useAdminDbSelectDatabaseMutation();
 
   const metadata = metadataQuery.data ?? null;
   const databaseHash = hashQuery.data?.hash ?? null;
   const accessError = metadataQuery.error ?? hashQuery.error;
+  const storageWorkspace = metadata?.storageWorkspace ?? null;
+  const availableDatabases = useMemo(() => storageWorkspace?.availableDatabases ?? [], [storageWorkspace?.availableDatabases]);
+  const automaticBackups = useMemo(() => storageWorkspace?.automaticBackups ?? [], [storageWorkspace?.automaticBackups]);
+  const manualCopies = useMemo(() => storageWorkspace?.manualCopies ?? [], [storageWorkspace?.manualCopies]);
   const objectList = useMemo(() => metadata?.objects ?? [], [metadata?.objects]);
   const tables = useMemo(() => metadata?.tables ?? [], [metadata?.tables]);
   const normalizedSchemaSearch = deferredSchemaSearch.trim().toLowerCase();
@@ -275,12 +310,14 @@ export function DataBasePage() {
   const hasImportEdits = importFile ? importFile.originalText !== importScript : importScript.trim().length > 0;
   const isExecuting = queryMutation.isPending || executeMutation.isPending;
   const isImporting = importMutation.isPending;
+  const isCreatingManualCopy = manualCopyMutation.isPending;
+  const isSelectingDatabase = selectDatabaseMutation.isPending;
   const accessStateReady = Boolean(metadata) && !accessError;
   const accessStateMessage = accessError
     ? describeApiError(accessError, "Could not access admin database tools.")
     : metadata
-      ? "Live metadata is connected directly to the local admin database endpoints. No browser token/session setup is required."
-      : "Connecting to local admin database endpoints and loading live metadata.";
+      ? "Live metadata is connected directly to the admin database endpoints exposed by the current GF3 host."
+      : "Connecting to admin database endpoints and loading live metadata.";
   const viewerResult = viewerPreviewQuery.data ?? null;
   const viewerTone: ResultTone =
     !selectedObject || !selectedObjectPreviewable
@@ -299,17 +336,74 @@ export function DataBasePage() {
         : viewerPreviewQuery.isError
           ? describeApiError(viewerPreviewQuery.error, `Could not load preview rows for ${selectedObject.name}.`)
           : `Showing ${viewerResult?.rowCount ?? 0} row${viewerResult?.rowCount === 1 ? "" : "s"} from ${selectedObject.name}.`;
+  const recentAutomaticBackups = automaticBackups.slice(0, 6);
+  const recentManualCopies = manualCopies.slice(0, 6);
+  const autoBackupsOverflowCount = Math.max(automaticBackups.length - recentAutomaticBackups.length, 0);
+  const manualCopiesOverflowCount = Math.max(manualCopies.length - recentManualCopies.length, 0);
 
   const invalidateAdminQueries = () => {
-    queryClient.invalidateQueries({ queryKey: queryKeys.adminDb.metadata() });
-    queryClient.invalidateQueries({ queryKey: queryKeys.adminDb.hash() });
-    queryClient.invalidateQueries({ queryKey: VIEWER_QUERY_KEY });
+    void queryClient.invalidateQueries({ queryKey: queryKeys.adminDb.metadata() });
+    void queryClient.invalidateQueries({ queryKey: queryKeys.adminDb.hash() });
+    void queryClient.invalidateQueries({ queryKey: VIEWER_QUERY_KEY });
+  };
+
+  const invalidateAllDatabaseQueries = () => {
+    void queryClient.invalidateQueries({});
   };
 
   const handleClearExecutorOutput = () => {
     setQueryResult(null);
     setExecutorTone("neutral");
     setExecutorMessage("Output cleared.");
+  };
+
+  const handleCreateManualCopy = () => {
+    manualCopyMutation.mutate(undefined, {
+      onSuccess: createdCopy => {
+        setDatabaseActionTone("success");
+        setDatabaseActionMessage(`Manual copy created: ${createdCopy.name}.`);
+        invalidateAdminQueries();
+      },
+      onError: error => {
+        setDatabaseActionTone("error");
+        setDatabaseActionMessage(describeApiError(error, "Could not create a manual database copy."));
+      },
+    });
+  };
+
+  const handleSelectDatabase = () => {
+    const databasePath = selectedDatabasePath.trim();
+
+    if (!databasePath) {
+      setDatabaseActionTone("error");
+      setDatabaseActionMessage("Choose a database file before switching.");
+      return;
+    }
+
+    if (databasePath === metadata?.databasePath) {
+      setDatabaseActionTone("neutral");
+      setDatabaseActionMessage("This database is already active.");
+      return;
+    }
+
+    selectDatabaseMutation.mutate(
+      { databasePath },
+      {
+        onSuccess: selectedDatabase => {
+          setSelectedDatabasePath(selectedDatabase.path);
+          setSelectedObjectKey("");
+          setQueryResult(null);
+          setSchemaSearch("");
+          setDatabaseActionTone("success");
+          setDatabaseActionMessage(`Active database switched to ${selectedDatabase.name}. This choice will be restored after restart.`);
+          invalidateAllDatabaseQueries();
+        },
+        onError: error => {
+          setDatabaseActionTone("error");
+          setDatabaseActionMessage(describeApiError(error, "Could not switch the active database."));
+        },
+      },
+    );
   };
 
   const handleExecuteSql = () => {
@@ -467,6 +561,14 @@ export function DataBasePage() {
     return () => mediaQuery.removeListener(handleChange);
   }, []);
 
+  useEffect(() => {
+    if (!metadata?.databasePath) {
+      return;
+    }
+
+    setSelectedDatabasePath(metadata.databasePath);
+  }, [metadata?.databasePath]);
+
   useLayoutEffect(() => {
     if (!isWideViewerRow) {
       return;
@@ -519,6 +621,13 @@ export function DataBasePage() {
   ]
     .filter(Boolean)
     .join(" ");
+  const databaseActionResultClassName = [
+    styles.resultBox,
+    databaseActionTone === "success" ? styles.resultBoxSuccess : "",
+    databaseActionTone === "error" ? styles.resultBoxError : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
   const viewerResultClassName = [
     styles.resultBox,
     viewerTone === "success" ? styles.resultBoxSuccess : "",
@@ -531,7 +640,7 @@ export function DataBasePage() {
     <div className={styles.page}>
       <PageHeader
         title="Database"
-        subtitle="Run SQL, import scripts, and inspect live database metadata"
+        subtitle="Switch databases, manage copies, run SQL, and inspect live metadata"
         backTo="/"
         gutter={8}
       />
@@ -589,6 +698,131 @@ export function DataBasePage() {
                     <div className={styles.overviewMiniTile}>
                       <span className={styles.detailLabel}>Schema objects</span>
                       <span className={styles.detailValue}>{objectList.length}</span>
+                    </div>
+                  </div>
+                </section>
+
+                <section className={styles.overviewPanel}>
+                  <p className={styles.sectionCaption}>Database Control</p>
+
+                  <div className={styles.controlStack}>
+                    <div className={styles.controlHeader}>
+                      <label className={styles.fieldLabel} htmlFor="active-database-select">
+                        Working database
+                      </label>
+
+                      <div className={styles.pillRow}>
+                        <span className={styles.infoPill}>AutoBackup hourly</span>
+                        <span className={styles.infoPill}>Keep {storageWorkspace?.automaticBackupRetentionLimit ?? 10} copies</span>
+                      </div>
+                    </div>
+
+                    <div className={styles.databaseSelectRow}>
+                      <div className={styles.selectShell}>
+                        <select
+                          id="active-database-select"
+                          className={styles.selectInput}
+                          value={selectedDatabasePath}
+                          onChange={event => setSelectedDatabasePath(event.target.value)}
+                        >
+                          {availableDatabases.length > 0 ? (
+                            availableDatabases.map(entry => (
+                              <option key={entry.path} value={entry.path}>
+                                {buildDatabaseOptionLabel(entry)}
+                              </option>
+                            ))
+                          ) : (
+                            <option value={metadata.databasePath}>{metadata.databasePath}</option>
+                          )}
+                        </select>
+                      </div>
+
+                      <IosButton
+                        label="Use Selected DB"
+                        onClick={handleSelectDatabase}
+                        disabled={isSelectingDatabase || !selectedDatabasePath || selectedDatabasePath === metadata.databasePath}
+                      />
+                      <IosButton
+                        label="Create Manual Copy"
+                        variant="secondary"
+                        onClick={handleCreateManualCopy}
+                        disabled={isCreatingManualCopy}
+                      />
+                    </div>
+
+                    <div className={`${databaseActionResultClassName} ${styles.controlMessage}`}>{databaseActionMessage}</div>
+                  </div>
+
+                  <div className={`${styles.overviewMiniGrid} ${styles.controlMetricsGrid}`}>
+                    <div className={`${styles.overviewMiniTile} ${styles.overviewMiniTileWide}`}>
+                      <span className={styles.detailLabel}>Workspace root</span>
+                      <span className={styles.detailValueHash}>{storageWorkspace?.workspaceRootPath || "-"}</span>
+                    </div>
+                    <div className={`${styles.overviewMiniTile} ${styles.overviewMiniTileWide}`}>
+                      <span className={styles.detailLabel}>Auto backup folder</span>
+                      <span className={styles.detailValueHash}>{storageWorkspace?.automaticBackupDirectoryPath || "-"}</span>
+                    </div>
+                    <div className={`${styles.overviewMiniTile} ${styles.overviewMiniTileWide}`}>
+                      <span className={styles.detailLabel}>Manual copy folder</span>
+                      <span className={styles.detailValueHash}>{storageWorkspace?.manualCopyDirectoryPath || "-"}</span>
+                    </div>
+                    <div className={styles.overviewMiniTile}>
+                      <span className={styles.detailLabel}>Auto backups</span>
+                      <span className={styles.detailValue}>{automaticBackups.length}</span>
+                    </div>
+                    <div className={styles.overviewMiniTile}>
+                      <span className={styles.detailLabel}>Manual copies</span>
+                      <span className={styles.detailValue}>{manualCopies.length}</span>
+                    </div>
+                  </div>
+
+                  <div className={styles.fileCollections}>
+                    <div className={styles.fileCollection}>
+                      <p className={styles.fileCollectionTitle}>Recent Auto Backups</p>
+                      {recentAutomaticBackups.length > 0 ? (
+                        <div className={styles.fileStack}>
+                          {recentAutomaticBackups.map(entry => (
+                            <div key={entry.path} className={styles.fileRow}>
+                              <div className={styles.fileRowMain}>
+                                <span className={styles.fileName}>{entry.name}</span>
+                                {entry.isActive ? <span className={styles.fileBadge}>Active</span> : null}
+                              </div>
+                              <span className={styles.fileMeta}>
+                                {formatBytes(entry.fileSizeBytes)} • {formatDateTime(entry.lastModifiedUtc)}
+                              </span>
+                            </div>
+                          ))}
+                          {autoBackupsOverflowCount > 0 ? (
+                            <span className={styles.emptyInline}>+{autoBackupsOverflowCount} more auto backups</span>
+                          ) : null}
+                        </div>
+                      ) : (
+                        <span className={styles.emptyInline}>The first automatic backup will appear after the app has been running for one hour.</span>
+                      )}
+                    </div>
+
+                    <div className={styles.fileCollection}>
+                      <p className={styles.fileCollectionTitle}>Recent Manual Copies</p>
+                      {recentManualCopies.length > 0 ? (
+                        <div className={styles.fileStack}>
+                          {recentManualCopies.map(entry => (
+                            <div key={entry.path} className={styles.fileRow}>
+                              <div className={styles.fileRowMain}>
+                                <span className={styles.fileName}>{entry.name}</span>
+                                {entry.isActive ? <span className={styles.fileBadge}>Active</span> : null}
+                              </div>
+                              <span className={styles.fileMeta}>
+                                {formatBytes(entry.fileSizeBytes)} • {formatDateTime(entry.lastModifiedUtc)}
+                              </span>
+                            </div>
+                          ))}
+                          {manualCopiesOverflowCount > 0 ? (
+                            <span className={styles.emptyInline}>+{manualCopiesOverflowCount} more manual copies</span>
+                          ) : null}
+                        </div>
+                      ) : (
+                        <span className={styles.emptyInline}>Manual copies appear here after the first Create Manual Copy action.</span>
+                      )}
                     </div>
                   </div>
                 </section>

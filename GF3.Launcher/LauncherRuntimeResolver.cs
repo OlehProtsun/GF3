@@ -11,20 +11,29 @@ internal static class LauncherRuntimeResolver
         string databasePath)
     {
         var connectionString = $"Data Source={databasePath}";
+        var networkBinding = LauncherNetworkResolver.CreateBinding(backendPort);
 
         return options.RunMode switch
         {
-            LauncherRunMode.Workspace => CreateWorkspacePlan(ResolveWorkspaceRoot(startingDirectory), backendPort, databasePath, connectionString),
-            LauncherRunMode.Bundle => CreateBundlePlan(startingDirectory, backendPort, databasePath, connectionString),
+            LauncherRunMode.Workspace => CreateWorkspacePlan(
+                ResolveWorkspaceRoot(startingDirectory),
+                networkBinding,
+                databasePath,
+                connectionString),
+            LauncherRunMode.Bundle => CreateBundlePlan(
+                startingDirectory,
+                networkBinding,
+                databasePath,
+                connectionString),
             _ => TryFindWorkspaceRoot(startingDirectory, out var workspaceRoot)
-                ? CreateWorkspacePlan(workspaceRoot, backendPort, databasePath, connectionString)
-                : CreateBundlePlan(startingDirectory, backendPort, databasePath, connectionString),
+                ? CreateWorkspacePlan(workspaceRoot, networkBinding, databasePath, connectionString)
+                : CreateBundlePlan(startingDirectory, networkBinding, databasePath, connectionString),
         };
     }
 
     private static LauncherRuntimePlan CreateWorkspacePlan(
         string workspaceRoot,
-        int backendPort,
+        LauncherNetworkBinding networkBinding,
         string databasePath,
         string connectionString)
     {
@@ -32,7 +41,7 @@ internal static class LauncherRuntimeResolver
         var frontendRoot = Path.Combine(workspaceRoot, "FrontEnd");
         var templatesDirectory = Path.Combine(workspaceRoot, "GF3.WebApi", "Resources", "ExcelTemplate");
         var backendEnvironment = BuildBackendEnvironmentVariables(
-            backendPort,
+            networkBinding.ListenUrl,
             databasePath,
             connectionString,
             environmentName: "Development",
@@ -58,21 +67,22 @@ internal static class LauncherRuntimeResolver
 
         return new LauncherRuntimePlan(
             ModeLabel: "workspace",
-            BaseUrl: $"http://127.0.0.1:{backendPort}",
+            BaseUrl: networkBinding.LocalBaseUrl,
+            RemoteBaseUrls: networkBinding.RemoteBaseUrls,
             Backend: backend,
             Frontend: frontend);
     }
 
     private static LauncherRuntimePlan CreateBundlePlan(
         string startingDirectory,
-        int backendPort,
+        LauncherNetworkBinding networkBinding,
         string databasePath,
         string connectionString)
     {
         var launchConfiguration = BackendLocator.Resolve(startingDirectory);
         var templatesDirectory = Path.Combine(launchConfiguration.WorkingDirectory, "Resources", "ExcelTemplate");
         var backendEnvironment = BuildBackendEnvironmentVariables(
-            backendPort,
+            networkBinding.ListenUrl,
             databasePath,
             connectionString,
             environmentName: "Production",
@@ -89,13 +99,14 @@ internal static class LauncherRuntimeResolver
 
         return new LauncherRuntimePlan(
             ModeLabel: "bundle",
-            BaseUrl: $"http://127.0.0.1:{backendPort}",
+            BaseUrl: networkBinding.LocalBaseUrl,
+            RemoteBaseUrls: networkBinding.RemoteBaseUrls,
             Backend: backend,
             Frontend: null);
     }
 
     private static Dictionary<string, string> BuildBackendEnvironmentVariables(
-        int backendPort,
+        string listenUrl,
         string databasePath,
         string connectionString,
         string environmentName,
@@ -105,9 +116,11 @@ internal static class LauncherRuntimeResolver
         {
             ["ASPNETCORE_ENVIRONMENT"] = environmentName,
             ["DOTNET_ENVIRONMENT"] = environmentName,
-            ["ASPNETCORE_URLS"] = $"http://127.0.0.1:{backendPort}",
-            // Launcher runs only the local desktop instance, so keep admin/database tooling fully available.
+            ["ASPNETCORE_URLS"] = listenUrl,
+            // Launcher runs only the local desktop instance, so keep admin/database tooling fully
+            // available even when the UI is opened from another machine on the same LAN.
             ["GF3_ADMIN_ENABLED"] = bool.TrueString,
+            ["GF3_ADMIN_ALLOW_REMOTE"] = bool.TrueString,
             ["GF3_ADMIN_ALLOW_WRITE"] = bool.TrueString,
             ["GF3_DATABASE_PATH"] = databasePath,
             ["GF3_CONNECTION_STRING"] = connectionString,

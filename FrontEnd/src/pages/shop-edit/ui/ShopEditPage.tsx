@@ -5,9 +5,12 @@ import {
   useShopByIdQuery,
   useUpdateShopMutation,
 } from "@entities/shops/api/queries";
-import { useShopForm } from "@entities/shops/model/form";
+import { createShopFormState, useShopForm } from "@entities/shops/model/form";
 import { ShopDetailsForm } from "@entities/shops/ui/ShopDetailsForm";
+import { stableSerialize } from "@shared/lib/stableSerialize";
+import { useUnsavedChangesPrompt } from "@shared/lib/useUnsavedChangesPrompt";
 import { PageHeader } from "@shared/ui/PageHeader";
+import { SavingOverlay } from "@shared/ui/SavingOverlay";
 import styles from "./ShopEditPage.module.css";
 
 export function ShopEditPage() {
@@ -31,6 +34,21 @@ export function ShopEditPage() {
 
   const isSaving = createMutation.isPending || updateMutation.isPending;
   const hasLoadError = !isCreate && Boolean(shopQuery.error) && !shopQuery.isLoading && !shopQuery.data;
+  const initialFormSnapshot = useMemo(
+    () => stableSerialize(createShopFormState(shopQuery.data)),
+    [shopQuery.data],
+  );
+  const currentFormSnapshot = useMemo(() => stableSerialize(form), [form]);
+  const hasUnsavedChanges = useMemo(() => {
+    if (isCreate) {
+      return currentFormSnapshot !== initialFormSnapshot;
+    }
+
+    return Boolean(shopQuery.data) && currentFormSnapshot !== initialFormSnapshot;
+  }, [currentFormSnapshot, initialFormSnapshot, isCreate, shopQuery.data]);
+  const { dialog: unsavedChangesDialog, runWithoutPrompt } = useUnsavedChangesPrompt({
+    when: hasUnsavedChanges && !isSaving,
+  });
 
   const onSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -38,13 +56,13 @@ export function ShopEditPage() {
 
     if (isCreate) {
       createMutation.mutate(form, {
-        onSuccess: (created) => navigate(`/shop/${created.id}`),
+        onSuccess: (created) => runWithoutPrompt(() => navigate(`/shop/${created.id}`)),
       });
       return;
     }
 
     if (!id) return;
-    updateMutation.mutate({ id, payload: form }, { onSuccess: () => navigate(`/shop/${id}`) });
+    updateMutation.mutate({ id, payload: form }, { onSuccess: () => runWithoutPrompt(() => navigate(`/shop/${id}`)) });
   };
 
   return (
@@ -65,6 +83,9 @@ export function ShopEditPage() {
         onCancel={() => navigate(backTo)}
         onSubmit={onSubmit}
       />
+
+      <SavingOverlay active={isSaving} />
+      {unsavedChangesDialog}
     </div>
   );
 }

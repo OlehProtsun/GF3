@@ -169,6 +169,112 @@
   background: rgba(248, 250, 252, 0.86);
 }
 
+.controlStack,
+.fileCollections,
+.fileCollection,
+.fileStack {
+  display: grid;
+  gap: 12px;
+}
+
+.controlHeader,
+.databaseSelectRow,
+.fileRowMain {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.controlHeader,
+.databaseSelectRow {
+  justify-content: space-between;
+}
+
+.controlMessage,
+.controlMetricsGrid {
+  margin-bottom: 8px;
+}
+
+.selectShell {
+  min-width: min(100%, 420px);
+  flex: 1 1 320px;
+  padding: 0 14px;
+  border-radius: 18px;
+  border: 1px solid rgba(148, 163, 184, 0.26);
+  background: rgba(255, 255, 255, 0.96);
+}
+
+.selectInput {
+  width: 100%;
+  min-width: 0;
+  height: 44px;
+  border: none;
+  background: transparent;
+  color: var(--page-ink);
+  font: inherit;
+  outline: none;
+}
+
+.fileCollections {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.fileCollection {
+  min-height: 0;
+  padding: 14px;
+  border-radius: 20px;
+  border: 1px solid rgba(226, 232, 240, 0.86);
+  background: rgba(255, 255, 255, 0.8);
+}
+
+.fileCollectionTitle {
+  margin: 0;
+  color: var(--page-ink);
+  font-size: 0.88rem;
+  font-weight: 800;
+}
+
+.fileStack {
+  gap: 8px;
+}
+
+.fileRow {
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  border-radius: 16px;
+  background: rgba(248, 250, 252, 0.9);
+  border: 1px solid rgba(226, 232, 240, 0.9);
+}
+
+.fileName {
+  color: var(--page-ink);
+  font-size: 0.9rem;
+  font-weight: 700;
+  word-break: break-word;
+}
+
+.fileBadge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 0 0.65rem;
+  border-radius: 999px;
+  color: #1d4ed8;
+  background: rgba(37, 99, 235, 0.1);
+  border: 1px solid rgba(37, 99, 235, 0.18);
+  font-size: 0.72rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.fileMeta {
+  color: var(--page-muted);
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
 .fieldLabel {
   font-size: 0.78rem;
   font-weight: 800;
@@ -638,6 +744,7 @@
   .workspaceGrid,
   .viewerLayout,
   .detailsGrid,
+  .fileCollections,
   .viewerSummaryGrid,
   .overviewMiniGrid {
     grid-template-columns: 1fr;
@@ -673,6 +780,20 @@
 
   .buttonRowCompact {
     justify-content: stretch;
+  }
+
+  .databaseSelectRow {
+    justify-content: stretch;
+  }
+
+  .databaseSelectRow :global(button) {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .selectShell {
+    min-width: 0;
+    width: 100%;
   }
 
   .buttonRowCompact :global(button) {

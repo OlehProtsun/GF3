@@ -69,9 +69,10 @@ public static class Extensions
     /// </summary>
     public static IServiceCollection AddBusinessLogicStack(this IServiceCollection serviceCollection, string connectionString, string databasePath)
     {
-        serviceCollection.AddDataAccess(connectionString);
+        serviceCollection.AddSingleton<ISqliteDatabaseWorkspace>(_ => new SqliteDatabaseWorkspace(databasePath));
+        serviceCollection.AddDataAccess();
         serviceCollection.AddBusinessLogicLayer();
-        serviceCollection.AddSingleton<ISqliteAdminService>(_ => new SqliteAdminService(connectionString, databasePath));
+        serviceCollection.AddSingleton<ISqliteAdminService, SqliteAdminService>();
         serviceCollection.AddOptions<ExportTemplatesOptions>();
 
         return serviceCollection;
@@ -85,12 +86,11 @@ public static class Extensions
             return connectionString;
         }
 
-        var root = Path.Combine(
+        var defaultDatabasePath = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            DefaultDatabaseFolderName);
-
-        Directory.CreateDirectory(root);
-        var databasePath = Path.Combine(root, DefaultDatabaseFileName);
+            DefaultDatabaseFolderName,
+            DefaultDatabaseFileName);
+        var databasePath = SqliteDatabaseSelectionStore.ResolveDatabasePath(defaultDatabasePath);
         return $"Data Source={databasePath}";
     }
 
@@ -104,11 +104,10 @@ public static class Extensions
             return dataSourcePart[DataSourceMarker.Length..];
         }
 
-        var root = Path.Combine(
+        var defaultDatabasePath = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            DefaultDatabaseFolderName);
-
-        Directory.CreateDirectory(root);
-        return Path.Combine(root, DefaultDatabaseFileName);
+            DefaultDatabaseFolderName,
+            DefaultDatabaseFileName);
+        return SqliteDatabaseSelectionStore.ResolveDatabasePath(defaultDatabasePath);
     }
 }

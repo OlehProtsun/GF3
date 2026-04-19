@@ -39,6 +39,11 @@ public sealed class AdminDbMetadataDto
     /// Broader list of schema objects such as tables, indexes, and views.
     /// </summary>
     public IReadOnlyList<AdminDbObjectDto> Objects { get; init; } = Array.Empty<AdminDbObjectDto>();
+
+    /// <summary>
+    /// Database workspace details, including available database files and backup folders.
+    /// </summary>
+    public AdminDbStorageWorkspaceDto StorageWorkspace { get; init; } = new();
 }
 
 /// <summary>
@@ -60,6 +65,83 @@ public sealed class AdminDbObjectDto
     /// Raw SQL definition when SQLite exposes one.
     /// </summary>
     public string Sql { get; init; } = string.Empty;
+}
+
+/// <summary>
+/// Represents one database file visible to the admin database workspace.
+/// </summary>
+public sealed class AdminDbFileEntryDto
+{
+    /// <summary>
+    /// File name without directory information.
+    /// </summary>
+    public string Name { get; init; } = string.Empty;
+
+    /// <summary>
+    /// Fully qualified path to the file.
+    /// </summary>
+    public string Path { get; init; } = string.Empty;
+
+    /// <summary>
+    /// Source category of the file inside the workspace.
+    /// </summary>
+    public string Category { get; init; } = string.Empty;
+
+    /// <summary>
+    /// Current file size when available.
+    /// </summary>
+    public long FileSizeBytes { get; init; }
+
+    /// <summary>
+    /// Last write timestamp when available.
+    /// </summary>
+    public DateTime? LastModifiedUtc { get; init; }
+
+    /// <summary>
+    /// Indicates whether this file is the currently active database.
+    /// </summary>
+    public bool IsActive { get; init; }
+}
+
+/// <summary>
+/// Describes the storage workspace around the active database file.
+/// </summary>
+public sealed class AdminDbStorageWorkspaceDto
+{
+    /// <summary>
+    /// Root folder relative to which backup/manual-copy directories are resolved.
+    /// </summary>
+    public string WorkspaceRootPath { get; init; } = string.Empty;
+
+    /// <summary>
+    /// Folder that stores automatic hourly backups.
+    /// </summary>
+    public string AutomaticBackupDirectoryPath { get; init; } = string.Empty;
+
+    /// <summary>
+    /// Folder that stores user-triggered manual copies.
+    /// </summary>
+    public string ManualCopyDirectoryPath { get; init; } = string.Empty;
+
+    /// <summary>
+    /// Maximum number of automatic backups retained in the automatic backup folder.
+    /// </summary>
+    public int AutomaticBackupRetentionLimit { get; init; }
+
+    /// <summary>
+    /// All database-like files currently visible in the workspace.
+    /// </summary>
+    public IReadOnlyList<AdminDbFileEntryDto> AvailableDatabases { get; init; } = Array.Empty<AdminDbFileEntryDto>();
+
+    /// <summary>
+    /// Known automatic backups ordered by recency.
+    /// </summary>
+    public IReadOnlyList<AdminDbFileEntryDto> AutomaticBackups { get; init; } = Array.Empty<AdminDbFileEntryDto>();
+
+    /// <summary>
+    /// Known manual copies ordered by recency.
+    /// </summary>
+    public IReadOnlyList<AdminDbFileEntryDto> ManualCopies { get; init; } = Array.Empty<AdminDbFileEntryDto>();
 }
 
 /// <summary>

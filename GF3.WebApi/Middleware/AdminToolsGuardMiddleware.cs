@@ -6,8 +6,8 @@ namespace WebApi.Middleware;
 
 /// <summary>
 /// Protects admin-only database endpoints from accidental exposure.
-/// The middleware currently allows access only when the feature is enabled and the caller comes
-/// from the local machine.
+/// By default requests must originate from the local machine, but the launcher can opt into
+/// remote access for LAN scenarios by setting a dedicated configuration override.
 /// </summary>
 public sealed class AdminToolsGuardMiddleware
 {
@@ -37,7 +37,7 @@ public sealed class AdminToolsGuardMiddleware
             return;
         }
 
-        if (!IsLocalRequest(context))
+        if (!options.AllowRemoteAccess && !IsLocalRequest(context))
         {
             context.Response.StatusCode = StatusCodes.Status403Forbidden;
             return;

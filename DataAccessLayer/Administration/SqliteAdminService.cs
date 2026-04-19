@@ -48,16 +48,14 @@ public interface ISqliteAdminService
 /// </summary>
 public sealed class SqliteAdminService : ISqliteAdminService
 {
-    private readonly string _connectionString;
-    private readonly string _databasePath;
+    private readonly ISqliteDatabaseWorkspace _workspace;
 
-    public SqliteAdminService(string connectionString, string databasePath)
+    public SqliteAdminService(ISqliteDatabaseWorkspace workspace)
     {
-        _connectionString = connectionString ?? throw new ArgumentNullException(nameof(connectionString));
-        _databasePath = databasePath ?? throw new ArgumentNullException(nameof(databasePath));
+        _workspace = workspace ?? throw new ArgumentNullException(nameof(workspace));
     }
 
-    public string DatabasePath => _databasePath;
+    public string DatabasePath => _workspace.DatabasePath;
 
     /// <summary>
     /// Executes a single SQL command.
@@ -96,7 +94,8 @@ public sealed class SqliteAdminService : ISqliteAdminService
     /// </summary>
     public async Task<DatabaseInfo> GetDatabaseInfoAsync(CancellationToken ct)
     {
-        var fileInfo = new FileInfo(_databasePath);
+        var databasePath = _workspace.DatabasePath;
+        var fileInfo = new FileInfo(databasePath);
 
         await using var connection = await OpenConnectionAsync(ct).ConfigureAwait(false);
         var tables = await GetUserTableNamesAsync(connection, ct).ConfigureAwait(false);
@@ -104,7 +103,7 @@ public sealed class SqliteAdminService : ISqliteAdminService
 
         return new DatabaseInfo
         {
-            DatabasePath = _databasePath,
+            DatabasePath = databasePath,
             FileSizeBytes = fileInfo.Exists ? fileInfo.Length : 0,
             LastModifiedUtc = fileInfo.Exists ? fileInfo.LastWriteTimeUtc : DateTime.MinValue,
             UserVersion = userVersion,
@@ -142,7 +141,7 @@ public sealed class SqliteAdminService : ISqliteAdminService
 
     private async Task<SqliteConnection> OpenConnectionAsync(CancellationToken ct)
     {
-        var connection = new SqliteConnection(_connectionString);
+        var connection = new SqliteConnection(_workspace.ConnectionString);
         await connection.OpenAsync(ct).ConfigureAwait(false);
         return connection;
     }
