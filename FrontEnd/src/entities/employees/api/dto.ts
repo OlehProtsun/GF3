@@ -4,6 +4,10 @@ export type EmployeeDto = {
   lastName: string;
   phone?: string | null;
   email?: string | null;
+  username?: string | null;
+  hasLoginAccount: boolean;
+  isOnline: boolean;
+  lastLoginAtUtc?: string | null;
 };
 
 export type SaveEmployeeDto = {
@@ -11,4 +15,6 @@ export type SaveEmployeeDto = {
   lastName: string;
   phone?: string;
   email?: string;
+  username?: string;
+  password?: string;
 };

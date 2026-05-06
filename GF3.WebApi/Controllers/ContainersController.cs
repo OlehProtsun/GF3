@@ -1,5 +1,7 @@
 using BusinessLogicLayer.Services.Abstractions;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using WebApi.Auth;
 using WebApi.Infrastructure;
 using WebApi.Contracts.Containers;
 using WebApi.Contracts.Containers.Graphs;
@@ -8,17 +10,23 @@ using WebApi.Contracts.Containers.Graphs.Employees;
 using WebApi.Contracts.Containers.Graphs.Slots;
 using WebApi.Contracts.Containers.SchedulePresets;
 using WebApi.Mappers;
+using WebApi.Realtime;
+using WebApi.Services;
 
 namespace WebApi.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
+[Authorize(Roles = AuthRoles.Manager)]
 /// <summary>
 /// Main HTTP API for containers and all nested graph resources.
 /// This controller intentionally mirrors the aggregate structure from the business layer,
 /// which makes the route tree predictable for frontend code and keeps ownership boundaries explicit.
 /// </summary>
-public class ContainersController(IContainerService containerService) : ControllerBase
+public class ContainersController(
+    IContainerService containerService,
+    IWorkflowLogService workflowLogService,
+    IRealtimeNotifier realtimeNotifier) : ControllerBase
 {
     [HttpGet]
     [ProducesResponseType(typeof(IEnumerable<ContainerDto>), StatusCodes.Status200OK)]
@@ -83,6 +91,7 @@ public class ContainersController(IContainerService containerService) : Controll
     {
         var created = await containerService.CreateSchedulePresetAsync(containerId, request.ToCreateModel(containerId), cancellationToken).ConfigureAwait(false);
         var dto = created.ToSchedulePresetDto();
+        await LogManagerActionAsync($"Created schedule preset {dto.Name}.", cancellationToken).ConfigureAwait(false);
         return CreatedAtAction(nameof(GetSchedulePresets), new { containerId }, dto);
     }
 
@@ -110,6 +119,8 @@ public class ContainersController(IContainerService containerService) : Controll
     {
         var created = await containerService.CreateGraphAsync(containerId, request.ToCreateModel(containerId), cancellationToken).ConfigureAwait(false);
         var dto = created.ToGraphDto();
+        await LogManagerActionAsync($"Created schedule {dto.Name}.", cancellationToken).ConfigureAwait(false);
+        await NotifyGraphChangedAsync(containerId, dto.Id, "manager-schedule-created").ConfigureAwait(false);
         return CreatedAtAction(nameof(GetGraphById), new { containerId, graphId = dto.Id }, dto);
     }
 
@@ -121,6 +132,8 @@ public class ContainersController(IContainerService containerService) : Controll
     public async Task<IActionResult> UpdateGraph(int containerId, int graphId, [FromBody] UpdateGraphRequest request, CancellationToken cancellationToken)
     {
         await containerService.UpdateGraphAsync(containerId, graphId, request.ToUpdateModel(containerId, graphId), cancellationToken).ConfigureAwait(false);
+        await LogManagerActionAsync($"Updated schedule {request.Name}.", cancellationToken).ConfigureAwait(false);
+        await NotifyGraphChangedAsync(containerId, graphId, "manager-schedule-updated").ConfigureAwait(false);
         return NoContent();
     }
 
@@ -131,6 +144,8 @@ public class ContainersController(IContainerService containerService) : Controll
     public async Task<IActionResult> DeleteGraph(int containerId, int graphId, CancellationToken cancellationToken)
     {
         await containerService.DeleteGraphAsync(containerId, graphId, cancellationToken).ConfigureAwait(false);
+        await LogManagerActionAsync($"Deleted schedule #{graphId}.", cancellationToken).ConfigureAwait(false);
+        await NotifyGraphChangedAsync(containerId, graphId, "manager-schedule-deleted").ConfigureAwait(false);
         return NoContent();
     }
 
@@ -179,6 +194,11 @@ public class ContainersController(IContainerService containerService) : Controll
         // Returning slots is optional for persisted generation because some callers only care
         // about counts. Dry-run always returns slots because there is no database write to inspect later.
         var includeSlots = request.DryRun || request.ReturnSlots;
+        if (!request.DryRun && result.WrittenSlotsCount > 0)
+        {
+            await LogManagerActionAsync($"Generated {result.WrittenSlotsCount} slots for schedule #{graphId}.", cancellationToken).ConfigureAwait(false);
+            await NotifyGraphChangedAsync(containerId, graphId, "manager-schedule-generated").ConfigureAwait(false);
+        }
 
         return Ok(new GenerateGraphResponse
         {
@@ -210,6 +230,8 @@ public class ContainersController(IContainerService containerService) : Controll
     public async Task<IActionResult> ReplaceGraphSlots(int containerId, int graphId, [FromBody] ReplaceGraphSlotsRequest request, CancellationToken cancellationToken)
     {
         await containerService.ReplaceGraphSlotsAsync(containerId, graphId, request.ToReplaceModels(graphId), cancellationToken).ConfigureAwait(false);
+        await LogManagerActionAsync($"Saved schedule matrix for schedule #{graphId}.", cancellationToken).ConfigureAwait(false);
+        await NotifyGraphChangedAsync(containerId, graphId, "manager-schedule-slots-replaced").ConfigureAwait(false);
         return NoContent();
     }
 
@@ -219,6 +241,8 @@ public class ContainersController(IContainerService containerService) : Controll
     public async Task<ActionResult<GraphSlotDto>> CreateGraphSlot(int containerId, int graphId, [FromBody] CreateGraphSlotRequest request, CancellationToken cancellationToken)
     {
         var created = await containerService.CreateGraphSlotAsync(containerId, graphId, request.ToCreateModel(graphId), cancellationToken).ConfigureAwait(false);
+        await LogManagerActionAsync($"Added shift on day {created.DayOfMonth} for schedule #{graphId}.", cancellationToken).ConfigureAwait(false);
+        await NotifyGraphChangedAsync(containerId, graphId, "manager-schedule-slot-created").ConfigureAwait(false);
         return CreatedAtAction(nameof(GetGraphSlots), new { containerId, graphId }, created.ToGraphSlotDto());
     }
 
@@ -228,6 +252,8 @@ public class ContainersController(IContainerService containerService) : Controll
     public async Task<IActionResult> UpdateGraphSlot(int containerId, int graphId, int slotId, [FromBody] UpdateGraphSlotRequest request, CancellationToken cancellationToken)
     {
         await containerService.UpdateGraphSlotAsync(containerId, graphId, slotId, request.ToUpdateModel(graphId, slotId), cancellationToken).ConfigureAwait(false);
+        await LogManagerActionAsync($"Updated shift #{slotId} for schedule #{graphId}.", cancellationToken).ConfigureAwait(false);
+        await NotifyGraphChangedAsync(containerId, graphId, "manager-schedule-slot-updated").ConfigureAwait(false);
         return NoContent();
     }
 
@@ -236,6 +262,8 @@ public class ContainersController(IContainerService containerService) : Controll
     public async Task<IActionResult> DeleteGraphSlot(int containerId, int graphId, int slotId, CancellationToken cancellationToken)
     {
         await containerService.DeleteGraphSlotAsync(containerId, graphId, slotId, cancellationToken).ConfigureAwait(false);
+        await LogManagerActionAsync($"Deleted shift #{slotId} from schedule #{graphId}.", cancellationToken).ConfigureAwait(false);
+        await NotifyGraphChangedAsync(containerId, graphId, "manager-schedule-slot-deleted").ConfigureAwait(false);
         return NoContent();
     }
 
@@ -258,6 +286,8 @@ public class ContainersController(IContainerService containerService) : Controll
     public async Task<ActionResult<GraphEmployeeDto>> AddGraphEmployee(int containerId, int graphId, [FromBody] AddGraphEmployeeRequest request, CancellationToken cancellationToken)
     {
         var created = await containerService.AddGraphEmployeeAsync(containerId, graphId, request.ToAddModel(graphId), cancellationToken).ConfigureAwait(false);
+        await LogManagerActionAsync($"Added employee #{created.EmployeeId} to schedule #{graphId}.", cancellationToken).ConfigureAwait(false);
+        await NotifyGraphChangedAsync(containerId, graphId, "manager-schedule-employee-added").ConfigureAwait(false);
         return CreatedAtAction(nameof(GetGraphEmployees), new { containerId, graphId }, created.ToGraphEmployeeDto());
     }
 
@@ -266,6 +296,8 @@ public class ContainersController(IContainerService containerService) : Controll
     public async Task<IActionResult> UpdateGraphEmployee(int containerId, int graphId, int graphEmployeeId, [FromBody] UpdateGraphEmployeeRequest request, CancellationToken cancellationToken)
     {
         await containerService.UpdateGraphEmployeeAsync(containerId, graphId, graphEmployeeId, request.ToUpdateModel(graphId, graphEmployeeId), cancellationToken).ConfigureAwait(false);
+        await LogManagerActionAsync($"Updated employee row #{graphEmployeeId} in schedule #{graphId}.", cancellationToken).ConfigureAwait(false);
+        await NotifyGraphChangedAsync(containerId, graphId, "manager-schedule-employee-updated").ConfigureAwait(false);
         return NoContent();
     }
 
@@ -274,6 +306,8 @@ public class ContainersController(IContainerService containerService) : Controll
     public async Task<IActionResult> RemoveGraphEmployee(int containerId, int graphId, int graphEmployeeId, CancellationToken cancellationToken)
     {
         await containerService.RemoveGraphEmployeeAsync(containerId, graphId, graphEmployeeId, cancellationToken).ConfigureAwait(false);
+        await LogManagerActionAsync($"Removed employee row #{graphEmployeeId} from schedule #{graphId}.", cancellationToken).ConfigureAwait(false);
+        await NotifyGraphChangedAsync(containerId, graphId, "manager-schedule-employee-removed").ConfigureAwait(false);
         return NoContent();
     }
 
@@ -296,6 +330,7 @@ public class ContainersController(IContainerService containerService) : Controll
     public async Task<ActionResult<GraphCellStyleDto>> UpsertGraphCellStyle(int containerId, int graphId, [FromBody] UpsertGraphCellStyleRequest request, CancellationToken cancellationToken)
     {
         var style = await containerService.UpsertGraphCellStyleAsync(containerId, graphId, request.ToUpsertModel(graphId), cancellationToken).ConfigureAwait(false);
+        await NotifyGraphChangedAsync(containerId, graphId, "manager-schedule-style-updated").ConfigureAwait(false);
         return Ok(style.ToGraphCellStyleDto());
     }
 
@@ -304,6 +339,7 @@ public class ContainersController(IContainerService containerService) : Controll
     public async Task<IActionResult> DeleteGraphCellStyle(int containerId, int graphId, int styleId, CancellationToken cancellationToken)
     {
         await containerService.DeleteGraphCellStyleAsync(containerId, graphId, styleId, cancellationToken).ConfigureAwait(false);
+        await NotifyGraphChangedAsync(containerId, graphId, "manager-schedule-style-deleted").ConfigureAwait(false);
         return NoContent();
     }
 
@@ -315,6 +351,7 @@ public class ContainersController(IContainerService containerService) : Controll
     {
         var created = await containerService.CreateAsync(request.ToCreateModel(), cancellationToken).ConfigureAwait(false);
         var dto = created.ToApiDto();
+        await LogManagerActionAsync($"Created container {dto.Name}.", cancellationToken).ConfigureAwait(false);
         return CreatedAtAction(nameof(GetById), new { id = dto.Id }, dto);
     }
 
@@ -332,6 +369,7 @@ public class ContainersController(IContainerService containerService) : Controll
         }
 
         await containerService.UpdateAsync(request.ToUpdateModel(id), cancellationToken).ConfigureAwait(false);
+        await LogManagerActionAsync($"Updated container {request.Name}.", cancellationToken).ConfigureAwait(false);
         return NoContent();
     }
 
@@ -357,7 +395,17 @@ public class ContainersController(IContainerService containerService) : Controll
                 result.Message));
         }
 
+        await LogManagerActionAsync($"Deleted container {existing.Name}.", cancellationToken).ConfigureAwait(false);
         return NoContent();
+    }
+
+    private Task LogManagerActionAsync(string action, CancellationToken cancellationToken)
+        => workflowLogService.LogAsync(User, action, cancellationToken);
+
+    private async Task NotifyGraphChangedAsync(int containerId, int graphId, string reason)
+    {
+        await realtimeNotifier.NotifyScheduleChangedAsync(containerId, graphId, reason).ConfigureAwait(false);
+        await realtimeNotifier.NotifyShiftSwapsChangedAsync(containerId, graphId, graphId, reason).ConfigureAwait(false);
     }
 
     private ProblemDetails CreateNotFoundProblem(string detail)

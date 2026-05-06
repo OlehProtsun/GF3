@@ -1,6 +1,12 @@
 import type { ReactNode } from "react";
 import type { AvailabilityGroup } from "@entities/availability-groups/model/types";
-import { getAvailabilityGroupPeriodLabel, getAvailabilityMonthLabel } from "@entities/availability-groups/model/presentation";
+import {
+  formatAvailabilityDateTimeLabel,
+  getAvailabilityGroupPeriodLabel,
+  getAvailabilityMonthLabel,
+  getAvailabilityPublicationStatusLabel,
+  normalizeAvailabilityPublicationStatus,
+} from "@entities/availability-groups/model/presentation";
 import { IosButton } from "@shared/ui/components/IosButton";
 import { ProfileSummaryCard } from "@shared/ui/components/ProfileSummaryCard";
 import { AvailabilityIcon } from "@shared/ui/icons";
@@ -23,6 +29,37 @@ export function AvailabilityProfileInfoCard({
   onEdit,
   onDelete,
 }: AvailabilityProfileInfoCardProps) {
+  const publicationStatus = normalizeAvailabilityPublicationStatus(group.publicationStatus);
+  const hasVisibilityWindow = Boolean(group.visibleFromUtc || group.visibleToUtc);
+  const publicationOverview = (
+    <div className={styles.publicationOverview}>
+      <div className={styles.publicationStatusPanel}>
+        <span className={styles.publicationLabel}>Status</span>
+        <span className={[styles.statusBadge, publicationStatus === "public" ? styles.statusBadgePublic : ""].filter(Boolean).join(" ")}>
+          {getAvailabilityPublicationStatusLabel(group.publicationStatus)}
+        </span>
+      </div>
+
+      <div className={styles.visibilityPanel}>
+        <span className={styles.publicationLabel}>Visible</span>
+        {hasVisibilityWindow ? (
+          <div className={styles.visibilityTimeline}>
+            <span className={styles.visibilityEndpoint}>
+              <small>From</small>
+              <strong>{formatAvailabilityDateTimeLabel(group.visibleFromUtc)}</strong>
+            </span>
+            <span className={styles.visibilityLine} aria-hidden="true" />
+            <span className={styles.visibilityEndpoint}>
+              <small>To</small>
+              <strong>{formatAvailabilityDateTimeLabel(group.visibleToUtc)}</strong>
+            </span>
+          </div>
+        ) : (
+          <span className={styles.visibilityEmpty}>Not configured</span>
+        )}
+      </div>
+    </div>
+  );
   const detailItems = [
     { key: "month", label: "Month", value: getAvailabilityMonthLabel(group.month) },
     { key: "year", label: "Year", value: String(group.year) },
@@ -39,6 +76,7 @@ export function AvailabilityProfileInfoCard({
       headerRightSlot={headerRightSlot}
       name={group.name}
       subtitle={getAvailabilityGroupPeriodLabel(group)}
+      statusContent={publicationOverview}
       details={detailItems}
       actions={
         <>

@@ -4,8 +4,10 @@ import {
   getEmployeeContactState,
   getEmployeeFullName,
   getEmployeeInitials,
+  getEmployeePresenceTone,
 } from "@entities/employees/model/presentation";
 import { IosButton } from "@shared/ui/components/IosButton";
+import { PresenceBadge } from "@shared/ui/components/PresenceBadge";
 import {
   RecordProfileCard,
   renderRecordDetailValue,
@@ -32,7 +34,8 @@ export function EmployeeProfileCard({
 }: EmployeeProfileCardProps) {
   const fullName = getEmployeeFullName(employee, "Employee Profile");
   const initials = getEmployeeInitials(employee);
-  const contactState = getEmployeeContactState(employee);
+  const presenceLabel = getEmployeeContactState(employee);
+  const presenceTone = getEmployeePresenceTone(employee);
   const details: ProfileSummaryDetail[] = employee
     ? getEmployeeContactDetails(employee).map(item => ({
         key: item.key,
@@ -52,7 +55,7 @@ export function EmployeeProfileCard({
       errorMessage="Could not load employee."
       avatar={employee ? initials : undefined}
       name={employee ? fullName : undefined}
-      subtitle={employee ? contactState : undefined}
+      subtitle={employee ? <PresenceBadge label={presenceLabel} tone={presenceTone} /> : undefined}
       details={details}
       actions={
         employee ? (

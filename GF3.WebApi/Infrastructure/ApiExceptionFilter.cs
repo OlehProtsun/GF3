@@ -22,12 +22,12 @@ public sealed class ApiExceptionFilter : IAsyncExceptionFilter
 
     public Task OnExceptionAsync(ExceptionContext context)
     {
-        if (context.HttpContext.Response.HasStarted)
+        if (TryHandleClientCancellation(context))
         {
             return Task.CompletedTask;
         }
 
-        if (TryHandleClientCancellation(context))
+        if (context.HttpContext.Response.HasStarted)
         {
             return Task.CompletedTask;
         }
@@ -49,7 +49,7 @@ public sealed class ApiExceptionFilter : IAsyncExceptionFilter
             return false;
         }
 
-        if (context.HttpContext.RequestAborted.IsCancellationRequested)
+        if (!context.HttpContext.Response.HasStarted && context.HttpContext.RequestAborted.IsCancellationRequested)
         {
             context.HttpContext.Response.StatusCode = 499;
         }

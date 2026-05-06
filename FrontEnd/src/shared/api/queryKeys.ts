@@ -1,4 +1,26 @@
-﻿export const queryKeys = {
+export const queryKeys = {
+  employeeProfile: {
+    me: () => ["employeeProfile", "me"] as const,
+  },
+  employeeAvailability: {
+    all: ["employeeAvailability"] as const,
+    list: () => ["employeeAvailability", "list"] as const,
+    byId: (id: number) => ["employeeAvailability", "byId", id] as const,
+  },
+  employeeSchedules: {
+    all: ["employeeSchedules"] as const,
+    list: () => ["employeeSchedules", "list"] as const,
+  },
+  shiftSwaps: {
+    all: ["shiftSwaps"] as const,
+    employee: () => ["shiftSwaps", "employee"] as const,
+    employees: () => ["shiftSwaps", "employees"] as const,
+    graphLog: (containerId: number, graphId: number) => ["shiftSwaps", "graphLog", containerId, graphId] as const,
+  },
+  workflowLogs: {
+    all: ["workflowLogs"] as const,
+    list: () => ["workflowLogs", "list"] as const,
+  },
   employees: {
     all: ["employees"] as const,
     list: () => ["employees", "list"] as const,

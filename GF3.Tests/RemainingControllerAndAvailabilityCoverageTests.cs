@@ -146,7 +146,7 @@ public sealed class RemainingControllerAndAvailabilityCoverageTests
         await using var context = database.CreateContext();
 
         var employeeController = new EmployeesController(
-            new EmployeeFacade(new EmployeeService(new DataAccessLayer.Repositories.EmployeeRepository(context))));
+            TestEmployeeFacadeFactory.Create(new EmployeeService(new DataAccessLayer.Repositories.EmployeeRepository(context))));
         var shopController = new ShopsController(
             new ShopFacade(new ShopService(new DataAccessLayer.Repositories.ShopRepository(context))));
         SetHttpContext(employeeController);

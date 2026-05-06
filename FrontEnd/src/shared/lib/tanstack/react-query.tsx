@@ -174,6 +174,11 @@ export class QueryClient {
     }
 
     matchingKeys.forEach((key) => {
+      const record = this.records.get(key);
+      if (record) {
+        record.updatedAt = 0;
+      }
+
       this.bumps.set(key, this.getBump(key) + 1);
       this.listeners.forEach((listener) => listener({ type: "invalidate", key }));
     });

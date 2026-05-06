@@ -2,6 +2,8 @@ import type { AvailabilityGroup } from "@entities/availability-groups/model/type
 import {
   getAvailabilityGroupPeriodLabel,
   getAvailabilityMonthLabel,
+  getAvailabilityPublicationStatusLabel,
+  getAvailabilityWindowStatusLabel,
 } from "@entities/availability-groups/model/presentation";
 import { usePinnedRecords } from "@shared/lib/records/usePinnedRecords";
 import { IosButton } from "@shared/ui/components/IosButton";
@@ -10,6 +12,7 @@ import { RecordGrid } from "@shared/ui/components/RecordGrid";
 import type { RecordTileMetaItem } from "@shared/ui/components/RecordTile";
 import { RecordTile } from "@shared/ui/components/RecordTile";
 import { PlusIcon } from "@shared/ui/icons";
+import styles from "./AvailabilityGroupListCard.module.css";
 
 type AvailabilityGroupListCardProps = {
   groups: AvailabilityGroup[];
@@ -56,9 +59,37 @@ export function AvailabilityGroupListCard({
         {sortedGroups.map(group => {
           const isPinned = pinnedIdSet.has(String(group.id));
           const periodLabel = getAvailabilityGroupPeriodLabel(group);
+          const windowStatusLabel = getAvailabilityWindowStatusLabel(group);
+          const publicationStatusLabel = getAvailabilityPublicationStatusLabel(group.publicationStatus);
           const metaItems: RecordTileMetaItem[] = [
             { key: "month", label: "Month", value: getAvailabilityMonthLabel(group.month, "short") },
             { key: "year", label: "Year", value: String(group.year) },
+            {
+              key: "window-status",
+              label: "Status",
+              value: (
+                <span className={[
+                  styles.statusPill,
+                  windowStatusLabel === "Open" ? styles.statusPillOpen : styles.statusPillClosed,
+                ].filter(Boolean).join(" ")}
+                >
+                  {windowStatusLabel}
+                </span>
+              ),
+            },
+            {
+              key: "publication-status",
+              label: "Public",
+              value: (
+                <span className={[
+                  styles.statusPill,
+                  publicationStatusLabel === "Public" ? styles.publicationPillPublic : styles.publicationPillPrivate,
+                ].filter(Boolean).join(" ")}
+                >
+                  {publicationStatusLabel}
+                </span>
+              ),
+            },
           ];
 
           return (

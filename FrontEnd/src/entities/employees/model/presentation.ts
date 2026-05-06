@@ -1,7 +1,21 @@
-﻿import type { Employee } from "./types";
+import type { Employee } from "./types";
 
 type EmployeeIdentity = Pick<Employee, "firstName" | "lastName">;
-type EmployeeContact = Pick<Employee, "email" | "phone">;
+type EmployeeContact = Pick<
+  Employee,
+  "email" | "phone" | "username" | "hasLoginAccount" | "isOnline" | "lastLoginAtUtc"
+>;
+export type EmployeePresenceTone = "online" | "offline" | "inactive";
+type PresenceLabelMode = "default" | "compact";
+
+const employeeLastLoginFormatter = new Intl.DateTimeFormat("en-GB", {
+  day: "2-digit",
+  month: "short",
+  year: "numeric",
+  hour: "2-digit",
+  minute: "2-digit",
+  hour12: false,
+});
 
 export function getEmployeeFullName(employee?: EmployeeIdentity | null, fallback = "Employee") {
   const fullName = [employee?.firstName, employee?.lastName].filter(Boolean).join(" ").trim();
@@ -13,23 +27,58 @@ export function getEmployeeInitials(employee?: EmployeeIdentity | null, fallback
   return initials || fallback;
 }
 
-export function getEmployeeContactState(employee?: EmployeeContact | null) {
-  if (employee?.email && employee.phone) {
-    return "Fully reachable";
+export function getEmployeePresenceTone(employee?: EmployeeContact | null): EmployeePresenceTone {
+  if (employee?.hasLoginAccount) {
+    return employee.isOnline ? "online" : "offline";
   }
 
-  if (employee?.email || employee?.phone) {
-    return "Partial contact data";
+  return "inactive";
+}
+
+export function getEmployeeContactState(
+  employee?: EmployeeContact | null,
+  mode: PresenceLabelMode = "default",
+) {
+  switch (getEmployeePresenceTone(employee)) {
+    case "online":
+      return mode === "compact" ? "Online" : "Online now";
+    case "offline":
+      return "Offline";
+    default:
+      return mode === "compact" ? "No login" : "No login account";
+  }
+}
+
+export function formatEmployeeLastLogin(lastLoginAtUtc?: string | null) {
+  if (!lastLoginAtUtc) {
+    return "Never";
   }
 
-  return "Contact details missing";
+  const parsedValue = new Date(lastLoginAtUtc);
+  if (Number.isNaN(parsedValue.getTime())) {
+    return lastLoginAtUtc;
+  }
+
+  return employeeLastLoginFormatter.format(parsedValue).replace(",", "");
 }
 
 export function getEmployeeContactDetails(employee?: EmployeeContact | null) {
   return [
     {
+      key: "last-login",
+      label: "Last Login",
+      value: formatEmployeeLastLogin(employee?.lastLoginAtUtc),
+      href: undefined,
+    },
+    {
+      key: "username",
+      label: "Username",
+      value: employee?.username ?? null,
+      href: undefined,
+    },
+    {
       key: "email",
-      label: "Email",
+      label: "Recovery Email",
       value: employee?.email ?? null,
       href: employee?.email ? `mailto:${employee.email}` : undefined,
     },

@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using DataAccessLayer.Models.Enums;
 
 namespace DataAccessLayer.Models;
 
@@ -47,6 +48,10 @@ public class ScheduleModel
     [Required]
     [Column("month")]
     public int Month { get; set; }
+
+    [Required]
+    [Column("publication_status")]
+    public SchedulePublicationStatus PublicationStatus { get; set; } = SchedulePublicationStatus.Private;
 
     [Required]
     [Column("people_per_shift")]

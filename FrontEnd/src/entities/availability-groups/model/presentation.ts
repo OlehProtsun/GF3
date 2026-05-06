@@ -2,11 +2,19 @@ import type {
   AvailabilityGroup,
   AvailabilityGroupMember,
   AvailabilityKind,
+  AvailabilityPublicationStatus,
   AvailabilitySlot,
 } from "./types";
 
 const longMonthFormatter = new Intl.DateTimeFormat("en-US", { month: "long" });
 const shortMonthFormatter = new Intl.DateTimeFormat("en-US", { month: "short" });
+const dateTimeFormatter = new Intl.DateTimeFormat("en-US", {
+  month: "short",
+  day: "numeric",
+  hour: "2-digit",
+  minute: "2-digit",
+  hourCycle: "h23",
+});
 
 export const availabilityMonthOptions = Array.from({ length: 12 }, (_, index) => {
   const month = index + 1;
@@ -39,6 +47,76 @@ export function getAvailabilityGroupPeriodLabel(
   return `${monthLabel} ${group.year}`;
 }
 
+export function normalizeAvailabilityPublicationStatus(status?: string | null): AvailabilityPublicationStatus {
+  return status?.toLowerCase() === "public" ? "public" : "private";
+}
+
+export function getAvailabilityPublicationStatusLabel(status?: string | null) {
+  return normalizeAvailabilityPublicationStatus(status) === "public" ? "Public" : "Private";
+}
+
+export function isAvailabilityWindowOpen(
+  group: Pick<AvailabilityGroup, "publicationStatus" | "visibleFromUtc" | "visibleToUtc">,
+  now: Date = new Date()
+) {
+  if (normalizeAvailabilityPublicationStatus(group.publicationStatus) !== "public") {
+    return false;
+  }
+
+  const nowTime = now.getTime();
+  const fromTime = group.visibleFromUtc ? new Date(group.visibleFromUtc).getTime() : null;
+  const toTime = group.visibleToUtc ? new Date(group.visibleToUtc).getTime() : null;
+
+  if (fromTime !== null && (!Number.isFinite(fromTime) || fromTime > nowTime)) {
+    return false;
+  }
+
+  if (toTime !== null && (!Number.isFinite(toTime) || toTime < nowTime)) {
+    return false;
+  }
+
+  return true;
+}
+
+export function getAvailabilityWindowStatusLabel(
+  group: Pick<AvailabilityGroup, "publicationStatus" | "visibleFromUtc" | "visibleToUtc">,
+  now: Date = new Date()
+) {
+  return isAvailabilityWindowOpen(group, now) ? "Open" : "Closed";
+}
+
+export function formatAvailabilityDateTimeLabel(value?: string | null) {
+  if (!value) {
+    return "Not set";
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "Not set";
+  }
+
+  return dateTimeFormatter.format(date);
+}
+
+export function getAvailabilityVisibilityWindowLabel(group: Pick<AvailabilityGroup, "visibleFromUtc" | "visibleToUtc">) {
+  const from = formatAvailabilityDateTimeLabel(group.visibleFromUtc);
+  const to = formatAvailabilityDateTimeLabel(group.visibleToUtc);
+
+  if (from === "Not set" && to === "Not set") {
+    return "Not configured";
+  }
+
+  return `${from} - ${to}`;
+}
+
+export function getAvailabilityMemberLastModifiedLabel(value?: string | null) {
+  if (!value) {
+    return "No employee edits";
+  }
+
+  return `Modified ${formatAvailabilityDateTimeLabel(value)}`;
+}
+
 export function filterAvailabilityGroups(groups: AvailabilityGroup[], query: string) {
   const normalizedQuery = query.trim().toLowerCase();
   if (!normalizedQuery) {
@@ -54,6 +132,8 @@ export function filterAvailabilityGroups(groups: AvailabilityGroup[], query: str
       getAvailabilityMonthLabel(group.month, "long"),
       getAvailabilityMonthLabel(group.month, "short"),
       getAvailabilityGroupPeriodLabel(group),
+      getAvailabilityPublicationStatusLabel(group.publicationStatus),
+      getAvailabilityWindowStatusLabel(group),
     ]
       .join(" ")
       .toLowerCase();

@@ -1,0 +1,34 @@
+export type AuthRole = "manager" | "employee";
+
+export type AuthSession = {
+  role: AuthRole;
+  userName: string;
+  displayName: string;
+  employeeId?: number | null;
+};
+
+export type AuthLoginResult = {
+  accessToken: string;
+  expiresAtUtc: string;
+  session: AuthSession;
+};
+
+export type LoginInput = {
+  username: string;
+  password: string;
+};
+
+export type PasswordResetCodeDispatch = {
+  deliveryHint: string;
+  expiresAtUtc: string;
+};
+
+export type SendPasswordResetCodeInput = {
+  username: string;
+};
+
+export type CompleteForgotPasswordResetInput = {
+  username: string;
+  code: string;
+  newPassword: string;
+};

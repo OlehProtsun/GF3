@@ -1,7 +1,9 @@
 import { Suspense, lazy, useEffect } from "react";
 import type { ComponentType, LazyExoticComponent } from "react";
 import { BrowserRouter, Navigate, useLocation } from "react-router-dom";
+import { EmployeeWorkspaceLayout } from "@app/layouts/employee-workspace-layout";
 import { OverlaySidebarLayout } from "@app/layouts/overlay-sidebar-layout";
+import { useAuth } from "@app/providers/AuthProvider";
 import { renderMatched } from "@shared/lib/react-router-dom";
 import { RouteFallback } from "./RouteFallback";
 
@@ -35,6 +37,28 @@ function lazyPage<TModule>(
 }
 
 const HomePage = lazyPage(() => import("@pages/home"), (module) => module.HomePage);
+const EmployeeHomePage = lazyPage(() => import("@pages/employee-home"), (module) => module.EmployeeHomePage);
+const EmployeeAvailabilityPage = lazyPage(
+  () => import("@pages/employee-availability"),
+  (module) => module.EmployeeAvailabilityPage,
+);
+const EmployeeSchedulePage = lazyPage(
+  () => import("@pages/employee-schedule"),
+  (module) => module.EmployeeSchedulePage,
+);
+const EmployeeSwapPage = lazyPage(
+  () => import("@pages/employee-swap"),
+  (module) => module.EmployeeSwapPage,
+);
+const EmployeeAccountPage = lazyPage(
+  () => import("@pages/employee-account"),
+  (module) => module.EmployeeAccountPage,
+);
+const LoginPage = lazyPage(() => import("@pages/login"), (module) => module.LoginPage);
+const PasswordRecoveryPage = lazyPage(
+  () => import("@pages/password-recovery"),
+  (module) => module.PasswordRecoveryPage,
+);
 const ShopListPage = lazyPage(() => import("@pages/shop-list"), (module) => module.ShopListPage);
 const ShopProfilePage = lazyPage(() => import("@pages/shop-profile"), (module) => module.ShopProfilePage);
 const ShopEditPage = lazyPage(() => import("@pages/shop-edit"), (module) => module.ShopEditPage);
@@ -58,6 +82,13 @@ const EmployeeEditPage = lazyPage(() => import("@pages/employee-edit"), (module)
 
 const preloadablePages: readonly PreloadablePage[] = [
   HomePage,
+  EmployeeHomePage,
+  EmployeeAvailabilityPage,
+  EmployeeSchedulePage,
+  EmployeeSwapPage,
+  EmployeeAccountPage,
+  LoginPage,
+  PasswordRecoveryPage,
   ShopListPage,
   ShopProfilePage,
   ShopEditPage,
@@ -74,7 +105,7 @@ const preloadablePages: readonly PreloadablePage[] = [
   EmployeeEditPage,
 ] as const;
 
-const routes = [
+const managerRoutes = [
   { path: "/shop/new", element: <ShopEditPage /> },
   { path: "/shop/:shopId/edit", element: <ShopEditPage /> },
   { path: "/shop/:shopId", element: <ShopProfilePage /> },
@@ -94,6 +125,15 @@ const routes = [
   { path: "/employee/:employeeId", element: <EmployeeProfilePage /> },
   { path: "/employee", element: <EmployeeListPage /> },
   { path: "/", element: <HomePage /> },
+] as const;
+
+const employeeRoutes = [
+  { path: "/profile", element: <EmployeeAccountPage /> },
+  { path: "/notifications", element: <Navigate to="/swap" /> },
+  { path: "/swap", element: <EmployeeSwapPage /> },
+  { path: "/schedule", element: <EmployeeSchedulePage /> },
+  { path: "/availability", element: <EmployeeAvailabilityPage /> },
+  { path: "/", element: <EmployeeHomePage /> },
 ] as const;
 
 function useWarmRouteChunks() {
@@ -135,19 +175,59 @@ function useWarmRouteChunks() {
 
 function RoutedContent() {
   const { pathname } = useLocation();
+  const { session, status } = useAuth();
   useWarmRouteChunks();
+  const isPublicAuthRoute = pathname === "/login" || pathname === "/password-recovery";
 
-  return renderMatched(pathname, routes) ?? <Navigate to="/" />;
+  if (status === "loading") {
+    return <RouteFallback />;
+  }
+
+  if (status === "unauthenticated") {
+    if (pathname === "/login") {
+      return <LoginPage />;
+    }
+
+    if (pathname === "/password-recovery") {
+      return <PasswordRecoveryPage />;
+    }
+
+    return <Navigate to="/login" />;
+  }
+
+  if (isPublicAuthRoute) {
+    return <Navigate to="/" />;
+  }
+
+  const matched = renderMatched(pathname, session?.role === "manager" ? managerRoutes : employeeRoutes);
+  return matched ?? <Navigate to="/" />;
+}
+
+function RoutedShell() {
+  const { pathname } = useLocation();
+  const { session, status } = useAuth();
+  const shouldUseLayout = status === "authenticated" && pathname !== "/login" && pathname !== "/password-recovery";
+  const content = (
+    <Suspense fallback={<RouteFallback />}>
+      <RoutedContent />
+    </Suspense>
+  );
+
+  if (!shouldUseLayout) {
+    return content;
+  }
+
+  if (session?.role === "employee") {
+    return <EmployeeWorkspaceLayout>{content}</EmployeeWorkspaceLayout>;
+  }
+
+  return <OverlaySidebarLayout>{content}</OverlaySidebarLayout>;
 }
 
 export function AppRouter() {
   return (
     <BrowserRouter>
-      <OverlaySidebarLayout>
-        <Suspense fallback={<RouteFallback />}>
-          <RoutedContent />
-        </Suspense>
-      </OverlaySidebarLayout>
+      <RoutedShell />
     </BrowserRouter>
   );
 }

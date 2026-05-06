@@ -1,8 +1,10 @@
 using System.ComponentModel.DataAnnotations;
 using BusinessLogicLayer.Contracts.Database;
 using BusinessLogicLayer.Services.Abstractions;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
+using WebApi.Auth;
 using WebApi.Contracts.AdminDb;
 using WebApi.Options;
 
@@ -15,6 +17,7 @@ namespace WebApi.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/admin/db")]
+[Authorize(Roles = AuthRoles.Manager)]
 public sealed class AdminDbController : ControllerBase
 {
     private readonly IAdminDbService _adminDbService;

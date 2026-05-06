@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
+import { useRealtime } from "@app/providers/PresenceProvider";
 import { useQueryClient, type QueryClient } from "@tanstack/react-query";
 import {
   buildActiveAvailabilityBindMap,
@@ -70,10 +71,17 @@ import {
   type GraphAutoAvailabilityStyleSuppressionMap,
   type GraphCellStyle,
   type GraphMatrixColumn,
+  type ManualColumnShiftPublicationInput,
+  type PendingManualColumnShiftPublication,
   type SaveSchedulePresetDto,
 } from "@entities/containers";
 import { useEmployeesListQuery } from "@entities/employees/api/queries";
 import { getEmployeeFullName } from "@entities/employees/model/presentation";
+import {
+  useCancelManagerManualShiftSwapMutation,
+  useCreateManagerManualShiftSwapMutation,
+  useGraphShiftSwapLogQuery,
+} from "@entities/shift-swaps";
 import { useShopsListQuery } from "@entities/shops/api/queries";
 import { queryKeys } from "@shared/api/queryKeys";
 import { ApiError } from "@shared/api/httpClient";
@@ -107,6 +115,7 @@ type GraphEditorSessionDraft = {
   selectedEmployeeId: number | null;
   cellMap: Record<string, string>;
   manualColumns: EditableScheduleManualColumn[];
+  pendingManualShiftPublishes: PendingManualColumnShiftPublication[];
   scheduleColumnOrder: number[];
   selectedCellKeys: string[];
   styleRecords: GraphCellStyle[];
@@ -141,6 +150,14 @@ function toErrorMessage(error: unknown) {
   }
 
   return "Something went wrong while saving bind information.";
+}
+
+function toManualShiftPublishError(error: unknown) {
+  if (error instanceof ApiError || error instanceof Error) {
+    return error.message;
+  }
+
+  return "Could not publish this manual shift.";
 }
 
 function toEditableAvailabilityBind(bind: AvailabilityBind): EditableAvailabilityBind {
@@ -354,6 +371,7 @@ function cloneGraphEditorSessionDraft(draft: GraphEditorSessionDraft): GraphEdit
       ...column,
       cells: { ...column.cells },
     })),
+    pendingManualShiftPublishes: draft.pendingManualShiftPublishes.map(shift => ({ ...shift })),
     scheduleColumnOrder: [...draft.scheduleColumnOrder],
     selectedCellKeys: [...draft.selectedCellKeys],
     styleRecords: draft.styleRecords.map(style => ({ ...style })),
@@ -379,6 +397,7 @@ function toPayload(
     name: form.name.trim(),
     year,
     month,
+    publicationStatus: form.publicationStatus,
     peoplePerShift: Number(form.peoplePerShift),
     shift1Time: form.shift1Time.trim(),
     shift2Time: form.shift2Time.trim(),
@@ -402,6 +421,7 @@ function buildGraphWorkspaceSnapshot(params: {
   form: ContainerGraphFormState;
   graphEmployeeRows: Array<{ id: number | null; employeeId: number; minHoursMonth: string }>;
   manualColumns: EditableScheduleManualColumn[];
+  pendingManualShiftPublishes?: PendingManualColumnShiftPublication[];
   scheduleColumnOrder: number[];
   styleRecords: GraphCellStyle[];
   cellMap: Record<string, string>;
@@ -427,6 +447,20 @@ function buildGraphWorkspaceSnapshot(params: {
       employeeId: row.employeeId,
       minHoursMonth: row.minHoursMonth.trim(),
     })),
+    pendingManualShiftPublishes: (params.pendingManualShiftPublishes ?? [])
+      .map(shift => ({
+        manualColumnId: shift.manualColumnId,
+        dayOfMonth: shift.dayOfMonth,
+        fromTime: shift.fromTime,
+        toTime: shift.toTime,
+        targetEmployeeId: shift.targetEmployeeId ?? null,
+      }))
+      .sort((left, right) =>
+        left.manualColumnId - right.manualColumnId ||
+        left.dayOfMonth - right.dayOfMonth ||
+        left.fromTime.localeCompare(right.fromTime) ||
+        left.toTime.localeCompare(right.toTime) ||
+        (left.targetEmployeeId ?? 0) - (right.targetEmployeeId ?? 0)),
     cellMap: Object.entries(sanitizedCellMap).sort(([leftKey], [rightKey]) => leftKey.localeCompare(rightKey)),
   });
 }
@@ -436,6 +470,7 @@ function buildGraphDraftSnapshot(draft: GraphEditorSessionDraft) {
     form: draft.form,
     graphEmployeeRows: draft.graphEmployeeRows,
     manualColumns: draft.manualColumns,
+    pendingManualShiftPublishes: draft.pendingManualShiftPublishes,
     scheduleColumnOrder: draft.scheduleColumnOrder,
     styleRecords: draft.styleRecords,
     cellMap: draft.cellMap,
@@ -795,6 +830,7 @@ export function ContainerGraphEditPage() {
   const location = useLocation();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { setScheduleEditLocks } = useRealtime();
   const { containerId: containerIdParam, graphId: graphIdParam } = useParams<{ containerId: string; graphId?: string }>();
   const parsedContainerId = containerIdParam ? Number(containerIdParam) : null;
   const parsedGraphId = graphIdParam ? Number(graphIdParam) : null;
@@ -809,6 +845,7 @@ export function ContainerGraphEditPage() {
   const slotsQuery = useGraphSlotsQuery(containerId, graphId);
   const cellStylesQuery = useGraphCellStylesQuery(containerId, graphId);
   const schedulePresetsQuery = useSchedulePresetsQuery(containerId);
+  const shiftSwapLogQuery = useGraphShiftSwapLogQuery(containerId, graphId, !isCreate);
   const availabilityGroupsQuery = useAvailabilityGroupsListQuery(location.key);
   const bindsQuery = useAvailabilityBindsListQuery();
   const employeesQuery = useEmployeesListQuery({ refreshKey: location.key });
@@ -819,6 +856,8 @@ export function ContainerGraphEditPage() {
   const createBindMutation = useCreateAvailabilityBindMutation();
   const updateBindMutation = useUpdateAvailabilityBindMutation();
   const deleteBindMutation = useDeleteAvailabilityBindMutation();
+  const createManualShiftSwapMutation = useCreateManagerManualShiftSwapMutation();
+  const cancelManualShiftSwapMutation = useCancelManagerManualShiftSwapMutation();
 
   const [form, setForm] = useState<ContainerGraphFormState>(() => createInitialGraphForm());
   const [formErrors, setFormErrors] = useState<ContainerGraphFormErrors>({});
@@ -829,6 +868,7 @@ export function ContainerGraphEditPage() {
   const [cellMap, setCellMap] = useState<Record<string, string>>({});
   const [cellErrors, setCellErrors] = useState<Record<string, string>>({});
   const [submitError, setSubmitError] = useState<string | undefined>();
+  const [manualShiftPublishError, setManualShiftPublishError] = useState<string | null>(null);
   const [hydratedKey, setHydratedKey] = useState<string | null>(null);
   const [isHeaderCollapsed, setIsHeaderCollapsed] = useState(false);
   const [selectedCellKeys, setSelectedCellKeys] = useState<string[]>([]);
@@ -842,6 +882,7 @@ export function ContainerGraphEditPage() {
   const [bindError, setBindError] = useState<string | undefined>();
   const [bindRows, setBindRows] = useState<EditableAvailabilityBind[]>([]);
   const [manualColumns, setManualColumns] = useState<EditableScheduleManualColumn[]>([]);
+  const [pendingManualShiftPublishes, setPendingManualShiftPublishes] = useState<PendingManualColumnShiftPublication[]>([]);
   const [scheduleColumnOrder, setScheduleColumnOrder] = useState<number[]>([]);
   const [selectedBindClientId, setSelectedBindClientId] = useState<string | null>(null);
   const [hasLocalBindChanges, setHasLocalBindChanges] = useState(false);
@@ -878,8 +919,10 @@ export function ContainerGraphEditPage() {
       setCellMap({});
       setCellErrors({});
       setSubmitError(undefined);
+      setManualShiftPublishError(null);
       setSelectedCellKeys([]);
       setManualColumns([]);
+      setPendingManualShiftPublishes([]);
       setScheduleColumnOrder([]);
       setStyleRecords([]);
       setAutoAvailabilityStyleSuppressions({});
@@ -905,8 +948,10 @@ export function ContainerGraphEditPage() {
         setCellMap(restoredDraft.cellMap);
         setCellErrors({});
         setSubmitError(undefined);
+        setManualShiftPublishError(null);
         setSelectedCellKeys(restoredDraft.selectedCellKeys);
         setManualColumns(restoredDraft.manualColumns);
+        setPendingManualShiftPublishes(restoredDraft.pendingManualShiftPublishes);
         setScheduleColumnOrder(restoredDraft.scheduleColumnOrder);
         setStyleRecords(restoredDraft.styleRecords);
         setAutoAvailabilityStyleSuppressions(restoredDraft.autoAvailabilityStyleSuppressions);
@@ -952,8 +997,10 @@ export function ContainerGraphEditPage() {
     });
     setCellErrors({});
     setSubmitError(undefined);
+    setManualShiftPublishError(null);
     setSelectedCellKeys([]);
     setManualColumns(sortManualColumnsByColumnOrder(editableManualColumns, nextScheduleColumnOrder));
+    setPendingManualShiftPublishes([]);
     setScheduleColumnOrder(nextScheduleColumnOrder);
     setAutoAvailabilityStyleSuppressions(parsedGraphNote.autoAvailabilityStyleSuppressions);
     const hydratedStyles = mergeNormalizedStyleRecords(
@@ -1190,6 +1237,7 @@ export function ContainerGraphEditPage() {
         name: form.name,
         year: Number(form.year) || new Date().getFullYear(),
         month: Number(form.month) || 1,
+        publicationStatus: form.publicationStatus,
         peoplePerShift: Number(form.peoplePerShift) || 1,
         shift1Time: form.shift1Time,
         shift2Time: form.shift2Time,
@@ -1204,6 +1252,7 @@ export function ContainerGraphEditPage() {
       name: form.name,
       year: Number(form.year) || new Date().getFullYear(),
       month: Number(form.month) || 1,
+      publicationStatus: form.publicationStatus,
       peoplePerShift: Number(form.peoplePerShift) || 1,
       shift1Time: form.shift1Time,
       shift2Time: form.shift2Time,
@@ -1241,6 +1290,7 @@ export function ContainerGraphEditPage() {
       },
       graphEmployeeRows: editableEmployeeRows,
       manualColumns: sortManualColumnsByColumnOrder(editableManualColumns, nextScheduleColumnOrder),
+      pendingManualShiftPublishes: [],
       scheduleColumnOrder: nextScheduleColumnOrder,
       styleRecords: hydratedStyles,
       cellMap: {
@@ -1262,6 +1312,7 @@ export function ContainerGraphEditPage() {
         form: createInitialGraphForm(shopsQuery.data?.[0]?.id ?? null),
         graphEmployeeRows: [],
         manualColumns: [],
+        pendingManualShiftPublishes: [],
         scheduleColumnOrder: [],
         styleRecords: [],
         cellMap: {},
@@ -1275,12 +1326,22 @@ export function ContainerGraphEditPage() {
         form,
         graphEmployeeRows,
         manualColumns,
+        pendingManualShiftPublishes,
         scheduleColumnOrder,
         styleRecords,
         cellMap,
         autoAvailabilityStyleSuppressions,
       }),
-    [autoAvailabilityStyleSuppressions, cellMap, form, graphEmployeeRows, manualColumns, scheduleColumnOrder, styleRecords],
+    [
+      autoAvailabilityStyleSuppressions,
+      cellMap,
+      form,
+      graphEmployeeRows,
+      manualColumns,
+      pendingManualShiftPublishes,
+      scheduleColumnOrder,
+      styleRecords,
+    ],
   );
   const currentGraphBaselineSnapshot = isCreate
     ? createModeSnapshot
@@ -1294,9 +1355,13 @@ export function ContainerGraphEditPage() {
       const savedSnapshot = savedGraphSnapshotByIdRef.current[draft.graphId];
       return savedSnapshot ? buildGraphDraftSnapshot(draft) !== savedSnapshot : false;
     });
-  const hasUnsavedChanges = hydratedKey !== null && Boolean(currentGraphBaselineSnapshot) && (
+  const hasUnsavedScheduleChanges = hydratedKey !== null && Boolean(currentGraphBaselineSnapshot) && (
     currentGraphSnapshot !== currentGraphBaselineSnapshot ||
-    hasDirtySessionDrafts ||
+    hasDirtySessionDrafts
+  );
+  const hasUnsavedChanges = hasUnsavedScheduleChanges || (
+    hydratedKey !== null &&
+    Boolean(currentGraphBaselineSnapshot) &&
     hasPendingBindDraftChanges(bindRows)
   );
 
@@ -1307,6 +1372,37 @@ export function ContainerGraphEditPage() {
 
     savedGraphSnapshotByIdRef.current[graphId] = persistedGraphSnapshot;
   }, [graphId, persistedGraphSnapshot]);
+
+  useEffect(() => {
+    if (!containerId || isCreate || !hasUnsavedScheduleChanges) {
+      setScheduleEditLocks([]);
+      return;
+    }
+
+    const lockTargetsByGraphId = new Map<number, { containerId: number; graphId: number }>();
+    if (graphId !== null && currentGraphSnapshot !== currentGraphBaselineSnapshot) {
+      lockTargetsByGraphId.set(graphId, { containerId, graphId });
+    }
+
+    Object.values(sessionDraftsRef.current).forEach(draft => {
+      const savedSnapshot = savedGraphSnapshotByIdRef.current[draft.graphId];
+      if (savedSnapshot && buildGraphDraftSnapshot(draft) !== savedSnapshot) {
+        lockTargetsByGraphId.set(draft.graphId, { containerId, graphId: draft.graphId });
+      }
+    });
+
+    setScheduleEditLocks([...lockTargetsByGraphId.values()]);
+  }, [
+    containerId,
+    currentGraphBaselineSnapshot,
+    currentGraphSnapshot,
+    graphId,
+    hasUnsavedScheduleChanges,
+    isCreate,
+    setScheduleEditLocks,
+  ]);
+
+  useEffect(() => () => setScheduleEditLocks([]), [setScheduleEditLocks]);
   const relatedGraphs = useMemo(
     () => (containerGraphsQuery.data ?? []).filter(item =>
       item.id !== graphId &&
@@ -1645,6 +1741,7 @@ export function ContainerGraphEditPage() {
       selectedEmployeeId,
       cellMap,
       manualColumns,
+      pendingManualShiftPublishes,
       scheduleColumnOrder,
       selectedCellKeys,
       styleRecords: styleRecordsRef.current,
@@ -1877,6 +1974,24 @@ export function ContainerGraphEditPage() {
       graphId: result.graphId,
       styleRecords: draft.styleRecords,
       queryClient,
+    });
+
+    for (const pendingShift of draft.pendingManualShiftPublishes) {
+      await runMutation(createManualShiftSwapMutation.mutate, {
+        containerId,
+        graphId: result.graphId,
+        manualColumnId: pendingShift.manualColumnId,
+        dayOfMonth: pendingShift.dayOfMonth,
+        fromTime: pendingShift.fromTime,
+        toTime: pendingShift.toTime,
+        targetEmployeeId: pendingShift.targetEmployeeId ?? null,
+      });
+    }
+
+    savedGraphSnapshotByIdRef.current[result.graphId] = buildGraphDraftSnapshot({
+      ...draft,
+      graphId: result.graphId,
+      pendingManualShiftPublishes: [],
     });
 
     return result.graphId;
@@ -2307,6 +2422,7 @@ export function ContainerGraphEditPage() {
       column.columnId === columnId ? { ...column, label: value } : column
     )));
     setSubmitError(undefined);
+    setManualShiftPublishError(null);
   };
 
   const handleAddManualColumn = () => {
@@ -2315,17 +2431,91 @@ export function ContainerGraphEditPage() {
     setManualColumns(currentColumns => [...currentColumns, nextManualColumn]);
     setScheduleColumnOrder(current => [...current, buildManualColumnEmployeeId(nextManualColumn.columnId)]);
     setSubmitError(undefined);
+    setManualShiftPublishError(null);
   };
 
   const handleDeleteManualColumn = (columnId: number) => {
     const manualEmployeeId = buildManualColumnEmployeeId(columnId);
 
     setManualColumns(currentColumns => currentColumns.filter(column => column.columnId !== columnId));
+    setPendingManualShiftPublishes(current => current.filter(shift => shift.manualColumnId !== columnId));
     setScheduleColumnOrder(current => current.filter(columnEmployeeId => columnEmployeeId !== manualEmployeeId));
     setSelectedCellKeys(currentSelection =>
       currentSelection.filter(cellKey => parseSelectedCellKey(cellKey).employeeId !== manualEmployeeId),
     );
     setSubmitError(undefined);
+    setManualShiftPublishError(null);
+  };
+
+  const handlePublishManualShift = (input: ManualColumnShiftPublicationInput) => {
+    setManualShiftPublishError(null);
+
+    if (!containerId || !graphId) {
+      setManualShiftPublishError("Save this schedule before adding manual shifts to swap.");
+      return;
+    }
+
+    if (!handleValidate()) {
+      setManualShiftPublishError("Check highlighted schedule fields before publishing this shift.");
+      return;
+    }
+
+    const currentDraft = createCurrentGraphDraft();
+    if (!currentDraft) {
+      setManualShiftPublishError("Current schedule draft is not ready yet.");
+      return;
+    }
+
+    const hasExistingOpenOffer = (shiftSwapLogQuery.data ?? []).some(shift =>
+      shift.status === "open" &&
+      shift.isManagerCreated &&
+      shift.manualColumnId === input.manualColumnId &&
+      shift.dayOfMonth === input.dayOfMonth);
+    const hasPendingOffer = pendingManualShiftPublishes.some(shift =>
+      shift.manualColumnId === input.manualColumnId &&
+      shift.dayOfMonth === input.dayOfMonth);
+
+    if (hasExistingOpenOffer || hasPendingOffer) {
+      setManualShiftPublishError("This manual shift already has an open or pending swap offer.");
+      return;
+    }
+
+    setPendingManualShiftPublishes(current => [
+      ...current,
+      {
+        ...input,
+        clientId: `pending-manual-shift-${crypto.randomUUID()}`,
+      },
+    ]);
+    setSubmitError(undefined);
+  };
+
+  const handleCancelPendingManualShift = (clientId: string) => {
+    setPendingManualShiftPublishes(current => current.filter(shift => shift.clientId !== clientId));
+    setManualShiftPublishError(null);
+    setSubmitError(undefined);
+  };
+
+  const handleCancelManualShift = (shiftId: number) => {
+    setManualShiftPublishError(null);
+
+    if (!containerId || !graphId) {
+      setManualShiftPublishError("Schedule is not ready yet.");
+      return;
+    }
+
+    cancelManualShiftSwapMutation.mutate(
+      {
+        containerId,
+        graphId,
+        id: shiftId,
+      },
+      {
+        onError: error => {
+          setManualShiftPublishError(toManualShiftPublishError(error));
+        },
+      },
+    );
   };
 
   return (
@@ -2396,9 +2586,12 @@ export function ContainerGraphEditPage() {
         availabilityGroups={matchingAvailabilityGroups}
         employees={employeesQuery.data ?? []}
         schedulePresets={schedulePresetsQuery.data ?? []}
+        shiftSwapLog={shiftSwapLogQuery.data ?? []}
+        isShiftSwapLogLoading={shiftSwapLogQuery.isLoading}
         selectedSchedulePresetId={selectedSchedulePresetId}
         graphEmployeeRows={graphEmployeeRows}
         manualColumns={manualColumns}
+        pendingManualShiftPublishes={pendingManualShiftPublishes}
         selectedEmployeeId={selectedEmployeeId}
         scheduleColumns={scheduleColumns}
         cellMap={matrixCellMap}
@@ -2430,8 +2623,11 @@ export function ContainerGraphEditPage() {
         isBindsLoading={bindsQuery.isLoading && bindRows.length === 0}
         isBindBusy={createBindMutation.isPending || updateBindMutation.isPending || deleteBindMutation.isPending}
         isSchedulePresetsLoading={schedulePresetsQuery.isLoading}
+        isPublishingManualShift={createManualShiftSwapMutation.isPending || isSaving}
+        isCancellingManualShift={cancelManualShiftSwapMutation.isPending}
         submitError={submitError}
         bindErrorMessage={bindError ?? (bindsQuery.isError && bindRows.length === 0 ? "Could not load bind information." : undefined)}
+        manualShiftPublishError={manualShiftPublishError}
         onFieldChange={setFieldValue}
         onSelectedEmployeeIdChange={setSelectedEmployeeId}
         onPreviewAvailabilitySelectionChange={setPreviewAvailabilitySelection}
@@ -2450,6 +2646,9 @@ export function ContainerGraphEditPage() {
         onManualColumnLabelChange={handleManualColumnLabelChange}
         onAddManualColumn={handleAddManualColumn}
         onDeleteManualColumn={handleDeleteManualColumn}
+        onPublishManualShift={handlePublishManualShift}
+        onCancelManualShift={handleCancelManualShift}
+        onCancelPendingManualShift={handleCancelPendingManualShift}
         onEmployeeMinHoursChange={(employeeId, value) => {
           setGraphEmployeeRows(current => current.map(row => (row.employeeId === employeeId ? { ...row, minHoursMonth: value } : row)));
           setSelectedSchedulePresetId(null);
@@ -2475,7 +2674,10 @@ export function ContainerGraphEditPage() {
 
               return { ...column, cells: nextCells };
             }));
+            setPendingManualShiftPublishes(current => current.filter(shift =>
+              shift.manualColumnId !== manualColumnId || shift.dayOfMonth !== dayOfMonth));
             setSubmitError(undefined);
+            setManualShiftPublishError(null);
             return;
           }
 

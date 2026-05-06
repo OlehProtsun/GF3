@@ -21,6 +21,7 @@ import { normalizeGraphCellValue } from "@entities/containers/model/graphWorkspa
 import type { SaveSchedulePresetDto } from "@entities/containers/api/dto";
 import type { Graph, SchedulePreset } from "@entities/containers/model/types";
 import type { Shop } from "@entities/shops/model/types";
+import type { ShiftSwap } from "@entities/shift-swaps";
 import { ErrorBanner } from "@shared/ui/components/ErrorBanner";
 import { IosButton } from "@shared/ui/components/IosButton";
 import { SearchableSelect, type SearchableSelectOption } from "@shared/ui/components/SearchableSelect";
@@ -29,6 +30,7 @@ import {
   ClearFormatAllIcon,
   ClearFormatIcon,
   EmployeeIcon,
+  EyeIcon,
   NoteIcon,
   PlusIcon,
   SaveIcon,
@@ -37,7 +39,11 @@ import {
 import { CardSection } from "@shared/ui/sections/CardSection";
 import { ContainerGraphColorDialog } from "./ContainerGraphColorDialog";
 import { ContainerGraphDetailsFields } from "./ContainerGraphDetailsFields";
-import { ContainerGraphManualColumnsCard } from "./ContainerGraphManualColumnsCard";
+import {
+  ContainerGraphManualColumnsCard,
+  type ManualColumnShiftPublicationInput,
+  type PendingManualColumnShiftPublication,
+} from "./ContainerGraphManualColumnsCard";
 import { ContainerGraphMatrix } from "./ContainerGraphMatrix";
 import { ContainerGraphPresetDialog } from "./ContainerGraphPresetDialog";
 import { ContainerGraphRelatedHintDialog } from "./ContainerGraphRelatedHintDialog";
@@ -66,7 +72,7 @@ export type EditableGraphManualColumn = {
   cells: Record<string, string>;
 };
 
-type SidebarSectionKey = "details" | "employees" | "bind" | "manualColumns" | "note";
+type SidebarSectionKey = "details" | "publication" | "employees" | "bind" | "manualColumns" | "note";
 type ColorDialogMode = "fill" | "text";
 type PreviewLayoutMode = "side" | "stacked";
 type ToolbarActionButtonProps = {
@@ -86,10 +92,13 @@ type ContainerGraphEditorProps = {
   availabilityGroups: AvailabilityGroup[];
   employees: Employee[];
   schedulePresets: SchedulePreset[];
+  shiftSwapLog?: ShiftSwap[];
+  isShiftSwapLogLoading?: boolean;
   selectedSchedulePresetId: number | null;
   graphEmployeeRows: EditableGraphEmployeeRow[];
   binds: EditableGraphBindRow[];
   manualColumns: EditableGraphManualColumn[];
+  pendingManualShiftPublishes?: PendingManualColumnShiftPublication[];
   selectedEmployeeId: number | null;
   selectedBindClientId: string | null;
   scheduleColumns: GraphMatrixColumn[];
@@ -120,8 +129,11 @@ type ContainerGraphEditorProps = {
   isBindsLoading: boolean;
   isBindBusy: boolean;
   isSchedulePresetsLoading: boolean;
+  isPublishingManualShift?: boolean;
+  isCancellingManualShift?: boolean;
   submitError?: string;
   bindErrorMessage?: string;
+  manualShiftPublishError?: string | null;
   onFieldChange: (field: keyof ContainerGraphFormState) => (value: string) => void;
   onSelectedEmployeeIdChange: (value: number | null) => void;
   onPreviewAvailabilitySelectionChange: (value: string) => void;
@@ -137,6 +149,9 @@ type ContainerGraphEditorProps = {
   onManualColumnLabelChange: (columnId: number, value: string) => void;
   onAddManualColumn: () => void;
   onDeleteManualColumn: (columnId: number) => void;
+  onPublishManualShift: (input: ManualColumnShiftPublicationInput) => void;
+  onCancelManualShift: (shiftId: number) => void;
+  onCancelPendingManualShift: (clientId: string) => void;
   onEmployeeMinHoursChange: (employeeId: number, value: string) => void;
   onColumnMove: (employeeId: number, targetEmployeeId: number) => void;
   onCellChange: (employeeId: number, dayOfMonth: number, value: string) => void;
@@ -163,6 +178,49 @@ function formatGraphHintDateLabel(year: number, month: number, dayOfMonth: numbe
     year: "numeric",
     timeZone: "UTC",
   }).format(new Date(Date.UTC(year, month - 1, dayOfMonth)));
+}
+
+const shiftSwapLogDayFormatter = new Intl.DateTimeFormat("en-GB", {
+  day: "2-digit",
+  month: "short",
+  timeZone: "UTC",
+});
+
+const shiftSwapLogAcceptedAtFormatter = new Intl.DateTimeFormat("en-GB", {
+  day: "2-digit",
+  month: "short",
+  hour: "2-digit",
+  minute: "2-digit",
+  hourCycle: "h23",
+});
+
+function formatShiftSwapLogDay(item: ShiftSwap) {
+  return shiftSwapLogDayFormatter.format(new Date(Date.UTC(item.year, item.month - 1, item.dayOfMonth)));
+}
+
+function formatShiftSwapLogTime(value: string) {
+  return value.slice(0, 5);
+}
+
+function formatShiftSwapLogHours(value: number) {
+  const normalized = Math.abs(value) < 0.05 ? 0 : value;
+  return `${Number.isInteger(normalized) ? normalized.toFixed(0) : normalized.toFixed(1)}h`;
+}
+
+function formatShiftSwapAcceptedAt(value?: string | null) {
+  if (!value) {
+    return "Unknown";
+  }
+
+  return shiftSwapLogAcceptedAtFormatter.format(new Date(value));
+}
+
+function formatShiftSwapLogShift(item: ShiftSwap) {
+  const locationLabel = item.shopName || item.containerName || item.scheduleName;
+  const timeLabel = `${formatShiftSwapLogTime(item.fromTime)}-${formatShiftSwapLogTime(item.toTime)}`;
+  const baseLabel = `${formatShiftSwapLogDay(item)} ${timeLabel} (${formatShiftSwapLogHours(item.shiftHours)})`;
+
+  return locationLabel ? `${baseLabel} - ${locationLabel}` : baseLabel;
 }
 
 type SplitColorButtonProps = {
@@ -268,10 +326,13 @@ export function ContainerGraphEditor({
   availabilityGroups,
   employees,
   schedulePresets,
+  shiftSwapLog = [],
+  isShiftSwapLogLoading = false,
   selectedSchedulePresetId,
   graphEmployeeRows,
   binds,
   manualColumns,
+  pendingManualShiftPublishes = [],
   selectedEmployeeId,
   selectedBindClientId,
   scheduleColumns,
@@ -302,8 +363,11 @@ export function ContainerGraphEditor({
   isBindsLoading,
   isBindBusy,
   isSchedulePresetsLoading,
+  isPublishingManualShift = false,
+  isCancellingManualShift = false,
   submitError,
   bindErrorMessage,
+  manualShiftPublishError = null,
   onFieldChange,
   onSelectedEmployeeIdChange,
   onPreviewAvailabilitySelectionChange,
@@ -319,6 +383,9 @@ export function ContainerGraphEditor({
   onManualColumnLabelChange,
   onAddManualColumn,
   onDeleteManualColumn,
+  onPublishManualShift,
+  onCancelManualShift,
+  onCancelPendingManualShift,
   onEmployeeMinHoursChange,
   onColumnMove,
   onCellChange,
@@ -335,6 +402,7 @@ export function ContainerGraphEditor({
 }: ContainerGraphEditorProps) {
   const [collapsedSections, setCollapsedSections] = useState<Record<SidebarSectionKey, boolean>>({
     details: false,
+    publication: false,
     employees: false,
     bind: false,
     manualColumns: false,
@@ -519,6 +587,8 @@ export function ContainerGraphEditor({
     activeRelatedHint
       ? formatGraphHintDateLabel(displayGraphYear, displayGraphMonth, activeRelatedHint.dayOfMonth)
       : "";
+  const acceptedShiftSwapLog = shiftSwapLog.filter(item => item.status === "accepted");
+  const openManagerManualShifts = shiftSwapLog.filter(item => item.status === "open" && item.isManagerCreated);
 
   const setSectionCollapsed = (section: SidebarSectionKey, collapsed: boolean) => {
     setCollapsedSections(current => (
@@ -597,6 +667,85 @@ export function ContainerGraphEditor({
                     disabled={isGenerating || isSaving}
                     onClick={handleGenerate}
                   />
+                </div>
+              </CardSection>
+            </AvailabilitySidebarSection>
+
+            <AvailabilitySidebarSection
+              label="Publication"
+              collapsed={collapsedSections.publication}
+              collapsedOffset={allSectionsCollapsed ? "flush" : "default"}
+              onExpand={() => setSectionCollapsed("publication", false)}
+            >
+              <CardSection
+                className={styles.sidebarCard}
+                title="Publication"
+                icon={<EyeIcon size={18} />}
+                headerRightSlot={renderCollapseButton("Publication", "publication")}
+              >
+                <div className={styles.publicationCard}>
+                  <div className={styles.publicationControl} role="radiogroup" aria-label="Schedule publication status">
+                    <button
+                      type="button"
+                      role="radio"
+                      aria-checked={form.publicationStatus === "private"}
+                      className={joinClassNames(
+                        styles.publicationSegment,
+                        form.publicationStatus === "private" && styles.publicationSegmentActive,
+                      )}
+                      onClick={() => onFieldChange("publicationStatus")("private")}
+                    >
+                      Private
+                    </button>
+
+                    <button
+                      type="button"
+                      role="radio"
+                      aria-checked={form.publicationStatus === "public"}
+                      className={joinClassNames(
+                        styles.publicationSegment,
+                        form.publicationStatus === "public" && styles.publicationSegmentActive,
+                      )}
+                      onClick={() => onFieldChange("publicationStatus")("public")}
+                    >
+                      Public
+                    </button>
+                  </div>
+
+                  <div className={styles.publicationLog}>
+                    <div className={styles.publicationLogHeader}>
+                      <span>Swap log</span>
+                      <strong>{acceptedShiftSwapLog.length}</strong>
+                    </div>
+
+                    {isShiftSwapLogLoading ? (
+                      <p className={styles.publicationLogState}>Loading swap log...</p>
+                    ) : acceptedShiftSwapLog.length === 0 ? (
+                      <p className={styles.publicationLogState}>No accepted swaps yet.</p>
+                    ) : (
+                      <div className={styles.publicationLogList}>
+                        {acceptedShiftSwapLog.map(item => (
+                          <article key={item.id} className={styles.publicationLogItem}>
+                            <div className={styles.publicationLogItemMain}>
+                              <strong>{item.fromEmployeeName}</strong>
+                              <span>to</span>
+                              <strong>{item.acceptedByEmployeeName ?? "Employee"}</strong>
+                            </div>
+                            <div className={styles.publicationLogDetails}>
+                              <div className={styles.publicationLogDetail}>
+                                <span>Shift:</span>
+                                <strong>{formatShiftSwapLogShift(item)}</strong>
+                              </div>
+                              <div className={styles.publicationLogDetail}>
+                                <span>When was accepted:</span>
+                                <strong>{formatShiftSwapAcceptedAt(item.acceptedAtUtc)}</strong>
+                              </div>
+                            </div>
+                          </article>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </CardSection>
             </AvailabilitySidebarSection>
@@ -713,9 +862,20 @@ export function ContainerGraphEditor({
           >
             <ContainerGraphManualColumnsCard
               columns={manualColumns}
+              year={displayGraphYear}
+              month={displayGraphMonth}
+              employees={employees}
+              isPublishingShift={isPublishingManualShift}
+              isCancellingPublishedShift={isCancellingManualShift}
+              publishError={manualShiftPublishError}
+              publishedShifts={openManagerManualShifts}
+              pendingPublishedShifts={pendingManualShiftPublishes}
               headerRightSlot={renderCollapseButton("Manual Columns", "manualColumns")}
               onAddColumn={onAddManualColumn}
               onDeleteColumn={onDeleteManualColumn}
+              onPublishShift={onPublishManualShift}
+              onCancelPublishedShift={onCancelManualShift}
+              onCancelPendingPublishedShift={onCancelPendingManualShift}
             />
           </AvailabilitySidebarSection>
 

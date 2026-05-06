@@ -2,7 +2,7 @@ import type { ChangeEvent, FormEvent } from "react";
 import type { EmployeeFormErrors, EmployeeFormState } from "@entities/employees/model/form";
 import { RecordDetailsFormCard } from "@shared/ui/components/RecordDetailsFormCard";
 import { LabeledField, TextInput } from "@shared/ui/forms/Field";
-import { FormRow } from "@shared/ui/forms/FormLayout";
+import styles from "./EmployeeDetailsForm.module.css";
 
 type EmployeeDetailsFormProps = {
   form: EmployeeFormState;
@@ -35,51 +35,83 @@ export function EmployeeDetailsForm({
       onCancel={onCancel}
       onSubmit={onSubmit}
     >
-      <FormRow>
-        <LabeledField id="firstName" label="First Name" error={errors.firstName}>
-          <TextInput
-            id="firstName"
-            value={form.firstName}
-            placeholder="Example: John"
-            onChange={onFieldChange("firstName")}
-            aria-invalid={Boolean(errors.firstName)}
-            aria-describedby={errors.firstName ? "firstName-error" : undefined}
-          />
-        </LabeledField>
+      <div className={styles.fields}>
+        <div className={styles.compactRow}>
+          <LabeledField id="firstName" label="First Name" error={errors.firstName}>
+            <TextInput
+              id="firstName"
+              value={form.firstName}
+              placeholder="Example: John"
+              onChange={onFieldChange("firstName")}
+              aria-invalid={Boolean(errors.firstName)}
+              aria-describedby={errors.firstName ? "firstName-error" : undefined}
+            />
+          </LabeledField>
 
-        <LabeledField id="lastName" label="Last Name" error={errors.lastName}>
-          <TextInput
-            id="lastName"
-            value={form.lastName}
-            placeholder="Example: Doe"
-            onChange={onFieldChange("lastName")}
-            aria-invalid={Boolean(errors.lastName)}
-            aria-describedby={errors.lastName ? "lastName-error" : undefined}
-          />
-        </LabeledField>
-      </FormRow>
+          <LabeledField id="lastName" label="Last Name" error={errors.lastName}>
+            <TextInput
+              id="lastName"
+              value={form.lastName}
+              placeholder="Example: Doe"
+              onChange={onFieldChange("lastName")}
+              aria-invalid={Boolean(errors.lastName)}
+              aria-describedby={errors.lastName ? "lastName-error" : undefined}
+            />
+          </LabeledField>
+        </div>
 
-      <LabeledField id="email" label="Email" error={errors.email}>
-        <TextInput
-          id="email"
-          type="email"
-          placeholder="Example: john.doe@example.com"
-          value={form.email}
-          onChange={onFieldChange("email")}
-          aria-invalid={Boolean(errors.email)}
-          aria-describedby={errors.email ? "email-error" : undefined}
-        />
-      </LabeledField>
+        <div className={styles.compactRow}>
+          <LabeledField id="email" label="Email" error={errors.email}>
+            <TextInput
+              id="email"
+              type="email"
+              placeholder="Example: john.doe@example.com"
+              value={form.email}
+              onChange={onFieldChange("email")}
+              aria-invalid={Boolean(errors.email)}
+              aria-describedby={errors.email ? "email-error" : undefined}
+            />
+          </LabeledField>
 
-      <LabeledField id="phone" label="Phone">
-        <TextInput
-          id="phone"
-          type="tel"
-          placeholder="Example: +1 (555) 123-4567"
-          value={form.phone}
-          onChange={onFieldChange("phone")}
-        />
-      </LabeledField>
+          <LabeledField id="phone" label="Phone">
+            <TextInput
+              id="phone"
+              type="tel"
+              placeholder="Example: +1 (555) 123-4567"
+              value={form.phone}
+              onChange={onFieldChange("phone")}
+            />
+          </LabeledField>
+        </div>
+
+        <div className={styles.compactRow}>
+          <LabeledField id="username" label="Username" error={errors.username}>
+            <TextInput
+              id="username"
+              placeholder="Example: john.doe"
+              value={form.username}
+              onChange={onFieldChange("username")}
+              aria-invalid={Boolean(errors.username)}
+              aria-describedby={errors.username ? "username-error" : undefined}
+              autoCapitalize="none"
+              autoCorrect="off"
+            />
+          </LabeledField>
+
+          <LabeledField id="password" label="Password" error={errors.password}>
+            <TextInput
+              id="password"
+              type="password"
+              placeholder="Leave blank to keep current password"
+              value={form.password}
+              onChange={onFieldChange("password")}
+              aria-invalid={Boolean(errors.password)}
+              aria-describedby={errors.password ? "password-error" : undefined}
+              autoComplete="new-password"
+            />
+          </LabeledField>
+        </div>
+      </div>
     </RecordDetailsFormCard>
   );
 }

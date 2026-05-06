@@ -36,6 +36,12 @@
     <Folder Include="Resources\ExcelTemplate\" />
   </ItemGroup>
 
+  <Target Name="EnsureFrontendDependenciesForDebug" BeforeTargets="Build"
+          Condition="'$(Configuration)' == 'Debug' And !Exists('$(SpaRoot)node_modules')">
+    <Message Importance="high" Text="Restoring frontend dependencies in $(SpaRoot) for SPA proxy debugging..." />
+    <Exec WorkingDirectory="$(SpaRoot)" Command="npm install" />
+  </Target>
+
   <Target Name="PublishFrontendAssets" BeforeTargets="ComputeFilesToPublish">
     <Exec
       WorkingDirectory="$(SpaRoot)"

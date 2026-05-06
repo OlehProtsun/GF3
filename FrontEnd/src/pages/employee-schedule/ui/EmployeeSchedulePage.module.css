@@ -1,0 +1,274 @@
+.summaryPanel {
+  gap: 14px;
+}
+
+.summaryHeader {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.summaryIcon {
+  width: 44px;
+  height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  border-radius: 18px;
+  border: 1px solid rgba(37, 99, 235, 0.16);
+  background: rgba(219, 234, 254, 0.8);
+  color: #1d4ed8;
+}
+
+.summaryStats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.summaryStats span,
+.selectedSchedulePill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 32px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  background: rgba(248, 250, 252, 0.86);
+  color: #475569;
+  font-size: 0.78rem;
+  font-weight: 850;
+}
+
+.publicSchedulesPanel {
+  align-content: start;
+}
+
+.publicSchedulesHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.publicSchedulesHeader > div {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.publicSchedulesHeader strong {
+  color: #0f172a;
+  font-size: 1.05rem;
+  line-height: 1.15;
+  font-weight: 900;
+  letter-spacing: 0;
+}
+
+.selectedSchedulePill {
+  flex-shrink: 0;
+  border-color: rgba(37, 99, 235, 0.14);
+  background: rgba(219, 234, 254, 0.76);
+  color: #1d4ed8;
+  font-weight: 900;
+}
+
+.scheduleSwitcher {
+  display: grid;
+  gap: 10px;
+}
+
+.scheduleButton {
+  width: 100%;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  box-sizing: border-box;
+  padding: 14px;
+  border-radius: 24px;
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(248, 250, 252, 0.9));
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  box-shadow:
+    0 10px 24px rgba(15, 23, 42, 0.045),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  transition:
+    transform 0.16s ease,
+    border-color 0.18s ease,
+    background 0.18s ease,
+    box-shadow 0.18s ease;
+}
+
+.scheduleButton:hover {
+  transform: translateY(-1px);
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow: 0 12px 26px rgba(15, 23, 42, 0.06);
+}
+
+.scheduleButtonActive {
+  border-color: rgba(37, 99, 235, 0.34);
+  background:
+    linear-gradient(180deg, rgba(239, 246, 255, 0.98), rgba(219, 234, 254, 0.74));
+  box-shadow: 0 14px 30px rgba(37, 99, 235, 0.1);
+}
+
+.scheduleDateBadge {
+  width: 52px;
+  min-height: 52px;
+  display: grid;
+  place-items: center;
+  gap: 1px;
+  border-radius: 18px;
+  border: 1px solid rgba(148, 163, 184, 0.12);
+  background: rgba(255, 255, 255, 0.86);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.78);
+}
+
+.scheduleDateBadge span {
+  color: #64748b;
+  font-size: 0.68rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.scheduleDateBadge strong {
+  color: #0f172a;
+  font-size: 0.86rem;
+  line-height: 1;
+  font-weight: 900;
+}
+
+.scheduleButtonContent {
+  min-width: 0;
+  display: grid;
+  gap: 5px;
+}
+
+.scheduleButtonName {
+  min-width: 0;
+  color: #0f172a;
+  font-size: 0.95rem;
+  line-height: 1.2;
+  font-weight: 900;
+  letter-spacing: 0;
+  overflow-wrap: anywhere;
+}
+
+.scheduleButtonMeta {
+  color: #64748b;
+  font-size: 0.76rem;
+  line-height: 1.25;
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+
+.openScheduleHeaderActions {
+  display: flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 6px;
+  justify-content: flex-end;
+  min-width: 0;
+}
+
+.openSchedulePdfButton {
+  min-height: 24px;
+  flex: 0 0 auto;
+  padding: 0 9px;
+  border-radius: 999px;
+  border: 1px solid rgba(220, 38, 38, 0.18);
+  background: rgba(255, 241, 242, 0.94);
+  color: #be123c;
+  font-size: 0.72rem;
+  font-weight: 900;
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    border-color 140ms ease,
+    background 140ms ease,
+    color 140ms ease;
+}
+
+.openSchedulePdfButton:hover {
+  border-color: rgba(220, 38, 38, 0.3);
+  background: rgba(255, 228, 230, 0.96);
+  color: #9f1239;
+}
+
+.openSchedulePdfButton:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(244, 63, 94, 0.16);
+}
+
+.openScheduleMeta {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 4px;
+  min-width: 0;
+}
+
+.openScheduleMeta span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  min-width: 0;
+  padding: 0 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  background: rgba(248, 250, 252, 0.86);
+  color: rgba(71, 85, 105, 0.92);
+  font-size: 0.72rem;
+  font-weight: 850;
+  white-space: nowrap;
+}
+
+.openScheduleMeta span:first-child {
+  max-width: 92px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.openScheduleMatrix {
+  --matrix-day-column-width: 48px;
+  --matrix-cell-min-width: 104px;
+  --matrix-cell-min-height: 26px;
+  --matrix-cell-font-size: 0.76rem;
+  --matrix-neutral-weekend-background: #f1f5f9;
+  --matrix-card-padding-bottom: 0px;
+  --matrix-layout-padding-bottom: 0px;
+  --matrix-shell-radius: 18px;
+  --matrix-header-padding: 7px 5px;
+  --matrix-day-header-padding: 7px 3px;
+  --matrix-header-font-size: 0.78rem;
+  --matrix-day-header-font-size: 0.68rem;
+  --matrix-value-header-padding-right: 5px;
+  --matrix-header-cell-gap: 0px;
+  --matrix-cell-padding: 2px 6px;
+  width: 100%;
+  max-width: none;
+  margin-inline: 0;
+  padding: 12px 10px 0;
+  border-radius: 24px;
+}
+
+@media (max-width: 520px) {
+  .publicSchedulesHeader {
+    flex-direction: column;
+  }
+
+  .openScheduleHeaderActions {
+    flex-wrap: wrap;
+    justify-content: flex-start;
+  }
+
+  .selectedSchedulePill {
+    width: fit-content;
+  }
+}

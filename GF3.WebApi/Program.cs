@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.SpaServices.Extensions;
 using Microsoft.EntityFrameworkCore;
 using WebApi.Infrastructure;
 using WebApi.Middleware;
+using WebApi.Realtime;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddWebApiCore(builder.Configuration);
@@ -41,15 +42,23 @@ static void ConfigureCommonMiddleware(WebApplication app)
         app.UseCors("FrontendDev");
     }
 
+    app.UseAuthentication();
+    app.UseAuthorization();
+
     app.UseWhen(
         context => StartupConfiguration.IsApiRequest(context.Request.Path),
         apiBranch =>
         {
             apiBranch.UseMiddleware<ApiExceptionMiddleware>();
+            apiBranch.UseMiddleware<EmployeePresenceMiddleware>();
             apiBranch.UseMiddleware<AdminToolsGuardMiddleware>();
         });
 
     app.MapControllers();
+    app.MapHub<EmployeePresenceHub>(EmployeePresenceHub.RoutePattern, options =>
+    {
+        options.CloseOnAuthenticationExpiration = true;
+    });
 }
 
 /// <summary>

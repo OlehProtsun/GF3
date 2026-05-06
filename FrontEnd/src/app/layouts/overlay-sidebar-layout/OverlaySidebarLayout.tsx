@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { ReactNode } from "react";
 import { NavLink, useLocation } from "react-router-dom";
+import { useAuth } from "@app/providers/AuthProvider";
 import styles from "./OverlaySidebarLayout.module.css";
 import {
   InfoIcon,
@@ -16,6 +17,12 @@ import { matchPath } from "@shared/lib/react-router-dom";
 
 type OverlaySidebarLayoutProps = {
   children: ReactNode;
+};
+
+type NavItemDefinition = {
+  label: string;
+  to: string;
+  icon: React.ReactNode;
 };
 
 function NavItem({
@@ -47,6 +54,8 @@ function NavItem({
 export function OverlaySidebarLayout({ children }: OverlaySidebarLayoutProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const { pathname } = useLocation();
+  const { logout, session } = useAuth();
+  const isManager = session?.role === "manager";
   const isContainerWideContent = pathname === "/container";
   const isHomeWideContent = pathname === "/";
   const isDatabaseWideContent = pathname === "/database";
@@ -78,6 +87,34 @@ export function OverlaySidebarLayout({ children }: OverlaySidebarLayoutProps) {
     isWideScrollableContent ? styles.contentWideScrollable : "",
     isContainerGraphHeaderAligned ? styles.contentWideHeaderAligned : "",
   ].filter(Boolean).join(" ");
+  const mainNavItems: NavItemDefinition[] = isManager
+    ? [
+        {
+          label: "Home",
+          to: "/",
+          icon: (
+            <span className={`${styles.navIcon} ${styles.navIconHome}`}>
+              <HomeIcon size={26} />
+            </span>
+          ),
+        },
+        { label: "Employee", to: "/employee", icon: <EmployeeIcon size={22} /> },
+        { label: "Shop", to: "/shop", icon: <ShopIcon size={28} style={{ transform: "scaleY(-1)" }} /> },
+        { label: "Availability", to: "/availability", icon: <AvailabilityIcon size={22} /> },
+        { label: "Container", to: "/container", icon: <ContainerIcon size={25} /> },
+        { label: "Information", to: "/information", icon: <InfoIcon size={26} /> },
+      ]
+    : [
+        {
+          label: "Home",
+          to: "/",
+          icon: (
+            <span className={`${styles.navIcon} ${styles.navIconHome}`}>
+              <HomeIcon size={26} />
+            </span>
+          ),
+        },
+      ];
 
   return (
     <div className={styles.layout}>
@@ -101,35 +138,42 @@ export function OverlaySidebarLayout({ children }: OverlaySidebarLayoutProps) {
         aria-hidden={isCollapsed}
       >
         <div className={styles.nav}>
-          <NavItem
-            label="Home"
-            to="/"
-            icon={
-              <span className={`${styles.navIcon} ${styles.navIconHome}`}>
-                <HomeIcon size={26} />
-              </span>
-            }
-          />
-          <NavItem label="Employee" to="/employee" icon={<EmployeeIcon size={22} />} />
-          <NavItem label="Shop" to="/shop" icon={<ShopIcon size={28} style={{ transform: "scaleY(-1)" }} />} />
-          <NavItem label="Availability" to="/availability" icon={<AvailabilityIcon size={22} />} />
-          <NavItem label="Container" to="/container" icon={<ContainerIcon size={25} />} />
-          <NavItem label="Information" to="/information" icon={<InfoIcon size={26} />} />
+          {mainNavItems.map(item => (
+            <NavItem key={item.to} label={item.label} to={item.to} icon={item.icon} />
+          ))}
         </div>
 
-        <div className={`${styles.section} ${styles.sectionBottom}`}>
-          <div className={styles.sectionTitle}>Settings</div>
-          <div className={styles.nav}>
-            <NavItem label="DataBase" to="/database" icon={<DatabaseIcon size={30} />} />
+        {isManager ? (
+          <div className={`${styles.section} ${styles.sectionBottom}`}>
+            <div className={styles.sectionTitle}>Settings</div>
+            <div className={styles.nav}>
+              <NavItem label="DataBase" to="/database" icon={<DatabaseIcon size={30} />} />
+            </div>
           </div>
-        </div>
+        ) : null}
 
         <div className={styles.sidebarFooter}>
+          <div className={styles.userBadge}>
+            <span className={styles.userRole}>{isManager ? "Manager" : "Employee"}</span>
+            <strong className={styles.userName}>{session?.displayName ?? "Signed in"}</strong>
+            <span className={styles.userLogin}>@{session?.userName ?? "account"}</span>
+          </div>
+
+          <button
+            type="button"
+            className={styles.logoutButton}
+            onClick={() => {
+              void logout();
+            }}
+          >
+            Log out
+          </button>
+
           <button
             type="button"
             className={styles.powerButton}
             onClick={() => setIsCollapsed(true)}
-            aria-label="Power Off"
+            aria-label="Collapse sidebar"
           >
             <span className={styles.navIcon}>
               <ArrowIcon size={20} className={styles.arrowLeft} style={{ transform: "scaleY(-1)translateX(2px) translateY(2px)" }} />

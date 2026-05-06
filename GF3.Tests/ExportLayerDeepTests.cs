@@ -877,6 +877,9 @@ public sealed class ExportLayerDeepTests
         public Task<ScheduleModel?> GetGraphByIdAsync(int containerId, int graphId, CancellationToken ct = default)
             => Task.FromResult(Graphs.FirstOrDefault(graph => graph.Id == graphId && graph.ContainerId == containerId));
 
+        public Task<List<ScheduleModel>> GetPublishedGraphsForEmployeeAsync(int employeeId, CancellationToken ct = default)
+            => Task.FromResult(Graphs);
+
         public Task<ScheduleModel> CreateGraphAsync(int containerId, ScheduleModel model, CancellationToken ct = default)
             => Task.FromResult(model);
 

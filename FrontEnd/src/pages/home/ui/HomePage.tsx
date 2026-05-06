@@ -184,8 +184,8 @@ export function HomePage() {
   usePageScrollbarHidden(true);
   const homeQuery = useQuery({
     queryKey: [...HOME_QUERY_KEY, location.key],
-    cancelOnUnmount: true,
     staleTime: 60_000,
+    // Keep the dashboard bootstrap request alive through StrictMode remounts after sign-in.
     queryFn: ({ signal }) => loadHomeDashboard(signal),
   });
 

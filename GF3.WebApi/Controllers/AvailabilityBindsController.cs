@@ -1,6 +1,8 @@
 using BusinessLogicLayer.Contracts.Models;
 using BusinessLogicLayer.Services.Abstractions;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using WebApi.Auth;
 using WebApi.Contracts.AvailabilityBinds;
 using WebApi.Mappers;
 
@@ -13,6 +15,7 @@ namespace WebApi.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/availability-binds")]
+[Authorize(Roles = AuthRoles.Manager)]
 public sealed class AvailabilityBindsController(IBindService bindService) : ControllerBase
 {
     [HttpGet]

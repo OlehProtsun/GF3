@@ -13,6 +13,8 @@ type RecordTileProps = {
   description?: ReactNode;
   badge?: ReactNode;
   metaItems?: RecordTileMetaItem[];
+  metaLayout?: "wrap" | "stacked";
+  density?: "default" | "compact";
   headerSlot?: ReactNode;
   cornerSlot?: ReactNode;
   onClick?: () => void;
@@ -29,6 +31,8 @@ export function RecordTile({
   description,
   badge,
   metaItems = [],
+  metaLayout = "wrap",
+  density = "default",
   headerSlot,
   cornerSlot,
   onClick,
@@ -42,6 +46,7 @@ export function RecordTile({
   const isInteractive = Boolean(onClick);
   const tileClassName = [
     styles.tile,
+    density === "compact" ? styles.tileCompact : "",
     isInteractive ? styles.tileInteractive : "",
     isSelected ? styles.tileSelected : "",
     cornerSlot ? styles.tileWithCornerSlot : "",
@@ -111,9 +116,24 @@ export function RecordTile({
       {description ? <div className={styles.description}>{description}</div> : null}
 
       {metaItems.length > 0 ? (
-        <div className={styles.metaRow}>
+        <div
+          className={[
+            styles.metaRow,
+            metaLayout === "stacked" ? styles.metaRowStacked : "",
+          ]
+            .filter(Boolean)
+            .join(" ")}
+        >
           {metaItems.map((item, index) => (
-            <span key={item.key ?? index} className={styles.metaItem}>
+            <span
+              key={item.key ?? index}
+              className={[
+                styles.metaItem,
+                metaLayout === "stacked" ? styles.metaItemStacked : "",
+              ]
+                .filter(Boolean)
+                .join(" ")}
+            >
               {item.label ? <span className={styles.metaLabel}>{item.label}</span> : null}
               <span className={styles.metaValue}>{item.value}</span>
             </span>

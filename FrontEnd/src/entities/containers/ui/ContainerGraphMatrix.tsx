@@ -43,6 +43,11 @@ type ContainerGraphMatrixProps = {
   style?: CSSProperties;
   icon?: ReactNode;
   compactSize?: boolean;
+  neutralStyle?: boolean;
+  showColumnTotals?: boolean;
+  allowColumnResize?: boolean;
+  stretchColumns?: boolean;
+  compactHeader?: boolean;
   preserveShellHeightOnCompact?: boolean;
   editMode?: ContainerGraphMatrixEditMode;
   emptyCellVariant?: ContainerGraphMatrixEmptyCellVariant;
@@ -577,6 +582,11 @@ export function ContainerGraphMatrix({
   style,
   icon = <ScheduleIcon size={18} />,
   compactSize = false,
+  neutralStyle = false,
+  showColumnTotals = true,
+  allowColumnResize = true,
+  stretchColumns = true,
+  compactHeader = false,
   preserveShellHeightOnCompact = false,
   editMode = "deferred",
   emptyCellVariant = "neutral",
@@ -639,9 +649,8 @@ export function ContainerGraphMatrix({
     () =>
       ({
         ...(style ?? {}),
-        "--matrix-cell-min-height": compactSize ? "10px" : "30px",
       }) as CSSProperties,
-    [compactSize, style],
+    [style],
   );
   const hasToolbar = Boolean(toolbar);
   const isEmpty = columns.length === 0;
@@ -669,12 +678,12 @@ export function ContainerGraphMatrix({
       ({
         "--matrix-column-count": String(columns.length),
         "--matrix-auto-column-width":
-          autoWidthColumnCount > 0
+          stretchColumns && autoWidthColumnCount > 0
             ? `max(var(--matrix-cell-min-width), calc((100% - var(--matrix-day-column-width) - ${fixedWidthSum}px) / ${autoWidthColumnCount}))`
             : "var(--matrix-cell-min-width)",
         "--matrix-table-min-width": `calc(var(--matrix-day-column-width) + ${fixedWidthSum}px + (var(--matrix-cell-min-width) * ${autoWidthColumnCount}))`,
       }) as CSSProperties,
-    [autoWidthColumnCount, columns.length, fixedWidthSum],
+    [autoWidthColumnCount, columns.length, fixedWidthSum, stretchColumns],
   );
   const effectiveSelectedCellKeys = draftSelectedCellKeys ?? selectedCellKeys;
   const selectedCellKeySet = useMemo(() => new Set(effectiveSelectedCellKeys), [effectiveSelectedCellKeys]);
@@ -798,7 +807,7 @@ export function ContainerGraphMatrix({
   }, [columns, resizingEmployeeId]);
 
   useEffect(() => {
-    if (resizingEmployeeId === null) {
+    if (!allowColumnResize || resizingEmployeeId === null) {
       return;
     }
 
@@ -845,7 +854,7 @@ export function ContainerGraphMatrix({
       window.removeEventListener("mouseup", stopResize);
       window.removeEventListener("blur", stopResize);
     };
-  }, [resizingEmployeeId]);
+  }, [allowColumnResize, resizingEmployeeId]);
 
   const resolveSelectionMode = (event: { shiftKey: boolean; ctrlKey: boolean; metaKey: boolean }): GraphMatrixSelectionMode => {
     if (event.shiftKey) {
@@ -1377,6 +1386,10 @@ export function ContainerGraphMatrix({
   };
 
   const handleColumnResizeStart = (event: MouseEvent<HTMLSpanElement>, employeeId: number) => {
+    if (!allowColumnResize) {
+      return;
+    }
+
     event.preventDefault();
     event.stopPropagation();
 
@@ -1407,6 +1420,9 @@ export function ContainerGraphMatrix({
       style={cardStyle}
       title={title}
       icon={icon}
+      headerClassName={compactHeader ? styles.compactHeader : undefined}
+      titleClassName={compactHeader ? styles.compactTitle : undefined}
+      headerRightClassName={compactHeader ? styles.compactHeaderRight : undefined}
       headerCenterSlot={headerCenterSlot}
       headerRightSlot={headerRightSlot}
     >
@@ -1421,7 +1437,11 @@ export function ContainerGraphMatrix({
           <div className={joinClassNames(styles.tableShell, useCompactShell && styles.tableShellCompact)}>
             <div className={joinClassNames(styles.tableScroll, useCompactShell && styles.tableScrollCompact)}>
               <table
-                className={styles.table}
+                className={joinClassNames(
+                  styles.table,
+                  neutralStyle && styles.tableNeutral,
+                  !stretchColumns && styles.tableFixedColumns,
+                )}
                 style={tableStyle}
                 onMouseDown={handleTableMouseDown}
                 onMouseMove={handleTableMouseMove}
@@ -1488,19 +1508,21 @@ export function ContainerGraphMatrix({
                           ) : (
                             <div className={styles.headerCell}>
                               <span className={styles.headerLabel}>{column.label}</span>
-                              {column.totalText ? <span className={styles.headerMeta}>{column.totalText}</span> : null}
+                              {showColumnTotals && column.totalText ? <span className={styles.headerMeta}>{column.totalText}</span> : null}
                             </div>
                           )}
 
-                          <span
-                            className={joinClassNames(
-                              styles.columnResizeHandle,
-                              resizingEmployeeId === column.employeeId && styles.columnResizeHandleActive,
-                            )}
-                            role="presentation"
-                            draggable={false}
-                            onMouseDown={event => handleColumnResizeStart(event, column.employeeId)}
-                          />
+                          {allowColumnResize ? (
+                            <span
+                              className={joinClassNames(
+                                styles.columnResizeHandle,
+                                resizingEmployeeId === column.employeeId && styles.columnResizeHandleActive,
+                              )}
+                              role="presentation"
+                              draggable={false}
+                              onMouseDown={event => handleColumnResizeStart(event, column.employeeId)}
+                            />
+                          ) : null}
                         </th>
                       );
                     })}

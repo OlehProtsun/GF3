@@ -18,6 +18,11 @@ public interface IScheduleRepository : IBaseRepository<ScheduleModel>
     Task<List<ScheduleModel>> GetByContainerAsync(int containerId, string? value = null, CancellationToken ct = default);
 
     /// <summary>
+    /// Returns public schedules assigned to one employee.
+    /// </summary>
+    Task<List<ScheduleModel>> GetPublishedForEmployeeAsync(int employeeId, CancellationToken ct = default);
+
+    /// <summary>
     /// Returns a schedule together with the related data required by edit/export flows.
     /// </summary>
     Task<ScheduleModel?> GetDetailedAsync(int id, CancellationToken ct = default);

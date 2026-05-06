@@ -24,4 +24,9 @@ public sealed class AvailabilityGroupMemberDto
     /// Stable row order used by the planner UI.
     /// </summary>
     public int DisplayOrder { get; set; }
+
+    /// <summary>
+    /// Last UTC moment this member was modified from the employee self-service workflow.
+    /// </summary>
+    public DateTimeOffset? EmployeeLastModifiedAtUtc { get; set; }
 }

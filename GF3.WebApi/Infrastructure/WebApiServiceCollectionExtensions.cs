@@ -1,10 +1,18 @@
 using BusinessLogicLayer;
+using BusinessLogicLayer.Services.Abstractions;
 using DataAccessLayer.Administration;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Cors.Infrastructure;
+using Microsoft.AspNetCore.Mvc.Authorization;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using Microsoft.OpenApi;
+using WebApi.Auth;
 using WebApi.Options;
+using WebApi.Realtime;
+using WebApi.Services;
 
 namespace WebApi.Infrastructure;
 
@@ -25,10 +33,24 @@ public static class WebApiServiceCollectionExtensions
         string? localApplicationDataRoot = null,
         Action<string>? ensureDirectory = null)
     {
-        services.AddApiMvc();
+        var jwtOptions = JwtAuthOptions.FromConfiguration(configuration);
+
+        services.AddApiMvc(jwtOptions);
         services.AddApiDocumentation();
         services.AddFrontendDevelopmentCors();
+        services.AddSignalR(options =>
+        {
+            options.KeepAliveInterval = TimeSpan.FromSeconds(10);
+            options.ClientTimeoutInterval = TimeSpan.FromSeconds(20);
+        });
+        services.AddSingleton<IScheduleEditLockService, ScheduleEditLockService>();
+        services.AddScoped<IRealtimeNotifier, RealtimeNotifier>();
+        services.AddScoped<IWorkflowLogService, WorkflowLogService>();
+        services.Configure<SmtpEmailOptions>(configuration.GetSection("Smtp"));
         services.ConfigureAdminTools(configuration, readEnvironmentVariable);
+        services.AddSingleton(Microsoft.Extensions.Options.Options.Create(jwtOptions));
+        services.AddSingleton<IJwtTokenService, JwtTokenService>();
+        services.AddTransient<IEmailSender, SmtpEmailSender>();
 
         var connectionString = StartupConfiguration.ResolveConnectionString(
             configuration.GetConnectionString("Default"),
@@ -49,13 +71,21 @@ public static class WebApiServiceCollectionExtensions
     public static string ResolveRegisteredDatabasePath(IServiceProvider services)
         => services.GetRequiredService<ISqliteAdminService>().DatabasePath;
 
-    private static IServiceCollection AddApiMvc(this IServiceCollection services)
+    private static IServiceCollection AddApiMvc(this IServiceCollection services, JwtAuthOptions jwtOptions)
     {
         services.AddLogging();
         services.AddScoped<ApiExceptionFilter>();
+        services.AddAuthentication(JwtAuthenticationDefaults.SchemeName)
+            .AddScheme<AuthenticationSchemeOptions, JwtAuthenticationHandler>(
+                JwtAuthenticationDefaults.SchemeName,
+                _ => { });
+        services.AddAuthorization();
         services.AddControllers(options =>
         {
             options.Filters.AddService<ApiExceptionFilter>();
+            options.Filters.Add(new AuthorizeFilter(new AuthorizationPolicyBuilder()
+                .RequireAuthenticatedUser()
+                .Build()));
         });
         services.AddProblemDetails();
         return services;
@@ -64,7 +94,20 @@ public static class WebApiServiceCollectionExtensions
     private static IServiceCollection AddApiDocumentation(this IServiceCollection services)
     {
         services.AddEndpointsApiExplorer();
-        services.AddSwaggerGen();
+        services.AddSwaggerGen(options =>
+        {
+            var bearerScheme = new OpenApiSecurityScheme
+            {
+                Name = "Authorization",
+                Type = SecuritySchemeType.Http,
+                Scheme = "bearer",
+                BearerFormat = "JWT",
+                In = ParameterLocation.Header,
+                Description = "JWT access token in the format: Bearer {token}",
+            };
+
+            options.AddSecurityDefinition("Bearer", bearerScheme);
+        });
         return services;
     }
 
@@ -76,7 +119,8 @@ public static class WebApiServiceCollectionExtensions
             {
                 policy.WithOrigins(FrontendDevOrigins)
                     .AllowAnyHeader()
-                    .AllowAnyMethod();
+                    .AllowAnyMethod()
+                    .AllowCredentials();
             });
         });
 

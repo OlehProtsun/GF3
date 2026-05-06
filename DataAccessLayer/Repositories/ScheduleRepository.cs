@@ -1,5 +1,6 @@
 using DataAccessLayer.Models;
 using DataAccessLayer.Models.DataBaseContext;
+using DataAccessLayer.Models.Enums;
 using DataAccessLayer.Repositories.Abstractions;
 using Microsoft.EntityFrameworkCore;
 
@@ -49,6 +50,24 @@ public class ScheduleRepository : GenericRepository<ScheduleModel>, IScheduleRep
             .ToListAsync(ct)
             .ConfigureAwait(false);
     }
+
+    /// <inheritdoc />
+    public async Task<List<ScheduleModel>> GetPublishedForEmployeeAsync(int employeeId, CancellationToken ct = default)
+        => await _set
+            .AsNoTracking()
+            .Include(schedule => schedule.Container)
+            .Include(schedule => schedule.Shop)
+            .Include(schedule => schedule.Employees)
+                .ThenInclude(scheduleEmployee => scheduleEmployee.Employee)
+            .Include(schedule => schedule.Slots)
+            .Where(schedule =>
+                schedule.PublicationStatus == SchedulePublicationStatus.Public &&
+                schedule.Employees.Any(scheduleEmployee => scheduleEmployee.EmployeeId == employeeId))
+            .OrderByDescending(schedule => schedule.Year)
+            .ThenByDescending(schedule => schedule.Month)
+            .ThenBy(schedule => schedule.Name)
+            .ToListAsync(ct)
+            .ConfigureAwait(false);
 
     /// <inheritdoc />
     public async Task<ScheduleModel?> GetDetailedAsync(int id, CancellationToken ct = default)

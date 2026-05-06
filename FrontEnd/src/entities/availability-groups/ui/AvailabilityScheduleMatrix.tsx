@@ -9,6 +9,7 @@ import {
   type AvailabilityMatrixCellMap,
   type AvailabilityMatrixColumn,
 } from "@entities/availability-groups/model/editor";
+import { getAvailabilityMemberLastModifiedLabel } from "@entities/availability-groups/model/presentation";
 import { AvailabilityIcon } from "@shared/ui/icons";
 
 type AvailabilityScheduleMatrixProps = {
@@ -64,7 +65,7 @@ export function AvailabilityScheduleMatrix({
         label: column.label,
         minHoursMonth: null,
         totalMinutes: 0,
-        totalText: "",
+        totalText: getAvailabilityMemberLastModifiedLabel(column.employeeLastModifiedAtUtc),
       })),
     [columns],
   );

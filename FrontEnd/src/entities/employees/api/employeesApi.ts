@@ -10,6 +10,8 @@ function toSaveDto(input: SaveEmployeeInput): SaveEmployeeDto {
     lastName: input.lastName.trim(),
     phone: input.phone?.trim() || undefined,
     email: input.email?.trim() || undefined,
+    username: input.username?.trim() || undefined,
+    password: input.password || undefined,
   };
 }
 

@@ -1,5 +1,6 @@
 using BusinessLogicLayer.Generators;
 using BusinessLogicLayer.Options;
+using BusinessLogicLayer.Security;
 using BusinessLogicLayer.Services;
 using BusinessLogicLayer.Services.Abstractions;
 using DataAccessLayer.Administration;
@@ -25,6 +26,9 @@ public static class Extensions
     {
         serviceCollection.AddScoped<IContainerService, ContainerService>();
         serviceCollection.AddScoped<IEmployeeService, EmployeeService>();
+        serviceCollection.AddScoped<IEmployeeAccountService, EmployeeAccountService>();
+        serviceCollection.AddScoped<IEmployeeProfileService, EmployeeProfileService>();
+        serviceCollection.AddSingleton<IEmployeePresenceService, EmployeePresenceService>();
         serviceCollection.AddScoped<IShopService, ShopService>();
         serviceCollection.AddScoped<IScheduleService, ScheduleService>();
         serviceCollection.AddScoped<IScheduleEmployeeService, ScheduleEmployeeService>();
@@ -33,6 +37,7 @@ public static class Extensions
         serviceCollection.AddScoped<IAvailabilityGroupService, AvailabilityGroupService>();
         serviceCollection.AddScoped<IShopFacade, ShopFacade>();
         serviceCollection.AddScoped<IEmployeeFacade, EmployeeFacade>();
+        serviceCollection.AddScoped<IAuthService, AuthService>();
         serviceCollection.AddScoped<IScheduleExportDataBuilder, Services.Export.ScheduleExportDataBuilder>();
         serviceCollection.AddScoped<IScheduleExcelContextBuilder, Services.Export.ScheduleExcelContextBuilder>();
         serviceCollection.AddScoped<IGraphExportService, GraphExportService>();
@@ -41,6 +46,7 @@ public static class Extensions
         serviceCollection.AddScoped<ISqliteAdminFacade, SqliteAdminFacade>();
         serviceCollection.AddScoped<IAdminDbService, AdminDbService>();
         serviceCollection.AddTransient<IScheduleGenerator, ScheduleGenerator>();
+        serviceCollection.AddSingleton<IPasswordHasher, PasswordHasher>();
 
         return serviceCollection;
     }

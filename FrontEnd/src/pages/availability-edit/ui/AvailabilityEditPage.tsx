@@ -24,6 +24,7 @@ import {
   useSaveAvailabilityGroupGraphMutation,
 } from "@entities/availability-groups";
 import { AvailabilityGroupEditor } from "@entities/availability-groups/ui";
+import type { AvailabilityPublicationStatus } from "@entities/availability-groups/model/types";
 import { useEmployeesListQuery } from "@entities/employees/api/queries";
 import { getEmployeeFullName } from "@entities/employees/model/presentation";
 import { stableSerialize } from "@shared/lib/stableSerialize";
@@ -51,15 +52,24 @@ type AvailabilityEditorInformationErrors = {
   year?: string;
 };
 
+type AvailabilityEditorPublicationErrors = {
+  visibleFrom?: string;
+  visibleTo?: string;
+};
+
 type AvailabilityEditorState = {
   name: string;
   month: number;
   year: number;
+  publicationStatus: AvailabilityPublicationStatus;
+  visibleFrom: string;
+  visibleTo: string;
   selectedEmployeeId: number | null;
   selectedEmployeeIds: number[];
   cellMap: AvailabilityMatrixCellMap;
   cellErrors: Record<string, string>;
   informationErrors: AvailabilityEditorInformationErrors;
+  publicationErrors: AvailabilityEditorPublicationErrors;
   employeeError?: string;
   editorError?: string;
 };
@@ -68,6 +78,9 @@ type AvailabilityGroupSource = {
   name: string;
   month: number;
   year: number;
+  publicationStatus?: AvailabilityPublicationStatus | string | null;
+  visibleFromUtc?: string | null;
+  visibleToUtc?: string | null;
 } | null | undefined;
 
 type AvailabilityMembersSource = Parameters<typeof buildAvailabilityCellMap>[0] | null | undefined;
@@ -96,6 +109,34 @@ function getDefaultDateParts() {
     month: clampAvailabilityMonth(today.getMonth() + 1),
     year: clampAvailabilityYear(today.getFullYear()),
   };
+}
+
+function toDateTimeLocalValue(value?: string | null) {
+  if (!value) {
+    return "";
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+
+  const offsetDate = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
+  return offsetDate.toISOString().slice(0, 16);
+}
+
+function toIsoDateTime(value: string) {
+  const trimmedValue = value.trim();
+  if (!trimmedValue) {
+    return null;
+  }
+
+  const date = new Date(trimmedValue);
+  return Number.isNaN(date.getTime()) ? null : date.toISOString();
+}
+
+function toDraftPublicationStatus(status?: string | null): AvailabilityPublicationStatus {
+  return status?.toLowerCase() === "public" ? "public" : "private";
 }
 
 function toEditableAvailabilityBind(bind: AvailabilityBind): EditableAvailabilityBind {
@@ -181,11 +222,15 @@ function createAvailabilityEditorState({
       name: "",
       month: defaults.month,
       year: defaults.year,
+      publicationStatus: "private",
+      visibleFrom: "",
+      visibleTo: "",
       selectedEmployeeId: null,
       selectedEmployeeIds: [],
       cellMap: {},
       cellErrors: {},
       informationErrors: {},
+      publicationErrors: {},
       employeeError: undefined,
       editorError: undefined,
     };
@@ -198,11 +243,15 @@ function createAvailabilityEditorState({
     name: group.name,
     month: group.month,
     year: group.year,
+    publicationStatus: toDraftPublicationStatus(group.publicationStatus),
+    visibleFrom: toDateTimeLocalValue(group.visibleFromUtc),
+    visibleTo: toDateTimeLocalValue(group.visibleToUtc),
     selectedEmployeeId: selectedEmployeeIds[0] ?? null,
     selectedEmployeeIds,
     cellMap: sanitizeAvailabilityCellMap(hydratedCellMap, selectedEmployeeIds, group.year, group.month),
     cellErrors: {},
     informationErrors: {},
+    publicationErrors: {},
     employeeError: undefined,
     editorError: undefined,
   };
@@ -236,7 +285,18 @@ function buildAvailabilityEditorSourceKey({
     .map(slot => `${slot.id}:${slot.availabilityGroupMemberId}:${slot.dayOfMonth}:${slot.kind}:${slot.intervalStr ?? ""}`)
     .join("|");
 
-  return `group:${groupId}:${group.name}:${group.month}:${group.year}:${memberKey}:${slotKey}`;
+  return [
+    "group",
+    groupId,
+    group.name,
+    group.month,
+    group.year,
+    toDraftPublicationStatus(group.publicationStatus),
+    group.visibleFromUtc ?? "",
+    group.visibleToUtc ?? "",
+    memberKey,
+    slotKey,
+  ].join(":");
 }
 
 function buildAvailabilityEditorSnapshot({
@@ -245,16 +305,59 @@ function buildAvailabilityEditorSnapshot({
   year,
   selectedEmployeeIds,
   cellMap,
-}: Pick<AvailabilityEditorState, "name" | "month" | "year" | "selectedEmployeeIds" | "cellMap">) {
+  publicationStatus,
+  visibleFrom,
+  visibleTo,
+}: Pick<
+  AvailabilityEditorState,
+  "name" | "month" | "year" | "selectedEmployeeIds" | "cellMap" | "publicationStatus" | "visibleFrom" | "visibleTo"
+>) {
   const sanitizedCellMap = sanitizeAvailabilityCellMap(cellMap, selectedEmployeeIds, year, month);
 
   return stableSerialize({
     name,
     month,
     year,
+    publicationStatus,
+    visibleFrom,
+    visibleTo,
     selectedEmployeeIds,
     cellMap: Object.entries(sanitizedCellMap).sort(([leftKey], [rightKey]) => leftKey.localeCompare(rightKey)),
   });
+}
+
+function validatePublicationFields({
+  publicationStatus,
+  visibleFrom,
+  visibleTo,
+}: Pick<AvailabilityEditorState, "publicationStatus" | "visibleFrom" | "visibleTo">) {
+  const errors: AvailabilityEditorPublicationErrors = {};
+  const visibleFromDate = visibleFrom ? new Date(visibleFrom) : null;
+  const visibleToDate = visibleTo ? new Date(visibleTo) : null;
+
+  if (publicationStatus === "public") {
+    if (!visibleFrom) {
+      errors.visibleFrom = "Publication start is required.";
+    }
+
+    if (!visibleTo) {
+      errors.visibleTo = "Publication end is required.";
+    }
+  }
+
+  if (visibleFrom && (!visibleFromDate || Number.isNaN(visibleFromDate.getTime()))) {
+    errors.visibleFrom = "Use a valid publication start.";
+  }
+
+  if (visibleTo && (!visibleToDate || Number.isNaN(visibleToDate.getTime()))) {
+    errors.visibleTo = "Use a valid publication end.";
+  }
+
+  if (visibleFromDate && visibleToDate && visibleFromDate > visibleToDate) {
+    errors.visibleTo = "Publication end must be after publication start.";
+  }
+
+  return errors;
 }
 
 function hasPendingBindDraftChanges(bindRows: EditableAvailabilityBind[]) {
@@ -336,11 +439,15 @@ export function AvailabilityEditPage() {
     name,
     month,
     year,
+    publicationStatus,
+    visibleFrom,
+    visibleTo,
     selectedEmployeeId,
     selectedEmployeeIds,
     cellMap,
     cellErrors,
     informationErrors,
+    publicationErrors,
     employeeError,
     editorError,
   } = editorState;
@@ -377,6 +484,7 @@ export function AvailabilityEditPage() {
         employeeId,
         memberId: member?.id ?? null,
         displayOrder: member?.displayOrder ?? index,
+        employeeLastModifiedAtUtc: member?.employeeLastModifiedAtUtc ?? null,
         label: employeeNameById.get(employeeId) ?? `Employee #${employeeId}`,
       };
     });
@@ -414,10 +522,13 @@ export function AvailabilityEditPage() {
         name,
         month,
         year,
+        publicationStatus,
+        visibleFrom,
+        visibleTo,
         selectedEmployeeIds,
         cellMap,
       }),
-    [cellMap, month, name, selectedEmployeeIds, year],
+    [cellMap, month, name, publicationStatus, selectedEmployeeIds, visibleFrom, visibleTo, year],
   );
   const hasUnsavedChanges = useMemo(() => {
     if (isLoading || hasLoadError) {
@@ -712,6 +823,11 @@ export function AvailabilityEditPage() {
   const handleSave = () => {
     const trimmedName = name.trim();
     const nextInformationErrors: AvailabilityEditorInformationErrors = {};
+    const nextPublicationErrors = validatePublicationFields({
+      publicationStatus,
+      visibleFrom,
+      visibleTo,
+    });
     const nextEmployeeError = selectedEmployeeIds.length === 0 ? "Add at least one employee to the group." : undefined;
 
     if (!trimmedName) {
@@ -736,11 +852,17 @@ export function AvailabilityEditPage() {
     setEditorState((current) => ({
       ...current,
       informationErrors: nextInformationErrors,
+      publicationErrors: nextPublicationErrors,
       employeeError: nextEmployeeError,
       cellErrors: nextCellErrors,
     }));
 
-    if (Object.keys(nextInformationErrors).length > 0 || nextEmployeeError || Object.keys(nextCellErrors).length > 0) {
+    if (
+      Object.keys(nextInformationErrors).length > 0 ||
+      Object.keys(nextPublicationErrors).length > 0 ||
+      nextEmployeeError ||
+      Object.keys(nextCellErrors).length > 0
+    ) {
       setEditorState((current) => ({
         ...current,
         editorError: "Check highlighted fields before saving.",
@@ -760,6 +882,9 @@ export function AvailabilityEditPage() {
           name: trimmedName,
           month,
           year,
+          publicationStatus,
+          visibleFromUtc: toIsoDateTime(visibleFrom),
+          visibleToUtc: toIsoDateTime(visibleTo),
         },
         employeeIds: selectedEmployeeIds,
         cellMap,
@@ -802,6 +927,10 @@ export function AvailabilityEditPage() {
         isHeaderCollapsed={isHeaderCollapsed}
         compactSize={isCompactMatrix}
         informationErrors={informationErrors}
+        publicationStatus={publicationStatus}
+        visibleFrom={visibleFrom}
+        visibleTo={visibleTo}
+        publicationErrors={publicationErrors}
         employeeError={employeeError}
         employees={employees}
         selectedEmployeeId={selectedEmployeeId}
@@ -873,6 +1002,40 @@ export function AvailabilityEditPage() {
                 nextYear,
                 current.month,
               ),
+            };
+          });
+        }}
+        onPublicationStatusChange={value => {
+          setEditorState((current) => ({
+            ...current,
+            publicationStatus: value,
+            publicationErrors: {},
+            editorError: undefined,
+          }));
+        }}
+        onVisibleFromChange={value => {
+          setEditorState((current) => {
+            const nextPublicationErrors = { ...current.publicationErrors };
+            delete nextPublicationErrors.visibleFrom;
+
+            return {
+              ...current,
+              visibleFrom: value,
+              publicationErrors: nextPublicationErrors,
+              editorError: undefined,
+            };
+          });
+        }}
+        onVisibleToChange={value => {
+          setEditorState((current) => {
+            const nextPublicationErrors = { ...current.publicationErrors };
+            delete nextPublicationErrors.visibleTo;
+
+            return {
+              ...current,
+              visibleTo: value,
+              publicationErrors: nextPublicationErrors,
+              editorError: undefined,
             };
           });
         }}

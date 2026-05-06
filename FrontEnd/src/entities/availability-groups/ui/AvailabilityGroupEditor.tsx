@@ -2,12 +2,14 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import type { Employee } from "@entities/employees/model/types";
 import type { AvailabilityMatrixCellMap, AvailabilityMatrixColumn } from "@entities/availability-groups/model/editor";
+import type { AvailabilityPublicationStatus } from "@entities/availability-groups/model/types";
 import { ErrorBanner } from "@shared/ui/components/ErrorBanner";
 import { IosButton } from "@shared/ui/components/IosButton";
 import { SaveIcon } from "@shared/ui/icons";
 import { AvailabilityBindCard } from "./AvailabilityBindCard";
 import { AvailabilityEmployeeCard } from "./AvailabilityEmployeeCard";
 import { AvailabilityInformationCard, type AvailabilityInformationErrors } from "./AvailabilityInformationCard";
+import { AvailabilityPublicationCard, type AvailabilityPublicationErrors } from "./AvailabilityPublicationCard";
 import { AvailabilityScheduleMatrix } from "./AvailabilityScheduleMatrix";
 import { AvailabilitySidebarCollapseButton, AvailabilitySidebarSection } from "./AvailabilitySidebarSection";
 import { AvailabilityWorkspaceLayout } from "./AvailabilityWorkspaceLayout";
@@ -30,6 +32,10 @@ type AvailabilityGroupEditorProps = {
   isHeaderCollapsed?: boolean;
   compactSize?: boolean;
   informationErrors?: AvailabilityInformationErrors;
+  publicationStatus: AvailabilityPublicationStatus;
+  visibleFrom: string;
+  visibleTo: string;
+  publicationErrors?: AvailabilityPublicationErrors;
   employeeError?: string;
   employees: Employee[];
   selectedEmployeeId: number | null;
@@ -50,6 +56,9 @@ type AvailabilityGroupEditorProps = {
   onNameChange: (value: string) => void;
   onMonthChange: (value: number) => void;
   onYearChange: (value: number) => void;
+  onPublicationStatusChange: (value: AvailabilityPublicationStatus) => void;
+  onVisibleFromChange: (value: string) => void;
+  onVisibleToChange: (value: string) => void;
   onSelectedEmployeeIdChange: (value: number | null) => void;
   onSelectedBindChange: (clientId: string | null) => void;
   onBindFieldChange: (clientId: string, patch: Partial<Pick<AvailabilityGroupEditorBindRow, "key" | "value" | "isActive">>) => void;
@@ -63,7 +72,7 @@ type AvailabilityGroupEditorProps = {
   onSave: () => void;
 };
 
-type SidebarSectionKey = "information" | "employee" | "bind";
+type SidebarSectionKey = "information" | "publication" | "employee" | "bind";
 
 function joinClassNames(...values: Array<string | undefined>) {
   return values.filter(Boolean).join(" ");
@@ -99,6 +108,10 @@ export function AvailabilityGroupEditor({
   isHeaderCollapsed = false,
   compactSize = false,
   informationErrors,
+  publicationStatus,
+  visibleFrom,
+  visibleTo,
+  publicationErrors,
   employeeError,
   employees,
   selectedEmployeeId,
@@ -119,6 +132,9 @@ export function AvailabilityGroupEditor({
   onNameChange,
   onMonthChange,
   onYearChange,
+  onPublicationStatusChange,
+  onVisibleFromChange,
+  onVisibleToChange,
   onSelectedEmployeeIdChange,
   onSelectedBindChange,
   onBindFieldChange,
@@ -133,6 +149,7 @@ export function AvailabilityGroupEditor({
 }: AvailabilityGroupEditorProps) {
   const [collapsedSections, setCollapsedSections] = useState<Record<SidebarSectionKey, boolean>>({
     information: false,
+    publication: false,
     employee: false,
     bind: false,
   });
@@ -320,6 +337,24 @@ export function AvailabilityGroupEditor({
               onNameChange={onNameChange}
               onMonthChange={onMonthChange}
               onYearChange={onYearChange}
+            />
+          </AvailabilitySidebarSection>
+
+          <AvailabilitySidebarSection
+            label="Publication"
+            collapsed={collapsedSections.publication}
+            collapsedOffset={allSectionsCollapsed ? "flush" : "default"}
+            onExpand={() => setSectionCollapsed("publication", false)}
+          >
+            <AvailabilityPublicationCard
+              publicationStatus={publicationStatus}
+              visibleFrom={visibleFrom}
+              visibleTo={visibleTo}
+              errors={publicationErrors}
+              headerRightSlot={renderCollapseButton("Publication", "publication")}
+              onPublicationStatusChange={onPublicationStatusChange}
+              onVisibleFromChange={onVisibleFromChange}
+              onVisibleToChange={onVisibleToChange}
             />
           </AvailabilitySidebarSection>
 

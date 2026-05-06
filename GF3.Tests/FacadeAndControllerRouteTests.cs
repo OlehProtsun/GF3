@@ -2,6 +2,7 @@ using System.ComponentModel.DataAnnotations;
 using System.Data;
 using System.Text;
 using BusinessLogicLayer.Common;
+using BusinessLogicLayer.Contracts.Availability;
 using BusinessLogicLayer.Contracts.Database;
 using BusinessLogicLayer.Contracts.Employees;
 using BusinessLogicLayer.Contracts.Enums;
@@ -45,7 +46,7 @@ public sealed class FacadeAndControllerRouteTests
             CreatedEmployee = createdEmployee,
             DeleteResult = DeleteOperationResult.Failure("Blocked."),
         };
-        var facade = new EmployeeFacade(service);
+        var facade = TestEmployeeFacadeFactory.Create(service);
 
         var all = await facade.GetAllAsync(CancellationToken.None);
         var search = await facade.GetByValueAsync("john", CancellationToken.None);
@@ -464,7 +465,7 @@ public sealed class FacadeAndControllerRouteTests
                 Slots = [graphSlot],
             },
         };
-        var controller = new ContainersController(service);
+        var controller = new ContainersController(service, new NoopWorkflowLogService(), new NoopRealtimeNotifier());
         SetHttpContext(controller);
 
         var allResult = await controller.GetAll(CancellationToken.None);
@@ -688,6 +689,15 @@ public sealed class FacadeAndControllerRouteTests
         public Task<List<EmployeeModel>> GetByValueAsync(string value, CancellationToken ct = default)
             => Task.FromResult(SearchEmployees);
 
+        public Task<EmployeeModel> UpdateContactAsync(int employeeId, string? email, string? phone, CancellationToken ct = default)
+        {
+            var updatedEmployee = ExistingEmployee ?? new EmployeeModel { Id = employeeId };
+            updatedEmployee.Email = email;
+            updatedEmployee.Phone = phone;
+            LastUpdatedModel = updatedEmployee;
+            return Task.FromResult(updatedEmployee);
+        }
+
         public Task<DeleteOperationResult> TryDeleteAsync(int id, CancellationToken ct = default)
             => Task.FromResult(DeleteResult);
     }
@@ -804,6 +814,39 @@ public sealed class FacadeAndControllerRouteTests
 
         public Task<(AvailabilityGroupModel group, List<AvailabilityGroupMemberModel> members, List<AvailabilityGroupDayModel> days)> LoadFullAsync(int groupId, CancellationToken ct = default)
             => Task.FromResult((Group ?? new AvailabilityGroupModel(), Members, Slots));
+
+        public Task<List<EmployeeAvailabilityModel>> GetPublishedForEmployeeAsync(int employeeId, DateTimeOffset nowUtc, CancellationToken ct = default)
+            => Task.FromResult(new List<EmployeeAvailabilityModel>());
+
+        public Task<EmployeeAvailabilityModel> GetPublishedForEmployeeByIdAsync(int employeeId, int groupId, DateTimeOffset nowUtc, CancellationToken ct = default)
+            => Task.FromResult(new EmployeeAvailabilityModel
+            {
+                Group = Group ?? new AvailabilityGroupModel(),
+                Member = Members.FirstOrDefault(member => member.EmployeeId == employeeId) ?? new AvailabilityGroupMemberModel(),
+                Days = GetDaysForEmployee(employeeId),
+            });
+
+        public Task<EmployeeAvailabilityModel> SaveEmployeeAvailabilityAsync(
+            int employeeId,
+            int groupId,
+            IList<AvailabilityGroupDayModel> days,
+            DateTimeOffset nowUtc,
+            CancellationToken ct = default)
+            => Task.FromResult(new EmployeeAvailabilityModel
+            {
+                Group = Group ?? new AvailabilityGroupModel(),
+                Member = Members.FirstOrDefault(member => member.EmployeeId == employeeId) ?? new AvailabilityGroupMemberModel(),
+                Days = days.ToList(),
+                CanSubmit = true,
+            });
+
+        private List<AvailabilityGroupDayModel> GetDaysForEmployee(int employeeId)
+        {
+            var member = Members.FirstOrDefault(member => member.EmployeeId == employeeId);
+            return member is null
+                ? []
+                : Slots.Where(slot => slot.AvailabilityGroupMemberId == member.Id).ToList();
+        }
 
         public Task<List<AvailabilityGroupMemberModel>> GetMembersAsync(int groupId, CancellationToken ct = default)
             => Task.FromResult(Members);
@@ -928,6 +971,9 @@ public sealed class FacadeAndControllerRouteTests
 
         public Task<ScheduleModel?> GetGraphByIdAsync(int containerId, int graphId, CancellationToken ct = default)
             => Task.FromResult(Graph?.Id == graphId ? Graph : null);
+
+        public Task<List<ScheduleModel>> GetPublishedGraphsForEmployeeAsync(int employeeId, CancellationToken ct = default)
+            => Task.FromResult(Graph is null ? new List<ScheduleModel>() : [Graph]);
 
         public Task<ScheduleModel> CreateGraphAsync(int containerId, ScheduleModel model, CancellationToken ct = default)
         {

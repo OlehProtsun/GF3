@@ -31,6 +31,11 @@ public interface IContainerService : IBaseService<ContainerModel>
     Task<ScheduleModel?> GetGraphByIdAsync(int containerId, int graphId, CancellationToken ct = default);
 
     /// <summary>
+    /// Returns public graphs assigned to one employee for the employee workflow.
+    /// </summary>
+    Task<List<ScheduleModel>> GetPublishedGraphsForEmployeeAsync(int employeeId, CancellationToken ct = default);
+
+    /// <summary>
     /// Creates a new graph inside the specified container.
     /// </summary>
     Task<ScheduleModel> CreateGraphAsync(int containerId, ScheduleModel model, CancellationToken ct = default);

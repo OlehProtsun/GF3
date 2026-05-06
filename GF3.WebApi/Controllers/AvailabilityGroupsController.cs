@@ -1,5 +1,7 @@
 using BusinessLogicLayer.Services.Abstractions;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using WebApi.Auth;
 using WebApi.Contracts.AvailabilityGroups;
 using WebApi.Contracts.AvailabilityGroups.Members;
 using WebApi.Contracts.AvailabilityGroups.Slots;
@@ -9,6 +11,7 @@ namespace WebApi.Controllers;
 
 [ApiController]
 [Route("api/availability-groups")]
+[Authorize(Roles = AuthRoles.Manager)]
 /// <summary>
 /// HTTP surface for the availability-group aggregate.
 /// The controller deliberately stays thin: it validates route-level existence where needed,

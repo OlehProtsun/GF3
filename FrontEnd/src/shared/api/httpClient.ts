@@ -115,6 +115,15 @@ export function isRequestCanceledError(error: unknown): boolean {
 }
 
 const defaultBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim() || "/api";
+let authAccessToken: string | null = null;
+
+export function setAuthAccessToken(token: string | null) {
+  authAccessToken = token && token.trim().length > 0 ? token.trim() : null;
+}
+
+export function getAuthAccessToken() {
+  return authAccessToken;
+}
 
 function withQueryString(url: string, query?: Record<string, QueryValue>) {
   if (!query) {
@@ -147,6 +156,10 @@ function buildUrl(path: string, query?: Record<string, QueryValue>): string {
   const base = defaultBaseUrl.replace(/\/$/, "");
   const relativePath = path.replace(/^\//, "");
   return withQueryString(`${base}/${relativePath}`, query);
+}
+
+export function buildApiUrl(path: string, query?: Record<string, QueryValue>) {
+  return buildUrl(path, query);
 }
 
 function parseContentDispositionFileName(contentDisposition: string | null): string | null {
@@ -260,6 +273,11 @@ async function executeRequest(path: string, options: RequestOptions = {}): Promi
 
   const headers = new Headers(options.headers);
   headers.set("Accept", responseType === "blob" ? "*/*" : "application/json");
+
+  if (authAccessToken && !headers.has("Authorization")) {
+    headers.set("Authorization", `Bearer ${authAccessToken}`);
+  }
+
   const requestBody = hasBody ? buildRequestBody(options.body, headers) : undefined;
 
   let response: Response;

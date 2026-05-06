@@ -12,6 +12,7 @@ export type AvailabilityMatrixColumn = {
   memberId?: number | null;
   label: string;
   displayOrder?: number | null;
+  employeeLastModifiedAtUtc?: string | null;
 };
 
 export type AvailabilityMatrixCellMap = Record<string, string>;
@@ -220,6 +221,7 @@ export function buildAvailabilityColumns(
       employeeId: member.employeeId,
       memberId: member.id,
       displayOrder: member.displayOrder,
+      employeeLastModifiedAtUtc: member.employeeLastModifiedAtUtc ?? null,
       label: employeeNameById.get(member.employeeId) ?? `Employee #${member.employeeId}`,
     }))
   );
@@ -250,7 +252,10 @@ export function buildAvailabilityColumnsFromItems(
   items: AvailabilityGroupItem[],
   employeeNameById: Map<number, string>
 ): AvailabilityMatrixColumn[] {
-  const memberById = new Map<number, { employeeId: number; memberId: number; displayOrder: number }>();
+  const memberById = new Map<
+    number,
+    { employeeId: number; memberId: number; displayOrder: number; employeeLastModifiedAtUtc: string | null }
+  >();
 
   items.forEach(item => {
     if (!memberById.has(item.memberId)) {
@@ -258,6 +263,7 @@ export function buildAvailabilityColumnsFromItems(
         employeeId: item.employeeId,
         memberId: item.memberId,
         displayOrder: item.displayOrder,
+        employeeLastModifiedAtUtc: null,
       });
     }
   });
@@ -268,6 +274,7 @@ export function buildAvailabilityColumnsFromItems(
       employeeId: member.employeeId,
       memberId: member.memberId,
       displayOrder: member.displayOrder,
+      employeeLastModifiedAtUtc: member.employeeLastModifiedAtUtc,
       label: employeeNameById.get(member.employeeId) ?? `Employee #${member.employeeId}`,
     }))
   );

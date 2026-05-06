@@ -1,4 +1,4 @@
-import type { Graph } from "./types";
+import type { Graph, GraphPublicationStatus } from "./types";
 import { getGraphVisibleNote } from "./graphNote";
 
 const SHIFT_TIME_PATTERN = /^(\d{1,2}):(\d{2})\s*-\s*(\d{1,2}):(\d{2})$/;
@@ -8,6 +8,7 @@ export type ContainerGraphFormState = {
   shopId: string;
   year: string;
   month: string;
+  publicationStatus: GraphPublicationStatus;
   peoplePerShift: string;
   shift1Time: string;
   shift2Time: string;
@@ -30,6 +31,7 @@ export function createInitialGraphForm(defaultShopId?: number | null): Container
     shopId: defaultShopId ? String(defaultShopId) : "",
     year: String(today.getFullYear()),
     month: String(today.getMonth() + 1),
+    publicationStatus: "private",
     peoplePerShift: "1",
     shift1Time: "06:00 - 14:00",
     shift2Time: "14:00 - 22:00",
@@ -48,6 +50,7 @@ export function createGraphFormFromGraph(graph: Graph): ContainerGraphFormState 
     shopId: String(graph.shopId),
     year: String(graph.year),
     month: String(graph.month),
+    publicationStatus: graph.publicationStatus === "public" ? "public" : "private",
     peoplePerShift: String(graph.peoplePerShift),
     shift1Time: graph.shift1Time,
     shift2Time: graph.shift2Time,

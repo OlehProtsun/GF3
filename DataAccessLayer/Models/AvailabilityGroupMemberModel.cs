@@ -41,6 +41,13 @@ public class AvailabilityGroupMemberModel
     public int DisplayOrder { get; set; }
 
     /// <summary>
+    /// Last moment this member's availability was changed from the employee self-service workflow.
+    /// Manager edits do not update this value.
+    /// </summary>
+    [Column("employee_last_modified_at_utc")]
+    public DateTimeOffset? EmployeeLastModifiedAtUtc { get; set; }
+
+    /// <summary>
     /// Day-level availability entries for the member.
     /// </summary>
     public ICollection<AvailabilityGroupDayModel> Days { get; set; } = new List<AvailabilityGroupDayModel>();

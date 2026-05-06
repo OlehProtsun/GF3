@@ -29,4 +29,15 @@ public sealed class SaveEmployeeRequest
     /// Optional contact email address.
     /// </summary>
     public string? Email { get; set; }
+
+    /// <summary>
+    /// Optional login name for the employee account.
+    /// </summary>
+    public string? Username { get; set; }
+
+    /// <summary>
+    /// Optional plain-text password used only during create/reset flows.
+    /// The password is hashed before it reaches the database.
+    /// </summary>
+    public string? Password { get; set; }
 }

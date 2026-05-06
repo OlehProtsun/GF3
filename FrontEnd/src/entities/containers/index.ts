@@ -13,6 +13,7 @@ export * from "./ui/ContainerListCard";
 export * from "./ui/ContainerDetailsForm";
 export * from "./ui/ContainerGraphDetailsForm";
 export * from "./ui/ContainerGraphMatrix";
+export * from "./ui/ContainerGraphManualColumnsCard";
 export * from "./ui/ContainerGraphProfileWorkspace";
 export * from "./ui/ContainerGraphEditor";
 export * from "./ui/ContainerGraphSessionTabs";

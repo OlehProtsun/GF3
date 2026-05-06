@@ -16,6 +16,7 @@ export function EmployeeListPage() {
   const [query, setQuery] = useState("");
   const employeesQuery = useEmployeesQuery(query, location.key);
   const employees = employeesQuery.data ?? [];
+  const onlineCount = employees.filter(employee => employee.isOnline).length;
 
   const handleAddEmployee = useCallback(() => {
     navigate("/employee/new");
@@ -37,7 +38,7 @@ export function EmployeeListPage() {
         rightSlot={
           <IosButton label="Add New" icon={<PlusIcon size={18} />} onClick={handleAddEmployee} />
         }
-        searchMeta={`Total: ${employees.length}`}
+        searchMeta={`Total: ${employees.length} | Online: ${onlineCount}`}
         search={{
           value: query,
           onChange: setQuery,

@@ -119,6 +119,20 @@ public class ContainerService : IContainerService
         return graph?.ToContract();
     }
 
+    public async Task<List<ScheduleModel>> GetPublishedGraphsForEmployeeAsync(int employeeId, CancellationToken ct = default)
+    {
+        if (employeeId <= 0)
+        {
+            throw ValidationException.ForField(nameof(employeeId), "Employee is required.");
+        }
+
+        return (await _scheduleRepo
+                .GetPublishedForEmployeeAsync(employeeId, ServiceMappingHelper.NormalizeReadCancellationToken(ct))
+                .ConfigureAwait(false))
+            .Select(x => x.ToContract())
+            .ToList();
+    }
+
     public async Task<ScheduleModel> CreateGraphAsync(int containerId, ScheduleModel model, CancellationToken ct = default)
     {
         await EnsureContainerExistsAsync(containerId, ct).ConfigureAwait(false);

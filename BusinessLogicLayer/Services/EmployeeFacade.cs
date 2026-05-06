@@ -13,32 +13,70 @@ namespace BusinessLogicLayer.Services;
 public sealed class EmployeeFacade : IEmployeeFacade
 {
     private readonly IEmployeeService _employeeService;
+    private readonly IEmployeeAccountService _employeeAccountService;
+    private readonly IEmployeePresenceService _employeePresenceService;
 
-    public EmployeeFacade(IEmployeeService employeeService)
+    public EmployeeFacade(
+        IEmployeeService employeeService,
+        IEmployeeAccountService employeeAccountService,
+        IEmployeePresenceService employeePresenceService)
     {
         _employeeService = employeeService;
+        _employeeAccountService = employeeAccountService;
+        _employeePresenceService = employeePresenceService;
     }
 
     public async Task<IReadOnlyList<EmployeeDto>> GetAllAsync(CancellationToken ct = default)
-        => (await _employeeService.GetAllAsync(ct).ConfigureAwait(false)).Select(MapToDto).ToList();
+    {
+        var employees = await _employeeService.GetAllAsync(ct).ConfigureAwait(false);
+        var accountMap = await _employeeAccountService
+            .GetByEmployeeIdsAsync(employees.Select(employee => employee.Id), ct)
+            .ConfigureAwait(false);
+        var onlineStateMap = _employeePresenceService.GetOnlineStates(employees.Select(employee => employee.Id));
+
+        return employees.Select(employee => MapToDto(employee, GetAccount(accountMap, employee.Id), onlineStateMap)).ToList();
+    }
 
     public async Task<IReadOnlyList<EmployeeDto>> GetByValueAsync(string value, CancellationToken ct = default)
-        => (await _employeeService.GetByValueAsync(value, ct).ConfigureAwait(false)).Select(MapToDto).ToList();
+    {
+        var employees = await _employeeService.GetByValueAsync(value, ct).ConfigureAwait(false);
+        var accountMap = await _employeeAccountService
+            .GetByEmployeeIdsAsync(employees.Select(employee => employee.Id), ct)
+            .ConfigureAwait(false);
+        var onlineStateMap = _employeePresenceService.GetOnlineStates(employees.Select(employee => employee.Id));
+
+        return employees.Select(employee => MapToDto(employee, GetAccount(accountMap, employee.Id), onlineStateMap)).ToList();
+    }
 
     public async Task<EmployeeDto?> GetAsync(int id, CancellationToken ct = default)
     {
         var model = await _employeeService.GetAsync(id, ct).ConfigureAwait(false);
-        return model is null ? null : MapToDto(model);
+        if (model is null)
+        {
+            return null;
+        }
+
+        var account = await _employeeAccountService.GetByEmployeeIdAsync(id, ct).ConfigureAwait(false);
+        return MapToDto(model, account, _employeePresenceService.IsEmployeeOnline(id));
     }
 
     public async Task<EmployeeDto> CreateAsync(SaveEmployeeRequest request, CancellationToken ct = default)
     {
         var created = await _employeeService.CreateAsync(MapToModel(request), ct).ConfigureAwait(false);
-        return MapToDto(created);
+        var account = await _employeeAccountService
+            .UpsertForEmployeeAsync(created.Id, request.Username, request.Password, ct)
+            .ConfigureAwait(false);
+
+        return MapToDto(created, account, false);
     }
 
-    public Task UpdateAsync(SaveEmployeeRequest request, CancellationToken ct = default)
-        => _employeeService.UpdateAsync(MapToModel(request), ct);
+    public async Task UpdateAsync(SaveEmployeeRequest request, CancellationToken ct = default)
+    {
+        await _employeeService.UpdateAsync(MapToModel(request), ct).ConfigureAwait(false);
+        await _employeeAccountService
+            .UpsertForEmployeeAsync(request.Id, request.Username, request.Password, ct)
+            .ConfigureAwait(false);
+    }
 
     public Task DeleteAsync(int id, CancellationToken ct = default)
         => _employeeService.DeleteAsync(id, ct);
@@ -46,13 +84,26 @@ public sealed class EmployeeFacade : IEmployeeFacade
     public Task<DeleteOperationResult> TryDeleteAsync(int id, CancellationToken ct = default)
         => _employeeService.TryDeleteAsync(id, ct);
 
-    private static EmployeeDto MapToDto(EmployeeModel model) => new()
+    private static EmployeeDto MapToDto(
+        EmployeeModel model,
+        EmployeeAccountModel? account,
+        IReadOnlyDictionary<int, bool> onlineStateMap)
+        => MapToDto(
+            model,
+            account,
+            onlineStateMap.TryGetValue(model.Id, out var isOnline) && isOnline);
+
+    private static EmployeeDto MapToDto(EmployeeModel model, EmployeeAccountModel? account, bool isOnline) => new()
     {
         Id = model.Id,
         FirstName = model.FirstName,
         LastName = model.LastName,
         Phone = model.Phone,
-        Email = model.Email
+        Email = model.Email,
+        Username = account?.Username,
+        HasLoginAccount = account is not null,
+        IsOnline = account is not null && isOnline,
+        LastLoginAtUtc = account?.LastLoginAtUtc,
     };
 
     private static EmployeeModel MapToModel(SaveEmployeeRequest request) => new()
@@ -63,4 +114,7 @@ public sealed class EmployeeFacade : IEmployeeFacade
         Phone = request.Phone,
         Email = request.Email
     };
+
+    private static EmployeeAccountModel? GetAccount(IReadOnlyDictionary<int, EmployeeAccountModel> accountMap, int employeeId)
+        => accountMap.TryGetValue(employeeId, out var account) ? account : null;
 }

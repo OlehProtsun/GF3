@@ -6,6 +6,7 @@ export { AvailabilityGroupListCard } from "./AvailabilityGroupListCard";
 export { AvailabilityGroupProfileCard } from "./AvailabilityGroupProfileCard";
 export { AvailabilityGroupSummaryCard } from "./AvailabilityGroupSummaryCard";
 export { AvailabilityInformationCard } from "./AvailabilityInformationCard";
+export { AvailabilityPublicationCard } from "./AvailabilityPublicationCard";
 export { AvailabilityProfileInfoCard } from "./AvailabilityProfileInfoCard";
 export { AvailabilityScheduleMatrix } from "./AvailabilityScheduleMatrix";
 export { AvailabilitySidebarCollapseButton, AvailabilitySidebarSection } from "./AvailabilitySidebarSection";

@@ -1,5 +1,6 @@
 using System.Text;
 using BusinessLogicLayer.Common;
+using BusinessLogicLayer.Contracts.Availability;
 using BusinessLogicLayer.Contracts.Models;
 using BusinessLogicLayer.Contracts.Shops;
 using BusinessLogicLayer.Generators;
@@ -151,7 +152,7 @@ public sealed class DeepBusinessAndControllerCoverageTests
             }
         };
 
-        var controller = new ContainersController(service);
+        var controller = new ContainersController(service, new NoopWorkflowLogService(), new NoopRealtimeNotifier());
         SetHttpContext(controller);
 
         var deleteResult = await controller.Delete(1, CancellationToken.None);
@@ -189,7 +190,7 @@ public sealed class DeepBusinessAndControllerCoverageTests
             ]
         };
 
-        var controller = new ContainersController(service);
+        var controller = new ContainersController(service, new NoopWorkflowLogService(), new NoopRealtimeNotifier());
         SetHttpContext(controller);
 
         var getById = await controller.GetById(1, CancellationToken.None);
@@ -507,6 +508,9 @@ public sealed class DeepBusinessAndControllerCoverageTests
         public Task<ScheduleModel?> GetGraphByIdAsync(int containerId, int graphId, CancellationToken ct = default)
             => Task.FromResult(Graphs.FirstOrDefault(graph => graph.Id == graphId && graph.ContainerId == containerId));
 
+        public Task<List<ScheduleModel>> GetPublishedGraphsForEmployeeAsync(int employeeId, CancellationToken ct = default)
+            => Task.FromResult(Graphs);
+
         public Task<ScheduleModel> CreateGraphAsync(int containerId, ScheduleModel model, CancellationToken ct = default)
             => Task.FromResult(model);
 
@@ -605,6 +609,39 @@ public sealed class DeepBusinessAndControllerCoverageTests
         public Task<(AvailabilityGroupModel group, List<AvailabilityGroupMemberModel> members, List<AvailabilityGroupDayModel> days)> LoadFullAsync(int groupId, CancellationToken ct = default)
             => Task.FromResult((_group, _members, _days));
 
+        public Task<List<EmployeeAvailabilityModel>> GetPublishedForEmployeeAsync(int employeeId, DateTimeOffset nowUtc, CancellationToken ct = default)
+            => Task.FromResult(new List<EmployeeAvailabilityModel>());
+
+        public Task<EmployeeAvailabilityModel> GetPublishedForEmployeeByIdAsync(int employeeId, int groupId, DateTimeOffset nowUtc, CancellationToken ct = default)
+            => Task.FromResult(new EmployeeAvailabilityModel
+            {
+                Group = _group,
+                Member = _members.FirstOrDefault(member => member.EmployeeId == employeeId) ?? new AvailabilityGroupMemberModel(),
+                Days = GetDaysForEmployee(employeeId),
+            });
+
+        public Task<EmployeeAvailabilityModel> SaveEmployeeAvailabilityAsync(
+            int employeeId,
+            int groupId,
+            IList<AvailabilityGroupDayModel> days,
+            DateTimeOffset nowUtc,
+            CancellationToken ct = default)
+            => Task.FromResult(new EmployeeAvailabilityModel
+            {
+                Group = _group,
+                Member = _members.FirstOrDefault(member => member.EmployeeId == employeeId) ?? new AvailabilityGroupMemberModel(),
+                Days = days.ToList(),
+                CanSubmit = true,
+            });
+
+        private List<AvailabilityGroupDayModel> GetDaysForEmployee(int employeeId)
+        {
+            var member = _members.FirstOrDefault(member => member.EmployeeId == employeeId);
+            return member is null
+                ? []
+                : _days.Where(day => day.AvailabilityGroupMemberId == member.Id).ToList();
+        }
+
         public Task<List<AvailabilityGroupMemberModel>> GetMembersAsync(int groupId, CancellationToken ct = default)
             => Task.FromResult(_members);
 
@@ -656,6 +693,13 @@ public sealed class DeepBusinessAndControllerCoverageTests
 
         public Task<List<EmployeeModel>> GetByValueAsync(string value, CancellationToken ct = default)
             => Task.FromResult(new List<EmployeeModel>());
+
+        public Task<EmployeeModel> UpdateContactAsync(int employeeId, string? email, string? phone, CancellationToken ct = default)
+        {
+            _employee.Email = email;
+            _employee.Phone = phone;
+            return Task.FromResult(_employee);
+        }
 
         public Task<DeleteOperationResult> TryDeleteAsync(int id, CancellationToken ct = default)
             => Task.FromResult(DeleteOperationResult.Success());

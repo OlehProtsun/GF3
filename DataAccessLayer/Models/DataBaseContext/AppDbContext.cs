@@ -13,6 +13,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
 {
     public DbSet<ContainerModel> Containers => Set<ContainerModel>();
     public DbSet<EmployeeModel> Employees => Set<EmployeeModel>();
+    public DbSet<EmployeeAccountModel> EmployeeAccounts => Set<EmployeeAccountModel>();
     public DbSet<ShopModel> Shops => Set<ShopModel>();
     public DbSet<ScheduleModel> Schedules => Set<ScheduleModel>();
     public DbSet<SchedulePresetModel> SchedulePresets => Set<SchedulePresetModel>();
@@ -20,6 +21,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<ScheduleEmployeeModel> ScheduleEmployees => Set<ScheduleEmployeeModel>();
     public DbSet<ScheduleSlotModel> ScheduleSlots => Set<ScheduleSlotModel>();
     public DbSet<ScheduleCellStyleModel> ScheduleCellStyles => Set<ScheduleCellStyleModel>();
+    public DbSet<ShiftSwapRequestModel> ShiftSwapRequests => Set<ShiftSwapRequestModel>();
+    public DbSet<WorkflowLogEntryModel> WorkflowLogEntries => Set<WorkflowLogEntryModel>();
     public DbSet<BindModel> AvailabilityBinds => Set<BindModel>();
     public DbSet<AvailabilityGroupModel> AvailabilityGroups => Set<AvailabilityGroupModel>();
     public DbSet<AvailabilityGroupMemberModel> AvailabilityGroupMembers => Set<AvailabilityGroupMemberModel>();
@@ -29,6 +32,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     {
         ConfigureContainer(modelBuilder);
         ConfigureEmployee(modelBuilder);
+        ConfigureEmployeeAccount(modelBuilder);
         ConfigureShop(modelBuilder);
         ConfigureSchedule(modelBuilder);
         ConfigureSchedulePreset(modelBuilder);
@@ -36,6 +40,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         ConfigureScheduleEmployee(modelBuilder);
         ConfigureScheduleSlot(modelBuilder);
         ConfigureScheduleCellStyle(modelBuilder);
+        ConfigureShiftSwapRequest(modelBuilder);
+        ConfigureWorkflowLogEntry(modelBuilder);
         ConfigureAvailabilityBind(modelBuilder);
         ConfigureAvailabilityGroup(modelBuilder);
         ConfigureAvailabilityGroupMember(modelBuilder);
@@ -57,9 +63,42 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         {
             entity.Property(property => property.FirstName).IsRequired();
             entity.Property(property => property.LastName).IsRequired();
+            entity.Property(property => property.Email).IsRequired(false);
             entity.HasIndex(property => new { property.FirstName, property.LastName })
                 .IsUnique()
                 .HasDatabaseName("ux_employee_full_name");
+
+            entity.HasOne(property => property.Account)
+                .WithOne(account => account.Employee)
+                .HasForeignKey<EmployeeAccountModel>(account => account.EmployeeId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+    }
+
+    private static void ConfigureEmployeeAccount(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<EmployeeAccountModel>(entity =>
+        {
+            entity.Property(property => property.Username)
+                .IsRequired()
+                .HasMaxLength(100)
+                .UseCollation("NOCASE");
+
+            entity.Property(property => property.PasswordHash).IsRequired();
+            entity.Property(property => property.PasswordUpdatedAtUtc).IsRequired();
+            entity.Property(property => property.LastLoginAtUtc).IsRequired(false);
+            entity.Property(property => property.LastSeenAtUtc).IsRequired(false);
+            entity.Property(property => property.PasswordResetCodeHash).IsRequired(false);
+            entity.Property(property => property.PasswordResetRequestedAtUtc).IsRequired(false);
+            entity.Property(property => property.PasswordResetExpiresAtUtc).IsRequired(false);
+
+            entity.HasIndex(property => property.EmployeeId)
+                .IsUnique()
+                .HasDatabaseName("ux_employee_account_employee");
+
+            entity.HasIndex(property => property.Username)
+                .IsUnique()
+                .HasDatabaseName("ux_employee_account_username");
         });
     }
 
@@ -99,8 +138,12 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             entity.HasIndex(schedule => new { schedule.ShopId, schedule.Year, schedule.Month }).HasDatabaseName("ix_sched_shop_month");
             entity.HasIndex(schedule => new { schedule.ContainerId, schedule.ShopId }).HasDatabaseName("ix_sched_container_shop");
             entity.HasIndex(schedule => schedule.AvailabilityGroupId).HasDatabaseName("ix_sched_avail_group");
+            entity.HasIndex(schedule => schedule.PublicationStatus).HasDatabaseName("ix_sched_publication_status");
 
             entity.Property(schedule => schedule.Note).IsRequired(false);
+            entity.Property(schedule => schedule.PublicationStatus)
+                .HasConversion<string>()
+                .HasDefaultValue(SchedulePublicationStatus.Private);
 
             entity.ToTable(table =>
             {
@@ -277,6 +320,70 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         });
     }
 
+    private static void ConfigureShiftSwapRequest(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<ShiftSwapRequestModel>(entity =>
+        {
+            entity.HasOne(request => request.Schedule)
+                .WithMany()
+                .HasForeignKey(request => request.ScheduleId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(request => request.ScheduleSlot)
+                .WithMany()
+                .HasForeignKey(request => request.ScheduleSlotId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(request => request.FromEmployee)
+                .WithMany()
+                .HasForeignKey(request => request.FromEmployeeId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(request => request.TargetEmployee)
+                .WithMany()
+                .HasForeignKey(request => request.TargetEmployeeId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(request => request.AcceptedByEmployee)
+                .WithMany()
+                .HasForeignKey(request => request.AcceptedByEmployeeId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.Property(request => request.Visibility)
+                .HasConversion<string>()
+                .HasDefaultValue(ShiftSwapVisibility.Public);
+
+            entity.Property(request => request.Status)
+                .HasConversion<string>()
+                .HasDefaultValue(ShiftSwapStatus.Open);
+
+            entity.Property(request => request.OfferedFromTime).IsRequired(false);
+            entity.Property(request => request.OfferedToTime).IsRequired(false);
+            entity.Property(request => request.IsManagerCreated)
+                .HasDefaultValue(false);
+            entity.Property(request => request.ManualColumnId).IsRequired(false);
+            entity.Property(request => request.CreatedAtUtc).IsRequired();
+            entity.Property(request => request.AcceptedAtUtc).IsRequired(false);
+            entity.Property(request => request.CancelledAtUtc).IsRequired(false);
+
+            entity.HasIndex(request => new { request.ScheduleSlotId, request.Status })
+                .IsUnique()
+                .HasDatabaseName("ux_shift_swap_open_slot")
+                .HasFilter("status = 'Open'");
+        });
+    }
+
+    private static void ConfigureWorkflowLogEntry(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<WorkflowLogEntryModel>(entity =>
+        {
+            entity.Property(log => log.OccurredAtUtc).IsRequired();
+            entity.Property(log => log.ActorRole).IsRequired().HasMaxLength(32);
+            entity.Property(log => log.ActorName).IsRequired().HasMaxLength(160);
+            entity.Property(log => log.Action).IsRequired().HasMaxLength(512);
+        });
+    }
+
     private static void ConfigureAvailabilityBind(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<BindModel>(entity =>
@@ -292,9 +399,17 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         modelBuilder.Entity<AvailabilityGroupModel>(entity =>
         {
             entity.Property(group => group.Name).IsRequired();
+            entity.Property(group => group.PublicationStatus)
+                .HasConversion<string>()
+                .HasDefaultValue(AvailabilityPublicationStatus.Private);
+            entity.Property(group => group.VisibleFromUtc).IsRequired(false);
+            entity.Property(group => group.VisibleToUtc).IsRequired(false);
+
             entity.HasIndex(group => new { group.Year, group.Month, group.Name })
                 .IsUnique()
                 .HasDatabaseName("ux_avail_group_year_month_name");
+            entity.HasIndex(group => new { group.PublicationStatus, group.VisibleFromUtc, group.VisibleToUtc })
+                .HasDatabaseName("ix_avail_group_publication_visibility");
 
             entity.ToTable(table =>
             {
@@ -319,6 +434,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
 
             entity.Property(member => member.DisplayOrder)
                 .HasDefaultValue(0);
+            entity.Property(member => member.EmployeeLastModifiedAtUtc)
+                .IsRequired(false);
 
             entity.HasIndex(member => new { member.AvailabilityGroupId, member.EmployeeId })
                 .IsUnique()

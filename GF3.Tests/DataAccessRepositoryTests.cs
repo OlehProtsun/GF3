@@ -293,6 +293,77 @@ public sealed class DataAccessRepositoryTests
     }
 
     [Fact]
+    public async Task ScheduleSlotRepository_ReplaceForSchedule_PreservesOpenManagerManualOffer()
+    {
+        await using var database = await SqliteTestDatabase.CreateAsync();
+        await using var context = database.CreateContext();
+
+        var container = TestDataFactory.CreateDalContainer();
+        var shop = TestDataFactory.CreateDalShop();
+        var employee = TestDataFactory.CreateDalEmployee();
+        context.AddRange(container, shop, employee);
+        await context.SaveChangesAsync();
+
+        var schedule = TestDataFactory.CreateDalSchedule(container.Id, shop.Id);
+        context.Schedules.Add(schedule);
+        await context.SaveChangesAsync();
+
+        var protectedManualSlot = TestDataFactory.CreateDalSlot(schedule.Id, 3, 2, null, "10:00", "14:00");
+        context.ScheduleSlots.Add(protectedManualSlot);
+        await context.SaveChangesAsync();
+
+        context.ShiftSwapRequests.Add(new DataAccessLayer.Models.ShiftSwapRequestModel
+        {
+            ScheduleId = schedule.Id,
+            ScheduleSlotId = protectedManualSlot.Id,
+            OfferedFromTime = protectedManualSlot.FromTime,
+            OfferedToTime = protectedManualSlot.ToTime,
+            FromEmployeeId = null,
+            TargetEmployeeId = null,
+            Visibility = DalEnums.ShiftSwapVisibility.Public,
+            Status = DalEnums.ShiftSwapStatus.Open,
+            IsManagerCreated = true,
+            ManualColumnId = 101,
+            CreatedAtUtc = DateTimeOffset.UtcNow,
+        });
+        await context.SaveChangesAsync();
+
+        var repository = new ScheduleSlotRepository(context);
+        await repository.ReplaceForScheduleAsync(
+            schedule.Id,
+            [
+                new DataAccessLayer.Models.ScheduleSlotModel
+                {
+                    Id = protectedManualSlot.Id,
+                    ScheduleId = schedule.Id,
+                    DayOfMonth = protectedManualSlot.DayOfMonth,
+                    SlotNo = protectedManualSlot.SlotNo,
+                    EmployeeId = null,
+                    Status = protectedManualSlot.Status,
+                    FromTime = protectedManualSlot.FromTime,
+                    ToTime = protectedManualSlot.ToTime,
+                },
+                TestDataFactory.CreateDalSlot(schedule.Id, 3, 1, employee.Id, "10:00", "14:00"),
+                TestDataFactory.CreateDalSlot(schedule.Id, 4, 1, employee.Id, "08:00", "12:00"),
+            ],
+            overwrite: true);
+
+        var slots = await context.ScheduleSlots
+            .AsNoTracking()
+            .Where(slot => slot.ScheduleId == schedule.Id)
+            .OrderBy(slot => slot.DayOfMonth)
+            .ThenBy(slot => slot.SlotNo)
+            .ToListAsync();
+        var swap = await context.ShiftSwapRequests.AsNoTracking().SingleAsync();
+
+        Assert.Contains(slots, slot => slot.Id == protectedManualSlot.Id && slot.EmployeeId is null);
+        Assert.Equal(3, slots.Count);
+        Assert.Equal(protectedManualSlot.Id, swap.ScheduleSlotId);
+        Assert.Equal(DalEnums.ShiftSwapStatus.Open, swap.Status);
+        Assert.Equal([1, 2], slots.Where(slot => slot.DayOfMonth == 3).Select(slot => slot.SlotNo).ToArray());
+    }
+
+    [Fact]
     public async Task AvailabilityGroupDayRepository_AddRangeDeleteByMemberIdAndGetByGroup_Work()
     {
         await using var database = await SqliteTestDatabase.CreateAsync();

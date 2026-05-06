@@ -1,0 +1,267 @@
+.profilePanel {
+  gap: 1rem;
+  padding: clamp(1rem, 3vw, 1.25rem);
+  border-radius: 36px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.82), rgba(255, 255, 255, 0.68)),
+    rgba(252, 253, 252, 0.88);
+  border-color: rgba(255, 255, 255, 0.72);
+  box-shadow:
+    0 30px 84px rgba(15, 23, 42, 0.1),
+    0 1px 0 rgba(255, 255, 255, 0.76) inset;
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+}
+
+.profileButton {
+  --ios-button-height: 42px;
+  --ios-button-radius: 20px;
+  --ios-button-padding-inline: 1rem;
+  --ios-button-font-size: 0.94rem;
+  min-width: 112px;
+  font-weight: 800;
+}
+
+.panelHeader {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  padding: clamp(1rem, 3vw, 1.25rem);
+  border: 1px solid rgba(226, 232, 240, 0.76);
+  border-radius: 30px;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.96), rgba(248, 250, 252, 0.78)),
+    rgba(255, 255, 255, 0.82);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.84) inset;
+}
+
+.panelIntro {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
+.profileSummaryBlock {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px;
+}
+
+.headerActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.contentGrid {
+  display: grid;
+  gap: 1rem;
+}
+
+.infoGrid {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.infoCard,
+.passwordCard {
+  display: grid;
+  gap: 10px;
+  padding: clamp(0.95rem, 2.5vw, 1.1rem);
+  border-radius: 28px;
+  border: 1px solid rgba(226, 232, 240, 0.72);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(248, 250, 252, 0.72)),
+    rgba(255, 255, 255, 0.78);
+  box-shadow:
+    0 12px 30px rgba(15, 23, 42, 0.05),
+    0 1px 0 rgba(255, 255, 255, 0.84) inset;
+}
+
+.cardLabel,
+.fieldLabel {
+  color: #64748b;
+  font-size: 0.74rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.cardValue {
+  color: #0f172a;
+  font-size: 1rem;
+  line-height: 1.35;
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+
+.field {
+  display: grid;
+  gap: 8px;
+}
+
+.input {
+  width: 100%;
+  min-height: 50px;
+  box-sizing: border-box;
+  padding: 0.82rem 1rem;
+  border-radius: 22px;
+  border: 1px solid rgba(209, 213, 219, 0.86);
+  background: rgba(244, 246, 248, 0.92);
+  color: #0f172a;
+  font: inherit;
+  outline: none;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.82) inset;
+  transition:
+    border-color 0.18s ease,
+    box-shadow 0.18s ease,
+    background 0.18s ease;
+}
+
+.input:focus {
+  border-color: rgba(37, 99, 235, 0.36);
+  box-shadow:
+    0 0 0 4px rgba(37, 99, 235, 0.1),
+    0 1px 0 rgba(255, 255, 255, 0.86) inset;
+  background: #ffffff;
+}
+
+.passwordHeader {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.passwordTitle {
+  display: block;
+  color: #0f172a;
+  font-size: 1rem;
+  line-height: 1.25;
+  font-weight: 900;
+}
+
+.passwordHint {
+  display: inline-flex;
+  align-items: center;
+  min-height: 34px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: rgba(219, 234, 254, 0.72);
+  border: 1px solid rgba(59, 130, 246, 0.16);
+  color: #1d4ed8;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.passwordText,
+.passwordMeta,
+.passwordReadonly {
+  color: #475569;
+  line-height: 1.55;
+}
+
+.passwordActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.passwordFormGrid {
+  display: grid;
+  gap: 12px;
+}
+
+.passwordNotice,
+.successBanner {
+  padding: 0.86rem 1rem;
+  border-radius: 22px;
+  border: 1px solid rgba(59, 130, 246, 0.16);
+  background: rgba(239, 246, 255, 0.94);
+  color: #1d4ed8;
+  font-weight: 700;
+}
+
+.errorBanner {
+  margin-bottom: 0;
+}
+
+.panelFooter {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 12px;
+  padding: clamp(0.85rem, 2.5vw, 1rem);
+  border: 1px solid rgba(226, 232, 240, 0.72);
+  border-radius: 30px;
+  background: rgba(255, 255, 255, 0.7);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.78) inset;
+}
+
+.panelFooterEditing {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: stretch;
+}
+
+.footerPrimaryActions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+  width: 100%;
+}
+
+.logoutButton {
+  justify-self: start;
+}
+
+@media (min-width: 720px) {
+  .contentGrid {
+    grid-template-columns: minmax(0, 1fr) minmax(320px, 0.95fr);
+    align-items: start;
+  }
+
+  .infoGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .profilePanel {
+    padding: 0.78rem;
+    border-radius: 28px;
+  }
+
+  .panelHeader,
+  .panelFooter {
+    border-radius: 24px;
+  }
+
+  .infoCard,
+  .passwordCard {
+    border-radius: 24px;
+  }
+
+  .footerPrimaryActions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: stretch;
+  }
+
+  .footerPrimaryActions :global(button) {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .logoutButton {
+    width: 100%;
+    justify-self: stretch;
+  }
+}

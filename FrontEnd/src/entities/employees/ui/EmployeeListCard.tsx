@@ -1,12 +1,18 @@
 import type { Employee } from "@entities/employees/model/types";
-import { getEmployeeFullName } from "@entities/employees/model/presentation";
+import {
+  getEmployeeContactState,
+  getEmployeeFullName,
+  getEmployeePresenceTone,
+} from "@entities/employees/model/presentation";
 import { usePinnedRecords } from "@shared/lib/records/usePinnedRecords";
 import { IosButton } from "@shared/ui/components/IosButton";
 import { ListCardSection } from "@shared/ui/components/ListCardSection";
+import { PresenceBadge } from "@shared/ui/components/PresenceBadge";
 import { RecordGrid } from "@shared/ui/components/RecordGrid";
 import type { RecordTileMetaItem } from "@shared/ui/components/RecordTile";
 import { RecordTile } from "@shared/ui/components/RecordTile";
 import { PlusIcon } from "@shared/ui/icons";
+import styles from "./EmployeeListCard.module.css";
 
 type EmployeeListCardProps = {
   employees: Employee[];
@@ -53,11 +59,18 @@ export function EmployeeListCard({
         <IosButton label="Clear Search" variant="secondary" onClick={onClearSearch} />
       }
     >
-      <RecordGrid>
+      <RecordGrid className={styles.grid}>
         {sortedEmployees.map(employee => {
           const fullName = getEmployeeFullName(employee);
           const isPinned = pinnedIdSet.has(String(employee.id));
+          const presenceLabel = getEmployeeContactState(employee, "compact");
+          const presenceTone = getEmployeePresenceTone(employee);
           const metaItems: RecordTileMetaItem[] = [
+            {
+              key: "username",
+              label: "Login",
+              value: employee.username ?? "Not created",
+            },
             {
               key: "email",
               label: "Email",
@@ -74,7 +87,10 @@ export function EmployeeListCard({
             <RecordTile
               key={employee.id}
               title={fullName}
-              badge={`ID ${employee.id}`}
+              headerSlot={<PresenceBadge label={presenceLabel} tone={presenceTone} size="sm" />}
+              badge={`#${employee.id}`}
+              density="compact"
+              metaLayout="stacked"
               metaItems={metaItems}
               isPinned={isPinned}
               onTogglePin={() => togglePin(employee.id)}

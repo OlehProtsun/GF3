@@ -1,4 +1,5 @@
 using DataAccessLayer.Models.DataBaseContext;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace WebApi.Controllers;
@@ -9,6 +10,7 @@ namespace WebApi.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/[controller]")]
+[AllowAnonymous]
 public sealed class HealthController(AppDbContext dbContext) : ControllerBase
 {
     [HttpGet]

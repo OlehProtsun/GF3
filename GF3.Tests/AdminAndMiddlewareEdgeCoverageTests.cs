@@ -452,7 +452,7 @@ public sealed class AdminAndMiddlewareEdgeCoverageTests
         await using var context = database.CreateContext();
 
         var employeesController = new WebApi.Controllers.EmployeesController(
-            new EmployeeFacade(new EmployeeService(new DataAccessLayer.Repositories.EmployeeRepository(context))));
+            TestEmployeeFacadeFactory.Create(new EmployeeService(new DataAccessLayer.Repositories.EmployeeRepository(context))));
         var shopsController = new WebApi.Controllers.ShopsController(
             new ShopFacade(new ShopService(new DataAccessLayer.Repositories.ShopRepository(context))));
         var bindsController = new WebApi.Controllers.AvailabilityBindsController(

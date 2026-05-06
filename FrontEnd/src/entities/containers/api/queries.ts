@@ -289,10 +289,14 @@ export function useSaveGraphWorkspaceMutation() {
   return useMutation({
     mutationFn: syncGraphWorkspace,
     onSuccess: (result, variables) => {
+      qc.invalidateQueries({ queryKey: queryKeys.containers.all });
       qc.invalidateQueries({ queryKey: queryKeys.containers.graphs(variables.containerId) });
       qc.invalidateQueries({ queryKey: queryKeys.containers.graphById(variables.containerId, result.graphId) });
       qc.invalidateQueries({ queryKey: queryKeys.containers.graphEmployees(variables.containerId, result.graphId) });
       qc.invalidateQueries({ queryKey: queryKeys.containers.graphSlots(variables.containerId, result.graphId) });
+      qc.invalidateQueries({ queryKey: queryKeys.containers.graphCellStyles(variables.containerId, result.graphId) });
+      qc.invalidateQueries({ queryKey: queryKeys.employeeSchedules.all });
+      qc.invalidateQueries({ queryKey: queryKeys.shiftSwaps.all });
     },
   });
 }

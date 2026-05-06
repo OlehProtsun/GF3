@@ -1,6 +1,8 @@
 using BusinessLogicLayer.Common;
 using BusinessLogicLayer.Services.Abstractions;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using WebApi.Auth;
 using WebApi.Contracts.Shops;
 using WebApi.Infrastructure;
 using WebApi.Mappers;
@@ -14,6 +16,7 @@ namespace WebApi.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/[controller]")]
+[Authorize(Roles = AuthRoles.Manager)]
 public class ShopsController(IShopFacade shopFacade) : ControllerBase
 {
     /// <summary>

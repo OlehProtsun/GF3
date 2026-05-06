@@ -21,6 +21,7 @@ public static class Extensions
     {
         serviceCollection.AddScoped<IContainerRepository, ContainerRepository>();
         serviceCollection.AddScoped<IEmployeeRepository, EmployeeRepository>();
+        serviceCollection.AddScoped<IEmployeeAccountRepository, EmployeeAccountRepository>();
         serviceCollection.AddScoped<IShopRepository, ShopRepository>();
         serviceCollection.AddScoped<IScheduleRepository, ScheduleRepository>();
         serviceCollection.AddScoped<ISchedulePresetRepository, SchedulePresetRepository>();

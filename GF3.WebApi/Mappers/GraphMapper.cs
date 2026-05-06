@@ -1,3 +1,4 @@
+using BusinessLogicLayer.Contracts.Enums;
 using BusinessLogicLayer.Contracts.Models;
 using WebApi.Contracts.Containers.Graphs;
 
@@ -16,6 +17,7 @@ public static class GraphMapper
         Name = model.Name,
         Year = model.Year,
         Month = model.Month,
+        PublicationStatus = ToApiPublicationStatus(model.PublicationStatus),
         PeoplePerShift = model.PeoplePerShift,
         Shift1Time = model.Shift1Time,
         Shift2Time = model.Shift2Time,
@@ -34,6 +36,7 @@ public static class GraphMapper
             request.Name,
             request.Year,
             request.Month,
+            request.PublicationStatus,
             request.PeoplePerShift,
             request.Shift1Time,
             request.Shift2Time,
@@ -51,6 +54,7 @@ public static class GraphMapper
             request.Name,
             request.Year,
             request.Month,
+            request.PublicationStatus,
             request.PeoplePerShift,
             request.Shift1Time,
             request.Shift2Time,
@@ -69,6 +73,7 @@ public static class GraphMapper
             request.Graph.Name,
             request.Graph.Year,
             request.Graph.Month,
+            request.Graph.PublicationStatus,
             request.Graph.PeoplePerShift,
             request.Graph.Shift1Time,
             request.Graph.Shift2Time,
@@ -86,6 +91,7 @@ public static class GraphMapper
         string name,
         int year,
         int month,
+        string? publicationStatus,
         int peoplePerShift,
         string shift1Time,
         string shift2Time,
@@ -104,6 +110,7 @@ public static class GraphMapper
             Name = name,
             Year = year,
             Month = month,
+            PublicationStatus = ToDomainPublicationStatus(publicationStatus),
             PeoplePerShift = peoplePerShift,
             Shift1Time = shift1Time,
             Shift2Time = shift2Time,
@@ -114,4 +121,12 @@ public static class GraphMapper
             Note = note,
             AvailabilityGroupId = availabilityGroupId,
         };
+
+    private static string ToApiPublicationStatus(SchedulePublicationStatus status)
+        => status == SchedulePublicationStatus.Public ? "public" : "private";
+
+    private static SchedulePublicationStatus ToDomainPublicationStatus(string? status)
+        => string.Equals(status, "public", StringComparison.OrdinalIgnoreCase)
+            ? SchedulePublicationStatus.Public
+            : SchedulePublicationStatus.Private;
 }

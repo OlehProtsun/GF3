@@ -28,15 +28,9 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Reference Include="BusinessLogicLayer">
-      <HintPath>..\BusinessLogicLayer\bin\Debug\net10.0\BusinessLogicLayer.dll</HintPath>
-    </Reference>
-    <Reference Include="DataAccessLayer">
-      <HintPath>..\DataAccessLayer\bin\Debug\net10.0\DataAccessLayer.dll</HintPath>
-    </Reference>
-    <Reference Include="WebApi">
-      <HintPath>..\GF3.WebApi\bin\Debug\net10.0\WebApi.dll</HintPath>
-    </Reference>
+    <ProjectReference Include="..\BusinessLogicLayer\BusinessLogicLayer.csproj" />
+    <ProjectReference Include="..\DataAccessLayer\DataAccessLayer.csproj" />
+    <ProjectReference Include="..\GF3.WebApi\WebApi.csproj" />
   </ItemGroup>
 
 </Project>

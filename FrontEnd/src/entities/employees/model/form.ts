@@ -8,17 +8,21 @@ export type EmployeeFormState = {
   lastName: string;
   email: string;
   phone: string;
+  username: string;
+  password: string;
 };
 
 export type EmployeeFormErrors = Partial<Record<keyof EmployeeFormState, string>>;
 
-type EmployeeFormSource = Pick<Employee, "firstName" | "lastName" | "email" | "phone">;
+type EmployeeFormSource = Pick<Employee, "firstName" | "lastName" | "email" | "phone" | "username" | "hasLoginAccount">;
 
 const EMPTY_FORM: EmployeeFormState = {
   firstName: "",
   lastName: "",
   email: "",
   phone: "",
+  username: "",
+  password: "",
 };
 
 export function createEmployeeFormState(employee?: EmployeeFormSource | null): EmployeeFormState {
@@ -31,10 +35,18 @@ export function createEmployeeFormState(employee?: EmployeeFormSource | null): E
     lastName: employee.lastName,
     email: employee.email ?? "",
     phone: employee.phone ?? "",
+    username: employee.username ?? "",
+    password: "",
   };
 }
 
-export function validateEmployeeForm(form: EmployeeFormState): EmployeeFormErrors {
+export function validateEmployeeForm(
+  form: EmployeeFormState,
+  options: {
+    isCreate: boolean;
+    hasLoginAccount: boolean;
+  },
+): EmployeeFormErrors {
   const nextErrors: EmployeeFormErrors = {};
 
   if (!form.firstName.trim()) {
@@ -49,6 +61,33 @@ export function validateEmployeeForm(form: EmployeeFormState): EmployeeFormError
     nextErrors.email = "Invalid email format";
   }
 
+  const normalizedUsername = form.username.trim();
+  const normalizedPassword = form.password.trim();
+
+  if (normalizedUsername && normalizedUsername.length < 3) {
+    nextErrors.username = "Username must be at least 3 characters long";
+  }
+
+  if (normalizedUsername && !/^[A-Za-z0-9._-]+$/.test(normalizedUsername)) {
+    nextErrors.username = "Username may use letters, numbers, dots, underscores, and dashes";
+  }
+
+  if (!normalizedUsername && normalizedPassword) {
+    nextErrors.username = "Username is required when setting a password";
+  }
+
+  if (options.hasLoginAccount && !normalizedUsername) {
+    nextErrors.username = "Username is required for employees with an existing login";
+  }
+
+  if ((options.isCreate || !options.hasLoginAccount) && normalizedUsername && !normalizedPassword) {
+    nextErrors.password = "Password is required when creating a login";
+  }
+
+  if (normalizedPassword && normalizedPassword.length < 6) {
+    nextErrors.password = "Password must be at least 6 characters long";
+  }
+
   return nextErrors;
 }
 
@@ -56,7 +95,7 @@ export function useEmployeeForm(employee?: EmployeeFormSource | null, isCreate =
   const sourceKey = useMemo(
     () =>
       employee
-        ? `employee:${employee.firstName}:${employee.lastName}:${employee.email ?? ""}:${employee.phone ?? ""}`
+        ? `employee:${employee.firstName}:${employee.lastName}:${employee.email ?? ""}:${employee.phone ?? ""}:${employee.username ?? ""}:${employee.hasLoginAccount}`
         : isCreate
           ? "create"
           : "empty",
@@ -71,6 +110,7 @@ export function useEmployeeForm(employee?: EmployeeFormSource | null, isCreate =
   );
   const { value: draft, setValue: setDraft } = useSyncedDraft(sourceKey, initialDraft);
   const { form, errors } = draft;
+  const hasLoginAccount = employee?.hasLoginAccount ?? false;
 
   const handleFieldChange =
     (field: keyof EmployeeFormState) =>
@@ -82,7 +122,7 @@ export function useEmployeeForm(employee?: EmployeeFormSource | null, isCreate =
     };
 
   const validate = () => {
-    const nextErrors = validateEmployeeForm(form);
+    const nextErrors = validateEmployeeForm(form, { isCreate, hasLoginAccount });
 
     setDraft((current) => ({
       ...current,

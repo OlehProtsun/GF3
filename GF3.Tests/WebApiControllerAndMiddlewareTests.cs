@@ -146,7 +146,7 @@ public sealed class WebApiControllerAndMiddlewareTests
         await using var context = database.CreateContext();
 
         var controller = new EmployeesController(
-            new EmployeeFacade(new EmployeeService(new DataAccessLayer.Repositories.EmployeeRepository(context))));
+            TestEmployeeFacadeFactory.Create(new EmployeeService(new DataAccessLayer.Repositories.EmployeeRepository(context))));
         SetHttpContext(controller);
 
         var createResult = await controller.Create(new CreateEmployeeRequest
@@ -194,7 +194,7 @@ public sealed class WebApiControllerAndMiddlewareTests
         await context.SaveChangesAsync();
 
         var controller = new EmployeesController(
-            new EmployeeFacade(new EmployeeService(new DataAccessLayer.Repositories.EmployeeRepository(context))));
+            TestEmployeeFacadeFactory.Create(new EmployeeService(new DataAccessLayer.Repositories.EmployeeRepository(context))));
         SetHttpContext(controller);
 
         var result = await controller.Delete(employee.Id, CancellationToken.None);

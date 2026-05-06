@@ -3,3 +3,125 @@
   max-width: none;
   margin: 0;
 }
+
+.publicationOverview {
+  display: grid;
+  grid-template-columns: minmax(112px, 0.28fr) minmax(0, 1fr);
+  gap: 8px;
+}
+
+.publicationStatusPanel,
+.visibilityPanel {
+  min-width: 0;
+  display: grid;
+  gap: 7px;
+  align-content: start;
+  padding: 10px 12px;
+  border-radius: 18px;
+  border: 1px solid rgba(148, 163, 184, 0.1);
+  background:
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.42), rgba(255, 255, 255, 0)),
+    rgba(244, 244, 245, 0.72);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.78),
+    0 6px 14px rgba(15, 23, 42, 0.035);
+}
+
+.publicationStatusPanel {
+  align-content: center;
+  justify-items: center;
+  text-align: center;
+}
+
+.publicationLabel {
+  color: rgba(17, 24, 39, 0.46);
+  font-size: 0.69rem;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+}
+
+.statusBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: fit-content;
+  min-height: 26px;
+  padding: 0.28rem 0.58rem;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.12);
+  background: rgba(255, 255, 255, 0.74);
+  color: #475569;
+  font-size: 0.76rem;
+  font-weight: 850;
+  line-height: 1;
+}
+
+.statusBadgePublic {
+  border-color: rgba(37, 99, 235, 0.18);
+  background: rgba(219, 234, 254, 0.82);
+  color: #1d4ed8;
+}
+
+.visibilityTimeline {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 6px;
+}
+
+.visibilityEndpoint {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+  padding: 7px 9px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(148, 163, 184, 0.08);
+}
+
+.visibilityEndpoint small {
+  color: rgba(17, 24, 39, 0.44);
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0;
+}
+
+.visibilityEndpoint strong {
+  min-width: 0;
+  color: #111827;
+  font-size: 0.8rem;
+  line-height: 1.2;
+  font-weight: 850;
+  overflow-wrap: anywhere;
+}
+
+.visibilityLine {
+  width: 14px;
+  height: 2px;
+  border-radius: 999px;
+  background: rgba(37, 99, 235, 0.16);
+}
+
+.visibilityEmpty {
+  width: fit-content;
+  padding: 7px 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.68);
+  color: #6b7280;
+  font-size: 0.8rem;
+  font-weight: 750;
+}
+
+@media (max-width: 760px) {
+  .publicationOverview,
+  .visibilityTimeline {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .visibilityLine {
+    width: 2px;
+    height: 14px;
+    margin-inline: 12px;
+  }
+}
