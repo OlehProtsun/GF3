@@ -388,6 +388,29 @@ function SwapStatisticsCard({
   );
 }
 
+function CollapseToggleButton({
+  isExpanded,
+  label,
+  onToggle,
+}: {
+  isExpanded: boolean;
+  label: string;
+  onToggle: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      className={styles.collapseButton}
+      aria-label={isExpanded ? `Collapse ${label}` : `Expand ${label}`}
+      aria-expanded={isExpanded}
+      title={isExpanded ? `Collapse ${label}` : `Expand ${label}`}
+      onClick={onToggle}
+    >
+      <ArrowIcon size={13} />
+    </button>
+  );
+}
+
 function ShiftPickerDialog({
   schedule,
   slots,
@@ -626,6 +649,7 @@ function SwapOfferCard({
   onAccept: (swap: ShiftSwap) => void;
   onCancel: (swap: ShiftSwap) => void;
 }) {
+  const [isExpanded, setIsExpanded] = useState(false);
   const isAccepted = swap.status === "accepted";
   const badgeText = isAccepted
     ? "Accepted"
@@ -641,61 +665,72 @@ function SwapOfferCard({
           <span>{`${formatSwapDate(swap)} - ${swap.fromTime} - ${swap.toTime}`}</span>
         </div>
 
-        <span className={[styles.badge, isAccepted ? styles.badgeMuted : ""].filter(Boolean).join(" ")}>
-          {badgeText}
-        </span>
+        <div className={styles.offerHeaderActions}>
+          <span className={[styles.badge, isAccepted ? styles.badgeMuted : ""].filter(Boolean).join(" ")}>
+            {badgeText}
+          </span>
+          <CollapseToggleButton
+            isExpanded={isExpanded}
+            label={`${swap.scheduleName} swap`}
+            onToggle={() => setIsExpanded(value => !value)}
+          />
+        </div>
       </div>
 
-      <div className={styles.detailGrid}>
-        <div className={styles.detailItem}>
-          <span>Location</span>
-          <strong>{swap.shopName || swap.containerName || "Schedule"}</strong>
-        </div>
-        <div className={styles.detailItem}>
-          <span>From</span>
-          <strong>{swap.fromEmployeeName}</strong>
-        </div>
-        <div className={styles.detailItem}>
-          <span>Target</span>
-          <strong>{swap.targetEmployeeName ?? "Everyone"}</strong>
-        </div>
-        <div className={styles.detailItem}>
-          <span>Shift hours</span>
-          <strong>{formatHours(swap.shiftHours)}</strong>
-        </div>
-        {swap.acceptedByEmployeeName ? (
-          <div className={styles.detailItem}>
-            <span>Accepted by</span>
-            <strong>{swap.acceptedByEmployeeName}</strong>
+      {isExpanded ? (
+        <>
+          <div className={styles.detailGrid}>
+            <div className={styles.detailItem}>
+              <span>Location</span>
+              <strong>{swap.shopName || swap.containerName || "Schedule"}</strong>
+            </div>
+            <div className={styles.detailItem}>
+              <span>From</span>
+              <strong>{swap.fromEmployeeName}</strong>
+            </div>
+            <div className={styles.detailItem}>
+              <span>Target</span>
+              <strong>{swap.targetEmployeeName ?? "Everyone"}</strong>
+            </div>
+            <div className={styles.detailItem}>
+              <span>Shift hours</span>
+              <strong>{formatHours(swap.shiftHours)}</strong>
+            </div>
+            {swap.acceptedByEmployeeName ? (
+              <div className={styles.detailItem}>
+                <span>Accepted by</span>
+                <strong>{swap.acceptedByEmployeeName}</strong>
+              </div>
+            ) : null}
           </div>
-        ) : null}
-      </div>
 
-      <SwapStatisticsCard stats={stats} />
+          <SwapStatisticsCard stats={stats} />
 
-      {swap.canAccept || swap.canCancel ? (
-        <div className={styles.cardActions}>
-          {swap.canAccept ? (
-            <button
-              type="button"
-              className={styles.primaryButton}
-              disabled={isBusy}
-              onClick={() => onAccept(swap)}
-            >
-              Accept
-            </button>
+          {swap.canAccept || swap.canCancel ? (
+            <div className={styles.cardActions}>
+              {swap.canAccept ? (
+                <button
+                  type="button"
+                  className={styles.primaryButton}
+                  disabled={isBusy}
+                  onClick={() => onAccept(swap)}
+                >
+                  Accept
+                </button>
+              ) : null}
+              {swap.canCancel ? (
+                <button
+                  type="button"
+                  className={styles.secondaryButton}
+                  disabled={isBusy}
+                  onClick={() => onCancel(swap)}
+                >
+                  Cancel offer
+                </button>
+              ) : null}
+            </div>
           ) : null}
-          {swap.canCancel ? (
-            <button
-              type="button"
-              className={styles.secondaryButton}
-              disabled={isBusy}
-              onClick={() => onCancel(swap)}
-            >
-              Cancel offer
-            </button>
-          ) : null}
-        </div>
+        </>
       ) : null}
     </article>
   );
@@ -721,6 +756,7 @@ export function EmployeeSwapPage() {
   const [targetMode, setTargetMode] = useState<"public" | "private">("public");
   const [targetEmployeeId, setTargetEmployeeId] = useState<number | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [isGiveAwayExpanded, setIsGiveAwayExpanded] = useState(false);
   const selectedSchedule = useMemo(
     () => getSelectedSchedule(schedules, selectedScheduleId),
     [schedules, selectedScheduleId],
@@ -825,99 +861,113 @@ export function EmployeeSwapPage() {
       {actionError ? <ErrorBanner dismissible={false}>{actionError}</ErrorBanner> : null}
 
       <section className={workspaceStyles.panel}>
-        <span className={workspaceStyles.panelEyebrow}>Give away a shift</span>
-        <h1 className={workspaceStyles.panelTitle}>Create a swap offer</h1>
-
-        {schedules.length === 0 ? (
-          <p className={styles.emptyText}>No published schedules are available for swap.</p>
-        ) : (
-          <div className={styles.scheduleSwitcher}>
-            {schedules.map(schedule => {
-              const isSelected = schedule.id === selectedSchedule?.id;
-
-              return (
-                <button
-                  key={schedule.id}
-                  type="button"
-                  className={[styles.scheduleButton, isSelected ? styles.scheduleButtonActive : ""].filter(Boolean).join(" ")}
-                  aria-pressed={isSelected}
-                  onClick={() => handleOpenSchedule(schedule)}
-                >
-                  <span className={styles.scheduleDateBadge}>
-                    <span>{formatScheduleMonthOnly(schedule).slice(0, 3)}</span>
-                    <strong>{schedule.year}</strong>
-                  </span>
-
-                  <span className={styles.scheduleButtonContent}>
-                    <span className={styles.scheduleButtonName}>{schedule.name}</span>
-                    <span className={styles.scheduleButtonMeta}>
-                      {`${schedule.shopName || `Shop ${schedule.shopId}`} / ${schedule.containerName || `Container ${schedule.containerId}`}`}
-                    </span>
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-        )}
-
-        {selectedSchedule && selectedSlot ? (
-          <div className={styles.selectedShiftCard}>
-            <span>Selected shift</span>
-            <strong>{buildOwnShiftLabel(selectedSchedule, selectedSlot, selectedPeriod)}</strong>
-          </div>
-        ) : (
-          <p className={styles.helperText}>Choose a schedule, then select one of your shifts from the dialog.</p>
-        )}
-
-        <SwapStatisticsCard stats={swapPreviewStats} summary="Give away impact" collapsible defaultExpanded={false} />
-
-        <div className={styles.formGrid}>
-          <div className={`${styles.field} ${styles.fieldWide}`}>
-            <span className={styles.fieldLabel}>Receiver</span>
-            <div className={styles.segmentRow}>
-              <button
-                type="button"
-                className={[styles.segmentButton, targetMode === "public" ? styles.segmentButtonActive : ""].filter(Boolean).join(" ")}
-                onClick={() => setTargetMode("public")}
-              >
-                Everyone
-              </button>
-              <button
-                type="button"
-                className={[styles.segmentButton, targetMode === "private" ? styles.segmentButtonActive : ""].filter(Boolean).join(" ")}
-                onClick={() => setTargetMode("private")}
-              >
-                Specific employee
-              </button>
-            </div>
+        <div className={styles.panelHeaderRow}>
+          <div>
+            <span className={workspaceStyles.panelEyebrow}>Give away a shift</span>
+            <h1 className={workspaceStyles.panelTitle}>Create a swap offer</h1>
           </div>
 
-          {targetMode === "private" ? (
-            <div className={styles.field}>
-              <span className={styles.fieldLabel}>Employee</span>
-              <EmployeeTargetCombobox
-                employees={sortedTargetEmployees}
-                selectedEmployeeId={resolvedTargetEmployeeId}
-                loading={targetEmployeesQuery.isLoading}
-                onChange={setTargetEmployeeId}
-              />
-            </div>
-          ) : null}
-
-          <button
-            type="button"
-            className={styles.primaryButton}
-            disabled={
-              isActionBusy ||
-              !selectedSchedule ||
-              !selectedSlot ||
-              (targetMode === "private" && !resolvedTargetEmployeeId)
-            }
-            onClick={handleCreateOffer}
-          >
-            {createSwapMutation.isPending ? "Creating..." : "Offer shift"}
-          </button>
+          <CollapseToggleButton
+            isExpanded={isGiveAwayExpanded}
+            label="give away a shift"
+            onToggle={() => setIsGiveAwayExpanded(value => !value)}
+          />
         </div>
+
+        {isGiveAwayExpanded ? (
+          <>
+            {schedules.length === 0 ? (
+              <p className={styles.emptyText}>No published schedules are available for swap.</p>
+            ) : (
+              <div className={styles.scheduleSwitcher}>
+                {schedules.map(schedule => {
+                  const isSelected = schedule.id === selectedSchedule?.id;
+
+                  return (
+                    <button
+                      key={schedule.id}
+                      type="button"
+                      className={[styles.scheduleButton, isSelected ? styles.scheduleButtonActive : ""].filter(Boolean).join(" ")}
+                      aria-pressed={isSelected}
+                      onClick={() => handleOpenSchedule(schedule)}
+                    >
+                      <span className={styles.scheduleDateBadge}>
+                        <span>{formatScheduleMonthOnly(schedule).slice(0, 3)}</span>
+                        <strong>{schedule.year}</strong>
+                      </span>
+
+                      <span className={styles.scheduleButtonContent}>
+                        <span className={styles.scheduleButtonName}>{schedule.name}</span>
+                        <span className={styles.scheduleButtonMeta}>
+                          {`${schedule.shopName || `Shop ${schedule.shopId}`} / ${schedule.containerName || `Container ${schedule.containerId}`}`}
+                        </span>
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
+            {selectedSchedule && selectedSlot ? (
+              <div className={styles.selectedShiftCard}>
+                <span>Selected shift</span>
+                <strong>{buildOwnShiftLabel(selectedSchedule, selectedSlot, selectedPeriod)}</strong>
+              </div>
+            ) : (
+              <p className={styles.helperText}>Choose a schedule, then select one of your shifts from the dialog.</p>
+            )}
+
+            <SwapStatisticsCard stats={swapPreviewStats} summary="Give away impact" collapsible defaultExpanded={false} />
+
+            <div className={styles.formGrid}>
+              <div className={`${styles.field} ${styles.fieldWide}`}>
+                <span className={styles.fieldLabel}>Receiver</span>
+                <div className={styles.segmentRow}>
+                  <button
+                    type="button"
+                    className={[styles.segmentButton, targetMode === "public" ? styles.segmentButtonActive : ""].filter(Boolean).join(" ")}
+                    onClick={() => setTargetMode("public")}
+                  >
+                    Everyone
+                  </button>
+                  <button
+                    type="button"
+                    className={[styles.segmentButton, targetMode === "private" ? styles.segmentButtonActive : ""].filter(Boolean).join(" ")}
+                    onClick={() => setTargetMode("private")}
+                  >
+                    Specific employee
+                  </button>
+                </div>
+              </div>
+
+              {targetMode === "private" ? (
+                <div className={styles.field}>
+                  <span className={styles.fieldLabel}>Employee</span>
+                  <EmployeeTargetCombobox
+                    employees={sortedTargetEmployees}
+                    selectedEmployeeId={resolvedTargetEmployeeId}
+                    loading={targetEmployeesQuery.isLoading}
+                    onChange={setTargetEmployeeId}
+                  />
+                </div>
+              ) : null}
+
+              <button
+                type="button"
+                className={styles.primaryButton}
+                disabled={
+                  isActionBusy ||
+                  !selectedSchedule ||
+                  !selectedSlot ||
+                  (targetMode === "private" && !resolvedTargetEmployeeId)
+                }
+                onClick={handleCreateOffer}
+              >
+                {createSwapMutation.isPending ? "Creating..." : "Offer shift"}
+              </button>
+            </div>
+          </>
+        ) : null}
       </section>
 
       <ShiftPickerDialog

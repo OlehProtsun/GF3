@@ -38,7 +38,7 @@ internal sealed class NoopRealtimeNotifier : IRealtimeNotifier
     public Task NotifyScheduleChangedAsync(int containerId, int graphId, string reason)
         => Task.CompletedTask;
 
-    public Task NotifyShiftSwapsChangedAsync(int? containerId, int? graphId, int? scheduleId, string reason)
+    public Task NotifyShiftSwapsChangedAsync(int? containerId, int? graphId, int? scheduleId, string reason, int? shiftSwapId = null)
         => Task.CompletedTask;
 
     public Task NotifyWorkflowLogCreatedAsync(WorkflowLogEntryModel entry)

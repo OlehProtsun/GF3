@@ -133,6 +133,7 @@ internal static class JwtTokenCodec
                 UserName = userName,
                 Role = role,
                 DisplayName = ReadString(payloadRoot.RootElement, "display_name") ?? userName,
+                ManagerId = ReadNullableInt(payloadRoot.RootElement, "manager_id"),
                 EmployeeId = ReadNullableInt(payloadRoot.RootElement, "employee_id"),
             };
 
@@ -162,6 +163,11 @@ internal static class JwtTokenCodec
         if (session.EmployeeId.HasValue)
         {
             payload["employee_id"] = session.EmployeeId.Value;
+        }
+
+        if (session.ManagerId.HasValue)
+        {
+            payload["manager_id"] = session.ManagerId.Value;
         }
 
         return payload;

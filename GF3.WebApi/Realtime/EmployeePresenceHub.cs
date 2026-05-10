@@ -50,6 +50,8 @@ public sealed class ShiftSwapsChangedMessage
 
     public int? ScheduleId { get; init; }
 
+    public int? ShiftSwapId { get; init; }
+
     public string Reason { get; init; } = string.Empty;
 
     public DateTimeOffset ChangedAtUtc { get; init; }

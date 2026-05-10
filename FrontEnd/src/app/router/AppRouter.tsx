@@ -37,7 +37,10 @@ function lazyPage<TModule>(
 }
 
 const HomePage = lazyPage(() => import("@pages/home"), (module) => module.HomePage);
-const EmployeeHomePage = lazyPage(() => import("@pages/employee-home"), (module) => module.EmployeeHomePage);
+const EmployeeNotificationsPage = lazyPage(
+  () => import("@pages/employee-notifications"),
+  (module) => module.EmployeeNotificationsPage,
+);
 const EmployeeAvailabilityPage = lazyPage(
   () => import("@pages/employee-availability"),
   (module) => module.EmployeeAvailabilityPage,
@@ -76,13 +79,14 @@ const ContainerGraphEditPage = lazyPage(
 );
 const InformationPage = lazyPage(() => import("@pages/information"), (module) => module.InformationPage);
 const DataBasePage = lazyPage(() => import("@pages/database"), (module) => module.DataBasePage);
+const ManagerAccountPage = lazyPage(() => import("@pages/manager-account"), (module) => module.ManagerAccountPage);
 const EmployeeListPage = lazyPage(() => import("@pages/employee-list"), (module) => module.EmployeeListPage);
 const EmployeeProfilePage = lazyPage(() => import("@pages/employee-profile"), (module) => module.EmployeeProfilePage);
 const EmployeeEditPage = lazyPage(() => import("@pages/employee-edit"), (module) => module.EmployeeEditPage);
 
 const preloadablePages: readonly PreloadablePage[] = [
   HomePage,
-  EmployeeHomePage,
+  EmployeeNotificationsPage,
   EmployeeAvailabilityPage,
   EmployeeSchedulePage,
   EmployeeSwapPage,
@@ -100,6 +104,7 @@ const preloadablePages: readonly PreloadablePage[] = [
   ContainerGraphEditPage,
   InformationPage,
   DataBasePage,
+  ManagerAccountPage,
   EmployeeListPage,
   EmployeeProfilePage,
   EmployeeEditPage,
@@ -120,6 +125,7 @@ const managerRoutes = [
   { path: "/container", element: <ContainerPage /> },
   { path: "/information", element: <InformationPage /> },
   { path: "/database", element: <DataBasePage /> },
+  { path: "/manager-profile", element: <ManagerAccountPage /> },
   { path: "/employee/new", element: <EmployeeEditPage /> },
   { path: "/employee/:employeeId/edit", element: <EmployeeEditPage /> },
   { path: "/employee/:employeeId", element: <EmployeeProfilePage /> },
@@ -129,11 +135,11 @@ const managerRoutes = [
 
 const employeeRoutes = [
   { path: "/profile", element: <EmployeeAccountPage /> },
-  { path: "/notifications", element: <Navigate to="/swap" /> },
+  { path: "/notifications", element: <EmployeeNotificationsPage /> },
   { path: "/swap", element: <EmployeeSwapPage /> },
   { path: "/schedule", element: <EmployeeSchedulePage /> },
   { path: "/availability", element: <EmployeeAvailabilityPage /> },
-  { path: "/", element: <EmployeeHomePage /> },
+  { path: "/", element: <EmployeeNotificationsPage /> },
 ] as const;
 
 function useWarmRouteChunks() {

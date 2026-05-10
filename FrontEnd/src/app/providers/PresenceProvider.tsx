@@ -10,7 +10,7 @@ import {
   type PropsWithChildren,
 } from "react";
 import { HubConnectionBuilder, HubConnectionState, LogLevel, type HubConnection } from "@microsoft/signalr";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { useAuth } from "@app/providers/AuthProvider";
 import type {
   Employee,
@@ -22,6 +22,7 @@ import {
   getAuthAccessToken,
 } from "@shared/api/httpClient";
 import { queryKeys } from "@shared/api/queryKeys";
+import { getEmployeeOpenShiftNotificationId } from "@shared/lib/employeeNotificationReadState";
 import { isDev } from "@shared/lib/isDev";
 
 const presenceHubMethodName = "PresenceChanged";
@@ -42,6 +43,7 @@ type ShiftSwapsChangedUpdate = {
   containerId?: number | null;
   graphId?: number | null;
   scheduleId?: number | null;
+  shiftSwapId?: number | null;
   reason: string;
   changedAtUtc: string;
 };
@@ -59,16 +61,61 @@ type ScheduleEditLockTarget = {
   graphId: number;
 };
 
+export type EmployeeRealtimeNotification = {
+  id: string;
+  kind: "schedule" | "shiftSwap";
+  reason: string;
+  occurredAtUtc: string;
+  containerId?: number | null;
+  graphId?: number | null;
+  scheduleId?: number | null;
+  shiftSwapId?: number | null;
+};
+
 type RealtimeContextValue = {
   setScheduleEditLocks: (locks: ScheduleEditLockTarget[]) => void;
+  notifications: EmployeeRealtimeNotification[];
+  clearNotifications: () => void;
 };
 
 const RealtimeContext = createContext<RealtimeContextValue>({
   setScheduleEditLocks: () => undefined,
+  notifications: [],
+  clearNotifications: () => undefined,
 });
 
 export function useRealtime() {
   return useContext(RealtimeContext);
+}
+
+function invalidateRealtimeQuery(queryClient: QueryClient, queryKey: readonly unknown[]) {
+  void queryClient.invalidateQueries({
+    queryKey,
+  });
+}
+
+function invalidateRealtimeBaselineQueries(queryClient: QueryClient) {
+  invalidateRealtimeQuery(queryClient, queryKeys.home.dashboard());
+  invalidateRealtimeQuery(queryClient, queryKeys.containers.all);
+  invalidateRealtimeQuery(queryClient, queryKeys.employeeSchedules.all);
+  invalidateRealtimeQuery(queryClient, queryKeys.shiftSwaps.all);
+  invalidateRealtimeQuery(queryClient, queryKeys.workflowLogs.all);
+}
+
+function invalidateGraphRealtimeQueries(queryClient: QueryClient, containerId: number, graphId: number) {
+  invalidateRealtimeBaselineQueries(queryClient);
+  invalidateRealtimeQuery(queryClient, queryKeys.containers.byId(containerId));
+  invalidateRealtimeQuery(queryClient, queryKeys.containers.graphs(containerId));
+  invalidateRealtimeQuery(queryClient, queryKeys.containers.graphById(containerId, graphId));
+  invalidateRealtimeQuery(queryClient, queryKeys.containers.graphSlots(containerId, graphId));
+  invalidateRealtimeQuery(queryClient, queryKeys.containers.graphSlotsBatches(containerId));
+  invalidateRealtimeQuery(queryClient, queryKeys.containers.graphEmployees(containerId, graphId));
+  invalidateRealtimeQuery(queryClient, queryKeys.containers.graphCellStyles(containerId, graphId));
+  invalidateRealtimeQuery(queryClient, queryKeys.containers.graphRecordsPrefix(containerId));
+}
+
+function isOpenShiftPostedReason(reason: string) {
+  return reason === "manager-manual-shift-offer-created";
 }
 
 function patchEmployeePresence<T extends Pick<Employee, "id" | "isOnline" | "lastLoginAtUtc">>(
@@ -92,6 +139,22 @@ export function PresenceProvider({ children }: PropsWithChildren) {
   const connectionRef = useRef<HubConnection | null>(null);
   const [connectionTick, setConnectionTick] = useState(0);
   const [desiredScheduleEditLocks, setDesiredScheduleEditLocks] = useState<ScheduleEditLockTarget[]>([]);
+  const [notifications, setNotifications] = useState<EmployeeRealtimeNotification[]>([]);
+
+  useEffect(() => {
+    setNotifications([]);
+  }, [session?.role, session?.userName]);
+
+  const pushEmployeeNotification = useEffectEvent((notification: EmployeeRealtimeNotification) => {
+    if (session?.role !== "employee") {
+      return;
+    }
+
+    setNotifications(current => [
+      notification,
+      ...current.filter(item => item.id !== notification.id),
+    ].slice(0, 80));
+  });
 
   const applyPresenceUpdate = useEffectEvent((update: EmployeePresenceUpdate) => {
     const employeeQueryKey = queryKeys.employees.byId(update.employeeId);
@@ -100,37 +163,33 @@ export function PresenceProvider({ children }: PropsWithChildren) {
       queryClient.setQueryData(employeeQueryKey, patchEmployeePresence(employeeState.data, update));
     }
 
-    void queryClient.invalidateQueries({
-      queryKey: queryKeys.employees.all,
-    });
+    invalidateRealtimeQuery(queryClient, queryKeys.employees.all);
   });
 
   const applyScheduleChanged = useEffectEvent((update: ScheduleChangedUpdate) => {
-    void queryClient.invalidateQueries({
-      queryKey: queryKeys.containers.all,
-    });
-    void queryClient.invalidateQueries({
-      queryKey: queryKeys.containers.graphs(update.containerId),
-    });
-    void queryClient.invalidateQueries({
-      queryKey: queryKeys.employeeSchedules.all,
-    });
-    void queryClient.invalidateQueries({
-      queryKey: queryKeys.shiftSwaps.all,
-    });
+    invalidateGraphRealtimeQueries(queryClient, update.containerId, update.graphId);
   });
 
   const applyShiftSwapsChanged = useEffectEvent((update: ShiftSwapsChangedUpdate) => {
-    void queryClient.invalidateQueries({
-      queryKey: queryKeys.shiftSwaps.all,
-    });
-    void queryClient.invalidateQueries({
-      queryKey: queryKeys.employeeSchedules.all,
-    });
+    invalidateRealtimeQuery(queryClient, queryKeys.shiftSwaps.all);
+    invalidateRealtimeQuery(queryClient, queryKeys.employeeSchedules.all);
 
-    if (update.containerId && update.graphId) {
-      void queryClient.invalidateQueries({
-        queryKey: queryKeys.shiftSwaps.graphLog(update.containerId, update.graphId),
+    if (update.containerId != null && update.graphId != null) {
+      invalidateRealtimeQuery(queryClient, queryKeys.shiftSwaps.graphLog(update.containerId, update.graphId));
+    }
+
+    if (isOpenShiftPostedReason(update.reason)) {
+      const scheduleId = update.scheduleId ?? update.graphId ?? null;
+      const notificationIdSource = update.shiftSwapId ?? scheduleId;
+      pushEmployeeNotification({
+        id: getEmployeeOpenShiftNotificationId(notificationIdSource),
+        kind: "shiftSwap",
+        reason: update.reason,
+        occurredAtUtc: update.changedAtUtc,
+        containerId: update.containerId,
+        graphId: update.graphId,
+        scheduleId,
+        shiftSwapId: update.shiftSwapId,
       });
     }
   });
@@ -146,18 +205,12 @@ export function PresenceProvider({ children }: PropsWithChildren) {
       );
     }
 
-    void queryClient.invalidateQueries({
-      queryKey: queryKeys.workflowLogs.all,
-    });
+    invalidateRealtimeQuery(queryClient, queryKeys.workflowLogs.all);
   });
 
   const applyScheduleEditLockChanged = useEffectEvent((_update: ScheduleEditLockChangedUpdate) => {
-    void queryClient.invalidateQueries({
-      queryKey: queryKeys.shiftSwaps.employee(),
-    });
-    void queryClient.invalidateQueries({
-      queryKey: queryKeys.employeeSchedules.all,
-    });
+    invalidateRealtimeQuery(queryClient, queryKeys.shiftSwaps.employee());
+    invalidateRealtimeQuery(queryClient, queryKeys.employeeSchedules.all);
   });
 
   const publishScheduleEditLocks = useCallback(async (locks: ScheduleEditLockTarget[]) => {
@@ -180,9 +233,15 @@ export function PresenceProvider({ children }: PropsWithChildren) {
     void publishScheduleEditLocks(locks);
   }, [publishScheduleEditLocks]);
 
+  const clearNotifications = useCallback(() => {
+    setNotifications([]);
+  }, []);
+
   const realtimeContextValue = useMemo<RealtimeContextValue>(() => ({
     setScheduleEditLocks,
-  }), [setScheduleEditLocks]);
+    notifications,
+    clearNotifications,
+  }), [clearNotifications, notifications, setScheduleEditLocks]);
 
   useEffect(() => {
     if (status !== "authenticated" || !session || !getAuthAccessToken()) {
@@ -206,9 +265,7 @@ export function PresenceProvider({ children }: PropsWithChildren) {
       });
 
       connection.onreconnected(() => {
-        void queryClient.invalidateQueries({
-          queryKey: queryKeys.employees.all,
-        });
+        invalidateRealtimeQuery(queryClient, queryKeys.employees.all);
         setConnectionTick(tick => tick + 1);
       });
     }
@@ -230,6 +287,7 @@ export function PresenceProvider({ children }: PropsWithChildren) {
     });
 
     connection.onreconnected(() => {
+      invalidateRealtimeBaselineQueries(queryClient);
       setConnectionTick(tick => tick + 1);
     });
 
@@ -242,9 +300,7 @@ export function PresenceProvider({ children }: PropsWithChildren) {
           setConnectionTick(tick => tick + 1);
         }
         if (!isDisposed && sessionRole === "manager") {
-          void queryClient.invalidateQueries({
-            queryKey: queryKeys.employees.all,
-          });
+          invalidateRealtimeQuery(queryClient, queryKeys.employees.all);
         }
       } catch (error) {
         if (isDev && !isDisposed) {
@@ -271,11 +327,6 @@ export function PresenceProvider({ children }: PropsWithChildren) {
     queryClient,
     status,
     session,
-    applyPresenceUpdate,
-    applyScheduleChanged,
-    applyShiftSwapsChanged,
-    applyWorkflowLogCreated,
-    applyScheduleEditLockChanged,
   ]);
 
   useEffect(() => {

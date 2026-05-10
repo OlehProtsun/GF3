@@ -140,7 +140,7 @@ public sealed class ShiftSwapLogsController(
             .NotifyScheduleChangedAsync(containerId, graphId, "manager-manual-shift-offer-created")
             .ConfigureAwait(false);
         await realtimeNotifier
-            .NotifyShiftSwapsChangedAsync(containerId, graphId, graphId, "manager-manual-shift-offer-created")
+            .NotifyShiftSwapsChangedAsync(containerId, graphId, graphId, "manager-manual-shift-offer-created", created.Id)
             .ConfigureAwait(false);
 
         return CreatedAtAction(nameof(GetGraphLog), new { containerId, graphId }, ToLogDto(created));
@@ -230,7 +230,7 @@ public sealed class ShiftSwapLogsController(
             .NotifyScheduleChangedAsync(containerId, graphId, "manager-manual-shift-offer-cancelled")
             .ConfigureAwait(false);
         await realtimeNotifier
-            .NotifyShiftSwapsChangedAsync(containerId, graphId, graphId, "manager-manual-shift-offer-cancelled")
+            .NotifyShiftSwapsChangedAsync(containerId, graphId, graphId, "manager-manual-shift-offer-cancelled", swap.Id)
             .ConfigureAwait(false);
 
         return NoContent();

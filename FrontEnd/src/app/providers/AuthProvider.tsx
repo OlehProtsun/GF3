@@ -1,7 +1,7 @@
 import { createContext, startTransition, useContext, useEffect, useState, type PropsWithChildren } from "react";
 import { ApiError, getAuthAccessToken, getErrorMessage, setAuthAccessToken } from "@shared/api/httpClient";
 import { authApi } from "@entities/auth";
-import type { AuthSession, LoginInput } from "@entities/auth";
+import type { AuthLoginResult, AuthSession, LoginInput } from "@entities/auth";
 
 type AuthStatus = "loading" | "authenticated" | "unauthenticated";
 
@@ -12,6 +12,7 @@ type AuthContextValue = {
   login: (input: LoginInput) => Promise<AuthSession>;
   logout: () => Promise<void>;
   refreshSession: () => Promise<void>;
+  replaceLoginResult: (result: AuthLoginResult) => void;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -102,6 +103,11 @@ export function AuthProvider({ children }: PropsWithChildren) {
     return result.session;
   };
 
+  const replaceLoginResult = (result: AuthLoginResult) => {
+    storeAccessToken(result.accessToken);
+    applyAuthenticatedState(result.session);
+  };
+
   const logout = async () => {
     try {
       await authApi.logout();
@@ -120,6 +126,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
         login,
         logout,
         refreshSession,
+        replaceLoginResult,
       }}
     >
       {children}

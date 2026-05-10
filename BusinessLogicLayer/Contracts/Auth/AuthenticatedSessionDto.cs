@@ -11,5 +11,7 @@ public sealed class AuthenticatedSessionDto
 
     public string DisplayName { get; set; } = string.Empty;
 
+    public int? ManagerId { get; set; }
+
     public int? EmployeeId { get; set; }
 }

@@ -64,6 +64,7 @@ public sealed class AuthController(
             Role = User.FindFirstValue(ClaimTypes.Role) ?? string.Empty,
             UserName = User.Identity.Name ?? string.Empty,
             DisplayName = User.FindFirstValue("display_name") ?? User.Identity.Name ?? string.Empty,
+            ManagerId = TryParseNullableInt(User.FindFirstValue("manager_id")),
             EmployeeId = TryParseNullableInt(User.FindFirstValue("employee_id")),
         });
     }
@@ -109,6 +110,7 @@ public sealed class AuthController(
         Role = session.Role,
         UserName = session.UserName,
         DisplayName = session.DisplayName,
+        ManagerId = session.ManagerId,
         EmployeeId = session.EmployeeId,
     };
 

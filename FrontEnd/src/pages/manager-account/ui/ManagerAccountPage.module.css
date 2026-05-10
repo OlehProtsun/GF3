@@ -1,0 +1,403 @@
+.page {
+  --page-header-max-width: 1120px;
+
+  min-height: 100%;
+  padding: 0 18px 40px;
+}
+
+.panel {
+  width: min(1120px, 100%);
+  box-sizing: border-box;
+  margin: 18px auto 0;
+  padding: 18px;
+  border: 1px solid rgba(17, 17, 17, 0.08);
+  border-radius: 32px;
+  background: rgba(255, 255, 255, 0.7);
+  box-shadow:
+    0 18px 44px rgba(17, 17, 17, 0.08),
+    0 1px 0 rgba(255, 255, 255, 0.52) inset;
+}
+
+.profileHeader {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 14px;
+  align-items: center;
+  padding: 14px;
+  border-radius: 26px;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  background: rgba(248, 250, 252, 0.84);
+}
+
+.avatar,
+.managerInitials {
+  display: inline-grid;
+  place-items: center;
+  border-radius: 20px;
+  background: #0f172a;
+  color: #ffffff;
+  font-weight: 900;
+}
+
+.avatar {
+  width: 58px;
+  height: 58px;
+  font-size: 1.1rem;
+}
+
+.profileTitle {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.profileTitle strong {
+  color: #111827;
+  font-size: 1.35rem;
+  line-height: 1.15;
+  font-weight: 950;
+  overflow-wrap: anywhere;
+}
+
+.profileTitle span:last-child,
+.managerItem span,
+.stateText {
+  color: #64748b;
+}
+
+.eyebrow,
+.field span {
+  color: #64748b;
+  font-size: 0.72rem;
+  font-weight: 850;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.successBanner {
+  margin-top: 14px;
+  padding: 0.86rem 1rem;
+  border-radius: 22px;
+  border: 1px solid rgba(22, 163, 74, 0.16);
+  background: rgba(240, 253, 244, 0.94);
+  color: #15803d;
+  font-weight: 800;
+}
+
+.grid {
+  display: grid;
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.profileColumn {
+  display: grid;
+  gap: 16px;
+  align-content: start;
+}
+
+.card {
+  display: grid;
+  gap: 16px;
+  padding: clamp(1rem, 2.4vw, 1.15rem);
+  border-radius: 26px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  background: rgba(255, 255, 255, 0.78);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.62) inset;
+}
+
+.cardHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.cardHeader h2 {
+  margin: 2px 0 0;
+  color: #111827;
+  font-size: 1.05rem;
+  line-height: 1.25;
+}
+
+.badge,
+.currentPill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 30px;
+  padding: 0 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(37, 99, 235, 0.16);
+  background: rgba(219, 234, 254, 0.72);
+  color: #1d4ed8;
+  font-size: 0.76rem;
+  font-weight: 900;
+}
+
+.formGrid {
+  display: grid;
+  gap: 12px;
+}
+
+.field {
+  display: grid;
+  gap: 8px;
+}
+
+.field input {
+  width: 100%;
+  min-height: 48px;
+  box-sizing: border-box;
+  padding: 0.8rem 0.95rem;
+  border-radius: 18px;
+  border: 1px solid rgba(209, 213, 219, 0.92);
+  background: rgba(248, 250, 252, 0.9);
+  color: #0f172a;
+  outline: none;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.82) inset;
+  transition:
+    border-color 0.18s ease,
+    box-shadow 0.18s ease,
+    background 0.18s ease;
+}
+
+.field input:focus {
+  border-color: rgba(37, 99, 235, 0.38);
+  background: #ffffff;
+  box-shadow:
+    0 0 0 4px rgba(37, 99, 235, 0.1),
+    0 1px 0 rgba(255, 255, 255, 0.86) inset;
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.primaryButton {
+  min-width: 150px;
+  font-weight: 850;
+}
+
+.managerList {
+  display: grid;
+  gap: 10px;
+}
+
+.onlineList {
+  display: grid;
+  gap: 10px;
+}
+
+.onlineItem {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 11px;
+  border-radius: 20px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  background: rgba(248, 250, 252, 0.78);
+}
+
+.onlineDot {
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+}
+
+.onlineDotActive {
+  background: #16a34a;
+  box-shadow: 0 0 0 4px rgba(22, 163, 74, 0.12);
+}
+
+.onlineDotIdle {
+  background: #cbd5e1;
+}
+
+.onlineDetails {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.onlineDetails strong {
+  color: #111827;
+  font-size: 0.95rem;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+.onlineDetails span,
+.lastOnline {
+  color: #64748b;
+  overflow-wrap: anywhere;
+}
+
+.onlineNow,
+.lastOnline {
+  justify-self: end;
+  font-size: 0.78rem;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.onlineNow {
+  color: #15803d;
+}
+
+.managerItem {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 11px;
+  border-radius: 20px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  background: rgba(248, 250, 252, 0.78);
+}
+
+.managerInitials {
+  width: 38px;
+  height: 38px;
+  border-radius: 15px;
+  font-size: 0.8rem;
+}
+
+.managerDetails {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.managerItem strong {
+  color: #111827;
+  font-size: 0.95rem;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+.managerItem span {
+  overflow-wrap: anywhere;
+}
+
+.managerActions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  min-width: 86px;
+}
+
+.deleteManagerButton {
+  min-height: 34px;
+  padding: 0 12px;
+  border: 1px solid rgba(220, 38, 38, 0.18);
+  border-radius: 999px;
+  background: rgba(254, 242, 242, 0.84);
+  color: #b91c1c;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 900;
+  cursor: pointer;
+  transition:
+    background 0.18s ease,
+    border-color 0.18s ease,
+    color 0.18s ease,
+    opacity 0.18s ease;
+}
+
+.deleteManagerButton:hover:not(:disabled),
+.deleteManagerButton:focus-visible:not(:disabled) {
+  border-color: rgba(220, 38, 38, 0.34);
+  background: rgba(254, 226, 226, 0.96);
+  color: #991b1b;
+}
+
+.deleteManagerButton:focus-visible {
+  outline: 3px solid rgba(220, 38, 38, 0.18);
+  outline-offset: 2px;
+}
+
+.deleteManagerButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
+}
+
+.createPanel {
+  display: grid;
+  gap: 12px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(148, 163, 184, 0.18);
+}
+
+.stateText {
+  margin: 0;
+  line-height: 1.5;
+}
+
+@media (min-width: 860px) {
+  .profileHeader {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .grid {
+    grid-template-columns: minmax(0, 1fr) minmax(340px, 0.8fr);
+    align-items: start;
+  }
+
+  .formGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .createPanel .formGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .page {
+    padding-inline: 12px;
+  }
+
+  .panel {
+    border-radius: 26px;
+    padding: 14px;
+  }
+
+  .profileHeader,
+  .card {
+    border-radius: 22px;
+  }
+
+  .managerItem {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .onlineItem {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .onlineNow,
+  .lastOnline {
+    grid-column: 2;
+    justify-self: start;
+    white-space: normal;
+  }
+
+  .currentPill {
+    grid-column: 2;
+    justify-self: start;
+  }
+
+  .managerActions {
+    grid-column: 2;
+    justify-content: flex-start;
+    min-width: 0;
+  }
+
+  .actions,
+  .actions :global(button) {
+    width: 100%;
+  }
+}

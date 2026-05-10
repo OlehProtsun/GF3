@@ -1370,8 +1370,81 @@ export function ContainerGraphEditPage() {
       return;
     }
 
+    const savedSnapshot = savedGraphSnapshotByIdRef.current[graphId];
+    if (!savedSnapshot || currentGraphSnapshot === persistedGraphSnapshot) {
+      savedGraphSnapshotByIdRef.current[graphId] = persistedGraphSnapshot;
+    }
+  }, [currentGraphSnapshot, graphId, persistedGraphSnapshot]);
+
+  useEffect(() => {
+    if (
+      isCreate ||
+      graphId === null ||
+      !persistedGraphSnapshot ||
+      !currentGraphBaselineSnapshot ||
+      currentGraphSnapshot !== currentGraphBaselineSnapshot ||
+      persistedGraphSnapshot === currentGraphBaselineSnapshot ||
+      !graphQuery.data ||
+      !graphEmployeesQuery.data ||
+      !slotsQuery.data ||
+      !cellStylesQuery.data
+    ) {
+      return;
+    }
+
+    const parsedGraphNote = parseGraphNoteContent(graphQuery.data.note);
+    const editableEmployeeRows = createEditableEmployeeRows(graphEmployeesQuery.data, employeesById);
+    const editableManualColumns = parsedGraphNote.manualColumns.map(toEditableScheduleManualColumn);
+    const nextScheduleColumnOrder = sanitizeScheduleColumnOrder(
+      parsedGraphNote.columnOrder,
+      editableEmployeeRows,
+      editableManualColumns,
+    );
+    const hydratedStyles = mergeNormalizedStyleRecords(
+      cellStylesQuery.data,
+      rehydrateGraphNoteCellStyles(parsedGraphNote.cellStyles, graphQuery.data.id),
+    );
+
+    setForm({
+      ...createGraphFormFromGraph(graphQuery.data),
+      note: parsedGraphNote.note,
+    });
+    setFormErrors({});
+    setGraphEmployeeRows(editableEmployeeRows);
+    setSelectedSchedulePresetId(null);
+    setSelectedEmployeeId(editableEmployeeRows[0]?.employeeId ?? null);
+    setCellMap({
+      ...buildGraphCellMap(slotsQuery.data),
+      ...rehydrateGraphNoteTextCells(parsedGraphNote.textCells),
+    });
+    setCellErrors({});
+    setSubmitError(undefined);
+    setManualShiftPublishError(null);
+    setSelectedCellKeys([]);
+    setManualColumns(sortManualColumnsByColumnOrder(editableManualColumns, nextScheduleColumnOrder));
+    setPendingManualShiftPublishes([]);
+    setScheduleColumnOrder(nextScheduleColumnOrder);
+    setStyleRecords(hydratedStyles);
+    setAutoAvailabilityStyleSuppressions(parsedGraphNote.autoAvailabilityStyleSuppressions);
+    styleRecordsRef.current = hydratedStyles;
+    syncedAvailabilityGroupIdRef.current = graphQuery.data.availabilityGroupId ?? null;
+    setFillColor("#dbeafe");
+    setTextColor("#0f172a");
+    setPreviewAvailabilitySelection(FOLLOW_SCHEDULE_DETAILS_PREVIEW);
+    delete sessionDraftsRef.current[graphId];
     savedGraphSnapshotByIdRef.current[graphId] = persistedGraphSnapshot;
-  }, [graphId, persistedGraphSnapshot]);
+  }, [
+    cellStylesQuery.data,
+    currentGraphBaselineSnapshot,
+    currentGraphSnapshot,
+    employeesById,
+    graphEmployeesQuery.data,
+    graphId,
+    graphQuery.data,
+    isCreate,
+    persistedGraphSnapshot,
+    slotsQuery.data,
+  ]);
 
   useEffect(() => {
     if (!containerId || isCreate || !hasUnsavedScheduleChanges) {

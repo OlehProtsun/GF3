@@ -3,6 +3,59 @@
   gap: 12px;
 }
 
+.panelHeaderRow {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 12px;
+}
+
+.panelHeaderRow > div {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.collapseButton {
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  padding: 0;
+  border-radius: 13px;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  background: rgba(255, 255, 255, 0.9);
+  color: #64748b;
+  cursor: pointer;
+  transition:
+    transform 140ms ease,
+    border-color 140ms ease,
+    background 140ms ease,
+    color 140ms ease;
+}
+
+.collapseButton:hover {
+  border-color: rgba(37, 99, 235, 0.22);
+  background: rgba(239, 246, 255, 0.94);
+  color: #1d4ed8;
+}
+
+.collapseButton:active {
+  transform: scale(0.98);
+}
+
+.collapseButton svg {
+  transform: rotate(180deg);
+  transition: transform 140ms ease;
+}
+
+.collapseButton[aria-expanded="true"] svg {
+  transform: rotate(0deg);
+}
+
 .scheduleSwitcher {
   display: grid;
   gap: 10px;
@@ -386,6 +439,14 @@
   align-items: flex-start;
   justify-content: space-between;
   gap: 10px;
+}
+
+.offerHeaderActions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex: 0 0 auto;
+  gap: 8px;
 }
 
 .offerTitle {
@@ -980,6 +1041,14 @@
 }
 
 @media (max-width: 460px) {
+  .offerHeader {
+    align-items: start;
+  }
+
+  .offerHeaderActions {
+    gap: 6px;
+  }
+
   .confirmActions {
     grid-template-columns: 1fr;
   }

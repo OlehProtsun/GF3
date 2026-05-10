@@ -11,6 +11,7 @@ import {
   ContainerIcon,
   HomeIcon,
   DatabaseIcon,
+  LogoutIcon,
   ArrowIcon,
 } from "@shared/ui/icons";
 import { matchPath } from "@shared/lib/react-router-dom";
@@ -56,6 +57,7 @@ export function OverlaySidebarLayout({ children }: OverlaySidebarLayoutProps) {
   const { pathname } = useLocation();
   const { logout, session } = useAuth();
   const isManager = session?.role === "manager";
+  const accountPath = isManager ? "/manager-profile" : "/profile";
   const isContainerWideContent = pathname === "/container";
   const isHomeWideContent = pathname === "/";
   const isDatabaseWideContent = pathname === "/database";
@@ -137,37 +139,53 @@ export function OverlaySidebarLayout({ children }: OverlaySidebarLayoutProps) {
         }`}
         aria-hidden={isCollapsed}
       >
-        <div className={styles.nav}>
-          {mainNavItems.map(item => (
-            <NavItem key={item.to} label={item.label} to={item.to} icon={item.icon} />
-          ))}
+        <div className={styles.sidebarScroll}>
+          <div className={styles.nav}>
+            {mainNavItems.map(item => (
+              <NavItem key={item.to} label={item.label} to={item.to} icon={item.icon} />
+            ))}
+          </div>
+
+          {isManager ? (
+            <div className={styles.section}>
+              <div className={styles.sectionTitle}>Settings</div>
+              <div className={styles.nav}>
+                <NavItem label="DataBase" to="/database" icon={<DatabaseIcon size={30} />} />
+              </div>
+            </div>
+          ) : null}
         </div>
 
-        {isManager ? (
-          <div className={`${styles.section} ${styles.sectionBottom}`}>
-            <div className={styles.sectionTitle}>Settings</div>
-            <div className={styles.nav}>
-              <NavItem label="DataBase" to="/database" icon={<DatabaseIcon size={30} />} />
+        <div className={styles.sidebarFooter}>
+          <div className={styles.navItem}>
+            <NavLink
+              to={accountPath}
+              className={({ isActive }) => `${styles.navButton} ${isActive ? styles.navButtonActive : ""}`}
+              aria-label={isManager ? "Open manager profile" : "Open profile"}
+              title={`${session?.displayName ?? "Signed in"} (@${session?.userName ?? "account"})`}
+            >
+              <EmployeeIcon size={22} />
+            </NavLink>
+            <div className={styles.navLabel} aria-hidden="true">
+              {isManager ? "Manager" : "Profile"}
             </div>
           </div>
-        ) : null}
 
-        <div className={styles.sidebarFooter}>
-          <div className={styles.userBadge}>
-            <span className={styles.userRole}>{isManager ? "Manager" : "Employee"}</span>
-            <strong className={styles.userName}>{session?.displayName ?? "Signed in"}</strong>
-            <span className={styles.userLogin}>@{session?.userName ?? "account"}</span>
+          <div className={styles.navItem}>
+            <button
+              type="button"
+              className={styles.navButton}
+              onClick={() => {
+                void logout();
+              }}
+              aria-label="Log out"
+            >
+              <LogoutIcon size={22} />
+            </button>
+            <div className={styles.navLabel} aria-hidden="true">
+              Log out
+            </div>
           </div>
-
-          <button
-            type="button"
-            className={styles.logoutButton}
-            onClick={() => {
-              void logout();
-            }}
-          >
-            Log out
-          </button>
 
           <button
             type="button"

@@ -12,6 +12,7 @@ type SessionDto = {
   role: AuthSession["role"];
   userName: string;
   displayName: string;
+  managerId?: number | null;
   employeeId?: number | null;
 };
 
@@ -26,6 +27,7 @@ function toSessionModel(dto: SessionDto): AuthSession {
     role: dto.role,
     userName: dto.userName,
     displayName: dto.displayName,
+    managerId: dto.managerId ?? null,
     employeeId: dto.employeeId ?? null,
   };
 }

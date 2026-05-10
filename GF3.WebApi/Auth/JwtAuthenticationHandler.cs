@@ -48,6 +48,11 @@ public sealed class JwtAuthenticationHandler : AuthenticationHandler<Authenticat
             claims.Add(new Claim("employee_id", session.EmployeeId.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)));
         }
 
+        if (session.ManagerId.HasValue)
+        {
+            claims.Add(new Claim("manager_id", session.ManagerId.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)));
+        }
+
         var identity = new ClaimsIdentity(claims, JwtAuthenticationDefaults.SchemeName, ClaimTypes.Name, ClaimTypes.Role);
         var principal = new ClaimsPrincipal(identity);
         var ticket = new AuthenticationTicket(principal, JwtAuthenticationDefaults.SchemeName);

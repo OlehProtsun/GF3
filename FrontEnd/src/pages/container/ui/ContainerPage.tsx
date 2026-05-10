@@ -33,6 +33,7 @@ import {
 } from "@entities/exports";
 import { useShopsListQuery } from "@entities/shops/api/queries";
 import { ApiError } from "@shared/api/httpClient";
+import { queryKeys } from "@shared/api/queryKeys";
 import { usePageScrollbarHidden } from "@shared/lib/usePageScrollbarHidden";
 import { stableSerialize } from "@shared/lib/stableSerialize";
 import { useUnsavedChangesPrompt } from "@shared/lib/useUnsavedChangesPrompt";
@@ -64,7 +65,7 @@ function useContainerGraphRecords(containerId: number | null, graphs: Graph[], e
   );
 
   const recordsQuery = useQuery({
-    queryKey: ["containers", containerId ?? 0, "graphRecords", graphIdsKey],
+    queryKey: queryKeys.containers.graphRecords(containerId ?? 0, graphIdsKey),
     enabled: enabled && containerId !== null && graphs.length > 0,
     cancelOnUnmount: true,
     staleTime: 30_000,

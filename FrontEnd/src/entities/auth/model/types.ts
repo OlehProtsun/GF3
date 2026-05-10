@@ -4,6 +4,7 @@ export type AuthSession = {
   role: AuthRole;
   userName: string;
   displayName: string;
+  managerId?: number | null;
   employeeId?: number | null;
 };
 

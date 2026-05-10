@@ -2,6 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { useLocation, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { AvailabilityIcon, ContainerIcon, EyeIcon, InformationIcon, ScheduleDetailsIcon } from "@shared/ui/icons";
+import { queryKeys } from "@shared/api/queryKeys";
 import { usePageScrollbarHidden } from "@shared/lib/usePageScrollbarHidden";
 import { PageHeader } from "@shared/ui/PageHeader";
 import { ErrorBanner } from "@shared/ui/components/ErrorBanner";
@@ -10,7 +11,6 @@ import { ContainerGraphMatrix } from "@entities/containers";
 import { loadHomeDashboard, type HomeDashboardData } from "./homeDashboard";
 import styles from "./HomePage.module.css";
 
-const HOME_QUERY_KEY = ["home", "dashboard"] as const;
 const CURRENT_TIME_FORMATTER = new Intl.DateTimeFormat("en-GB", {
   hour: "2-digit",
   minute: "2-digit",
@@ -183,7 +183,7 @@ export function HomePage() {
   );
   usePageScrollbarHidden(true);
   const homeQuery = useQuery({
-    queryKey: [...HOME_QUERY_KEY, location.key],
+    queryKey: [...queryKeys.home.dashboard(), location.key],
     staleTime: 60_000,
     // Keep the dashboard bootstrap request alive through StrictMode remounts after sign-in.
     queryFn: ({ signal }) => loadHomeDashboard(signal),

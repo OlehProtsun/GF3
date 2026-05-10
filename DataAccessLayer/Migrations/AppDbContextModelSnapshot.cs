@@ -258,6 +258,73 @@ namespace DataAccessLayer.Migrations
                     b.ToTable("employee_account");
                 });
 
+            modelBuilder.Entity("DataAccessLayer.Models.ManagerAccountModel", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<string>("DisplayName")
+                        .IsRequired()
+                        .HasMaxLength(160)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("display_name");
+
+                    b.Property<DateTimeOffset?>("LastLoginAtUtc")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("last_login_at_utc");
+
+                    b.Property<string>("PasswordHash")
+                        .IsRequired()
+                        .HasColumnType("TEXT")
+                        .HasColumnName("password_hash");
+
+                    b.Property<string>("PasswordResetCodeHash")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("password_reset_code_hash");
+
+                    b.Property<DateTimeOffset?>("PasswordResetExpiresAtUtc")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("password_reset_expires_at_utc");
+
+                    b.Property<DateTimeOffset?>("PasswordResetRequestedAtUtc")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("password_reset_requested_at_utc");
+
+                    b.Property<DateTimeOffset>("PasswordUpdatedAtUtc")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("password_updated_at_utc");
+
+                    b.Property<string>("RecoveryEmail")
+                        .HasMaxLength(254)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("recovery_email");
+
+                    b.Property<DateTimeOffset>("UpdatedAtUtc")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("updated_at_utc");
+
+                    b.Property<string>("Username")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("username")
+                        .UseCollation("NOCASE");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Username")
+                        .IsUnique()
+                        .HasDatabaseName("ux_manager_account_username");
+
+                    b.ToTable("manager_account");
+                });
+
             modelBuilder.Entity("DataAccessLayer.Models.EmployeeModel", b =>
                 {
                     b.Property<int>("Id")

@@ -67,6 +67,29 @@ internal static class ModelMapper
         LastSeenAtUtc = model.LastSeenAtUtc,
     };
 
+    internal static Contracts.Managers.ManagerAccountModel ToContract(this Dal.ManagerAccountModel model) => new()
+    {
+        Id = model.Id,
+        UserName = model.Username,
+        DisplayName = model.DisplayName,
+        PasswordHash = model.PasswordHash,
+        RecoveryEmail = model.RecoveryEmail,
+        PasswordUpdatedAtUtc = model.PasswordUpdatedAtUtc,
+        LastLoginAtUtc = model.LastLoginAtUtc,
+        CreatedAtUtc = model.CreatedAtUtc,
+        UpdatedAtUtc = model.UpdatedAtUtc,
+    };
+
+    internal static Contracts.Managers.ManagerProfileDto ToProfileDto(this Dal.ManagerAccountModel model) => new()
+    {
+        Id = model.Id,
+        UserName = model.Username,
+        DisplayName = model.DisplayName,
+        RecoveryEmail = model.RecoveryEmail,
+        LastLoginAtUtc = model.LastLoginAtUtc,
+        CreatedAtUtc = model.CreatedAtUtc,
+    };
+
     internal static ShopModel ToContract(this Dal.ShopModel model) => new()
     {
         Id = model.Id,

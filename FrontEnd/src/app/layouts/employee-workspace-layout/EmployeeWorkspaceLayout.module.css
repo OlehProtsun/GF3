@@ -2,10 +2,7 @@
   --shell-max-width: 1120px;
   --shell-gutter: clamp(14px, 3.6vw, 28px);
   min-height: 100svh;
-  background:
-    radial-gradient(circle at top left, rgba(191, 219, 254, 0.32), transparent 32%),
-    radial-gradient(circle at bottom right, rgba(186, 230, 253, 0.28), transparent 28%),
-    linear-gradient(180deg, #f8fbff 0%, #f5f7fb 42%, #eef2f7 100%);
+  background: var(--app-page-background, #f3f4f6);
   color: #0f172a;
 }
 
@@ -330,9 +327,20 @@
 }
 
 .tabIcon {
+  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+}
+
+.navUnreadDot {
+  position: absolute;
+  top: -2px;
+  right: -3px;
+  width: 5px;
+  height: 5px;
+  border-radius: 999px;
+  background: #dc2626;
 }
 
 .homeIconFlipped {

@@ -14,6 +14,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<ContainerModel> Containers => Set<ContainerModel>();
     public DbSet<EmployeeModel> Employees => Set<EmployeeModel>();
     public DbSet<EmployeeAccountModel> EmployeeAccounts => Set<EmployeeAccountModel>();
+    public DbSet<ManagerAccountModel> ManagerAccounts => Set<ManagerAccountModel>();
     public DbSet<ShopModel> Shops => Set<ShopModel>();
     public DbSet<ScheduleModel> Schedules => Set<ScheduleModel>();
     public DbSet<SchedulePresetModel> SchedulePresets => Set<SchedulePresetModel>();
@@ -33,6 +34,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         ConfigureContainer(modelBuilder);
         ConfigureEmployee(modelBuilder);
         ConfigureEmployeeAccount(modelBuilder);
+        ConfigureManagerAccount(modelBuilder);
         ConfigureShop(modelBuilder);
         ConfigureSchedule(modelBuilder);
         ConfigureSchedulePreset(modelBuilder);
@@ -99,6 +101,38 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             entity.HasIndex(property => property.Username)
                 .IsUnique()
                 .HasDatabaseName("ux_employee_account_username");
+        });
+    }
+
+    private static void ConfigureManagerAccount(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<ManagerAccountModel>(entity =>
+        {
+            entity.Property(property => property.Username)
+                .IsRequired()
+                .HasMaxLength(100)
+                .UseCollation("NOCASE");
+
+            entity.Property(property => property.DisplayName)
+                .IsRequired()
+                .HasMaxLength(160);
+
+            entity.Property(property => property.RecoveryEmail)
+                .IsRequired(false)
+                .HasMaxLength(254);
+
+            entity.Property(property => property.PasswordHash).IsRequired();
+            entity.Property(property => property.PasswordUpdatedAtUtc).IsRequired();
+            entity.Property(property => property.LastLoginAtUtc).IsRequired(false);
+            entity.Property(property => property.PasswordResetCodeHash).IsRequired(false);
+            entity.Property(property => property.PasswordResetRequestedAtUtc).IsRequired(false);
+            entity.Property(property => property.PasswordResetExpiresAtUtc).IsRequired(false);
+            entity.Property(property => property.CreatedAtUtc).IsRequired();
+            entity.Property(property => property.UpdatedAtUtc).IsRequired();
+
+            entity.HasIndex(property => property.Username)
+                .IsUnique()
+                .HasDatabaseName("ux_manager_account_username");
         });
     }
 

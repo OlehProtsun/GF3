@@ -18,11 +18,16 @@ public sealed class EmployeeAccountService : IEmployeeAccountService
     private static readonly TimeSpan PasswordResetCodeLifetime = TimeSpan.FromMinutes(15);
     private static readonly TimeSpan PasswordResetRequestThrottle = TimeSpan.FromSeconds(45);
     private readonly IEmployeeAccountRepository _accountRepository;
+    private readonly IManagerAccountRepository _managerAccountRepository;
     private readonly IPasswordHasher _passwordHasher;
 
-    public EmployeeAccountService(IEmployeeAccountRepository accountRepository, IPasswordHasher passwordHasher)
+    public EmployeeAccountService(
+        IEmployeeAccountRepository accountRepository,
+        IManagerAccountRepository managerAccountRepository,
+        IPasswordHasher passwordHasher)
     {
         _accountRepository = accountRepository;
+        _managerAccountRepository = managerAccountRepository;
         _passwordHasher = passwordHasher;
     }
 
@@ -61,10 +66,7 @@ public sealed class EmployeeAccountService : IEmployeeAccountService
 
             ValidateNewAccount(employeeId, normalizedUsername, normalizedPassword);
 
-            if (await _accountRepository.ExistsByUsernameAsync(normalizedUsername!, excludeEmployeeId: employeeId, ct).ConfigureAwait(false))
-            {
-                throw new ValidationException("This username is already in use.");
-            }
+            await EnsureUsernameIsAvailableAsync(normalizedUsername!, employeeId, ct).ConfigureAwait(false);
 
             var created = await _accountRepository.AddAsync(
                     new DataAccessLayer.Models.EmployeeAccountModel
@@ -82,10 +84,7 @@ public sealed class EmployeeAccountService : IEmployeeAccountService
 
         ValidateExistingAccount(existingAccount, normalizedUsername, normalizedPassword);
 
-        if (await _accountRepository.ExistsByUsernameAsync(normalizedUsername!, excludeEmployeeId: employeeId, ct).ConfigureAwait(false))
-        {
-            throw new ValidationException("This username is already in use.");
-        }
+        await EnsureUsernameIsAvailableAsync(normalizedUsername!, employeeId, ct).ConfigureAwait(false);
 
         existingAccount.Username = normalizedUsername!;
         if (!string.IsNullOrWhiteSpace(normalizedPassword))
@@ -248,6 +247,19 @@ public sealed class EmployeeAccountService : IEmployeeAccountService
         if (password.Length < 6 || password.Length > 200)
         {
             throw new ValidationException("Password must be between 6 and 200 characters long.");
+        }
+    }
+
+    private async Task EnsureUsernameIsAvailableAsync(string username, int employeeId, CancellationToken ct)
+    {
+        if (await _accountRepository.ExistsByUsernameAsync(username, excludeEmployeeId: employeeId, ct).ConfigureAwait(false))
+        {
+            throw new ValidationException("This username is already in use.");
+        }
+
+        if (await _managerAccountRepository.GetByUsernameAsync(username, ct).ConfigureAwait(false) is not null)
+        {
+            throw new ValidationException("This username is already in use.");
         }
     }
 

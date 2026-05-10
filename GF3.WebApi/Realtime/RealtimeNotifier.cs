@@ -8,7 +8,7 @@ public interface IRealtimeNotifier
 {
     Task NotifyScheduleChangedAsync(int containerId, int graphId, string reason);
 
-    Task NotifyShiftSwapsChangedAsync(int? containerId, int? graphId, int? scheduleId, string reason);
+    Task NotifyShiftSwapsChangedAsync(int? containerId, int? graphId, int? scheduleId, string reason, int? shiftSwapId = null);
 
     Task NotifyWorkflowLogCreatedAsync(WorkflowLogEntryModel entry);
 
@@ -27,12 +27,13 @@ public sealed class RealtimeNotifier(IHubContext<EmployeePresenceHub, IEmployeeP
             ChangedAtUtc = DateTimeOffset.UtcNow,
         });
 
-    public Task NotifyShiftSwapsChangedAsync(int? containerId, int? graphId, int? scheduleId, string reason)
+    public Task NotifyShiftSwapsChangedAsync(int? containerId, int? graphId, int? scheduleId, string reason, int? shiftSwapId = null)
         => hubContext.Clients.All.ShiftSwapsChanged(new ShiftSwapsChangedMessage
         {
             ContainerId = containerId,
             GraphId = graphId,
             ScheduleId = scheduleId,
+            ShiftSwapId = shiftSwapId,
             Reason = reason,
             ChangedAtUtc = DateTimeOffset.UtcNow,
         });

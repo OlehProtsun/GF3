@@ -1,5 +1,4 @@
 /* eslint-disable react-refresh/only-export-components */
-/* eslint-disable react-hooks/set-state-in-effect */
 import {
   createContext,
   useCallback,
@@ -49,6 +48,7 @@ type CacheRecord = {
   updatedAt: number;
   promise?: Promise<unknown>;
   controller?: AbortController;
+  invalidatedWhileFetching?: boolean;
 };
 
 export class QueryCache {
@@ -177,6 +177,9 @@ export class QueryClient {
       const record = this.records.get(key);
       if (record) {
         record.updatedAt = 0;
+        if (record.promise) {
+          record.invalidatedWhileFetching = true;
+        }
       }
 
       this.bumps.set(key, this.getBump(key) + 1);
@@ -222,13 +225,19 @@ export class QueryClient {
 
     const controller = new AbortController();
     const retry = Math.max(0, options.retry ?? this.defaults?.queries?.retry ?? 0);
+    record.invalidatedWhileFetching = false;
 
     const promise = runWithRetry(
       () => queryFn({ signal: controller.signal }),
       retry,
     )
       .then((data) => {
-        this.setQueryData(queryKey, data);
+        const activeRecord = this.records.get(key);
+
+        if (activeRecord?.promise === promise && !activeRecord.invalidatedWhileFetching) {
+          this.setQueryData(queryKey, data);
+        }
+
         return data;
       })
       .finally(() => {
@@ -238,8 +247,16 @@ export class QueryClient {
           return;
         }
 
+        const shouldRefetch = activeRecord.invalidatedWhileFetching;
         activeRecord.promise = undefined;
         activeRecord.controller = undefined;
+        activeRecord.invalidatedWhileFetching = false;
+
+        if (shouldRefetch) {
+          activeRecord.updatedAt = 0;
+          this.bumps.set(key, this.getBump(key) + 1);
+          this.listeners.forEach((listener) => listener({ type: "invalidate", key }));
+        }
       });
 
     record.promise = promise;
@@ -255,10 +272,7 @@ export class QueryClient {
       return;
     }
 
-    const controller = record.controller;
-    record.promise = undefined;
-    record.controller = undefined;
-    controller?.abort();
+    record.invalidatedWhileFetching = true;
   }
 }
 

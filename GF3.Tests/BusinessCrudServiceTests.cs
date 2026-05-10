@@ -1,5 +1,9 @@
 using BusinessLogicLayer.Common;
+using BusinessLogicLayer.Contracts.Managers;
+using BusinessLogicLayer.Security;
 using BusinessLogicLayer.Services;
+using BusinessLogicLayer.Services.Abstractions;
+using DataAccessLayer.Repositories;
 using GF3.Tests.Infrastructure;
 
 namespace GF3.Tests;
@@ -108,6 +112,38 @@ public sealed class BusinessCrudServiceTests
     }
 
     [Fact]
+    public async Task ManagerAccountService_Delete_RemovesOtherManager_AndRejectsSelf()
+    {
+        await using var database = await SqliteTestDatabase.CreateAsync();
+        await using var context = database.CreateContext();
+        var service = CreateManagerAccountService(context);
+
+        var currentManager = await service.CreateAsync(new CreateManagerAccountRequest
+        {
+            DisplayName = "Primary Manager",
+            UserName = "primary.manager",
+            Password = "secret1",
+        });
+        var otherManager = await service.CreateAsync(new CreateManagerAccountRequest
+        {
+            DisplayName = "Second Manager",
+            UserName = "second.manager",
+            Password = "secret2",
+        });
+
+        var deletedProfile = await service.DeleteAsync(otherManager.Id, currentManager.Id, currentManager.UserName);
+        var remainingManagers = await service.ListProfilesAsync();
+
+        Assert.Equal(otherManager.Id, deletedProfile.Id);
+        Assert.DoesNotContain(remainingManagers, manager => manager.Id == otherManager.Id);
+        Assert.Contains(remainingManagers, manager => manager.Id == currentManager.Id);
+
+        var exception = await Assert.ThrowsAsync<ValidationException>(() =>
+            service.DeleteAsync(currentManager.Id, currentManager.Id, currentManager.UserName));
+        Assert.Equal(["You cannot delete your own manager account."], exception.Errors["managerId"]);
+    }
+
+    [Fact]
     public async Task ScheduleEmployeeAndSlotServices_PerformCrudOperations()
     {
         await using var database = await SqliteTestDatabase.CreateAsync();
@@ -149,5 +185,23 @@ public sealed class BusinessCrudServiceTests
 
         Assert.Empty(await employeeService.GetAllAsync());
         Assert.Empty(await slotService.GetAllAsync());
+    }
+
+    private static ManagerAccountService CreateManagerAccountService(DataAccessLayer.Models.DataBaseContext.AppDbContext context)
+        => new(
+            new ManagerAccountRepository(context),
+            new EmployeeAccountRepository(context),
+            new PasswordHasher(),
+            new NoopEmailSender());
+
+    private sealed class NoopEmailSender : IEmailSender
+    {
+        public Task SendAsync(
+            string toEmail,
+            string? toName,
+            string subject,
+            string textBody,
+            CancellationToken ct = default)
+            => Task.CompletedTask;
     }
 }

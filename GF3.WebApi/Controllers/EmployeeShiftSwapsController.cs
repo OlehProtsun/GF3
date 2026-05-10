@@ -152,7 +152,7 @@ public sealed class EmployeeShiftSwapsController(
             .LogAsync(User, $"Created swap offer for {created.Schedule.Name} on day {slot.DayOfMonth} ({offeredPeriod.FromTime}-{offeredPeriod.ToTime}).", cancellationToken)
             .ConfigureAwait(false);
         await realtimeNotifier
-            .NotifyShiftSwapsChangedAsync(created.Schedule.ContainerId, created.ScheduleId, created.ScheduleId, "employee-swap-created")
+            .NotifyShiftSwapsChangedAsync(created.Schedule.ContainerId, created.ScheduleId, created.ScheduleId, "employee-swap-created", created.Id)
             .ConfigureAwait(false);
 
         return CreatedAtAction(nameof(GetVisible), new { id = created.Id }, ToDto(created, employeeId, isScheduleLocked: false));
@@ -238,7 +238,7 @@ public sealed class EmployeeShiftSwapsController(
             .NotifyScheduleChangedAsync(accepted.Schedule.ContainerId, accepted.ScheduleId, "employee-swap-accepted")
             .ConfigureAwait(false);
         await realtimeNotifier
-            .NotifyShiftSwapsChangedAsync(accepted.Schedule.ContainerId, accepted.ScheduleId, accepted.ScheduleId, "employee-swap-accepted")
+            .NotifyShiftSwapsChangedAsync(accepted.Schedule.ContainerId, accepted.ScheduleId, accepted.ScheduleId, "employee-swap-accepted", accepted.Id)
             .ConfigureAwait(false);
 
         return Ok(ToDto(accepted, employeeId, isScheduleLocked: false));
@@ -272,7 +272,7 @@ public sealed class EmployeeShiftSwapsController(
             .LogAsync(User, $"Cancelled swap offer for {swap.Schedule.Name} on day {swap.ScheduleSlot.DayOfMonth}.", cancellationToken)
             .ConfigureAwait(false);
         await realtimeNotifier
-            .NotifyShiftSwapsChangedAsync(swap.Schedule.ContainerId, swap.ScheduleId, swap.ScheduleId, "employee-swap-cancelled")
+            .NotifyShiftSwapsChangedAsync(swap.Schedule.ContainerId, swap.ScheduleId, swap.ScheduleId, "employee-swap-cancelled", swap.Id)
             .ConfigureAwait(false);
 
         return Ok(ToDto(swap, employeeId, scheduleEditLockService.IsLocked(swap.Schedule.ContainerId, swap.ScheduleId)));

@@ -1,6 +1,13 @@
 export const queryKeys = {
+  home: {
+    dashboard: () => ["home", "dashboard"] as const,
+  },
   employeeProfile: {
     me: () => ["employeeProfile", "me"] as const,
+  },
+  managerProfile: {
+    me: () => ["managerProfile", "me"] as const,
+    list: () => ["managerProfile", "list"] as const,
   },
   employeeAvailability: {
     all: ["employeeAvailability"] as const,
@@ -46,10 +53,13 @@ export const queryKeys = {
     schedulePresets: (containerId: number) => ["containers", containerId, "schedulePresets"] as const,
     graphById: (containerId: number, graphId: number) => ["containers", containerId, "graphs", graphId] as const,
     graphSlots: (containerId: number, graphId: number) => ["containers", containerId, "graphs", graphId, "slots"] as const,
+    graphSlotsBatches: (containerId: number) => ["containers", containerId, "graphs", "slotsBatch"] as const,
     graphSlotsBatch: (containerId: number, graphIds: readonly number[]) =>
       ["containers", containerId, "graphs", "slotsBatch", ...graphIds] as const,
     graphEmployees: (containerId: number, graphId: number) => ["containers", containerId, "graphs", graphId, "employees"] as const,
     graphCellStyles: (containerId: number, graphId: number) => ["containers", containerId, "graphs", graphId, "cellStyles"] as const,
+    graphRecordsPrefix: (containerId: number) => ["containers", containerId, "graphRecords"] as const,
+    graphRecords: (containerId: number, graphIdsKey: string) => ["containers", containerId, "graphRecords", graphIdsKey] as const,
   },
   availabilityBinds: {
     all: ["availabilityBinds"] as const,
