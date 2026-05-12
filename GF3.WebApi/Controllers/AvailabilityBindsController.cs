@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Mvc;
 using WebApi.Auth;
 using WebApi.Contracts.AvailabilityBinds;
 using WebApi.Mappers;
+using WebApi.Realtime;
 
 namespace WebApi.Controllers;
 
@@ -16,7 +17,9 @@ namespace WebApi.Controllers;
 [ApiController]
 [Route("api/availability-binds")]
 [Authorize(Roles = AuthRoles.Manager)]
-public sealed class AvailabilityBindsController(IBindService bindService) : ControllerBase
+public sealed class AvailabilityBindsController(
+    IBindService bindService,
+    IRealtimeNotifier? realtimeNotifier = null) : ControllerBase
 {
     [HttpGet]
     [ProducesResponseType(typeof(IEnumerable<AvailabilityBindDto>), StatusCodes.Status200OK)]
@@ -54,6 +57,7 @@ public sealed class AvailabilityBindsController(IBindService bindService) : Cont
     {
         var created = await bindService.CreateAsync(request.ToCreateModel(), cancellationToken).ConfigureAwait(false);
         var dto = created.ToApiDto();
+        await NotifyBindChangedAsync(dto.Id, "manager-availability-bind-created").ConfigureAwait(false);
         return CreatedAtAction(nameof(GetById), new { id = dto.Id }, dto);
     }
 
@@ -66,6 +70,7 @@ public sealed class AvailabilityBindsController(IBindService bindService) : Cont
     {
         _ = await GetExistingBindOrThrowAsync(id, cancellationToken).ConfigureAwait(false);
         await bindService.UpdateAsync(request.ToUpdateModel(id), cancellationToken).ConfigureAwait(false);
+        await NotifyBindChangedAsync(id, "manager-availability-bind-updated").ConfigureAwait(false);
         return NoContent();
     }
 
@@ -77,8 +82,15 @@ public sealed class AvailabilityBindsController(IBindService bindService) : Cont
     {
         _ = await GetExistingBindOrThrowAsync(id, cancellationToken).ConfigureAwait(false);
         await bindService.DeleteAsync(id, cancellationToken).ConfigureAwait(false);
+        await NotifyBindChangedAsync(id, "manager-availability-bind-deleted").ConfigureAwait(false);
         return NoContent();
     }
+
+    private Task NotifyBindChangedAsync(int bindId, string reason)
+        => realtimeNotifier?.NotifyManagerDataChangedAsync(
+            ManagerEditResourceTypes.AvailabilityBind,
+            bindId.ToString(),
+            reason) ?? Task.CompletedTask;
 
     private async Task<BindModel> GetExistingBindOrThrowAsync(int id, CancellationToken cancellationToken)
     {

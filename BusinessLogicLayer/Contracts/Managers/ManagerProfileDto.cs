@@ -12,5 +12,7 @@ public sealed class ManagerProfileDto
 
     public DateTimeOffset? LastLoginAtUtc { get; set; }
 
+    public bool IsOnline { get; set; }
+
     public DateTimeOffset CreatedAtUtc { get; set; }
 }

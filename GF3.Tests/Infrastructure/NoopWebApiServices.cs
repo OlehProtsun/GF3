@@ -38,6 +38,14 @@ internal sealed class NoopRealtimeNotifier : IRealtimeNotifier
     public Task NotifyScheduleChangedAsync(int containerId, int graphId, string reason)
         => Task.CompletedTask;
 
+    public Task NotifyManagerDataChangedAsync(
+        string resourceType,
+        string? resourceId,
+        string reason,
+        int? containerId = null,
+        int? graphId = null)
+        => Task.CompletedTask;
+
     public Task NotifyShiftSwapsChangedAsync(int? containerId, int? graphId, int? scheduleId, string reason, int? shiftSwapId = null)
         => Task.CompletedTask;
 
@@ -45,5 +53,8 @@ internal sealed class NoopRealtimeNotifier : IRealtimeNotifier
         => Task.CompletedTask;
 
     public Task NotifyScheduleEditLockChangedAsync(ScheduleEditLockState state)
+        => Task.CompletedTask;
+
+    public Task NotifyManagerEditLockChangedAsync(ManagerEditLockState state)
         => Task.CompletedTask;
 }

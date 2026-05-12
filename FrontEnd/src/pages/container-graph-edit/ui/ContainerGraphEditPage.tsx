@@ -1,6 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
-import { useRealtime } from "@app/providers/PresenceProvider";
+import {
+  buildManagerEditLockMessage,
+  managerEditResourceTypes,
+  useManagerEditLocks,
+} from "@app/providers/PresenceProvider";
 import { useQueryClient, type QueryClient } from "@tanstack/react-query";
 import {
   buildActiveAvailabilityBindMap,
@@ -89,6 +93,7 @@ import { usePageScrollbarHidden } from "@shared/lib/usePageScrollbarHidden";
 import { stableSerialize } from "@shared/lib/stableSerialize";
 import { useUnsavedChangesPrompt } from "@shared/lib/useUnsavedChangesPrompt";
 import { ConfirmDialog } from "@shared/ui/ConfirmDialog";
+import { ManagerEditLockDialog } from "@shared/ui/ManagerEditLockDialog";
 import { SavingOverlay } from "@shared/ui/SavingOverlay";
 import { IosButton } from "@shared/ui/components/IosButton";
 import { SaveIcon } from "@shared/ui/icons";
@@ -830,7 +835,6 @@ export function ContainerGraphEditPage() {
   const location = useLocation();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { setScheduleEditLocks } = useRealtime();
   const { containerId: containerIdParam, graphId: graphIdParam } = useParams<{ containerId: string; graphId?: string }>();
   const parsedContainerId = containerIdParam ? Number(containerIdParam) : null;
   const parsedGraphId = graphIdParam ? Number(graphIdParam) : null;
@@ -1446,36 +1450,6 @@ export function ContainerGraphEditPage() {
     slotsQuery.data,
   ]);
 
-  useEffect(() => {
-    if (!containerId || isCreate || !hasUnsavedScheduleChanges) {
-      setScheduleEditLocks([]);
-      return;
-    }
-
-    const lockTargetsByGraphId = new Map<number, { containerId: number; graphId: number }>();
-    if (graphId !== null && currentGraphSnapshot !== currentGraphBaselineSnapshot) {
-      lockTargetsByGraphId.set(graphId, { containerId, graphId });
-    }
-
-    Object.values(sessionDraftsRef.current).forEach(draft => {
-      const savedSnapshot = savedGraphSnapshotByIdRef.current[draft.graphId];
-      if (savedSnapshot && buildGraphDraftSnapshot(draft) !== savedSnapshot) {
-        lockTargetsByGraphId.set(draft.graphId, { containerId, graphId: draft.graphId });
-      }
-    });
-
-    setScheduleEditLocks([...lockTargetsByGraphId.values()]);
-  }, [
-    containerId,
-    currentGraphBaselineSnapshot,
-    currentGraphSnapshot,
-    graphId,
-    hasUnsavedScheduleChanges,
-    isCreate,
-    setScheduleEditLocks,
-  ]);
-
-  useEffect(() => () => setScheduleEditLocks([]), [setScheduleEditLocks]);
   const relatedGraphs = useMemo(
     () => (containerGraphsQuery.data ?? []).filter(item =>
       item.id !== graphId &&
@@ -1548,6 +1522,24 @@ export function ContainerGraphEditPage() {
   const pageHeaderMaxWidth = showSessionTabs
     ? `${860 + (visibleSessionTabCount * 122)}px`
     : "980px";
+  const editLockTargets = useMemo(
+    () => (
+      !isCreate && containerId
+        ? openGraphIds.map(openGraphId => ({
+          resourceType: managerEditResourceTypes.schedule,
+          resourceId: `${containerId}:${openGraphId}`,
+          containerId,
+          graphId: openGraphId,
+        }))
+        : []
+    ),
+    [containerId, isCreate, openGraphIds],
+  );
+  const { lockedByOtherState, isCheckingLocks } = useManagerEditLocks(editLockTargets);
+  const editLockMessage = lockedByOtherState
+    ? buildManagerEditLockMessage(lockedByOtherState, "This schedule")
+    : null;
+  const canEdit = !editLockMessage && !isCheckingLocks;
 
   const dayConflictMap = useMemo(
     () => buildGraphConflictDayMap(effectiveGraph, effectiveSlots),
@@ -1672,6 +1664,22 @@ export function ContainerGraphEditPage() {
   } = useUnsavedChangesPrompt({
     when: hasUnsavedChanges && !isSaving,
   });
+
+  const handleEditLockDialogClose = () => {
+    runWithoutPrompt(() => {
+      if (containerId && graphId !== null) {
+        navigate(`/container/${containerId}/graphs/${graphId}${sessionSearch}`);
+        return;
+      }
+
+      if (containerId) {
+        navigate(`/container?openContainerId=${containerId}`);
+        return;
+      }
+
+      navigate("/container");
+    });
+  };
 
   useEffect(() => {
     if (previewAvailabilitySelection === FOLLOW_SCHEDULE_DETAILS_PREVIEW) {
@@ -2105,6 +2113,16 @@ export function ContainerGraphEditPage() {
 
   const handleSave = async () => {
     setIsSaveConfirmOpen(false);
+
+    if (editLockMessage) {
+      setSubmitError(editLockMessage);
+      return;
+    }
+
+    if (isCheckingLocks) {
+      setSubmitError("Checking edit access. Please wait a moment.");
+      return;
+    }
 
     if (!containerId || !handleValidate()) {
       return;
@@ -2632,7 +2650,7 @@ export function ContainerGraphEditPage() {
                     <IosButton
                       label="Save"
                       icon={<SaveIcon size={18} />}
-                      disabled={isSaving}
+                      disabled={isSaving || Boolean(editLockMessage) || isCheckingLocks}
                       onClick={() => setIsSaveConfirmOpen(true)}
                     />
                 }
@@ -2649,7 +2667,25 @@ export function ContainerGraphEditPage() {
         }
       />
 
-      <ContainerGraphEditor
+      {isCheckingLocks ? (
+        <ManagerEditLockDialog
+          open
+          title="Checking edit access"
+          message="Please wait while we check whether this schedule can be edited."
+        />
+      ) : null}
+
+      {editLockMessage ? (
+        <ManagerEditLockDialog
+          open
+          message={editLockMessage}
+          actionText="Back to schedule"
+          onClose={handleEditLockDialogClose}
+        />
+      ) : null}
+
+      {canEdit ? (
+        <ContainerGraphEditor
         graph={effectiveGraph}
         isHeaderCollapsed={isHeaderCollapsed}
         compactSize={isCompactMatrix}
@@ -2776,7 +2812,8 @@ export function ContainerGraphEditPage() {
         onClearAllCellStyles={() => void handleClearAllCellStyles()}
         onSave={() => setIsSaveConfirmOpen(true)}
         onGenerate={() => void handleGenerate()}
-      />
+        />
+      ) : null}
 
       <ConfirmDialog
         open={bindDeleteTarget !== null}

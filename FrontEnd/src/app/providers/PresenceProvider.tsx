@@ -27,14 +27,26 @@ import { isDev } from "@shared/lib/isDev";
 
 const presenceHubMethodName = "PresenceChanged";
 const scheduleChangedMethodName = "ScheduleChanged";
+const managerDataChangedMethodName = "ManagerDataChanged";
 const shiftSwapsChangedMethodName = "ShiftSwapsChanged";
 const workflowLogCreatedMethodName = "WorkflowLogCreated";
 const scheduleEditLockChangedMethodName = "ScheduleEditLockChanged";
-const setScheduleEditLocksMethodName = "SetScheduleEditLocks";
+const managerEditLockChangedMethodName = "ManagerEditLockChanged";
+const setManagerEditLocksMethodName = "SetManagerEditLocks";
+const managerEditLockCheckTimeoutMs = 8000;
 
 type ScheduleChangedUpdate = {
   containerId: number;
   graphId: number;
+  reason: string;
+  changedAtUtc: string;
+};
+
+type ManagerDataChangedUpdate = {
+  resourceType: string;
+  resourceId?: string | null;
+  containerId?: number | null;
+  graphId?: number | null;
   reason: string;
   changedAtUtc: string;
 };
@@ -53,12 +65,27 @@ type ScheduleEditLockChangedUpdate = {
   graphId: number;
   isLocked: boolean;
   lockedBy?: string | null;
+  lockedByManagerId?: number | null;
   changedAtUtc: string;
 };
 
 type ScheduleEditLockTarget = {
   containerId: number;
   graphId: number;
+};
+
+export type ManagerEditLockTarget = {
+  resourceType: string;
+  resourceId: string;
+  containerId?: number | null;
+  graphId?: number | null;
+};
+
+export type ManagerEditLockState = ManagerEditLockTarget & {
+  isLocked: boolean;
+  lockedBy?: string | null;
+  lockedByManagerId?: number | null;
+  changedAtUtc: string;
 };
 
 export type EmployeeRealtimeNotification = {
@@ -73,19 +100,152 @@ export type EmployeeRealtimeNotification = {
 };
 
 type RealtimeContextValue = {
-  setScheduleEditLocks: (locks: ScheduleEditLockTarget[]) => void;
+  setScheduleEditLocks: (locks: ScheduleEditLockTarget[]) => Promise<ManagerEditLockState[]>;
+  setManagerEditLocks: (locks: ManagerEditLockTarget[]) => Promise<ManagerEditLockState[]>;
+  managerEditLocks: Record<string, ManagerEditLockState>;
   notifications: EmployeeRealtimeNotification[];
   clearNotifications: () => void;
 };
 
 const RealtimeContext = createContext<RealtimeContextValue>({
-  setScheduleEditLocks: () => undefined,
+  setScheduleEditLocks: async () => [],
+  setManagerEditLocks: async () => [],
+  managerEditLocks: {},
   notifications: [],
   clearNotifications: () => undefined,
 });
 
 export function useRealtime() {
   return useContext(RealtimeContext);
+}
+
+export const managerEditResourceTypes = {
+  schedule: "schedule",
+  availabilityGroup: "availability-group",
+  employee: "employee",
+  shop: "shop",
+  container: "container",
+  availabilityBind: "availability-bind",
+  managerProfile: "manager-profile",
+} as const;
+
+export function buildManagerEditLockKey(target: Pick<ManagerEditLockTarget, "resourceType" | "resourceId">) {
+  return `${target.resourceType.trim().toLowerCase()}:${target.resourceId.trim()}`;
+}
+
+export function buildManagerEditLockMessage(state: ManagerEditLockState | null | undefined, fallbackName: string) {
+  const lockedBy = state?.lockedBy?.trim() || "another manager";
+  return `${fallbackName} is currently being edited by ${lockedBy}. You cannot edit it right now.`;
+}
+
+function scheduleToManagerEditLockTarget(target: ScheduleEditLockTarget): ManagerEditLockTarget {
+  return {
+    resourceType: managerEditResourceTypes.schedule,
+    resourceId: `${target.containerId}:${target.graphId}`,
+    containerId: target.containerId,
+    graphId: target.graphId,
+  };
+}
+
+function managerEditLockStatesEqual(left: ManagerEditLockState | undefined, right: ManagerEditLockState) {
+  if (!left) {
+    return false;
+  }
+
+  return (
+    left.resourceType === right.resourceType &&
+    left.resourceId === right.resourceId &&
+    left.containerId === right.containerId &&
+    left.graphId === right.graphId &&
+    left.isLocked === right.isLocked &&
+    left.lockedBy === right.lockedBy &&
+    left.lockedByManagerId === right.lockedByManagerId &&
+    left.changedAtUtc === right.changedAtUtc
+  );
+}
+
+function managerEditLockStatesCoverTargets(targets: ManagerEditLockTarget[], states: ManagerEditLockState[]) {
+  const stateKeys = new Set(states.map(buildManagerEditLockKey));
+  return targets.every(target => stateKeys.has(buildManagerEditLockKey(target)));
+}
+
+export function useManagerEditLocks(targets: ManagerEditLockTarget[]) {
+  const { setManagerEditLocks, managerEditLocks } = useRealtime();
+  const { session } = useAuth();
+  const setManagerEditLocksRef = useRef(setManagerEditLocks);
+  const targetKey = useMemo(
+    () => targets.map(buildManagerEditLockKey).sort().join("|"),
+    [targets],
+  );
+  const stableTargets = useMemo(() => targets, [targetKey]);
+  const [resolvedTargetKey, setResolvedTargetKey] = useState("");
+  const [timedOutTargetKey, setTimedOutTargetKey] = useState("");
+
+  useEffect(() => {
+    setManagerEditLocksRef.current = setManagerEditLocks;
+  }, [setManagerEditLocks]);
+
+  useEffect(() => {
+    let isDisposed = false;
+    const timeoutId = targetKey.length > 0
+      ? window.setTimeout(() => {
+        if (!isDisposed) {
+          setTimedOutTargetKey(targetKey);
+        }
+      }, managerEditLockCheckTimeoutMs)
+      : undefined;
+
+    setResolvedTargetKey(targetKey.length === 0 ? targetKey : "");
+    setTimedOutTargetKey("");
+
+    void setManagerEditLocksRef.current(stableTargets).then((states) => {
+      if (
+        !isDisposed &&
+        (targetKey.length === 0 || managerEditLockStatesCoverTargets(stableTargets, states))
+      ) {
+        setResolvedTargetKey(targetKey);
+      }
+    });
+
+    return () => {
+      isDisposed = true;
+      if (timeoutId !== undefined) {
+        window.clearTimeout(timeoutId);
+      }
+      void setManagerEditLocksRef.current([]);
+    };
+  }, [stableTargets, targetKey]);
+
+  const states = useMemo(
+    () => stableTargets
+      .map(target => managerEditLocks[buildManagerEditLockKey(target)])
+      .filter((state): state is ManagerEditLockState => Boolean(state)),
+    [managerEditLocks, stableTargets],
+  );
+  const hasLockStateForEveryTarget = targetKey.length > 0 && stableTargets.every(target =>
+    Boolean(managerEditLocks[buildManagerEditLockKey(target)]),
+  );
+  const isWaitingForLockResponse = (
+    targetKey.length > 0 &&
+    resolvedTargetKey !== targetKey &&
+    !hasLockStateForEveryTarget &&
+    timedOutTargetKey !== targetKey
+  );
+  const lockedByOtherState = states.find(state =>
+    state.isLocked &&
+    (
+      state.lockedByManagerId == null ||
+      session?.managerId == null ||
+      state.lockedByManagerId !== session.managerId
+    ),
+  ) ?? null;
+
+  return {
+    states,
+    lockedByOtherState,
+    isLockedByOther: lockedByOtherState !== null,
+    isCheckingLocks: lockedByOtherState === null && isWaitingForLockResponse,
+  };
 }
 
 function invalidateRealtimeQuery(queryClient: QueryClient, queryKey: readonly unknown[]) {
@@ -138,7 +298,9 @@ export function PresenceProvider({ children }: PropsWithChildren) {
   const { status, session } = useAuth();
   const connectionRef = useRef<HubConnection | null>(null);
   const [connectionTick, setConnectionTick] = useState(0);
-  const [desiredScheduleEditLocks, setDesiredScheduleEditLocks] = useState<ScheduleEditLockTarget[]>([]);
+  const [desiredManagerEditLocks, setDesiredManagerEditLocks] = useState<ManagerEditLockTarget[]>([]);
+  const desiredManagerEditLocksRef = useRef<ManagerEditLockTarget[]>([]);
+  const [managerEditLocks, setManagerEditLocksState] = useState<Record<string, ManagerEditLockState>>({});
   const [notifications, setNotifications] = useState<EmployeeRealtimeNotification[]>([]);
 
   useEffect(() => {
@@ -168,6 +330,76 @@ export function PresenceProvider({ children }: PropsWithChildren) {
 
   const applyScheduleChanged = useEffectEvent((update: ScheduleChangedUpdate) => {
     invalidateGraphRealtimeQueries(queryClient, update.containerId, update.graphId);
+  });
+
+  const applyManagerDataChanged = useEffectEvent((update: ManagerDataChangedUpdate) => {
+    invalidateRealtimeBaselineQueries(queryClient);
+
+    const parsedResourceId = update.resourceId ? Number(update.resourceId) : null;
+    const resourceId = Number.isFinite(parsedResourceId) ? parsedResourceId : null;
+
+    switch (update.resourceType) {
+      case managerEditResourceTypes.schedule:
+        if (update.containerId != null && update.graphId != null) {
+          invalidateGraphRealtimeQueries(queryClient, update.containerId, update.graphId);
+        }
+        break;
+
+      case managerEditResourceTypes.container:
+        invalidateRealtimeQuery(queryClient, queryKeys.containers.all);
+        if (resourceId !== null) {
+          invalidateRealtimeQuery(queryClient, queryKeys.containers.byId(resourceId));
+          invalidateRealtimeQuery(queryClient, queryKeys.containers.graphs(resourceId));
+          invalidateRealtimeQuery(queryClient, queryKeys.containers.schedulePresets(resourceId));
+          invalidateRealtimeQuery(queryClient, queryKeys.containers.graphRecordsPrefix(resourceId));
+        }
+        break;
+
+      case managerEditResourceTypes.availabilityGroup:
+        invalidateRealtimeQuery(queryClient, queryKeys.availabilityGroups.all);
+        invalidateRealtimeQuery(queryClient, queryKeys.containers.all);
+        if (resourceId !== null) {
+          invalidateRealtimeQuery(queryClient, queryKeys.availabilityGroups.byId(resourceId));
+          invalidateRealtimeQuery(queryClient, queryKeys.availabilityGroups.items(resourceId));
+          invalidateRealtimeQuery(queryClient, queryKeys.availabilityGroups.members(resourceId));
+          invalidateRealtimeQuery(queryClient, queryKeys.availabilityGroups.slots(resourceId));
+        }
+        break;
+
+      case managerEditResourceTypes.employee:
+        invalidateRealtimeQuery(queryClient, queryKeys.employees.all);
+        invalidateRealtimeQuery(queryClient, queryKeys.availabilityGroups.all);
+        invalidateRealtimeQuery(queryClient, queryKeys.containers.all);
+        invalidateRealtimeQuery(queryClient, queryKeys.employeeSchedules.all);
+        invalidateRealtimeQuery(queryClient, queryKeys.shiftSwaps.all);
+        if (resourceId !== null) {
+          invalidateRealtimeQuery(queryClient, queryKeys.employees.byId(resourceId));
+        }
+        break;
+
+      case managerEditResourceTypes.shop:
+        invalidateRealtimeQuery(queryClient, queryKeys.shops.all);
+        invalidateRealtimeQuery(queryClient, queryKeys.containers.all);
+        if (resourceId !== null) {
+          invalidateRealtimeQuery(queryClient, queryKeys.shops.byId(resourceId));
+        }
+        break;
+
+      case managerEditResourceTypes.availabilityBind:
+        invalidateRealtimeQuery(queryClient, queryKeys.availabilityBinds.all);
+        if (resourceId !== null) {
+          invalidateRealtimeQuery(queryClient, queryKeys.availabilityBinds.byId(resourceId));
+        }
+        break;
+
+      case managerEditResourceTypes.managerProfile:
+        invalidateRealtimeQuery(queryClient, queryKeys.managerProfile.me());
+        invalidateRealtimeQuery(queryClient, queryKeys.managerProfile.list());
+        break;
+
+      default:
+        break;
+    }
   });
 
   const applyShiftSwapsChanged = useEffectEvent((update: ShiftSwapsChangedUpdate) => {
@@ -213,25 +445,81 @@ export function PresenceProvider({ children }: PropsWithChildren) {
     invalidateRealtimeQuery(queryClient, queryKeys.employeeSchedules.all);
   });
 
-  const publishScheduleEditLocks = useCallback(async (locks: ScheduleEditLockTarget[]) => {
+  const applyManagerEditLockStates = useEffectEvent((states: ManagerEditLockState[]) => {
+    setManagerEditLocksState(current => {
+      const next = { ...current };
+      let hasChanges = false;
+      states.forEach(state => {
+        const lockKey = buildManagerEditLockKey(state);
+        if (!managerEditLockStatesEqual(current[lockKey], state)) {
+          next[lockKey] = state;
+          hasChanges = true;
+        }
+      });
+      return hasChanges ? next : current;
+    });
+  });
+
+  const applyManagerEditLockChanged = useEffectEvent((update: ManagerEditLockState) => {
+    applyManagerEditLockStates([update]);
+
+    if (update.resourceType === managerEditResourceTypes.schedule) {
+      invalidateRealtimeQuery(queryClient, queryKeys.shiftSwaps.employee());
+      invalidateRealtimeQuery(queryClient, queryKeys.employeeSchedules.all);
+    }
+
+    if (!update.isLocked) {
+      const unlockedKey = buildManagerEditLockKey(update);
+      const shouldTryAcquire = desiredManagerEditLocksRef.current.some(target =>
+        buildManagerEditLockKey(target) === unlockedKey,
+      );
+      if (shouldTryAcquire) {
+        void publishManagerEditLocks(desiredManagerEditLocksRef.current);
+      }
+    }
+  });
+
+  const publishManagerEditLocks = useCallback(async (locks: ManagerEditLockTarget[]) => {
     const connection = connectionRef.current;
     if (!connection || connection.state !== HubConnectionState.Connected || session?.role !== "manager") {
-      return;
+      return [];
     }
 
     try {
-      await connection.invoke(setScheduleEditLocksMethodName, locks);
+      const states = await connection.invoke<ManagerEditLockState[]>(setManagerEditLocksMethodName, locks);
+      applyManagerEditLockStates(states);
+      return states;
     } catch (error) {
       if (isDev) {
-        console.warn("[Realtime] Could not publish schedule edit locks.", error);
+        console.warn("[Realtime] Could not publish manager edit locks.", error);
       }
+      return [];
     }
-  }, [session?.role]);
+  }, [applyManagerEditLockStates, session?.role]);
+
+  const setManagerEditLocks = useCallback((locks: ManagerEditLockTarget[]) => {
+    desiredManagerEditLocksRef.current = locks;
+    setDesiredManagerEditLocks(locks);
+    if (locks.length > 0) {
+      setManagerEditLocksState(current => {
+        const next = { ...current };
+        let hasChanges = false;
+        locks.forEach(lock => {
+          const lockKey = buildManagerEditLockKey(lock);
+          if (lockKey in next) {
+            delete next[lockKey];
+            hasChanges = true;
+          }
+        });
+        return hasChanges ? next : current;
+      });
+    }
+    return publishManagerEditLocks(locks);
+  }, [publishManagerEditLocks]);
 
   const setScheduleEditLocks = useCallback((locks: ScheduleEditLockTarget[]) => {
-    setDesiredScheduleEditLocks(locks);
-    void publishScheduleEditLocks(locks);
-  }, [publishScheduleEditLocks]);
+    return setManagerEditLocks(locks.map(scheduleToManagerEditLockTarget));
+  }, [setManagerEditLocks]);
 
   const clearNotifications = useCallback(() => {
     setNotifications([]);
@@ -239,9 +527,11 @@ export function PresenceProvider({ children }: PropsWithChildren) {
 
   const realtimeContextValue = useMemo<RealtimeContextValue>(() => ({
     setScheduleEditLocks,
+    setManagerEditLocks,
+    managerEditLocks,
     notifications,
     clearNotifications,
-  }), [clearNotifications, notifications, setScheduleEditLocks]);
+  }), [clearNotifications, managerEditLocks, notifications, setManagerEditLocks, setScheduleEditLocks]);
 
   useEffect(() => {
     if (status !== "authenticated" || !session || !getAuthAccessToken()) {
@@ -274,6 +564,10 @@ export function PresenceProvider({ children }: PropsWithChildren) {
       applyScheduleChanged(update);
     });
 
+    connection.on(managerDataChangedMethodName, (update: ManagerDataChangedUpdate) => {
+      applyManagerDataChanged(update);
+    });
+
     connection.on(shiftSwapsChangedMethodName, (update: ShiftSwapsChangedUpdate) => {
       applyShiftSwapsChanged(update);
     });
@@ -284,6 +578,10 @@ export function PresenceProvider({ children }: PropsWithChildren) {
 
     connection.on(scheduleEditLockChangedMethodName, (update: ScheduleEditLockChangedUpdate) => {
       applyScheduleEditLockChanged(update);
+    });
+
+    connection.on(managerEditLockChangedMethodName, (update: ManagerEditLockState) => {
+      applyManagerEditLockChanged(update);
     });
 
     connection.onreconnected(() => {
@@ -315,9 +613,11 @@ export function PresenceProvider({ children }: PropsWithChildren) {
       isDisposed = true;
       connection.off(presenceHubMethodName);
       connection.off(scheduleChangedMethodName);
+      connection.off(managerDataChangedMethodName);
       connection.off(shiftSwapsChangedMethodName);
       connection.off(workflowLogCreatedMethodName);
       connection.off(scheduleEditLockChangedMethodName);
+      connection.off(managerEditLockChangedMethodName);
       if (connectionRef.current === connection) {
         connectionRef.current = null;
       }
@@ -330,8 +630,9 @@ export function PresenceProvider({ children }: PropsWithChildren) {
   ]);
 
   useEffect(() => {
-    void publishScheduleEditLocks(desiredScheduleEditLocks);
-  }, [connectionTick, desiredScheduleEditLocks, publishScheduleEditLocks]);
+    desiredManagerEditLocksRef.current = desiredManagerEditLocks;
+    void publishManagerEditLocks(desiredManagerEditLocks);
+  }, [connectionTick, desiredManagerEditLocks, publishManagerEditLocks]);
 
   return (
     <RealtimeContext.Provider value={realtimeContextValue}>

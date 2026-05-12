@@ -43,7 +43,9 @@ public static class WebApiServiceCollectionExtensions
             options.KeepAliveInterval = TimeSpan.FromSeconds(10);
             options.ClientTimeoutInterval = TimeSpan.FromSeconds(20);
         });
-        services.AddSingleton<IScheduleEditLockService, ScheduleEditLockService>();
+        services.AddSingleton<ManagerEditLockService>();
+        services.AddSingleton<IManagerEditLockService>(services => services.GetRequiredService<ManagerEditLockService>());
+        services.AddSingleton<IScheduleEditLockService>(services => services.GetRequiredService<ManagerEditLockService>());
         services.AddScoped<IRealtimeNotifier, RealtimeNotifier>();
         services.AddScoped<IWorkflowLogService, WorkflowLogService>();
         services.Configure<SmtpEmailOptions>(configuration.GetSection("Smtp"));

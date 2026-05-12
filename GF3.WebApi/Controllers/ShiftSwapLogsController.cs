@@ -20,7 +20,8 @@ namespace WebApi.Controllers;
 public sealed class ShiftSwapLogsController(
     AppDbContext db,
     IWorkflowLogService workflowLogService,
-    IRealtimeNotifier realtimeNotifier) : ControllerBase
+    IRealtimeNotifier realtimeNotifier,
+    IManagerEditLockService? editLockService = null) : ControllerBase
 {
     [HttpPost("manual")]
     [ProducesResponseType(typeof(ShiftSwapDto), StatusCodes.Status201Created)]
@@ -30,6 +31,11 @@ public sealed class ShiftSwapLogsController(
         [FromBody] CreateManagerShiftSwapRequest request,
         CancellationToken cancellationToken)
     {
+        if (CreateEditLockConflictResult(containerId, graphId) is { } conflict)
+        {
+            return conflict;
+        }
+
         var schedule = await db.Schedules
             .Include(schedule => schedule.Container)
             .Include(schedule => schedule.Shop)
@@ -140,6 +146,9 @@ public sealed class ShiftSwapLogsController(
             .NotifyScheduleChangedAsync(containerId, graphId, "manager-manual-shift-offer-created")
             .ConfigureAwait(false);
         await realtimeNotifier
+            .NotifyManagerDataChangedAsync(ManagerEditResourceTypes.Schedule, $"{containerId}:{graphId}", "manager-manual-shift-offer-created", containerId, graphId)
+            .ConfigureAwait(false);
+        await realtimeNotifier
             .NotifyShiftSwapsChangedAsync(containerId, graphId, graphId, "manager-manual-shift-offer-created", created.Id)
             .ConfigureAwait(false);
 
@@ -195,6 +204,11 @@ public sealed class ShiftSwapLogsController(
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     public async Task<IActionResult> CancelManualOffer(int containerId, int graphId, int id, CancellationToken cancellationToken)
     {
+        if (CreateEditLockConflictResult(containerId, graphId) is { } conflict)
+        {
+            return conflict;
+        }
+
         var swap = await db.ShiftSwapRequests
             .Include(request => request.Schedule)
             .Include(request => request.ScheduleSlot)
@@ -230,11 +244,21 @@ public sealed class ShiftSwapLogsController(
             .NotifyScheduleChangedAsync(containerId, graphId, "manager-manual-shift-offer-cancelled")
             .ConfigureAwait(false);
         await realtimeNotifier
+            .NotifyManagerDataChangedAsync(ManagerEditResourceTypes.Schedule, $"{containerId}:{graphId}", "manager-manual-shift-offer-cancelled", containerId, graphId)
+            .ConfigureAwait(false);
+        await realtimeNotifier
             .NotifyShiftSwapsChangedAsync(containerId, graphId, graphId, "manager-manual-shift-offer-cancelled", swap.Id)
             .ConfigureAwait(false);
 
         return NoContent();
     }
+
+    private ActionResult? CreateEditLockConflictResult(int containerId, int graphId)
+        => ManagerEditLockHttp.CreateConflictResult(
+            this,
+            editLockService,
+            ManagerEditLockTargets.Schedule(containerId, graphId),
+            "This schedule");
 
     private static ShiftSwapDto ToLogDto(ShiftSwapRequestModel model)
     {

@@ -1,6 +1,11 @@
 ﻿import { useMemo, type FormEvent } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
+  buildManagerEditLockMessage,
+  managerEditResourceTypes,
+  useManagerEditLocks,
+} from "@app/providers/PresenceProvider";
+import {
   useCreateEmployeeMutation,
   useEmployeeByIdQuery,
   useUpdateEmployeeMutation,
@@ -9,6 +14,7 @@ import { createEmployeeFormState, useEmployeeForm } from "@entities/employees/mo
 import { EmployeeDetailsForm } from "@entities/employees/ui/EmployeeDetailsForm";
 import { stableSerialize } from "@shared/lib/stableSerialize";
 import { useUnsavedChangesPrompt } from "@shared/lib/useUnsavedChangesPrompt";
+import { ManagerEditLockDialog } from "@shared/ui/ManagerEditLockDialog";
 import { PageHeader } from "@shared/ui/PageHeader";
 import { SavingOverlay } from "@shared/ui/SavingOverlay";
 import styles from "./EmployeeEditPage.module.css";
@@ -18,6 +24,20 @@ export function EmployeeEditPage() {
   const { employeeId } = useParams<{ employeeId: string }>();
   const isCreate = !employeeId;
   const id = employeeId ? Number(employeeId) : null;
+  const editLockTargets = useMemo(
+    () => !isCreate && Number.isFinite(id)
+      ? [{
+        resourceType: managerEditResourceTypes.employee,
+        resourceId: String(id),
+      }]
+      : [],
+    [id, isCreate],
+  );
+  const { lockedByOtherState, isCheckingLocks } = useManagerEditLocks(editLockTargets);
+  const editLockMessage = lockedByOtherState
+    ? buildManagerEditLockMessage(lockedByOtherState, "This employee")
+    : null;
+  const canEdit = !editLockMessage && !isCheckingLocks;
 
   const employeeQuery = useEmployeeByIdQuery(!isCreate && Number.isFinite(id) ? id : null);
   const createMutation = useCreateEmployeeMutation();
@@ -50,8 +70,13 @@ export function EmployeeEditPage() {
     when: hasUnsavedChanges && !isSaving,
   });
 
+  const handleEditLockDialogClose = () => {
+    runWithoutPrompt(() => navigate(backTo));
+  };
+
   const onSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (editLockMessage) return;
     if (!validate()) return;
 
     if (isCreate) {
@@ -73,16 +98,35 @@ export function EmployeeEditPage() {
         backTo={backTo}
       />
 
-      <EmployeeDetailsForm
-        form={form}
-        errors={errors}
-        isLoading={!isCreate && employeeQuery.isLoading}
-        hasLoadError={hasLoadError}
-        isSaving={isSaving}
-        onFieldChange={handleFieldChange}
-        onCancel={() => navigate(backTo)}
-        onSubmit={onSubmit}
-      />
+      {isCheckingLocks ? (
+        <ManagerEditLockDialog
+          open
+          title="Checking edit access"
+          message="Please wait while we check whether this employee can be edited."
+        />
+      ) : null}
+
+      {editLockMessage ? (
+        <ManagerEditLockDialog
+          open
+          message={editLockMessage}
+          actionText="Back to employee"
+          onClose={handleEditLockDialogClose}
+        />
+      ) : null}
+
+      {canEdit ? (
+        <EmployeeDetailsForm
+          form={form}
+          errors={errors}
+          isLoading={!isCreate && employeeQuery.isLoading}
+          hasLoadError={hasLoadError}
+          isSaving={isSaving}
+          onFieldChange={handleFieldChange}
+          onCancel={() => navigate(backTo)}
+          onSubmit={onSubmit}
+        />
+      ) : null}
 
       <SavingOverlay active={isSaving} />
       {unsavedChangesDialog}

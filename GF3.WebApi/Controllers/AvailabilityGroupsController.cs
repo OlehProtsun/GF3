@@ -6,6 +6,7 @@ using WebApi.Contracts.AvailabilityGroups;
 using WebApi.Contracts.AvailabilityGroups.Members;
 using WebApi.Contracts.AvailabilityGroups.Slots;
 using WebApi.Mappers;
+using WebApi.Realtime;
 
 namespace WebApi.Controllers;
 
@@ -17,7 +18,10 @@ namespace WebApi.Controllers;
 /// The controller deliberately stays thin: it validates route-level existence where needed,
 /// delegates business rules to the service layer, and only maps contracts to API DTOs.
 /// </summary>
-public class AvailabilityGroupsController(IAvailabilityGroupService availabilityGroupService) : ControllerBase
+public class AvailabilityGroupsController(
+    IAvailabilityGroupService availabilityGroupService,
+    IRealtimeNotifier? realtimeNotifier = null,
+    IManagerEditLockService? editLockService = null) : ControllerBase
 {
     [HttpGet]
     [ProducesResponseType(typeof(IEnumerable<AvailabilityGroupDto>), StatusCodes.Status200OK)]
@@ -68,8 +72,14 @@ public class AvailabilityGroupsController(IAvailabilityGroupService availability
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult<AvailabilityGroupMemberDto>> CreateMember(int groupId, [FromBody] CreateAvailabilityGroupMemberRequest request, CancellationToken cancellationToken)
     {
+        if (CreateEditLockConflictResult(groupId) is { } conflict)
+        {
+            return conflict;
+        }
+
         var created = await availabilityGroupService.CreateMemberAsync(groupId, request.ToCreateMemberModel(groupId), cancellationToken).ConfigureAwait(false);
         var dto = created.ToMemberDto();
+        await NotifyAvailabilityChangedAsync(groupId, "manager-availability-member-created").ConfigureAwait(false);
         return CreatedAtAction(nameof(GetMembers), new { groupId }, dto);
     }
 
@@ -80,7 +90,13 @@ public class AvailabilityGroupsController(IAvailabilityGroupService availability
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> UpdateMember(int groupId, int memberId, [FromBody] UpdateAvailabilityGroupMemberRequest request, CancellationToken cancellationToken)
     {
+        if (CreateEditLockConflictResult(groupId) is { } conflict)
+        {
+            return conflict;
+        }
+
         await availabilityGroupService.UpdateMemberAsync(groupId, memberId, request.ToUpdateMemberModel(groupId, memberId), cancellationToken).ConfigureAwait(false);
+        await NotifyAvailabilityChangedAsync(groupId, "manager-availability-member-updated").ConfigureAwait(false);
         return NoContent();
     }
 
@@ -90,7 +106,13 @@ public class AvailabilityGroupsController(IAvailabilityGroupService availability
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> DeleteMember(int groupId, int memberId, CancellationToken cancellationToken)
     {
+        if (CreateEditLockConflictResult(groupId) is { } conflict)
+        {
+            return conflict;
+        }
+
         await availabilityGroupService.DeleteMemberAsync(groupId, memberId, cancellationToken).ConfigureAwait(false);
+        await NotifyAvailabilityChangedAsync(groupId, "manager-availability-member-deleted").ConfigureAwait(false);
         return NoContent();
     }
 
@@ -111,8 +133,14 @@ public class AvailabilityGroupsController(IAvailabilityGroupService availability
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult<AvailabilitySlotDto>> CreateSlot(int groupId, [FromBody] CreateAvailabilitySlotRequest request, CancellationToken cancellationToken)
     {
+        if (CreateEditLockConflictResult(groupId) is { } conflict)
+        {
+            return conflict;
+        }
+
         var created = await availabilityGroupService.CreateSlotAsync(groupId, request.ToCreateSlotModel(), cancellationToken).ConfigureAwait(false);
         var dto = created.ToSlotDto();
+        await NotifyAvailabilityChangedAsync(groupId, "manager-availability-slot-created").ConfigureAwait(false);
         return CreatedAtAction(nameof(GetSlots), new { groupId }, dto);
     }
 
@@ -123,7 +151,13 @@ public class AvailabilityGroupsController(IAvailabilityGroupService availability
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> UpdateSlot(int groupId, int slotId, [FromBody] UpdateAvailabilitySlotRequest request, CancellationToken cancellationToken)
     {
+        if (CreateEditLockConflictResult(groupId) is { } conflict)
+        {
+            return conflict;
+        }
+
         await availabilityGroupService.UpdateSlotAsync(groupId, slotId, request.ToUpdateSlotModel(slotId), cancellationToken).ConfigureAwait(false);
+        await NotifyAvailabilityChangedAsync(groupId, "manager-availability-slot-updated").ConfigureAwait(false);
         return NoContent();
     }
 
@@ -133,7 +167,13 @@ public class AvailabilityGroupsController(IAvailabilityGroupService availability
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> DeleteSlot(int groupId, int slotId, CancellationToken cancellationToken)
     {
+        if (CreateEditLockConflictResult(groupId) is { } conflict)
+        {
+            return conflict;
+        }
+
         await availabilityGroupService.DeleteSlotAsync(groupId, slotId, cancellationToken).ConfigureAwait(false);
+        await NotifyAvailabilityChangedAsync(groupId, "manager-availability-slot-deleted").ConfigureAwait(false);
         return NoContent();
     }
 
@@ -145,6 +185,7 @@ public class AvailabilityGroupsController(IAvailabilityGroupService availability
     {
         var created = await availabilityGroupService.CreateAsync(request.ToCreateModel(), cancellationToken).ConfigureAwait(false);
         var dto = created.ToApiDto();
+        await NotifyAvailabilityChangedAsync(dto.Id, "manager-availability-created").ConfigureAwait(false);
         return CreatedAtAction(nameof(GetById), new { id = dto.Id }, dto);
     }
 
@@ -155,9 +196,15 @@ public class AvailabilityGroupsController(IAvailabilityGroupService availability
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> Update(int id, [FromBody] UpdateAvailabilityGroupRequest request, CancellationToken cancellationToken)
     {
+        if (CreateEditLockConflictResult(id) is { } conflict)
+        {
+            return conflict;
+        }
+
         _ = await RequireGroupAsync(id, cancellationToken).ConfigureAwait(false);
 
         await availabilityGroupService.UpdateAsync(request.ToUpdateModel(id), cancellationToken).ConfigureAwait(false);
+        await NotifyAvailabilityChangedAsync(id, "manager-availability-updated").ConfigureAwait(false);
         return NoContent();
     }
 
@@ -167,11 +214,30 @@ public class AvailabilityGroupsController(IAvailabilityGroupService availability
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> Delete(int id, CancellationToken cancellationToken)
     {
+        if (CreateEditLockConflictResult(id) is { } conflict)
+        {
+            return conflict;
+        }
+
         _ = await RequireGroupAsync(id, cancellationToken).ConfigureAwait(false);
 
         await availabilityGroupService.DeleteAsync(id, cancellationToken).ConfigureAwait(false);
+        await NotifyAvailabilityChangedAsync(id, "manager-availability-deleted").ConfigureAwait(false);
         return NoContent();
     }
+
+    private ActionResult? CreateEditLockConflictResult(int groupId)
+        => ManagerEditLockHttp.CreateConflictResult(
+            this,
+            editLockService,
+            ManagerEditLockTargets.AvailabilityGroup(groupId),
+            "This availability group");
+
+    private Task NotifyAvailabilityChangedAsync(int groupId, string reason)
+        => realtimeNotifier?.NotifyManagerDataChangedAsync(
+            ManagerEditResourceTypes.AvailabilityGroup,
+            groupId.ToString(),
+            reason) ?? Task.CompletedTask;
 
     private async Task<BusinessLogicLayer.Contracts.Models.AvailabilityGroupModel> RequireGroupAsync(int groupId, CancellationToken cancellationToken)
     {

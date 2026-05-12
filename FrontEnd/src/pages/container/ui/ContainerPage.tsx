@@ -1,6 +1,11 @@
 import { startTransition, useDeferredValue, useEffect, useMemo, useState, type FormEvent } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
+import {
+  buildManagerEditLockMessage,
+  managerEditResourceTypes,
+  useManagerEditLocks,
+} from "@app/providers/PresenceProvider";
 import type { ContainerGraphRecords, Graph } from "@entities/containers";
 import {
   ContainerDetailsForm,
@@ -38,6 +43,7 @@ import { usePageScrollbarHidden } from "@shared/lib/usePageScrollbarHidden";
 import { stableSerialize } from "@shared/lib/stableSerialize";
 import { useUnsavedChangesPrompt } from "@shared/lib/useUnsavedChangesPrompt";
 import { ConfirmDialog } from "@shared/ui/ConfirmDialog";
+import { ManagerEditLockDialog } from "@shared/ui/ManagerEditLockDialog";
 import { SavingOverlay } from "@shared/ui/SavingOverlay";
 import { ErrorBanner } from "@shared/ui/components/ErrorBanner";
 import { IosButton } from "@shared/ui/components/IosButton";
@@ -141,6 +147,20 @@ export function ContainerPage() {
   const profileContainerId = mode === "profile" ? selectedContainerId : null;
   const editContainerId = mode === "edit" && editingContainerId !== null ? editingContainerId : null;
   const profileQueriesEnabled = mode === "profile" && !deleteMutation.isPending;
+  const editLockTargets = useMemo(
+    () => editContainerId !== null
+      ? [{
+        resourceType: managerEditResourceTypes.container,
+        resourceId: String(editContainerId),
+      }]
+      : [],
+    [editContainerId],
+  );
+  const { lockedByOtherState, isCheckingLocks } = useManagerEditLocks(editLockTargets);
+  const editLockMessage = lockedByOtherState
+    ? buildManagerEditLockMessage(lockedByOtherState, "This container")
+    : null;
+  const canEdit = !editLockMessage && !isCheckingLocks;
 
   const profileContainerQuery = useContainerByIdQuery(profileContainerId, profileQueriesEnabled);
   const editContainerQuery = useContainerByIdQuery(editContainerId);
@@ -245,7 +265,7 @@ export function ContainerPage() {
     isEditLoading,
     mode,
   ]);
-  const { confirmIfNeeded, dialog: unsavedChangesDialog } = useUnsavedChangesPrompt({
+  const { confirmIfNeeded, dialog: unsavedChangesDialog, runWithoutPrompt } = useUnsavedChangesPrompt({
     when: hasUnsavedChanges && !isSaving,
   });
 
@@ -364,6 +384,21 @@ export function ContainerPage() {
     });
   };
 
+  const handleEditLockDialogClose = () => {
+    runWithoutPrompt(() => {
+      setSubmitError(null);
+
+      if (editingContainerId !== null) {
+        setProfileExportError(null);
+        setMode("profile");
+        return;
+      }
+
+      setProfileExportError(null);
+      setMode("list");
+    });
+  };
+
   const handleMutationError = (error: unknown) => {
     if (error instanceof ApiError) {
       applyApiErrors(error.validationErrors);
@@ -377,6 +412,16 @@ export function ContainerPage() {
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setSubmitError(null);
+
+    if (editLockMessage) {
+      setSubmitError(editLockMessage);
+      return;
+    }
+
+    if (isCheckingLocks) {
+      setSubmitError("Checking edit access. Please wait a moment.");
+      return;
+    }
 
     if (!validate()) {
       return;
@@ -539,17 +584,36 @@ export function ContainerPage() {
 
         {mode === "edit" ? (
           <div className={styles.editShell}>
-            <ContainerDetailsForm
-              form={form}
-              errors={errors}
-              isLoading={isEditLoading}
-              hasLoadError={Boolean(hasEditLoadError)}
-              isSaving={isSaving}
-              submitError={submitError}
-              onFieldChange={handleFieldChange}
-              onCancel={handleCancelEdit}
-              onSubmit={handleSubmit}
-            />
+            {isCheckingLocks ? (
+              <ManagerEditLockDialog
+                open
+                title="Checking edit access"
+                message="Please wait while we check whether this container can be edited."
+              />
+            ) : null}
+
+            {editLockMessage ? (
+              <ManagerEditLockDialog
+                open
+                message={editLockMessage}
+                actionText="Back to container"
+                onClose={handleEditLockDialogClose}
+              />
+            ) : null}
+
+            {canEdit ? (
+              <ContainerDetailsForm
+                form={form}
+                errors={errors}
+                isLoading={isEditLoading}
+                hasLoadError={Boolean(hasEditLoadError)}
+                isSaving={isSaving}
+                submitError={submitError}
+                onFieldChange={handleFieldChange}
+                onCancel={handleCancelEdit}
+                onSubmit={handleSubmit}
+              />
+            ) : null}
           </div>
         ) : null}
 

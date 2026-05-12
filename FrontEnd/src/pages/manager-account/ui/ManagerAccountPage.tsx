@@ -131,19 +131,28 @@ export function ManagerAccountPage() {
   const isBusy = updateProfileMutation.isPending || createManagerMutation.isPending || deleteManagerMutation.isPending;
   const managerPresenceItems = useMemo(() => {
     return [...managers]
-      .map(manager => ({
-        manager,
-        isCurrent: isSameManager(manager, currentManagerId, currentUserName),
-      }))
+      .map(manager => {
+        const isCurrent = isSameManager(manager, currentManagerId, currentUserName);
+
+        return {
+          manager,
+          isCurrent,
+          isOnline: manager.isOnline || isCurrent,
+        };
+      })
       .sort((left, right) => {
         if (left.isCurrent !== right.isCurrent) {
           return left.isCurrent ? -1 : 1;
         }
 
+        if (left.isOnline !== right.isOnline) {
+          return left.isOnline ? -1 : 1;
+        }
+
         return getLastOnlineTime(right.manager.lastLoginAtUtc) - getLastOnlineTime(left.manager.lastLoginAtUtc);
       });
   }, [currentManagerId, currentUserName, managers]);
-  const onlineManagerCount = managerPresenceItems.filter(item => item.isCurrent).length;
+  const onlineManagerCount = managerPresenceItems.filter(item => item.isOnline).length;
   const hasProfileChanges = useMemo(() => {
     if (!profile) {
       return false;
@@ -348,18 +357,18 @@ export function ManagerAccountPage() {
                   ) : managerPresenceItems.length === 0 ? (
                     <p className={styles.stateText}>No manager activity yet.</p>
                   ) : (
-                    managerPresenceItems.map(({ manager, isCurrent }) => (
+                    managerPresenceItems.map(({ manager, isOnline }) => (
                       <article key={manager.id} className={styles.onlineItem}>
                         <span
-                          className={`${styles.onlineDot} ${isCurrent ? styles.onlineDotActive : styles.onlineDotIdle}`}
+                          className={`${styles.onlineDot} ${isOnline ? styles.onlineDotActive : styles.onlineDotIdle}`}
                           aria-hidden="true"
                         />
                         <div className={styles.onlineDetails}>
                           <strong>{manager.displayName}</strong>
                           <span>@{manager.userName}</span>
                         </div>
-                        <span className={isCurrent ? styles.onlineNow : styles.lastOnline}>
-                          {isCurrent ? "Online now" : formatLastOnline(manager.lastLoginAtUtc)}
+                        <span className={isOnline ? styles.onlineNow : styles.lastOnline}>
+                          {isOnline ? "Online now" : formatLastOnline(manager.lastLoginAtUtc)}
                         </span>
                       </article>
                     ))

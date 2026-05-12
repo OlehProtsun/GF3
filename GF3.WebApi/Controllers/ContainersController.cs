@@ -26,7 +26,8 @@ namespace WebApi.Controllers;
 public class ContainersController(
     IContainerService containerService,
     IWorkflowLogService workflowLogService,
-    IRealtimeNotifier realtimeNotifier) : ControllerBase
+    IRealtimeNotifier realtimeNotifier,
+    IManagerEditLockService? editLockService = null) : ControllerBase
 {
     [HttpGet]
     [ProducesResponseType(typeof(IEnumerable<ContainerDto>), StatusCodes.Status200OK)]
@@ -92,6 +93,9 @@ public class ContainersController(
         var created = await containerService.CreateSchedulePresetAsync(containerId, request.ToCreateModel(containerId), cancellationToken).ConfigureAwait(false);
         var dto = created.ToSchedulePresetDto();
         await LogManagerActionAsync($"Created schedule preset {dto.Name}.", cancellationToken).ConfigureAwait(false);
+        await realtimeNotifier
+            .NotifyManagerDataChangedAsync(ManagerEditResourceTypes.Container, containerId.ToString(), "manager-schedule-preset-created", containerId)
+            .ConfigureAwait(false);
         return CreatedAtAction(nameof(GetSchedulePresets), new { containerId }, dto);
     }
 
@@ -131,6 +135,11 @@ public class ContainersController(
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> UpdateGraph(int containerId, int graphId, [FromBody] UpdateGraphRequest request, CancellationToken cancellationToken)
     {
+        if (CreateEditLockConflictResult(ManagerEditLockTargets.Schedule(containerId, graphId), "This schedule") is { } conflict)
+        {
+            return conflict;
+        }
+
         await containerService.UpdateGraphAsync(containerId, graphId, request.ToUpdateModel(containerId, graphId), cancellationToken).ConfigureAwait(false);
         await LogManagerActionAsync($"Updated schedule {request.Name}.", cancellationToken).ConfigureAwait(false);
         await NotifyGraphChangedAsync(containerId, graphId, "manager-schedule-updated").ConfigureAwait(false);
@@ -143,6 +152,11 @@ public class ContainersController(
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> DeleteGraph(int containerId, int graphId, CancellationToken cancellationToken)
     {
+        if (CreateEditLockConflictResult(ManagerEditLockTargets.Schedule(containerId, graphId), "This schedule") is { } conflict)
+        {
+            return conflict;
+        }
+
         await containerService.DeleteGraphAsync(containerId, graphId, cancellationToken).ConfigureAwait(false);
         await LogManagerActionAsync($"Deleted schedule #{graphId}.", cancellationToken).ConfigureAwait(false);
         await NotifyGraphChangedAsync(containerId, graphId, "manager-schedule-deleted").ConfigureAwait(false);
@@ -187,6 +201,12 @@ public class ContainersController(
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult<GenerateGraphResponse>> GenerateGraph(int containerId, int graphId, [FromBody] GenerateGraphRequest request, CancellationToken cancellationToken)
     {
+        if (!request.DryRun &&
+            CreateEditLockConflictResult(ManagerEditLockTargets.Schedule(containerId, graphId), "This schedule") is { } conflict)
+        {
+            return conflict;
+        }
+
         var result = await containerService
             .GenerateGraphAsync(containerId, graphId, request.Overwrite, request.DryRun, progress: null, cancellationToken)
             .ConfigureAwait(false);
@@ -229,6 +249,11 @@ public class ContainersController(
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> ReplaceGraphSlots(int containerId, int graphId, [FromBody] ReplaceGraphSlotsRequest request, CancellationToken cancellationToken)
     {
+        if (CreateEditLockConflictResult(ManagerEditLockTargets.Schedule(containerId, graphId), "This schedule") is { } conflict)
+        {
+            return conflict;
+        }
+
         await containerService.ReplaceGraphSlotsAsync(containerId, graphId, request.ToReplaceModels(graphId), cancellationToken).ConfigureAwait(false);
         await LogManagerActionAsync($"Saved schedule matrix for schedule #{graphId}.", cancellationToken).ConfigureAwait(false);
         await NotifyGraphChangedAsync(containerId, graphId, "manager-schedule-slots-replaced").ConfigureAwait(false);
@@ -240,6 +265,11 @@ public class ContainersController(
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
     public async Task<ActionResult<GraphSlotDto>> CreateGraphSlot(int containerId, int graphId, [FromBody] CreateGraphSlotRequest request, CancellationToken cancellationToken)
     {
+        if (CreateEditLockConflictResult(ManagerEditLockTargets.Schedule(containerId, graphId), "This schedule") is { } conflict)
+        {
+            return conflict;
+        }
+
         var created = await containerService.CreateGraphSlotAsync(containerId, graphId, request.ToCreateModel(graphId), cancellationToken).ConfigureAwait(false);
         await LogManagerActionAsync($"Added shift on day {created.DayOfMonth} for schedule #{graphId}.", cancellationToken).ConfigureAwait(false);
         await NotifyGraphChangedAsync(containerId, graphId, "manager-schedule-slot-created").ConfigureAwait(false);
@@ -251,6 +281,11 @@ public class ContainersController(
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> UpdateGraphSlot(int containerId, int graphId, int slotId, [FromBody] UpdateGraphSlotRequest request, CancellationToken cancellationToken)
     {
+        if (CreateEditLockConflictResult(ManagerEditLockTargets.Schedule(containerId, graphId), "This schedule") is { } conflict)
+        {
+            return conflict;
+        }
+
         await containerService.UpdateGraphSlotAsync(containerId, graphId, slotId, request.ToUpdateModel(graphId, slotId), cancellationToken).ConfigureAwait(false);
         await LogManagerActionAsync($"Updated shift #{slotId} for schedule #{graphId}.", cancellationToken).ConfigureAwait(false);
         await NotifyGraphChangedAsync(containerId, graphId, "manager-schedule-slot-updated").ConfigureAwait(false);
@@ -261,6 +296,11 @@ public class ContainersController(
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     public async Task<IActionResult> DeleteGraphSlot(int containerId, int graphId, int slotId, CancellationToken cancellationToken)
     {
+        if (CreateEditLockConflictResult(ManagerEditLockTargets.Schedule(containerId, graphId), "This schedule") is { } conflict)
+        {
+            return conflict;
+        }
+
         await containerService.DeleteGraphSlotAsync(containerId, graphId, slotId, cancellationToken).ConfigureAwait(false);
         await LogManagerActionAsync($"Deleted shift #{slotId} from schedule #{graphId}.", cancellationToken).ConfigureAwait(false);
         await NotifyGraphChangedAsync(containerId, graphId, "manager-schedule-slot-deleted").ConfigureAwait(false);
@@ -285,6 +325,11 @@ public class ContainersController(
     [ProducesResponseType(typeof(GraphEmployeeDto), StatusCodes.Status201Created)]
     public async Task<ActionResult<GraphEmployeeDto>> AddGraphEmployee(int containerId, int graphId, [FromBody] AddGraphEmployeeRequest request, CancellationToken cancellationToken)
     {
+        if (CreateEditLockConflictResult(ManagerEditLockTargets.Schedule(containerId, graphId), "This schedule") is { } conflict)
+        {
+            return conflict;
+        }
+
         var created = await containerService.AddGraphEmployeeAsync(containerId, graphId, request.ToAddModel(graphId), cancellationToken).ConfigureAwait(false);
         await LogManagerActionAsync($"Added employee #{created.EmployeeId} to schedule #{graphId}.", cancellationToken).ConfigureAwait(false);
         await NotifyGraphChangedAsync(containerId, graphId, "manager-schedule-employee-added").ConfigureAwait(false);
@@ -295,6 +340,11 @@ public class ContainersController(
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     public async Task<IActionResult> UpdateGraphEmployee(int containerId, int graphId, int graphEmployeeId, [FromBody] UpdateGraphEmployeeRequest request, CancellationToken cancellationToken)
     {
+        if (CreateEditLockConflictResult(ManagerEditLockTargets.Schedule(containerId, graphId), "This schedule") is { } conflict)
+        {
+            return conflict;
+        }
+
         await containerService.UpdateGraphEmployeeAsync(containerId, graphId, graphEmployeeId, request.ToUpdateModel(graphId, graphEmployeeId), cancellationToken).ConfigureAwait(false);
         await LogManagerActionAsync($"Updated employee row #{graphEmployeeId} in schedule #{graphId}.", cancellationToken).ConfigureAwait(false);
         await NotifyGraphChangedAsync(containerId, graphId, "manager-schedule-employee-updated").ConfigureAwait(false);
@@ -305,6 +355,11 @@ public class ContainersController(
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     public async Task<IActionResult> RemoveGraphEmployee(int containerId, int graphId, int graphEmployeeId, CancellationToken cancellationToken)
     {
+        if (CreateEditLockConflictResult(ManagerEditLockTargets.Schedule(containerId, graphId), "This schedule") is { } conflict)
+        {
+            return conflict;
+        }
+
         await containerService.RemoveGraphEmployeeAsync(containerId, graphId, graphEmployeeId, cancellationToken).ConfigureAwait(false);
         await LogManagerActionAsync($"Removed employee row #{graphEmployeeId} from schedule #{graphId}.", cancellationToken).ConfigureAwait(false);
         await NotifyGraphChangedAsync(containerId, graphId, "manager-schedule-employee-removed").ConfigureAwait(false);
@@ -329,6 +384,11 @@ public class ContainersController(
     [ProducesResponseType(typeof(GraphCellStyleDto), StatusCodes.Status200OK)]
     public async Task<ActionResult<GraphCellStyleDto>> UpsertGraphCellStyle(int containerId, int graphId, [FromBody] UpsertGraphCellStyleRequest request, CancellationToken cancellationToken)
     {
+        if (CreateEditLockConflictResult(ManagerEditLockTargets.Schedule(containerId, graphId), "This schedule") is { } conflict)
+        {
+            return conflict;
+        }
+
         var style = await containerService.UpsertGraphCellStyleAsync(containerId, graphId, request.ToUpsertModel(graphId), cancellationToken).ConfigureAwait(false);
         await NotifyGraphChangedAsync(containerId, graphId, "manager-schedule-style-updated").ConfigureAwait(false);
         return Ok(style.ToGraphCellStyleDto());
@@ -338,6 +398,11 @@ public class ContainersController(
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     public async Task<IActionResult> DeleteGraphCellStyle(int containerId, int graphId, int styleId, CancellationToken cancellationToken)
     {
+        if (CreateEditLockConflictResult(ManagerEditLockTargets.Schedule(containerId, graphId), "This schedule") is { } conflict)
+        {
+            return conflict;
+        }
+
         await containerService.DeleteGraphCellStyleAsync(containerId, graphId, styleId, cancellationToken).ConfigureAwait(false);
         await NotifyGraphChangedAsync(containerId, graphId, "manager-schedule-style-deleted").ConfigureAwait(false);
         return NoContent();
@@ -352,6 +417,9 @@ public class ContainersController(
         var created = await containerService.CreateAsync(request.ToCreateModel(), cancellationToken).ConfigureAwait(false);
         var dto = created.ToApiDto();
         await LogManagerActionAsync($"Created container {dto.Name}.", cancellationToken).ConfigureAwait(false);
+        await realtimeNotifier
+            .NotifyManagerDataChangedAsync(ManagerEditResourceTypes.Container, dto.Id.ToString(), "manager-container-created", dto.Id)
+            .ConfigureAwait(false);
         return CreatedAtAction(nameof(GetById), new { id = dto.Id }, dto);
     }
 
@@ -362,6 +430,11 @@ public class ContainersController(
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> Update(int id, [FromBody] UpdateContainerRequest request, CancellationToken cancellationToken)
     {
+        if (CreateEditLockConflictResult(ManagerEditLockTargets.Container(id), "This container") is { } conflict)
+        {
+            return conflict;
+        }
+
         var existing = await containerService.GetAsync(id, cancellationToken).ConfigureAwait(false);
         if (existing is null)
         {
@@ -370,6 +443,9 @@ public class ContainersController(
 
         await containerService.UpdateAsync(request.ToUpdateModel(id), cancellationToken).ConfigureAwait(false);
         await LogManagerActionAsync($"Updated container {request.Name}.", cancellationToken).ConfigureAwait(false);
+        await realtimeNotifier
+            .NotifyManagerDataChangedAsync(ManagerEditResourceTypes.Container, id.ToString(), "manager-container-updated", id)
+            .ConfigureAwait(false);
         return NoContent();
     }
 
@@ -380,6 +456,11 @@ public class ContainersController(
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> Delete(int id, CancellationToken cancellationToken)
     {
+        if (CreateEditLockConflictResult(ManagerEditLockTargets.Container(id), "This container") is { } conflict)
+        {
+            return conflict;
+        }
+
         var existing = await containerService.GetAsync(id, cancellationToken).ConfigureAwait(false);
         if (existing is null)
         {
@@ -396,6 +477,9 @@ public class ContainersController(
         }
 
         await LogManagerActionAsync($"Deleted container {existing.Name}.", cancellationToken).ConfigureAwait(false);
+        await realtimeNotifier
+            .NotifyManagerDataChangedAsync(ManagerEditResourceTypes.Container, id.ToString(), "manager-container-deleted", id)
+            .ConfigureAwait(false);
         return NoContent();
     }
 
@@ -404,9 +488,15 @@ public class ContainersController(
 
     private async Task NotifyGraphChangedAsync(int containerId, int graphId, string reason)
     {
+        await realtimeNotifier
+            .NotifyManagerDataChangedAsync(ManagerEditResourceTypes.Schedule, $"{containerId}:{graphId}", reason, containerId, graphId)
+            .ConfigureAwait(false);
         await realtimeNotifier.NotifyScheduleChangedAsync(containerId, graphId, reason).ConfigureAwait(false);
         await realtimeNotifier.NotifyShiftSwapsChangedAsync(containerId, graphId, graphId, reason).ConfigureAwait(false);
     }
+
+    private ActionResult? CreateEditLockConflictResult(ManagerEditLockTarget target, string resourceLabel)
+        => ManagerEditLockHttp.CreateConflictResult(this, editLockService, target, resourceLabel);
 
     private ProblemDetails CreateNotFoundProblem(string detail)
         => new()

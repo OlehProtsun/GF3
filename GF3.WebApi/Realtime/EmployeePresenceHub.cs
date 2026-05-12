@@ -13,11 +13,15 @@ public interface IEmployeePresenceClient
 
     Task ScheduleChanged(ScheduleChangedMessage message);
 
+    Task ManagerDataChanged(ManagerDataChangedMessage message);
+
     Task ShiftSwapsChanged(ShiftSwapsChangedMessage message);
 
     Task WorkflowLogCreated(WorkflowLogDto message);
 
     Task ScheduleEditLockChanged(ScheduleEditLockChangedMessage message);
+
+    Task ManagerEditLockChanged(ManagerEditLockChangedMessage message);
 }
 
 public sealed class EmployeePresenceChangedMessage
@@ -36,6 +40,21 @@ public sealed class ScheduleChangedMessage
     public int ContainerId { get; init; }
 
     public int GraphId { get; init; }
+
+    public string Reason { get; init; } = string.Empty;
+
+    public DateTimeOffset ChangedAtUtc { get; init; }
+}
+
+public sealed class ManagerDataChangedMessage
+{
+    public string ResourceType { get; init; } = string.Empty;
+
+    public string? ResourceId { get; init; }
+
+    public int? ContainerId { get; init; }
+
+    public int? GraphId { get; init; }
 
     public string Reason { get; init; } = string.Empty;
 
@@ -67,6 +86,27 @@ public sealed class ScheduleEditLockChangedMessage
 
     public string? LockedBy { get; init; }
 
+    public int? LockedByManagerId { get; init; }
+
+    public DateTimeOffset ChangedAtUtc { get; init; }
+}
+
+public sealed class ManagerEditLockChangedMessage
+{
+    public string ResourceType { get; init; } = string.Empty;
+
+    public string ResourceId { get; init; } = string.Empty;
+
+    public int? ContainerId { get; init; }
+
+    public int? GraphId { get; init; }
+
+    public bool IsLocked { get; init; }
+
+    public string? LockedBy { get; init; }
+
+    public int? LockedByManagerId { get; init; }
+
     public DateTimeOffset ChangedAtUtc { get; init; }
 }
 
@@ -81,38 +121,64 @@ public sealed class EmployeePresenceHub : Hub<IEmployeePresenceClient>
 
     private const string ManagersGroupName = "presence:managers";
     private readonly IEmployeePresenceService _employeePresenceService;
+    private readonly IManagerPresenceService _managerPresenceService;
     private readonly IEmployeeAccountService _employeeAccountService;
-    private readonly IScheduleEditLockService _scheduleEditLockService;
+    private readonly IManagerEditLockService _managerEditLockService;
     private readonly IRealtimeNotifier _realtimeNotifier;
     private readonly ILogger<EmployeePresenceHub> _logger;
 
     public EmployeePresenceHub(
         IEmployeePresenceService employeePresenceService,
+        IManagerPresenceService managerPresenceService,
         IEmployeeAccountService employeeAccountService,
-        IScheduleEditLockService scheduleEditLockService,
+        IManagerEditLockService managerEditLockService,
         IRealtimeNotifier realtimeNotifier,
         ILogger<EmployeePresenceHub> logger)
     {
         _employeePresenceService = employeePresenceService;
+        _managerPresenceService = managerPresenceService;
         _employeeAccountService = employeeAccountService;
-        _scheduleEditLockService = scheduleEditLockService;
+        _managerEditLockService = managerEditLockService;
         _realtimeNotifier = realtimeNotifier;
         _logger = logger;
     }
 
-    public async Task SetScheduleEditLocks(IReadOnlyList<ScheduleEditLockTarget> locks)
+    public async Task<IReadOnlyList<ManagerEditLockState>> SetManagerEditLocks(IReadOnlyList<ManagerEditLockTarget> locks)
     {
         if (!string.Equals(Context.User?.FindFirstValue(ClaimTypes.Role), AuthRoles.Manager, StringComparison.Ordinal))
         {
-            throw new HubException("Only managers can lock schedules for editing.");
+            throw new HubException("Only managers can lock records for editing.");
         }
 
         var lockedBy = Context.User?.FindFirstValue("display_name") ?? Context.User?.Identity?.Name ?? "Manager";
-        var changes = _scheduleEditLockService.SetLocks(Context.ConnectionId, lockedBy, locks);
-        foreach (var change in changes)
+        var managerId = TryGetManagerId(Context.User);
+        var result = _managerEditLockService.SetLocks(Context.ConnectionId, managerId, lockedBy, locks);
+        foreach (var change in result.ChangedStates)
         {
-            await _realtimeNotifier.NotifyScheduleEditLockChangedAsync(change).ConfigureAwait(false);
+            await _realtimeNotifier.NotifyManagerEditLockChangedAsync(change).ConfigureAwait(false);
         }
+
+        return result.RequestedStates;
+    }
+
+    public async Task<IReadOnlyList<ScheduleEditLockState>> SetScheduleEditLocks(IReadOnlyList<ScheduleEditLockTarget> locks)
+    {
+        var states = await SetManagerEditLocks(locks
+            .Select(target => ManagerEditLockTargets.Schedule(target.ContainerId, target.GraphId))
+            .ToList()).ConfigureAwait(false);
+
+        return states
+            .Where(state => state.ResourceType == ManagerEditResourceTypes.Schedule &&
+                            state.ContainerId is > 0 &&
+                            state.GraphId is > 0)
+            .Select(state => new ScheduleEditLockState(
+                state.ContainerId!.Value,
+                state.GraphId!.Value,
+                state.IsLocked,
+                state.LockedBy,
+                state.ChangedAtUtc,
+                state.LockedByManagerId))
+            .ToList();
     }
 
     public override async Task OnConnectedAsync()
@@ -126,6 +192,16 @@ public sealed class EmployeePresenceHub : Hub<IEmployeePresenceClient>
         if (string.Equals(Context.User.FindFirstValue(ClaimTypes.Role), AuthRoles.Manager, StringComparison.Ordinal))
         {
             await Groups.AddToGroupAsync(Context.ConnectionId, ManagersGroupName).ConfigureAwait(false);
+
+            var managerId = TryGetManagerId(Context.User);
+            if (managerId is > 0)
+            {
+                var change = _managerPresenceService.ConnectManager(managerId.Value, Context.ConnectionId, DateTimeOffset.UtcNow);
+                if (change.StateChanged)
+                {
+                    await NotifyManagerPresenceChangedAsync(change.ManagerId).ConfigureAwait(false);
+                }
+            }
         }
 
         if (TryGetEmployeeId(Context.User, out var employeeId))
@@ -159,10 +235,16 @@ public sealed class EmployeePresenceHub : Hub<IEmployeePresenceClient>
 
     public override async Task OnDisconnectedAsync(Exception? exception)
     {
-        var lockChanges = _scheduleEditLockService.ReleaseConnection(Context.ConnectionId);
+        var lockChanges = _managerEditLockService.ReleaseConnection(Context.ConnectionId);
         foreach (var lockChange in lockChanges)
         {
-            await _realtimeNotifier.NotifyScheduleEditLockChangedAsync(lockChange).ConfigureAwait(false);
+            await _realtimeNotifier.NotifyManagerEditLockChangedAsync(lockChange).ConfigureAwait(false);
+        }
+
+        var managerChange = _managerPresenceService.DisconnectConnection(Context.ConnectionId, DateTimeOffset.UtcNow);
+        if (managerChange is not null && managerChange.StateChanged)
+        {
+            await NotifyManagerPresenceChangedAsync(managerChange.ManagerId).ConfigureAwait(false);
         }
 
         var change = _employeePresenceService.DisconnectConnection(Context.ConnectionId, DateTimeOffset.UtcNow);
@@ -195,6 +277,12 @@ public sealed class EmployeePresenceHub : Hub<IEmployeePresenceClient>
             LastLoginAtUtc = lastLoginAtUtc,
         });
 
+    private Task NotifyManagerPresenceChangedAsync(int managerId)
+        => _realtimeNotifier.NotifyManagerDataChangedAsync(
+            ManagerEditResourceTypes.ManagerProfile,
+            managerId.ToString(),
+            "manager-presence-changed");
+
     private static bool TryGetEmployeeId(ClaimsPrincipal user, out int employeeId)
     {
         employeeId = 0;
@@ -209,4 +297,9 @@ public sealed class EmployeePresenceHub : Hub<IEmployeePresenceClient>
 
     private static string GetEmployeeGroupName(int employeeId)
         => $"presence:employee:{employeeId}";
+
+    private static int? TryGetManagerId(ClaimsPrincipal? user)
+        => int.TryParse(user?.FindFirstValue("manager_id"), out var managerId) && managerId > 0
+            ? managerId
+            : null;
 }

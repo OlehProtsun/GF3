@@ -6,6 +6,7 @@ using WebApi.Auth;
 using WebApi.Contracts.Employees;
 using WebApi.Infrastructure;
 using WebApi.Mappers;
+using WebApi.Realtime;
 
 namespace WebApi.Controllers;
 
@@ -17,7 +18,10 @@ namespace WebApi.Controllers;
 [ApiController]
 [Route("api/[controller]")]
 [Authorize(Roles = AuthRoles.Manager)]
-public class EmployeesController(IEmployeeFacade employeeFacade) : ControllerBase
+public class EmployeesController(
+    IEmployeeFacade employeeFacade,
+    IRealtimeNotifier? realtimeNotifier = null,
+    IManagerEditLockService? editLockService = null) : ControllerBase
 {
     /// <summary>
     /// Returns all employees as API DTOs.
@@ -55,6 +59,7 @@ public class EmployeesController(IEmployeeFacade employeeFacade) : ControllerBas
     {
         var created = await employeeFacade.CreateAsync(request.ToSaveRequest(), cancellationToken).ConfigureAwait(false);
         var dto = created.ToApiDto();
+        await NotifyEmployeeChangedAsync(dto.Id, "manager-employee-created").ConfigureAwait(false);
         return CreatedAtAction(nameof(GetById), new { id = dto.Id }, dto);
     }
 
@@ -70,8 +75,14 @@ public class EmployeesController(IEmployeeFacade employeeFacade) : ControllerBas
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> Update(int id, [FromBody] UpdateEmployeeRequest request, CancellationToken cancellationToken)
     {
+        if (CreateEditLockConflictResult(id) is { } conflict)
+        {
+            return conflict;
+        }
+
         await EnsureEmployeeExistsAsync(id, cancellationToken).ConfigureAwait(false);
         await employeeFacade.UpdateAsync(request.ToSaveRequest(id), cancellationToken).ConfigureAwait(false);
+        await NotifyEmployeeChangedAsync(id, "manager-employee-updated").ConfigureAwait(false);
         return NoContent();
     }
 
@@ -87,6 +98,11 @@ public class EmployeesController(IEmployeeFacade employeeFacade) : ControllerBas
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> Delete(int id, CancellationToken cancellationToken)
     {
+        if (CreateEditLockConflictResult(id) is { } conflict)
+        {
+            return conflict;
+        }
+
         await EnsureEmployeeExistsAsync(id, cancellationToken).ConfigureAwait(false);
 
         var result = await employeeFacade.TryDeleteAsync(id, cancellationToken).ConfigureAwait(false);
@@ -95,8 +111,22 @@ public class EmployeesController(IEmployeeFacade employeeFacade) : ControllerBas
             return CreateDeleteValidationResult(result);
         }
 
+        await NotifyEmployeeChangedAsync(id, "manager-employee-deleted").ConfigureAwait(false);
         return NoContent();
     }
+
+    private ActionResult? CreateEditLockConflictResult(int employeeId)
+        => ManagerEditLockHttp.CreateConflictResult(
+            this,
+            editLockService,
+            ManagerEditLockTargets.Employee(employeeId),
+            "This employee");
+
+    private Task NotifyEmployeeChangedAsync(int employeeId, string reason)
+        => realtimeNotifier?.NotifyManagerDataChangedAsync(
+            ManagerEditResourceTypes.Employee,
+            employeeId.ToString(),
+            reason) ?? Task.CompletedTask;
 
     private async Task EnsureEmployeeExistsAsync(int id, CancellationToken cancellationToken)
         => _ = await GetRequiredEmployeeAsync(id, cancellationToken).ConfigureAwait(false);

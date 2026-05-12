@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Mvc;
 using WebApi.Auth;
 using WebApi.Contracts.Auth;
 using WebApi.Contracts.ManagerProfile;
+using WebApi.Realtime;
 using WebApi.Services;
 
 namespace WebApi.Controllers;
@@ -16,8 +17,10 @@ namespace WebApi.Controllers;
 [Authorize(Roles = AuthRoles.Manager)]
 public sealed class ManagerProfileController(
     IManagerAccountService managerAccountService,
+    IManagerPresenceService managerPresenceService,
     IJwtTokenService jwtTokenService,
-    IWorkflowLogService workflowLogService) : ControllerBase
+    IWorkflowLogService workflowLogService,
+    IRealtimeNotifier? realtimeNotifier = null) : ControllerBase
 {
     [HttpGet("me")]
     [ProducesResponseType(typeof(ManagerProfileDto), StatusCodes.Status200OK)]
@@ -27,7 +30,7 @@ public sealed class ManagerProfileController(
             .GetProfileAsync(GetCurrentManagerId(), GetCurrentUserName(), cancellationToken)
             .ConfigureAwait(false);
 
-        return Ok(ToApiDto(profile));
+        return Ok(ToApiDto(profile, managerPresenceService.IsManagerOnline(profile.Id)));
     }
 
     [HttpPut("me")]
@@ -56,10 +59,11 @@ public sealed class ManagerProfileController(
         await workflowLogService
             .LogAsync(AuthRoles.Manager, profile.DisplayName, null, "Updated manager profile.", cancellationToken)
             .ConfigureAwait(false);
+        await NotifyManagerProfileChangedAsync(profile.Id, "manager-profile-updated").ConfigureAwait(false);
 
         return Ok(new ManagerProfileUpdateResponseDto
         {
-            Profile = ToApiDto(profile),
+            Profile = ToApiDto(profile, managerPresenceService.IsManagerOnline(profile.Id)),
             AccessToken = token.AccessToken,
             ExpiresAtUtc = token.ExpiresAtUtc,
             Session = ToSessionDto(session),
@@ -71,7 +75,10 @@ public sealed class ManagerProfileController(
     public async Task<ActionResult<IReadOnlyList<ManagerProfileDto>>> ListManagers(CancellationToken cancellationToken)
     {
         var profiles = await managerAccountService.ListProfilesAsync(cancellationToken).ConfigureAwait(false);
-        return Ok(profiles.Select(ToApiDto).ToList());
+        var onlineStates = managerPresenceService.GetOnlineStates(profiles.Select(profile => profile.Id));
+        return Ok(profiles
+            .Select(profile => ToApiDto(profile, onlineStates.TryGetValue(profile.Id, out var isOnline) && isOnline))
+            .ToList());
     }
 
     [HttpPost("managers")]
@@ -96,6 +103,7 @@ public sealed class ManagerProfileController(
         await workflowLogService
             .LogAsync(AuthRoles.Manager, GetCurrentDisplayName(), null, $"Created manager account {profile.DisplayName}.", cancellationToken)
             .ConfigureAwait(false);
+        await NotifyManagerProfileChangedAsync(profile.Id, "manager-account-created").ConfigureAwait(false);
 
         return Ok(ToApiDto(profile));
     }
@@ -112,9 +120,16 @@ public sealed class ManagerProfileController(
         await workflowLogService
             .LogAsync(AuthRoles.Manager, GetCurrentDisplayName(), null, $"Deleted manager account {deletedProfile.DisplayName}.", cancellationToken)
             .ConfigureAwait(false);
+        await NotifyManagerProfileChangedAsync(managerId, "manager-account-deleted").ConfigureAwait(false);
 
         return NoContent();
     }
+
+    private Task NotifyManagerProfileChangedAsync(int managerId, string reason)
+        => realtimeNotifier?.NotifyManagerDataChangedAsync(
+            ManagerEditResourceTypes.ManagerProfile,
+            managerId.ToString(),
+            reason) ?? Task.CompletedTask;
 
     private int? GetCurrentManagerId()
         => int.TryParse(User.FindFirstValue("manager_id"), out var parsed) ? parsed : null;
@@ -142,13 +157,14 @@ public sealed class ManagerProfileController(
         EmployeeId = session.EmployeeId,
     };
 
-    private static ManagerProfileDto ToApiDto(BusinessLogicLayer.Contracts.Managers.ManagerProfileDto profile) => new()
+    private static ManagerProfileDto ToApiDto(BusinessLogicLayer.Contracts.Managers.ManagerProfileDto profile, bool isOnline = false) => new()
     {
         Id = profile.Id,
         UserName = profile.UserName,
         DisplayName = profile.DisplayName,
         RecoveryEmail = profile.RecoveryEmail,
         LastLoginAtUtc = profile.LastLoginAtUtc,
+        IsOnline = isOnline,
         CreatedAtUtc = profile.CreatedAtUtc,
     };
 }

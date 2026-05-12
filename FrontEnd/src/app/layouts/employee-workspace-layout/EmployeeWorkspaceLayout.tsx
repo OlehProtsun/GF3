@@ -2,17 +2,18 @@ import { useEffect, useMemo, useState, type PropsWithChildren } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 import { useAuth } from "@app/providers/AuthProvider";
 import { useRealtime } from "@app/providers/PresenceProvider";
-import { useEmployeeShiftSwapsQuery } from "@entities/shift-swaps";
+import { useEmployeeShiftSwapsQuery, type ShiftSwap } from "@entities/shift-swaps";
 import {
   employeeNotificationReadStateEventName,
-  getEmployeeOpenShiftNotificationId,
   getEmployeeNotificationReadStorageKey,
   readEmployeeNotificationIds,
 } from "@shared/lib/employeeNotificationReadState";
+import {
+  getUnreadEmployeeNotificationTargets,
+  type EmployeeNavNotificationTarget,
+} from "@pages/employee-notifications/model/notifications";
 import { AvailabilityIcon, BackIcon, EmployeeIcon, NoteIcon, ScheduleIcon } from "@shared/ui/icons";
 import styles from "./EmployeeWorkspaceLayout.module.css";
-
-type EmployeeNavNotificationTarget = "alerts" | "swap";
 
 type EmployeeNavItem = {
   to: string;
@@ -63,12 +64,14 @@ const employeeNavItems: readonly EmployeeNavItem[] = [
   },
 ] as const;
 
+const emptySwaps: ShiftSwap[] = [];
+
 export function EmployeeWorkspaceLayout({ children }: PropsWithChildren) {
   const [isMobileTabsCollapsed, setIsMobileTabsCollapsed] = useState(false);
   const { session } = useAuth();
   const { notifications } = useRealtime();
   const swapsQuery = useEmployeeShiftSwapsQuery();
-  const swaps = swapsQuery.data ?? [];
+  const swaps = swapsQuery.data ?? emptySwaps;
   const { pathname } = useLocation();
   const storageKey = getEmployeeNotificationReadStorageKey(session?.userName);
   const [readNotificationIds, setReadNotificationIds] = useState<Set<string>>(() =>
@@ -112,34 +115,10 @@ export function EmployeeWorkspaceLayout({ children }: PropsWithChildren) {
   ]
     .filter(Boolean)
     .join(" ");
-  const unreadNotificationTargets = useMemo(() => {
-    const targets: Record<EmployeeNavNotificationTarget, boolean> = {
-      alerts: false,
-      swap: false,
-    };
-
-    if (swaps.some(swap =>
-      swap.isManagerCreated &&
-      swap.status === "open" &&
-      !readNotificationIds.has(getEmployeeOpenShiftNotificationId(swap.id)),
-    )) {
-      targets.alerts = true;
-      targets.swap = true;
-    }
-
-    notifications.forEach((notification) => {
-      if (readNotificationIds.has(notification.id)) {
-        return;
-      }
-
-      if (notification.kind === "shiftSwap" && notification.reason === "manager-manual-shift-offer-created") {
-        targets.alerts = true;
-        targets.swap = true;
-      }
-    });
-
-    return targets;
-  }, [notifications, readNotificationIds, swaps]);
+  const unreadNotificationTargets = useMemo(
+    () => getUnreadEmployeeNotificationTargets(notifications, swaps, readNotificationIds),
+    [notifications, readNotificationIds, swaps],
+  );
 
   useEffect(() => {
     const refreshReadState = () => {

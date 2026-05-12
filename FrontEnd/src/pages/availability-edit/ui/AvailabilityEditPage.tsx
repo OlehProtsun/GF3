@@ -1,6 +1,11 @@
 import { useMemo, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import {
+  buildManagerEditLockMessage,
+  managerEditResourceTypes,
+  useManagerEditLocks,
+} from "@app/providers/PresenceProvider";
+import {
   buildActiveAvailabilityBindMap,
   normalizeBindKey,
   type AvailabilityBind,
@@ -31,6 +36,7 @@ import { stableSerialize } from "@shared/lib/stableSerialize";
 import { useSyncedDraft } from "@shared/lib/useSyncedDraft";
 import { useUnsavedChangesPrompt } from "@shared/lib/useUnsavedChangesPrompt";
 import { ConfirmDialog } from "@shared/ui/ConfirmDialog";
+import { ManagerEditLockDialog } from "@shared/ui/ManagerEditLockDialog";
 import { PageHeader } from "@shared/ui/PageHeader";
 import { SavingOverlay } from "@shared/ui/SavingOverlay";
 import styles from "./AvailabilityEditPage.module.css";
@@ -399,6 +405,20 @@ export function AvailabilityEditPage() {
   const isCreate = !availabilityId;
   const groupId = !isCreate && Number.isFinite(parsedId) ? parsedId : null;
   const defaults = useMemo(() => getDefaultDateParts(), []);
+  const editLockTargets = useMemo(
+    () => groupId
+      ? [{
+        resourceType: managerEditResourceTypes.availabilityGroup,
+        resourceId: String(groupId),
+      }]
+      : [],
+    [groupId],
+  );
+  const { lockedByOtherState, isCheckingLocks } = useManagerEditLocks(editLockTargets);
+  const editLockMessage = lockedByOtherState
+    ? buildManagerEditLockMessage(lockedByOtherState, "This availability group")
+    : null;
+  const canEdit = !editLockMessage && !isCheckingLocks;
 
   const groupQuery = useAvailabilityGroupByIdQuery(groupId);
   const membersQuery = useAvailabilityGroupMembersQuery(groupId);
@@ -560,6 +580,10 @@ export function AvailabilityEditPage() {
   } = useUnsavedChangesPrompt({
     when: hasUnsavedChanges && !saveMutation.isPending,
   });
+
+  const handleEditLockDialogClose = () => {
+    runWithoutPrompt(() => navigate(backTo));
+  };
 
   const updateBindRows = (nextRows: EditableAvailabilityBind[]) => {
     setLocalBindRows(nextRows);
@@ -821,6 +845,22 @@ export function AvailabilityEditPage() {
   };
 
   const handleSave = () => {
+    if (editLockMessage) {
+      setEditorState((current) => ({
+        ...current,
+        editorError: editLockMessage,
+      }));
+      return;
+    }
+
+    if (isCheckingLocks) {
+      setEditorState((current) => ({
+        ...current,
+        editorError: "Checking edit access. Please wait a moment.",
+      }));
+      return;
+    }
+
     const trimmedName = name.trim();
     const nextInformationErrors: AvailabilityEditorInformationErrors = {};
     const nextPublicationErrors = validatePublicationFields({
@@ -920,7 +960,25 @@ export function AvailabilityEditPage() {
         )}
       />
 
-      <AvailabilityGroupEditor
+      {isCheckingLocks ? (
+        <ManagerEditLockDialog
+          open
+          title="Checking edit access"
+          message="Please wait while we check whether this availability can be edited."
+        />
+      ) : null}
+
+      {editLockMessage ? (
+        <ManagerEditLockDialog
+          open
+          message={editLockMessage}
+          actionText="Back to availability"
+          onClose={handleEditLockDialogClose}
+        />
+      ) : null}
+
+      {canEdit ? (
+        <AvailabilityGroupEditor
         name={name}
         month={month}
         year={year}
@@ -1059,7 +1117,8 @@ export function AvailabilityEditPage() {
         onColumnMove={handleColumnMove}
         onCellChange={handleCellChange}
         onSave={handleSave}
-      />
+        />
+      ) : null}
 
       <ConfirmDialog
         open={bindDeleteTarget !== null}
