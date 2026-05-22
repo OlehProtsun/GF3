@@ -1,15 +1,26 @@
+using System.Security.Claims;
 using BusinessLogicLayer.Common;
 using BusinessLogicLayer.Contracts.Enums;
 using BusinessLogicLayer.Contracts.Models;
 using BusinessLogicLayer.Generators;
 using BusinessLogicLayer.Services;
+using BusinessLogicLayer.Services.Abstractions;
 using GF3.Tests.Infrastructure;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using WebApi.Controllers;
 using WebApi.Contracts.AvailabilityBinds;
+using WebApi.Contracts.AvailabilityGroups;
+using WebApi.Contracts.AvailabilityGroups.Members;
+using WebApi.Contracts.AvailabilityGroups.Slots;
+using WebApi.Contracts.Containers;
+using WebApi.Contracts.Containers.Graphs;
+using WebApi.Contracts.Containers.Graphs.Slots;
 using WebApi.Contracts.Employees;
 using WebApi.Contracts.Shops;
+using WebApi.Auth;
+using WebApi.Realtime;
 
 namespace GF3.Tests;
 
@@ -243,6 +254,157 @@ public sealed class RemainingControllerAndAvailabilityCoverageTests
         Assert.Equal("08:00 - 12:00", refreshedDto.Value);
     }
 
+    [Fact]
+    public async Task AvailabilityGroupsController_ReturnsConflictForLockedGroupMutations()
+    {
+        await using var database = await SqliteTestDatabase.CreateAsync();
+        await using var context = database.CreateContext();
+        var service = CreateAvailabilityGroupService(context);
+        var lockService = new ManagerEditLockService();
+        var group = await service.CreateAsync(TestDataFactory.CreateAvailabilityGroupModel(name: "May Availability"));
+        lockService.SetLocks(
+            "manager-a",
+            managerId: 1,
+            "Alice Manager",
+            [ManagerEditLockTargets.AvailabilityGroup(group.Id)]);
+        var controller = new AvailabilityGroupsController(service, editLockService: lockService);
+        SetManagerHttpContext(controller, managerId: 2, path: $"/api/availability-groups/{group.Id}");
+
+        var updateResult = await controller.Update(group.Id, new UpdateAvailabilityGroupRequest
+        {
+            Name = "Blocked Update",
+            Year = group.Year,
+            Month = group.Month,
+            PublicationStatus = "public",
+        }, CancellationToken.None);
+        var memberResult = await controller.CreateMember(group.Id, new CreateAvailabilityGroupMemberRequest
+        {
+            EmployeeId = 999,
+            DisplayOrder = 0,
+        }, CancellationToken.None);
+        var slotResult = await controller.CreateSlot(group.Id, new CreateAvailabilitySlotRequest
+        {
+            AvailabilityGroupMemberId = 999,
+            DayOfMonth = 1,
+            Kind = AvailabilityKind.ANY,
+        }, CancellationToken.None);
+
+        var updateConflict = Assert.IsType<ConflictObjectResult>(updateResult);
+        var memberConflict = Assert.IsType<ConflictObjectResult>(memberResult.Result);
+        var slotConflict = Assert.IsType<ConflictObjectResult>(slotResult.Result);
+        Assert.All([updateConflict, memberConflict, slotConflict], result =>
+        {
+            var problem = Assert.IsType<ProblemDetails>(result.Value);
+            Assert.Equal(StatusCodes.Status409Conflict, problem.Status);
+            Assert.Equal("edit_lock_conflict", problem.Type);
+            Assert.Equal("This availability group is currently being edited by Alice Manager.", problem.Detail);
+        });
+        Assert.Equal("May Availability", (await service.GetAsync(group.Id))!.Name);
+        Assert.Empty(await service.GetMembersAsync(group.Id));
+        Assert.Empty(await service.GetSlotsAsync(group.Id));
+    }
+
+    [Fact]
+    public async Task EmployeesAndShopsControllers_ReturnConflictForLockedMutations()
+    {
+        var lockService = new ManagerEditLockService();
+        lockService.SetLocks(
+            "manager-a",
+            managerId: 1,
+            "Alice Manager",
+            [ManagerEditLockTargets.Employee(7), ManagerEditLockTargets.Shop(4)]);
+        var employeeFacade = new RecordingEmployeeFacade();
+        var shopFacade = new RecordingShopFacade();
+        var employeesController = new EmployeesController(employeeFacade, editLockService: lockService);
+        var shopsController = new ShopsController(shopFacade, editLockService: lockService);
+        SetManagerHttpContext(employeesController, managerId: 2, path: "/api/employees/7");
+        SetManagerHttpContext(shopsController, managerId: 2, path: "/api/shops/4");
+
+        var employeeUpdate = await employeesController.Update(7, new UpdateEmployeeRequest
+        {
+            FirstName = "Blocked",
+            LastName = "Worker",
+        }, CancellationToken.None);
+        var employeeDelete = await employeesController.Delete(7, CancellationToken.None);
+        var shopUpdate = await shopsController.Update(4, new UpdateShopRequest
+        {
+            Name = "Blocked Shop",
+            Address = "Main Street",
+        }, CancellationToken.None);
+        var shopDelete = await shopsController.Delete(4, CancellationToken.None);
+
+        AssertEditLockConflict(employeeUpdate, "This employee is currently being edited by Alice Manager.");
+        AssertEditLockConflict(employeeDelete, "This employee is currently being edited by Alice Manager.");
+        AssertEditLockConflict(shopUpdate, "This shop is currently being edited by Alice Manager.");
+        AssertEditLockConflict(shopDelete, "This shop is currently being edited by Alice Manager.");
+        Assert.Equal(0, employeeFacade.Calls);
+        Assert.Equal(0, shopFacade.Calls);
+    }
+
+    [Fact]
+    public async Task ContainersController_ReturnsConflictForLockedContainerAndGraphMutations()
+    {
+        await using var database = await SqliteTestDatabase.CreateAsync();
+        await using var context = database.CreateContext();
+        var containerService = new ContainerService(
+            new DataAccessLayer.Repositories.ContainerRepository(context),
+            new DataAccessLayer.Repositories.ScheduleRepository(context),
+            new DataAccessLayer.Repositories.SchedulePresetRepository(context),
+            new DataAccessLayer.Repositories.ScheduleSlotRepository(context),
+            new DataAccessLayer.Repositories.ScheduleEmployeeRepository(context),
+            new DataAccessLayer.Repositories.ScheduleCellStyleRepository(context),
+            new DataAccessLayer.Repositories.AvailabilityGroupRepository(context),
+            new DummyGenerator());
+        var lockService = new ManagerEditLockService();
+        lockService.SetLocks(
+            "manager-a",
+            managerId: 1,
+            "Alice Manager",
+            [ManagerEditLockTargets.Container(2), ManagerEditLockTargets.Schedule(2, 66)]);
+        var controller = new ContainersController(
+            containerService,
+            new NoopWorkflowLogService(),
+            new NoopRealtimeNotifier(),
+            lockService);
+        SetManagerHttpContext(controller, managerId: 2, path: "/api/containers/2");
+
+        var containerUpdate = await controller.Update(2, new UpdateContainerRequest
+        {
+            Name = "Blocked Container",
+        }, CancellationToken.None);
+        var containerDelete = await controller.Delete(2, CancellationToken.None);
+        var graphUpdate = await controller.UpdateGraph(2, 66, new UpdateGraphRequest
+        {
+            ShopId = 3,
+            Name = "Blocked Graph",
+            Year = 2026,
+            Month = 5,
+            PeoplePerShift = 2,
+            Shift1Time = "08:00 - 16:00",
+            Shift2Time = "16:00 - 22:00",
+            MaxHoursPerEmpMonth = 180,
+            MaxConsecutiveDays = 5,
+            MaxConsecutiveFull = 3,
+            MaxFullPerMonth = 18,
+        }, CancellationToken.None);
+        var graphDelete = await controller.DeleteGraph(2, 66, CancellationToken.None);
+        var graphGenerate = await controller.GenerateGraph(2, 66, new GenerateGraphRequest
+        {
+            DryRun = false,
+            Overwrite = true,
+        }, CancellationToken.None);
+        var replaceSlots = await controller.ReplaceGraphSlots(2, 66, new ReplaceGraphSlotsRequest(), CancellationToken.None);
+
+        AssertEditLockConflict(containerUpdate, "This container is currently being edited by Alice Manager.");
+        AssertEditLockConflict(containerDelete, "This container is currently being edited by Alice Manager.");
+        AssertEditLockConflict(graphUpdate, "This schedule is currently being edited by Alice Manager.");
+        AssertEditLockConflict(graphDelete, "This schedule is currently being edited by Alice Manager.");
+        AssertEditLockConflict(graphGenerate.Result!, "This schedule is currently being edited by Alice Manager.");
+        AssertEditLockConflict(replaceSlots, "This schedule is currently being edited by Alice Manager.");
+        Assert.Empty(await context.Containers.ToListAsync());
+        Assert.Empty(await context.Schedules.ToListAsync());
+    }
+
     private static AvailabilityGroupService CreateAvailabilityGroupService(DataAccessLayer.Models.DataBaseContext.AppDbContext context)
         => new(
             new DataAccessLayer.Repositories.AvailabilityGroupRepository(context),
@@ -255,6 +417,130 @@ public sealed class RemainingControllerAndAvailabilityCoverageTests
         {
             HttpContext = new DefaultHttpContext(),
         };
+    }
+
+    private static void SetManagerHttpContext(ControllerBase controller, int managerId, string path)
+    {
+        controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext
+            {
+                User = new ClaimsPrincipal(new ClaimsIdentity(
+                [
+                    new Claim(ClaimTypes.Name, $"manager-{managerId}"),
+                    new Claim(ClaimTypes.Role, AuthRoles.Manager),
+                    new Claim("manager_id", managerId.ToString(System.Globalization.CultureInfo.InvariantCulture)),
+                ], JwtAuthenticationDefaults.SchemeName, ClaimTypes.Name, ClaimTypes.Role)),
+                Request =
+                {
+                    Path = path,
+                },
+            },
+        };
+    }
+
+    private static void AssertEditLockConflict(IActionResult result, string expectedDetail)
+    {
+        var conflict = Assert.IsType<ConflictObjectResult>(result);
+        var problem = Assert.IsType<ProblemDetails>(conflict.Value);
+
+        Assert.Equal(StatusCodes.Status409Conflict, problem.Status);
+        Assert.Equal("edit_lock_conflict", problem.Type);
+        Assert.Equal(expectedDetail, problem.Detail);
+    }
+
+    private sealed class RecordingEmployeeFacade : IEmployeeFacade
+    {
+        public int Calls { get; private set; }
+
+        public Task<IReadOnlyList<BusinessLogicLayer.Contracts.Employees.EmployeeDto>> GetAllAsync(CancellationToken ct = default)
+        {
+            Calls++;
+            return Task.FromResult<IReadOnlyList<BusinessLogicLayer.Contracts.Employees.EmployeeDto>>([]);
+        }
+
+        public Task<IReadOnlyList<BusinessLogicLayer.Contracts.Employees.EmployeeDto>> GetByValueAsync(string value, CancellationToken ct = default)
+        {
+            Calls++;
+            return Task.FromResult<IReadOnlyList<BusinessLogicLayer.Contracts.Employees.EmployeeDto>>([]);
+        }
+
+        public Task<BusinessLogicLayer.Contracts.Employees.EmployeeDto?> GetAsync(int id, CancellationToken ct = default)
+        {
+            Calls++;
+            return Task.FromResult<BusinessLogicLayer.Contracts.Employees.EmployeeDto?>(new BusinessLogicLayer.Contracts.Employees.EmployeeDto { Id = id });
+        }
+
+        public Task<BusinessLogicLayer.Contracts.Employees.EmployeeDto> CreateAsync(BusinessLogicLayer.Contracts.Employees.SaveEmployeeRequest request, CancellationToken ct = default)
+        {
+            Calls++;
+            return Task.FromResult(new BusinessLogicLayer.Contracts.Employees.EmployeeDto { Id = 1 });
+        }
+
+        public Task UpdateAsync(BusinessLogicLayer.Contracts.Employees.SaveEmployeeRequest request, CancellationToken ct = default)
+        {
+            Calls++;
+            return Task.CompletedTask;
+        }
+
+        public Task DeleteAsync(int id, CancellationToken ct = default)
+        {
+            Calls++;
+            return Task.CompletedTask;
+        }
+
+        public Task<DeleteOperationResult> TryDeleteAsync(int id, CancellationToken ct = default)
+        {
+            Calls++;
+            return Task.FromResult(DeleteOperationResult.Success());
+        }
+    }
+
+    private sealed class RecordingShopFacade : IShopFacade
+    {
+        public int Calls { get; private set; }
+
+        public Task<IReadOnlyList<BusinessLogicLayer.Contracts.Shops.ShopDto>> GetAllAsync(CancellationToken ct = default)
+        {
+            Calls++;
+            return Task.FromResult<IReadOnlyList<BusinessLogicLayer.Contracts.Shops.ShopDto>>([]);
+        }
+
+        public Task<IReadOnlyList<BusinessLogicLayer.Contracts.Shops.ShopDto>> GetByValueAsync(string value, CancellationToken ct = default)
+        {
+            Calls++;
+            return Task.FromResult<IReadOnlyList<BusinessLogicLayer.Contracts.Shops.ShopDto>>([]);
+        }
+
+        public Task<BusinessLogicLayer.Contracts.Shops.ShopDto?> GetAsync(int id, CancellationToken ct = default)
+        {
+            Calls++;
+            return Task.FromResult<BusinessLogicLayer.Contracts.Shops.ShopDto?>(new BusinessLogicLayer.Contracts.Shops.ShopDto { Id = id });
+        }
+
+        public Task<BusinessLogicLayer.Contracts.Shops.ShopDto> CreateAsync(BusinessLogicLayer.Contracts.Shops.SaveShopRequest request, CancellationToken ct = default)
+        {
+            Calls++;
+            return Task.FromResult(new BusinessLogicLayer.Contracts.Shops.ShopDto { Id = 1 });
+        }
+
+        public Task UpdateAsync(BusinessLogicLayer.Contracts.Shops.SaveShopRequest request, CancellationToken ct = default)
+        {
+            Calls++;
+            return Task.CompletedTask;
+        }
+
+        public Task DeleteAsync(int id, CancellationToken ct = default)
+        {
+            Calls++;
+            return Task.CompletedTask;
+        }
+
+        public Task<DeleteOperationResult> TryDeleteAsync(int id, CancellationToken ct = default)
+        {
+            Calls++;
+            return Task.FromResult(DeleteOperationResult.Success());
+        }
     }
 
     private sealed class DummyGenerator : IScheduleGenerator

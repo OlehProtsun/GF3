@@ -178,6 +178,158 @@ public sealed class ManagerAccountServiceWorkflowTests
     }
 
     [Fact]
+    public async Task SendPasswordResetCodeAsync_ClearsChallengeWhenEmailDeliveryFails()
+    {
+        await using var database = await SqliteTestDatabase.CreateAsync();
+        await using var context = database.CreateContext();
+        var service = CreateService(context, emailSender: new FailingEmailSender("SMTP down."));
+        await service.CreateAsync(new CreateManagerAccountRequest
+        {
+            DisplayName = "Recovery Manager",
+            UserName = "delivery.failure",
+            Password = "password",
+            RecoveryEmail = "delivery.failure@example.com",
+        });
+
+        var exception = await Assert.ThrowsAsync<ValidationException>(() =>
+            service.SendPasswordResetCodeAsync("delivery.failure"));
+        var storedAccount = await context.ManagerAccounts.AsNoTracking().SingleAsync();
+
+        Assert.Equal("The password reset email could not be delivered. SMTP down.", exception.Message);
+        Assert.Null(storedAccount.PasswordResetCodeHash);
+        Assert.Null(storedAccount.PasswordResetExpiresAtUtc);
+        Assert.Null(storedAccount.PasswordResetRequestedAtUtc);
+    }
+
+    [Fact]
+    public async Task ConfirmPasswordResetAsync_ValidatesChallengeCodeExpiryAndNewPassword()
+    {
+        await using var database = await SqliteTestDatabase.CreateAsync();
+        await using var context = database.CreateContext();
+        var emailSender = new CapturingEmailSender();
+        var service = CreateService(context, emailSender: emailSender);
+        await service.CreateAsync(new CreateManagerAccountRequest
+        {
+            DisplayName = "Recovery Manager",
+            UserName = "confirm.manager",
+            Password = "old-password",
+            RecoveryEmail = "confirm.manager@example.com",
+        });
+
+        var missingChallenge = await Assert.ThrowsAsync<ValidationException>(() =>
+            service.ConfirmPasswordResetAsync("confirm.manager", "123456", "new-password"));
+
+        await service.SendPasswordResetCodeAsync("confirm.manager");
+        var code = ExtractResetCode(Assert.Single(emailSender.Messages).TextBody);
+
+        var malformedCode = await Assert.ThrowsAsync<ValidationException>(() =>
+            service.ConfirmPasswordResetAsync("confirm.manager", "12x", "new-password"));
+        var blankPassword = await Assert.ThrowsAsync<ValidationException>(() =>
+            service.ConfirmPasswordResetAsync("confirm.manager", code, " "));
+        var weakPassword = await Assert.ThrowsAsync<ValidationException>(() =>
+            service.ConfirmPasswordResetAsync("confirm.manager", code, "123"));
+
+        var challengedAccount = await context.ManagerAccounts.SingleAsync();
+        challengedAccount.PasswordResetExpiresAtUtc = DateTimeOffset.UtcNow.AddMinutes(-1);
+        await context.SaveChangesAsync();
+        context.ChangeTracker.Clear();
+
+        var expiredCode = await Assert.ThrowsAsync<ValidationException>(() =>
+            service.ConfirmPasswordResetAsync("confirm.manager", code, "new-password"));
+        var storedAccount = await context.ManagerAccounts.AsNoTracking().SingleAsync();
+
+        Assert.Equal(["Request a new password code before changing the password."], missingChallenge.Errors["code"]);
+        Assert.Equal(["Enter the 6-digit code from your email."], malformedCode.Errors["code"]);
+        Assert.Equal(["New password is required."], blankPassword.Errors["newPassword"]);
+        Assert.Equal(["Password must be between 6 and 200 characters long."], weakPassword.Errors["newPassword"]);
+        Assert.Equal(["This password code expired. Request a new one."], expiredCode.Errors["code"]);
+        Assert.Null(storedAccount.PasswordResetCodeHash);
+        Assert.Null(storedAccount.PasswordResetExpiresAtUtc);
+        Assert.Null(storedAccount.PasswordResetRequestedAtUtc);
+    }
+
+    [Fact]
+    public async Task CreateAndUpdateProfileAsync_ValidateFieldShapesAndDuplicateUsernames()
+    {
+        await using var database = await SqliteTestDatabase.CreateAsync();
+        await using var context = database.CreateContext();
+        var service = CreateService(context);
+
+        var shortUsername = await Assert.ThrowsAsync<ValidationException>(() =>
+            service.CreateAsync(new CreateManagerAccountRequest
+            {
+                DisplayName = "Valid Name",
+                UserName = "ab",
+                Password = "password",
+            }));
+        var badUsername = await Assert.ThrowsAsync<ValidationException>(() =>
+            service.CreateAsync(new CreateManagerAccountRequest
+            {
+                DisplayName = "Valid Name",
+                UserName = "bad user",
+                Password = "password",
+            }));
+        var badEmail = await Assert.ThrowsAsync<ValidationException>(() =>
+            service.CreateAsync(new CreateManagerAccountRequest
+            {
+                DisplayName = "Valid Name",
+                UserName = "valid.user",
+                Password = "password",
+                RecoveryEmail = "not-an-email",
+            }));
+        var weakPassword = await Assert.ThrowsAsync<ValidationException>(() =>
+            service.CreateAsync(new CreateManagerAccountRequest
+            {
+                DisplayName = "Valid Name",
+                UserName = "weak.password",
+                Password = "123",
+            }));
+
+        var first = await service.CreateAsync(new CreateManagerAccountRequest
+        {
+            DisplayName = "First Manager",
+            UserName = "first.manager",
+            Password = "password",
+            RecoveryEmail = "first@example.com",
+        });
+        var second = await service.CreateAsync(new CreateManagerAccountRequest
+        {
+            DisplayName = "Second Manager",
+            UserName = "second.manager",
+            Password = "password",
+        });
+
+        var duplicateUsername = await Assert.ThrowsAsync<ValidationException>(() =>
+            service.UpdateProfileAsync(
+                second.Id,
+                null,
+                new UpdateManagerProfileRequest
+                {
+                    DisplayName = "Second Manager",
+                    UserName = " first.manager ",
+                }));
+
+        var updatedByUsername = await service.UpdateProfileAsync(
+            null,
+            first.UserName,
+            new UpdateManagerProfileRequest
+            {
+                DisplayName = " ",
+                UserName = " renamed.manager ",
+                RecoveryEmail = " renamed@example.com ",
+            });
+
+        Assert.Equal(["Username must be between 3 and 100 characters long."], shortUsername.Errors["userName"]);
+        Assert.Equal(["Username may contain only letters, numbers, dots, underscores, and dashes."], badUsername.Errors["userName"]);
+        Assert.Equal(["Enter a valid recovery email address."], badEmail.Errors["recoveryEmail"]);
+        Assert.Equal(["Password must be between 6 and 200 characters long."], weakPassword.Errors["password"]);
+        Assert.Equal(["This username is already in use."], duplicateUsername.Errors["userName"]);
+        Assert.Equal("renamed.manager", updatedByUsername.UserName);
+        Assert.Equal("renamed.manager", updatedByUsername.DisplayName);
+        Assert.Equal("renamed@example.com", updatedByUsername.RecoveryEmail);
+    }
+
+    [Fact]
     public async Task DeleteAsync_RemovesAnotherManagerButPreventsSelfDeletion()
     {
         await using var database = await SqliteTestDatabase.CreateAsync();
@@ -266,6 +418,17 @@ public sealed class ManagerAccountServiceWorkflowTests
             Messages.Add(new SentEmail(toEmail, toName, subject, textBody));
             return Task.CompletedTask;
         }
+    }
+
+    private sealed class FailingEmailSender(string message) : IEmailSender
+    {
+        public Task SendAsync(
+            string toEmail,
+            string? toName,
+            string subject,
+            string textBody,
+            CancellationToken ct = default)
+            => Task.FromException(new InvalidOperationException(message));
     }
 
     private sealed record SentEmail(

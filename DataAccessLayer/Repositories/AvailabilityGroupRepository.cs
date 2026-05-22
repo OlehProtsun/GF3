@@ -50,6 +50,7 @@ public class AvailabilityGroupRepository : GenericRepository<AvailabilityGroupMo
     public async Task<AvailabilityGroupModel?> GetFullByIdAsync(int id, CancellationToken ct = default)
         => await _set
             .AsNoTracking()
+            .AsSplitQuery()
             .Include(group => group.Members)
                 .ThenInclude(member => member.Employee)
             .Include(group => group.Members)
@@ -110,6 +111,7 @@ public class AvailabilityGroupRepository : GenericRepository<AvailabilityGroupMo
     private IQueryable<AvailabilityGroupModel> CreatePublishedEmployeeQuery(int employeeId)
         => _set
             .AsNoTracking()
+            .AsSplitQuery()
             .Include(group => group.Members)
                 .ThenInclude(member => member.Employee)
             .Include(group => group.Members)

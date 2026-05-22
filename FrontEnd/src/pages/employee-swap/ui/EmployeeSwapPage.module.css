@@ -488,6 +488,11 @@
   color: #475569;
 }
 
+.badgeLocked {
+  background: rgba(254, 226, 226, 0.94);
+  color: #b91c1c;
+}
+
 .detailGrid {
   display: grid;
   gap: 8px;
@@ -537,6 +542,18 @@
 
 .deltaNegative {
   color: #be123c;
+}
+
+.lockedText {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(220, 38, 38, 0.16);
+  background: rgba(254, 242, 242, 0.9);
+  color: #991b1b;
+  font-size: 0.8rem;
+  line-height: 1.35;
+  font-weight: 850;
 }
 
 .cardActions {

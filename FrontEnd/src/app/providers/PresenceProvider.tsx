@@ -22,7 +22,10 @@ import {
   getAuthAccessToken,
 } from "@shared/api/httpClient";
 import { queryKeys } from "@shared/api/queryKeys";
-import { getEmployeeOpenShiftNotificationId } from "@shared/lib/employeeNotificationReadState";
+import {
+  getEmployeeOpenShiftNotificationId,
+  getEmployeeOpenShiftScheduleNotificationId,
+} from "@shared/lib/employeeNotificationReadState";
 import { isDev } from "@shared/lib/isDev";
 
 const presenceHubMethodName = "PresenceChanged";
@@ -357,6 +360,7 @@ export function PresenceProvider({ children }: PropsWithChildren) {
 
       case managerEditResourceTypes.availabilityGroup:
         invalidateRealtimeQuery(queryClient, queryKeys.availabilityGroups.all);
+        invalidateRealtimeQuery(queryClient, queryKeys.employeeAvailability.all);
         invalidateRealtimeQuery(queryClient, queryKeys.containers.all);
         if (resourceId !== null) {
           invalidateRealtimeQuery(queryClient, queryKeys.availabilityGroups.byId(resourceId));
@@ -412,9 +416,13 @@ export function PresenceProvider({ children }: PropsWithChildren) {
 
     if (isOpenShiftPostedReason(update.reason)) {
       const scheduleId = update.scheduleId ?? update.graphId ?? null;
-      const notificationIdSource = update.shiftSwapId ?? scheduleId;
+      const notificationId = update.shiftSwapId != null
+        ? getEmployeeOpenShiftNotificationId(update.shiftSwapId)
+        : scheduleId != null
+          ? getEmployeeOpenShiftScheduleNotificationId(scheduleId)
+          : getEmployeeOpenShiftNotificationId(null);
       pushEmployeeNotification({
-        id: getEmployeeOpenShiftNotificationId(notificationIdSource),
+        id: notificationId,
         kind: "shiftSwap",
         reason: update.reason,
         occurredAtUtc: update.changedAtUtc,
@@ -445,7 +453,7 @@ export function PresenceProvider({ children }: PropsWithChildren) {
     invalidateRealtimeQuery(queryClient, queryKeys.employeeSchedules.all);
   });
 
-  const applyManagerEditLockStates = useEffectEvent((states: ManagerEditLockState[]) => {
+  const applyManagerEditLockStates = useCallback((states: ManagerEditLockState[]) => {
     setManagerEditLocksState(current => {
       const next = { ...current };
       let hasChanges = false;
@@ -458,26 +466,7 @@ export function PresenceProvider({ children }: PropsWithChildren) {
       });
       return hasChanges ? next : current;
     });
-  });
-
-  const applyManagerEditLockChanged = useEffectEvent((update: ManagerEditLockState) => {
-    applyManagerEditLockStates([update]);
-
-    if (update.resourceType === managerEditResourceTypes.schedule) {
-      invalidateRealtimeQuery(queryClient, queryKeys.shiftSwaps.employee());
-      invalidateRealtimeQuery(queryClient, queryKeys.employeeSchedules.all);
-    }
-
-    if (!update.isLocked) {
-      const unlockedKey = buildManagerEditLockKey(update);
-      const shouldTryAcquire = desiredManagerEditLocksRef.current.some(target =>
-        buildManagerEditLockKey(target) === unlockedKey,
-      );
-      if (shouldTryAcquire) {
-        void publishManagerEditLocks(desiredManagerEditLocksRef.current);
-      }
-    }
-  });
+  }, []);
 
   const publishManagerEditLocks = useCallback(async (locks: ManagerEditLockTarget[]) => {
     const connection = connectionRef.current;
@@ -496,6 +485,38 @@ export function PresenceProvider({ children }: PropsWithChildren) {
       return [];
     }
   }, [applyManagerEditLockStates, session?.role]);
+
+  const applyManagerEditLockChanged = useEffectEvent((update: ManagerEditLockState) => {
+    applyManagerEditLockStates([update]);
+
+    if (update.resourceType === managerEditResourceTypes.schedule) {
+      invalidateRealtimeQuery(queryClient, queryKeys.shiftSwaps.employee());
+      invalidateRealtimeQuery(queryClient, queryKeys.employeeSchedules.all);
+    }
+
+    if (update.resourceType === managerEditResourceTypes.availabilityGroup) {
+      invalidateRealtimeQuery(queryClient, queryKeys.availabilityGroups.all);
+      invalidateRealtimeQuery(queryClient, queryKeys.employeeAvailability.all);
+
+      const parsedResourceId = Number(update.resourceId);
+      if (Number.isFinite(parsedResourceId)) {
+        invalidateRealtimeQuery(queryClient, queryKeys.availabilityGroups.byId(parsedResourceId));
+        invalidateRealtimeQuery(queryClient, queryKeys.availabilityGroups.items(parsedResourceId));
+        invalidateRealtimeQuery(queryClient, queryKeys.availabilityGroups.members(parsedResourceId));
+        invalidateRealtimeQuery(queryClient, queryKeys.availabilityGroups.slots(parsedResourceId));
+      }
+    }
+
+    if (!update.isLocked) {
+      const unlockedKey = buildManagerEditLockKey(update);
+      const shouldTryAcquire = desiredManagerEditLocksRef.current.some(target =>
+        buildManagerEditLockKey(target) === unlockedKey,
+      );
+      if (shouldTryAcquire) {
+        void publishManagerEditLocks(desiredManagerEditLocksRef.current);
+      }
+    }
+  });
 
   const setManagerEditLocks = useCallback((locks: ManagerEditLockTarget[]) => {
     desiredManagerEditLocksRef.current = locks;

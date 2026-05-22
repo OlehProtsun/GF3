@@ -1,6 +1,7 @@
 using System.Text;
 using BusinessLogicLayer.Common;
 using BusinessLogicLayer.Contracts.Availability;
+using BusinessLogicLayer.Contracts.Enums;
 using BusinessLogicLayer.Contracts.Models;
 using BusinessLogicLayer.Contracts.Shops;
 using BusinessLogicLayer.Generators;
@@ -62,6 +63,101 @@ public sealed class DeepBusinessAndControllerCoverageTests
     }
 
     [Fact]
+    public async Task ScheduleGenerator_GenerateAsync_GuardsInvalidInputs()
+    {
+        var generator = new ScheduleGenerator();
+        var employees = new[]
+        {
+            new ScheduleEmployeeModel
+            {
+                EmployeeId = 42,
+                MinHoursMonth = 20,
+            }
+        };
+
+        await Assert.ThrowsAsync<ArgumentNullException>(() =>
+            generator.GenerateAsync(null!, [], employees, progress: null, CancellationToken.None));
+        await Assert.ThrowsAsync<ArgumentNullException>(() =>
+            generator.GenerateAsync(CreateGeneratorSchedule(), null!, employees, progress: null, CancellationToken.None));
+        await Assert.ThrowsAsync<ArgumentNullException>(() =>
+            generator.GenerateAsync(CreateGeneratorSchedule(), [], null!, progress: null, CancellationToken.None));
+
+        var invalidMonth = CreateGeneratorSchedule();
+        invalidMonth.Month = 13;
+        var invalidYear = CreateGeneratorSchedule();
+        invalidYear.Year = 1899;
+        var invalidPeoplePerShift = CreateGeneratorSchedule();
+        invalidPeoplePerShift.PeoplePerShift = 0;
+        var missingShiftTemplate = CreateGeneratorSchedule();
+        missingShiftTemplate.Shift1Time = " ";
+        missingShiftTemplate.Shift2Time = string.Empty;
+
+        Assert.Empty(await generator.GenerateAsync(invalidMonth, [], employees, progress: null, CancellationToken.None));
+        Assert.Empty(await generator.GenerateAsync(invalidYear, [], employees, progress: null, CancellationToken.None));
+        Assert.Empty(await generator.GenerateAsync(invalidPeoplePerShift, [], employees, progress: null, CancellationToken.None));
+        Assert.Empty(await generator.GenerateAsync(missingShiftTemplate, [], employees, progress: null, CancellationToken.None));
+        Assert.Empty(await generator.GenerateAsync(CreateGeneratorSchedule(), [], [], progress: null, CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task ScheduleGenerator_GenerateAsync_HonorsUnavailableAndUnreadableAvailability()
+    {
+        var generator = new ScheduleGenerator();
+        var schedule = CreateGeneratorSchedule();
+        var employees = new[]
+        {
+            new ScheduleEmployeeModel { EmployeeId = 1, DisplayOrder = 0, MinHoursMonth = 40 },
+            new ScheduleEmployeeModel { EmployeeId = 2, DisplayOrder = 1, MinHoursMonth = 40 },
+        };
+        var availability = new AvailabilityGroupModel
+        {
+            Id = 10,
+            Name = "April Availability",
+            Year = schedule.Year,
+            Month = schedule.Month,
+            Members =
+            [
+                new AvailabilityGroupMemberModel
+                {
+                    Id = 11,
+                    AvailabilityGroupId = 10,
+                    EmployeeId = 1,
+                    Days =
+                    [
+                        new AvailabilityGroupDayModel
+                        {
+                            AvailabilityGroupMemberId = 11,
+                            DayOfMonth = 1,
+                            Kind = AvailabilityKind.NONE,
+                        },
+                        new AvailabilityGroupDayModel
+                        {
+                            AvailabilityGroupMemberId = 11,
+                            DayOfMonth = 2,
+                            Kind = AvailabilityKind.INT,
+                            IntervalStr = "not-a-time",
+                        },
+                    ],
+                },
+                new AvailabilityGroupMemberModel
+                {
+                    Id = 12,
+                    AvailabilityGroupId = 10,
+                    EmployeeId = 2,
+                },
+            ],
+        };
+
+        var result = await generator.GenerateAsync(schedule, [availability], employees, progress: null, CancellationToken.None);
+
+        var day1Slot = Assert.Single(result, slot => slot.DayOfMonth == 1);
+        var day2Slot = Assert.Single(result, slot => slot.DayOfMonth == 2);
+        Assert.Equal(2, day1Slot.EmployeeId);
+        Assert.Equal(2, day2Slot.EmployeeId);
+        Assert.DoesNotContain(result, slot => slot.DayOfMonth is 1 or 2 && slot.EmployeeId == 1);
+    }
+
+    [Fact]
     public async Task GraphExportService_ExportGraphSqlAsync_EmitsPortableSqlForGraphBundle()
     {
         var fixture = ExportFixture.Create();
@@ -91,6 +187,52 @@ public sealed class DeepBusinessAndControllerCoverageTests
     }
 
     [Fact]
+    public async Task GraphExportService_ExportGraphSqlAsync_FetchesReferencedEmployeesAndHonorsIncludeFlags()
+    {
+        var fixture = ExportFixture.Create();
+        fixture.Slot.Employee = null;
+        fixture.Member.Employee = null;
+        fixture.ScheduleEmployee.Employee = null;
+        var service = fixture.CreateExportService();
+
+        var bytes = await service.ExportGraphSqlAsync(
+            fixture.Container.Id,
+            fixture.Graph.Id,
+            includeEmployees: false,
+            includeStyles: false,
+            CancellationToken.None);
+
+        var script = Encoding.UTF8.GetString(bytes);
+
+        Assert.Contains("INSERT OR IGNORE INTO employee", script);
+        Assert.Contains(fixture.Employee.FirstName, script);
+        Assert.Contains("INSERT OR IGNORE INTO availability_group_member", script);
+        Assert.Contains("INSERT OR IGNORE INTO availability_group_day", script);
+        Assert.Contains("INSERT OR IGNORE INTO schedule_slot", script);
+        Assert.DoesNotContain("INSERT OR IGNORE INTO schedule_employee", script);
+        Assert.DoesNotContain("INSERT OR IGNORE INTO schedule_cell_style", script);
+    }
+
+    [Fact]
+    public async Task GraphExportService_ExportGraphSqlAsync_ThrowsWhenReferencedEmployeeCannotBeLoaded()
+    {
+        var fixture = ExportFixture.Create();
+        fixture.Slot.Employee = null;
+        fixture.Slot.EmployeeId = 999;
+        var service = fixture.CreateExportService();
+
+        var exception = await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+            service.ExportGraphSqlAsync(
+                fixture.Container.Id,
+                fixture.Graph.Id,
+                includeEmployees: false,
+                includeStyles: false,
+                CancellationToken.None));
+
+        Assert.Equal("A referenced employee could not be loaded for SQL export.", exception.Message);
+    }
+
+    [Fact]
     public async Task GraphExportService_ExportGraphExcelCsvAsync_IncludesEmployeeNameAndStyles()
     {
         var fixture = ExportFixture.Create();
@@ -110,6 +252,30 @@ public sealed class DeepBusinessAndControllerCoverageTests
         Assert.Contains("10", csv);
         Assert.Contains("20", csv);
         Assert.Contains(fixture.Graph.Name, csv);
+    }
+
+    [Fact]
+    public async Task GraphExportService_ExportGraphExcelCsvAsync_EscapesCsvAndOmitsOptionalEmployeeData()
+    {
+        var fixture = ExportFixture.Create();
+        fixture.Graph.Name = "April, \"Night\"";
+        fixture.Slot.FromTime = "08:00\nstart";
+        var service = fixture.CreateExportService();
+
+        var bytes = await service.ExportGraphExcelCsvAsync(
+            fixture.Container.Id,
+            fixture.Graph.Id,
+            includeEmployees: false,
+            includeStyles: false,
+            CancellationToken.None);
+
+        var csv = Encoding.UTF8.GetString(bytes);
+
+        Assert.Contains("\"April, \"\"Night\"\"\"", csv);
+        Assert.Contains("\"08:00\nstart\"", csv);
+        Assert.Contains($",{fixture.Employee.Id},,", csv);
+        Assert.DoesNotContain($"{fixture.Employee.FirstName} {fixture.Employee.LastName}", csv);
+        Assert.DoesNotContain(",10,20", csv);
     }
 
     [Fact]
@@ -176,6 +342,35 @@ public sealed class DeepBusinessAndControllerCoverageTests
         Assert.Equal(3, payload.GeneratedSlotsCount);
         Assert.Equal(3, payload.WrittenSlotsCount);
         Assert.Null(payload.Slots);
+    }
+
+    [Fact]
+    public async Task ContainersController_Delete_ReturnsNoContentWhenDeleteSucceeds()
+    {
+        var service = new ContainerServiceStub
+        {
+            Container = new ContainerModel { Id = 1, Name = "Container" },
+            DeleteResult = DeleteOperationResult.Success(),
+        };
+        var controller = new ContainersController(service, new NoopWorkflowLogService(), new NoopRealtimeNotifier());
+        SetHttpContext(controller);
+
+        var result = await controller.Delete(1, CancellationToken.None);
+
+        Assert.IsType<NoContentResult>(result);
+    }
+
+    [Fact]
+    public async Task ContainersController_Delete_ThrowsWhenContainerIsMissing()
+    {
+        var service = new ContainerServiceStub();
+        var controller = new ContainersController(service, new NoopWorkflowLogService(), new NoopRealtimeNotifier());
+        SetHttpContext(controller);
+
+        var exception = await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+            controller.Delete(1, CancellationToken.None));
+
+        Assert.Equal("Container with id 1 was not found.", exception.Message);
     }
 
     [Fact]
@@ -321,6 +516,25 @@ public sealed class DeepBusinessAndControllerCoverageTests
 
     private static int CountOccurrences(string text, string value)
         => text.Split(value, StringSplitOptions.None).Length - 1;
+
+    private static ScheduleModel CreateGeneratorSchedule()
+    {
+        var schedule = TestDataFactory.CreateScheduleModel(
+            id: 5,
+            containerId: 1,
+            shopId: 2,
+            year: 2026,
+            month: 4);
+
+        schedule.PeoplePerShift = 1;
+        schedule.Shift1Time = "08:00 - 16:00";
+        schedule.Shift2Time = string.Empty;
+        schedule.MaxHoursPerEmpMonth = 300;
+        schedule.MaxConsecutiveDays = 31;
+        schedule.MaxConsecutiveFull = 31;
+        schedule.MaxFullPerMonth = 31;
+        return schedule;
+    }
 
     private sealed class ExportFixture
     {

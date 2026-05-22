@@ -158,4 +158,32 @@ public sealed class PresenceAndLockServiceTests
         Assert.Equal(2, activeLocks[0].ContainerId);
         Assert.Equal(3, activeLocks[0].GraphId);
     }
+
+    [Fact]
+    public void ScheduleEditLockService_AllowsSameManagerAcrossTabsAndUnlocksAfterLastConnectionReleases()
+    {
+        var service = new ManagerEditLockService();
+        var target = ManagerEditLockTargets.Schedule(4, 12);
+
+        var firstAcquire = service.SetLocks("connection-a", 7, "Manager", [target]);
+        var secondAcquire = service.SetLocks("connection-b", 7, "Manager", [target]);
+        var isLockedBySameManager = service.IsLockedByAnotherManager(target, 7);
+        var isLockedByDifferentManager = service.IsLockedByAnotherManager(target, 8);
+        var firstRelease = service.ReleaseConnection("connection-a");
+        var stateAfterFirstRelease = service.GetLockState(target);
+        var secondRelease = service.ReleaseConnection("connection-b");
+
+        Assert.Single(firstAcquire.ChangedStates);
+        Assert.Empty(secondAcquire.ChangedStates);
+        Assert.False(isLockedBySameManager);
+        Assert.True(isLockedByDifferentManager);
+        Assert.Empty(firstRelease);
+        Assert.NotNull(stateAfterFirstRelease);
+        Assert.True(stateAfterFirstRelease!.IsLocked);
+        Assert.Equal(7, stateAfterFirstRelease.LockedByManagerId);
+
+        var finalState = Assert.Single(secondRelease);
+        Assert.False(finalState.IsLocked);
+        Assert.False(service.GetLockState(target)!.IsLocked);
+    }
 }

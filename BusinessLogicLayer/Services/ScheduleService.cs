@@ -90,10 +90,6 @@ public class ScheduleService : IScheduleService
             return null;
         }
 
-        schedule.Employees = (await _employeeRepo.GetByScheduleAsync(id, ct).ConfigureAwait(false)).ToList();
-        schedule.Slots = (await _slotRepo.GetByScheduleAsync(id, ct).ConfigureAwait(false)).ToList();
-        schedule.CellStyles = (await _cellStyleRepo.GetByScheduleAsync(id, ct).ConfigureAwait(false)).ToList();
-
         return schedule.ToContract();
     }
 
@@ -122,19 +118,9 @@ public class ScheduleService : IScheduleService
         IReadOnlyList<ScheduleEmployeeModel> employees,
         CancellationToken ct)
     {
-        var existingEmployees = await _employeeRepo.GetByScheduleAsync(scheduleId, ct).ConfigureAwait(false);
-        foreach (var employee in existingEmployees)
-        {
-            await _employeeRepo.DeleteAsync(employee.Id, ct).ConfigureAwait(false);
-        }
-
-        foreach (var employee in employees)
-        {
-            var dal = employee.ToDal();
-            dal.Id = 0;
-            dal.ScheduleId = scheduleId;
-            await _employeeRepo.AddAsync(dal, ct).ConfigureAwait(false);
-        }
+        await _employeeRepo
+            .ReplaceForScheduleAsync(scheduleId, employees.Select(employee => employee.ToDal()), ct)
+            .ConfigureAwait(false);
     }
 
     private async Task ReplaceScheduleSlotsAsync(
@@ -142,19 +128,9 @@ public class ScheduleService : IScheduleService
         IReadOnlyList<ScheduleSlotModel> slots,
         CancellationToken ct)
     {
-        var existingSlots = await _slotRepo.GetByScheduleAsync(scheduleId, ct).ConfigureAwait(false);
-        foreach (var slot in existingSlots)
-        {
-            await _slotRepo.DeleteAsync(slot.Id, ct).ConfigureAwait(false);
-        }
-
-        foreach (var slot in slots)
-        {
-            var dal = slot.ToDal();
-            dal.Id = 0;
-            dal.ScheduleId = scheduleId;
-            await _slotRepo.AddAsync(dal, ct).ConfigureAwait(false);
-        }
+        await _slotRepo
+            .ReplaceForScheduleAsync(scheduleId, slots.Select(slot => slot.ToDal()), overwrite: true, ct)
+            .ConfigureAwait(false);
     }
 
     private async Task ReplaceScheduleCellStylesAsync(
@@ -162,19 +138,9 @@ public class ScheduleService : IScheduleService
         IReadOnlyList<ScheduleCellStyleModel> styles,
         CancellationToken ct)
     {
-        var existingStyles = await _cellStyleRepo.GetByScheduleAsync(scheduleId, ct).ConfigureAwait(false);
-        foreach (var style in existingStyles)
-        {
-            await _cellStyleRepo.DeleteAsync(style.Id, ct).ConfigureAwait(false);
-        }
-
-        foreach (var style in styles)
-        {
-            var dal = style.ToDal();
-            dal.Id = 0;
-            dal.ScheduleId = scheduleId;
-            await _cellStyleRepo.AddAsync(dal, ct).ConfigureAwait(false);
-        }
+        await _cellStyleRepo
+            .ReplaceForScheduleAsync(scheduleId, styles.Select(style => style.ToDal()), ct)
+            .ConfigureAwait(false);
     }
 
     private static List<ScheduleCellStyleModel> NormalizeStyles(IEnumerable<ScheduleCellStyleModel> cellStyles)

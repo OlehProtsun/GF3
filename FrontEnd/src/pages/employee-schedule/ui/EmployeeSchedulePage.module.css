@@ -258,9 +258,139 @@
   border-radius: 24px;
 }
 
+.hoursSummaryPanel {
+  gap: 14px;
+}
+
+.hoursSummaryHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.hoursSummaryHeader > div {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.hoursSummaryTotalPill {
+  min-height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  align-self: flex-start;
+  margin-left: auto;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(22, 163, 74, 0.16);
+  background: rgba(220, 252, 231, 0.82);
+  color: #15803d;
+  font-size: 0.78rem;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.hoursSummaryGrid {
+  display: grid;
+  overflow: hidden;
+  border-radius: 18px;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.hoursSummaryGridHeader,
+.hoursSummaryGridRow,
+.hoursSummaryTotalRow {
+  display: grid;
+  grid-template-columns: minmax(80px, 0.8fr) minmax(74px, 0.54fr) minmax(120px, 1.35fr);
+  align-items: center;
+  min-height: 40px;
+}
+
+.hoursSummaryGridHeader {
+  background: rgba(241, 245, 249, 0.94);
+  color: #64748b;
+  font-size: 0.72rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.hoursSummaryGridHeader span,
+.hoursSummaryGridRow span,
+.hoursSummaryGridRow strong,
+.hoursSummaryTotalRow span,
+.hoursSummaryTotalRow strong {
+  min-width: 0;
+  padding: 10px 12px;
+  overflow-wrap: anywhere;
+}
+
+.hoursSummaryGridRow,
+.hoursSummaryTotalRow {
+  color: #334155;
+  font-size: 0.84rem;
+  font-weight: 800;
+}
+
+.hoursSummaryGridRow + .hoursSummaryGridRow,
+.hoursSummaryTotalRow {
+  border-top: 1px solid rgba(148, 163, 184, 0.12);
+}
+
+.hoursSummaryGridRow strong,
+.hoursSummaryTotalRow strong {
+  color: #0f172a;
+  font-weight: 950;
+}
+
+.hoursSummaryGridHeader span:last-child,
+.hoursSummaryGridRow span:last-child,
+.hoursSummaryTotalRow span:last-child {
+  color: #475569;
+  text-align: center;
+}
+
+.hoursSummaryTotalRow {
+  background: rgba(240, 253, 244, 0.78);
+}
+
+.hoursSummaryTotalRow span:first-child,
+.hoursSummaryTotalRow strong {
+  color: #15803d;
+}
+
+.hoursSummaryEmpty {
+  margin: 0;
+  padding: 14px;
+  border-radius: 18px;
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  background: rgba(248, 250, 252, 0.84);
+  color: #64748b;
+  font-size: 0.86rem;
+  line-height: 1.45;
+  font-weight: 800;
+}
+
 @media (max-width: 520px) {
   .publicSchedulesHeader {
     flex-direction: column;
+  }
+
+  .hoursSummaryGridHeader,
+  .hoursSummaryGridRow,
+  .hoursSummaryTotalRow {
+    grid-template-columns: minmax(68px, 0.7fr) minmax(66px, 0.55fr) minmax(94px, 1fr);
+  }
+
+  .hoursSummaryGridHeader span,
+  .hoursSummaryGridRow span,
+  .hoursSummaryGridRow strong,
+  .hoursSummaryTotalRow span,
+  .hoursSummaryTotalRow strong {
+    padding-inline: 9px;
   }
 
   .openScheduleHeaderActions {

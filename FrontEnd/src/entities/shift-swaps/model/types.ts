@@ -32,6 +32,7 @@ export type ShiftSwap = {
   manualColumnId?: number | null;
   manualColumnName?: string | null;
   isCreatedByCurrentEmployee: boolean;
+  isScheduleLocked: boolean;
   canAccept: boolean;
   canCancel: boolean;
 };

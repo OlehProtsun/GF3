@@ -258,6 +258,83 @@ public sealed class DataAccessRepositoryTests
     }
 
     [Fact]
+    public async Task ScheduleRepository_GetPublishedForEmployee_FiltersAndOrdersVisibleSchedules()
+    {
+        await using var database = await SqliteTestDatabase.CreateAsync();
+        await using var context = database.CreateContext();
+
+        var container = TestDataFactory.CreateDalContainer("Published Container");
+        var shop = TestDataFactory.CreateDalShop("Published Shop");
+        var employee = TestDataFactory.CreateDalEmployee("Visible", "Worker", email: "visible@example.com");
+        var otherEmployee = TestDataFactory.CreateDalEmployee("Other", "Worker", email: "other.worker@example.com");
+        context.AddRange(container, shop, employee, otherEmployee);
+        await context.SaveChangesAsync();
+
+        var april = TestDataFactory.CreateDalSchedule(container.Id, shop.Id, "April Published", year: 2026, month: 4);
+        april.PublicationStatus = DalEnums.SchedulePublicationStatus.Public;
+        var may = TestDataFactory.CreateDalSchedule(container.Id, shop.Id, "May Published", year: 2026, month: 5);
+        may.PublicationStatus = DalEnums.SchedulePublicationStatus.Public;
+        var privateSchedule = TestDataFactory.CreateDalSchedule(container.Id, shop.Id, "June Private", year: 2026, month: 6);
+        privateSchedule.PublicationStatus = DalEnums.SchedulePublicationStatus.Private;
+        var otherSchedule = TestDataFactory.CreateDalSchedule(container.Id, shop.Id, "Other Published", year: 2027, month: 1);
+        otherSchedule.PublicationStatus = DalEnums.SchedulePublicationStatus.Public;
+        context.Schedules.AddRange(april, may, privateSchedule, otherSchedule);
+        await context.SaveChangesAsync();
+
+        context.ScheduleEmployees.AddRange(
+            new DataAccessLayer.Models.ScheduleEmployeeModel { ScheduleId = april.Id, EmployeeId = employee.Id, DisplayOrder = 0 },
+            new DataAccessLayer.Models.ScheduleEmployeeModel { ScheduleId = may.Id, EmployeeId = employee.Id, DisplayOrder = 0 },
+            new DataAccessLayer.Models.ScheduleEmployeeModel { ScheduleId = privateSchedule.Id, EmployeeId = employee.Id, DisplayOrder = 0 },
+            new DataAccessLayer.Models.ScheduleEmployeeModel { ScheduleId = otherSchedule.Id, EmployeeId = otherEmployee.Id, DisplayOrder = 0 });
+        context.ScheduleSlots.Add(TestDataFactory.CreateDalSlot(may.Id, 1, 1, employee.Id, "08:00", "12:00"));
+        await context.SaveChangesAsync();
+
+        var repository = new ScheduleRepository(context);
+
+        var published = await repository.GetPublishedForEmployeeAsync(employee.Id);
+
+        Assert.Equal(["May Published", "April Published"], published.Select(schedule => schedule.Name));
+        Assert.All(published, schedule => Assert.Equal(DalEnums.SchedulePublicationStatus.Public, schedule.PublicationStatus));
+        Assert.All(published, schedule => Assert.Equal("Published Container", schedule.Container.Name));
+        Assert.All(published, schedule => Assert.Equal("Published Shop", schedule.Shop.Name));
+        Assert.Single(published[0].Employees);
+        Assert.Single(published[0].Slots);
+    }
+
+    [Fact]
+    public async Task ScheduleRepository_SearchSupportsWhitespaceNumericNoteAndContainerScope()
+    {
+        await using var database = await SqliteTestDatabase.CreateAsync();
+        await using var context = database.CreateContext();
+
+        var firstContainer = TestDataFactory.CreateDalContainer("North Region");
+        var secondContainer = TestDataFactory.CreateDalContainer("South Region");
+        var shop = TestDataFactory.CreateDalShop("Numeric Shop");
+        context.AddRange(firstContainer, secondContainer, shop);
+        await context.SaveChangesAsync();
+
+        var first = TestDataFactory.CreateDalSchedule(firstContainer.Id, shop.Id, "Early Plan", year: 2026, month: 5);
+        first.Note = "Contains audit token";
+        var second = TestDataFactory.CreateDalSchedule(secondContainer.Id, shop.Id, "Later Plan", year: 2027, month: 6);
+        context.Schedules.AddRange(first, second);
+        await context.SaveChangesAsync();
+
+        var repository = new ScheduleRepository(context);
+
+        var allFromWhitespace = await repository.GetByValueAsync("   ");
+        var byYear = await repository.GetByValueAsync("2027");
+        var byMonth = await repository.GetByValueAsync("5");
+        var byNoteInContainer = await repository.GetByContainerAsync(firstContainer.Id, " audit ");
+        var allInContainer = await repository.GetByContainerAsync(firstContainer.Id);
+
+        Assert.Equal(2, allFromWhitespace.Count);
+        Assert.Equal(["Later Plan"], byYear.Select(schedule => schedule.Name));
+        Assert.Equal(["Early Plan"], byMonth.Select(schedule => schedule.Name));
+        Assert.Equal(["Early Plan"], byNoteInContainer.Select(schedule => schedule.Name));
+        Assert.Equal(["Early Plan"], allInContainer.Select(schedule => schedule.Name));
+    }
+
+    [Fact]
     public async Task ScheduleSlotRepository_ReplaceForSchedule_OverwriteAndAppend_Work()
     {
         await using var database = await SqliteTestDatabase.CreateAsync();
@@ -436,6 +513,57 @@ public sealed class DataAccessRepositoryTests
     }
 
     [Fact]
+    public async Task SchedulePresetRepository_GetAllAndByContainer_OrderByNameAndIncludeEmployees()
+    {
+        await using var database = await SqliteTestDatabase.CreateAsync();
+        await using var context = database.CreateContext();
+
+        var firstContainer = TestDataFactory.CreateDalContainer("First");
+        var secondContainer = TestDataFactory.CreateDalContainer("Second");
+        var shop = TestDataFactory.CreateDalShop();
+        var employee = TestDataFactory.CreateDalEmployee("Preset", "Worker");
+        context.AddRange(firstContainer, secondContainer, shop, employee);
+        await context.SaveChangesAsync();
+
+        var beta = CreateSchedulePreset(firstContainer.Id, shop.Id, "Beta");
+        var alpha = CreateSchedulePreset(firstContainer.Id, shop.Id, "Alpha");
+        var gamma = CreateSchedulePreset(secondContainer.Id, shop.Id, "Gamma");
+        context.SchedulePresets.AddRange(beta, alpha, gamma);
+        await context.SaveChangesAsync();
+
+        context.SchedulePresetEmployees.AddRange(
+            new DataAccessLayer.Models.SchedulePresetEmployeeModel
+            {
+                SchedulePresetId = alpha.Id,
+                EmployeeId = employee.Id,
+                MinHoursMonth = 80,
+            },
+            new DataAccessLayer.Models.SchedulePresetEmployeeModel
+            {
+                SchedulePresetId = beta.Id,
+                EmployeeId = employee.Id,
+                MinHoursMonth = 60,
+            });
+        await context.SaveChangesAsync();
+
+        var repository = new SchedulePresetRepository(context);
+
+        var all = await repository.GetAllAsync();
+        var byContainer = await repository.GetByContainerAsync(firstContainer.Id);
+        var duplicateInFirst = await repository.ExistsByNameAsync(firstContainer.Id, "Alpha");
+        var duplicateExcluded = await repository.ExistsByNameAsync(firstContainer.Id, "Alpha", alpha.Id);
+        var sameNameOtherContainer = await repository.ExistsByNameAsync(secondContainer.Id, "Alpha");
+
+        Assert.Equal(["Alpha", "Beta", "Gamma"], all.Select(preset => preset.Name));
+        Assert.Equal(["Alpha", "Beta"], byContainer.Select(preset => preset.Name));
+        Assert.Equal(80, Assert.Single(byContainer[0].Employees).MinHoursMonth);
+        Assert.True(duplicateInFirst);
+        Assert.False(duplicateExcluded);
+        Assert.False(sameNameOtherContainer);
+        Assert.Equal(EntityState.Detached, context.Entry(byContainer[0]).State);
+    }
+
+    [Fact]
     public async Task AppDbContext_EnforcesUniqueEmployeeName_AndSlotStatusPair()
     {
         await using var database = await SqliteTestDatabase.CreateAsync();
@@ -471,4 +599,22 @@ public sealed class DataAccessRepositoryTests
 
         await Assert.ThrowsAsync<DbUpdateException>(() => context2.SaveChangesAsync());
     }
+
+    private static DataAccessLayer.Models.SchedulePresetModel CreateSchedulePreset(int containerId, int shopId, string name)
+        => new()
+        {
+            ContainerId = containerId,
+            Name = name,
+            ScheduleName = $"{name} Schedule",
+            ShopId = shopId,
+            Year = 2026,
+            Month = 4,
+            PeoplePerShift = 1,
+            Shift1Time = "08:00 - 16:00",
+            Shift2Time = "16:00 - 20:00",
+            MaxHoursPerEmpMonth = 120,
+            MaxConsecutiveDays = 4,
+            MaxConsecutiveFull = 2,
+            MaxFullPerMonth = 8,
+        };
 }

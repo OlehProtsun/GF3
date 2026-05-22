@@ -137,6 +137,108 @@ function getScheduleStats(
   };
 }
 
+const summaryWeekdayLabels = ["su.", "mo.", "tu.", "we.", "th.", "fr.", "sa."] as const;
+
+type ScheduleHoursSummaryRow = {
+  key: string;
+  dayOfMonth: number;
+  dayLabel: string;
+  hours: number;
+  hoursText: string;
+  scheduleName: string;
+  sortValue: number;
+};
+
+function formatSummaryDay(schedule: Pick<EmployeeSchedule, "year" | "month">, dayOfMonth: number) {
+  const weekdayLabel = summaryWeekdayLabels[getWeekdayIndex(schedule.year, schedule.month, dayOfMonth)];
+  return `${weekdayLabel}/${String(dayOfMonth).padStart(2, "0")}`;
+}
+
+function getScheduleSummaryName(schedule: EmployeeSchedule) {
+  return schedule.name.trim() || schedule.shopName.trim() || schedule.containerName.trim() || `Schedule #${schedule.id}`;
+}
+
+function buildScheduleHoursSummary(
+  schedules: EmployeeSchedule[],
+  selectedSchedule: EmployeeSchedule | null,
+  employeeId: number | null,
+) {
+  if (!selectedSchedule) {
+    return {
+      rows: [] as ScheduleHoursSummaryRow[],
+      totalHours: 0,
+      totalHoursText: "0h",
+    };
+  }
+
+  const rowsByKey = new Map<string, Omit<ScheduleHoursSummaryRow, "hoursText">>();
+  schedules
+    .filter(schedule => schedule.year === selectedSchedule.year && schedule.month === selectedSchedule.month)
+    .forEach(schedule => {
+      schedule.slots
+        .filter(slot => isCurrentEmployeeSlot(slot, employeeId))
+        .forEach(slot => {
+          const rowKey = `${schedule.id}:${slot.dayOfMonth}`;
+          const existingRow = rowsByKey.get(rowKey);
+          const nextHours = (existingRow?.hours ?? 0) + getSlotDurationHours(slot);
+          rowsByKey.set(rowKey, {
+            key: rowKey,
+            dayOfMonth: slot.dayOfMonth,
+            dayLabel: formatSummaryDay(schedule, slot.dayOfMonth),
+            hours: nextHours,
+            scheduleName: getScheduleSummaryName(schedule),
+            sortValue: Date.UTC(schedule.year, schedule.month - 1, slot.dayOfMonth),
+          });
+        });
+    });
+
+  const workedRows = [...rowsByKey.values()]
+    .map(row => ({
+      ...row,
+      hoursText: formatHours(row.hours),
+    }))
+    .sort((left, right) =>
+      left.dayOfMonth - right.dayOfMonth ||
+      left.scheduleName.localeCompare(right.scheduleName) ||
+      left.key.localeCompare(right.key),
+    );
+
+  const rowsByDay = new Map<number, ScheduleHoursSummaryRow[]>();
+  workedRows.forEach(row => {
+    const dayRows = rowsByDay.get(row.dayOfMonth) ?? [];
+    dayRows.push(row);
+    rowsByDay.set(row.dayOfMonth, dayRows);
+  });
+
+  const daysInMonth = getDaysInMonth(selectedSchedule.year, selectedSchedule.month);
+  const rows: ScheduleHoursSummaryRow[] = [];
+  for (let dayOfMonth = 1; dayOfMonth <= daysInMonth; dayOfMonth += 1) {
+    const dayRows = rowsByDay.get(dayOfMonth);
+    if (dayRows && dayRows.length > 0) {
+      rows.push(...dayRows);
+      continue;
+    }
+
+    rows.push({
+      key: `empty:${selectedSchedule.year}:${selectedSchedule.month}:${dayOfMonth}`,
+      dayOfMonth,
+      dayLabel: formatSummaryDay(selectedSchedule, dayOfMonth),
+      hours: 0,
+      hoursText: "-",
+      scheduleName: "-",
+      sortValue: Date.UTC(selectedSchedule.year, selectedSchedule.month - 1, dayOfMonth),
+    });
+  }
+
+  const totalHours = rows.reduce((sum, row) => sum + row.hours, 0);
+
+  return {
+    rows,
+    totalHours,
+    totalHoursText: formatHours(totalHours),
+  };
+}
+
 function buildScheduleMatrixColumn(
   employeeId: number,
   label: string,
@@ -515,6 +617,10 @@ export function EmployeeSchedulePage() {
     () => getScheduleStats(schedules, selectedSchedule, currentEmployeeId),
     [currentEmployeeId, schedules, selectedSchedule],
   );
+  const scheduleHoursSummary = useMemo(
+    () => buildScheduleHoursSummary(schedules, selectedSchedule, currentEmployeeId),
+    [currentEmployeeId, schedules, selectedSchedule],
+  );
   const scheduleMatrixColumns = useMemo(
     () => buildScheduleMatrixColumns(selectedSchedule, fallbackMatrixEmployeeId, displayName),
     [displayName, fallbackMatrixEmployeeId, selectedSchedule],
@@ -666,6 +772,43 @@ export function EmployeeSchedulePage() {
             </div>
           }
         />
+      ) : null}
+
+      {selectedSchedule ? (
+        <section className={`${workspaceStyles.panel} ${styles.hoursSummaryPanel}`}>
+          <div className={styles.hoursSummaryHeader}>
+            <div>
+              <h2 className={workspaceStyles.panelTitle}>Summary</h2>
+            </div>
+            <span className={styles.hoursSummaryTotalPill}>{scheduleHoursSummary.totalHoursText}</span>
+          </div>
+
+          {scheduleHoursSummary.rows.length > 0 ? (
+            <div className={styles.hoursSummaryGrid} role="table" aria-label="Schedule hours summary">
+              <div className={styles.hoursSummaryGridHeader} role="row">
+                <span role="columnheader">Day</span>
+                <span role="columnheader">Hours</span>
+                <span role="columnheader">Schedule</span>
+              </div>
+
+              {scheduleHoursSummary.rows.map(row => (
+                <div key={row.key} className={styles.hoursSummaryGridRow} role="row">
+                  <span role="cell">{row.dayLabel}</span>
+                  <strong role="cell">{row.hoursText}</strong>
+                  <span role="cell">{row.scheduleName}</span>
+                </div>
+              ))}
+
+              <div className={styles.hoursSummaryTotalRow} role="row">
+                <span role="cell">Total</span>
+                <strong role="cell">{scheduleHoursSummary.totalHoursText}</strong>
+                <span role="cell">All schedules</span>
+              </div>
+            </div>
+          ) : (
+            <p className={styles.hoursSummaryEmpty}>No assigned shifts in this period.</p>
+          )}
+        </section>
       ) : null}
     </div>
   );

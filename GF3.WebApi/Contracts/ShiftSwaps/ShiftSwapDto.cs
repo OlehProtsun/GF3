@@ -32,6 +32,7 @@ public sealed class ShiftSwapDto
     public int? ManualColumnId { get; set; }
     public string? ManualColumnName { get; set; }
     public bool IsCreatedByCurrentEmployee { get; set; }
+    public bool IsScheduleLocked { get; set; }
     public bool CanAccept { get; set; }
     public bool CanCancel { get; set; }
 }

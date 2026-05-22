@@ -9,6 +9,7 @@ using DataAccessLayer.Administration;
 using DataAccessLayer.Models.DataBaseContext;
 using GF3.Tests.Infrastructure;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http.Features;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -243,6 +244,33 @@ public sealed class AdminAndMiddlewareEdgeCoverageTests
         Assert.Contains("\"type\":\"database_conflict\"", updateBody, StringComparison.OrdinalIgnoreCase);
     }
 
+    [Theory]
+    [InlineData(typeof(KeyNotFoundException), StatusCodes.Status404NotFound, "not_found", "Missing entity.")]
+    [InlineData(typeof(InvalidOperationException), StatusCodes.Status404NotFound, "not_found", "Missing aggregate.")]
+    [InlineData(typeof(Exception), StatusCodes.Status500InternalServerError, "server_error", "An unexpected error occurred.")]
+    public async Task ApiExceptionMiddleware_MapsNotFoundAndUnhandledExceptions_ToProblemDetails(
+        Type exceptionType,
+        int expectedStatus,
+        string expectedType,
+        string expectedDetail)
+    {
+        var httpContext = CreateHttpContext("/api/containers/7");
+        var exception = (Exception)Activator.CreateInstance(exceptionType, expectedDetail)!;
+        var middleware = new ApiExceptionMiddleware(
+            _ => Task.FromException(exception),
+            NullLogger<ApiExceptionMiddleware>.Instance);
+
+        await middleware.InvokeAsync(httpContext);
+
+        var body = await ReadBodyAsync(httpContext);
+
+        Assert.Equal(expectedStatus, httpContext.Response.StatusCode);
+        Assert.Equal("application/problem+json", httpContext.Response.ContentType);
+        Assert.Contains($"\"type\":\"{expectedType}\"", body, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains($"\"detail\":\"{expectedDetail}\"", body, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("\"instance\":\"/api/containers/7\"", body, StringComparison.OrdinalIgnoreCase);
+    }
+
     [Fact]
     public void ApiProblemDetailsFactory_TreatsCanceledExceptionToken_AsRequestCancellation()
     {
@@ -257,6 +285,24 @@ public sealed class AdminAndMiddlewareEdgeCoverageTests
     }
 
     [Fact]
+    public async Task ApiExceptionMiddleware_Uses499ForClientCancellation()
+    {
+        var httpContext = CreateHttpContext("/api/containers/1");
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+        httpContext.RequestAborted = cts.Token;
+
+        var middleware = new ApiExceptionMiddleware(
+            _ => Task.FromException(new OperationCanceledException(cts.Token)),
+            NullLogger<ApiExceptionMiddleware>.Instance);
+
+        await middleware.InvokeAsync(httpContext);
+
+        Assert.Equal(499, httpContext.Response.StatusCode);
+        Assert.Equal(0, httpContext.Response.Body.Length);
+    }
+
+    [Fact]
     public async Task ApiExceptionMiddleware_SkipsWritingProblemBody_WhenRequestWasAlreadyAborted()
     {
         var httpContext = CreateHttpContext("/api/test");
@@ -266,6 +312,24 @@ public sealed class AdminAndMiddlewareEdgeCoverageTests
 
         var middleware = new ApiExceptionMiddleware(
             _ => Task.FromException(new InvalidOperationException("Boom.")),
+            NullLogger<ApiExceptionMiddleware>.Instance);
+
+        await middleware.InvokeAsync(httpContext);
+
+        Assert.Equal(StatusCodes.Status200OK, httpContext.Response.StatusCode);
+        Assert.Equal(0, httpContext.Response.Body.Length);
+    }
+
+    [Fact]
+    public async Task ApiExceptionMiddleware_DoesNotWriteProblem_WhenResponseAlreadyStarted()
+    {
+        var httpContext = CreateHttpContext("/api/test");
+        httpContext.Features.Set<IHttpResponseFeature>(new StartedHttpResponseFeature
+        {
+            Body = httpContext.Response.Body,
+        });
+        var middleware = new ApiExceptionMiddleware(
+            _ => Task.FromException(new Exception("Boom.")),
             NullLogger<ApiExceptionMiddleware>.Instance);
 
         await middleware.InvokeAsync(httpContext);
@@ -340,6 +404,70 @@ public sealed class AdminAndMiddlewareEdgeCoverageTests
         Assert.Equal("ScheduleTemplate.xlsx", options.ScheduleTemplateFile);
         Assert.Equal("ContainerTemplate.xlsx", options.ContainerTemplateFile);
         Assert.True(options.SeedToLocalAppData);
+    }
+
+    [Fact]
+    public void ExcelTemplateLocator_ReturnsPreferredPath_FromConfiguredTemplateDirectory()
+    {
+        var targetDirectory = Path.Combine(Path.GetTempPath(), "GF3.Tests", Guid.NewGuid().ToString("N"));
+        var fileName = $"preferred-{Guid.NewGuid():N}.xlsx";
+        var preferredPath = Path.Combine(targetDirectory, fileName);
+        var previousValue = Environment.GetEnvironmentVariable("GF3_EXPORT_TEMPLATES_DIR");
+
+        Directory.CreateDirectory(targetDirectory);
+        File.WriteAllBytes(preferredPath, [9, 8, 7]);
+        Environment.SetEnvironmentVariable("GF3_EXPORT_TEMPLATES_DIR", null);
+
+        try
+        {
+            var locator = new ExcelTemplateLocator(Options.Create(new ExportTemplatesOptions
+            {
+                TemplateDirectory = targetDirectory,
+                ScheduleTemplateFile = fileName,
+            }));
+
+            var resolvedPath = locator.GetScheduleTemplatePath();
+
+            Assert.Equal(preferredPath, resolvedPath);
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("GF3_EXPORT_TEMPLATES_DIR", previousValue);
+            if (Directory.Exists(targetDirectory))
+            {
+                Directory.Delete(targetDirectory, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public void ExcelTemplateLocator_ThrowsFileNotFound_WhenPreferredAndFallbackTemplatesAreMissing()
+    {
+        var targetDirectory = Path.Combine(Path.GetTempPath(), "GF3.Tests", Guid.NewGuid().ToString("N"));
+        var fileName = $"missing-{Guid.NewGuid():N}.xlsx";
+        var previousValue = Environment.GetEnvironmentVariable("GF3_EXPORT_TEMPLATES_DIR");
+        Environment.SetEnvironmentVariable("GF3_EXPORT_TEMPLATES_DIR", targetDirectory);
+
+        try
+        {
+            var locator = new ExcelTemplateLocator(Options.Create(new ExportTemplatesOptions
+            {
+                ContainerTemplateFile = fileName,
+            }));
+
+            var exception = Assert.Throws<FileNotFoundException>(locator.GetContainerTemplatePath);
+
+            Assert.Equal(Path.Combine(targetDirectory, fileName), exception.FileName);
+            Assert.Contains("template not found path", exception.Message, StringComparison.Ordinal);
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("GF3_EXPORT_TEMPLATES_DIR", previousValue);
+            if (Directory.Exists(targetDirectory))
+            {
+                Directory.Delete(targetDirectory, recursive: true);
+            }
+        }
     }
 
     [Fact]
@@ -573,6 +701,27 @@ public sealed class AdminAndMiddlewareEdgeCoverageTests
         {
             ComputeFileHashCalls++;
             return Task.FromResult("unexpected");
+        }
+    }
+
+    private sealed class StartedHttpResponseFeature : IHttpResponseFeature
+    {
+        public int StatusCode { get; set; } = StatusCodes.Status200OK;
+
+        public string? ReasonPhrase { get; set; }
+
+        public IHeaderDictionary Headers { get; set; } = new HeaderDictionary();
+
+        public Stream Body { get; set; } = Stream.Null;
+
+        public bool HasStarted => true;
+
+        public void OnCompleted(Func<object, Task> callback, object state)
+        {
+        }
+
+        public void OnStarting(Func<object, Task> callback, object state)
+        {
         }
     }
 

@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Cors.Infrastructure;
 using Microsoft.AspNetCore.Mvc.Authorization;
+using Microsoft.AspNetCore.ResponseCompression;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
@@ -38,10 +39,11 @@ public static class WebApiServiceCollectionExtensions
         services.AddApiMvc(jwtOptions);
         services.AddApiDocumentation();
         services.AddFrontendDevelopmentCors();
+        services.AddHttpResponseCompression();
         services.AddSignalR(options =>
         {
-            options.KeepAliveInterval = TimeSpan.FromSeconds(10);
-            options.ClientTimeoutInterval = TimeSpan.FromSeconds(20);
+            options.KeepAliveInterval = TimeSpan.FromSeconds(15);
+            options.ClientTimeoutInterval = TimeSpan.FromSeconds(35);
         });
         services.AddSingleton<ManagerEditLockService>();
         services.AddSingleton<IManagerEditLockService>(services => services.GetRequiredService<ManagerEditLockService>());
@@ -110,6 +112,22 @@ public static class WebApiServiceCollectionExtensions
 
             options.AddSecurityDefinition("Bearer", bearerScheme);
         });
+        return services;
+    }
+
+    private static IServiceCollection AddHttpResponseCompression(this IServiceCollection services)
+    {
+        services.AddResponseCompression(options =>
+        {
+            options.EnableForHttps = true;
+            options.MimeTypes = ResponseCompressionDefaults.MimeTypes.Concat(
+            [
+                "application/json",
+                "application/problem+json",
+                "application/vnd.api+json",
+            ]);
+        });
+
         return services;
     }
 

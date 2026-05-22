@@ -3,9 +3,12 @@ import type { ShiftSwap } from "@entities/shift-swaps";
 import {
   buildEmployeeNotificationItems,
   getUnreadEmployeeNotificationTargets,
+  isEmployeeNotificationRead,
   isOpenShiftPostedNotification,
   type EmployeeRealtimeNotificationLike,
 } from "./notifications";
+
+const TEST_NOW_MS = Date.parse("2026-05-10T12:00:00.000Z");
 
 function createSwap(overrides: Partial<ShiftSwap> = {}): ShiftSwap {
   return {
@@ -39,6 +42,7 @@ function createSwap(overrides: Partial<ShiftSwap> = {}): ShiftSwap {
     manualColumnId: 55,
     manualColumnName: "Open shift",
     isCreatedByCurrentEmployee: false,
+    isScheduleLocked: false,
     canAccept: true,
     canCancel: false,
     ...overrides,
@@ -75,6 +79,7 @@ describe("employee notification model", () => {
         createSwap({ id: 2, status: "accepted", createdAtUtc: "2026-05-10T11:00:00.000Z" }),
         createSwap({ id: 3, isManagerCreated: false, createdAtUtc: "2026-05-10T12:00:00.000Z" }),
       ],
+      TEST_NOW_MS,
     );
 
     expect(items).toHaveLength(1);
@@ -105,6 +110,7 @@ describe("employee notification model", () => {
         createSwap({ id: 1, createdAtUtc: "2026-05-10T09:00:00.000Z" }),
         createSwap({ id: 2, scheduleId: 11, createdAtUtc: "2026-05-10T12:00:00.000Z" }),
       ],
+      TEST_NOW_MS,
     );
 
     expect(items.map(item => item.id)).toEqual(["open-shift:2", "open-shift:1"]);
@@ -124,18 +130,72 @@ describe("employee notification model", () => {
         createSwap({ id: 1, scheduleId: 10, createdAtUtc: "2026-05-10T08:00:00.000Z" }),
         createSwap({ id: 2, scheduleId: 10, createdAtUtc: "2026-05-10T09:00:00.000Z" }),
       ],
+      TEST_NOW_MS,
     );
 
     expect(items[0]?.id).toBe("open-shift:2");
   });
 
+  it("keeps read state when a schedule-only live event resolves to a swap snapshot after login", () => {
+    const liveItems = buildEmployeeNotificationItems(
+      [
+        createNotification({
+          id: "open-shift-schedule:10",
+          shiftSwapId: null,
+          scheduleId: 10,
+          graphId: 10,
+        }),
+      ],
+      [],
+      Date.parse("2026-05-10T12:00:00.000Z"),
+    );
+    const readIds = new Set(liveItems[0]?.readIds ?? []);
+    const snapshotItems = buildEmployeeNotificationItems(
+      [],
+      [createSwap({ id: 7, scheduleId: 10 })],
+      Date.parse("2026-05-10T12:00:00.000Z"),
+    );
+
+    expect(liveItems[0]?.id).toBe("open-shift-schedule:10");
+    expect(snapshotItems[0]?.id).toBe("open-shift:7");
+    expect(isEmployeeNotificationRead(snapshotItems[0]!, readIds)).toBe(true);
+    expect(getUnreadEmployeeNotificationTargets([], [createSwap({ id: 7, scheduleId: 10 })], readIds, TEST_NOW_MS))
+      .toEqual({ alerts: false, swap: false });
+  });
+
+  it("hides open shift notifications after seven days", () => {
+    const nowMs = Date.parse("2026-05-18T12:00:00.000Z");
+    const items = buildEmployeeNotificationItems(
+      [
+        createNotification({
+          id: "recent-live",
+          shiftSwapId: 2,
+          occurredAtUtc: "2026-05-12T12:00:00.000Z",
+        }),
+        createNotification({
+          id: "expired-live",
+          shiftSwapId: 3,
+          occurredAtUtc: "2026-05-10T11:59:59.000Z",
+        }),
+      ],
+      [
+        createSwap({ id: 2, createdAtUtc: "2026-05-12T12:00:00.000Z" }),
+        createSwap({ id: 3, createdAtUtc: "2026-05-10T11:59:59.000Z" }),
+      ],
+      nowMs,
+    );
+
+    expect(items.map(item => item.id)).toEqual(["open-shift:2"]);
+  });
+
   it("marks alert and swap targets unread only for unread open shift events", () => {
     const openSwap = createSwap({ id: 4 });
-    const unreadTargets = getUnreadEmployeeNotificationTargets([], [openSwap], new Set());
+    const unreadTargets = getUnreadEmployeeNotificationTargets([], [openSwap], new Set(), TEST_NOW_MS);
     const readTargets = getUnreadEmployeeNotificationTargets(
       [createNotification({ id: "open-shift:4", shiftSwapId: 4 })],
       [openSwap],
       new Set(["open-shift:4"]),
+      TEST_NOW_MS,
     );
 
     expect(unreadTargets).toEqual({ alerts: true, swap: true });

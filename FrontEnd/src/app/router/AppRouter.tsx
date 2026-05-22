@@ -1,20 +1,11 @@
-import { Suspense, lazy, useEffect } from "react";
-import type { ComponentType, LazyExoticComponent } from "react";
+import { Suspense, lazy } from "react";
+import type { ComponentType } from "react";
 import { BrowserRouter, Navigate, useLocation } from "react-router-dom";
 import { EmployeeWorkspaceLayout } from "@app/layouts/employee-workspace-layout";
 import { OverlaySidebarLayout } from "@app/layouts/overlay-sidebar-layout";
 import { useAuth } from "@app/providers/AuthProvider";
 import { renderMatched } from "@shared/lib/react-router-dom";
 import { RouteFallback } from "./RouteFallback";
-
-type PreloadablePage = LazyExoticComponent<ComponentType> & {
-  preload: () => Promise<void>;
-};
-
-type IdleWindow = Window & typeof globalThis & {
-  requestIdleCallback?: (callback: () => void, options?: { timeout: number }) => number;
-  cancelIdleCallback?: (handle: number) => void;
-};
 
 function lazyPage<TModule>(
   load: () => Promise<TModule>,
@@ -30,10 +21,7 @@ function lazyPage<TModule>(
     return modulePromise;
   };
 
-  const component = lazy(loadComponent) as PreloadablePage;
-  component.preload = () => loadComponent().then(() => undefined);
-
-  return component;
+  return lazy(loadComponent);
 }
 
 const HomePage = lazyPage(() => import("@pages/home"), (module) => module.HomePage);
@@ -84,32 +72,6 @@ const EmployeeListPage = lazyPage(() => import("@pages/employee-list"), (module)
 const EmployeeProfilePage = lazyPage(() => import("@pages/employee-profile"), (module) => module.EmployeeProfilePage);
 const EmployeeEditPage = lazyPage(() => import("@pages/employee-edit"), (module) => module.EmployeeEditPage);
 
-const preloadablePages: readonly PreloadablePage[] = [
-  HomePage,
-  EmployeeNotificationsPage,
-  EmployeeAvailabilityPage,
-  EmployeeSchedulePage,
-  EmployeeSwapPage,
-  EmployeeAccountPage,
-  LoginPage,
-  PasswordRecoveryPage,
-  ShopListPage,
-  ShopProfilePage,
-  ShopEditPage,
-  AvailabilityPage,
-  AvailabilityEditPage,
-  AvailabilityProfilePage,
-  ContainerPage,
-  ContainerGraphProfilePage,
-  ContainerGraphEditPage,
-  InformationPage,
-  DataBasePage,
-  ManagerAccountPage,
-  EmployeeListPage,
-  EmployeeProfilePage,
-  EmployeeEditPage,
-] as const;
-
 const managerRoutes = [
   { path: "/shop/new", element: <ShopEditPage /> },
   { path: "/shop/:shopId/edit", element: <ShopEditPage /> },
@@ -142,47 +104,9 @@ const employeeRoutes = [
   { path: "/", element: <EmployeeNotificationsPage /> },
 ] as const;
 
-function useWarmRouteChunks() {
-  useEffect(() => {
-    if (typeof window === "undefined") {
-      return;
-    }
-
-    const connection = (navigator as Navigator & {
-      connection?: {
-        saveData?: boolean;
-      };
-    }).connection;
-
-    if (connection?.saveData) {
-      return;
-    }
-
-    const warmRouteChunks = () => {
-      void Promise.allSettled(preloadablePages.map((page) => page.preload()));
-    };
-
-    const idleWindow = window as IdleWindow;
-    const idleHandle = idleWindow.requestIdleCallback?.(warmRouteChunks, { timeout: 1200 });
-
-    if (idleHandle !== undefined) {
-      return () => {
-        idleWindow.cancelIdleCallback?.(idleHandle);
-      };
-    }
-
-    const timeoutId = window.setTimeout(warmRouteChunks, 320);
-
-    return () => {
-      window.clearTimeout(timeoutId);
-    };
-  }, []);
-}
-
 function RoutedContent() {
   const { pathname } = useLocation();
   const { session, status } = useAuth();
-  useWarmRouteChunks();
   const isPublicAuthRoute = pathname === "/login" || pathname === "/password-recovery";
 
   if (status === "loading") {

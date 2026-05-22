@@ -45,7 +45,7 @@ public sealed class EmployeeAccountRepository : GenericRepository<EmployeeAccoun
 
         return _set
             .AsNoTracking()
-            .FirstOrDefaultAsync(account => account.Username.ToLower() == normalizedUsername, ct);
+            .FirstOrDefaultAsync(account => account.Username == normalizedUsername, ct);
     }
 
     public Task<bool> ExistsByUsernameAsync(string username, int? excludeEmployeeId = null, CancellationToken ct = default)
@@ -57,59 +57,32 @@ public sealed class EmployeeAccountRepository : GenericRepository<EmployeeAccoun
             .AnyAsync(
                 account =>
                     (!excludeEmployeeId.HasValue || account.EmployeeId != excludeEmployeeId.Value) &&
-                    account.Username.ToLower() == normalizedUsername,
+                    account.Username == normalizedUsername,
                 ct);
     }
 
     public async Task RecordSuccessfulLoginAsync(int employeeId, DateTimeOffset occurredAtUtc, CancellationToken ct = default)
-    {
-        var account = await _set
-            .FirstOrDefaultAsync(existingAccount => existingAccount.EmployeeId == employeeId, ct)
+        => await _set
+            .Where(account => account.EmployeeId == employeeId)
+            .ExecuteUpdateAsync(
+                setters => setters
+                    .SetProperty(account => account.LastLoginAtUtc, (DateTimeOffset?)occurredAtUtc)
+                    .SetProperty(account => account.LastSeenAtUtc, (DateTimeOffset?)occurredAtUtc),
+                ct)
             .ConfigureAwait(false);
-
-        if (account is null)
-        {
-            return;
-        }
-
-        account.LastLoginAtUtc = occurredAtUtc;
-        account.LastSeenAtUtc = occurredAtUtc;
-        await SaveChangesOrResetAsync(ct).ConfigureAwait(false);
-    }
 
     public async Task TouchLastSeenAsync(int employeeId, DateTimeOffset seenAtUtc, TimeSpan minInterval, CancellationToken ct = default)
-    {
-        var account = await _set
-            .FirstOrDefaultAsync(existingAccount => existingAccount.EmployeeId == employeeId, ct)
+        => await _db.Database
+            .ExecuteSqlInterpolatedAsync(
+                $"""
+                UPDATE employee_account
+                SET last_seen_at_utc = {seenAtUtc}
+                WHERE employee_id = {employeeId}
+                  AND (last_seen_at_utc IS NULL OR last_seen_at_utc < {seenAtUtc.Subtract(minInterval)})
+                """,
+                ct)
             .ConfigureAwait(false);
 
-        if (account is null)
-        {
-            return;
-        }
-
-        if (account.LastSeenAtUtc.HasValue && seenAtUtc <= account.LastSeenAtUtc.Value.Add(minInterval))
-        {
-            return;
-        }
-
-        account.LastSeenAtUtc = seenAtUtc;
-        await SaveChangesOrResetAsync(ct).ConfigureAwait(false);
-    }
-
     private static string NormalizeUsername(string? username)
-        => (username ?? string.Empty).Trim().ToLowerInvariant();
-
-    private async Task SaveChangesOrResetAsync(CancellationToken ct)
-    {
-        try
-        {
-            await _db.SaveChangesAsync(ct).ConfigureAwait(false);
-        }
-        catch
-        {
-            _db.ChangeTracker.Clear();
-            throw;
-        }
-    }
+        => (username ?? string.Empty).Trim();
 }

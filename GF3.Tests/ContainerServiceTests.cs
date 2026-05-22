@@ -4,6 +4,7 @@ using BusinessLogicLayer.Contracts.Models;
 using BusinessLogicLayer.Generators;
 using BusinessLogicLayer.Services;
 using GF3.Tests.Infrastructure;
+using DalEnums = DataAccessLayer.Models.Enums;
 
 namespace GF3.Tests;
 
@@ -129,6 +130,76 @@ public sealed class ContainerServiceTests
         Assert.Equal(1, result.GeneratedSlotsCount);
         Assert.Equal(0, result.WrittenSlotsCount);
         Assert.Single(result.Slots);
+    }
+
+    [Fact]
+    public async Task GetPublishedGraphsForEmployeeAsync_FiltersPublishedGraphsAndNormalizesCanceledReadTokens()
+    {
+        await using var database = await SqliteTestDatabase.CreateAsync();
+        await using var context = database.CreateContext();
+        var service = CreateService(context, new FakeScheduleGenerator());
+
+        var container = TestDataFactory.CreateDalContainer("Employee Container");
+        var shop = TestDataFactory.CreateDalShop("Employee Shop");
+        var employee = TestDataFactory.CreateDalEmployee("Zoe", "Young");
+        var otherEmployee = TestDataFactory.CreateDalEmployee("Adam", "Blue");
+        context.AddRange(container, shop, employee, otherEmployee);
+        await context.SaveChangesAsync();
+
+        var visibleMay = TestDataFactory.CreateDalSchedule(container.Id, shop.Id, "Visible May", year: 2026, month: 5);
+        visibleMay.PublicationStatus = DalEnums.SchedulePublicationStatus.Public;
+        var visibleApril = TestDataFactory.CreateDalSchedule(container.Id, shop.Id, "Visible April", year: 2026, month: 4);
+        visibleApril.PublicationStatus = DalEnums.SchedulePublicationStatus.Public;
+        var privateGraph = TestDataFactory.CreateDalSchedule(container.Id, shop.Id, "Private June", year: 2026, month: 6);
+        privateGraph.PublicationStatus = DalEnums.SchedulePublicationStatus.Private;
+        var otherEmployeeGraph = TestDataFactory.CreateDalSchedule(container.Id, shop.Id, "Other Employee", year: 2026, month: 7);
+        otherEmployeeGraph.PublicationStatus = DalEnums.SchedulePublicationStatus.Public;
+        context.Schedules.AddRange(visibleMay, visibleApril, privateGraph, otherEmployeeGraph);
+        await context.SaveChangesAsync();
+
+        context.ScheduleEmployees.AddRange(
+            new DataAccessLayer.Models.ScheduleEmployeeModel
+            {
+                ScheduleId = visibleMay.Id,
+                EmployeeId = employee.Id,
+                DisplayOrder = 2,
+            },
+            new DataAccessLayer.Models.ScheduleEmployeeModel
+            {
+                ScheduleId = visibleApril.Id,
+                EmployeeId = employee.Id,
+                DisplayOrder = 1,
+            },
+            new DataAccessLayer.Models.ScheduleEmployeeModel
+            {
+                ScheduleId = privateGraph.Id,
+                EmployeeId = employee.Id,
+                DisplayOrder = 1,
+            },
+            new DataAccessLayer.Models.ScheduleEmployeeModel
+            {
+                ScheduleId = otherEmployeeGraph.Id,
+                EmployeeId = otherEmployee.Id,
+                DisplayOrder = 1,
+            });
+        context.ScheduleSlots.Add(TestDataFactory.CreateDalSlot(visibleMay.Id, 10, 1, employee.Id, "08:00", "12:00"));
+        await context.SaveChangesAsync();
+
+        using var cts = new CancellationTokenSource();
+        await cts.CancelAsync();
+
+        var visibleGraphs = await service.GetPublishedGraphsForEmployeeAsync(employee.Id, cts.Token);
+
+        Assert.Equal(["Visible May", "Visible April"], visibleGraphs.Select(graph => graph.Name).ToArray());
+        Assert.All(visibleGraphs, graph => Assert.Equal(SchedulePublicationStatus.Public, graph.PublicationStatus));
+        Assert.All(visibleGraphs, graph => Assert.Equal("Employee Container", graph.Container?.Name));
+        Assert.All(visibleGraphs, graph => Assert.Equal("Employee Shop", graph.Shop?.Name));
+        Assert.Single(visibleGraphs[0].Employees);
+        Assert.Single(visibleGraphs[0].Slots);
+
+        var invalidEmployee = await Assert.ThrowsAsync<ValidationException>(() =>
+            service.GetPublishedGraphsForEmployeeAsync(0));
+        Assert.Equal(["Employee is required."], invalidEmployee.Errors["employeeId"]);
     }
 
     [Fact]

@@ -15,7 +15,7 @@ import {
 import { ErrorBanner } from "@shared/ui/components/ErrorBanner";
 import { NoteIcon } from "@shared/ui/icons";
 import workspaceStyles from "@pages/shared/EmployeeWorkspacePage.module.css";
-import { buildEmployeeNotificationItems } from "../model/notifications";
+import { buildEmployeeNotificationItems, isEmployeeNotificationRead } from "../model/notifications";
 import styles from "./EmployeeNotificationsPage.module.css";
 
 const EMPTY_SWAPS: ShiftSwap[] = [];
@@ -37,23 +37,29 @@ export function EmployeeNotificationsPage() {
     [realtimeNotifications, swaps],
   );
 
-  const unreadCount = notificationItems.reduce((count, item) => count + (readIds.has(item.id) ? 0 : 1), 0);
+  const unreadCount = notificationItems.reduce(
+    (count, item) => count + (isEmployeeNotificationRead(item, readIds) ? 0 : 1),
+    0,
+  );
   const queryError = swapsQuery.error;
   const queryErrorMessage = queryError ? getErrorMessage(queryError, "Could not load notifications.") : null;
 
   const handleMarkAllRead = () => {
-    const nextReadIds = new Set([...readIds, ...notificationItems.map(item => item.id)]);
+    const nextReadIds = new Set([
+      ...readIds,
+      ...notificationItems.flatMap(item => item.readIds),
+    ]);
     setReadIds(nextReadIds);
     writeEmployeeNotificationIds(storageKey, nextReadIds);
   };
 
-  const handleMarkRead = (itemId: string) => {
-    if (readIds.has(itemId)) {
+  const handleMarkRead = (itemReadIds: string[]) => {
+    if (itemReadIds.every(id => readIds.has(id))) {
       return;
     }
 
     const nextReadIds = new Set(readIds);
-    nextReadIds.add(itemId);
+    itemReadIds.forEach(id => nextReadIds.add(id));
     setReadIds(nextReadIds);
     writeEmployeeNotificationIds(storageKey, nextReadIds);
   };
@@ -93,7 +99,7 @@ export function EmployeeNotificationsPage() {
         ) : (
           <div className={styles.notificationList}>
             {notificationItems.map(item => {
-              const isUnread = !readIds.has(item.id);
+              const isUnread = !isEmployeeNotificationRead(item, readIds);
               const itemClassName = [
                 styles.notificationItem,
                 styles[`notificationItem_${item.tone}`],
@@ -119,7 +125,7 @@ export function EmployeeNotificationsPage() {
                     <button
                       type="button"
                       className={styles.markReadButton}
-                      onClick={() => handleMarkRead(item.id)}
+                      onClick={() => handleMarkRead(item.readIds)}
                       disabled={!isUnread}
                     >
                       {isUnread ? "Mark as read" : "Read"}

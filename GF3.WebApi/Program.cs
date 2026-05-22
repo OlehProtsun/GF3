@@ -34,6 +34,8 @@ static void ApplyDatabaseMigrations(WebApplication app)
 /// </summary>
 static void ConfigureCommonMiddleware(WebApplication app)
 {
+    app.UseResponseCompression();
+
     app.UseSwagger();
     app.UseSwaggerUI();
 
@@ -85,6 +87,15 @@ static void ConfigureFrontendHosting(WebApplication app)
     }
 
     app.UseDefaultFiles();
-    app.UseStaticFiles();
+    app.UseStaticFiles(new StaticFileOptions
+    {
+        OnPrepareResponse = context =>
+        {
+            if (context.Context.Request.Path.StartsWithSegments("/assets"))
+            {
+                context.Context.Response.Headers.CacheControl = "public,max-age=31536000,immutable";
+            }
+        }
+    });
     app.MapFallbackToFile("index.html");
 }

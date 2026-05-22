@@ -5,6 +5,7 @@ using BusinessLogicLayer.Services;
 using BusinessLogicLayer.Services.Abstractions;
 using DataAccessLayer.Repositories;
 using GF3.Tests.Infrastructure;
+using Microsoft.EntityFrameworkCore;
 
 namespace GF3.Tests;
 
@@ -56,6 +57,87 @@ public sealed class BusinessCrudServiceTests
             result.Message);
 
         await Assert.ThrowsAsync<ValidationException>(() => service.DeleteAsync(employee.Id));
+    }
+
+    [Fact]
+    public async Task EmployeeService_UpdateContactSearchDeleteAndValidationPaths_Work()
+    {
+        await using var database = await SqliteTestDatabase.CreateAsync();
+        await using var context = database.CreateContext();
+        var service = new EmployeeService(new DataAccessLayer.Repositories.EmployeeRepository(context));
+
+        var created = await service.CreateAsync(TestDataFactory.CreateEmployeeModel(
+            firstName: " Alice ",
+            lastName: " Brown ",
+            phone: " 111 ",
+            email: "alice@example.com"));
+        var duplicateTarget = await service.CreateAsync(TestDataFactory.CreateEmployeeModel(
+            firstName: " Bob ",
+            lastName: " Stone ",
+            email: "bob@example.com"));
+
+        created.FirstName = " Alicia ";
+        created.LastName = " Brown-Smith ";
+        await service.UpdateAsync(created);
+
+        var updated = await service.GetAsync(created.Id);
+        var searchByName = await service.GetByValueAsync("brown-smith");
+        var searchByEmail = await service.GetByValueAsync("ALICE@EXAMPLE");
+        var allFromBlankSearch = await service.GetByValueAsync(" ");
+
+        Assert.NotNull(updated);
+        Assert.Equal("Alicia", updated!.FirstName);
+        Assert.Equal("Brown-Smith", updated.LastName);
+        Assert.Contains(searchByName, employee => employee.Id == created.Id);
+        Assert.Contains(searchByEmail, employee => employee.Id == created.Id);
+        Assert.Equal(2, allFromBlankSearch.Count);
+
+        var contact = await service.UpdateContactAsync(created.Id, "  fresh@example.com  ", "  +48 123  ");
+        Assert.Equal("fresh@example.com", contact.Email);
+        Assert.Equal("+48 123", contact.Phone);
+
+        var clearedContact = await service.UpdateContactAsync(created.Id, " ", "");
+        Assert.Null(clearedContact.Email);
+        Assert.Null(clearedContact.Phone);
+
+        duplicateTarget.FirstName = "alicia";
+        duplicateTarget.LastName = "brown-smith";
+        var duplicateUpdate = await Assert.ThrowsAsync<ValidationException>(() => service.UpdateAsync(duplicateTarget));
+        Assert.Equal("An employee with the same first and last name already exists.", duplicateUpdate.Message);
+
+        var missingContact = await Assert.ThrowsAsync<ValidationException>(() =>
+            service.UpdateContactAsync(9999, "missing@example.com", null));
+        Assert.Equal("The employee profile could not be found.", missingContact.Message);
+
+        var invalidEmail = await Assert.ThrowsAsync<ValidationException>(() =>
+            service.UpdateContactAsync(created.Id, "not-an-email", null));
+        Assert.Equal(["Enter a valid recovery email address."], invalidEmail.Errors["recoveryEmail"]);
+
+        var longPhone = await Assert.ThrowsAsync<ValidationException>(() =>
+            service.UpdateContactAsync(created.Id, null, new string('1', 51)));
+        Assert.Equal(["Phone number is too long."], longPhone.Errors["phone"]);
+
+        var blankFirstName = await Assert.ThrowsAsync<ValidationException>(() =>
+            service.CreateAsync(TestDataFactory.CreateEmployeeModel(firstName: " ", lastName: "Valid")));
+        Assert.Equal("First name is required.", blankFirstName.Message);
+
+        var blankLastName = await Assert.ThrowsAsync<ValidationException>(() =>
+            service.CreateAsync(TestDataFactory.CreateEmployeeModel(firstName: "Valid", lastName: " ")));
+        Assert.Equal("Last name is required.", blankLastName.Message);
+
+        var tooLongName = await Assert.ThrowsAsync<ValidationException>(() =>
+            service.CreateAsync(TestDataFactory.CreateEmployeeModel(firstName: new string('A', 101), lastName: "Valid")));
+        Assert.Equal("First name or last name is too long.", tooLongName.Message);
+
+        var deleteCandidate = await service.CreateAsync(TestDataFactory.CreateEmployeeModel(
+            firstName: "Delete",
+            lastName: "Me",
+            email: "delete@example.com"));
+        var deleteResult = await service.TryDeleteAsync(deleteCandidate.Id);
+
+        Assert.True(deleteResult.Succeeded);
+        Assert.Null(await service.GetAsync(deleteCandidate.Id));
+        Assert.Equal(2, await context.Employees.AsNoTracking().CountAsync());
     }
 
     [Fact]

@@ -273,6 +273,7 @@ export class QueryClient {
     }
 
     record.invalidatedWhileFetching = true;
+    record.controller?.abort();
   }
 }
 

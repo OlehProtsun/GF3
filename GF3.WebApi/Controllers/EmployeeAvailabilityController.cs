@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Mvc;
 using WebApi.Auth;
 using WebApi.Contracts.AvailabilityGroups.Slots;
 using WebApi.Contracts.EmployeeAvailability;
+using WebApi.Realtime;
 using WebApi.Services;
 
 namespace WebApi.Controllers;
@@ -19,7 +20,9 @@ namespace WebApi.Controllers;
 [Authorize(Roles = AuthRoles.Employee)]
 public sealed class EmployeeAvailabilityController(
     IAvailabilityGroupService availabilityGroupService,
-    IWorkflowLogService workflowLogService) : ControllerBase
+    IWorkflowLogService workflowLogService,
+    IManagerEditLockService? editLockService = null,
+    IRealtimeNotifier? realtimeNotifier = null) : ControllerBase
 {
     [HttpGet]
     [ProducesResponseType(typeof(IEnumerable<EmployeeAvailabilityGroupDto>), StatusCodes.Status200OK)]
@@ -50,16 +53,27 @@ public sealed class EmployeeAvailabilityController(
     [ProducesResponseType(typeof(EmployeeAvailabilityGroupDto), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
     public async Task<ActionResult<EmployeeAvailabilityGroupDto>> UpdateSlots(
         int groupId,
         [FromBody] UpdateEmployeeAvailabilityRequest request,
         CancellationToken cancellationToken)
     {
+        var employeeId = GetRequiredEmployeeId();
         var nowUtc = DateTimeOffset.UtcNow;
+        _ = await availabilityGroupService
+            .GetPublishedForEmployeeByIdAsync(employeeId, groupId, nowUtc, cancellationToken)
+            .ConfigureAwait(false);
+
+        if (CreateEditLockConflictResult(groupId) is { } conflict)
+        {
+            return conflict;
+        }
+
         var slots = request.Slots ?? [];
         var updated = await availabilityGroupService
             .SaveEmployeeAvailabilityAsync(
-                GetRequiredEmployeeId(),
+                employeeId,
                 groupId,
                 slots.Select(ToDayModel).ToList(),
                 nowUtc,
@@ -69,6 +83,7 @@ public sealed class EmployeeAvailabilityController(
         await workflowLogService
             .LogAsync(User, $"Updated availability for {updated.Group.Name} ({updated.Group.Month:00}.{updated.Group.Year}).", cancellationToken)
             .ConfigureAwait(false);
+        await NotifyAvailabilityChangedAsync(groupId, "employee-availability-updated").ConfigureAwait(false);
 
         return Ok(ToApiDto(updated));
     }
@@ -84,18 +99,44 @@ public sealed class EmployeeAvailabilityController(
         return employeeId;
     }
 
-    private static EmployeeAvailabilityGroupDto ToApiDto(EmployeeAvailabilityModel model) => new()
+    private ActionResult? CreateEditLockConflictResult(int groupId)
+        => ManagerEditLockHttp.CreateConflictResult(
+            this,
+            editLockService,
+            ManagerEditLockTargets.AvailabilityGroup(groupId),
+            "This availability group");
+
+    private Task NotifyAvailabilityChangedAsync(int groupId, string reason)
+        => realtimeNotifier?.NotifyManagerDataChangedAsync(
+            ManagerEditResourceTypes.AvailabilityGroup,
+            groupId.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            reason) ?? Task.CompletedTask;
+
+    private ManagerEditLockState? GetAvailabilityEditLockState(int groupId)
     {
-        Id = model.Group.Id,
-        Name = model.Group.Name,
-        Year = model.Group.Year,
-        Month = model.Group.Month,
-        VisibleFromUtc = model.Group.VisibleFromUtc,
-        VisibleToUtc = model.Group.VisibleToUtc,
-        CanSubmit = model.CanSubmit,
-        EmployeeLastModifiedAtUtc = model.Member.EmployeeLastModifiedAtUtc,
-        Slots = model.Days.Select(ToSlotDto).ToList(),
-    };
+        var state = editLockService?.GetLockState(ManagerEditLockTargets.AvailabilityGroup(groupId));
+        return state?.IsLocked == true ? state : null;
+    }
+
+    private EmployeeAvailabilityGroupDto ToApiDto(EmployeeAvailabilityModel model)
+    {
+        var editLockState = GetAvailabilityEditLockState(model.Group.Id);
+
+        return new EmployeeAvailabilityGroupDto
+        {
+            Id = model.Group.Id,
+            Name = model.Group.Name,
+            Year = model.Group.Year,
+            Month = model.Group.Month,
+            VisibleFromUtc = model.Group.VisibleFromUtc,
+            VisibleToUtc = model.Group.VisibleToUtc,
+            CanSubmit = model.CanSubmit && editLockState is null,
+            IsEditLocked = editLockState is not null,
+            EditLockedBy = editLockState?.LockedBy,
+            EmployeeLastModifiedAtUtc = model.Member.EmployeeLastModifiedAtUtc,
+            Slots = model.Days.Select(ToSlotDto).ToList(),
+        };
+    }
 
     private static AvailabilitySlotDto ToSlotDto(AvailabilityGroupDayModel model) => new()
     {

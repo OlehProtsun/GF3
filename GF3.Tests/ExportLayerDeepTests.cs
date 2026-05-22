@@ -427,6 +427,69 @@ public sealed class ExportLayerDeepTests
     }
 
     [Fact]
+    public void GraphNoteSqlExportBuilder_BuildPortableNote_LeavesPlainNoteUnchangedWhenNoTextCells()
+    {
+        var note = "Visible note without metadata";
+
+        var result = BuildPortableGraphNote(note, CreateInternalTextCellList());
+
+        Assert.Equal(note, result);
+    }
+
+    [Fact]
+    public void GraphNoteSqlExportBuilder_BuildPortableNote_ConvertsLegacyRawMetadataWhenNoTextCells()
+    {
+        var legacyNote =
+            """
+            Visible note
+
+            <!--GF3_GRAPH_META:not-json-but-preserved-->
+            """;
+
+        var result = BuildPortableGraphNote(legacyNote, CreateInternalTextCellList());
+
+        Assert.Equal("Visible note\n\n[[GF3_GRAPH_META:not-json-but-preserved]]", result);
+    }
+
+    [Fact]
+    public void GraphNoteSqlExportBuilder_BuildPortableNote_KeepsBrokenPortableMetadataUnchanged()
+    {
+        var note = "Visible note\n\n[[GF3_GRAPH_META:b64:not-valid-base64]]";
+
+        var result = BuildPortableGraphNote(
+            note,
+            CreateInternalTextCellList((3, 2, "Vacation")));
+
+        Assert.Equal(note, result);
+    }
+
+    [Fact]
+    public void GraphNoteSqlExportBuilder_BuildPortableNote_ParsesUrlEncodedMetadataAndReplacesTextCells()
+    {
+        var encodedMetadata = Uri.EscapeDataString(
+            """{"manualColumns":[{"id":8,"label":"Notes","cells":{"1":"Call"}}],"textCells":[{"employeeId":1,"dayOfMonth":1,"value":"Old"}]}""");
+        var note = $"Visible note\n\n[[GF3_GRAPH_META:{encodedMetadata}]]";
+
+        var result = BuildPortableGraphNote(
+            note,
+            CreateInternalTextCellList((5, 6, "Clinic")));
+
+        Assert.StartsWith("Visible note", result, StringComparison.Ordinal);
+        Assert.Contains("[[GF3_GRAPH_META:b64:", result, StringComparison.Ordinal);
+
+        var parsedMetadata = ParseGraphNoteMetadata(result);
+        var manualColumn = Assert.Single(ReadManualColumns(parsedMetadata));
+        var textCell = Assert.Single(ReadTextCells(parsedMetadata));
+
+        Assert.Equal(8, manualColumn.Id);
+        Assert.Equal("Notes", manualColumn.Label);
+        Assert.Equal("Call", manualColumn.Cells[1]);
+        Assert.Equal(5, textCell.EmployeeId);
+        Assert.Equal(6, textCell.DayOfMonth);
+        Assert.Equal("Clinic", textCell.Value);
+    }
+
+    [Fact]
     public void GraphRelatedScheduleHintExportBuilder_BuildTextCells_MergesDistinctGraphNamesAndSkipsBusyCells()
     {
         var currentGraph = TestDataFactory.CreateScheduleModel(id: 5, containerId: 1, shopId: 2, name: "Current", year: 2026, month: 4, availabilityGroupId: null);

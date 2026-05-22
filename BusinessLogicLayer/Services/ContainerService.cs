@@ -62,7 +62,7 @@ public class ContainerService : IContainerService
         => await ServiceMappingHelper.GetMappedAsync(token => _repo.GetByIdAsync(id, token), x => x.ToContract(), ct).ConfigureAwait(false);
 
     public async Task<List<ContainerModel>> GetAllAsync(CancellationToken ct = default)
-        => await ServiceMappingHelper.GetMappedListAsync(_repo.GetAllAsync, x => x.ToContract(), ct).ConfigureAwait(false);
+        => await ServiceMappingHelper.GetMappedListAsync(_repo.GetSummariesAsync, x => x.ToContract(), ct).ConfigureAwait(false);
 
     public async Task<ContainerModel> CreateAsync(ContainerModel entity, CancellationToken ct = default)
     {
@@ -97,7 +97,7 @@ public class ContainerService : IContainerService
     }
 
     public async Task<List<ContainerModel>> GetByValueAsync(string value, CancellationToken ct = default)
-        => await ServiceMappingHelper.GetMappedListAsync(token => _repo.GetByValueAsync(value, token), x => x.ToContract(), ct).ConfigureAwait(false);
+        => await ServiceMappingHelper.GetMappedListAsync(token => _repo.GetSummariesByValueAsync(value, token), x => x.ToContract(), ct).ConfigureAwait(false);
 
     public async Task<List<ScheduleModel>?> GetGraphsAsync(int containerId, CancellationToken ct = default)
     {
@@ -350,8 +350,9 @@ public class ContainerService : IContainerService
     {
         await EnsureGraphOwnershipAsync(containerId, graphId, ct).ConfigureAwait(false);
 
-        var existing = (await _cellStyleRepo.GetByScheduleAsync(graphId, ct).ConfigureAwait(false))
-            .FirstOrDefault(x => x.DayOfMonth == model.DayOfMonth && x.EmployeeId == model.EmployeeId);
+        var existing = await _cellStyleRepo
+            .GetByScheduleCellAsync(graphId, model.DayOfMonth, model.EmployeeId, ct)
+            .ConfigureAwait(false);
 
         if (existing is null)
         {
@@ -590,9 +591,9 @@ public class ContainerService : IContainerService
             throw ValidationException.ForField(nameof(ScheduleEmployeeModel.EmployeeId), "Employee is required.");
         }
 
-        var existing = await _employeeRepo.GetByScheduleAsync(graphId, ct).ConfigureAwait(false);
-        var duplicateExists = existing.Any(x => x.EmployeeId == employeeId && (!excludeGraphEmployeeId.HasValue || x.Id != excludeGraphEmployeeId.Value));
-        if (duplicateExists)
+        if (await _employeeRepo
+                .ExistsForScheduleAsync(graphId, employeeId, excludeGraphEmployeeId, ct)
+                .ConfigureAwait(false))
         {
             throw ValidationException.ForField(nameof(ScheduleEmployeeModel.EmployeeId), "This employee is already added to the graph.");
         }

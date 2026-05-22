@@ -118,6 +118,29 @@ function getEmployeeVisibilityWindowLabel(group: Pick<EmployeeAvailabilityGroup,
   return `${from} - ${to}`;
 }
 
+const availabilityEditLockedMessagePrefix = "This availability is currently being edited by ";
+
+function getAvailabilityEditLockedMessage(group: Pick<EmployeeAvailabilityGroup, "editLockedBy">) {
+  const lockedBy = group.editLockedBy?.trim() || "a manager";
+  return `${availabilityEditLockedMessagePrefix}${lockedBy}. You cannot edit it right now.`;
+}
+
+function isAvailabilityEditLockedMessage(value: string | null) {
+  return value?.startsWith(availabilityEditLockedMessagePrefix) ?? false;
+}
+
+function isAvailabilityOpen(group?: EmployeeAvailabilityGroup | null) {
+  return Boolean(group?.canSubmit) && group?.isEditLocked !== true;
+}
+
+function getAvailabilityStatusLabel(group: EmployeeAvailabilityGroup) {
+  if (group.isEditLocked) {
+    return "Locked";
+  }
+
+  return group.canSubmit ? "Open" : "Closed";
+}
+
 function isAvailableKind(kind: AvailabilityKind, intervalStr?: string | null) {
   if (intervalStr?.trim()) {
     return true;
@@ -400,6 +423,9 @@ export function EmployeeAvailabilityPage() {
   const [editingDayOfMonth, setEditingDayOfMonth] = useState<number | null>(null);
   const [saveSuccessMessage, setSaveSuccessMessage] = useState<string | null>(null);
   const [closedMessage, setClosedMessage] = useState<string | null>(null);
+  const selectedEditLockedMessage = selectedAvailability?.isEditLocked
+    ? getAvailabilityEditLockedMessage(selectedAvailability)
+    : null;
 
   useEffect(() => {
     setCommittedDraftSnapshot(availabilityDraftSource.snapshot);
@@ -411,6 +437,18 @@ export function EmployeeAvailabilityPage() {
     setSaveSuccessMessage(null);
     setClosedMessage(null);
   }, [selectedId]);
+
+  useEffect(() => {
+    if (selectedEditLockedMessage) {
+      setEditingDayOfMonth(null);
+      setClosedMessage(selectedEditLockedMessage);
+      return;
+    }
+
+    setClosedMessage(currentMessage =>
+      isAvailabilityEditLockedMessage(currentMessage) ? null : currentMessage,
+    );
+  }, [selectedEditLockedMessage]);
 
   useEffect(() => {
     if (!closedMessage) {
@@ -454,7 +492,7 @@ export function EmployeeAvailabilityPage() {
     when: hasUnsavedChanges && !saveMutation.isPending,
   });
 
-  const canSubmit = Boolean(selectedAvailability?.canSubmit) && !saveMutation.isPending;
+  const canSubmit = isAvailabilityOpen(selectedAvailability) && !saveMutation.isPending;
   const queryErrorMessage = availabilityQuery.error
     ? getErrorMessage(availabilityQuery.error, "Could not load availability.")
     : null;
@@ -471,6 +509,11 @@ export function EmployeeAvailabilityPage() {
   };
 
   const handleOpenDayDialog = (dayOfMonth: number) => {
+    if (selectedAvailability?.isEditLocked) {
+      setClosedMessage(getAvailabilityEditLockedMessage(selectedAvailability));
+      return;
+    }
+
     if (!canSubmit) {
       setClosedMessage("The time for editing this availability has expired.");
       return;
@@ -615,8 +658,12 @@ export function EmployeeAvailabilityPage() {
                       <span className={styles.groupMeta}>{getEmployeeVisibilityWindowLabel(group)}</span>
                     </span>
 
-                    <span className={joinClassNames(styles.groupState, group.canSubmit && styles.groupStateOpen)}>
-                      {group.canSubmit ? "Open" : "Closed"}
+                    <span className={joinClassNames(
+                      styles.groupState,
+                      isAvailabilityOpen(group) && styles.groupStateOpen,
+                      group.isEditLocked && styles.groupStateLocked,
+                    )}>
+                      {getAvailabilityStatusLabel(group)}
                     </span>
                   </button>
                 );
@@ -631,8 +678,12 @@ export function EmployeeAvailabilityPage() {
                 <span className={styles.editorMeta}>{getAvailabilityGroupPeriodLabel(selectedAvailability, "compact")}</span>
               </div>
 
-              <span className={[styles.statusPill, selectedAvailability.canSubmit ? styles.statusPillOpen : ""].filter(Boolean).join(" ")}>
-                {selectedAvailability.canSubmit ? "Open" : "Closed"}
+              <span className={joinClassNames(
+                styles.statusPill,
+                isAvailabilityOpen(selectedAvailability) && styles.statusPillOpen,
+                selectedAvailability.isEditLocked && styles.statusPillLocked,
+              )}>
+                {getAvailabilityStatusLabel(selectedAvailability)}
               </span>
             </div>
 

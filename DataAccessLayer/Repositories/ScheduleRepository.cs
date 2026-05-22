@@ -55,6 +55,7 @@ public class ScheduleRepository : GenericRepository<ScheduleModel>, IScheduleRep
     public async Task<List<ScheduleModel>> GetPublishedForEmployeeAsync(int employeeId, CancellationToken ct = default)
         => await _set
             .AsNoTracking()
+            .AsSplitQuery()
             .Include(schedule => schedule.Container)
             .Include(schedule => schedule.Shop)
             .Include(schedule => schedule.Employees)
@@ -73,19 +74,20 @@ public class ScheduleRepository : GenericRepository<ScheduleModel>, IScheduleRep
     public async Task<ScheduleModel?> GetDetailedAsync(int id, CancellationToken ct = default)
         => await _set
             .AsNoTracking()
+            .AsSplitQuery()
             .Include(schedule => schedule.Container)
             .Include(schedule => schedule.Shop)
             .Include(schedule => schedule.Slots)
+                .ThenInclude(slot => slot.Employee)
             .Include(schedule => schedule.Employees)
                 .ThenInclude(scheduleEmployee => scheduleEmployee.Employee)
+            .Include(schedule => schedule.CellStyles)
             .FirstOrDefaultAsync(schedule => schedule.Id == id, ct)
             .ConfigureAwait(false);
 
     private IQueryable<ScheduleModel> CreateListQuery()
         => _set
-            .AsNoTracking()
-            .Include(schedule => schedule.Container)
-            .Include(schedule => schedule.Shop);
+            .AsNoTracking();
 
     /// <summary>
     /// Applies the shared schedule search logic used by both global lists and container-scoped lists.

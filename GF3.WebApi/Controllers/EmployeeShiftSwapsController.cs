@@ -454,6 +454,7 @@ public sealed class EmployeeShiftSwapsController(
             ManualColumnId = model.ManualColumnId,
             ManualColumnName = manualColumnName,
             IsCreatedByCurrentEmployee = isOwner,
+            IsScheduleLocked = isScheduleLocked,
             CanAccept = canAccept,
             CanCancel = isOwner && isOpen,
         };

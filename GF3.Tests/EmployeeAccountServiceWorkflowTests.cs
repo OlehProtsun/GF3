@@ -91,6 +91,66 @@ public sealed class EmployeeAccountServiceWorkflowTests
     }
 
     [Fact]
+    public async Task UpsertForEmployeeAsync_ReturnsNullForBlankNewAccountAndRejectsMissingRequiredFields()
+    {
+        await using var database = await SqliteTestDatabase.CreateAsync();
+        await using var context = database.CreateContext();
+        var service = CreateService(context);
+        var employee = await AddEmployeeAsync(context);
+
+        var noAccount = await service.UpsertForEmployeeAsync(employee.Id, " ", null);
+        var invalidEmployeeId = await Assert.ThrowsAsync<ValidationException>(() =>
+            service.UpsertForEmployeeAsync(0, "worker.one", "password-one"));
+        var missingUsername = await Assert.ThrowsAsync<ValidationException>(() =>
+            service.UpsertForEmployeeAsync(employee.Id, null, "password-one"));
+        var missingPassword = await Assert.ThrowsAsync<ValidationException>(() =>
+            service.UpsertForEmployeeAsync(employee.Id, "worker.one", null));
+
+        Assert.Null(noAccount);
+        Assert.Empty(await context.EmployeeAccounts.AsNoTracking().ToListAsync());
+        Assert.Equal("A valid employee id is required before creating an account.", invalidEmployeeId.Message);
+        Assert.Equal("Username is required when creating a login account.", missingUsername.Message);
+        Assert.Equal("Password is required when creating a login account.", missingPassword.Message);
+    }
+
+    [Fact]
+    public async Task UpsertForEmployeeAsync_ExistingAccountRejectsBlankUsername()
+    {
+        await using var database = await SqliteTestDatabase.CreateAsync();
+        await using var context = database.CreateContext();
+        var service = CreateService(context);
+        var employee = await AddEmployeeAsync(context);
+        await service.UpsertForEmployeeAsync(employee.Id, "worker.one", "password-one");
+
+        var exception = await Assert.ThrowsAsync<ValidationException>(() =>
+            service.UpsertForEmployeeAsync(employee.Id, " ", "password-two"));
+
+        Assert.Equal("Username is required for employees that already have a login account.", exception.Message);
+    }
+
+    [Fact]
+    public async Task GetAccountMethods_MapStoredAccountsByEmployeeAndUsername()
+    {
+        await using var database = await SqliteTestDatabase.CreateAsync();
+        await using var context = database.CreateContext();
+        var service = CreateService(context);
+        var employee = await AddEmployeeAsync(context);
+        await service.UpsertForEmployeeAsync(employee.Id, "worker.one", "password-one");
+
+        var byEmployee = await service.GetByEmployeeIdAsync(employee.Id);
+        var byUsername = await service.GetByUsernameAsync("worker.one");
+        var missingEmployee = await service.GetByEmployeeIdAsync(999);
+        var missingUsername = await service.GetByUsernameAsync("missing");
+
+        Assert.NotNull(byEmployee);
+        Assert.Equal(employee.Id, byEmployee!.EmployeeId);
+        Assert.NotNull(byUsername);
+        Assert.Equal("worker.one", byUsername!.Username);
+        Assert.Null(missingEmployee);
+        Assert.Null(missingUsername);
+    }
+
+    [Fact]
     public async Task PasswordResetWorkflow_ValidatesCodeAndChangesPassword()
     {
         await using var database = await SqliteTestDatabase.CreateAsync();
@@ -122,6 +182,32 @@ public sealed class EmployeeAccountServiceWorkflowTests
     }
 
     [Fact]
+    public async Task PasswordResetWorkflow_RejectsMissingAccountMissingChallengeAndBlankNewPassword()
+    {
+        await using var database = await SqliteTestDatabase.CreateAsync();
+        await using var context = database.CreateContext();
+        var service = CreateService(context);
+        var employee = await AddEmployeeAsync(context);
+        await service.UpsertForEmployeeAsync(employee.Id, "worker.one", "old-password");
+
+        var missingChallengeAccount = await Assert.ThrowsAsync<ValidationException>(() =>
+            service.CreatePasswordResetChallengeAsync(999));
+        var missingCompleteAccount = await Assert.ThrowsAsync<ValidationException>(() =>
+            service.CompletePasswordResetAsync(999, "123456", "new-password"));
+        var missingChallenge = await Assert.ThrowsAsync<ValidationException>(() =>
+            service.CompletePasswordResetAsync(employee.Id, "123456", "new-password"));
+
+        var challenge = await service.CreatePasswordResetChallengeAsync(employee.Id);
+        var blankPassword = await Assert.ThrowsAsync<ValidationException>(() =>
+            service.CompletePasswordResetAsync(employee.Id, challenge.Code, "   "));
+
+        Assert.Equal("The login account for this employee could not be found.", missingChallengeAccount.Message);
+        Assert.Equal("The login account for this employee could not be found.", missingCompleteAccount.Message);
+        Assert.Equal(["Request a new password code before changing the password."], missingChallenge.Errors["code"]);
+        Assert.Equal(["New password is required."], blankPassword.Errors["newPassword"]);
+    }
+
+    [Fact]
     public async Task PasswordResetWorkflow_ExpiredCodeClearsChallengeAndThrottlePreventsImmediateRepeat()
     {
         await using var database = await SqliteTestDatabase.CreateAsync();
@@ -147,6 +233,32 @@ public sealed class EmployeeAccountServiceWorkflowTests
         Assert.Null(storedAccount.PasswordResetCodeHash);
         Assert.Null(storedAccount.PasswordResetExpiresAtUtc);
         Assert.Null(storedAccount.PasswordResetRequestedAtUtc);
+    }
+
+    [Fact]
+    public async Task ClearPasswordResetChallengeAsync_IgnoresMissingOrEmptyChallengeAndClearsExistingChallenge()
+    {
+        await using var database = await SqliteTestDatabase.CreateAsync();
+        await using var context = database.CreateContext();
+        var service = CreateService(context);
+        var employee = await AddEmployeeAsync(context);
+        await service.UpsertForEmployeeAsync(employee.Id, "worker.one", "old-password");
+
+        await service.ClearPasswordResetChallengeAsync(999);
+        await service.ClearPasswordResetChallengeAsync(employee.Id);
+        var accountBeforeChallenge = await context.EmployeeAccounts.AsNoTracking().SingleAsync();
+
+        await service.CreatePasswordResetChallengeAsync(employee.Id);
+        var challengedAccount = await context.EmployeeAccounts.AsNoTracking().SingleAsync();
+
+        await service.ClearPasswordResetChallengeAsync(employee.Id);
+        var clearedAccount = await context.EmployeeAccounts.AsNoTracking().SingleAsync();
+
+        Assert.Null(accountBeforeChallenge.PasswordResetCodeHash);
+        Assert.NotNull(challengedAccount.PasswordResetCodeHash);
+        Assert.Null(clearedAccount.PasswordResetCodeHash);
+        Assert.Null(clearedAccount.PasswordResetExpiresAtUtc);
+        Assert.Null(clearedAccount.PasswordResetRequestedAtUtc);
     }
 
     [Fact]

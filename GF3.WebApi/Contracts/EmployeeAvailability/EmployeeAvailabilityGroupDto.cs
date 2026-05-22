@@ -21,6 +21,10 @@ public sealed class EmployeeAvailabilityGroupDto
 
     public bool CanSubmit { get; set; }
 
+    public bool IsEditLocked { get; set; }
+
+    public string? EditLockedBy { get; set; }
+
     public DateTimeOffset? EmployeeLastModifiedAtUtc { get; set; }
 
     public IReadOnlyList<AvailabilitySlotDto> Slots { get; set; } = Array.Empty<AvailabilitySlotDto>();

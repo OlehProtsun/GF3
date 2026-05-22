@@ -651,11 +651,14 @@ function SwapOfferCard({
 }) {
   const [isExpanded, setIsExpanded] = useState(false);
   const isAccepted = swap.status === "accepted";
+  const isScheduleLocked = swap.status === "open" && swap.isScheduleLocked;
   const badgeText = isAccepted
     ? "Accepted"
-    : swap.visibility === "private"
-      ? "Private"
-      : "Public";
+    : isScheduleLocked
+      ? "Locked"
+      : swap.visibility === "private"
+        ? "Private"
+        : "Public";
 
   return (
     <article className={styles.offerCard}>
@@ -666,7 +669,13 @@ function SwapOfferCard({
         </div>
 
         <div className={styles.offerHeaderActions}>
-          <span className={[styles.badge, isAccepted ? styles.badgeMuted : ""].filter(Boolean).join(" ")}>
+          <span
+            className={[
+              styles.badge,
+              isAccepted ? styles.badgeMuted : "",
+              isScheduleLocked ? styles.badgeLocked : "",
+            ].filter(Boolean).join(" ")}
+          >
             {badgeText}
           </span>
           <CollapseToggleButton
@@ -705,6 +714,12 @@ function SwapOfferCard({
           </div>
 
           <SwapStatisticsCard stats={stats} />
+
+          {isScheduleLocked ? (
+            <p className={styles.lockedText}>
+              Schedule is locked while a manager is editing it.
+            </p>
+          ) : null}
 
           {swap.canAccept || swap.canCancel ? (
             <div className={styles.cardActions}>

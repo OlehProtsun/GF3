@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Security.Claims;
 using BusinessLogicLayer.Services.Abstractions;
 using WebApi.Auth;
@@ -10,8 +11,11 @@ namespace WebApi.Middleware;
 /// </summary>
 public sealed class EmployeePresenceMiddleware
 {
+    private static readonly TimeSpan PresenceWriteThrottle = TimeSpan.FromMinutes(1);
+
     private readonly RequestDelegate _next;
     private readonly ILogger<EmployeePresenceMiddleware> _logger;
+    private readonly ConcurrentDictionary<int, DateTimeOffset> _nextPresenceWriteAtUtc = new();
 
     public EmployeePresenceMiddleware(RequestDelegate next, ILogger<EmployeePresenceMiddleware> logger)
     {
@@ -28,13 +32,48 @@ public sealed class EmployeePresenceMiddleware
             return;
         }
 
+        var nowUtc = DateTimeOffset.UtcNow;
+        if (!TryReservePresenceWrite(employeeId, nowUtc))
+        {
+            return;
+        }
+
         try
         {
             await employeeAccountService.TouchLastSeenAsync(employeeId, CancellationToken.None).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
+            _nextPresenceWriteAtUtc.TryRemove(employeeId, out _);
             _logger.LogDebug(ex, "Employee presence update skipped for employee {EmployeeId}.", employeeId);
+        }
+    }
+
+    private bool TryReservePresenceWrite(int employeeId, DateTimeOffset nowUtc)
+    {
+        var nextAllowedAtUtc = nowUtc.Add(PresenceWriteThrottle);
+
+        while (true)
+        {
+            if (_nextPresenceWriteAtUtc.TryGetValue(employeeId, out var reservedUntilUtc))
+            {
+                if (nowUtc < reservedUntilUtc)
+                {
+                    return false;
+                }
+
+                if (_nextPresenceWriteAtUtc.TryUpdate(employeeId, nextAllowedAtUtc, reservedUntilUtc))
+                {
+                    return true;
+                }
+
+                continue;
+            }
+
+            if (_nextPresenceWriteAtUtc.TryAdd(employeeId, nextAllowedAtUtc))
+            {
+                return true;
+            }
         }
     }
 

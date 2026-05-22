@@ -415,6 +415,12 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             entity.Property(log => log.ActorRole).IsRequired().HasMaxLength(32);
             entity.Property(log => log.ActorName).IsRequired().HasMaxLength(160);
             entity.Property(log => log.Action).IsRequired().HasMaxLength(512);
+
+            entity.HasIndex(log => log.OccurredAtUtc)
+                .HasDatabaseName("ix_workflow_log_occurred_at");
+
+            entity.HasIndex(log => new { log.ActorRole, log.OccurredAtUtc })
+                .HasDatabaseName("ix_workflow_log_role_time");
         });
     }
 

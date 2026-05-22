@@ -8,6 +8,8 @@ export type EmployeeAvailabilityGroup = {
   visibleFromUtc?: string | null;
   visibleToUtc?: string | null;
   canSubmit: boolean;
+  isEditLocked: boolean;
+  editLockedBy?: string | null;
   employeeLastModifiedAtUtc?: string | null;
   slots: AvailabilitySlot[];
 };

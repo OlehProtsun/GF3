@@ -150,6 +150,11 @@
   color: #15803d;
 }
 
+.groupStateLocked {
+  background: rgba(254, 226, 226, 0.84);
+  color: #b91c1c;
+}
+
 .editorPanel {
   min-width: 0;
 }
@@ -188,6 +193,12 @@
   border-color: rgba(34, 197, 94, 0.2);
   background: rgba(220, 252, 231, 0.78);
   color: #15803d;
+}
+
+.statusPillLocked {
+  border-color: rgba(220, 38, 38, 0.2);
+  background: rgba(254, 226, 226, 0.82);
+  color: #b91c1c;
 }
 
 .detailsGrid {

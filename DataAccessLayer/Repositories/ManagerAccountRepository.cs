@@ -29,7 +29,7 @@ public sealed class ManagerAccountRepository : GenericRepository<ManagerAccountM
 
         return _set
             .AsNoTracking()
-            .FirstOrDefaultAsync(account => account.Username.ToLower() == normalizedUsername, ct);
+            .FirstOrDefaultAsync(account => account.Username == normalizedUsername, ct);
     }
 
     public Task<bool> ExistsByUsernameAsync(string username, int? excludeManagerId = null, CancellationToken ct = default)
@@ -41,7 +41,7 @@ public sealed class ManagerAccountRepository : GenericRepository<ManagerAccountM
             .AnyAsync(
                 account =>
                     (!excludeManagerId.HasValue || account.Id != excludeManagerId.Value) &&
-                    account.Username.ToLower() == normalizedUsername,
+                    account.Username == normalizedUsername,
                 ct);
     }
 
@@ -49,34 +49,15 @@ public sealed class ManagerAccountRepository : GenericRepository<ManagerAccountM
         => _set.AsNoTracking().AnyAsync(ct);
 
     public async Task RecordSuccessfulLoginAsync(int managerId, DateTimeOffset occurredAtUtc, CancellationToken ct = default)
-    {
-        var account = await _set
-            .FirstOrDefaultAsync(existingAccount => existingAccount.Id == managerId, ct)
+        => await _set
+            .Where(account => account.Id == managerId)
+            .ExecuteUpdateAsync(
+                setters => setters
+                    .SetProperty(account => account.LastLoginAtUtc, (DateTimeOffset?)occurredAtUtc)
+                    .SetProperty(account => account.UpdatedAtUtc, occurredAtUtc),
+                ct)
             .ConfigureAwait(false);
 
-        if (account is null)
-        {
-            return;
-        }
-
-        account.LastLoginAtUtc = occurredAtUtc;
-        account.UpdatedAtUtc = occurredAtUtc;
-        await SaveChangesOrResetAsync(ct).ConfigureAwait(false);
-    }
-
     private static string NormalizeUsername(string? username)
-        => (username ?? string.Empty).Trim().ToLowerInvariant();
-
-    private async Task SaveChangesOrResetAsync(CancellationToken ct)
-    {
-        try
-        {
-            await _db.SaveChangesAsync(ct).ConfigureAwait(false);
-        }
-        catch
-        {
-            _db.ChangeTracker.Clear();
-            throw;
-        }
-    }
+        => (username ?? string.Empty).Trim();
 }

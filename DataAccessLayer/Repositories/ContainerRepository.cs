@@ -24,6 +24,13 @@ public class ContainerRepository : GenericRepository<ContainerModel>, IContainer
             .ConfigureAwait(false);
 
     /// <inheritdoc />
+    public async Task<List<ContainerModel>> GetSummariesAsync(CancellationToken ct = default)
+        => await _set
+            .AsNoTracking()
+            .ToListAsync(ct)
+            .ConfigureAwait(false);
+
+    /// <inheritdoc />
     public async Task<List<ContainerModel>> GetByValueAsync(string value, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(value))
@@ -34,6 +41,25 @@ public class ContainerRepository : GenericRepository<ContainerModel>, IContainer
         var normalized = NormalizeSearchValue(value);
 
         return await CreateDetailedQuery()
+            .Where(container =>
+                container.Name.ToLower().Contains(normalized) ||
+                (container.Note != null && container.Note.ToLower().Contains(normalized)))
+            .ToListAsync(ct)
+            .ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
+    public async Task<List<ContainerModel>> GetSummariesByValueAsync(string value, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return await GetSummariesAsync(ct).ConfigureAwait(false);
+        }
+
+        var normalized = NormalizeSearchValue(value);
+
+        return await _set
+            .AsNoTracking()
             .Where(container =>
                 container.Name.ToLower().Contains(normalized) ||
                 (container.Note != null && container.Note.ToLower().Contains(normalized)))

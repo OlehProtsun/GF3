@@ -63,15 +63,17 @@ public sealed class WorkflowLogService(AppDbContext db, IRealtimeNotifier realti
     public async Task<IReadOnlyList<WorkflowLogEntryModel>> GetRecentAsync(int limit, CancellationToken cancellationToken = default)
     {
         var safeLimit = Math.Clamp(limit, 1, 500);
-        var entries = await db.WorkflowLogEntries
+        return await db.WorkflowLogEntries
+            .FromSqlInterpolated(
+                $"""
+                SELECT id, occurred_at_utc, actor_role, actor_employee_id, actor_name, action
+                FROM workflow_log_entry
+                ORDER BY occurred_at_utc DESC
+                LIMIT {safeLimit}
+                """)
             .AsNoTracking()
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
-
-        return entries
-            .OrderByDescending(entry => entry.OccurredAtUtc)
-            .Take(safeLimit)
-            .ToList();
     }
 
     private static string NormalizeActorRole(string actorRole)
