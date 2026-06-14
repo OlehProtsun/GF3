@@ -1,0 +1,50 @@
+name: gf3
+
+services:
+  gf3-app:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    image: ${GF3_IMAGE:-gf3-web:local}
+    restart: unless-stopped
+    env_file:
+      - ./.env
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      DOTNET_ENVIRONMENT: Production
+      ASPNETCORE_URLS: http://+:8080
+      ASPNETCORE_FORWARDEDHEADERS_ENABLED: "true"
+      ConnectionStrings__Default: "Data Source=/data/SQLite.db"
+      GF3_CONNECTION_STRING: "Data Source=/data/SQLite.db"
+      GF3_EXPORT_TEMPLATES_DIR: /app/Resources/ExcelTemplate
+      GF3_ADMIN_ENABLED: ${GF3_ADMIN_ENABLED:-false}
+      GF3_ADMIN_ALLOW_REMOTE: ${GF3_ADMIN_ALLOW_REMOTE:-false}
+      GF3_ADMIN_ALLOW_WRITE: ${GF3_ADMIN_ALLOW_WRITE:-false}
+    volumes:
+      - gf3-data:/data
+    expose:
+      - "8080"
+    networks:
+      - gf3-internal
+
+  nginx:
+    image: nginx:stable-alpine
+    restart: unless-stopped
+    depends_on:
+      - gf3-app
+    environment:
+      GF3_SERVER_NAME: ${GF3_SERVER_NAME:-_}
+    ports:
+      - "${GF3_HTTP_PORT:-80}:80"
+    volumes:
+      - ./nginx/http-templates/gf3.conf.template:/etc/nginx/templates/default.conf.template:ro
+    networks:
+      - gf3-internal
+
+networks:
+  gf3-internal:
+    driver: bridge
+
+volumes:
+  gf3-data:
+    name: ${GF3_DATA_VOLUME:-gf3-data}

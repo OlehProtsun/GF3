@@ -14,6 +14,7 @@
 		<SpaProxyLaunchCommand>npm run dev</SpaProxyLaunchCommand>
 		<SpaProxyServerUrl>http://localhost:5173</SpaProxyServerUrl>
 		<SpaProxyTimeoutInSeconds>180</SpaProxyTimeoutInSeconds>
+		<SkipFrontendBuild>false</SkipFrontendBuild>
 	</PropertyGroup>
 
   <ItemGroup>
@@ -33,7 +34,11 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Folder Include="Resources\ExcelTemplate\" />
+    <None Update="Resources\ExcelTemplate\*.xlsx">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+      <TargetPath>Resources\ExcelTemplate\%(Filename)%(Extension)</TargetPath>
+    </None>
   </ItemGroup>
 
   <Target Name="EnsureFrontendDependenciesForDebug" BeforeTargets="Build"
@@ -42,7 +47,8 @@
     <Exec WorkingDirectory="$(SpaRoot)" Command="npm install" />
   </Target>
 
-  <Target Name="PublishFrontendAssets" BeforeTargets="ComputeFilesToPublish">
+  <Target Name="PublishFrontendAssets" BeforeTargets="ComputeFilesToPublish"
+          Condition="'$(SkipFrontendBuild)' != 'true'">
     <Exec
       WorkingDirectory="$(SpaRoot)"
       Command="npm install"

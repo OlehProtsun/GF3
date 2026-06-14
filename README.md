@@ -57,3 +57,7 @@ cd FrontEnd
 npm run lint
 npm run build
 ```
+
+## Deployment
+
+Production deployment is prepared for Docker + nginx. See `docs/deploy.md` for the full local smoke-test, server setup, HTTPS, update, rollback, and backup workflow.

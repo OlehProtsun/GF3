@@ -1,4 +1,5 @@
 using BusinessLogicLayer;
+using BusinessLogicLayer.Options;
 using BusinessLogicLayer.Services.Abstractions;
 using DataAccessLayer.Administration;
 using Microsoft.AspNetCore.Authentication;
@@ -32,9 +33,10 @@ public static class WebApiServiceCollectionExtensions
         IConfiguration configuration,
         Func<string, string?>? readEnvironmentVariable = null,
         string? localApplicationDataRoot = null,
-        Action<string>? ensureDirectory = null)
+        Action<string>? ensureDirectory = null,
+        bool requireExplicitJwtSigningKey = false)
     {
-        var jwtOptions = JwtAuthOptions.FromConfiguration(configuration);
+        var jwtOptions = JwtAuthOptions.FromConfiguration(configuration, requireExplicitJwtSigningKey);
 
         services.AddApiMvc(jwtOptions);
         services.AddApiDocumentation();
@@ -51,6 +53,7 @@ public static class WebApiServiceCollectionExtensions
         services.AddScoped<IRealtimeNotifier, RealtimeNotifier>();
         services.AddScoped<IWorkflowLogService, WorkflowLogService>();
         services.Configure<SmtpEmailOptions>(configuration.GetSection("Smtp"));
+        services.Configure<ExportTemplatesOptions>(configuration.GetSection("ExportTemplates"));
         services.ConfigureAdminTools(configuration, readEnvironmentVariable);
         services.AddSingleton(Microsoft.Extensions.Options.Options.Create(jwtOptions));
         services.AddSingleton<IJwtTokenService, JwtTokenService>();

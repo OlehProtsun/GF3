@@ -7,7 +7,9 @@ using WebApi.Middleware;
 using WebApi.Realtime;
 
 var builder = WebApplication.CreateBuilder(args);
-builder.Services.AddWebApiCore(builder.Configuration);
+builder.Services.AddWebApiCore(
+    builder.Configuration,
+    requireExplicitJwtSigningKey: builder.Environment.IsProduction());
 
 var app = builder.Build();
 
@@ -36,11 +38,10 @@ static void ConfigureCommonMiddleware(WebApplication app)
 {
     app.UseResponseCompression();
 
-    app.UseSwagger();
-    app.UseSwaggerUI();
-
     if (app.Environment.IsDevelopment())
     {
+        app.UseSwagger();
+        app.UseSwaggerUI();
         app.UseCors("FrontendDev");
     }
 

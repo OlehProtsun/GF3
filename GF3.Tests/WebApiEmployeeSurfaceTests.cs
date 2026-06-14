@@ -112,6 +112,22 @@ public sealed class WebApiEmployeeSurfaceTests
     }
 
     [Fact]
+    public void JwtAuthOptions_FromConfiguration_RejectsUnsafeProductionSigningKey()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Jwt:SigningKey"] = "CHANGE_ME",
+            })
+            .Build();
+
+        var exception = Assert.Throws<InvalidOperationException>(() =>
+            JwtAuthOptions.FromConfiguration(configuration, requireExplicitSigningKey: true));
+
+        Assert.Contains("Jwt:SigningKey", exception.Message);
+    }
+
+    [Fact]
     public void GraphManualColumnLabelResolver_ReadsFallbackCompactLegacyAndBase64Metadata()
     {
         var compact = "Visible note\n\n<!--GF3_GRAPH_META:{\"m\":[[2,\"Morning\",{\"1\":\"08:00\"}]]}-->";

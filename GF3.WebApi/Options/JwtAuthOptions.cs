@@ -20,7 +20,7 @@ public sealed class JwtAuthOptions
     public string GetEffectiveSigningKey()
         => string.IsNullOrWhiteSpace(SigningKey) ? FallbackDevelopmentSigningKey : SigningKey.Trim();
 
-    public static JwtAuthOptions FromConfiguration(IConfiguration configuration)
+    public static JwtAuthOptions FromConfiguration(IConfiguration configuration, bool requireExplicitSigningKey = false)
     {
         var options = new JwtAuthOptions();
         configuration.GetSection("Jwt").Bind(options);
@@ -28,8 +28,19 @@ public sealed class JwtAuthOptions
         options.Issuer = string.IsNullOrWhiteSpace(options.Issuer) ? "GF3.WebApi" : options.Issuer.Trim();
         options.Audience = string.IsNullOrWhiteSpace(options.Audience) ? "GF3.FrontEnd" : options.Audience.Trim();
         options.AccessTokenMinutes = options.AccessTokenMinutes <= 0 ? 720 : options.AccessTokenMinutes;
+        if (requireExplicitSigningKey && IsUnsafeProductionSigningKey(options.SigningKey))
+        {
+            throw new InvalidOperationException("Jwt:SigningKey must be configured with a long random secret in Production.");
+        }
+
         options.SigningKey = options.GetEffectiveSigningKey();
 
         return options;
     }
+
+    private static bool IsUnsafeProductionSigningKey(string? signingKey)
+        => string.IsNullOrWhiteSpace(signingKey)
+           || signingKey.Trim().Length < 32
+           || signingKey.Contains("CHANGE_ME", StringComparison.OrdinalIgnoreCase)
+           || string.Equals(signingKey.Trim(), FallbackDevelopmentSigningKey, StringComparison.Ordinal);
 }
