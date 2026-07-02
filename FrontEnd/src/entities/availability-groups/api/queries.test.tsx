@@ -22,26 +22,29 @@ const apiMocks = vi.hoisted(() => ({
   createSlot: vi.fn(),
   updateSlot: vi.fn(),
   removeSlot: vi.fn(),
+  transferDays: vi.fn(),
 }));
 
 vi.mock("./availabilityGroupsApi", () => ({
   availabilityGroupsApi: apiMocks,
 }));
 
-function SaveGraphHarness({ mode }: { mode: "create" | "update" }) {
+function SaveGraphHarness({ mode }: { mode: "create" | "update" | "transfer" }) {
   const saveGraph = useSaveAvailabilityGroupGraphMutation();
 
   return (
     <button
       type="button"
-      onClick={() => saveGraph.mutate(mode === "create" ? createInput() : updateInput())}
+      onClick={() => saveGraph.mutate(
+        mode === "create" ? createInput() : mode === "transfer" ? transferInput() : updateInput(),
+      )}
     >
       save graph
     </button>
   );
 }
 
-function renderHarness(client: QueryClient, mode: "create" | "update") {
+function renderHarness(client: QueryClient, mode: "create" | "update" | "transfer") {
   return render(
     <QueryClientProvider client={client}>
       <SaveGraphHarness mode={mode} />
@@ -63,6 +66,21 @@ function createInput() {
       [getAvailabilityCellKey(7, 1)]: "+",
       [getAvailabilityCellKey(5, 2)]: "9:00-13:30",
     },
+  };
+}
+
+function transferInput() {
+  return {
+    ...createInput(),
+    employeeIds: [7],
+    cellMap: {
+      [getAvailabilityCellKey(7, 1)]: "09:00 - 15:00",
+    },
+    transfers: [{
+      employeeId: 7,
+      sourceGroupId: 35,
+      dayOfMonths: [1],
+    }],
   };
 }
 
@@ -130,6 +148,8 @@ beforeEach(() => {
   apiMocks.createSlot.mockResolvedValue({});
   apiMocks.updateSlot.mockResolvedValue(undefined);
   apiMocks.removeSlot.mockResolvedValue(undefined);
+  apiMocks.slots.mockResolvedValue([]);
+  apiMocks.transferDays.mockResolvedValue({});
 });
 
 describe("availability group graph query mutation", () => {
@@ -172,6 +192,38 @@ describe("availability group graph query mutation", () => {
       { queryKey: queryKeys.availabilityGroups.members(44) },
       { queryKey: queryKeys.availabilityGroups.slots(44) },
     ]);
+  });
+
+  test("applies staged CFA only during save, refreshes transferred slots, and avoids duplicate slot creation", async () => {
+    const user = userEvent.setup();
+    const client = new QueryClient();
+    apiMocks.slots.mockResolvedValue([{
+      id: 7001,
+      availabilityGroupMemberId: 70,
+      dayOfMonth: 1,
+      kind: 2,
+      intervalStr: "09:00 - 15:00",
+    }]);
+    renderHarness(client, "transfer");
+
+    await user.click(screen.getByRole("button", { name: "save graph" }));
+
+    await waitFor(() => {
+      expect(apiMocks.transferDays).toHaveBeenCalledWith(44, 70, {
+        sourceGroupId: 35,
+        dayOfMonths: [1],
+      });
+      expect(apiMocks.slots).toHaveBeenCalledWith(44);
+      expect(apiMocks.createSlot).toHaveBeenCalledTimes(27);
+    });
+
+    expect(apiMocks.createSlot).not.toHaveBeenCalledWith(44, expect.objectContaining({
+      availabilityGroupMemberId: 70,
+      dayOfMonth: 1,
+    }));
+    expect(apiMocks.createMember.mock.invocationCallOrder[0]).toBeLessThan(apiMocks.transferDays.mock.invocationCallOrder[0]);
+    expect(apiMocks.transferDays.mock.invocationCallOrder[0]).toBeLessThan(apiMocks.slots.mock.invocationCallOrder[0]);
+    expect(apiMocks.slots.mock.invocationCallOrder[0]).toBeLessThan(apiMocks.createSlot.mock.invocationCallOrder[0]);
   });
 
   test("updates an existing graph by reordering members, deleting removed records, and only updating changed slots", async () => {

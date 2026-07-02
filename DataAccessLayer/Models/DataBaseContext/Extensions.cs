@@ -23,6 +23,7 @@ public static class Extensions
         serviceCollection.AddScoped<IEmployeeRepository, EmployeeRepository>();
         serviceCollection.AddScoped<IEmployeeAccountRepository, EmployeeAccountRepository>();
         serviceCollection.AddScoped<IManagerAccountRepository, ManagerAccountRepository>();
+        serviceCollection.AddScoped<ICommunicationRepository, CommunicationRepository>();
         serviceCollection.AddScoped<IShopRepository, ShopRepository>();
         serviceCollection.AddScoped<IScheduleRepository, ScheduleRepository>();
         serviceCollection.AddScoped<ISchedulePresetRepository, SchedulePresetRepository>();
@@ -33,6 +34,7 @@ public static class Extensions
         serviceCollection.AddScoped<IAvailabilityGroupRepository, AvailabilityGroupRepository>();
         serviceCollection.AddScoped<IAvailabilityGroupMemberRepository, AvailabilityGroupMemberRepository>();
         serviceCollection.AddScoped<IAvailabilityGroupDayRepository, AvailabilityGroupDayRepository>();
+        serviceCollection.AddScoped<IAvailabilityGroupTransferRepository, AvailabilityGroupTransferRepository>();
 
         serviceCollection.AddDbContext<AppDbContext>((serviceProvider, options) =>
         {

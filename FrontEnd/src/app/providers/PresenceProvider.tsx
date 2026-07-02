@@ -23,8 +23,12 @@ import {
 } from "@shared/api/httpClient";
 import { queryKeys } from "@shared/api/queryKeys";
 import {
+  getEmployeeAvailabilityNotificationId,
   getEmployeeOpenShiftNotificationId,
   getEmployeeOpenShiftScheduleNotificationId,
+  getEmployeeScheduleNotificationId,
+  getEmployeeSwapAcceptedNotificationId,
+  getEmployeeSwapNotificationId,
 } from "@shared/lib/employeeNotificationReadState";
 import { isDev } from "@shared/lib/isDev";
 
@@ -93,12 +97,13 @@ export type ManagerEditLockState = ManagerEditLockTarget & {
 
 export type EmployeeRealtimeNotification = {
   id: string;
-  kind: "schedule" | "shiftSwap";
+  kind: "schedule" | "availability" | "shiftSwap";
   reason: string;
   occurredAtUtc: string;
   containerId?: number | null;
   graphId?: number | null;
   scheduleId?: number | null;
+  availabilityId?: number | null;
   shiftSwapId?: number | null;
 };
 
@@ -130,6 +135,7 @@ export const managerEditResourceTypes = {
   container: "container",
   availabilityBind: "availability-bind",
   managerProfile: "manager-profile",
+  communication: "communication",
 } as const;
 
 export function buildManagerEditLockKey(target: Pick<ManagerEditLockTarget, "resourceType" | "resourceId">) {
@@ -277,10 +283,6 @@ function invalidateGraphRealtimeQueries(queryClient: QueryClient, containerId: n
   invalidateRealtimeQuery(queryClient, queryKeys.containers.graphRecordsPrefix(containerId));
 }
 
-function isOpenShiftPostedReason(reason: string) {
-  return reason === "manager-manual-shift-offer-created";
-}
-
 function patchEmployeePresence<T extends Pick<Employee, "id" | "isOnline" | "lastLoginAtUtc">>(
   employee: T,
   update: EmployeePresenceUpdate,
@@ -333,6 +335,18 @@ export function PresenceProvider({ children }: PropsWithChildren) {
 
   const applyScheduleChanged = useEffectEvent((update: ScheduleChangedUpdate) => {
     invalidateGraphRealtimeQueries(queryClient, update.containerId, update.graphId);
+
+    if (update.reason === "manager-schedule-published") {
+      pushEmployeeNotification({
+        id: getEmployeeScheduleNotificationId(update.graphId),
+        kind: "schedule",
+        reason: update.reason,
+        occurredAtUtc: update.changedAtUtc,
+        containerId: update.containerId,
+        graphId: update.graphId,
+        scheduleId: update.graphId,
+      });
+    }
   });
 
   const applyManagerDataChanged = useEffectEvent((update: ManagerDataChangedUpdate) => {
@@ -367,7 +381,22 @@ export function PresenceProvider({ children }: PropsWithChildren) {
           invalidateRealtimeQuery(queryClient, queryKeys.availabilityGroups.items(resourceId));
           invalidateRealtimeQuery(queryClient, queryKeys.availabilityGroups.members(resourceId));
           invalidateRealtimeQuery(queryClient, queryKeys.availabilityGroups.slots(resourceId));
+
+          if (update.reason === "manager-availability-published") {
+            pushEmployeeNotification({
+              id: getEmployeeAvailabilityNotificationId(resourceId),
+              kind: "availability",
+              reason: update.reason,
+              occurredAtUtc: update.changedAtUtc,
+              availabilityId: resourceId,
+            });
+          }
         }
+        break;
+
+      case managerEditResourceTypes.communication:
+        invalidateRealtimeQuery(queryClient, queryKeys.communications.managerList());
+        invalidateRealtimeQuery(queryClient, queryKeys.communications.employeePendingAll);
         break;
 
       case managerEditResourceTypes.employee:
@@ -414,10 +443,12 @@ export function PresenceProvider({ children }: PropsWithChildren) {
       invalidateRealtimeQuery(queryClient, queryKeys.shiftSwaps.graphLog(update.containerId, update.graphId));
     }
 
-    if (isOpenShiftPostedReason(update.reason)) {
+    if (update.reason === "manager-manual-shift-offer-created" || update.reason === "employee-swap-created") {
       const scheduleId = update.scheduleId ?? update.graphId ?? null;
-      const notificationId = update.shiftSwapId != null
-        ? getEmployeeOpenShiftNotificationId(update.shiftSwapId)
+      const notificationId = update.reason === "employee-swap-created" && update.shiftSwapId != null
+        ? getEmployeeSwapNotificationId(update.shiftSwapId)
+        : update.shiftSwapId != null
+          ? getEmployeeOpenShiftNotificationId(update.shiftSwapId)
         : scheduleId != null
           ? getEmployeeOpenShiftScheduleNotificationId(scheduleId)
           : getEmployeeOpenShiftNotificationId(null);
@@ -429,6 +460,19 @@ export function PresenceProvider({ children }: PropsWithChildren) {
         containerId: update.containerId,
         graphId: update.graphId,
         scheduleId,
+        shiftSwapId: update.shiftSwapId,
+      });
+    }
+
+    if (update.reason === "employee-swap-accepted") {
+      pushEmployeeNotification({
+        id: getEmployeeSwapAcceptedNotificationId(update.shiftSwapId),
+        kind: "shiftSwap",
+        reason: update.reason,
+        occurredAtUtc: update.changedAtUtc,
+        containerId: update.containerId,
+        graphId: update.graphId,
+        scheduleId: update.scheduleId,
         shiftSwapId: update.shiftSwapId,
       });
     }

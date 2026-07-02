@@ -39,7 +39,8 @@ public sealed class WebApiMapperCoverageTests
             AvailabilityGroupId = 11,
         };
 
-        var dto = model.ToGraphDto();
+        var lastUpdatedAtUtc = new DateTimeOffset(2026, 6, 28, 12, 45, 0, TimeSpan.Zero);
+        var dto = model.ToGraphDto(lastUpdatedAtUtc);
         var createModel = new CreateGraphRequest
         {
             ShopId = 5,
@@ -99,6 +100,7 @@ public sealed class WebApiMapperCoverageTests
         Assert.Equal("public", dto.PublicationStatus);
         Assert.Equal("Planner note", dto.Note);
         Assert.Equal(11, dto.AvailabilityGroupId);
+        Assert.Equal(lastUpdatedAtUtc, dto.LastUpdatedAtUtc);
 
         Assert.Equal(9, createModel.ContainerId);
         Assert.Equal(SchedulePublicationStatus.Public, createModel.PublicationStatus);

@@ -241,7 +241,7 @@ describe("container graph workspace model", () => {
     expect(conflictMap[4]).toBe(true);
   });
 
-  test("builds related schedule hints only for empty current employee cells", () => {
+  test("builds related schedule hints for both empty and filled current employee cells", () => {
     const data = buildGraphRelatedScheduleHintData({
       currentGraph: graph,
       columns: [
@@ -275,7 +275,18 @@ describe("container graph workspace model", () => {
       ],
     });
 
-    expect(data.visualHintMap).toEqual({ "1:2": "Alpha, Beta" });
+    expect(data.visualHintMap).toEqual({
+      "1:1": "Alpha",
+      "1:2": "Alpha, Beta",
+    });
+    expect(data.detailMap["1:1"]).toMatchObject({
+      employeeId: 1,
+      dayOfMonth: 1,
+      visualHint: "Alpha",
+      relatedGraphs: [
+        { graphId: 3, graphName: "Alpha", intervalsText: "10:00 - 14:00" },
+      ],
+    });
     expect(data.detailMap["1:2"]).toMatchObject({
       employeeId: 1,
       dayOfMonth: 2,

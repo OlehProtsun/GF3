@@ -2,11 +2,17 @@ import { useEffect, useMemo, useState, type PropsWithChildren } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 import { useAuth } from "@app/providers/AuthProvider";
 import { useRealtime } from "@app/providers/PresenceProvider";
+import { EmployeeCommunicationDialog } from "@entities/communications/ui";
 import { useEmployeeShiftSwapsQuery, type ShiftSwap } from "@entities/shift-swaps";
+import { useEmployeeScheduleListQuery, type EmployeeSchedule } from "@entities/employee-schedule";
+import {
+  useEmployeeAvailabilityListQuery,
+  type EmployeeAvailabilityGroup,
+} from "@entities/employee-availability";
 import {
   employeeNotificationReadStateEventName,
-  getEmployeeNotificationReadStorageKey,
-  readEmployeeNotificationIds,
+  getEmployeeNotificationReadStorageKeys,
+  readEmployeeNotificationIdsForAccount,
 } from "@shared/lib/employeeNotificationReadState";
 import {
   getUnreadEmployeeNotificationTargets,
@@ -40,6 +46,7 @@ const employeeNavItems: readonly EmployeeNavItem[] = [
     mobileLabel: "Avail.",
     description: "Share available time when your manager opens access.",
     icon: <AvailabilityIcon size={18} />,
+    notificationTarget: "availability",
   },
   {
     to: "/schedule",
@@ -47,6 +54,7 @@ const employeeNavItems: readonly EmployeeNavItem[] = [
     mobileLabel: "Shifts",
     description: "See published shifts and ready-made plans.",
     icon: <ScheduleIcon size={18} />,
+    notificationTarget: "schedule",
   },
   {
     to: "/swap",
@@ -65,17 +73,22 @@ const employeeNavItems: readonly EmployeeNavItem[] = [
 ] as const;
 
 const emptySwaps: ShiftSwap[] = [];
+const emptySchedules: EmployeeSchedule[] = [];
+const emptyAvailabilityGroups: EmployeeAvailabilityGroup[] = [];
 
 export function EmployeeWorkspaceLayout({ children }: PropsWithChildren) {
   const [isMobileTabsCollapsed, setIsMobileTabsCollapsed] = useState(false);
   const { session } = useAuth();
   const { notifications } = useRealtime();
   const swapsQuery = useEmployeeShiftSwapsQuery();
+  const schedulesQuery = useEmployeeScheduleListQuery();
+  const availabilityQuery = useEmployeeAvailabilityListQuery();
   const swaps = swapsQuery.data ?? emptySwaps;
+  const schedules = schedulesQuery.data ?? emptySchedules;
+  const availabilityGroups = availabilityQuery.data ?? emptyAvailabilityGroups;
   const { pathname } = useLocation();
-  const storageKey = getEmployeeNotificationReadStorageKey(session?.userName);
   const [readNotificationIds, setReadNotificationIds] = useState<Set<string>>(() =>
-    readEmployeeNotificationIds(storageKey),
+    readEmployeeNotificationIdsForAccount(session?.userName, session?.employeeId),
   );
   const isProfileRoute = pathname === "/profile";
   const isAvailabilityRoute = pathname === "/availability";
@@ -116,19 +129,26 @@ export function EmployeeWorkspaceLayout({ children }: PropsWithChildren) {
     .filter(Boolean)
     .join(" ");
   const unreadNotificationTargets = useMemo(
-    () => getUnreadEmployeeNotificationTargets(notifications, swaps, readNotificationIds),
-    [notifications, readNotificationIds, swaps],
+    () => getUnreadEmployeeNotificationTargets(
+      notifications,
+      swaps,
+      schedules,
+      availabilityGroups,
+      readNotificationIds,
+    ),
+    [availabilityGroups, notifications, readNotificationIds, schedules, swaps],
   );
 
   useEffect(() => {
+    const storageKeys = getEmployeeNotificationReadStorageKeys(session?.userName, session?.employeeId);
     const refreshReadState = () => {
-      setReadNotificationIds(readEmployeeNotificationIds(storageKey));
+      setReadNotificationIds(readEmployeeNotificationIdsForAccount(session?.userName, session?.employeeId));
     };
 
     refreshReadState();
 
     const handleStorage = (event: StorageEvent) => {
-      if (event.key === storageKey) {
+      if (event.key && storageKeys.includes(event.key)) {
         refreshReadState();
       }
     };
@@ -140,7 +160,7 @@ export function EmployeeWorkspaceLayout({ children }: PropsWithChildren) {
       window.removeEventListener("storage", handleStorage);
       window.removeEventListener(employeeNotificationReadStateEventName, refreshReadState);
     };
-  }, [storageKey]);
+  }, [session?.employeeId, session?.userName]);
 
   const hasUnreadNavigationDot = (item: EmployeeNavItem) =>
     item.notificationTarget ? unreadNotificationTargets[item.notificationTarget] : false;
@@ -220,6 +240,8 @@ export function EmployeeWorkspaceLayout({ children }: PropsWithChildren) {
           </span>
         </button>
       </nav>
+
+      <EmployeeCommunicationDialog employeeId={session?.employeeId ?? null} />
     </div>
   );
 }

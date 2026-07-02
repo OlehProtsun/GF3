@@ -59,7 +59,10 @@ export function LoginPage() {
       <div className={styles.frame}>
         <section className={styles.card}>
           <div className={styles.cardHeader}>
-            <span className={styles.cardEyebrow}>Access to GF</span>
+            <div className={styles.brandRow}>
+              <span className={styles.cardEyebrow}>Access to GF</span>
+              <img className={styles.brandLogo} src="/gf-favicon.svg" alt="" aria-hidden="true" />
+            </div>
             <h2 className={styles.cardTitle}>Sign in</h2>
             <p className={styles.cardSubtitle}>Use the credentials created for your role.</p>
           </div>

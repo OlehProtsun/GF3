@@ -1,6 +1,17 @@
 export type ShiftSwapStatus = "open" | "accepted" | "cancelled";
 export type ShiftSwapVisibility = "public" | "private";
 
+export type ShiftSwapScheduleSnapshotRow = {
+  employeeId: number;
+  employeeName: string;
+  kind: "employee" | "manual";
+  dayValues: Record<number, string>;
+};
+
+export type ShiftSwapScheduleSnapshot = {
+  rows: ShiftSwapScheduleSnapshotRow[];
+};
+
 export type ShiftSwap = {
   id: number;
   scheduleId: number;
@@ -26,6 +37,10 @@ export type ShiftSwap = {
   shiftHours: number;
   currentEmployeeHoursBefore: number;
   currentEmployeeHoursAfter: number;
+  currentEmployeeWorkDaysBefore: number;
+  currentEmployeeWorkDaysAfter: number;
+  currentEmployeeFreeDaysBefore: number;
+  currentEmployeeFreeDaysAfter: number;
   fromEmployeeHoursBefore: number;
   fromEmployeeHoursAfter: number;
   isManagerCreated: boolean;
@@ -34,7 +49,10 @@ export type ShiftSwap = {
   isCreatedByCurrentEmployee: boolean;
   isScheduleLocked: boolean;
   canAccept: boolean;
+  acceptanceUnavailableReason?: string | null;
   canCancel: boolean;
+  beforeSnapshot?: ShiftSwapScheduleSnapshot | null;
+  afterSnapshot?: ShiftSwapScheduleSnapshot | null;
 };
 
 export type ShiftSwapEmployee = {

@@ -13,6 +13,7 @@ import {
   DatabaseIcon,
   LogoutIcon,
   ArrowIcon,
+  NoteIcon,
 } from "@shared/ui/icons";
 import { matchPath } from "@shared/lib/react-router-dom";
 
@@ -94,17 +95,14 @@ export function OverlaySidebarLayout({ children }: OverlaySidebarLayoutProps) {
         {
           label: "Home",
           to: "/",
-          icon: (
-            <span className={`${styles.navIcon} ${styles.navIconHome}`}>
-              <HomeIcon size={26} />
-            </span>
-          ),
+          icon: <img className={styles.navLogo} src="/gf-favicon.svg" alt="" aria-hidden="true" />,
         },
         { label: "Employee", to: "/employee", icon: <EmployeeIcon size={22} /> },
         { label: "Shop", to: "/shop", icon: <ShopIcon size={28} style={{ transform: "scaleY(-1)" }} /> },
         { label: "Availability", to: "/availability", icon: <AvailabilityIcon size={22} /> },
         { label: "Container", to: "/container", icon: <ContainerIcon size={25} /> },
         { label: "Information", to: "/information", icon: <InfoIcon size={26} /> },
+        { label: "Message", to: "/communications", icon: <NoteIcon size={24} /> },
       ]
     : [
         {

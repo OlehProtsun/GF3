@@ -7,14 +7,34 @@
   min-width: 0;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  align-items: start;
+  align-items: center;
   gap: 12px;
 }
 
-.panelHeaderRow > div {
+.sectionHeading {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.sectionHeading > div {
   min-width: 0;
   display: grid;
   gap: 3px;
+}
+
+.sectionIcon {
+  width: 44px;
+  height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  border-radius: 18px;
+  border: 1px solid rgba(37, 99, 235, 0.16);
+  background: rgba(219, 234, 254, 0.8);
+  color: #1d4ed8;
 }
 
 .collapseButton {
@@ -435,18 +455,26 @@
 }
 
 .offerHeader {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 10px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
 }
 
 .offerHeaderActions {
   display: inline-flex;
   align-items: center;
   justify-content: flex-end;
-  flex: 0 0 auto;
+  min-width: 0;
   gap: 8px;
+}
+
+.offerBadges {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 6px;
 }
 
 .offerTitle {
@@ -463,10 +491,20 @@
   overflow-wrap: anywhere;
 }
 
-.offerTitle span {
+.offerMeta {
+  min-width: 0;
+  width: 100%;
   color: #64748b;
   font-size: 0.8rem;
+  line-height: 1.35;
   font-weight: 750;
+}
+
+.offerMeta span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .badge {
@@ -481,6 +519,17 @@
   font-size: 0.72rem;
   font-weight: 900;
   white-space: nowrap;
+}
+
+.badgePrivate,
+.badgeCan {
+  background: rgba(220, 252, 231, 0.92);
+  color: #15803d;
+}
+
+.badgeCant {
+  background: rgba(254, 226, 226, 0.94);
+  color: #b91c1c;
 }
 
 .badgeMuted {
@@ -544,7 +593,7 @@
   color: #be123c;
 }
 
-.lockedText {
+.unavailableText {
   margin: 0;
   padding: 10px 12px;
   border-radius: 14px;

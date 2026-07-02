@@ -26,6 +26,10 @@ public sealed class ShiftSwapDto
     public double ShiftHours { get; set; }
     public double CurrentEmployeeHoursBefore { get; set; }
     public double CurrentEmployeeHoursAfter { get; set; }
+    public int CurrentEmployeeWorkDaysBefore { get; set; }
+    public int CurrentEmployeeWorkDaysAfter { get; set; }
+    public int CurrentEmployeeFreeDaysBefore { get; set; }
+    public int CurrentEmployeeFreeDaysAfter { get; set; }
     public double FromEmployeeHoursBefore { get; set; }
     public double FromEmployeeHoursAfter { get; set; }
     public bool IsManagerCreated { get; set; }
@@ -34,5 +38,21 @@ public sealed class ShiftSwapDto
     public bool IsCreatedByCurrentEmployee { get; set; }
     public bool IsScheduleLocked { get; set; }
     public bool CanAccept { get; set; }
+    public string? AcceptanceUnavailableReason { get; set; }
     public bool CanCancel { get; set; }
+    public ShiftSwapScheduleSnapshotDto? BeforeSnapshot { get; set; }
+    public ShiftSwapScheduleSnapshotDto? AfterSnapshot { get; set; }
+}
+
+public sealed class ShiftSwapScheduleSnapshotDto
+{
+    public List<ShiftSwapScheduleSnapshotRowDto> Rows { get; set; } = [];
+}
+
+public sealed class ShiftSwapScheduleSnapshotRowDto
+{
+    public int EmployeeId { get; set; }
+    public string EmployeeName { get; set; } = string.Empty;
+    public string Kind { get; set; } = "employee";
+    public Dictionary<int, string> DayValues { get; set; } = [];
 }

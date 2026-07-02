@@ -107,4 +107,39 @@ describe("container statistics model", () => {
       { employee: "Grace Hopper", workDays: 1, freeDays: 30 },
     ]);
   });
+
+  test("counts unique calendar days once across multiple graphs in the same month", () => {
+    const secondGraph: Graph = {
+      ...graph,
+      id: 11,
+      shopId: 3,
+      name: "Second May Schedule",
+    };
+    const secondGraphEmployees: GraphEmployee[] = [
+      { id: 3, scheduleId: 11, employeeId: 1, minHoursMonth: 80, displayOrder: 1 },
+    ];
+    const secondGraphSlots: GraphSlot[] = [
+      { id: 4, scheduleId: 11, dayOfMonth: 1, slotNo: 1, fromTime: "13:00", toTime: "17:00", employeeId: 1, status: "Working" },
+      { id: 5, scheduleId: 11, dayOfMonth: 3, slotNo: 1, fromTime: "09:00", toTime: "13:00", employeeId: 1, status: "Working" },
+    ];
+
+    const statistics = buildContainerStatistics({
+      graphs: [graph, secondGraph],
+      graphRecordsById: {
+        [graph.id]: { employees: graphEmployees, slots },
+        [secondGraph.id]: { employees: secondGraphEmployees, slots: secondGraphSlots },
+      },
+      employeesById,
+      shopsById,
+    });
+
+    expect(statistics.pivotRows).toEqual(expect.arrayContaining([
+      expect.objectContaining({ employee: "Ada Lovelace", workDays: 2, freeDays: 29 }),
+      expect.objectContaining({ employee: "Grace Hopper", workDays: 1, freeDays: 30 }),
+    ]));
+    expect(statistics.workFreeRows).toEqual([
+      { employee: "Ada Lovelace", workDays: 2, freeDays: 29 },
+      { employee: "Grace Hopper", workDays: 1, freeDays: 30 },
+    ]);
+  });
 });

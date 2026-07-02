@@ -17,7 +17,7 @@ import {
 import { getErrorMessage } from "@shared/api/httpClient";
 import { ErrorBanner } from "@shared/ui/components/ErrorBanner";
 import { EmployeeTargetCombobox } from "@shared/ui/components/EmployeeTargetCombobox";
-import { ArrowIcon, CloseIcon } from "@shared/ui/icons";
+import { ArrowIcon, CloseIcon, ShiftGiveAwayIcon, SwapHistoryIcon, SwapOffersIcon } from "@shared/ui/icons";
 import workspaceStyles from "@pages/shared/EmployeeWorkspacePage.module.css";
 import styles from "./EmployeeSwapPage.module.css";
 
@@ -246,50 +246,14 @@ function getEmployeeMonthStats(
   };
 }
 
-function getSwapOfferStats(
-  schedules: EmployeeSchedule[],
-  swap: ShiftSwap,
-  employeeId: number | null,
-): SwapPreviewStats | null {
-  if (!employeeId) {
-    return null;
-  }
-
-  const daysInMonth = getDaysInMonth(swap.year, swap.month);
-  const monthSchedules = schedules.filter(schedule => schedule.year === swap.year && schedule.month === swap.month);
-  const employeeSlots = monthSchedules.flatMap(schedule =>
-    schedule.slots.filter(slot => slot.employeeId === employeeId),
-  );
-  const workDaysBeforeSet = new Set(employeeSlots.map(slot => slot.dayOfMonth));
-  const workDaysAfterSet = new Set(workDaysBeforeSet);
-  const relatedSlot = monthSchedules
-    .flatMap(schedule => schedule.slots)
-    .find(slot => slot.id === swap.scheduleSlotId) ?? null;
-  const deltaHours = swap.currentEmployeeHoursAfter - swap.currentEmployeeHoursBefore;
-
-  if (deltaHours > 0) {
-    workDaysAfterSet.add(swap.dayOfMonth);
-  } else if (deltaHours < 0) {
-    const otherSameDayHours = employeeSlots
-      .filter(slot => slot.dayOfMonth === swap.dayOfMonth && slot.id !== swap.scheduleSlotId)
-      .reduce((sum, slot) => sum + getSlotDurationHours(slot), 0);
-    const relatedSlotHours = relatedSlot ? getSlotDurationHours(relatedSlot) : swap.shiftHours;
-    const remainingRelatedHours = Math.max(0, relatedSlotHours - Math.abs(deltaHours));
-
-    if (otherSameDayHours + remainingRelatedHours <= 0) {
-      workDaysAfterSet.delete(swap.dayOfMonth);
-    } else {
-      workDaysAfterSet.add(swap.dayOfMonth);
-    }
-  }
-
+function getSwapOfferStats(swap: ShiftSwap): SwapPreviewStats {
   return {
     hoursBefore: swap.currentEmployeeHoursBefore,
     hoursAfter: swap.currentEmployeeHoursAfter,
-    workDaysBefore: workDaysBeforeSet.size,
-    workDaysAfter: workDaysAfterSet.size,
-    freeDaysBefore: Math.max(0, daysInMonth - workDaysBeforeSet.size),
-    freeDaysAfter: Math.max(0, daysInMonth - workDaysAfterSet.size),
+    workDaysBefore: swap.currentEmployeeWorkDaysBefore,
+    workDaysAfter: swap.currentEmployeeWorkDaysAfter,
+    freeDaysBefore: swap.currentEmployeeFreeDaysBefore,
+    freeDaysAfter: swap.currentEmployeeFreeDaysAfter,
   };
 }
 
@@ -650,40 +614,56 @@ function SwapOfferCard({
   onCancel: (swap: ShiftSwap) => void;
 }) {
   const [isExpanded, setIsExpanded] = useState(false);
-  const isAccepted = swap.status === "accepted";
-  const isScheduleLocked = swap.status === "open" && swap.isScheduleLocked;
-  const badgeText = isAccepted
-    ? "Accepted"
-    : isScheduleLocked
-      ? "Locked"
-      : swap.visibility === "private"
-        ? "Private"
-        : "Public";
+  const isOpen = swap.status === "open";
+  const isScheduleLocked = isOpen && swap.isScheduleLocked;
+  const unavailableReason = isOpen && !swap.canAccept
+    ? swap.acceptanceUnavailableReason
+      ?? (isScheduleLocked
+        ? "Schedule is locked while a manager is editing it."
+        : swap.isCreatedByCurrentEmployee
+          ? "This is your own swap offer."
+          : null)
+    : null;
 
   return (
     <article className={styles.offerCard}>
       <div className={styles.offerHeader}>
         <div className={styles.offerTitle}>
           <strong>{swap.scheduleName}</strong>
-          <span>{`${formatSwapDate(swap)} - ${swap.fromTime} - ${swap.toTime}`}</span>
         </div>
 
         <div className={styles.offerHeaderActions}>
-          <span
-            className={[
+          <div className={styles.offerBadges}>
+            {isOpen ? (
+              <span className={[
+                styles.badge,
+                swap.canAccept ? styles.badgeCan : styles.badgeCant,
+              ].join(" ")}>
+                {swap.canAccept ? "Can" : "Can\u2019t"}
+              </span>
+            ) : (
+              <span className={[styles.badge, styles.badgeMuted].join(" ")}>
+                {swap.status === "accepted" ? "Accepted" : "Cancelled"}
+              </span>
+            )}
+            <span className={[
               styles.badge,
-              isAccepted ? styles.badgeMuted : "",
-              isScheduleLocked ? styles.badgeLocked : "",
-            ].filter(Boolean).join(" ")}
-          >
-            {badgeText}
-          </span>
+              swap.visibility === "private" ? styles.badgePrivate : "",
+            ].filter(Boolean).join(" ")}>
+              {swap.visibility === "private" ? "Private" : "Public"}
+            </span>
+            {isScheduleLocked ? <span className={[styles.badge, styles.badgeLocked].join(" ")}>Locked</span> : null}
+          </div>
           <CollapseToggleButton
             isExpanded={isExpanded}
             label={`${swap.scheduleName} swap`}
             onToggle={() => setIsExpanded(value => !value)}
           />
         </div>
+      </div>
+
+      <div className={styles.offerMeta}>
+        <span>{`${formatSwapDate(swap)} - ${swap.fromTime} - ${swap.toTime}`}</span>
       </div>
 
       {isExpanded ? (
@@ -715,10 +695,8 @@ function SwapOfferCard({
 
           <SwapStatisticsCard stats={stats} />
 
-          {isScheduleLocked ? (
-            <p className={styles.lockedText}>
-              Schedule is locked while a manager is editing it.
-            </p>
+          {unavailableReason ? (
+            <p className={styles.unavailableText}>{unavailableReason}</p>
           ) : null}
 
           {swap.canAccept || swap.canCancel ? (
@@ -877,9 +855,14 @@ export function EmployeeSwapPage() {
 
       <section className={workspaceStyles.panel}>
         <div className={styles.panelHeaderRow}>
-          <div>
-            <span className={workspaceStyles.panelEyebrow}>Give away a shift</span>
-            <h1 className={workspaceStyles.panelTitle}>Create a swap offer</h1>
+          <div className={styles.sectionHeading}>
+            <span className={styles.sectionIcon} aria-hidden="true">
+              <ShiftGiveAwayIcon size={20} />
+            </span>
+            <div>
+              <span className={workspaceStyles.panelEyebrow}>Give away a shift</span>
+              <h1 className={workspaceStyles.panelTitle}>Create a swap offer</h1>
+            </div>
           </div>
 
           <CollapseToggleButton
@@ -999,8 +982,15 @@ export function EmployeeSwapPage() {
       />
 
       <section className={workspaceStyles.panel}>
-        <span className={workspaceStyles.panelEyebrow}>Swap offers</span>
-        <h2 className={workspaceStyles.panelTitle}>Open swaps</h2>
+        <div className={styles.sectionHeading}>
+          <span className={styles.sectionIcon} aria-hidden="true">
+            <SwapOffersIcon size={20} />
+          </span>
+          <div>
+            <span className={workspaceStyles.panelEyebrow}>Swap offers</span>
+            <h2 className={workspaceStyles.panelTitle}>Open swaps</h2>
+          </div>
+        </div>
         <div className={styles.offerList}>
           {openSwaps.length === 0 ? (
             <p className={styles.emptyText}>No open swap offers right now.</p>
@@ -1008,7 +998,7 @@ export function EmployeeSwapPage() {
             <SwapOfferCard
               key={swap.id}
               swap={swap}
-              stats={getSwapOfferStats(schedules, swap, employeeId)}
+              stats={getSwapOfferStats(swap)}
               isBusy={isActionBusy}
               onAccept={handleAccept}
               onCancel={handleCancel}
@@ -1018,8 +1008,15 @@ export function EmployeeSwapPage() {
       </section>
 
       <section className={workspaceStyles.panel}>
-        <span className={workspaceStyles.panelEyebrow}>History</span>
-        <h2 className={workspaceStyles.panelTitle}>Recent swap activity</h2>
+        <div className={styles.sectionHeading}>
+          <span className={styles.sectionIcon} aria-hidden="true">
+            <SwapHistoryIcon size={20} />
+          </span>
+          <div>
+            <span className={workspaceStyles.panelEyebrow}>History</span>
+            <h2 className={workspaceStyles.panelTitle}>Recent swap activity</h2>
+          </div>
+        </div>
         <div className={styles.offerList}>
           {swapHistory.length === 0 ? (
             <p className={styles.emptyText}>Accepted and cancelled swaps will appear here.</p>
@@ -1027,7 +1024,7 @@ export function EmployeeSwapPage() {
             <SwapOfferCard
               key={swap.id}
               swap={swap}
-              stats={getSwapOfferStats(schedules, swap, employeeId)}
+              stats={getSwapOfferStats(swap)}
               isBusy={isActionBusy}
               onAccept={handleAccept}
               onCancel={handleCancel}

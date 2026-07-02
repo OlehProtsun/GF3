@@ -5,6 +5,7 @@ import styles from "./AvailabilitySidebarSection.module.css";
 type AvailabilitySidebarSectionProps = {
   label: string;
   collapsed: boolean;
+  collapsedIcon?: ReactNode;
   collapsedOffset?: "default" | "compact" | "flush";
   onExpand: () => void;
   children: ReactNode;
@@ -22,6 +23,7 @@ function joinClassNames(...values: Array<string | undefined | false>) {
 export function AvailabilitySidebarSection({
   label,
   collapsed,
+  collapsedIcon,
   collapsedOffset = "default",
   onExpand,
   children,
@@ -47,7 +49,7 @@ export function AvailabilitySidebarSection({
         aria-label={`Expand ${label}`}
         title={`Expand ${label}`}
       >
-        <ArrowIcon size={16} className={styles.sectionExpandArrow} />
+        {collapsedIcon ?? <ArrowIcon size={16} className={styles.sectionExpandArrow} />}
       </button>
 
       <div className={styles.sectionCardWrap}>{children}</div>

@@ -140,7 +140,10 @@ public sealed class ShiftSwapLogsController(
             .ConfigureAwait(false);
 
         await workflowLogService
-            .LogAsync(User, $"Published manual shift offer from {GraphManualColumnLabelResolver.Resolve(schedule.Note, request.ManualColumnId)} on day {request.DayOfMonth}.", cancellationToken)
+            .LogAsync(
+                User,
+                $"Published an open shift from \"{GraphManualColumnLabelResolver.Resolve(schedule.Note, request.ManualColumnId)}\" in schedule \"{schedule.Name}\" at {schedule.Shop?.Name ?? "the assigned shop"} for {schedule.Year}-{schedule.Month:00}-{request.DayOfMonth:00}, {period.FromTime}-{period.ToTime}; offered to {(created.TargetEmployeeId.HasValue ? GetEmployeeName(created.TargetEmployee, created.TargetEmployeeId.Value) : "all eligible employees")}.",
+                cancellationToken)
             .ConfigureAwait(false);
         await realtimeNotifier
             .NotifyScheduleChangedAsync(containerId, graphId, "manager-manual-shift-offer-created")
@@ -175,7 +178,7 @@ public sealed class ShiftSwapLogsController(
             });
         }
 
-        var requests = await db.ShiftSwapRequests
+        var openRequests = await db.ShiftSwapRequests
             .Include(request => request.Schedule)
                 .ThenInclude(schedule => schedule.Container)
             .Include(request => request.Schedule)
@@ -188,16 +191,24 @@ public sealed class ShiftSwapLogsController(
             .Include(request => request.AcceptedByEmployee)
             .Where(request =>
                 request.ScheduleId == graphId &&
-                (request.Status == ShiftSwapStatus.Accepted ||
-                 (request.IsManagerCreated && request.Status == ShiftSwapStatus.Open)))
+                request.IsManagerCreated &&
+                request.Status == ShiftSwapStatus.Open)
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
 
-        var orderedRequests = requests
-            .OrderBy(request => request.Status == ShiftSwapStatus.Open ? 0 : 1)
-            .ThenByDescending(request => request.AcceptedAtUtc ?? request.CreatedAtUtc);
+        var history = await db.ShiftSwapHistories
+            .AsNoTracking()
+            .Where(entry => entry.ScheduleId == graphId)
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
 
-        return Ok(orderedRequests.Select(ToLogDto));
+        var result = openRequests
+            .OrderByDescending(request => request.CreatedAtUtc)
+            .Select(ToLogDto)
+            .Concat(history.OrderByDescending(entry => entry.AcceptedAtUtc).Select(ToLogDto))
+            .ToList();
+
+        return Ok(result);
     }
 
     [HttpPost("{id:int}/cancel")]
@@ -238,7 +249,10 @@ public sealed class ShiftSwapLogsController(
 
         await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
         await workflowLogService
-            .LogAsync(User, $"Cancelled manual shift offer for {swap.Schedule.Name} on day {swap.ScheduleSlot.DayOfMonth}.", cancellationToken)
+            .LogAsync(
+                User,
+                $"Cancelled the open shift in schedule \"{swap.Schedule.Name}\" for {swap.Schedule.Year}-{swap.Schedule.Month:00}-{swap.ScheduleSlot.DayOfMonth:00}, {swap.OfferedFromTime ?? swap.ScheduleSlot.FromTime}-{swap.OfferedToTime ?? swap.ScheduleSlot.ToTime}.",
+                cancellationToken)
             .ConfigureAwait(false);
         await realtimeNotifier
             .NotifyScheduleChangedAsync(containerId, graphId, "manager-manual-shift-offer-cancelled")
@@ -312,6 +326,45 @@ public sealed class ShiftSwapLogsController(
             IsCreatedByCurrentEmployee = false,
             CanAccept = false,
             CanCancel = model.IsManagerCreated && model.Status == ShiftSwapStatus.Open,
+        };
+    }
+
+    private static ShiftSwapDto ToLogDto(ShiftSwapHistoryModel history)
+    {
+        var shiftHours = Math.Round(GetTimeRangeDurationHours(history.FromTime, history.ToTime), 2);
+
+        return new ShiftSwapDto
+        {
+            Id = history.SourceShiftSwapRequestId,
+            ScheduleId = history.ScheduleId,
+            ScheduleSlotId = history.ScheduleSlotId,
+            ScheduleName = history.ScheduleName,
+            ContainerName = history.ContainerName,
+            ShopName = history.ShopName,
+            Year = history.Year,
+            Month = history.Month,
+            DayOfMonth = history.DayOfMonth,
+            FromTime = history.FromTime,
+            ToTime = history.ToTime,
+            FromEmployeeId = history.FromEmployeeId,
+            FromEmployeeName = history.FromEmployeeName,
+            TargetEmployeeId = history.TargetEmployeeId,
+            TargetEmployeeName = history.TargetEmployeeName,
+            AcceptedByEmployeeId = history.AcceptedByEmployeeId,
+            AcceptedByEmployeeName = history.AcceptedByEmployeeName,
+            Visibility = history.TargetEmployeeId.HasValue ? "private" : "public",
+            Status = "accepted",
+            CreatedAtUtc = history.CreatedAtUtc,
+            AcceptedAtUtc = history.AcceptedAtUtc,
+            ShiftHours = shiftHours,
+            IsManagerCreated = history.IsManagerCreated,
+            ManualColumnId = history.ManualColumnId,
+            ManualColumnName = history.ManualColumnName,
+            BeforeSnapshot = ShiftSwapHistorySnapshotBuilder.Deserialize(history.BeforeSnapshotJson),
+            AfterSnapshot = ShiftSwapHistorySnapshotBuilder.Deserialize(history.AfterSnapshotJson),
+            IsCreatedByCurrentEmployee = false,
+            CanAccept = false,
+            CanCancel = false,
         };
     }
 

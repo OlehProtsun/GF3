@@ -7,28 +7,22 @@ using WebApi.Middleware;
 using WebApi.Realtime;
 
 var builder = WebApplication.CreateBuilder(args);
+if (builder.Environment.IsProduction())
+{
+    builder.Logging.ClearProviders();
+    builder.Logging.AddConsole();
+}
 builder.Services.AddWebApiCore(
     builder.Configuration,
     requireExplicitJwtSigningKey: builder.Environment.IsProduction());
 
 var app = builder.Build();
 
-ApplyDatabaseMigrations(app);
+await DatabaseMigrationStartup.ApplyAsync(app);
 ConfigureCommonMiddleware(app);
 ConfigureFrontendHosting(app);
 
 app.Run();
-
-/// <summary>
-/// Applies pending EF Core migrations during startup.
-/// We do this once on boot so the API always operates against the expected schema.
-/// </summary>
-static void ApplyDatabaseMigrations(WebApplication app)
-{
-    using var scope = app.Services.CreateScope();
-    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    db.Database.Migrate();
-}
 
 /// <summary>
 /// Configures middleware shared by all environments.

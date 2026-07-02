@@ -9,7 +9,7 @@ namespace WebApi.Mappers;
 /// </summary>
 public static class GraphMapper
 {
-    public static GraphDto ToGraphDto(this ScheduleModel model) => new()
+    public static GraphDto ToGraphDto(this ScheduleModel model, DateTimeOffset? lastUpdatedAtUtc = null) => new()
     {
         Id = model.Id,
         ContainerId = model.ContainerId,
@@ -27,6 +27,7 @@ public static class GraphMapper
         MaxFullPerMonth = model.MaxFullPerMonth,
         Note = model.Note,
         AvailabilityGroupId = model.AvailabilityGroupId,
+        LastUpdatedAtUtc = lastUpdatedAtUtc,
     };
 
     public static ScheduleModel ToCreateModel(this CreateGraphRequest request, int containerId)

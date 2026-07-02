@@ -27,6 +27,7 @@ import { ErrorBanner } from "@shared/ui/components/ErrorBanner";
 import { IosButton } from "@shared/ui/components/IosButton";
 import { ProfileSummaryCard } from "@shared/ui/components/ProfileSummaryCard";
 import { InformationIcon, ScheduleDetailsIcon } from "@shared/ui/icons";
+import { formatScheduleLastUpdate } from "@shared/lib/scheduleLastUpdate";
 import { CardSection } from "@shared/ui/sections/CardSection";
 import { ContainerGraphMatrix } from "./ContainerGraphMatrix";
 import { ContainerGraphRelatedHintDialog } from "./ContainerGraphRelatedHintDialog";
@@ -256,6 +257,7 @@ export function ContainerGraphProfileWorkspace({
   const summaryRows = buildGraphSummaryRows(graph, graphEmployees, employeesById, slots);
   const note = getGraphVisibleNote(graph.note).trim();
   const hasNote = note.length > 0;
+  const lastUpdateLabel = formatScheduleLastUpdate(graph.lastUpdatedAtUtc);
   const topRowBaseMinHeight =
     isDesktopLayout
       ? Math.max(isHeaderCollapsed ? 680 : 660, viewportHeight - (isHeaderCollapsed ? 188 : 228))
@@ -373,6 +375,18 @@ export function ContainerGraphProfileWorkspace({
                         />
                       ))}
                     </DetailList>
+
+                    <div className={styles.lastUpdateField} aria-label={`Last Update: ${lastUpdateLabel}`}>
+                      <span className={styles.lastUpdateLabel}>
+                        <span className={styles.lastUpdateDot} aria-hidden="true" />
+                        Last Update
+                      </span>
+                      <strong className={styles.lastUpdateValue}>
+                        {graph.lastUpdatedAtUtc ? (
+                          <time dateTime={graph.lastUpdatedAtUtc}>{lastUpdateLabel}</time>
+                        ) : lastUpdateLabel}
+                      </strong>
+                    </div>
                   </div>
                 }
                 actions={

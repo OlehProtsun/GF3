@@ -44,6 +44,31 @@ internal static class GraphManualColumnLabelResolver
         return string.IsNullOrWhiteSpace(label) ? fallback : label.Trim();
     }
 
+    public static Dictionary<int, string> ResolveCells(string? rawNote, int? manualColumnId)
+    {
+        if (manualColumnId is not > 0 || string.IsNullOrWhiteSpace(rawNote))
+        {
+            return [];
+        }
+
+        var match = GraphNoteMetaRegex.Match(rawNote);
+        if (!match.Success)
+        {
+            return [];
+        }
+
+        var rawMeta = match.Groups[2].Success ? match.Groups[2].Value : match.Groups[1].Value;
+        var meta = ParseGraphNoteMeta(rawMeta);
+        if (meta is null)
+        {
+            return [];
+        }
+
+        return ResolveCompactCells(meta["m"] as JsonArray, manualColumnId.Value)
+            ?? ResolveLegacyCells(meta["manualColumns"] as JsonArray, manualColumnId.Value)
+            ?? [];
+    }
+
     private static string? ResolveCompactLabel(JsonArray? manualColumns, int manualColumnId)
     {
         if (manualColumns is null)
@@ -82,6 +107,71 @@ internal static class GraphManualColumnLabelResolver
         }
 
         return null;
+    }
+
+    private static Dictionary<int, string>? ResolveCompactCells(JsonArray? manualColumns, int manualColumnId)
+    {
+        if (manualColumns is null)
+        {
+            return null;
+        }
+
+        foreach (var rawColumn in manualColumns)
+        {
+            if (rawColumn is not JsonArray column || GetJsonInt(column.ElementAtOrDefault(0)) != manualColumnId)
+            {
+                continue;
+            }
+
+            return ReadCells(column.ElementAtOrDefault(2));
+        }
+
+        return null;
+    }
+
+    private static Dictionary<int, string>? ResolveLegacyCells(JsonArray? manualColumns, int manualColumnId)
+    {
+        if (manualColumns is null)
+        {
+            return null;
+        }
+
+        foreach (var rawColumn in manualColumns)
+        {
+            if (rawColumn is not JsonObject column || GetJsonInt(column["id"]) != manualColumnId)
+            {
+                continue;
+            }
+
+            return ReadCells(column["cells"]);
+        }
+
+        return null;
+    }
+
+    private static Dictionary<int, string> ReadCells(JsonNode? cellsNode)
+    {
+        if (cellsNode is not JsonObject cells)
+        {
+            return [];
+        }
+
+        var result = new Dictionary<int, string>();
+        foreach (var cell in cells)
+        {
+            if (!int.TryParse(cell.Key, out var day) || day is < 1 or > 31)
+            {
+                continue;
+            }
+
+            var value = cell.Value?.GetValue<string>()?.Trim();
+            if (!string.IsNullOrWhiteSpace(value))
+            {
+                result[day] = value;
+            }
+        }
+
+        return result;
     }
 
     private static JsonObject? ParseGraphNoteMeta(string rawMeta)

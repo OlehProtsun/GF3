@@ -5,6 +5,7 @@ using BusinessLogicLayer.Common;
 using DataAccessLayer.Models;
 using DataAccessLayer.Models.DataBaseContext;
 using DataAccessLayer.Models.Enums;
+using DataAccessLayer.Repositories;
 using GF3.Tests.Infrastructure;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -111,6 +112,48 @@ public sealed class ShiftSwapControllerWorkflowTests
                 (fixture.OwnerEmployeeId, "14:00", "16:00"),
             ],
             slots.Select(slot => (slot.EmployeeId.GetValueOrDefault(), slot.FromTime, slot.ToTime)));
+
+        var history = await context.ShiftSwapHistories.SingleAsync();
+        Assert.Equal(createdDto.Id, history.SourceShiftSwapRequestId);
+        Assert.Contains("\"employeeName\":\"Owner Worker\"", history.BeforeSnapshotJson, StringComparison.Ordinal);
+        Assert.Contains("\"employeeName\":\"Target Worker\"", history.AfterSnapshotJson, StringComparison.Ordinal);
+
+        var replacementSlots = await context.ScheduleSlots
+            .AsNoTracking()
+            .Where(item => item.ScheduleId == fixture.ScheduleId)
+            .Select(item => new ScheduleSlotModel
+            {
+                DayOfMonth = item.DayOfMonth,
+                SlotNo = item.SlotNo,
+                EmployeeId = item.EmployeeId,
+                Status = item.Status,
+                FromTime = item.FromTime,
+                ToTime = item.ToTime,
+            })
+            .ToListAsync();
+        var repository = new ScheduleSlotRepository(context);
+        await repository.ReplaceForScheduleAsync(fixture.ScheduleId, replacementSlots, overwrite: true);
+
+        Assert.False(await context.ShiftSwapRequests.AnyAsync());
+        Assert.Single(await context.ShiftSwapHistories.ToListAsync());
+
+        var logController = new ShiftSwapLogsController(
+            context,
+            new NoopWorkflowLogService(),
+            new NoopRealtimeNotifier());
+        SetManagerUser(logController, managerId: 3);
+
+        var logResult = await logController.GetGraphLog(
+            fixture.ContainerId,
+            fixture.ScheduleId,
+            CancellationToken.None);
+        var logEntry = Assert.Single(Assert.IsAssignableFrom<IEnumerable<ShiftSwapDto>>(
+            Assert.IsType<OkObjectResult>(logResult.Result).Value));
+
+        Assert.Equal("accepted", logEntry.Status);
+        Assert.Equal(createdDto.Id, logEntry.Id);
+        Assert.NotEmpty(Assert.IsType<ShiftSwapScheduleSnapshotDto>(logEntry.BeforeSnapshot).Rows);
+        Assert.NotEmpty(Assert.IsType<ShiftSwapScheduleSnapshotDto>(logEntry.AfterSnapshot).Rows);
     }
 
     [Fact]
@@ -369,11 +412,84 @@ public sealed class ShiftSwapControllerWorkflowTests
             new NoopWorkflowLogService(),
             new NoopRealtimeNotifier());
         SetEmployeeUser(targetController, fixture.TargetEmployeeId);
+        var visibleResult = await targetController.GetVisible(CancellationToken.None);
+        var visibleDto = Assert.Single(Assert.IsAssignableFrom<IEnumerable<ShiftSwapDto>>(
+            Assert.IsType<OkObjectResult>(visibleResult.Result).Value));
         var overlapException = await Assert.ThrowsAsync<ValidationException>(() =>
             targetController.Accept(createdDto.Id, CancellationToken.None));
 
+        Assert.False(visibleDto.CanAccept);
+        Assert.Equal("You already work during this time.", visibleDto.AcceptanceUnavailableReason);
+
         Assert.Equal(["This shift already has an open swap offer."], duplicateException.Errors[nameof(CreateEmployeeShiftSwapRequest.ScheduleSlotId)]);
-        Assert.Equal("You already have a shift that overlaps this time.", overlapException.Message);
+        Assert.Equal("You already work during this time.", overlapException.Message);
+    }
+
+    [Fact]
+    public async Task EmployeeShiftSwaps_GetVisible_AggregatesMonthAndBlocksOverlapAcrossSchedules()
+    {
+        await using var database = await SqliteTestDatabase.CreateAsync();
+        await using var context = database.CreateContext();
+        var fixture = await SeedPublishedScheduleAsync(context);
+        var secondShop = TestDataFactory.CreateDalShop("Second Shop");
+        context.Shops.Add(secondShop);
+        await context.SaveChangesAsync();
+        var secondSchedule = TestDataFactory.CreateDalSchedule(
+            fixture.ContainerId,
+            secondShop.Id,
+            name: "Second May Schedule",
+            year: 2026,
+            month: 5);
+        secondSchedule.PublicationStatus = SchedulePublicationStatus.Public;
+        context.Schedules.Add(secondSchedule);
+        await context.SaveChangesAsync();
+        context.ScheduleEmployees.Add(new ScheduleEmployeeModel
+        {
+            ScheduleId = secondSchedule.Id,
+            EmployeeId = fixture.TargetEmployeeId,
+            DisplayOrder = 0,
+            MinHoursMonth = 80,
+        });
+        context.ScheduleSlots.AddRange(
+            TestDataFactory.CreateDalSlot(secondSchedule.Id, 1, 1, fixture.TargetEmployeeId, "11:00", "12:00"),
+            TestDataFactory.CreateDalSlot(secondSchedule.Id, 2, 1, fixture.TargetEmployeeId, "17:00", "20:00"));
+        await context.SaveChangesAsync();
+
+        var lockService = new ManagerEditLockService();
+        var ownerController = new EmployeeShiftSwapsController(
+            context,
+            lockService,
+            new NoopWorkflowLogService(),
+            new NoopRealtimeNotifier());
+        SetEmployeeUser(ownerController, fixture.OwnerEmployeeId);
+        var createResult = await ownerController.Create(new CreateEmployeeShiftSwapRequest
+        {
+            ScheduleId = fixture.ScheduleId,
+            ScheduleSlotId = fixture.OwnerSlotId,
+            FromTime = "10:00",
+            ToTime = "14:00",
+        }, CancellationToken.None);
+        var createdDto = Assert.IsType<ShiftSwapDto>(Assert.IsType<CreatedAtActionResult>(createResult.Result).Value);
+
+        var targetController = new EmployeeShiftSwapsController(
+            context,
+            lockService,
+            new NoopWorkflowLogService(),
+            new NoopRealtimeNotifier());
+        SetEmployeeUser(targetController, fixture.TargetEmployeeId);
+        var visibleResult = await targetController.GetVisible(CancellationToken.None);
+        var visibleDto = Assert.Single(Assert.IsAssignableFrom<IEnumerable<ShiftSwapDto>>(
+            Assert.IsType<OkObjectResult>(visibleResult.Result).Value));
+
+        Assert.Equal(createdDto.Id, visibleDto.Id);
+        Assert.False(visibleDto.CanAccept);
+        Assert.Equal("You already work during this time.", visibleDto.AcceptanceUnavailableReason);
+        Assert.Equal(4, visibleDto.CurrentEmployeeHoursBefore);
+        Assert.Equal(4, visibleDto.CurrentEmployeeHoursAfter);
+        Assert.Equal(2, visibleDto.CurrentEmployeeWorkDaysBefore);
+        Assert.Equal(2, visibleDto.CurrentEmployeeWorkDaysAfter);
+        Assert.Equal(29, visibleDto.CurrentEmployeeFreeDaysBefore);
+        Assert.Equal(29, visibleDto.CurrentEmployeeFreeDaysAfter);
     }
 
     [Fact]

@@ -12,8 +12,10 @@ import { parseGraphNoteContent } from "@entities/containers/model/graphNote";
 import { ContainerGraphMatrix } from "@entities/containers/ui/ContainerGraphMatrix";
 import { getEmployeeFullName } from "@entities/employees/model/presentation";
 import { getErrorMessage } from "@shared/api/httpClient";
+import { formatScheduleLastUpdate } from "@shared/lib/scheduleLastUpdate";
 import { ErrorBanner } from "@shared/ui/components/ErrorBanner";
-import { AvailabilityIcon, ScheduleIcon } from "@shared/ui/icons";
+import { SearchableSelect, type SearchableSelectOption } from "@shared/ui/components/SearchableSelect";
+import { AvailabilityIcon, ScheduleDetailsIcon, ScheduleIcon, StatisticsIcon } from "@shared/ui/icons";
 import workspaceStyles from "@pages/shared/EmployeeWorkspacePage.module.css";
 import styles from "./EmployeeSchedulePage.module.css";
 
@@ -149,6 +151,12 @@ type ScheduleHoursSummaryRow = {
   sortValue: number;
 };
 
+type ScheduleSummaryPeriod = {
+  key: string;
+  year: number;
+  month: number;
+};
+
 function formatSummaryDay(schedule: Pick<EmployeeSchedule, "year" | "month">, dayOfMonth: number) {
   const weekdayLabel = summaryWeekdayLabels[getWeekdayIndex(schedule.year, schedule.month, dayOfMonth)];
   return `${weekdayLabel}/${String(dayOfMonth).padStart(2, "0")}`;
@@ -158,12 +166,29 @@ function getScheduleSummaryName(schedule: EmployeeSchedule) {
   return schedule.name.trim() || schedule.shopName.trim() || schedule.containerName.trim() || `Schedule #${schedule.id}`;
 }
 
+function getScheduleSummaryPeriods(schedules: EmployeeSchedule[]) {
+  const periodsByKey = new Map<string, ScheduleSummaryPeriod>();
+
+  schedules.forEach(schedule => {
+    const key = `${schedule.year}:${schedule.month}`;
+    periodsByKey.set(key, {
+      key,
+      year: schedule.year,
+      month: schedule.month,
+    });
+  });
+
+  return [...periodsByKey.values()].sort((left, right) =>
+    right.year - left.year || right.month - left.month,
+  );
+}
+
 function buildScheduleHoursSummary(
   schedules: EmployeeSchedule[],
-  selectedSchedule: EmployeeSchedule | null,
+  period: ScheduleSummaryPeriod | null,
   employeeId: number | null,
 ) {
-  if (!selectedSchedule) {
+  if (!period) {
     return {
       rows: [] as ScheduleHoursSummaryRow[],
       totalHours: 0,
@@ -171,62 +196,58 @@ function buildScheduleHoursSummary(
     };
   }
 
-  const rowsByKey = new Map<string, Omit<ScheduleHoursSummaryRow, "hoursText">>();
+  const rowsByDay = new Map<number, Omit<ScheduleHoursSummaryRow, "hoursText" | "scheduleName"> & {
+    scheduleNames: string[];
+  }>();
   schedules
-    .filter(schedule => schedule.year === selectedSchedule.year && schedule.month === selectedSchedule.month)
+    .filter(schedule => schedule.year === period.year && schedule.month === period.month)
     .forEach(schedule => {
       schedule.slots
         .filter(slot => isCurrentEmployeeSlot(slot, employeeId))
         .forEach(slot => {
-          const rowKey = `${schedule.id}:${slot.dayOfMonth}`;
-          const existingRow = rowsByKey.get(rowKey);
+          const existingRow = rowsByDay.get(slot.dayOfMonth);
+          const scheduleName = getScheduleSummaryName(schedule);
           const nextHours = (existingRow?.hours ?? 0) + getSlotDurationHours(slot);
-          rowsByKey.set(rowKey, {
-            key: rowKey,
+          rowsByDay.set(slot.dayOfMonth, {
+            key: `day:${period.year}:${period.month}:${slot.dayOfMonth}`,
             dayOfMonth: slot.dayOfMonth,
             dayLabel: formatSummaryDay(schedule, slot.dayOfMonth),
             hours: nextHours,
-            scheduleName: getScheduleSummaryName(schedule),
+            scheduleNames: existingRow?.scheduleNames.includes(scheduleName)
+              ? existingRow.scheduleNames
+              : [...(existingRow?.scheduleNames ?? []), scheduleName],
             sortValue: Date.UTC(schedule.year, schedule.month - 1, slot.dayOfMonth),
           });
         });
     });
 
-  const workedRows = [...rowsByKey.values()]
+  const workedRows = [...rowsByDay.values()]
     .map(row => ({
       ...row,
       hoursText: formatHours(row.hours),
+      scheduleName: row.scheduleNames.sort((left, right) => left.localeCompare(right)).join(", "),
     }))
-    .sort((left, right) =>
-      left.dayOfMonth - right.dayOfMonth ||
-      left.scheduleName.localeCompare(right.scheduleName) ||
-      left.key.localeCompare(right.key),
-    );
+    .sort((left, right) => left.dayOfMonth - right.dayOfMonth);
 
-  const rowsByDay = new Map<number, ScheduleHoursSummaryRow[]>();
-  workedRows.forEach(row => {
-    const dayRows = rowsByDay.get(row.dayOfMonth) ?? [];
-    dayRows.push(row);
-    rowsByDay.set(row.dayOfMonth, dayRows);
-  });
+  const workedRowsByDay = new Map(workedRows.map(row => [row.dayOfMonth, row]));
 
-  const daysInMonth = getDaysInMonth(selectedSchedule.year, selectedSchedule.month);
+  const daysInMonth = getDaysInMonth(period.year, period.month);
   const rows: ScheduleHoursSummaryRow[] = [];
   for (let dayOfMonth = 1; dayOfMonth <= daysInMonth; dayOfMonth += 1) {
-    const dayRows = rowsByDay.get(dayOfMonth);
-    if (dayRows && dayRows.length > 0) {
-      rows.push(...dayRows);
+    const dayRow = workedRowsByDay.get(dayOfMonth);
+    if (dayRow) {
+      rows.push(dayRow);
       continue;
     }
 
     rows.push({
-      key: `empty:${selectedSchedule.year}:${selectedSchedule.month}:${dayOfMonth}`,
+      key: `empty:${period.year}:${period.month}:${dayOfMonth}`,
       dayOfMonth,
-      dayLabel: formatSummaryDay(selectedSchedule, dayOfMonth),
+      dayLabel: formatSummaryDay(period, dayOfMonth),
       hours: 0,
       hoursText: "-",
       scheduleName: "-",
-      sortValue: Date.UTC(selectedSchedule.year, selectedSchedule.month - 1, dayOfMonth),
+      sortValue: Date.UTC(period.year, period.month - 1, dayOfMonth),
     });
   }
 
@@ -384,6 +405,37 @@ function buildScheduleMatrixCellMap(schedule: EmployeeSchedule | null, fallbackE
   };
 }
 
+function buildScheduleMatrixDisplayCellMap(
+  selectedSchedule: EmployeeSchedule | null,
+  cellMap: GraphMatrixCellMap,
+): { cellMap: GraphMatrixCellMap; mutedSuffixMap: GraphMatrixCellMap } {
+  if (!selectedSchedule) {
+    return { cellMap, mutedSuffixMap: {} };
+  }
+
+  const scheduleNamesByCell = new Map<string, Set<string>>();
+  (selectedSchedule.relatedScheduleAssignments ?? []).forEach(assignment => {
+    const cellKey = getGraphCellKey(assignment.employeeId, assignment.dayOfMonth);
+    const scheduleName = assignment.scheduleName.trim() || `Schedule #${assignment.scheduleId}`;
+    const scheduleNames = scheduleNamesByCell.get(cellKey) ?? new Set<string>();
+    scheduleNames.add(scheduleName);
+    scheduleNamesByCell.set(cellKey, scheduleNames);
+  });
+
+  const mutedSuffixMap: GraphMatrixCellMap = {};
+  const displayCellMap = [...scheduleNamesByCell.entries()].reduce<GraphMatrixCellMap>((result, [cellKey, scheduleNames]) => {
+    const sortedScheduleNames = [...scheduleNames].sort((left, right) => left.localeCompare(right));
+    const currentValue = cellMap[cellKey]?.trim();
+    const relatedScheduleNames = sortedScheduleNames.join(", ");
+    mutedSuffixMap[cellKey] = relatedScheduleNames;
+    result[cellKey] = currentValue && currentValue !== "-"
+      ? `${currentValue}, ${relatedScheduleNames}`
+      : relatedScheduleNames;
+    return result;
+  }, { ...cellMap });
+
+  return { cellMap: displayCellMap, mutedSuffixMap };
+}
 const pdfTemplateEmployeeCapacity = 25;
 const pdfTemplateDayCount = 31;
 const pdfTemplateWeekdayLabels = ["niedz.", "pon.", "wt.", "\u015br.", "czw.", "pt.", "sob."];
@@ -605,10 +657,51 @@ export function EmployeeSchedulePage() {
   const scheduleQuery = useEmployeeScheduleListQuery();
   const schedules = scheduleQuery.data ?? [];
   const [selectedScheduleId, setSelectedScheduleId] = useState<number | null>(null);
+  const [selectedSummaryPeriodKey, setSelectedSummaryPeriodKey] = useState<string | null>(null);
   const [pdfExportError, setPdfExportError] = useState<string | null>(null);
   const selectedSchedule = useMemo(
     () => schedules.find(schedule => schedule.id === selectedScheduleId) ?? schedules[0] ?? null,
     [schedules, selectedScheduleId],
+  );
+  const summaryPeriods = useMemo(
+    () => getScheduleSummaryPeriods(schedules),
+    [schedules],
+  );
+  const activeSummaryPeriod = useMemo(() => {
+    const selectedPeriod = summaryPeriods.find(period => period.key === selectedSummaryPeriodKey);
+    if (selectedPeriod) {
+      return selectedPeriod;
+    }
+
+    const openedSchedulePeriod = selectedSchedule
+      ? summaryPeriods.find(period => period.year === selectedSchedule.year && period.month === selectedSchedule.month)
+      : null;
+    return openedSchedulePeriod ?? summaryPeriods[0] ?? null;
+  }, [selectedSchedule, selectedSummaryPeriodKey, summaryPeriods]);
+  const summaryYears = useMemo(
+    () => Array.from(new Set(summaryPeriods.map(period => period.year))),
+    [summaryPeriods],
+  );
+  const summaryMonths = useMemo(() => {
+    if (!activeSummaryPeriod) {
+      return [];
+    }
+
+    return summaryPeriods
+      .filter(period => period.year === activeSummaryPeriod.year)
+      .slice()
+      .sort((left, right) => left.month - right.month);
+  }, [activeSummaryPeriod, summaryPeriods]);
+  const summaryMonthOptions = useMemo<SearchableSelectOption[]>(
+    () => summaryMonths.map(period => ({
+      value: String(period.month),
+      label: formatScheduleMonthOnly(period),
+    })),
+    [summaryMonths],
+  );
+  const summaryYearOptions = useMemo<SearchableSelectOption[]>(
+    () => summaryYears.map(year => ({ value: String(year), label: String(year) })),
+    [summaryYears],
   );
   const displayName = session?.displayName?.trim() || session?.userName || "Employee";
   const currentEmployeeId = session?.employeeId && session.employeeId > 0 ? session.employeeId : null;
@@ -618,8 +711,8 @@ export function EmployeeSchedulePage() {
     [currentEmployeeId, schedules, selectedSchedule],
   );
   const scheduleHoursSummary = useMemo(
-    () => buildScheduleHoursSummary(schedules, selectedSchedule, currentEmployeeId),
-    [currentEmployeeId, schedules, selectedSchedule],
+    () => buildScheduleHoursSummary(schedules, activeSummaryPeriod, currentEmployeeId),
+    [activeSummaryPeriod, currentEmployeeId, schedules],
   );
   const scheduleMatrixColumns = useMemo(
     () => buildScheduleMatrixColumns(selectedSchedule, fallbackMatrixEmployeeId, displayName),
@@ -629,9 +722,35 @@ export function EmployeeSchedulePage() {
     () => buildScheduleMatrixCellMap(selectedSchedule, fallbackMatrixEmployeeId),
     [fallbackMatrixEmployeeId, selectedSchedule],
   );
+  const scheduleMatrixDisplay = useMemo(
+    () => buildScheduleMatrixDisplayCellMap(selectedSchedule, scheduleMatrixCellMap),
+    [scheduleMatrixCellMap, selectedSchedule],
+  );
   const queryErrorMessage = scheduleQuery.error
     ? getErrorMessage(scheduleQuery.error, "Could not load published schedules.")
     : null;
+
+  const handleSummaryYearChange = (value: string) => {
+    const year = Number(value);
+    const nextPeriod = summaryPeriods.find(period =>
+      period.year === year && period.month === activeSummaryPeriod?.month,
+    ) ?? summaryPeriods.find(period => period.year === year);
+
+    if (nextPeriod) {
+      setSelectedSummaryPeriodKey(nextPeriod.key);
+    }
+  };
+
+  const handleSummaryMonthChange = (value: string) => {
+    const month = Number(value);
+    const nextPeriod = summaryPeriods.find(period =>
+      period.year === activeSummaryPeriod?.year && period.month === month,
+    );
+
+    if (nextPeriod) {
+      setSelectedSummaryPeriodKey(nextPeriod.key);
+    }
+  };
 
   const handleExportPdf = () => {
     if (!selectedSchedule) {
@@ -697,17 +816,24 @@ export function EmployeeSchedulePage() {
       {schedules.length > 0 ? (
         <section className={`${workspaceStyles.panel} ${styles.publicSchedulesPanel}`}>
           <div className={styles.publicSchedulesHeader}>
-            <div>
-              <span className={workspaceStyles.panelEyebrow}>Public schedules</span>
-              <strong>{`${schedules.length} schedules`}</strong>
+            <div className={styles.publicSchedulesHeading}>
+              <span className={styles.summaryIcon} aria-hidden="true">
+                <ScheduleDetailsIcon size={20} />
+              </span>
+              <div>
+                <span className={workspaceStyles.panelEyebrow}>Public schedules</span>
+                <strong>{`${schedules.length} schedules`}</strong>
+              </div>
             </div>
 
-            <span className={styles.selectedSchedulePill}>{scheduleStats.period}</span>
+            <div className={styles.publicSchedulesHeaderMeta}>
+              <span className={styles.selectedSchedulePill}>{scheduleStats.period}</span>
+            </div>
           </div>
-
           <div className={styles.scheduleSwitcher}>
             {schedules.map(schedule => {
               const isSelected = schedule.id === selectedSchedule?.id;
+              const scheduleLastUpdateLabel = formatScheduleLastUpdate(schedule.lastUpdatedAtUtc);
 
               return (
                 <button
@@ -717,18 +843,31 @@ export function EmployeeSchedulePage() {
                   aria-pressed={isSelected}
                   onClick={() => setSelectedScheduleId(schedule.id)}
                 >
-                  <span className={styles.scheduleDateBadge}>
+                  <span className={styles.scheduleCardDate} aria-hidden="true">
                     <span>{formatScheduleMonthOnly(schedule).slice(0, 3)}</span>
                     <strong>{schedule.year}</strong>
                   </span>
 
-                  <span className={styles.scheduleButtonContent}>
-                    <span className={styles.scheduleButtonName}>{schedule.name}</span>
-                    <span className={styles.scheduleButtonMeta}>
-                      {`${schedule.shopName || `Shop ${schedule.shopId}`} / ${schedule.containerName || `Container ${schedule.containerId}`}`}
+                  <span className={styles.scheduleButtonDetails}>
+                    <span className={styles.scheduleButtonContent}>
+                      <span className={styles.scheduleButtonName}>{schedule.name}</span>
+                      <span className={styles.scheduleButtonMeta}>
+                        {`${schedule.shopName || `Shop ${schedule.shopId}`} / ${schedule.containerName || `Container ${schedule.containerId}`}`}
+                      </span>
+                    </span>
+
+                    <span className={styles.lastUpdateField} aria-label={`Last Update: ${scheduleLastUpdateLabel}`}>
+                      <span>
+                        <span className={styles.lastUpdateDot} aria-hidden="true" />
+                        Last Update
+                      </span>
+                      <strong>
+                        {schedule.lastUpdatedAtUtc ? (
+                          <time dateTime={schedule.lastUpdatedAtUtc}>{scheduleLastUpdateLabel}</time>
+                        ) : scheduleLastUpdateLabel}
+                      </strong>
                     </span>
                   </span>
-
                 </button>
               );
             })}
@@ -741,9 +880,23 @@ export function EmployeeSchedulePage() {
           className={styles.openScheduleMatrix}
           graph={selectedSchedule}
           columns={scheduleMatrixColumns}
-          cellMap={scheduleMatrixCellMap}
-          title="Open schedules"
-          icon={null}
+          cellMap={scheduleMatrixDisplay.cellMap}
+          mutedSuffixMap={scheduleMatrixDisplay.mutedSuffixMap}
+          title={
+            <span className={styles.openScheduleTitleBlock}>
+              <span className={styles.openScheduleTitleLabel}>Schedules</span>
+              <span className={styles.openScheduleMeta}>
+                <span>{selectedSchedule.name}</span>
+                <span>{formatScheduleMonthOnly(selectedSchedule)}</span>
+                <span>{selectedSchedule.year}</span>
+              </span>
+            </span>
+          }
+          icon={
+            <span className={styles.summaryIcon} aria-hidden="true">
+              <ScheduleIcon size={20} />
+            </span>
+          }
           readOnly
           compactSize
           compactHeader
@@ -753,34 +906,73 @@ export function EmployeeSchedulePage() {
           stretchColumns={false}
           emptyMessage="No assigned shifts in this schedule yet."
           headerRightSlot={
-            <div className={styles.openScheduleHeaderActions}>
-              <button
-                type="button"
-                className={styles.openSchedulePdfButton}
-                onClick={handleExportPdf}
-                title="Export schedule to PDF"
-                aria-label="Export schedule to PDF"
-              >
-                PDF
-              </button>
-
-              <div className={styles.openScheduleMeta}>
-                <span>{selectedSchedule.name}</span>
-                <span>{formatScheduleMonthOnly(selectedSchedule)}</span>
-                <span>{selectedSchedule.year}</span>
-              </div>
-            </div>
+            <button
+              type="button"
+              className={styles.openSchedulePdfButton}
+              onClick={handleExportPdf}
+              title="Export schedule to PDF"
+              aria-label="Export schedule to PDF"
+            >
+              PDF
+            </button>
           }
         />
       ) : null}
 
       {selectedSchedule ? (
         <section className={`${workspaceStyles.panel} ${styles.hoursSummaryPanel}`}>
+          <span className={styles.hoursSummaryTotalPill}>{scheduleHoursSummary.totalHoursText}</span>
+
           <div className={styles.hoursSummaryHeader}>
-            <div>
-              <h2 className={workspaceStyles.panelTitle}>Summary</h2>
+            <div className={styles.hoursSummaryHeading}>
+              <span className={styles.summaryIcon} aria-hidden="true">
+                <StatisticsIcon size={20} />
+              </span>
+              <div>
+                <span className={workspaceStyles.panelEyebrow}>Work hours</span>
+                <h2 className={workspaceStyles.panelTitle}>Summary</h2>
+              </div>
             </div>
-            <span className={styles.hoursSummaryTotalPill}>{scheduleHoursSummary.totalHoursText}</span>
+
+            <div className={styles.hoursSummaryActions}>
+              <div className={styles.summaryPeriodControls} role="group" aria-label="Summary period">
+                <div className={styles.summaryPeriodField}>
+                  <span>Month</span>
+                  <SearchableSelect
+                    ariaLabel="Summary month"
+                    value={activeSummaryPeriod ? String(activeSummaryPeriod.month) : ""}
+                    options={summaryMonthOptions}
+                    placeholder="Month"
+                    dropdownTitle="Month"
+                    size="summary"
+                    shadow="soft"
+                    searchEnabled={false}
+                    showSelectedHint={false}
+                    disabled={summaryMonths.length <= 1}
+                    className={styles.summaryMonthSelect}
+                    onChange={handleSummaryMonthChange}
+                  />
+                </div>
+
+                <div className={styles.summaryPeriodField}>
+                  <span>Year</span>
+                  <SearchableSelect
+                    ariaLabel="Summary year"
+                    value={activeSummaryPeriod ? String(activeSummaryPeriod.year) : ""}
+                    options={summaryYearOptions}
+                    placeholder="Year"
+                    dropdownTitle="Year"
+                    size="summary"
+                    shadow="soft"
+                    searchEnabled={false}
+                    showSelectedHint={false}
+                    disabled={summaryYears.length <= 1}
+                    className={styles.summaryYearSelect}
+                    onChange={handleSummaryYearChange}
+                  />
+                </div>
+              </div>
+            </div>
           </div>
 
           {scheduleHoursSummary.rows.length > 0 ? (

@@ -28,6 +28,12 @@ export const queryKeys = {
     all: ["workflowLogs"] as const,
     list: () => ["workflowLogs", "list"] as const,
   },
+  communications: {
+    all: ["communications"] as const,
+    managerList: () => ["communications", "managerList"] as const,
+    employeePendingAll: ["communications", "employeePending"] as const,
+    employeePending: (employeeId: number) => ["communications", "employeePending", employeeId] as const,
+  },
   employees: {
     all: ["employees"] as const,
     list: () => ["employees", "list"] as const,
@@ -74,5 +80,9 @@ export const queryKeys = {
     items: (id: number) => ["availabilityGroups", "items", id] as const,
     members: (id: number) => ["availabilityGroups", id, "members"] as const,
     slots: (id: number) => ["availabilityGroups", id, "slots"] as const,
+    transferSources: (id: number, memberId: number) => ["availabilityGroups", id, "members", memberId, "transferSources"] as const,
+    transferPreview: (employeeIdsKey: string, year: number, month: number, targetGroupId: number | null) =>
+      ["availabilityGroups", "transferPreview", employeeIdsKey, year, month, targetGroupId ?? "new"] as const,
+    transferHints: (id: number) => ["availabilityGroups", id, "transferHints"] as const,
   },
 };

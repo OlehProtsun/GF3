@@ -1,19 +1,26 @@
 import type { ShiftSwap } from "@entities/shift-swaps";
+import type { EmployeeSchedule } from "@entities/employee-schedule";
+import type { EmployeeAvailabilityGroup } from "@entities/employee-availability";
 import {
+  getEmployeeAvailabilityNotificationId,
   getEmployeeOpenShiftNotificationId,
   getEmployeeOpenShiftScheduleNotificationId,
+  getEmployeeScheduleNotificationId,
+  getEmployeeSwapAcceptedNotificationId,
+  getEmployeeSwapNotificationId,
 } from "@shared/lib/employeeNotificationReadState";
 
-export type NotificationTone = "swap";
+export type NotificationTone = "schedule" | "availability" | "swap";
 
 export type EmployeeRealtimeNotificationLike = {
   id: string;
-  kind: "schedule" | "shiftSwap";
+  kind: "schedule" | "availability" | "shiftSwap";
   reason: string;
   occurredAtUtc: string;
   containerId?: number | null;
   graphId?: number | null;
   scheduleId?: number | null;
+  availabilityId?: number | null;
   shiftSwapId?: number | null;
 };
 
@@ -29,9 +36,45 @@ export type EmployeeNotificationItem = {
   actionLabel: string;
 };
 
-export type EmployeeNavNotificationTarget = "alerts" | "swap";
+export type EmployeeNavNotificationTarget = "alerts" | "availability" | "schedule" | "swap";
 
 export const employeeNotificationRetentionMs = 7 * 24 * 60 * 60 * 1000;
+
+export function getEmployeeNotificationExpiryAtMs(value?: string | null) {
+  if (!value) {
+    return null;
+  }
+
+  const occurredAtMs = new Date(value).getTime();
+  return Number.isNaN(occurredAtMs) ? null : occurredAtMs + employeeNotificationRetentionMs;
+}
+
+export function formatEmployeeNotificationExpiry(value?: string | null, nowMs = Date.now()) {
+  const expiresAtMs = getEmployeeNotificationExpiryAtMs(value);
+  if (expiresAtMs === null) {
+    return "This notification will be deleted automatically after 7 days.";
+  }
+
+  const remainingMs = expiresAtMs - nowMs;
+  if (remainingMs <= 0) {
+    return "This notification is being deleted.";
+  }
+
+  const totalMinutes = Math.max(1, Math.ceil(remainingMs / 60_000));
+  const days = Math.floor(totalMinutes / (24 * 60));
+  const hours = Math.floor((totalMinutes % (24 * 60)) / 60);
+  const minutes = totalMinutes % 60;
+
+  if (days > 0) {
+    return `This notification will be deleted in ${days}d${hours > 0 ? ` ${hours}h` : ""}.`;
+  }
+
+  if (hours > 0) {
+    return `This notification will be deleted in ${hours}h${minutes > 0 ? ` ${minutes}m` : ""}.`;
+  }
+
+  return `This notification will be deleted in ${minutes}m.`;
+}
 
 const dayFormatter = new Intl.DateTimeFormat("en-GB", {
   day: "2-digit",
@@ -45,6 +88,16 @@ const notificationTimeFormatter = new Intl.DateTimeFormat("en-GB", {
   hour: "2-digit",
   minute: "2-digit",
 });
+
+const monthFormatter = new Intl.DateTimeFormat("en-GB", {
+  month: "long",
+  year: "numeric",
+  timeZone: "UTC",
+});
+
+function formatMonth(year: number, month: number) {
+  return monthFormatter.format(new Date(Date.UTC(year, month - 1, 1)));
+}
 
 export function formatSwapDay(swap: Pick<ShiftSwap, "year" | "month" | "dayOfMonth">) {
   return dayFormatter.format(new Date(Date.UTC(swap.year, swap.month - 1, swap.dayOfMonth)));
@@ -97,12 +150,8 @@ export function isEmployeeNotificationRead(item: Pick<EmployeeNotificationItem, 
 }
 
 export function isWithinEmployeeNotificationRetention(value?: string | null, nowMs = Date.now()) {
-  if (!value) {
-    return true;
-  }
-
-  const parsed = new Date(value).getTime();
-  return Number.isNaN(parsed) || nowMs - parsed <= employeeNotificationRetentionMs;
+  const expiresAtMs = getEmployeeNotificationExpiryAtMs(value);
+  return expiresAtMs === null || nowMs < expiresAtMs;
 }
 
 export function buildOpenShiftLiveNotification(
@@ -157,52 +206,208 @@ export function getNotificationSortValue(item: Pick<EmployeeNotificationItem, "o
   return Number.isNaN(parsed) ? 0 : parsed;
 }
 
-function getSwapSortValue(swap: Pick<ShiftSwap, "createdAtUtc">) {
-  const parsed = new Date(swap.createdAtUtc).getTime();
-  return Number.isNaN(parsed) ? 0 : parsed;
+function findSchedulePublicationEvent(
+  notifications: EmployeeRealtimeNotificationLike[],
+  scheduleId: number,
+) {
+  return notifications.find(event =>
+    event.kind === "schedule" &&
+    event.reason === "manager-schedule-published" &&
+    getRelatedScheduleId(event) === scheduleId,
+  );
+}
+
+function findAvailabilityPublicationEvent(
+  notifications: EmployeeRealtimeNotificationLike[],
+  availabilityId: number,
+) {
+  return notifications.find(event =>
+    event.kind === "availability" &&
+    event.reason === "manager-availability-published" &&
+    event.availabilityId === availabilityId,
+  );
+}
+
+function findSwapEvent(
+  notifications: EmployeeRealtimeNotificationLike[],
+  swap: Pick<ShiftSwap, "id" | "scheduleId">,
+  reasons: readonly string[],
+  allowScheduleFallback = false,
+) {
+  return notifications.find(event =>
+    event.kind === "shiftSwap" &&
+    (
+      event.shiftSwapId === swap.id ||
+      (allowScheduleFallback && event.shiftSwapId == null && getRelatedScheduleId(event) === swap.scheduleId)
+    ) &&
+    reasons.includes(event.reason),
+  );
+}
+
+function buildScheduleNotification(
+  schedule: EmployeeSchedule,
+  event?: EmployeeRealtimeNotificationLike,
+): EmployeeNotificationItem {
+  const id = getEmployeeScheduleNotificationId(schedule.id);
+  return {
+    id,
+    readIds: uniqueIds([id, event?.id]),
+    title: "New schedule published",
+    body: `"${schedule.name}" for ${formatMonth(schedule.year, schedule.month)} is now available at ${schedule.shopName || "your shop"}.`,
+    meta: `${schedule.shopName || "Shop"} / ${schedule.containerName || "Container"}`,
+    tone: "schedule",
+    occurredAtUtc: event?.occurredAtUtc ?? schedule.lastUpdatedAtUtc ?? null,
+    actionPath: "/schedule",
+    actionLabel: "Open schedule",
+  };
+}
+
+function buildAvailabilityNotification(
+  availability: EmployeeAvailabilityGroup,
+  event?: EmployeeRealtimeNotificationLike,
+): EmployeeNotificationItem {
+  const id = getEmployeeAvailabilityNotificationId(availability.id, availability.visibleFromUtc);
+  return {
+    id,
+    readIds: uniqueIds([id, event?.id]),
+    title: "New availability published",
+    body: `"${availability.name}" for ${formatMonth(availability.year, availability.month)} is open for your availability.`,
+    meta: availability.visibleToUtc
+      ? `Submit by ${formatNotificationTime(availability.visibleToUtc)}`
+      : "Open now",
+    tone: "availability",
+    occurredAtUtc: event?.occurredAtUtc ?? availability.visibleFromUtc ?? null,
+    actionPath: "/availability",
+    actionLabel: "Open availability",
+  };
+}
+
+function buildSwapAvailableNotification(
+  swap: ShiftSwap,
+  event?: EmployeeRealtimeNotificationLike,
+): EmployeeNotificationItem {
+  if (swap.isManagerCreated) {
+    const item = buildOpenShiftSnapshotNotification(swap);
+    return {
+      ...item,
+      readIds: uniqueIds([...item.readIds, event?.id]),
+      occurredAtUtc: event?.occurredAtUtc ?? item.occurredAtUtc,
+    };
+  }
+
+  const id = getEmployeeSwapNotificationId(swap.id);
+  return {
+    id,
+    readIds: uniqueIds([id, event?.id]),
+    title: "Shift swap available",
+    body: `${swap.fromEmployeeName || "A coworker"} offered ${formatSwapDay(swap)} ${swap.fromTime} - ${swap.toTime} from "${swap.scheduleName}".`,
+    meta: `${swap.shopName || "Shop"} / ${swap.containerName || "Container"}`,
+    tone: "swap",
+    occurredAtUtc: event?.occurredAtUtc ?? swap.createdAtUtc,
+    actionPath: "/swap",
+    actionLabel: "Open swap",
+  };
+}
+
+function buildAcceptedOwnSwapNotification(
+  swap: ShiftSwap,
+  event?: EmployeeRealtimeNotificationLike,
+): EmployeeNotificationItem {
+  const id = getEmployeeSwapAcceptedNotificationId(swap.id);
+  return {
+    id,
+    readIds: uniqueIds([id, event?.id]),
+    title: "Your shift was accepted",
+    body: `${swap.acceptedByEmployeeName || "A coworker"} accepted your ${formatSwapDay(swap)} ${swap.fromTime} - ${swap.toTime} shift from "${swap.scheduleName}".`,
+    meta: `${swap.shopName || "Shop"} / ${swap.containerName || "Container"}`,
+    tone: "swap",
+    occurredAtUtc: event?.occurredAtUtc ?? swap.acceptedAtUtc ?? swap.createdAtUtc,
+    actionPath: "/swap",
+    actionLabel: "View swap",
+  };
 }
 
 export function buildEmployeeNotificationItems(
   realtimeNotifications: EmployeeRealtimeNotificationLike[],
   swaps: ShiftSwap[],
+  schedules: EmployeeSchedule[],
+  availabilityGroups: EmployeeAvailabilityGroup[],
   nowMs = Date.now(),
 ) {
-  const openShifts = swaps.filter(swap =>
-    swap.isManagerCreated &&
-    swap.status === "open" &&
-    isWithinEmployeeNotificationRetention(swap.createdAtUtc, nowMs),
-  );
-  const openShiftById = new Map(openShifts.map(swap => [swap.id, swap]));
-  const latestOpenShiftByScheduleId = new Map<number, ShiftSwap>();
+  const items: EmployeeNotificationItem[] = [];
+  const latestOpenSwapByScheduleId = new Map<number, ShiftSwap>();
 
-  openShifts.forEach(swap => {
-    const current = latestOpenShiftByScheduleId.get(swap.scheduleId);
-    if (!current || getSwapSortValue(swap) > getSwapSortValue(current)) {
-      latestOpenShiftByScheduleId.set(swap.scheduleId, swap);
+  swaps.forEach(swap => {
+    if (swap.status !== "open") {
+      return;
+    }
+
+    const current = latestOpenSwapByScheduleId.get(swap.scheduleId);
+    if (!current || getNotificationSortValue({ occurredAtUtc: swap.createdAtUtc }) > getNotificationSortValue({ occurredAtUtc: current.createdAtUtc })) {
+      latestOpenSwapByScheduleId.set(swap.scheduleId, swap);
     }
   });
 
-  const items: EmployeeNotificationItem[] = [];
+  schedules.forEach(schedule => {
+    items.push(buildScheduleNotification(schedule, findSchedulePublicationEvent(realtimeNotifications, schedule.id)));
+  });
+
+  availabilityGroups.forEach(availability => {
+    items.push(buildAvailabilityNotification(
+      availability,
+      findAvailabilityPublicationEvent(realtimeNotifications, availability.id),
+    ));
+  });
 
   realtimeNotifications.forEach(event => {
     if (!isOpenShiftPostedNotification(event) || !isWithinEmployeeNotificationRetention(event.occurredAtUtc, nowMs)) {
       return;
     }
 
-    const relatedScheduleId = getRelatedScheduleId(event);
-    const swap = event.shiftSwapId != null
-      ? openShiftById.get(event.shiftSwapId) ?? null
-      : relatedScheduleId !== null
-        ? latestOpenShiftByScheduleId.get(relatedScheduleId) ?? null
-        : null;
-    items.push(buildOpenShiftLiveNotification(event, swap));
+    const hasMatchingSnapshot = swaps.some(swap =>
+      swap.isManagerCreated &&
+      swap.status === "open" &&
+      (
+        event.shiftSwapId === swap.id ||
+        (event.shiftSwapId == null && getRelatedScheduleId(event) === swap.scheduleId)
+      ),
+    );
+    if (!hasMatchingSnapshot) {
+      items.push(buildOpenShiftLiveNotification(event, null));
+    }
   });
 
-  openShifts.forEach(swap => {
-    items.push(buildOpenShiftSnapshotNotification(swap));
+  swaps.forEach(swap => {
+    if (
+      swap.status === "open" &&
+      !swap.isCreatedByCurrentEmployee &&
+      isWithinEmployeeNotificationRetention(swap.createdAtUtc, nowMs)
+    ) {
+      items.push(buildSwapAvailableNotification(
+        swap,
+        findSwapEvent(
+          realtimeNotifications,
+          swap,
+          ["employee-swap-created", "manager-manual-shift-offer-created"],
+          latestOpenSwapByScheduleId.get(swap.scheduleId)?.id === swap.id,
+        ),
+      ));
+    }
+
+    if (
+      swap.status === "accepted" &&
+      swap.isCreatedByCurrentEmployee &&
+      isWithinEmployeeNotificationRetention(swap.acceptedAtUtc, nowMs)
+    ) {
+      items.push(buildAcceptedOwnSwapNotification(
+        swap,
+        findSwapEvent(realtimeNotifications, swap, ["employee-swap-accepted"]),
+      ));
+    }
   });
 
   return [...new Map(items.map(item => [item.id, item])).values()]
+    .filter(item => isWithinEmployeeNotificationRetention(item.occurredAtUtc, nowMs))
     .sort((left, right) => getNotificationSortValue(right) - getNotificationSortValue(left))
     .slice(0, 80);
 }
@@ -210,14 +415,23 @@ export function buildEmployeeNotificationItems(
 export function getUnreadEmployeeNotificationTargets(
   notifications: EmployeeRealtimeNotificationLike[],
   swaps: ShiftSwap[],
+  schedules: EmployeeSchedule[],
+  availabilityGroups: EmployeeAvailabilityGroup[],
   readNotificationIds: Set<string>,
   nowMs = Date.now(),
 ): Record<EmployeeNavNotificationTarget, boolean> {
-  const hasUnreadNotification = buildEmployeeNotificationItems(notifications, swaps, nowMs)
-    .some(item => !isEmployeeNotificationRead(item, readNotificationIds));
+  const unreadItems = buildEmployeeNotificationItems(
+    notifications,
+    swaps,
+    schedules,
+    availabilityGroups,
+    nowMs,
+  ).filter(item => !isEmployeeNotificationRead(item, readNotificationIds));
 
   return {
-    alerts: hasUnreadNotification,
-    swap: hasUnreadNotification,
+    alerts: unreadItems.length > 0,
+    availability: unreadItems.some(item => item.tone === "availability"),
+    schedule: unreadItems.some(item => item.tone === "schedule"),
+    swap: unreadItems.some(item => item.tone === "swap"),
   };
 }

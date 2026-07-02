@@ -1,4 +1,5 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { BrowserRouter } from "react-router-dom";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 import type { EmployeeSchedule } from "@entities/employee-schedule";
@@ -54,6 +55,7 @@ const schedules: EmployeeSchedule[] = [
     year: 2026,
     month: 5,
     publicationStatus: "public",
+    lastUpdatedAtUtc: "2026-06-28T12:45:00Z",
     employees: [
       {
         id: 10,
@@ -73,6 +75,11 @@ const schedules: EmployeeSchedule[] = [
         minHoursMonth: 60,
         displayOrder: 1,
       },
+    ],
+    relatedScheduleAssignments: [
+      { employeeId: 7, dayOfMonth: 13, scheduleId: 2, scheduleName: "Second May Schedule" },
+      { employeeId: 12, dayOfMonth: 10, scheduleId: 2, scheduleName: "Second May Schedule" },
+      { employeeId: 12, dayOfMonth: 10, scheduleId: 3, scheduleName: "Late May Schedule" },
     ],
     slots: [
       { id: 1, dayOfMonth: 10, slotNo: 1, employeeId: 12, fromTime: "08:00", toTime: "12:00", status: "ASSIGNED" },
@@ -138,18 +145,97 @@ describe("EmployeeSchedulePage", () => {
     expect(screen.getByText("12h Total Hours")).toBeInTheDocument();
     expect(screen.getByText("Month: May")).toBeInTheDocument();
     expect(screen.getByText("Year: 2026")).toBeInTheDocument();
+    expect(screen.getAllByText("Last Update")).toHaveLength(2);
+    expect(screen.getByText(/28 Jun 2026/)).toBeInTheDocument();
 
+    expect(within(screen.getByRole("table", { name: "Schedule hours summary" }))
+      .getByText("May Schedule, Second May Schedule")).toBeInTheDocument();
     expect(screen.getByTestId("schedule-matrix")).toHaveTextContent("May Schedule");
     expect(screen.getByTestId("schedule-matrix")).toHaveTextContent("Adam Blue, Zoe Young");
-    expect(screen.getByTestId("schedule-matrix")).toHaveTextContent('"12:10":"08:00 - 12:00"');
+    expect(screen.getByTestId("schedule-matrix")).toHaveTextContent('"12:10":"08:00 - 12:00, Late May Schedule, Second May Schedule"');
     expect(screen.getByTestId("schedule-matrix")).toHaveTextContent('"12:11":"22:00 - 02:00"');
     expect(screen.getByTestId("schedule-matrix")).toHaveTextContent('"7:12":"09:00 - 13:00"');
+    expect(screen.getByTestId("schedule-matrix")).toHaveTextContent('"7:13":"Second May Schedule"');
 
     expect(mocks.matrix).toHaveBeenCalledWith(expect.objectContaining({
       readOnly: true,
       showColumnTotals: false,
       graph: expect.objectContaining({ id: 1 }),
+      cellMap: expect.objectContaining({
+        "7:13": "Second May Schedule",
+        "12:10": "08:00 - 12:00, Late May Schedule, Second May Schedule",
+      }),
     }));
+    const matrixProps = mocks.matrix.mock.calls.at(-1)?.[0];
+    expect(matrixProps).not.toHaveProperty("onVisualHintClick");
+    expect(matrixProps).not.toHaveProperty("onVisualHintCellClick");
+  });
+
+  test("lets the employee choose the month and year used by Summary", async () => {
+    const user = userEvent.setup();
+    const periodSchedules: EmployeeSchedule[] = [
+      ...schedules,
+      {
+        id: 3,
+        containerId: 6,
+        containerName: "June Container",
+        shopId: 8,
+        shopName: "East Shop",
+        name: "June Schedule",
+        year: 2026,
+        month: 6,
+        publicationStatus: "public",
+        slots: [
+          { id: 5, dayOfMonth: 5, slotNo: 1, employeeId: 12, fromTime: "10:00", toTime: "12:00", status: "ASSIGNED" },
+        ],
+      },
+      {
+        id: 4,
+        containerId: 7,
+        containerName: "Past Container",
+        shopId: 9,
+        shopName: "West Shop",
+        name: "May 2025 Schedule",
+        year: 2025,
+        month: 5,
+        publicationStatus: "public",
+        slots: [
+          { id: 6, dayOfMonth: 7, slotNo: 1, employeeId: 12, fromTime: "09:00", toTime: "12:00", status: "ASSIGNED" },
+        ],
+      },
+    ];
+
+    mocks.scheduleQuery.mockReturnValue({
+      data: periodSchedules,
+      isLoading: false,
+      error: null,
+    });
+
+    renderPage();
+
+    const summaryTable = screen.getByRole("table", { name: "Schedule hours summary" });
+    const monthSelect = screen.getByRole("button", { name: "Summary month" });
+    const yearSelect = screen.getByRole("button", { name: "Summary year" });
+
+    expect(monthSelect).toHaveTextContent("May");
+    expect(yearSelect).toHaveTextContent("2026");
+
+    await user.click(monthSelect);
+    const monthOptions = screen.getByRole("listbox", { name: "Summary month" });
+    await user.click(within(monthOptions).getByRole("option", { name: "June" }));
+
+    expect(monthSelect).toHaveTextContent("June");
+    expect(within(summaryTable).getByText("June Schedule")).toBeInTheDocument();
+    expect(within(summaryTable).getAllByText("2h")).toHaveLength(2);
+
+    await user.click(yearSelect);
+    const yearOptions = screen.getByRole("listbox", { name: "Summary year" });
+    await user.click(within(yearOptions).getByRole("option", { name: "2025" }));
+
+    expect(yearSelect).toHaveTextContent("2025");
+    expect(monthSelect).toHaveTextContent("May");
+    expect(within(summaryTable).getByText("May 2025 Schedule")).toBeInTheDocument();
+    expect(within(summaryTable).getAllByText("3h")).toHaveLength(2);
   });
 
   test("shows a loading and empty state when no public schedule is available", () => {

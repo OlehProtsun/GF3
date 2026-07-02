@@ -891,6 +891,7 @@ export function ContainerGraphEditPage() {
   const [selectedBindClientId, setSelectedBindClientId] = useState<string | null>(null);
   const [hasLocalBindChanges, setHasLocalBindChanges] = useState(false);
   const [bindDeleteTarget, setBindDeleteTarget] = useState<EditableAvailabilityBind | null>(null);
+  const [employeeRemoveTargetId, setEmployeeRemoveTargetId] = useState<number | null>(null);
   const [isSaveConfirmOpen, setIsSaveConfirmOpen] = useState(false);
   const [isSessionSaving, setIsSessionSaving] = useState(false);
   const optimisticStyleIdRef = useRef(-1);
@@ -1231,6 +1232,9 @@ export function ContainerGraphEditPage() {
   );
   const activeBindValueByKey = useMemo(() => buildActiveAvailabilityBindMap(bindRows), [bindRows]);
   const bindDeleteLabel = bindDeleteTarget?.key.trim() || "this bind";
+  const employeeRemoveTargetLabel = employeeRemoveTargetId !== null
+    ? employeeNameById.get(employeeRemoveTargetId) ?? `Employee #${employeeRemoveTargetId}`
+    : "this employee";
 
   const effectiveGraph = useMemo(
     () => ({
@@ -1951,7 +1955,12 @@ export function ContainerGraphEditPage() {
     setSelectedEmployeeId(null);
   };
 
-  const handleRemoveEmployee = (employeeId: number) => {
+  const handleRemoveEmployeeConfirm = () => {
+    if (employeeRemoveTargetId === null) {
+      return;
+    }
+
+    const employeeId = employeeRemoveTargetId;
     setGraphEmployeeRows(current => current.filter(row => row.employeeId !== employeeId));
     setScheduleColumnOrder(current => current.filter(columnId => columnId !== employeeId));
     setCellMap(current => {
@@ -1964,8 +1973,8 @@ export function ContainerGraphEditPage() {
       return next;
     });
     setSelectedCellKeys(currentSelection => currentSelection.filter(cellKey => !cellKey.startsWith(`${employeeId}:`)));
+    setEmployeeRemoveTargetId(null);
   };
-
   const handleColumnMove = (columnId: number, targetColumnId: number) => {
     const currentColumnOrder = sanitizeScheduleColumnOrder(scheduleColumnOrder, graphEmployeeRows, manualColumns);
     const nextColumnOrder = moveScheduleColumnOrder(currentColumnOrder, columnId, targetColumnId);
@@ -2749,7 +2758,7 @@ export function ContainerGraphEditPage() {
         onBindFieldChange={handleBindFieldChange}
         onBindCommit={handleBindCommit}
         onAddEmployee={handleAddEmployee}
-        onRemoveEmployee={handleRemoveEmployee}
+        onRemoveEmployee={setEmployeeRemoveTargetId}
         onAddBind={handleAddBind}
         onDeleteBind={handleDeleteBind}
         onManualColumnLabelChange={handleManualColumnLabelChange}
@@ -2815,6 +2824,14 @@ export function ContainerGraphEditPage() {
         />
       ) : null}
 
+      <ConfirmDialog
+        open={employeeRemoveTargetId !== null}
+        title="Remove employee"
+        message={`Are you sure you want to remove '${employeeRemoveTargetLabel}' from this schedule? Their schedule cells in this editor will be removed.`}
+        onCancel={() => setEmployeeRemoveTargetId(null)}
+        onConfirm={handleRemoveEmployeeConfirm}
+        confirmText="Remove"
+      />
       <ConfirmDialog
         open={bindDeleteTarget !== null}
         title="Delete bind"

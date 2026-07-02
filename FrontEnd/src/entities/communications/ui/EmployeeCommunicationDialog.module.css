@@ -1,0 +1,348 @@
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: rgba(15, 23, 42, 0.34);
+  backdrop-filter: blur(16px) saturate(140%);
+  -webkit-backdrop-filter: blur(16px) saturate(140%);
+}
+
+.dialog {
+  width: min(540px, 100%);
+  max-height: min(720px, calc(100vh - 36px));
+  display: grid;
+  gap: 16px;
+  overflow: auto;
+  padding: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  border-radius: 28px;
+  background:
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.3), rgba(255, 255, 255, 0)),
+    rgba(255, 255, 255, 0.9);
+  box-shadow:
+    0 28px 80px rgba(15, 23, 42, 0.28),
+    0 1px 0 rgba(255, 255, 255, 0.65) inset;
+  box-sizing: border-box;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+}
+
+.slide {
+  min-width: 0;
+  display: grid;
+  gap: 16px;
+}
+
+.slideNext {
+  animation: slide-in-next 180ms ease-out;
+}
+
+.slidePrevious {
+  animation: slide-in-previous 180ms ease-out;
+}
+
+.header {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr) 36px;
+  gap: 12px;
+  align-items: start;
+}
+
+.icon,
+.iconButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(113, 113, 122, 0.14);
+  background: rgba(255, 255, 255, 0.76);
+  color: #2563eb;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.5) inset;
+}
+
+.icon {
+  width: 42px;
+  height: 42px;
+  border-radius: 18px;
+}
+
+.iconButton {
+  width: 36px;
+  height: 36px;
+  border-radius: 16px;
+  color: #475569;
+  cursor: pointer;
+  transition:
+    transform 0.16s ease,
+    background 0.16s ease,
+    color 0.16s ease;
+}
+
+.iconButton:hover:not(:disabled),
+.iconButton:focus-visible:not(:disabled) {
+  transform: translateY(-1px);
+  background: rgba(248, 250, 252, 0.96);
+  color: #111827;
+}
+
+.iconButton:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+
+.header > div {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.eyebrow {
+  color: rgba(17, 17, 17, 0.58);
+  font-size: 12px;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.header h2 {
+  min-width: 0;
+  margin: 0;
+  color: #111827;
+  font-size: 1.18rem;
+  line-height: 1.25;
+  font-weight: 950;
+  overflow-wrap: anywhere;
+}
+
+.body {
+  margin: 0;
+  padding: 14px;
+  border-radius: 20px;
+  border: 1px solid rgba(113, 113, 122, 0.1);
+  background: rgba(248, 250, 252, 0.76);
+  color: rgba(17, 17, 17, 0.78);
+  font-size: 0.96rem;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.metaLine {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.metaLine span {
+  min-height: 28px;
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(113, 113, 122, 0.12);
+  background: rgba(255, 255, 255, 0.72);
+  color: rgba(17, 17, 17, 0.62);
+  font-size: 12px;
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+
+.carouselNavigation {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr) 38px;
+  align-items: center;
+  gap: 10px;
+}
+
+.carouselButton {
+  width: 38px;
+  height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(113, 113, 122, 0.14);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.78);
+  color: #334155;
+  cursor: pointer;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.54) inset;
+}
+
+.carouselButton:hover,
+.carouselButton:focus-visible {
+  color: #1d4ed8;
+  border-color: rgba(37, 99, 235, 0.2);
+  background: #ffffff;
+}
+
+.paginationDots {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  flex-wrap: wrap;
+}
+
+.paginationDot {
+  width: 8px;
+  height: 8px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(100, 116, 139, 0.3);
+  cursor: pointer;
+  transition:
+    width 160ms ease,
+    background 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.paginationDotActive {
+  width: 22px;
+  border-radius: 999px;
+  background: #2563eb;
+  box-shadow: 0 5px 12px rgba(37, 99, 235, 0.2);
+}
+
+.errorText {
+  padding: 12px 14px;
+  border-radius: 18px;
+  border: 1px solid rgba(220, 38, 38, 0.16);
+  background: rgba(254, 226, 226, 0.78);
+  color: #b91c1c;
+  font-size: 0.88rem;
+  font-weight: 750;
+  line-height: 1.45;
+}
+
+.footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.checkboxRow {
+  min-height: 38px;
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  color: rgba(17, 17, 17, 0.7);
+  font-size: 0.9rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.checkboxRow input {
+  width: 18px;
+  height: 18px;
+  accent-color: #2563eb;
+}
+
+.checkboxRow:has(input:disabled) {
+  cursor: wait;
+  opacity: 0.62;
+}
+
+.primaryButton {
+  min-height: 40px;
+  min-width: 104px;
+  padding: 0 18px;
+  border: 1px solid rgba(37, 99, 235, 0.18);
+  border-radius: 18px;
+  background: #2563eb;
+  color: white;
+  font: inherit;
+  font-size: 0.92rem;
+  font-weight: 900;
+  cursor: pointer;
+  box-shadow:
+    0 10px 22px rgba(37, 99, 235, 0.18),
+    0 1px 0 rgba(255, 255, 255, 0.28) inset;
+  transition:
+    transform 0.16s ease,
+    box-shadow 0.16s ease,
+    background 0.16s ease;
+}
+
+.primaryButton:hover:not(:disabled),
+.primaryButton:focus-visible:not(:disabled) {
+  transform: translateY(-1px);
+  background: #1d4ed8;
+  box-shadow:
+    0 14px 28px rgba(37, 99, 235, 0.22),
+    0 1px 0 rgba(255, 255, 255, 0.32) inset;
+}
+
+.primaryButton:disabled {
+  cursor: wait;
+  opacity: 0.62;
+}
+
+@media (max-width: 560px) {
+  .backdrop {
+    place-items: center;
+    padding: max(18px, env(safe-area-inset-top)) 16px max(18px, env(safe-area-inset-bottom));
+  }
+
+  .dialog {
+    width: 100%;
+    max-height: calc(100dvh - 36px);
+    border-radius: 24px;
+    padding: 15px;
+  }
+
+  .header {
+    grid-template-columns: 38px minmax(0, 1fr) 34px;
+  }
+
+  .icon {
+    width: 38px;
+    height: 38px;
+  }
+
+  .footer,
+  .primaryButton {
+    width: 100%;
+  }
+
+  .primaryButton {
+    justify-content: center;
+  }
+}
+
+@keyframes slide-in-next {
+  from {
+    opacity: 0;
+    transform: translateX(18px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes slide-in-previous {
+  from {
+    opacity: 0;
+    transform: translateX(-18px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .slideNext,
+  .slidePrevious {
+    animation: none;
+  }
+}

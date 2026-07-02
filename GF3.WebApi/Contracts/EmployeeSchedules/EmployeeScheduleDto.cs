@@ -15,6 +15,8 @@ public sealed class EmployeeScheduleDto
     public int Year { get; set; }
     public int Month { get; set; }
     public string PublicationStatus { get; set; } = "public";
+    public DateTimeOffset? LastUpdatedAtUtc { get; set; }
     public IReadOnlyList<EmployeeScheduleEmployeeDto> Employees { get; set; } = Array.Empty<EmployeeScheduleEmployeeDto>();
     public IReadOnlyList<EmployeeScheduleSlotDto> Slots { get; set; } = Array.Empty<EmployeeScheduleSlotDto>();
+    public IReadOnlyList<EmployeeScheduleRelatedAssignmentDto> RelatedScheduleAssignments { get; set; } = Array.Empty<EmployeeScheduleRelatedAssignmentDto>();
 }

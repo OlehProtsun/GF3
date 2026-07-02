@@ -23,6 +23,17 @@ public interface IScheduleRepository : IBaseRepository<ScheduleModel>
     Task<List<ScheduleModel>> GetPublishedForEmployeeAsync(int employeeId, CancellationToken ct = default);
 
     /// <summary>
+    /// Returns every other saved schedule in the requested month together with its concrete slots.
+    /// Generation uses this read model to keep one employee from receiving overlapping work in
+    /// separate schedules.
+    /// </summary>
+    Task<List<ScheduleModel>> GetByMonthWithSlotsAsync(
+        int year,
+        int month,
+        int? excludeScheduleId = null,
+        CancellationToken ct = default);
+
+    /// <summary>
     /// Returns a schedule together with the related data required by edit/export flows.
     /// </summary>
     Task<ScheduleModel?> GetDetailedAsync(int id, CancellationToken ct = default);

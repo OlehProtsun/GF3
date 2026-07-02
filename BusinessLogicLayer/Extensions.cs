@@ -31,12 +31,14 @@ public static class Extensions
         serviceCollection.AddScoped<IManagerAccountService, ManagerAccountService>();
         serviceCollection.AddSingleton<IEmployeePresenceService, EmployeePresenceService>();
         serviceCollection.AddSingleton<IManagerPresenceService, ManagerPresenceService>();
+        serviceCollection.AddScoped<ICommunicationService, CommunicationService>();
         serviceCollection.AddScoped<IShopService, ShopService>();
         serviceCollection.AddScoped<IScheduleService, ScheduleService>();
         serviceCollection.AddScoped<IScheduleEmployeeService, ScheduleEmployeeService>();
         serviceCollection.AddScoped<IScheduleSlotService, ScheduleSlotService>();
         serviceCollection.AddScoped<IBindService, BindService>();
         serviceCollection.AddScoped<IAvailabilityGroupService, AvailabilityGroupService>();
+        serviceCollection.AddScoped<IAvailabilityGroupTransferService, AvailabilityGroupTransferService>();
         serviceCollection.AddScoped<IShopFacade, ShopFacade>();
         serviceCollection.AddScoped<IEmployeeFacade, EmployeeFacade>();
         serviceCollection.AddScoped<IAuthService, AuthService>();

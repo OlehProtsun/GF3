@@ -59,6 +59,7 @@ Jwt__SigningKey=replace_with_a_long_local_test_secret_at_least_64_chars
 GF3_ADMIN_ENABLED=false
 GF3_ADMIN_ALLOW_REMOTE=false
 GF3_ADMIN_ALLOW_WRITE=false
+GF3_REQUIRE_EXISTING_DATABASE=false
 ```
 
 Build and start:
@@ -127,6 +128,8 @@ GF3_SERVER_NAME=your-domain.com
 GF3_HTTP_PORT=80
 GF3_HTTPS_PORT=443
 GF3_DATA_VOLUME=gf3-data
+GF3_REQUIRE_EXISTING_DATABASE=true
+GF3_BACKUP_BEFORE_MIGRATE=true
 
 Jwt__SigningKey=CHANGE_THIS_TO_A_LONG_RANDOM_SECRET
 
@@ -198,6 +201,7 @@ Set at least:
 
 ```env
 GF3_SERVER_NAME=your-domain.com
+GF3_REQUIRE_EXISTING_DATABASE=false
 Jwt__SigningKey=<generated secret>
 ```
 
@@ -266,33 +270,47 @@ docker compose --env-file deploy/.env \
 
 ## 7. Updating the app
 
-Simple source-based update:
+For an existing production installation, keep these values in `deploy/.env`:
+
+```env
+GF3_DATA_VOLUME=gf3-data
+GF3_REQUIRE_EXISTING_DATABASE=true
+GF3_BACKUP_BEFORE_MIGRATE=true
+```
+
+`GF3_DATA_VOLUME` must stay exactly the same as on the current server. A different name creates a new empty volume; the existing-database guard intentionally refuses to start in that case.
+
+Build the replacement image before the maintenance window:
 
 ```bash
 cd /opt/gf3
 git pull
-docker compose --env-file deploy/.env -f deploy/docker-compose.yml up --build -d
-docker image prune -f
+docker compose --env-file deploy/.env -f deploy/docker-compose.yml build gf3-app
 ```
 
-With HTTPS:
+Take an off-container volume snapshot while the app is stopped, then deploy:
 
 ```bash
-cd /opt/gf3
-git pull
-docker compose --env-file deploy/.env \
-  -f deploy/docker-compose.yml \
-  -f deploy/docker-compose.https.yml \
-  up --build -d
-docker image prune -f
+mkdir -p backups
+docker compose --env-file deploy/.env -f deploy/docker-compose.yml stop nginx gf3-app
+docker volume inspect gf3-data
+docker run --rm \
+  -v gf3-data:/data:ro \
+  -v "$PWD/backups:/backup" \
+  alpine \
+  tar czf /backup/gf3-data-pre-release-$(date +%Y%m%d-%H%M%S).tar.gz -C /data .
+docker compose --env-file deploy/.env -f deploy/docker-compose.yml up -d
 ```
 
-After every update:
+Use the same two compose files for HTTPS deployments. Wait for `gf3-app` to become healthy before nginx starts, then verify:
 
 ```bash
 docker compose --env-file deploy/.env -f deploy/docker-compose.yml ps
-curl https://your-domain.com/api/health
+docker compose --env-file deploy/.env -f deploy/docker-compose.yml logs --tail=200 gf3-app
+curl --fail https://your-domain.com/api/health
 ```
+
+At startup GF3 performs `PRAGMA quick_check`, creates a consistent SQLite backup inside `/data/backups` when migrations are pending, applies migrations, and checks integrity again. A migration or integrity failure keeps the container unhealthy and prevents nginx from routing traffic to it.
 
 Registry-based update after running the manual `Publish Docker image` GitHub Actions workflow:
 
@@ -350,6 +368,8 @@ For real production, schedule off-server backups with `restic`, `rclone`, S3, Ba
 
 ## 9. Rollback
 
+If the new image fails before migrations are applied, return to the previous image/commit. If migrations were applied, restore the matching pre-release volume archive before starting the previous application version; old code is not guaranteed to understand the newer schema.
+
 If you deploy from source and the new version fails:
 
 ```bash
@@ -382,6 +402,9 @@ Before first public launch:
 - `Jwt__SigningKey` is long and random.
 - `GF3_ADMIN_ENABLED=false` unless you are in a short trusted maintenance window.
 - `GF3_SERVER_NAME` matches the real domain.
+- `GF3_DATA_VOLUME` matches the existing production volume exactly.
+- `GF3_REQUIRE_EXISTING_DATABASE=true` for every update of an existing installation.
+- A fresh off-server volume archive exists before deployment.
 - DNS points to the server.
 - Firewall allows `80` and `443`.
 - `curl https://your-domain.com/api/health` returns `canConnect: true`.

@@ -133,6 +133,10 @@ function createSwap(overrides: Partial<ShiftSwap> = {}): ShiftSwap {
     shiftHours: 8,
     currentEmployeeHoursBefore: 0,
     currentEmployeeHoursAfter: 8,
+    currentEmployeeWorkDaysBefore: 0,
+    currentEmployeeWorkDaysAfter: 1,
+    currentEmployeeFreeDaysBefore: 31,
+    currentEmployeeFreeDaysAfter: 30,
     fromEmployeeHoursBefore: 8,
     fromEmployeeHoursAfter: 0,
     isManagerCreated: false,
@@ -233,6 +237,19 @@ describe("EmployeeSwapPage", () => {
           canAccept: false,
           canCancel: false,
         }),
+        createSwap({
+          id: 8,
+          scheduleName: "Overlap offer",
+          canAccept: false,
+          canCancel: false,
+          acceptanceUnavailableReason: "You already work during this time.",
+          currentEmployeeHoursBefore: 8,
+          currentEmployeeHoursAfter: 8,
+          currentEmployeeWorkDaysBefore: 1,
+          currentEmployeeWorkDaysAfter: 1,
+          currentEmployeeFreeDaysBefore: 30,
+          currentEmployeeFreeDaysAfter: 30,
+        }),
       ],
       isLoading: false,
       error: null,
@@ -245,6 +262,7 @@ describe("EmployeeSwapPage", () => {
     await user.click(screen.getByRole("button", { name: "Expand Own offer swap" }));
     await user.click(screen.getByRole("button", { name: "Cancel offer" }));
     await user.click(screen.getByRole("button", { name: "Expand Locked offer swap" }));
+    await user.click(screen.getByRole("button", { name: "Expand Overlap offer swap" }));
 
     expect(mocks.acceptMutate).toHaveBeenCalledWith(5, expect.objectContaining({
       onError: expect.any(Function),
@@ -253,6 +271,10 @@ describe("EmployeeSwapPage", () => {
       onError: expect.any(Function),
     }));
     expect(screen.getByText("Schedule is locked while a manager is editing it.")).toBeInTheDocument();
+    expect(screen.getByText("You already work during this time.")).toBeInTheDocument();
     expect(screen.getAllByText("Locked")).toHaveLength(1);
+    expect(screen.getAllByText("Can")).toHaveLength(1);
+    expect(screen.getAllByText("Can\u2019t")).toHaveLength(3);
+    expect(screen.getByText("Private")).toBeInTheDocument();
   });
 });

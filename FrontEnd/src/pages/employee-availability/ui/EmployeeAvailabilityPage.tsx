@@ -628,9 +628,14 @@ export function EmployeeAvailabilityPage() {
         <div className={styles.shell}>
           <section className={`${workspaceStyles.panel} ${styles.windowsPanel}`}>
             <div className={styles.windowsHeader}>
-              <div>
-                <span className={workspaceStyles.panelEyebrow}>Public windows</span>
-                <strong>{groups.length} active</strong>
+              <div className={styles.windowsHeading}>
+                <span className={styles.windowsIcon} aria-hidden="true">
+                  <AvailabilityIcon size={20} />
+                </span>
+                <div>
+                  <span className={workspaceStyles.panelEyebrow}>Public windows</span>
+                  <strong>{groups.length} active</strong>
+                </div>
               </div>
 
               <span className={styles.availableCount}>{availableDaysCount} available</span>
@@ -736,14 +741,18 @@ export function EmployeeAvailabilityPage() {
             <div className={styles.actions}>
               <IosButton
                 label={saveMutation.isPending ? "Saving..." : "Save"}
-                icon={<SaveIcon size={16} />}
+                icon={<SaveIcon size={14} />}
+                size="compact"
+                className={styles.editorActionButton}
                 disabled={!canSubmit}
                 onClick={handleSave}
               />
               <IosButton
                 label="Clear"
-                icon={<AvailabilityIcon size={16} />}
+                icon={<CloseIcon size={14} />}
                 variant="secondary"
+                size="compact"
+                className={`${styles.editorActionButton} ${styles.editorActionButtonClear}`}
                 disabled={!canSubmit}
                 onClick={handleClear}
               />

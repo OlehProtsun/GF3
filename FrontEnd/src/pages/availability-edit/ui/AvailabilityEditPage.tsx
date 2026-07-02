@@ -17,18 +17,27 @@ import {
 } from "@entities/availability-binds";
 import {
   buildAvailabilityCellMap,
+  buildAvailabilityTransferSourceHintData,
   clampAvailabilityMonth,
   clampAvailabilityYear,
   getAvailabilityCellKey,
   parseAvailabilityCode,
+  removeStagedAvailabilityTransferDay,
   sanitizeAvailabilityCellMap,
+  stageAvailabilityTransfer,
   type AvailabilityMatrixCellMap,
+  type StagedAvailabilityTransfer,
   useAvailabilityGroupByIdQuery,
   useAvailabilityGroupMembersQuery,
   useAvailabilityGroupSlotsQuery,
   useSaveAvailabilityGroupGraphMutation,
+  useAvailabilityTransferPreviewQuery,
 } from "@entities/availability-groups";
-import { AvailabilityGroupEditor } from "@entities/availability-groups/ui";
+import {
+  AvailabilityGroupEditor,
+  AvailabilityRelatedHintDialog,
+  AvailabilityTransferDialog,
+} from "@entities/availability-groups/ui";
 import type { AvailabilityPublicationStatus } from "@entities/availability-groups/model/types";
 import { useEmployeesListQuery } from "@entities/employees/api/queries";
 import { getEmployeeFullName } from "@entities/employees/model/presentation";
@@ -73,6 +82,7 @@ type AvailabilityEditorState = {
   selectedEmployeeId: number | null;
   selectedEmployeeIds: number[];
   cellMap: AvailabilityMatrixCellMap;
+  stagedTransfers: StagedAvailabilityTransfer[];
   cellErrors: Record<string, string>;
   informationErrors: AvailabilityEditorInformationErrors;
   publicationErrors: AvailabilityEditorPublicationErrors;
@@ -234,6 +244,7 @@ function createAvailabilityEditorState({
       selectedEmployeeId: null,
       selectedEmployeeIds: [],
       cellMap: {},
+      stagedTransfers: [],
       cellErrors: {},
       informationErrors: {},
       publicationErrors: {},
@@ -255,6 +266,7 @@ function createAvailabilityEditorState({
     selectedEmployeeId: selectedEmployeeIds[0] ?? null,
     selectedEmployeeIds,
     cellMap: sanitizeAvailabilityCellMap(hydratedCellMap, selectedEmployeeIds, group.year, group.month),
+    stagedTransfers: [],
     cellErrors: {},
     informationErrors: {},
     publicationErrors: {},
@@ -311,12 +323,13 @@ function buildAvailabilityEditorSnapshot({
   year,
   selectedEmployeeIds,
   cellMap,
+  stagedTransfers,
   publicationStatus,
   visibleFrom,
   visibleTo,
 }: Pick<
   AvailabilityEditorState,
-  "name" | "month" | "year" | "selectedEmployeeIds" | "cellMap" | "publicationStatus" | "visibleFrom" | "visibleTo"
+  "name" | "month" | "year" | "selectedEmployeeIds" | "cellMap" | "stagedTransfers" | "publicationStatus" | "visibleFrom" | "visibleTo"
 >) {
   const sanitizedCellMap = sanitizeAvailabilityCellMap(cellMap, selectedEmployeeIds, year, month);
 
@@ -329,6 +342,13 @@ function buildAvailabilityEditorSnapshot({
     visibleTo,
     selectedEmployeeIds,
     cellMap: Object.entries(sanitizedCellMap).sort(([leftKey], [rightKey]) => leftKey.localeCompare(rightKey)),
+    stagedTransfers: stagedTransfers
+      .map(transfer => ({
+        ...transfer,
+        dayOfMonths: [...transfer.dayOfMonths].sort((left, right) => left - right),
+      }))
+      .sort((left, right) =>
+        left.employeeId - right.employeeId || left.sourceGroupId - right.sourceGroupId),
   });
 }
 
@@ -465,6 +485,7 @@ export function AvailabilityEditPage() {
     selectedEmployeeId,
     selectedEmployeeIds,
     cellMap,
+    stagedTransfers,
     cellErrors,
     informationErrors,
     publicationErrors,
@@ -480,8 +501,11 @@ export function AvailabilityEditPage() {
   const bindRows = localBindRows ?? remoteBindRows;
   const [selectedBindClientId, setSelectedBindClientId] = useState<string | null>(null);
   const [bindDeleteTarget, setBindDeleteTarget] = useState<EditableAvailabilityBind | null>(null);
+  const [employeeRemoveTargetId, setEmployeeRemoveTargetId] = useState<number | null>(null);
   const [isHeaderCollapsed, setIsHeaderCollapsed] = useState(false);
   const [isCompactMatrix, setIsCompactMatrix] = useState(false);
+  const [transferEmployeeId, setTransferEmployeeId] = useState<number | null>(null);
+  const [activeRelatedHintCellKey, setActiveRelatedHintCellKey] = useState<string | null>(null);
 
   const employees = useMemo(() => employeesQuery.data ?? [], [employeesQuery.data]);
   const employeeNameById = useMemo(() => {
@@ -495,6 +519,75 @@ export function AvailabilityEditPage() {
   const existingMemberByEmployeeId = useMemo(() => {
     return new Map((membersQuery.data ?? []).map(member => [member.employeeId, member]));
   }, [membersQuery.data]);
+  const transferEmployeeName = transferEmployeeId !== null
+    ? employeeNameById.get(transferEmployeeId) ?? "Employee #" + transferEmployeeId
+    : "";
+  const transferPreviewQuery = useAvailabilityTransferPreviewQuery(
+    selectedEmployeeIds,
+    year,
+    month,
+    groupId,
+  );
+  const stagedTransferCellKeys = useMemo(
+    () => new Set(stagedTransfers.flatMap(transfer =>
+      transfer.dayOfMonths.map(dayOfMonth => getAvailabilityCellKey(transfer.employeeId, dayOfMonth)))),
+    [stagedTransfers],
+  );
+  const transferSources = useMemo(() => {
+    if (transferEmployeeId === null) {
+      return [];
+    }
+
+    return (transferPreviewQuery.data ?? [])
+      .filter(source => source.employeeId === transferEmployeeId)
+      .map(source => ({
+        ...source,
+        days: source.days.map(day => {
+          const cellKey = getAvailabilityCellKey(transferEmployeeId, day.dayOfMonth);
+          const parsedTarget = parseAvailabilityCode(cellMap[cellKey] ?? "-");
+          const targetIsEmpty = parsedTarget.ok && parsedTarget.value.normalizedCode === "-";
+
+          return {
+            ...day,
+            canTransfer: day.canTransfer && targetIsEmpty && !stagedTransferCellKeys.has(cellKey),
+          };
+        }),
+      }));
+  }, [cellMap, stagedTransferCellKeys, transferEmployeeId, transferPreviewQuery.data]);
+  const transferVisualHintData = useMemo(
+    () => buildAvailabilityTransferSourceHintData(transferPreviewQuery.data ?? []),
+    [transferPreviewQuery.data],
+  );
+  const transferVisualHintMap = transferVisualHintData.visualHintMap;
+  const activeRelatedHint = activeRelatedHintCellKey
+    ? transferVisualHintData.detailMap[activeRelatedHintCellKey] ?? null
+    : null;
+  const activeRelatedSource = activeRelatedHint
+    ? (transferPreviewQuery.data ?? []).find(source => (
+      source.employeeId === activeRelatedHint.employeeId &&
+      source.groupId === activeRelatedHint.sourceGroupId
+    )) ?? null
+    : null;
+  const activeRelatedHighlightedDays = useMemo(() => {
+    if (!activeRelatedHint || !activeRelatedSource) {
+      return [];
+    }
+
+    return activeRelatedSource.days.flatMap(day => {
+      const cellKey = getAvailabilityCellKey(activeRelatedHint.employeeId, day.dayOfMonth);
+      const detail = transferVisualHintData.detailMap[cellKey];
+      const parsedTarget = parseAvailabilityCode(cellMap[cellKey] ?? "-");
+      const isRenderedAsHint = parsedTarget.ok && parsedTarget.value.normalizedCode === "-";
+
+      return detail?.sourceGroupId === activeRelatedHint.sourceGroupId && isRenderedAsHint
+        ? [day.dayOfMonth]
+        : [];
+    });
+  }, [activeRelatedHint, activeRelatedSource, cellMap, transferVisualHintData.detailMap]);
+  const activeRelatedEmployeeName = activeRelatedHint
+    ? employeeNameById.get(activeRelatedHint.employeeId) ?? `Employee #${activeRelatedHint.employeeId}`
+    : "";
+
 
   const columns = useMemo(() => {
     return selectedEmployeeIds.map((employeeId, index) => {
@@ -511,8 +604,20 @@ export function AvailabilityEditPage() {
   }, [employeeNameById, existingMemberByEmployeeId, selectedEmployeeIds]);
 
   const assignedEmployees = useMemo(() => {
-    return columns.map(column => ({ id: column.employeeId, label: column.label }));
-  }, [columns]);
+    return columns.map(column => ({
+      id: column.employeeId,
+      label: column.label,
+      canChooseFromAnother: (transferPreviewQuery.data ?? []).some(source =>
+        source.employeeId === column.employeeId && source.days.some(day => {
+          const cellKey = getAvailabilityCellKey(column.employeeId, day.dayOfMonth);
+          const parsedTarget = parseAvailabilityCode(cellMap[cellKey] ?? "-");
+          return day.canTransfer &&
+            parsedTarget.ok &&
+            parsedTarget.value.normalizedCode === "-" &&
+            !stagedTransferCellKeys.has(cellKey);
+        })),
+    }));
+  }, [cellMap, columns, stagedTransferCellKeys, transferPreviewQuery.data]);
 
   const selectedBindRow = useMemo(
     () => bindRows.find(bind => bind.clientId === resolvedSelectedBindClientId) ?? null,
@@ -521,6 +626,9 @@ export function AvailabilityEditPage() {
 
   const activeBindValueByKey = useMemo(() => buildActiveAvailabilityBindMap(bindRows), [bindRows]);
   const bindDeleteLabel = bindDeleteTarget?.key.trim() || "this bind";
+  const employeeRemoveTargetLabel = employeeRemoveTargetId !== null
+    ? employeeNameById.get(employeeRemoveTargetId) ?? `Employee #${employeeRemoveTargetId}`
+    : "this employee";
 
   const backTo = isCreate ? "/availability" : `/availability/${groupId}`;
   const hasGroupLoadError = (groupQuery.isError || Boolean(groupQuery.error)) && !groupQuery.data;
@@ -547,8 +655,9 @@ export function AvailabilityEditPage() {
         visibleTo,
         selectedEmployeeIds,
         cellMap,
+        stagedTransfers,
       }),
-    [cellMap, month, name, publicationStatus, selectedEmployeeIds, visibleFrom, visibleTo, year],
+    [cellMap, month, name, publicationStatus, selectedEmployeeIds, stagedTransfers, visibleFrom, visibleTo, year],
   );
   const hasUnsavedChanges = useMemo(() => {
     if (isLoading || hasLoadError) {
@@ -646,17 +755,14 @@ export function AvailabilityEditPage() {
     });
   };
 
-  const handleRemoveEmployee = () => {
-    setEditorState((current) => {
-      if (!current.selectedEmployeeId) {
-        return {
-          ...current,
-          employeeError: undefined,
-          editorError: "Select employee first.",
-        };
-      }
+  const handleRemoveEmployeeConfirm = () => {
+    if (employeeRemoveTargetId === null) {
+      return;
+    }
 
-      if (!current.selectedEmployeeIds.includes(current.selectedEmployeeId)) {
+    const employeeId = employeeRemoveTargetId;
+    setEditorState((current) => {
+      if (!current.selectedEmployeeIds.includes(employeeId)) {
         return {
           ...current,
           employeeError: undefined,
@@ -665,13 +771,14 @@ export function AvailabilityEditPage() {
       }
 
       const nextSelectedEmployeeIds = current.selectedEmployeeIds.filter(
-        employeeId => employeeId !== current.selectedEmployeeId,
+        currentEmployeeId => currentEmployeeId !== employeeId,
       );
 
       return {
         ...current,
-        selectedEmployeeId: null,
+        selectedEmployeeId: current.selectedEmployeeId === employeeId ? null : current.selectedEmployeeId,
         selectedEmployeeIds: nextSelectedEmployeeIds,
+        stagedTransfers: current.stagedTransfers.filter(transfer => transfer.employeeId !== employeeId),
         employeeError: undefined,
         editorError: undefined,
         ...sanitizeAvailabilityEditorMatrices(
@@ -683,6 +790,45 @@ export function AvailabilityEditPage() {
         ),
       };
     });
+    setEmployeeRemoveTargetId(null);
+  };
+
+  const handleChooseFromAnother = (employeeId: number) => {
+    setEditorState(current => ({
+      ...current,
+      editorError: undefined,
+    }));
+    setTransferEmployeeId(employeeId);
+  };
+
+  const handleTransferConfirm = (sourceGroupId: number, dayOfMonths: number[]) => {
+    if (transferEmployeeId === null) {
+      return;
+    }
+
+    setEditorState(current => {
+      const staged = stageAvailabilityTransfer({
+        cellMap: current.cellMap,
+        transfers: current.stagedTransfers,
+        sources: transferSources,
+        employeeId: transferEmployeeId,
+        sourceGroupId,
+        dayOfMonths,
+      });
+
+      return {
+        ...current,
+        cellMap: staged.cellMap,
+        stagedTransfers: staged.transfers,
+        editorError: undefined,
+      };
+    });
+    setTransferEmployeeId(null);
+  };
+
+  const handleVisualHintClick = (employeeId: number, dayOfMonth: number) => {
+    const cellKey = getAvailabilityCellKey(employeeId, dayOfMonth);
+    setActiveRelatedHintCellKey(transferVisualHintData.detailMap[cellKey] ? cellKey : null);
   };
 
   const handleCellChange = (employeeId: number, dayOfMonth: number, value: string) => {
@@ -699,6 +845,11 @@ export function AvailabilityEditPage() {
           ...current.cellMap,
           [cellKey]: value,
         },
+        stagedTransfers: removeStagedAvailabilityTransferDay(
+          current.stagedTransfers,
+          employeeId,
+          dayOfMonth,
+        ),
         cellErrors: nextErrors,
       };
     });
@@ -928,6 +1079,7 @@ export function AvailabilityEditPage() {
         },
         employeeIds: selectedEmployeeIds,
         cellMap,
+        transfers: stagedTransfers,
         existingMembers: membersQuery.data ?? [],
         existingSlots: slotsQuery.data ?? [],
       },
@@ -995,6 +1147,7 @@ export function AvailabilityEditPage() {
         assignedEmployees={assignedEmployees}
         columns={columns}
         cellMap={cellMap}
+        visualHintMap={transferVisualHintMap}
         cellErrors={cellErrors}
         binds={bindRows}
         selectedBindClientId={resolvedSelectedBindClientId}
@@ -1029,6 +1182,7 @@ export function AvailabilityEditPage() {
             return {
               ...current,
               month: nextMonth,
+              stagedTransfers: [],
               informationErrors: nextInformationErrors,
               editorError: undefined,
               ...sanitizeAvailabilityEditorMatrices(
@@ -1051,6 +1205,7 @@ export function AvailabilityEditPage() {
             return {
               ...current,
               year: nextYear,
+              stagedTransfers: [],
               informationErrors: nextInformationErrors,
               editorError: undefined,
               ...sanitizeAvailabilityEditorMatrices(
@@ -1111,15 +1266,50 @@ export function AvailabilityEditPage() {
         onBindFieldChange={handleBindFieldChange}
         onBindCommit={handleBindCommit}
         onAddEmployee={handleAddEmployee}
-        onRemoveEmployee={handleRemoveEmployee}
+        onRemoveEmployee={setEmployeeRemoveTargetId}
+        onChooseFromAnother={handleChooseFromAnother}
         onAddBind={handleAddBind}
         onDeleteBind={handleDeleteBind}
         onColumnMove={handleColumnMove}
         onCellChange={handleCellChange}
+        onVisualHintClick={handleVisualHintClick}
         onSave={handleSave}
         />
       ) : null}
 
+      <AvailabilityTransferDialog
+        open={transferEmployeeId !== null}
+        employeeId={transferEmployeeId ?? 0}
+        employeeName={transferEmployeeName}
+        year={year}
+        month={month}
+        sources={transferSources}
+        isLoading={transferPreviewQuery.isLoading || transferPreviewQuery.isFetching}
+        isPending={false}
+        errorMessage={transferPreviewQuery.isError ? "Could not load availability transfer sources." : undefined}
+        onCancel={() => setTransferEmployeeId(null)}
+        onConfirm={handleTransferConfirm}
+      />
+
+      <AvailabilityRelatedHintDialog
+        open={activeRelatedHint !== null}
+        employeeId={activeRelatedHint?.employeeId ?? 0}
+        employeeName={activeRelatedEmployeeName}
+        year={year}
+        month={month}
+        source={activeRelatedSource}
+        highlightedDayOfMonths={activeRelatedHighlightedDays}
+        onCancel={() => setActiveRelatedHintCellKey(null)}
+      />
+
+      <ConfirmDialog
+        open={employeeRemoveTargetId !== null}
+        title="Remove employee"
+        message={`Are you sure you want to remove '${employeeRemoveTargetLabel}' from this availability? Their availability data in this editor will be removed.`}
+        onCancel={() => setEmployeeRemoveTargetId(null)}
+        onConfirm={handleRemoveEmployeeConfirm}
+        confirmText="Remove"
+      />
       <ConfirmDialog
         open={bindDeleteTarget !== null}
         title="Delete bind"

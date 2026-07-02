@@ -60,19 +60,14 @@ public sealed class LauncherTests
     [Fact]
     public void LauncherDatabaseSelectionStore_ResolveDatabasePath_UsesSavedSelection()
     {
-        var localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-        var stateDirectory = Path.Combine(localAppData, "GF3");
-        var statePath = Path.Combine(stateDirectory, "database-selection.json");
-        var hadExistingState = File.Exists(statePath);
-        var existingStateJson = hadExistingState ? File.ReadAllText(statePath) : null;
-        var databasePath = Path.Combine(localAppData, "GF3.Tests", Guid.NewGuid().ToString("N"), "custom.db");
+        var root = Path.Combine(Path.GetTempPath(), "GF3.Tests", Guid.NewGuid().ToString("N"));
+        var statePath = Path.Combine(root, "database-selection.json");
+        var databasePath = Path.Combine(root, "custom.db");
 
         try
         {
-            Directory.CreateDirectory(Path.GetDirectoryName(databasePath)!);
+            Directory.CreateDirectory(root);
             File.WriteAllText(databasePath, "db");
-
-            Directory.CreateDirectory(stateDirectory);
             File.WriteAllText(
                 statePath,
                 JsonSerializer.Serialize(new
@@ -85,30 +80,19 @@ public sealed class LauncherTests
             var resolved = (string)ReflectionTestHelper.InvokeStatic(
                 storeType,
                 "ResolveDatabasePath",
-                Path.Combine(localAppData, "fallback.db"))!;
+                Path.Combine(root, "fallback.db"),
+                root)!;
 
             Assert.Equal(Path.GetFullPath(databasePath), resolved);
         }
         finally
         {
-            if (hadExistingState)
+            if (Directory.Exists(root))
             {
-                Directory.CreateDirectory(stateDirectory);
-                File.WriteAllText(statePath, existingStateJson!);
-            }
-            else if (File.Exists(statePath))
-            {
-                File.Delete(statePath);
-            }
-
-            var databaseDirectory = Path.GetDirectoryName(databasePath);
-            if (!string.IsNullOrWhiteSpace(databaseDirectory) && Directory.Exists(databaseDirectory))
-            {
-                Directory.Delete(databaseDirectory, recursive: true);
+                Directory.Delete(root, recursive: true);
             }
         }
     }
-
     [Fact]
     public void LauncherRuntimeResolver_ResolveWorkspaceMode_BuildsExpectedPlan()
     {

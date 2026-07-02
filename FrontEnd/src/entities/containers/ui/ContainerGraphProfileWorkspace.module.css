@@ -148,6 +148,46 @@
   line-height: 1.35;
 }
 
+.lastUpdateField {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 10px;
+  padding: 11px 12px;
+  border: 1px solid rgba(37, 99, 235, 0.14);
+  border-radius: 14px;
+  background: linear-gradient(135deg, rgba(239, 246, 255, 0.92), rgba(248, 250, 252, 0.96));
+}
+
+.lastUpdateLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: #64748b;
+  font-size: 0.72rem;
+  font-weight: 850;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.lastUpdateDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: #2563eb;
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.1);
+}
+
+.lastUpdateValue {
+  color: #1e3a8a;
+  font-size: 0.82rem;
+  font-weight: 900;
+  line-height: 1.3;
+  text-align: right;
+}
+
 .mutedValue {
   color: rgba(71, 85, 105, 0.76);
 }
@@ -384,5 +424,14 @@
 
   .profileNoteValueEmpty {
     min-height: 8rem;
+  }
+
+  .lastUpdateField {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .lastUpdateValue {
+    text-align: left;
   }
 }

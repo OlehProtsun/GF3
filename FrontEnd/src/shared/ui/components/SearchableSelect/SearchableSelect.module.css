@@ -49,6 +49,25 @@
     inset 0 1px 0 rgba(255, 255, 255, 0.72),
     0 10px 24px rgba(15, 23, 42, 0.05);
 }
+.selectButtonSummary {
+  min-height: 42px;
+  padding: 8px 12px;
+  border-radius: 16px;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.82),
+    0 6px 14px rgba(15, 23, 42, 0.05);
+}
+
+.selectButtonSummary .selectButtonText {
+  gap: 0;
+}
+
+.selectButtonSummary .selectButtonLabel {
+  color: #1e3a8a;
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+
 
 .selectButtonField .selectButtonText {
   gap: 0;

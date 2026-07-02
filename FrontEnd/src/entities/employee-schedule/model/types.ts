@@ -18,6 +18,13 @@ export type EmployeeScheduleEmployee = {
   displayOrder: number;
 };
 
+export type EmployeeScheduleRelatedAssignment = {
+  employeeId: number;
+  dayOfMonth: number;
+  scheduleId: number;
+  scheduleName: string;
+};
+
 export type EmployeeSchedule = {
   id: number;
   containerId: number;
@@ -29,6 +36,8 @@ export type EmployeeSchedule = {
   year: number;
   month: number;
   publicationStatus: "public" | "private";
+  lastUpdatedAtUtc?: string | null;
   employees?: EmployeeScheduleEmployee[];
   slots: EmployeeScheduleSlot[];
+  relatedScheduleAssignments?: EmployeeScheduleRelatedAssignment[];
 };

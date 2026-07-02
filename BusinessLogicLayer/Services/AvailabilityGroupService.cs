@@ -21,15 +21,18 @@ public class AvailabilityGroupService : IAvailabilityGroupService
     private readonly IAvailabilityGroupRepository _groupRepo;
     private readonly IAvailabilityGroupMemberRepository _memberRepo;
     private readonly IAvailabilityGroupDayRepository _dayRepo;
+    private readonly IAvailabilityGroupTransferRepository? _transferRepo;
 
     public AvailabilityGroupService(
         IAvailabilityGroupRepository groupRepo,
         IAvailabilityGroupMemberRepository memberRepo,
-        IAvailabilityGroupDayRepository dayRepo)
+        IAvailabilityGroupDayRepository dayRepo,
+        IAvailabilityGroupTransferRepository? transferRepo = null)
     {
         _groupRepo = groupRepo;
         _memberRepo = memberRepo;
         _dayRepo = dayRepo;
+        _transferRepo = transferRepo;
     }
 
     public async Task<AvailabilityGroupModel?> GetAsync(int id, CancellationToken ct = default)
@@ -125,6 +128,17 @@ public class AvailabilityGroupService : IAvailabilityGroupService
         }
 
         var normalizedDays = NormalizeEmployeeDays(days, published.Group);
+        if (_transferRepo is not null)
+        {
+            var transferredDays = await _transferRepo
+                .GetOutgoingDayNumbersAsync(published.Member.Id, ct)
+                .ConfigureAwait(false);
+            foreach (var transferredDay in normalizedDays.Where(day => transferredDays.Contains(day.DayOfMonth)))
+            {
+                transferredDay.Kind = AvailabilityKind.NONE;
+                transferredDay.IntervalStr = null;
+            }
+        }
         await ReplaceMemberDaysAsync(published.Member.Id, normalizedDays, ct).ConfigureAwait(false);
 
         var stampedMember = new AvailabilityGroupMemberModel
