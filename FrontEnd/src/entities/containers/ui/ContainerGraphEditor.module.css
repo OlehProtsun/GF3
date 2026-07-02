@@ -23,12 +23,15 @@
 
 .sidebarColumn {
   flex: 0 0 392px;
+  width: 392px;
+  max-width: 392px;
+  box-sizing: border-box;
   min-width: 0;
   min-height: 0;
   overflow-y: auto;
   overflow-x: clip;
   overflow-clip-margin: 18px;
-  direction: rtl;
+  direction: ltr;
   margin-top: calc(-1 * var(--schedule-edit-header-underlap, 0px));
   padding: calc(2px + var(--schedule-edit-header-underlap, 0px)) 8px 0 6px;
   scrollbar-width: none;
@@ -37,6 +40,9 @@
 
 .sidebarColumnCollapsed {
   flex-basis: 46px;
+  width: 46px;
+  min-width: 46px;
+  max-width: 46px;
   margin-top: calc(-1 * var(--schedule-edit-header-underlap, 0px));
   padding: calc(8px + var(--schedule-edit-header-underlap, 0px)) 0 0 0;
   overflow: clip;
@@ -557,10 +563,46 @@
   font-weight: 750;
 }
 
+.publicationLogSearch {
+  min-width: 0;
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 11px;
+  box-sizing: border-box;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 13px;
+  background: rgba(255, 255, 255, 0.9);
+  color: #64748b;
+}
+
+.publicationLogSearch:focus-within {
+  border-color: rgba(37, 99, 235, 0.38);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+  color: #2563eb;
+}
+
+.publicationLogSearch input {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: #0f172a;
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.publicationLogSearch input::placeholder {
+  color: rgba(100, 116, 139, 0.76);
+}
+
 .publicationLogList {
   display: grid;
   gap: 8px;
-  max-height: 220px;
+  max-height: 888px;
   overflow-y: auto;
   overscroll-behavior: contain;
   padding-right: 2px;
@@ -582,10 +624,20 @@
 .publicationLogItem {
   display: grid;
   gap: 7px;
+  min-height: 104px;
   padding: 10px;
+  box-sizing: border-box;
   border-radius: 16px;
   border: 1px solid rgba(148, 163, 184, 0.14);
   background: rgba(255, 255, 255, 0.84);
+}
+
+.publicationLogItemHeader {
+  min-width: 0;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
 }
 
 .publicationLogItemMain {
@@ -597,6 +649,34 @@
   font-size: 0.82rem;
   font-weight: 800;
   line-height: 1.25;
+}
+
+.publicationLogViewButton {
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  border: 1px solid rgba(96, 165, 250, 0.22);
+  border-radius: 50%;
+  background: rgba(239, 246, 255, 0.9);
+  color: #2563eb;
+  cursor: pointer;
+  transition:
+    background-color 140ms ease,
+    border-color 140ms ease,
+    transform 140ms ease;
+}
+
+.publicationLogViewButton:hover {
+  border-color: rgba(37, 99, 235, 0.36);
+  background: #dbeafe;
+  transform: translateY(-1px);
+}
+
+.publicationLogViewButton:focus-visible {
+  outline: 3px solid rgba(37, 99, 235, 0.14);
 }
 
 .publicationLogItemMain strong {
@@ -1143,6 +1223,9 @@
   .sidebarColumn,
   .sidebarColumnCollapsed {
     flex-basis: auto;
+    width: auto;
+    min-width: 0;
+    max-width: none;
     margin-top: 0;
     overflow: visible;
     direction: ltr;

@@ -14,10 +14,30 @@
   gap: 12px;
 }
 
-.windowsHeader > div {
+.windowsHeading {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.windowsHeading > div {
   min-width: 0;
   display: grid;
   gap: 4px;
+}
+
+.windowsIcon {
+  width: 44px;
+  height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  border-radius: 18px;
+  border: 1px solid rgba(37, 99, 235, 0.16);
+  background: rgba(219, 234, 254, 0.8);
+  color: #1d4ed8;
 }
 
 .windowsHeader strong {
@@ -307,7 +327,29 @@
 .actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 7px;
+}
+
+.editorActionButton {
+  --ios-button-height: 34px;
+  --ios-button-padding-block: 0.35rem;
+  --ios-button-padding-inline: 0.68rem;
+  --ios-button-gap: 6px;
+  --ios-button-font-size: 0.8rem;
+  --ios-button-radius: 13px;
+  --btn-shadow: transparent;
+
+  font-weight: 800;
+  box-shadow: none;
+}
+
+.editorActionButtonClear {
+  --btn-bg: rgba(248, 250, 252, 0.96);
+  --btn-bg-hover: #ffffff;
+  --btn-border: rgba(148, 163, 184, 0.2);
+  --btn-focus: rgba(100, 116, 139, 0.14);
+
+  color: #475569;
 }
 
 .closedMessage {
@@ -655,6 +697,21 @@
 }
 
 @media (max-width: 460px) {
+  .windowsHeader {
+    align-items: center;
+    gap: 8px;
+  }
+
+  .windowsHeading {
+    gap: 9px;
+  }
+
+  .windowsIcon {
+    width: 40px;
+    height: 40px;
+    border-radius: 15px;
+  }
+
   .groupButton {
     grid-template-columns: auto minmax(0, 1fr);
   }

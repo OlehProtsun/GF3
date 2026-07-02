@@ -66,6 +66,7 @@ const ContainerGraphEditPage = lazyPage(
   (module) => module.ContainerGraphEditPage,
 );
 const InformationPage = lazyPage(() => import("@pages/information"), (module) => module.InformationPage);
+const CommunicationsPage = lazyPage(() => import("@pages/communications"), (module) => module.CommunicationsPage);
 const DataBasePage = lazyPage(() => import("@pages/database"), (module) => module.DataBasePage);
 const ManagerAccountPage = lazyPage(() => import("@pages/manager-account"), (module) => module.ManagerAccountPage);
 const EmployeeListPage = lazyPage(() => import("@pages/employee-list"), (module) => module.EmployeeListPage);
@@ -86,6 +87,7 @@ const managerRoutes = [
   { path: "/container/:containerId/graphs/:graphId", element: <ContainerGraphProfilePage /> },
   { path: "/container", element: <ContainerPage /> },
   { path: "/information", element: <InformationPage /> },
+  { path: "/communications", element: <CommunicationsPage /> },
   { path: "/database", element: <DataBasePage /> },
   { path: "/manager-profile", element: <ManagerAccountPage /> },
   { path: "/employee/new", element: <EmployeeEditPage /> },

@@ -4,6 +4,7 @@ using BusinessLogicLayer.Contracts.Enums;
 using BusinessLogicLayer.Contracts.Models;
 using BusinessLogicLayer.Generators;
 using BusinessLogicLayer.Mappers;
+using BusinessLogicLayer.Schedule;
 using BusinessLogicLayer.Services.Abstractions;
 using DataAccessLayer.Repositories.Abstractions;
 using Microsoft.EntityFrameworkCore;
@@ -454,19 +455,38 @@ public class ContainerService : IContainerService
             .ToList();
     }
 
-    private async Task<List<AvailabilityGroupModel>> LoadAvailabilityGroupsAsync(ScheduleModel schedule, CancellationToken ct)
+    private async Task<List<AvailabilityGroupModel>> LoadAvailabilityGroupsAsync(
+        ScheduleModel schedule,
+        IEnumerable<ScheduleEmployeeModel> employees,
+        CancellationToken ct)
     {
         var availabilities = new List<AvailabilityGroupModel>();
 
-        if (schedule.AvailabilityGroupId is not int availabilityGroupId || availabilityGroupId <= 0)
+        if (schedule.AvailabilityGroupId is int availabilityGroupId && availabilityGroupId > 0)
         {
-            return availabilities;
+            var group = await _availabilityGroupRepo.GetFullByIdAsync(availabilityGroupId, ct).ConfigureAwait(false)
+                ?? throw new KeyNotFoundException($"Availability group with id {availabilityGroupId} was not found.");
+
+            availabilities.Add(group.ToContract());
         }
 
-        var group = await _availabilityGroupRepo.GetFullByIdAsync(availabilityGroupId, ct).ConfigureAwait(false)
-            ?? throw new KeyNotFoundException($"Availability group with id {availabilityGroupId} was not found.");
+        var otherSchedules = await _scheduleRepo
+            .GetByMonthWithSlotsAsync(
+                schedule.Year,
+                schedule.Month,
+                schedule.Id > 0 ? schedule.Id : null,
+                ct)
+            .ConfigureAwait(false);
+        var savedScheduleConstraint = ExternalScheduleAvailabilityBuilder.Build(
+            schedule,
+            otherSchedules.SelectMany(otherSchedule => otherSchedule.Slots).Select(slot => slot.ToContract()),
+            employees.Select(employee => employee.EmployeeId));
 
-        availabilities.Add(group.ToContract());
+        if (savedScheduleConstraint is not null)
+        {
+            availabilities.Add(savedScheduleConstraint);
+        }
+
         return availabilities;
     }
 
@@ -476,10 +496,11 @@ public class ContainerService : IContainerService
         IProgress<int>? progress,
         CancellationToken ct)
     {
-        var availabilities = await LoadAvailabilityGroupsAsync(schedule, ct).ConfigureAwait(false);
+        var employeeList = employees.ToList();
+        var availabilities = await LoadAvailabilityGroupsAsync(schedule, employeeList, ct).ConfigureAwait(false);
 
         return (await _scheduleGenerator
-            .GenerateAsync(schedule, availabilities, employees, progress, ct)
+            .GenerateAsync(schedule, availabilities, employeeList, progress, ct)
             .ConfigureAwait(false))
             .Select(slot =>
             {

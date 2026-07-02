@@ -9,6 +9,7 @@ public static class ManagerEditResourceTypes
     public const string Container = "container";
     public const string AvailabilityBind = "availability-bind";
     public const string ManagerProfile = "manager-profile";
+    public const string Communication = "communication";
 }
 
 public static class ManagerEditLockTargets

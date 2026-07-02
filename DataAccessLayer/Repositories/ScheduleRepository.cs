@@ -71,6 +71,23 @@ public class ScheduleRepository : GenericRepository<ScheduleModel>, IScheduleRep
             .ConfigureAwait(false);
 
     /// <inheritdoc />
+    public async Task<List<ScheduleModel>> GetByMonthWithSlotsAsync(
+        int year,
+        int month,
+        int? excludeScheduleId = null,
+        CancellationToken ct = default)
+        => await _set
+            .AsNoTracking()
+            .AsSplitQuery()
+            .Include(schedule => schedule.Slots)
+            .Where(schedule =>
+                schedule.Year == year &&
+                schedule.Month == month &&
+                (!excludeScheduleId.HasValue || schedule.Id != excludeScheduleId.Value))
+            .ToListAsync(ct)
+            .ConfigureAwait(false);
+
+    /// <inheritdoc />
     public async Task<ScheduleModel?> GetDetailedAsync(int id, CancellationToken ct = default)
         => await _set
             .AsNoTracking()

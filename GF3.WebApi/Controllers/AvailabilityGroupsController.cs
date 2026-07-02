@@ -1,4 +1,5 @@
 using BusinessLogicLayer.Services.Abstractions;
+using BusinessLogicLayer.Contracts.Enums;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using WebApi.Auth;
@@ -7,6 +8,7 @@ using WebApi.Contracts.AvailabilityGroups.Members;
 using WebApi.Contracts.AvailabilityGroups.Slots;
 using WebApi.Mappers;
 using WebApi.Realtime;
+using WebApi.Services;
 
 namespace WebApi.Controllers;
 
@@ -21,7 +23,8 @@ namespace WebApi.Controllers;
 public class AvailabilityGroupsController(
     IAvailabilityGroupService availabilityGroupService,
     IRealtimeNotifier? realtimeNotifier = null,
-    IManagerEditLockService? editLockService = null) : ControllerBase
+    IManagerEditLockService? editLockService = null,
+    IWorkflowLogService? workflowLogService = null) : ControllerBase
 {
     [HttpGet]
     [ProducesResponseType(typeof(IEnumerable<AvailabilityGroupDto>), StatusCodes.Status200OK)]
@@ -185,7 +188,13 @@ public class AvailabilityGroupsController(
     {
         var created = await availabilityGroupService.CreateAsync(request.ToCreateModel(), cancellationToken).ConfigureAwait(false);
         var dto = created.ToApiDto();
-        await NotifyAvailabilityChangedAsync(dto.Id, "manager-availability-created").ConfigureAwait(false);
+        var isPublished = created.PublicationStatus == AvailabilityPublicationStatus.Public;
+        await LogManagerActionAsync(
+            $"{(isPublished ? "Published" : "Created")} {DescribeAvailability(created)}.",
+            cancellationToken).ConfigureAwait(false);
+        await NotifyAvailabilityChangedAsync(
+            dto.Id,
+            isPublished ? "manager-availability-published" : "manager-availability-created").ConfigureAwait(false);
         return CreatedAtAction(nameof(GetById), new { id = dto.Id }, dto);
     }
 
@@ -201,10 +210,19 @@ public class AvailabilityGroupsController(
             return conflict;
         }
 
-        _ = await RequireGroupAsync(id, cancellationToken).ConfigureAwait(false);
+        var existing = await RequireGroupAsync(id, cancellationToken).ConfigureAwait(false);
+        var updatedModel = request.ToUpdateModel(id);
+        var becamePublic =
+            existing.PublicationStatus != AvailabilityPublicationStatus.Public &&
+            updatedModel.PublicationStatus == AvailabilityPublicationStatus.Public;
 
-        await availabilityGroupService.UpdateAsync(request.ToUpdateModel(id), cancellationToken).ConfigureAwait(false);
-        await NotifyAvailabilityChangedAsync(id, "manager-availability-updated").ConfigureAwait(false);
+        await availabilityGroupService.UpdateAsync(updatedModel, cancellationToken).ConfigureAwait(false);
+        await LogManagerActionAsync(
+            $"{(becamePublic ? "Published" : "Updated")} {DescribeAvailability(updatedModel)}.",
+            cancellationToken).ConfigureAwait(false);
+        await NotifyAvailabilityChangedAsync(
+            id,
+            becamePublic ? "manager-availability-published" : "manager-availability-updated").ConfigureAwait(false);
         return NoContent();
     }
 
@@ -219,9 +237,10 @@ public class AvailabilityGroupsController(
             return conflict;
         }
 
-        _ = await RequireGroupAsync(id, cancellationToken).ConfigureAwait(false);
+        var existing = await RequireGroupAsync(id, cancellationToken).ConfigureAwait(false);
 
         await availabilityGroupService.DeleteAsync(id, cancellationToken).ConfigureAwait(false);
+        await LogManagerActionAsync($"Deleted {DescribeAvailability(existing)}.", cancellationToken).ConfigureAwait(false);
         await NotifyAvailabilityChangedAsync(id, "manager-availability-deleted").ConfigureAwait(false);
         return NoContent();
     }
@@ -238,6 +257,22 @@ public class AvailabilityGroupsController(
             ManagerEditResourceTypes.AvailabilityGroup,
             groupId.ToString(),
             reason) ?? Task.CompletedTask;
+
+    private Task LogManagerActionAsync(string action, CancellationToken cancellationToken)
+        => workflowLogService?.LogAsync(User, action, cancellationToken) ?? Task.CompletedTask;
+
+    private static string DescribeAvailability(BusinessLogicLayer.Contracts.Models.AvailabilityGroupModel group)
+    {
+        var period = new DateTime(group.Year, group.Month, 1)
+            .ToString("MMMM yyyy", System.Globalization.CultureInfo.InvariantCulture);
+        var window = group.VisibleFromUtc.HasValue && group.VisibleToUtc.HasValue
+            ? $", visible {FormatDateTime(group.VisibleFromUtc.Value)} to {FormatDateTime(group.VisibleToUtc.Value)}"
+            : string.Empty;
+        return $"availability \"{group.Name}\" for {period}{window}";
+    }
+
+    private static string FormatDateTime(DateTimeOffset value)
+        => value.ToUniversalTime().ToString("yyyy-MM-dd HH:mm 'UTC'", System.Globalization.CultureInfo.InvariantCulture);
 
     private async Task<BusinessLogicLayer.Contracts.Models.AvailabilityGroupModel> RequireGroupAsync(int groupId, CancellationToken cancellationToken)
     {

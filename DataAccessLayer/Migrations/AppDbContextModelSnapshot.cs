@@ -58,6 +58,53 @@ namespace DataAccessLayer.Migrations
                         });
                 });
 
+            modelBuilder.Entity("DataAccessLayer.Models.AvailabilityGroupDayTransferModel", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<int>("DayOfMonth")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("day_of_month");
+
+                    b.Property<int>("SourceMemberId")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("source_member_id");
+
+                    b.Property<int>("TargetMemberId")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("target_member_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SourceMemberId", "DayOfMonth")
+                        .IsUnique()
+                        .HasDatabaseName("ux_avail_transfer_source_day");
+
+                    b.HasIndex("TargetMemberId", "DayOfMonth")
+                        .IsUnique()
+                        .HasDatabaseName("ux_avail_transfer_target_day");
+
+                    b.HasIndex(new[] { "SourceMemberId", "DayOfMonth" }, "ux_avail_transfer_source_day")
+                        .IsUnique();
+
+                    b.HasIndex(new[] { "TargetMemberId", "DayOfMonth" }, "ux_avail_transfer_target_day")
+                        .IsUnique();
+
+                    b.ToTable("availability_group_day_transfer", t =>
+                        {
+                            t.HasCheckConstraint("ck_avail_transfer_distinct_members", "source_member_id <> target_member_id");
+
+                            t.HasCheckConstraint("ck_avail_transfer_dom", "day_of_month BETWEEN 1 AND 31");
+                        });
+                });
+
             modelBuilder.Entity("DataAccessLayer.Models.AvailabilityGroupMemberModel", b =>
                 {
                     b.Property<int>("Id")
@@ -174,6 +221,70 @@ namespace DataAccessLayer.Migrations
                     b.ToTable("AvailabilityBinds");
                 });
 
+            modelBuilder.Entity("DataAccessLayer.Models.CommunicationMessageModel", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Body")
+                        .IsRequired()
+                        .HasMaxLength(4000)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("body");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<int?>("CreatedByManagerId")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("created_by_manager_id");
+
+                    b.Property<string>("CreatedByManagerName")
+                        .IsRequired()
+                        .HasMaxLength(160)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("created_by_manager_name");
+
+                    b.Property<DateTimeOffset>("DeadlineAtUtc")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("deadline_at_utc");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(160)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("title");
+
+                    b.Property<DateTimeOffset?>("VisibleFromUtc")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("visible_from_utc");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedAtUtc")
+                        .HasDatabaseName("ix_communication_message_created");
+
+                    b.HasIndex("CreatedByManagerId");
+
+                    b.HasIndex("DeadlineAtUtc")
+                        .HasDatabaseName("ix_communication_message_deadline");
+
+                    b.HasIndex("VisibleFromUtc")
+                        .HasDatabaseName("ix_communication_message_visible_from");
+
+                    b.ToTable("communication_message", t =>
+                        {
+                            t.HasCheckConstraint("ck_communication_message_body", "length(trim(body)) > 0");
+
+                            t.HasCheckConstraint("ck_communication_message_deadline", "deadline_at_utc > created_at_utc");
+
+                            t.HasCheckConstraint("ck_communication_message_title", "length(trim(title)) > 0");
+                        });
+                });
+
             modelBuilder.Entity("DataAccessLayer.Models.ContainerModel", b =>
                 {
                     b.Property<int>("Id")
@@ -258,6 +369,71 @@ namespace DataAccessLayer.Migrations
                     b.ToTable("employee_account");
                 });
 
+            modelBuilder.Entity("DataAccessLayer.Models.EmployeeCommunicationDismissalModel", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("id");
+
+                    b.Property<int>("CommunicationMessageId")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("communication_message_id");
+
+                    b.Property<DateTimeOffset>("DismissedAtUtc")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("dismissed_at_utc");
+
+                    b.Property<int>("EmployeeId")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("employee_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CommunicationMessageId", "EmployeeId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_employee_comm_dismissal_msg_emp");
+
+                    b.HasIndex("EmployeeId", "DismissedAtUtc")
+                        .HasDatabaseName("ix_employee_comm_dismissal_emp_time");
+
+                    b.ToTable("employee_communication_dismissal");
+                });
+
+            modelBuilder.Entity("DataAccessLayer.Models.EmployeeModel", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Email")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("email");
+
+                    b.Property<string>("FirstName")
+                        .IsRequired()
+                        .HasColumnType("TEXT")
+                        .HasColumnName("first_name");
+
+                    b.Property<string>("LastName")
+                        .IsRequired()
+                        .HasColumnType("TEXT")
+                        .HasColumnName("last_name");
+
+                    b.Property<string>("Phone")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("phone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("FirstName", "LastName")
+                        .IsUnique()
+                        .HasDatabaseName("ux_employee_full_name");
+
+                    b.ToTable("employee");
+                });
+
             modelBuilder.Entity("DataAccessLayer.Models.ManagerAccountModel", b =>
                 {
                     b.Property<int>("Id")
@@ -323,40 +499,6 @@ namespace DataAccessLayer.Migrations
                         .HasDatabaseName("ux_manager_account_username");
 
                     b.ToTable("manager_account");
-                });
-
-            modelBuilder.Entity("DataAccessLayer.Models.EmployeeModel", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("INTEGER")
-                        .HasColumnName("id");
-
-                    b.Property<string>("Email")
-                        .HasColumnType("TEXT")
-                        .HasColumnName("email");
-
-                    b.Property<string>("FirstName")
-                        .IsRequired()
-                        .HasColumnType("TEXT")
-                        .HasColumnName("first_name");
-
-                    b.Property<string>("LastName")
-                        .IsRequired()
-                        .HasColumnType("TEXT")
-                        .HasColumnName("last_name");
-
-                    b.Property<string>("Phone")
-                        .HasColumnType("TEXT")
-                        .HasColumnName("phone");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("FirstName", "LastName")
-                        .IsUnique()
-                        .HasDatabaseName("ux_employee_full_name");
-
-                    b.ToTable("employee");
                 });
 
             modelBuilder.Entity("DataAccessLayer.Models.ScheduleCellStyleModel", b =>
@@ -753,6 +895,142 @@ namespace DataAccessLayer.Migrations
                         });
                 });
 
+            modelBuilder.Entity("DataAccessLayer.Models.ShiftSwapHistoryModel", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("AcceptedAtUtc")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("accepted_at_utc");
+
+                    b.Property<int>("AcceptedByEmployeeId")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("accepted_by_employee_id");
+
+                    b.Property<string>("AcceptedByEmployeeName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("accepted_by_employee_name");
+
+                    b.Property<string>("AfterSnapshotJson")
+                        .IsRequired()
+                        .HasColumnType("TEXT")
+                        .HasColumnName("after_snapshot_json");
+
+                    b.Property<string>("BeforeSnapshotJson")
+                        .IsRequired()
+                        .HasColumnType("TEXT")
+                        .HasColumnName("before_snapshot_json");
+
+                    b.Property<string>("ContainerName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("container_name");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<int>("DayOfMonth")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("day_of_month");
+
+                    b.Property<int?>("FromEmployeeId")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("from_employee_id");
+
+                    b.Property<string>("FromEmployeeName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("from_employee_name");
+
+                    b.Property<string>("FromTime")
+                        .IsRequired()
+                        .HasMaxLength(5)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("from_time");
+
+                    b.Property<bool>("IsManagerCreated")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("is_manager_created");
+
+                    b.Property<int?>("ManualColumnId")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("manual_column_id");
+
+                    b.Property<string>("ManualColumnName")
+                        .HasMaxLength(200)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("manual_column_name");
+
+                    b.Property<int>("Month")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("month");
+
+                    b.Property<int>("ScheduleId")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("schedule_id");
+
+                    b.Property<string>("ScheduleName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("schedule_name");
+
+                    b.Property<int>("ScheduleSlotId")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("schedule_slot_id");
+
+                    b.Property<string>("ShopName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("shop_name");
+
+                    b.Property<int>("SourceShiftSwapRequestId")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("source_shift_swap_request_id");
+
+                    b.Property<int?>("TargetEmployeeId")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("target_employee_id");
+
+                    b.Property<string>("TargetEmployeeName")
+                        .HasMaxLength(200)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("target_employee_name");
+
+                    b.Property<string>("ToTime")
+                        .IsRequired()
+                        .HasMaxLength(5)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("to_time");
+
+                    b.Property<int>("Year")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("year");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex(new[] { "ScheduleId", "AcceptedAtUtc" }, "ix_shift_swap_history_schedule_accepted");
+
+                    b.HasIndex(new[] { "SourceShiftSwapRequestId" }, "ux_shift_swap_history_source_request")
+                        .IsUnique();
+
+                    b.ToTable("shift_swap_history", t =>
+                        {
+                            t.HasCheckConstraint("ck_shift_swap_history_dom", "day_of_month BETWEEN 1 AND 31");
+
+                            t.HasCheckConstraint("ck_shift_swap_history_month", "month BETWEEN 1 AND 12");
+                        });
+                });
+
             modelBuilder.Entity("DataAccessLayer.Models.ShiftSwapRequestModel", b =>
                 {
                     b.Property<int>("Id")
@@ -907,6 +1185,12 @@ namespace DataAccessLayer.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("OccurredAtUtc")
+                        .HasDatabaseName("ix_workflow_log_occurred_at");
+
+                    b.HasIndex("ActorRole", "OccurredAtUtc")
+                        .HasDatabaseName("ix_workflow_log_role_time");
+
                     b.HasIndex(new[] { "OccurredAtUtc" }, "ix_workflow_log_occurred_at");
 
                     b.HasIndex(new[] { "ActorRole", "OccurredAtUtc" }, "ix_workflow_log_role_time");
@@ -923,6 +1207,25 @@ namespace DataAccessLayer.Migrations
                         .IsRequired();
 
                     b.Navigation("AvailabilityGroupMember");
+                });
+
+            modelBuilder.Entity("DataAccessLayer.Models.AvailabilityGroupDayTransferModel", b =>
+                {
+                    b.HasOne("DataAccessLayer.Models.AvailabilityGroupMemberModel", "SourceMember")
+                        .WithMany()
+                        .HasForeignKey("SourceMemberId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("DataAccessLayer.Models.AvailabilityGroupMemberModel", "TargetMember")
+                        .WithMany()
+                        .HasForeignKey("TargetMemberId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("SourceMember");
+
+                    b.Navigation("TargetMember");
                 });
 
             modelBuilder.Entity("DataAccessLayer.Models.AvailabilityGroupMemberModel", b =>
@@ -944,6 +1247,16 @@ namespace DataAccessLayer.Migrations
                     b.Navigation("Employee");
                 });
 
+            modelBuilder.Entity("DataAccessLayer.Models.CommunicationMessageModel", b =>
+                {
+                    b.HasOne("DataAccessLayer.Models.ManagerAccountModel", "CreatedByManager")
+                        .WithMany()
+                        .HasForeignKey("CreatedByManagerId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("CreatedByManager");
+                });
+
             modelBuilder.Entity("DataAccessLayer.Models.EmployeeAccountModel", b =>
                 {
                     b.HasOne("DataAccessLayer.Models.EmployeeModel", "Employee")
@@ -951,6 +1264,25 @@ namespace DataAccessLayer.Migrations
                         .HasForeignKey("DataAccessLayer.Models.EmployeeAccountModel", "EmployeeId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.Navigation("Employee");
+                });
+
+            modelBuilder.Entity("DataAccessLayer.Models.EmployeeCommunicationDismissalModel", b =>
+                {
+                    b.HasOne("DataAccessLayer.Models.CommunicationMessageModel", "CommunicationMessage")
+                        .WithMany("Dismissals")
+                        .HasForeignKey("CommunicationMessageId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("DataAccessLayer.Models.EmployeeModel", "Employee")
+                        .WithMany()
+                        .HasForeignKey("EmployeeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("CommunicationMessage");
 
                     b.Navigation("Employee");
                 });
@@ -1074,6 +1406,17 @@ namespace DataAccessLayer.Migrations
                     b.Navigation("Schedule");
                 });
 
+            modelBuilder.Entity("DataAccessLayer.Models.ShiftSwapHistoryModel", b =>
+                {
+                    b.HasOne("DataAccessLayer.Models.ScheduleModel", "Schedule")
+                        .WithMany()
+                        .HasForeignKey("ScheduleId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Schedule");
+                });
+
             modelBuilder.Entity("DataAccessLayer.Models.ShiftSwapRequestModel", b =>
                 {
                     b.HasOne("DataAccessLayer.Models.EmployeeModel", "AcceptedByEmployee")
@@ -1122,6 +1465,11 @@ namespace DataAccessLayer.Migrations
             modelBuilder.Entity("DataAccessLayer.Models.AvailabilityGroupModel", b =>
                 {
                     b.Navigation("Members");
+                });
+
+            modelBuilder.Entity("DataAccessLayer.Models.CommunicationMessageModel", b =>
+                {
+                    b.Navigation("Dismissals");
                 });
 
             modelBuilder.Entity("DataAccessLayer.Models.ContainerModel", b =>

@@ -84,4 +84,10 @@ public sealed class GraphDto
     /// Optional availability group that constrains generation.
     /// </summary>
     public int? AvailabilityGroupId { get; set; }
+
+    /// <summary>
+    /// Latest recorded manager edit or accepted employee swap for this schedule.
+    /// Null is reserved for legacy schedules that have no matching workflow history yet.
+    /// </summary>
+    public DateTimeOffset? LastUpdatedAtUtc { get; set; }
 }

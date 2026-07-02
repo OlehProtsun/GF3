@@ -23,6 +23,7 @@ using WebApi.Contracts.EmployeeProfile;
 using WebApi.Contracts.EmployeeSchedules;
 using WebApi.Options;
 using WebApi.Realtime;
+using WebApi.Services;
 using WebApi.ShiftSwaps;
 
 namespace GF3.Tests;
@@ -345,7 +346,56 @@ public sealed class WebApiEmployeeSurfaceTests
                 }
             ],
         };
-        var controller = new EmployeeSchedulesController(service);
+        service.GraphsByContainer[2] =
+        [
+            new ScheduleModel
+            {
+                Id = 10,
+                ContainerId = 2,
+                ShopId = 4,
+                Shop = new ShopModel { Id = 4, Name = "Central Shop" },
+                Name = "Second May Schedule",
+                Year = 2026,
+                Month = 5,
+                PublicationStatus = SchedulePublicationStatus.Public,
+            },
+        ];
+        service.DetailedGraphs[(2, 10)] = new ScheduleModel
+        {
+            Id = 10,
+            ContainerId = 2,
+            Container = new ContainerModel { Id = 2, Name = "Main Container" },
+            ShopId = 4,
+            Shop = new ShopModel { Id = 4, Name = "Central Shop" },
+            Name = "Second May Schedule",
+            Year = 2026,
+            Month = 5,
+            PublicationStatus = SchedulePublicationStatus.Public,
+            Slots =
+            [
+                new ScheduleSlotModel
+                {
+                    Id = 4,
+                    DayOfMonth = 3,
+                    SlotNo = 1,
+                    EmployeeId = 7,
+                    FromTime = "10:00",
+                    ToTime = "14:00",
+                },
+                new ScheduleSlotModel
+                {
+                    Id = 5,
+                    DayOfMonth = 2,
+                    SlotNo = 1,
+                    EmployeeId = 12,
+                    FromTime = "17:00",
+                    ToTime = "21:00",
+                },
+            ],
+        };
+
+        var lastUpdatedAtUtc = new DateTimeOffset(2026, 6, 28, 12, 45, 0, TimeSpan.Zero);
+        var controller = new EmployeeSchedulesController(service, new StubScheduleLastUpdateService(lastUpdatedAtUtc));
         SetEmployeeUser(controller, 12);
 
         var result = await controller.GetVisible(CancellationToken.None);
@@ -361,8 +411,25 @@ public sealed class WebApiEmployeeSurfaceTests
         Assert.Equal("Central Shop", dto.ShopName);
         Assert.Equal("public", dto.PublicationStatus);
         Assert.Equal("", dto.Note);
+        Assert.Equal(lastUpdatedAtUtc, dto.LastUpdatedAtUtc);
         Assert.Equal([7, 12], dto.Employees.Select(employee => employee.EmployeeId));
         Assert.Equal([2, 1], dto.Slots.Select(slot => slot.Id));
+        Assert.Collection(
+            dto.RelatedScheduleAssignments,
+            assignment =>
+            {
+                Assert.Equal(7, assignment.EmployeeId);
+                Assert.Equal(3, assignment.DayOfMonth);
+                Assert.Equal(10, assignment.ScheduleId);
+                Assert.Equal("Second May Schedule", assignment.ScheduleName);
+            },
+            assignment =>
+            {
+                Assert.Equal(12, assignment.EmployeeId);
+                Assert.Equal(2, assignment.DayOfMonth);
+                Assert.Equal(10, assignment.ScheduleId);
+                Assert.Equal("Second May Schedule", assignment.ScheduleName);
+            });
         Assert.Equal("The current employee session is invalid.", missingClaimException.Message);
     }
 
@@ -647,6 +714,8 @@ public sealed class WebApiEmployeeSurfaceTests
     private sealed class RecordingContainerService : IContainerService
     {
         public List<ScheduleModel> PublishedGraphs { get; init; } = [];
+        public Dictionary<int, List<ScheduleModel>> GraphsByContainer { get; } = [];
+        public Dictionary<(int ContainerId, int GraphId), ScheduleModel> DetailedGraphs { get; } = [];
         public int? LastPublishedEmployeeId { get; private set; }
 
         public Task<List<ScheduleModel>> GetPublishedGraphsForEmployeeAsync(int employeeId, CancellationToken ct = default)
@@ -677,10 +746,11 @@ public sealed class WebApiEmployeeSurfaceTests
             => throw new NotSupportedException();
 
         public Task<List<ScheduleModel>?> GetGraphsAsync(int containerId, CancellationToken ct = default)
-            => throw new NotSupportedException();
+            => Task.FromResult<List<ScheduleModel>?>(
+                GraphsByContainer.TryGetValue(containerId, out var graphs) ? graphs : []);
 
         public Task<ScheduleModel?> GetGraphByIdAsync(int containerId, int graphId, CancellationToken ct = default)
-            => throw new NotSupportedException();
+            => Task.FromResult<ScheduleModel?>(DetailedGraphs.GetValueOrDefault((containerId, graphId)));
 
         public Task<ScheduleModel> CreateGraphAsync(int containerId, ScheduleModel model, CancellationToken ct = default)
             => throw new NotSupportedException();
@@ -715,7 +785,8 @@ public sealed class WebApiEmployeeSurfaceTests
             => throw new NotSupportedException();
 
         public Task<List<ScheduleSlotModel>?> GetGraphSlotsAsync(int containerId, int graphId, CancellationToken ct = default)
-            => throw new NotSupportedException();
+            => Task.FromResult<List<ScheduleSlotModel>?>(
+                DetailedGraphs.GetValueOrDefault((containerId, graphId))?.Slots.ToList() ?? []);
 
         public Task ReplaceGraphSlotsAsync(int containerId, int graphId, IEnumerable<ScheduleSlotModel> slots, CancellationToken ct = default)
             => throw new NotSupportedException();
@@ -787,6 +858,15 @@ public sealed class WebApiEmployeeSurfaceTests
             string Reason,
             int? ContainerId,
             int? GraphId);
+    }
+
+    private sealed class StubScheduleLastUpdateService(DateTimeOffset lastUpdatedAtUtc) : IScheduleLastUpdateService
+    {
+        public Task<IReadOnlyDictionary<int, DateTimeOffset>> GetLastUpdatesAsync(
+            IEnumerable<int> scheduleIds,
+            CancellationToken cancellationToken = default)
+            => Task.FromResult<IReadOnlyDictionary<int, DateTimeOffset>>(
+                scheduleIds.Distinct().ToDictionary(scheduleId => scheduleId, _ => lastUpdatedAtUtc));
     }
 
     private sealed class RecordingAvailabilityGroupService : IAvailabilityGroupService

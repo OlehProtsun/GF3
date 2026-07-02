@@ -18,6 +18,10 @@ import {
   isCommonEditorShortcut,
 } from "@entities/availability-binds";
 import type { Graph } from "@entities/containers/model/types";
+import {
+  buildMatrixAutoColumnWidths,
+  MATRIX_COLUMN_MIN_WIDTH_PX,
+} from "@entities/containers/model/matrixLayout";
 import { ScheduleIcon } from "@shared/ui/icons";
 import { CardSection } from "@shared/ui/sections/CardSection";
 import styles from "./ContainerGraphMatrix.module.css";
@@ -31,10 +35,12 @@ type ContainerGraphMatrixProps = {
   columns: GraphMatrixColumn[];
   cellMap: GraphMatrixCellMap;
   visualHintMap?: GraphMatrixCellMap;
+  mutedSuffixMap?: GraphMatrixCellMap;
   visualHintDetailMap?: GraphRelatedScheduleHintDetailMap;
+  lockVisualHintCells?: boolean;
   styleMap?: GraphMatrixStyleMap;
   dayConflictMap?: Record<number, boolean>;
-  title?: string;
+  title?: ReactNode;
   helperText?: string;
   readOnly?: boolean;
   highlightReadOnlyEmpty?: boolean;
@@ -64,6 +70,7 @@ type ContainerGraphMatrixProps = {
   onColumnLabelChange?: (columnId: number, value: string) => void;
   onCellChange?: (employeeId: number, dayOfMonth: number, value: string) => void;
   onVisualHintClick?: (detail: GraphRelatedScheduleHintDetail) => void;
+  onVisualHintCellClick?: (employeeId: number, dayOfMonth: number) => void;
 };
 
 type MatrixDay = {
@@ -106,6 +113,8 @@ type MatrixValueCellProps = {
   columnLabel: string;
   value: string;
   visualHint?: string;
+  mutedSuffix?: string;
+  lockVisualHint?: boolean;
   error?: string;
   isEmpty: boolean;
   isSelected: boolean;
@@ -138,8 +147,6 @@ type MatrixDayCellProps = {
 
 const EMPTY_STYLE = {} as CSSProperties;
 const NOOP = () => {};
-const MATRIX_CELL_MIN_WIDTH_PX = 135;
-
 function joinClassNames(...values: Array<string | undefined | false>) {
   return values.filter(Boolean).join(" ");
 }
@@ -340,6 +347,8 @@ const MatrixValueCell = memo(function MatrixValueCell({
   columnLabel,
   value,
   visualHint,
+  mutedSuffix,
+  lockVisualHint,
   error,
   isEmpty,
   isSelected,
@@ -367,9 +376,21 @@ const MatrixValueCell = memo(function MatrixValueCell({
     ...(backgroundColor ? { backgroundColor } : {}),
     ...(textColor ? { color: textColor } : {}),
   } satisfies CSSProperties;
-  const hasVisualHint = isEmpty && Boolean(visualHint?.trim());
-  const renderedValue = hasVisualHint ? visualHint?.trim() ?? value : value;
-  const cellTitle = error ?? (hasVisualHint ? `Also works in: ${renderedValue}` : value);
+  const trimmedVisualHint = visualHint?.trim() ?? "";
+  const hasVisualHint = Boolean(trimmedVisualHint);
+  const isLockedVisualHint = Boolean(lockVisualHint && isEmpty && hasVisualHint);
+  const renderedValue = isEmpty && hasVisualHint ? trimmedVisualHint : value;
+  const trimmedMutedSuffix = mutedSuffix?.trim() ?? "";
+  const renderedPrefix = trimmedMutedSuffix && renderedValue.endsWith(trimmedMutedSuffix)
+    ? renderedValue.slice(0, -trimmedMutedSuffix.length).replace(/,\s*$/, "")
+    : renderedValue;
+  const renderedContent = trimmedMutedSuffix ? (
+    <>
+      {renderedPrefix ? renderedPrefix + ",\u00a0" : null}
+      <span className={styles.mutedSuffix}>{trimmedMutedSuffix}</span>
+    </>
+  ) : renderedValue;
+  const cellTitle = error ?? (hasVisualHint ? `Also works in: ${trimmedVisualHint}` : value);
   const interactiveCellTitle =
     hasVisualHint && onVisualHintClick
       ? `${cellTitle}. Click for details.`
@@ -416,6 +437,27 @@ const MatrixValueCell = memo(function MatrixValueCell({
     clearVisualHintClickTimeout();
   };
 
+  const renderVisualHintContent = () => (
+    <>
+      {!isEmpty ? <span className={styles.visualHintCurrentValue}>{renderedContent},{"\u00a0"}</span> : null}
+      <button
+        type="button"
+        ref={onFocusTargetRef}
+        className={joinClassNames(
+          styles.visualHintButton,
+          !isEmpty && styles.visualHintValue,
+        )}
+        aria-label={`${columnLabel} day ${dayOfMonth}`}
+        aria-invalid={Boolean(error)}
+        title={interactiveCellTitle}
+        onClick={handleVisualHintButtonClick}
+        onDoubleClick={handleVisualHintButtonDoubleClick}
+      >
+        {isEmpty ? renderedContent : trimmedVisualHint}
+      </button>
+    </>
+  );
+
   const handleEditorFocus = (event: FocusEvent<HTMLInputElement>) => {
     if (editorSelectionBehavior === "caret-end") {
       const { value: currentValue } = event.currentTarget;
@@ -455,21 +497,11 @@ const MatrixValueCell = memo(function MatrixValueCell({
                 styles.readonlyValue,
                 isEmpty && styles.cellValueEmpty,
                 isDangerEmpty && styles.dangerEmptyValue,
-                hasVisualHint && styles.visualHintValue,
+                isEmpty && hasVisualHint && styles.visualHintValue,
               )}
               title={interactiveCellTitle}
             >
-              <button
-                type="button"
-                ref={onFocusTargetRef}
-                className={styles.visualHintButton}
-                aria-label={`${columnLabel} day ${dayOfMonth}`}
-                title={interactiveCellTitle}
-                onClick={handleVisualHintButtonClick}
-                onDoubleClick={handleVisualHintButtonDoubleClick}
-              >
-                {renderedValue}
-              </button>
+              {renderVisualHintContent()}
             </div>
           ) : (
             <span
@@ -477,14 +509,14 @@ const MatrixValueCell = memo(function MatrixValueCell({
                 styles.readonlyValue,
                 isEmpty && styles.cellValueEmpty,
                 isDangerEmpty && styles.dangerEmptyValue,
-                hasVisualHint && styles.visualHintValue,
+                isEmpty && hasVisualHint && styles.visualHintValue,
               )}
               title={interactiveCellTitle}
             >
-              {renderedValue}
+              {renderedContent}
             </span>
           )
-        ) : isInlineEditing ? (
+        ) : isInlineEditing && !isLockedVisualHint ? (
           <input
             ref={onFocusTargetRef}
             className={joinClassNames(
@@ -501,7 +533,7 @@ const MatrixValueCell = memo(function MatrixValueCell({
             title={interactiveCellTitle}
             data-matrix-editor="true"
           />
-        ) : isEditing ? (
+        ) : isEditing && !isLockedVisualHint ? (
           <input
             autoFocus
             ref={onFocusTargetRef}
@@ -525,22 +557,11 @@ const MatrixValueCell = memo(function MatrixValueCell({
               styles.visualHintShell,
               isEmpty && styles.cellValueEmpty,
               isDangerEmpty && styles.dangerEmptyValue,
-              hasVisualHint && styles.visualHintValue,
+              isEmpty && hasVisualHint && styles.visualHintValue,
             )}
             title={interactiveCellTitle}
           >
-            <button
-              type="button"
-              ref={onFocusTargetRef}
-              className={styles.visualHintButton}
-              aria-label={`${columnLabel} day ${dayOfMonth}`}
-              aria-invalid={Boolean(error)}
-              title={interactiveCellTitle}
-              onClick={handleVisualHintButtonClick}
-              onDoubleClick={handleVisualHintButtonDoubleClick}
-            >
-              {renderedValue}
-            </button>
+            {renderVisualHintContent()}
           </div>
         ) : (
           <button
@@ -551,13 +572,13 @@ const MatrixValueCell = memo(function MatrixValueCell({
               readOnly && styles.readonlyValue,
               isEmpty && styles.cellValueEmpty,
               isDangerEmpty && styles.dangerEmptyValue,
-              hasVisualHint && styles.visualHintValue,
+              isEmpty && hasVisualHint && styles.visualHintValue,
             )}
             aria-label={`${columnLabel} day ${dayOfMonth}`}
             aria-invalid={Boolean(error)}
             title={interactiveCellTitle}
           >
-            {renderedValue}
+            {renderedContent}
           </button>
         )}
       </div>
@@ -570,7 +591,9 @@ export function ContainerGraphMatrix({
   columns,
   cellMap,
   visualHintMap = {},
+  mutedSuffixMap = {},
   visualHintDetailMap = {},
+  lockVisualHintCells = false,
   styleMap = {},
   dayConflictMap = {},
   title = "Schedule Matrix",
@@ -603,6 +626,7 @@ export function ContainerGraphMatrix({
   onColumnLabelChange,
   onCellChange,
   onVisualHintClick,
+  onVisualHintCellClick,
 }: ContainerGraphMatrixProps) {
   const [editingCellKey, setEditingCellKey] = useState<string | null>(null);
   const [editingValue, setEditingValue] = useState(GRAPH_EMPTY_MARK);
@@ -665,9 +689,21 @@ export function ContainerGraphMatrix({
     () => new Set(columns.map(column => column.employeeId)),
     [columns],
   );
+  const automaticColumnWidths = useMemo(
+    () => buildMatrixAutoColumnWidths({ columns, cellMap, visualHintMap }),
+    [cellMap, columns, visualHintMap],
+  );
   const fixedWidthSum = useMemo(
     () => columns.reduce((totalWidth, column) => totalWidth + (columnWidthOverrides[column.employeeId] ?? 0), 0),
     [columnWidthOverrides, columns],
+  );
+  const automaticWidthSum = useMemo(
+    () => columns.reduce((totalWidth, column) => (
+      columnWidthOverrides[column.employeeId] === undefined
+        ? totalWidth + (automaticColumnWidths[column.employeeId] ?? MATRIX_COLUMN_MIN_WIDTH_PX)
+        : totalWidth
+    ), 0),
+    [automaticColumnWidths, columnWidthOverrides, columns],
   );
   const autoWidthColumnCount = useMemo(
     () => columns.reduce((count, column) => count + (columnWidthOverrides[column.employeeId] === undefined ? 1 : 0), 0),
@@ -677,13 +713,13 @@ export function ContainerGraphMatrix({
     () =>
       ({
         "--matrix-column-count": String(columns.length),
-        "--matrix-auto-column-width":
+        "--matrix-auto-extra-width":
           stretchColumns && autoWidthColumnCount > 0
-            ? `max(var(--matrix-cell-min-width), calc((100% - var(--matrix-day-column-width) - ${fixedWidthSum}px) / ${autoWidthColumnCount}))`
-            : "var(--matrix-cell-min-width)",
-        "--matrix-table-min-width": `calc(var(--matrix-day-column-width) + ${fixedWidthSum}px + (var(--matrix-cell-min-width) * ${autoWidthColumnCount}))`,
+            ? `max(0px, calc((100% - var(--matrix-day-column-width) - ${fixedWidthSum}px - ${automaticWidthSum}px) / ${autoWidthColumnCount}))`
+            : "0px",
+        "--matrix-table-min-width": `calc(var(--matrix-day-column-width) + ${fixedWidthSum + automaticWidthSum}px)`,
       }) as CSSProperties,
-    [autoWidthColumnCount, columns.length, fixedWidthSum, stretchColumns],
+    [autoWidthColumnCount, automaticWidthSum, columns.length, fixedWidthSum, stretchColumns],
   );
   const effectiveSelectedCellKeys = draftSelectedCellKeys ?? selectedCellKeys;
   const selectedCellKeySet = useMemo(() => new Set(effectiveSelectedCellKeys), [effectiveSelectedCellKeys]);
@@ -818,7 +854,7 @@ export function ContainerGraphMatrix({
       }
 
       const nextWidth = Math.max(
-        MATRIX_CELL_MIN_WIDTH_PX,
+        MATRIX_COLUMN_MIN_WIDTH_PX,
         Math.round(activeResizeSession.startWidth + (event.clientX - activeResizeSession.startClientX)),
       );
 
@@ -1395,8 +1431,8 @@ export function ContainerGraphMatrix({
 
     const currentWidth = columnWidthOverrides[employeeId];
     const fallbackWidth = Math.max(
-      MATRIX_CELL_MIN_WIDTH_PX,
-      Math.round((event.currentTarget.closest("th")?.getBoundingClientRect().width ?? MATRIX_CELL_MIN_WIDTH_PX)),
+      MATRIX_COLUMN_MIN_WIDTH_PX,
+      Math.round((event.currentTarget.closest("th")?.getBoundingClientRect().width ?? MATRIX_COLUMN_MIN_WIDTH_PX)),
     );
 
     activeResizeSessionRef.current = {
@@ -1407,12 +1443,16 @@ export function ContainerGraphMatrix({
     setResizingEmployeeId(employeeId);
   };
 
-  const getColumnStyle = (employeeId: number) =>
-    ({
-      "--matrix-column-width": columnWidthOverrides[employeeId] !== undefined
-        ? `${columnWidthOverrides[employeeId]}px`
-        : "var(--matrix-auto-column-width)",
+  const getColumnStyle = (employeeId: number) => {
+    const manualWidth = columnWidthOverrides[employeeId];
+    const automaticWidth = automaticColumnWidths[employeeId] ?? MATRIX_COLUMN_MIN_WIDTH_PX;
+
+    return ({
+      "--matrix-column-width": manualWidth !== undefined
+        ? `${manualWidth}px`
+        : `calc(${automaticWidth}px + var(--matrix-auto-extra-width))`,
     }) as CSSProperties;
+  };
 
   return (
     <CardSection
@@ -1565,6 +1605,8 @@ export function ContainerGraphMatrix({
                             columnLabel={column.label}
                             value={cellValue}
                             visualHint={visualHint}
+                            mutedSuffix={mutedSuffixMap[cellKey]}
+                            lockVisualHint={lockVisualHintCells}
                             error={error}
                             isEmpty={isEmpty}
                             isSelected={isSelected}
@@ -1587,9 +1629,11 @@ export function ContainerGraphMatrix({
                             onEditorBlur={isEditing ? flushEditingCell : NOOP}
                             onInlineValueChange={nextValue => onCellChange?.(column.employeeId, day.dayOfMonth, nextValue)}
                             onInlineValueCommit={nextValue => commitCellValue(column.employeeId, day.dayOfMonth, nextValue)}
-                            onVisualHintClick={visualHintDetail && onVisualHintClick
-                              ? () => onVisualHintClick(visualHintDetail)
-                              : undefined}
+                            onVisualHintClick={onVisualHintCellClick
+                              ? () => onVisualHintCellClick(column.employeeId, day.dayOfMonth)
+                              : visualHintDetail && onVisualHintClick
+                                ? () => onVisualHintClick(visualHintDetail)
+                                : undefined}
                           />
                         );
                       })}

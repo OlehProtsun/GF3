@@ -42,7 +42,7 @@ function toLocalDateTimeValue(date: string, hour: number, minute: number) {
 }
 
 function splitLocalDateTime(value: string) {
-  const [date = "", time = ""] = value.split("T");
+  const [date = "", time = ""] = (value ?? "").split("T");
 
   return {
     date,
@@ -127,7 +127,7 @@ function formatLocalDateTime(value: string) {
   }).format(date);
 }
 
-function PublicationDateTimeField({
+export function AvailabilityDateTimeField({
   id,
   label,
   value,
@@ -350,7 +350,7 @@ export function AvailabilityPublicationCard({
 
         <p className={styles.hint}>Public availability is visible only to assigned employees after saving.</p>
 
-        <PublicationDateTimeField
+        <AvailabilityDateTimeField
           id={`${fieldId}-visible-from`}
           label="Visible From"
           value={visibleFrom}
@@ -359,7 +359,7 @@ export function AvailabilityPublicationCard({
           onChange={onVisibleFromChange}
         />
 
-        <PublicationDateTimeField
+        <AvailabilityDateTimeField
           id={`${fieldId}-visible-to`}
           label="Visible To"
           value={visibleTo}

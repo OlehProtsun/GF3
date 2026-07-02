@@ -11,9 +11,9 @@ internal static class LauncherDatabaseSelectionStore
         WriteIndented = true,
     };
 
-    public static string ResolveDatabasePath(string fallbackDatabasePath)
+    public static string ResolveDatabasePath(string fallbackDatabasePath, string? applicationDataRoot = null)
     {
-        if (TryRead(out var selectedDatabasePath))
+        if (TryRead(out var selectedDatabasePath, applicationDataRoot))
         {
             return selectedDatabasePath;
         }
@@ -21,13 +21,13 @@ internal static class LauncherDatabaseSelectionStore
         return Path.GetFullPath(fallbackDatabasePath);
     }
 
-    private static bool TryRead(out string databasePath)
+    private static bool TryRead(out string databasePath, string? applicationDataRoot)
     {
         databasePath = string.Empty;
 
         try
         {
-            var stateFilePath = Path.Combine(LauncherPaths.GetApplicationDataRoot(), StateFileName);
+            var stateFilePath = Path.Combine(applicationDataRoot ?? LauncherPaths.GetApplicationDataRoot(), StateFileName);
             if (!File.Exists(stateFilePath))
             {
                 return false;

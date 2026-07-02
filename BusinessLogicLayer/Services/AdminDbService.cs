@@ -28,17 +28,20 @@ public sealed class AdminDbService : IAdminDbService
     private readonly ISqliteAdminFacade _sqliteAdminFacade;
     private readonly ISqliteDatabaseWorkspace _databaseWorkspace;
     private readonly IServiceScopeFactory _serviceScopeFactory;
+    private readonly string? _localApplicationDataRoot;
 
     public AdminDbService(
         AppDbContext dbContext,
         ISqliteAdminFacade sqliteAdminFacade,
         ISqliteDatabaseWorkspace databaseWorkspace,
-        IServiceScopeFactory serviceScopeFactory)
+        IServiceScopeFactory serviceScopeFactory,
+        string? localApplicationDataRoot = null)
     {
         _dbContext = dbContext;
         _sqliteAdminFacade = sqliteAdminFacade;
         _databaseWorkspace = databaseWorkspace;
         _serviceScopeFactory = serviceScopeFactory;
+        _localApplicationDataRoot = localApplicationDataRoot;
     }
 
     public async Task<AdminDbMetadataDto> GetMetadataAsync(CancellationToken ct = default)
@@ -176,7 +179,7 @@ public sealed class AdminDbService : IAdminDbService
         try
         {
             await EnsureSelectedDatabaseIsReadyAsync(ct).ConfigureAwait(false);
-            SqliteDatabaseSelectionStore.Save(normalizedPath);
+            SqliteDatabaseSelectionStore.Save(normalizedPath, _localApplicationDataRoot);
         }
         catch
         {

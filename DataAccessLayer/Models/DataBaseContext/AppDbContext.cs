@@ -15,6 +15,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<EmployeeModel> Employees => Set<EmployeeModel>();
     public DbSet<EmployeeAccountModel> EmployeeAccounts => Set<EmployeeAccountModel>();
     public DbSet<ManagerAccountModel> ManagerAccounts => Set<ManagerAccountModel>();
+    public DbSet<CommunicationMessageModel> CommunicationMessages => Set<CommunicationMessageModel>();
+    public DbSet<EmployeeCommunicationDismissalModel> EmployeeCommunicationDismissals => Set<EmployeeCommunicationDismissalModel>();
     public DbSet<ShopModel> Shops => Set<ShopModel>();
     public DbSet<ScheduleModel> Schedules => Set<ScheduleModel>();
     public DbSet<SchedulePresetModel> SchedulePresets => Set<SchedulePresetModel>();
@@ -23,11 +25,13 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<ScheduleSlotModel> ScheduleSlots => Set<ScheduleSlotModel>();
     public DbSet<ScheduleCellStyleModel> ScheduleCellStyles => Set<ScheduleCellStyleModel>();
     public DbSet<ShiftSwapRequestModel> ShiftSwapRequests => Set<ShiftSwapRequestModel>();
+    public DbSet<ShiftSwapHistoryModel> ShiftSwapHistories => Set<ShiftSwapHistoryModel>();
     public DbSet<WorkflowLogEntryModel> WorkflowLogEntries => Set<WorkflowLogEntryModel>();
     public DbSet<BindModel> AvailabilityBinds => Set<BindModel>();
     public DbSet<AvailabilityGroupModel> AvailabilityGroups => Set<AvailabilityGroupModel>();
     public DbSet<AvailabilityGroupMemberModel> AvailabilityGroupMembers => Set<AvailabilityGroupMemberModel>();
     public DbSet<AvailabilityGroupDayModel> AvailabilityGroupDays => Set<AvailabilityGroupDayModel>();
+    public DbSet<AvailabilityGroupDayTransferModel> AvailabilityGroupDayTransfers => Set<AvailabilityGroupDayTransferModel>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -35,6 +39,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         ConfigureEmployee(modelBuilder);
         ConfigureEmployeeAccount(modelBuilder);
         ConfigureManagerAccount(modelBuilder);
+        ConfigureCommunicationMessage(modelBuilder);
+        ConfigureEmployeeCommunicationDismissal(modelBuilder);
         ConfigureShop(modelBuilder);
         ConfigureSchedule(modelBuilder);
         ConfigureSchedulePreset(modelBuilder);
@@ -43,11 +49,13 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         ConfigureScheduleSlot(modelBuilder);
         ConfigureScheduleCellStyle(modelBuilder);
         ConfigureShiftSwapRequest(modelBuilder);
+        ConfigureShiftSwapHistory(modelBuilder);
         ConfigureWorkflowLogEntry(modelBuilder);
         ConfigureAvailabilityBind(modelBuilder);
         ConfigureAvailabilityGroup(modelBuilder);
         ConfigureAvailabilityGroupMember(modelBuilder);
         ConfigureAvailabilityGroupDay(modelBuilder);
+        ConfigureAvailabilityGroupDayTransfer(modelBuilder);
     }
 
     private static void ConfigureContainer(ModelBuilder modelBuilder)
@@ -133,6 +141,73 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             entity.HasIndex(property => property.Username)
                 .IsUnique()
                 .HasDatabaseName("ux_manager_account_username");
+        });
+    }
+
+    private static void ConfigureCommunicationMessage(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<CommunicationMessageModel>(entity =>
+        {
+            entity.Property(message => message.Title)
+                .IsRequired()
+                .HasMaxLength(160);
+
+            entity.Property(message => message.Body)
+                .IsRequired()
+                .HasMaxLength(4000);
+
+            entity.Property(message => message.DeadlineAtUtc).IsRequired();
+            entity.Property(message => message.CreatedAtUtc).IsRequired();
+            entity.Property(message => message.CreatedByManagerId).IsRequired(false);
+            entity.Property(message => message.CreatedByManagerName)
+                .IsRequired()
+                .HasMaxLength(160);
+
+            entity.HasOne(message => message.CreatedByManager)
+                .WithMany()
+                .HasForeignKey(message => message.CreatedByManagerId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            entity.HasIndex(message => message.DeadlineAtUtc)
+                .HasDatabaseName("ix_communication_message_deadline");
+
+            entity.HasIndex(message => message.VisibleFromUtc)
+                .HasDatabaseName("ix_communication_message_visible_from");
+
+            entity.HasIndex(message => message.CreatedAtUtc)
+                .HasDatabaseName("ix_communication_message_created");
+
+            entity.ToTable(table =>
+            {
+                table.HasCheckConstraint("ck_communication_message_title", "length(trim(title)) > 0");
+                table.HasCheckConstraint("ck_communication_message_body", "length(trim(body)) > 0");
+                table.HasCheckConstraint("ck_communication_message_deadline", "deadline_at_utc > created_at_utc");
+            });
+        });
+    }
+
+    private static void ConfigureEmployeeCommunicationDismissal(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<EmployeeCommunicationDismissalModel>(entity =>
+        {
+            entity.Property(dismissal => dismissal.DismissedAtUtc).IsRequired();
+
+            entity.HasOne(dismissal => dismissal.CommunicationMessage)
+                .WithMany(message => message.Dismissals)
+                .HasForeignKey(dismissal => dismissal.CommunicationMessageId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(dismissal => dismissal.Employee)
+                .WithMany()
+                .HasForeignKey(dismissal => dismissal.EmployeeId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasIndex(dismissal => new { dismissal.CommunicationMessageId, dismissal.EmployeeId })
+                .IsUnique()
+                .HasDatabaseName("ux_employee_comm_dismissal_msg_emp");
+
+            entity.HasIndex(dismissal => new { dismissal.EmployeeId, dismissal.DismissedAtUtc })
+                .HasDatabaseName("ix_employee_comm_dismissal_emp_time");
         });
     }
 
@@ -407,6 +482,35 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         });
     }
 
+    private static void ConfigureShiftSwapHistory(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<ShiftSwapHistoryModel>(entity =>
+        {
+            entity.HasOne(history => history.Schedule)
+                .WithMany()
+                .HasForeignKey(history => history.ScheduleId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.Property(history => history.ScheduleName).IsRequired().HasMaxLength(200);
+            entity.Property(history => history.ContainerName).IsRequired().HasMaxLength(200);
+            entity.Property(history => history.ShopName).IsRequired().HasMaxLength(200);
+            entity.Property(history => history.FromTime).IsRequired().HasMaxLength(5);
+            entity.Property(history => history.ToTime).IsRequired().HasMaxLength(5);
+            entity.Property(history => history.FromEmployeeName).IsRequired().HasMaxLength(200);
+            entity.Property(history => history.TargetEmployeeName).IsRequired(false).HasMaxLength(200);
+            entity.Property(history => history.AcceptedByEmployeeName).IsRequired().HasMaxLength(200);
+            entity.Property(history => history.ManualColumnName).IsRequired(false).HasMaxLength(200);
+            entity.Property(history => history.BeforeSnapshotJson).IsRequired();
+            entity.Property(history => history.AfterSnapshotJson).IsRequired();
+
+            entity.ToTable(table =>
+            {
+                table.HasCheckConstraint("ck_shift_swap_history_dom", "day_of_month BETWEEN 1 AND 31");
+                table.HasCheckConstraint("ck_shift_swap_history_month", "month BETWEEN 1 AND 12");
+            });
+        });
+    }
+
     private static void ConfigureWorkflowLogEntry(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<WorkflowLogEntryModel>(entity =>
@@ -504,6 +608,36 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
                 table.HasCheckConstraint(
                     "ck_avail_group_day_kind_interval",
                     "((kind = 'INT' AND interval_str IS NOT NULL AND length(trim(interval_str)) >= 11) OR (kind = 'ANY' AND interval_str IS NULL) OR kind = 'NONE')");
+            });
+        });
+    }
+
+    private static void ConfigureAvailabilityGroupDayTransfer(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<AvailabilityGroupDayTransferModel>(entity =>
+        {
+            entity.HasOne(transfer => transfer.SourceMember)
+                .WithMany()
+                .HasForeignKey(transfer => transfer.SourceMemberId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(transfer => transfer.TargetMember)
+                .WithMany()
+                .HasForeignKey(transfer => transfer.TargetMemberId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.Property(transfer => transfer.CreatedAtUtc).IsRequired();
+            entity.HasIndex(transfer => new { transfer.SourceMemberId, transfer.DayOfMonth })
+                .IsUnique()
+                .HasDatabaseName("ux_avail_transfer_source_day");
+            entity.HasIndex(transfer => new { transfer.TargetMemberId, transfer.DayOfMonth })
+                .IsUnique()
+                .HasDatabaseName("ux_avail_transfer_target_day");
+
+            entity.ToTable(table =>
+            {
+                table.HasCheckConstraint("ck_avail_transfer_dom", "day_of_month BETWEEN 1 AND 31");
+                table.HasCheckConstraint("ck_avail_transfer_distinct_members", "source_member_id <> target_member_id");
             });
         });
     }

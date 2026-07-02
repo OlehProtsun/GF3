@@ -1,0 +1,52 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1780;
+  display: grid;
+  place-items: center;
+  padding: 28px 18px 32px;
+  background: rgba(15, 23, 42, 0.4);
+  backdrop-filter: blur(14px);
+}
+
+.dialog {
+  width: min(980px, calc(100vw - 24px));
+  max-height: calc(100vh - 60px);
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr);
+  gap: 16px;
+  padding: 20px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.62);
+  border-radius: 28px;
+  background: rgba(248, 250, 252, 0.985);
+  box-shadow: 0 34px 80px rgba(15, 23, 42, 0.24);
+}
+
+.header,
+.headerActions,
+.eyebrow,
+.summaryChip { display: flex; align-items: center; }
+.header { align-items: flex-start; justify-content: space-between; gap: 16px; }
+.headerActions { gap: 10px; }
+.titleBlock { min-width: 0; display: grid; gap: 8px; }
+.eyebrow { gap: 8px; color: #2563eb; font-size: 0.76rem; font-weight: 900; letter-spacing: 0.06em; text-transform: uppercase; }
+.title { margin: 0; color: #0f172a; font-size: 1.24rem; font-weight: 900; }
+.description { margin: 0; color: rgba(15, 23, 42, 0.68); font-size: 0.92rem; line-height: 1.5; }
+.summaryChip { gap: 9px; padding: 10px 13px; border: 1px solid rgba(96, 165, 250, 0.22); border-radius: 999px; background: rgba(239, 246, 255, 0.9); color: #0f172a; font-size: 0.8rem; font-weight: 850; white-space: nowrap; }
+.summaryChip strong { color: #1d4ed8; }
+.closeButton { width: 42px; height: 42px; display: inline-grid; place-items: center; flex: 0 0 auto; border: 1px solid rgba(148, 163, 184, 0.24); border-radius: 50%; background: #fff; color: #334155; cursor: pointer; }
+.closeButton:hover { background: #eff6ff; color: #1d4ed8; }
+.closeButton:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.16); }
+.error { margin: 0; }
+.content { min-height: 0; overflow: auto; padding: 4px 6px 16px; }
+.matrix { --matrix-day-column-width: 58px; --matrix-cell-min-width: 150px; margin: 0; }
+.state { min-height: 260px; display: grid; place-items: center; color: #64748b; text-align: center; }
+
+@media (max-width: 720px) {
+  .overlay { padding: 8px; }
+  .dialog { width: 100%; max-height: calc(100vh - 16px); padding: 16px; border-radius: 20px; }
+  .header { flex-direction: column; }
+  .headerActions { width: 100%; justify-content: space-between; }
+  .summaryChip { white-space: normal; }
+}

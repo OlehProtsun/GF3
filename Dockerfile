@@ -36,11 +36,18 @@ ENV ASPNETCORE_ENVIRONMENT=Production \
     ASPNETCORE_URLS=http://+:8080 \
     DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=false
 
-RUN mkdir -p /data && chown -R app:app /data /app
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/* \
+    && mkdir -p /data \
+    && chown -R app:app /data /app
 
 COPY --from=dotnet-build --chown=app:app /app/publish/ ./
 
 USER app
 EXPOSE 8080
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
+    CMD curl --fail --silent --show-error http://127.0.0.1:8080/api/health || exit 1
 
 ENTRYPOINT ["dotnet", "WebApi.dll"]

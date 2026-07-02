@@ -77,12 +77,31 @@ public sealed class EmployeeShiftSwapsController(
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
 
+        var years = requests.Select(request => request.Schedule.Year).Distinct().ToList();
+        var months = requests.Select(request => request.Schedule.Month).Distinct().ToList();
+        IReadOnlyList<ScheduleSlotModel> employeeSlots = requests.Count == 0
+            ? []
+            : await db.ScheduleSlots
+                .AsNoTracking()
+                .Include(slot => slot.Schedule)
+                .Where(slot =>
+                    slot.EmployeeId == employeeId &&
+                    slot.Schedule.PublicationStatus == SchedulePublicationStatus.Public &&
+                    years.Contains(slot.Schedule.Year) &&
+                    months.Contains(slot.Schedule.Month))
+                .ToListAsync(cancellationToken)
+                .ConfigureAwait(false);
         var orderedRequests = requests
             .OrderBy(request => request.Status == ShiftSwapStatus.Open ? 0 : 1)
-            .ThenByDescending(request => request.CreatedAtUtc);
+            .ThenByDescending(request => request.CreatedAtUtc)
+            .ToList();
 
         return Ok(orderedRequests.Select(request =>
-            ToDto(request, employeeId, scheduleEditLockService.IsLocked(request.Schedule.ContainerId, request.ScheduleId))));
+            ToDto(
+                request,
+                employeeId,
+                scheduleEditLockService.IsLocked(request.Schedule.ContainerId, request.ScheduleId),
+                GetPeriodSlots(employeeSlots, request.Schedule.Year, request.Schedule.Month))));
     }
 
     [HttpPost]
@@ -149,13 +168,25 @@ public sealed class EmployeeShiftSwapsController(
             .ConfigureAwait(false);
 
         await workflowLogService
-            .LogAsync(User, $"Created swap offer for {created.Schedule.Name} on day {slot.DayOfMonth} ({offeredPeriod.FromTime}-{offeredPeriod.ToTime}).", cancellationToken)
+            .LogAsync(
+                User,
+                $"Published a shift swap from schedule \"{created.Schedule.Name}\" at {created.Schedule.Shop?.Name ?? "the assigned shop"} for {created.Schedule.Year}-{created.Schedule.Month:00}-{slot.DayOfMonth:00}, {offeredPeriod.FromTime}-{offeredPeriod.ToTime}; offered to {(created.TargetEmployeeId.HasValue ? GetEmployeeName(created.TargetEmployee, created.TargetEmployeeId.Value) : "all eligible employees") }.",
+                cancellationToken)
             .ConfigureAwait(false);
         await realtimeNotifier
             .NotifyShiftSwapsChangedAsync(created.Schedule.ContainerId, created.ScheduleId, created.ScheduleId, "employee-swap-created", created.Id)
             .ConfigureAwait(false);
 
-        return CreatedAtAction(nameof(GetVisible), new { id = created.Id }, ToDto(created, employeeId, isScheduleLocked: false));
+        var employeeMonthSlots = await LoadPublishedEmployeeMonthSlotsAsync(
+            employeeId,
+            created.Schedule.Year,
+            created.Schedule.Month,
+            cancellationToken).ConfigureAwait(false);
+
+        return CreatedAtAction(
+            nameof(GetVisible),
+            new { id = created.Id },
+            ToDto(created, employeeId, isScheduleLocked: false, employeeMonthSlots));
     }
 
     [HttpPost("{id:int}/accept")]
@@ -170,10 +201,39 @@ public sealed class EmployeeShiftSwapsController(
             ?? throw new KeyNotFoundException($"Shift swap with id {id} was not found.");
 
         EnsureScheduleIsNotLocked(swap.Schedule);
-        EnsureCanAccept(swap, employeeId);
         var slot = swap.Schedule.Slots.First(slot => slot.Id == swap.ScheduleSlotId);
         var offeredPeriod = GetSwapPeriod(swap, slot);
         EnsurePeriodWithinSlot(slot, offeredPeriod);
+        var employeeMonthSlots = await LoadPublishedEmployeeMonthSlotsAsync(
+            employeeId,
+            swap.Schedule.Year,
+            swap.Schedule.Month,
+            cancellationToken).ConfigureAwait(false);
+        var acceptanceUnavailableReason = GetAcceptanceUnavailableReason(
+            swap,
+            employeeId,
+            isScheduleLocked: false,
+            employeeMonthSlots,
+            slot,
+            offeredPeriod);
+        if (acceptanceUnavailableReason is not null)
+        {
+            throw new ValidationException(acceptanceUnavailableReason);
+        }
+        var acceptingEmployee = await db.Employees
+            .AsNoTracking()
+            .FirstAsync(employee => employee.Id == employeeId, cancellationToken)
+            .ConfigureAwait(false);
+        var acceptingEmployeeName = GetEmployeeName(acceptingEmployee, employeeId);
+        var manualColumnName = swap.IsManagerCreated
+            ? GraphManualColumnLabelResolver.Resolve(swap.Schedule.Note, swap.ManualColumnId)
+            : null;
+        var beforeSnapshotJson = ShiftSwapHistorySnapshotBuilder.BuildJson(
+            swap.Schedule,
+            swap.Schedule.Slots,
+            swap,
+            employeeId,
+            acceptingEmployeeName);
 
         if (swap.IsManagerCreated)
         {
@@ -185,11 +245,6 @@ public sealed class EmployeeShiftSwapsController(
         else if (slot.EmployeeId != swap.FromEmployeeId)
         {
             throw new ValidationException("This shift is no longer assigned to the employee who opened the swap.");
-        }
-
-        if (HasOverlappingShift(swap.Schedule.Slots, slot.DayOfMonth, offeredPeriod.FromTime, offeredPeriod.ToTime, employeeId, slot.Id))
-        {
-            throw new ValidationException("You already have a shift that overlaps this time.");
         }
 
         if (swap.IsManagerCreated)
@@ -215,10 +270,54 @@ public sealed class EmployeeShiftSwapsController(
         EnsureScheduleEmployee(swap.Schedule, employeeId);
         swap.Status = ShiftSwapStatus.Accepted;
         swap.AcceptedByEmployeeId = employeeId;
-        swap.AcceptedAtUtc = DateTimeOffset.UtcNow;
+        var acceptedAtUtc = DateTimeOffset.UtcNow;
+        swap.AcceptedAtUtc = acceptedAtUtc;
 
         try
         {
+            await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+
+            var afterSlots = await db.ScheduleSlots
+                .AsNoTracking()
+                .Where(scheduleSlot => scheduleSlot.ScheduleId == swap.ScheduleId)
+                .ToListAsync(cancellationToken)
+                .ConfigureAwait(false);
+            var afterSnapshotJson = ShiftSwapHistorySnapshotBuilder.BuildJson(
+                swap.Schedule,
+                afterSlots,
+                swap,
+                employeeId,
+                acceptingEmployeeName);
+
+            db.ShiftSwapHistories.Add(new ShiftSwapHistoryModel
+            {
+                SourceShiftSwapRequestId = swap.Id,
+                ScheduleId = swap.ScheduleId,
+                ScheduleSlotId = swap.ScheduleSlotId,
+                ScheduleName = swap.Schedule.Name,
+                ContainerName = swap.Schedule.Container?.Name ?? string.Empty,
+                ShopName = swap.Schedule.Shop?.Name ?? string.Empty,
+                Year = swap.Schedule.Year,
+                Month = swap.Schedule.Month,
+                DayOfMonth = slot.DayOfMonth,
+                FromTime = offeredPeriod.FromTime,
+                ToTime = offeredPeriod.ToTime,
+                FromEmployeeId = swap.FromEmployeeId,
+                FromEmployeeName = manualColumnName ?? GetEmployeeName(swap.FromEmployee, swap.FromEmployeeId),
+                TargetEmployeeId = swap.TargetEmployeeId,
+                TargetEmployeeName = swap.TargetEmployeeId.HasValue
+                    ? GetEmployeeName(swap.TargetEmployee, swap.TargetEmployeeId.Value)
+                    : null,
+                AcceptedByEmployeeId = employeeId,
+                AcceptedByEmployeeName = acceptingEmployeeName,
+                CreatedAtUtc = swap.CreatedAtUtc,
+                AcceptedAtUtc = acceptedAtUtc,
+                IsManagerCreated = swap.IsManagerCreated,
+                ManualColumnId = swap.ManualColumnId,
+                ManualColumnName = manualColumnName,
+                BeforeSnapshotJson = beforeSnapshotJson,
+                AfterSnapshotJson = afterSnapshotJson,
+            });
             await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
             await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
         }
@@ -232,7 +331,10 @@ public sealed class EmployeeShiftSwapsController(
             .ConfigureAwait(false);
 
         await workflowLogService
-            .LogAsync(User, $"Accepted swap for {accepted.Schedule.Name} on day {accepted.ScheduleSlot.DayOfMonth}.", cancellationToken)
+            .LogAsync(
+                User,
+                $"Accepted {(accepted.FromEmployeeId.HasValue ? $"{GetEmployeeName(accepted.FromEmployee, accepted.FromEmployeeId.Value)}'s shift" : "an open shift")} from schedule \"{accepted.Schedule.Name}\" for {accepted.Schedule.Year}-{accepted.Schedule.Month:00}-{accepted.ScheduleSlot.DayOfMonth:00}, {offeredPeriod.FromTime}-{offeredPeriod.ToTime}.",
+                cancellationToken)
             .ConfigureAwait(false);
         await realtimeNotifier
             .NotifyScheduleChangedAsync(accepted.Schedule.ContainerId, accepted.ScheduleId, "employee-swap-accepted")
@@ -241,7 +343,13 @@ public sealed class EmployeeShiftSwapsController(
             .NotifyShiftSwapsChangedAsync(accepted.Schedule.ContainerId, accepted.ScheduleId, accepted.ScheduleId, "employee-swap-accepted", accepted.Id)
             .ConfigureAwait(false);
 
-        return Ok(ToDto(accepted, employeeId, isScheduleLocked: false));
+        var updatedEmployeeMonthSlots = await LoadPublishedEmployeeMonthSlotsAsync(
+            employeeId,
+            accepted.Schedule.Year,
+            accepted.Schedule.Month,
+            cancellationToken).ConfigureAwait(false);
+
+        return Ok(ToDto(accepted, employeeId, isScheduleLocked: false, updatedEmployeeMonthSlots));
     }
 
     [HttpPost("{id:int}/cancel")]
@@ -269,13 +377,26 @@ public sealed class EmployeeShiftSwapsController(
         await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
 
         await workflowLogService
-            .LogAsync(User, $"Cancelled swap offer for {swap.Schedule.Name} on day {swap.ScheduleSlot.DayOfMonth}.", cancellationToken)
+            .LogAsync(
+                User,
+                $"Cancelled the shift swap from schedule \"{swap.Schedule.Name}\" for {swap.Schedule.Year}-{swap.Schedule.Month:00}-{swap.ScheduleSlot.DayOfMonth:00}, {swap.OfferedFromTime ?? swap.ScheduleSlot.FromTime}-{swap.OfferedToTime ?? swap.ScheduleSlot.ToTime}.",
+                cancellationToken)
             .ConfigureAwait(false);
         await realtimeNotifier
             .NotifyShiftSwapsChangedAsync(swap.Schedule.ContainerId, swap.ScheduleId, swap.ScheduleId, "employee-swap-cancelled", swap.Id)
             .ConfigureAwait(false);
 
-        return Ok(ToDto(swap, employeeId, scheduleEditLockService.IsLocked(swap.Schedule.ContainerId, swap.ScheduleId)));
+        var employeeMonthSlots = await LoadPublishedEmployeeMonthSlotsAsync(
+            employeeId,
+            swap.Schedule.Year,
+            swap.Schedule.Month,
+            cancellationToken).ConfigureAwait(false);
+
+        return Ok(ToDto(
+            swap,
+            employeeId,
+            scheduleEditLockService.IsLocked(swap.Schedule.ContainerId, swap.ScheduleId),
+            employeeMonthSlots));
     }
 
     private IQueryable<ShiftSwapRequestModel> BuildSwapRequestQuery()
@@ -321,30 +442,29 @@ public sealed class EmployeeShiftSwapsController(
         return employeeId;
     }
 
-    private static void EnsureCanAccept(ShiftSwapRequestModel swap, int employeeId)
+    private async Task<IReadOnlyList<ScheduleSlotModel>> LoadPublishedEmployeeMonthSlotsAsync(
+        int employeeId,
+        int year,
+        int month,
+        CancellationToken cancellationToken)
     {
-        if (swap.Status != ShiftSwapStatus.Open)
-        {
-            throw new ValidationException("This swap offer is no longer open.");
-        }
-
-        if (swap.FromEmployeeId == employeeId)
-        {
-            throw new ValidationException("You cannot accept your own swap offer.");
-        }
-
-        if (swap.TargetEmployeeId.HasValue && swap.TargetEmployeeId.Value != employeeId)
-        {
-            throw new ValidationException("This private swap offer was sent to another employee.");
-        }
-
-        if (swap.Visibility == ShiftSwapVisibility.Public &&
-            !swap.IsManagerCreated &&
-            !swap.Schedule.Employees.Any(employee => employee.EmployeeId == employeeId))
-        {
-            throw new ValidationException("You are not assigned to this schedule.");
-        }
+        return await db.ScheduleSlots
+            .AsNoTracking()
+            .Include(slot => slot.Schedule)
+            .Where(slot =>
+                slot.EmployeeId == employeeId &&
+                slot.Schedule.Year == year &&
+                slot.Schedule.Month == month &&
+                slot.Schedule.PublicationStatus == SchedulePublicationStatus.Public)
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
     }
+
+    private static IReadOnlyList<ScheduleSlotModel> GetPeriodSlots(
+        IEnumerable<ScheduleSlotModel> slots,
+        int year,
+        int month)
+        => slots.Where(slot => slot.Schedule.Year == year && slot.Schedule.Month == month).ToList();
 
     private static void EnsureScheduleEmployee(ScheduleModel schedule, int employeeId)
     {
@@ -372,43 +492,45 @@ public sealed class EmployeeShiftSwapsController(
         }
     }
 
-    private static ShiftSwapDto ToDto(ShiftSwapRequestModel model, int currentEmployeeId, bool isScheduleLocked)
+    private static ShiftSwapDto ToDto(
+        ShiftSwapRequestModel model,
+        int currentEmployeeId,
+        bool isScheduleLocked,
+        IReadOnlyList<ScheduleSlotModel> currentEmployeeMonthSlots)
     {
         var slot = model.Schedule.Slots.FirstOrDefault(slot => slot.Id == model.ScheduleSlotId) ?? model.ScheduleSlot;
         var offeredPeriod = GetSwapPeriod(model, slot);
         var shiftHours = GetTimeRangeDurationHours(offeredPeriod.FromTime, offeredPeriod.ToTime);
-        var currentHoursBefore = GetEmployeeHours(model.Schedule.Slots, currentEmployeeId);
         var fromHoursBefore = model.FromEmployeeId.HasValue ? GetEmployeeHours(model.Schedule.Slots, model.FromEmployeeId.Value) : 0;
         var isOpen = model.Status == ShiftSwapStatus.Open;
         var isOwner = model.FromEmployeeId == currentEmployeeId;
-        var canAccept = isOpen &&
-                        !isScheduleLocked &&
-                        !isOwner &&
-                        (!model.TargetEmployeeId.HasValue || model.TargetEmployeeId.Value == currentEmployeeId) &&
-                        (model.Visibility == ShiftSwapVisibility.Private ||
-                         model.IsManagerCreated ||
-                         model.Schedule.Employees.Any(employee => employee.EmployeeId == currentEmployeeId)) &&
-                        !HasOverlappingShift(model.Schedule.Slots, slot.DayOfMonth, offeredPeriod.FromTime, offeredPeriod.ToTime, currentEmployeeId, slot.Id);
-        var currentHoursAfter = currentHoursBefore;
+        var acceptanceUnavailableReason = GetAcceptanceUnavailableReason(
+            model,
+            currentEmployeeId,
+            isScheduleLocked,
+            currentEmployeeMonthSlots,
+            slot,
+            offeredPeriod);
+        var canAccept = isOpen && acceptanceUnavailableReason is null;
+        var currentEmployeeStats = GetCurrentEmployeeSwapStats(
+            model,
+            currentEmployeeId,
+            currentEmployeeMonthSlots,
+            slot,
+            shiftHours,
+            canAccept);
         var fromHoursAfter = fromHoursBefore;
 
         if (isOpen)
         {
             if (isOwner)
             {
-                currentHoursAfter = Math.Max(0, currentHoursBefore - shiftHours);
-                fromHoursAfter = currentHoursAfter;
+                fromHoursAfter = Math.Max(0, fromHoursBefore - shiftHours);
             }
             else if (canAccept)
             {
-                currentHoursAfter = currentHoursBefore + shiftHours;
                 fromHoursAfter = model.IsManagerCreated ? fromHoursBefore : Math.Max(0, fromHoursBefore - shiftHours);
             }
-        }
-        else if (model.Status == ShiftSwapStatus.Accepted)
-        {
-            currentHoursAfter = currentHoursBefore;
-            fromHoursAfter = fromHoursBefore;
         }
 
         var manualColumnName = model.IsManagerCreated
@@ -446,8 +568,12 @@ public sealed class EmployeeShiftSwapsController(
             CreatedAtUtc = model.CreatedAtUtc,
             AcceptedAtUtc = model.AcceptedAtUtc,
             ShiftHours = Math.Round(shiftHours, 2),
-            CurrentEmployeeHoursBefore = Math.Round(currentHoursBefore, 2),
-            CurrentEmployeeHoursAfter = Math.Round(currentHoursAfter, 2),
+            CurrentEmployeeHoursBefore = Math.Round(currentEmployeeStats.HoursBefore, 2),
+            CurrentEmployeeHoursAfter = Math.Round(currentEmployeeStats.HoursAfter, 2),
+            CurrentEmployeeWorkDaysBefore = currentEmployeeStats.WorkDaysBefore,
+            CurrentEmployeeWorkDaysAfter = currentEmployeeStats.WorkDaysAfter,
+            CurrentEmployeeFreeDaysBefore = currentEmployeeStats.FreeDaysBefore,
+            CurrentEmployeeFreeDaysAfter = currentEmployeeStats.FreeDaysAfter,
             FromEmployeeHoursBefore = Math.Round(fromHoursBefore, 2),
             FromEmployeeHoursAfter = Math.Round(fromHoursAfter, 2),
             IsManagerCreated = model.IsManagerCreated,
@@ -456,9 +582,133 @@ public sealed class EmployeeShiftSwapsController(
             IsCreatedByCurrentEmployee = isOwner,
             IsScheduleLocked = isScheduleLocked,
             CanAccept = canAccept,
+            AcceptanceUnavailableReason = isOpen ? acceptanceUnavailableReason : null,
             CanCancel = isOwner && isOpen,
         };
     }
+
+    private static string? GetAcceptanceUnavailableReason(
+        ShiftSwapRequestModel swap,
+        int employeeId,
+        bool isScheduleLocked,
+        IReadOnlyList<ScheduleSlotModel> employeeMonthSlots,
+        ScheduleSlotModel slot,
+        ShiftSwapPeriod offeredPeriod)
+    {
+        if (swap.Status != ShiftSwapStatus.Open)
+        {
+            return "This swap offer is no longer open.";
+        }
+
+        if (isScheduleLocked)
+        {
+            return "Schedule is locked while a manager is editing it.";
+        }
+
+        if (swap.FromEmployeeId == employeeId)
+        {
+            return "This is your own swap offer.";
+        }
+
+        if (swap.TargetEmployeeId.HasValue && swap.TargetEmployeeId.Value != employeeId)
+        {
+            return "This private swap offer is for another employee.";
+        }
+
+        if (swap.Visibility == ShiftSwapVisibility.Public &&
+            !swap.IsManagerCreated &&
+            !swap.Schedule.Employees.Any(employee => employee.EmployeeId == employeeId))
+        {
+            return "You are not assigned to this schedule.";
+        }
+
+        if (HasOverlappingShift(
+            employeeMonthSlots,
+            slot.DayOfMonth,
+            offeredPeriod.FromTime,
+            offeredPeriod.ToTime,
+            employeeId,
+            slot.Id))
+        {
+            return "You already work during this time.";
+        }
+
+        return null;
+    }
+
+    private static CurrentEmployeeSwapStats GetCurrentEmployeeSwapStats(
+        ShiftSwapRequestModel swap,
+        int employeeId,
+        IReadOnlyList<ScheduleSlotModel> employeeMonthSlots,
+        ScheduleSlotModel offeredSlot,
+        double shiftHours,
+        bool canAccept)
+    {
+        var daysInMonth = DateTime.DaysInMonth(swap.Schedule.Year, swap.Schedule.Month);
+        var actualHours = employeeMonthSlots.Sum(GetSlotDurationHours);
+        var actualWorkDays = employeeMonthSlots.Select(slot => slot.DayOfMonth).ToHashSet();
+        var beforeHours = actualHours;
+        var afterHours = actualHours;
+        var beforeWorkDays = new HashSet<int>(actualWorkDays);
+        var afterWorkDays = new HashSet<int>(actualWorkDays);
+
+        if (swap.Status == ShiftSwapStatus.Open && swap.FromEmployeeId == employeeId)
+        {
+            afterHours = Math.Max(0, actualHours - shiftHours);
+            RemoveTransferredWorkDay(afterWorkDays, employeeMonthSlots, offeredSlot, shiftHours);
+        }
+        else if (swap.Status == ShiftSwapStatus.Open && canAccept)
+        {
+            afterHours = actualHours + shiftHours;
+            afterWorkDays.Add(offeredSlot.DayOfMonth);
+        }
+        else if (swap.Status == ShiftSwapStatus.Accepted && swap.AcceptedByEmployeeId == employeeId)
+        {
+            beforeHours = Math.Max(0, actualHours - shiftHours);
+            RemoveTransferredWorkDay(beforeWorkDays, employeeMonthSlots, offeredSlot, shiftHours);
+        }
+        else if (swap.Status == ShiftSwapStatus.Accepted && swap.FromEmployeeId == employeeId)
+        {
+            beforeHours = actualHours + shiftHours;
+            beforeWorkDays.Add(offeredSlot.DayOfMonth);
+        }
+
+        return new CurrentEmployeeSwapStats(
+            beforeHours,
+            afterHours,
+            beforeWorkDays.Count,
+            afterWorkDays.Count,
+            Math.Max(0, daysInMonth - beforeWorkDays.Count),
+            Math.Max(0, daysInMonth - afterWorkDays.Count));
+    }
+
+    private static void RemoveTransferredWorkDay(
+        ISet<int> workDays,
+        IReadOnlyList<ScheduleSlotModel> employeeMonthSlots,
+        ScheduleSlotModel offeredSlot,
+        double transferredHours)
+    {
+        var otherSameDayHours = employeeMonthSlots
+            .Where(slot => slot.DayOfMonth == offeredSlot.DayOfMonth && slot.Id != offeredSlot.Id)
+            .Sum(GetSlotDurationHours);
+        var offeredSlotHours = employeeMonthSlots
+            .Where(slot => slot.Id == offeredSlot.Id)
+            .Sum(GetSlotDurationHours);
+        var remainingOfferedSlotHours = Math.Max(0, offeredSlotHours - transferredHours);
+
+        if (otherSameDayHours + remainingOfferedSlotHours <= 0.001)
+        {
+            workDays.Remove(offeredSlot.DayOfMonth);
+        }
+    }
+
+    private readonly record struct CurrentEmployeeSwapStats(
+        double HoursBefore,
+        double HoursAfter,
+        int WorkDaysBefore,
+        int WorkDaysAfter,
+        int FreeDaysBefore,
+        int FreeDaysAfter);
 
     private static string GetEmployeeName(EmployeeModel? employee, int? employeeId)
     {

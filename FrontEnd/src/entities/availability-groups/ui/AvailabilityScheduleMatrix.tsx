@@ -17,6 +17,7 @@ type AvailabilityScheduleMatrixProps = {
   month: number;
   columns: AvailabilityMatrixColumn[];
   cellMap: AvailabilityMatrixCellMap;
+  visualHintMap?: AvailabilityMatrixCellMap;
   title?: string;
   helperText?: string;
   readOnly?: boolean;
@@ -29,9 +30,11 @@ type AvailabilityScheduleMatrixProps = {
   headerRightSlot?: ReactNode;
   bindValueByKey?: ReadonlyMap<string, string>;
   selectedCellKeys?: string[];
+  enableSelectionWhenReadOnly?: boolean;
   onColumnMove?: (employeeId: number, targetEmployeeId: number) => void;
   onSelectedCellKeysChange?: (keys: string[]) => void;
   onCellChange?: (employeeId: number, dayOfMonth: number, value: string) => void;
+  onVisualHintClick?: (employeeId: number, dayOfMonth: number) => void;
 };
 
 export function AvailabilityScheduleMatrix({
@@ -39,6 +42,7 @@ export function AvailabilityScheduleMatrix({
   month,
   columns,
   cellMap,
+  visualHintMap,
   title = "Availability Schedule",
   helperText = `Use ${AVAILABILITY_ANY_MARK} for any shift, ${AVAILABILITY_NONE_MARK} for unavailable, a time interval like 08:00 - 16:00, or any text note. Text notes stay visible but are treated as unavailable during schedule generation.`,
   readOnly = false,
@@ -51,9 +55,11 @@ export function AvailabilityScheduleMatrix({
   headerRightSlot,
   bindValueByKey,
   selectedCellKeys,
+  enableSelectionWhenReadOnly,
   onColumnMove,
   onSelectedCellKeysChange,
   onCellChange,
+  onVisualHintClick,
 }: AvailabilityScheduleMatrixProps) {
   const graphColumns = useMemo<GraphMatrixColumn[]>(
     () =>
@@ -92,6 +98,8 @@ export function AvailabilityScheduleMatrix({
       graph={{ year, month }}
       columns={graphColumns}
       cellMap={cellMap}
+      visualHintMap={visualHintMap}
+      lockVisualHintCells
       readOnly={readOnly}
       emptyMessage={
         emptyMessage ??
@@ -108,10 +116,12 @@ export function AvailabilityScheduleMatrix({
       headerRightSlot={headerRightSlot}
       bindValueByKey={normalizedBindValueByKey}
       selectedCellKeys={selectedCellKeys}
+      enableSelectionWhenReadOnly={enableSelectionWhenReadOnly}
       normalizeCellValue={(_, value) => normalizeAvailabilityCellValue(value)}
       onColumnMove={onColumnMove}
       onSelectedCellKeysChange={onSelectedCellKeysChange}
       onCellChange={onCellChange}
+      onVisualHintCellClick={onVisualHintClick}
     />
   );
 }

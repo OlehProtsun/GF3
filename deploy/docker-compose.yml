@@ -20,18 +20,22 @@ services:
       GF3_ADMIN_ENABLED: ${GF3_ADMIN_ENABLED:-false}
       GF3_ADMIN_ALLOW_REMOTE: ${GF3_ADMIN_ALLOW_REMOTE:-false}
       GF3_ADMIN_ALLOW_WRITE: ${GF3_ADMIN_ALLOW_WRITE:-false}
+      DatabaseStartup__RequireExistingDatabase: ${GF3_REQUIRE_EXISTING_DATABASE:-true}
+      DatabaseStartup__BackupBeforeMigrate: ${GF3_BACKUP_BEFORE_MIGRATE:-true}
     volumes:
       - gf3-data:/data
     expose:
       - "8080"
     networks:
       - gf3-internal
+    stop_grace_period: 30s
 
   nginx:
     image: nginx:stable-alpine
     restart: unless-stopped
     depends_on:
-      - gf3-app
+      gf3-app:
+        condition: service_healthy
     environment:
       GF3_SERVER_NAME: ${GF3_SERVER_NAME:-_}
     ports:

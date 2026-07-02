@@ -22,19 +22,23 @@ import type { SaveSchedulePresetDto } from "@entities/containers/api/dto";
 import type { Graph, SchedulePreset } from "@entities/containers/model/types";
 import type { Shop } from "@entities/shops/model/types";
 import type { ShiftSwap } from "@entities/shift-swaps";
+import { filterAcceptedShiftSwapHistory } from "@entities/shift-swaps/model/history";
 import { ErrorBanner } from "@shared/ui/components/ErrorBanner";
 import { IosButton } from "@shared/ui/components/IosButton";
 import { SearchableSelect, type SearchableSelectOption } from "@shared/ui/components/SearchableSelect";
 import { LabeledField, TextArea } from "@shared/ui/forms/Field";
 import {
+  BindIcon,
   ClearFormatAllIcon,
   ClearFormatIcon,
   EmployeeIcon,
   EyeIcon,
+  InformationIcon,
   NoteIcon,
   PlusIcon,
   SaveIcon,
   ScheduleDetailsIcon,
+  SearchIcon,
 } from "@shared/ui/icons";
 import { CardSection } from "@shared/ui/sections/CardSection";
 import { ContainerGraphColorDialog } from "./ContainerGraphColorDialog";
@@ -48,6 +52,7 @@ import { ContainerGraphMatrix } from "./ContainerGraphMatrix";
 import { ContainerGraphPresetDialog } from "./ContainerGraphPresetDialog";
 import { ContainerGraphRelatedHintDialog } from "./ContainerGraphRelatedHintDialog";
 import { ContainerGraphPresetSelect } from "./ContainerGraphPresetSelect";
+import { ShiftSwapHistoryDialog } from "./ShiftSwapHistoryDialog";
 import styles from "./ContainerGraphEditor.module.css";
 
 const DESKTOP_MEDIA_QUERY = "(min-width: 1181px)";
@@ -401,18 +406,20 @@ export function ContainerGraphEditor({
   onGenerate,
 }: ContainerGraphEditorProps) {
   const [collapsedSections, setCollapsedSections] = useState<Record<SidebarSectionKey, boolean>>({
-    details: false,
-    publication: false,
-    employees: false,
-    bind: false,
-    manualColumns: false,
-    note: false,
+    details: true,
+    publication: true,
+    employees: true,
+    bind: true,
+    manualColumns: true,
+    note: true,
   });
   const [colorDialogMode, setColorDialogMode] = useState<ColorDialogMode | null>(null);
   const [isPresetDialogOpen, setIsPresetDialogOpen] = useState(false);
   const [previewLayoutMode, setPreviewLayoutMode] = useState<PreviewLayoutMode>("stacked");
   const [isGenerationOverlayArmed, setIsGenerationOverlayArmed] = useState(false);
   const [activeRelatedHintCellKey, setActiveRelatedHintCellKey] = useState<string | null>(null);
+  const [shiftSwapLogSearch, setShiftSwapLogSearch] = useState("");
+  const [selectedShiftSwapHistory, setSelectedShiftSwapHistory] = useState<ShiftSwap | null>(null);
   const [viewportHeight, setViewportHeight] = useState(() => {
     if (typeof window === "undefined") {
       return 0;
@@ -521,6 +528,18 @@ export function ContainerGraphEditor({
     () => new Map(scheduleColumns.map(column => [column.employeeId, column.kind])),
     [scheduleColumns],
   );
+  const acceptedShiftSwapLog = useMemo(
+    () => shiftSwapLog.filter(item => item.status === "accepted"),
+    [shiftSwapLog],
+  );
+  const filteredAcceptedShiftSwapLog = useMemo(
+    () => filterAcceptedShiftSwapHistory(acceptedShiftSwapLog, shiftSwapLogSearch),
+    [acceptedShiftSwapLog, shiftSwapLogSearch],
+  );
+  const openManagerManualShifts = useMemo(
+    () => shiftSwapLog.filter(item => item.status === "open" && item.isManagerCreated),
+    [shiftSwapLog],
+  );
 
   if (isLoading) {
     return <div className={styles.state}>Loading schedule editor...</div>;
@@ -587,9 +606,6 @@ export function ContainerGraphEditor({
     activeRelatedHint
       ? formatGraphHintDateLabel(displayGraphYear, displayGraphMonth, activeRelatedHint.dayOfMonth)
       : "";
-  const acceptedShiftSwapLog = shiftSwapLog.filter(item => item.status === "accepted");
-  const openManagerManualShifts = shiftSwapLog.filter(item => item.status === "open" && item.isManagerCreated);
-
   const setSectionCollapsed = (section: SidebarSectionKey, collapsed: boolean) => {
     setCollapsedSections(current => (
       current[section] === collapsed ? current : { ...current, [section]: collapsed }
@@ -630,6 +646,7 @@ export function ContainerGraphEditor({
             <AvailabilitySidebarSection
               label="Schedule Details"
               collapsed={collapsedSections.details}
+              collapsedIcon={<ScheduleDetailsIcon size={18} />}
               collapsedOffset={allSectionsCollapsed ? "flush" : "default"}
               onExpand={() => setSectionCollapsed("details", false)}
             >
@@ -674,6 +691,7 @@ export function ContainerGraphEditor({
             <AvailabilitySidebarSection
               label="Publication"
               collapsed={collapsedSections.publication}
+              collapsedIcon={<EyeIcon size={18} />}
               collapsedOffset={allSectionsCollapsed ? "flush" : "default"}
               onExpand={() => setSectionCollapsed("publication", false)}
             >
@@ -715,21 +733,49 @@ export function ContainerGraphEditor({
                   <div className={styles.publicationLog}>
                     <div className={styles.publicationLogHeader}>
                       <span>Swap log</span>
-                      <strong>{acceptedShiftSwapLog.length}</strong>
+                      <strong>
+                        {shiftSwapLogSearch.trim()
+                          ? `${filteredAcceptedShiftSwapLog.length}/${acceptedShiftSwapLog.length}`
+                          : acceptedShiftSwapLog.length}
+                      </strong>
                     </div>
+
+                    <label className={styles.publicationLogSearch}>
+                      <SearchIcon size={16} />
+                      <input
+                        type="search"
+                        value={shiftSwapLogSearch}
+                        placeholder="Search name or date..."
+                        aria-label="Search accepted swaps by employee name or date"
+                        onChange={event => setShiftSwapLogSearch(event.target.value)}
+                      />
+                    </label>
 
                     {isShiftSwapLogLoading ? (
                       <p className={styles.publicationLogState}>Loading swap log...</p>
                     ) : acceptedShiftSwapLog.length === 0 ? (
                       <p className={styles.publicationLogState}>No accepted swaps yet.</p>
+                    ) : filteredAcceptedShiftSwapLog.length === 0 ? (
+                      <p className={styles.publicationLogState}>No swaps match this search.</p>
                     ) : (
                       <div className={styles.publicationLogList}>
-                        {acceptedShiftSwapLog.map(item => (
+                        {filteredAcceptedShiftSwapLog.map(item => (
                           <article key={item.id} className={styles.publicationLogItem}>
-                            <div className={styles.publicationLogItemMain}>
-                              <strong>{item.fromEmployeeName}</strong>
-                              <span>to</span>
-                              <strong>{item.acceptedByEmployeeName ?? "Employee"}</strong>
+                            <div className={styles.publicationLogItemHeader}>
+                              <div className={styles.publicationLogItemMain}>
+                                <strong>{item.fromEmployeeName}</strong>
+                                <span>to</span>
+                                <strong>{item.acceptedByEmployeeName ?? "Employee"}</strong>
+                              </div>
+                              <button
+                                type="button"
+                                className={styles.publicationLogViewButton}
+                                aria-label={`View swap comparison for ${item.fromEmployeeName}`}
+                                title="View before and after"
+                                onClick={() => setSelectedShiftSwapHistory(item)}
+                              >
+                                <EyeIcon size={17} />
+                              </button>
                             </div>
                             <div className={styles.publicationLogDetails}>
                               <div className={styles.publicationLogDetail}>
@@ -753,6 +799,7 @@ export function ContainerGraphEditor({
           <AvailabilitySidebarSection
             label="Employees"
             collapsed={collapsedSections.employees}
+            collapsedIcon={<EmployeeIcon size={18} />}
             collapsedOffset={allSectionsCollapsed ? "flush" : "default"}
             onExpand={() => setSectionCollapsed("employees", false)}
           >
@@ -836,6 +883,7 @@ export function ContainerGraphEditor({
           <AvailabilitySidebarSection
             label="Bind Information"
             collapsed={collapsedSections.bind}
+            collapsedIcon={<BindIcon size={18} />}
             collapsedOffset={allSectionsCollapsed ? "flush" : "default"}
             onExpand={() => setSectionCollapsed("bind", false)}
           >
@@ -857,6 +905,7 @@ export function ContainerGraphEditor({
           <AvailabilitySidebarSection
             label="Manual Columns"
             collapsed={collapsedSections.manualColumns}
+            collapsedIcon={<InformationIcon size={18} />}
             collapsedOffset={allSectionsCollapsed ? "flush" : "default"}
             onExpand={() => setSectionCollapsed("manualColumns", false)}
           >
@@ -882,6 +931,7 @@ export function ContainerGraphEditor({
           <AvailabilitySidebarSection
             label="Note"
             collapsed={collapsedSections.note}
+            collapsedIcon={<NoteIcon size={18} />}
             collapsedOffset={allSectionsCollapsed ? "flush" : "default"}
             onExpand={() => setSectionCollapsed("note", false)}
           >
@@ -1088,6 +1138,11 @@ export function ContainerGraphEditor({
         currentCellMap={cellMap}
         detail={activeRelatedHint}
         onCancel={() => setActiveRelatedHintCellKey(null)}
+      />
+      <ShiftSwapHistoryDialog
+        open={selectedShiftSwapHistory !== null}
+        swap={selectedShiftSwapHistory}
+        onCancel={() => setSelectedShiftSwapHistory(null)}
       />
       {showGenerationOverlay ? (
         <div className={styles.generationOverlay} role="status" aria-live="polite" aria-label="Generating schedule">

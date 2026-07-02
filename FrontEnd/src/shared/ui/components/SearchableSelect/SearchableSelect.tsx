@@ -16,7 +16,7 @@ type SearchableSelectProps = {
   options: SearchableSelectOption[];
   placeholder: string;
   dropdownTitle: string;
-  size?: "default" | "compact" | "field";
+  size?: "default" | "compact" | "field" | "summary";
   searchPlaceholder?: string;
   emptyMessage?: string;
   fallbackHint?: string;
@@ -237,6 +237,7 @@ export function SearchableSelect({
             styles.selectButton,
             size === "compact" && styles.selectButtonCompact,
             size === "field" && styles.selectButtonField,
+            size === "summary" && styles.selectButtonSummary,
             shadow === "soft" && styles.selectButtonShadowSoft,
             invalid && styles.selectButtonInvalid,
           )}

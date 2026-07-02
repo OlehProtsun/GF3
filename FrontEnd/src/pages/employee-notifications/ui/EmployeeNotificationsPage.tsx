@@ -6,42 +6,59 @@ import {
   useEmployeeShiftSwapsQuery,
   type ShiftSwap,
 } from "@entities/shift-swaps";
+import { useEmployeeScheduleListQuery, type EmployeeSchedule } from "@entities/employee-schedule";
+import {
+  useEmployeeAvailabilityListQuery,
+  type EmployeeAvailabilityGroup,
+} from "@entities/employee-availability";
 import { getErrorMessage } from "@shared/api/httpClient";
 import {
-  getEmployeeNotificationReadStorageKey,
-  readEmployeeNotificationIds,
-  writeEmployeeNotificationIds,
+  readEmployeeNotificationIdsForAccount,
+  writeEmployeeNotificationIdsForAccount,
 } from "@shared/lib/employeeNotificationReadState";
 import { ErrorBanner } from "@shared/ui/components/ErrorBanner";
-import { NoteIcon } from "@shared/ui/icons";
+import { InboxIcon, NoteIcon } from "@shared/ui/icons";
 import workspaceStyles from "@pages/shared/EmployeeWorkspacePage.module.css";
-import { buildEmployeeNotificationItems, isEmployeeNotificationRead } from "../model/notifications";
+import { buildEmployeeNotificationItems, formatEmployeeNotificationExpiry, isEmployeeNotificationRead } from "../model/notifications";
 import styles from "./EmployeeNotificationsPage.module.css";
 
 const EMPTY_SWAPS: ShiftSwap[] = [];
+const EMPTY_SCHEDULES: EmployeeSchedule[] = [];
+const EMPTY_AVAILABILITY_GROUPS: EmployeeAvailabilityGroup[] = [];
 
 export function EmployeeNotificationsPage() {
   const { session } = useAuth();
   const { notifications: realtimeNotifications } = useRealtime();
   const swapsQuery = useEmployeeShiftSwapsQuery();
+  const schedulesQuery = useEmployeeScheduleListQuery();
+  const availabilityQuery = useEmployeeAvailabilityListQuery();
   const swaps = swapsQuery.data ?? EMPTY_SWAPS;
-  const storageKey = getEmployeeNotificationReadStorageKey(session?.userName);
-  const [readIds, setReadIds] = useState<Set<string>>(() => readEmployeeNotificationIds(storageKey));
+  const schedules = schedulesQuery.data ?? EMPTY_SCHEDULES;
+  const availabilityGroups = availabilityQuery.data ?? EMPTY_AVAILABILITY_GROUPS;
+  const [nowMs, setNowMs] = useState(() => Date.now());
+  const [readIds, setReadIds] = useState<Set<string>>(() =>
+    readEmployeeNotificationIdsForAccount(session?.userName, session?.employeeId),
+  );
 
   useEffect(() => {
-    setReadIds(readEmployeeNotificationIds(storageKey));
-  }, [storageKey]);
+    setReadIds(readEmployeeNotificationIdsForAccount(session?.userName, session?.employeeId));
+  }, [session?.employeeId, session?.userName]);
+
+  useEffect(() => {
+    const intervalId = window.setInterval(() => setNowMs(Date.now()), 30_000);
+    return () => window.clearInterval(intervalId);
+  }, []);
 
   const notificationItems = useMemo(
-    () => buildEmployeeNotificationItems(realtimeNotifications, swaps),
-    [realtimeNotifications, swaps],
+    () => buildEmployeeNotificationItems(realtimeNotifications, swaps, schedules, availabilityGroups, nowMs),
+    [availabilityGroups, nowMs, realtimeNotifications, schedules, swaps],
   );
 
   const unreadCount = notificationItems.reduce(
     (count, item) => count + (isEmployeeNotificationRead(item, readIds) ? 0 : 1),
     0,
   );
-  const queryError = swapsQuery.error;
+  const queryError = swapsQuery.error ?? schedulesQuery.error ?? availabilityQuery.error;
   const queryErrorMessage = queryError ? getErrorMessage(queryError, "Could not load notifications.") : null;
 
   const handleMarkAllRead = () => {
@@ -50,7 +67,7 @@ export function EmployeeNotificationsPage() {
       ...notificationItems.flatMap(item => item.readIds),
     ]);
     setReadIds(nextReadIds);
-    writeEmployeeNotificationIds(storageKey, nextReadIds);
+    writeEmployeeNotificationIdsForAccount(session?.userName, session?.employeeId, nextReadIds);
   };
 
   const handleMarkRead = (itemReadIds: string[]) => {
@@ -61,7 +78,7 @@ export function EmployeeNotificationsPage() {
     const nextReadIds = new Set(readIds);
     itemReadIds.forEach(id => nextReadIds.add(id));
     setReadIds(nextReadIds);
-    writeEmployeeNotificationIds(storageKey, nextReadIds);
+    writeEmployeeNotificationIdsForAccount(session?.userName, session?.employeeId, nextReadIds);
   };
 
   return (
@@ -70,9 +87,14 @@ export function EmployeeNotificationsPage() {
 
       <section className={`${workspaceStyles.panel} ${styles.inboxPanel}`}>
         <div className={styles.sectionHeader}>
-          <div>
-            <span className={workspaceStyles.panelEyebrow}>Inbox</span>
-            <h2 className={workspaceStyles.panelTitle}>Inbox</h2>
+          <div className={styles.sectionHeading}>
+            <span className={styles.sectionIcon} aria-hidden="true">
+              <InboxIcon size={20} />
+            </span>
+            <div>
+              <span className={workspaceStyles.panelEyebrow}>Notifications</span>
+              <h2 className={workspaceStyles.panelTitle}>Inbox</h2>
+            </div>
           </div>
 
           <div className={styles.inboxHeaderActions}>
@@ -94,7 +116,7 @@ export function EmployeeNotificationsPage() {
               <NoteIcon size={20} />
             </span>
             <strong>No notifications yet</strong>
-            <span>Open shift updates will appear here.</span>
+            <span>Published schedules, availability and shift updates will appear here.</span>
           </div>
         ) : (
           <div className={styles.notificationList}>
@@ -119,6 +141,9 @@ export function EmployeeNotificationsPage() {
                     </div>
                     <p>{item.body}</p>
                     <span>{item.meta}</span>
+                    <span className={styles.notificationExpiry}>
+                      {formatEmployeeNotificationExpiry(item.occurredAtUtc, nowMs)}
+                    </span>
                   </div>
 
                   <div className={styles.notificationActions}>

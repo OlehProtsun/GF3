@@ -135,6 +135,14 @@
   display: block;
 }
 
+.navLogo {
+  width: 38px;
+  height: 38px;
+  display: block;
+  object-fit: contain;
+}
+
+
 .navIconHome :global(svg) {
   transform: translateX(1px) translateY(-5px) scaleY(-1);
   transform-origin: center;

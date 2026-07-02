@@ -148,44 +148,21 @@ public sealed class SqliteAdministrationTests
     [Fact]
     public async Task AdminDbService_SelectDatabase_SwitchesWorkspaceAndPersistsSelection()
     {
-        var localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-        Directory.CreateDirectory(localAppData);
-        var stateDirectory = Path.Combine(localAppData, "GF3");
-        var stateFilePath = Path.Combine(stateDirectory, "database-selection.json");
-        var hadExistingState = File.Exists(stateFilePath);
-        var existingStateJson = hadExistingState ? await File.ReadAllTextAsync(stateFilePath) : null;
+        await using var database = await SqliteTestDatabase.CreateAsync();
+        var secondDatabasePath = Path.Combine(database.RootPath, "other.db");
+        File.WriteAllBytes(secondDatabasePath, []);
 
-        try
-        {
-            await using var database = await SqliteTestDatabase.CreateAsync();
-            var secondDatabasePath = Path.Combine(database.RootPath, "other.db");
-            File.WriteAllBytes(secondDatabasePath, []);
+        await using var provider = BuildAdminProvider(database);
+        await using var scope = provider.CreateAsyncScope();
+        var service = scope.ServiceProvider.GetRequiredService<IAdminDbService>();
 
-            await using var provider = BuildAdminProvider(database);
-            await using var scope = provider.CreateAsyncScope();
-            var service = scope.ServiceProvider.GetRequiredService<IAdminDbService>();
+        var selected = await service.SelectDatabaseAsync(secondDatabasePath);
+        var readSuccess = SqliteDatabaseSelectionStore.TryRead(out var persistedPath, database.RootPath);
 
-            var selected = await service.SelectDatabaseAsync(secondDatabasePath);
-            var readSuccess = SqliteDatabaseSelectionStore.TryRead(out var persistedPath, localAppData);
-
-            Assert.True(readSuccess);
-            Assert.True(selected.IsActive);
-            Assert.Equal(Path.GetFullPath(secondDatabasePath), persistedPath);
-        }
-        finally
-        {
-            if (hadExistingState)
-            {
-                Directory.CreateDirectory(stateDirectory);
-                await File.WriteAllTextAsync(stateFilePath, existingStateJson!);
-            }
-            else if (File.Exists(stateFilePath))
-            {
-                File.Delete(stateFilePath);
-            }
-        }
+        Assert.True(readSuccess);
+        Assert.True(selected.IsActive);
+        Assert.Equal(Path.GetFullPath(secondDatabasePath), persistedPath);
     }
-
     private static ServiceProvider BuildAdminProvider(SqliteTestDatabase database)
     {
         var services = new ServiceCollection();
@@ -197,7 +174,12 @@ public sealed class SqliteAdministrationTests
         });
         services.AddScoped<ISqliteAdminService, SqliteAdminService>();
         services.AddScoped<ISqliteAdminFacade, SqliteAdminFacade>();
-        services.AddScoped<IAdminDbService, AdminDbService>();
+        services.AddScoped<IAdminDbService>(serviceProvider => new AdminDbService(
+            serviceProvider.GetRequiredService<AppDbContext>(),
+            serviceProvider.GetRequiredService<ISqliteAdminFacade>(),
+            serviceProvider.GetRequiredService<ISqliteDatabaseWorkspace>(),
+            serviceProvider.GetRequiredService<IServiceScopeFactory>(),
+            database.RootPath));
 
         return services.BuildServiceProvider();
     }

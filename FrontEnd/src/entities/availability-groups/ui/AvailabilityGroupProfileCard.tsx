@@ -12,11 +12,13 @@ type AvailabilityGroupProfileCardProps = {
   group?: AvailabilityGroup | null;
   columns: AvailabilityMatrixColumn[];
   cellMap: AvailabilityMatrixCellMap;
+  visualHintMap?: AvailabilityMatrixCellMap;
   isLoading: boolean;
   hasLoadError: boolean;
   isDeleting: boolean;
   onEdit: () => void;
   onDelete: () => void;
+  onVisualHintClick?: (employeeId: number, dayOfMonth: number) => void;
 };
 
 function joinClassNames(...values: Array<string | undefined | false>) {
@@ -27,11 +29,13 @@ export function AvailabilityGroupProfileCard({
   group,
   columns,
   cellMap,
+  visualHintMap,
   isLoading,
   hasLoadError,
   isDeleting,
   onEdit,
   onDelete,
+  onVisualHintClick,
 }: AvailabilityGroupProfileCardProps) {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
@@ -79,9 +83,11 @@ export function AvailabilityGroupProfileCard({
           month={group.month}
           columns={columns}
           cellMap={cellMap}
+          visualHintMap={visualHintMap}
           readOnly
           title="Availability Schedule"
           helperText="This schedule is read-only. Open edit if you want to update assigned employees or day codes."
+          onVisualHintClick={onVisualHintClick}
         />
       }
     />

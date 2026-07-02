@@ -550,6 +550,14 @@
   box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.24);
 }
 
+.visualHintCurrentValue {
+  min-width: 0;
+  overflow: hidden;
+  color: inherit;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
 .cellButton:focus-visible {
   outline: none;
   box-shadow: inset 0 0 0 2px rgba(37, 99, 235, 0.32);
@@ -581,6 +589,10 @@
   font-size: 0.76rem;
   font-weight: 800;
   letter-spacing: 0.01em;
+}
+
+.mutedSuffix {
+  color: rgba(107, 114, 128, 0.92);
 }
 
 .readonlyValue {

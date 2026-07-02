@@ -247,7 +247,7 @@ export function buildGraphRelatedScheduleHintData(params: {
     slots: GraphSlot[];
   }>;
 }) {
-  const { currentGraph, columns, cellMap, relatedGraphs } = params;
+  const { currentGraph, columns, relatedGraphs } = params;
   const employeeIdSet = new Set(
     columns
       .filter(column => column.kind === "employee" && column.employeeId > 0)
@@ -287,10 +287,6 @@ export function buildGraphRelatedScheduleHintData(params: {
       }
 
       const cellKey = getGraphCellKey(slot.employeeId, slot.dayOfMonth);
-      if (!isGraphCellEmptyValue(cellMap[cellKey])) {
-        return;
-      }
-
       const cellSlots = slotsByCellKey.get(cellKey) ?? [];
       cellSlots.push(slot);
       slotsByCellKey.set(cellKey, cellSlots);
@@ -1168,11 +1164,6 @@ function parseGraphTimeMinutes(value: string) {
 
   const [hours, minutes] = normalized.split(":").map(Number);
   return hours * 60 + minutes;
-}
-
-function isGraphCellEmptyValue(value: string | undefined) {
-  const trimmed = value?.trim() ?? "";
-  return trimmed.length === 0 || trimmed === GRAPH_EMPTY_MARK;
 }
 
 function buildGraphRelatedScheduleHintDayValues(params: {

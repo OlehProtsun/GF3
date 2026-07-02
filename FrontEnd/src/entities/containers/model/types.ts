@@ -24,6 +24,7 @@ export type Graph = {
   maxFullPerMonth: number;
   note?: string | null;
   availabilityGroupId?: number | null;
+  lastUpdatedAtUtc?: string | null;
 };
 
 export type SchedulePresetEmployee = {

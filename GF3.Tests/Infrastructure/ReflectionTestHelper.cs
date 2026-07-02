@@ -57,7 +57,7 @@ internal static class ReflectionTestHelper
             if (Directory.Exists(projectDirectory))
             {
                 var directCandidate = Directory.EnumerateFiles(projectDirectory, $"{assemblyName}.dll", SearchOption.AllDirectories)
-                    .OrderByDescending(path => path.Contains(Path.Combine("bin", "Debug"), StringComparison.OrdinalIgnoreCase))
+                    .OrderByDescending(path => path.Contains(Path.Combine("bin", "Release"), StringComparison.OrdinalIgnoreCase))
                     .ThenByDescending(path => path.Contains("net10.0-windows", StringComparison.OrdinalIgnoreCase))
                     .FirstOrDefault();
 
