@@ -72,6 +72,8 @@
 .todayCard {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
+  height: clamp(460px, calc(100svh - 170px), 620px);
+  min-height: 0;
 }
 
 .todayCard > :last-child {
@@ -169,6 +171,9 @@
 }
 
 .todayTable th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
   background: rgba(241, 245, 249, 0.92);
   color: rgba(15, 23, 42, 0.72);
   font-size: 0.78rem;
@@ -422,6 +427,10 @@
 }
 
 @media (max-width: 720px) {
+  .todayCard {
+    height: 480px;
+  }
+
   .todayTable {
     min-width: 620px;
   }

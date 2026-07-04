@@ -31,6 +31,7 @@ import {
   BindIcon,
   ClearFormatAllIcon,
   ClearFormatIcon,
+  CloseIcon,
   EmployeeIcon,
   EyeIcon,
   InformationIcon,
@@ -860,15 +861,22 @@ export function ContainerGraphEditor({
                     >
                       {graphEmployeeRows.map(row => {
                         const employee = employeeById.get(row.employeeId);
+                        const employeeLabel = getEmployeeFullName(employee, `Employee ${row.employeeId}`);
 
                         return (
                           <div key={row.employeeId} className={styles.employeeRow}>
-                            <span className={styles.employeeName}>
-                              {getEmployeeFullName(employee, `Employee ${row.employeeId}`)}
-                            </span>
+                            <span className={styles.employeeName}>{employeeLabel}</span>
 
                             <div className={styles.employeeRowActions}>
-                              <IosButton label="Remove" variant="secondary" onClick={() => onRemoveEmployee(row.employeeId)} />
+                              <button
+                                type="button"
+                                className={styles.removeEmployeeButton}
+                                aria-label={`Remove ${employeeLabel} from schedule`}
+                                title="Remove employee"
+                                onClick={() => onRemoveEmployee(row.employeeId)}
+                              >
+                                <CloseIcon size={15} />
+                              </button>
                             </div>
                           </div>
                         );

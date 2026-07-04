@@ -1,14 +1,12 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { ErrorBanner } from "@shared/ui/components/ErrorBanner";
-import { DetailItem, DetailList } from "@shared/ui/components/DetailList";
 import { IosButton } from "@shared/ui/components/IosButton";
 import { RecordGrid } from "@shared/ui/components/RecordGrid";
 import { RecordTile } from "@shared/ui/components/RecordTile";
-import { ProfileSummaryCard, type ProfileSummaryDetail } from "@shared/ui/components/ProfileSummaryCard";
 import { CheckIcon, SearchIcon, ContainerInfoIcon, InformationIcon, PlusIcon, ScheduleIcon } from "@shared/ui/icons";
+import { formatScheduleLastUpdate } from "@shared/lib/scheduleLastUpdate";
 import { CardSection } from "@shared/ui/sections/CardSection";
 import type { Container } from "@entities/containers/model/types";
-import { getGraphVisibleNote } from "@entities/containers/model/graphNote";
 import {
   getContainerDisplayName,
   getContainerInitials,
@@ -45,6 +43,13 @@ const DESKTOP_MEDIA_QUERY = "(min-width: 961px)";
 
 function joinClassNames(...values: Array<string | false | null | undefined>) {
   return values.filter(Boolean).join(" ");
+}
+
+function matchesEmployeeSearch(employeeName: string, searchQuery: string) {
+  const normalizedEmployeeName = employeeName.toLocaleLowerCase();
+  const searchTerms = searchQuery.trim().toLocaleLowerCase().split(/\s+/).filter(Boolean);
+
+  return searchTerms.every(term => normalizedEmployeeName.includes(term));
 }
 
 type MultiOpenHeaderToggleProps = {
@@ -101,6 +106,7 @@ export function ContainerProfileWorkspace({
     return window.matchMedia(DESKTOP_MEDIA_QUERY).matches;
   });
   const [scheduleCardHeight, setScheduleCardHeight] = useState<number | null>(null);
+  const [statisticsSearchQuery, setStatisticsSearchQuery] = useState("");
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -163,7 +169,7 @@ export function ContainerProfileWorkspace({
     totalHoursText: statistics.totalHoursText,
   });
   const noteDetail = rawDetails.find(item => item.key === "note");
-  const details: ProfileSummaryDetail[] = rawDetails
+  const details = rawDetails
     .filter(item => item.key !== "note")
     .map(item => ({
       key: item.key,
@@ -175,6 +181,13 @@ export function ContainerProfileWorkspace({
   const showGraphsEmpty = !isGraphsLoading && !hasGraphsError && totalGraphsCount === 0;
   const showSearchEmpty = !isGraphsLoading && totalGraphsCount > 0 && graphs.length === 0;
   const showStatisticsEmpty = statistics.pivotRows.length === 0;
+  const hasStatisticsSearch = statisticsSearchQuery.trim().length > 0;
+  const filteredStatisticsRows = hasStatisticsSearch
+    ? statistics.pivotRows.filter(
+        row => !row.isTotal && matchesEmployeeSearch(row.employee, statisticsSearchQuery),
+      )
+    : statistics.pivotRows;
+  const showStatisticsSearchEmpty = hasStatisticsSearch && filteredStatisticsRows.length === 0;
   const selectedGraphIdSet = new Set(selectedGraphIds);
   const hasSelectedGraphs = selectedGraphIds.length > 0;
   const scheduleCardShellStyle =
@@ -186,42 +199,42 @@ export function ContainerProfileWorkspace({
     <div className={styles.workspace}>
       <div className={styles.topRow}>
         <aside ref={sidebarRef} className={styles.sidebar}>
-          <ProfileSummaryCard
-            className={styles.summaryCard}
-            sectionTitle="Container Information"
+          <CardSection
+            className={joinClassNames(styles.sectionCard, styles.summaryCard)}
+            title="Container Information"
             icon={<ContainerInfoIcon size={18} />}
-            headerMeta={`ID ${container.id}`}
-            avatar={getContainerInitials(container)}
-            name={getContainerDisplayName(container)}
-            subtitle={getContainerState(totalGraphsCount, statistics.totalHoursText, container.note)}
-            contentAfterIdentity={
-              <div className={styles.summaryDetails}>
-                <DetailList columns={1} className={styles.noteList}>
-                  <DetailItem
-                    label={noteDetail?.label ?? "Note"}
-                    value={noteValue}
-                    className={joinClassNames(styles.profileNoteItem, !hasNote && styles.profileNoteItemEmpty)}
-                    valueClassName={joinClassNames(styles.profileNoteValue, !hasNote && styles.profileNoteValueEmpty)}
-                  />
-                </DetailList>
-
-                {details.length > 0 ? (
-                  <DetailList columns={2} className={styles.metricsList}>
-                    {details.map((item, index) => (
-                      <DetailItem
-                        key={item.key ?? index}
-                        label={item.label}
-                        value={item.value}
-                        className={styles.profileMetricItem}
-                        valueClassName={styles.profileMetricValue}
-                      />
-                    ))}
-                  </DetailList>
-                ) : null}
+          >
+            <div className={styles.containerInfoContent}>
+              <div className={styles.containerIdentity}>
+                <div className={styles.containerAvatar} aria-hidden="true">
+                  {getContainerInitials(container)}
+                </div>
+                <div className={styles.containerIdentityText}>
+                  <h2 className={styles.containerName}>{getContainerDisplayName(container)}</h2>
+                  <p className={styles.containerSubtitle}>
+                    {getContainerState(totalGraphsCount, statistics.totalHoursText, container.note)}
+                  </p>
+                </div>
               </div>
-            }
-            actions={
-              <>
+
+              <div className={styles.containerInfoLabels} role="group" aria-label="Container details">
+                <div className={styles.statisticsSummaryItem}>
+                  <span className={styles.statisticsSummaryLabel}>ID</span>
+                  <strong className={styles.statisticsSummaryValue}>{container.id}</strong>
+                </div>
+                {details.map(item => (
+                  <div key={item.key} className={styles.statisticsSummaryItem}>
+                    <span className={styles.statisticsSummaryLabel}>{item.label}</span>
+                    <strong className={styles.statisticsSummaryValue}>{item.value}</strong>
+                  </div>
+                ))}
+              </div>
+
+              <div className={joinClassNames(styles.containerNote, !hasNote && styles.containerNoteEmpty)}>
+                <span className={styles.containerNoteLabel}>{noteDetail?.label ?? "Note"}</span>
+                <div className={styles.containerNoteValue}>{noteValue}</div>
+              </div>
+              <div className={styles.containerInfoActions}>
                 <IosButton label="Edit Container" onClick={() => onEditContainer(container.id)} />
                 <IosButton
                   label={isDeleting ? "Deleting..." : "Delete Container"}
@@ -231,9 +244,9 @@ export function ContainerProfileWorkspace({
                   disabled={isDeleting}
                   onClick={onDeleteContainer}
                 />
-              </>
-            }
-          />
+              </div>
+            </div>
+          </CardSection>
         </aside>
 
         <div className={styles.scheduleColumn}>
@@ -311,8 +324,6 @@ export function ContainerProfileWorkspace({
                         <RecordTile
                           key={summary.graph.id}
                           title={summary.graph.name}
-                          description={getGraphVisibleNote(summary.graph.note).trim() || undefined}
-                          badge={summary.monthYearLabel}
                           headerSlot={
                             null
                           }
@@ -347,7 +358,32 @@ export function ContainerProfileWorkspace({
                             { key: "shop", label: "Shop", value: summary.shopName },
                             { key: "employees", label: "Employees", value: String(summary.employeeCount) },
                             { key: "hours", label: "Hours", value: summary.assignedHoursText },
-                            { key: "days", label: "Days", value: String(summary.coverageDays) },
+                            { key: "month-year", label: "Month Year", value: summary.monthYearLabel },
+                            {
+                              key: "status",
+                              label: "Status",
+                              value: (
+                                <span
+                                  className={joinClassNames(
+                                    styles.scheduleStatusValue,
+                                    summary.graph.publicationStatus === "public"
+                                      ? styles.scheduleStatusPublic
+                                      : styles.scheduleStatusPrivate,
+                                  )}
+                                >
+                                  {summary.graph.publicationStatus === "public" ? "Public" : "Private"}
+                                </span>
+                              ),
+                            },
+                            {
+                              key: "last-update",
+                              label: "Last Update",
+                              value: (
+                                <span className={styles.scheduleLastUpdateValue}>
+                                  {formatScheduleLastUpdate(summary.graph.lastUpdatedAtUtc)}
+                                </span>
+                              ),
+                            },
                           ]}
                         />
                       ))}
@@ -362,26 +398,44 @@ export function ContainerProfileWorkspace({
 
       <CardSection
         className={`${styles.sectionCard} ${styles.statisticsCard}`}
+        headerClassName={styles.statisticsHeader}
         title="Container Statistics"
         icon={<InformationIcon size={18} />}
       >
-        <div className={styles.metricRow}>
-          <div className={styles.metricCard}>
-            <span className={styles.metricLabel}>Total hours</span>
-            <strong className={styles.metricValue}>{statistics.totalHoursText}</strong>
+        <div className={styles.statisticsSummary} role="group" aria-label="Container totals">
+          <div className={styles.statisticsSummaryItem}>
+            <span className={styles.statisticsSummaryLabel}>Total hours</span>
+            <strong className={styles.statisticsSummaryValue}>{statistics.totalHoursText}</strong>
           </div>
-          <div className={styles.metricCard}>
-            <span className={styles.metricLabel}>Employees</span>
-            <strong className={styles.metricValue}>{statistics.totalEmployees}</strong>
+          <div className={styles.statisticsSummaryItem}>
+            <span className={styles.statisticsSummaryLabel}>Employees</span>
+            <strong className={styles.statisticsSummaryValue}>{statistics.totalEmployees}</strong>
           </div>
-          <div className={styles.metricCard}>
-            <span className={styles.metricLabel}>Shops</span>
-            <strong className={styles.metricValue}>{statistics.totalShops}</strong>
+          <div className={styles.statisticsSummaryItem}>
+            <span className={styles.statisticsSummaryLabel}>Shops</span>
+            <strong className={styles.statisticsSummaryValue}>{statistics.totalShops}</strong>
           </div>
-          <div className={styles.metricCard}>
-            <span className={styles.metricLabel}>Schedules</span>
-            <strong className={styles.metricValue}>{totalGraphsCount}</strong>
+          <div className={styles.statisticsSummaryItem}>
+            <span className={styles.statisticsSummaryLabel}>Schedules</span>
+            <strong className={styles.statisticsSummaryValue}>{totalGraphsCount}</strong>
           </div>
+          {!showStatisticsEmpty ? (
+            <label
+              className={joinClassNames(styles.searchField, styles.statisticsSearchField)}
+              htmlFor="container-statistics-search"
+            >
+              <SearchIcon className={styles.searchIcon} />
+              <input
+                id="container-statistics-search"
+                className={styles.searchInput}
+                type="search"
+                value={statisticsSearchQuery}
+                onChange={event => setStatisticsSearchQuery(event.target.value)}
+                placeholder="Search by name or surname"
+                aria-label="Search statistics by employee name or surname"
+              />
+            </label>
+          ) : null}
         </div>
 
         {showStatisticsEmpty ? (
@@ -389,6 +443,13 @@ export function ContainerProfileWorkspace({
             <div className={styles.emptyTitle}>No statistics yet</div>
             <div className={styles.emptyDescription}>
               Statistics will appear as soon as schedules contain assigned employees and slots.
+            </div>
+          </div>
+        ) : showStatisticsSearchEmpty ? (
+          <div className={`${styles.emptyState} ${styles.statisticsSearchEmptyState}`} role="status">
+            <div className={styles.emptyTitle}>No employees found</div>
+            <div className={styles.emptyDescription}>
+              No employee matches "{statisticsSearchQuery.trim()}".
             </div>
           </div>
         ) : (
@@ -407,7 +468,7 @@ export function ContainerProfileWorkspace({
                   </tr>
                 </thead>
                 <tbody>
-                  {statistics.pivotRows.map(row => (
+                  {filteredStatisticsRows.map(row => (
                     <tr key={`${row.employee}-${row.isTotal ? "total" : "row"}`} className={row.isTotal ? styles.totalRow : undefined}>
                       <td>{row.employee}</td>
                       <td>{row.workDays}</td>

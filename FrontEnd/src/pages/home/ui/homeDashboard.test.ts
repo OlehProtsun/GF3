@@ -227,11 +227,17 @@ describe("home dashboard loader", () => {
         "1:10": "08:00 - 12:00",
         "2:11": "22:00 - 02:00",
       },
+      visualHintMap: {
+        "2:10": "Alpha graph",
+      },
       styleMap: {
         "1:10": {
           backgroundColor: "rgba(255, 0, 0, 1)",
         },
       },
+    });
+    expect(dashboard.activeSchedules[1].visualHintMap).toEqual({
+      "2:11": "Beta graph",
     });
   });
 

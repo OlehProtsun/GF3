@@ -2,6 +2,7 @@ import {
   buildGraphCellMap,
   buildGraphConflictDayMap,
   buildGraphMatrixColumns,
+  buildGraphRelatedScheduleHintMap,
   buildGraphStyleMap,
   buildGraphTotals,
   containersApi,
@@ -45,6 +46,7 @@ export type HomeSchedulePreview = {
   route: string;
   columns: GraphMatrixColumn[];
   cellMap: GraphMatrixCellMap;
+  visualHintMap: GraphMatrixCellMap;
   styleMap: GraphMatrixStyleMap;
   dayConflictMap: Record<number, boolean>;
   totals: GraphTotals;
@@ -141,9 +143,10 @@ function buildHomeSchedulePreview(
     cellStyles: GraphCellStyle[];
     shop: Shop | null;
     employeesById: Map<number, Employee>;
+    relatedGraphs: LoadedMonthGraph[];
   },
 ) {
-  const { container, graph, graphEmployees, slots, cellStyles, shop, employeesById } = params;
+  const { container, graph, graphEmployees, slots, cellStyles, shop, employeesById, relatedGraphs } = params;
   const parsedGraphNote = parseGraphNoteContent(graph.note);
   const baseColumns = buildGraphMatrixColumns(graphEmployees, employeesById, slots);
   const manualColumns = parsedGraphNote.manualColumns.map(column => ({
@@ -168,6 +171,11 @@ function buildHomeSchedulePreview(
 
     return accumulator;
   }, {});
+  const cellMap = {
+    ...buildGraphCellMap(slots),
+    ...rehydrateGraphNoteTextCells(parsedGraphNote.textCells),
+    ...manualCellMap,
+  };
 
   return {
     graph,
@@ -176,11 +184,16 @@ function buildHomeSchedulePreview(
     monthLabel: formatGraphMonthYear(graph.year, graph.month),
     route: `/container/${container.id}/graphs/${graph.id}`,
     columns,
-    cellMap: {
-      ...buildGraphCellMap(slots),
-      ...rehydrateGraphNoteTextCells(parsedGraphNote.textCells),
-      ...manualCellMap,
-    },
+    cellMap,
+    visualHintMap: buildGraphRelatedScheduleHintMap({
+      currentGraph: graph,
+      columns,
+      cellMap,
+      relatedGraphs: relatedGraphs.map(relatedGraph => ({
+        graph: relatedGraph.graph,
+        slots: relatedGraph.slots,
+      })),
+    }),
     styleMap: buildGraphStyleMap([
       ...cellStyles,
       ...rehydrateGraphNoteCellStyles(parsedGraphNote.cellStyles, graph.id),
@@ -344,6 +357,7 @@ export async function loadHomeDashboard(signal?: AbortSignal): Promise<HomeDashb
       cellStyles: record.cellStyles,
       shop: record.shop,
       employeesById,
+      relatedGraphs: loadedMonthGraphs,
     });
   });
 

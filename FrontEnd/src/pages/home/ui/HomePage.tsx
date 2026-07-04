@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { AvailabilityIcon, ContainerIcon, EyeIcon, InformationIcon, ScheduleDetailsIcon } from "@shared/ui/icons";
@@ -98,54 +98,6 @@ function useCurrentTimeText() {
   return currentTimeText;
 }
 
-function useDesktopMatchedHeight() {
-  const targetRef = useRef<HTMLDivElement | null>(null);
-  const [matchedHeight, setMatchedHeight] = useState<number | null>(null);
-
-  useLayoutEffect(() => {
-    if (typeof window === "undefined") {
-      return;
-    }
-
-    const targetElement = targetRef.current;
-    if (!targetElement) {
-      return;
-    }
-
-    const mediaQuery = window.matchMedia("(min-width: 1241px)");
-
-    const updateMatchedHeight = () => {
-      if (!mediaQuery.matches) {
-        setMatchedHeight(null);
-        return;
-      }
-
-      const nextHeight = Math.ceil(targetElement.getBoundingClientRect().height);
-      setMatchedHeight(previousHeight => (previousHeight !== nextHeight ? nextHeight : previousHeight));
-    };
-
-    updateMatchedHeight();
-
-    const resizeObserver = new ResizeObserver(updateMatchedHeight);
-    resizeObserver.observe(targetElement);
-
-    const handleMediaQueryChange = () => {
-      updateMatchedHeight();
-    };
-
-    mediaQuery.addEventListener("change", handleMediaQueryChange);
-    window.addEventListener("resize", updateMatchedHeight);
-
-    return () => {
-      resizeObserver.disconnect();
-      mediaQuery.removeEventListener("change", handleMediaQueryChange);
-      window.removeEventListener("resize", updateMatchedHeight);
-    };
-  }, []);
-
-  return { targetRef, matchedHeight };
-}
-
 function HomePillList({
   title,
   items,
@@ -177,7 +129,6 @@ export function HomePage() {
   const location = useLocation();
   const navigate = useNavigate();
   const currentTimeText = useCurrentTimeText();
-  const { targetRef: sideColumnRef, matchedHeight: todayCardHeight } = useDesktopMatchedHeight();
   const [activeScheduleSelection, setActiveScheduleSelection] = useState<ActiveScheduleSelectionState>(
     EMPTY_ACTIVE_SCHEDULE_SELECTION,
   );
@@ -244,7 +195,6 @@ export function HomePage() {
       <div className={styles.topGrid}>
         <CardSection
           className={styles.todayCard}
-          style={todayCardHeight ? { height: `${todayCardHeight}px` } : undefined}
           title="Who Works Today?"
           icon={<AvailabilityIcon size={18} />}
           headerRightSlot={
@@ -290,7 +240,7 @@ export function HomePage() {
           )}
         </CardSection>
 
-        <div ref={sideColumnRef} className={styles.sideColumn}>
+        <div className={styles.sideColumn}>
           <CardSection
             className={styles.monthCard}
             title="This Month"
@@ -399,6 +349,7 @@ export function HomePage() {
                   graph={schedule.graph}
                   columns={schedule.columns}
                   cellMap={schedule.cellMap}
+                  visualHintMap={schedule.visualHintMap}
                   styleMap={schedule.styleMap}
                   dayConflictMap={schedule.dayConflictMap}
                   title={schedule.graph.name}
