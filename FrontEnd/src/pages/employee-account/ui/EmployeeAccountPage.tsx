@@ -10,6 +10,7 @@ import { getErrorMessage } from "@shared/api/httpClient";
 import { ErrorBanner } from "@shared/ui/components/ErrorBanner";
 import { IosButton } from "@shared/ui/components/IosButton";
 import { pushErrorAlertFromError } from "@shared/ui/feedback/error-alerts/errorAlerts";
+import { CodeIcon, EmployeeIcon, LogoutIcon, SaveIcon } from "@shared/ui/icons";
 import sharedStyles from "@pages/shared/EmployeeWorkspacePage.module.css";
 import styles from "./EmployeeAccountPage.module.css";
 
@@ -187,116 +188,139 @@ export function EmployeeAccountPage() {
 
   return (
     <div className={sharedStyles.page}>
-      <section className={`${sharedStyles.panel} ${sharedStyles.panelAccent} ${styles.profilePanel}`}>
+      <section className={styles.profilePanel}>
         <div className={styles.panelHeader}>
-          <div className={styles.panelIntro}>
-            <span className={sharedStyles.panelEyebrow}>Profile</span>
+          <div className={styles.profileSummaryBlock}>
+            <span className={styles.profileAvatar} aria-hidden="true">
+              {initials}
+            </span>
 
-            <div className={styles.profileSummaryBlock}>
-              <span className={sharedStyles.profileAvatar} aria-hidden="true">
-                {initials}
-              </span>
-
-              <div className={sharedStyles.profileIdentity}>
-                <strong className={sharedStyles.profileName}>{displayName}</strong>
-                <span className={sharedStyles.profileHandle}>@{userName}</span>
-              </div>
+            <div className={styles.profileIdentity}>
+              <span className={styles.profileEyebrow}>Profile</span>
+              <h1 className={styles.profileName}>{displayName}</h1>
+              <span className={styles.profileHandle}>@{userName}</span>
             </div>
-
-            <h2 className={sharedStyles.panelTitle}>Account details and recovery</h2>
-            <p className={sharedStyles.panelText}>Update your recovery contacts and confirm password changes with a code sent to email.</p>
           </div>
 
-          {!isEditing ? (
-            <div className={styles.headerActions}>
-              <IosButton
-                label="Edit"
-                size="compact"
-                className={styles.profileButton}
-                onClick={handleOpenEdit}
-                disabled={profileQuery.isLoading || !profile}
-              />
-            </div>
-          ) : null}
+          <p className={styles.profileDescription}>
+            Keep your contact details current and manage password recovery securely.
+          </p>
         </div>
 
-        {inlineError ? <ErrorBanner>{inlineError}</ErrorBanner> : null}
-        {profileQuery.error ? (
-          <ErrorBanner bannerClassName={styles.errorBanner}>Could not load your profile right now.</ErrorBanner>
+        {inlineError || profileQuery.error || inlineSuccess ? (
+          <div className={styles.feedbackStack}>
+            {inlineError ? <ErrorBanner>{inlineError}</ErrorBanner> : null}
+            {profileQuery.error ? (
+              <ErrorBanner bannerClassName={styles.errorBanner}>Could not load your profile right now.</ErrorBanner>
+            ) : null}
+            {inlineSuccess ? <div className={styles.successBanner}>{inlineSuccess}</div> : null}
+          </div>
         ) : null}
-        {inlineSuccess ? <div className={styles.successBanner}>{inlineSuccess}</div> : null}
 
         {profileQuery.isLoading && !profile ? (
-          <p className={sharedStyles.panelText}>Loading your profile...</p>
+          <div className={styles.loadingState}>Loading your profile...</div>
         ) : profile ? (
           <div className={styles.contentGrid}>
-            <div className={styles.infoGrid}>
-              <div className={styles.infoCard}>
-                <span className={styles.cardLabel}>Login</span>
-                <span className={styles.cardValue}>@{profile.username}</span>
-              </div>
-
-              <div className={styles.infoCard}>
-                <span className={styles.cardLabel}>Display name</span>
-                <span className={styles.cardValue}>{profile.displayName}</span>
-              </div>
-
-              <div className={styles.infoCard}>
-                <span className={styles.cardLabel}>Recovery email</span>
-                {isEditing ? (
-                  <label className={styles.field}>
-                    <input
-                      type="email"
-                      className={styles.input}
-                      value={recoveryEmail}
-                      onChange={(event) => setRecoveryEmail(event.target.value)}
-                      placeholder="example@email.com"
-                      autoComplete="email"
-                    />
-                  </label>
-                ) : (
-                  <span className={styles.cardValue}>{profile.recoveryEmail ?? "Not added yet"}</span>
-                )}
-              </div>
-
-              <div className={styles.infoCard}>
-                <span className={styles.cardLabel}>Phone</span>
-                {isEditing ? (
-                  <label className={styles.field}>
-                    <input
-                      type="tel"
-                      className={styles.input}
-                      value={phone}
-                      onChange={(event) => setPhone(event.target.value)}
-                      placeholder="+48 500 000 000"
-                      autoComplete="tel"
-                    />
-                  </label>
-                ) : (
-                  <span className={styles.cardValue}>{profile.phone ?? "Not added yet"}</span>
-                )}
-              </div>
-            </div>
-
-            <div className={styles.passwordCard}>
-              <div className={styles.passwordHeader}>
+            <section className={styles.detailsSection} aria-labelledby="personal-details-heading">
+              <div className={styles.sectionHeader}>
+                <span className={styles.sectionIcon} aria-hidden="true">
+                  <EmployeeIcon size={20} />
+                </span>
                 <div>
-                  <span className={styles.cardLabel}>Password change</span>
-                  <strong className={styles.passwordTitle}>Email verification</strong>
+                  <h2 id="personal-details-heading" className={styles.sectionTitle}>Personal details</h2>
+                  <p className={styles.sectionText}>Your account and recovery contacts.</p>
                 </div>
-                <span className={styles.passwordHint}>{hasRecoveryEmailForPassword ? "6-digit code" : "Recovery email required"}</span>
               </div>
 
-              <p className={styles.passwordText}>
-                {hasRecoveryEmailForPassword
-                  ? "We will send a one-time code to your recovery email. Save any changed contact details before continuing."
-                  : "Add and save a recovery email first, then request a one-time password code here."}
-              </p>
+              <div className={styles.detailsList}>
+                <div className={styles.detailRow}>
+                  <span className={styles.cardLabel}>Login</span>
+                  <span className={styles.cardValue}>@{profile.username}</span>
+                </div>
+
+                <div className={styles.detailRow}>
+                  <span className={styles.cardLabel}>Display name</span>
+                  <span className={styles.cardValue}>{profile.displayName}</span>
+                </div>
+
+                <div className={`${styles.detailRow} ${isEditing ? styles.detailRowEditing : ""}`}>
+                  {isEditing ? (
+                    <label className={styles.field}>
+                      <span className={styles.fieldLabel}>Recovery email</span>
+                      <span className={styles.fieldHint}>Used for secure password recovery.</span>
+                      <input
+                        type="email"
+                        className={styles.input}
+                        value={recoveryEmail}
+                        onChange={(event) => setRecoveryEmail(event.target.value)}
+                        placeholder="example@email.com"
+                        autoComplete="email"
+                      />
+                    </label>
+                  ) : (
+                    <>
+                      <span className={styles.cardLabel}>Recovery email</span>
+                      <span className={styles.cardValue}>{profile.recoveryEmail ?? "Not added yet"}</span>
+                    </>
+                  )}
+                </div>
+
+                <div className={`${styles.detailRow} ${isEditing ? styles.detailRowEditing : ""}`}>
+                  {isEditing ? (
+                    <label className={styles.field}>
+                      <span className={styles.fieldLabel}>Phone</span>
+                      <span className={styles.fieldHint}>Optional contact number for your manager.</span>
+                      <input
+                        type="tel"
+                        className={styles.input}
+                        value={phone}
+                        onChange={(event) => setPhone(event.target.value)}
+                        placeholder="+48 500 000 000"
+                        autoComplete="tel"
+                      />
+                    </label>
+                  ) : (
+                    <>
+                      <span className={styles.cardLabel}>Phone</span>
+                      <span className={styles.cardValue}>{profile.phone ?? "Not added yet"}</span>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              {!isEditing ? (
+                <div className={styles.detailsActions}>
+                  <IosButton
+                    label="Edit"
+                    size="compact"
+                    className={styles.profileButton}
+                    onClick={handleOpenEdit}
+                    disabled={profileQuery.isLoading || !profile}
+                  />
+                </div>
+              ) : null}
+            </section>
+
+            <section className={styles.securitySection} aria-labelledby="security-heading">
+              <div className={styles.sectionHeader}>
+                <span className={`${styles.sectionIcon} ${styles.sectionIconSecurity}`} aria-hidden="true">
+                  <CodeIcon size={20} />
+                </span>
+                <div>
+                  <h2 id="security-heading" className={styles.sectionTitle}>Password &amp; security</h2>
+                  <p className={styles.sectionText}>Confirm changes with a one-time email code.</p>
+                </div>
+              </div>
+
+              <div className={`${styles.securityStatus} ${!hasRecoveryEmailForPassword ? styles.securityStatusMissing : ""}`}>
+                <span className={styles.statusDot} aria-hidden="true" />
+                <span>{hasRecoveryEmailForPassword ? "Recovery email connected" : "Recovery email required"}</span>
+              </div>
 
               {codeDeliveryHint ? <div className={styles.passwordNotice}>Last code sent to {codeDeliveryHint}.</div> : null}
 
               {isEditing ? (
-                <>
+                <div className={styles.securityEditor}>
                   <div className={styles.passwordActions}>
                     <IosButton
                       label={sendPasswordCodeMutation.isPending ? "Sending..." : "Send code"}
@@ -306,15 +330,15 @@ export function EmployeeAccountPage() {
                       disabled={isBusy || !hasRecoveryEmailForPassword}
                     />
                     {!hasRecoveryEmailForPassword ? (
-                      <span className={styles.passwordMeta}>Recovery email is required.</span>
+                      <span className={styles.passwordMeta}>Add a recovery email first.</span>
                     ) : hasUnsavedChanges ? (
-                      <span className={styles.passwordMeta}>Unsaved profile changes will be saved first.</span>
+                      <span className={styles.passwordMeta}>Contact changes will be saved first.</span>
                     ) : null}
                   </div>
 
                   <div className={styles.passwordFormGrid}>
                     <label className={styles.field}>
-                      <span className={styles.fieldLabel}>Code</span>
+                      <span className={styles.fieldLabel}>Verification code</span>
                       <input
                         type="text"
                         inputMode="numeric"
@@ -323,6 +347,7 @@ export function EmployeeAccountPage() {
                         value={passwordCode}
                         onChange={(event) => setPasswordCode(event.target.value)}
                         placeholder="123456"
+                        autoComplete="one-time-code"
                       />
                     </label>
 
@@ -339,23 +364,23 @@ export function EmployeeAccountPage() {
                     </label>
                   </div>
 
-                  <div className={styles.passwordActions}>
-                    <IosButton
-                      label={confirmPasswordMutation.isPending ? "Updating..." : "Change password"}
-                      size="compact"
-                      className={styles.profileButton}
-                      onClick={() => void handleConfirmPasswordReset()}
-                      disabled={isBusy || !passwordCode.trim() || !newPassword.trim()}
-                    />
-                  </div>
-                </>
+                  <IosButton
+                    label={confirmPasswordMutation.isPending ? "Updating..." : "Change password"}
+                    size="compact"
+                    className={`${styles.profileButton} ${styles.changePasswordButton}`}
+                    onClick={() => void handleConfirmPasswordReset()}
+                    disabled={isBusy || !passwordCode.trim() || !newPassword.trim()}
+                  />
+                </div>
               ) : (
-                <div className={styles.passwordReadonly}>Use Edit to update recovery details and change the password by email code.</div>
+                <p className={styles.passwordReadonly}>
+                  Choose Edit to update your recovery details or change your password.
+                </p>
               )}
-            </div>
+            </section>
           </div>
         ) : (
-          <p className={sharedStyles.panelText}>Your profile is not available yet.</p>
+          <div className={styles.loadingState}>Your profile is not available yet.</div>
         )}
 
         {profile ? (
@@ -365,6 +390,7 @@ export function EmployeeAccountPage() {
                 <IosButton label="Cancel" variant="secondary" size="compact" className={styles.profileButton} onClick={handleCancelEdit} disabled={isBusy} />
                 <IosButton
                   label={updateProfileMutation.isPending ? "Saving..." : "Save profile"}
+                  icon={<SaveIcon size={17} />}
                   size="compact"
                   className={styles.profileButton}
                   onClick={() => void handleSaveProfile()}
@@ -375,6 +401,7 @@ export function EmployeeAccountPage() {
 
             <IosButton
               label="Log out"
+              icon={<LogoutIcon size={17} />}
               variant="secondary"
               size="compact"
               className={[styles.profileButton, styles.logoutButton].join(" ")}

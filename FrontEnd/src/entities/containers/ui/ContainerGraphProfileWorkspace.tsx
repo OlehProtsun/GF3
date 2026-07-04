@@ -22,11 +22,9 @@ import { getEmployeeFullName } from "@entities/employees/model/presentation";
 import type { Container, Graph, GraphCellStyle, GraphEmployee, GraphSlot } from "@entities/containers/model/types";
 import type { Employee } from "@entities/employees/model/types";
 import type { Shop } from "@entities/shops/model/types";
-import { DetailItem, DetailList } from "@shared/ui/components/DetailList";
 import { ErrorBanner } from "@shared/ui/components/ErrorBanner";
 import { IosButton } from "@shared/ui/components/IosButton";
-import { ProfileSummaryCard } from "@shared/ui/components/ProfileSummaryCard";
-import { InformationIcon, ScheduleDetailsIcon } from "@shared/ui/icons";
+import { InformationIcon, ScheduleDetailsIcon, SearchIcon } from "@shared/ui/icons";
 import { formatScheduleLastUpdate } from "@shared/lib/scheduleLastUpdate";
 import { CardSection } from "@shared/ui/sections/CardSection";
 import { ContainerGraphMatrix } from "./ContainerGraphMatrix";
@@ -58,6 +56,13 @@ const DESKTOP_MEDIA_QUERY = "(min-width: 1181px)";
 
 function joinClassNames(...values: Array<string | undefined | false>) {
   return values.filter(Boolean).join(" ");
+}
+
+function matchesEmployeeSearch(employeeName: string, searchQuery: string) {
+  const normalizedEmployeeName = employeeName.toLocaleLowerCase();
+  const searchTerms = searchQuery.trim().toLocaleLowerCase().split(/\s+/).filter(Boolean);
+
+  return searchTerms.every(term => normalizedEmployeeName.includes(term));
 }
 
 function getGraphInitials(graph?: Graph | null) {
@@ -132,6 +137,7 @@ function sanitizeScheduleColumnOrder(
 export function ContainerGraphProfileWorkspace({
   graph,
   shop,
+  availabilityGroup,
   graphEmployees,
   slots,
   cellStyles,
@@ -147,8 +153,9 @@ export function ContainerGraphProfileWorkspace({
   onEdit,
   onDelete,
 }: ContainerGraphProfileWorkspaceProps) {
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(true);
   const [activeRelatedHintCellKey, setActiveRelatedHintCellKey] = useState<string | null>(null);
+  const [summarySearchQuery, setSummarySearchQuery] = useState("");
   const [viewportHeight, setViewportHeight] = useState(() => {
     if (typeof window === "undefined") {
       return 0;
@@ -255,6 +262,11 @@ export function ContainerGraphProfileWorkspace({
   const totals = buildGraphTotals(graphEmployees, slots, employeesById);
   const summaryHeaders = buildGraphSummaryHeaders(graph.year, graph.month);
   const summaryRows = buildGraphSummaryRows(graph, graphEmployees, employeesById, slots);
+  const hasSummarySearch = summarySearchQuery.trim().length > 0;
+  const filteredSummaryRows = hasSummarySearch
+    ? summaryRows.filter(row => matchesEmployeeSearch(row.employee, summarySearchQuery))
+    : summaryRows;
+  const showSummarySearchEmpty = hasSummarySearch && filteredSummaryRows.length === 0;
   const note = getGraphVisibleNote(graph.note).trim();
   const hasNote = note.length > 0;
   const lastUpdateLabel = formatScheduleLastUpdate(graph.lastUpdatedAtUtc);
@@ -286,6 +298,14 @@ export function ContainerGraphProfileWorkspace({
     { key: "month", label: "Month", value: getGraphMonthLabel(graph.year, graph.month) },
     { key: "year", label: "Year", value: String(graph.year) },
     { key: "shop", label: "Shop", value: shop?.name ?? `Shop ${graph.shopId}` },
+    { key: "status", label: "Status", value: graph.publicationStatus === "public" ? "Public" : "Private" },
+    { key: "people", label: "People on Shift", value: String(graph.peoplePerShift) },
+    { key: "shift1", label: "Shift1", value: graph.shift1Time },
+    { key: "shift2", label: "Shift2", value: graph.shift2Time },
+    { key: "max-days", label: "Max Consecutive Days", value: String(graph.maxConsecutiveDays) },
+    { key: "max-consecutive-full", label: "Max Consecutive Full", value: String(graph.maxConsecutiveFull) },
+    { key: "max-full", label: "Max Full", value: String(graph.maxFullPerMonth) },
+    { key: "availability", label: "Availability", value: availabilityGroup?.name ?? "None" },
   ] as const;
   const matrixCardShellStyle =
     shouldPreserveMatrixHeight && topRowCardMinHeight !== null
@@ -340,57 +360,68 @@ export function ContainerGraphProfileWorkspace({
             onExpand={() => setIsSidebarCollapsed(false)}
           >
             <div className={styles.summaryCardMeasure}>
-              <ProfileSummaryCard
+              <CardSection
                 className={styles.summaryCard}
-                sectionTitle="Schedule Information"
+                title="Schedule Information"
                 icon={<ScheduleDetailsIcon size={18} />}
-                headerMeta={`ID ${graph.id}`}
                 headerRightSlot={
                   <AvailabilitySidebarCollapseButton
                     label="Schedule Information"
                     onCollapse={() => setIsSidebarCollapsed(true)}
                   />
                 }
-                avatar={getGraphInitials(graph)}
-                name={graph.name}
-                contentAfterIdentity={
-                  <div className={styles.summaryContent}>
-                    <DetailList columns={1} className={styles.noteList}>
-                      <DetailItem
-                        label="Note"
-                        value={note || <span className={styles.mutedValue}>No notes yet.</span>}
-                        className={joinClassNames(styles.profileNoteItem, !hasNote && styles.profileNoteItemEmpty)}
-                        valueClassName={joinClassNames(styles.profileNoteValue, !hasNote && styles.profileNoteValueEmpty)}
-                      />
-                    </DetailList>
-
-                    <DetailList columns={3} className={styles.metricsList}>
-                      {scheduleDetails.map(item => (
-                        <DetailItem
-                          key={item.key}
-                          label={item.label}
-                          value={item.value}
-                          className={styles.profileMetricItem}
-                          valueClassName={styles.profileMetricValue}
-                        />
-                      ))}
-                    </DetailList>
-
-                    <div className={styles.lastUpdateField} aria-label={`Last Update: ${lastUpdateLabel}`}>
-                      <span className={styles.lastUpdateLabel}>
-                        <span className={styles.lastUpdateDot} aria-hidden="true" />
-                        Last Update
-                      </span>
-                      <strong className={styles.lastUpdateValue}>
-                        {graph.lastUpdatedAtUtc ? (
-                          <time dateTime={graph.lastUpdatedAtUtc}>{lastUpdateLabel}</time>
-                        ) : lastUpdateLabel}
-                      </strong>
+              >
+                <div className={styles.summaryContent}>
+                  <div className={styles.scheduleIdentity}>
+                    <div className={styles.scheduleAvatar} aria-hidden="true">
+                      {getGraphInitials(graph)}
+                    </div>
+                    <div className={styles.scheduleIdentityText}>
+                      <h2 className={styles.scheduleName}>{graph.name}</h2>
+                      <p className={styles.scheduleId}>{`ID ${graph.id}`}</p>
                     </div>
                   </div>
-                }
-                actions={
-                  <>
+
+                  <div className={joinClassNames(styles.scheduleNote, !hasNote && styles.scheduleNoteEmpty)}>
+                    <span className={styles.scheduleInfoLabel}>Note</span>
+                    <div className={styles.scheduleNoteValue}>
+                      {note || <span className={styles.mutedValue}>No notes yet.</span>}
+                    </div>
+                  </div>
+
+                  <div className={styles.scheduleInfoLabels} role="group" aria-label="Schedule details">
+                    {scheduleDetails.map(item => (
+                      <div key={item.key} className={styles.scheduleInfoItem}>
+                        <span className={styles.scheduleInfoLabel}>{item.label}</span>
+                        <strong
+                          className={joinClassNames(
+                            styles.scheduleInfoValue,
+                            item.key === "status" && (
+                              graph.publicationStatus === "public"
+                                ? styles.scheduleStatusPublic
+                                : styles.scheduleStatusPrivate
+                            ),
+                          )}
+                        >
+                          {item.value}
+                        </strong>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className={styles.lastUpdateField} aria-label={`Last Update: ${lastUpdateLabel}`}>
+                    <span className={styles.lastUpdateLabel}>
+                      <span className={styles.lastUpdateDot} aria-hidden="true" />
+                      Last Update
+                    </span>
+                    <strong className={styles.lastUpdateValue}>
+                      {graph.lastUpdatedAtUtc ? (
+                        <time dateTime={graph.lastUpdatedAtUtc}>{lastUpdateLabel}</time>
+                      ) : lastUpdateLabel}
+                    </strong>
+                  </div>
+
+                  <div className={styles.scheduleInfoActions}>
                     {showEditAction ? <IosButton label="Edit Schedule" onClick={onEdit} /> : null}
                     <IosButton
                       label={isDeleting ? "Deleting..." : "Delete Schedule"}
@@ -400,9 +431,9 @@ export function ContainerGraphProfileWorkspace({
                       disabled={isDeleting}
                       onClick={onDelete}
                     />
-                  </>
-                }
-              />
+                  </div>
+                </div>
+              </CardSection>
             </div>
           </AvailabilitySidebarSection>
           </aside>
@@ -422,15 +453,35 @@ export function ContainerGraphProfileWorkspace({
           title="Schedule Summary"
           icon={<InformationIcon size={18} />}
           headerRightSlot={
-            <div className={styles.summaryMeta}>
-              <span className={styles.metaBadge}>{`Employees: ${totals.totalEmployees}`}</span>
-              <span className={styles.metaBadge}>{`Hours: ${totals.totalHoursText}`}</span>
+            <div className={styles.summaryHeaderActions}>
+              {summaryRows.length > 0 ? (
+                <label className={styles.summarySearchField} htmlFor="schedule-summary-search">
+                  <SearchIcon className={styles.summarySearchIcon} />
+                  <input
+                    id="schedule-summary-search"
+                    className={styles.summarySearchInput}
+                    type="search"
+                    value={summarySearchQuery}
+                    onChange={event => setSummarySearchQuery(event.target.value)}
+                    placeholder="Search by name or surname"
+                    aria-label="Search schedule summary by employee name or surname"
+                  />
+                </label>
+              ) : null}
+              <div className={styles.summaryMeta}>
+                <span className={styles.metaBadge}>{`Employees: ${totals.totalEmployees}`}</span>
+                <span className={styles.metaBadge}>{`Hours: ${totals.totalHoursText}`}</span>
+              </div>
             </div>
           }
         >
           {summaryRows.length === 0 ? (
             <div className={styles.emptyState}>
               No employee schedule rows yet. Generate a schedule or assign matrix intervals to see the summary.
+            </div>
+          ) : showSummarySearchEmpty ? (
+            <div className={styles.emptyState} role="status">
+              {`No employees found for "${summarySearchQuery.trim()}".`}
             </div>
           ) : (
             <div className={styles.summaryTableScroll}>
@@ -457,7 +508,7 @@ export function ContainerGraphProfileWorkspace({
                 </thead>
 
                 <tbody>
-                  {summaryRows.map(row => (
+                  {filteredSummaryRows.map(row => (
                     <tr key={row.employeeId}>
                       <td className={joinClassNames(styles.stickyColumn, styles.employeeValue)}>{row.employee}</td>
                       <td className={joinClassNames(styles.stickyColumnSecondary, styles.statValue)}>{row.workDays}</td>
