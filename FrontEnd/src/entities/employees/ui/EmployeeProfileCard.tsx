@@ -20,8 +20,10 @@ type EmployeeProfileCardProps = {
   isLoading: boolean;
   hasLoadError: boolean;
   isDeleting: boolean;
+  isKicking: boolean;
   onEditEmployee: (employeeId: Employee["id"]) => void;
   onDeleteEmployee: () => void;
+  onKickEmployee: () => void;
 };
 
 export function EmployeeProfileCard({
@@ -29,8 +31,10 @@ export function EmployeeProfileCard({
   isLoading,
   hasLoadError,
   isDeleting,
+  isKicking,
   onEditEmployee,
   onDeleteEmployee,
+  onKickEmployee,
 }: EmployeeProfileCardProps) {
   const fullName = getEmployeeFullName(employee, "Employee Profile");
   const initials = getEmployeeInitials(employee);
@@ -61,6 +65,16 @@ export function EmployeeProfileCard({
         employee ? (
           <>
             <IosButton label="Edit Employee" onClick={() => onEditEmployee(employee.id)} />
+            {employee.hasLoginAccount ? (
+              <IosButton
+                label={isKicking ? "Kicking..." : "Kick Employee"}
+                variant="secondary"
+                customColor="#2563eb"
+                customBorderColor="#2563eb"
+                onClick={onKickEmployee}
+                disabled={isKicking}
+              />
+            ) : null}
             <IosButton
               label={isDeleting ? "Deleting..." : "Delete Employee"}
               variant="secondary"

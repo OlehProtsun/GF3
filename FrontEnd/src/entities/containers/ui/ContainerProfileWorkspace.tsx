@@ -1,9 +1,19 @@
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { AvailabilitySidebarCollapseButton, AvailabilitySidebarSection } from "@entities/availability-groups/ui/AvailabilitySidebarSection";
+import {
+  filterShiftSwaps,
+  useCancelContainerShiftSwapMutation,
+  useContainerShiftSwapsQuery,
+  useDeleteContainerShiftSwapMutation,
+  type ShiftSwap,
+} from "@entities/shift-swaps";
+import { getErrorMessage } from "@shared/api/httpClient";
+import { ConfirmDialog } from "@shared/ui/ConfirmDialog";
 import { ErrorBanner } from "@shared/ui/components/ErrorBanner";
 import { IosButton } from "@shared/ui/components/IosButton";
 import { RecordGrid } from "@shared/ui/components/RecordGrid";
 import { RecordTile } from "@shared/ui/components/RecordTile";
-import { CheckIcon, SearchIcon, ContainerInfoIcon, InformationIcon, PlusIcon, ScheduleIcon } from "@shared/ui/icons";
+import { CheckIcon, EyeIcon, SearchIcon, ContainerInfoIcon, InformationIcon, PlusIcon, ScheduleIcon, SwapOffersIcon } from "@shared/ui/icons";
 import { formatScheduleLastUpdate } from "@shared/lib/scheduleLastUpdate";
 import { CardSection } from "@shared/ui/sections/CardSection";
 import type { Container } from "@entities/containers/model/types";
@@ -14,6 +24,7 @@ import {
   getContainerState,
 } from "@entities/containers/model/presentation";
 import type { ContainerGraphSummary, ContainerStatistics } from "@entities/containers/model/statistics";
+import { ShiftSwapHistoryDialog } from "./ShiftSwapHistoryDialog";
 import styles from "./ContainerProfileWorkspace.module.css";
 type ContainerProfileWorkspaceProps = {
   container?: Container | null;
@@ -51,6 +62,25 @@ function matchesEmployeeSearch(employeeName: string, searchQuery: string) {
 
   return searchTerms.every(term => normalizedEmployeeName.includes(term));
 }
+
+function formatSwapDate(swap: ShiftSwap) {
+  return new Intl.DateTimeFormat("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(new Date(Date.UTC(swap.year, swap.month - 1, swap.dayOfMonth)));
+}
+
+function getSwapReceiver(swap: ShiftSwap) {
+  if (swap.status === "accepted") {
+    return swap.acceptedByEmployeeName ?? "Employee";
+  }
+
+  return swap.targetEmployeeName ?? "Everyone";
+}
+
+type SwapAction = { type: "cancel" | "delete"; swap: ShiftSwap } | null;
 
 type MultiOpenHeaderToggleProps = {
   checked: boolean;
@@ -107,6 +137,22 @@ export function ContainerProfileWorkspace({
   });
   const [scheduleCardHeight, setScheduleCardHeight] = useState<number | null>(null);
   const [statisticsSearchQuery, setStatisticsSearchQuery] = useState("");
+  const [swapSearchQuery, setSwapSearchQuery] = useState("");
+  const [selectedSwap, setSelectedSwap] = useState<ShiftSwap | null>(null);
+  const [swapAction, setSwapAction] = useState<SwapAction>(null);
+  const [swapActionError, setSwapActionError] = useState<string | null>(null);
+  const [collapsedSections, setCollapsedSections] = useState({ information: false, swaps: false });
+  const allSectionsCollapsed = collapsedSections.information && collapsedSections.swaps;
+  const swapsQuery = useContainerShiftSwapsQuery(container?.id ?? null, Boolean(container));
+  const cancelSwapMutation = useCancelContainerShiftSwapMutation();
+  const deleteSwapMutation = useDeleteContainerShiftSwapMutation();
+  const swaps = useMemo(() => swapsQuery.data ?? [], [swapsQuery.data]);
+  const filteredSwaps = useMemo(
+    () => filterShiftSwaps(swaps, swapSearchQuery),
+    [swapSearchQuery, swaps],
+  );
+  const hasSwapSearch = swapSearchQuery.trim().length > 0;
+  const isSwapActionPending = cancelSwapMutation.isPending || deleteSwapMutation.isPending;
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -140,7 +186,12 @@ export function ContainerProfileWorkspace({
     }
 
     const updateHeight = () => {
-      const nextHeight = Math.ceil(sidebarElement.getBoundingClientRect().height);
+      const informationSection = sidebarElement.firstElementChild;
+      const nextHeight = Math.ceil(
+        collapsedSections.swaps && !collapsedSections.information && informationSection
+          ? informationSection.getBoundingClientRect().height
+          : sidebarElement.getBoundingClientRect().height,
+      );
       setScheduleCardHeight(previousHeight => (previousHeight !== nextHeight ? nextHeight : previousHeight));
     };
 
@@ -152,7 +203,26 @@ export function ContainerProfileWorkspace({
     return () => {
       observer.disconnect();
     };
-  }, [isDesktopLayout, totalGraphsCount, graphs.length, statistics.totalHoursText]);
+  }, [collapsedSections.information, collapsedSections.swaps, filteredSwaps.length, isDesktopLayout, totalGraphsCount, graphs.length, statistics.totalHoursText]);
+
+  const handleSwapActionConfirm = () => {
+    if (!container || !swapAction) {
+      return;
+    }
+
+    setSwapActionError(null);
+    const mutation = swapAction.type === "cancel" ? cancelSwapMutation : deleteSwapMutation;
+    mutation.mutate(
+      { containerId: container.id, id: swapAction.swap.id },
+      {
+        onSuccess: () => {
+          setSwapAction(null);
+          setSelectedSwap(current => current?.id === swapAction.swap.id ? null : current);
+        },
+        onError: error => setSwapActionError(getErrorMessage(error, `Could not ${swapAction.type} this swap.`)),
+      },
+    );
+  };
 
   if (isLoading) {
     return <div className={styles.state}>Loading container profile...</div>;
@@ -197,13 +267,26 @@ export function ContainerProfileWorkspace({
 
   return (
     <div className={styles.workspace}>
-      <div className={styles.topRow}>
-        <aside ref={sidebarRef} className={styles.sidebar}>
-          <CardSection
-            className={joinClassNames(styles.sectionCard, styles.summaryCard)}
-            title="Container Information"
-            icon={<ContainerInfoIcon size={18} />}
+      <div className={joinClassNames(styles.topRow, allSectionsCollapsed && styles.topRowAllCollapsed)}>
+        <aside ref={sidebarRef} className={joinClassNames(styles.sidebar, allSectionsCollapsed && styles.sidebarAllCollapsed)}>
+          <AvailabilitySidebarSection
+            label="Container Information"
+            collapsed={collapsedSections.information}
+            collapsedIcon={<ContainerInfoIcon size={18} />}
+            collapsedOffset="flush"
+            onExpand={() => setCollapsedSections(current => ({ ...current, information: false }))}
           >
+            <CardSection
+              className={joinClassNames(styles.sectionCard, styles.summaryCard)}
+              title="Container Information"
+              icon={<ContainerInfoIcon size={18} />}
+              headerRightSlot={
+                <AvailabilitySidebarCollapseButton
+                  label="Container Information"
+                  onCollapse={() => setCollapsedSections(current => ({ ...current, information: true }))}
+                />
+              }
+            >
             <div className={styles.containerInfoContent}>
               <div className={styles.containerIdentity}>
                 <div className={styles.containerAvatar} aria-hidden="true">
@@ -246,7 +329,100 @@ export function ContainerProfileWorkspace({
                 />
               </div>
             </div>
-          </CardSection>
+            </CardSection>
+          </AvailabilitySidebarSection>
+
+          <AvailabilitySidebarSection
+            label="Swaps"
+            collapsed={collapsedSections.swaps}
+            collapsedIcon={<SwapOffersIcon size={18} />}
+            collapsedOffset="flush"
+            onExpand={() => setCollapsedSections(current => ({ ...current, swaps: false }))}
+          >
+            <CardSection
+              className={joinClassNames(styles.sectionCard, styles.swapsCard)}
+              title="Swaps"
+              icon={<SwapOffersIcon size={18} />}
+              headerRightSlot={
+                <div className={styles.swapHeaderActions}>
+                  <span className={styles.headerBadge}>{hasSwapSearch ? `${filteredSwaps.length}/${swaps.length}` : swaps.length}</span>
+                  <AvailabilitySidebarCollapseButton
+                    label="Swaps"
+                    onCollapse={() => setCollapsedSections(current => ({ ...current, swaps: true }))}
+                  />
+                </div>
+              }
+            >
+              <div className={styles.swapsContent}>
+                <div className={styles.swapMonthLabel}>
+                  All schedules in this container
+                </div>
+
+                <label className={joinClassNames(styles.searchField, styles.swapSearchField)} htmlFor="container-swaps-search">
+                  <SearchIcon className={styles.searchIcon} />
+                  <input
+                    id="container-swaps-search"
+                    className={styles.searchInput}
+                    type="search"
+                    value={swapSearchQuery}
+                    onChange={event => setSwapSearchQuery(event.target.value)}
+                    placeholder="Employee, date or schedule"
+                    aria-label="Search swaps by giver, receiver, date or schedule"
+                  />
+                </label>
+
+                {swapActionError ? <ErrorBanner className={styles.swapError}>{swapActionError}</ErrorBanner> : null}
+                {swapsQuery.isLoading ? <div className={styles.swapState}>Loading swaps...</div> : null}
+                {swapsQuery.isError ? <div className={styles.swapState}>Could not load swaps for this container.</div> : null}
+                {!swapsQuery.isLoading && !swapsQuery.isError && swaps.length === 0 ? (
+                  <div className={styles.swapState}>No swaps in this container.</div>
+                ) : null}
+                {!swapsQuery.isLoading && swaps.length > 0 && filteredSwaps.length === 0 ? (
+                  <div className={styles.swapState}>{`No swaps match "${swapSearchQuery.trim()}".`}</div>
+                ) : null}
+
+                {filteredSwaps.length > 0 ? (
+                  <div className={styles.swapList}>
+                    {filteredSwaps.map(swap => (
+                      <article key={`${swap.status}-${swap.id}`} className={styles.swapItem}>
+                        <div className={styles.swapItemHeader}>
+                          <div className={styles.swapPeople}>
+                            <strong>{swap.fromEmployeeName}</strong>
+                            <span>to</span>
+                            <strong>{getSwapReceiver(swap)}</strong>
+                          </div>
+                          <span className={joinClassNames(styles.swapStatus, styles[`swapStatus${swap.status}`])}>{swap.status}</span>
+                        </div>
+                        <div className={styles.swapMeta}>
+                          <strong>{swap.scheduleName}</strong>
+                          <span>{`${formatSwapDate(swap)} | ${swap.fromTime.slice(0, 5)}-${swap.toTime.slice(0, 5)}`}</span>
+                        </div>
+                        <div className={styles.swapActions}>
+                          <button type="button" onClick={() => setSelectedSwap(swap)} aria-label={`View ${swap.scheduleName} swap`}>
+                            <EyeIcon size={16} />
+                            <span>View</span>
+                          </button>
+                          {swap.status === "open" ? (
+                            <button type="button" disabled={isSwapActionPending} onClick={() => setSwapAction({ type: "cancel", swap })}>
+                              Cancel
+                            </button>
+                          ) : null}
+                          <button
+                            type="button"
+                            className={styles.swapDeleteButton}
+                            disabled={isSwapActionPending}
+                            onClick={() => setSwapAction({ type: "delete", swap })}
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </article>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+            </CardSection>
+          </AvailabilitySidebarSection>
         </aside>
 
         <div className={styles.scheduleColumn}>
@@ -487,6 +663,20 @@ export function ContainerProfileWorkspace({
           </>
         )}
       </CardSection>
+
+      <ShiftSwapHistoryDialog open={selectedSwap !== null} swap={selectedSwap} onCancel={() => setSelectedSwap(null)} />
+      <ConfirmDialog
+        open={swapAction !== null}
+        title={swapAction?.type === "cancel" ? "Cancel swap" : "Delete swap"}
+        message={swapAction?.type === "cancel"
+          ? "Cancel this open swap? Employees will no longer be able to accept it."
+          : "Delete this swap record? This does not reverse an already accepted schedule change."}
+        confirmText={isSwapActionPending ? "Working..." : swapAction?.type === "cancel" ? "Cancel swap" : "Delete"}
+        confirmDisabled={isSwapActionPending}
+        cancelDisabled={isSwapActionPending}
+        onCancel={() => setSwapAction(null)}
+        onConfirm={handleSwapActionConfirm}
+      />
     </div>
   );
 }

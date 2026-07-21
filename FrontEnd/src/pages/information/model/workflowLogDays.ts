@@ -45,6 +45,35 @@ export function getWorkflowDayKey(date: Date | null) {
   return `${year}-${month}-${day}`;
 }
 
+function parseWorkflowDayKey(value: string) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) {
+    return null;
+  }
+
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const date = new Date(year, month - 1, day);
+
+  return date.getFullYear() === year && date.getMonth() === month - 1 && date.getDate() === day ? date : null;
+}
+
+export function getWorkflowLogRangeBounds(fromDayKey: string, toDayKey: string) {
+  const from = parseWorkflowDayKey(fromDayKey);
+  const lastDay = parseWorkflowDayKey(toDayKey);
+  if (!from || !lastDay || lastDay < from) {
+    return null;
+  }
+
+  const to = new Date(lastDay.getFullYear(), lastDay.getMonth(), lastDay.getDate() + 1);
+  return { fromUtc: from.toISOString(), toUtc: to.toISOString() };
+}
+
+export function getWorkflowLogDayBounds(dayKey: string) {
+  return getWorkflowLogRangeBounds(dayKey, dayKey);
+}
+
 export function formatWorkflowLogTime(value: string) {
   const date = parseWorkflowLogDate(value);
   if (!date) {

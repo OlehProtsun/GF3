@@ -140,7 +140,7 @@ type ContainerGraphEditorProps = {
   submitError?: string;
   bindErrorMessage?: string;
   manualShiftPublishError?: string | null;
-  onFieldChange: (field: keyof ContainerGraphFormState) => (value: string) => void;
+  onFieldChange: <K extends keyof ContainerGraphFormState>(field: K) => (value: ContainerGraphFormState[K]) => void;
   onSelectedEmployeeIdChange: (value: number | null) => void;
   onPreviewAvailabilitySelectionChange: (value: string) => void;
   onSelectedBindChange: (clientId: string | null) => void;
@@ -731,6 +731,17 @@ export function ContainerGraphEditor({
                     </button>
                   </div>
 
+                  <div className={styles.swapPermission}>
+                    <div className={styles.swapPermissionCopy}>
+                      <strong>Allow swap</strong>
+                      <span>Controls employee offers and manager Manual-column swaps.</span>
+                    </div>
+                    <div className={styles.swapPermissionControl} role="radiogroup" aria-label="Allow schedule swaps">
+                      <button type="button" role="radio" aria-checked={!form.allowSwap} className={joinClassNames(styles.publicationSegment, !form.allowSwap && styles.publicationSegmentActive)} onClick={() => onFieldChange("allowSwap")(false)}>Off</button>
+                      <button type="button" role="radio" aria-checked={form.allowSwap} className={joinClassNames(styles.publicationSegment, form.allowSwap && styles.publicationSegmentActive)} onClick={() => onFieldChange("allowSwap")(true)}>On</button>
+                    </div>
+                  </div>
+
                   <div className={styles.publicationLog}>
                     <div className={styles.publicationLogHeader}>
                       <span>Swap log</span>
@@ -746,8 +757,8 @@ export function ContainerGraphEditor({
                       <input
                         type="search"
                         value={shiftSwapLogSearch}
-                        placeholder="Search name or date..."
-                        aria-label="Search accepted swaps by employee name or date"
+                        placeholder="Search employee, date or schedule..."
+                        aria-label="Search accepted swaps by giver, receiver, date or schedule"
                         onChange={event => setShiftSwapLogSearch(event.target.value)}
                       />
                     </label>
@@ -919,6 +930,7 @@ export function ContainerGraphEditor({
           >
             <ContainerGraphManualColumnsCard
               columns={manualColumns}
+              allowSwap={form.allowSwap}
               year={displayGraphYear}
               month={displayGraphMonth}
               employees={employees}

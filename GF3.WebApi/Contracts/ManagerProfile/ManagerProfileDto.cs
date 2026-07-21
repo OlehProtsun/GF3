@@ -14,5 +14,7 @@ public sealed class ManagerProfileDto
 
     public bool IsOnline { get; set; }
 
+    public bool IsSystem { get; set; }
+
     public DateTimeOffset CreatedAtUtc { get; set; }
 }

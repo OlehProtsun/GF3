@@ -76,4 +76,18 @@ describe("shift swaps api", () => {
       signal: controller.signal,
     });
   });
+
+  test("uses the whole-container endpoint for manager swap maintenance", () => {
+    const controller = new AbortController();
+
+    shiftSwapsApi.listContainer(2, controller.signal);
+    shiftSwapsApi.cancelContainer(2, 41);
+    shiftSwapsApi.deleteContainer(2, 42);
+
+    expect(requestMock).toHaveBeenNthCalledWith(1, "containers/2/shift-swaps", {
+      signal: controller.signal,
+    });
+    expect(requestMock).toHaveBeenNthCalledWith(2, "containers/2/shift-swaps/41/cancel", { method: "POST" });
+    expect(requestMock).toHaveBeenNthCalledWith(3, "containers/2/shift-swaps/42", { method: "DELETE" });
+  });
 });

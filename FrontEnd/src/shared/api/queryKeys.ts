@@ -2,12 +2,23 @@ export const queryKeys = {
   home: {
     dashboard: () => ["home", "dashboard"] as const,
   },
+  employeeUiState: {
+    current: () => ["employeeUiState", "current"] as const,
+  },
   employeeProfile: {
     me: () => ["employeeProfile", "me"] as const,
   },
   managerProfile: {
     me: () => ["managerProfile", "me"] as const,
     list: () => ["managerProfile", "list"] as const,
+  },
+  managerNotepad: {
+    current: () => ["managerNotepad", "current"] as const,
+  },
+  systemNews: {
+    all: ["systemNews"] as const,
+    visible: () => ["systemNews", "visible"] as const,
+    admin: () => ["systemNews", "admin"] as const,
   },
   employeeAvailability: {
     all: ["employeeAvailability"] as const,
@@ -23,10 +34,12 @@ export const queryKeys = {
     employee: () => ["shiftSwaps", "employee"] as const,
     employees: () => ["shiftSwaps", "employees"] as const,
     graphLog: (containerId: number, graphId: number) => ["shiftSwaps", "graphLog", containerId, graphId] as const,
+    container: (containerId: number) => ["shiftSwaps", "container", containerId] as const,
   },
   workflowLogs: {
     all: ["workflowLogs"] as const,
     list: () => ["workflowLogs", "list"] as const,
+    settings: () => ["workflowLogs", "settings"] as const,
   },
   communications: {
     all: ["communications"] as const,

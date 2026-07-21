@@ -7,6 +7,7 @@ using WebApi.Contracts.Employees;
 using WebApi.Infrastructure;
 using WebApi.Mappers;
 using WebApi.Realtime;
+using WebApi.Services;
 
 namespace WebApi.Controllers;
 
@@ -21,7 +22,9 @@ namespace WebApi.Controllers;
 public class EmployeesController(
     IEmployeeFacade employeeFacade,
     IRealtimeNotifier? realtimeNotifier = null,
-    IManagerEditLockService? editLockService = null) : ControllerBase
+    IManagerEditLockService? editLockService = null,
+    IEmployeeAccountService? employeeAccountService = null,
+    IWorkflowLogService? workflowLogService = null) : ControllerBase
 {
     /// <summary>
     /// Returns all employees as API DTOs.
@@ -112,6 +115,40 @@ public class EmployeesController(
         }
 
         await NotifyEmployeeChangedAsync(id, "manager-employee-deleted").ConfigureAwait(false);
+        return NoContent();
+    }
+
+    /// <summary>
+    /// Immediately revokes every active session for an employee without changing their credentials.
+    /// </summary>
+    [HttpPost("{id:int}/kick")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> Kick(int id, CancellationToken cancellationToken)
+    {
+        await EnsureEmployeeExistsAsync(id, cancellationToken).ConfigureAwait(false);
+
+        if (employeeAccountService is null)
+        {
+            throw new InvalidOperationException("Employee account service is unavailable.");
+        }
+
+        await employeeAccountService.RevokeSessionsAsync(id, cancellationToken).ConfigureAwait(false);
+
+        if (realtimeNotifier is not null)
+        {
+            await realtimeNotifier.NotifyEmployeeSessionRevokedAsync(id).ConfigureAwait(false);
+        }
+
+        if (workflowLogService is not null)
+        {
+            await workflowLogService
+                .LogAsync(User, $"Kicked employee #{id} from active sessions.", cancellationToken)
+                .ConfigureAwait(false);
+        }
+
+        await NotifyEmployeeChangedAsync(id, "manager-employee-session-revoked").ConfigureAwait(false);
         return NoContent();
     }
 

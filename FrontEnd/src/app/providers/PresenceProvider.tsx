@@ -39,6 +39,7 @@ const shiftSwapsChangedMethodName = "ShiftSwapsChanged";
 const workflowLogCreatedMethodName = "WorkflowLogCreated";
 const scheduleEditLockChangedMethodName = "ScheduleEditLockChanged";
 const managerEditLockChangedMethodName = "ManagerEditLockChanged";
+const sessionRevokedMethodName = "SessionRevoked";
 const setManagerEditLocksMethodName = "SetManagerEditLocks";
 const managerEditLockCheckTimeoutMs = 8000;
 
@@ -74,6 +75,11 @@ type ScheduleEditLockChangedUpdate = {
   lockedBy?: string | null;
   lockedByManagerId?: number | null;
   changedAtUtc: string;
+};
+
+type EmployeeSessionRevokedUpdate = {
+  employeeId: number;
+  revokedAtUtc: string;
 };
 
 type ScheduleEditLockTarget = {
@@ -300,7 +306,7 @@ function patchEmployeePresence<T extends Pick<Employee, "id" | "isOnline" | "las
 
 export function PresenceProvider({ children }: PropsWithChildren) {
   const queryClient = useQueryClient();
-  const { status, session } = useAuth();
+  const { status, session, logout } = useAuth();
   const connectionRef = useRef<HubConnection | null>(null);
   const [connectionTick, setConnectionTick] = useState(0);
   const [desiredManagerEditLocks, setDesiredManagerEditLocks] = useState<ManagerEditLockTarget[]>([]);
@@ -485,11 +491,17 @@ export function PresenceProvider({ children }: PropsWithChildren) {
     if (current) {
       queryClient.setQueryData(
         logsQueryKey,
-        [entry, ...current.filter(item => item.id !== entry.id)].slice(0, 200),
+        [entry, ...current.filter(item => item.id !== entry.id)],
       );
     }
 
     invalidateRealtimeQuery(queryClient, queryKeys.workflowLogs.all);
+  });
+
+  const applySessionRevoked = useEffectEvent((update: EmployeeSessionRevokedUpdate) => {
+    if (session?.role === "employee" && session.employeeId === update.employeeId) {
+      void logout();
+    }
   });
 
   const applyScheduleEditLockChanged = useEffectEvent((_update: ScheduleEditLockChangedUpdate) => {
@@ -649,6 +661,10 @@ export function PresenceProvider({ children }: PropsWithChildren) {
       applyManagerEditLockChanged(update);
     });
 
+    connection.on(sessionRevokedMethodName, (update: EmployeeSessionRevokedUpdate) => {
+      applySessionRevoked(update);
+    });
+
     connection.onreconnected(() => {
       invalidateRealtimeBaselineQueries(queryClient);
       setConnectionTick(tick => tick + 1);
@@ -683,6 +699,7 @@ export function PresenceProvider({ children }: PropsWithChildren) {
       connection.off(workflowLogCreatedMethodName);
       connection.off(scheduleEditLockChangedMethodName);
       connection.off(managerEditLockChangedMethodName);
+      connection.off(sessionRevokedMethodName);
       if (connectionRef.current === connection) {
         connectionRef.current = null;
       }

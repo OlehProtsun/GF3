@@ -19,6 +19,14 @@ vi.mock("@app/providers/AuthProvider", () => ({
   }),
 }));
 
+vi.mock("@features/manager-notepad/ui/ManagerNotepad", () => ({
+  ManagerNotepad: () => <div data-testid="manager-notepad" />,
+}));
+
+vi.mock("@features/manager-system-news/ui/ManagerSystemNews", () => ({
+  ManagerSystemNews: () => <div data-testid="manager-system-news" />,
+}));
+
 function renderManagerLayout(pathname = "/") {
   window.history.replaceState({}, "", pathname);
 

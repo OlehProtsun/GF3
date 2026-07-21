@@ -40,6 +40,8 @@ public sealed class GraphDto
     /// </summary>
     public string PublicationStatus { get; set; } = "private";
 
+    public bool AllowSwap { get; set; } = true;
+
     /// <summary>
     /// Number of employees required in each shift interval.
     /// </summary>

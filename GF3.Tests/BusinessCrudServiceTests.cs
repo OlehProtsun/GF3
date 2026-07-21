@@ -204,13 +204,13 @@ public sealed class BusinessCrudServiceTests
         {
             DisplayName = "Primary Manager",
             UserName = "primary.manager",
-            Password = "secret1",
+            Password = "135791",
         });
         var otherManager = await service.CreateAsync(new CreateManagerAccountRequest
         {
             DisplayName = "Second Manager",
             UserName = "second.manager",
-            Password = "secret2",
+            Password = "246802",
         });
 
         var deletedProfile = await service.DeleteAsync(otherManager.Id, currentManager.Id, currentManager.UserName);

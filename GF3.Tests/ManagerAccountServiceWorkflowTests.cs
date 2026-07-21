@@ -20,8 +20,8 @@ public sealed class ManagerAccountServiceWorkflowTests
         await using var context = database.CreateContext();
         var service = CreateService(context);
 
-        var session = await service.AuthenticateAsync(" manager ", "123");
-        var wrongPassword = await service.AuthenticateAsync("manager", "wrong-password");
+        var session = await service.AuthenticateAsync(" manager ", "123456");
+        var wrongPassword = await service.AuthenticateAsync("manager", "999999");
 
         Assert.NotNull(session);
         Assert.Equal("manager", session!.UserName);
@@ -50,7 +50,7 @@ public sealed class ManagerAccountServiceWorkflowTests
         {
             EmployeeId = employee.Id,
             Username = "shared.login",
-            PasswordHash = hasher.HashPassword("employee-password"),
+            PasswordHash = hasher.HashPassword("444444"),
             PasswordUpdatedAtUtc = DateTimeOffset.UtcNow,
         });
         await context.SaveChangesAsync();
@@ -60,7 +60,7 @@ public sealed class ManagerAccountServiceWorkflowTests
             {
                 DisplayName = "Shared Login",
                 UserName = " shared.login ",
-                Password = "manager-password",
+                Password = "333333",
             }));
 
         Assert.Equal(["This username is already in use."], exception.Errors["userName"]);
@@ -77,7 +77,7 @@ public sealed class ManagerAccountServiceWorkflowTests
         {
             DisplayName = "Primary Manager",
             UserName = "primary",
-            Password = "old-password",
+            Password = "555555",
             RecoveryEmail = "primary@example.com",
         });
 
@@ -93,11 +93,11 @@ public sealed class ManagerAccountServiceWorkflowTests
                 DisplayName = " Updated Manager ",
                 UserName = " updated.manager ",
                 RecoveryEmail = " updated@example.com ",
-                NewPassword = "new-password",
+                NewPassword = "666666",
             });
 
-        var oldLogin = await service.AuthenticateAsync("primary", "old-password");
-        var newLogin = await service.AuthenticateAsync("updated.manager", "new-password");
+        var oldLogin = await service.AuthenticateAsync("primary", "555555");
+        var newLogin = await service.AuthenticateAsync("updated.manager", "666666");
         var storedAccount = await context.ManagerAccounts.AsNoTracking().SingleAsync(account => account.Id == manager.Id);
 
         Assert.Equal("Updated Manager", updated.DisplayName);
@@ -121,7 +121,7 @@ public sealed class ManagerAccountServiceWorkflowTests
         {
             DisplayName = "Recovery Manager",
             UserName = "recovery.manager",
-            Password = "old-password",
+            Password = "555555",
             RecoveryEmail = "recovery.manager@example.com",
         });
 
@@ -130,11 +130,11 @@ public sealed class ManagerAccountServiceWorkflowTests
         var code = ExtractResetCode(sentEmail.TextBody);
 
         var invalidCodeException = await Assert.ThrowsAsync<ValidationException>(() =>
-            service.ConfirmPasswordResetAsync("recovery.manager", "000000", "new-password"));
-        await service.ConfirmPasswordResetAsync("recovery.manager", code, "new-password");
+            service.ConfirmPasswordResetAsync("recovery.manager", "000000", "666666"));
+        await service.ConfirmPasswordResetAsync("recovery.manager", code, "666666");
 
-        var oldLogin = await service.AuthenticateAsync("recovery.manager", "old-password");
-        var newLogin = await service.AuthenticateAsync("recovery.manager", "new-password");
+        var oldLogin = await service.AuthenticateAsync("recovery.manager", "555555");
+        var newLogin = await service.AuthenticateAsync("recovery.manager", "666666");
         var storedAccount = await context.ManagerAccounts.AsNoTracking().SingleAsync();
 
         Assert.Contains("*", dispatch.DeliveryHint);
@@ -157,13 +157,13 @@ public sealed class ManagerAccountServiceWorkflowTests
         {
             DisplayName = "No Recovery",
             UserName = "no.recovery",
-            Password = "password",
+            Password = "777777",
         });
         await service.CreateAsync(new CreateManagerAccountRequest
         {
             DisplayName = "With Recovery",
             UserName = "with.recovery",
-            Password = "password",
+            Password = "777777",
             RecoveryEmail = "with.recovery@example.com",
         });
 
@@ -187,7 +187,7 @@ public sealed class ManagerAccountServiceWorkflowTests
         {
             DisplayName = "Recovery Manager",
             UserName = "delivery.failure",
-            Password = "password",
+            Password = "777777",
             RecoveryEmail = "delivery.failure@example.com",
         });
 
@@ -212,22 +212,22 @@ public sealed class ManagerAccountServiceWorkflowTests
         {
             DisplayName = "Recovery Manager",
             UserName = "confirm.manager",
-            Password = "old-password",
+            Password = "555555",
             RecoveryEmail = "confirm.manager@example.com",
         });
 
         var missingChallenge = await Assert.ThrowsAsync<ValidationException>(() =>
-            service.ConfirmPasswordResetAsync("confirm.manager", "123456", "new-password"));
+            service.ConfirmPasswordResetAsync("confirm.manager", "123456", "666666"));
 
         await service.SendPasswordResetCodeAsync("confirm.manager");
         var code = ExtractResetCode(Assert.Single(emailSender.Messages).TextBody);
 
         var malformedCode = await Assert.ThrowsAsync<ValidationException>(() =>
-            service.ConfirmPasswordResetAsync("confirm.manager", "12x", "new-password"));
+            service.ConfirmPasswordResetAsync("confirm.manager", "12x", "666666"));
         var blankPassword = await Assert.ThrowsAsync<ValidationException>(() =>
             service.ConfirmPasswordResetAsync("confirm.manager", code, " "));
         var weakPassword = await Assert.ThrowsAsync<ValidationException>(() =>
-            service.ConfirmPasswordResetAsync("confirm.manager", code, "123"));
+            service.ConfirmPasswordResetAsync("confirm.manager", code, "1234567"));
 
         var challengedAccount = await context.ManagerAccounts.SingleAsync();
         challengedAccount.PasswordResetExpiresAtUtc = DateTimeOffset.UtcNow.AddMinutes(-1);
@@ -235,13 +235,13 @@ public sealed class ManagerAccountServiceWorkflowTests
         context.ChangeTracker.Clear();
 
         var expiredCode = await Assert.ThrowsAsync<ValidationException>(() =>
-            service.ConfirmPasswordResetAsync("confirm.manager", code, "new-password"));
+            service.ConfirmPasswordResetAsync("confirm.manager", code, "666666"));
         var storedAccount = await context.ManagerAccounts.AsNoTracking().SingleAsync();
 
         Assert.Equal(["Request a new password code before changing the password."], missingChallenge.Errors["code"]);
         Assert.Equal(["Enter the 6-digit code from your email."], malformedCode.Errors["code"]);
         Assert.Equal(["New password is required."], blankPassword.Errors["newPassword"]);
-        Assert.Equal(["Password must be between 6 and 200 characters long."], weakPassword.Errors["newPassword"]);
+        Assert.Equal(["Password must contain exactly 6 digits."], weakPassword.Errors["newPassword"]);
         Assert.Equal(["This password code expired. Request a new one."], expiredCode.Errors["code"]);
         Assert.Null(storedAccount.PasswordResetCodeHash);
         Assert.Null(storedAccount.PasswordResetExpiresAtUtc);
@@ -260,21 +260,21 @@ public sealed class ManagerAccountServiceWorkflowTests
             {
                 DisplayName = "Valid Name",
                 UserName = "ab",
-                Password = "password",
+                Password = "777777",
             }));
         var badUsername = await Assert.ThrowsAsync<ValidationException>(() =>
             service.CreateAsync(new CreateManagerAccountRequest
             {
                 DisplayName = "Valid Name",
                 UserName = "bad user",
-                Password = "password",
+                Password = "777777",
             }));
         var badEmail = await Assert.ThrowsAsync<ValidationException>(() =>
             service.CreateAsync(new CreateManagerAccountRequest
             {
                 DisplayName = "Valid Name",
                 UserName = "valid.user",
-                Password = "password",
+                Password = "777777",
                 RecoveryEmail = "not-an-email",
             }));
         var weakPassword = await Assert.ThrowsAsync<ValidationException>(() =>
@@ -284,19 +284,26 @@ public sealed class ManagerAccountServiceWorkflowTests
                 UserName = "weak.password",
                 Password = "123",
             }));
+        var nonNumericPassword = await Assert.ThrowsAsync<ValidationException>(() =>
+            service.CreateAsync(new CreateManagerAccountRequest
+            {
+                DisplayName = "Valid Name",
+                UserName = "numeric.password",
+                Password = "123abc",
+            }));
 
         var first = await service.CreateAsync(new CreateManagerAccountRequest
         {
             DisplayName = "First Manager",
             UserName = "first.manager",
-            Password = "password",
+            Password = "777777",
             RecoveryEmail = "first@example.com",
         });
         var second = await service.CreateAsync(new CreateManagerAccountRequest
         {
             DisplayName = "Second Manager",
             UserName = "second.manager",
-            Password = "password",
+            Password = "777777",
         });
 
         var duplicateUsername = await Assert.ThrowsAsync<ValidationException>(() =>
@@ -322,7 +329,8 @@ public sealed class ManagerAccountServiceWorkflowTests
         Assert.Equal(["Username must be between 3 and 100 characters long."], shortUsername.Errors["userName"]);
         Assert.Equal(["Username may contain only letters, numbers, dots, underscores, and dashes."], badUsername.Errors["userName"]);
         Assert.Equal(["Enter a valid recovery email address."], badEmail.Errors["recoveryEmail"]);
-        Assert.Equal(["Password must be between 6 and 200 characters long."], weakPassword.Errors["password"]);
+        Assert.Equal(["Password must contain exactly 6 digits."], weakPassword.Errors["password"]);
+        Assert.Equal(["Password must contain exactly 6 digits."], nonNumericPassword.Errors["password"]);
         Assert.Equal(["This username is already in use."], duplicateUsername.Errors["userName"]);
         Assert.Equal("renamed.manager", updatedByUsername.UserName);
         Assert.Equal("renamed.manager", updatedByUsername.DisplayName);
@@ -339,13 +347,13 @@ public sealed class ManagerAccountServiceWorkflowTests
         {
             DisplayName = "Owner Manager",
             UserName = "owner.manager",
-            Password = "password",
+            Password = "777777",
         });
         var teammate = await service.CreateAsync(new CreateManagerAccountRequest
         {
             DisplayName = "Team Manager",
             UserName = "team.manager",
-            Password = "password",
+            Password = "777777",
         });
 
         var selfDeleteException = await Assert.ThrowsAsync<ValidationException>(() =>
@@ -369,7 +377,7 @@ public sealed class ManagerAccountServiceWorkflowTests
         {
             DisplayName = "Owner Manager",
             UserName = "owner.manager",
-            Password = "password",
+            Password = "777777",
         });
 
         var invalidTarget = await Assert.ThrowsAsync<ValidationException>(() =>

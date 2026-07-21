@@ -142,7 +142,7 @@ public sealed class EmployeeProfileServiceTests
             emailSender);
 
         var result = await service.SendPasswordResetCodeAsync(5);
-        await service.ConfirmPasswordResetAsync(5, "123456", "new-password");
+        await service.ConfirmPasswordResetAsync(5, "123456", "654321");
 
         Assert.Equal("ad*@example.com", result.DeliveryHint);
         Assert.Equal(expiresAtUtc, result.ExpiresAtUtc);
@@ -151,7 +151,7 @@ public sealed class EmployeeProfileServiceTests
         Assert.Equal("GF3 password reset code", emailSender.LastMessage.Value.Subject);
         Assert.Contains("123456", emailSender.LastMessage.Value.TextBody);
         Assert.Contains("2026-05-13 18:30 UTC", emailSender.LastMessage.Value.TextBody);
-        Assert.Equal((5, "123456", "new-password"), accountService.LastCompletedReset);
+        Assert.Equal((5, "123456", "654321"), accountService.LastCompletedReset);
     }
 
     [Fact]

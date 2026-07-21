@@ -36,6 +36,7 @@ export type EmployeeSchedule = {
   year: number;
   month: number;
   publicationStatus: "public" | "private";
+  allowSwap?: boolean;
   lastUpdatedAtUtc?: string | null;
   employees?: EmployeeScheduleEmployee[];
   slots: EmployeeScheduleSlot[];

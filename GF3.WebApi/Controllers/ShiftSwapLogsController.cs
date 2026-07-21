@@ -23,6 +23,193 @@ public sealed class ShiftSwapLogsController(
     IRealtimeNotifier realtimeNotifier,
     IManagerEditLockService? editLockService = null) : ControllerBase
 {
+    [HttpGet("~/api/containers/{containerId:int}/shift-swaps")]
+    [ProducesResponseType(typeof(IEnumerable<ShiftSwapDto>), StatusCodes.Status200OK)]
+    public async Task<ActionResult<IEnumerable<ShiftSwapDto>>> GetContainerSwaps(
+        int containerId,
+        CancellationToken cancellationToken)
+    {
+        var containerExists = await db.Containers
+            .AnyAsync(container => container.Id == containerId, cancellationToken)
+            .ConfigureAwait(false);
+        if (!containerExists)
+        {
+            return NotFound(new ProblemDetails
+            {
+                Type = "not_found",
+                Title = "Not Found",
+                Status = StatusCodes.Status404NotFound,
+                Detail = $"Container with id {containerId} was not found.",
+                Instance = HttpContext.Request.Path
+            });
+        }
+
+        var requests = await db.ShiftSwapRequests
+            .AsNoTracking()
+            .Include(request => request.Schedule)
+                .ThenInclude(schedule => schedule.Container)
+            .Include(request => request.Schedule)
+                .ThenInclude(schedule => schedule.Shop)
+            .Include(request => request.ScheduleSlot)
+            .Include(request => request.FromEmployee)
+            .Include(request => request.TargetEmployee)
+            .Include(request => request.AcceptedByEmployee)
+            .Where(request => request.Schedule.ContainerId == containerId)
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        var history = await db.ShiftSwapHistories
+            .AsNoTracking()
+            .Where(entry => entry.Schedule.ContainerId == containerId)
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        var historicalRequestIds = history
+            .Select(entry => entry.SourceShiftSwapRequestId)
+            .ToHashSet();
+        var result = requests
+            .Where(request => !historicalRequestIds.Contains(request.Id))
+            .Select(request => ToLogDto(request, managerCanCancel: true))
+            .Concat(history.Select(ToLogDto))
+            .OrderByDescending(item => item.AcceptedAtUtc ?? item.CreatedAtUtc)
+            .ToList();
+
+        return Ok(result);
+    }
+
+    [HttpPost("~/api/containers/{containerId:int}/shift-swaps/{id:int}/cancel")]
+    [ProducesResponseType(typeof(ShiftSwapDto), StatusCodes.Status200OK)]
+    public async Task<ActionResult<ShiftSwapDto>> CancelContainerSwap(
+        int containerId,
+        int id,
+        CancellationToken cancellationToken)
+    {
+        var swap = await db.ShiftSwapRequests
+            .Include(request => request.Schedule)
+                .ThenInclude(schedule => schedule.Container)
+            .Include(request => request.Schedule)
+                .ThenInclude(schedule => schedule.Shop)
+            .Include(request => request.ScheduleSlot)
+            .Include(request => request.FromEmployee)
+            .Include(request => request.TargetEmployee)
+            .Include(request => request.AcceptedByEmployee)
+            .FirstOrDefaultAsync(request =>
+                request.Id == id && request.Schedule.ContainerId == containerId,
+                cancellationToken)
+            .ConfigureAwait(false)
+            ?? throw new KeyNotFoundException($"Shift swap with id {id} was not found.");
+
+        if (CreateEditLockConflictResult(containerId, swap.ScheduleId) is { } conflict)
+        {
+            return conflict;
+        }
+
+        if (swap.Status != ShiftSwapStatus.Open)
+        {
+            throw new ValidationException("Only open shift swaps can be cancelled.");
+        }
+
+        if (swap.IsManagerCreated)
+        {
+            swap.Status = ShiftSwapStatus.Cancelled;
+            swap.CancelledAtUtc = DateTimeOffset.UtcNow;
+            db.ShiftSwapRequests.Remove(swap);
+            if (swap.ScheduleSlot.EmployeeId is null)
+            {
+                db.ScheduleSlots.Remove(swap.ScheduleSlot);
+            }
+        }
+        else
+        {
+            swap.Status = ShiftSwapStatus.Cancelled;
+            swap.CancelledAtUtc = DateTimeOffset.UtcNow;
+        }
+
+        await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        await workflowLogService
+            .LogAsync(
+                User,
+                $"Cancelled the shift swap in schedule \"{swap.Schedule.Name}\" for {swap.Schedule.Year}-{swap.Schedule.Month:00}-{swap.ScheduleSlot.DayOfMonth:00}, {swap.OfferedFromTime ?? swap.ScheduleSlot.FromTime}-{swap.OfferedToTime ?? swap.ScheduleSlot.ToTime}.",
+                cancellationToken)
+            .ConfigureAwait(false);
+        if (swap.IsManagerCreated)
+        {
+            await realtimeNotifier
+                .NotifyScheduleChangedAsync(containerId, swap.ScheduleId, "manager-container-shift-swap-cancelled")
+                .ConfigureAwait(false);
+        }
+        await NotifyContainerSwapChangedAsync(containerId, swap.ScheduleId, swap.Id, "manager-container-shift-swap-cancelled")
+            .ConfigureAwait(false);
+
+        return Ok(ToLogDto(swap, managerCanCancel: true));
+    }
+
+    [HttpDelete("~/api/containers/{containerId:int}/shift-swaps/{id:int}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    public async Task<IActionResult> DeleteContainerSwap(int containerId, int id, CancellationToken cancellationToken)
+    {
+        var request = await db.ShiftSwapRequests
+            .Include(item => item.Schedule)
+            .Include(item => item.ScheduleSlot)
+            .FirstOrDefaultAsync(item => item.Id == id && item.Schedule.ContainerId == containerId, cancellationToken)
+            .ConfigureAwait(false);
+
+        if (request is not null)
+        {
+            if (CreateEditLockConflictResult(containerId, request.ScheduleId) is { } conflict)
+            {
+                return conflict;
+            }
+
+            db.ShiftSwapRequests.Remove(request);
+            var matchingHistory = await db.ShiftSwapHistories
+                .FirstOrDefaultAsync(item =>
+                    item.SourceShiftSwapRequestId == request.Id && item.Schedule.ContainerId == containerId,
+                    cancellationToken)
+                .ConfigureAwait(false);
+            if (matchingHistory is not null)
+            {
+                db.ShiftSwapHistories.Remove(matchingHistory);
+            }
+            var removesManualSlot = request.IsManagerCreated && request.ScheduleSlot.EmployeeId is null;
+            if (removesManualSlot)
+            {
+                db.ScheduleSlots.Remove(request.ScheduleSlot);
+            }
+
+            await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+            await workflowLogService
+                .LogAsync(User, $"Deleted a {GetStatusLabel(request.Status)} shift swap from schedule \"{request.Schedule.Name}\".", cancellationToken)
+                .ConfigureAwait(false);
+            if (removesManualSlot)
+            {
+                await realtimeNotifier
+                    .NotifyScheduleChangedAsync(containerId, request.ScheduleId, "manager-container-shift-swap-deleted")
+                    .ConfigureAwait(false);
+            }
+            await NotifyContainerSwapChangedAsync(containerId, request.ScheduleId, request.Id, "manager-container-shift-swap-deleted")
+                .ConfigureAwait(false);
+
+            return NoContent();
+        }
+
+        var history = await db.ShiftSwapHistories
+            .Include(item => item.Schedule)
+            .FirstOrDefaultAsync(item => item.SourceShiftSwapRequestId == id && item.Schedule.ContainerId == containerId, cancellationToken)
+            .ConfigureAwait(false)
+            ?? throw new KeyNotFoundException($"Shift swap with id {id} was not found.");
+
+        db.ShiftSwapHistories.Remove(history);
+        await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        await workflowLogService
+            .LogAsync(User, $"Deleted an accepted shift swap record from schedule \"{history.ScheduleName}\".", cancellationToken)
+            .ConfigureAwait(false);
+        await NotifyContainerSwapChangedAsync(containerId, history.ScheduleId, history.SourceShiftSwapRequestId, "manager-container-shift-swap-history-deleted")
+            .ConfigureAwait(false);
+
+        return NoContent();
+    }
+
     [HttpPost("manual")]
     [ProducesResponseType(typeof(ShiftSwapDto), StatusCodes.Status201Created)]
     public async Task<ActionResult<ShiftSwapDto>> CreateManualOffer(
@@ -49,6 +236,11 @@ public sealed class ShiftSwapLogsController(
         if (schedule.PublicationStatus != SchedulePublicationStatus.Public)
         {
             throw new ValidationException("Publish this schedule before publishing manual shifts to swap.");
+        }
+
+        if (!schedule.AllowSwap)
+        {
+            throw new ValidationException("Swaps are not allowed for this schedule.");
         }
 
         if (request.ManualColumnId <= 0)
@@ -204,7 +396,7 @@ public sealed class ShiftSwapLogsController(
 
         var result = openRequests
             .OrderByDescending(request => request.CreatedAtUtc)
-            .Select(ToLogDto)
+            .Select(request => ToLogDto(request))
             .Concat(history.OrderByDescending(entry => entry.AcceptedAtUtc).Select(ToLogDto))
             .ToList();
 
@@ -274,7 +466,24 @@ public sealed class ShiftSwapLogsController(
             ManagerEditLockTargets.Schedule(containerId, graphId),
             "This schedule");
 
-    private static ShiftSwapDto ToLogDto(ShiftSwapRequestModel model)
+    private async Task NotifyContainerSwapChangedAsync(int containerId, int graphId, int shiftSwapId, string reason)
+    {
+        await realtimeNotifier
+            .NotifyManagerDataChangedAsync(ManagerEditResourceTypes.Container, containerId.ToString(CultureInfo.InvariantCulture), reason, containerId, graphId)
+            .ConfigureAwait(false);
+        await realtimeNotifier
+            .NotifyShiftSwapsChangedAsync(containerId, graphId, graphId, reason, shiftSwapId)
+            .ConfigureAwait(false);
+    }
+
+    private static string GetStatusLabel(ShiftSwapStatus status) => status switch
+    {
+        ShiftSwapStatus.Accepted => "accepted",
+        ShiftSwapStatus.Cancelled => "cancelled",
+        _ => "open",
+    };
+
+    private static ShiftSwapDto ToLogDto(ShiftSwapRequestModel model, bool managerCanCancel = false)
     {
         var slot = model.ScheduleSlot;
         var fromTime = string.IsNullOrWhiteSpace(model.OfferedFromTime) ? slot.FromTime : model.OfferedFromTime;
@@ -325,7 +534,7 @@ public sealed class ShiftSwapLogsController(
             ManualColumnName = manualColumnName,
             IsCreatedByCurrentEmployee = false,
             CanAccept = false,
-            CanCancel = model.IsManagerCreated && model.Status == ShiftSwapStatus.Open,
+            CanCancel = model.Status == ShiftSwapStatus.Open && (managerCanCancel || model.IsManagerCreated),
         };
     }
 

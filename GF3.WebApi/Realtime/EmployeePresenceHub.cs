@@ -22,6 +22,16 @@ public interface IEmployeePresenceClient
     Task ScheduleEditLockChanged(ScheduleEditLockChangedMessage message);
 
     Task ManagerEditLockChanged(ManagerEditLockChangedMessage message);
+
+    Task SessionRevoked(EmployeeSessionRevokedMessage message)
+        => Task.CompletedTask;
+}
+
+public sealed class EmployeeSessionRevokedMessage
+{
+    public int EmployeeId { get; init; }
+
+    public DateTimeOffset RevokedAtUtc { get; init; }
 }
 
 public sealed class EmployeePresenceChangedMessage
@@ -295,7 +305,7 @@ public sealed class EmployeePresenceHub : Hub<IEmployeePresenceClient>
         return int.TryParse(user.FindFirstValue("employee_id"), out employeeId) && employeeId > 0;
     }
 
-    private static string GetEmployeeGroupName(int employeeId)
+    internal static string GetEmployeeGroupName(int employeeId)
         => $"presence:employee:{employeeId}";
 
     private static int? TryGetManagerId(ClaimsPrincipal? user)

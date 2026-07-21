@@ -41,6 +41,7 @@ public sealed class GraphTemplateExportService : IGraphTemplateExportService
     private const int M_LastDataCol = 27;
     private const int M_FirstDayRow = 2;
     private const int M_DayCount = 31;
+    private const double M_MaxAutoDataColumnWidth = 64d;
 
     private const int S_ValueCol = 2;
     private const int S_EmployeesLineRow = 12;
@@ -488,10 +489,24 @@ public sealed class GraphTemplateExportService : IGraphTemplateExportService
                 sheet.Cell(excelRow, c).Value = "-";
         }
 
+        AdjustMatrixDataColumnWidths(sheet, dataCols.Count);
+
         sheet.PageSetup.SetRowsToRepeatAtTop(M_HeaderRow, M_HeaderRow);
         sheet.PageSetup.SetColumnsToRepeatAtLeft(M_DateCol, M_DateCol);
         sheet.PageSetup.PrintAreas.Clear();
         sheet.PageSetup.PrintAreas.Add(MatrixClearRange);
+    }
+
+    private static void AdjustMatrixDataColumnWidths(IXLWorksheet sheet, int dataColumnCount)
+    {
+        for (var i = 0; i < dataColumnCount; i++)
+        {
+            var column = sheet.Column(M_FirstDataCol + i);
+            column.AdjustToContents(M_FirstDayRow, M_FirstDayRow + M_DayCount - 1);
+
+            if (column.Width > M_MaxAutoDataColumnWidth)
+                column.Width = M_MaxAutoDataColumnWidth;
+        }
     }
 
     private static void SetDashIfEmpty(IXLCell cell, object? value)

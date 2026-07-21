@@ -19,6 +19,9 @@ public interface IEmployeeAccountService
 
     Task TouchLastSeenAsync(int employeeId, CancellationToken ct = default);
 
+    Task<bool> RevokeSessionsAsync(int employeeId, CancellationToken ct = default)
+        => Task.FromResult(false);
+
     Task<EmployeePasswordResetChallengeDto> CreatePasswordResetChallengeAsync(int employeeId, CancellationToken ct = default);
 
     Task CompletePasswordResetAsync(int employeeId, string code, string newPassword, CancellationToken ct = default);

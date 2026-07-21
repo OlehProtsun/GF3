@@ -62,15 +62,19 @@ public sealed class EmployeeShiftSwapsController(
     public async Task<ActionResult<IEnumerable<ShiftSwapDto>>> GetVisible(CancellationToken cancellationToken)
     {
         var employeeId = GetRequiredEmployeeId();
+        var sharedContainerIds = db.Schedules
+            .Where(schedule =>
+                schedule.PublicationStatus == SchedulePublicationStatus.Public &&
+                schedule.Employees.Any(employee => employee.EmployeeId == employeeId))
+            .Select(schedule => schedule.ContainerId);
         var requests = await BuildSwapRequestQuery()
             .Where(request =>
-                request.FromEmployeeId == employeeId ||
-                request.TargetEmployeeId == employeeId ||
-                request.AcceptedByEmployeeId == employeeId ||
-                (request.Visibility == ShiftSwapVisibility.Public &&
-                 (request.IsManagerCreated ||
-                  (request.FromEmployeeId != employeeId &&
-                   request.Schedule.Employees.Any(employee => employee.EmployeeId == employeeId)))))
+                request.Schedule.PublicationStatus == SchedulePublicationStatus.Public &&
+                (request.FromEmployeeId == employeeId ||
+                 request.TargetEmployeeId == employeeId ||
+                 request.AcceptedByEmployeeId == employeeId ||
+                 (request.Visibility == ShiftSwapVisibility.Public &&
+                  sharedContainerIds.Contains(request.Schedule.ContainerId))))
             .Where(request => request.Status == ShiftSwapStatus.Open ||
                               request.AcceptedByEmployeeId == employeeId ||
                               request.FromEmployeeId == employeeId)
@@ -111,6 +115,7 @@ public sealed class EmployeeShiftSwapsController(
         var employeeId = GetRequiredEmployeeId();
         var schedule = await LoadEmployeePublishedScheduleAsync(request.ScheduleId, employeeId, cancellationToken)
             .ConfigureAwait(false);
+        EnsureSwapAllowed(schedule);
         EnsureScheduleIsNotLocked(schedule);
 
         var slot = schedule.Slots.FirstOrDefault(slot => slot.Id == request.ScheduleSlotId)
@@ -199,6 +204,26 @@ public sealed class EmployeeShiftSwapsController(
             .FirstOrDefaultAsync(request => request.Id == id, cancellationToken)
             .ConfigureAwait(false)
             ?? throw new KeyNotFoundException($"Shift swap with id {id} was not found.");
+
+        if (swap.Schedule.PublicationStatus != SchedulePublicationStatus.Public)
+        {
+            throw new ValidationException("This swap belongs to a schedule that is no longer public.");
+        }
+
+        EnsureSwapAllowed(swap.Schedule);
+
+        if (swap.Visibility == ShiftSwapVisibility.Public)
+        {
+            var sharesContainer = await db.Schedules.AnyAsync(schedule =>
+                schedule.ContainerId == swap.Schedule.ContainerId &&
+                schedule.PublicationStatus == SchedulePublicationStatus.Public &&
+                schedule.Employees.Any(employee => employee.EmployeeId == employeeId),
+                cancellationToken).ConfigureAwait(false);
+            if (!sharesContainer)
+            {
+                throw new ValidationException("This swap belongs to another container.");
+            }
+        }
 
         EnsureScheduleIsNotLocked(swap.Schedule);
         var slot = swap.Schedule.Slots.First(slot => slot.Id == swap.ScheduleSlotId);
@@ -492,6 +517,14 @@ public sealed class EmployeeShiftSwapsController(
         }
     }
 
+    private static void EnsureSwapAllowed(ScheduleModel schedule)
+    {
+        if (!schedule.AllowSwap)
+        {
+            throw new ValidationException("Swaps are not allowed for this schedule.");
+        }
+    }
+
     private static ShiftSwapDto ToDto(
         ShiftSwapRequestModel model,
         int currentEmployeeId,
@@ -600,6 +633,11 @@ public sealed class EmployeeShiftSwapsController(
             return "This swap offer is no longer open.";
         }
 
+        if (!swap.Schedule.AllowSwap)
+        {
+            return "Swaps are not allowed for this schedule.";
+        }
+
         if (isScheduleLocked)
         {
             return "Schedule is locked while a manager is editing it.";
@@ -613,13 +651,6 @@ public sealed class EmployeeShiftSwapsController(
         if (swap.TargetEmployeeId.HasValue && swap.TargetEmployeeId.Value != employeeId)
         {
             return "This private swap offer is for another employee.";
-        }
-
-        if (swap.Visibility == ShiftSwapVisibility.Public &&
-            !swap.IsManagerCreated &&
-            !swap.Schedule.Employees.Any(employee => employee.EmployeeId == employeeId))
-        {
-            return "You are not assigned to this schedule.";
         }
 
         if (HasOverlappingShift(

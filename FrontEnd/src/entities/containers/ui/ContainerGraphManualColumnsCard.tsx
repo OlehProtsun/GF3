@@ -28,6 +28,7 @@ export type PendingManualColumnShiftPublication = ManualColumnShiftPublicationIn
 
 type ContainerGraphManualColumnsCardProps = {
   columns: ManualColumnSummary[];
+  allowSwap?: boolean;
   year: number;
   month: number;
   employees: Employee[];
@@ -315,6 +316,7 @@ function ManualShiftPickerDialog({
 
 export function ContainerGraphManualColumnsCard({
   columns,
+  allowSwap = true,
   year,
   month,
   employees,
@@ -386,6 +388,7 @@ export function ContainerGraphManualColumnsCard({
   }, [selectedShiftId, shiftOptions]);
 
   const canPublishShift =
+    allowSwap &&
     Boolean(selectedShift) &&
     !isPublishingShift &&
     (targetMode === "public" || selectedEmployeeId !== null);
@@ -444,7 +447,9 @@ export function ContainerGraphManualColumnsCard({
             <span className={styles.publishCount}>{shiftOptions.length}</span>
           </div>
 
-          {shiftOptions.length === 0 ? (
+          {!allowSwap ? (
+            <div className={styles.swapDisabledNotice}>Swaps are not allowed for this schedule. Enable Allow swap in Publication first.</div>
+          ) : shiftOptions.length === 0 ? (
             <div className={styles.emptyState}>Write a time range like 09:00-15:00 in a manual column cell first.</div>
           ) : (
             <div className={styles.publishForm}>

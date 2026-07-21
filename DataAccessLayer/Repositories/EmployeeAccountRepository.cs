@@ -83,6 +83,16 @@ public sealed class EmployeeAccountRepository : GenericRepository<EmployeeAccoun
                 ct)
             .ConfigureAwait(false);
 
+    public async Task<bool> IncrementSessionVersionAsync(int employeeId, CancellationToken ct = default)
+        => await _set
+            .Where(account => account.EmployeeId == employeeId)
+            .ExecuteUpdateAsync(
+                setters => setters.SetProperty(
+                    account => account.SessionVersion,
+                    account => account.SessionVersion + 1),
+                ct)
+            .ConfigureAwait(false) > 0;
+
     private static string NormalizeUsername(string? username)
         => (username ?? string.Empty).Trim();
 }

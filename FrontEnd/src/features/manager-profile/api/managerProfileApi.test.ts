@@ -28,13 +28,13 @@ describe("manager profile api", () => {
       userName: " chief ",
       displayName: " Chief Manager ",
       recoveryEmail: " ",
-      newPassword: " secret123 ",
+      newPassword: " 654321 ",
     });
     managerProfileApi.createManager({
       userName: " second ",
       displayName: " Second Manager ",
       recoveryEmail: " second@example.com ",
-      password: "secret456",
+      password: "654321",
     });
 
     expect(requestMock).toHaveBeenNthCalledWith(1, "manager-profile/me", {
@@ -43,7 +43,7 @@ describe("manager profile api", () => {
         userName: "chief",
         displayName: "Chief Manager",
         recoveryEmail: undefined,
-        newPassword: "secret123",
+        newPassword: "654321",
       },
     });
     expect(requestMock).toHaveBeenNthCalledWith(2, "manager-profile/managers", {
@@ -52,7 +52,7 @@ describe("manager profile api", () => {
         userName: "second",
         displayName: "Second Manager",
         recoveryEmail: "second@example.com",
-        password: "secret456",
+        password: "654321",
       },
     });
   });

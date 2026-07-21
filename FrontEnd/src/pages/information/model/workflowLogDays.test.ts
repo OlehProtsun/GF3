@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import type { WorkflowLog } from "@entities/workflow-logs";
 import {
   formatWorkflowLogTime,
+  getWorkflowLogDayBounds,
+  getWorkflowLogRangeBounds,
   getRoleLabel,
   getWorkflowDayKey,
   groupWorkflowLogsByDay,
@@ -52,5 +54,21 @@ describe("workflow log day model", () => {
     expect(getRoleLabel("employee")).toBe("Employee");
     expect(getRoleLabel("manager")).toBe("Manager");
     expect(getRoleLabel("anything-else")).toBe("Manager");
+  });
+
+  it("builds local inclusive day and range bounds as UTC instants", () => {
+    const day = getWorkflowLogDayBounds("2026-05-10");
+    const range = getWorkflowLogRangeBounds("2026-05-10", "2026-05-12");
+
+    expect(day).toEqual({
+      fromUtc: new Date(2026, 4, 10).toISOString(),
+      toUtc: new Date(2026, 4, 11).toISOString(),
+    });
+    expect(range).toEqual({
+      fromUtc: new Date(2026, 4, 10).toISOString(),
+      toUtc: new Date(2026, 4, 13).toISOString(),
+    });
+    expect(getWorkflowLogRangeBounds("2026-05-12", "2026-05-10")).toBeNull();
+    expect(getWorkflowLogDayBounds("unknown")).toBeNull();
   });
 });

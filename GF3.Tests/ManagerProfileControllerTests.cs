@@ -45,7 +45,7 @@ public sealed class ManagerProfileControllerTests
             UserName = "chief-updated",
             DisplayName = "Chief Updated",
             RecoveryEmail = "chief@example.com",
-            NewPassword = "new-password",
+            NewPassword = "654321",
         }, CancellationToken.None);
         var listResult = await controller.ListManagers(CancellationToken.None);
         var createResult = await controller.CreateManager(new ManagerApi.CreateManagerRequest

@@ -22,4 +22,5 @@ export const employeesApi = {
   update: (id: number, payload: SaveEmployeeInput) =>
     request<void>(`${endpoint}/${id}`, { method: "PUT", body: toSaveDto(payload) }),
   remove: (id: number) => request<void>(`${endpoint}/${id}`, { method: "DELETE" }),
+  kick: (id: number) => request<void>(`${endpoint}/${id}/kick`, { method: "POST" }),
 };

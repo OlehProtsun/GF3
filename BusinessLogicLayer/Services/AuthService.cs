@@ -36,7 +36,7 @@ public sealed class AuthService : IAuthService
     public async Task<AuthenticatedSessionDto?> AuthenticateAsync(string username, string password, CancellationToken ct = default)
     {
         var normalizedUserName = username?.Trim() ?? string.Empty;
-        if (string.IsNullOrWhiteSpace(normalizedUserName) || string.IsNullOrWhiteSpace(password))
+        if (string.IsNullOrWhiteSpace(normalizedUserName) || !NumericPasswordPolicy.IsValid(password))
         {
             return null;
         }
@@ -80,6 +80,7 @@ public sealed class AuthService : IAuthService
             UserName = account.Username,
             DisplayName = string.IsNullOrWhiteSpace(displayName) ? account.Username : displayName,
             EmployeeId = employee.Id,
+            SessionVersion = account.SessionVersion,
         };
     }
 

@@ -23,6 +23,144 @@
   height: 0;
 }
 
+.accessOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1600;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(10, 15, 28, 0.34);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.accessDialog {
+  box-sizing: border-box;
+  width: min(480px, calc(100vw - 32px));
+  display: grid;
+  gap: 22px;
+  padding: 24px;
+  border: 1px solid rgba(255, 255, 255, 0.58);
+  border-radius: 30px;
+  background:
+    radial-gradient(circle at top right, rgba(59, 130, 246, 0.18), transparent 44%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.99), rgba(239, 246, 255, 0.95));
+  box-shadow:
+    0 30px 70px rgba(15, 23, 42, 0.24),
+    inset 0 1px 0 rgba(255, 255, 255, 0.82);
+}
+
+.accessHero {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.accessIcon {
+  flex: 0 0 56px;
+  width: 56px;
+  height: 56px;
+  display: grid;
+  place-items: center;
+  border-radius: 19px;
+  border: 1px solid rgba(37, 99, 235, 0.16);
+  background: linear-gradient(180deg, rgba(219, 234, 254, 0.98), rgba(191, 219, 254, 0.92));
+  color: #2563eb;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.84),
+    0 14px 28px rgba(37, 99, 235, 0.16);
+}
+
+.accessCopy {
+  min-width: 0;
+  display: grid;
+  gap: 7px;
+}
+
+.accessEyebrow {
+  width: fit-content;
+  padding: 4px 9px;
+  border-radius: 999px;
+  background: rgba(37, 99, 235, 0.1);
+  color: #1d4ed8;
+  font-size: 0.68rem;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.accessCopy h2,
+.accessCopy p {
+  margin: 0;
+}
+
+.accessCopy h2 {
+  color: #111827;
+  font-size: 1.24rem;
+  font-weight: 900;
+  letter-spacing: -0.03em;
+}
+
+.accessCopy p {
+  color: rgba(17, 24, 39, 0.66);
+  font-size: 0.94rem;
+  line-height: 1.5;
+}
+
+.accessField {
+  display: grid;
+  gap: 8px;
+  color: rgba(17, 24, 39, 0.74);
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+
+.accessField input {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 50px;
+  padding: 0 16px;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  border-radius: 18px;
+  outline: none;
+  background: rgba(255, 255, 255, 0.92);
+  color: #111827;
+  font: inherit;
+  font-size: 0.96rem;
+  transition: border-color 140ms ease, box-shadow 140ms ease, background 140ms ease;
+}
+
+.accessField input:focus {
+  border-color: rgba(37, 99, 235, 0.38);
+  background: #ffffff;
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.1);
+}
+
+.accessError {
+  padding: 11px 13px;
+  border: 1px solid rgba(220, 38, 38, 0.18);
+  border-radius: 16px;
+  background: rgba(254, 242, 242, 0.9);
+  color: #b91c1c;
+  font-size: 0.82rem;
+  font-weight: 750;
+  line-height: 1.45;
+}
+
+.accessActions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.accessActions :global(button) {
+  min-width: 138px;
+  justify-content: center;
+}
+
 .workspaceGrid {
   display: grid;
   grid-template-columns: repeat(6, minmax(0, 1fr));
@@ -768,6 +906,20 @@
 }
 
 @media (max-width: 760px) {
+  .accessOverlay {
+    padding: 14px;
+  }
+
+  .accessDialog {
+    width: min(100%, 100vw - 20px);
+    padding: 20px;
+    border-radius: 24px;
+  }
+
+  .accessActions :global(button) {
+    width: 100%;
+  }
+
   .page {
     padding-inline: 8px;
     padding-bottom: 22px;

@@ -13,6 +13,11 @@
   align-items: stretch;
 }
 
+.topRowAllCollapsed {
+  grid-template-columns: 46px minmax(0, 1fr);
+  gap: 4px;
+}
+
 .sidebar,
 .scheduleColumn,
 .statisticsCard {
@@ -22,12 +27,22 @@
 .sidebar {
   position: static;
   min-height: 0;
+  display: grid;
+  align-content: start;
+  gap: 18px;
+}
+
+.sidebarAllCollapsed {
+  gap: 8px;
+}
+
+.sidebar > * button[aria-label^="Expand "] {
+  margin-left: -8px;
 }
 
 .summaryCard {
   width: 100%;
   max-width: none;
-  height: 100%;
   margin-inline: 0;
   padding: 20px 20px 18px;
   border-radius: 32px;
@@ -144,6 +159,186 @@
 .containerInfoActions :global(button) {
   flex: 1 1 140px;
   justify-content: center;
+}
+
+.swapsCard {
+  padding: 18px;
+  border-radius: 32px;
+  border-color: rgba(148, 163, 184, 0.16);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(248, 250, 252, 0.82));
+  box-shadow: 0 18px 50px rgba(15, 23, 42, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.82);
+}
+
+.swapHeaderActions,
+.swapActions,
+.swapPeople,
+.swapItemHeader {
+  display: flex;
+  align-items: center;
+}
+
+.swapHeaderActions {
+  gap: 8px;
+}
+
+.swapsContent {
+  min-width: 0;
+  display: grid;
+  gap: 12px;
+}
+
+.swapMonthLabel {
+  color: #64748b;
+  font-size: 0.78rem;
+  font-weight: 850;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.swapSearchField {
+  width: 100%;
+  min-width: 0;
+}
+
+.swapError {
+  margin: 0;
+}
+
+.swapState {
+  padding: 18px 12px;
+  border: 1px dashed rgba(148, 163, 184, 0.34);
+  border-radius: 18px;
+  color: #64748b;
+  font-size: 0.86rem;
+  font-weight: 700;
+  text-align: center;
+}
+
+.swapList {
+  max-height: 470px;
+  display: grid;
+  gap: 10px;
+  margin-right: -10px;
+  padding-right: 12px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.swapItem {
+  min-width: 0;
+  display: grid;
+  gap: 10px;
+  padding: 13px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.78);
+}
+
+.swapItemHeader {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) max-content;
+  gap: 10px;
+}
+
+.swapPeople {
+  min-width: 0;
+  gap: 5px;
+  color: #64748b;
+  font-size: 0.82rem;
+  overflow: hidden;
+}
+
+.swapPeople strong {
+  min-width: 0;
+  color: #0f172a;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.swapStatus {
+  flex: 0 0 auto;
+  padding: 4px 8px;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 900;
+  text-transform: capitalize;
+}
+
+.swapStatusopen {
+  background: rgba(37, 99, 235, 0.1);
+  color: #1d4ed8;
+}
+
+.swapStatusaccepted {
+  background: rgba(22, 163, 74, 0.1);
+  color: #15803d;
+}
+
+.swapStatuscancelled {
+  background: rgba(100, 116, 139, 0.12);
+  color: #475569;
+}
+
+.swapMeta {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+  color: #64748b;
+  font-size: 0.78rem;
+}
+
+.swapMeta strong {
+  color: #334155;
+  overflow-wrap: anywhere;
+}
+
+.swapActions {
+  display: grid;
+  grid-template-columns: max-content max-content minmax(0, 1fr) max-content;
+  gap: 7px;
+}
+
+.swapActions button {
+  min-height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 6px 10px;
+  border: 1px solid rgba(37, 99, 235, 0.16);
+  border-radius: 999px;
+  background: rgba(239, 246, 255, 0.82);
+  color: #1d4ed8;
+  font: inherit;
+  font-size: 0.76rem;
+  font-weight: 850;
+  cursor: pointer;
+}
+
+.swapActions button:hover:not(:disabled) {
+  background: #dbeafe;
+}
+
+.swapActions button:focus-visible {
+  outline: 3px solid rgba(37, 99, 235, 0.16);
+}
+
+.swapActions button:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.swapActions .swapDeleteButton {
+  grid-column: 4;
+  margin-left: 0;
+  border-color: rgba(220, 38, 38, 0.16);
+  background: rgba(254, 242, 242, 0.86);
+  color: #dc2626;
+}
+
+.swapActions .swapDeleteButton:hover:not(:disabled) {
+  background: #fee2e2;
 }
 
 .scheduleColumn {
@@ -585,6 +780,12 @@
   }
 }
 
+@media (max-width: 1100px) and (min-width: 961px) {
+  .sidebar > * button[aria-label^="Expand "] {
+    margin-left: -12px;
+  }
+}
+
 @media (max-width: 960px) {
   .topRow {
     grid-template-columns: 1fr;
@@ -596,6 +797,10 @@
 
   .scheduleCardShell {
     height: auto;
+  }
+
+  .sidebar {
+    gap: 14px;
   }
 
   .scheduleCard {

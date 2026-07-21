@@ -19,7 +19,8 @@ namespace BusinessLogicLayer.Services;
 public sealed class ManagerAccountService : IManagerAccountService
 {
     private const string DefaultManagerUserName = "manager";
-    private const string DefaultManagerPassword = "123";
+    private const string DefaultManagerPassword = "123456";
+    private const string DefaultManagerPasswordVariable = "GF3_BOOTSTRAP_MANAGER_PASSWORD";
     private const string DefaultManagerDisplayName = "Manager";
     private static readonly TimeSpan PasswordResetCodeLifetime = TimeSpan.FromMinutes(15);
     private static readonly TimeSpan PasswordResetRequestThrottle = TimeSpan.FromSeconds(45);
@@ -43,7 +44,7 @@ public sealed class ManagerAccountService : IManagerAccountService
     public async Task<ManagerAccountModel?> AuthenticateAsync(string username, string password, CancellationToken ct = default)
     {
         var normalizedUsername = NormalizeUsername(username);
-        if (string.IsNullOrWhiteSpace(normalizedUsername) || string.IsNullOrWhiteSpace(password))
+        if (string.IsNullOrWhiteSpace(normalizedUsername) || !NumericPasswordPolicy.IsValid(password))
         {
             return null;
         }
@@ -128,6 +129,17 @@ public sealed class ManagerAccountService : IManagerAccountService
             NormalizeNullable(normalizedRecoveryEmail),
             StringComparison.OrdinalIgnoreCase);
 
+        if (account.IsSystem &&
+            !string.Equals(normalizedUsername, account.Username, StringComparison.OrdinalIgnoreCase))
+        {
+            throw ValidationException.ForField("userName", "The system manager username cannot be changed.");
+        }
+
+        if (account.IsSystem && isChangingPassword)
+        {
+            throw ValidationException.ForField("newPassword", $"The system manager password is managed by {DefaultManagerPasswordVariable}.");
+        }
+
         ValidateUsername(normalizedUsername);
         ValidateDisplayName(normalizedDisplayName);
         await EnsureUsernameIsAvailableAsync(normalizedUsername, account.Id, ct).ConfigureAwait(false);
@@ -179,6 +191,11 @@ public sealed class ManagerAccountService : IManagerAccountService
             throw ValidationException.ForField("managerId", "This manager account could not be found.");
         }
 
+        if (account.IsSystem)
+        {
+            throw ValidationException.ForField("managerId", "The system manager account cannot be deleted.");
+        }
+
         var deletedProfile = account.ToProfileDto();
         await _managerAccountRepository.DeleteAsync(managerId, ct).ConfigureAwait(false);
         return deletedProfile;
@@ -191,6 +208,11 @@ public sealed class ManagerAccountService : IManagerAccountService
     {
         await EnsureDefaultManagerAsync(ct).ConfigureAwait(false);
         var account = await ResolveManagerByUsernameForRecoveryAsync(username, ct).ConfigureAwait(false);
+        if (account.IsSystem)
+        {
+            throw ValidationException.ForField("username", $"The system manager password is managed by {DefaultManagerPasswordVariable}.");
+        }
+
         if (string.IsNullOrWhiteSpace(account.RecoveryEmail))
         {
             throw ValidationException.ForField("recoveryEmail", "Add a recovery email before requesting a password code.");
@@ -240,6 +262,11 @@ public sealed class ManagerAccountService : IManagerAccountService
     {
         await EnsureDefaultManagerAsync(ct).ConfigureAwait(false);
         var account = await ResolveManagerByUsernameForRecoveryAsync(username, ct).ConfigureAwait(false);
+
+        if (account.IsSystem)
+        {
+            throw ValidationException.ForField("username", $"The system manager password is managed by {DefaultManagerPasswordVariable}.");
+        }
 
         if (string.IsNullOrWhiteSpace(account.PasswordResetCodeHash) || !account.PasswordResetExpiresAtUtc.HasValue)
         {
@@ -317,24 +344,52 @@ public sealed class ManagerAccountService : IManagerAccountService
 
     private async Task EnsureDefaultManagerAsync(CancellationToken ct)
     {
-        if (await _managerAccountRepository.AnyAsync(ct).ConfigureAwait(false))
+        var configuredPassword = ResolveDefaultManagerPassword();
+        var systemManager = await _managerAccountRepository.GetSystemManagerAsync(ct).ConfigureAwait(false);
+
+        if (systemManager is null && await _managerAccountRepository.AnyAsync(ct).ConfigureAwait(false))
         {
             return;
         }
 
-        var now = DateTimeOffset.UtcNow;
-        await _managerAccountRepository.AddAsync(
+        if (systemManager is null)
+        {
+            var now = DateTimeOffset.UtcNow;
+            await _managerAccountRepository.AddAsync(
                 new DalManagerAccountModel
                 {
                     Username = DefaultManagerUserName,
                     DisplayName = DefaultManagerDisplayName,
-                    PasswordHash = _passwordHasher.HashPassword(DefaultManagerPassword),
+                    PasswordHash = _passwordHasher.HashPassword(configuredPassword),
+                    IsSystem = true,
                     PasswordUpdatedAtUtc = now,
                     CreatedAtUtc = now,
                     UpdatedAtUtc = now,
-                },
-                ct)
-            .ConfigureAwait(false);
+                    },
+                    ct)
+                .ConfigureAwait(false);
+            return;
+        }
+
+        if (_passwordHasher.VerifyPassword(configuredPassword, systemManager.PasswordHash))
+        {
+            return;
+        }
+
+        var updatedAtUtc = DateTimeOffset.UtcNow;
+        systemManager.PasswordHash = _passwordHasher.HashPassword(configuredPassword);
+        systemManager.PasswordUpdatedAtUtc = updatedAtUtc;
+        systemManager.UpdatedAtUtc = updatedAtUtc;
+        ClearPasswordResetChallengeFields(systemManager);
+        await _managerAccountRepository.UpdateAsync(systemManager, ct).ConfigureAwait(false);
+    }
+
+    private static string ResolveDefaultManagerPassword()
+    {
+        var configuredPassword = Environment.GetEnvironmentVariable(DefaultManagerPasswordVariable);
+        var password = string.IsNullOrWhiteSpace(configuredPassword) ? DefaultManagerPassword : configuredPassword.Trim();
+        ValidatePassword(password, "password");
+        return password;
     }
 
     private async Task<DalManagerAccountModel> ResolveManagerAccountAsync(int? managerId, string? userName, CancellationToken ct)
@@ -402,9 +457,9 @@ public sealed class ManagerAccountService : IManagerAccountService
 
     private static void ValidatePassword(string password, string fieldName)
     {
-        if (password.Length < 6 || password.Length > 200)
+        if (!NumericPasswordPolicy.IsValid(password))
         {
-            throw ValidationException.ForField(fieldName, "Password must be between 6 and 200 characters long.");
+            throw ValidationException.ForField(fieldName, NumericPasswordPolicy.ValidationMessage);
         }
     }
 

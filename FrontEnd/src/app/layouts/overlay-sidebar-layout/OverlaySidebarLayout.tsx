@@ -16,6 +16,8 @@ import {
   NoteIcon,
 } from "@shared/ui/icons";
 import { matchPath } from "@shared/lib/react-router-dom";
+import { ManagerNotepad } from "@features/manager-notepad/ui/ManagerNotepad";
+import { ManagerSystemNews } from "@features/manager-system-news/ui/ManagerSystemNews";
 
 type OverlaySidebarLayoutProps = {
   children: ReactNode;
@@ -208,6 +210,8 @@ export function OverlaySidebarLayout({ children }: OverlaySidebarLayoutProps) {
         onClick={() => setIsCollapsed(true)}
         aria-hidden="true"
       />
+
+      {isManager ? <><ManagerSystemNews /><ManagerNotepad /></> : null}
 
     </div>
   );

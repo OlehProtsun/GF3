@@ -2,28 +2,56 @@ import { useEffect, useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@app/providers/AuthProvider";
 import { getErrorMessage } from "@shared/api/httpClient";
+import { isValidPassword, PASSWORD_LENGTH, PASSWORD_VALIDATION_MESSAGE, sanitizePassword } from "@shared/lib/passwordPolicy";
 import { IosButton } from "@shared/ui/components/IosButton";
 import { ErrorBanner } from "@shared/ui/components/ErrorBanner";
 import { LabeledField, TextInput } from "@shared/ui/forms/Field";
 import styles from "./LoginPage.module.css";
 
+type PasswordMode = "pc" | "phone";
+
+const USERNAME_STORAGE_KEY = "gf3.auth.last-username";
+const PASSWORD_MODE_STORAGE_KEY = "gf3.auth.password-mode";
+const KEYPAD_DIGITS = ["1", "2", "3", "4", "5", "6", "7", "8", "9"];
+
+function readStoredValue(key: string) {
+  if (typeof window === "undefined") return "";
+  try {
+    return window.localStorage.getItem(key) ?? "";
+  } catch {
+    return "";
+  }
+}
+
+function persistValue(key: string, value: string) {
+  try {
+    window.localStorage.setItem(key, value);
+  } catch {
+    // Login still works when browser storage is unavailable.
+  }
+}
+
+function readStoredPasswordMode(): PasswordMode {
+  return readStoredValue(PASSWORD_MODE_STORAGE_KEY) === "phone" ? "phone" : "pc";
+}
+
 export function LoginPage() {
   const { bootstrapError, login } = useAuth();
   const navigate = useNavigate();
-  const [username, setUsername] = useState("");
+  const [username, setUsername] = useState(() => readStoredValue(USERNAME_STORAGE_KEY));
+  const [passwordMode, setPasswordMode] = useState<PasswordMode>(readStoredPasswordMode);
   const [password, setPassword] = useState("");
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [failedPinAttempts, setFailedPinAttempts] = useState(0);
 
   useEffect(() => {
     const htmlElement = document.documentElement;
     const bodyElement = document.body;
     const rootElement = document.getElementById("root");
-
     htmlElement.classList.add("login-page-active");
     bodyElement.classList.add("login-page-active");
     rootElement?.classList.add("login-page-active");
-
     return () => {
       htmlElement.classList.remove("login-page-active");
       bodyElement.classList.remove("login-page-active");
@@ -31,28 +59,86 @@ export function LoginPage() {
     };
   }, []);
 
-  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
+  const submitCredentials = async (candidatePassword: string) => {
+    if (isSubmitting) return;
+    if (!username.trim()) {
+      setSubmitError("Enter your username first.");
+      return;
+    }
+    if (!isValidPassword(candidatePassword)) {
+      setSubmitError(PASSWORD_VALIDATION_MESSAGE);
+      return;
+    }
+
     setSubmitError(null);
     setIsSubmitting(true);
-
     try {
-      await login({ username, password });
+      await login({ username, password: candidatePassword });
     } catch (error) {
       setSubmitError(getErrorMessage(error, "Could not sign you in."));
+      if (passwordMode === "phone") {
+        setPassword("");
+        setFailedPinAttempts((current) => current + 1);
+      }
     } finally {
       setIsSubmitting(false);
     }
   };
 
+  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    void submitCredentials(password);
+  };
+
+  const handleUsernameChange = (value: string) => {
+    setUsername(value);
+    persistValue(USERNAME_STORAGE_KEY, value);
+    setSubmitError(null);
+  };
+
+  const handlePasswordModeChange = (mode: PasswordMode) => {
+    setPasswordMode(mode);
+    setPassword("");
+    setSubmitError(null);
+    persistValue(PASSWORD_MODE_STORAGE_KEY, mode);
+  };
+
+  const handlePinDigit = (digit: string) => {
+    if (isSubmitting || !username.trim() || password.length >= PASSWORD_LENGTH) return;
+    const nextPassword = `${password}${digit}`;
+    setPassword(nextPassword);
+    setSubmitError(null);
+    if (nextPassword.length === PASSWORD_LENGTH) void submitCredentials(nextPassword);
+  };
+
+  const handlePinDelete = () => {
+    if (isSubmitting) return;
+    setPassword((current) => current.slice(0, -1));
+    setSubmitError(null);
+  };
+
   const handleOpenPasswordRecovery = () => {
     const normalizedUsername = username.trim();
-    const recoveryPath = normalizedUsername
-      ? `/password-recovery?username=${encodeURIComponent(normalizedUsername)}`
-      : "/password-recovery";
-
-    navigate(recoveryPath);
+    navigate(normalizedUsername ? `/password-recovery?username=${encodeURIComponent(normalizedUsername)}` : "/password-recovery");
   };
+
+  const passwordModeSwitch = (
+    <div className={styles.passwordLabelRow}>
+      <span className={styles.modeSwitch} role="group" aria-label="Password input mode">
+        {(["pc", "phone"] as const).map((mode) => (
+          <button
+            key={mode}
+            type="button"
+            className={`${styles.modeButton} ${passwordMode === mode ? styles.modeButtonActive : ""}`}
+            aria-pressed={passwordMode === mode}
+            onClick={() => handlePasswordModeChange(mode)}
+          >
+            {mode === "pc" ? "PC" : "Phone"}
+          </button>
+        ))}
+      </span>
+    </div>
+  );
 
   return (
     <div className={styles.page}>
@@ -77,36 +163,85 @@ export function LoginPage() {
                 autoComplete="username"
                 value={username}
                 placeholder="Example User"
-                onChange={(event) => setUsername(event.target.value)}
+                onChange={(event) => handleUsernameChange(event.target.value)}
               />
             </LabeledField>
 
             <LabeledField id="login-password" label="Password">
-              <TextInput
-                id="login-password"
-                type="password"
-                autoComplete="current-password"
-                value={password}
-                placeholder="********"
-                onChange={(event) => setPassword(event.target.value)}
-              />
+              {passwordModeSwitch}
+              {passwordMode === "pc" ? (
+                <>
+                  <TextInput
+                    id="login-password"
+                    type="password"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    minLength={PASSWORD_LENGTH}
+                    maxLength={PASSWORD_LENGTH}
+                    autoComplete="current-password"
+                    value={password}
+                    placeholder="••••••"
+                    onChange={(event) => {
+                      setPassword(sanitizePassword(event.target.value));
+                      setSubmitError(null);
+                    }}
+                  />
+                  <span className={styles.passwordHint}>Exactly 6 digits</span>
+                </>
+              ) : (
+                <div className={styles.pinPanel} aria-label="Password PIN entry">
+                  <div
+                    key={failedPinAttempts}
+                    className={`${styles.pinDots} ${failedPinAttempts ? styles.pinDotsError : ""}`}
+                    role="status"
+                    aria-label={`${password.length} of ${PASSWORD_LENGTH} digits entered`}
+                  >
+                    {Array.from({ length: PASSWORD_LENGTH }, (_, index) => (
+                      <span key={index} className={`${styles.pinDot} ${index < password.length ? styles.pinDotFilled : ""}`} aria-hidden="true" />
+                    ))}
+                  </div>
+
+                  <div className={styles.pinKeypad} aria-label="Numeric keypad">
+                    {KEYPAD_DIGITS.map((digit) => (
+                      <button
+                        key={digit}
+                        type="button"
+                        className={styles.pinKey}
+                        aria-label={digit}
+                        disabled={isSubmitting || !username.trim()}
+                        onClick={() => handlePinDigit(digit)}
+                      >
+                        {digit}
+                      </button>
+                    ))}
+                    <span aria-hidden="true" />
+                    <button type="button" className={styles.pinKey} aria-label="0" disabled={isSubmitting || !username.trim()} onClick={() => handlePinDigit("0")}>0</button>
+                    <button type="button" className={styles.pinDelete} aria-label="Delete last digit" disabled={isSubmitting || password.length === 0} onClick={handlePinDelete}>Delete</button>
+                  </div>
+                  <span className={styles.pinHint}>
+                    {isSubmitting ? "Checking…" : username.trim() ? "Enter your 6-digit PIN" : "Enter username to unlock keypad"}
+                  </span>
+                </div>
+              )}
             </LabeledField>
 
             <div className={styles.inlineRecoveryAction}>
-              <button type="button" className={styles.textButton} onClick={handleOpenPasswordRecovery}>
-                Forgot password?
-              </button>
+              <button type="button" className={styles.textButton} onClick={handleOpenPasswordRecovery}>Forgot password?</button>
             </div>
 
-            <div className={styles.actions}>
-              <IosButton
-                label={isSubmitting ? "Signing in..." : "Sign in"}
-                type="submit"
-                disabled={isSubmitting || !username.trim() || !password}
-                className={styles.submitButton}
-              />
-            </div>
+            {passwordMode === "pc" ? (
+              <div className={styles.actions}>
+                <IosButton
+                  label={isSubmitting ? "Signing in..." : "Sign in"}
+                  type="submit"
+                  disabled={isSubmitting || !username.trim() || !isValidPassword(password)}
+                  className={styles.submitButton}
+                />
+              </div>
+            ) : null}
           </form>
+
+          <p className={styles.supportText}>contact us <a href="mailto:support@app-gf.com">support@app-gf.com</a></p>
         </section>
       </div>
     </div>

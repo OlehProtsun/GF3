@@ -1,4 +1,11 @@
-import { useEffect, useMemo, useState, type MouseEvent } from "react";
+import {
+  useDeferredValue,
+  useEffect,
+  useMemo,
+  useState,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type MouseEvent,
+} from "react";
 import { useAuth } from "@app/providers/AuthProvider";
 import {
   useEmployeeScheduleListQuery,
@@ -6,6 +13,11 @@ import {
   type EmployeeScheduleSlot,
 } from "@entities/employee-schedule";
 import {
+  useEmployeeUiStateQuery,
+  useSetEmployeeSwapPinMutation,
+} from "@entities/employee-ui-state";
+import {
+  filterShiftSwaps,
   useAcceptEmployeeShiftSwapMutation,
   useCancelEmployeeShiftSwapMutation,
   useCreateEmployeeShiftSwapMutation,
@@ -17,7 +29,8 @@ import {
 import { getErrorMessage } from "@shared/api/httpClient";
 import { ErrorBanner } from "@shared/ui/components/ErrorBanner";
 import { EmployeeTargetCombobox } from "@shared/ui/components/EmployeeTargetCombobox";
-import { ArrowIcon, CloseIcon, ShiftGiveAwayIcon, SwapHistoryIcon, SwapOffersIcon } from "@shared/ui/icons";
+import { ConfirmDialog } from "@shared/ui/ConfirmDialog";
+import { ArrowIcon, CloseIcon, PinIcon, SearchIcon, ShiftGiveAwayIcon, SwapHistoryIcon, SwapOffersIcon } from "@shared/ui/icons";
 import workspaceStyles from "@pages/shared/EmployeeWorkspacePage.module.css";
 import styles from "./EmployeeSwapPage.module.css";
 
@@ -375,6 +388,34 @@ function CollapseToggleButton({
   );
 }
 
+function PinToggleButton({
+  isPinned,
+  label,
+  onToggle,
+}: {
+  isPinned: boolean;
+  label: string;
+  onToggle: () => void;
+}) {
+  const actionLabel = `${isPinned ? "Unpin" : "Pin"} ${label}`;
+  return (
+    <button
+      type="button"
+      className={[
+        styles.collapseButton,
+        styles.pinButton,
+        isPinned ? styles.pinButtonActive : "",
+      ].filter(Boolean).join(" ")}
+      aria-label={actionLabel}
+      aria-pressed={isPinned}
+      title={actionLabel}
+      onClick={onToggle}
+    >
+      <PinIcon size={15} />
+    </button>
+  );
+}
+
 function ShiftPickerDialog({
   schedule,
   slots,
@@ -604,12 +645,16 @@ function SwapOfferCard({
   swap,
   stats,
   isBusy,
+  isPinned,
+  onTogglePin,
   onAccept,
   onCancel,
 }: {
   swap: ShiftSwap;
   stats: SwapPreviewStats | null;
   isBusy: boolean;
+  isPinned: boolean;
+  onTogglePin: (swapId: number) => void;
   onAccept: (swap: ShiftSwap) => void;
   onCancel: (swap: ShiftSwap) => void;
 }) {
@@ -625,8 +670,33 @@ function SwapOfferCard({
           : null)
     : null;
 
+  const handleCardClick = (event: MouseEvent<HTMLElement>) => {
+    if ((event.target as Element).closest("button, a, input, select, textarea")) {
+      return;
+    }
+
+    setIsExpanded(value => !value);
+  };
+
+  const handleCardKeyDown = (event: ReactKeyboardEvent<HTMLElement>) => {
+    if (event.target !== event.currentTarget || (event.key !== "Enter" && event.key !== " ")) {
+      return;
+    }
+
+    event.preventDefault();
+    setIsExpanded(value => !value);
+  };
+
   return (
-    <article className={styles.offerCard}>
+    <article
+      className={[styles.offerCard, isPinned ? styles.offerCardPinned : ""].filter(Boolean).join(" ")}
+      data-pinned={isPinned ? "true" : "false"}
+      data-expanded={isExpanded ? "true" : "false"}
+      tabIndex={0}
+      title={isExpanded ? "Click to collapse this swap" : "Click to expand this swap"}
+      onClick={handleCardClick}
+      onKeyDown={handleCardKeyDown}
+    >
       <div className={styles.offerHeader}>
         <div className={styles.offerTitle}>
           <strong>{swap.scheduleName}</strong>
@@ -654,10 +724,10 @@ function SwapOfferCard({
             </span>
             {isScheduleLocked ? <span className={[styles.badge, styles.badgeLocked].join(" ")}>Locked</span> : null}
           </div>
-          <CollapseToggleButton
-            isExpanded={isExpanded}
+          <PinToggleButton
+            isPinned={isPinned}
             label={`${swap.scheduleName} swap`}
-            onToggle={() => setIsExpanded(value => !value)}
+            onToggle={() => onTogglePin(swap.id)}
           />
         </div>
       </div>
@@ -735,9 +805,11 @@ export function EmployeeSwapPage() {
   const schedulesQuery = useEmployeeScheduleListQuery();
   const swapsQuery = useEmployeeShiftSwapsQuery();
   const targetEmployeesQuery = useEmployeeShiftSwapEmployeesQuery();
+  const uiStateQuery = useEmployeeUiStateQuery(Boolean(employeeId));
   const createSwapMutation = useCreateEmployeeShiftSwapMutation();
   const acceptSwapMutation = useAcceptEmployeeShiftSwapMutation();
   const cancelSwapMutation = useCancelEmployeeShiftSwapMutation();
+  const setSwapPinMutation = useSetEmployeeSwapPinMutation();
   const schedules = schedulesQuery.data ?? [];
   const swaps = swapsQuery.data ?? [];
   const targetEmployees = targetEmployeesQuery.data ?? [];
@@ -750,6 +822,9 @@ export function EmployeeSwapPage() {
   const [targetEmployeeId, setTargetEmployeeId] = useState<number | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [isGiveAwayExpanded, setIsGiveAwayExpanded] = useState(false);
+  const [swapSearchQuery, setSwapSearchQuery] = useState("");
+  const [pendingUnpinSwapId, setPendingUnpinSwapId] = useState<number | null>(null);
+  const deferredSwapSearchQuery = useDeferredValue(swapSearchQuery);
   const selectedSchedule = useMemo(
     () => getSelectedSchedule(schedules, selectedScheduleId),
     [schedules, selectedScheduleId],
@@ -773,17 +848,64 @@ export function EmployeeSwapPage() {
       .sort((left, right) => getTargetEmployeeLabel(left).localeCompare(getTargetEmployeeLabel(right))),
     [employeeId, targetEmployees],
   );
-  const openSwaps = swaps.filter(swap => swap.status === "open");
-  const swapHistory = swaps.filter(swap => swap.status !== "open");
+  const pinnedSwapIdSet = useMemo(
+    () => new Set((uiStateQuery.data?.pinnedSwapIds ?? []).map(String)),
+    [uiStateQuery.data?.pinnedSwapIds],
+  );
+  const sortedSwaps = useMemo(() => {
+    const pinnedSwaps: ShiftSwap[] = [];
+    const regularSwaps: ShiftSwap[] = [];
+    swaps.forEach(swap => {
+      (pinnedSwapIdSet.has(String(swap.id)) ? pinnedSwaps : regularSwaps).push(swap);
+    });
+    return [...pinnedSwaps, ...regularSwaps];
+  }, [pinnedSwapIdSet, swaps]);
+  const openSwaps = useMemo(() => sortedSwaps.filter(swap => swap.status === "open"), [sortedSwaps]);
+  const filteredOpenSwaps = useMemo(
+    () => filterShiftSwaps(openSwaps, deferredSwapSearchQuery),
+    [deferredSwapSearchQuery, openSwaps],
+  );
+  const swapHistory = useMemo(() => sortedSwaps.filter(swap => swap.status !== "open"), [sortedSwaps]);
+  const pendingUnpinSwap = pendingUnpinSwapId === null
+    ? null
+    : swaps.find(swap => swap.id === pendingUnpinSwapId) ?? null;
   const isActionBusy = createSwapMutation.isPending || acceptSwapMutation.isPending || cancelSwapMutation.isPending;
-  const loadError = schedulesQuery.error ?? swapsQuery.error ?? targetEmployeesQuery.error;
+  const loadError = schedulesQuery.error ?? swapsQuery.error ?? targetEmployeesQuery.error ?? uiStateQuery.error;
   const resolvedTargetEmployeeId = targetMode === "private" ? targetEmployeeId ?? sortedTargetEmployees[0]?.id ?? null : null;
+  const hasSwapSearch = swapSearchQuery.trim().length > 0;
   const swapPreviewStats = useMemo(
     () => getEmployeeMonthStats(schedules, selectedSchedule, employeeId, selectedSlot, selectedPeriod),
     [employeeId, schedules, selectedPeriod, selectedSchedule, selectedSlot],
   );
 
+  const handleToggleSwapPin = (swapId: number) => {
+    if (pinnedSwapIdSet.has(String(swapId))) {
+      setPendingUnpinSwapId(swapId);
+      return;
+    }
+
+    setSwapPinMutation.mutate(
+      { swapId, pinned: true },
+      { onError: error => setActionError(getErrorMessage(error, "Could not pin this swap.")) },
+    );
+  };
+
+  const handleConfirmUnpin = () => {
+    if (pendingUnpinSwapId !== null) {
+      setSwapPinMutation.mutate(
+        { swapId: pendingUnpinSwapId, pinned: false },
+        { onError: error => setActionError(getErrorMessage(error, "Could not unpin this swap.")) },
+      );
+    }
+    setPendingUnpinSwapId(null);
+  };
+
   const handleOpenSchedule = (schedule: EmployeeSchedule) => {
+    if (schedule.allowSwap === false) {
+      setActionError(`Swaps are not allowed for “${schedule.name}”.`);
+      return;
+    }
+
     setSelectedScheduleId(schedule.id);
     setShiftDialogScheduleId(schedule.id);
     setConfirmSlotId(null);
@@ -808,6 +930,11 @@ export function EmployeeSwapPage() {
 
     if (!selectedSchedule || !selectedSlot) {
       setActionError("Choose a published schedule and one of your shifts.");
+      return;
+    }
+
+    if (selectedSchedule.allowSwap === false) {
+      setActionError("Swaps are not allowed for this schedule.");
       return;
     }
 
@@ -897,7 +1024,7 @@ export function EmployeeSwapPage() {
                       <span className={styles.scheduleButtonContent}>
                         <span className={styles.scheduleButtonName}>{schedule.name}</span>
                         <span className={styles.scheduleButtonMeta}>
-                          {`${schedule.shopName || `Shop ${schedule.shopId}`} / ${schedule.containerName || `Container ${schedule.containerId}`}`}
+                          {`${schedule.shopName || `Shop ${schedule.shopId}`} / ${schedule.containerName || `Container ${schedule.containerId}`}${schedule.allowSwap === false ? " · Swaps disabled" : ""}`}
                         </span>
                       </span>
                     </button>
@@ -956,6 +1083,7 @@ export function EmployeeSwapPage() {
                 disabled={
                   isActionBusy ||
                   !selectedSchedule ||
+                  selectedSchedule.allowSwap === false ||
                   !selectedSlot ||
                   (targetMode === "private" && !resolvedTargetEmployeeId)
                 }
@@ -991,15 +1119,50 @@ export function EmployeeSwapPage() {
             <h2 className={workspaceStyles.panelTitle}>Open swaps</h2>
           </div>
         </div>
-        <div className={styles.offerList}>
+        <div className={styles.offerToolbar}>
+          <label className={styles.swapSearchField} htmlFor="employee-swap-search">
+            <SearchIcon size={16} className={styles.swapSearchIcon} />
+            <input
+              id="employee-swap-search"
+              className={styles.swapSearchInput}
+              type="search"
+              value={swapSearchQuery}
+              placeholder="Search employee, date or schedule"
+              aria-label="Search swaps by giver, receiver, date or schedule"
+              onChange={event => setSwapSearchQuery(event.target.value)}
+            />
+            {hasSwapSearch ? (
+              <button
+                type="button"
+                className={styles.clearSearchButton}
+                aria-label="Clear swap search"
+                title="Clear search"
+                onClick={() => setSwapSearchQuery("")}
+              >
+                <CloseIcon size={13} />
+              </button>
+            ) : null}
+          </label>
+          <span className={styles.searchResultText}>
+            {hasSwapSearch ? `${filteredOpenSwaps.length} of ${openSwaps.length}` : `${openSwaps.length} offers`}
+          </span>
+        </div>
+        <div className={[
+          styles.offerList,
+          filteredOpenSwaps.length >= 5 ? styles.offerListScrollable : "",
+        ].filter(Boolean).join(" ")}>
           {openSwaps.length === 0 ? (
             <p className={styles.emptyText}>No open swap offers right now.</p>
-          ) : openSwaps.map(swap => (
+          ) : filteredOpenSwaps.length === 0 ? (
+            <p className={styles.emptyText}>{`No open swap offers match "${swapSearchQuery.trim()}".`}</p>
+          ) : filteredOpenSwaps.map(swap => (
             <SwapOfferCard
               key={swap.id}
               swap={swap}
               stats={getSwapOfferStats(swap)}
               isBusy={isActionBusy}
+              isPinned={pinnedSwapIdSet.has(String(swap.id))}
+              onTogglePin={handleToggleSwapPin}
               onAccept={handleAccept}
               onCancel={handleCancel}
             />
@@ -1017,7 +1180,10 @@ export function EmployeeSwapPage() {
             <h2 className={workspaceStyles.panelTitle}>Recent swap activity</h2>
           </div>
         </div>
-        <div className={styles.offerList}>
+        <div className={[
+          styles.offerList,
+          swapHistory.length >= 5 ? styles.offerListScrollable : "",
+        ].filter(Boolean).join(" ")}>
           {swapHistory.length === 0 ? (
             <p className={styles.emptyText}>Accepted and cancelled swaps will appear here.</p>
           ) : swapHistory.map(swap => (
@@ -1026,12 +1192,24 @@ export function EmployeeSwapPage() {
               swap={swap}
               stats={getSwapOfferStats(swap)}
               isBusy={isActionBusy}
+              isPinned={pinnedSwapIdSet.has(String(swap.id))}
+              onTogglePin={handleToggleSwapPin}
               onAccept={handleAccept}
               onCancel={handleCancel}
             />
           ))}
         </div>
       </section>
+
+      <ConfirmDialog
+        open={pendingUnpinSwapId !== null}
+        variant="confirm"
+        title="Unpin swap?"
+        message={`Remove ${pendingUnpinSwap?.scheduleName ?? "this swap"} from your pinned swaps?`}
+        confirmText="Unpin"
+        onCancel={() => setPendingUnpinSwapId(null)}
+        onConfirm={handleConfirmUnpin}
+      />
     </div>
   );
 }

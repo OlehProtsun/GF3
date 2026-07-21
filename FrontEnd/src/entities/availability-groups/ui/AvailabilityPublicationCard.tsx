@@ -1,4 +1,4 @@
-import { useId, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useId, useMemo, useState, type ReactNode } from "react";
 import type { AvailabilityPublicationStatus } from "@entities/availability-groups/model/types";
 import { ErrorPill } from "@shared/ui/forms/Field";
 import { EyeIcon } from "@shared/ui/icons";
@@ -24,6 +24,7 @@ type AvailabilityPublicationCardProps = {
 const monthYearFormatter = new Intl.DateTimeFormat("en-US", { month: "long", year: "numeric" });
 const weekdayLabels = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"] as const;
 const quickTimes = ["09:00", "12:00", "18:00", "23:59"] as const;
+const datePickerOpenEvent = "gf-date-picker-open";
 
 function joinClassNames(...values: Array<string | false | undefined>) {
   return values.filter(Boolean).join(" ");
@@ -127,12 +128,30 @@ function formatLocalDateTime(value: string) {
   }).format(date);
 }
 
+function formatLocalDate(value: string) {
+  if (!value) {
+    return "Select date";
+  }
+
+  const date = new Date(value + "T00:00");
+  if (Number.isNaN(date.getTime())) {
+    return "Select date";
+  }
+
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  }).format(date);
+}
+
 export function AvailabilityDateTimeField({
   id,
   label,
   value,
   error,
   defaultTime,
+  dateOnly = false,
   onChange,
 }: {
   id: string;
@@ -140,6 +159,7 @@ export function AvailabilityDateTimeField({
   value: string;
   error?: string;
   defaultTime: string;
+  dateOnly?: boolean;
   onChange: (value: string) => void;
 }) {
   const [isOpen, setIsOpen] = useState(false);
@@ -152,10 +172,22 @@ export function AvailabilityDateTimeField({
   const selectedTime = `${padDatePart(pickerParts.hour)}:${padDatePart(pickerParts.minute)}`;
   const errorId = error ? `${id}-error` : undefined;
 
+  useEffect(() => {
+    const closeWhenAnotherPickerOpens = (event: Event) => {
+      if ((event as CustomEvent<string>).detail !== id) {
+        setIsOpen(false);
+      }
+    };
+
+    window.addEventListener(datePickerOpenEvent, closeWhenAnotherPickerOpens);
+    return () => window.removeEventListener(datePickerOpenEvent, closeWhenAnotherPickerOpens);
+  }, [id]);
+
   const openPicker = () => {
     setIsOpen(current => {
       if (!current) {
         setViewDate(getPickerBaseDate(value));
+        window.dispatchEvent(new CustomEvent<string>(datePickerOpenEvent, { detail: id }));
       }
 
       return !current;
@@ -163,7 +195,7 @@ export function AvailabilityDateTimeField({
   };
 
   const commitDateTime = (date: string, hour = pickerParts.hour, minute = pickerParts.minute) => {
-    onChange(toLocalDateTimeValue(date, hour, minute));
+    onChange(dateOnly ? date : toLocalDateTimeValue(date, hour, minute));
   };
 
   const commitQuickTime = (time: string) => {
@@ -190,12 +222,16 @@ export function AvailabilityDateTimeField({
         aria-describedby={errorId}
         onClick={openPicker}
       >
-        <span className={styles.dateButtonValue}>{formatLocalDateTime(value)}</span>
+        <span className={styles.dateButtonValue}>{dateOnly ? formatLocalDate(value) : formatLocalDateTime(value)}</span>
         <span className={styles.dateButtonHint}>Edit</span>
       </button>
 
       {isOpen ? (
-        <div className={styles.dateDialog} role="dialog" aria-label={`${label} picker`}>
+        <div
+          className={joinClassNames(styles.dateDialog, dateOnly && styles.dateDialogDateOnly)}
+          role="dialog"
+          aria-label={`${label} picker`}
+        >
           <div className={styles.calendarHeader}>
             <button
               type="button"

@@ -7,6 +7,8 @@ import {
   type ShiftSwap,
 } from "@entities/shift-swaps";
 import { useEmployeeScheduleListQuery, type EmployeeSchedule } from "@entities/employee-schedule";
+import { employeeUiStateApi, useEmployeeUiStateQuery } from "@entities/employee-ui-state";
+import { useMarkAllSystemNewsReadMutation, useMarkSystemNewsReadMutation, useSystemNewsQuery } from "@entities/system-news";
 import {
   useEmployeeAvailabilityListQuery,
   type EmployeeAvailabilityGroup,
@@ -32,10 +34,16 @@ export function EmployeeNotificationsPage() {
   const swapsQuery = useEmployeeShiftSwapsQuery();
   const schedulesQuery = useEmployeeScheduleListQuery();
   const availabilityQuery = useEmployeeAvailabilityListQuery();
+  const newsQuery = useSystemNewsQuery();
+  const markNewsRead = useMarkSystemNewsReadMutation();
+  const markAllNewsRead = useMarkAllSystemNewsReadMutation();
+  const { data: uiState, refetch: refetchUiState } = useEmployeeUiStateQuery(Boolean(session?.employeeId));
   const swaps = swapsQuery.data ?? EMPTY_SWAPS;
   const schedules = schedulesQuery.data ?? EMPTY_SCHEDULES;
   const availabilityGroups = availabilityQuery.data ?? EMPTY_AVAILABILITY_GROUPS;
   const [nowMs, setNowMs] = useState(() => Date.now());
+  const [syncError, setSyncError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<"inbox" | "news">("inbox");
   const [readIds, setReadIds] = useState<Set<string>>(() =>
     readEmployeeNotificationIdsForAccount(session?.userName, session?.employeeId),
   );
@@ -43,6 +51,20 @@ export function EmployeeNotificationsPage() {
   useEffect(() => {
     setReadIds(readEmployeeNotificationIdsForAccount(session?.userName, session?.employeeId));
   }, [session?.employeeId, session?.userName]);
+  useEffect(() => {
+    if (!uiState) {
+      return;
+    }
+
+    const localReadIds = readEmployeeNotificationIdsForAccount(session?.userName, session?.employeeId);
+    const serverReadIds = new Set(uiState.readNotificationIds ?? []);
+    const mergedReadIds = new Set([...localReadIds, ...serverReadIds]);
+    setReadIds(mergedReadIds);
+    if ([...serverReadIds].some(id => !localReadIds.has(id))) {
+      writeEmployeeNotificationIdsForAccount(session?.userName, session?.employeeId, mergedReadIds);
+    }
+
+  }, [session?.employeeId, session?.userName, uiState, refetchUiState]);
 
   useEffect(() => {
     const intervalId = window.setInterval(() => setNowMs(Date.now()), 30_000);
@@ -58,7 +80,11 @@ export function EmployeeNotificationsPage() {
     (count, item) => count + (isEmployeeNotificationRead(item, readIds) ? 0 : 1),
     0,
   );
-  const queryError = swapsQuery.error ?? schedulesQuery.error ?? availabilityQuery.error;
+  const newsItems = newsQuery.data ?? [];
+  const newsUnreadCount = newsItems.filter(item => !item.isRead).length;
+  const activeUnreadCount = activeTab === "inbox" ? unreadCount : newsUnreadCount;
+  const activeItemCount = activeTab === "inbox" ? notificationItems.length : newsItems.length;
+  const queryError = swapsQuery.error ?? schedulesQuery.error ?? availabilityQuery.error ?? newsQuery.error;
   const queryErrorMessage = queryError ? getErrorMessage(queryError, "Could not load notifications.") : null;
 
   const handleMarkAllRead = () => {
@@ -68,6 +94,10 @@ export function EmployeeNotificationsPage() {
     ]);
     setReadIds(nextReadIds);
     writeEmployeeNotificationIdsForAccount(session?.userName, session?.employeeId, nextReadIds);
+    setSyncError(null);
+    void employeeUiStateApi.markNotificationsRead(notificationItems.flatMap(item => item.readIds))
+      .then(() => refetchUiState())
+      .catch(error => setSyncError(getErrorMessage(error, "Could not sync notification state.")));
   };
 
   const handleMarkRead = (itemReadIds: string[]) => {
@@ -79,11 +109,26 @@ export function EmployeeNotificationsPage() {
     itemReadIds.forEach(id => nextReadIds.add(id));
     setReadIds(nextReadIds);
     writeEmployeeNotificationIdsForAccount(session?.userName, session?.employeeId, nextReadIds);
+    setSyncError(null);
+    void employeeUiStateApi.markNotificationsRead(itemReadIds)
+      .then(() => refetchUiState())
+      .catch(error => setSyncError(getErrorMessage(error, "Could not sync notification state.")));
+  };
+
+  const getYoutubeEmbedUrl = (value: string | null) => {
+    if (!value) return null;
+    try {
+      const url = new URL(value);
+      const id = url.hostname === "youtu.be" ? url.pathname.slice(1).split("/")[0] :
+        url.pathname.startsWith("/shorts/") || url.pathname.startsWith("/embed/") ? url.pathname.split("/")[2] : url.searchParams.get("v");
+      return id && /^[\w-]{6,20}$/.test(id) ? `https://www.youtube-nocookie.com/embed/${id}` : null;
+    } catch { return null; }
   };
 
   return (
     <div className={workspaceStyles.page}>
       {queryErrorMessage ? <ErrorBanner dismissible={false}>{queryErrorMessage}</ErrorBanner> : null}
+      {syncError ? <ErrorBanner dismissible>{syncError}</ErrorBanner> : null}
 
       <section className={`${workspaceStyles.panel} ${styles.inboxPanel}`}>
         <div className={styles.sectionHeader}>
@@ -91,26 +136,30 @@ export function EmployeeNotificationsPage() {
             <span className={styles.sectionIcon} aria-hidden="true">
               <InboxIcon size={20} />
             </span>
-            <div>
+            <div className={styles.headingCopy}>
               <span className={workspaceStyles.panelEyebrow}>Notifications</span>
-              <h2 className={workspaceStyles.panelTitle}>Inbox</h2>
+              <div className={styles.tabsSummaryRow}>
+                <div className={styles.inboxTabs} role="tablist" aria-label="Notification type">
+                  <button type="button" role="tab" aria-selected={activeTab === "inbox"} className={activeTab === "inbox" ? styles.inboxTabActive : ""} onClick={() => setActiveTab("inbox")}>Inbox{unreadCount > 0 ? <span>{unreadCount}</span> : null}</button>
+                  <button type="button" role="tab" aria-selected={activeTab === "news"} className={activeTab === "news" ? styles.inboxTabActive : ""} onClick={() => setActiveTab("news")}>News{newsUnreadCount > 0 ? <span>{newsUnreadCount}</span> : null}</button>
+                </div>
+                <span className={`${styles.countBadge} ${activeUnreadCount > 0 ? styles.countBadgeUnread : ""}`}>
+                  {activeUnreadCount > 0 ? `${activeUnreadCount} unread` : activeItemCount}
+                </span>
+              </div>
             </div>
           </div>
 
           <div className={styles.inboxHeaderActions}>
-            <span className={`${styles.countBadge} ${unreadCount > 0 ? styles.countBadgeUnread : ""}`}>
-              {unreadCount > 0 ? `${unreadCount} unread` : notificationItems.length}
-            </span>
-
-            {unreadCount > 0 ? (
-              <button type="button" className={styles.actionButton} onClick={handleMarkAllRead}>
+            {activeUnreadCount > 0 ? (
+              <button type="button" className={styles.actionButton} onClick={activeTab === "inbox" ? handleMarkAllRead : () => markAllNewsRead.mutate(undefined)}>
                 Mark all read
               </button>
             ) : null}
           </div>
         </div>
 
-        {notificationItems.length === 0 ? (
+        {activeTab === "inbox" && notificationItems.length === 0 ? (
           <div className={styles.emptyState}>
             <span className={styles.emptyIcon}>
               <NoteIcon size={20} />
@@ -118,7 +167,7 @@ export function EmployeeNotificationsPage() {
             <strong>No notifications yet</strong>
             <span>Published schedules, availability and shift updates will appear here.</span>
           </div>
-        ) : (
+        ) : activeTab === "inbox" ? (
           <div className={styles.notificationList}>
             {notificationItems.map(item => {
               const isUnread = !isEmployeeNotificationRead(item, readIds);
@@ -159,6 +208,33 @@ export function EmployeeNotificationsPage() {
                     <NavLink to={item.actionPath} className={styles.notificationAction}>
                       {item.actionLabel}
                     </NavLink>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        ) : newsItems.length === 0 ? (
+          <div className={styles.emptyState}>
+            <span className={styles.emptyIcon}><NoteIcon size={20} /></span>
+            <strong>No system news yet</strong>
+            <span>Product updates and announcements will appear here.</span>
+          </div>
+        ) : (
+          <div className={styles.notificationList}>
+            {newsItems.map(item => {
+              const embedUrl = getYoutubeEmbedUrl(item.videoUrl);
+              return (
+                <article key={item.id} className={[styles.notificationItem, styles.newsItem, !item.isRead ? styles.notificationItemUnread : ""].filter(Boolean).join(" ")}>
+                  <span className={styles.notificationIcon}><NoteIcon size={17} /></span>
+                  <div className={styles.notificationBody}>
+                    <div className={styles.notificationTitleRow}><strong>{item.title}</strong>{!item.isRead ? <span className={styles.unreadDot} aria-label="Unread" /> : null}</div>
+                    <p className={styles.newsBody}>{item.body}</p>
+                    <span>{new Date(item.createdAtUtc).toLocaleString()}</span>
+                    {item.imageUrl ? <img className={styles.newsImage} src={item.imageUrl} alt="" /> : null}
+                    {embedUrl ? <div className={styles.newsVideo}><iframe src={embedUrl} title={`${item.title} video`} allow="accelerometer; autoplay; encrypted-media; picture-in-picture" allowFullScreen /></div> : null}
+                  </div>
+                  <div className={styles.notificationActions}>
+                    <button type="button" className={styles.markReadButton} onClick={() => markNewsRead.mutate(item.id)} disabled={item.isRead}>{item.isRead ? "Read" : "Mark as read"}</button>
                   </div>
                 </article>
               );

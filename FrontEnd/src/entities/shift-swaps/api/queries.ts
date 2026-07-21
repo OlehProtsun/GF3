@@ -25,6 +25,17 @@ export const useGraphShiftSwapLogQuery = (containerId: number | null, graphId: n
     queryFn: ({ signal }) => shiftSwapsApi.listGraphLog(containerId as number, graphId as number, signal),
   });
 
+export const useContainerShiftSwapsQuery = (
+  containerId: number | null,
+  enabled = true,
+) =>
+  useQuery({
+    queryKey: queryKeys.shiftSwaps.container(containerId ?? 0),
+    enabled: enabled && containerId !== null,
+    staleTime: 30_000,
+    queryFn: ({ signal }) => shiftSwapsApi.listContainer(containerId as number, signal),
+  });
+
 export function useCreateEmployeeShiftSwapMutation() {
   const queryClient = useQueryClient();
 
@@ -58,6 +69,30 @@ export function useCancelManagerManualShiftSwapMutation() {
       queryClient.invalidateQueries({ queryKey: queryKeys.shiftSwaps.graphLog(payload.containerId, payload.graphId) });
       queryClient.invalidateQueries({ queryKey: queryKeys.shiftSwaps.all });
       queryClient.invalidateQueries({ queryKey: queryKeys.containers.graphSlots(payload.containerId, payload.graphId) });
+    },
+  });
+}
+
+export function useCancelContainerShiftSwapMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ containerId, id }: { containerId: number; id: number }) =>
+      shiftSwapsApi.cancelContainer(containerId, id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.shiftSwaps.all });
+    },
+  });
+}
+
+export function useDeleteContainerShiftSwapMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ containerId, id }: { containerId: number; id: number }) =>
+      shiftSwapsApi.deleteContainer(containerId, id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.shiftSwaps.all });
     },
   });
 }

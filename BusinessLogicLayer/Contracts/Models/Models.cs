@@ -274,6 +274,9 @@ public class ScheduleModel
     /// </summary>
     public SchedulePublicationStatus PublicationStatus { get; set; } = SchedulePublicationStatus.Private;
 
+    /// <summary>Controls whether shift swaps are allowed for this schedule.</summary>
+    public bool AllowSwap { get; set; } = true;
+
     /// <summary>
     /// Number of employees required in each shift interval.
     /// </summary>

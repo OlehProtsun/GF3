@@ -6,6 +6,11 @@ namespace WebApi.Options;
 public sealed class AdminToolsOptions
 {
     /// <summary>
+    /// Additional developer password required by every admin database request.
+    /// </summary>
+    public string DeveloperPassword { get; set; } = string.Empty;
+
+    /// <summary>
     /// Enables or disables the admin database endpoints completely.
     /// </summary>
     public bool Enabled { get; set; }

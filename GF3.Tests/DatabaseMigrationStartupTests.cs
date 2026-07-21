@@ -70,14 +70,15 @@ public sealed class DatabaseMigrationStartupTests
                     NullLogger.Instance);
 
                 Assert.True(result.DatabaseExisted);
-                Assert.Equal(4, result.AppliedMigrations.Count);
+                Assert.Contains("20260720120000_AddEmployeeSessionVersion", result.AppliedMigrations);
                 Assert.NotNull(result.BackupPath);
                 Assert.True(File.Exists(result.BackupPath));
             }
 
             await using var verificationContext = CreateContext(workspace.ConnectionString);
             Assert.Equal(2, await verificationContext.Employees.CountAsync());
-            Assert.Single(await verificationContext.Schedules.ToListAsync());
+            var migratedSchedule = Assert.Single(await verificationContext.Schedules.ToListAsync());
+            Assert.True(migratedSchedule.AllowSwap);
             Assert.Single(await verificationContext.ScheduleSlots.ToListAsync());
             Assert.Single(await verificationContext.ShiftSwapRequests.ToListAsync());
 
@@ -112,28 +113,22 @@ public sealed class DatabaseMigrationStartupTests
         context.AddRange(container, shop, alice, bob);
         await context.SaveChangesAsync();
 
-        var schedule = new ScheduleModel
-        {
-            ContainerId = container.Id,
-            ShopId = shop.Id,
-            Name = "Release schedule",
-            Year = 2026,
-            Month = 7,
-            PublicationStatus = SchedulePublicationStatus.Public,
-            PeoplePerShift = 1,
-            Shift1Time = "09:00 - 17:00",
-            Shift2Time = "17:00 - 22:00",
-            MaxHoursPerEmpMonth = 200,
-            MaxConsecutiveDays = 6,
-            MaxConsecutiveFull = 3,
-            MaxFullPerMonth = 10,
-        };
-        context.Schedules.Add(schedule);
-        await context.SaveChangesAsync();
+        await context.Database.ExecuteSqlInterpolatedAsync($"""
+            INSERT INTO schedule
+                (container_id, shop_id, name, year, month, publication_status, people_per_shift,
+                 shift1_time, shift2_time, max_hours_per_emp_month, max_consecutive_days,
+                 max_consecutive_full, max_full_per_month)
+            VALUES
+                ({container.Id}, {shop.Id}, {"Release schedule"}, {2026}, {7}, {SchedulePublicationStatus.Public.ToString()}, {1},
+                 {"09:00 - 17:00"}, {"17:00 - 22:00"}, {200}, {6}, {3}, {10});
+            """);
+        var scheduleId = checked((int)await context.Database
+            .SqlQueryRaw<long>("SELECT last_insert_rowid() AS Value")
+            .SingleAsync());
 
         var slot = new ScheduleSlotModel
         {
-            ScheduleId = schedule.Id,
+            ScheduleId = scheduleId,
             DayOfMonth = 5,
             SlotNo = 1,
             EmployeeId = alice.Id,
@@ -146,7 +141,7 @@ public sealed class DatabaseMigrationStartupTests
 
         context.ShiftSwapRequests.Add(new ShiftSwapRequestModel
         {
-            ScheduleId = schedule.Id,
+            ScheduleId = scheduleId,
             ScheduleSlotId = slot.Id,
             FromEmployeeId = alice.Id,
             AcceptedByEmployeeId = bob.Id,

@@ -14,6 +14,7 @@ public static class StartupConfiguration
     private const string AdminEnabledVariable = "GF3_ADMIN_ENABLED";
     private const string AdminAllowRemoteVariable = "GF3_ADMIN_ALLOW_REMOTE";
     private const string AdminAllowWriteVariable = "GF3_ADMIN_ALLOW_WRITE";
+    private const string AdminDeveloperPasswordVariable = "GF3_ADMIN_DEVELOPER_PASSWORD";
     private const string ApplicationDataFolderName = "GF3";
     private const string DatabaseFileName = "SQLite.db";
 
@@ -27,6 +28,7 @@ public static class StartupConfiguration
         ApplyBooleanOverride(AdminEnabledVariable, value => options.Enabled = value, readEnvironmentVariable);
         ApplyBooleanOverride(AdminAllowRemoteVariable, value => options.AllowRemoteAccess = value, readEnvironmentVariable);
         ApplyBooleanOverride(AdminAllowWriteVariable, value => options.AllowWriteSql = value, readEnvironmentVariable);
+        options.DeveloperPassword = readEnvironmentVariable(AdminDeveloperPasswordVariable)?.Trim() ?? options.DeveloperPassword;
     }
 
     public static string ResolveConnectionString(

@@ -119,6 +119,7 @@ public sealed class EmployeeSchedulesController(
             Year = model.Year,
             Month = model.Month,
             PublicationStatus = model.PublicationStatus == SchedulePublicationStatus.Public ? "public" : "private",
+            AllowSwap = model.AllowSwap,
             LastUpdatedAtUtc = lastUpdatedAtUtc,
             Employees = model.Employees
                 .OrderBy(employee => employee.DisplayOrder)

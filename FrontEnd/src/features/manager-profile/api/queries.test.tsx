@@ -28,6 +28,7 @@ const updatedProfile = {
   recoveryEmail: "chief@example.com",
   lastLoginAtUtc: "2026-05-01T10:00:00.000Z",
   isOnline: true,
+  isSystem: false,
   createdAtUtc: "2026-04-01T10:00:00.000Z",
 };
 
@@ -44,7 +45,7 @@ function MutationHarness() {
           userName: " chief ",
           displayName: " Chief Manager ",
           recoveryEmail: " chief@example.com ",
-          newPassword: "secret123",
+          newPassword: "654321",
         })}
       >
         update profile
@@ -55,7 +56,7 @@ function MutationHarness() {
           userName: "second",
           displayName: "Second Manager",
           recoveryEmail: "second@example.com",
-          password: "secret456",
+          password: "654321",
         })}
       >
         create manager
@@ -83,6 +84,7 @@ beforeEach(() => {
     userName: "second",
     displayName: "Second Manager",
     isOnline: false,
+    isSystem: false,
     createdAtUtc: "2026-05-01T10:00:00.000Z",
   });
   apiMocks.deleteManager.mockResolvedValue(undefined);
@@ -101,7 +103,7 @@ describe("manager profile query mutations", () => {
         userName: " chief ",
         displayName: " Chief Manager ",
         recoveryEmail: " chief@example.com ",
-        newPassword: "secret123",
+        newPassword: "654321",
       });
       expect(client.getQueryState(queryKeys.managerProfile.me()).data).toEqual(updatedProfile);
     });
@@ -112,7 +114,7 @@ describe("manager profile query mutations", () => {
         userName: "second",
         displayName: "Second Manager",
         recoveryEmail: "second@example.com",
-        password: "secret456",
+        password: "654321",
       });
     });
 

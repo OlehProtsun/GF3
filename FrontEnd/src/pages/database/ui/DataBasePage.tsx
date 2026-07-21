@@ -1,5 +1,6 @@
-import { useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import type { ChangeEvent } from "react";
+import { useDeferredValue, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
+import type { ChangeEvent, FormEvent } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   type AdminDbFileEntry,
   type AdminDbImportResponse,
@@ -209,7 +210,137 @@ function buildDatabaseOptionLabel(entry: AdminDbFileEntry) {
   return parts.join(" • ");
 }
 
+function DeveloperAccessDialog({
+  password,
+  error,
+  isSubmitting,
+  onPasswordChange,
+  onSubmit,
+  onCancel,
+}: {
+  password: string;
+  error: string | null;
+  isSubmitting: boolean;
+  onPasswordChange: (value: string) => void;
+  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+  onCancel: () => void;
+}) {
+  const titleId = useId();
+  const descriptionId = useId();
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && !isSubmitting) {
+        onCancel();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isSubmitting, onCancel]);
+
+  return (
+    <div className={styles.accessOverlay} role="dialog" aria-modal="true" aria-labelledby={titleId} aria-describedby={descriptionId}>
+      <form className={styles.accessDialog} onSubmit={onSubmit}>
+        <div className={styles.accessHero}>
+          <span className={styles.accessIcon} aria-hidden="true">
+            <DatabaseIcon size={24} />
+          </span>
+          <div className={styles.accessCopy}>
+            <span className={styles.accessEyebrow}>Developer access</span>
+            <h2 id={titleId}>Unlock Database</h2>
+            <p id={descriptionId}>Enter the developer password configured on the GF3 host.</p>
+          </div>
+        </div>
+
+        <label className={styles.accessField} htmlFor="database-developer-password">
+          <span>Developer password</span>
+          <input
+            id="database-developer-password"
+            type="password"
+            value={password}
+            autoComplete="off"
+            autoFocus
+            placeholder="Enter password"
+            disabled={isSubmitting}
+            onChange={event => onPasswordChange(event.target.value)}
+          />
+        </label>
+
+        {error ? <div className={styles.accessError} role="alert">{error}</div> : null}
+
+        <div className={styles.accessActions}>
+          <IosButton
+            label="Go back"
+            type="button"
+            variant="secondary"
+            customColor="#e5e7eb"
+            customBorderColor="#d1d5db"
+            disabled={isSubmitting}
+            onClick={onCancel}
+          />
+          <IosButton
+            label={isSubmitting ? "Checking..." : "Unlock database"}
+            type="submit"
+            icon={<CheckIcon size={16} />}
+            disabled={isSubmitting || !password.trim()}
+          />
+        </div>
+      </form>
+    </div>
+  );
+}
+
 export function DataBasePage() {
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const [developerPassword, setDeveloperPassword] = useState("");
+  const [accessError, setAccessError] = useState<string | null>(null);
+  const [isCheckingAccess, setIsCheckingAccess] = useState(false);
+  const [isUnlocked, setIsUnlocked] = useState(false);
+
+  const handleUnlock = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const password = developerPassword.trim();
+    if (!password || isCheckingAccess) {
+      return;
+    }
+
+    setAccessError(null);
+    setIsCheckingAccess(true);
+
+    try {
+      const metadata = await adminDbApi.unlock(password);
+      queryClient.setQueryData(queryKeys.adminDb.metadata(), metadata);
+      setDeveloperPassword("");
+      setIsUnlocked(true);
+    } catch (error) {
+      setAccessError(error instanceof ApiError ? error.message : "Could not verify the developer password.");
+    } finally {
+      setIsCheckingAccess(false);
+    }
+  };
+
+  if (!isUnlocked) {
+    return (
+      <DeveloperAccessDialog
+        password={developerPassword}
+        error={accessError}
+        isSubmitting={isCheckingAccess}
+        onPasswordChange={value => {
+          setDeveloperPassword(value);
+          setAccessError(null);
+        }}
+        onSubmit={handleUnlock}
+        onCancel={() => navigate(-1)}
+      />
+    );
+  }
+
+  return <DataBaseWorkspace />;
+}
+
+function DataBaseWorkspace() {
   usePageScrollbarHidden();
 
   const queryClient = useQueryClient();
