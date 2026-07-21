@@ -169,6 +169,12 @@ export function EmployeeAccountPage() {
 
   const handleConfirmPasswordReset = async () => {
     try {
+      if (!/^\d{6}$/.test(newPassword)) {
+        setInlineError("Password must contain exactly 6 digits.");
+        setInlineSuccess(null);
+        return;
+      }
+
       await runMutation(confirmPasswordMutation.mutate, {
         code: passwordCode,
         newPassword,
@@ -355,11 +361,15 @@ export function EmployeeAccountPage() {
                       <span className={styles.fieldLabel}>New password</span>
                       <input
                         type="password"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
+                        minLength={6}
+                        maxLength={6}
                         className={styles.input}
                         value={newPassword}
-                        onChange={(event) => setNewPassword(event.target.value)}
-                        placeholder="Minimum 6 characters"
-                        autoComplete="new-password"
+                        onChange={(event) => setNewPassword(event.target.value.replace(/\D/g, "").slice(0, 6))}
+                        placeholder="Exactly 6 digits"
+                        autoComplete="654321"
                       />
                     </label>
                   </div>
@@ -369,7 +379,7 @@ export function EmployeeAccountPage() {
                     size="compact"
                     className={`${styles.profileButton} ${styles.changePasswordButton}`}
                     onClick={() => void handleConfirmPasswordReset()}
-                    disabled={isBusy || !passwordCode.trim() || !newPassword.trim()}
+                    disabled={isBusy || !passwordCode.trim() || !/^\d{6}$/.test(newPassword)}
                   />
                 </div>
               ) : (

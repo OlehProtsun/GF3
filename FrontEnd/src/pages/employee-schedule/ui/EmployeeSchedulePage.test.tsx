@@ -1,13 +1,19 @@
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import type { ReactNode } from "react";
 import { BrowserRouter } from "react-router-dom";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 import type { EmployeeSchedule } from "@entities/employee-schedule";
-import { EmployeeSchedulePage } from "./EmployeeSchedulePage";
+import { buildSchedulePdfHtml, EmployeeSchedulePage } from "./EmployeeSchedulePage";
+import styles from "./EmployeeSchedulePage.module.css";
 
 const mocks = vi.hoisted(() => ({
   scheduleQuery: vi.fn(),
   matrix: vi.fn(),
+  uiStateQuery: {
+    data: { scheduleColumnOrders: {}, readNotificationIds: [] },
+    refetch: vi.fn(),
+  },
 }));
 
 vi.mock("@app/providers/AuthProvider", () => ({
@@ -24,20 +30,41 @@ vi.mock("@entities/employee-schedule", () => ({
   useEmployeeScheduleListQuery: () => mocks.scheduleQuery(),
 }));
 
+vi.mock("@entities/employee-ui-state", () => ({
+  employeeUiStateApi: {
+    saveScheduleColumnOrder: vi.fn().mockResolvedValue(undefined),
+  },
+  useEmployeeUiStateQuery: () => mocks.uiStateQuery,
+}));
 vi.mock("@entities/containers/ui/ContainerGraphMatrix", () => ({
   ContainerGraphMatrix: (props: {
     title: string;
+    icon?: ReactNode;
     graph: EmployeeSchedule;
     columns: Array<{ employeeId: number; label: string }>;
     cellMap: Record<string, string>;
+    onColumnHeaderClick?: (column: { employeeId: number; label: string }) => void;
   }) => {
     mocks.matrix(props);
 
     return (
       <section data-testid="schedule-matrix">
+        {props.icon}
         <h2>{props.title}</h2>
         <span>{props.graph.name}</span>
         <span>{props.columns.map(column => column.label).join(", ")}</span>
+        {props.onColumnHeaderClick
+          ? props.columns.map(column => (
+            <button
+              key={column.employeeId}
+              type="button"
+              aria-label={"Customize " + column.label}
+              onClick={() => props.onColumnHeaderClick?.(column)}
+            >
+              {column.label}
+            </button>
+          ))
+          : null}
         <span>{JSON.stringify(props.cellMap)}</span>
       </section>
     );
@@ -125,11 +152,34 @@ function renderPage() {
 }
 
 beforeEach(() => {
+  window.localStorage.clear();
   mocks.scheduleQuery.mockReset();
   mocks.matrix.mockClear();
 });
 
 describe("EmployeeSchedulePage", () => {
+  test("uses intrinsic PDF column sizing with minimal cell padding", () => {
+    const html = buildSchedulePdfHtml(
+      schedules[0],
+      [
+        { employeeId: 12, kind: "employee", manualColumnId: null, graphEmployeeId: 10, label: "Zoe Young", minHoursMonth: 80, totalMinutes: 0, totalText: "" },
+        { employeeId: 7, kind: "employee", manualColumnId: null, graphEmployeeId: 11, label: "Adam Blue", minHoursMonth: 60, totalMinutes: 0, totalText: "" },
+      ],
+      {
+        "12:10": "08:00 - 12:00, Late May Schedule, Second May Schedule",
+        "7:12": "09:00 - 13:00",
+      },
+    );
+    const document = new DOMParser().parseFromString(html, "text/html");
+    const employeeColumns = document.querySelectorAll<HTMLTableColElement>("col.employee-column");
+    const styleText = document.querySelector("style")?.textContent ?? "";
+
+    expect(employeeColumns).toHaveLength(25);
+    expect([...employeeColumns].every(column => column.style.width === "")).toBe(true);
+    expect(styleText).toContain("table-layout: auto");
+    expect(styleText).toContain("padding: 0 1px");
+  });
+
   test("summarizes current employee work across public schedules and feeds selected schedule to the matrix", () => {
     mocks.scheduleQuery.mockReturnValue({
       data: schedules,
@@ -171,6 +221,122 @@ describe("EmployeeSchedulePage", () => {
     expect(matrixProps).not.toHaveProperty("onVisualHintCellClick");
   });
 
+  test("switches to a daily view, marks work days, and orders early, all-day, and late workers", async () => {
+    const user = userEvent.setup();
+    const dailySchedule: EmployeeSchedule = {
+      ...schedules[0],
+      relatedScheduleAssignments: [
+        ...(schedules[0].relatedScheduleAssignments ?? []),
+        { employeeId: 12, dayOfMonth: 14, scheduleId: 35, scheduleName: "F35" },
+      ],
+      employees: [
+        ...(schedules[0].employees ?? []),
+        { id: 12, employeeId: 5, firstName: "Alex", lastName: "All Day", displayName: "Alex All Day", displayOrder: 3 },
+        { id: 13, employeeId: 9, firstName: "Liam", lastName: "Late", displayName: "Liam Late", displayOrder: 4 },
+      ],
+      slots: [
+        ...schedules[0].slots,
+        { id: 20, dayOfMonth: 10, slotNo: 1, employeeId: 5, fromTime: "00:00", toTime: "00:00", status: "ASSIGNED" },
+        { id: 21, dayOfMonth: 10, slotNo: 1, employeeId: 9, fromTime: "18:00", toTime: "22:00", status: "ASSIGNED" },
+      ],
+    };
+    mocks.scheduleQuery.mockReturnValue({ data: [dailySchedule], isLoading: false, error: null });
+
+    renderPage();
+    await user.click(screen.getByRole("button", { name: "Show daily schedule view" }));
+
+    const workDay = screen.getByRole("tab", { name: "Sunday 10, working day" });
+    const dayOff = screen.getByRole("tab", { name: "Saturday 9, day off" });
+    expect(workDay).toHaveClass(styles.dailyScheduleDayWorking, styles.dailyScheduleDaySelected);
+    expect(dayOff).toHaveClass(styles.dailyScheduleDayOff);
+    expect(screen.getByRole("button", { name: "Show schedule matrix view" })).toHaveAttribute("aria-pressed", "true");
+
+    const workerCards = within(screen.getByRole("tabpanel", { name: "Sunday 10" })).getAllByRole("article");
+    expect(workerCards.map(card => card.textContent)).toEqual([
+      expect.stringContaining("Zoe Young08:00 - 12:00, Late May Schedule, Second May Schedule"),
+      expect.stringContaining("Alex All DayAll day"),
+      expect.stringContaining("Liam Late18:00 - 22:00"),
+    ]);
+
+    await user.click(dayOff);
+    expect(screen.getByText("No one is scheduled.")).toBeInTheDocument();
+
+    const relatedOnlyDay = screen.getByRole("tab", { name: "Thursday 14, working day" });
+    expect(relatedOnlyDay).toHaveClass(styles.dailyScheduleDayWorking);
+    await user.click(relatedOnlyDay);
+    expect(within(screen.getByRole("tabpanel", { name: "Thursday 14" })).getByRole("article"))
+      .toHaveTextContent("Zoe YoungF35");
+
+    await user.click(screen.getByRole("button", { name: "Show schedule matrix view" }));
+    expect(screen.getByTestId("schedule-matrix")).toBeInTheDocument();
+  });
+
+  test("calculates estimated salary and restores the Work hours total", async () => {
+    const user = userEvent.setup();
+    mocks.scheduleQuery.mockReturnValue({
+      data: schedules,
+      isLoading: false,
+      error: null,
+    });
+
+    renderPage();
+
+    const calculator = screen.getByRole("region", { name: "Salary calculator" });
+    const hoursInput = within(calculator).getByRole("textbox", { name: "Hours" });
+    const rateInput = within(calculator).getByRole("textbox", { name: "Hourly rate" });
+    const result = within(calculator).getByLabelText("Estimated pay");
+
+    expect(hoursInput).toHaveValue("12");
+    expect(result).toHaveTextContent("—");
+
+    await user.clear(hoursInput);
+    await user.type(hoursInput, "10");
+    await user.type(rateInput, "31,4");
+    await user.click(within(calculator).getByRole("button", { name: "Calculate salary" }));
+
+    expect(result).toHaveTextContent("314.00");
+
+    await user.click(within(calculator).getByRole("button", { name: "Reset" }));
+
+    expect(hoursInput).toHaveValue("12");
+    expect(rateInput).toHaveValue("31,4");
+    expect(result).toHaveTextContent("—");
+  });
+  test("lets the employee customize and persist the schedule column order", async () => {
+    const user = userEvent.setup();
+    mocks.scheduleQuery.mockReturnValue({
+      data: schedules,
+      isLoading: false,
+      error: null,
+    });
+
+    renderPage();
+
+    await user.click(screen.getByRole("button", { name: "Customize Adam Blue" }));
+
+    const dialog = screen.getByRole("dialog", { name: "Customize schedule" });
+    expect(within(dialog).getByText("Adam Blue")).toBeInTheDocument();
+    expect(within(dialog).getByText("Zoe Young")).toBeInTheDocument();
+
+    await user.click(within(dialog).getByRole("button", { name: "Move Zoe Young left" }));
+    await user.click(within(dialog).getByRole("button", { name: "Apply" }));
+
+    const latestMatrixProps = mocks.matrix.mock.calls.at(-1)?.[0];
+    expect(latestMatrixProps.columns.map((column: { label: string }) => column.label)).toEqual([
+      "Zoe Young",
+      "Adam Blue",
+    ]);
+
+    const storedValue = JSON.parse(
+      window.localStorage.getItem("gf3:employee-schedule-column-order:v1:employee-12") ?? "null",
+    );
+    expect(storedValue).toEqual({
+      version: 1,
+      scheduleOrders: {
+        "1": [12, 7],
+      },
+    });
+  });
   test("lets the employee choose the month and year used by Summary", async () => {
     const user = userEvent.setup();
     const periodSchedules: EmployeeSchedule[] = [

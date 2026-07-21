@@ -23,6 +23,7 @@ export type SaveGraphDto = {
   year: number;
   month: number;
   publicationStatus?: Graph["publicationStatus"];
+  allowSwap?: boolean;
   peoplePerShift: number;
   shift1Time: string;
   shift2Time: string;

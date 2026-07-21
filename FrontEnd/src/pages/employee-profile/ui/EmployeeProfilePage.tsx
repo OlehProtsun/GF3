@@ -1,6 +1,10 @@
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { useDeleteEmployeeMutation, useEmployeeByIdQuery } from "@entities/employees/api/queries";
+import {
+  useDeleteEmployeeMutation,
+  useEmployeeByIdQuery,
+  useKickEmployeeMutation,
+} from "@entities/employees/api/queries";
 import { EmployeeProfileCard } from "@entities/employees/ui/EmployeeProfileCard";
 import { ConfirmDialog } from "@shared/ui/ConfirmDialog";
 import { PageHeader } from "@shared/ui/PageHeader";
@@ -11,9 +15,11 @@ export function EmployeeProfilePage() {
   const { employeeId } = useParams<{ employeeId: string }>();
   const id = employeeId ? Number(employeeId) : null;
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+  const [isKickOpen, setIsKickOpen] = useState(false);
 
   const employeeQuery = useEmployeeByIdQuery(Number.isFinite(id) ? id : null);
   const deleteMutation = useDeleteEmployeeMutation();
+  const kickMutation = useKickEmployeeMutation();
 
   const employee = employeeQuery.data;
   const hasValidId = Number.isFinite(id);
@@ -25,6 +31,14 @@ export function EmployeeProfilePage() {
 
     deleteMutation.mutate(id, {
       onSuccess: () => navigate("/employee"),
+    });
+  };
+
+  const handleKickConfirm = () => {
+    if (!id) return;
+
+    kickMutation.mutate(id, {
+      onSuccess: () => setIsKickOpen(false),
     });
   };
 
@@ -41,8 +55,10 @@ export function EmployeeProfilePage() {
         isLoading={isEmployeeLoading}
         hasLoadError={hasLoadError}
         isDeleting={deleteMutation.isPending}
+        isKicking={kickMutation.isPending}
         onEditEmployee={employeeIdValue => navigate(`/employee/${employeeIdValue}/edit`)}
         onDeleteEmployee={() => setIsDeleteOpen(true)}
+        onKickEmployee={() => setIsKickOpen(true)}
       />
 
       <ConfirmDialog
@@ -52,6 +68,15 @@ export function EmployeeProfilePage() {
         onCancel={() => setIsDeleteOpen(false)}
         onConfirm={handleDeleteConfirm}
         confirmText={deleteMutation.isPending ? "Deleting..." : "Delete"}
+      />
+
+      <ConfirmDialog
+        open={isKickOpen}
+        title="Kick employee"
+        message="This will immediately sign the employee out of every active session. They can sign in again with the same credentials."
+        onCancel={() => setIsKickOpen(false)}
+        onConfirm={handleKickConfirm}
+        confirmText={kickMutation.isPending ? "Kicking..." : "Kick"}
       />
     </div>
   );

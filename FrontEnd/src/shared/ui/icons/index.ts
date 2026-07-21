@@ -37,3 +37,5 @@ export { CloseIcon } from "./CloseIcon";
 export { ChevronLeftIcon } from "./ChevronLeftIcon";
 export { ChevronRightIcon } from "./ChevronRightIcon";
 export { PinIcon } from "./PinIcon";
+export { NewsIcon } from "./NewsIcon";
+export { SettingsIcon } from "./SettingsIcon";

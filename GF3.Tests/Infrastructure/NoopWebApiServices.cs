@@ -21,8 +21,29 @@ internal sealed class NoopWorkflowLogService : IWorkflowLogService
         CancellationToken cancellationToken = default)
         => Task.FromResult(CreateEntry(action));
 
-    public Task<IReadOnlyList<WorkflowLogEntryModel>> GetRecentAsync(int limit, CancellationToken cancellationToken = default)
+    public Task<IReadOnlyList<WorkflowLogEntryModel>> GetRecentAsync(CancellationToken cancellationToken = default)
         => Task.FromResult<IReadOnlyList<WorkflowLogEntryModel>>(Array.Empty<WorkflowLogEntryModel>());
+
+    public Task<WorkflowLogSettingsModel> GetSettingsAsync(CancellationToken cancellationToken = default)
+        => Task.FromResult(new WorkflowLogSettingsModel());
+
+    public Task<WorkflowLogSettingsModel> UpdateSettingsAsync(
+        bool isEnabled,
+        string audience,
+        CancellationToken cancellationToken = default)
+        => Task.FromResult(new WorkflowLogSettingsModel { IsEnabled = isEnabled, Audience = audience });
+
+    public Task<bool> DeleteAsync(int id, CancellationToken cancellationToken = default)
+        => Task.FromResult(true);
+
+    public Task<int> DeleteRangeAsync(
+        DateTimeOffset fromUtc,
+        DateTimeOffset toUtc,
+        CancellationToken cancellationToken = default)
+        => Task.FromResult(0);
+
+    public Task<int> DeleteAllAsync(CancellationToken cancellationToken = default)
+        => Task.FromResult(0);
 
     private static WorkflowLogEntryModel CreateEntry(string action) => new()
     {

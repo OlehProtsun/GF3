@@ -36,4 +36,9 @@ public interface IEmployeeAccountRepository : IBaseRepository<EmployeeAccountMod
     /// Updates the last-seen timestamp when the employee is active, throttled by a minimum interval.
     /// </summary>
     Task TouchLastSeenAsync(int employeeId, DateTimeOffset seenAtUtc, TimeSpan minInterval, CancellationToken ct = default);
+
+    /// <summary>
+    /// Invalidates every access token previously issued for the employee account.
+    /// </summary>
+    Task<bool> IncrementSessionVersionAsync(int employeeId, CancellationToken ct = default);
 }

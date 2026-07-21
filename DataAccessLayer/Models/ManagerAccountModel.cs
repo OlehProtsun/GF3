@@ -28,6 +28,9 @@ public class ManagerAccountModel
     [Column("password_hash")]
     public string PasswordHash { get; set; } = null!;
 
+    [Column("is_system")]
+    public bool IsSystem { get; set; }
+
     [MaxLength(254)]
     [Column("recovery_email")]
     public string? RecoveryEmail { get; set; }

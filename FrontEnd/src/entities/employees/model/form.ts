@@ -84,8 +84,8 @@ export function validateEmployeeForm(
     nextErrors.password = "Password is required when creating a login";
   }
 
-  if (normalizedPassword && normalizedPassword.length < 6) {
-    nextErrors.password = "Password must be at least 6 characters long";
+  if (normalizedPassword && !/^\d{6}$/.test(normalizedPassword)) {
+    nextErrors.password = "Password must contain exactly 6 digits.";
   }
 
   return nextErrors;
@@ -116,7 +116,7 @@ export function useEmployeeForm(employee?: EmployeeFormSource | null, isCreate =
     (field: keyof EmployeeFormState) =>
     (event: ChangeEvent<HTMLInputElement>): void => {
       setDraft((current) => ({
-        form: { ...current.form, [field]: event.target.value },
+        form: { ...current.form, [field]: field === "password" ? event.target.value.replace(/\D/g, "").slice(0, 6) : event.target.value },
         errors: current.errors,
       }));
     };

@@ -366,3 +366,17 @@
   color: #ffffff;
   box-shadow: 0 10px 22px rgba(37, 99, 235, 0.18);
 }
+
+.dateDialogDateOnly .timePanel,
+.dateDialogDateOnly .quickTimeGrid {
+  display: none;
+}
+
+.dateDialogDateOnly {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  z-index: 30;
+  width: min(320px, calc(100vw - 48px));
+  box-sizing: border-box;
+}

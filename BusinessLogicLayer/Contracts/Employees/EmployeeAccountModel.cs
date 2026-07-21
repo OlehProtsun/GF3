@@ -18,4 +18,6 @@ public sealed class EmployeeAccountModel
     public DateTimeOffset? LastLoginAtUtc { get; set; }
 
     public DateTimeOffset? LastSeenAtUtc { get; set; }
+
+    public int SessionVersion { get; set; }
 }

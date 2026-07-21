@@ -7,6 +7,7 @@ export type ManagerProfileDto = {
   recoveryEmail?: string | null;
   lastLoginAtUtc?: string | null;
   isOnline: boolean;
+  isSystem: boolean;
   createdAtUtc: string;
 };
 

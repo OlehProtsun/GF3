@@ -54,6 +54,10 @@ public class ScheduleModel
     public SchedulePublicationStatus PublicationStatus { get; set; } = SchedulePublicationStatus.Private;
 
     [Required]
+    [Column("allow_swap")]
+    public bool AllowSwap { get; set; } = true;
+
+    [Required]
     [Column("people_per_shift")]
     public int PeoplePerShift { get; set; }
 

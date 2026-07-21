@@ -151,8 +151,8 @@ export function ShiftSwapHistoryDialog({ open, swap, onCancel }: ShiftSwapHistor
             />
           </div>
         ) : (
-          <div className={styles.unavailable}>
-            Detailed comparison is unavailable for this historical record.
+          <div className={styles.emptyComparison}>
+            No one has accepted this swap yet. The comparison will appear after it is accepted.
           </div>
         )}
       </div>

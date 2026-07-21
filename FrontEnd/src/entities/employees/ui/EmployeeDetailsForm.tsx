@@ -102,12 +102,16 @@ export function EmployeeDetailsForm({
             <TextInput
               id="password"
               type="password"
-              placeholder="Leave blank to keep current password"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              minLength={6}
+              maxLength={6}
+              placeholder="Exactly 6 digits"
               value={form.password}
               onChange={onFieldChange("password")}
               aria-invalid={Boolean(errors.password)}
               aria-describedby={errors.password ? "password-error" : undefined}
-              autoComplete="new-password"
+              autoComplete="654321"
             />
           </LabeledField>
         </div>

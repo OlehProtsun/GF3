@@ -66,6 +66,7 @@ type ContainerGraphMatrixProps = {
   enableSelectionWhenReadOnly?: boolean;
   normalizeCellValue?: (employeeId: number, value: string) => string;
   onSelectedCellKeysChange?: (keys: string[]) => void;
+  onColumnHeaderClick?: (column: GraphMatrixColumn) => void;
   onColumnMove?: (employeeId: number, targetEmployeeId: number) => void;
   onColumnLabelChange?: (columnId: number, value: string) => void;
   onCellChange?: (employeeId: number, dayOfMonth: number, value: string) => void;
@@ -622,6 +623,7 @@ export function ContainerGraphMatrix({
   enableSelectionWhenReadOnly = false,
   normalizeCellValue,
   onSelectedCellKeysChange,
+  onColumnHeaderClick,
   onColumnMove,
   onColumnLabelChange,
   onCellChange,
@@ -1547,7 +1549,18 @@ export function ContainerGraphMatrix({
                             </div>
                           ) : (
                             <div className={styles.headerCell}>
-                              <span className={styles.headerLabel}>{column.label}</span>
+                              {onColumnHeaderClick && column.kind === "employee" ? (
+                                <button
+                                  type="button"
+                                  className={styles.headerLabelButton}
+                                  aria-label={`Customize columns from ${column.label}`}
+                                  onClick={() => onColumnHeaderClick(column)}
+                                >
+                                  {column.label}
+                                </button>
+                              ) : (
+                                <span className={styles.headerLabel}>{column.label}</span>
+                              )}
                               {showColumnTotals && column.totalText ? <span className={styles.headerMeta}>{column.totalText}</span> : null}
                             </div>
                           )}

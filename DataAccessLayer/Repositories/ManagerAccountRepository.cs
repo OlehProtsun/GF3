@@ -32,6 +32,11 @@ public sealed class ManagerAccountRepository : GenericRepository<ManagerAccountM
             .FirstOrDefaultAsync(account => account.Username == normalizedUsername, ct);
     }
 
+    public Task<ManagerAccountModel?> GetSystemManagerAsync(CancellationToken ct = default)
+        => _set
+            .AsNoTracking()
+            .FirstOrDefaultAsync(account => account.IsSystem, ct);
+
     public Task<bool> ExistsByUsernameAsync(string username, int? excludeManagerId = null, CancellationToken ct = default)
     {
         var normalizedUsername = NormalizeUsername(username);

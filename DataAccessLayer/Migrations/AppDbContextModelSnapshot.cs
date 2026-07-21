@@ -15,7 +15,7 @@ namespace DataAccessLayer.Migrations
         protected override void BuildModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
-            modelBuilder.HasAnnotation("ProductVersion", "10.0.5");
+            modelBuilder.HasAnnotation("ProductVersion", "10.0.9");
 
             modelBuilder.Entity("DataAccessLayer.Models.AvailabilityGroupDayModel", b =>
                 {
@@ -349,6 +349,10 @@ namespace DataAccessLayer.Migrations
                         .HasColumnType("TEXT")
                         .HasColumnName("password_updated_at_utc");
 
+                    b.Property<int>("SessionVersion")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("session_version");
+
                     b.Property<string>("Username")
                         .IsRequired()
                         .HasMaxLength(100)
@@ -434,6 +438,107 @@ namespace DataAccessLayer.Migrations
                     b.ToTable("employee");
                 });
 
+            modelBuilder.Entity("DataAccessLayer.Models.EmployeeNotificationReadModel", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("id");
+
+                    b.Property<int>("EmployeeId")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("employee_id");
+
+                    b.Property<string>("NotificationId")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("notification_id");
+
+                    b.Property<DateTimeOffset>("ReadAtUtc")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("read_at_utc");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EmployeeId", "NotificationId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_emp_notification_read_emp_notification");
+
+                    b.HasIndex("EmployeeId", "ReadAtUtc")
+                        .HasDatabaseName("ix_emp_notification_read_emp_time");
+
+                    b.ToTable("employee_notification_read");
+                });
+
+            modelBuilder.Entity("DataAccessLayer.Models.EmployeePinnedSwapModel", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("id");
+
+                    b.Property<int>("EmployeeId")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("employee_id");
+
+                    b.Property<DateTimeOffset>("PinnedAtUtc")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("pinned_at_utc");
+
+                    b.Property<int>("ShiftSwapId")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("shift_swap_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ShiftSwapId");
+
+                    b.HasIndex("EmployeeId", "PinnedAtUtc")
+                        .HasDatabaseName("ix_employee_pinned_swap_employee_time");
+
+                    b.HasIndex("EmployeeId", "ShiftSwapId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_employee_pinned_swap_employee_swap");
+
+                    b.ToTable("employee_pinned_swap");
+                });
+
+            modelBuilder.Entity("DataAccessLayer.Models.EmployeeScheduleColumnPreferenceModel", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("id");
+
+                    b.Property<string>("ColumnOrderJson")
+                        .IsRequired()
+                        .HasColumnType("TEXT")
+                        .HasColumnName("column_order_json");
+
+                    b.Property<int>("EmployeeId")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("employee_id");
+
+                    b.Property<int>("ScheduleId")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("schedule_id");
+
+                    b.Property<DateTimeOffset>("UpdatedAtUtc")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("updated_at_utc");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ScheduleId");
+
+                    b.HasIndex("EmployeeId", "ScheduleId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_emp_schedule_column_pref_emp_schedule");
+
+                    b.ToTable("employee_schedule_column_preference");
+                });
+
             modelBuilder.Entity("DataAccessLayer.Models.ManagerAccountModel", b =>
                 {
                     b.Property<int>("Id")
@@ -450,6 +555,10 @@ namespace DataAccessLayer.Migrations
                         .HasMaxLength(160)
                         .HasColumnType("TEXT")
                         .HasColumnName("display_name");
+
+                    b.Property<bool>("IsSystem")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("is_system");
 
                     b.Property<DateTimeOffset?>("LastLoginAtUtc")
                         .HasColumnType("TEXT")
@@ -494,11 +603,88 @@ namespace DataAccessLayer.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("IsSystem")
+                        .IsUnique()
+                        .HasDatabaseName("ux_manager_account_system")
+                        .HasFilter("\"is_system\" = 1");
+
                     b.HasIndex("Username")
                         .IsUnique()
                         .HasDatabaseName("ux_manager_account_username");
 
                     b.ToTable("manager_account");
+                });
+
+            modelBuilder.Entity("DataAccessLayer.Models.ManagerNoteModel", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Color")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("color");
+
+                    b.Property<string>("Content")
+                        .IsRequired()
+                        .HasMaxLength(20000)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("content");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<int>("ManagerAccountId")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("manager_account_id");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(160)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("title");
+
+                    b.Property<DateTimeOffset>("UpdatedAtUtc")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("updated_at_utc");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ManagerAccountId", "UpdatedAtUtc")
+                        .HasDatabaseName("ix_manager_note_manager_updated");
+
+                    b.ToTable("manager_note");
+                });
+
+            modelBuilder.Entity("DataAccessLayer.Models.ManagerNotepadStateModel", b =>
+                {
+                    b.Property<int>("ManagerAccountId")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("manager_account_id");
+
+                    b.Property<int>("Height")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("height");
+
+                    b.Property<bool>("IsExpanded")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("is_expanded");
+
+                    b.Property<bool>("IsPinned")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("is_pinned");
+
+                    b.Property<DateTimeOffset>("UpdatedAtUtc")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("updated_at_utc");
+
+                    b.HasKey("ManagerAccountId");
+
+                    b.ToTable("manager_notepad_state");
                 });
 
             modelBuilder.Entity("DataAccessLayer.Models.ScheduleCellStyleModel", b =>
@@ -583,6 +769,12 @@ namespace DataAccessLayer.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER")
                         .HasColumnName("id");
+
+                    b.Property<bool>("AllowSwap")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER")
+                        .HasDefaultValue(true)
+                        .HasColumnName("allow_swap");
 
                     b.Property<int?>("AvailabilityGroupId")
                         .HasColumnType("INTEGER")
@@ -1150,6 +1342,94 @@ namespace DataAccessLayer.Migrations
                     b.ToTable("shop");
                 });
 
+            modelBuilder.Entity("DataAccessLayer.Models.SystemNewsMessageModel", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Audience")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("audience");
+
+                    b.Property<string>("Body")
+                        .IsRequired()
+                        .HasMaxLength(10000)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("body");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<string>("ImageUrl")
+                        .HasMaxLength(2800000)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("image_url");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(160)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("title");
+
+                    b.Property<DateTimeOffset>("UpdatedAtUtc")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("updated_at_utc");
+
+                    b.Property<string>("VideoUrl")
+                        .HasMaxLength(500)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("video_url");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedAtUtc")
+                        .HasDatabaseName("ix_system_news_created");
+
+                    b.ToTable("system_news_message");
+                });
+
+            modelBuilder.Entity("DataAccessLayer.Models.SystemNewsReadModel", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("id");
+
+                    b.Property<int>("AccountId")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("account_id");
+
+                    b.Property<string>("AccountRole")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("account_role");
+
+                    b.Property<int>("MessageId")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("message_id");
+
+                    b.Property<DateTimeOffset>("ReadAtUtc")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("read_at_utc");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AccountRole", "AccountId", "ReadAtUtc")
+                        .HasDatabaseName("ix_system_news_read_subject_time");
+
+                    b.HasIndex("MessageId", "AccountRole", "AccountId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_system_news_read_subject");
+
+                    b.ToTable("system_news_read");
+                });
+
             modelBuilder.Entity("DataAccessLayer.Models.WorkflowLogEntryModel", b =>
                 {
                     b.Property<int>("Id")
@@ -1196,6 +1476,45 @@ namespace DataAccessLayer.Migrations
                     b.HasIndex(new[] { "ActorRole", "OccurredAtUtc" }, "ix_workflow_log_role_time");
 
                     b.ToTable("workflow_log_entry");
+                });
+
+            modelBuilder.Entity("DataAccessLayer.Models.WorkflowLogSettingsModel", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Audience")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(16)
+                        .HasColumnType("TEXT")
+                        .HasDefaultValue("all")
+                        .HasColumnName("audience");
+
+                    b.Property<bool>("IsEnabled")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER")
+                        .HasDefaultValue(true)
+                        .HasColumnName("is_enabled");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("workflow_log_settings", t =>
+                        {
+                            t.HasCheckConstraint("ck_workflow_log_settings_audience", "audience IN ('all', 'managers', 'employees')");
+
+                            t.HasCheckConstraint("ck_workflow_log_settings_singleton", "id = 1");
+                        });
+
+                    b.HasData(
+                        new
+                        {
+                            Id = 1,
+                            Audience = "all",
+                            IsEnabled = true
+                        });
                 });
 
             modelBuilder.Entity("DataAccessLayer.Models.AvailabilityGroupDayModel", b =>
@@ -1285,6 +1604,77 @@ namespace DataAccessLayer.Migrations
                     b.Navigation("CommunicationMessage");
 
                     b.Navigation("Employee");
+                });
+
+            modelBuilder.Entity("DataAccessLayer.Models.EmployeeNotificationReadModel", b =>
+                {
+                    b.HasOne("DataAccessLayer.Models.EmployeeModel", "Employee")
+                        .WithMany()
+                        .HasForeignKey("EmployeeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Employee");
+                });
+
+            modelBuilder.Entity("DataAccessLayer.Models.EmployeePinnedSwapModel", b =>
+                {
+                    b.HasOne("DataAccessLayer.Models.EmployeeModel", "Employee")
+                        .WithMany()
+                        .HasForeignKey("EmployeeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("DataAccessLayer.Models.ShiftSwapRequestModel", "ShiftSwap")
+                        .WithMany()
+                        .HasForeignKey("ShiftSwapId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Employee");
+
+                    b.Navigation("ShiftSwap");
+                });
+
+            modelBuilder.Entity("DataAccessLayer.Models.EmployeeScheduleColumnPreferenceModel", b =>
+                {
+                    b.HasOne("DataAccessLayer.Models.EmployeeModel", "Employee")
+                        .WithMany()
+                        .HasForeignKey("EmployeeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("DataAccessLayer.Models.ScheduleModel", "Schedule")
+                        .WithMany()
+                        .HasForeignKey("ScheduleId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Employee");
+
+                    b.Navigation("Schedule");
+                });
+
+            modelBuilder.Entity("DataAccessLayer.Models.ManagerNoteModel", b =>
+                {
+                    b.HasOne("DataAccessLayer.Models.ManagerAccountModel", "ManagerAccount")
+                        .WithMany()
+                        .HasForeignKey("ManagerAccountId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("ManagerAccount");
+                });
+
+            modelBuilder.Entity("DataAccessLayer.Models.ManagerNotepadStateModel", b =>
+                {
+                    b.HasOne("DataAccessLayer.Models.ManagerAccountModel", "ManagerAccount")
+                        .WithOne()
+                        .HasForeignKey("DataAccessLayer.Models.ManagerNotepadStateModel", "ManagerAccountId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("ManagerAccount");
                 });
 
             modelBuilder.Entity("DataAccessLayer.Models.ScheduleCellStyleModel", b =>
@@ -1457,6 +1847,17 @@ namespace DataAccessLayer.Migrations
                     b.Navigation("TargetEmployee");
                 });
 
+            modelBuilder.Entity("DataAccessLayer.Models.SystemNewsReadModel", b =>
+                {
+                    b.HasOne("DataAccessLayer.Models.SystemNewsMessageModel", "Message")
+                        .WithMany("Reads")
+                        .HasForeignKey("MessageId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Message");
+                });
+
             modelBuilder.Entity("DataAccessLayer.Models.AvailabilityGroupMemberModel", b =>
                 {
                     b.Navigation("Days");
@@ -1503,6 +1904,11 @@ namespace DataAccessLayer.Migrations
             modelBuilder.Entity("DataAccessLayer.Models.ShopModel", b =>
                 {
                     b.Navigation("Schedules");
+                });
+
+            modelBuilder.Entity("DataAccessLayer.Models.SystemNewsMessageModel", b =>
+                {
+                    b.Navigation("Reads");
                 });
 #pragma warning restore 612, 618
         }

@@ -13,6 +13,8 @@ public sealed class ManagerAccountModel
 
     public string PasswordHash { get; set; } = string.Empty;
 
+    public bool IsSystem { get; set; }
+
     public string? RecoveryEmail { get; set; }
 
     public DateTimeOffset PasswordUpdatedAtUtc { get; set; }

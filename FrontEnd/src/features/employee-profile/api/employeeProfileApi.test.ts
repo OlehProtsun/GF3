@@ -29,7 +29,7 @@ describe("employee profile api", () => {
     employeeProfileApi.sendPasswordResetCode();
     employeeProfileApi.confirmPasswordReset({
       code: " 123456 ",
-      newPassword: "secret123",
+      newPassword: "654321",
     });
 
     expect(requestMock).toHaveBeenNthCalledWith(1, "employee-profile/me", {
@@ -46,7 +46,7 @@ describe("employee profile api", () => {
       method: "POST",
       body: {
         code: "123456",
-        newPassword: "secret123",
+        newPassword: "654321",
       },
     });
   });

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { filterAcceptedShiftSwapHistory } from "./history";
+import { filterAcceptedShiftSwapHistory, filterShiftSwaps } from "./history";
 import type { ShiftSwap } from "./types";
 
 const baseSwap: ShiftSwap = {
@@ -48,5 +48,18 @@ describe("filterAcceptedShiftSwapHistory", () => {
   it("requires every search term to match", () => {
     expect(filterAcceptedShiftSwapHistory([baseSwap], "oleh 25/06/2026")).toEqual([baseSwap]);
     expect(filterAcceptedShiftSwapHistory([baseSwap], "oleh july")).toEqual([]);
+  });
+
+  it("uses the same giver receiver date and schedule search for open swaps", () => {
+    const openSwap = {
+      ...baseSwap,
+      status: "open" as const,
+      targetEmployeeName: "Marta Receiver",
+      acceptedByEmployeeName: null,
+      acceptedAtUtc: null,
+    };
+
+    expect(filterShiftSwaps([openSwap], "marta 01/06/2026 june")).toEqual([openSwap]);
+    expect(filterShiftSwaps([openSwap], "amin")).toEqual([]);
   });
 });

@@ -14,4 +14,6 @@ public sealed class AuthenticatedSessionDto
     public int? ManagerId { get; set; }
 
     public int? EmployeeId { get; set; }
+
+    public int? SessionVersion { get; set; }
 }

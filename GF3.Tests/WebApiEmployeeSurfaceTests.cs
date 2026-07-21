@@ -207,7 +207,7 @@ public sealed class WebApiEmployeeSurfaceTests
         {
             Username = "worker",
             Code = "123456",
-            NewPassword = "new-password",
+            NewPassword = "654321",
         }, CancellationToken.None);
 
         var loginDto = Assert.IsType<LoginResponseDto>(Assert.IsType<OkObjectResult>(loginResult.Result).Value);
@@ -225,7 +225,7 @@ public sealed class WebApiEmployeeSurfaceTests
         Assert.Equal("w***@example.com", dispatchDto.DeliveryHint);
         Assert.IsType<NoContentResult>(confirmResult);
         Assert.Equal("worker", authService.LastPasswordResetUsername);
-        Assert.Equal(("worker", "123456", "new-password"), authService.LastConfirmedReset);
+        Assert.Equal(("worker", "123456", "654321"), authService.LastConfirmedReset);
     }
 
     [Fact]
@@ -280,7 +280,7 @@ public sealed class WebApiEmployeeSurfaceTests
         var confirmResult = await controller.ConfirmPasswordReset(new CompletePasswordResetRequest
         {
             Code = "123456",
-            NewPassword = "new-password",
+            NewPassword = "654321",
         }, CancellationToken.None);
 
         var currentDto = Assert.IsType<WebApi.Contracts.EmployeeProfile.EmployeeProfileDto>(
@@ -297,7 +297,7 @@ public sealed class WebApiEmployeeSurfaceTests
         Assert.Equal(12, service.LastPasswordResetEmployeeId);
         Assert.Equal("w***@example.com", dispatchDto.DeliveryHint);
         Assert.IsType<NoContentResult>(confirmResult);
-        Assert.Equal((12, "123456", "new-password"), service.LastConfirmedReset);
+        Assert.Equal((12, "123456", "654321"), service.LastConfirmedReset);
     }
 
     [Fact]

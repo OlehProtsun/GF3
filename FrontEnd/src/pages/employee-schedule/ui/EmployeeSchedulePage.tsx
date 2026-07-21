@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { NavLink } from "react-router-dom";
 import { useAuth } from "@app/providers/AuthProvider";
 import {
@@ -11,12 +11,15 @@ import { getGraphCellKey, type GraphMatrixCellMap, type GraphMatrixColumn } from
 import { parseGraphNoteContent } from "@entities/containers/model/graphNote";
 import { ContainerGraphMatrix } from "@entities/containers/ui/ContainerGraphMatrix";
 import { getEmployeeFullName } from "@entities/employees/model/presentation";
+import { employeeUiStateApi, useEmployeeUiStateQuery } from "@entities/employee-ui-state";
 import { getErrorMessage } from "@shared/api/httpClient";
 import { formatScheduleLastUpdate } from "@shared/lib/scheduleLastUpdate";
 import { ErrorBanner } from "@shared/ui/components/ErrorBanner";
 import { SearchableSelect, type SearchableSelectOption } from "@shared/ui/components/SearchableSelect";
 import { AvailabilityIcon, ScheduleDetailsIcon, ScheduleIcon, StatisticsIcon } from "@shared/ui/icons";
+import { CardSection } from "@shared/ui/sections";
 import workspaceStyles from "@pages/shared/EmployeeWorkspacePage.module.css";
+import { EmployeeScheduleColumnOrderDialog } from "./EmployeeScheduleColumnOrderDialog";
 import styles from "./EmployeeSchedulePage.module.css";
 
 const scheduleMonthFormatter = new Intl.DateTimeFormat("en-GB", {
@@ -30,6 +33,33 @@ const scheduleMonthOnlyFormatter = new Intl.DateTimeFormat("en-GB", {
   timeZone: "UTC",
 });
 
+const scheduleWeekdayFormatter = new Intl.DateTimeFormat("en-GB", {
+  weekday: "long",
+  timeZone: "UTC",
+});
+
+const scheduleWeekdayShortFormatter = new Intl.DateTimeFormat("en-GB", {
+  weekday: "short",
+  timeZone: "UTC",
+});
+
+const salaryAmountFormatter = new Intl.NumberFormat("en-GB", {
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+});
+
+function formatSalaryHours(value: number) {
+  return String(Math.round(value * 100) / 100);
+}
+
+function parseSalaryValue(value: string) {
+  if (!value.trim()) {
+    return null;
+  }
+
+  const parsedValue = Number(value.trim().replace(",", "."));
+  return Number.isFinite(parsedValue) && parsedValue >= 0 ? parsedValue : null;
+}
 function formatScheduleMonth(schedule: Pick<EmployeeSchedule, "year" | "month">) {
   return scheduleMonthFormatter.format(new Date(Date.UTC(schedule.year, schedule.month - 1, 1)));
 }
@@ -309,6 +339,106 @@ function sortScheduleEmployees(employees: EmployeeScheduleEmployee[]) {
   });
 }
 
+type DailyScheduleWorker = {
+  employeeId: number;
+  label: string;
+  shifts: EmployeeScheduleSlot[];
+  relatedScheduleNames: string[];
+  isAllDay: boolean;
+  firstStartMinutes: number;
+};
+
+function isAllDayScheduleSlot(slot: EmployeeScheduleSlot) {
+  const fromTime = slot.fromTime.trim();
+  const toTime = slot.toTime.trim();
+  return fromTime === "00:00" && (toTime === "00:00" || toTime === "23:59" || toTime === "24:00");
+}
+
+function buildDailyScheduleWorkers(
+  schedule: EmployeeSchedule,
+  dayOfMonth: number,
+  fallbackEmployeeId: number,
+  fallbackLabel: string,
+) {
+  const employeesById = new Map((schedule.employees ?? []).map(employee => [employee.employeeId, employee] as const));
+  const slotsByEmployeeId = new Map<number, EmployeeScheduleSlot[]>();
+  const relatedScheduleNamesByEmployeeId = new Map<number, Set<string>>();
+
+  (schedule.relatedScheduleAssignments ?? [])
+    .filter(assignment => assignment.dayOfMonth === dayOfMonth)
+    .forEach(assignment => {
+      const scheduleName = assignment.scheduleName.trim() || `Schedule #${assignment.scheduleId}`;
+      const scheduleNames = relatedScheduleNamesByEmployeeId.get(assignment.employeeId) ?? new Set<string>();
+      scheduleNames.add(scheduleName);
+      relatedScheduleNamesByEmployeeId.set(assignment.employeeId, scheduleNames);
+    });
+
+  relatedScheduleNamesByEmployeeId.forEach((_, employeeId) => {
+    if (!slotsByEmployeeId.has(employeeId)) {
+      slotsByEmployeeId.set(employeeId, []);
+    }
+  });
+
+  schedule.slots
+    .filter(slot => slot.dayOfMonth === dayOfMonth)
+    .forEach(slot => {
+      const employeeId = slot.employeeId && slot.employeeId > 0 ? slot.employeeId : fallbackEmployeeId;
+      const employeeSlots = slotsByEmployeeId.get(employeeId) ?? [];
+      employeeSlots.push(slot);
+      slotsByEmployeeId.set(employeeId, employeeSlots);
+    });
+
+  const workers = [...slotsByEmployeeId.entries()].map<DailyScheduleWorker>(([employeeId, slots]) => {
+    const sortedSlots = [...slots].sort((left, right) =>
+      (parseTimeMinutes(left.fromTime) ?? Number.MAX_SAFE_INTEGER) -
+        (parseTimeMinutes(right.fromTime) ?? Number.MAX_SAFE_INTEGER) ||
+      left.toTime.localeCompare(right.toTime),
+    );
+    const employee = employeesById.get(employeeId);
+
+    return {
+      employeeId,
+      label: employee ? getScheduleEmployeeLabel(employee) : employeeId === fallbackEmployeeId
+        ? fallbackLabel
+        : `Employee #${employeeId}`,
+      shifts: sortedSlots,
+      relatedScheduleNames: [...(relatedScheduleNamesByEmployeeId.get(employeeId) ?? [])]
+        .sort((left, right) => left.localeCompare(right)),
+      isAllDay: sortedSlots.some(isAllDayScheduleSlot),
+      firstStartMinutes: parseTimeMinutes(sortedSlots[0]?.fromTime ?? "") ?? Number.MAX_SAFE_INTEGER,
+    };
+  });
+
+  const timedWorkers = workers
+    .filter(worker => !worker.isAllDay)
+    .sort((left, right) =>
+      left.firstStartMinutes - right.firstStartMinutes || left.label.localeCompare(right.label),
+    );
+  const allDayWorkers = workers
+    .filter(worker => worker.isAllDay)
+    .sort((left, right) => left.label.localeCompare(right.label));
+  const middleIndex = Math.ceil(timedWorkers.length / 2);
+
+  return [
+    ...timedWorkers.slice(0, middleIndex),
+    ...allDayWorkers,
+    ...timedWorkers.slice(middleIndex),
+  ];
+}
+
+function formatDailyWorkerShifts(worker: DailyScheduleWorker) {
+  const relatedScheduleText = worker.relatedScheduleNames.join(", ");
+  if (worker.shifts.length === 0) {
+    return relatedScheduleText;
+  }
+
+  const shiftText = worker.isAllDay
+    ? "All day"
+    : worker.shifts.map(slot => `${slot.fromTime} - ${slot.toTime}`).join(" · ");
+
+  return relatedScheduleText ? `${shiftText}, ${relatedScheduleText}` : shiftText;
+}
+
 function buildScheduleMatrixColumns(
   schedule: EmployeeSchedule | null,
   fallbackEmployeeId: number,
@@ -436,10 +566,87 @@ function buildScheduleMatrixDisplayCellMap(
 
   return { cellMap: displayCellMap, mutedSuffixMap };
 }
+
+const employeeScheduleColumnOrderStorageVersion = 1;
+const employeeScheduleColumnOrderStoragePrefix = "gf3:employee-schedule-column-order";
+
+type StoredEmployeeScheduleColumnOrders = {
+  version: number;
+  scheduleOrders: Record<string, number[]>;
+};
+
+function getEmployeeScheduleColumnOrderStorageKey(employeeId: number | null, userName?: string | null) {
+  const identity = employeeId && employeeId > 0
+    ? "employee-" + employeeId
+    : "user-" + encodeURIComponent(userName?.trim() || "unknown");
+  return employeeScheduleColumnOrderStoragePrefix
+    + ":v"
+    + employeeScheduleColumnOrderStorageVersion
+    + ":"
+    + identity;
+}
+
+function sanitizeEmployeeScheduleColumnOrder(columnOrder: number[], columns: GraphMatrixColumn[]) {
+  const availableIds = new Set(columns.map(column => column.employeeId));
+  const seenIds = new Set<number>();
+  const sanitizedOrder: number[] = [];
+
+  columnOrder.forEach(columnId => {
+    if (availableIds.has(columnId) && !seenIds.has(columnId)) {
+      seenIds.add(columnId);
+      sanitizedOrder.push(columnId);
+    }
+  });
+
+  columns.forEach(column => {
+    if (!seenIds.has(column.employeeId)) {
+      sanitizedOrder.push(column.employeeId);
+    }
+  });
+
+  return sanitizedOrder;
+}
+
+function applyEmployeeScheduleColumnOrder(columns: GraphMatrixColumn[], columnOrder: number[]) {
+  const columnById = new Map(columns.map(column => [column.employeeId, column] as const));
+  return sanitizeEmployeeScheduleColumnOrder(columnOrder, columns)
+    .map(columnId => columnById.get(columnId))
+    .filter((column): column is GraphMatrixColumn => Boolean(column));
+}
+
+function readEmployeeScheduleColumnOrders(storageKey: string): Record<string, number[]> {
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(storageKey) ?? "null") as StoredEmployeeScheduleColumnOrders | null;
+    if (!parsed || parsed.version !== employeeScheduleColumnOrderStorageVersion || !parsed.scheduleOrders) {
+      return {};
+    }
+
+    return Object.entries(parsed.scheduleOrders).reduce<Record<string, number[]>>((result, [scheduleId, columnOrder]) => {
+      if (Array.isArray(columnOrder)) {
+        result[scheduleId] = columnOrder.filter(columnId => Number.isInteger(columnId));
+      }
+      return result;
+    }, {});
+  } catch {
+    return {};
+  }
+}
+
+function writeEmployeeScheduleColumnOrders(storageKey: string, scheduleOrders: Record<string, number[]>) {
+  const payload: StoredEmployeeScheduleColumnOrders = {
+    version: employeeScheduleColumnOrderStorageVersion,
+    scheduleOrders,
+  };
+
+  try {
+    window.localStorage.setItem(storageKey, JSON.stringify(payload));
+  } catch {
+    // Keep customization available for this session when browser storage is unavailable.
+  }
+}
 const pdfTemplateEmployeeCapacity = 25;
 const pdfTemplateDayCount = 31;
 const pdfTemplateWeekdayLabels = ["niedz.", "pon.", "wt.", "\u015br.", "czw.", "pt.", "sob."];
-
 function escapeHtml(value: string | number | null | undefined) {
   return String(value ?? "")
     .replace(/&/g, "&amp;")
@@ -466,7 +673,8 @@ function formatTemplateDateCell(schedule: EmployeeSchedule, dayOfMonth: number) 
   return `${weekdayLabel}, ${dayText}/${monthText}`;
 }
 
-function buildSchedulePdfHtml(
+// eslint-disable-next-line react-refresh/only-export-components -- exported for focused PDF layout verification
+export function buildSchedulePdfHtml(
   schedule: EmployeeSchedule,
   columns: GraphMatrixColumn[],
   cellMap: GraphMatrixCellMap,
@@ -527,7 +735,7 @@ function buildSchedulePdfHtml(
       .template-sheet {
         width: auto;
         border-collapse: collapse;
-        table-layout: fixed;
+        table-layout: auto;
         font-size: 10pt;
         line-height: 1.15;
       }
@@ -537,7 +745,7 @@ function buildSchedulePdfHtml(
       }
 
       .employee-column {
-        width: 10.28515625ch;
+        width: auto;
       }
 
       .template-cell {
@@ -590,6 +798,7 @@ function buildSchedulePdfHtml(
       }
 
       .matrix-cell {
+        padding: 0 1px;
         text-align: center;
         white-space: nowrap;
         text-overflow: clip;
@@ -655,14 +864,58 @@ function printSchedulePdf(
 export function EmployeeSchedulePage() {
   const { session } = useAuth();
   const scheduleQuery = useEmployeeScheduleListQuery();
-  const schedules = scheduleQuery.data ?? [];
+  const { data: uiState, refetch: refetchUiState } = useEmployeeUiStateQuery(Boolean(session?.employeeId));
+  const schedules = useMemo(() => scheduleQuery.data ?? [], [scheduleQuery.data]);
+  const columnOrderStorageKey = getEmployeeScheduleColumnOrderStorageKey(
+    session?.employeeId ?? null,
+    session?.userName,
+  );
+  const [savedColumnOrders, setSavedColumnOrders] = useState<Record<string, number[]>>(
+    () => readEmployeeScheduleColumnOrders(columnOrderStorageKey),
+  );
+  const [columnOrderDialogEmployeeId, setColumnOrderDialogEmployeeId] = useState<number | null>(null);
   const [selectedScheduleId, setSelectedScheduleId] = useState<number | null>(null);
+  const [scheduleViewMode, setScheduleViewMode] = useState<"matrix" | "daily">("matrix");
+  const [selectedDayOfMonth, setSelectedDayOfMonth] = useState<number | null>(null);
+  const [preferenceSaveError, setPreferenceSaveError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setSavedColumnOrders(readEmployeeScheduleColumnOrders(columnOrderStorageKey));
+    setColumnOrderDialogEmployeeId(null);
+  }, [columnOrderStorageKey]);
+
+  useEffect(() => {
+    if (!uiState) {
+      return;
+    }
+
+    const localOrders = readEmployeeScheduleColumnOrders(columnOrderStorageKey);
+    const serverOrders = uiState.scheduleColumnOrders ?? {};
+    const mergedOrders = { ...localOrders, ...serverOrders };
+    setSavedColumnOrders(mergedOrders);
+    writeEmployeeScheduleColumnOrders(columnOrderStorageKey, mergedOrders);
+
+    const localOnlyOrders = Object.entries(localOrders)
+      .filter(([scheduleId]) => !Object.prototype.hasOwnProperty.call(serverOrders, scheduleId));
+    if (localOnlyOrders.length > 0) {
+      void Promise.all(localOnlyOrders.map(([scheduleId, columnOrder]) =>
+        employeeUiStateApi.saveScheduleColumnOrder(Number(scheduleId), columnOrder),
+      )).then(() => refetchUiState())
+        .catch(error => setPreferenceSaveError(getErrorMessage(error, "Could not sync the column order.")));
+    }
+  }, [columnOrderStorageKey, refetchUiState, setPreferenceSaveError, uiState]);
   const [selectedSummaryPeriodKey, setSelectedSummaryPeriodKey] = useState<string | null>(null);
   const [pdfExportError, setPdfExportError] = useState<string | null>(null);
+
   const selectedSchedule = useMemo(
     () => schedules.find(schedule => schedule.id === selectedScheduleId) ?? schedules[0] ?? null,
     [schedules, selectedScheduleId],
   );
+
+  useEffect(() => {
+    setSelectedDayOfMonth(null);
+  }, [selectedSchedule?.id]);
+
   const summaryPeriods = useMemo(
     () => getScheduleSummaryPeriods(schedules),
     [schedules],
@@ -706,6 +959,50 @@ export function EmployeeSchedulePage() {
   const displayName = session?.displayName?.trim() || session?.userName || "Employee";
   const currentEmployeeId = session?.employeeId && session.employeeId > 0 ? session.employeeId : null;
   const fallbackMatrixEmployeeId = currentEmployeeId ?? 1;
+  const dailyScheduleDays = useMemo(() => {
+    if (!selectedSchedule) {
+      return [];
+    }
+
+    return Array.from({ length: getDaysInMonth(selectedSchedule.year, selectedSchedule.month) }, (_, index) => {
+      const dayOfMonth = index + 1;
+      const date = new Date(Date.UTC(selectedSchedule.year, selectedSchedule.month - 1, dayOfMonth));
+      const isWorkingDay = selectedSchedule.slots.some(slot =>
+        slot.dayOfMonth === dayOfMonth && isCurrentEmployeeSlot(slot, currentEmployeeId),
+      ) || Boolean(currentEmployeeId && selectedSchedule.relatedScheduleAssignments?.some(assignment =>
+        assignment.dayOfMonth === dayOfMonth && assignment.employeeId === currentEmployeeId,
+      ));
+
+      return {
+        dayOfMonth,
+        weekdayLong: scheduleWeekdayFormatter.format(date),
+        weekdayShort: scheduleWeekdayShortFormatter.format(date).replace(".", ""),
+        isWorkingDay,
+      };
+    });
+  }, [currentEmployeeId, selectedSchedule]);
+  const defaultDailyScheduleDay = useMemo(() => {
+    if (!selectedSchedule || dailyScheduleDays.length === 0) {
+      return 1;
+    }
+
+    const now = new Date();
+    if (now.getUTCFullYear() === selectedSchedule.year && now.getUTCMonth() + 1 === selectedSchedule.month) {
+      return Math.min(now.getUTCDate(), dailyScheduleDays.length);
+    }
+
+    return dailyScheduleDays.find(day => day.isWorkingDay)?.dayOfMonth ?? 1;
+  }, [dailyScheduleDays, selectedSchedule]);
+  const activeDailyScheduleDay = selectedDayOfMonth && selectedDayOfMonth <= dailyScheduleDays.length
+    ? selectedDayOfMonth
+    : defaultDailyScheduleDay;
+  const activeDailyScheduleDayInfo = dailyScheduleDays.find(day => day.dayOfMonth === activeDailyScheduleDay) ?? null;
+  const dailyScheduleWorkers = useMemo(
+    () => selectedSchedule
+      ? buildDailyScheduleWorkers(selectedSchedule, activeDailyScheduleDay, fallbackMatrixEmployeeId, displayName)
+      : [],
+    [activeDailyScheduleDay, displayName, fallbackMatrixEmployeeId, selectedSchedule],
+  );
   const scheduleStats = useMemo(
     () => getScheduleStats(schedules, selectedSchedule, currentEmployeeId),
     [currentEmployeeId, schedules, selectedSchedule],
@@ -714,10 +1011,28 @@ export function EmployeeSchedulePage() {
     () => buildScheduleHoursSummary(schedules, activeSummaryPeriod, currentEmployeeId),
     [activeSummaryPeriod, currentEmployeeId, schedules],
   );
-  const scheduleMatrixColumns = useMemo(
+  const [salaryHoursInput, setSalaryHoursInput] = useState(() => formatSalaryHours(scheduleHoursSummary.totalHours));
+  const [salaryRateInput, setSalaryRateInput] = useState("");
+  const [salaryResult, setSalaryResult] = useState<number | null>(null);
+  const parsedSalaryHours = parseSalaryValue(salaryHoursInput);
+  const parsedSalaryRate = parseSalaryValue(salaryRateInput);
+  const canCalculateSalary = parsedSalaryHours !== null && parsedSalaryRate !== null;
+
+  useEffect(() => {
+    setSalaryHoursInput(formatSalaryHours(scheduleHoursSummary.totalHours));
+    setSalaryResult(null);
+  }, [scheduleHoursSummary.totalHours]);  const defaultScheduleMatrixColumns = useMemo(
     () => buildScheduleMatrixColumns(selectedSchedule, fallbackMatrixEmployeeId, displayName),
     [displayName, fallbackMatrixEmployeeId, selectedSchedule],
   );
+  const scheduleMatrixColumns = useMemo(() => {
+    if (!selectedSchedule) {
+      return defaultScheduleMatrixColumns;
+    }
+
+    const savedOrder = savedColumnOrders[String(selectedSchedule.id)] ?? [];
+    return applyEmployeeScheduleColumnOrder(defaultScheduleMatrixColumns, savedOrder);
+  }, [defaultScheduleMatrixColumns, savedColumnOrders, selectedSchedule]);
   const scheduleMatrixCellMap = useMemo(
     () => buildScheduleMatrixCellMap(selectedSchedule, fallbackMatrixEmployeeId),
     [fallbackMatrixEmployeeId, selectedSchedule],
@@ -752,6 +1067,44 @@ export function EmployeeSchedulePage() {
     }
   };
 
+  const handleCalculateSalary = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (parsedSalaryHours === null || parsedSalaryRate === null) {
+      return;
+    }
+
+    setSalaryResult(parsedSalaryHours * parsedSalaryRate);
+  };
+
+  const handleResetSalaryHours = () => {
+    setSalaryHoursInput(formatSalaryHours(scheduleHoursSummary.totalHours));
+    setSalaryResult(null);
+  };
+  const handleSaveColumnOrder = (columnOrder: number[]) => {
+    if (!selectedSchedule) {
+      return;
+    }
+
+    const scheduleKey = String(selectedSchedule.id);
+    const sanitizedOrder = sanitizeEmployeeScheduleColumnOrder(columnOrder, defaultScheduleMatrixColumns);
+    const defaultOrder = defaultScheduleMatrixColumns.map(column => column.employeeId);
+    const nextSavedOrders = { ...savedColumnOrders };
+
+    if (sanitizedOrder.every((columnId, index) => columnId === defaultOrder[index])) {
+      delete nextSavedOrders[scheduleKey];
+    } else {
+      nextSavedOrders[scheduleKey] = sanitizedOrder;
+    }
+
+    setSavedColumnOrders(nextSavedOrders);
+    writeEmployeeScheduleColumnOrders(columnOrderStorageKey, nextSavedOrders);
+    setPreferenceSaveError(null);
+    void employeeUiStateApi
+      .saveScheduleColumnOrder(selectedSchedule.id, sanitizedOrder)
+      .catch(error => setPreferenceSaveError(getErrorMessage(error, "Could not sync the column order.")));
+    setColumnOrderDialogEmployeeId(null);
+  };
+
   const handleExportPdf = () => {
     if (!selectedSchedule) {
       return;
@@ -760,7 +1113,7 @@ export function EmployeeSchedulePage() {
     setPdfExportError(null);
 
     try {
-      printSchedulePdf(selectedSchedule, scheduleMatrixColumns, scheduleMatrixCellMap);
+      printSchedulePdf(selectedSchedule, scheduleMatrixColumns, scheduleMatrixDisplay.cellMap);
     } catch (error) {
       setPdfExportError(error instanceof Error ? error.message : "Could not export this schedule to PDF.");
     }
@@ -770,16 +1123,22 @@ export function EmployeeSchedulePage() {
     <div className={workspaceStyles.page}>
       {queryErrorMessage ? <ErrorBanner dismissible={false}>{queryErrorMessage}</ErrorBanner> : null}
       {pdfExportError ? <ErrorBanner dismissible={false}>{pdfExportError}</ErrorBanner> : null}
+      {preferenceSaveError ? <ErrorBanner dismissible>{preferenceSaveError}</ErrorBanner> : null}
 
       <section className={`${workspaceStyles.panel} ${styles.summaryPanel}`}>
         <div className={styles.summaryHeader}>
-          <span className={styles.summaryIcon} aria-hidden="true">
-            <ScheduleIcon size={20} />
-          </span>
-          <div>
-            <span className={workspaceStyles.panelEyebrow}>Statistics</span>
-            <h1 className={workspaceStyles.panelTitle}>{displayName}</h1>
+          <div className={styles.summaryHeading}>
+            <span className={styles.summaryIcon} aria-hidden="true">
+              <ScheduleIcon size={20} />
+            </span>
+            <div>
+              <span className={workspaceStyles.panelEyebrow}>Statistics</span>
+              <h1 className={workspaceStyles.panelTitle}>{displayName}</h1>
+            </div>
           </div>
+          <time className={styles.todayBadge} dateTime={new Date().toISOString().slice(0, 10)}>
+            {new Intl.DateTimeFormat("en-GB", { day: "2-digit", month: "short", year: "numeric" }).format(new Date())}
+          </time>
         </div>
 
         <div className={styles.summaryStats}>
@@ -875,7 +1234,7 @@ export function EmployeeSchedulePage() {
         </section>
       ) : null}
 
-      {selectedSchedule ? (
+      {selectedSchedule && scheduleViewMode === "matrix" ? (
         <ContainerGraphMatrix
           className={styles.openScheduleMatrix}
           graph={selectedSchedule}
@@ -893,9 +1252,16 @@ export function EmployeeSchedulePage() {
             </span>
           }
           icon={
-            <span className={styles.summaryIcon} aria-hidden="true">
+            <button
+              type="button"
+              className={styles.scheduleViewToggle}
+              aria-label="Show daily schedule view"
+              aria-pressed="false"
+              title="Show daily schedule view"
+              onClick={() => setScheduleViewMode("daily")}
+            >
               <ScheduleIcon size={20} />
-            </span>
+            </button>
           }
           readOnly
           compactSize
@@ -905,6 +1271,7 @@ export function EmployeeSchedulePage() {
           allowColumnResize={false}
           stretchColumns={false}
           emptyMessage="No assigned shifts in this schedule yet."
+          onColumnHeaderClick={column => setColumnOrderDialogEmployeeId(column.employeeId)}
           headerRightSlot={
             <button
               type="button"
@@ -918,6 +1285,107 @@ export function EmployeeSchedulePage() {
           }
         />
       ) : null}
+
+      {selectedSchedule && scheduleViewMode === "daily" ? (
+        <CardSection
+          className={styles.dailyScheduleCard}
+          title={
+            <span className={styles.openScheduleTitleBlock}>
+              <span className={styles.openScheduleTitleLabel}>Schedules</span>
+              <span className={styles.openScheduleMeta}>
+                <span>{selectedSchedule.name}</span>
+                <span>{formatScheduleMonthOnly(selectedSchedule)}</span>
+                <span>{selectedSchedule.year}</span>
+              </span>
+            </span>
+          }
+          icon={
+            <button
+              type="button"
+              className={`${styles.scheduleViewToggle} ${styles.scheduleViewToggleActive}`}
+              aria-label="Show schedule matrix view"
+              aria-pressed="true"
+              title="Show schedule matrix view"
+              onClick={() => setScheduleViewMode("matrix")}
+            >
+              <ScheduleIcon size={20} />
+            </button>
+          }
+          headerRightSlot={
+            <button
+              type="button"
+              className={styles.openSchedulePdfButton}
+              onClick={handleExportPdf}
+              title="Export schedule to PDF"
+              aria-label="Export schedule to PDF"
+            >
+              PDF
+            </button>
+          }
+        >
+          <div className={styles.dailyScheduleShell}>
+            <div className={styles.dailyScheduleDays} role="tablist" aria-label="Schedule days">
+              {dailyScheduleDays.map(day => {
+                const isSelected = day.dayOfMonth === activeDailyScheduleDay;
+                return (
+                  <button
+                    key={day.dayOfMonth}
+                    type="button"
+                    role="tab"
+                    aria-selected={isSelected}
+                    aria-controls="daily-schedule-content"
+                    aria-label={`${day.weekdayLong} ${day.dayOfMonth}, ${day.isWorkingDay ? "working day" : "day off"}`}
+                    className={[
+                      styles.dailyScheduleDay,
+                      day.isWorkingDay ? styles.dailyScheduleDayWorking : styles.dailyScheduleDayOff,
+                      isSelected ? styles.dailyScheduleDaySelected : "",
+                    ].filter(Boolean).join(" ")}
+                    onClick={() => setSelectedDayOfMonth(day.dayOfMonth)}
+                  >
+                    <span>{day.weekdayShort}</span>
+                    <strong>{day.dayOfMonth}</strong>
+                  </button>
+                );
+              })}
+            </div>
+
+            <div
+              id="daily-schedule-content"
+              className={styles.dailyScheduleBody}
+              role="tabpanel"
+              aria-label={`${activeDailyScheduleDayInfo?.weekdayLong ?? "Day"} ${activeDailyScheduleDay}`}
+            >
+              <div className={styles.dailyScheduleDate} aria-hidden="true">
+                <span>{activeDailyScheduleDayInfo?.weekdayLong ?? "Day"}</span>
+                <strong>{activeDailyScheduleDay}</strong>
+              </div>
+
+              <div className={styles.dailyScheduleWorkers}>
+                {dailyScheduleWorkers.length > 0 ? dailyScheduleWorkers.map(worker => (
+                  <article key={worker.employeeId} className={styles.dailyScheduleWorker}>
+                    <span>{worker.label}</span>
+                    <strong>{formatDailyWorkerShifts(worker)}</strong>
+                  </article>
+                )) : (
+                  <div className={styles.dailyScheduleEmpty}>
+                    <strong>No one is scheduled.</strong>
+                    <span>This day has no assigned shifts.</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </CardSection>
+      ) : null}
+
+      <EmployeeScheduleColumnOrderDialog
+        open={columnOrderDialogEmployeeId !== null}
+        columns={scheduleMatrixColumns}
+        defaultColumns={defaultScheduleMatrixColumns}
+        activeEmployeeId={columnOrderDialogEmployeeId}
+        onCancel={() => setColumnOrderDialogEmployeeId(null)}
+        onSave={handleSaveColumnOrder}
+      />
 
       {selectedSchedule ? (
         <section className={`${workspaceStyles.panel} ${styles.hoursSummaryPanel}`}>
@@ -1000,6 +1468,72 @@ export function EmployeeSchedulePage() {
           ) : (
             <p className={styles.hoursSummaryEmpty}>No assigned shifts in this period.</p>
           )}
+          <section className={styles.salaryCalculator} aria-labelledby="salary-calculator-title">
+            <div className={styles.salaryCalculatorHeader}>
+              <span className={styles.salaryCalculatorMark} aria-hidden="true">=</span>
+              <div>
+                <span>Quick estimate</span>
+                <h3 id="salary-calculator-title">Salary calculator</h3>
+              </div>
+            </div>
+
+            <form className={styles.salaryCalculatorForm} onSubmit={handleCalculateSalary}>
+              <label className={styles.salaryCalculatorField}>
+                <span>Hours</span>
+                <span className={styles.salaryCalculatorInputShell}>
+                  <input
+                    type="text"
+                    aria-label="Hours"
+                    pattern="[0-9]*([.,][0-9]*)?"
+                    inputMode="decimal"
+                    value={salaryHoursInput}
+                    onChange={event => {
+                      setSalaryHoursInput(event.target.value);
+                      setSalaryResult(null);
+                    }}
+                  />
+                  <small>h</small>
+                </span>
+              </label>
+
+              <label className={styles.salaryCalculatorField}>
+                <span>Hourly rate</span>
+                <span className={styles.salaryCalculatorInputShell}>
+                  <input
+                    type="text"
+                    aria-label="Hourly rate"
+                    pattern="[0-9]*([.,][0-9]*)?"
+                    inputMode="decimal"
+                    placeholder="0.00"
+                    value={salaryRateInput}
+                    onChange={event => {
+                      setSalaryRateInput(event.target.value);
+                      setSalaryResult(null);
+                    }}
+                  />
+                  <small>/ h</small>
+                </span>
+              </label>
+
+              <button
+                type="submit"
+                className={styles.salaryCalculatorEquals}
+                aria-label="Calculate salary"
+                disabled={!canCalculateSalary}
+              >
+                =
+              </button>
+
+              <output className={styles.salaryCalculatorResult} aria-label="Estimated pay" aria-live="polite">
+                <span>Estimated pay</span>
+                <strong>{salaryResult === null ? "—" : salaryAmountFormatter.format(salaryResult)}</strong>
+              </output>
+
+              <button type="button" className={styles.salaryCalculatorReset} onClick={handleResetSalaryHours}>
+                Reset
+              </button>
+            </form>
+          </section>
         </section>
       ) : null}
     </div>

@@ -45,6 +45,12 @@ const emptyNewManagerForm: NewManagerFormState = {
   password: "",
 };
 
+const PASSWORD_VALIDATION_MESSAGE = "Password must contain exactly 6 digits.";
+
+function isValidNumericPassword(value: string) {
+  return /^\d{6}$/.test(value);
+}
+
 const lastOnlineFormatter = new Intl.DateTimeFormat(undefined, {
   month: "short",
   day: "2-digit",
@@ -127,7 +133,8 @@ export function ManagerAccountPage() {
   const [inlineError, setInlineError] = useState<string | null>(null);
   const [inlineSuccess, setInlineSuccess] = useState<string | null>(null);
   const initials = getInitials(profile?.displayName ?? session?.displayName);
-  const hasPasswordDraft = Boolean(normalize(form.newPassword));
+  const isSystemManager = profile?.isSystem ?? false;
+  const hasPasswordDraft = !isSystemManager && Boolean(normalize(form.newPassword));
   const isBusy = updateProfileMutation.isPending || createManagerMutation.isPending || deleteManagerMutation.isPending;
   const managerPresenceItems = useMemo(() => {
     return [...managers]
@@ -160,11 +167,11 @@ export function ManagerAccountPage() {
 
     return (
       normalize(form.displayName) !== profile.displayName ||
-      normalize(form.userName) !== profile.userName ||
+      (!isSystemManager && normalize(form.userName) !== profile.userName) ||
       normalize(form.recoveryEmail) !== normalize(profile.recoveryEmail ?? "") ||
       hasPasswordDraft
     );
-  }, [form.displayName, form.recoveryEmail, form.userName, hasPasswordDraft, profile]);
+  }, [form.displayName, form.recoveryEmail, form.userName, hasPasswordDraft, isSystemManager, profile]);
 
   useEffect(() => {
     if (!profile) {
@@ -180,11 +187,13 @@ export function ManagerAccountPage() {
   }, [profile]);
 
   const updateForm = (field: keyof ManagerFormState) => (event: ChangeEvent<HTMLInputElement>) => {
-    setForm(current => ({ ...current, [field]: event.target.value }));
+    const value = field === "newPassword" ? event.target.value.replace(/\D/g, "").slice(0, 6) : event.target.value;
+    setForm(current => ({ ...current, [field]: value }));
   };
 
   const updateNewManagerForm = (field: keyof NewManagerFormState) => (event: ChangeEvent<HTMLInputElement>) => {
-    setNewManagerForm(current => ({ ...current, [field]: event.target.value }));
+    const value = field === "password" ? event.target.value.replace(/\D/g, "").slice(0, 6) : event.target.value;
+    setNewManagerForm(current => ({ ...current, [field]: value }));
   };
 
   const handleSaveProfile = async () => {
@@ -195,11 +204,17 @@ export function ManagerAccountPage() {
         return;
       }
 
+      if (hasPasswordDraft && !isValidNumericPassword(form.newPassword)) {
+        setInlineError(PASSWORD_VALIDATION_MESSAGE);
+        setInlineSuccess(null);
+        return;
+      }
+
       const result = await runMutation(updateProfileMutation.mutate, {
         displayName: form.displayName,
         userName: form.userName,
         recoveryEmail: form.recoveryEmail,
-        newPassword: form.newPassword,
+        newPassword: isSystemManager ? "" : form.newPassword,
       });
 
       replaceLoginResult(result);
@@ -218,6 +233,13 @@ export function ManagerAccountPage() {
     try {
       if (!normalize(newManagerForm.displayName) || !normalize(newManagerForm.userName) || !normalize(newManagerForm.password)) {
         setInlineError("Display name, username and password are required for a new manager.");
+        setInlineSuccess(null);
+        return;
+      }
+
+
+      if (!isValidNumericPassword(newManagerForm.password)) {
+        setInlineError(PASSWORD_VALIDATION_MESSAGE);
         setInlineSuccess(null);
         return;
       }
@@ -283,7 +305,7 @@ export function ManagerAccountPage() {
                     <span className={styles.eyebrow}>Profile access</span>
                     <h2>Sign-in details</h2>
                   </div>
-                  <span className={styles.badge}>Editable</span>
+                  <span className={styles.badge}>{isSystemManager ? "System account" : "Editable"}</span>
                 </div>
 
                 <div className={styles.formGrid}>
@@ -306,6 +328,7 @@ export function ManagerAccountPage() {
                       onChange={updateForm("userName")}
                       placeholder="manager"
                       autoComplete="username"
+                      disabled={isSystemManager}
                     />
                   </label>
 
@@ -324,10 +347,15 @@ export function ManagerAccountPage() {
                     <span>New password</span>
                     <input
                       type="password"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      minLength={6}
+                      maxLength={6}
                       value={form.newPassword}
                       onChange={updateForm("newPassword")}
-                      placeholder="Minimum 6 characters"
-                      autoComplete="new-password"
+                      placeholder={isSystemManager ? "Managed through server environment" : "Exactly 6 digits"}
+                      autoComplete="654321"
+                      disabled={isSystemManager}
                     />
                   </label>
                 </div>
@@ -404,7 +432,9 @@ export function ManagerAccountPage() {
                           <span>{manager.recoveryEmail ?? "No recovery email"}</span>
                         </div>
                         <div className={styles.managerActions}>
-                          {isCurrent ? (
+                          {manager.isSystem ? (
+                            <span className={styles.currentPill}>{isCurrent ? "You / System" : "System"}</span>
+                          ) : isCurrent ? (
                             <span className={styles.currentPill}>You</span>
                           ) : (
                             <button
@@ -463,10 +493,14 @@ export function ManagerAccountPage() {
                     <span>Temporary password</span>
                     <input
                       type="password"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      minLength={6}
+                      maxLength={6}
                       value={newManagerForm.password}
                       onChange={updateNewManagerForm("password")}
-                      placeholder="Minimum 6 characters"
-                      autoComplete="new-password"
+                      placeholder="Exactly 6 digits"
+                      autoComplete="654321"
                     />
                   </label>
                 </div>

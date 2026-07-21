@@ -103,6 +103,9 @@ public sealed class EmployeeAccountService : IEmployeeAccountService
     public Task TouchLastSeenAsync(int employeeId, CancellationToken ct = default)
         => _accountRepository.TouchLastSeenAsync(employeeId, DateTimeOffset.UtcNow, ActivityWriteThrottle, ct);
 
+    public Task<bool> RevokeSessionsAsync(int employeeId, CancellationToken ct = default)
+        => _accountRepository.IncrementSessionVersionAsync(employeeId, ct);
+
     public async Task<EmployeePasswordResetChallengeDto> CreatePasswordResetChallengeAsync(int employeeId, CancellationToken ct = default)
     {
         var account = await _accountRepository.GetByEmployeeIdAsync(employeeId, ct).ConfigureAwait(false);
@@ -244,9 +247,9 @@ public sealed class EmployeeAccountService : IEmployeeAccountService
 
     private static void ValidatePassword(string password)
     {
-        if (password.Length < 6 || password.Length > 200)
+        if (!NumericPasswordPolicy.IsValid(password))
         {
-            throw new ValidationException("Password must be between 6 and 200 characters long.");
+            throw new ValidationException(NumericPasswordPolicy.ValidationMessage);
         }
     }
 

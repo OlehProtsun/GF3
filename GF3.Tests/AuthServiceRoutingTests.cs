@@ -32,7 +32,7 @@ public sealed class AuthServiceRoutingTests
         var employeeAccountService = new FakeEmployeeAccountService();
         var authService = CreateService(managerService, employeeAccountService);
 
-        var session = await authService.AuthenticateAsync(" manager ", "123");
+        var session = await authService.AuthenticateAsync(" manager ", "123456");
 
         Assert.NotNull(session);
         Assert.Equal(AuthService.ManagerRole, session!.Role);
@@ -54,7 +54,7 @@ public sealed class AuthServiceRoutingTests
             Id = 1,
             EmployeeId = 5,
             Username = "worker",
-            PasswordHash = hasher.HashPassword("worker-password"),
+            PasswordHash = hasher.HashPassword("824681"),
             PasswordUpdatedAtUtc = DateTimeOffset.UtcNow,
         };
         var employeeService = new FakeEmployeeService();
@@ -67,8 +67,8 @@ public sealed class AuthServiceRoutingTests
         };
         var authService = CreateService(new FakeManagerAccountService(), employeeAccountService, employeeService, hasher);
 
-        var wrongPassword = await authService.AuthenticateAsync("worker", "wrong-password");
-        var session = await authService.AuthenticateAsync(" worker ", "worker-password");
+        var wrongPassword = await authService.AuthenticateAsync("worker", "999999");
+        var session = await authService.AuthenticateAsync(" worker ", "824681");
 
         Assert.Null(wrongPassword);
         Assert.NotNull(session);
@@ -90,15 +90,37 @@ public sealed class AuthServiceRoutingTests
             Id = 1,
             EmployeeId = 99,
             Username = "orphan",
-            PasswordHash = hasher.HashPassword("worker-password"),
+            PasswordHash = hasher.HashPassword("824681"),
             PasswordUpdatedAtUtc = DateTimeOffset.UtcNow,
         };
         var authService = CreateService(new FakeManagerAccountService(), employeeAccountService, new FakeEmployeeService(), hasher);
 
-        var session = await authService.AuthenticateAsync("orphan", "worker-password");
+        var session = await authService.AuthenticateAsync("orphan", "824681");
 
         Assert.Null(session);
         Assert.Null(employeeAccountService.MarkedLoginEmployeeId);
+    }
+
+    [Theory]
+    [InlineData("12345")]
+    [InlineData("123abc")]
+    [InlineData("1234567")]
+    public async Task AuthenticateAsync_RejectsPasswordsOutsideNumericPolicy(string password)
+    {
+        var managerService = new FakeManagerAccountService
+        {
+            AuthenticatedAccount = new ManagerAccountModel
+            {
+                Id = 9,
+                UserName = "manager",
+                DisplayName = "Main Manager",
+            },
+        };
+        var authService = CreateService(managerService, new FakeEmployeeAccountService());
+
+        var session = await authService.AuthenticateAsync("manager", password);
+
+        Assert.Null(session);
     }
 
     [Fact]
@@ -125,11 +147,11 @@ public sealed class AuthServiceRoutingTests
         var authService = CreateService(managerService, employeeAccountService, employeeProfileService: employeeProfileService);
 
         var dispatch = await authService.SendPasswordResetCodeAsync(" shared ");
-        await authService.ConfirmPasswordResetAsync("shared", "123456", "new-password");
+        await authService.ConfirmPasswordResetAsync("shared", "123456", "654321");
 
         Assert.Equal("manager", dispatch.DeliveryHint);
         Assert.Equal(["shared"], managerService.PasswordResetDispatchUsernames);
-        Assert.Equal([("shared", "123456", "new-password")], managerService.ConfirmedPasswordResets);
+        Assert.Equal([("shared", "123456", "654321")], managerService.ConfirmedPasswordResets);
         Assert.Empty(employeeProfileService.DispatchedEmployeeIds);
         Assert.Empty(employeeProfileService.ConfirmedResets);
     }
@@ -197,9 +219,9 @@ public sealed class AuthServiceRoutingTests
             employeeService,
             employeeProfileService: employeeProfileService);
 
-        await authService.ConfirmPasswordResetAsync("worker", "123456", "new-password");
+        await authService.ConfirmPasswordResetAsync("worker", "123456", "654321");
 
-        Assert.Equal([(5, "123456", "new-password")], employeeProfileService.ConfirmedResets);
+        Assert.Equal([(5, "123456", "654321")], employeeProfileService.ConfirmedResets);
     }
 
     private static AuthService CreateService(

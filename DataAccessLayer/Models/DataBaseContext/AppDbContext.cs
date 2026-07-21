@@ -15,8 +15,15 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<EmployeeModel> Employees => Set<EmployeeModel>();
     public DbSet<EmployeeAccountModel> EmployeeAccounts => Set<EmployeeAccountModel>();
     public DbSet<ManagerAccountModel> ManagerAccounts => Set<ManagerAccountModel>();
+    public DbSet<ManagerNoteModel> ManagerNotes => Set<ManagerNoteModel>();
+    public DbSet<ManagerNotepadStateModel> ManagerNotepadStates => Set<ManagerNotepadStateModel>();
+    public DbSet<SystemNewsMessageModel> SystemNewsMessages => Set<SystemNewsMessageModel>();
+    public DbSet<SystemNewsReadModel> SystemNewsReads => Set<SystemNewsReadModel>();
     public DbSet<CommunicationMessageModel> CommunicationMessages => Set<CommunicationMessageModel>();
     public DbSet<EmployeeCommunicationDismissalModel> EmployeeCommunicationDismissals => Set<EmployeeCommunicationDismissalModel>();
+    public DbSet<EmployeeScheduleColumnPreferenceModel> EmployeeScheduleColumnPreferences => Set<EmployeeScheduleColumnPreferenceModel>();
+    public DbSet<EmployeeNotificationReadModel> EmployeeNotificationReads => Set<EmployeeNotificationReadModel>();
+    public DbSet<EmployeePinnedSwapModel> EmployeePinnedSwaps => Set<EmployeePinnedSwapModel>();
     public DbSet<ShopModel> Shops => Set<ShopModel>();
     public DbSet<ScheduleModel> Schedules => Set<ScheduleModel>();
     public DbSet<SchedulePresetModel> SchedulePresets => Set<SchedulePresetModel>();
@@ -27,6 +34,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<ShiftSwapRequestModel> ShiftSwapRequests => Set<ShiftSwapRequestModel>();
     public DbSet<ShiftSwapHistoryModel> ShiftSwapHistories => Set<ShiftSwapHistoryModel>();
     public DbSet<WorkflowLogEntryModel> WorkflowLogEntries => Set<WorkflowLogEntryModel>();
+    public DbSet<WorkflowLogSettingsModel> WorkflowLogSettings => Set<WorkflowLogSettingsModel>();
     public DbSet<BindModel> AvailabilityBinds => Set<BindModel>();
     public DbSet<AvailabilityGroupModel> AvailabilityGroups => Set<AvailabilityGroupModel>();
     public DbSet<AvailabilityGroupMemberModel> AvailabilityGroupMembers => Set<AvailabilityGroupMemberModel>();
@@ -39,8 +47,14 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         ConfigureEmployee(modelBuilder);
         ConfigureEmployeeAccount(modelBuilder);
         ConfigureManagerAccount(modelBuilder);
+        ConfigureManagerNote(modelBuilder);
+        ConfigureManagerNotepadState(modelBuilder);
+        ConfigureSystemNews(modelBuilder);
         ConfigureCommunicationMessage(modelBuilder);
         ConfigureEmployeeCommunicationDismissal(modelBuilder);
+        ConfigureEmployeeScheduleColumnPreference(modelBuilder);
+        ConfigureEmployeeNotificationRead(modelBuilder);
+        ConfigureEmployeePinnedSwap(modelBuilder);
         ConfigureShop(modelBuilder);
         ConfigureSchedule(modelBuilder);
         ConfigureSchedulePreset(modelBuilder);
@@ -51,6 +65,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         ConfigureShiftSwapRequest(modelBuilder);
         ConfigureShiftSwapHistory(modelBuilder);
         ConfigureWorkflowLogEntry(modelBuilder);
+        ConfigureWorkflowLogSettings(modelBuilder);
         ConfigureAvailabilityBind(modelBuilder);
         ConfigureAvailabilityGroup(modelBuilder);
         ConfigureAvailabilityGroupMember(modelBuilder);
@@ -135,12 +150,82 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             entity.Property(property => property.PasswordResetCodeHash).IsRequired(false);
             entity.Property(property => property.PasswordResetRequestedAtUtc).IsRequired(false);
             entity.Property(property => property.PasswordResetExpiresAtUtc).IsRequired(false);
+            entity.Property(property => property.IsSystem).IsRequired();
             entity.Property(property => property.CreatedAtUtc).IsRequired();
             entity.Property(property => property.UpdatedAtUtc).IsRequired();
 
             entity.HasIndex(property => property.Username)
                 .IsUnique()
                 .HasDatabaseName("ux_manager_account_username");
+
+            entity.HasIndex(property => property.IsSystem)
+                .IsUnique()
+                .HasDatabaseName("ux_manager_account_system")
+                .HasFilter("\"is_system\" = 1");
+        });
+    }
+
+    private static void ConfigureManagerNote(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<ManagerNoteModel>(entity =>
+        {
+            entity.Property(note => note.Title).IsRequired().HasMaxLength(160);
+            entity.Property(note => note.Content).IsRequired().HasMaxLength(20_000);
+            entity.Property(note => note.Color).IsRequired().HasMaxLength(16);
+            entity.Property(note => note.CreatedAtUtc).IsRequired();
+            entity.Property(note => note.UpdatedAtUtc).IsRequired();
+
+            entity.HasOne(note => note.ManagerAccount)
+                .WithMany()
+                .HasForeignKey(note => note.ManagerAccountId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasIndex(note => new { note.ManagerAccountId, note.UpdatedAtUtc })
+                .HasDatabaseName("ix_manager_note_manager_updated");
+        });
+    }
+
+    private static void ConfigureManagerNotepadState(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<ManagerNotepadStateModel>(entity =>
+        {
+            entity.Property(state => state.Height).IsRequired();
+            entity.Property(state => state.UpdatedAtUtc).IsRequired();
+
+            entity.HasOne(state => state.ManagerAccount)
+                .WithOne()
+                .HasForeignKey<ManagerNotepadStateModel>(state => state.ManagerAccountId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+    }
+
+    private static void ConfigureSystemNews(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<SystemNewsMessageModel>(entity =>
+        {
+            entity.Property(message => message.Title).IsRequired().HasMaxLength(160);
+            entity.Property(message => message.Body).IsRequired().HasMaxLength(10_000);
+            entity.Property(message => message.Audience).IsRequired().HasMaxLength(16);
+            entity.Property(message => message.ImageUrl).IsRequired(false).HasMaxLength(2_800_000);
+            entity.Property(message => message.VideoUrl).IsRequired(false).HasMaxLength(500);
+            entity.Property(message => message.CreatedAtUtc).IsRequired();
+            entity.Property(message => message.UpdatedAtUtc).IsRequired();
+            entity.HasIndex(message => message.CreatedAtUtc).HasDatabaseName("ix_system_news_created");
+        });
+
+        modelBuilder.Entity<SystemNewsReadModel>(entity =>
+        {
+            entity.Property(read => read.AccountRole).IsRequired().HasMaxLength(16);
+            entity.Property(read => read.ReadAtUtc).IsRequired();
+            entity.HasOne(read => read.Message)
+                .WithMany(message => message.Reads)
+                .HasForeignKey(read => read.MessageId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasIndex(read => new { read.MessageId, read.AccountRole, read.AccountId })
+                .IsUnique()
+                .HasDatabaseName("ux_system_news_read_subject");
+            entity.HasIndex(read => new { read.AccountRole, read.AccountId, read.ReadAtUtc })
+                .HasDatabaseName("ix_system_news_read_subject_time");
         });
     }
 
@@ -211,6 +296,76 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         });
     }
 
+    private static void ConfigureEmployeeScheduleColumnPreference(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<EmployeeScheduleColumnPreferenceModel>(entity =>
+        {
+            entity.Property(preference => preference.ColumnOrderJson).IsRequired();
+            entity.Property(preference => preference.UpdatedAtUtc).IsRequired();
+
+            entity.HasOne(preference => preference.Employee)
+                .WithMany()
+                .HasForeignKey(preference => preference.EmployeeId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(preference => preference.Schedule)
+                .WithMany()
+                .HasForeignKey(preference => preference.ScheduleId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasIndex(preference => new { preference.EmployeeId, preference.ScheduleId })
+                .IsUnique()
+                .HasDatabaseName("ux_emp_schedule_column_pref_emp_schedule");
+        });
+    }
+
+    private static void ConfigureEmployeeNotificationRead(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<EmployeeNotificationReadModel>(entity =>
+        {
+            entity.Property(read => read.NotificationId)
+                .IsRequired()
+                .HasMaxLength(256);
+            entity.Property(read => read.ReadAtUtc).IsRequired();
+
+            entity.HasOne(read => read.Employee)
+                .WithMany()
+                .HasForeignKey(read => read.EmployeeId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasIndex(read => new { read.EmployeeId, read.NotificationId })
+                .IsUnique()
+                .HasDatabaseName("ux_emp_notification_read_emp_notification");
+
+            entity.HasIndex(read => new { read.EmployeeId, read.ReadAtUtc })
+                .HasDatabaseName("ix_emp_notification_read_emp_time");
+        });
+    }
+
+    private static void ConfigureEmployeePinnedSwap(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<EmployeePinnedSwapModel>(entity =>
+        {
+            entity.Property(pin => pin.PinnedAtUtc).IsRequired();
+
+            entity.HasOne(pin => pin.Employee)
+                .WithMany()
+                .HasForeignKey(pin => pin.EmployeeId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(pin => pin.ShiftSwap)
+                .WithMany()
+                .HasForeignKey(pin => pin.ShiftSwapId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasIndex(pin => new { pin.EmployeeId, pin.ShiftSwapId })
+                .IsUnique()
+                .HasDatabaseName("ux_employee_pinned_swap_employee_swap");
+
+            entity.HasIndex(pin => new { pin.EmployeeId, pin.PinnedAtUtc })
+                .HasDatabaseName("ix_employee_pinned_swap_employee_time");
+        });
+    }
     private static void ConfigureShop(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<ShopModel>(entity =>
@@ -253,6 +408,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             entity.Property(schedule => schedule.PublicationStatus)
                 .HasConversion<string>()
                 .HasDefaultValue(SchedulePublicationStatus.Private);
+            entity.Property(schedule => schedule.AllowSwap).HasDefaultValue(true);
 
             entity.ToTable(table =>
             {
@@ -525,6 +681,28 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
 
             entity.HasIndex(log => new { log.ActorRole, log.OccurredAtUtc })
                 .HasDatabaseName("ix_workflow_log_role_time");
+        });
+    }
+
+    private static void ConfigureWorkflowLogSettings(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<WorkflowLogSettingsModel>(entity =>
+        {
+            entity.Property(settings => settings.IsEnabled).IsRequired().HasDefaultValue(true);
+            entity.Property(settings => settings.Audience)
+                .IsRequired()
+                .HasMaxLength(16)
+                .HasDefaultValue(WorkflowLogSettingsModel.AllAudience);
+
+            entity.ToTable(table =>
+            {
+                table.HasCheckConstraint("ck_workflow_log_settings_singleton", "id = 1");
+                table.HasCheckConstraint(
+                    "ck_workflow_log_settings_audience",
+                    "audience IN ('all', 'managers', 'employees')");
+            });
+
+            entity.HasData(new WorkflowLogSettingsModel());
         });
     }
 

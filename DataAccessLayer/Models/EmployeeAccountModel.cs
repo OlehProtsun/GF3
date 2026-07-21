@@ -37,6 +37,9 @@ public class EmployeeAccountModel
     [Column("last_seen_at_utc")]
     public DateTimeOffset? LastSeenAtUtc { get; set; }
 
+    [Column("session_version")]
+    public int SessionVersion { get; set; }
+
     [Column("password_reset_code_hash")]
     public string? PasswordResetCodeHash { get; set; }
 

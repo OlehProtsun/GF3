@@ -4,6 +4,32 @@ import type { GraphRelatedScheduleHintDetail } from "@entities/containers/model/
 import { ContainerGraphMatrix } from "./ContainerGraphMatrix";
 
 describe("ContainerGraphMatrix related schedule hints", () => {
+  test("exposes an employee header as a customization button", () => {
+    const onColumnHeaderClick = vi.fn();
+    const column = {
+      employeeId: 7,
+      kind: "employee" as const,
+      manualColumnId: null,
+      graphEmployeeId: 70,
+      label: "Ada",
+      minHoursMonth: null,
+      totalMinutes: 0,
+      totalText: "",
+    };
+
+    render(
+      <ContainerGraphMatrix
+        graph={{ year: 2026, month: 1 }}
+        columns={[column]}
+        cellMap={{}}
+        readOnly
+        onColumnHeaderClick={onColumnHeaderClick}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Customize columns from Ada" }));
+    expect(onColumnHeaderClick).toHaveBeenCalledWith(column);
+  });
   test("keeps a filled shift visible and renders the related schedule as a clickable blue suffix", () => {
     vi.useFakeTimers();
     const onVisualHintClick = vi.fn();

@@ -15,6 +15,7 @@ export type Graph = {
   year: number;
   month: number;
   publicationStatus: GraphPublicationStatus;
+  allowSwap?: boolean;
   peoplePerShift: number;
   shift1Time: string;
   shift2Time: string;

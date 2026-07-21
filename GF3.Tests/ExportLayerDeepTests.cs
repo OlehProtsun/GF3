@@ -254,6 +254,7 @@ public sealed class ExportLayerDeepTests
         Assert.Equal(new DateTime(2026, 4, 1), matrixSheet.Cell("B2").GetDateTime().Date);
         Assert.Equal("08:00 - 16:00", matrixSheet.Cell("C2").GetString());
         Assert.Equal("April Graph 2", matrixSheet.Cell("C3").GetString());
+        Assert.InRange(matrixSheet.Column("C").Width, 10d, 15d);
         Assert.Equal("April Graph", statisticSheet.Cell("B2").GetString());
         Assert.Equal("Main Shop", statisticSheet.Cell("B5").GetString());
         Assert.Equal("8h 0m", statisticSheet.Cell("B7").GetString());
@@ -490,7 +491,7 @@ public sealed class ExportLayerDeepTests
     }
 
     [Fact]
-    public void GraphRelatedScheduleHintExportBuilder_BuildTextCells_MergesDistinctGraphNamesAndSkipsBusyCells()
+    public void GraphRelatedScheduleHintExportBuilder_BuildTextCells_AppendsDistinctGraphNamesToCurrentShift()
     {
         var currentGraph = TestDataFactory.CreateScheduleModel(id: 5, containerId: 1, shopId: 2, name: "Current", year: 2026, month: 4, availabilityGroupId: null);
         var john = new ScheduleEmployeeModel { Id = 11, ScheduleId = currentGraph.Id, EmployeeId = 3, Employee = TestDataFactory.CreateEmployeeModel(id: 3, firstName: "John", lastName: "Smith") };
@@ -529,10 +530,13 @@ public sealed class ExportLayerDeepTests
             persistedTextCells,
             relatedSources);
 
-        var textCell = Assert.Single(ReadTextCellSequence(result));
-        Assert.Equal(3, textCell.EmployeeId);
-        Assert.Equal(2, textCell.DayOfMonth);
-        Assert.Equal("Alpha, Zulu", textCell.Value);
+        var textCells = ReadTextCellSequence(result);
+
+        Assert.Equal(2, textCells.Count);
+        Assert.Equal((3, 1, "08:00 - 16:00, Zulu"),
+            (textCells[0].EmployeeId, textCells[0].DayOfMonth, textCells[0].Value));
+        Assert.Equal((3, 2, "Alpha, Zulu"),
+            (textCells[1].EmployeeId, textCells[1].DayOfMonth, textCells[1].Value));
     }
 
     [Fact]

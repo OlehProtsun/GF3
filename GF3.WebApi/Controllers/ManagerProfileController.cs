@@ -165,6 +165,7 @@ public sealed class ManagerProfileController(
         RecoveryEmail = profile.RecoveryEmail,
         LastLoginAtUtc = profile.LastLoginAtUtc,
         IsOnline = isOnline,
+        IsSystem = profile.IsSystem,
         CreatedAtUtc = profile.CreatedAtUtc,
     };
 }

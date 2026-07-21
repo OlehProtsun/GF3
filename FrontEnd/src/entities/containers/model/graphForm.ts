@@ -9,6 +9,7 @@ export type ContainerGraphFormState = {
   year: string;
   month: string;
   publicationStatus: GraphPublicationStatus;
+  allowSwap: boolean;
   peoplePerShift: string;
   shift1Time: string;
   shift2Time: string;
@@ -32,6 +33,7 @@ export function createInitialGraphForm(defaultShopId?: number | null): Container
     year: String(today.getFullYear()),
     month: String(today.getMonth() + 1),
     publicationStatus: "private",
+    allowSwap: true,
     peoplePerShift: "1",
     shift1Time: "06:00 - 14:00",
     shift2Time: "14:00 - 22:00",
@@ -51,6 +53,7 @@ export function createGraphFormFromGraph(graph: Graph): ContainerGraphFormState 
     year: String(graph.year),
     month: String(graph.month),
     publicationStatus: graph.publicationStatus === "public" ? "public" : "private",
+    allowSwap: graph.allowSwap !== false,
     peoplePerShift: String(graph.peoplePerShift),
     shift1Time: graph.shift1Time,
     shift2Time: graph.shift2Time,

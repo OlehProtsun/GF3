@@ -22,6 +22,9 @@ public interface IRealtimeNotifier
     Task NotifyScheduleEditLockChangedAsync(ScheduleEditLockState state);
 
     Task NotifyManagerEditLockChangedAsync(ManagerEditLockState state);
+
+    Task NotifyEmployeeSessionRevokedAsync(int employeeId)
+        => Task.CompletedTask;
 }
 
 public sealed class RealtimeNotifier(IHubContext<EmployeePresenceHub, IEmployeePresenceClient> hubContext)
@@ -104,6 +107,15 @@ public sealed class RealtimeNotifier(IHubContext<EmployeePresenceHub, IEmployeeP
                 state.LockedByManagerId)).ConfigureAwait(false);
         }
     }
+
+    public Task NotifyEmployeeSessionRevokedAsync(int employeeId)
+        => hubContext.Clients
+            .Group(EmployeePresenceHub.GetEmployeeGroupName(employeeId))
+            .SessionRevoked(new EmployeeSessionRevokedMessage
+            {
+                EmployeeId = employeeId,
+                RevokedAtUtc = DateTimeOffset.UtcNow,
+            });
 
     private static WorkflowLogDto ToDto(WorkflowLogEntryModel entry) => new()
     {

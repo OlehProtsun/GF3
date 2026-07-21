@@ -170,6 +170,13 @@
     0 1px 0 rgba(255, 255, 255, 0.86) inset;
 }
 
+.field input:disabled {
+  cursor: not-allowed;
+  color: #64748b;
+  background: rgba(241, 245, 249, 0.88);
+  opacity: 0.84;
+}
+
 .actions {
   display: flex;
   justify-content: flex-end;

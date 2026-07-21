@@ -54,6 +54,7 @@ internal static class ModelMapper
         PasswordUpdatedAtUtc = model.PasswordUpdatedAtUtc,
         LastLoginAtUtc = model.LastLoginAtUtc,
         LastSeenAtUtc = model.LastSeenAtUtc,
+        SessionVersion = model.SessionVersion,
     };
 
     internal static Dal.EmployeeAccountModel ToDal(this Contracts.Employees.EmployeeAccountModel model) => new()
@@ -65,6 +66,7 @@ internal static class ModelMapper
         PasswordUpdatedAtUtc = model.PasswordUpdatedAtUtc,
         LastLoginAtUtc = model.LastLoginAtUtc,
         LastSeenAtUtc = model.LastSeenAtUtc,
+        SessionVersion = model.SessionVersion,
     };
 
     internal static Contracts.Managers.ManagerAccountModel ToContract(this Dal.ManagerAccountModel model) => new()
@@ -73,6 +75,7 @@ internal static class ModelMapper
         UserName = model.Username,
         DisplayName = model.DisplayName,
         PasswordHash = model.PasswordHash,
+        IsSystem = model.IsSystem,
         RecoveryEmail = model.RecoveryEmail,
         PasswordUpdatedAtUtc = model.PasswordUpdatedAtUtc,
         LastLoginAtUtc = model.LastLoginAtUtc,
@@ -87,6 +90,7 @@ internal static class ModelMapper
         DisplayName = model.DisplayName,
         RecoveryEmail = model.RecoveryEmail,
         LastLoginAtUtc = model.LastLoginAtUtc,
+        IsSystem = model.IsSystem,
         CreatedAtUtc = model.CreatedAtUtc,
     };
 
@@ -328,6 +332,7 @@ internal static class ModelMapper
         Year = model.Year,
         Month = model.Month,
         PublicationStatus = model.PublicationStatus.ToContract(),
+        AllowSwap = model.AllowSwap,
         PeoplePerShift = model.PeoplePerShift,
         Shift1Time = model.Shift1Time,
         Shift2Time = model.Shift2Time,
@@ -352,6 +357,7 @@ internal static class ModelMapper
         Year = model.Year,
         Month = model.Month,
         PublicationStatus = model.PublicationStatus.ToDal(),
+        AllowSwap = model.AllowSwap,
         PeoplePerShift = model.PeoplePerShift,
         Shift1Time = model.Shift1Time,
         Shift2Time = model.Shift2Time,

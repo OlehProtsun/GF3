@@ -113,6 +113,17 @@
   line-height: 1.5;
 }
 
+.swapDisabledNotice {
+  padding: 12px 14px;
+  border: 1px solid rgba(245, 158, 11, 0.22);
+  border-radius: 16px;
+  background: rgba(255, 251, 235, 0.92);
+  color: #92400e;
+  font-size: 0.8rem;
+  font-weight: 750;
+  line-height: 1.45;
+}
+
 .actions {
   display: flex;
   justify-content: flex-end;

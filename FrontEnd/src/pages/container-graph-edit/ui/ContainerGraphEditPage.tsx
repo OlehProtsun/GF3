@@ -403,6 +403,7 @@ function toPayload(
     year,
     month,
     publicationStatus: form.publicationStatus,
+    allowSwap: form.allowSwap,
     peoplePerShift: Number(form.peoplePerShift),
     shift1Time: form.shift1Time.trim(),
     shift2Time: form.shift2Time.trim(),
@@ -1246,6 +1247,7 @@ export function ContainerGraphEditPage() {
         year: Number(form.year) || new Date().getFullYear(),
         month: Number(form.month) || 1,
         publicationStatus: form.publicationStatus,
+        allowSwap: form.allowSwap,
         peoplePerShift: Number(form.peoplePerShift) || 1,
         shift1Time: form.shift1Time,
         shift2Time: form.shift2Time,
@@ -1261,6 +1263,7 @@ export function ContainerGraphEditPage() {
       year: Number(form.year) || new Date().getFullYear(),
       month: Number(form.month) || 1,
       publicationStatus: form.publicationStatus,
+      allowSwap: form.allowSwap,
       peoplePerShift: Number(form.peoplePerShift) || 1,
       shift1Time: form.shift1Time,
       shift2Time: form.shift2Time,
@@ -1870,7 +1873,7 @@ export function ContainerGraphEditPage() {
     setSelectedBindClientId(nextSelectedBind?.clientId ?? null);
   };
 
-  const setFieldValue = (field: keyof ContainerGraphFormState) => (value: string) => {
+  const setFieldValue = <K extends keyof ContainerGraphFormState>(field: K) => (value: ContainerGraphFormState[K]) => {
     setForm(current => ({ ...current, [field]: value }));
     setSubmitError(undefined);
 
@@ -2549,6 +2552,11 @@ export function ContainerGraphEditPage() {
 
   const handlePublishManualShift = (input: ManualColumnShiftPublicationInput) => {
     setManualShiftPublishError(null);
+
+    if (!form.allowSwap) {
+      setManualShiftPublishError("Swaps are not allowed for this schedule. Enable Allow swap in Publication first.");
+      return;
+    }
 
     if (!containerId || !graphId) {
       setManualShiftPublishError("Save this schedule before adding manual shifts to swap.");

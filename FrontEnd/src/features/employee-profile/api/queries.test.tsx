@@ -46,7 +46,7 @@ function MutationHarness() {
       </button>
       <button
         type="button"
-        onClick={() => confirmReset.mutate({ code: " 123456 ", newPassword: "secret123" })}
+        onClick={() => confirmReset.mutate({ code: " 123456 ", newPassword: "654321" })}
       >
         confirm reset
       </button>
@@ -91,7 +91,7 @@ describe("employee profile query mutations", () => {
 
     await user.click(screen.getByRole("button", { name: "confirm reset" }));
     await waitFor(() => {
-      expect(apiMocks.confirmPasswordReset).toHaveBeenCalledWith({ code: " 123456 ", newPassword: "secret123" });
+      expect(apiMocks.confirmPasswordReset).toHaveBeenCalledWith({ code: " 123456 ", newPassword: "654321" });
     });
   });
 });

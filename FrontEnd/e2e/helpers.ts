@@ -30,7 +30,7 @@ export async function loginWithCredentials(page: Page, username: string, passwor
 }
 
 export async function loginAsManager(page: Page) {
-  await loginWithCredentials(page, "manager", "123");
+  await loginWithCredentials(page, "manager", "123456");
   await expect(page.getByRole("link", { name: "Home" })).toBeVisible({ timeout: 10000 });
 }
 
@@ -42,11 +42,11 @@ export async function expectNoRequestError(page: Page) {
 export async function createEmployeeAccount(api: APIRequestContext, prefix = "e2e") {
   const suffix = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   const username = `${prefix}.${suffix}`;
-  const password = "test-pass-123";
+  const password = "824681";
   const loginResponse = await api.post("/api/auth/login", {
     data: {
       username: "manager",
-      password: "123",
+      password: "123456",
     },
   });
   expect(loginResponse.ok()).toBe(true);

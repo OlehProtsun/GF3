@@ -24,4 +24,10 @@ export const shiftSwapsApi = {
     }),
   listGraphLog: (containerId: number, graphId: number, signal?: AbortSignal) =>
     request<ShiftSwap[]>(`${containerEndpoint}/${containerId}/graphs/${graphId}/shift-swaps`, { signal }),
+  listContainer: (containerId: number, signal?: AbortSignal) =>
+    request<ShiftSwap[]>(`${containerEndpoint}/${containerId}/shift-swaps`, { signal }),
+  cancelContainer: (containerId: number, id: number) =>
+    request<ShiftSwap>(`${containerEndpoint}/${containerId}/shift-swaps/${id}/cancel`, { method: "POST" }),
+  deleteContainer: (containerId: number, id: number) =>
+    request<void>(`${containerEndpoint}/${containerId}/shift-swaps/${id}`, { method: "DELETE" }),
 };

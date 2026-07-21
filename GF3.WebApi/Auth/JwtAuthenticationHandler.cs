@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using System.Text.Encodings.Web;
+using BusinessLogicLayer.Services.Abstractions;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.Extensions.Options;
 using WebApi.Options;
@@ -12,28 +13,42 @@ namespace WebApi.Auth;
 public sealed class JwtAuthenticationHandler : AuthenticationHandler<AuthenticationSchemeOptions>
 {
     private readonly JwtAuthOptions _jwtOptions;
+    private readonly IEmployeeAccountService? _employeeAccountService;
 
     public JwtAuthenticationHandler(
         IOptionsMonitor<AuthenticationSchemeOptions> options,
         ILoggerFactory logger,
         UrlEncoder encoder,
-        IOptions<JwtAuthOptions> jwtOptions)
+        IOptions<JwtAuthOptions> jwtOptions,
+        IEmployeeAccountService? employeeAccountService = null)
         : base(options, logger, encoder)
     {
         _jwtOptions = jwtOptions.Value;
+        _employeeAccountService = employeeAccountService;
     }
 
-    protected override Task<AuthenticateResult> HandleAuthenticateAsync()
+    protected override async Task<AuthenticateResult> HandleAuthenticateAsync()
     {
         var token = TryResolveAccessToken();
         if (string.IsNullOrWhiteSpace(token))
         {
-            return Task.FromResult(AuthenticateResult.NoResult());
+            return AuthenticateResult.NoResult();
         }
 
         if (!JwtTokenCodec.TryReadAccessToken(token, _jwtOptions, TimeSpan.FromMinutes(1), out var session, out var error))
         {
-            return Task.FromResult(AuthenticateResult.Fail(error ?? "Invalid bearer token."));
+            return AuthenticateResult.Fail(error ?? "Invalid bearer token.");
+        }
+
+        if (session.EmployeeId is > 0 && _employeeAccountService is not null)
+        {
+            var account = await _employeeAccountService
+                .GetByEmployeeIdAsync(session.EmployeeId.Value, Context.RequestAborted)
+                .ConfigureAwait(false);
+            if (account is null || account.SessionVersion != (session.SessionVersion ?? 0))
+            {
+                return AuthenticateResult.Fail("Employee session was revoked.");
+            }
         }
 
         var claims = new List<Claim>
@@ -56,7 +71,7 @@ public sealed class JwtAuthenticationHandler : AuthenticationHandler<Authenticat
         var identity = new ClaimsIdentity(claims, JwtAuthenticationDefaults.SchemeName, ClaimTypes.Name, ClaimTypes.Role);
         var principal = new ClaimsPrincipal(identity);
         var ticket = new AuthenticationTicket(principal, JwtAuthenticationDefaults.SchemeName);
-        return Task.FromResult(AuthenticateResult.Success(ticket));
+        return AuthenticateResult.Success(ticket);
     }
 
     private string? TryResolveAccessToken()

@@ -5,6 +5,8 @@ import { useRealtime } from "@app/providers/PresenceProvider";
 import { EmployeeCommunicationDialog } from "@entities/communications/ui";
 import { useEmployeeShiftSwapsQuery, type ShiftSwap } from "@entities/shift-swaps";
 import { useEmployeeScheduleListQuery, type EmployeeSchedule } from "@entities/employee-schedule";
+import { employeeUiStateApi, useEmployeeUiStateQuery } from "@entities/employee-ui-state";
+import { useSystemNewsQuery } from "@entities/system-news";
 import {
   useEmployeeAvailabilityListQuery,
   type EmployeeAvailabilityGroup,
@@ -13,6 +15,7 @@ import {
   employeeNotificationReadStateEventName,
   getEmployeeNotificationReadStorageKeys,
   readEmployeeNotificationIdsForAccount,
+  writeEmployeeNotificationIdsForAccount,
 } from "@shared/lib/employeeNotificationReadState";
 import {
   getUnreadEmployeeNotificationTargets,
@@ -83,6 +86,8 @@ export function EmployeeWorkspaceLayout({ children }: PropsWithChildren) {
   const swapsQuery = useEmployeeShiftSwapsQuery();
   const schedulesQuery = useEmployeeScheduleListQuery();
   const availabilityQuery = useEmployeeAvailabilityListQuery();
+  const { data: uiState, refetch: refetchUiState } = useEmployeeUiStateQuery(Boolean(session?.employeeId));
+  const newsQuery = useSystemNewsQuery(Boolean(session?.employeeId));
   const swaps = swapsQuery.data ?? emptySwaps;
   const schedules = schedulesQuery.data ?? emptySchedules;
   const availabilityGroups = availabilityQuery.data ?? emptyAvailabilityGroups;
@@ -161,9 +166,30 @@ export function EmployeeWorkspaceLayout({ children }: PropsWithChildren) {
       window.removeEventListener(employeeNotificationReadStateEventName, refreshReadState);
     };
   }, [session?.employeeId, session?.userName]);
+  useEffect(() => {
+    if (!uiState) {
+      return;
+    }
+
+    const localReadIds = readEmployeeNotificationIdsForAccount(session?.userName, session?.employeeId);
+    const serverReadIds = new Set(uiState.readNotificationIds ?? []);
+    const mergedReadIds = new Set([...localReadIds, ...serverReadIds]);
+    setReadNotificationIds(mergedReadIds);
+    if ([...serverReadIds].some(id => !localReadIds.has(id))) {
+      writeEmployeeNotificationIdsForAccount(session?.userName, session?.employeeId, mergedReadIds);
+    }
+
+    const localOnlyIds = [...localReadIds].filter(id => !serverReadIds.has(id));
+    if (localOnlyIds.length > 0) {
+      void employeeUiStateApi.markNotificationsRead(localOnlyIds)
+        .then(() => refetchUiState())
+        .catch(() => undefined);
+    }
+  }, [session?.employeeId, session?.userName, uiState, refetchUiState]);
 
   const hasUnreadNavigationDot = (item: EmployeeNavItem) =>
-    item.notificationTarget ? unreadNotificationTargets[item.notificationTarget] : false;
+    item.notificationTarget ? unreadNotificationTargets[item.notificationTarget] ||
+      (item.notificationTarget === "alerts" && (newsQuery.data ?? []).some(message => !message.isRead)) : false;
 
   return (
     <div className={layoutClassName}>

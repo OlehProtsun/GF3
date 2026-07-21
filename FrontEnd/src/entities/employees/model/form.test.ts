@@ -65,7 +65,18 @@ describe("employee form model", () => {
       password: "123",
     }, { isCreate: false, hasLoginAccount: false })).toEqual({
       username: "Username may use letters, numbers, dots, underscores, and dashes",
-      password: "Password must be at least 6 characters long",
+      password: "Password must contain exactly 6 digits.",
+    });
+
+    expect(validateEmployeeForm({
+      firstName: "Amy",
+      lastName: "Jones",
+      email: "",
+      phone: "",
+      username: "amy.jones",
+      password: "123abc",
+    }, { isCreate: false, hasLoginAccount: true })).toEqual({
+      password: "Password must contain exactly 6 digits.",
     });
 
     expect(validateEmployeeForm({
@@ -74,7 +85,7 @@ describe("employee form model", () => {
       email: "",
       phone: "",
       username: "",
-      password: "secret1",
+      password: "123456",
     }, { isCreate: false, hasLoginAccount: false })).toEqual({
       username: "Username is required when setting a password",
     });

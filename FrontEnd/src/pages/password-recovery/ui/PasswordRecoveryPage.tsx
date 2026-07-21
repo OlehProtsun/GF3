@@ -65,7 +65,7 @@ export function PasswordRecoveryPage() {
   const canConfirmPassword =
     normalizedUsername.length > 0 &&
     normalizedCode.length === 6 &&
-    newPassword.trim().length >= 6 &&
+    /^\d{6}$/.test(newPassword.trim()) &&
     !isSendingCode &&
     !isConfirming;
 
@@ -112,8 +112,8 @@ export function PasswordRecoveryPage() {
     if (normalizedCode.length !== 6) {
       nextErrors.code = "Enter the 6-digit code from your email.";
     }
-    if (newPassword.trim().length < 6) {
-      nextErrors.newPassword = "Password must be at least 6 characters long.";
+    if (!/^\d{6}$/.test(newPassword.trim())) {
+      nextErrors.newPassword = "Password must contain exactly 6 digits.";
     }
 
     if (Object.keys(nextErrors).length > 0) {
@@ -213,10 +213,14 @@ export function PasswordRecoveryPage() {
               <TextInput
                 id="recovery-new-password"
                 type="password"
-                autoComplete="new-password"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                minLength={6}
+                maxLength={6}
+                autoComplete="654321"
                 value={newPassword}
-                placeholder="Minimum 6 characters"
-                onChange={(event) => setNewPassword(event.target.value)}
+                placeholder="Exactly 6 digits"
+                onChange={(event) => setNewPassword(event.target.value.replace(/\D/g, "").slice(0, 6))}
               />
             </LabeledField>
 

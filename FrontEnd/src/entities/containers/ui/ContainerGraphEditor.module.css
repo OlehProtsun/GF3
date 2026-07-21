@@ -812,6 +812,24 @@
   align-items: center;
 }
 
+.swapPermission {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 150px;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  border-radius: 20px;
+  background: rgba(248, 250, 252, 0.76);
+}
+
+.swapPermissionCopy { min-width: 0; display: grid; gap: 3px; }
+.swapPermissionCopy strong { color: #0f172a; font-size: 0.86rem; font-weight: 900; }
+.swapPermissionCopy span { color: #64748b; font-size: 0.75rem; line-height: 1.4; }
+.swapPermissionControl { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 5px; padding: 4px; border: 1px solid rgba(148, 163, 184, 0.16); border-radius: 18px; background: rgba(241, 245, 249, 0.82); }
+
+@media (max-width: 520px) { .swapPermission { grid-template-columns: 1fr; } }
+
 .removeEmployeeButton {
   width: 30px;
   height: 30px;

@@ -13,6 +13,7 @@ describe("container graph form model", () => {
 
     expect(form.shopId).toBe("42");
     expect(form.publicationStatus).toBe("private");
+    expect(form.allowSwap).toBe(true);
     expect(form.peoplePerShift).toBe("1");
     expect(Number(form.year)).toBeGreaterThanOrEqual(2026);
     expect(Number(form.month)).toBeGreaterThanOrEqual(1);

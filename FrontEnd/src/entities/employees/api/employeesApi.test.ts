@@ -38,7 +38,7 @@ describe("employees api", () => {
       phone: " ",
       email: " grace@example.com ",
       username: " ",
-      password: "new-password",
+      password: "654321",
     });
 
     expect(requestMock).toHaveBeenNthCalledWith(1, "employees", {
@@ -60,7 +60,7 @@ describe("employees api", () => {
         phone: undefined,
         email: "grace@example.com",
         username: undefined,
-        password: "new-password",
+        password: "654321",
       },
     });
   });

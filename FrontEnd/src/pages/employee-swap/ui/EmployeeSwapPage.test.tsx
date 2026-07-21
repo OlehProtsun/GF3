@@ -1,9 +1,10 @@
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 import type { EmployeeSchedule } from "@entities/employee-schedule";
 import type { ShiftSwap, ShiftSwapEmployee } from "@entities/shift-swaps";
 import { EmployeeSwapPage } from "./EmployeeSwapPage";
+import styles from "./EmployeeSwapPage.module.css";
 
 const mocks = vi.hoisted(() => ({
   schedulesQuery: vi.fn(),
@@ -12,6 +13,8 @@ const mocks = vi.hoisted(() => ({
   createMutate: vi.fn(),
   acceptMutate: vi.fn(),
   cancelMutate: vi.fn(),
+  setPinMutate: vi.fn(),
+  initialPinnedSwapIds: [] as number[],
   mutationState: {
     createPending: false,
     acceptPending: false,
@@ -33,7 +36,33 @@ vi.mock("@entities/employee-schedule", () => ({
   useEmployeeScheduleListQuery: () => mocks.schedulesQuery(),
 }));
 
-vi.mock("@entities/shift-swaps", () => ({
+vi.mock("@entities/employee-ui-state", async () => {
+  const { useState } = await import("react");
+  let updatePinnedIds: ((updater: (current: number[]) => number[]) => void) | null = null;
+
+  return {
+    useEmployeeUiStateQuery: () => {
+      const [pinnedSwapIds, setPinnedSwapIds] = useState<number[]>(() => mocks.initialPinnedSwapIds);
+      updatePinnedIds = updater => setPinnedSwapIds(updater);
+      return {
+        data: { scheduleColumnOrders: {}, readNotificationIds: [], pinnedSwapIds },
+        error: null,
+      };
+    },
+    useSetEmployeeSwapPinMutation: () => ({
+      mutate: ({ swapId, pinned }: { swapId: number; pinned: boolean }) => {
+        mocks.setPinMutate({ swapId, pinned });
+        updatePinnedIds?.(current => pinned
+          ? [swapId, ...current.filter(id => id !== swapId)]
+          : current.filter(id => id !== swapId));
+      },
+      isPending: false,
+    }),
+  };
+});
+
+vi.mock("@entities/shift-swaps", async importOriginal => ({
+  ...(await importOriginal<typeof import("@entities/shift-swaps")>()),
   useEmployeeShiftSwapsQuery: () => mocks.swapsQuery(),
   useEmployeeShiftSwapEmployeesQuery: () => mocks.employeesQuery(),
   useCreateEmployeeShiftSwapMutation: () => ({
@@ -155,12 +184,15 @@ function renderPage() {
 }
 
 beforeEach(() => {
+  window.localStorage.clear();
   mocks.schedulesQuery.mockReset();
   mocks.swapsQuery.mockReset();
   mocks.employeesQuery.mockReset();
   mocks.createMutate.mockReset();
   mocks.acceptMutate.mockReset();
   mocks.cancelMutate.mockReset();
+  mocks.setPinMutate.mockReset();
+  mocks.initialPinnedSwapIds = [];
   mocks.mutationState.createPending = false;
   mocks.mutationState.acceptPending = false;
   mocks.mutationState.cancelPending = false;
@@ -215,6 +247,131 @@ describe("EmployeeSwapPage", () => {
     expect(mocks.createMutate).not.toHaveBeenCalled();
   });
 
+  test("filters open swap offers by employee names and schedule name", async () => {
+    const user = userEvent.setup();
+    mocks.swapsQuery.mockReturnValue({
+      data: [
+        createSwap({
+          id: 5,
+          scheduleName: "Morning Core",
+          fromEmployeeName: "Alicia Stone",
+        }),
+        createSwap({
+          id: 6,
+          scheduleName: "Night Support",
+          fromEmployeeName: "Bohdan Reed",
+          targetEmployeeName: "Marta Lane",
+          visibility: "private",
+        }),
+      ],
+      isLoading: false,
+      error: null,
+    });
+
+    renderPage();
+
+    const searchInput = screen.getByRole("searchbox", { name: "Search swaps by giver, receiver, date or schedule" });
+
+    expect(screen.getByText("Morning Core")).toBeInTheDocument();
+    expect(screen.getByText("Night Support")).toBeInTheDocument();
+
+    await user.type(searchInput, "Marta");
+    await waitFor(() => expect(screen.queryByText("Morning Core")).not.toBeInTheDocument());
+    expect(screen.getByText("Night Support")).toBeInTheDocument();
+
+    await user.clear(searchInput);
+    await user.type(searchInput, "Alicia Stone");
+    await waitFor(() => expect(screen.queryByText("Night Support")).not.toBeInTheDocument());
+    expect(screen.getByText("Morning Core")).toBeInTheDocument();
+
+    await user.clear(searchInput);
+    await user.type(searchInput, "support");
+    await waitFor(() => expect(screen.queryByText("Morning Core")).not.toBeInTheDocument());
+    expect(screen.getByText("Night Support")).toBeInTheDocument();
+
+    await user.clear(searchInput);
+    await user.type(searchInput, "01/05/2026");
+    await waitFor(() => expect(screen.getByText("Morning Core")).toBeInTheDocument());
+    expect(screen.getByText("Night Support")).toBeInTheDocument();
+
+    await user.clear(searchInput);
+    await user.type(searchInput, "missing");
+    await waitFor(() => expect(screen.queryByText("Night Support")).not.toBeInTheDocument());
+    expect(screen.getByText('No open swap offers match "missing".')).toBeInTheDocument();
+  });
+
+  test("toggles details from the card and controls pinning from the pin button", async () => {
+    const user = userEvent.setup();
+    mocks.swapsQuery.mockReturnValue({
+      data: [
+        createSwap({ id: 5, scheduleName: "Morning Core" }),
+        createSwap({ id: 6, scheduleName: "Night Support" }),
+      ],
+      isLoading: false,
+      error: null,
+    });
+
+    renderPage();
+
+    const card = screen.getByText("Night Support").closest("article");
+    expect(card).not.toBeNull();
+    await user.click(within(card as HTMLElement).getByText("Night Support"));
+
+    expect(card).toHaveAttribute("data-expanded", "true");
+    expect(card).toHaveAttribute("data-pinned", "false");
+    expect(mocks.setPinMutate).not.toHaveBeenCalled();
+
+    await user.click(within(card as HTMLElement).getByText("Night Support"));
+    expect(card).toHaveAttribute("data-expanded", "false");
+
+    await user.click(within(card as HTMLElement).getByRole("button", { name: "Pin Night Support swap" }));
+
+    expect(card).toHaveClass(styles.offerCardPinned);
+    expect(card).toHaveAttribute("data-pinned", "true");
+    expect(mocks.setPinMutate).toHaveBeenLastCalledWith({ swapId: 6, pinned: true });
+
+    await user.click(within(card as HTMLElement).getByText("Night Support"));
+    expect(card).toHaveAttribute("data-expanded", "true");
+    expect(card).toHaveAttribute("data-pinned", "true");
+
+    await user.click(within(card as HTMLElement).getByRole("button", { name: "Unpin Night Support swap" }));
+    expect(screen.getByRole("dialog", { name: "Unpin swap?" })).toBeInTheDocument();
+    expect(card).toHaveAttribute("data-pinned", "true");
+
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(card).toHaveAttribute("data-pinned", "true");
+
+    await user.click(within(card as HTMLElement).getByRole("button", { name: "Unpin Night Support swap" }));
+    await user.click(screen.getByRole("button", { name: "Unpin" }));
+    expect(card).toHaveAttribute("data-pinned", "false");
+    expect(mocks.setPinMutate).toHaveBeenLastCalledWith({ swapId: 6, pinned: false });
+  });
+
+  test("adds independent scroll containers when offers and history contain five swaps", () => {
+    mocks.swapsQuery.mockReturnValue({
+      data: [
+        ...Array.from({ length: 5 }, (_, index) => createSwap({
+          id: index + 1,
+          scheduleName: `Open ${index + 1}`,
+        })),
+        ...Array.from({ length: 5 }, (_, index) => createSwap({
+          id: index + 101,
+          scheduleName: `History ${index + 1}`,
+          status: "accepted",
+        })),
+      ],
+      isLoading: false,
+      error: null,
+    });
+
+    renderPage();
+
+    const offersSection = screen.getByRole("heading", { name: "Open swaps" }).closest("section");
+    const historySection = screen.getByRole("heading", { name: "Recent swap activity" }).closest("section");
+    expect(offersSection?.querySelector(`.${styles.offerListScrollable}`)).not.toBeNull();
+    expect(historySection?.querySelector(`.${styles.offerListScrollable}`)).not.toBeNull();
+  });
+
   test("accepts open offers, cancels own offers, and disables locked offers", async () => {
     const user = userEvent.setup();
     mocks.swapsQuery.mockReturnValue({
@@ -257,12 +414,16 @@ describe("EmployeeSwapPage", () => {
 
     renderPage();
 
-    await user.click(screen.getByRole("button", { name: "Expand May Schedule swap" }));
+    const mayCard = screen.getByRole("button", { name: "Pin May Schedule swap" }).closest("article") as HTMLElement;
+    await user.click(within(mayCard).getByText("May Schedule"));
     await user.click(screen.getByRole("button", { name: "Accept" }));
-    await user.click(screen.getByRole("button", { name: "Expand Own offer swap" }));
+    const ownCard = screen.getByRole("button", { name: "Pin Own offer swap" }).closest("article") as HTMLElement;
+    await user.click(within(ownCard).getByText("Own offer"));
     await user.click(screen.getByRole("button", { name: "Cancel offer" }));
-    await user.click(screen.getByRole("button", { name: "Expand Locked offer swap" }));
-    await user.click(screen.getByRole("button", { name: "Expand Overlap offer swap" }));
+    const lockedCard = screen.getByRole("button", { name: "Pin Locked offer swap" }).closest("article") as HTMLElement;
+    await user.click(within(lockedCard).getByText("Locked offer"));
+    const overlapCard = screen.getByRole("button", { name: "Pin Overlap offer swap" }).closest("article") as HTMLElement;
+    await user.click(within(overlapCard).getByText("Overlap offer"));
 
     expect(mocks.acceptMutate).toHaveBeenCalledWith(5, expect.objectContaining({
       onError: expect.any(Function),

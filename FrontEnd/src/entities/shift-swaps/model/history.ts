@@ -33,7 +33,7 @@ function buildDateSearchValues(item: ShiftSwap) {
   ];
 }
 
-export function filterAcceptedShiftSwapHistory(items: ShiftSwap[], query: string) {
+export function filterShiftSwaps(items: ShiftSwap[], query: string) {
   const terms = normalizeSearchValue(query).split(/\s+/).filter(Boolean);
   if (terms.length === 0) {
     return items;
@@ -54,3 +54,5 @@ export function filterAcceptedShiftSwapHistory(items: ShiftSwap[], query: string
     return terms.every(term => searchableValue.includes(term));
   });
 }
+
+export const filterAcceptedShiftSwapHistory = filterShiftSwaps;
