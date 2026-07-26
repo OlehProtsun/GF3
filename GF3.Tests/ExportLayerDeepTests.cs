@@ -953,6 +953,9 @@ public sealed class ExportLayerDeepTests
         public Task UpdateGraphAsync(int containerId, int graphId, ScheduleModel model, CancellationToken ct = default)
             => Task.CompletedTask;
 
+        public Task<int> UpdateGraphPublicationAsync(int containerId, SchedulePublicationStatus publicationStatus, bool? allowSwap, CancellationToken ct = default)
+            => Task.FromResult(Graphs.Count);
+
         public Task DeleteGraphAsync(int containerId, int graphId, CancellationToken ct = default)
             => Task.CompletedTask;
 

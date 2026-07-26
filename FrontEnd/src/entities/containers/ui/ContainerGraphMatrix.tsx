@@ -2,6 +2,7 @@ import { memo, useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties, ClipboardEvent, DragEvent, FocusEvent, KeyboardEvent, MouseEvent, ReactNode } from "react";
 import {
   GRAPH_EMPTY_MARK,
+  buildGraphDayShiftStaffingCounts,
   getGraphCellKey,
   getGraphDaysInMonth,
   getGraphWeekdayLabel,
@@ -31,7 +32,7 @@ export type ContainerGraphMatrixEditMode = "deferred" | "inline";
 export type ContainerGraphMatrixEmptyCellVariant = "neutral" | "danger";
 
 type ContainerGraphMatrixProps = {
-  graph: Pick<Graph, "year" | "month">;
+  graph: Pick<Graph, "year" | "month"> & Partial<Pick<Graph, "shift1Time" | "shift2Time">>;
   columns: GraphMatrixColumn[];
   cellMap: GraphMatrixCellMap;
   visualHintMap?: GraphMatrixCellMap;
@@ -51,6 +52,7 @@ type ContainerGraphMatrixProps = {
   compactSize?: boolean;
   neutralStyle?: boolean;
   showColumnTotals?: boolean;
+  showShiftStaffingCounts?: boolean;
   allowColumnResize?: boolean;
   stretchColumns?: boolean;
   compactHeader?: boolean;
@@ -141,6 +143,7 @@ type MatrixValueCellProps = {
 
 type MatrixDayCellProps = {
   day: MatrixDay;
+  shiftStaffingCounts?: number[];
   selectionEnabled: boolean;
   isSelected: boolean;
   inlineStyle: CSSProperties;
@@ -314,10 +317,16 @@ function getSelectionTarget(target: EventTarget | null) {
 
 const MatrixDayCell = memo(function MatrixDayCell({
   day,
+  shiftStaffingCounts,
   selectionEnabled,
   isSelected,
   inlineStyle,
 }: MatrixDayCellProps) {
+  const staffingLabel = shiftStaffingCounts?.join(",") ?? "";
+  const staffingDescription = shiftStaffingCounts
+    ?.map((count, index) => `Shift ${index + 1}: ${count} ${count === 1 ? "employee" : "employees"}`)
+    .join("; ");
+
   return (
     <th
       className={joinClassNames(
@@ -332,10 +341,16 @@ const MatrixDayCell = memo(function MatrixDayCell({
       <span
         className={joinClassNames(
           styles.dayButton,
+          shiftStaffingCounts && styles.dayButtonWithStaffing,
           isSelected && styles.dayButtonSelected,
         )}
       >
-        {day.label}
+        {shiftStaffingCounts ? (
+          <span className={styles.shiftStaffingBadge} aria-label={staffingDescription} title={staffingDescription}>
+            {staffingLabel}
+          </span>
+        ) : null}
+        <span className={styles.dayLabel}>{day.label}</span>
       </span>
     </th>
   );
@@ -608,6 +623,7 @@ export function ContainerGraphMatrix({
   compactSize = false,
   neutralStyle = false,
   showColumnTotals = true,
+  showShiftStaffingCounts = false,
   allowColumnResize = true,
   stretchColumns = true,
   compactHeader = false,
@@ -666,11 +682,22 @@ export function ContainerGraphMatrix({
       }),
     [dayConflictMap, graph.month, graph.year],
   );
+  const shiftStaffingCountsByDay = useMemo(
+    () => showShiftStaffingCounts
+      ? buildGraphDayShiftStaffingCounts({ graph, columns, cellMap })
+      : {},
+    [cellMap, columns, graph.month, graph.shift1Time, graph.shift2Time, graph.year, showShiftStaffingCounts],
+  );
   const useCompactShell = compactSize && !preserveShellHeightOnCompact;
   const effectiveEditMode: ContainerGraphMatrixEditMode = readOnly ? "deferred" : editMode;
   const selectionEnabled = Boolean(onSelectedCellKeysChange) && (!readOnly || enableSelectionWhenReadOnly);
   const cellInteractionEnabled = !readOnly || selectionEnabled;
-  const cardClassName = [styles.card, useCompactShell ? styles.cardCompact : "", className ?? ""].filter(Boolean).join(" ");
+  const cardClassName = [
+    styles.card,
+    showShiftStaffingCounts ? styles.cardWithStaffing : "",
+    useCompactShell ? styles.cardCompact : "",
+    className ?? "",
+  ].filter(Boolean).join(" ");
   const cardStyle = useMemo(
     () =>
       ({
@@ -1593,6 +1620,7 @@ export function ContainerGraphMatrix({
                     >
                       <MatrixDayCell
                         day={day}
+                        shiftStaffingCounts={shiftStaffingCountsByDay[day.dayOfMonth]}
                         selectionEnabled={selectionEnabled}
                         isSelected={selectedDaySet.has(day.dayOfMonth)}
                         inlineStyle={dayStyleMetaByDay[day.dayOfMonth]?.inlineStyle ?? EMPTY_STYLE}

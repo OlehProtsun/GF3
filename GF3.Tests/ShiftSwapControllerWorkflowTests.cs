@@ -51,6 +51,14 @@ public sealed class ShiftSwapControllerWorkflowTests
         await using var context = database.CreateContext();
         var fixture = await SeedPublishedScheduleAsync(context);
         var lockService = new ManagerEditLockService();
+        context.ScheduleCellStyles.Add(new ScheduleCellStyleModel
+        {
+            ScheduleId = fixture.ScheduleId,
+            EmployeeId = fixture.OwnerEmployeeId,
+            DayOfMonth = 1,
+            TextColorArgb = -16777216,
+        });
+        await context.SaveChangesAsync();
 
         var ownerController = new EmployeeShiftSwapsController(
             context,
@@ -105,6 +113,13 @@ public sealed class ShiftSwapControllerWorkflowTests
         Assert.False(acceptedDto.CanCancel);
         Assert.Equal(ShiftSwapStatus.Accepted, swap.Status);
         Assert.Equal(fixture.TargetEmployeeId, swap.AcceptedByEmployeeId);
+        var swapCellStyles = await context.ScheduleCellStyles
+            .Where(style => style.ScheduleId == fixture.ScheduleId && style.DayOfMonth == 1)
+            .ToDictionaryAsync(style => style.EmployeeId);
+        Assert.Equal(2, swapCellStyles.Count);
+        Assert.All(swapCellStyles.Values, style => Assert.Equal(-4458544, style.BackgroundColorArgb));
+        Assert.Equal(-16777216, swapCellStyles[fixture.OwnerEmployeeId].TextColorArgb);
+        Assert.Null(swapCellStyles[fixture.TargetEmployeeId].TextColorArgb);
         Assert.Equal(
             [
                 (fixture.OwnerEmployeeId, "08:00", "10:00"),
@@ -927,6 +942,11 @@ public sealed class ShiftSwapControllerWorkflowTests
         Assert.Equal("accepted", acceptedDto.Status);
         Assert.Equal(fixture.TargetEmployeeId, slot.EmployeeId);
         Assert.Equal(SlotStatus.ASSIGNED, slot.Status);
+        var swapCellStyle = await context.ScheduleCellStyles.SingleAsync(style =>
+            style.ScheduleId == fixture.ScheduleId &&
+            style.EmployeeId == fixture.TargetEmployeeId &&
+            style.DayOfMonth == 5);
+        Assert.Equal(-4458544, swapCellStyle.BackgroundColorArgb);
         Assert.Contains("b64:", schedule.Note, StringComparison.Ordinal);
         Assert.DoesNotContain("\"5\"", DecodeGraphMetaSuffix(schedule.Note!));
     }

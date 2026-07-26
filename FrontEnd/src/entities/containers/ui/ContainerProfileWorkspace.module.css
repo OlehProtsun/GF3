@@ -422,6 +422,54 @@
   flex-wrap: wrap;
 }
 
+.scheduleBulkActions {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.scheduleBulkButton {
+  min-height: 32px;
+  padding: 6px 10px;
+  border: 1px solid rgba(100, 116, 139, 0.2);
+  border-radius: 999px;
+  background: rgba(248, 250, 252, 0.92);
+  color: #475569;
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 850;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease;
+}
+
+.scheduleBulkPublishButton {
+  border-color: rgba(22, 163, 74, 0.2);
+  background: rgba(240, 253, 244, 0.92);
+  color: #15803d;
+}
+
+.scheduleBulkButton:hover:not(:disabled) {
+  border-color: rgba(71, 85, 105, 0.34);
+  background: #f1f5f9;
+}
+
+.scheduleBulkPublishButton:hover:not(:disabled) {
+  border-color: rgba(22, 163, 74, 0.34);
+  background: #dcfce7;
+}
+
+.scheduleBulkButton:focus-visible {
+  outline: 3px solid rgba(59, 130, 246, 0.14);
+  outline-offset: 1px;
+}
+
+.scheduleBulkButton:disabled {
+  opacity: 0.48;
+  cursor: default;
+}
+
 .multiOpenToggle {
   position: relative;
   display: inline-flex;
@@ -636,6 +684,42 @@
   box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.12);
 }
 
+.swapPermissionChoice {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #475569;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.swapPermissionOptions {
+  display: inline-flex;
+  padding: 2px;
+  border-radius: 999px;
+  background: rgba(226, 232, 240, 0.78);
+}
+
+.swapPermissionOptions button {
+  min-width: 38px !important;
+  min-height: 28px;
+  padding: 4px 9px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: #64748b;
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 850;
+  cursor: pointer;
+}
+
+.swapPermissionOptions .swapPermissionOptionActive {
+  background: #ffffff;
+  color: #1d4ed8;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.1);
+}
+
 
 
 .statisticsSummary {
@@ -834,6 +918,10 @@
 
   .scheduleHeaderActions {
     justify-content: flex-start;
+  }
+
+  .scheduleBulkActions {
+    align-self: flex-start;
   }
 
   .containerAvatar {

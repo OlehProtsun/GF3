@@ -28,6 +28,8 @@ public sealed class EmployeeShiftSwapsController(
     IWorkflowLogService workflowLogService,
     IRealtimeNotifier realtimeNotifier) : ControllerBase
 {
+    private const int AcceptedSwapCellBackgroundArgb = unchecked((int)0xFFBBF7D0);
+
     private static readonly Regex GraphNoteMetaRegex = new(
         @"(?:\r?\n\r?\n)?(?:<!--GF3_GRAPH_META:([\s\S]*?)-->|\[\[GF3_GRAPH_META:([\s\S]*?)\]\])$",
         RegexOptions.Compiled);
@@ -293,6 +295,7 @@ public sealed class EmployeeShiftSwapsController(
         }
 
         EnsureScheduleEmployee(swap.Schedule, employeeId);
+        await HighlightAcceptedSwapCellsAsync(swap, employeeId, cancellationToken).ConfigureAwait(false);
         swap.Status = ShiftSwapStatus.Accepted;
         swap.AcceptedByEmployeeId = employeeId;
         var acceptedAtUtc = DateTimeOffset.UtcNow;
@@ -439,6 +442,43 @@ public sealed class EmployeeShiftSwapsController(
             .Include(request => request.FromEmployee)
             .Include(request => request.TargetEmployee)
             .Include(request => request.AcceptedByEmployee);
+
+    private async Task HighlightAcceptedSwapCellsAsync(
+        ShiftSwapRequestModel swap,
+        int acceptingEmployeeId,
+        CancellationToken cancellationToken)
+    {
+        var affectedEmployeeIds = new HashSet<int> { acceptingEmployeeId };
+        if (swap.FromEmployeeId.HasValue)
+        {
+            affectedEmployeeIds.Add(swap.FromEmployeeId.Value);
+        }
+
+        var existingStyles = await db.ScheduleCellStyles
+            .Where(style =>
+                style.ScheduleId == swap.ScheduleId &&
+                style.DayOfMonth == swap.ScheduleSlot.DayOfMonth &&
+                affectedEmployeeIds.Contains(style.EmployeeId))
+            .ToDictionaryAsync(style => style.EmployeeId, cancellationToken)
+            .ConfigureAwait(false);
+
+        foreach (var employeeId in affectedEmployeeIds)
+        {
+            if (existingStyles.TryGetValue(employeeId, out var existingStyle))
+            {
+                existingStyle.BackgroundColorArgb = AcceptedSwapCellBackgroundArgb;
+                continue;
+            }
+
+            db.ScheduleCellStyles.Add(new ScheduleCellStyleModel
+            {
+                ScheduleId = swap.ScheduleId,
+                DayOfMonth = swap.ScheduleSlot.DayOfMonth,
+                EmployeeId = employeeId,
+                BackgroundColorArgb = AcceptedSwapCellBackgroundArgb,
+            });
+        }
+    }
 
     private async Task<ScheduleModel> LoadEmployeePublishedScheduleAsync(int scheduleId, int employeeId, CancellationToken cancellationToken)
     {

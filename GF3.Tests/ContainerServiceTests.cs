@@ -4,6 +4,7 @@ using BusinessLogicLayer.Contracts.Models;
 using BusinessLogicLayer.Generators;
 using BusinessLogicLayer.Services;
 using GF3.Tests.Infrastructure;
+using Microsoft.EntityFrameworkCore;
 using DalEnums = DataAccessLayer.Models.Enums;
 
 namespace GF3.Tests;
@@ -37,6 +38,54 @@ public sealed class ContainerServiceTests
         var deleteResult = await service.TryDeleteAsync(created.Id);
         Assert.False(deleteResult.Succeeded);
         Assert.Equal("To delete this container, first delete all graphs that belong to it.", deleteResult.Message);
+    }
+
+    [Fact]
+    public async Task UpdateGraphPublicationAsync_UpdatesOnlyContainerSchedules_AndPreservesSwapWhenPrivate()
+    {
+        await using var database = await SqliteTestDatabase.CreateAsync();
+        await using var context = database.CreateContext();
+        var service = CreateService(context, new FakeScheduleGenerator());
+
+        var container = TestDataFactory.CreateDalContainer();
+        var otherContainer = TestDataFactory.CreateDalContainer("Other Container");
+        var shop = TestDataFactory.CreateDalShop();
+        context.AddRange(container, otherContainer, shop);
+        await context.SaveChangesAsync();
+
+        var first = TestDataFactory.CreateDalSchedule(container.Id, shop.Id, "First");
+        var second = TestDataFactory.CreateDalSchedule(container.Id, shop.Id, "Second");
+        var unrelated = TestDataFactory.CreateDalSchedule(otherContainer.Id, shop.Id, "Unrelated");
+        first.AllowSwap = true;
+        second.AllowSwap = true;
+        unrelated.AllowSwap = true;
+        context.AddRange(first, second, unrelated);
+        await context.SaveChangesAsync();
+
+        var publishedCount = await service.UpdateGraphPublicationAsync(
+            container.Id,
+            SchedulePublicationStatus.Public,
+            allowSwap: false);
+
+        context.ChangeTracker.Clear();
+        var published = await context.Schedules.OrderBy(schedule => schedule.Id).ToListAsync();
+        Assert.Equal(2, publishedCount);
+        Assert.All(published.Where(schedule => schedule.ContainerId == container.Id), schedule =>
+        {
+            Assert.Equal(DalEnums.SchedulePublicationStatus.Public, schedule.PublicationStatus);
+            Assert.False(schedule.AllowSwap);
+        });
+        Assert.Equal(DalEnums.SchedulePublicationStatus.Private, published.Single(schedule => schedule.ContainerId == otherContainer.Id).PublicationStatus);
+
+        await service.UpdateGraphPublicationAsync(container.Id, SchedulePublicationStatus.Private, allowSwap: null);
+
+        context.ChangeTracker.Clear();
+        var privateSchedules = await context.Schedules.Where(schedule => schedule.ContainerId == container.Id).ToListAsync();
+        Assert.All(privateSchedules, schedule =>
+        {
+            Assert.Equal(DalEnums.SchedulePublicationStatus.Private, schedule.PublicationStatus);
+            Assert.False(schedule.AllowSwap);
+        });
     }
 
     [Fact]

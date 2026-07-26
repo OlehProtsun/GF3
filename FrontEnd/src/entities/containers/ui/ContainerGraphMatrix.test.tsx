@@ -4,6 +4,30 @@ import type { GraphRelatedScheduleHintDetail } from "@entities/containers/model/
 import { ContainerGraphMatrix } from "./ContainerGraphMatrix";
 
 describe("ContainerGraphMatrix related schedule hints", () => {
+  test("shows compact per-shift staffing counts in the day column when enabled", () => {
+    render(
+      <ContainerGraphMatrix
+        graph={{ year: 2026, month: 1, shift1Time: "08:00 - 16:00", shift2Time: "16:00 - 22:00" }}
+        columns={[
+          { employeeId: 1, kind: "employee", manualColumnId: null, graphEmployeeId: 1, label: "Ada", minHoursMonth: null, totalMinutes: 0, totalText: "" },
+          { employeeId: 2, kind: "employee", manualColumnId: null, graphEmployeeId: 2, label: "Grace", minHoursMonth: null, totalMinutes: 0, totalText: "" },
+          { employeeId: 3, kind: "employee", manualColumnId: null, graphEmployeeId: 3, label: "Linus", minHoursMonth: null, totalMinutes: 0, totalText: "" },
+          { employeeId: -1, kind: "manual", manualColumnId: 1, graphEmployeeId: null, label: "Open", minHoursMonth: null, totalMinutes: 0, totalText: "" },
+        ]}
+        cellMap={{
+          "1:1": "08:00 - 16:00",
+          "2:1": "12:00 - 20:00",
+          "3:1": "16:00 - 22:00",
+          "-1:1": "08:00 - 22:00",
+        }}
+        showShiftStaffingCounts
+        readOnly
+      />,
+    );
+
+    expect(screen.getByLabelText("Shift 1: 2 employees; Shift 2: 2 employees")).toHaveTextContent("2,2");
+  });
+
   test("exposes an employee header as a customization button", () => {
     const onColumnHeaderClick = vi.fn();
     const column = {

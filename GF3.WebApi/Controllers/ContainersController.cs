@@ -73,6 +73,71 @@ public class ContainersController(
         return Ok(graphs.Select(graph => graph.ToGraphDto(lastUpdates.GetValueOrDefault(graph.Id))));
     }
 
+    [HttpPut("{containerId:int}/graphs/publication")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> UpdateGraphsPublication(
+        int containerId,
+        [FromBody] UpdateGraphsPublicationRequest request,
+        CancellationToken cancellationToken)
+    {
+        var isPublic = string.Equals(request.PublicationStatus, "public", StringComparison.OrdinalIgnoreCase);
+        var isPrivate = string.Equals(request.PublicationStatus, "private", StringComparison.OrdinalIgnoreCase);
+        if (!isPublic && !isPrivate)
+        {
+            return BadRequest(ApiProblemDetailsFactory.CreateValidationProblem(
+                HttpContext,
+                new Dictionary<string, string[]> { [nameof(request.PublicationStatus)] = ["Publication status must be private or public."] }));
+        }
+
+        if (isPublic && !request.AllowSwap.HasValue)
+        {
+            return BadRequest(ApiProblemDetailsFactory.CreateValidationProblem(
+                HttpContext,
+                new Dictionary<string, string[]> { [nameof(request.AllowSwap)] = ["Can swap must be selected when publishing schedules."] }));
+        }
+
+        var graphs = await containerService.GetGraphsAsync(containerId, cancellationToken).ConfigureAwait(false);
+        if (graphs is null)
+        {
+            return NotFound(CreateNotFoundProblem($"Container with id {containerId} was not found."));
+        }
+
+        foreach (var graph in graphs)
+        {
+            if (CreateEditLockConflictResult(
+                    ManagerEditLockTargets.Schedule(containerId, graph.Id),
+                    $"Schedule \"{graph.Name}\"") is { } conflict)
+            {
+                return conflict;
+            }
+        }
+
+        var publicationStatus = isPublic
+            ? SchedulePublicationStatus.Public
+            : SchedulePublicationStatus.Private;
+        await containerService
+            .UpdateGraphPublicationAsync(containerId, publicationStatus, isPublic ? request.AllowSwap : null, cancellationToken)
+            .ConfigureAwait(false);
+
+        var action = isPublic
+            ? $"Published all {graphs.Count} schedules in container {containerId} with swaps {(request.AllowSwap == true ? "enabled" : "disabled")}."
+            : $"Made all {graphs.Count} schedules private in container {containerId}.";
+        await LogManagerActionAsync(action, cancellationToken).ConfigureAwait(false);
+
+        foreach (var graph in graphs)
+        {
+            await NotifyGraphChangedAsync(
+                containerId,
+                graph.Id,
+                isPublic ? "manager-schedules-published" : "manager-schedules-made-private").ConfigureAwait(false);
+        }
+
+        return NoContent();
+    }
+
     [HttpGet("{containerId:int}/schedule-presets")]
     [ProducesResponseType(typeof(IEnumerable<SchedulePresetDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]

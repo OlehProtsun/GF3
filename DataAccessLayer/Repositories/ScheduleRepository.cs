@@ -39,6 +39,26 @@ public class ScheduleRepository : GenericRepository<ScheduleModel>, IScheduleRep
     }
 
     /// <inheritdoc />
+    public async Task<int> UpdatePublicationByContainerAsync(
+        int containerId,
+        SchedulePublicationStatus publicationStatus,
+        bool? allowSwap,
+        CancellationToken ct = default)
+    {
+        var query = _set.Where(schedule => schedule.ContainerId == containerId);
+
+        return allowSwap.HasValue
+            ? await query.ExecuteUpdateAsync(
+                setters => setters
+                    .SetProperty(schedule => schedule.PublicationStatus, publicationStatus)
+                    .SetProperty(schedule => schedule.AllowSwap, allowSwap.Value),
+                ct).ConfigureAwait(false)
+            : await query.ExecuteUpdateAsync(
+                setters => setters.SetProperty(schedule => schedule.PublicationStatus, publicationStatus),
+                ct).ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
     public async Task<List<ScheduleModel>> GetByValueAsync(string value, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(value))

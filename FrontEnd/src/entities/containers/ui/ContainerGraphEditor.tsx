@@ -1000,7 +1000,10 @@ export function ContainerGraphEditor({
                   graph={{
                     year: Number(form.year) || graph?.year || new Date().getFullYear(),
                     month: Number(form.month) || graph?.month || 1,
+                    shift1Time: form.shift1Time,
+                    shift2Time: form.shift2Time,
                   }}
+                  showShiftStaffingCounts
                   columns={scheduleColumns}
                   cellMap={cellMap}
                   visualHintMap={visualHintMap}

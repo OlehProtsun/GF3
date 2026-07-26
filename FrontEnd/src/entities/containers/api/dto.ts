@@ -17,6 +17,10 @@ export type SchedulePresetDto = SchedulePreset;
 export type SchedulePresetEmployeeDto = SchedulePresetEmployee;
 
 export type SaveContainerDto = { name: string; note?: string };
+export type UpdateGraphsPublicationDto = {
+  publicationStatus: Graph["publicationStatus"];
+  allowSwap?: boolean | null;
+};
 export type SaveGraphDto = {
   shopId: number;
   name: string;

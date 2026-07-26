@@ -758,6 +758,9 @@ public sealed class WebApiEmployeeSurfaceTests
         public Task UpdateGraphAsync(int containerId, int graphId, ScheduleModel model, CancellationToken ct = default)
             => throw new NotSupportedException();
 
+        public Task<int> UpdateGraphPublicationAsync(int containerId, SchedulePublicationStatus publicationStatus, bool? allowSwap, CancellationToken ct = default)
+            => throw new NotSupportedException();
+
         public Task DeleteGraphAsync(int containerId, int graphId, CancellationToken ct = default)
             => throw new NotSupportedException();
 
