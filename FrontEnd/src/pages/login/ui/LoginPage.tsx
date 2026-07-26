@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent, type PointerEvent as ReactPointerEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@app/providers/AuthProvider";
 import { getErrorMessage } from "@shared/api/httpClient";
@@ -13,6 +13,7 @@ type PasswordMode = "pc" | "phone";
 const USERNAME_STORAGE_KEY = "gf3.auth.last-username";
 const PASSWORD_MODE_STORAGE_KEY = "gf3.auth.password-mode";
 const KEYPAD_DIGITS = ["1", "2", "3", "4", "5", "6", "7", "8", "9"];
+const PHONE_VIEWPORT_CONTENT = "width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover";
 
 function readStoredValue(key: string) {
   if (typeof window === "undefined") return "";
@@ -44,6 +45,8 @@ export function LoginPage() {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [failedPinAttempts, setFailedPinAttempts] = useState(0);
+  const passwordRef = useRef("");
+  const lastPinPointerActionRef = useRef<{ key: string; at: number } | null>(null);
 
   useEffect(() => {
     const htmlElement = document.documentElement;
@@ -58,6 +61,61 @@ export function LoginPage() {
       rootElement?.classList.remove("login-page-active");
     };
   }, []);
+
+  useEffect(() => {
+    if (passwordMode !== "phone") return;
+
+    const htmlElement = document.documentElement;
+    const bodyElement = document.body;
+    const rootElement = document.getElementById("root");
+    const viewportMeta = document.querySelector<HTMLMetaElement>('meta[name="viewport"]');
+    const previousViewportContent = viewportMeta?.getAttribute("content") ?? null;
+    const previousBodyStyles = {
+      position: bodyElement.style.position,
+      inset: bodyElement.style.inset,
+      width: bodyElement.style.width,
+      overflow: bodyElement.style.overflow,
+      top: bodyElement.style.top,
+    };
+    const scrollY = window.scrollY;
+    const preventGesture = (event: Event) => event.preventDefault();
+    const preventPinch = (event: TouchEvent) => {
+      if (event.touches.length > 1) event.preventDefault();
+    };
+
+    htmlElement.classList.add("login-phone-mode");
+    bodyElement.classList.add("login-phone-mode");
+    rootElement?.classList.add("login-phone-mode");
+    bodyElement.style.position = "fixed";
+    bodyElement.style.inset = "0";
+    bodyElement.style.width = "100%";
+    bodyElement.style.overflow = "hidden";
+    bodyElement.style.top = `-${scrollY}px`;
+    viewportMeta?.setAttribute("content", PHONE_VIEWPORT_CONTENT);
+    document.addEventListener("gesturestart", preventGesture, { passive: false });
+    document.addEventListener("gesturechange", preventGesture, { passive: false });
+    document.addEventListener("touchmove", preventPinch, { passive: false });
+
+    return () => {
+      htmlElement.classList.remove("login-phone-mode");
+      bodyElement.classList.remove("login-phone-mode");
+      rootElement?.classList.remove("login-phone-mode");
+      Object.assign(bodyElement.style, previousBodyStyles);
+      if (viewportMeta) {
+        if (previousViewportContent === null) viewportMeta.removeAttribute("content");
+        else viewportMeta.setAttribute("content", previousViewportContent);
+      }
+      document.removeEventListener("gesturestart", preventGesture);
+      document.removeEventListener("gesturechange", preventGesture);
+      document.removeEventListener("touchmove", preventPinch);
+      if (scrollY > 0) window.scrollTo(0, scrollY);
+    };
+  }, [passwordMode]);
+
+  const updatePassword = (value: string) => {
+    passwordRef.current = value;
+    setPassword(value);
+  };
 
   const submitCredentials = async (candidatePassword: string) => {
     if (isSubmitting) return;
@@ -77,7 +135,7 @@ export function LoginPage() {
     } catch (error) {
       setSubmitError(getErrorMessage(error, "Could not sign you in."));
       if (passwordMode === "phone") {
-        setPassword("");
+        updatePassword("");
         setFailedPinAttempts((current) => current + 1);
       }
     } finally {
@@ -98,23 +156,42 @@ export function LoginPage() {
 
   const handlePasswordModeChange = (mode: PasswordMode) => {
     setPasswordMode(mode);
-    setPassword("");
+    updatePassword("");
     setSubmitError(null);
     persistValue(PASSWORD_MODE_STORAGE_KEY, mode);
+    if (mode === "phone" && document.activeElement instanceof HTMLElement) document.activeElement.blur();
   };
 
   const handlePinDigit = (digit: string) => {
-    if (isSubmitting || !username.trim() || password.length >= PASSWORD_LENGTH) return;
-    const nextPassword = `${password}${digit}`;
-    setPassword(nextPassword);
+    const currentPassword = passwordRef.current;
+    if (isSubmitting || !username.trim() || currentPassword.length >= PASSWORD_LENGTH) return;
+    const nextPassword = `${currentPassword}${digit}`;
+    updatePassword(nextPassword);
     setSubmitError(null);
     if (nextPassword.length === PASSWORD_LENGTH) void submitCredentials(nextPassword);
   };
 
   const handlePinDelete = () => {
     if (isSubmitting) return;
-    setPassword((current) => current.slice(0, -1));
+    updatePassword(passwordRef.current.slice(0, -1));
     setSubmitError(null);
+  };
+
+  const handlePinPointerDown = (
+    event: ReactPointerEvent<HTMLButtonElement>,
+    actionKey: string,
+    action: () => void,
+  ) => {
+    if (event.pointerType === "mouse" || event.button !== 0) return;
+    event.preventDefault();
+    lastPinPointerActionRef.current = { key: actionKey, at: Date.now() };
+    action();
+  };
+
+  const handlePinClick = (actionKey: string, action: () => void) => {
+    const lastPointerAction = lastPinPointerActionRef.current;
+    if (lastPointerAction?.key === actionKey && Date.now() - lastPointerAction.at < 750) return;
+    action();
   };
 
   const handleOpenPasswordRecovery = () => {
@@ -141,7 +218,7 @@ export function LoginPage() {
   );
 
   return (
-    <div className={styles.page}>
+    <div className={`${styles.page} ${passwordMode === "phone" ? styles.pagePhone : ""}`}>
       <div className={styles.frame}>
         <section className={styles.card}>
           <div className={styles.cardHeader}>
@@ -182,7 +259,7 @@ export function LoginPage() {
                     value={password}
                     placeholder="••••••"
                     onChange={(event) => {
-                      setPassword(sanitizePassword(event.target.value));
+                      updatePassword(sanitizePassword(event.target.value));
                       setSubmitError(null);
                     }}
                   />
@@ -209,14 +286,33 @@ export function LoginPage() {
                         className={styles.pinKey}
                         aria-label={digit}
                         disabled={isSubmitting || !username.trim()}
-                        onClick={() => handlePinDigit(digit)}
+                        onPointerDown={(event) => handlePinPointerDown(event, digit, () => handlePinDigit(digit))}
+                        onClick={() => handlePinClick(digit, () => handlePinDigit(digit))}
                       >
                         {digit}
                       </button>
                     ))}
                     <span aria-hidden="true" />
-                    <button type="button" className={styles.pinKey} aria-label="0" disabled={isSubmitting || !username.trim()} onClick={() => handlePinDigit("0")}>0</button>
-                    <button type="button" className={styles.pinDelete} aria-label="Delete last digit" disabled={isSubmitting || password.length === 0} onClick={handlePinDelete}>Delete</button>
+                    <button
+                      type="button"
+                      className={styles.pinKey}
+                      aria-label="0"
+                      disabled={isSubmitting || !username.trim()}
+                      onPointerDown={(event) => handlePinPointerDown(event, "0", () => handlePinDigit("0"))}
+                      onClick={() => handlePinClick("0", () => handlePinDigit("0"))}
+                    >
+                      0
+                    </button>
+                    <button
+                      type="button"
+                      className={styles.pinDelete}
+                      aria-label="Delete last digit"
+                      disabled={isSubmitting || password.length === 0}
+                      onPointerDown={(event) => handlePinPointerDown(event, "delete", handlePinDelete)}
+                      onClick={() => handlePinClick("delete", handlePinDelete)}
+                    >
+                      Delete
+                    </button>
                   </div>
                   <span className={styles.pinHint}>
                     {isSubmitting ? "Checking…" : username.trim() ? "Enter your 6-digit PIN" : "Enter username to unlock keypad"}

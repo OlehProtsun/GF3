@@ -15,6 +15,7 @@ import type {
   SaveGraphSlotDto,
   SaveSchedulePresetDto,
   UpsertGraphCellStyleDto,
+  UpdateGraphsPublicationDto,
 } from "./dto";
 
 export type SaveGraphWorkspaceEmployeeAssignment = {
@@ -295,6 +296,20 @@ export function useSaveGraphWorkspaceMutation() {
       qc.invalidateQueries({ queryKey: queryKeys.containers.graphEmployees(variables.containerId, result.graphId) });
       qc.invalidateQueries({ queryKey: queryKeys.containers.graphSlots(variables.containerId, result.graphId) });
       qc.invalidateQueries({ queryKey: queryKeys.containers.graphCellStyles(variables.containerId, result.graphId) });
+      qc.invalidateQueries({ queryKey: queryKeys.employeeSchedules.all });
+      qc.invalidateQueries({ queryKey: queryKeys.shiftSwaps.all });
+    },
+  });
+}
+
+export function useUpdateGraphsPublicationMutation() {
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ containerId, payload }: { containerId: number; payload: UpdateGraphsPublicationDto }) =>
+      containersApi.updateGraphsPublication(containerId, payload),
+    onSuccess: (_, variables) => {
+      qc.invalidateQueries({ queryKey: queryKeys.containers.graphs(variables.containerId) });
       qc.invalidateQueries({ queryKey: queryKeys.employeeSchedules.all });
       qc.invalidateQueries({ queryKey: queryKeys.shiftSwaps.all });
     },

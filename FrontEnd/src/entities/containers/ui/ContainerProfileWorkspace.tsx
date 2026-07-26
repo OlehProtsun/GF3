@@ -8,6 +8,7 @@ import {
   type ShiftSwap,
 } from "@entities/shift-swaps";
 import { getErrorMessage } from "@shared/api/httpClient";
+import { useUpdateGraphsPublicationMutation } from "@entities/containers/api/queries";
 import { ConfirmDialog } from "@shared/ui/ConfirmDialog";
 import { ErrorBanner } from "@shared/ui/components/ErrorBanner";
 import { IosButton } from "@shared/ui/components/IosButton";
@@ -81,6 +82,7 @@ function getSwapReceiver(swap: ShiftSwap) {
 }
 
 type SwapAction = { type: "cancel" | "delete"; swap: ShiftSwap } | null;
+type SchedulePublicationAction = "publish" | "private" | null;
 
 type MultiOpenHeaderToggleProps = {
   checked: boolean;
@@ -141,11 +143,15 @@ export function ContainerProfileWorkspace({
   const [selectedSwap, setSelectedSwap] = useState<ShiftSwap | null>(null);
   const [swapAction, setSwapAction] = useState<SwapAction>(null);
   const [swapActionError, setSwapActionError] = useState<string | null>(null);
+  const [schedulePublicationAction, setSchedulePublicationAction] = useState<SchedulePublicationAction>(null);
+  const [bulkAllowSwap, setBulkAllowSwap] = useState(true);
+  const [schedulePublicationError, setSchedulePublicationError] = useState<string | null>(null);
   const [collapsedSections, setCollapsedSections] = useState({ information: false, swaps: false });
   const allSectionsCollapsed = collapsedSections.information && collapsedSections.swaps;
   const swapsQuery = useContainerShiftSwapsQuery(container?.id ?? null, Boolean(container));
   const cancelSwapMutation = useCancelContainerShiftSwapMutation();
   const deleteSwapMutation = useDeleteContainerShiftSwapMutation();
+  const updateGraphsPublicationMutation = useUpdateGraphsPublicationMutation();
   const swaps = useMemo(() => swapsQuery.data ?? [], [swapsQuery.data]);
   const filteredSwaps = useMemo(
     () => filterShiftSwaps(swaps, swapSearchQuery),
@@ -220,6 +226,27 @@ export function ContainerProfileWorkspace({
           setSelectedSwap(current => current?.id === swapAction.swap.id ? null : current);
         },
         onError: error => setSwapActionError(getErrorMessage(error, `Could not ${swapAction.type} this swap.`)),
+      },
+    );
+  };
+
+  const handleSchedulePublicationConfirm = () => {
+    if (!container || !schedulePublicationAction) {
+      return;
+    }
+
+    setSchedulePublicationError(null);
+    updateGraphsPublicationMutation.mutate(
+      {
+        containerId: container.id,
+        payload: {
+          publicationStatus: schedulePublicationAction === "publish" ? "public" : "private",
+          allowSwap: schedulePublicationAction === "publish" ? bulkAllowSwap : null,
+        },
+      },
+      {
+        onSuccess: () => setSchedulePublicationAction(null),
+        onError: error => setSchedulePublicationError(getErrorMessage(error, "Could not update all schedules.")),
       },
     );
   };
@@ -433,6 +460,32 @@ export function ContainerProfileWorkspace({
               icon={<ScheduleIcon size={18} />}
               headerRightSlot={
                 <div className={styles.scheduleHeaderRow}>
+                  <div className={styles.scheduleBulkActions} aria-label="Schedule publication actions">
+                    <button
+                      type="button"
+                      className={joinClassNames(styles.scheduleBulkButton, styles.scheduleBulkPublishButton)}
+                      disabled={totalGraphsCount === 0 || updateGraphsPublicationMutation.isPending}
+                      onClick={() => {
+                        setBulkAllowSwap(true);
+                        setSchedulePublicationError(null);
+                        setSchedulePublicationAction("publish");
+                      }}
+                    >
+                      Publish all
+                    </button>
+                    <button
+                      type="button"
+                      className={styles.scheduleBulkButton}
+                      disabled={totalGraphsCount === 0 || updateGraphsPublicationMutation.isPending}
+                      onClick={() => {
+                        setSchedulePublicationError(null);
+                        setSchedulePublicationAction("private");
+                      }}
+                    >
+                      Make private
+                    </button>
+                  </div>
+
                   <label className={styles.searchField} htmlFor="container-graphs-search">
                     <SearchIcon className={styles.searchIcon} />
                     <input
@@ -468,6 +521,10 @@ export function ContainerProfileWorkspace({
             >
               <div className={styles.scheduleBody}>
                 <div className={styles.scheduleContent}>
+                  {schedulePublicationError ? (
+                    <ErrorBanner className={styles.inlineBanner}>{schedulePublicationError}</ErrorBanner>
+                  ) : null}
+
                   {isGraphsLoading && totalGraphsCount === 0 ? (
                     <div className={styles.state}>Loading schedules...</div>
                   ) : null}
@@ -663,6 +720,45 @@ export function ContainerProfileWorkspace({
           </>
         )}
       </CardSection>
+
+      <ConfirmDialog
+        open={schedulePublicationAction !== null}
+        variant={schedulePublicationAction === "publish" ? "confirm" : "warning"}
+        title={schedulePublicationAction === "publish" ? "Publish all schedules" : "Make all schedules private"}
+        message={schedulePublicationError ?? (schedulePublicationAction === "publish"
+          ? `Publish all ${totalGraphsCount} schedules in this container?`
+          : `Make all ${totalGraphsCount} schedules private? Employees will no longer see them.`)}
+        confirmText={updateGraphsPublicationMutation.isPending
+          ? "Working..."
+          : schedulePublicationAction === "publish" ? "Publish all" : "Make private"}
+        confirmDisabled={updateGraphsPublicationMutation.isPending}
+        cancelDisabled={updateGraphsPublicationMutation.isPending}
+        footerSlot={schedulePublicationAction === "publish" ? (
+          <div className={styles.swapPermissionChoice}>
+            <span>Can swap</span>
+            <div className={styles.swapPermissionOptions}>
+              <button
+                type="button"
+                className={bulkAllowSwap ? styles.swapPermissionOptionActive : undefined}
+                aria-pressed={bulkAllowSwap}
+                onClick={() => setBulkAllowSwap(true)}
+              >
+                Yes
+              </button>
+              <button
+                type="button"
+                className={!bulkAllowSwap ? styles.swapPermissionOptionActive : undefined}
+                aria-pressed={!bulkAllowSwap}
+                onClick={() => setBulkAllowSwap(false)}
+              >
+                No
+              </button>
+            </div>
+          </div>
+        ) : undefined}
+        onCancel={() => setSchedulePublicationAction(null)}
+        onConfirm={handleSchedulePublicationConfirm}
+      />
 
       <ShiftSwapHistoryDialog open={selectedSwap !== null} swap={selectedSwap} onCancel={() => setSelectedSwap(null)} />
       <ConfirmDialog

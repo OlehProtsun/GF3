@@ -329,6 +329,7 @@ export function ContainerGraphProfileWorkspace({
       className={joinClassNames(styles.matrixCard, compactSize && styles.matrixCardCompact)}
       style={matrixCardStyle}
       graph={graph}
+      showShiftStaffingCounts
       compactSize={compactSize}
       columns={columns}
       cellMap={cellMap}

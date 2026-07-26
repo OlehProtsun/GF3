@@ -256,23 +256,25 @@ export function InformationPage() {
           <div className={styles.stateText}>No workflow activity yet.</div>
         ) : (
           <div className={styles.activityLayout}>
-            <div className={styles.dayRail} aria-label="Workflow log days">
-              {logDays.map(day => {
-                const isSelected = day.key === selectedDay?.key;
+            <div className={styles.dayRailShell}>
+              <div className={styles.dayRail} aria-label="Workflow log days">
+                {logDays.map(day => {
+                  const isSelected = day.key === selectedDay?.key;
 
-                return (
-                  <button
-                    key={day.key}
-                    type="button"
-                    className={[styles.dayButton, isSelected ? styles.dayButtonActive : ""].filter(Boolean).join(" ")}
-                    aria-pressed={isSelected}
-                    onClick={() => setSelectedDayKey(day.key)}
-                  >
-                    <span>{day.label}</span>
-                    <strong>{day.logs.length}</strong>
-                  </button>
-                );
-              })}
+                  return (
+                    <button
+                      key={day.key}
+                      type="button"
+                      className={[styles.dayButton, isSelected ? styles.dayButtonActive : ""].filter(Boolean).join(" ")}
+                      aria-pressed={isSelected}
+                      onClick={() => setSelectedDayKey(day.key)}
+                    >
+                      <span>{day.label}</span>
+                      <strong>{day.logs.length}</strong>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
 
             <div className={styles.timelinePanel}>

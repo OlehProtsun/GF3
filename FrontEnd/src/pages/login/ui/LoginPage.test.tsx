@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { BrowserRouter } from "react-router-dom";
 import { beforeEach, describe, expect, test, vi } from "vitest";
@@ -60,5 +60,37 @@ describe("LoginPage password modes", () => {
     }
 
     await waitFor(() => expect(mocks.login).toHaveBeenCalledWith({ username: "manager", password: "123456" }));
+  });
+
+  test("handles rapid phone pointer presses without losing digits", async () => {
+    window.localStorage.setItem("gf3.auth.last-username", "manager");
+    window.localStorage.setItem("gf3.auth.password-mode", "phone");
+    renderPage();
+
+    for (const digit of ["1", "2", "3", "4", "5", "6"]) {
+      fireEvent.pointerDown(screen.getByRole("button", { name: digit }), { pointerType: "touch", button: 0 });
+    }
+
+    await waitFor(() => expect(mocks.login).toHaveBeenCalledWith({ username: "manager", password: "123456" }));
+  });
+
+  test("locks and restores the page viewport in phone mode", () => {
+    const viewportMeta = document.querySelector<HTMLMetaElement>('meta[name="viewport"]') ?? document.createElement("meta");
+    viewportMeta.name = "viewport";
+    viewportMeta.content = "width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes";
+    if (!viewportMeta.isConnected) document.head.appendChild(viewportMeta);
+    window.localStorage.setItem("gf3.auth.password-mode", "phone");
+
+    const page = renderPage();
+
+    expect(document.documentElement).toHaveClass("login-phone-mode");
+    expect(document.body).toHaveClass("login-phone-mode");
+    expect(viewportMeta.content).toContain("user-scalable=no");
+
+    page.unmount();
+
+    expect(document.documentElement).not.toHaveClass("login-phone-mode");
+    expect(document.body).not.toHaveClass("login-phone-mode");
+    expect(viewportMeta.content).toContain("user-scalable=yes");
   });
 });

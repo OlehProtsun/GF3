@@ -2,7 +2,7 @@ import {
   buildGraphCellMap,
   buildGraphConflictDayMap,
   buildGraphMatrixColumns,
-  buildGraphRelatedScheduleHintMap,
+  buildGraphRelatedScheduleHintData,
   buildGraphStyleMap,
   buildGraphTotals,
   containersApi,
@@ -20,6 +20,7 @@ import {
   type GraphMatrixCellMap,
   type GraphMatrixColumn,
   type GraphMatrixStyleMap,
+  type GraphRelatedScheduleHintDetailMap,
   type GraphSlot,
   type GraphTotals,
 } from "@entities/containers";
@@ -31,11 +32,12 @@ import type { Shop } from "@entities/shops/model/types";
 
 export type HomeWhoWorksTodayRow = {
   id: string;
+  employeeId: number;
+  graphId: number;
   dateLabel: string;
   employee: string;
   shift: string;
   shop: string;
-  route: string;
 };
 
 export type HomeSchedulePreview = {
@@ -47,6 +49,7 @@ export type HomeSchedulePreview = {
   columns: GraphMatrixColumn[];
   cellMap: GraphMatrixCellMap;
   visualHintMap: GraphMatrixCellMap;
+  visualHintDetailMap: GraphRelatedScheduleHintDetailMap;
   styleMap: GraphMatrixStyleMap;
   dayConflictMap: Record<number, boolean>;
   totals: GraphTotals;
@@ -66,9 +69,7 @@ export type HomeDashboardData = {
   currentMonthTotalSchedules: number;
   currentMonthTotalHoursText: string;
   currentMonthTotalShops: number;
-  overallTotalEmployees: number;
-  overallTotalContainers: number;
-  overallTotalShops: number;
+  todayActiveEmployeesCount: number;
   statusText: string;
   todayRows: HomeWhoWorksTodayRow[];
   activeSchedules: HomeSchedulePreview[];
@@ -176,6 +177,15 @@ function buildHomeSchedulePreview(
     ...rehydrateGraphNoteTextCells(parsedGraphNote.textCells),
     ...manualCellMap,
   };
+  const relatedScheduleHintData = buildGraphRelatedScheduleHintData({
+    currentGraph: graph,
+    columns,
+    cellMap,
+    relatedGraphs: relatedGraphs.map(relatedGraph => ({
+      graph: relatedGraph.graph,
+      slots: relatedGraph.slots,
+    })),
+  });
 
   return {
     graph,
@@ -185,15 +195,8 @@ function buildHomeSchedulePreview(
     route: `/container/${container.id}/graphs/${graph.id}`,
     columns,
     cellMap,
-    visualHintMap: buildGraphRelatedScheduleHintMap({
-      currentGraph: graph,
-      columns,
-      cellMap,
-      relatedGraphs: relatedGraphs.map(relatedGraph => ({
-        graph: relatedGraph.graph,
-        slots: relatedGraph.slots,
-      })),
-    }),
+    visualHintMap: relatedScheduleHintData.visualHintMap,
+    visualHintDetailMap: relatedScheduleHintData.detailMap,
     styleMap: buildGraphStyleMap([
       ...cellStyles,
       ...rehydrateGraphNoteCellStyles(parsedGraphNote.cellStyles, graph.id),
@@ -295,6 +298,7 @@ export async function loadHomeDashboard(signal?: AbortSignal): Promise<HomeDashb
   const monthEmployeeIds = new Set<number>();
   const monthShopIds = new Set<number>();
   const activeContainerIds = new Set<number>();
+  const todayEmployeeIds = new Set<number>();
   const todayRowsByKey = new Map<string, HomeWhoWorksTodayRow>();
   let monthTotalMinutes = 0;
 
@@ -334,18 +338,20 @@ export async function loadHomeDashboard(signal?: AbortSignal): Promise<HomeDashb
 
       const employeeName = getEmployeeFullName(employeesById.get(slot.employeeId), `Employee ${slot.employeeId}`);
       const shift = `${slot.fromTime} - ${slot.toTime}`;
-      const rowKey = `${slot.dayOfMonth}:${employeeName}:${shift}:${shopName}`;
+      const rowKey = `${record.graph.id}:${slot.id}`;
       if (todayRowsByKey.has(rowKey)) {
         return;
       }
 
+      todayEmployeeIds.add(slot.employeeId);
       todayRowsByKey.set(rowKey, {
         id: rowKey,
+        employeeId: slot.employeeId,
+        graphId: record.graph.id,
         dateLabel: formatShortDate(currentYear, currentMonth, slot.dayOfMonth),
         employee: employeeName,
         shift,
         shop: shopName,
-        route: `/container/${record.container.id}/graphs/${record.graph.id}`,
       });
     });
 
@@ -401,9 +407,7 @@ export async function loadHomeDashboard(signal?: AbortSignal): Promise<HomeDashb
     currentMonthTotalSchedules: monthGraphs.length,
     currentMonthTotalHoursText: formatHoursMinutes(monthTotalMinutes),
     currentMonthTotalShops: monthShopIds.size,
-    overallTotalEmployees: employees.length,
-    overallTotalContainers: containers.length,
-    overallTotalShops: shops.length,
+    todayActiveEmployeesCount: todayEmployeeIds.size,
     statusText: hasPartialData
       ? "Home data loaded with a few missing schedule previews."
       : "Home data is up to date.",

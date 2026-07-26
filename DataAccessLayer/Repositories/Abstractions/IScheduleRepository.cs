@@ -1,4 +1,5 @@
 using DataAccessLayer.Models;
+using DataAccessLayer.Models.Enums;
 
 namespace DataAccessLayer.Repositories.Abstractions;
 
@@ -16,6 +17,15 @@ public interface IScheduleRepository : IBaseRepository<ScheduleModel>
     /// Returns schedules that belong to one container, optionally filtered by a search term.
     /// </summary>
     Task<List<ScheduleModel>> GetByContainerAsync(int containerId, string? value = null, CancellationToken ct = default);
+
+    /// <summary>
+    /// Updates publication settings for every schedule in one container atomically.
+    /// </summary>
+    Task<int> UpdatePublicationByContainerAsync(
+        int containerId,
+        SchedulePublicationStatus publicationStatus,
+        bool? allowSwap,
+        CancellationToken ct = default);
 
     /// <summary>
     /// Returns public schedules assigned to one employee.

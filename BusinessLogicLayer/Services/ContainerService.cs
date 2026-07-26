@@ -152,6 +152,18 @@ public class ContainerService : IContainerService
         await _scheduleRepo.UpdateAsync(model.ToDal(), ct).ConfigureAwait(false);
     }
 
+    public async Task<int> UpdateGraphPublicationAsync(
+        int containerId,
+        SchedulePublicationStatus publicationStatus,
+        bool? allowSwap,
+        CancellationToken ct = default)
+    {
+        await EnsureContainerExistsAsync(containerId, ct).ConfigureAwait(false);
+        return await _scheduleRepo
+            .UpdatePublicationByContainerAsync(containerId, publicationStatus.ToDal(), allowSwap, ct)
+            .ConfigureAwait(false);
+    }
+
     public async Task DeleteGraphAsync(int containerId, int graphId, CancellationToken ct = default)
     {
         await EnsureGraphOwnershipAsync(containerId, graphId, ct).ConfigureAwait(false);

@@ -16,6 +16,7 @@ import type {
   SaveGraphSlotDto,
   SchedulePresetDto,
   UpsertGraphCellStyleDto,
+  UpdateGraphsPublicationDto,
 } from "./dto";
 
 const endpoint = "containers";
@@ -32,6 +33,8 @@ export const containersApi = {
   createGraph: (containerId: number, payload: SaveGraphDto) => request<GraphDto>(`${endpoint}/${containerId}/graphs`, { method: "POST", body: payload }),
   updateGraph: (containerId: number, graphId: number, payload: SaveGraphDto) =>
     request<void>(`${endpoint}/${containerId}/graphs/${graphId}`, { method: "PUT", body: payload }),
+  updateGraphsPublication: (containerId: number, payload: UpdateGraphsPublicationDto) =>
+    request<void>(`${endpoint}/${containerId}/graphs/publication`, { method: "PUT", body: payload }),
   removeGraph: (containerId: number, graphId: number) => request<void>(`${endpoint}/${containerId}/graphs/${graphId}`, { method: "DELETE" }),
   listSchedulePresets: (containerId: number, signal?: AbortSignal) =>
     request<SchedulePresetDto[]>(`${endpoint}/${containerId}/schedule-presets`, { signal }),

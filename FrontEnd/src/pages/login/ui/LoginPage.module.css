@@ -6,6 +6,15 @@
   overscroll-behavior-y: auto;
 }
 
+:global(html.login-phone-mode),
+:global(body.login-phone-mode),
+:global(#root.login-phone-mode) {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
 .page {
   position: relative;
   box-sizing: border-box;
@@ -17,6 +26,15 @@
   overflow: visible;
   padding: clamp(1rem, 2.6vw, 2rem);
   background: var(--app-page-background, #f3f4f6);
+}
+
+.pagePhone {
+  width: 100%;
+  height: 100svh;
+  min-height: 100svh;
+  overflow: hidden;
+  overscroll-behavior: none;
+  touch-action: manipulation;
 }
 
 .frame {
@@ -243,6 +261,9 @@
   font-weight: 520;
   cursor: pointer;
   transition: transform 100ms ease, background 100ms ease;
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
   -webkit-tap-highlight-color: transparent;
 }
 
@@ -261,6 +282,10 @@
   font-size: 0.72rem;
   font-weight: 800;
   cursor: pointer;
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
 }
 
 @keyframes pin-shake {
@@ -394,6 +419,7 @@
 
   .pinKeypad { grid-template-columns: repeat(3, 3.4rem); gap: 0.5rem 0.75rem; }
   .pinKey { width: 3.4rem; height: 3.4rem; font-size: 1.32rem; }
+  .pagePhone .card :global(input) { font-size: 1rem; }
 }
 
 @media (prefers-reduced-motion: reduce) {

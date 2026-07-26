@@ -238,6 +238,54 @@ export function buildGraphCellMap(slots: GraphSlot[]) {
   return cellMap;
 }
 
+export function buildGraphDayShiftStaffingCounts(params: {
+  graph: Pick<Graph, "year" | "month"> & Partial<Pick<Graph, "shift1Time" | "shift2Time">>;
+  columns: Array<Pick<GraphMatrixColumn, "employeeId" | "kind">>;
+  cellMap: GraphMatrixCellMap;
+}) {
+  const { graph, columns, cellMap } = params;
+  const shifts = [tryParseGraphShiftRange(graph.shift1Time), tryParseGraphShiftRange(graph.shift2Time)]
+    .filter((shift): shift is { fromMinutes: number; toMinutes: number } => shift !== null);
+  if (shifts.length === 0) {
+    return {} as Record<number, number[]>;
+  }
+
+  const employeeIds = [...new Set(
+    columns
+      .filter(column => column.kind === "employee" && column.employeeId > 0)
+      .map(column => column.employeeId),
+  )];
+  const daysInMonth = getGraphDaysInMonth(graph.year, graph.month);
+
+  return Array.from({ length: daysInMonth }, (_, index) => index + 1)
+    .reduce<Record<number, number[]>>((result, dayOfMonth) => {
+      result[dayOfMonth] = shifts.map(shift => employeeIds.reduce((count, employeeId) => {
+        const parsed = parseGraphCellContent(cellMap[getGraphCellKey(employeeId, dayOfMonth)] ?? GRAPH_EMPTY_MARK);
+        if (parsed.kind !== "intervals") {
+          return count;
+        }
+
+        const worksThisShift = parsed.value.some(interval => {
+          const fromMinutes = parseGraphTimeMinutes(interval.from);
+          let toMinutes = parseGraphTimeMinutes(interval.to);
+          if (fromMinutes === null || toMinutes === null) {
+            return false;
+          }
+
+          if (toMinutes < fromMinutes) {
+            toMinutes += 24 * 60;
+          }
+
+          return fromMinutes < shift.toMinutes && toMinutes > shift.fromMinutes;
+        });
+
+        return count + (worksThisShift ? 1 : 0);
+      }, 0));
+
+      return result;
+    }, {});
+}
+
 export function buildGraphRelatedScheduleHintData(params: {
   currentGraph: Pick<Graph, "id" | "year" | "month">;
   columns: Array<Pick<GraphMatrixColumn, "employeeId" | "kind">>;

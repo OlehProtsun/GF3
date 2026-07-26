@@ -184,8 +184,6 @@ describe("home dashboard loader", () => {
     expect(dashboard.statusText).toBe("Home data is up to date.");
     expect(dashboard.monthSchedulesCount).toBe(2);
     expect(dashboard.totalContainersCount).toBe(2);
-    expect(dashboard.overallTotalEmployees).toBe(3);
-    expect(dashboard.overallTotalShops).toBe(2);
     expect(dashboard.activeShopsCount).toBe(2);
     expect(dashboard.currentMonthContainerName).toBe("2 active containers");
     expect(dashboard.currentMonthLabel).toBe("May 2026");
@@ -196,22 +194,25 @@ describe("home dashboard loader", () => {
     expect(dashboard.currentMonthTotalSchedules).toBe(2);
     expect(dashboard.currentMonthTotalHoursText).toBe("11h 30m");
     expect(dashboard.todayAssignmentsCount).toBe(2);
+    expect(dashboard.todayActiveEmployeesCount).toBe(2);
     expect(dashboard.todayRows).toEqual([
       {
-        id: "10:Ada Lovelace:08:00 - 12:00:Central Shop",
+        id: "10:1",
+        employeeId: 1,
+        graphId: 10,
         dateLabel: "10.05.2026",
         employee: "Ada Lovelace",
         shift: "08:00 - 12:00",
         shop: "Central Shop",
-        route: "/container/1/graphs/10",
       },
       {
-        id: "10:Grace Hopper:10:00 - 13:30:North Shop",
+        id: "20:3",
+        employeeId: 2,
+        graphId: 20,
         dateLabel: "10.05.2026",
         employee: "Grace Hopper",
         shift: "10:00 - 13:30",
         shop: "North Shop",
-        route: "/container/2/graphs/20",
       },
     ]);
 
@@ -235,6 +236,18 @@ describe("home dashboard loader", () => {
           backgroundColor: "rgba(255, 0, 0, 1)",
         },
       },
+    });
+    expect(dashboard.activeSchedules[0].visualHintDetailMap["2:10"]).toMatchObject({
+      employeeId: 2,
+      dayOfMonth: 10,
+      visualHint: "Alpha graph",
+      relatedGraphs: [
+        {
+          graphId: 20,
+          graphName: "Alpha graph",
+          intervalsText: "10:00 - 13:30",
+        },
+      ],
     });
     expect(dashboard.activeSchedules[1].visualHintMap).toEqual({
       "2:11": "Beta graph",

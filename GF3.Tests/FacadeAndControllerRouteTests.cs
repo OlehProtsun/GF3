@@ -987,6 +987,9 @@ public sealed class FacadeAndControllerRouteTests
             return Task.CompletedTask;
         }
 
+        public Task<int> UpdateGraphPublicationAsync(int containerId, SchedulePublicationStatus publicationStatus, bool? allowSwap, CancellationToken ct = default)
+            => Task.FromResult(Graph is null ? 0 : 1);
+
         public Task DeleteGraphAsync(int containerId, int graphId, CancellationToken ct = default)
             => Task.CompletedTask;
 
