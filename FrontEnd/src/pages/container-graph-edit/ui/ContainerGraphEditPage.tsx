@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import {
   buildManagerEditLockMessage,
@@ -131,8 +131,29 @@ type GraphEditorSessionDraft = {
   previewAvailabilitySelection: string;
 };
 
+type GraphEditorUndoSnapshot = {
+  form: ContainerGraphFormState;
+  graphEmployeeRows: Array<{ id: number | null; employeeId: number; minHoursMonth: string }>;
+  selectedSchedulePresetId: number | null;
+  selectedEmployeeId: number | null;
+  cellMap: Record<string, string>;
+  manualColumns: EditableScheduleManualColumn[];
+  scheduleColumnOrder: number[];
+  styleRecords: GraphCellStyle[];
+  autoAvailabilityStyleSuppressions: GraphAutoAvailabilityStyleSuppressionMap;
+  syncedAvailabilityGroupId: number | null;
+};
+
+type GraphEditorUndoEntry = {
+  snapshot: GraphEditorUndoSnapshot;
+  coalesceKey: string | null;
+  capturedAt: number;
+};
+
 const FOLLOW_SCHEDULE_DETAILS_PREVIEW = "__schedule-details__";
 const AUTO_UNAVAILABLE_AVAILABILITY_BACKGROUND_ARGB = rgbHexToArgb("#f8b4b4") ?? -478600;
+const GRAPH_UNDO_HISTORY_LIMIT = 50;
+const GRAPH_UNDO_COALESCE_MS = 800;
 
 function runMutation<TData, TVariables>(
   mutate: (
@@ -380,6 +401,24 @@ function cloneGraphEditorSessionDraft(draft: GraphEditorSessionDraft): GraphEdit
     scheduleColumnOrder: [...draft.scheduleColumnOrder],
     selectedCellKeys: [...draft.selectedCellKeys],
     styleRecords: draft.styleRecords.map(style => ({ ...style })),
+  };
+}
+
+function cloneGraphEditorUndoSnapshot(snapshot: GraphEditorUndoSnapshot): GraphEditorUndoSnapshot {
+  return {
+    ...snapshot,
+    form: { ...snapshot.form },
+    graphEmployeeRows: snapshot.graphEmployeeRows.map(row => ({ ...row })),
+    cellMap: { ...snapshot.cellMap },
+    manualColumns: snapshot.manualColumns.map(column => ({
+      ...column,
+      cells: { ...column.cells },
+    })),
+    scheduleColumnOrder: [...snapshot.scheduleColumnOrder],
+    styleRecords: snapshot.styleRecords.map(style => ({ ...style })),
+    autoAvailabilityStyleSuppressions: cloneAutoAvailabilityStyleSuppressions(
+      snapshot.autoAvailabilityStyleSuppressions,
+    ),
   };
 }
 
@@ -895,11 +934,18 @@ export function ContainerGraphEditPage() {
   const [employeeRemoveTargetId, setEmployeeRemoveTargetId] = useState<number | null>(null);
   const [isSaveConfirmOpen, setIsSaveConfirmOpen] = useState(false);
   const [isSessionSaving, setIsSessionSaving] = useState(false);
+  const [undoDepth, setUndoDepth] = useState(0);
   const optimisticStyleIdRef = useRef(-1);
   const styleRecordsRef = useRef<GraphCellStyle[]>([]);
   const syncedAvailabilityGroupIdRef = useRef<number | null>(null);
   const sessionDraftsRef = useRef<Record<number, GraphEditorSessionDraft>>({});
   const savedGraphSnapshotByIdRef = useRef<Record<number, string>>({});
+  const undoHistoryRef = useRef<GraphEditorUndoEntry[]>([]);
+
+  const resetUndoHistory = useCallback(() => {
+    undoHistoryRef.current = [];
+    setUndoDepth(0);
+  }, []);
 
   const employeesById = useMemo(
     () => new Map((employeesQuery.data ?? []).map(employee => [employee.id, employee])),
@@ -937,6 +983,7 @@ export function ContainerGraphEditPage() {
       setFillColor("#dbeafe");
       setTextColor("#0f172a");
       setPreviewAvailabilitySelection(FOLLOW_SCHEDULE_DETAILS_PREVIEW);
+      resetUndoHistory();
       setHydratedKey(createKey);
       return;
     }
@@ -966,6 +1013,7 @@ export function ContainerGraphEditPage() {
         setFillColor(restoredDraft.fillColor);
         setTextColor(restoredDraft.textColor);
         setPreviewAvailabilitySelection(restoredDraft.previewAvailabilitySelection ?? FOLLOW_SCHEDULE_DETAILS_PREVIEW);
+        resetUndoHistory();
         setHydratedKey(String(graphId));
         return;
       }
@@ -1019,6 +1067,7 @@ export function ContainerGraphEditPage() {
     setFillColor("#dbeafe");
     setTextColor("#0f172a");
     setPreviewAvailabilitySelection(FOLLOW_SCHEDULE_DETAILS_PREVIEW);
+    resetUndoHistory();
     setHydratedKey(nextHydratedKey);
   }, [
     cellStylesQuery.data,
@@ -1029,6 +1078,7 @@ export function ContainerGraphEditPage() {
     graphQuery.data,
     hydratedKey,
     isCreate,
+    resetUndoHistory,
     shopsQuery.data,
     slotsQuery.data,
   ]);
@@ -1442,6 +1492,7 @@ export function ContainerGraphEditPage() {
     setFillColor("#dbeafe");
     setTextColor("#0f172a");
     setPreviewAvailabilitySelection(FOLLOW_SCHEDULE_DETAILS_PREVIEW);
+    resetUndoHistory();
     delete sessionDraftsRef.current[graphId];
     savedGraphSnapshotByIdRef.current[graphId] = persistedGraphSnapshot;
   }, [
@@ -1454,6 +1505,7 @@ export function ContainerGraphEditPage() {
     graphQuery.data,
     isCreate,
     persistedGraphSnapshot,
+    resetUndoHistory,
     slotsQuery.data,
   ]);
 
@@ -1816,6 +1868,64 @@ export function ContainerGraphEditPage() {
     styleRecordsRef.current = nextStyles;
     setStyleRecords(nextStyles);
   };
+  const createCurrentUndoSnapshot = (): GraphEditorUndoSnapshot => cloneGraphEditorUndoSnapshot({
+    form,
+    graphEmployeeRows,
+    selectedSchedulePresetId,
+    selectedEmployeeId,
+    cellMap,
+    manualColumns,
+    scheduleColumnOrder,
+    styleRecords: styleRecordsRef.current,
+    autoAvailabilityStyleSuppressions,
+    syncedAvailabilityGroupId: syncedAvailabilityGroupIdRef.current,
+  });
+  const captureUndoSnapshot = (coalesceKey: string | null = null) => {
+    const capturedAt = Date.now();
+    const lastEntry = undoHistoryRef.current.at(-1);
+
+    if (
+      coalesceKey !== null &&
+      lastEntry?.coalesceKey === coalesceKey &&
+      capturedAt - lastEntry.capturedAt <= GRAPH_UNDO_COALESCE_MS
+    ) {
+      lastEntry.capturedAt = capturedAt;
+      return;
+    }
+
+    const nextHistory = [
+      ...undoHistoryRef.current,
+      { snapshot: createCurrentUndoSnapshot(), coalesceKey, capturedAt },
+    ].slice(-GRAPH_UNDO_HISTORY_LIMIT);
+
+    undoHistoryRef.current = nextHistory;
+    setUndoDepth(nextHistory.length);
+  };
+  const handleUndo = () => {
+    const nextHistory = [...undoHistoryRef.current];
+    const entry = nextHistory.pop();
+    if (!entry) {
+      return;
+    }
+
+    const snapshot = cloneGraphEditorUndoSnapshot(entry.snapshot);
+    undoHistoryRef.current = nextHistory;
+    setUndoDepth(nextHistory.length);
+    setForm(snapshot.form);
+    setGraphEmployeeRows(snapshot.graphEmployeeRows);
+    setSelectedSchedulePresetId(snapshot.selectedSchedulePresetId);
+    setSelectedEmployeeId(snapshot.selectedEmployeeId);
+    setCellMap(snapshot.cellMap);
+    setManualColumns(snapshot.manualColumns);
+    setScheduleColumnOrder(snapshot.scheduleColumnOrder);
+    syncStyleRecords(snapshot.styleRecords);
+    setAutoAvailabilityStyleSuppressions(snapshot.autoAvailabilityStyleSuppressions);
+    syncedAvailabilityGroupIdRef.current = snapshot.syncedAvailabilityGroupId;
+    setFormErrors({});
+    setCellErrors({});
+    setSubmitError(undefined);
+    setManualShiftPublishError(null);
+  };
   const createCurrentGraphDraft = () => {
     if (graphId === null || hydratedKey !== String(graphId)) {
       return null;
@@ -1874,6 +1984,10 @@ export function ContainerGraphEditPage() {
   };
 
   const setFieldValue = <K extends keyof ContainerGraphFormState>(field: K) => (value: ContainerGraphFormState[K]) => {
+    if (!Object.is(form[field], value)) {
+      captureUndoSnapshot(`field:${String(field)}`);
+    }
+
     setForm(current => ({ ...current, [field]: value }));
     setSubmitError(undefined);
 
@@ -1904,6 +2018,7 @@ export function ContainerGraphEditPage() {
       return;
     }
 
+    captureUndoSnapshot();
     setForm(current => ({
       ...current,
       name: preset.scheduleName,
@@ -1953,6 +2068,7 @@ export function ContainerGraphEditPage() {
       return;
     }
 
+    captureUndoSnapshot();
     setGraphEmployeeRows(current => [...current, { id: null, employeeId: selectedEmployeeId, minHoursMonth: "" }]);
     setScheduleColumnOrder(current => [...current, selectedEmployeeId]);
     setSelectedEmployeeId(null);
@@ -1964,6 +2080,7 @@ export function ContainerGraphEditPage() {
     }
 
     const employeeId = employeeRemoveTargetId;
+    captureUndoSnapshot();
     setGraphEmployeeRows(current => current.filter(row => row.employeeId !== employeeId));
     setScheduleColumnOrder(current => current.filter(columnId => columnId !== employeeId));
     setCellMap(current => {
@@ -1986,6 +2103,7 @@ export function ContainerGraphEditPage() {
       return;
     }
 
+    captureUndoSnapshot();
     setScheduleColumnOrder(nextColumnOrder);
     setGraphEmployeeRows(currentRows => sortGraphEmployeeRowsByColumnOrder(currentRows, nextColumnOrder));
     setManualColumns(currentColumns => sortManualColumnsByColumnOrder(currentColumns, nextColumnOrder));
@@ -2242,6 +2360,7 @@ export function ContainerGraphEditPage() {
       return;
     }
 
+    captureUndoSnapshot();
     if (!graphEmployeeRowsEqual(graphEmployeeRows, generationRows)) {
       setGraphEmployeeRows(generationRows);
     }
@@ -2441,6 +2560,7 @@ export function ContainerGraphEditPage() {
     const previousStyles = [...styleRecordsRef.current];
     const nextStyleByKey = buildStyleRecordByKey(previousStyles);
 
+    captureUndoSnapshot();
     selectedCellKeys
       .map(cellKey => ({ cellKey, ...parseSelectedCellKey(cellKey) }))
       .forEach(({ cellKey, employeeId, dayOfMonth }) => {
@@ -2491,6 +2611,7 @@ export function ContainerGraphEditPage() {
       return;
     }
 
+    captureUndoSnapshot();
     setSubmitError(undefined);
     if (autoCellKeysToSuppress.length > 0) {
       setAutoAvailabilityStyleSuppressions(current =>
@@ -2508,6 +2629,7 @@ export function ContainerGraphEditPage() {
       return;
     }
 
+    captureUndoSnapshot();
     setSubmitError(undefined);
     if (autoAvailabilityUnavailableCellKeys.length > 0) {
       setAutoAvailabilityStyleSuppressions(current =>
@@ -2521,6 +2643,10 @@ export function ContainerGraphEditPage() {
   };
 
   const handleManualColumnLabelChange = (columnId: number, value: string) => {
+    if (manualColumns.find(column => column.columnId === columnId)?.label !== value) {
+      captureUndoSnapshot(`manual-column-label:${columnId}`);
+    }
+
     setManualColumns(currentColumns => currentColumns.map(column => (
       column.columnId === columnId ? { ...column, label: value } : column
     )));
@@ -2531,6 +2657,7 @@ export function ContainerGraphEditPage() {
   const handleAddManualColumn = () => {
     const nextManualColumn = createDraftScheduleManualColumn(manualColumns);
 
+    captureUndoSnapshot();
     setManualColumns(currentColumns => [...currentColumns, nextManualColumn]);
     setScheduleColumnOrder(current => [...current, buildManualColumnEmployeeId(nextManualColumn.columnId)]);
     setSubmitError(undefined);
@@ -2540,6 +2667,7 @@ export function ContainerGraphEditPage() {
   const handleDeleteManualColumn = (columnId: number) => {
     const manualEmployeeId = buildManualColumnEmployeeId(columnId);
 
+    captureUndoSnapshot();
     setManualColumns(currentColumns => currentColumns.filter(column => column.columnId !== columnId));
     setPendingManualShiftPublishes(current => current.filter(shift => shift.manualColumnId !== columnId));
     setScheduleColumnOrder(current => current.filter(columnEmployeeId => columnEmployeeId !== manualEmployeeId));
@@ -2776,6 +2904,10 @@ export function ContainerGraphEditPage() {
         onCancelManualShift={handleCancelManualShift}
         onCancelPendingManualShift={handleCancelPendingManualShift}
         onEmployeeMinHoursChange={(employeeId, value) => {
+          if (graphEmployeeRows.find(row => row.employeeId === employeeId)?.minHoursMonth !== value) {
+            captureUndoSnapshot(`employee-min-hours:${employeeId}`);
+          }
+
           setGraphEmployeeRows(current => current.map(row => (row.employeeId === employeeId ? { ...row, minHoursMonth: value } : row)));
           setSelectedSchedulePresetId(null);
           setSubmitError(undefined);
@@ -2784,6 +2916,13 @@ export function ContainerGraphEditPage() {
         onCellChange={(employeeId, dayOfMonth, value) => {
           const manualColumnId = getManualColumnIdFromEmployeeId(employeeId);
           if (manualColumnId !== null) {
+            const currentValue = manualColumns
+              .find(column => column.columnId === manualColumnId)
+              ?.cells[String(dayOfMonth)] ?? "";
+            if (currentValue !== value) {
+              captureUndoSnapshot(`manual-cell:${manualColumnId}:${dayOfMonth}`);
+            }
+
             setManualColumns(currentColumns => currentColumns.map(column => {
               if (column.columnId !== manualColumnId) {
                 return column;
@@ -2808,6 +2947,10 @@ export function ContainerGraphEditPage() {
           }
 
           const key = getGraphCellKey(employeeId, dayOfMonth);
+          if ((cellMap[key] ?? "") !== value) {
+            captureUndoSnapshot(`cell:${key}`);
+          }
+
           setCellMap(current => ({ ...current, [key]: value }));
           setCellErrors(current => {
             if (!current[key]) {
@@ -2827,6 +2970,8 @@ export function ContainerGraphEditPage() {
         onApplyTextColor={() => void handleApplyStyleProperty("text")}
         onClearCellStyle={() => void handleClearCellStyle()}
         onClearAllCellStyles={() => void handleClearAllCellStyles()}
+        canUndo={undoDepth > 0}
+        onUndo={handleUndo}
         onSave={() => setIsSaveConfirmOpen(true)}
         onGenerate={() => void handleGenerate()}
         />

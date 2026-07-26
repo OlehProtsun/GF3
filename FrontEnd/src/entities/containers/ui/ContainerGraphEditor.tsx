@@ -28,6 +28,7 @@ import { IosButton } from "@shared/ui/components/IosButton";
 import { SearchableSelect, type SearchableSelectOption } from "@shared/ui/components/SearchableSelect";
 import { LabeledField, TextArea } from "@shared/ui/forms/Field";
 import {
+  BackIcon,
   BindIcon,
   ClearFormatAllIcon,
   ClearFormatIcon,
@@ -169,6 +170,8 @@ type ContainerGraphEditorProps = {
   onApplyTextColor: () => void;
   onClearCellStyle: () => void;
   onClearAllCellStyles: () => void;
+  canUndo: boolean;
+  onUndo: () => void;
   onSave: () => void;
   onGenerate: () => void;
 };
@@ -403,6 +406,8 @@ export function ContainerGraphEditor({
   onApplyTextColor,
   onClearCellStyle,
   onClearAllCellStyles,
+  canUndo,
+  onUndo,
   onSave,
   onGenerate,
 }: ContainerGraphEditorProps) {
@@ -1025,6 +1030,12 @@ export function ContainerGraphEditor({
                   onVisualHintClick={detail => setActiveRelatedHintCellKey(`${detail.employeeId}:${detail.dayOfMonth}`)}
                   toolbar={
                     <div className={styles.matrixToolbar}>
+                      <ToolbarActionButton
+                        label="Undo"
+                        icon={<BackIcon size={15} />}
+                        disabled={!canUndo || isSaving || isGenerating || isStylingBusy}
+                        onClick={onUndo}
+                      />
                       <SplitColorButton
                         label={isStylingBusy ? "Applying Fill..." : "Fill"}
                         color={fillColor}
