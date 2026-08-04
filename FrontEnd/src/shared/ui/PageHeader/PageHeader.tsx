@@ -4,6 +4,8 @@ import { useNavigate } from "react-router-dom";
 import { BackIcon, SearchIcon } from "@shared/ui/icons";
 import styles from "./PageHeader.module.css";
 
+const COLLAPSED_SPACER_HEIGHT = 16;
+
 type PageHeaderProps = {
   eyebrow?: string;
   title: string;
@@ -48,15 +50,12 @@ export function PageHeader({
 }: PageHeaderProps) {
   const navigate = useNavigate();
   const headerRef = useRef<HTMLElement | null>(null);
-  const collapsedRef = useRef<HTMLDivElement | null>(null);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [headerHeight, setHeaderHeight] = useState(0);
-  const [collapsedHeight, setCollapsedHeight] = useState(0);
 
   useLayoutEffect(() => {
     const headerElement = headerRef.current;
-    const collapsedElement = collapsedRef.current;
-    if (!headerElement || !collapsedElement) {
+    if (!headerElement) {
       return;
     }
 
@@ -65,22 +64,13 @@ export function PageHeader({
       setHeaderHeight(prev => (prev !== nextHeight ? nextHeight : prev));
     };
 
-    const updateCollapsedHeight = () => {
-      const nextHeight = Math.ceil(collapsedElement.getBoundingClientRect().height);
-      setCollapsedHeight(prev => (prev !== nextHeight ? nextHeight : prev));
-    };
-
     updateHeaderHeight();
-    updateCollapsedHeight();
 
     const headerObserver = new ResizeObserver(updateHeaderHeight);
-    const collapsedObserver = new ResizeObserver(updateCollapsedHeight);
     headerObserver.observe(headerElement);
-    collapsedObserver.observe(collapsedElement);
 
     return () => {
       headerObserver.disconnect();
-      collapsedObserver.disconnect();
     };
   }, [eyebrow, title, subtitle, backTo, onBack, rightSlot, searchMeta, search, variant, fullBleed, gutter, className]);
 
@@ -107,7 +97,7 @@ export function PageHeader({
     .join(" ");
 
   const hasSearchCluster = Boolean(search || searchMeta);
-  const spacerHeight = isCollapsed ? (collapsedHeight || 48) : headerHeight;
+  const spacerHeight = isCollapsed ? COLLAPSED_SPACER_HEIGHT : headerHeight;
   const hasBackAction = onBack != null || (backTo !== null && backTo !== undefined);
 
   const handleBackClick = () => {
@@ -200,7 +190,7 @@ export function PageHeader({
             </div>
           </header>
 
-          <div ref={collapsedRef} className={collapsedDockClassName}>
+          <div className={collapsedDockClassName}>
             <button
               type="button"
               className={styles.collapsedButton}

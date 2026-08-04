@@ -16,6 +16,8 @@ import { ConfirmDialog } from "@shared/ui/ConfirmDialog";
 import { pushErrorAlertFromError } from "@shared/ui/feedback/error-alerts/errorAlerts";
 import { PageHeader } from "@shared/ui/PageHeader";
 import styles from "./ManagerAccountPage.module.css";
+import { useMyRegulationHistoryQuery } from "@entities/regulations";
+import { RegulationHistoryCard } from "@entities/regulations/ui/RegulationHistoryCard";
 
 type ManagerFormState = {
   displayName: string;
@@ -122,6 +124,7 @@ export function ManagerAccountPage() {
   const updateProfileMutation = useUpdateManagerProfileMutation();
   const createManagerMutation = useCreateManagerMutation();
   const deleteManagerMutation = useDeleteManagerMutation();
+  const regulationHistoryQuery = useMyRegulationHistoryQuery(`manager:${session?.managerId ?? 0}`);
 
   const profile = profileQuery.data;
   const managers = managerListQuery.data ?? [];
@@ -518,6 +521,13 @@ export function ManagerAccountPage() {
             </div>
           </div>
         )}
+
+        <RegulationHistoryCard
+          acceptances={regulationHistoryQuery.data ?? []}
+          isLoading={regulationHistoryQuery.isLoading}
+          title="My regulation history"
+          className={styles.regulationHistory}
+        />
       </section>
 
       <ConfirmDialog

@@ -3,13 +3,13 @@
   top: env(safe-area-inset-top);
   right: calc(14px + env(safe-area-inset-right));
   z-index: 1350;
-  min-width: 108px;
+  width: 36px;
+  min-width: 36px;
   height: 32px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 7px;
-  padding: 0 13px;
+  padding: 0;
   border: 1px solid rgba(148, 163, 184, 0.25);
   border-top: 0;
   border-radius: 0 0 16px 16px;
@@ -25,7 +25,6 @@
 }
 
 .openTab:hover { background: #ffffff; color: #1d4ed8; }
-.openTab svg:last-child { transform: rotate(180deg); }
 .openTabHidden { opacity: 0; transform: translateY(-12px); pointer-events: none; }
 
 .notepad {

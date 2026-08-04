@@ -14,7 +14,7 @@ const endpoint = "admin/db";
 const developerPasswordHeader = "X-GF3-Developer-Password";
 let activeDeveloperPassword = "";
 
-function developerAccessHeaders(password = activeDeveloperPassword) {
+export function developerAccessHeaders(password = activeDeveloperPassword) {
   return { [developerPasswordHeader]: password };
 }
 

@@ -25,6 +25,7 @@ import { CheckIcon, CodeIcon, DatabaseIcon, ImportIcon, SearchIcon, WarnIcon } f
 import { PageHeader } from "@shared/ui/PageHeader";
 import { CardSection } from "@shared/ui/sections/CardSection";
 import styles from "./DataBasePage.module.css";
+import { RegulationsAdminPanel } from "@entities/regulations/ui/RegulationsAdminPanel";
 
 const DEFAULT_EXECUTOR_SQL = "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name;";
 const READ_PREFIXES = ["SELECT", "PRAGMA", "WITH"];
@@ -777,6 +778,8 @@ function DataBaseWorkspace() {
       />
 
       {accessError ? <ErrorBanner>{describeApiError(accessError, "Could not access admin database tools.")}</ErrorBanner> : null}
+
+      <RegulationsAdminPanel />
 
       <div className={styles.workspaceGrid}>
         <CardSection

@@ -13,7 +13,7 @@ import {
 } from "@entities/system-news";
 import { ApiError, getErrorMessage } from "@shared/api/httpClient";
 import { ConfirmDialog } from "@shared/ui/ConfirmDialog";
-import { ArrowIcon, CloseIcon, NewsIcon, PlusIcon, SaveIcon, SettingsIcon } from "@shared/ui/icons";
+import { CloseIcon, NewsIcon, PlusIcon, SaveIcon, SettingsIcon } from "@shared/ui/icons";
 import styles from "./ManagerSystemNews.module.css";
 
 const emptyDraft: SaveSystemNewsInput = { title: "", body: "", audience: "all", imageUrl: null, videoUrl: null };
@@ -144,8 +144,8 @@ export function ManagerSystemNews() {
   const isSaving = createNews.isPending || updateNews.isPending;
   return (
     <>
-      <button type="button" className={[styles.openTab, isOpen ? styles.openTabHidden : ""].filter(Boolean).join(" ")} onClick={openNews} aria-label="Open system news">
-        <NewsIcon size={17} /><span>News</span>{unreadCount > 0 ? <span className={styles.triggerDot} aria-label={`${unreadCount} unread`} /> : null}<ArrowIcon size={14} />
+      <button type="button" className={[styles.openTab, isOpen ? styles.openTabHidden : ""].filter(Boolean).join(" ")} onClick={openNews} aria-label="Open system news" title="Open system news">
+        <NewsIcon size={17} />{unreadCount > 0 ? <span className={styles.triggerDot} aria-label={`${unreadCount} unread`} /> : null}
       </button>
       <aside className={[styles.panel, isOpen ? styles.panelOpen : styles.panelClosed].join(" ")} aria-label="System news" aria-hidden={!isOpen}>
         <header className={styles.header}>

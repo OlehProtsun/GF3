@@ -405,11 +405,10 @@ export function ManagerNotepad() {
         type="button"
         className={[styles.openTab, isExpanded ? styles.openTabHidden : ""].filter(Boolean).join(" ")}
         aria-label="Open notepad"
+        title="Open notepad"
         onClick={handleToggleExpanded}
       >
         <NoteIcon size={17} />
-        <span>Notes</span>
-        <ArrowIcon size={14} />
       </button>
 
       <aside

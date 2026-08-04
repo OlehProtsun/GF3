@@ -15,6 +15,7 @@ public sealed class AdminToolsGuardMiddleware
 {
     private const string DatabasePathPrefix = "/api/admin/db";
     private const string NewsPathPrefix = "/api/admin/system-news";
+    private const string RegulationsPathPrefix = "/api/admin/regulations";
     private const string DeveloperPasswordHeader = "X-GF3-Developer-Password";
 
     private readonly RequestDelegate _next;
@@ -30,7 +31,8 @@ public sealed class AdminToolsGuardMiddleware
     {
         var isDatabaseRequest = IsDatabaseRequest(context.Request.Path);
         var isNewsRequest = context.Request.Path.StartsWithSegments(NewsPathPrefix, StringComparison.OrdinalIgnoreCase);
-        if (!isDatabaseRequest && !isNewsRequest)
+        var isRegulationsRequest = context.Request.Path.StartsWithSegments(RegulationsPathPrefix, StringComparison.OrdinalIgnoreCase);
+        if (!isDatabaseRequest && !isNewsRequest && !isRegulationsRequest)
         {
             await _next(context).ConfigureAwait(false);
             return;
