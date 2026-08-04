@@ -32,6 +32,7 @@ public static class Extensions
         serviceCollection.AddSingleton<IEmployeePresenceService, EmployeePresenceService>();
         serviceCollection.AddSingleton<IManagerPresenceService, ManagerPresenceService>();
         serviceCollection.AddScoped<ICommunicationService, CommunicationService>();
+        serviceCollection.AddScoped<IRegulationService, RegulationService>();
         serviceCollection.AddScoped<IShopService, ShopService>();
         serviceCollection.AddScoped<IScheduleService, ScheduleService>();
         serviceCollection.AddScoped<IScheduleEmployeeService, ScheduleEmployeeService>();

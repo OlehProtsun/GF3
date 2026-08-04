@@ -13,6 +13,8 @@ import { pushErrorAlertFromError } from "@shared/ui/feedback/error-alerts/errorA
 import { CodeIcon, EmployeeIcon, LogoutIcon, SaveIcon } from "@shared/ui/icons";
 import sharedStyles from "@pages/shared/EmployeeWorkspacePage.module.css";
 import styles from "./EmployeeAccountPage.module.css";
+import { useMyRegulationHistoryQuery } from "@entities/regulations";
+import { RegulationHistoryCard } from "@entities/regulations/ui/RegulationHistoryCard";
 
 function getFallbackInitials(value?: string | null) {
   const parts = value?.trim().split(/\s+/).filter(Boolean) ?? [];
@@ -47,6 +49,7 @@ export function EmployeeAccountPage() {
   const updateProfileMutation = useUpdateEmployeeProfileMutation();
   const sendPasswordCodeMutation = useSendEmployeePasswordResetCodeMutation();
   const confirmPasswordMutation = useConfirmEmployeePasswordResetMutation();
+  const regulationHistoryQuery = useMyRegulationHistoryQuery(`employee:${session?.employeeId ?? 0}`);
 
   const profile = profileQuery.data;
   const displayName = profile?.displayName ?? session?.displayName ?? "Employee";
@@ -392,6 +395,13 @@ export function EmployeeAccountPage() {
         ) : (
           <div className={styles.loadingState}>Your profile is not available yet.</div>
         )}
+
+        {profile ? (
+          <RegulationHistoryCard
+            acceptances={regulationHistoryQuery.data ?? []}
+            isLoading={regulationHistoryQuery.isLoading}
+          />
+        ) : null}
 
         {profile ? (
           <div className={panelFooterClassName}>

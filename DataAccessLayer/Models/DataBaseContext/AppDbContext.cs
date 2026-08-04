@@ -35,6 +35,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<ShiftSwapHistoryModel> ShiftSwapHistories => Set<ShiftSwapHistoryModel>();
     public DbSet<WorkflowLogEntryModel> WorkflowLogEntries => Set<WorkflowLogEntryModel>();
     public DbSet<WorkflowLogSettingsModel> WorkflowLogSettings => Set<WorkflowLogSettingsModel>();
+    public DbSet<RegulationDocumentModel> RegulationDocuments => Set<RegulationDocumentModel>();
+    public DbSet<RegulationAcceptanceModel> RegulationAcceptances => Set<RegulationAcceptanceModel>();
     public DbSet<BindModel> AvailabilityBinds => Set<BindModel>();
     public DbSet<AvailabilityGroupModel> AvailabilityGroups => Set<AvailabilityGroupModel>();
     public DbSet<AvailabilityGroupMemberModel> AvailabilityGroupMembers => Set<AvailabilityGroupMemberModel>();
@@ -66,6 +68,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         ConfigureShiftSwapHistory(modelBuilder);
         ConfigureWorkflowLogEntry(modelBuilder);
         ConfigureWorkflowLogSettings(modelBuilder);
+        ConfigureRegulationDocument(modelBuilder);
+        ConfigureRegulationAcceptance(modelBuilder);
         ConfigureAvailabilityBind(modelBuilder);
         ConfigureAvailabilityGroup(modelBuilder);
         ConfigureAvailabilityGroupMember(modelBuilder);
@@ -703,6 +707,50 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             });
 
             entity.HasData(new WorkflowLogSettingsModel());
+        });
+    }
+
+    private static void ConfigureRegulationDocument(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<RegulationDocumentModel>(entity =>
+        {
+            entity.Property(document => document.Title).IsRequired().HasMaxLength(160);
+            entity.Property(document => document.Version).IsRequired().HasMaxLength(80).UseCollation("NOCASE");
+            entity.Property(document => document.Message).IsRequired().HasMaxLength(4000);
+            entity.Property(document => document.PdfFileName).IsRequired().HasMaxLength(255);
+            entity.Property(document => document.PdfContent).IsRequired();
+            entity.Property(document => document.PdfSha256).IsRequired().HasMaxLength(64);
+            entity.Property(document => document.CreatedByManagerName).IsRequired().HasMaxLength(160);
+            entity.Property(document => document.IsPublished).IsRequired().HasDefaultValue(false);
+            entity.Property(document => document.PublishedAtUtc).IsRequired(false);
+            entity.Property(document => document.CreatedAtUtc).IsRequired();
+            entity.Property(document => document.UpdatedAtUtc).IsRequired();
+            entity.HasIndex(document => document.Version).IsUnique().HasDatabaseName("ux_regulation_document_version");
+            entity.HasIndex(document => new { document.IsPublished, document.PublishedAtUtc })
+                .HasDatabaseName("ix_regulation_document_published");
+        });
+    }
+
+    private static void ConfigureRegulationAcceptance(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<RegulationAcceptanceModel>(entity =>
+        {
+            entity.Property(acceptance => acceptance.AccountRole).IsRequired().HasMaxLength(16);
+            entity.Property(acceptance => acceptance.UsernameSnapshot).IsRequired().HasMaxLength(100);
+            entity.Property(acceptance => acceptance.DisplayNameSnapshot).IsRequired().HasMaxLength(160);
+            entity.Property(acceptance => acceptance.AcceptedAtUtc).IsRequired();
+            entity.HasOne(acceptance => acceptance.RegulationDocument)
+                .WithMany(document => document.Acceptances)
+                .HasForeignKey(acceptance => acceptance.RegulationDocumentId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(acceptance => new { acceptance.RegulationDocumentId, acceptance.AccountRole, acceptance.AccountId })
+                .IsUnique()
+                .HasDatabaseName("ux_regulation_acceptance_subject");
+            entity.HasIndex(acceptance => new { acceptance.AccountRole, acceptance.AccountId, acceptance.AcceptedAtUtc })
+                .HasDatabaseName("ix_regulation_acceptance_subject_time");
+            entity.ToTable(table => table.HasCheckConstraint(
+                "ck_regulation_acceptance_role",
+                "account_role IN ('manager', 'employee')"));
         });
     }
 

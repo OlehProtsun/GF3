@@ -6,6 +6,7 @@ import { OverlaySidebarLayout } from "@app/layouts/overlay-sidebar-layout";
 import { useAuth } from "@app/providers/AuthProvider";
 import { renderMatched } from "@shared/lib/react-router-dom";
 import { RouteFallback } from "./RouteFallback";
+import { RegulationAcceptanceGate } from "@entities/regulations/ui/RegulationAcceptanceGate";
 
 function lazyPage<TModule>(
   load: () => Promise<TModule>,
@@ -149,11 +150,11 @@ function RoutedShell() {
     return content;
   }
 
-  if (session?.role === "employee") {
-    return <EmployeeWorkspaceLayout>{content}</EmployeeWorkspaceLayout>;
-  }
+  const shell = session?.role === "employee"
+    ? <EmployeeWorkspaceLayout>{content}</EmployeeWorkspaceLayout>
+    : <OverlaySidebarLayout>{content}</OverlaySidebarLayout>;
 
-  return <OverlaySidebarLayout>{content}</OverlaySidebarLayout>;
+  return <>{shell}<RegulationAcceptanceGate /></>;
 }
 
 export function AppRouter() {

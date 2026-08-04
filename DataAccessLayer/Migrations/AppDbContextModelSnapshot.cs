@@ -687,6 +687,141 @@ namespace DataAccessLayer.Migrations
                     b.ToTable("manager_notepad_state");
                 });
 
+            modelBuilder.Entity("DataAccessLayer.Models.RegulationAcceptanceModel", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("AcceptedAtUtc")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("accepted_at_utc");
+
+                    b.Property<int>("AccountId")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("account_id");
+
+                    b.Property<string>("AccountRole")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("account_role");
+
+                    b.Property<string>("DisplayNameSnapshot")
+                        .IsRequired()
+                        .HasMaxLength(160)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("display_name_snapshot");
+
+                    b.Property<int>("RegulationDocumentId")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("regulation_document_id");
+
+                    b.Property<string>("UsernameSnapshot")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("username_snapshot");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AccountRole", "AccountId", "AcceptedAtUtc")
+                        .HasDatabaseName("ix_regulation_acceptance_subject_time");
+
+                    b.HasIndex("RegulationDocumentId", "AccountRole", "AccountId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_regulation_acceptance_subject");
+
+                    b.ToTable("regulation_acceptance", t =>
+                        {
+                            t.HasCheckConstraint("ck_regulation_acceptance_role", "account_role IN ('manager', 'employee')");
+                        });
+                });
+
+            modelBuilder.Entity("DataAccessLayer.Models.RegulationDocumentModel", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<int?>("CreatedByManagerId")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("created_by_manager_id");
+
+                    b.Property<string>("CreatedByManagerName")
+                        .IsRequired()
+                        .HasMaxLength(160)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("created_by_manager_name");
+
+                    b.Property<bool>("IsPublished")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER")
+                        .HasDefaultValue(false)
+                        .HasColumnName("is_published");
+
+                    b.Property<string>("Message")
+                        .IsRequired()
+                        .HasMaxLength(4000)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("message");
+
+                    b.Property<byte[]>("PdfContent")
+                        .IsRequired()
+                        .HasColumnType("BLOB")
+                        .HasColumnName("pdf_content");
+
+                    b.Property<string>("PdfFileName")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("pdf_file_name");
+
+                    b.Property<string>("PdfSha256")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("pdf_sha256");
+
+                    b.Property<DateTimeOffset?>("PublishedAtUtc")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("published_at_utc");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(160)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("title");
+
+                    b.Property<DateTimeOffset>("UpdatedAtUtc")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("updated_at_utc");
+
+                    b.Property<string>("Version")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("version")
+                        .UseCollation("NOCASE");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Version")
+                        .IsUnique()
+                        .HasDatabaseName("ux_regulation_document_version");
+
+                    b.HasIndex("IsPublished", "PublishedAtUtc")
+                        .HasDatabaseName("ix_regulation_document_published");
+
+                    b.ToTable("regulation_document");
+                });
+
             modelBuilder.Entity("DataAccessLayer.Models.ScheduleCellStyleModel", b =>
                 {
                     b.Property<int>("Id")
@@ -1677,6 +1812,17 @@ namespace DataAccessLayer.Migrations
                     b.Navigation("ManagerAccount");
                 });
 
+            modelBuilder.Entity("DataAccessLayer.Models.RegulationAcceptanceModel", b =>
+                {
+                    b.HasOne("DataAccessLayer.Models.RegulationDocumentModel", "RegulationDocument")
+                        .WithMany("Acceptances")
+                        .HasForeignKey("RegulationDocumentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("RegulationDocument");
+                });
+
             modelBuilder.Entity("DataAccessLayer.Models.ScheduleCellStyleModel", b =>
                 {
                     b.HasOne("DataAccessLayer.Models.EmployeeModel", "Employee")
@@ -1885,6 +2031,11 @@ namespace DataAccessLayer.Migrations
                     b.Navigation("ScheduleEmployees");
 
                     b.Navigation("ScheduleSlots");
+                });
+
+            modelBuilder.Entity("DataAccessLayer.Models.RegulationDocumentModel", b =>
+                {
+                    b.Navigation("Acceptances");
                 });
 
             modelBuilder.Entity("DataAccessLayer.Models.ScheduleModel", b =>

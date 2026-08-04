@@ -9,6 +9,8 @@ import { EmployeeProfileCard } from "@entities/employees/ui/EmployeeProfileCard"
 import { ConfirmDialog } from "@shared/ui/ConfirmDialog";
 import { PageHeader } from "@shared/ui/PageHeader";
 import styles from "./EmployeeProfilePage.module.css";
+import { useEmployeeRegulationHistoryQuery } from "@entities/regulations";
+import { RegulationHistoryCard } from "@entities/regulations/ui/RegulationHistoryCard";
 
 export function EmployeeProfilePage() {
   const navigate = useNavigate();
@@ -18,6 +20,7 @@ export function EmployeeProfilePage() {
   const [isKickOpen, setIsKickOpen] = useState(false);
 
   const employeeQuery = useEmployeeByIdQuery(Number.isFinite(id) ? id : null);
+  const regulationHistoryQuery = useEmployeeRegulationHistoryQuery(Number.isFinite(id) ? id : null);
   const deleteMutation = useDeleteEmployeeMutation();
   const kickMutation = useKickEmployeeMutation();
 
@@ -59,6 +62,12 @@ export function EmployeeProfilePage() {
         onEditEmployee={employeeIdValue => navigate(`/employee/${employeeIdValue}/edit`)}
         onDeleteEmployee={() => setIsDeleteOpen(true)}
         onKickEmployee={() => setIsKickOpen(true)}
+      />
+
+      <RegulationHistoryCard
+        acceptances={regulationHistoryQuery.data ?? []}
+        isLoading={regulationHistoryQuery.isLoading}
+        className={styles.regulationHistory}
       />
 
       <ConfirmDialog

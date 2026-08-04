@@ -64,6 +64,14 @@ export const queryKeys = {
     metadata: () => ["adminDb", "metadata"] as const,
     hash: () => ["adminDb", "hash"] as const,
   },
+  regulations: {
+    all: ["regulations"] as const,
+    pending: (accountKey: string) => ["regulations", "pending", accountKey] as const,
+    myHistory: (accountKey: string) => ["regulations", "history", "me", accountKey] as const,
+    employeeHistory: (employeeId: number) => ["regulations", "history", "employee", employeeId] as const,
+    admin: () => ["regulations", "admin"] as const,
+    adminAcceptances: () => ["regulations", "admin", "acceptances"] as const,
+  },
   containers: {
     all: ["containers"] as const,
     list: () => ["containers", "list"] as const,
