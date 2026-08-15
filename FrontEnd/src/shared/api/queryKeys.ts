@@ -15,6 +15,12 @@ export const queryKeys = {
   managerNotepad: {
     current: () => ["managerNotepad", "current"] as const,
   },
+  managerGraphFillColorBinds: {
+    current: () => ["managerGraphFillColorBinds", "current"] as const,
+  },
+  managerGraphTextColorBinds: {
+    current: () => ["managerGraphTextColorBinds", "current"] as const,
+  },
   systemNews: {
     all: ["systemNews"] as const,
     visible: () => ["systemNews", "visible"] as const,

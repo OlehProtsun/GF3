@@ -3,6 +3,7 @@ using System;
 using DataAccessLayer.Models.DataBaseContext;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -10,9 +11,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace DataAccessLayer.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260809121639_PreserveGlobalAvailabilityBindKeyUniqueness")]
+    partial class PreserveGlobalAvailabilityBindKeyUniqueness
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "10.0.9");
@@ -658,42 +661,6 @@ namespace DataAccessLayer.Migrations
                         .HasDatabaseName("ux_manager_graph_fill_bind_key");
 
                     b.ToTable("manager_graph_fill_color_bind");
-                });
-
-            modelBuilder.Entity("DataAccessLayer.Models.ManagerGraphTextColorBindModel", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("INTEGER")
-                        .HasColumnName("id");
-
-                    b.Property<string>("Key")
-                        .IsRequired()
-                        .HasMaxLength(64)
-                        .HasColumnType("TEXT")
-                        .HasColumnName("key");
-
-                    b.Property<int>("ManagerAccountId")
-                        .HasColumnType("INTEGER")
-                        .HasColumnName("manager_account_id");
-
-                    b.Property<string>("TextColor")
-                        .IsRequired()
-                        .HasMaxLength(7)
-                        .HasColumnType("TEXT")
-                        .HasColumnName("text_color");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ManagerAccountId", "Key")
-                        .IsUnique()
-                        .HasDatabaseName("ux_manager_graph_text_bind_key");
-
-                    b.HasIndex("ManagerAccountId", "TextColor")
-                        .IsUnique()
-                        .HasDatabaseName("ux_manager_graph_text_bind_color");
-
-                    b.ToTable("manager_graph_text_color_bind");
                 });
 
             modelBuilder.Entity("DataAccessLayer.Models.ManagerNoteModel", b =>
@@ -1882,17 +1849,6 @@ namespace DataAccessLayer.Migrations
                 });
 
             modelBuilder.Entity("DataAccessLayer.Models.ManagerGraphFillColorBindModel", b =>
-                {
-                    b.HasOne("DataAccessLayer.Models.ManagerAccountModel", "ManagerAccount")
-                        .WithMany()
-                        .HasForeignKey("ManagerAccountId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("ManagerAccount");
-                });
-
-            modelBuilder.Entity("DataAccessLayer.Models.ManagerGraphTextColorBindModel", b =>
                 {
                     b.HasOne("DataAccessLayer.Models.ManagerAccountModel", "ManagerAccount")
                         .WithMany()

@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using System.Security.Claims;
 using System.Reflection;
 using System.Text;
 using BusinessLogicLayer.Contracts.Database;
@@ -15,6 +16,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using WebApi.Contracts.Containers.Graphs;
+using WebApi.Auth;
 using WebApi.Infrastructure;
 using WebApi.Mappers;
 using WebApi.Middleware;
@@ -588,6 +590,12 @@ public sealed class AdminAndMiddlewareEdgeCoverageTests
         SetHttpContext(employeesController);
         SetHttpContext(shopsController);
         SetHttpContext(bindsController);
+        bindsController.HttpContext.User = new ClaimsPrincipal(new ClaimsIdentity(
+        [
+            new Claim(ClaimTypes.Name, "manager-1"),
+            new Claim(ClaimTypes.Role, AuthRoles.Manager),
+            new Claim("manager_id", "1"),
+        ], JwtAuthenticationDefaults.SchemeName, ClaimTypes.Name, ClaimTypes.Role));
 
         var employeeException = await Assert.ThrowsAsync<KeyNotFoundException>(() =>
             employeesController.GetById(999, CancellationToken.None));

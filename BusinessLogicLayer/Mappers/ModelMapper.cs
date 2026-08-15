@@ -113,6 +113,7 @@ internal static class ModelMapper
     internal static BindModel ToContract(this Dal.BindModel model) => new()
     {
         Id = model.Id,
+        ManagerAccountId = model.ManagerAccountId,
         Key = model.Key,
         Value = model.Value,
         IsActive = model.IsActive,
@@ -121,6 +122,7 @@ internal static class ModelMapper
     internal static Dal.BindModel ToDal(this BindModel model) => new()
     {
         Id = model.Id,
+        ManagerAccountId = model.ManagerAccountId,
         Key = model.Key,
         Value = model.Value,
         IsActive = model.IsActive,

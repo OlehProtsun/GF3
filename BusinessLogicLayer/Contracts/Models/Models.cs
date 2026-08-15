@@ -12,6 +12,8 @@ public class BindModel
     /// </summary>
     public int Id { get; set; }
 
+    public int? ManagerAccountId { get; set; }
+
     /// <summary>
     /// Availability code that will be inserted by the bind, for example <c>+</c>, <c>-</c>, or a normalized interval.
     /// </summary>

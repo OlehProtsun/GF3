@@ -5,7 +5,7 @@ import {
   type GraphMatrixCellMap,
 } from "@entities/containers/model/graphWorkspace";
 import { queryKeys } from "@shared/api/queryKeys";
-import { containersApi } from "./containersApi";
+import { containersApi, managerGraphFillColorBindsApi, managerGraphTextColorBindsApi } from "./containersApi";
 import type {
   GenerateGraphRequestDto,
   GenerateGraphPreviewRequestDto,
@@ -14,9 +14,59 @@ import type {
   SaveGraphEmployeeDto,
   SaveGraphSlotDto,
   SaveSchedulePresetDto,
+  SaveManagerGraphFillColorBindDto,
+  SaveManagerGraphTextColorBindDto,
   UpsertGraphCellStyleDto,
   UpdateGraphsPublicationDto,
 } from "./dto";
+
+export const useManagerGraphFillColorBindsQuery = () =>
+  useQuery({
+    queryKey: queryKeys.managerGraphFillColorBinds.current(),
+    queryFn: ({ signal }) => managerGraphFillColorBindsApi.list(signal),
+  });
+
+export function useUpsertManagerGraphFillColorBindMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload: SaveManagerGraphFillColorBindDto) => managerGraphFillColorBindsApi.upsert(payload),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.managerGraphFillColorBinds.current() }),
+  });
+}
+
+export function useDeleteManagerGraphFillColorBindMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id: number) => managerGraphFillColorBindsApi.remove(id),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.managerGraphFillColorBinds.current() }),
+  });
+}
+
+export const useManagerGraphTextColorBindsQuery = () =>
+  useQuery({
+    queryKey: queryKeys.managerGraphTextColorBinds.current(),
+    queryFn: ({ signal }) => managerGraphTextColorBindsApi.list(signal),
+  });
+
+export function useUpsertManagerGraphTextColorBindMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload: SaveManagerGraphTextColorBindDto) => managerGraphTextColorBindsApi.upsert(payload),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.managerGraphTextColorBinds.current() }),
+  });
+}
+
+export function useDeleteManagerGraphTextColorBindMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id: number) => managerGraphTextColorBindsApi.remove(id),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.managerGraphTextColorBinds.current() }),
+  });
+}
 
 export type SaveGraphWorkspaceEmployeeAssignment = {
   id: number | null;

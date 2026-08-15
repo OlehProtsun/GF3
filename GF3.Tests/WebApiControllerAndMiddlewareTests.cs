@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using System.Text.Json;
 using BusinessLogicLayer.Common;
 using BusinessLogicLayer.Services;
@@ -15,6 +16,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using WebApi.Controllers;
+using WebApi.Auth;
 using WebApi.Contracts.AdminDb;
 using WebApi.Contracts.AvailabilityBinds;
 using WebApi.Contracts.AvailabilityGroups;
@@ -209,10 +211,22 @@ public sealed class WebApiControllerAndMiddlewareTests
     {
         await using var database = await SqliteTestDatabase.CreateAsync();
         await using var context = database.CreateContext();
+        var now = DateTimeOffset.UtcNow;
+        var manager = new DataAccessLayer.Models.ManagerAccountModel
+        {
+            Username = "bind.manager",
+            DisplayName = "Bind manager",
+            PasswordHash = "test-hash",
+            PasswordUpdatedAtUtc = now,
+            CreatedAtUtc = now,
+            UpdatedAtUtc = now,
+        };
+        context.ManagerAccounts.Add(manager);
+        await context.SaveChangesAsync();
 
         var controller = new AvailabilityBindsController(
             new BindService(new DataAccessLayer.Repositories.BindRepository(context)));
-        SetHttpContext(controller);
+        SetManagerHttpContext(controller, manager.Id);
 
         var createResult = await controller.Create(new CreateAvailabilityBindRequest
         {
@@ -316,6 +330,17 @@ public sealed class WebApiControllerAndMiddlewareTests
         {
             HttpContext = CreateHttpContext(),
         };
+    }
+
+    private static void SetManagerHttpContext(ControllerBase controller, int managerId)
+    {
+        SetHttpContext(controller);
+        controller.HttpContext.User = new ClaimsPrincipal(new ClaimsIdentity(
+        [
+            new Claim(ClaimTypes.Name, $"manager-{managerId}"),
+            new Claim(ClaimTypes.Role, AuthRoles.Manager),
+            new Claim("manager_id", managerId.ToString()),
+        ], JwtAuthenticationDefaults.SchemeName, ClaimTypes.Name, ClaimTypes.Role));
     }
 
     private static ServiceProvider BuildAdminProvider(SqliteTestDatabase database)

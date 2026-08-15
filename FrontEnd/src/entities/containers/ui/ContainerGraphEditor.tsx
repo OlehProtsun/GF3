@@ -18,7 +18,11 @@ import type {
   GraphTotals,
 } from "@entities/containers/model/graphWorkspace";
 import { normalizeGraphCellValue } from "@entities/containers/model/graphWorkspace";
-import type { SaveSchedulePresetDto } from "@entities/containers/api/dto";
+import type {
+  ManagerGraphFillColorBindDto,
+  ManagerGraphTextColorBindDto,
+  SaveSchedulePresetDto,
+} from "@entities/containers/api/dto";
 import type { Graph, SchedulePreset } from "@entities/containers/model/types";
 import type { Shop } from "@entities/shops/model/types";
 import type { ShiftSwap } from "@entities/shift-swaps";
@@ -123,6 +127,11 @@ type ContainerGraphEditorProps = {
   previewAvailabilitySelection: string;
   previewAvailabilityOptions: SearchableSelectOption[];
   bindValueByKey: ReadonlyMap<string, string>;
+  valueBindKeys: ReadonlySet<string>;
+  fillColorBinds: ManagerGraphFillColorBindDto[];
+  fillColorByKey: ReadonlyMap<string, string>;
+  textColorBinds: ManagerGraphTextColorBindDto[];
+  textColorByKey: ReadonlyMap<string, string>;
   selectedCellKeys: string[];
   previewSelectedCellKeys: string[];
   fillColor: string;
@@ -135,6 +144,8 @@ type ContainerGraphEditorProps = {
   showMatrixSaveAction?: boolean;
   isBindsLoading: boolean;
   isBindBusy: boolean;
+  isFillColorBindBusy: boolean;
+  isTextColorBindBusy: boolean;
   isSchedulePresetsLoading: boolean;
   isPublishingManualShift?: boolean;
   isCancellingManualShift?: boolean;
@@ -167,7 +178,13 @@ type ContainerGraphEditorProps = {
   onFillColorChange: (value: string) => void;
   onTextColorChange: (value: string) => void;
   onApplyFillColor: () => void;
+  onApplyFillColorShortcut: (fillColor: string, cellKeys: string[]) => void;
+  onBindFillColor: (key: string, fillColor: string) => Promise<void>;
+  onDeleteFillColorBind: (id: number) => Promise<void>;
   onApplyTextColor: () => void;
+  onApplyTextColorShortcut: (textColor: string, cellKeys: string[]) => void;
+  onBindTextColor: (key: string, textColor: string) => Promise<void>;
+  onDeleteTextColorBind: (id: number) => Promise<void>;
   onClearCellStyle: () => void;
   onClearAllCellStyles: () => void;
   canUndo: boolean;
@@ -359,6 +376,11 @@ export function ContainerGraphEditor({
   previewAvailabilitySelection,
   previewAvailabilityOptions,
   bindValueByKey,
+  valueBindKeys,
+  fillColorBinds,
+  fillColorByKey,
+  textColorBinds,
+  textColorByKey,
   selectedCellKeys,
   previewSelectedCellKeys,
   fillColor,
@@ -371,6 +393,8 @@ export function ContainerGraphEditor({
   showMatrixSaveAction = true,
   isBindsLoading,
   isBindBusy,
+  isFillColorBindBusy,
+  isTextColorBindBusy,
   isSchedulePresetsLoading,
   isPublishingManualShift = false,
   isCancellingManualShift = false,
@@ -403,7 +427,13 @@ export function ContainerGraphEditor({
   onFillColorChange,
   onTextColorChange,
   onApplyFillColor,
+  onApplyFillColorShortcut,
+  onBindFillColor,
+  onDeleteFillColorBind,
   onApplyTextColor,
+  onApplyTextColorShortcut,
+  onBindTextColor,
+  onDeleteTextColorBind,
   onClearCellStyle,
   onClearAllCellStyles,
   canUndo,
@@ -1020,6 +1050,8 @@ export function ContainerGraphEditor({
                   onColumnLabelChange={onManualColumnLabelChange}
                   selectedCellKeys={selectedCellKeys}
                   bindValueByKey={bindValueByKey}
+                  fillColorByKey={fillColorByKey}
+                  textColorByKey={textColorByKey}
                   normalizeCellValue={(employeeId, value) => (
                     scheduleColumnKindByEmployeeId.get(employeeId) === "employee"
                       ? normalizeGraphCellValue(value)
@@ -1027,6 +1059,8 @@ export function ContainerGraphEditor({
                   )}
                   onSelectedCellKeysChange={onSelectedCellKeysChange}
                   onCellChange={onCellChange}
+                  onFillColorShortcut={onApplyFillColorShortcut}
+                  onTextColorShortcut={onApplyTextColorShortcut}
                   onVisualHintClick={detail => setActiveRelatedHintCellKey(`${detail.employeeId}:${detail.dayOfMonth}`)}
                   toolbar={
                     <div className={styles.matrixToolbar}>
@@ -1152,8 +1186,17 @@ export function ContainerGraphEditor({
         open={colorDialogMode !== null}
         mode={colorDialogMode}
         value={activeColorValue}
+        fillColorBinds={fillColorBinds}
+        textColorBinds={textColorBinds}
+        reservedValueBindKeys={valueBindKeys}
+        isFillColorBindBusy={isFillColorBindBusy}
+        isTextColorBindBusy={isTextColorBindBusy}
         onCancel={() => setColorDialogMode(null)}
         onSave={handleColorDialogSave}
+        onBindFillColor={onBindFillColor}
+        onDeleteFillColorBind={onDeleteFillColorBind}
+        onBindTextColor={onBindTextColor}
+        onDeleteTextColorBind={onDeleteTextColorBind}
       />
       <ContainerGraphPresetDialog
         open={isPresetDialogOpen}

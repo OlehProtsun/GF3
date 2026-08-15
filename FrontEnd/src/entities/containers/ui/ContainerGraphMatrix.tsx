@@ -64,6 +64,8 @@ type ContainerGraphMatrixProps = {
   headerCenterSlot?: ReactNode;
   headerRightSlot?: ReactNode;
   bindValueByKey?: ReadonlyMap<string, string>;
+  fillColorByKey?: ReadonlyMap<string, string>;
+  textColorByKey?: ReadonlyMap<string, string>;
   selectedCellKeys?: string[];
   enableSelectionWhenReadOnly?: boolean;
   normalizeCellValue?: (employeeId: number, value: string) => string;
@@ -72,6 +74,8 @@ type ContainerGraphMatrixProps = {
   onColumnMove?: (employeeId: number, targetEmployeeId: number) => void;
   onColumnLabelChange?: (columnId: number, value: string) => void;
   onCellChange?: (employeeId: number, dayOfMonth: number, value: string) => void;
+  onFillColorShortcut?: (fillColor: string, cellKeys: string[]) => void;
+  onTextColorShortcut?: (textColor: string, cellKeys: string[]) => void;
   onVisualHintClick?: (detail: GraphRelatedScheduleHintDetail) => void;
   onVisualHintCellClick?: (employeeId: number, dayOfMonth: number) => void;
 };
@@ -635,6 +639,8 @@ export function ContainerGraphMatrix({
   headerCenterSlot,
   headerRightSlot,
   bindValueByKey,
+  fillColorByKey,
+  textColorByKey,
   selectedCellKeys = [],
   enableSelectionWhenReadOnly = false,
   normalizeCellValue,
@@ -643,6 +649,8 @@ export function ContainerGraphMatrix({
   onColumnMove,
   onColumnLabelChange,
   onCellChange,
+  onFillColorShortcut,
+  onTextColorShortcut,
   onVisualHintClick,
   onVisualHintCellClick,
 }: ContainerGraphMatrixProps) {
@@ -675,7 +683,7 @@ export function ContainerGraphMatrix({
         const dayOfMonth = index + 1;
         return {
           dayOfMonth,
-          label: `${getGraphWeekdayLabel(graph.year, graph.month, dayOfMonth)}/${String(dayOfMonth).padStart(2, "0")}`,
+          label: `${getGraphWeekdayLabel(graph.year, graph.month, dayOfMonth)}/${String(dayOfMonth).padStart(2, "0")}.${String(graph.month).padStart(2, "0")}`,
           isWeekend: isGraphWeekend(graph.year, graph.month, dayOfMonth),
           hasConflict: Boolean(dayConflictMap[dayOfMonth]),
         };
@@ -686,7 +694,7 @@ export function ContainerGraphMatrix({
     () => showShiftStaffingCounts
       ? buildGraphDayShiftStaffingCounts({ graph, columns, cellMap })
       : {},
-    [cellMap, columns, graph.month, graph.shift1Time, graph.shift2Time, graph.year, showShiftStaffingCounts],
+    [cellMap, columns, graph, showShiftStaffingCounts],
   );
   const useCompactShell = compactSize && !preserveShellHeightOnCompact;
   const effectiveEditMode: ContainerGraphMatrixEditMode = readOnly ? "deferred" : editMode;
@@ -1113,6 +1121,35 @@ export function ContainerGraphMatrix({
     return true;
   };
 
+  const applyColorShortcut = (
+    event: KeyboardEvent<HTMLTableElement>,
+    target: Extract<MatrixSelectionTarget, { type: "cell" }>,
+  ) => {
+    if (readOnly) {
+      return false;
+    }
+
+    if (isBindNavigationKey(event.key) || isCommonEditorShortcut(event)) {
+      return false;
+    }
+
+    const bindToken = formatBindKeyFromKeyboardEvent(event);
+    const boundFillColor = bindToken && onFillColorShortcut ? fillColorByKey?.get(bindToken) : undefined;
+    const boundTextColor = bindToken && onTextColorShortcut ? textColorByKey?.get(bindToken) : undefined;
+    const boundColor = boundFillColor ?? boundTextColor;
+    const applyBoundColor = boundFillColor ? onFillColorShortcut : onTextColorShortcut;
+    if (!boundColor || !applyBoundColor) {
+      return false;
+    }
+
+    event.preventDefault();
+    const activeCellKeys = selectedCellKeysRef.current.includes(target.cellKey)
+      ? selectedCellKeysRef.current
+      : [target.cellKey];
+    applyBoundColor(boundColor, activeCellKeys);
+    return true;
+  };
+
   useEffect(() => {
     const handlePointerRelease = () => {
       if (isPointerSelectingRef.current && draftSelectedCellKeysRef.current) {
@@ -1275,7 +1312,7 @@ export function ContainerGraphMatrix({
 
     const isEditorTarget = event.target instanceof HTMLInputElement && event.target.dataset.matrixEditor === "true";
 
-    if (applyBindShortcut(event, target, isEditorTarget)) {
+    if (applyColorShortcut(event, target) || applyBindShortcut(event, target, isEditorTarget)) {
       return;
     }
 

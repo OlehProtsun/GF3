@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using BusinessLogicLayer.Contracts.Models;
 using BusinessLogicLayer.Services.Abstractions;
 using Microsoft.AspNetCore.Authorization;
@@ -26,7 +27,7 @@ public sealed class AvailabilityBindsController(
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult<IEnumerable<AvailabilityBindDto>>> GetAll(CancellationToken cancellationToken)
     {
-        var binds = await bindService.GetAllAsync(cancellationToken).ConfigureAwait(false);
+        var binds = await bindService.GetAllAsync(GetRequiredManagerId(), cancellationToken).ConfigureAwait(false);
         return Ok(binds.Select(bind => bind.ToApiDto()));
     }
 
@@ -35,7 +36,7 @@ public sealed class AvailabilityBindsController(
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult<IEnumerable<AvailabilityBindDto>>> GetActive(CancellationToken cancellationToken)
     {
-        var binds = await bindService.GetActiveAsync(cancellationToken).ConfigureAwait(false);
+        var binds = await bindService.GetActiveAsync(GetRequiredManagerId(), cancellationToken).ConfigureAwait(false);
         return Ok(binds.Select(bind => bind.ToApiDto()));
     }
 
@@ -55,7 +56,7 @@ public sealed class AvailabilityBindsController(
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult<AvailabilityBindDto>> Create([FromBody] CreateAvailabilityBindRequest request, CancellationToken cancellationToken)
     {
-        var created = await bindService.CreateAsync(request.ToCreateModel(), cancellationToken).ConfigureAwait(false);
+        var created = await bindService.CreateAsync(request.ToCreateModel(), GetRequiredManagerId(), cancellationToken).ConfigureAwait(false);
         var dto = created.ToApiDto();
         await NotifyBindChangedAsync(dto.Id, "manager-availability-bind-created").ConfigureAwait(false);
         return CreatedAtAction(nameof(GetById), new { id = dto.Id }, dto);
@@ -69,7 +70,7 @@ public sealed class AvailabilityBindsController(
     public async Task<IActionResult> Update(int id, [FromBody] UpdateAvailabilityBindRequest request, CancellationToken cancellationToken)
     {
         _ = await GetExistingBindOrThrowAsync(id, cancellationToken).ConfigureAwait(false);
-        await bindService.UpdateAsync(request.ToUpdateModel(id), cancellationToken).ConfigureAwait(false);
+        await bindService.UpdateAsync(request.ToUpdateModel(id), GetRequiredManagerId(), cancellationToken).ConfigureAwait(false);
         await NotifyBindChangedAsync(id, "manager-availability-bind-updated").ConfigureAwait(false);
         return NoContent();
     }
@@ -81,7 +82,7 @@ public sealed class AvailabilityBindsController(
     public async Task<IActionResult> Delete(int id, CancellationToken cancellationToken)
     {
         _ = await GetExistingBindOrThrowAsync(id, cancellationToken).ConfigureAwait(false);
-        await bindService.DeleteAsync(id, cancellationToken).ConfigureAwait(false);
+        await bindService.DeleteAsync(id, GetRequiredManagerId(), cancellationToken).ConfigureAwait(false);
         await NotifyBindChangedAsync(id, "manager-availability-bind-deleted").ConfigureAwait(false);
         return NoContent();
     }
@@ -94,7 +95,12 @@ public sealed class AvailabilityBindsController(
 
     private async Task<BindModel> GetExistingBindOrThrowAsync(int id, CancellationToken cancellationToken)
     {
-        var bind = await bindService.GetAsync(id, cancellationToken).ConfigureAwait(false);
+        var bind = await bindService.GetAsync(id, GetRequiredManagerId(), cancellationToken).ConfigureAwait(false);
         return bind ?? throw new KeyNotFoundException($"Availability bind with id {id} was not found.");
     }
+
+    private int GetRequiredManagerId()
+        => int.TryParse(User.FindFirstValue("manager_id"), out var managerId) && managerId > 0
+            ? managerId
+            : throw new BadHttpRequestException("The current manager session is invalid.");
 }
