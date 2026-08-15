@@ -17,6 +17,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<ManagerAccountModel> ManagerAccounts => Set<ManagerAccountModel>();
     public DbSet<ManagerNoteModel> ManagerNotes => Set<ManagerNoteModel>();
     public DbSet<ManagerNotepadStateModel> ManagerNotepadStates => Set<ManagerNotepadStateModel>();
+    public DbSet<ManagerGraphFillColorBindModel> ManagerGraphFillColorBinds => Set<ManagerGraphFillColorBindModel>();
+    public DbSet<ManagerGraphTextColorBindModel> ManagerGraphTextColorBinds => Set<ManagerGraphTextColorBindModel>();
     public DbSet<SystemNewsMessageModel> SystemNewsMessages => Set<SystemNewsMessageModel>();
     public DbSet<SystemNewsReadModel> SystemNewsReads => Set<SystemNewsReadModel>();
     public DbSet<CommunicationMessageModel> CommunicationMessages => Set<CommunicationMessageModel>();
@@ -51,6 +53,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         ConfigureManagerAccount(modelBuilder);
         ConfigureManagerNote(modelBuilder);
         ConfigureManagerNotepadState(modelBuilder);
+        ConfigureManagerGraphFillColorBind(modelBuilder);
+        ConfigureManagerGraphTextColorBind(modelBuilder);
         ConfigureSystemNews(modelBuilder);
         ConfigureCommunicationMessage(modelBuilder);
         ConfigureEmployeeCommunicationDismissal(modelBuilder);
@@ -200,6 +204,48 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
                 .WithOne()
                 .HasForeignKey<ManagerNotepadStateModel>(state => state.ManagerAccountId)
                 .OnDelete(DeleteBehavior.Cascade);
+        });
+    }
+
+    private static void ConfigureManagerGraphFillColorBind(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<ManagerGraphFillColorBindModel>(entity =>
+        {
+            entity.Property(bind => bind.Key).IsRequired().HasMaxLength(64);
+            entity.Property(bind => bind.FillColor).IsRequired().HasMaxLength(7);
+
+            entity.HasOne(bind => bind.ManagerAccount)
+                .WithMany()
+                .HasForeignKey(bind => bind.ManagerAccountId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasIndex(bind => new { bind.ManagerAccountId, bind.Key })
+                .IsUnique()
+                .HasDatabaseName("ux_manager_graph_fill_bind_key");
+            entity.HasIndex(bind => new { bind.ManagerAccountId, bind.FillColor })
+                .IsUnique()
+                .HasDatabaseName("ux_manager_graph_fill_bind_color");
+        });
+    }
+
+    private static void ConfigureManagerGraphTextColorBind(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<ManagerGraphTextColorBindModel>(entity =>
+        {
+            entity.Property(bind => bind.Key).IsRequired().HasMaxLength(64);
+            entity.Property(bind => bind.TextColor).IsRequired().HasMaxLength(7);
+
+            entity.HasOne(bind => bind.ManagerAccount)
+                .WithMany()
+                .HasForeignKey(bind => bind.ManagerAccountId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasIndex(bind => new { bind.ManagerAccountId, bind.Key })
+                .IsUnique()
+                .HasDatabaseName("ux_manager_graph_text_bind_key");
+            entity.HasIndex(bind => new { bind.ManagerAccountId, bind.TextColor })
+                .IsUnique()
+                .HasDatabaseName("ux_manager_graph_text_bind_color");
         });
     }
 
@@ -760,7 +806,17 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         {
             entity.Property(bind => bind.Key).IsRequired();
             entity.Property(bind => bind.Value).IsRequired();
-            entity.HasIndex(bind => bind.Key).IsUnique();
+            entity.HasOne(bind => bind.ManagerAccount)
+                .WithMany()
+                .HasForeignKey(bind => bind.ManagerAccountId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasIndex(bind => new { bind.ManagerAccountId, bind.Key })
+                .IsUnique()
+                .HasDatabaseName("ux_availability_bind_manager_key");
+            entity.HasIndex(bind => bind.Key)
+                .IsUnique()
+                .HasDatabaseName("ux_availability_bind_global_key")
+                .HasFilter("\"ManagerAccountId\" IS NULL");
         });
     }
 

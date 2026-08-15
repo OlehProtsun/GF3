@@ -64,6 +64,12 @@ import {
   useGenerateGraphPreviewMutation,
   useGraphByIdQuery,
   useGraphCellStylesQuery,
+  useManagerGraphFillColorBindsQuery,
+  useUpsertManagerGraphFillColorBindMutation,
+  useDeleteManagerGraphFillColorBindMutation,
+  useManagerGraphTextColorBindsQuery,
+  useUpsertManagerGraphTextColorBindMutation,
+  useDeleteManagerGraphTextColorBindMutation,
   useGraphEmployeesQuery,
   useGraphSlotsBatchQuery,
   useGraphSlotsQuery,
@@ -892,6 +898,8 @@ export function ContainerGraphEditPage() {
   const shiftSwapLogQuery = useGraphShiftSwapLogQuery(containerId, graphId, !isCreate);
   const availabilityGroupsQuery = useAvailabilityGroupsListQuery(location.key);
   const bindsQuery = useAvailabilityBindsListQuery();
+  const fillColorBindsQuery = useManagerGraphFillColorBindsQuery();
+  const textColorBindsQuery = useManagerGraphTextColorBindsQuery();
   const employeesQuery = useEmployeesListQuery({ refreshKey: location.key });
   const shopsQuery = useShopsListQuery({ refreshKey: location.key });
   const saveWorkspaceMutation = useSaveGraphWorkspaceMutation();
@@ -900,6 +908,10 @@ export function ContainerGraphEditPage() {
   const createBindMutation = useCreateAvailabilityBindMutation();
   const updateBindMutation = useUpdateAvailabilityBindMutation();
   const deleteBindMutation = useDeleteAvailabilityBindMutation();
+  const upsertFillColorBindMutation = useUpsertManagerGraphFillColorBindMutation();
+  const deleteFillColorBindMutation = useDeleteManagerGraphFillColorBindMutation();
+  const upsertTextColorBindMutation = useUpsertManagerGraphTextColorBindMutation();
+  const deleteTextColorBindMutation = useDeleteManagerGraphTextColorBindMutation();
   const createManualShiftSwapMutation = useCreateManagerManualShiftSwapMutation();
   const cancelManualShiftSwapMutation = useCancelManagerManualShiftSwapMutation();
 
@@ -1282,6 +1294,31 @@ export function ContainerGraphEditPage() {
     [bindRows, selectedBindClientId],
   );
   const activeBindValueByKey = useMemo(() => buildActiveAvailabilityBindMap(bindRows), [bindRows]);
+  const valueBindKeys = useMemo(() => new Set(
+    bindRows
+      .map(bind => normalizeBindKey(bind.key))
+      .filter((key): key is string => Boolean(key)),
+  ), [bindRows]);
+  const fillColorByKey = useMemo(() => {
+    const result = new Map<string, string>();
+    (fillColorBindsQuery.data ?? []).forEach(bind => {
+      const normalizedKey = normalizeBindKey(bind.key);
+      if (normalizedKey) {
+        result.set(normalizedKey, bind.fillColor);
+      }
+    });
+    return result;
+  }, [fillColorBindsQuery.data]);
+  const textColorByKey = useMemo(() => {
+    const result = new Map<string, string>();
+    (textColorBindsQuery.data ?? []).forEach(bind => {
+      const normalizedKey = normalizeBindKey(bind.key);
+      if (normalizedKey) {
+        result.set(normalizedKey, bind.textColor);
+      }
+    });
+    return result;
+  }, [textColorBindsQuery.data]);
   const bindDeleteLabel = bindDeleteTarget?.key.trim() || "this bind";
   const employeeRemoveTargetLabel = employeeRemoveTargetId !== null
     ? employeeNameById.get(employeeRemoveTargetId) ?? `Employee #${employeeRemoveTargetId}`
@@ -2547,12 +2584,17 @@ export function ContainerGraphEditPage() {
       });
   };
 
-  const handleApplyStyleProperty = (property: StyleProperty) => {
-    if (selectedCellKeys.length === 0) {
+  const handleApplyStyleProperty = (
+    property: StyleProperty,
+    colorOverride?: string,
+    cellKeysOverride?: string[],
+  ) => {
+    const targetCellKeys = cellKeysOverride ?? selectedCellKeys;
+    if (targetCellKeys.length === 0) {
       return;
     }
 
-    const nextColorArgb = rgbHexToArgb(property === "fill" ? fillColor : textColor);
+    const nextColorArgb = rgbHexToArgb(colorOverride ?? (property === "fill" ? fillColor : textColor));
     if (nextColorArgb === null) {
       return;
     }
@@ -2561,7 +2603,7 @@ export function ContainerGraphEditPage() {
     const nextStyleByKey = buildStyleRecordByKey(previousStyles);
 
     captureUndoSnapshot();
-    selectedCellKeys
+    targetCellKeys
       .map(cellKey => ({ cellKey, ...parseSelectedCellKey(cellKey) }))
       .forEach(({ cellKey, employeeId, dayOfMonth }) => {
         const currentStyle = nextStyleByKey.get(cellKey);
@@ -2576,7 +2618,7 @@ export function ContainerGraphEditPage() {
         });
       });
 
-    getFullySelectedDayOfMonths(selectedCellKeys, orderedEmployeeIds).forEach(dayOfMonth => {
+    getFullySelectedDayOfMonths(targetCellKeys, orderedEmployeeIds).forEach(dayOfMonth => {
       const dayCellKey = getGraphCellKey(GRAPH_DAY_STYLE_EMPLOYEE_ID, dayOfMonth);
       const currentStyle = nextStyleByKey.get(dayCellKey);
 
@@ -2864,6 +2906,11 @@ export function ContainerGraphEditPage() {
         binds={bindRows}
         selectedBindClientId={selectedBindClientId}
         bindValueByKey={activeBindValueByKey}
+        valueBindKeys={valueBindKeys}
+        fillColorBinds={fillColorBindsQuery.data ?? []}
+        fillColorByKey={fillColorByKey}
+        textColorBinds={textColorBindsQuery.data ?? []}
+        textColorByKey={textColorByKey}
         selectedCellKeys={selectedCellKeys}
         previewSelectedCellKeys={previewSelectedCellKeys}
         fillColor={fillColor}
@@ -2876,6 +2923,8 @@ export function ContainerGraphEditPage() {
         showMatrixSaveAction={!showSessionTabs}
         isBindsLoading={bindsQuery.isLoading && bindRows.length === 0}
         isBindBusy={createBindMutation.isPending || updateBindMutation.isPending || deleteBindMutation.isPending}
+        isFillColorBindBusy={upsertFillColorBindMutation.isPending || deleteFillColorBindMutation.isPending}
+        isTextColorBindBusy={upsertTextColorBindMutation.isPending || deleteTextColorBindMutation.isPending}
         isSchedulePresetsLoading={schedulePresetsQuery.isLoading}
         isPublishingManualShift={createManualShiftSwapMutation.isPending || isSaving}
         isCancellingManualShift={cancelManualShiftSwapMutation.isPending}
@@ -2967,7 +3016,27 @@ export function ContainerGraphEditPage() {
         onFillColorChange={setFillColor}
         onTextColorChange={setTextColor}
         onApplyFillColor={() => void handleApplyStyleProperty("fill")}
+        onApplyFillColorShortcut={(nextFillColor, cellKeys) => {
+          setFillColor(nextFillColor);
+          handleApplyStyleProperty("fill", nextFillColor, cellKeys);
+        }}
+        onBindFillColor={async (key, nextFillColor) => {
+          await runMutation(upsertFillColorBindMutation.mutate, { key, fillColor: nextFillColor });
+        }}
+        onDeleteFillColorBind={async id => {
+          await runMutation(deleteFillColorBindMutation.mutate, id);
+        }}
         onApplyTextColor={() => void handleApplyStyleProperty("text")}
+        onApplyTextColorShortcut={(nextTextColor, cellKeys) => {
+          setTextColor(nextTextColor);
+          handleApplyStyleProperty("text", nextTextColor, cellKeys);
+        }}
+        onBindTextColor={async (key, nextTextColor) => {
+          await runMutation(upsertTextColorBindMutation.mutate, { key, textColor: nextTextColor });
+        }}
+        onDeleteTextColorBind={async id => {
+          await runMutation(deleteTextColorBindMutation.mutate, id);
+        }}
         onClearCellStyle={() => void handleClearCellStyle()}
         onClearAllCellStyles={() => void handleClearAllCellStyles()}
         canUndo={undoDepth > 0}

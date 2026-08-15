@@ -5,6 +5,8 @@ import type {
   GenerateGraphPreviewRequestDto,
   GenerateGraphResponseDto,
   GraphCellStyleDto,
+  ManagerGraphFillColorBindDto,
+  ManagerGraphTextColorBindDto,
   GraphDto,
   GraphEmployeeDto,
   GraphSlotDto,
@@ -13,6 +15,8 @@ import type {
   SaveGraphEmployeeDto,
   ReplaceGraphSlotsDto,
   SaveSchedulePresetDto,
+  SaveManagerGraphFillColorBindDto,
+  SaveManagerGraphTextColorBindDto,
   SaveGraphSlotDto,
   SchedulePresetDto,
   UpsertGraphCellStyleDto,
@@ -71,4 +75,26 @@ export const containersApi = {
     request<GraphCellStyleDto>(`${endpoint}/${containerId}/graphs/${graphId}/cell-styles`, { method: "PUT", body: payload }),
   removeGraphCellStyle: (containerId: number, graphId: number, styleId: number) =>
     request<void>(`${endpoint}/${containerId}/graphs/${graphId}/cell-styles/${styleId}`, { method: "DELETE" }),
+};
+
+const managerGraphFillColorBindsEndpoint = "manager-graph-fill-color-binds";
+
+export const managerGraphFillColorBindsApi = {
+  list: (signal?: AbortSignal) =>
+    request<ManagerGraphFillColorBindDto[]>(managerGraphFillColorBindsEndpoint, { signal }),
+  upsert: (payload: SaveManagerGraphFillColorBindDto) =>
+    request<ManagerGraphFillColorBindDto>(managerGraphFillColorBindsEndpoint, { method: "PUT", body: payload }),
+  remove: (id: number) =>
+    request<void>(`${managerGraphFillColorBindsEndpoint}/${id}`, { method: "DELETE" }),
+};
+
+const managerGraphTextColorBindsEndpoint = "manager-graph-text-color-binds";
+
+export const managerGraphTextColorBindsApi = {
+  list: (signal?: AbortSignal) =>
+    request<ManagerGraphTextColorBindDto[]>(managerGraphTextColorBindsEndpoint, { signal }),
+  upsert: (payload: SaveManagerGraphTextColorBindDto) =>
+    request<ManagerGraphTextColorBindDto>(managerGraphTextColorBindsEndpoint, { method: "PUT", body: payload }),
+  remove: (id: number) =>
+    request<void>(`${managerGraphTextColorBindsEndpoint}/${id}`, { method: "DELETE" }),
 };

@@ -1,5 +1,5 @@
 .card {
-  --matrix-day-column-width: 65px;
+  --matrix-day-column-width: 76px;
   --matrix-cell-min-width: 135px;
   --matrix-cell-min-height: 30px;
   width: 100%;
@@ -17,7 +17,7 @@
 }
 
 .cardWithStaffing {
-  --matrix-day-column-width: 72px;
+  --matrix-day-column-width: 108px;
 }
 
 .layout {
@@ -372,16 +372,18 @@
 }
 
 .dayButtonWithStaffing {
-  justify-content: space-between;
-  gap: 2px;
-  padding-inline: 2px;
+  justify-content: center;
+  gap: 4px;
+  padding-inline: 3px;
 }
 
 .dayLabel {
-  min-width: 0;
+  flex: 0 0 auto;
+  min-width: max-content;
 }
 
 .shiftStaffingBadge {
+  flex: 0 0 auto;
   min-width: 21px;
   padding: 1px 2px;
   box-sizing: border-box;

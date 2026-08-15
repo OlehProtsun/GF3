@@ -211,9 +211,21 @@ public sealed class RemainingControllerAndAvailabilityCoverageTests
     {
         await using var database = await SqliteTestDatabase.CreateAsync();
         await using var context = database.CreateContext();
+        var now = DateTimeOffset.UtcNow;
+        var manager = new DataAccessLayer.Models.ManagerAccountModel
+        {
+            Username = "availability.bind.manager",
+            DisplayName = "Availability bind manager",
+            PasswordHash = "test-hash",
+            PasswordUpdatedAtUtc = now,
+            CreatedAtUtc = now,
+            UpdatedAtUtc = now,
+        };
+        context.ManagerAccounts.Add(manager);
+        await context.SaveChangesAsync();
         var controller = new AvailabilityBindsController(
             new BindService(new DataAccessLayer.Repositories.BindRepository(context)));
-        SetHttpContext(controller);
+        SetManagerHttpContext(controller, manager.Id, "/api/availability-binds");
 
         var createdActive = await controller.Create(new CreateAvailabilityBindRequest
         {

@@ -1,8 +1,15 @@
-import { useEffect, useId, useMemo, type MouseEvent } from "react";
+import { useEffect, useId, useMemo, useState, type MouseEvent } from "react";
+import {
+  formatBindKeyFromKeyboardEvent,
+  isBindNavigationKey,
+  isCommonEditorShortcut,
+  isModifierOnlyKey,
+} from "@entities/availability-binds";
+import type { ManagerGraphFillColorBindDto, ManagerGraphTextColorBindDto } from "@entities/containers/api/dto";
 import { useSyncedDraft } from "@shared/lib/useSyncedDraft";
 import { IosButton } from "@shared/ui/components/IosButton";
 import { LabeledField, TextInput } from "@shared/ui/forms/Field";
-import { CheckIcon, CloseIcon } from "@shared/ui/icons";
+import { BindIcon, CheckIcon, CloseIcon } from "@shared/ui/icons";
 import styles from "./ContainerGraphColorDialog.module.css";
 
 type ColorDialogMode = "fill" | "text";
@@ -21,8 +28,17 @@ type ContainerGraphColorDialogProps = {
   open: boolean;
   mode: ColorDialogMode | null;
   value: string;
+  fillColorBinds: ManagerGraphFillColorBindDto[];
+  textColorBinds: ManagerGraphTextColorBindDto[];
+  reservedValueBindKeys: ReadonlySet<string>;
+  isFillColorBindBusy: boolean;
+  isTextColorBindBusy: boolean;
   onCancel: () => void;
   onSave: (value: string) => void;
+  onBindFillColor: (key: string, fillColor: string) => Promise<void>;
+  onDeleteFillColorBind: (id: number) => Promise<void>;
+  onBindTextColor: (key: string, textColor: string) => Promise<void>;
+  onDeleteTextColorBind: (id: number) => Promise<void>;
 };
 
 const COLOR_GROUPS: ColorGroup[] = [
@@ -91,8 +107,17 @@ export function ContainerGraphColorDialog({
   open,
   mode,
   value,
+  fillColorBinds,
+  textColorBinds,
+  reservedValueBindKeys,
+  isFillColorBindBusy,
+  isTextColorBindBusy,
   onCancel,
   onSave,
+  onBindFillColor,
+  onDeleteFillColorBind,
+  onBindTextColor,
+  onDeleteTextColorBind,
 }: ContainerGraphColorDialogProps) {
   const titleId = useId();
   const descriptionId = useId();
@@ -112,6 +137,14 @@ export function ContainerGraphColorDialog({
     setValue: setDialogState,
   } = useSyncedDraft(dialogSourceKey, initialDialogState);
   const { draftValue, inputError } = dialogState;
+  const [isCapturingBind, setIsCapturingBind] = useState(false);
+  const [bindError, setBindError] = useState<string | undefined>();
+  const isColorBindBusy = mode === "text" ? isTextColorBindBusy : isFillColorBindBusy;
+
+  useEffect(() => {
+    setIsCapturingBind(false);
+    setBindError(undefined);
+  }, [mode, open]);
 
   useEffect(() => {
     if (!open || mode === null) {
@@ -119,6 +152,57 @@ export function ContainerGraphColorDialog({
     }
 
     const handleKeyDown = (event: KeyboardEvent) => {
+      if (isCapturingBind) {
+        event.preventDefault();
+        event.stopPropagation();
+
+        if (event.key === "Escape") {
+          setIsCapturingBind(false);
+          setBindError(undefined);
+          return;
+        }
+
+        if (isColorBindBusy) {
+          return;
+        }
+
+        if (isModifierOnlyKey(event.key)) {
+          return;
+        }
+
+        if (isBindNavigationKey(event.key) || isCommonEditorShortcut(event)) {
+          setBindError("Choose a non-navigation key that is not a standard editor shortcut.");
+          return;
+        }
+
+        const nextKey = formatBindKeyFromKeyboardEvent(event);
+        const nextColor = normalizeHexColor(draftValue);
+        if (!nextKey || !nextColor) {
+          setBindError(`Choose a valid ${mode} color before binding a key.`);
+          return;
+        }
+
+        if (reservedValueBindKeys.has(nextKey)) {
+          setBindError(`Key '${nextKey}' is already used by a value bind.`);
+          return;
+        }
+
+        const conflictingColorBind = (mode === "fill" ? textColorBinds : fillColorBinds)
+          .some(bind => bind.key.toUpperCase() === nextKey.toUpperCase());
+        if (conflictingColorBind) {
+          const conflictingMode = mode === "fill" ? "text" : "fill";
+          setBindError(`Key '${nextKey}' is already used by a ${conflictingMode} color bind.`);
+          return;
+        }
+
+        setBindError(undefined);
+        const saveBinding = mode === "fill" ? onBindFillColor : onBindTextColor;
+        void saveBinding(nextKey, nextColor.toUpperCase())
+          .then(() => setIsCapturingBind(false))
+          .catch(() => setBindError("Could not save this key binding."));
+        return;
+      }
+
       if (event.key === "Escape") {
         onCancel();
       }
@@ -126,13 +210,18 @@ export function ContainerGraphColorDialog({
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [mode, onCancel, open]);
+  }, [draftValue, fillColorBinds, isCapturingBind, isColorBindBusy, mode, onBindFillColor, onBindTextColor, onCancel, open, reservedValueBindKeys, textColorBinds]);
 
   if (!open || mode === null) {
     return null;
   }
 
   const normalizedDraftValue = normalizeHexColor(draftValue);
+  const currentColorBinding = normalizedDraftValue
+    ? mode === "fill"
+      ? fillColorBinds.find(bind => bind.fillColor.toLowerCase() === normalizedDraftValue)
+      : textColorBinds.find(bind => bind.textColor.toLowerCase() === normalizedDraftValue)
+    : undefined;
   const resolvedPreviewColor = getPreviewColor(mode, draftValue);
   const title = mode === "fill" ? "Choose Fill Color" : "Choose Text Color";
   const description =
@@ -167,6 +256,27 @@ export function ContainerGraphColorDialog({
       draftValue: nextValue,
       inputError: undefined,
     });
+  };
+
+  const handleStartBinding = () => {
+    if (!normalizedDraftValue) {
+      setBindError(`Choose a valid ${mode} color before binding a key.`);
+      return;
+    }
+
+    setBindError(undefined);
+    setIsCapturingBind(true);
+  };
+
+  const handleDeleteBinding = () => {
+    if (!currentColorBinding) {
+      return;
+    }
+
+    setBindError(undefined);
+    const deleteBinding = mode === "fill" ? onDeleteFillColorBind : onDeleteTextColorBind;
+    void deleteBinding(currentColorBinding.id)
+      .catch(() => setBindError("Could not remove this key binding."));
   };
 
   return (
@@ -266,8 +376,36 @@ export function ContainerGraphColorDialog({
         </LabeledField>
 
         <div className={styles.footer}>
-          <IosButton label="Cancel" variant="secondary" icon={<CloseIcon size={16} />} onClick={onCancel} />
-          <IosButton label={saveLabel} icon={<CheckIcon size={16} />} onClick={submit} />
+          <div className={styles.bindBlock}>
+              <div className={styles.bindActions}>
+                <IosButton
+                  label={isCapturingBind ? "Press a key..." : currentColorBinding ? `Bound: ${currentColorBinding.key}` : "Bind Key"}
+                  variant="secondary"
+                  size="compact"
+                  className={`${styles.bindButton} ${isCapturingBind ? styles.bindButtonCapturing : ""}`}
+                  icon={<BindIcon size={14} />}
+                  disabled={isColorBindBusy}
+                  onClick={handleStartBinding}
+                />
+                {currentColorBinding ? (
+                  <IosButton
+                    label="Unbind"
+                    variant="secondary"
+                    size="compact"
+                    className={styles.bindButton}
+                    disabled={isColorBindBusy || isCapturingBind}
+                    onClick={handleDeleteBinding}
+                  />
+                ) : null}
+              </div>
+              <span className={bindError ? styles.bindError : styles.bindHint}>
+                {bindError ?? (isCapturingBind ? `Press the shortcut to use for this ${mode} color. Esc cancels.` : `The shortcut applies this ${mode} color to the selected schedule cells.`)}
+              </span>
+            </div>
+          <div className={styles.footerActions}>
+            <IosButton label="Cancel" variant="secondary" icon={<CloseIcon size={16} />} onClick={onCancel} />
+            <IosButton label={saveLabel} icon={<CheckIcon size={16} />} onClick={submit} />
+          </div>
         </div>
       </div>
     </div>

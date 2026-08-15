@@ -4,6 +4,65 @@ import type { GraphRelatedScheduleHintDetail } from "@entities/containers/model/
 import { ContainerGraphMatrix } from "./ContainerGraphMatrix";
 
 describe("ContainerGraphMatrix related schedule hints", () => {
+  test("applies a bound fill color to the focused selected cell", () => {
+    const onFillColorShortcut = vi.fn();
+
+    render(
+      <ContainerGraphMatrix
+        graph={{ year: 2026, month: 1 }}
+        columns={[{
+          employeeId: 7,
+          kind: "employee",
+          manualColumnId: null,
+          graphEmployeeId: 70,
+          label: "Ada",
+          minHoursMonth: null,
+          totalMinutes: 0,
+          totalText: "",
+        }]}
+        cellMap={{}}
+        selectedCellKeys={["7:1"]}
+        fillColorByKey={new Map([["F4", "#DBEAFE"]])}
+        onSelectedCellKeysChange={() => undefined}
+        onFillColorShortcut={onFillColorShortcut}
+      />,
+    );
+
+    const cell = screen.getByRole("button", { name: "Ada day 1" });
+    fireEvent.keyDown(cell, { key: "F4" });
+
+    expect(onFillColorShortcut).toHaveBeenCalledWith("#DBEAFE", ["7:1"]);
+  });
+
+  test("applies a bound text color to the focused selected cell", () => {
+    const onTextColorShortcut = vi.fn();
+
+    render(
+      <ContainerGraphMatrix
+        graph={{ year: 2026, month: 1 }}
+        columns={[{
+          employeeId: 7,
+          kind: "employee",
+          manualColumnId: null,
+          graphEmployeeId: 70,
+          label: "Ada",
+          minHoursMonth: null,
+          totalMinutes: 0,
+          totalText: "",
+        }]}
+        cellMap={{}}
+        selectedCellKeys={["7:1"]}
+        textColorByKey={new Map([["F5", "#0F172A"]])}
+        onSelectedCellKeysChange={() => undefined}
+        onTextColorShortcut={onTextColorShortcut}
+      />,
+    );
+
+    fireEvent.keyDown(screen.getByRole("button", { name: "Ada day 1" }), { key: "F5" });
+
+    expect(onTextColorShortcut).toHaveBeenCalledWith("#0F172A", ["7:1"]);
+  });
+
   test("shows compact per-shift staffing counts in the day column when enabled", () => {
     render(
       <ContainerGraphMatrix
@@ -26,6 +85,7 @@ describe("ContainerGraphMatrix related schedule hints", () => {
     );
 
     expect(screen.getByLabelText("Shift 1: 2 employees; Shift 2: 2 employees")).toHaveTextContent("2,2");
+    expect(screen.getByText("th./01.01")).toBeVisible();
   });
 
   test("exposes an employee header as a customization button", () => {

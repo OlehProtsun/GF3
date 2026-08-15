@@ -105,3 +105,25 @@ export type UpsertGraphCellStyleDto = {
   backgroundColorArgb?: number | null;
   textColorArgb?: number | null;
 };
+
+export type ManagerGraphFillColorBindDto = {
+  id: number;
+  key: string;
+  fillColor: string;
+};
+
+export type SaveManagerGraphFillColorBindDto = {
+  key: string;
+  fillColor: string;
+};
+
+export type ManagerGraphTextColorBindDto = {
+  id: number;
+  key: string;
+  textColor: string;
+};
+
+export type SaveManagerGraphTextColorBindDto = {
+  key: string;
+  textColor: string;
+};
