@@ -23,6 +23,7 @@ public class ContainerService : IContainerService
     private const string DeleteBlockedMessage = "To delete this container, first delete all graphs that belong to it.";
     private const string DuplicateSlotMessage = "Duplicate slot for the same time/day";
     private const string ReplaceSlotsRejectedMessage = "Could not save schedule slots because the database rejected the slot set.";
+    private const int MaxAssignedIntervalsPerEmployeeDay = 4;
 
     private readonly IContainerRepository _repo;
     private readonly IScheduleRepository _scheduleRepo;
@@ -564,7 +565,7 @@ public class ContainerService : IContainerService
     /// Before persisting we:
     /// 1. normalize schedule ownership and time strings,
     /// 2. group logically identical slots,
-    /// 3. drop duplicate employees inside the same time bucket,
+    /// 3. validate split shifts per employee/day,
     /// 4. rebuild slot numbers so storage stays dense and deterministic.
     /// </summary>
     private static List<ScheduleSlotModel> NormalizeReplacementSlots(IEnumerable<ScheduleSlotModel> slots, int graphId)
@@ -588,6 +589,8 @@ public class ContainerService : IContainerService
                 };
             })
             .ToList();
+
+        ValidateAssignedEmployeeIntervals(normalizedInput);
 
         var normalizedSlots = new List<ScheduleSlotModel>(normalizedInput.Count);
 
@@ -615,6 +618,69 @@ public class ContainerService : IContainerService
         }
 
         return normalizedSlots;
+    }
+
+    private static void ValidateAssignedEmployeeIntervals(IReadOnlyCollection<ScheduleSlotModel> slots)
+    {
+        foreach (var employeeDay in slots
+            .Where(slot => slot.EmployeeId is > 0)
+            .GroupBy(slot => new { EmployeeId = slot.EmployeeId!.Value, slot.DayOfMonth }))
+        {
+            if (employeeDay.Count() > MaxAssignedIntervalsPerEmployeeDay)
+            {
+                throw new ValidationException(
+                    $"An employee can have no more than {MaxAssignedIntervalsPerEmployeeDay} time ranges in one day.");
+            }
+
+            var uniqueIntervals = new HashSet<(int FromMinutes, int ToMinutes)>();
+            var intervals = new List<(int FromMinutes, int ToMinutes)>();
+
+            foreach (var slot in employeeDay)
+            {
+                if (!ScheduleMatrixEngine.TryParseTime(slot.FromTime, out var fromTime) ||
+                    !ScheduleMatrixEngine.TryParseTime(slot.ToTime, out var toTime))
+                {
+                    throw new ValidationException("Schedule slot times must use a valid HH:mm format.");
+                }
+
+                var fromMinutes = (int)fromTime.TotalMinutes;
+                var toMinutes = (int)toTime.TotalMinutes;
+                if (fromMinutes < 0 || fromMinutes >= 24 * 60 || toMinutes < 0 || toMinutes >= 24 * 60)
+                {
+                    throw new ValidationException("Schedule slot times must be within one 24-hour day.");
+                }
+
+                if (toMinutes < fromMinutes)
+                {
+                    toMinutes += 24 * 60;
+                }
+
+                if (toMinutes == fromMinutes)
+                {
+                    throw new ValidationException("Schedule slot end time must differ from its start time.");
+                }
+
+                if (!uniqueIntervals.Add((fromMinutes, toMinutes)))
+                {
+                    throw new ValidationException(
+                        "The same time range cannot be entered more than once for one employee and day.");
+                }
+
+                intervals.Add((fromMinutes, toMinutes));
+            }
+
+            intervals.Sort((left, right) => left.FromMinutes != right.FromMinutes
+                ? left.FromMinutes.CompareTo(right.FromMinutes)
+                : left.ToMinutes.CompareTo(right.ToMinutes));
+
+            for (var index = 1; index < intervals.Count; index++)
+            {
+                if (intervals[index].FromMinutes < intervals[index - 1].ToMinutes)
+                {
+                    throw new ValidationException("Time ranges for one employee and day cannot overlap.");
+                }
+            }
+        }
     }
 
     private async Task EnsureGraphEmployeeIsUniqueAsync(int graphId, int employeeId, int? excludeGraphEmployeeId, CancellationToken ct)

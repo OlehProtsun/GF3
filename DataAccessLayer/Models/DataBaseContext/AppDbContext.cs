@@ -19,6 +19,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<ManagerNotepadStateModel> ManagerNotepadStates => Set<ManagerNotepadStateModel>();
     public DbSet<ManagerGraphFillColorBindModel> ManagerGraphFillColorBinds => Set<ManagerGraphFillColorBindModel>();
     public DbSet<ManagerGraphTextColorBindModel> ManagerGraphTextColorBinds => Set<ManagerGraphTextColorBindModel>();
+    public DbSet<ManagerShiftCorrectionSettingModel> ManagerShiftCorrectionSettings => Set<ManagerShiftCorrectionSettingModel>();
     public DbSet<SystemNewsMessageModel> SystemNewsMessages => Set<SystemNewsMessageModel>();
     public DbSet<SystemNewsReadModel> SystemNewsReads => Set<SystemNewsReadModel>();
     public DbSet<CommunicationMessageModel> CommunicationMessages => Set<CommunicationMessageModel>();
@@ -33,8 +34,11 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<ScheduleEmployeeModel> ScheduleEmployees => Set<ScheduleEmployeeModel>();
     public DbSet<ScheduleSlotModel> ScheduleSlots => Set<ScheduleSlotModel>();
     public DbSet<ScheduleCellStyleModel> ScheduleCellStyles => Set<ScheduleCellStyleModel>();
+    public DbSet<ScheduleVersionModel> ScheduleVersions => Set<ScheduleVersionModel>();
+    public DbSet<ScheduleVersionStateModel> ScheduleVersionStates => Set<ScheduleVersionStateModel>();
     public DbSet<ShiftSwapRequestModel> ShiftSwapRequests => Set<ShiftSwapRequestModel>();
     public DbSet<ShiftSwapHistoryModel> ShiftSwapHistories => Set<ShiftSwapHistoryModel>();
+    public DbSet<ShiftCorrectionRequestModel> ShiftCorrectionRequests => Set<ShiftCorrectionRequestModel>();
     public DbSet<WorkflowLogEntryModel> WorkflowLogEntries => Set<WorkflowLogEntryModel>();
     public DbSet<WorkflowLogSettingsModel> WorkflowLogSettings => Set<WorkflowLogSettingsModel>();
     public DbSet<RegulationDocumentModel> RegulationDocuments => Set<RegulationDocumentModel>();
@@ -55,6 +59,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         ConfigureManagerNotepadState(modelBuilder);
         ConfigureManagerGraphFillColorBind(modelBuilder);
         ConfigureManagerGraphTextColorBind(modelBuilder);
+        ConfigureManagerShiftCorrectionSetting(modelBuilder);
         ConfigureSystemNews(modelBuilder);
         ConfigureCommunicationMessage(modelBuilder);
         ConfigureEmployeeCommunicationDismissal(modelBuilder);
@@ -68,8 +73,11 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         ConfigureScheduleEmployee(modelBuilder);
         ConfigureScheduleSlot(modelBuilder);
         ConfigureScheduleCellStyle(modelBuilder);
+        ConfigureScheduleVersion(modelBuilder);
+        ConfigureScheduleVersionState(modelBuilder);
         ConfigureShiftSwapRequest(modelBuilder);
         ConfigureShiftSwapHistory(modelBuilder);
+        ConfigureShiftCorrectionRequest(modelBuilder);
         ConfigureWorkflowLogEntry(modelBuilder);
         ConfigureWorkflowLogSettings(modelBuilder);
         ConfigureRegulationDocument(modelBuilder);
@@ -246,6 +254,18 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             entity.HasIndex(bind => new { bind.ManagerAccountId, bind.TextColor })
                 .IsUnique()
                 .HasDatabaseName("ux_manager_graph_text_bind_color");
+        });
+    }
+
+    private static void ConfigureManagerShiftCorrectionSetting(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<ManagerShiftCorrectionSettingModel>(entity =>
+        {
+            entity.Property(setting => setting.HighlightColor).IsRequired().HasMaxLength(7);
+            entity.HasOne(setting => setting.ManagerAccount)
+                .WithOne()
+                .HasForeignKey<ManagerShiftCorrectionSettingModel>(setting => setting.ManagerAccountId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
     }
 
@@ -635,6 +655,49 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         });
     }
 
+    private static void ConfigureScheduleVersion(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<ScheduleVersionModel>(entity =>
+        {
+            entity.Property(version => version.BranchName).IsRequired().HasMaxLength(80);
+            entity.Property(version => version.CreatedByManagerName).IsRequired().HasMaxLength(160);
+            entity.Property(version => version.CreatedAtUtc).IsRequired();
+            entity.Property(version => version.SnapshotJson).IsRequired();
+
+            entity.HasOne(version => version.Schedule)
+                .WithMany(schedule => schedule.Versions)
+                .HasForeignKey(version => version.ScheduleId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(version => version.ParentVersion)
+                .WithMany(version => version.ChildVersions)
+                .HasForeignKey(version => version.ParentVersionId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            entity.ToTable(table =>
+            {
+                table.HasCheckConstraint("ck_schedule_version_number", "version_number >= 1");
+                table.HasCheckConstraint("ck_schedule_version_counts", "employee_count >= 0 AND slot_count >= 0 AND cell_style_count >= 0");
+            });
+        });
+    }
+
+    private static void ConfigureScheduleVersionState(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<ScheduleVersionStateModel>(entity =>
+        {
+            entity.HasOne(state => state.Schedule)
+                .WithOne(schedule => schedule.VersionState)
+                .HasForeignKey<ScheduleVersionStateModel>(state => state.ScheduleId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(state => state.CurrentVersion)
+                .WithMany()
+                .HasForeignKey(state => state.CurrentVersionId)
+                .OnDelete(DeleteBehavior.SetNull);
+        });
+    }
+
     private static void ConfigureShiftSwapRequest(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<ShiftSwapRequestModel>(entity =>
@@ -713,6 +776,48 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             {
                 table.HasCheckConstraint("ck_shift_swap_history_dom", "day_of_month BETWEEN 1 AND 31");
                 table.HasCheckConstraint("ck_shift_swap_history_month", "month BETWEEN 1 AND 12");
+            });
+        });
+    }
+
+    private static void ConfigureShiftCorrectionRequest(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<ShiftCorrectionRequestModel>(entity =>
+        {
+            entity.HasOne(request => request.Schedule)
+                .WithMany(schedule => schedule.ShiftCorrectionRequests)
+                .HasForeignKey(request => request.ScheduleId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(request => request.Employee)
+                .WithMany()
+                .HasForeignKey(request => request.EmployeeId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(request => request.ReviewedByManager)
+                .WithMany()
+                .HasForeignKey(request => request.ReviewedByManagerId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            entity.Property(request => request.OriginalFromTime).IsRequired().HasMaxLength(5);
+            entity.Property(request => request.OriginalToTime).IsRequired().HasMaxLength(5);
+            entity.Property(request => request.RequestedFromTime).IsRequired().HasMaxLength(5);
+            entity.Property(request => request.RequestedToTime).IsRequired().HasMaxLength(5);
+            entity.Property(request => request.Status)
+                .HasConversion<string>()
+                .HasDefaultValue(ShiftCorrectionStatus.Pending);
+            entity.Property(request => request.CreatedAtUtc).IsRequired();
+
+            entity.HasIndex(request => new { request.ScheduleSlotId, request.Status })
+                .IsUnique()
+                .HasDatabaseName("ux_shift_correction_pending_slot")
+                .HasFilter("status = 'Pending'");
+
+            entity.ToTable(table =>
+            {
+                table.HasCheckConstraint("ck_shift_correction_dom", "day_of_month BETWEEN 1 AND 31");
+                table.HasCheckConstraint("ck_shift_correction_time_format", "original_from_time LIKE '__:__' AND original_to_time LIKE '__:__' AND requested_from_time LIKE '__:__' AND requested_to_time LIKE '__:__'");
+                table.HasCheckConstraint("ck_shift_correction_requested_order", "requested_from_time < requested_to_time");
             });
         });
     }

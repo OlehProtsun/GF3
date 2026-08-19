@@ -116,4 +116,10 @@ public class ScheduleModel
     /// Optional cell-level formatting used by the planner UI and exports.
     /// </summary>
     public ICollection<ScheduleCellStyleModel> CellStyles { get; set; } = new List<ScheduleCellStyleModel>();
+
+    public ICollection<ScheduleVersionModel> Versions { get; set; } = new List<ScheduleVersionModel>();
+
+    public ScheduleVersionStateModel? VersionState { get; set; }
+
+    public ICollection<ShiftCorrectionRequestModel> ShiftCorrectionRequests { get; set; } = new List<ShiftCorrectionRequestModel>();
 }

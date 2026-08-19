@@ -7,6 +7,7 @@ import {
   getGraphDaysInMonth,
   getGraphWeekdayLabel,
   isGraphWeekend,
+  parseGraphCellContent,
   type GraphMatrixCellMap,
   type GraphMatrixColumn,
   type GraphRelatedScheduleHintDetail,
@@ -51,6 +52,7 @@ type ContainerGraphMatrixProps = {
   icon?: ReactNode;
   compactSize?: boolean;
   neutralStyle?: boolean;
+  regularCellText?: boolean;
   showColumnTotals?: boolean;
   showShiftStaffingCounts?: boolean;
   allowColumnResize?: boolean;
@@ -60,6 +62,7 @@ type ContainerGraphMatrixProps = {
   editMode?: ContainerGraphMatrixEditMode;
   emptyCellVariant?: ContainerGraphMatrixEmptyCellVariant;
   cellErrors?: Record<string, string>;
+  validationSignal?: number;
   toolbar?: ReactNode;
   headerCenterSlot?: ReactNode;
   headerRightSlot?: ReactNode;
@@ -125,6 +128,7 @@ type MatrixValueCellProps = {
   error?: string;
   isEmpty: boolean;
   isSelected: boolean;
+  hasRowGuide: boolean;
   isEditing: boolean;
   readOnly: boolean;
   isWeekend: boolean;
@@ -150,6 +154,7 @@ type MatrixDayCellProps = {
   shiftStaffingCounts?: number[];
   selectionEnabled: boolean;
   isSelected: boolean;
+  hasRowGuide: boolean;
   inlineStyle: CSSProperties;
 };
 
@@ -324,6 +329,7 @@ const MatrixDayCell = memo(function MatrixDayCell({
   shiftStaffingCounts,
   selectionEnabled,
   isSelected,
+  hasRowGuide,
   inlineStyle,
 }: MatrixDayCellProps) {
   const staffingLabel = shiftStaffingCounts?.join(",") ?? "";
@@ -336,6 +342,7 @@ const MatrixDayCell = memo(function MatrixDayCell({
       className={joinClassNames(
         styles.dayCell,
         day.hasConflict && styles.dayCellConflict,
+        hasRowGuide && styles.dayCellRowGuide,
         isSelected && styles.dayCellSelected,
       )}
       style={inlineStyle}
@@ -372,6 +379,7 @@ const MatrixValueCell = memo(function MatrixValueCell({
   error,
   isEmpty,
   isSelected,
+  hasRowGuide,
   isEditing,
   readOnly,
   isWeekend,
@@ -398,6 +406,7 @@ const MatrixValueCell = memo(function MatrixValueCell({
   } satisfies CSSProperties;
   const trimmedVisualHint = visualHint?.trim() ?? "";
   const hasVisualHint = Boolean(trimmedVisualHint);
+  const isTextValue = parseGraphCellContent(value).kind === "text";
   const isLockedVisualHint = Boolean(lockVisualHint && isEmpty && hasVisualHint);
   const renderedValue = isEmpty && hasVisualHint ? trimmedVisualHint : value;
   const trimmedMutedSuffix = mutedSuffix?.trim() ?? "";
@@ -459,7 +468,11 @@ const MatrixValueCell = memo(function MatrixValueCell({
 
   const renderVisualHintContent = () => (
     <>
-      {!isEmpty ? <span className={styles.visualHintCurrentValue}>{renderedContent},{"\u00a0"}</span> : null}
+      {!isEmpty ? (
+        <span className={joinClassNames(styles.visualHintCurrentValue, isTextValue && styles.textValue)}>
+          {renderedContent},{"\u00a0"}
+        </span>
+      ) : null}
       <button
         type="button"
         ref={onFocusTargetRef}
@@ -499,6 +512,7 @@ const MatrixValueCell = memo(function MatrixValueCell({
         readOnly && isDangerEmpty && styles.readonlyEmptyCellDanger,
         readOnly && isDangerEmpty && isWeekend && styles.readonlyEmptyCellDangerWeekend,
         error && styles.errorCell,
+        hasRowGuide && styles.rowGuideCell,
         isSelected && styles.selectedCell,
         isEditing && styles.editingCell,
       )}
@@ -515,6 +529,7 @@ const MatrixValueCell = memo(function MatrixValueCell({
               className={joinClassNames(
                 styles.visualHintShell,
                 styles.readonlyValue,
+                isTextValue && styles.textValue,
                 isEmpty && styles.cellValueEmpty,
                 isDangerEmpty && styles.dangerEmptyValue,
                 isEmpty && hasVisualHint && styles.visualHintValue,
@@ -527,6 +542,7 @@ const MatrixValueCell = memo(function MatrixValueCell({
             <span
               className={joinClassNames(
                 styles.readonlyValue,
+                isTextValue && styles.textValue,
                 isEmpty && styles.cellValueEmpty,
                 isDangerEmpty && styles.dangerEmptyValue,
                 isEmpty && hasVisualHint && styles.visualHintValue,
@@ -541,6 +557,7 @@ const MatrixValueCell = memo(function MatrixValueCell({
             ref={onFocusTargetRef}
             className={joinClassNames(
               styles.cellEditor,
+              isTextValue && styles.textValue,
               isEmpty && styles.cellValueEmpty,
               isDangerEmpty && styles.dangerEmptyValue,
             )}
@@ -559,6 +576,7 @@ const MatrixValueCell = memo(function MatrixValueCell({
             ref={onFocusTargetRef}
             className={joinClassNames(
               styles.cellEditor,
+              isTextValue && styles.textValue,
               isEmpty && styles.cellValueEmpty,
               isDangerEmpty && styles.dangerEmptyValue,
             )}
@@ -590,6 +608,7 @@ const MatrixValueCell = memo(function MatrixValueCell({
             className={joinClassNames(
               styles.cellButton,
               readOnly && styles.readonlyValue,
+              isTextValue && styles.textValue,
               isEmpty && styles.cellValueEmpty,
               isDangerEmpty && styles.dangerEmptyValue,
               isEmpty && hasVisualHint && styles.visualHintValue,
@@ -626,6 +645,7 @@ export function ContainerGraphMatrix({
   icon = <ScheduleIcon size={18} />,
   compactSize = false,
   neutralStyle = false,
+  regularCellText = false,
   showColumnTotals = true,
   showShiftStaffingCounts = false,
   allowColumnResize = true,
@@ -635,6 +655,7 @@ export function ContainerGraphMatrix({
   editMode = "deferred",
   emptyCellVariant = "neutral",
   cellErrors = {},
+  validationSignal = 0,
   toolbar,
   headerCenterSlot,
   headerRightSlot,
@@ -786,6 +807,22 @@ export function ContainerGraphMatrix({
     days.forEach(day => {
       const rowCellKeys = columns.map(column => getGraphCellKey(column.employeeId, day.dayOfMonth));
       if (rowCellKeys.length > 0 && rowCellKeys.every(cellKey => selectedCellKeySet.has(cellKey))) {
+        nextSet.add(day.dayOfMonth);
+      }
+    });
+
+    return nextSet;
+  }, [columns, days, selectedCellKeySet]);
+  const partiallySelectedDaySet = useMemo(() => {
+    const nextSet = new Set<number>();
+
+    days.forEach(day => {
+      const selectedCellCount = columns.reduce(
+        (count, column) => count + Number(selectedCellKeySet.has(getGraphCellKey(column.employeeId, day.dayOfMonth))),
+        0,
+      );
+
+      if (selectedCellCount > 0 && selectedCellCount < columns.length) {
         nextSet.add(day.dayOfMonth);
       }
     });
@@ -1546,6 +1583,7 @@ export function ContainerGraphMatrix({
                 className={joinClassNames(
                   styles.table,
                   neutralStyle && styles.tableNeutral,
+                  regularCellText && styles.regularCellText,
                   !stretchColumns && styles.tableFixedColumns,
                 )}
                 style={tableStyle}
@@ -1660,6 +1698,7 @@ export function ContainerGraphMatrix({
                         shiftStaffingCounts={shiftStaffingCountsByDay[day.dayOfMonth]}
                         selectionEnabled={selectionEnabled}
                         isSelected={selectedDaySet.has(day.dayOfMonth)}
+                        hasRowGuide={partiallySelectedDaySet.has(day.dayOfMonth)}
                         inlineStyle={dayStyleMetaByDay[day.dayOfMonth]?.inlineStyle ?? EMPTY_STYLE}
                       />
 
@@ -1676,7 +1715,7 @@ export function ContainerGraphMatrix({
 
                         return (
                           <MatrixValueCell
-                            key={cellKey}
+                            key={`${cellKey}:${error && !isEditing ? validationSignal : 0}`}
                             cellKey={cellKey}
                             employeeId={column.employeeId}
                             dayOfMonth={day.dayOfMonth}
@@ -1688,6 +1727,7 @@ export function ContainerGraphMatrix({
                             error={error}
                             isEmpty={isEmpty}
                             isSelected={isSelected}
+                            hasRowGuide={partiallySelectedDaySet.has(day.dayOfMonth)}
                             isEditing={isEditing}
                             readOnly={readOnly}
                             isWeekend={day.isWeekend}

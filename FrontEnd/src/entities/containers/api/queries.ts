@@ -386,6 +386,47 @@ export const useGraphSlotsQuery = (containerId: number | null, graphId: number |
     queryFn: ({ signal }) => containersApi.listGraphSlots(containerId as number, graphId as number, signal),
   });
 
+export const useGraphVersionsQuery = (
+  containerId: number | null,
+  graphId: number | null,
+  enabled = true,
+) => useQuery({
+  queryKey: queryKeys.containers.graphVersions(containerId ?? 0, graphId ?? 0),
+  enabled: enabled && containerId !== null && graphId !== null,
+  queryFn: ({ signal }) => containersApi.listGraphVersions(containerId as number, graphId as number, signal),
+});
+
+export function useCheckoutGraphVersionMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ containerId, graphId, versionId }: { containerId: number; graphId: number; versionId: number }) =>
+      containersApi.checkoutGraphVersion(containerId, graphId, versionId),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.containers.graphVersions(variables.containerId, variables.graphId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.containers.graphs(variables.containerId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.containers.graphById(variables.containerId, variables.graphId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.containers.graphEmployees(variables.containerId, variables.graphId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.containers.graphSlots(variables.containerId, variables.graphId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.containers.graphCellStyles(variables.containerId, variables.graphId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.employeeSchedules.all });
+      queryClient.invalidateQueries({ queryKey: queryKeys.shiftSwaps.all });
+    },
+  });
+}
+
+export function useDeleteGraphVersionMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ containerId, graphId, versionId }: { containerId: number; graphId: number; versionId: number }) =>
+      containersApi.removeGraphVersion(containerId, graphId, versionId),
+    onSuccess: (_, variables) => queryClient.invalidateQueries({
+      queryKey: queryKeys.containers.graphVersions(variables.containerId, variables.graphId),
+    }),
+  });
+}
+
 export const useGraphSlotsBatchQuery = (containerId: number | null, graphIds: number[], enabled = true) => {
   const normalizedGraphIds = [...new Set(
     graphIds.filter(graphId => Number.isInteger(graphId) && graphId > 0),

@@ -7,6 +7,11 @@ import {
   type EmployeeScheduleEmployee,
   type EmployeeScheduleSlot,
 } from "@entities/employee-schedule";
+import {
+  useCreateShiftCorrectionMutation,
+  useEmployeeShiftCorrectionsQuery,
+  type CreateShiftCorrectionInput,
+} from "@entities/shift-corrections";
 import { getGraphCellKey, type GraphMatrixCellMap, type GraphMatrixColumn } from "@entities/containers/model/graphWorkspace";
 import { parseGraphNoteContent } from "@entities/containers/model/graphNote";
 import { ContainerGraphMatrix } from "@entities/containers/ui/ContainerGraphMatrix";
@@ -20,6 +25,7 @@ import { AvailabilityIcon, ScheduleDetailsIcon, ScheduleIcon, StatisticsIcon } f
 import { CardSection } from "@shared/ui/sections";
 import workspaceStyles from "@pages/shared/EmployeeWorkspacePage.module.css";
 import { EmployeeScheduleColumnOrderDialog } from "./EmployeeScheduleColumnOrderDialog";
+import { EmployeeShiftCorrectionDialog } from "./EmployeeShiftCorrectionDialog";
 import styles from "./EmployeeSchedulePage.module.css";
 
 const scheduleMonthFormatter = new Intl.DateTimeFormat("en-GB", {
@@ -864,6 +870,8 @@ function printSchedulePdf(
 export function EmployeeSchedulePage() {
   const { session } = useAuth();
   const scheduleQuery = useEmployeeScheduleListQuery();
+  const shiftCorrectionsQuery = useEmployeeShiftCorrectionsQuery(Boolean(session?.employeeId));
+  const createShiftCorrectionMutation = useCreateShiftCorrectionMutation();
   const { data: uiState, refetch: refetchUiState } = useEmployeeUiStateQuery(Boolean(session?.employeeId));
   const schedules = useMemo(() => scheduleQuery.data ?? [], [scheduleQuery.data]);
   const columnOrderStorageKey = getEmployeeScheduleColumnOrderStorageKey(
@@ -877,6 +885,9 @@ export function EmployeeSchedulePage() {
   const [selectedScheduleId, setSelectedScheduleId] = useState<number | null>(null);
   const [scheduleViewMode, setScheduleViewMode] = useState<"matrix" | "daily">("matrix");
   const [selectedDayOfMonth, setSelectedDayOfMonth] = useState<number | null>(null);
+  const [isShiftCorrectionDialogOpen, setIsShiftCorrectionDialogOpen] = useState(false);
+  const [shiftCorrectionError, setShiftCorrectionError] = useState<string | null>(null);
+  const [shiftCorrectionSuccess, setShiftCorrectionSuccess] = useState<string | null>(null);
   const [preferenceSaveError, setPreferenceSaveError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -1119,11 +1130,24 @@ export function EmployeeSchedulePage() {
     }
   };
 
+  const handleSubmitShiftCorrection = (input: CreateShiftCorrectionInput) => {
+    setShiftCorrectionError(null);
+    setShiftCorrectionSuccess(null);
+    createShiftCorrectionMutation.mutate(input, {
+      onSuccess: () => {
+        setIsShiftCorrectionDialogOpen(false);
+        setShiftCorrectionSuccess("Shift correction request sent to your manager.");
+      },
+      onError: error => setShiftCorrectionError(getErrorMessage(error, "Could not send the shift correction request.")),
+    });
+  };
+
   return (
     <div className={workspaceStyles.page}>
       {queryErrorMessage ? <ErrorBanner dismissible={false}>{queryErrorMessage}</ErrorBanner> : null}
       {pdfExportError ? <ErrorBanner dismissible={false}>{pdfExportError}</ErrorBanner> : null}
       {preferenceSaveError ? <ErrorBanner dismissible>{preferenceSaveError}</ErrorBanner> : null}
+      {shiftCorrectionSuccess ? <div className={styles.shiftCorrectionSuccess} role="status">{shiftCorrectionSuccess}</div> : null}
 
       <section className={`${workspaceStyles.panel} ${styles.summaryPanel}`}>
         <div className={styles.summaryHeader}>
@@ -1273,15 +1297,13 @@ export function EmployeeSchedulePage() {
           emptyMessage="No assigned shifts in this schedule yet."
           onColumnHeaderClick={column => setColumnOrderDialogEmployeeId(column.employeeId)}
           headerRightSlot={
-            <button
-              type="button"
-              className={styles.openSchedulePdfButton}
-              onClick={handleExportPdf}
-              title="Export schedule to PDF"
-              aria-label="Export schedule to PDF"
-            >
-              PDF
-            </button>
+            <div className={styles.openScheduleActions}>
+              <button type="button" className={styles.openSchedulePdfButton} onClick={handleExportPdf}
+                title="Export schedule to PDF" aria-label="Export schedule to PDF">PDF</button>
+              <button type="button" className={`${styles.openSchedulePdfButton} ${styles.openScheduleCorrectionButton}`}
+                onClick={() => { setShiftCorrectionError(null); setIsShiftCorrectionDialogOpen(true); }}
+                title="Request a shift correction" aria-label="Request a shift correction">Adjust</button>
+            </div>
           }
         />
       ) : null}
@@ -1312,15 +1334,13 @@ export function EmployeeSchedulePage() {
             </button>
           }
           headerRightSlot={
-            <button
-              type="button"
-              className={styles.openSchedulePdfButton}
-              onClick={handleExportPdf}
-              title="Export schedule to PDF"
-              aria-label="Export schedule to PDF"
-            >
-              PDF
-            </button>
+            <div className={styles.openScheduleActions}>
+              <button type="button" className={styles.openSchedulePdfButton} onClick={handleExportPdf}
+                title="Export schedule to PDF" aria-label="Export schedule to PDF">PDF</button>
+              <button type="button" className={`${styles.openSchedulePdfButton} ${styles.openScheduleCorrectionButton}`}
+                onClick={() => { setShiftCorrectionError(null); setIsShiftCorrectionDialogOpen(true); }}
+                title="Request a shift correction" aria-label="Request a shift correction">Adjust</button>
+            </div>
           }
         >
           <div className={styles.dailyScheduleShell}>
@@ -1385,6 +1405,17 @@ export function EmployeeSchedulePage() {
         activeEmployeeId={columnOrderDialogEmployeeId}
         onCancel={() => setColumnOrderDialogEmployeeId(null)}
         onSave={handleSaveColumnOrder}
+      />
+
+      <EmployeeShiftCorrectionDialog
+        open={isShiftCorrectionDialogOpen}
+        schedule={selectedSchedule}
+        employeeId={currentEmployeeId}
+        existingRequests={shiftCorrectionsQuery.data ?? []}
+        isSending={createShiftCorrectionMutation.isPending}
+        errorMessage={shiftCorrectionError}
+        onCancel={() => { setIsShiftCorrectionDialogOpen(false); setShiftCorrectionError(null); }}
+        onSubmit={handleSubmitShiftCorrection}
       />
 
       {selectedSchedule ? (

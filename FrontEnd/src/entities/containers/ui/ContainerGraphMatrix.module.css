@@ -422,6 +422,22 @@
   box-shadow: inset 0 0 0 2px rgba(37, 99, 235, 0.42);
 }
 
+.dayCellRowGuide::after,
+.rowGuideCell::before {
+  content: "";
+  position: absolute;
+  inset: 1px;
+  z-index: 1;
+  border: 1px dashed rgba(37, 99, 235, 0.52);
+  pointer-events: none;
+}
+
+.dayCellRowGuide::after {
+  inset: 0;
+  border-width: 2px;
+  border-color: rgba(37, 99, 235, 0.76);
+}
+
 .table tbody td {
   padding: 0;
   height: var(--matrix-cell-min-height);
@@ -514,15 +530,39 @@
   background: rgba(252, 140, 140, 0.9);
 }
 
-.errorCell {
-  background: rgba(254, 179, 179, 0.96);
+.errorCell::before {
+  content: "";
+  position: absolute;
+  inset: 3px;
+  z-index: 4;
+  pointer-events: none;
+  border: 1px solid rgba(255, 255, 255, 0.96);
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.12);
+  opacity: 0;
+  box-shadow:
+    0 0 0 2px rgba(220, 38, 38, 0.92),
+    0 0 0 5px rgba(220, 38, 38, 0.2);
+  will-change: opacity, transform;
+  animation: matrix-error-pulse 850ms ease-in-out infinite;
 }
 
-.errorCell .cellSurface,
-.errorCell .cellButton,
-.errorCell .cellEditor,
-.errorCell .readonlyValue {
-  background: rgba(254, 179, 179, 0.96);
+.errorCell.editingCell::before {
+  display: none;
+}
+
+@keyframes matrix-error-pulse {
+  0%,
+  100% {
+    opacity: 0;
+    transform: scale(0.995);
+  }
+
+  38%,
+  62% {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
 .selectedCell,
@@ -539,6 +579,7 @@
 }
 
 .selectedCell::after {
+  z-index: 2;
   box-shadow: inset 0 0 0 2px rgba(37, 99, 235, 0.42);
 }
 
@@ -660,9 +701,21 @@
   color: rgba(107, 114, 128, 0.92);
 }
 
+.textValue {
+  color: rgba(100, 116, 139, 0.9);
+  font-weight: 400;
+}
+
 .readonlyValue {
   font-weight: 700;
   cursor: default;
+}
+
+.regularCellText .readonlyValue,
+.regularCellText .visualHintValue,
+.regularCellText .visualHintButton,
+.regularCellText .visualHintCurrentValue {
+  font-weight: 400;
 }
 
 .table tr:last-child td,

@@ -1,3 +1,4 @@
+using System.Text.Json;
 using DataAccessLayer.Administration;
 using DataAccessLayer.Models;
 using DataAccessLayer.Models.DataBaseContext;
@@ -81,6 +82,19 @@ public sealed class DatabaseMigrationStartupTests
             Assert.True(migratedSchedule.AllowSwap);
             Assert.Single(await verificationContext.ScheduleSlots.ToListAsync());
             Assert.Single(await verificationContext.ShiftSwapRequests.ToListAsync());
+            var importedVersion = Assert.Single(await verificationContext.ScheduleVersions.ToListAsync());
+            Assert.Equal(1, importedVersion.VersionNumber);
+            Assert.Equal("main", importedVersion.BranchName);
+            Assert.Equal("Production import", importedVersion.CreatedByManagerName);
+            Assert.Contains("Release schedule", importedVersion.SnapshotJson, StringComparison.Ordinal);
+            using var importedSnapshot = JsonDocument.Parse(importedVersion.SnapshotJson);
+            Assert.Equal(JsonValueKind.String, importedSnapshot.RootElement.GetProperty("publicationStatus").ValueKind);
+            Assert.Equal(JsonValueKind.True, importedSnapshot.RootElement.GetProperty("allowSwap").ValueKind);
+            Assert.Single(importedSnapshot.RootElement.GetProperty("slots").EnumerateArray());
+            Assert.Equal(
+                JsonValueKind.String,
+                importedSnapshot.RootElement.GetProperty("slots")[0].GetProperty("status").ValueKind);
+            Assert.Equal(importedVersion.Id, Assert.Single(await verificationContext.ScheduleVersionStates.ToListAsync()).CurrentVersionId);
 
             var history = Assert.Single(await verificationContext.ShiftSwapHistories.ToListAsync());
             Assert.Equal("Release schedule", history.ScheduleName);

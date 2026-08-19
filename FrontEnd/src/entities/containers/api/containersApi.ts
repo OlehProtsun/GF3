@@ -10,6 +10,7 @@ import type {
   GraphDto,
   GraphEmployeeDto,
   GraphSlotDto,
+  GraphVersionTreeDto,
   SaveContainerDto,
   SaveGraphDto,
   SaveGraphEmployeeDto,
@@ -40,6 +41,14 @@ export const containersApi = {
   updateGraphsPublication: (containerId: number, payload: UpdateGraphsPublicationDto) =>
     request<void>(`${endpoint}/${containerId}/graphs/publication`, { method: "PUT", body: payload }),
   removeGraph: (containerId: number, graphId: number) => request<void>(`${endpoint}/${containerId}/graphs/${graphId}`, { method: "DELETE" }),
+  listGraphVersions: (containerId: number, graphId: number, signal?: AbortSignal) =>
+    request<GraphVersionTreeDto>(`${endpoint}/${containerId}/graphs/${graphId}/versions`, { signal }),
+  commitGraphVersion: (containerId: number, graphId: number) =>
+    request<GraphVersionTreeDto>(`${endpoint}/${containerId}/graphs/${graphId}/versions`, { method: "POST" }),
+  checkoutGraphVersion: (containerId: number, graphId: number, versionId: number) =>
+    request<GraphVersionTreeDto>(`${endpoint}/${containerId}/graphs/${graphId}/versions/${versionId}/checkout`, { method: "POST" }),
+  removeGraphVersion: (containerId: number, graphId: number, versionId: number) =>
+    request<void>(`${endpoint}/${containerId}/graphs/${graphId}/versions/${versionId}`, { method: "DELETE" }),
   listSchedulePresets: (containerId: number, signal?: AbortSignal) =>
     request<SchedulePresetDto[]>(`${endpoint}/${containerId}/schedule-presets`, { signal }),
   createSchedulePreset: (containerId: number, payload: SaveSchedulePresetDto) =>

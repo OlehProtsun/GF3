@@ -110,18 +110,50 @@ describe("container graph workspace model", () => {
     ]);
     expect(formatGraphIntervals(merged)).toBe("09:00 - 12:00, 13:00 - 15:00");
     expect(formatGraphIntervals([])).toBe(GRAPH_EMPTY_MARK);
-    expect(tryParseGraphIntervals("13-15, 09:00 - 12:00, 13:00 - 15:00")).toEqual({
+    expect(tryParseGraphIntervals("13-15, 09:00 - 12:00")).toEqual({
       ok: true,
       value: [
         { from: "09:00", to: "12:00" },
         { from: "13:00", to: "15:00" },
       ],
     });
+    expect(tryParseGraphIntervals("9-15,15-21")).toEqual({
+      ok: true,
+      value: [
+        { from: "09:00", to: "15:00" },
+        { from: "15:00", to: "21:00" },
+      ],
+    });
+    expect(normalizeGraphCellValue("9:30-15,17:45-22")).toBe("09:30 - 15:00, 17:45 - 22:00");
+    expect(normalizeGraphCellValue("8-14,17-22:30")).toBe("08:00 - 14:00, 17:00 - 22:30");
+    expect(tryParseGraphIntervals("09-12, 09:00-12:00")).toEqual({
+      ok: false,
+      error: "The same time range cannot be entered more than once.",
+    });
+    expect(tryParseGraphIntervals("09-13, 12-15")).toEqual({
+      ok: false,
+      error: "Time ranges in one cell cannot overlap.",
+    });
+    expect(tryParseGraphIntervals("08-09, 10-11, 12-13, 14-15, 16-17")).toEqual({
+      ok: false,
+      error: "A cell can contain no more than 4 time ranges.",
+    });
     expect(tryParseGraphIntervals("15:00 - 13:00")).toMatchObject({ ok: false });
     expect(parseGraphCellContent("Manager note")).toEqual({ kind: "text", value: "Manager note" });
     expect(parseGraphCellContent("15:00 - 13:00")).toMatchObject({ kind: "invalid" });
     expect(normalizeGraphCellValue("9-12")).toBe("09:00 - 12:00");
     expect(normalizeGraphCellValue("  note  ")).toBe("note");
+  });
+
+  test("keeps touching split shifts separate when rebuilding cell values", () => {
+    const touchingSlots: GraphSlot[] = [
+      { id: 1, scheduleId: 1, dayOfMonth: 1, slotNo: 1, fromTime: "09:00", toTime: "15:00", employeeId: 1, status: 1 },
+      { id: 2, scheduleId: 1, dayOfMonth: 1, slotNo: 1, fromTime: "15:00", toTime: "21:00", employeeId: 1, status: 1 },
+    ];
+
+    expect(buildGraphCellMap(touchingSlots)).toEqual({
+      "1:1": "09:00 - 15:00, 15:00 - 21:00",
+    });
   });
 
   test("builds and sanitizes graph cell and style maps", () => {
@@ -334,11 +366,15 @@ describe("container graph workspace model", () => {
       freeDays: 30,
       sum: "7h 30m",
     });
-    expect(rows[0].days[0]).toEqual({ from: "08:00", to: "16:30", hours: "7h 30m" });
+    expect(rows[0].dayRows).toHaveLength(2);
+    expect(rows[0].days[0]).toEqual({ from: "08:00", to: "12:00", hours: "4" });
+    expect(rows[0].dayRows[1][0]).toEqual({ from: "13:00", to: "16:30", hours: "3h 30m" });
+    expect(rows[0].dayRows[1][1]).toEqual({ from: "", to: "", hours: "" });
     expect(rows[1]).toMatchObject({
       employeeId: 2,
       workDays: 1,
       sum: "4",
     });
+    expect(rows[1].days[1]).toEqual({ from: "22:00", to: "02:00", hours: "4" });
   });
 });

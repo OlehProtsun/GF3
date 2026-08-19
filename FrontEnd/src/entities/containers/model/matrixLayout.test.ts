@@ -56,7 +56,7 @@ describe("buildMatrixAutoColumnWidths", () => {
   test("widens a column for a filled shift followed by a related schedule hint", () => {
     const widths = buildMatrixAutoColumnWidths({
       columns,
-      cellMap: { "7:1": "15:00 - 21:00", "8:1": "09:00 - 15:00" },
+      cellMap: { "7:1": "09:00 - 15:00, 18:00 - 20:00", "8:1": "09:00 - 15:00" },
       visualHintMap: { "7:1": "F35" },
     });
 

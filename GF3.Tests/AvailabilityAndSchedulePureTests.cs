@@ -99,12 +99,14 @@ public sealed class AvailabilityAndSchedulePureTests
                 TestDataFactory.CreateScheduleSlotModel(1, 2, 1, "10:00", "14:00"),
                 TestDataFactory.CreateScheduleSlotModel(1, 3, 1, "10:00", "14:00"),
                 TestDataFactory.CreateScheduleSlotModel(1, 4, 1, "15:00", "16:00"),
+                TestDataFactory.CreateScheduleSlotModel(1, 5, 1, "16:00", "18:00"),
             ]);
 
         Assert.Equal(
             [
                 ("08:00", "14:00"),
                 ("15:00", "16:00"),
+                ("16:00", "18:00"),
             ],
             intervals);
     }

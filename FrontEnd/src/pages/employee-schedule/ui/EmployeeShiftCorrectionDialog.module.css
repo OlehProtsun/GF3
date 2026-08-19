@@ -1,0 +1,42 @@
+.overlay { position: fixed; inset: 0; z-index: 1800; width: 100%; box-sizing: border-box; display: grid; place-items: center; padding: 14px; background: rgba(10,15,28,.4); backdrop-filter: blur(12px); }
+.dialog { width: min(720px, 100%); max-height: min(760px, calc(100dvh - 28px)); display: grid; gap: 16px; padding: 20px; box-sizing: border-box; overflow-y: auto; border: 1px solid rgba(255,255,255,.64); border-radius: 28px; background: linear-gradient(180deg,rgba(255,255,255,.99),rgba(248,250,252,.98)); box-shadow: 0 28px 70px rgba(15,23,42,.24); }
+.header { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; }
+.titleBlock { min-width: 0; display: grid; gap: 6px; }
+.eyebrow { display: inline-flex; align-items: center; gap: 7px; color: #2563eb; font-size: .7rem; font-weight: 900; letter-spacing: .05em; text-transform: uppercase; }
+.titleBlock h2 { margin: 0; color: #0f172a; font-size: 1.2rem; font-weight: 950; letter-spacing: -.025em; }
+.titleBlock p { margin: 0; color: #64748b; font-size: .82rem; font-weight: 700; line-height: 1.4; }
+.closeButton { width: 34px; height: 34px; display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto; padding: 0; border: 1px solid rgba(148,163,184,.18); border-radius: 12px; background: #f8fafc; color: #64748b; cursor: pointer; }
+.dayList { display: flex; gap: 7px; overflow-x: auto; padding: 2px 1px 5px; scrollbar-width: thin; }
+.dayList button { min-width: 48px; height: 48px; display: grid; place-content: center; gap: 1px; border: 1px solid rgba(148,163,184,.16); border-radius: 15px; background: rgba(255,255,255,.86); color: #64748b; cursor: pointer; }
+.dayList button span { font-size: .62rem; font-weight: 850; text-transform: uppercase; }
+.dayList button strong { font-size: .85rem; color: #0f172a; }
+.dayList .dayActive { border-color: rgba(37,99,235,.35); background: #eff6ff; color: #2563eb; box-shadow: 0 5px 14px rgba(37,99,235,.1); }
+.timelineSection { display: grid; gap: 8px; padding: 17px 18px 14px; border: 1px solid rgba(148,163,184,.14); border-radius: 21px; background: rgba(255,255,255,.78); overflow: hidden; }
+.axisLabels { position: relative; height: 20px; margin: 0 4px; color: #64748b; font-size: .62rem; font-weight: 800; }
+.axisLabels span { position: absolute; transform: translateX(-50%); white-space: nowrap; }
+.axisLabels span:first-child { transform: none; }
+.axisLabels .lastTick { transform: translateX(-100%); }
+.axis { position: relative; display: grid; gap: 12px; min-height: 70px; padding: 10px 4px; border-top: 1px solid rgba(148,163,184,.2); }
+.axis > i { position: absolute; top: 0; bottom: 0; width: 1px; background: rgba(148,163,184,.18); }
+.shiftRow { position: relative; height: 28px; }
+.shiftBar { position: absolute; top: 2px; height: 24px; min-width: 24px; display: flex; align-items: center; justify-content: center; border-radius: 999px; color: white; box-shadow: 0 6px 16px rgba(15,23,42,.14); transition: left 150ms ease, width 150ms ease; }
+.shiftBar span { min-width: 0; padding: 0 12px; font-size: .68rem; font-weight: 900; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none; }
+.handle { position: absolute; top: 50%; width: 17px; height: 17px; padding: 0; border: 3px solid white; border-radius: 50%; background: inherit; box-shadow: 0 0 0 1px rgba(15,23,42,.2); cursor: pointer; transform: translateY(-50%); }
+.handleStart { left: -6px; } .handleEnd { right: -6px; }
+.handleSelected { width: 21px; height: 21px; box-shadow: 0 0 0 4px rgba(37,99,235,.2), 0 0 0 1px #fff; }
+.shiftPending { opacity: .62; }
+.shiftRow em { position: absolute; right: 0; top: 28px; color: #64748b; font-size: .6rem; font-style: normal; font-weight: 800; }
+.adjustmentPanel { min-height: 86px; display: grid; gap: 11px; padding: 14px; border-radius: 20px; background: #f1f5f9; }
+.adjustmentHeader { display: flex; align-items: center; justify-content: space-between; gap: 10px; color: #64748b; font-size: .76rem; font-weight: 850; }
+.adjustmentHeader strong { color: #2563eb; font-size: .9rem; }
+.stepButtons { display: flex; align-items: stretch; gap: 7px; flex-wrap: wrap; }
+.stepButtons > button { min-width: 52px; min-height: 34px; padding: 0 10px; border: 1px solid rgba(37,99,235,.16); border-radius: 11px; background: #fff; color: #2563eb; font-size: .73rem; font-weight: 900; cursor: pointer; }
+.stepButtons label { margin-left: auto; display: flex; align-items: center; gap: 7px; color: #64748b; font-size: .68rem; font-weight: 850; }
+.stepButtons input { width: 70px; min-height: 34px; box-sizing: border-box; border: 1px solid rgba(148,163,184,.25); border-radius: 11px; background: white; color: #0f172a; text-align: center; font-weight: 850; }
+.comparison { display: flex; align-items: center; justify-content: center; gap: 12px; color: #64748b; font-size: .82rem; }
+.comparison i { color: #94a3b8; font-style: normal; } .comparison strong { color: #0f172a; }
+.hint,.empty,.validation { margin: 0; color: #64748b; font-size: .77rem; font-weight: 750; line-height: 1.4; text-align: center; }
+.validation { color: #be123c; }
+.footer { display: flex; justify-content: flex-end; gap: 8px; }
+.closeButton:focus-visible,.dayList button:focus-visible,.handle:focus-visible,.stepButtons button:focus-visible,.stepButtons input:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(37,99,235,.18); }
+@media (max-width: 560px) { .overlay { padding: 8px; } .dialog { width: 100%; max-height: calc(100dvh - 16px); padding: 15px; border-radius: 22px; } .timelineSection { padding-inline: 10px; } .axisLabels span:nth-child(even) { display: none; } .stepButtons label { width: 100%; margin-left: 0; justify-content: space-between; } .footer { display: grid; grid-template-columns: 1fr 1fr; } .footer :global(button) { justify-content: center; } }

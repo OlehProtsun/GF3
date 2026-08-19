@@ -30,6 +30,11 @@ vi.mock("@entities/employee-schedule", () => ({
   useEmployeeScheduleListQuery: () => mocks.scheduleQuery(),
 }));
 
+vi.mock("@entities/shift-corrections", () => ({
+  useEmployeeShiftCorrectionsQuery: () => ({ data: [], isLoading: false, isError: false }),
+  useCreateShiftCorrectionMutation: () => ({ mutate: vi.fn(), isPending: false, error: null }),
+}));
+
 vi.mock("@entities/employee-ui-state", () => ({
   employeeUiStateApi: {
     saveScheduleColumnOrder: vi.fn().mockResolvedValue(undefined),

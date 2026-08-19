@@ -155,6 +155,7 @@ export function ContainerGraphProfileWorkspace({
 }: ContainerGraphProfileWorkspaceProps) {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(true);
   const [activeRelatedHintCellKey, setActiveRelatedHintCellKey] = useState<string | null>(null);
+  const [selectedCellKeys, setSelectedCellKeys] = useState<string[]>([]);
   const [summarySearchQuery, setSummarySearchQuery] = useState("");
   const [viewportHeight, setViewportHeight] = useState(() => {
     if (typeof window === "undefined") {
@@ -338,6 +339,10 @@ export function ContainerGraphProfileWorkspace({
       styleMap={styleMap}
       dayConflictMap={dayConflictMap}
       readOnly
+      regularCellText
+      enableSelectionWhenReadOnly
+      selectedCellKeys={selectedCellKeys}
+      onSelectedCellKeysChange={setSelectedCellKeys}
       helperText="This schedule is read-only. Open edit to update details, assigned employees, matrix values or cell styles."
       onVisualHintClick={detail => setActiveRelatedHintCellKey(`${detail.employeeId}:${detail.dayOfMonth}`)}
       headerRightSlot={
@@ -510,19 +515,27 @@ export function ContainerGraphProfileWorkspace({
 
                 <tbody>
                   {filteredSummaryRows.map(row => (
-                    <tr key={row.employeeId}>
-                      <td className={joinClassNames(styles.stickyColumn, styles.employeeValue)}>{row.employee}</td>
-                      <td className={joinClassNames(styles.stickyColumnSecondary, styles.statValue)}>{row.workDays}</td>
-                      <td className={joinClassNames(styles.stickyColumnTertiary, styles.statValue)}>{row.freeDays}</td>
-                      <td className={joinClassNames(styles.stickyColumnQuaternary, styles.statValue)}>{row.sum || "0"}</td>
-                      {row.days.map((day, index) => (
-                        <Fragment key={`${row.employeeId}-${index}`}>
-                          <td>{day.from || "-"}</td>
-                          <td>{day.to || "-"}</td>
-                          <td>{day.hours || "-"}</td>
-                        </Fragment>
+                    <Fragment key={row.employeeId}>
+                      {row.dayRows.map((days, rowIndex) => (
+                        <tr key={`${row.employeeId}-${rowIndex}`}>
+                          {rowIndex === 0 ? (
+                            <>
+                              <td rowSpan={row.dayRows.length} className={joinClassNames(styles.stickyColumn, styles.employeeValue)}>{row.employee}</td>
+                              <td rowSpan={row.dayRows.length} className={joinClassNames(styles.stickyColumnSecondary, styles.statValue)}>{row.workDays}</td>
+                              <td rowSpan={row.dayRows.length} className={joinClassNames(styles.stickyColumnTertiary, styles.statValue)}>{row.freeDays}</td>
+                              <td rowSpan={row.dayRows.length} className={joinClassNames(styles.stickyColumnQuaternary, styles.statValue)}>{row.sum || "0"}</td>
+                            </>
+                          ) : null}
+                          {days.map((day, index) => (
+                            <Fragment key={`${row.employeeId}-${rowIndex}-${index}`}>
+                              <td>{day.from || "-"}</td>
+                              <td>{day.to || "-"}</td>
+                              <td>{day.hours || "-"}</td>
+                            </Fragment>
+                          ))}
+                        </tr>
                       ))}
-                    </tr>
+                    </Fragment>
                   ))}
                 </tbody>
               </table>

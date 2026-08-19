@@ -49,6 +49,7 @@ import {
   getGraphCellKey,
   getGraphDaysInMonth,
   parseGraphNoteContent,
+  parseGraphCellContent,
   parseIntegerField,
   rehydrateGraphNoteCellStyles,
   rehydrateGraphNoteTextCells,
@@ -923,6 +924,7 @@ export function ContainerGraphEditPage() {
   const [isCompactMatrix, setIsCompactMatrix] = useState(false);
   const [cellMap, setCellMap] = useState<Record<string, string>>({});
   const [cellErrors, setCellErrors] = useState<Record<string, string>>({});
+  const [validationSignal, setValidationSignal] = useState(0);
   const [submitError, setSubmitError] = useState<string | undefined>();
   const [manualShiftPublishError, setManualShiftPublishError] = useState<string | null>(null);
   const [hydratedKey, setHydratedKey] = useState<string | null>(null);
@@ -2148,6 +2150,7 @@ export function ContainerGraphEditPage() {
   };
 
   const handleValidate = ({ requireAvailabilityGroup = false }: { requireAvailabilityGroup?: boolean } = {}) => {
+    setValidationSignal(current => current + 1);
     const nextFormErrors = buildGraphFormErrors(form, shopIdSet, availabilityGroupIdSet);
     const nextCellErrors = draftSlots.errors;
 
@@ -2235,6 +2238,8 @@ export function ContainerGraphEditPage() {
         targetEmployeeId: pendingShift.targetEmployeeId ?? null,
       });
     }
+
+    await containersApi.commitGraphVersion(containerId, result.graphId);
 
     savedGraphSnapshotByIdRef.current[result.graphId] = buildGraphDraftSnapshot({
       ...draft,
@@ -2329,6 +2334,7 @@ export function ContainerGraphEditPage() {
           styleRecords: styleRecordsRef.current,
           queryClient,
         });
+        await containersApi.commitGraphVersion(containerId, result.graphId);
         runWithoutPrompt(() => navigate(`/container/${containerId}/graphs/${result.graphId}`));
         return;
       }
@@ -2894,6 +2900,7 @@ export function ContainerGraphEditPage() {
         visualHintMap={visualHintMap}
         visualHintDetailMap={visualHintDetailMap}
         cellErrors={cellErrors}
+        validationSignal={validationSignal}
         styleMap={styleMap}
         dayConflictMap={dayConflictMap}
         totals={totals}
@@ -2920,6 +2927,7 @@ export function ContainerGraphEditPage() {
         isSaving={isSaving}
         isGenerating={generateMutation.isPending}
         isStylingBusy={false}
+        hasUnsavedChanges={hasUnsavedChanges}
         showMatrixSaveAction={!showSessionTabs}
         isBindsLoading={bindsQuery.isLoading && bindRows.length === 0}
         isBindBusy={createBindMutation.isPending || updateBindMutation.isPending || deleteBindMutation.isPending}
@@ -3002,12 +3010,15 @@ export function ContainerGraphEditPage() {
 
           setCellMap(current => ({ ...current, [key]: value }));
           setCellErrors(current => {
-            if (!current[key]) {
-              return current;
+            const parsedCell = parseGraphCellContent(value);
+            const nextErrors = { ...current };
+
+            if (parsedCell.kind === "invalid") {
+              nextErrors[key] = parsedCell.error;
+            } else {
+              delete nextErrors[key];
             }
 
-            const nextErrors = { ...current };
-            delete nextErrors[key];
             return nextErrors;
           });
         }}
@@ -3041,6 +3052,7 @@ export function ContainerGraphEditPage() {
         onClearAllCellStyles={() => void handleClearAllCellStyles()}
         canUndo={undoDepth > 0}
         onUndo={handleUndo}
+        onVersionCheckoutComplete={() => runWithoutPrompt(() => navigate(0))}
         onSave={() => setIsSaveConfirmOpen(true)}
         onGenerate={() => void handleGenerate()}
         />
