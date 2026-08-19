@@ -2,8 +2,116 @@ import { act, fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, test, vi } from "vitest";
 import type { GraphRelatedScheduleHintDetail } from "@entities/containers/model/graphWorkspace";
 import { ContainerGraphMatrix } from "./ContainerGraphMatrix";
+import styles from "./ContainerGraphMatrix.module.css";
 
 describe("ContainerGraphMatrix related schedule hints", () => {
+  test("marks an invalid styled cell for the visible error pulse", () => {
+    const renderMatrix = (validationSignal: number) => (
+      <ContainerGraphMatrix
+        graph={{ year: 2026, month: 1 }}
+        columns={[
+          { employeeId: 7, kind: "employee", manualColumnId: null, graphEmployeeId: 70, label: "Ada", minHoursMonth: null, totalMinutes: 0, totalText: "" },
+        ]}
+        cellMap={{ "7:1": "09:00 - 08:00" }}
+        cellErrors={{ "7:1": "From must be earlier than To." }}
+        validationSignal={validationSignal}
+        styleMap={{
+          "7:1": {
+            id: 1,
+            backgroundColor: "#ef4444",
+            textColor: "#ffffff",
+            backgroundColorArgb: null,
+            textColorArgb: null,
+          },
+        }}
+      />
+    );
+    const { rerender } = render(renderMatrix(1));
+
+    const invalidButton = screen.getByRole("button", { name: "Ada day 1" });
+    expect(invalidButton).toHaveAttribute("aria-invalid", "true");
+    expect(invalidButton.closest("td")).toHaveClass(styles.errorCell);
+
+    rerender(renderMatrix(2));
+    const restartedButton = screen.getByRole("button", { name: "Ada day 1" });
+    expect(restartedButton).not.toBe(invalidButton);
+
+    fireEvent.doubleClick(restartedButton);
+    const editor = screen.getByRole("textbox", { name: "Ada day 1" });
+    expect(editor.closest("td")).toHaveClass(styles.errorCell, styles.editingCell);
+
+    fireEvent.blur(editor);
+    expect(screen.getByRole("button", { name: "Ada day 1" }).closest("td")).not.toHaveClass(styles.editingCell);
+  });
+
+  test("renders text values muted while keeping shifts normal and supports regular profile weight", () => {
+    render(
+      <ContainerGraphMatrix
+        graph={{ year: 2026, month: 1 }}
+        columns={[
+          { employeeId: 7, kind: "employee", manualColumnId: null, graphEmployeeId: 70, label: "Ada", minHoursMonth: null, totalMinutes: 0, totalText: "" },
+          { employeeId: 8, kind: "employee", manualColumnId: null, graphEmployeeId: 80, label: "Grace", minHoursMonth: null, totalMinutes: 0, totalText: "" },
+        ]}
+        cellMap={{ "7:1": "Training", "8:1": "09:00 - 15:00" }}
+        readOnly
+        regularCellText
+      />,
+    );
+
+    const textValue = screen.getByText("Training");
+    const shiftValue = screen.getByText("09:00 - 15:00");
+
+    expect(textValue).toHaveClass(styles.textValue);
+    expect(shiftValue).not.toHaveClass(styles.textValue);
+    expect(textValue.closest("table")).toHaveClass(styles.regularCellText);
+  });
+
+  test("adds a dashed visual row guide for a partial selection without selecting the other cells", () => {
+    render(
+      <ContainerGraphMatrix
+        graph={{ year: 2026, month: 1 }}
+        columns={[
+          { employeeId: 7, kind: "employee", manualColumnId: null, graphEmployeeId: 70, label: "Ada", minHoursMonth: null, totalMinutes: 0, totalText: "" },
+          { employeeId: 8, kind: "employee", manualColumnId: null, graphEmployeeId: 80, label: "Grace", minHoursMonth: null, totalMinutes: 0, totalText: "" },
+        ]}
+        cellMap={{}}
+        selectedCellKeys={["7:1"]}
+        onSelectedCellKeysChange={() => undefined}
+      />,
+    );
+
+    const selectedCell = screen.getByRole("button", { name: "Ada day 1" }).closest("td");
+    const visualOnlyCell = screen.getByRole("button", { name: "Grace day 1" }).closest("td");
+    const dayCell = screen.getByText("th./01.01").closest("th");
+
+    expect(selectedCell).toHaveClass(styles.selectedCell, styles.rowGuideCell);
+    expect(visualOnlyCell).toHaveClass(styles.rowGuideCell);
+    expect(visualOnlyCell).not.toHaveClass(styles.selectedCell);
+    expect(dayCell).toHaveClass(styles.dayCellRowGuide);
+    expect(dayCell).not.toHaveClass(styles.dayCellSelected);
+  });
+
+  test("keeps a fully selected day as the existing solid row selection", () => {
+    render(
+      <ContainerGraphMatrix
+        graph={{ year: 2026, month: 1 }}
+        columns={[
+          { employeeId: 7, kind: "employee", manualColumnId: null, graphEmployeeId: 70, label: "Ada", minHoursMonth: null, totalMinutes: 0, totalText: "" },
+          { employeeId: 8, kind: "employee", manualColumnId: null, graphEmployeeId: 80, label: "Grace", minHoursMonth: null, totalMinutes: 0, totalText: "" },
+        ]}
+        cellMap={{}}
+        selectedCellKeys={["7:1", "8:1"]}
+        onSelectedCellKeysChange={() => undefined}
+      />,
+    );
+
+    const dayCell = screen.getByText("th./01.01").closest("th");
+
+    expect(dayCell).toHaveClass(styles.dayCellSelected);
+    expect(dayCell).not.toHaveClass(styles.dayCellRowGuide);
+    expect(screen.getByRole("button", { name: "Ada day 1" }).closest("td")).not.toHaveClass(styles.rowGuideCell);
+  });
+
   test("applies a bound fill color to the focused selected cell", () => {
     const onFillColorShortcut = vi.fn();
 
@@ -118,7 +226,7 @@ describe("ContainerGraphMatrix related schedule hints", () => {
     vi.useFakeTimers();
     const onVisualHintClick = vi.fn();
     const onCellChange = vi.fn();
-    const cellMap = { "7:1": "15:00 - 21:00" };
+    const cellMap = { "7:1": "09:00 - 15:00, 18:00 - 20:00" };
     const detail: GraphRelatedScheduleHintDetail = {
       employeeId: 7,
       dayOfMonth: 1,
@@ -158,15 +266,15 @@ describe("ContainerGraphMatrix related schedule hints", () => {
 
       const hintButton = screen.getByRole("button", { name: "Ada day 1" });
       expect(hintButton).toHaveTextContent("F35");
-      expect(hintButton).not.toHaveTextContent("15:00 - 21:00");
-      expect(hintButton.parentElement).toHaveTextContent("15:00 - 21:00, F35");
+      expect(hintButton).not.toHaveTextContent("09:00 - 15:00");
+      expect(hintButton.parentElement).toHaveTextContent("09:00 - 15:00, 18:00 - 20:00, F35");
 
       fireEvent.click(hintButton, { detail: 1 });
       act(() => vi.advanceTimersByTime(181));
 
       expect(onVisualHintClick).toHaveBeenCalledWith(detail);
       expect(onCellChange).not.toHaveBeenCalled();
-      expect(cellMap).toEqual({ "7:1": "15:00 - 21:00" });
+      expect(cellMap).toEqual({ "7:1": "09:00 - 15:00, 18:00 - 20:00" });
     } finally {
       vi.useRealTimers();
     }

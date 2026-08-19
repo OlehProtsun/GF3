@@ -3,6 +3,7 @@ using System;
 using DataAccessLayer.Models.DataBaseContext;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -10,9 +11,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace DataAccessLayer.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260819145856_AddScheduleVersionControl")]
+    partial class AddScheduleVersionControl
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "10.0.9");
@@ -768,23 +771,6 @@ namespace DataAccessLayer.Migrations
                     b.ToTable("manager_notepad_state");
                 });
 
-            modelBuilder.Entity("DataAccessLayer.Models.ManagerShiftCorrectionSettingModel", b =>
-                {
-                    b.Property<int>("ManagerAccountId")
-                        .HasColumnType("INTEGER")
-                        .HasColumnName("manager_account_id");
-
-                    b.Property<string>("HighlightColor")
-                        .IsRequired()
-                        .HasMaxLength(7)
-                        .HasColumnType("TEXT")
-                        .HasColumnName("highlight_color");
-
-                    b.HasKey("ManagerAccountId");
-
-                    b.ToTable("manager_shift_correction_setting");
-                });
-
             modelBuilder.Entity("DataAccessLayer.Models.RegulationAcceptanceModel", b =>
                 {
                     b.Property<int>("Id")
@@ -1410,95 +1396,6 @@ namespace DataAccessLayer.Migrations
                     b.ToTable("schedule_version_state");
                 });
 
-            modelBuilder.Entity("DataAccessLayer.Models.ShiftCorrectionRequestModel", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("INTEGER")
-                        .HasColumnName("id");
-
-                    b.Property<DateTimeOffset>("CreatedAtUtc")
-                        .HasColumnType("TEXT")
-                        .HasColumnName("created_at_utc");
-
-                    b.Property<int>("DayOfMonth")
-                        .HasColumnType("INTEGER")
-                        .HasColumnName("day_of_month");
-
-                    b.Property<int>("EmployeeId")
-                        .HasColumnType("INTEGER")
-                        .HasColumnName("employee_id");
-
-                    b.Property<string>("OriginalFromTime")
-                        .IsRequired()
-                        .HasMaxLength(5)
-                        .HasColumnType("TEXT")
-                        .HasColumnName("original_from_time");
-
-                    b.Property<string>("OriginalToTime")
-                        .IsRequired()
-                        .HasMaxLength(5)
-                        .HasColumnType("TEXT")
-                        .HasColumnName("original_to_time");
-
-                    b.Property<string>("RequestedFromTime")
-                        .IsRequired()
-                        .HasMaxLength(5)
-                        .HasColumnType("TEXT")
-                        .HasColumnName("requested_from_time");
-
-                    b.Property<string>("RequestedToTime")
-                        .IsRequired()
-                        .HasMaxLength(5)
-                        .HasColumnType("TEXT")
-                        .HasColumnName("requested_to_time");
-
-                    b.Property<DateTimeOffset?>("ReviewedAtUtc")
-                        .HasColumnType("TEXT")
-                        .HasColumnName("reviewed_at_utc");
-
-                    b.Property<int?>("ReviewedByManagerId")
-                        .HasColumnType("INTEGER")
-                        .HasColumnName("reviewed_by_manager_id");
-
-                    b.Property<int>("ScheduleId")
-                        .HasColumnType("INTEGER")
-                        .HasColumnName("schedule_id");
-
-                    b.Property<int>("ScheduleSlotId")
-                        .HasColumnType("INTEGER")
-                        .HasColumnName("schedule_slot_id");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("TEXT")
-                        .HasDefaultValue("Pending")
-                        .HasColumnName("status");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ReviewedByManagerId");
-
-                    b.HasIndex("ScheduleSlotId", "Status")
-                        .IsUnique()
-                        .HasDatabaseName("ux_shift_correction_pending_slot")
-                        .HasFilter("status = 'Pending'");
-
-                    b.HasIndex(new[] { "EmployeeId", "Status" }, "ix_shift_correction_employee_status");
-
-                    b.HasIndex(new[] { "ScheduleId", "Status" }, "ix_shift_correction_schedule_status");
-
-                    b.ToTable("shift_correction_request", t =>
-                        {
-                            t.HasCheckConstraint("ck_shift_correction_dom", "day_of_month BETWEEN 1 AND 31");
-
-                            t.HasCheckConstraint("ck_shift_correction_requested_order", "requested_from_time < requested_to_time");
-
-                            t.HasCheckConstraint("ck_shift_correction_time_format", "original_from_time LIKE '__:__' AND original_to_time LIKE '__:__' AND requested_from_time LIKE '__:__' AND requested_to_time LIKE '__:__'");
-                        });
-                });
-
             modelBuilder.Entity("DataAccessLayer.Models.ShiftSwapHistoryModel", b =>
                 {
                     b.Property<int>("Id")
@@ -2121,17 +2018,6 @@ namespace DataAccessLayer.Migrations
                     b.Navigation("ManagerAccount");
                 });
 
-            modelBuilder.Entity("DataAccessLayer.Models.ManagerShiftCorrectionSettingModel", b =>
-                {
-                    b.HasOne("DataAccessLayer.Models.ManagerAccountModel", "ManagerAccount")
-                        .WithOne()
-                        .HasForeignKey("DataAccessLayer.Models.ManagerShiftCorrectionSettingModel", "ManagerAccountId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("ManagerAccount");
-                });
-
             modelBuilder.Entity("DataAccessLayer.Models.RegulationAcceptanceModel", b =>
                 {
                     b.HasOne("DataAccessLayer.Models.RegulationDocumentModel", "RegulationDocument")
@@ -2298,32 +2184,6 @@ namespace DataAccessLayer.Migrations
                     b.Navigation("Schedule");
                 });
 
-            modelBuilder.Entity("DataAccessLayer.Models.ShiftCorrectionRequestModel", b =>
-                {
-                    b.HasOne("DataAccessLayer.Models.EmployeeModel", "Employee")
-                        .WithMany()
-                        .HasForeignKey("EmployeeId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("DataAccessLayer.Models.ManagerAccountModel", "ReviewedByManager")
-                        .WithMany()
-                        .HasForeignKey("ReviewedByManagerId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
-                    b.HasOne("DataAccessLayer.Models.ScheduleModel", "Schedule")
-                        .WithMany("ShiftCorrectionRequests")
-                        .HasForeignKey("ScheduleId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Employee");
-
-                    b.Navigation("ReviewedByManager");
-
-                    b.Navigation("Schedule");
-                });
-
             modelBuilder.Entity("DataAccessLayer.Models.ShiftSwapHistoryModel", b =>
                 {
                     b.HasOne("DataAccessLayer.Models.ScheduleModel", "Schedule")
@@ -2425,8 +2285,6 @@ namespace DataAccessLayer.Migrations
                     b.Navigation("CellStyles");
 
                     b.Navigation("Employees");
-
-                    b.Navigation("ShiftCorrectionRequests");
 
                     b.Navigation("Slots");
 

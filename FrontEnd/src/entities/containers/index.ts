@@ -17,5 +17,7 @@ export * from "./ui/ContainerGraphRelatedHintDialog";
 export * from "./ui/ContainerGraphManualColumnsCard";
 export * from "./ui/ContainerGraphProfileWorkspace";
 export * from "./ui/ContainerGraphEditor";
+export * from "./ui/ContainerGraphShiftCorrectionsCard";
+export * from "./ui/ContainerGraphVersionsDialog";
 export * from "./ui/ContainerGraphSessionTabs";
 export * from "./ui/ContainerProfileWorkspace";

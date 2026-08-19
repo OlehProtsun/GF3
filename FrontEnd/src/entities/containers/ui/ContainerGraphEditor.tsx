@@ -43,8 +43,10 @@ import {
   NoteIcon,
   PlusIcon,
   SaveIcon,
+  ScheduleIcon,
   ScheduleDetailsIcon,
   SearchIcon,
+  SwapHistoryIcon,
 } from "@shared/ui/icons";
 import { CardSection } from "@shared/ui/sections/CardSection";
 import { ContainerGraphColorDialog } from "./ContainerGraphColorDialog";
@@ -57,6 +59,8 @@ import {
 import { ContainerGraphMatrix } from "./ContainerGraphMatrix";
 import { ContainerGraphPresetDialog } from "./ContainerGraphPresetDialog";
 import { ContainerGraphRelatedHintDialog } from "./ContainerGraphRelatedHintDialog";
+import { ContainerGraphShiftCorrectionsCard } from "./ContainerGraphShiftCorrectionsCard";
+import { ContainerGraphVersionsDialog } from "./ContainerGraphVersionsDialog";
 import { ContainerGraphPresetSelect } from "./ContainerGraphPresetSelect";
 import { ShiftSwapHistoryDialog } from "./ShiftSwapHistoryDialog";
 import styles from "./ContainerGraphEditor.module.css";
@@ -83,7 +87,7 @@ export type EditableGraphManualColumn = {
   cells: Record<string, string>;
 };
 
-type SidebarSectionKey = "details" | "publication" | "employees" | "bind" | "manualColumns" | "note";
+type SidebarSectionKey = "details" | "publication" | "corrections" | "employees" | "bind" | "manualColumns" | "note";
 type ColorDialogMode = "fill" | "text";
 type PreviewLayoutMode = "side" | "stacked";
 type ToolbarActionButtonProps = {
@@ -117,6 +121,7 @@ type ContainerGraphEditorProps = {
   visualHintMap?: GraphMatrixCellMap;
   visualHintDetailMap?: GraphRelatedScheduleHintDetailMap;
   cellErrors: Record<string, string>;
+  validationSignal?: number;
   styleMap: GraphMatrixStyleMap;
   dayConflictMap: Record<number, boolean>;
   totals: GraphTotals;
@@ -141,6 +146,7 @@ type ContainerGraphEditorProps = {
   isSaving: boolean;
   isGenerating: boolean;
   isStylingBusy: boolean;
+  hasUnsavedChanges?: boolean;
   showMatrixSaveAction?: boolean;
   isBindsLoading: boolean;
   isBindBusy: boolean;
@@ -189,6 +195,7 @@ type ContainerGraphEditorProps = {
   onClearAllCellStyles: () => void;
   canUndo: boolean;
   onUndo: () => void;
+  onVersionCheckoutComplete: () => void;
   onSave: () => void;
   onGenerate: () => void;
 };
@@ -366,6 +373,7 @@ export function ContainerGraphEditor({
   visualHintMap,
   visualHintDetailMap = {},
   cellErrors,
+  validationSignal = 0,
   styleMap,
   dayConflictMap,
   totals,
@@ -390,6 +398,7 @@ export function ContainerGraphEditor({
   isSaving,
   isGenerating,
   isStylingBusy,
+  hasUnsavedChanges = false,
   showMatrixSaveAction = true,
   isBindsLoading,
   isBindBusy,
@@ -438,12 +447,14 @@ export function ContainerGraphEditor({
   onClearAllCellStyles,
   canUndo,
   onUndo,
+  onVersionCheckoutComplete,
   onSave,
   onGenerate,
 }: ContainerGraphEditorProps) {
   const [collapsedSections, setCollapsedSections] = useState<Record<SidebarSectionKey, boolean>>({
     details: true,
     publication: true,
+    corrections: true,
     employees: true,
     bind: true,
     manualColumns: true,
@@ -451,6 +462,7 @@ export function ContainerGraphEditor({
   });
   const [colorDialogMode, setColorDialogMode] = useState<ColorDialogMode | null>(null);
   const [isPresetDialogOpen, setIsPresetDialogOpen] = useState(false);
+  const [isVersionsDialogOpen, setIsVersionsDialogOpen] = useState(false);
   const [previewLayoutMode, setPreviewLayoutMode] = useState<PreviewLayoutMode>("stacked");
   const [isGenerationOverlayArmed, setIsGenerationOverlayArmed] = useState(false);
   const [activeRelatedHintCellKey, setActiveRelatedHintCellKey] = useState<string | null>(null);
@@ -843,6 +855,29 @@ export function ContainerGraphEditor({
               </CardSection>
             </AvailabilitySidebarSection>
 
+            <AvailabilitySidebarSection
+              label="Shift Corrections"
+              collapsed={collapsedSections.corrections}
+              collapsedIcon={<ScheduleIcon size={18} />}
+              collapsedOffset={allSectionsCollapsed ? "flush" : "default"}
+              onExpand={() => setSectionCollapsed("corrections", false)}
+            >
+              <CardSection
+                className={styles.sidebarCard}
+                title="Shift Corrections"
+                icon={<ScheduleIcon size={18} />}
+                headerRightSlot={renderCollapseButton("Shift Corrections", "corrections")}
+              >
+                <ContainerGraphShiftCorrectionsCard
+                  containerId={graph?.containerId ?? null}
+                  graphId={graph?.id ?? null}
+                  hasUnsavedChanges={Boolean(hasUnsavedChanges)}
+                  disabled={isSaving || isGenerating}
+                  onApproved={onVersionCheckoutComplete}
+                />
+              </CardSection>
+            </AvailabilitySidebarSection>
+
           <AvailabilitySidebarSection
             label="Employees"
             collapsed={collapsedSections.employees}
@@ -1012,7 +1047,7 @@ export function ContainerGraphEditor({
         }
         main={
           <div className={styles.mainStack}>
-            {submitError ? <ErrorBanner>{submitError}</ErrorBanner> : null}
+            {submitError ? <ErrorBanner key={validationSignal}>{submitError}</ErrorBanner> : null}
 
             <div className={joinClassNames(styles.matrixWorkspace, isSplitPreviewLayout && styles.matrixWorkspaceSplit)}>
               <div
@@ -1044,6 +1079,7 @@ export function ContainerGraphEditor({
                   visualHintMap={visualHintMap}
                   visualHintDetailMap={visualHintDetailMap}
                   cellErrors={cellErrors}
+                  validationSignal={validationSignal}
                   styleMap={styleMap}
                   dayConflictMap={dayConflictMap}
                   onColumnMove={onColumnMove}
@@ -1097,6 +1133,12 @@ export function ContainerGraphEditor({
                         icon={<ClearFormatAllIcon size={15} />}
                         disabled={!hasStyledCells || isStylingBusy}
                         onClick={onClearAllCellStyles}
+                      />
+                      <ToolbarActionButton
+                        label="Versions"
+                        icon={<SwapHistoryIcon size={15} />}
+                        disabled={!graph || isSaving || isGenerating || isStylingBusy}
+                        onClick={() => setIsVersionsDialogOpen(true)}
                       />
 
                     </div>
@@ -1197,6 +1239,14 @@ export function ContainerGraphEditor({
         onDeleteFillColorBind={onDeleteFillColorBind}
         onBindTextColor={onBindTextColor}
         onDeleteTextColorBind={onDeleteTextColorBind}
+      />
+      <ContainerGraphVersionsDialog
+        open={isVersionsDialogOpen}
+        containerId={graph?.containerId ?? null}
+        graphId={graph?.id ?? null}
+        hasUnsavedChanges={hasUnsavedChanges}
+        onCancel={() => setIsVersionsDialogOpen(false)}
+        onCheckoutComplete={onVersionCheckoutComplete}
       />
       <ContainerGraphPresetDialog
         open={isPresetDialogOpen}

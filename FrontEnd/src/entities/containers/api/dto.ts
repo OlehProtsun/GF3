@@ -16,6 +16,24 @@ export type GraphCellStyleDto = GraphCellStyle;
 export type SchedulePresetDto = SchedulePreset;
 export type SchedulePresetEmployeeDto = SchedulePresetEmployee;
 
+export type GraphVersionDto = {
+  id: number;
+  parentVersionId?: number | null;
+  versionNumber: number;
+  branchName: string;
+  createdAtUtc: string;
+  authorName: string;
+  employeeCount: number;
+  slotCount: number;
+  cellStyleCount: number;
+  isCurrent: boolean;
+};
+
+export type GraphVersionTreeDto = {
+  currentVersionId?: number | null;
+  versions: GraphVersionDto[];
+};
+
 export type SaveContainerDto = { name: string; note?: string };
 export type UpdateGraphsPublicationDto = {
   publicationStatus: Graph["publicationStatus"];

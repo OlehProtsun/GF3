@@ -252,7 +252,7 @@ public sealed class ContainerServiceTests
     }
 
     [Fact]
-    public async Task ReplaceGraphSlotsAsync_DeduplicatesEmployeesAndRebuildsSlotNumbers()
+    public async Task ReplaceGraphSlotsAsync_ValidatesSplitShiftsAndRebuildsSlotNumbers()
     {
         await using var database = await SqliteTestDatabase.CreateAsync();
         await using var context = database.CreateContext();
@@ -273,7 +273,6 @@ public sealed class ContainerServiceTests
             graph.Id,
             [
                 TestDataFactory.CreateScheduleSlotModel(1, 7, employee.Id, "08:00", "12:00"),
-                TestDataFactory.CreateScheduleSlotModel(1, 4, employee.Id, "08:00", "12:00"),
                 TestDataFactory.CreateScheduleSlotModel(1, 9, null, "08:00", "12:00"),
             ]);
 
@@ -284,6 +283,49 @@ public sealed class ContainerServiceTests
         Assert.Equal([1, 2], stored.Select(slot => slot.SlotNo).ToArray());
         Assert.Equal(SlotStatus.ASSIGNED, stored[0].Status);
         Assert.Equal(SlotStatus.UNFURNISHED, stored[1].Status);
+
+        var duplicate = await Assert.ThrowsAsync<ValidationException>(() => service.ReplaceGraphSlotsAsync(
+            container.Id,
+            graph.Id,
+            [
+                TestDataFactory.CreateScheduleSlotModel(1, 1, employee.Id, "09:00", "15:00"),
+                TestDataFactory.CreateScheduleSlotModel(1, 2, employee.Id, "09:00", "15:00"),
+            ]));
+        Assert.Equal(
+            "The same time range cannot be entered more than once for one employee and day.",
+            duplicate.Message);
+
+        var overlap = await Assert.ThrowsAsync<ValidationException>(() => service.ReplaceGraphSlotsAsync(
+            container.Id,
+            graph.Id,
+            [
+                TestDataFactory.CreateScheduleSlotModel(1, 1, employee.Id, "09:00", "15:00"),
+                TestDataFactory.CreateScheduleSlotModel(1, 2, employee.Id, "14:00", "18:00"),
+            ]));
+        Assert.Equal("Time ranges for one employee and day cannot overlap.", overlap.Message);
+
+        var tooMany = await Assert.ThrowsAsync<ValidationException>(() => service.ReplaceGraphSlotsAsync(
+            container.Id,
+            graph.Id,
+            [
+                TestDataFactory.CreateScheduleSlotModel(1, 1, employee.Id, "08:00", "09:00"),
+                TestDataFactory.CreateScheduleSlotModel(1, 1, employee.Id, "10:00", "11:00"),
+                TestDataFactory.CreateScheduleSlotModel(1, 1, employee.Id, "12:00", "13:00"),
+                TestDataFactory.CreateScheduleSlotModel(1, 1, employee.Id, "14:00", "15:00"),
+                TestDataFactory.CreateScheduleSlotModel(1, 1, employee.Id, "16:00", "17:00"),
+            ]));
+        Assert.Equal("An employee can have no more than 4 time ranges in one day.", tooMany.Message);
+
+        await service.ReplaceGraphSlotsAsync(
+            container.Id,
+            graph.Id,
+            [
+                TestDataFactory.CreateScheduleSlotModel(1, 1, employee.Id, "08:00", "09:00"),
+                TestDataFactory.CreateScheduleSlotModel(1, 1, employee.Id, "09:00", "10:00"),
+                TestDataFactory.CreateScheduleSlotModel(1, 1, employee.Id, "12:00", "13:00"),
+                TestDataFactory.CreateScheduleSlotModel(1, 1, employee.Id, "14:00", "15:00"),
+            ]);
+        Assert.Equal(4, (await service.GetGraphSlotsAsync(container.Id, graph.Id))?.Count);
     }
 
     [Fact]

@@ -5,6 +5,7 @@ import { buildPreviewList, formatHoursMinutes, getSlotDurationMinutes } from "./
 import type { Graph, GraphCellStyle, GraphEmployee, GraphSlot, SlotStatus } from "./types";
 
 export const GRAPH_EMPTY_MARK = "-";
+export const GRAPH_MAX_INTERVALS_PER_CELL = 4;
 
 export type GraphMatrixColumn = {
   employeeId: number;
@@ -73,6 +74,7 @@ export type GraphSummaryRow = {
   freeDays: number;
   sum: string;
   days: GraphSummaryDayCell[];
+  dayRows: GraphSummaryDayCell[][];
 };
 
 export type GraphTotals = {
@@ -505,7 +507,7 @@ export function mergeGraphIntervalsForDisplay(slots: Pick<GraphSlot, "fromTime" 
 
   for (let index = 1; index < intervals.length; index += 1) {
     const nextInterval = intervals[index];
-    if (nextInterval.fromMinutes <= current.toMinutes) {
+    if (nextInterval.fromMinutes < current.toMinutes) {
       current.toMinutes = Math.max(current.toMinutes, nextInterval.toMinutes);
       continue;
     }
@@ -541,8 +543,15 @@ export function tryParseGraphIntervals(input: string):
 
   const parts = trimmed
     .split(",")
-    .map(part => part.trim())
-    .filter(Boolean);
+    .map(part => part.trim());
+
+  if (parts.some(part => !part)) {
+    return { ok: false, error: "Enter a complete time range after each comma." };
+  }
+
+  if (parts.length > GRAPH_MAX_INTERVALS_PER_CELL) {
+    return { ok: false, error: `A cell can contain no more than ${GRAPH_MAX_INTERVALS_PER_CELL} time ranges.` };
+  }
 
   const uniqueIntervals = new Set<string>();
   const intervals: Array<{ from: string; to: string }> = [];
@@ -571,7 +580,7 @@ export function tryParseGraphIntervals(input: string):
 
     const key = `${from}:${to}`;
     if (uniqueIntervals.has(key)) {
-      continue;
+      return { ok: false, error: "The same time range cannot be entered more than once." };
     }
 
     uniqueIntervals.add(key);
@@ -587,6 +596,14 @@ export function tryParseGraphIntervals(input: string):
 
     return (parseGraphTimeMinutes(left.to) ?? 0) - (parseGraphTimeMinutes(right.to) ?? 0);
   });
+
+  for (let index = 1; index < intervals.length; index += 1) {
+    const previousTo = parseGraphTimeMinutes(intervals[index - 1].to) ?? 0;
+    const currentFrom = parseGraphTimeMinutes(intervals[index].from) ?? 0;
+    if (currentFrom < previousTo) {
+      return { ok: false, error: "Time ranges in one cell cannot overlap." };
+    }
+  }
 
   return { ok: true, value: intervals };
 }
@@ -746,17 +763,30 @@ export function buildGraphSummaryRows(
   slots: GraphSlot[] = [],
 ) {
   const columns = buildGraphMatrixColumns(graphEmployees, employeesById, slots);
-  const cellMap = buildGraphCellMap(slots);
   const daysInMonth = getGraphDaysInMonth(graph.year, graph.month);
+  const slotsByCellKey = new Map<string, GraphSlot[]>();
+
+  slots.forEach(slot => {
+    if (!slot.employeeId || slot.employeeId <= 0) {
+      return;
+    }
+
+    const cellKey = getGraphCellKey(slot.employeeId, slot.dayOfMonth);
+    const cellSlots = slotsByCellKey.get(cellKey) ?? [];
+    cellSlots.push(slot);
+    slotsByCellKey.set(cellKey, cellSlots);
+  });
 
   return columns.map(column => {
-    const days = Array.from({ length: daysInMonth }, (_, index) => {
+    const dayCells = Array.from({ length: daysInMonth }, (_, index) => {
       const dayOfMonth = index + 1;
-      const cellValue = cellMap[getGraphCellKey(column.employeeId, dayOfMonth)] ?? GRAPH_EMPTY_MARK;
-      return buildGraphSummaryDayCell(cellValue);
+      return buildGraphSummaryDayCells(slotsByCellKey.get(getGraphCellKey(column.employeeId, dayOfMonth)) ?? []);
     });
-
-    const workDays = days.filter(day => day.hours !== "" || day.from !== "" || day.to !== "").length;
+    const dayRowCount = Math.max(1, ...dayCells.map(cells => cells.length));
+    const dayRows = Array.from({ length: dayRowCount }, (_, rowIndex) =>
+      dayCells.map(cells => cells[rowIndex] ?? createEmptyGraphSummaryDayCell()),
+    );
+    const workDays = dayCells.filter(cells => cells.length > 0).length;
     const freeDays = Math.max(0, daysInMonth - workDays);
 
     return {
@@ -765,7 +795,8 @@ export function buildGraphSummaryRows(
       workDays,
       freeDays,
       sum: formatSummaryMinutes(column.totalMinutes),
-      days,
+      days: dayRows[0],
+      dayRows,
     } satisfies GraphSummaryRow;
   });
 }
@@ -1124,38 +1155,19 @@ function hasGraphIntervalOverlap(intervals: Array<{ fromMinutes: number; toMinut
   return false;
 }
 
-function buildGraphSummaryDayCell(value: string): GraphSummaryDayCell {
-  const trimmed = value.trim();
+function createEmptyGraphSummaryDayCell(): GraphSummaryDayCell {
+  return { from: "", to: "", hours: "" };
+}
 
-  if (!trimmed || trimmed === GRAPH_EMPTY_MARK) {
-    return { from: "", to: "", hours: "" };
-  }
-
-  const matches = [...trimmed.matchAll(/\b([01]?\d|2[0-3]):[0-5]\d\b/g)].map(match => match[0]);
-  if (matches.length < 2) {
-    return { from: trimmed, to: "", hours: "" };
-  }
-
-  const totalMinutes = matches.reduce((sum, _, index) => {
-    if (index % 2 !== 0) {
-      return sum;
-    }
-
-    const fromMinutes = parseGraphTimeMinutes(matches[index]);
-    const toMinutes = parseGraphTimeMinutes(matches[index + 1] ?? "");
-
-    if (fromMinutes === null || toMinutes === null || toMinutes <= fromMinutes) {
-      return sum;
-    }
-
-    return sum + (toMinutes - fromMinutes);
-  }, 0);
-
-  return {
-    from: matches[0],
-    to: matches[matches.length - 1],
-    hours: formatSummaryMinutes(totalMinutes),
-  };
+function buildGraphSummaryDayCells(daySlots: GraphSlot[]): GraphSummaryDayCell[] {
+  return mergeGraphIntervalsForDisplay(daySlots).map(interval => ({
+    from: interval.from,
+    to: interval.to,
+    hours: formatSummaryMinutes(getSlotDurationMinutes({
+      fromTime: interval.from,
+      toTime: interval.to,
+    })),
+  }));
 }
 
 function formatSummaryMinutes(totalMinutes: number) {
