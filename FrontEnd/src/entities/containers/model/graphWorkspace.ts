@@ -351,7 +351,7 @@ export function buildGraphRelatedScheduleHintData(params: {
         return;
       }
 
-      const mergedIntervals = mergeGraphIntervalsForDisplay(cellSlots);
+      const mergedIntervals = mergeGraphIntervalsForDisplay(cellSlots, { mergeTouching: true });
       const dayValues = dayValuesByEmployeeId.get(employeeId) ?? buildGraphRelatedScheduleHintDayValues({
         year: graph.year,
         month: graph.month,
@@ -467,7 +467,10 @@ export function rgbHexToArgb(value: string) {
   return (255 << 24) | (red << 16) | (green << 8) | blue;
 }
 
-export function mergeGraphIntervalsForDisplay(slots: Pick<GraphSlot, "fromTime" | "toTime">[]) {
+export function mergeGraphIntervalsForDisplay(
+  slots: Pick<GraphSlot, "fromTime" | "toTime">[],
+  options: { mergeTouching?: boolean } = {},
+) {
   const uniqueIntervals = new Set<string>();
   const intervals: Array<{ fromMinutes: number; toMinutes: number }> = [];
 
@@ -507,7 +510,10 @@ export function mergeGraphIntervalsForDisplay(slots: Pick<GraphSlot, "fromTime" 
 
   for (let index = 1; index < intervals.length; index += 1) {
     const nextInterval = intervals[index];
-    if (nextInterval.fromMinutes < current.toMinutes) {
+    if (
+      nextInterval.fromMinutes < current.toMinutes ||
+      (options.mergeTouching && nextInterval.fromMinutes === current.toMinutes)
+    ) {
       current.toMinutes = Math.max(current.toMinutes, nextInterval.toMinutes);
       continue;
     }
@@ -530,6 +536,18 @@ export function formatGraphIntervals(intervals: Array<{ from: string; to: string
   }
 
   return intervals.map(interval => `${interval.from} - ${interval.to}`).join(", ");
+}
+
+export function formatGraphCellValueForDisplay(value: string) {
+  const parsed = tryParseGraphIntervals(value);
+  if (!parsed.ok || parsed.value.length === 0) {
+    return value;
+  }
+
+  return formatGraphIntervals(mergeGraphIntervalsForDisplay(
+    parsed.value.map(interval => ({ fromTime: interval.from, toTime: interval.to })),
+    { mergeTouching: true },
+  ));
 }
 
 export function tryParseGraphIntervals(input: string):
@@ -1160,7 +1178,7 @@ function createEmptyGraphSummaryDayCell(): GraphSummaryDayCell {
 }
 
 function buildGraphSummaryDayCells(daySlots: GraphSlot[]): GraphSummaryDayCell[] {
-  return mergeGraphIntervalsForDisplay(daySlots).map(interval => ({
+  return mergeGraphIntervalsForDisplay(daySlots, { mergeTouching: true }).map(interval => ({
     from: interval.from,
     to: interval.to,
     hours: formatSummaryMinutes(getSlotDurationMinutes({

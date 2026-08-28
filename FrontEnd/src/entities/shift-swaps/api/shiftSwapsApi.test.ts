@@ -77,6 +77,21 @@ describe("shift swaps api", () => {
     });
   });
 
+  test("loads and saves the accepted swap highlight color for a graph", () => {
+    const controller = new AbortController();
+
+    shiftSwapsApi.getHighlightSetting(2, 10, controller.signal);
+    shiftSwapsApi.saveHighlightSetting(2, 10, "#DBEAFE");
+
+    expect(requestMock).toHaveBeenNthCalledWith(1, "containers/2/graphs/10/shift-swaps/highlight-setting", {
+      signal: controller.signal,
+    });
+    expect(requestMock).toHaveBeenNthCalledWith(2, "containers/2/graphs/10/shift-swaps/highlight-setting", {
+      method: "PUT",
+      body: { highlightColor: "#DBEAFE" },
+    });
+  });
+
   test("uses the whole-container endpoint for manager swap maintenance", () => {
     const controller = new AbortController();
 

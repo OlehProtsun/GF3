@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, test, vi } from "vitest";
 import type { EmployeeSchedule } from "@entities/employee-schedule";
@@ -32,9 +32,15 @@ describe("EmployeeShiftCorrectionDialog", () => {
     expect(screen.getByText("08:00 – 12:00")).toBeVisible();
     expect(screen.getByText("15:00 – 19:00")).toBeVisible();
 
-    await user.click(screen.getByRole("button", { name: "Adjust end of 08:00 to 12:00" }));
-    await user.click(screen.getByRole("button", { name: "+30m" }));
-    expect(screen.getAllByText("08:00 – 12:30")).toHaveLength(2);
+    expect(screen.getByText("Choose a workday")).toBeVisible();
+    expect(screen.getByText("Choose what to change")).toBeVisible();
+    expect(screen.getByText("Set the new time")).toBeVisible();
+
+    const firstShift = screen.getByRole("group", { name: "Change 08:00 to 12:00" });
+    await user.click(within(firstShift).getByRole("button", { name: "Change end time from 12:00" }));
+    await user.click(screen.getByRole("button", { name: "Move selected time 30 minutes later" }));
+    expect(screen.getByText("08:00 – 12:30")).toBeVisible();
+    expect(screen.getByText("End time: 30 min later")).toBeVisible();
     await user.click(screen.getByRole("button", { name: "Send request" }));
 
     expect(onSubmit).toHaveBeenCalledWith({
@@ -57,26 +63,30 @@ describe("EmployeeShiftCorrectionDialog", () => {
         onCancel={() => undefined} onSubmit={() => undefined} />,
     );
 
-    expect(screen.getByRole("button", { name: "Adjust start of 08:00 to 12:00" })).toBeDisabled();
-    expect(screen.getByText("Request pending")).toBeVisible();
+    const pendingShift = screen.getByRole("group", { name: "Change 08:00 to 12:00" });
+    expect(within(pendingShift).getByRole("button", { name: "Change start time from 08:00" })).toBeDisabled();
+    expect(screen.getByText("Pending approval")).toBeVisible();
   });
 
-  test("expands the time scale when an adjusted boundary moves beyond the initial range", async () => {
+  test("accepts an exact requested time", async () => {
     const user = userEvent.setup();
+    const onSubmit = vi.fn();
     render(
       <EmployeeShiftCorrectionDialog open schedule={schedule} employeeId={7} existingRequests={[]}
-        isSending={false} onCancel={() => undefined} onSubmit={() => undefined} />,
+        isSending={false} onCancel={() => undefined} onSubmit={onSubmit} />,
     );
 
-    expect(screen.queryByText("23:00")).not.toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Adjust end of 15:00 to 19:00" }));
-    const addHourButton = screen.getByRole("button", { name: "+1h" });
-    await user.click(addHourButton);
-    await user.click(addHourButton);
-    await user.click(addHourButton);
-    await user.click(addHourButton);
+    const secondShift = screen.getByRole("group", { name: "Change 15:00 to 19:00" });
+    await user.click(within(secondShift).getByRole("button", { name: "Change end time from 19:00" }));
+    await user.clear(screen.getByLabelText("New end time"));
+    await user.type(screen.getByLabelText("New end time"), "23:00");
+    await user.click(screen.getByRole("button", { name: "Send request" }));
 
-    expect(screen.getByText("23:00")).toBeVisible();
-    expect(screen.getAllByText("15:00 – 23:00")).toHaveLength(2);
+    expect(onSubmit).toHaveBeenCalledWith({
+      scheduleId: 9,
+      scheduleSlotId: 22,
+      requestedFromTime: "15:00",
+      requestedToTime: "23:00",
+    });
   });
 });

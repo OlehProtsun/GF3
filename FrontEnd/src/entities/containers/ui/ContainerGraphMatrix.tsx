@@ -3,6 +3,7 @@ import type { CSSProperties, ClipboardEvent, DragEvent, FocusEvent, KeyboardEven
 import {
   GRAPH_EMPTY_MARK,
   buildGraphDayShiftStaffingCounts,
+  formatGraphCellValueForDisplay,
   getGraphCellKey,
   getGraphDaysInMonth,
   getGraphWeekdayLabel,
@@ -406,19 +407,20 @@ const MatrixValueCell = memo(function MatrixValueCell({
   } satisfies CSSProperties;
   const trimmedVisualHint = visualHint?.trim() ?? "";
   const hasVisualHint = Boolean(trimmedVisualHint);
-  const isTextValue = parseGraphCellContent(value).kind === "text";
   const isLockedVisualHint = Boolean(lockVisualHint && isEmpty && hasVisualHint);
-  const renderedValue = isEmpty && hasVisualHint ? trimmedVisualHint : value;
   const trimmedMutedSuffix = mutedSuffix?.trim() ?? "";
-  const renderedPrefix = trimmedMutedSuffix && renderedValue.endsWith(trimmedMutedSuffix)
+  const renderedValue = isEmpty && hasVisualHint ? trimmedVisualHint : value;
+  const rawRenderedPrefix = trimmedMutedSuffix && renderedValue.endsWith(trimmedMutedSuffix)
     ? renderedValue.slice(0, -trimmedMutedSuffix.length).replace(/,\s*$/, "")
     : renderedValue;
+  const isTextValue = parseGraphCellContent(rawRenderedPrefix).kind === "text";
+  const renderedPrefix = formatGraphCellValueForDisplay(rawRenderedPrefix);
   const renderedContent = trimmedMutedSuffix ? (
     <>
       {renderedPrefix ? renderedPrefix + ",\u00a0" : null}
       <span className={styles.mutedSuffix}>{trimmedMutedSuffix}</span>
     </>
-  ) : renderedValue;
+  ) : renderedPrefix;
   const cellTitle = error ?? (hasVisualHint ? `Also works in: ${trimmedVisualHint}` : value);
   const interactiveCellTitle =
     hasVisualHint && onVisualHintClick

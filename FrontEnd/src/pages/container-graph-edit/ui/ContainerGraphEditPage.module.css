@@ -167,10 +167,10 @@
 
 @media (max-width: 960px) {
   .page {
-    height: auto;
+    height: calc(100dvh - 4px);
     min-height: 0;
     overflow-clip-margin: 0;
-    overflow: visible;
+    overflow: clip;
     padding-bottom: 0;
   }
 

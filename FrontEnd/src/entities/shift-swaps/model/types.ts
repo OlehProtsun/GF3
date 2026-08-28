@@ -81,3 +81,7 @@ export type CreateManagerShiftSwapInput = {
   toTime: string;
   targetEmployeeId?: number | null;
 };
+
+export type ShiftSwapHighlightSetting = {
+  highlightColor: string;
+};

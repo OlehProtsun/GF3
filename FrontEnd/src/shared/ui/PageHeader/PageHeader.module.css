@@ -8,7 +8,7 @@
   position: fixed;
   top: env(safe-area-inset-top);
   left: calc(1rem + var(--page-header-fixed-offset, 0px));
-  right: 1rem;
+  right: calc(1rem + var(--page-header-fixed-right-offset, 0px));
   z-index: 950;
   box-sizing: border-box;
   pointer-events: none;
@@ -345,7 +345,7 @@
 @media (max-width: 640px) {
   .headerRoot {
     left: calc(0.75rem + var(--page-header-fixed-offset, 0px));
-    right: 0.75rem;
+    right: calc(0.75rem + var(--page-header-fixed-right-offset, 0px));
   }
 
   .headerInner {

@@ -91,6 +91,7 @@ export function OverlaySidebarLayout({ children }: OverlaySidebarLayoutProps) {
     isWideContent ? styles.contentWide : "",
     isWideScrollableContent ? styles.contentWideScrollable : "",
     isContainerGraphHeaderAligned ? styles.contentWideHeaderAligned : "",
+    isManager ? styles.contentManager : "",
   ].filter(Boolean).join(" ");
   const mainNavItems: NavItemDefinition[] = isManager
     ? [

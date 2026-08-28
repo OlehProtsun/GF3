@@ -468,11 +468,11 @@ function ShiftPickerDialog({
   }
 
   const dayNumbers = Array.from({ length: getDaysInMonth(schedule.year, schedule.month) }, (_, index) => index + 1);
-  const slotByDay = new Map<number, EmployeeScheduleSlot>();
-  slots.forEach(slot => {
-    if (!slotByDay.has(slot.dayOfMonth)) {
-      slotByDay.set(slot.dayOfMonth, slot);
-    }
+  const pickerEntries = dayNumbers.flatMap<{ dayOfMonth: number; slot: EmployeeScheduleSlot | null }>(dayOfMonth => {
+    const daySlots = slots.filter(slot => slot.dayOfMonth === dayOfMonth);
+    return daySlots.length > 0
+      ? daySlots.map(slot => ({ dayOfMonth, slot }))
+      : [{ dayOfMonth, slot: null }];
   });
   const confirmSlot = slots.find(slot => slot.id === confirmSlotId) ?? null;
   const selectedPeriod = confirmSlot && periodMode === "custom"
@@ -530,14 +530,13 @@ function ShiftPickerDialog({
 
         <div className={styles.shiftScroll}>
           <div className={styles.shiftGrid}>
-            {dayNumbers.map(dayOfMonth => {
-              const slot = slotByDay.get(dayOfMonth) ?? null;
+            {pickerEntries.map(({ dayOfMonth, slot }) => {
               const isSelected = Boolean(slot && slot.id === selectedSlotId);
               const isConfirming = Boolean(slot && slot.id === confirmSlotId);
 
               return (
                 <button
-                  key={dayOfMonth}
+                  key={slot ? `slot-${slot.id}` : `day-${dayOfMonth}`}
                   type="button"
                   className={[
                     styles.shiftButton,

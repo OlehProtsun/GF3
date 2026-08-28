@@ -47,7 +47,7 @@ describe("OverlaySidebarLayout", () => {
 
   it("renders manager footer actions with the same nav button contract as top nav items", async () => {
     const user = userEvent.setup();
-    renderManagerLayout();
+    const { container } = renderManagerLayout();
 
     const homeLink = screen.getByRole("link", { name: "Home" });
     const managerLink = screen.getByRole("link", { name: "Open manager profile" });
@@ -56,6 +56,7 @@ describe("OverlaySidebarLayout", () => {
     expect(homeLink.className).toContain("navButton");
     expect(managerLink.className).toContain("navButton");
     expect(logoutButton.className).toContain("navButton");
+    expect(container.querySelector("main")?.className).toContain("contentManager");
     expect(screen.getByText("Manager")).toBeInTheDocument();
     expect(screen.getByText("Log out")).toBeInTheDocument();
 

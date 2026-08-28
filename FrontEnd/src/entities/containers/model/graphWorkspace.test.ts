@@ -145,7 +145,7 @@ describe("container graph workspace model", () => {
     expect(normalizeGraphCellValue("  note  ")).toBe("note");
   });
 
-  test("keeps touching split shifts separate when rebuilding cell values", () => {
+  test("keeps touching split shifts separate in data and can merge them for visual display", () => {
     const touchingSlots: GraphSlot[] = [
       { id: 1, scheduleId: 1, dayOfMonth: 1, slotNo: 1, fromTime: "09:00", toTime: "15:00", employeeId: 1, status: 1 },
       { id: 2, scheduleId: 1, dayOfMonth: 1, slotNo: 1, fromTime: "15:00", toTime: "21:00", employeeId: 1, status: 1 },
@@ -154,6 +154,9 @@ describe("container graph workspace model", () => {
     expect(buildGraphCellMap(touchingSlots)).toEqual({
       "1:1": "09:00 - 15:00, 15:00 - 21:00",
     });
+    expect(mergeGraphIntervalsForDisplay(touchingSlots, { mergeTouching: true })).toEqual([
+      { from: "09:00", to: "21:00" },
+    ]);
   });
 
   test("builds and sanitizes graph cell and style maps", () => {

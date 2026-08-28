@@ -58,6 +58,11 @@ public class ScheduleModel
     public bool AllowSwap { get; set; } = true;
 
     [Required]
+    [Column("accepted_swap_highlight_color")]
+    [MaxLength(7)]
+    public string AcceptedSwapHighlightColor { get; set; } = "#BBF7D0";
+
+    [Required]
     [Column("people_per_shift")]
     public int PeoplePerShift { get; set; }
 

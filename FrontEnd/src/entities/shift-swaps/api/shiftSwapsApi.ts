@@ -1,5 +1,5 @@
 import { request } from "@shared/api/httpClient";
-import type { CreateManagerShiftSwapInput, CreateShiftSwapInput, ShiftSwap, ShiftSwapEmployee } from "../model/types";
+import type { CreateManagerShiftSwapInput, CreateShiftSwapInput, ShiftSwap, ShiftSwapEmployee, ShiftSwapHighlightSetting } from "../model/types";
 
 const employeeEndpoint = "employee-shift-swaps";
 const containerEndpoint = "containers";
@@ -24,6 +24,13 @@ export const shiftSwapsApi = {
     }),
   listGraphLog: (containerId: number, graphId: number, signal?: AbortSignal) =>
     request<ShiftSwap[]>(`${containerEndpoint}/${containerId}/graphs/${graphId}/shift-swaps`, { signal }),
+  getHighlightSetting: (containerId: number, graphId: number, signal?: AbortSignal) =>
+    request<ShiftSwapHighlightSetting>(`${containerEndpoint}/${containerId}/graphs/${graphId}/shift-swaps/highlight-setting`, { signal }),
+  saveHighlightSetting: (containerId: number, graphId: number, highlightColor: string) =>
+    request<ShiftSwapHighlightSetting>(`${containerEndpoint}/${containerId}/graphs/${graphId}/shift-swaps/highlight-setting`, {
+      method: "PUT",
+      body: { highlightColor },
+    }),
   listContainer: (containerId: number, signal?: AbortSignal) =>
     request<ShiftSwap[]>(`${containerEndpoint}/${containerId}/shift-swaps`, { signal }),
   cancelContainer: (containerId: number, id: number) =>

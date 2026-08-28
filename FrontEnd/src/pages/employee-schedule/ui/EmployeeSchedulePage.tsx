@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { NavLink } from "react-router-dom";
 import { useAuth } from "@app/providers/AuthProvider";
 import {
@@ -12,7 +12,13 @@ import {
   useEmployeeShiftCorrectionsQuery,
   type CreateShiftCorrectionInput,
 } from "@entities/shift-corrections";
-import { getGraphCellKey, type GraphMatrixCellMap, type GraphMatrixColumn } from "@entities/containers/model/graphWorkspace";
+import {
+  formatGraphIntervals,
+  getGraphCellKey,
+  mergeGraphIntervalsForDisplay,
+  type GraphMatrixCellMap,
+  type GraphMatrixColumn,
+} from "@entities/containers/model/graphWorkspace";
 import { parseGraphNoteContent } from "@entities/containers/model/graphNote";
 import { ContainerGraphMatrix } from "@entities/containers/ui/ContainerGraphMatrix";
 import { getEmployeeFullName } from "@entities/employees/model/presentation";
@@ -440,7 +446,7 @@ function formatDailyWorkerShifts(worker: DailyScheduleWorker) {
 
   const shiftText = worker.isAllDay
     ? "All day"
-    : worker.shifts.map(slot => `${slot.fromTime} - ${slot.toTime}`).join(" · ");
+    : formatGraphIntervals(mergeGraphIntervalsForDisplay(worker.shifts, { mergeTouching: true }));
 
   return relatedScheduleText ? `${shiftText}, ${relatedScheduleText}` : shiftText;
 }
@@ -510,10 +516,7 @@ function buildScheduleMatrixCellMap(schedule: EmployeeSchedule | null, fallbackE
   });
 
   const slotCellMap = [...slotsByCell.entries()].reduce<GraphMatrixCellMap>((cellMap, [cellKey, cellSlots]) => {
-    const value = [...cellSlots]
-      .sort((left, right) => left.fromTime.localeCompare(right.fromTime) || left.toTime.localeCompare(right.toTime))
-      .map(slot => `${slot.fromTime} - ${slot.toTime}`)
-      .join(", ");
+    const value = formatGraphIntervals(mergeGraphIntervalsForDisplay(cellSlots, { mergeTouching: true }));
 
     if (value) {
       cellMap[cellKey] = value;
@@ -885,6 +888,7 @@ export function EmployeeSchedulePage() {
   const [selectedScheduleId, setSelectedScheduleId] = useState<number | null>(null);
   const [scheduleViewMode, setScheduleViewMode] = useState<"matrix" | "daily">("matrix");
   const [selectedDayOfMonth, setSelectedDayOfMonth] = useState<number | null>(null);
+  const activeDailyScheduleDayRef = useRef<HTMLButtonElement | null>(null);
   const [isShiftCorrectionDialogOpen, setIsShiftCorrectionDialogOpen] = useState(false);
   const [shiftCorrectionError, setShiftCorrectionError] = useState<string | null>(null);
   const [shiftCorrectionSuccess, setShiftCorrectionSuccess] = useState<string | null>(null);
@@ -1008,6 +1012,19 @@ export function EmployeeSchedulePage() {
     ? selectedDayOfMonth
     : defaultDailyScheduleDay;
   const activeDailyScheduleDayInfo = dailyScheduleDays.find(day => day.dayOfMonth === activeDailyScheduleDay) ?? null;
+
+  useLayoutEffect(() => {
+    if (scheduleViewMode !== "daily") {
+      return;
+    }
+
+    activeDailyScheduleDayRef.current?.scrollIntoView({
+      behavior: "auto",
+      block: "nearest",
+      inline: "center",
+    });
+  }, [activeDailyScheduleDay, scheduleViewMode, selectedSchedule?.id]);
+
   const dailyScheduleWorkers = useMemo(
     () => selectedSchedule
       ? buildDailyScheduleWorkers(selectedSchedule, activeDailyScheduleDay, fallbackMatrixEmployeeId, displayName)
@@ -1350,6 +1367,7 @@ export function EmployeeSchedulePage() {
                 return (
                   <button
                     key={day.dayOfMonth}
+                    ref={isSelected ? activeDailyScheduleDayRef : undefined}
                     type="button"
                     role="tab"
                     aria-selected={isSelected}

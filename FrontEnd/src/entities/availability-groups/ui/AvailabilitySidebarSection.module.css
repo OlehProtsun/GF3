@@ -91,6 +91,21 @@
   transform: translateX(0);
 }
 
+.sectionShellAttention .sectionExpandButton {
+  animation: sectionAttentionPulse 1.15s ease-in-out infinite !important;
+}
+
+@keyframes sectionAttentionPulse {
+  0%, 100% {
+    border-color: rgba(113, 113, 122, 0.14);
+    box-shadow: 0 10px 24px rgba(15, 23, 42, 0.12);
+  }
+  50% {
+    border-color: #dc2626;
+    box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.28), 0 10px 24px rgba(15, 23, 42, 0.12);
+  }
+}
+
 .sectionExpandButton :global(svg) {
   width: 18px;
   height: 18px;
@@ -167,6 +182,39 @@
     opacity: 1;
     pointer-events: auto;
     transform: none;
+  }
+
+  .sectionShellPreserveCollapsed .sectionExpandButton,
+  .sectionShellPreserveCollapsed .sectionCollapseButton {
+    display: grid;
+  }
+
+  .sectionShellPreserveCollapsed.sectionShellCollapsedDefault,
+  .sectionShellPreserveCollapsed.sectionShellCollapsedCompact,
+  .sectionShellPreserveCollapsed.sectionShellCollapsedFlush {
+    min-height: 54px;
+  }
+
+  .sectionShellPreserveCollapsed.sectionShellCollapsedDefault {
+    left: -12px;
+    padding-left: 12px;
+  }
+
+  .sectionShellPreserveCollapsed.sectionShellCollapsedCompact {
+    left: -10px;
+    padding-left: 10px;
+  }
+
+  .sectionShellPreserveCollapsed.sectionShellCollapsedDefault .sectionCardWrap,
+  .sectionShellPreserveCollapsed.sectionShellCollapsedCompact .sectionCardWrap,
+  .sectionShellPreserveCollapsed.sectionShellCollapsedFlush .sectionCardWrap {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    opacity: 0;
+    pointer-events: none;
+    transform: translate3d(calc(-100% - 18px), 0, 0);
   }
 }
 
