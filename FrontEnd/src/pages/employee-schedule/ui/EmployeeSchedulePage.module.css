@@ -366,7 +366,7 @@
 }
 
 .openScheduleMatrix {
-  --matrix-day-column-width: 48px;
+  --matrix-day-column-width: 68px;
   --matrix-cell-min-width: 104px;
   --matrix-cell-min-height: 26px;
   --matrix-cell-font-size: 0.76rem;

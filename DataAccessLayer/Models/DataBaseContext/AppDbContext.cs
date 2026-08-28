@@ -479,6 +479,9 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
                 .HasConversion<string>()
                 .HasDefaultValue(SchedulePublicationStatus.Private);
             entity.Property(schedule => schedule.AllowSwap).HasDefaultValue(true);
+            entity.Property(schedule => schedule.AcceptedSwapHighlightColor)
+                .HasMaxLength(7)
+                .HasDefaultValue("#BBF7D0");
 
             entity.ToTable(table =>
             {

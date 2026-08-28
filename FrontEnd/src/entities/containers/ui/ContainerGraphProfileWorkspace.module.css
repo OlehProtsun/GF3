@@ -32,6 +32,7 @@
 
 .sidebarCollapsed {
   overflow: visible;
+  margin-left: -8px;
 }
 
 .mainColumn {
@@ -571,10 +572,14 @@
 }
 
 @media (max-width: 1180px) {
-  .topRow,
-  .topRowCollapsed {
+  .topRow {
     grid-template-columns: 1fr;
     gap: 18px;
+  }
+
+  .topRowCollapsed {
+    grid-template-columns: 42px minmax(0, 1fr);
+    gap: 0.875px;
   }
 
   .matrixCardShell {
@@ -587,6 +592,12 @@
   }
 }
 
+@media (min-width: 961px) and (max-width: 1100px) {
+  .sidebarCollapsed {
+    margin-left: 0;
+  }
+}
+
 @media (max-width: 960px) {
   .workspace,
   .workspaceHeaderCollapsed {
@@ -595,6 +606,10 @@
 
   .summaryCardSection {
     margin-top: 0;
+  }
+
+  .sidebarCollapsed {
+    margin-left: -10px;
   }
 }
 

@@ -52,8 +52,6 @@ type ContainerGraphProfileWorkspaceProps = {
   onDelete: () => void;
 };
 
-const DESKTOP_MEDIA_QUERY = "(min-width: 1181px)";
-
 function joinClassNames(...values: Array<string | undefined | false>) {
   return values.filter(Boolean).join(" ");
 }
@@ -164,42 +162,19 @@ export function ContainerGraphProfileWorkspace({
 
     return window.innerHeight;
   });
-  const [isDesktopLayout, setIsDesktopLayout] = useState(() => {
-    if (typeof window === "undefined") {
-      return true;
-    }
-
-    return window.matchMedia(DESKTOP_MEDIA_QUERY).matches;
-  });
-
   useEffect(() => {
     if (typeof window === "undefined") {
       return;
     }
 
-    const mediaQuery = window.matchMedia(DESKTOP_MEDIA_QUERY);
     const handleChange = () => {
-      setIsDesktopLayout(mediaQuery.matches);
       setViewportHeight(window.innerHeight);
     };
 
     handleChange();
 
     window.addEventListener("resize", handleChange);
-
-    if (typeof mediaQuery.addEventListener === "function") {
-      mediaQuery.addEventListener("change", handleChange);
-      return () => {
-        window.removeEventListener("resize", handleChange);
-        mediaQuery.removeEventListener("change", handleChange);
-      };
-    }
-
-    mediaQuery.addListener(handleChange);
-    return () => {
-      window.removeEventListener("resize", handleChange);
-      mediaQuery.removeListener(handleChange);
-    };
+    return () => window.removeEventListener("resize", handleChange);
   }, []);
 
   if (isLoading) {
@@ -271,18 +246,15 @@ export function ContainerGraphProfileWorkspace({
   const note = getGraphVisibleNote(graph.note).trim();
   const hasNote = note.length > 0;
   const lastUpdateLabel = formatScheduleLastUpdate(graph.lastUpdatedAtUtc);
-  const topRowBaseMinHeight =
-    isDesktopLayout
-      ? Math.max(isHeaderCollapsed ? 680 : 660, viewportHeight - (isHeaderCollapsed ? 188 : 228))
-      : null;
-  const topRowCardMinHeight =
-    topRowBaseMinHeight !== null
-      ? Math.min(
-        isHeaderCollapsed ? 1000 : 980,
-        Math.round(topRowBaseMinHeight * 1.15),
-      )
-      : null;
-  const shouldPreserveMatrixHeight = isDesktopLayout && !compactSize;
+  const topRowBaseMinHeight = Math.max(
+    isHeaderCollapsed ? 680 : 660,
+    viewportHeight - (isHeaderCollapsed ? 188 : 228),
+  );
+  const topRowCardMinHeight = Math.min(
+    isHeaderCollapsed ? 1000 : 980,
+    Math.round(topRowBaseMinHeight * 1.15),
+  );
+  const shouldPreserveMatrixHeight = !compactSize;
   const activeRelatedHint =
     activeRelatedHintCellKey
       ? visualHintDetailMap[activeRelatedHintCellKey] ?? null
@@ -309,7 +281,7 @@ export function ContainerGraphProfileWorkspace({
     { key: "availability", label: "Availability", value: availabilityGroup?.name ?? "None" },
   ] as const;
   const matrixCardShellStyle =
-    shouldPreserveMatrixHeight && topRowCardMinHeight !== null
+    shouldPreserveMatrixHeight
       ? {
         minHeight: `${topRowCardMinHeight}px`,
         height: `${topRowCardMinHeight}px`,
@@ -361,8 +333,9 @@ export function ContainerGraphProfileWorkspace({
           <aside className={joinClassNames(styles.sidebar, isSidebarCollapsed && styles.sidebarCollapsed)}>
           <AvailabilitySidebarSection
             label="Schedule Information"
+            preserveCollapsedOnMobile
             collapsed={isSidebarCollapsed}
-            collapsedOffset="compact"
+            collapsedOffset="flush"
             onExpand={() => setIsSidebarCollapsed(false)}
           >
             <div className={styles.summaryCardMeasure}>

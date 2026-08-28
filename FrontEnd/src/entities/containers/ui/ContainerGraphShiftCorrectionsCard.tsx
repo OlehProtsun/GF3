@@ -12,6 +12,7 @@ import { getErrorMessage } from "@shared/api/httpClient";
 import { ErrorBanner } from "@shared/ui/components/ErrorBanner";
 import { IosButton } from "@shared/ui/components/IosButton";
 import { CheckIcon, CloseIcon } from "@shared/ui/icons";
+import { ContainerGraphHighlightColorDialog } from "./ContainerGraphHighlightColorDialog";
 import styles from "./ContainerGraphShiftCorrectionsCard.module.css";
 
 type ContainerGraphShiftCorrectionsCardProps = {
@@ -20,6 +21,7 @@ type ContainerGraphShiftCorrectionsCardProps = {
   hasUnsavedChanges: boolean;
   disabled: boolean;
   onApproved: () => void;
+  onPendingCountChange?: (count: number) => void;
 };
 
 const createdAtFormatter = new Intl.DateTimeFormat("en-GB", {
@@ -50,6 +52,7 @@ export function ContainerGraphShiftCorrectionsCard({
   hasUnsavedChanges,
   disabled,
   onApproved,
+  onPendingCountChange,
 }: ContainerGraphShiftCorrectionsCardProps) {
   const requestsQuery = useGraphShiftCorrectionsQuery(containerId, graphId);
   const settingQuery = useShiftCorrectionSettingQuery(containerId !== null && graphId !== null);
@@ -58,6 +61,7 @@ export function ContainerGraphShiftCorrectionsCard({
   const rejectMutation = useRejectShiftCorrectionMutation();
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [highlightColor, setHighlightColor] = useState("#FDE68A");
+  const [isColorDialogOpen, setIsColorDialogOpen] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
 
   const requests = useMemo(() => [...(requestsQuery.data ?? [])].sort((left, right) => {
@@ -76,8 +80,13 @@ export function ContainerGraphShiftCorrectionsCard({
     if (selectedId !== null && !requests.some(request => request.id === selectedId)) setSelectedId(null);
   }, [requests, selectedId]);
 
+  useEffect(() => {
+    onPendingCountChange?.(pendingCount);
+  }, [onPendingCountChange, pendingCount]);
+
   const handleColorChange = (value: string) => {
     setHighlightColor(value);
+    setIsColorDialogOpen(false);
     setActionError(null);
     saveSettingMutation.mutate(value, {
       onError: error => setActionError(getErrorMessage(error, "Could not save the correction highlight color.")),
@@ -108,16 +117,59 @@ export function ContainerGraphShiftCorrectionsCard({
   const isBusy = disabled || approveMutation.isPending || rejectMutation.isPending;
   const originalDuration = selected ? toMinutes(selected.originalToTime) - toMinutes(selected.originalFromTime) : 0;
   const requestedDuration = selected ? toMinutes(selected.requestedToTime) - toMinutes(selected.requestedFromTime) : 0;
+  const selectedDetails = selected ? (
+    <article key={selected.id} className={styles.details} role="listitem">
+      <div className={styles.detailsHeader}>
+        <div><span>Selected request</span><strong>{selected.employeeName}</strong></div>
+        <div className={styles.detailsHeaderActions}>
+          <time dateTime={selected.createdAtUtc}>{createdAtFormatter.format(new Date(selected.createdAtUtc))}</time>
+          <button type="button" aria-label={`Collapse request from ${selected.employeeName}`}
+            onClick={() => setSelectedId(null)}><CloseIcon size={14} /></button>
+        </div>
+      </div>
+      <dl className={styles.detailGrid}>
+        <div><dt>Schedule</dt><dd>{selected.scheduleName} · {selected.shopName}</dd></div>
+        <div><dt>Date</dt><dd>{String(selected.dayOfMonth).padStart(2, "0")}.{String(selected.month).padStart(2, "0")}.{selected.year}</dd></div>
+      </dl>
+      <div className={styles.comparison}>
+        <div><span>Current</span><strong>{selected.originalFromTime} – {selected.originalToTime}</strong></div>
+        <i>→</i>
+        <div><span>Requested</span><strong>{selected.requestedFromTime} – {selected.requestedToTime}</strong></div>
+      </div>
+      <div className={styles.deltaRow}>
+        <span>Start {formatDelta(toMinutes(selected.requestedFromTime) - toMinutes(selected.originalFromTime))}</span>
+        <span>End {formatDelta(toMinutes(selected.requestedToTime) - toMinutes(selected.originalToTime))}</span>
+        <strong>Duration {formatDelta(requestedDuration - originalDuration)}</strong>
+      </div>
+      {selected.status === "pending" ? (
+        <>
+          {hasUnsavedChanges ? <p className={styles.saveHint}>Save your current schedule edits before approving.</p> : null}
+          <div className={styles.actions}>
+            <IosButton label={rejectMutation.isPending ? "Rejecting..." : "Reject"} variant="secondary" size="compact"
+              icon={<CloseIcon size={15} />} disabled={isBusy} onClick={handleReject} />
+            <IosButton label={approveMutation.isPending ? "Applying..." : "Approve"} size="compact"
+              icon={<CheckIcon size={15} />} disabled={isBusy || hasUnsavedChanges} onClick={handleApprove} />
+          </div>
+        </>
+      ) : (
+        <p className={styles.reviewed}>Reviewed {selected.reviewedByManagerName ? `by ${selected.reviewedByManagerName}` : ""}</p>
+      )}
+    </article>
+  ) : null;
 
   return (
     <>
       <div className={styles.headerTools}>
-        <label className={styles.colorControl} title="Approved correction highlight color">
-          <input type="color" value={highlightColor} aria-label="Approved correction highlight color"
-            disabled={saveSettingMutation.isPending} onChange={event => void handleColorChange(event.target.value)} />
+        <button type="button" className={styles.colorControl} title="Approved correction highlight color"
+          aria-label="Approved correction highlight color" disabled={saveSettingMutation.isPending}
+          onClick={() => setIsColorDialogOpen(true)}>
           <span className={styles.colorSwatch} style={{ backgroundColor: highlightColor }} aria-hidden="true" />
-        </label>
+        </button>
       </div>
+
+      <ContainerGraphHighlightColorDialog open={isColorDialogOpen} value={highlightColor}
+        eyebrow="Shift corrections" title="Choose approval color" inputLabel="Approval highlight hex color"
+        isSaving={saveSettingMutation.isPending} onCancel={() => setIsColorDialogOpen(false)} onSave={handleColorChange} />
 
       {actionError ? <ErrorBanner dismissible={false}>{actionError}</ErrorBanner> : null}
 
@@ -133,7 +185,7 @@ export function ContainerGraphShiftCorrectionsCard({
 
       {requests.length > 0 ? (
         <div className={styles.list} role="list" aria-label="Shift correction requests">
-          {requests.map(request => (
+          {requests.map(request => selected?.id === request.id ? selectedDetails : (
             <button key={request.id} type="button" role="listitem"
               className={`${styles.requestButton} ${selected?.id === request.id ? styles.requestButtonActive : ""}`}
               aria-expanded={selected?.id === request.id}
@@ -147,42 +199,6 @@ export function ContainerGraphShiftCorrectionsCard({
             </button>
           ))}
         </div>
-      ) : null}
-
-      {selected ? (
-        <article className={styles.details}>
-          <div className={styles.detailsHeader}>
-            <div><span>Selected request</span><strong>{selected.employeeName}</strong></div>
-            <time dateTime={selected.createdAtUtc}>{createdAtFormatter.format(new Date(selected.createdAtUtc))}</time>
-          </div>
-          <dl className={styles.detailGrid}>
-            <div><dt>Schedule</dt><dd>{selected.scheduleName} · {selected.shopName}</dd></div>
-            <div><dt>Date</dt><dd>{String(selected.dayOfMonth).padStart(2, "0")}.{String(selected.month).padStart(2, "0")}.{selected.year}</dd></div>
-          </dl>
-          <div className={styles.comparison}>
-            <div><span>Current</span><strong>{selected.originalFromTime} – {selected.originalToTime}</strong></div>
-            <i>→</i>
-            <div><span>Requested</span><strong>{selected.requestedFromTime} – {selected.requestedToTime}</strong></div>
-          </div>
-          <div className={styles.deltaRow}>
-            <span>Start {formatDelta(toMinutes(selected.requestedFromTime) - toMinutes(selected.originalFromTime))}</span>
-            <span>End {formatDelta(toMinutes(selected.requestedToTime) - toMinutes(selected.originalToTime))}</span>
-            <strong>Duration {formatDelta(requestedDuration - originalDuration)}</strong>
-          </div>
-          {selected.status === "pending" ? (
-            <>
-              {hasUnsavedChanges ? <p className={styles.saveHint}>Save your current schedule edits before approving.</p> : null}
-              <div className={styles.actions}>
-                <IosButton label={rejectMutation.isPending ? "Rejecting..." : "Reject"} variant="secondary" size="compact"
-                  icon={<CloseIcon size={15} />} disabled={isBusy} onClick={handleReject} />
-                <IosButton label={approveMutation.isPending ? "Applying..." : "Approve"} size="compact"
-                  icon={<CheckIcon size={15} />} disabled={isBusy || hasUnsavedChanges} onClick={handleApprove} />
-              </div>
-            </>
-          ) : (
-            <p className={styles.reviewed}>Reviewed {selected.reviewedByManagerName ? `by ${selected.reviewedByManagerName}` : ""}</p>
-          )}
-        </article>
       ) : null}
     </>
   );

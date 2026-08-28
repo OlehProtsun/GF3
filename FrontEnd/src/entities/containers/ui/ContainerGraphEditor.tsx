@@ -25,8 +25,13 @@ import type {
 } from "@entities/containers/api/dto";
 import type { Graph, SchedulePreset } from "@entities/containers/model/types";
 import type { Shop } from "@entities/shops/model/types";
-import type { ShiftSwap } from "@entities/shift-swaps";
+import {
+  useGraphShiftSwapHighlightSettingQuery,
+  useSaveGraphShiftSwapHighlightSettingMutation,
+  type ShiftSwap,
+} from "@entities/shift-swaps";
 import { filterAcceptedShiftSwapHistory } from "@entities/shift-swaps/model/history";
+import { getErrorMessage } from "@shared/api/httpClient";
 import { ErrorBanner } from "@shared/ui/components/ErrorBanner";
 import { IosButton } from "@shared/ui/components/IosButton";
 import { SearchableSelect, type SearchableSelectOption } from "@shared/ui/components/SearchableSelect";
@@ -50,6 +55,7 @@ import {
 } from "@shared/ui/icons";
 import { CardSection } from "@shared/ui/sections/CardSection";
 import { ContainerGraphColorDialog } from "./ContainerGraphColorDialog";
+import { ContainerGraphHighlightColorDialog } from "./ContainerGraphHighlightColorDialog";
 import { ContainerGraphDetailsFields } from "./ContainerGraphDetailsFields";
 import {
   ContainerGraphManualColumnsCard,
@@ -65,7 +71,7 @@ import { ContainerGraphPresetSelect } from "./ContainerGraphPresetSelect";
 import { ShiftSwapHistoryDialog } from "./ShiftSwapHistoryDialog";
 import styles from "./ContainerGraphEditor.module.css";
 
-const DESKTOP_MEDIA_QUERY = "(min-width: 1181px)";
+const DESKTOP_MEDIA_QUERY = "(min-width: 961px)";
 
 export type EditableGraphEmployeeRow = {
   id: number | null;
@@ -460,6 +466,10 @@ export function ContainerGraphEditor({
     manualColumns: true,
     note: true,
   });
+  const [pendingCorrectionCount, setPendingCorrectionCount] = useState(0);
+  const [swapHighlightColor, setSwapHighlightColor] = useState("#BBF7D0");
+  const [isSwapColorDialogOpen, setIsSwapColorDialogOpen] = useState(false);
+  const [swapColorError, setSwapColorError] = useState<string | null>(null);
   const [colorDialogMode, setColorDialogMode] = useState<ColorDialogMode | null>(null);
   const [isPresetDialogOpen, setIsPresetDialogOpen] = useState(false);
   const [isVersionsDialogOpen, setIsVersionsDialogOpen] = useState(false);
@@ -482,8 +492,28 @@ export function ContainerGraphEditor({
 
     return window.matchMedia(DESKTOP_MEDIA_QUERY).matches;
   });
+  const graphContainerId = graph?.containerId ?? null;
+  const graphId = graph?.id ?? null;
+  const swapHighlightSettingQuery = useGraphShiftSwapHighlightSettingQuery(graphContainerId, graphId);
+  const saveSwapHighlightSettingMutation = useSaveGraphShiftSwapHighlightSettingMutation();
 
   const allSectionsCollapsed = Object.values(collapsedSections).every(Boolean);
+
+  useEffect(() => {
+    if (swapHighlightSettingQuery.data?.highlightColor) {
+      setSwapHighlightColor(swapHighlightSettingQuery.data.highlightColor);
+    }
+  }, [swapHighlightSettingQuery.data?.highlightColor]);
+
+  const handleSwapHighlightColorChange = (highlightColor: string) => {
+    if (graphContainerId === null || graphId === null) return;
+    setSwapHighlightColor(highlightColor);
+    setIsSwapColorDialogOpen(false);
+    setSwapColorError(null);
+    saveSwapHighlightSettingMutation.mutate({ containerId: graphContainerId, graphId, highlightColor }, {
+      onError: error => setSwapColorError(getErrorMessage(error, "Could not save the accepted swap highlight color.")),
+    });
+  };
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -597,24 +627,24 @@ export function ContainerGraphEditor({
     return <ErrorBanner className={styles.banner}>Could not load this schedule editor.</ErrorBanner>;
   }
 
-  const scheduleMatrixBaseMinHeight =
-    isDesktopLayout
-      ? Math.max(isHeaderCollapsed ? 680 : 660, viewportHeight - (isHeaderCollapsed ? 188 : 228))
-      : null;
+  const scheduleMatrixBaseMinHeight = Math.max(
+    isHeaderCollapsed ? 680 : 660,
+    viewportHeight - (isHeaderCollapsed ? 188 : 228),
+  );
   const previewMatrixBaseMinHeight =
     isDesktopLayout
       ? Math.max(660, viewportHeight - 228)
       : null;
-  const scheduleMatrixCardHeight =
-    scheduleMatrixBaseMinHeight !== null
-      ? Math.min(isHeaderCollapsed ? 1000 : 980, Math.round(scheduleMatrixBaseMinHeight * 1.15))
-      : null;
+  const scheduleMatrixCardHeight = Math.min(
+    isHeaderCollapsed ? 1000 : 980,
+    Math.round(scheduleMatrixBaseMinHeight * 1.15),
+  );
   const previewMatrixCardHeight =
     previewMatrixBaseMinHeight !== null
       ? Math.min(980, Math.round(previewMatrixBaseMinHeight * 1.15))
       : null;
   const scheduleMatrixCardShellStyle =
-    isDesktopLayout && scheduleMatrixCardHeight !== null && !compactSize
+    !compactSize
       ? {
         minHeight: `${scheduleMatrixCardHeight}px`,
         height: `${scheduleMatrixCardHeight}px`,
@@ -629,7 +659,11 @@ export function ContainerGraphEditor({
         maxHeight: `${previewMatrixCardHeight}px`,
       }
       : undefined;
-  const matrixCardStyle =
+  const scheduleMatrixCardStyle =
+    !compactSize
+      ? { height: "100%", maxHeight: "100%" }
+      : undefined;
+  const previewMatrixCardStyle =
     isDesktopLayout && !compactSize
       ? { height: "100%", maxHeight: "100%" }
       : undefined;
@@ -684,6 +718,7 @@ export function ContainerGraphEditor({
   return (
     <>
       <AvailabilityWorkspaceLayout
+        preserveSideLayoutOnMobile
         className={joinClassNames(styles.workspaceLayout, allSectionsCollapsed && styles.layoutCollapsed)}
         sidebarColumnClassName={joinClassNames(styles.sidebarColumn, allSectionsCollapsed && styles.sidebarColumnCollapsed)}
         sidebarContentClassName={joinClassNames(styles.sidebar, allSectionsCollapsed && styles.sidebarCollapsed)}
@@ -693,6 +728,7 @@ export function ContainerGraphEditor({
           <>
             <AvailabilitySidebarSection
               label="Schedule Details"
+              preserveCollapsedOnMobile
               collapsed={collapsedSections.details}
               collapsedIcon={<ScheduleDetailsIcon size={18} />}
               collapsedOffset={allSectionsCollapsed ? "flush" : "default"}
@@ -738,6 +774,7 @@ export function ContainerGraphEditor({
 
             <AvailabilitySidebarSection
               label="Publication"
+              preserveCollapsedOnMobile
               collapsed={collapsedSections.publication}
               collapsedIcon={<EyeIcon size={18} />}
               collapsedOffset={allSectionsCollapsed ? "flush" : "default"}
@@ -749,7 +786,23 @@ export function ContainerGraphEditor({
                 icon={<EyeIcon size={18} />}
                 headerRightSlot={renderCollapseButton("Publication", "publication")}
               >
+                <div className={styles.publicationHeaderTools}>
+                  <button type="button" className={styles.publicationColorControl}
+                    title="Accepted swap highlight color" aria-label="Accepted swap highlight color"
+                    disabled={graphId === null || saveSwapHighlightSettingMutation.isPending}
+                    onClick={() => setIsSwapColorDialogOpen(true)}>
+                    <span className={styles.publicationColorSwatch}
+                      style={{ backgroundColor: swapHighlightColor }} aria-hidden="true" />
+                  </button>
+                </div>
+
+                <ContainerGraphHighlightColorDialog open={isSwapColorDialogOpen} value={swapHighlightColor}
+                  eyebrow="Publication" title="Choose accepted swap color" inputLabel="Accepted swap highlight hex color"
+                  isSaving={saveSwapHighlightSettingMutation.isPending}
+                  onCancel={() => setIsSwapColorDialogOpen(false)} onSave={handleSwapHighlightColorChange} />
+
                 <div className={styles.publicationCard}>
+                  {swapColorError ? <ErrorBanner dismissible={false}>{swapColorError}</ErrorBanner> : null}
                   <div className={styles.publicationControl} role="radiogroup" aria-label="Schedule publication status">
                     <button
                       type="button"
@@ -857,9 +910,11 @@ export function ContainerGraphEditor({
 
             <AvailabilitySidebarSection
               label="Shift Corrections"
+              preserveCollapsedOnMobile
               collapsed={collapsedSections.corrections}
               collapsedIcon={<ScheduleIcon size={18} />}
               collapsedOffset={allSectionsCollapsed ? "flush" : "default"}
+              attention={pendingCorrectionCount > 0}
               onExpand={() => setSectionCollapsed("corrections", false)}
             >
               <CardSection
@@ -874,12 +929,14 @@ export function ContainerGraphEditor({
                   hasUnsavedChanges={Boolean(hasUnsavedChanges)}
                   disabled={isSaving || isGenerating}
                   onApproved={onVersionCheckoutComplete}
+                  onPendingCountChange={setPendingCorrectionCount}
                 />
               </CardSection>
             </AvailabilitySidebarSection>
 
           <AvailabilitySidebarSection
             label="Employees"
+            preserveCollapsedOnMobile
             collapsed={collapsedSections.employees}
             collapsedIcon={<EmployeeIcon size={18} />}
             collapsedOffset={allSectionsCollapsed ? "flush" : "default"}
@@ -971,6 +1028,7 @@ export function ContainerGraphEditor({
 
           <AvailabilitySidebarSection
             label="Bind Information"
+            preserveCollapsedOnMobile
             collapsed={collapsedSections.bind}
             collapsedIcon={<BindIcon size={18} />}
             collapsedOffset={allSectionsCollapsed ? "flush" : "default"}
@@ -993,6 +1051,7 @@ export function ContainerGraphEditor({
 
           <AvailabilitySidebarSection
             label="Manual Columns"
+            preserveCollapsedOnMobile
             collapsed={collapsedSections.manualColumns}
             collapsedIcon={<InformationIcon size={18} />}
             collapsedOffset={allSectionsCollapsed ? "flush" : "default"}
@@ -1020,6 +1079,7 @@ export function ContainerGraphEditor({
 
           <AvailabilitySidebarSection
             label="Note"
+            preserveCollapsedOnMobile
             collapsed={collapsedSections.note}
             collapsedIcon={<NoteIcon size={18} />}
             collapsedOffset={allSectionsCollapsed ? "flush" : "default"}
@@ -1064,7 +1124,7 @@ export function ContainerGraphEditor({
                     styles.trimmedMatrixCard,
                     compactSize && styles.matrixCardCompact,
                   )}
-                  style={matrixCardStyle}
+                  style={scheduleMatrixCardStyle}
                   compactSize={compactSize}
                   helperText=""
                   graph={{
@@ -1170,7 +1230,7 @@ export function ContainerGraphEditor({
                     styles.trimmedMatrixCard,
                     compactSize && styles.matrixCardCompact,
                   )}
-                  style={matrixCardStyle}
+                  style={previewMatrixCardStyle}
                   compactSize={compactSize}
                   title="Availability Preview"
                   helperText=""

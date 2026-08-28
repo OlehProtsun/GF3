@@ -331,18 +331,22 @@
   pointer-events: none;
 }
 
-@media (max-width: 1100px) {
+@media (max-width: 1180px) {
   .contentShifted {
     padding-left: calc(var(--sidebar-w) + var(--inset) * 2 + 10px);
     --page-header-fixed-offset: calc(var(--sidebar-w) + var(--inset) * 2 + 10px);
   }
-}
 
-@media (max-width: 960px) {
   .contentExpanded {
     --page-header-fixed-offset: calc(var(--sidebar-w) + 12px);
   }
 
+  .contentManager {
+    --page-header-fixed-right-offset: 82px;
+  }
+}
+
+@media (max-width: 960px) {
   .contentWide {
     height: auto;
     min-height: 100vh;

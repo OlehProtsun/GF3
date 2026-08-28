@@ -185,6 +185,13 @@
 
   .headerActions {
     width: 100%;
+    flex-wrap: nowrap;
+    justify-content: flex-start;
+  }
+
+  .headerActions .compactToggle {
+    width: auto;
+    flex: 0 0 auto;
   }
 
   .headerActionCluster {
@@ -221,7 +228,8 @@
   }
 
   .contentWide {
-    padding-inline: 12px;
+    padding-left: 0;
+    padding-right: 12px;
   }
 }
 
@@ -232,6 +240,7 @@
   }
 
   .contentWide {
-    padding-inline: 10px;
+    padding-left: 0;
+    padding-right: 10px;
   }
 }

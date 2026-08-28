@@ -236,6 +236,46 @@ describe("EmployeeSwapPage", () => {
     );
   });
 
+  test("creates an offer from the selected fragment after a shift was split", async () => {
+    const user = userEvent.setup();
+    mocks.schedulesQuery.mockReturnValue({
+      data: [{
+        ...schedules[0],
+        slots: [
+          { id: 110, dayOfMonth: 1, slotNo: 1, employeeId: 12, fromTime: "09:00", toTime: "10:00", status: "ASSIGNED" },
+          { id: 111, dayOfMonth: 1, slotNo: 2, employeeId: 12, fromTime: "11:00", toTime: "15:00", status: "ASSIGNED" },
+        ],
+      }],
+      isLoading: false,
+      error: null,
+    });
+    renderPage();
+
+    await user.click(screen.getByRole("button", { name: "Expand give away a shift" }));
+    await user.click(screen.getByRole("button", { name: /May Schedule/i }));
+    const dialog = screen.getByRole("dialog", { name: "Choose shift" });
+    await user.click(within(dialog).getByRole("button", { name: /11:00 - 15:00/i }));
+    await user.click(within(dialog).getByRole("button", { name: "Custom period" }));
+    await user.click(within(dialog).getByRole("button", { name: "Increase start time" }));
+    await user.click(within(dialog).getByRole("button", { name: "Decrease end time" }));
+    await user.click(within(dialog).getByRole("button", { name: "Choose shift" }));
+    await user.click(screen.getByRole("button", { name: "Offer shift" }));
+
+    expect(mocks.createMutate).toHaveBeenCalledWith(
+      {
+        scheduleId: 10,
+        scheduleSlotId: 111,
+        fromTime: "11:15",
+        toTime: "14:45",
+        targetEmployeeId: null,
+      },
+      expect.objectContaining({
+        onSuccess: expect.any(Function),
+        onError: expect.any(Function),
+      }),
+    );
+  });
+
   test("keeps the offer action disabled until a shift is selected", async () => {
     const user = userEvent.setup();
     renderPage();

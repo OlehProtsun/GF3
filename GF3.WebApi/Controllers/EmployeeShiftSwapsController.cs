@@ -28,8 +28,6 @@ public sealed class EmployeeShiftSwapsController(
     IWorkflowLogService workflowLogService,
     IRealtimeNotifier realtimeNotifier) : ControllerBase
 {
-    private const int AcceptedSwapCellBackgroundArgb = unchecked((int)0xFFBBF7D0);
-
     private static readonly Regex GraphNoteMetaRegex = new(
         @"(?:\r?\n\r?\n)?(?:<!--GF3_GRAPH_META:([\s\S]*?)-->|\[\[GF3_GRAPH_META:([\s\S]*?)\]\])$",
         RegexOptions.Compiled);
@@ -448,6 +446,7 @@ public sealed class EmployeeShiftSwapsController(
         int acceptingEmployeeId,
         CancellationToken cancellationToken)
     {
+        var highlightColorArgb = ShiftSwapHighlightRules.ToArgb(swap.Schedule.AcceptedSwapHighlightColor);
         var affectedEmployeeIds = new HashSet<int> { acceptingEmployeeId };
         if (swap.FromEmployeeId.HasValue)
         {
@@ -466,7 +465,7 @@ public sealed class EmployeeShiftSwapsController(
         {
             if (existingStyles.TryGetValue(employeeId, out var existingStyle))
             {
-                existingStyle.BackgroundColorArgb = AcceptedSwapCellBackgroundArgb;
+                existingStyle.BackgroundColorArgb = highlightColorArgb;
                 continue;
             }
 
@@ -475,7 +474,7 @@ public sealed class EmployeeShiftSwapsController(
                 ScheduleId = swap.ScheduleId,
                 DayOfMonth = swap.ScheduleSlot.DayOfMonth,
                 EmployeeId = employeeId,
-                BackgroundColorArgb = AcceptedSwapCellBackgroundArgb,
+                BackgroundColorArgb = highlightColorArgb,
             });
         }
     }

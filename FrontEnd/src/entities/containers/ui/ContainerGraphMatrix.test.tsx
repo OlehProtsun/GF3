@@ -66,6 +66,27 @@ describe("ContainerGraphMatrix related schedule hints", () => {
     expect(textValue.closest("table")).toHaveClass(styles.regularCellText);
   });
 
+  test("merges touching shifts visually and mutes only the related schedule suffix", () => {
+    render(
+      <ContainerGraphMatrix
+        graph={{ year: 2026, month: 1 }}
+        columns={[
+          { employeeId: 7, kind: "employee", manualColumnId: null, graphEmployeeId: 70, label: "Ada", minHoursMonth: null, totalMinutes: 0, totalText: "" },
+        ]}
+        cellMap={{ "7:1": "09:00 - 15:00, 15:00 - 21:00, F27" }}
+        mutedSuffixMap={{ "7:1": "F27" }}
+        readOnly
+      />,
+    );
+
+    const cellValue = screen.getByTitle("09:00 - 15:00, 15:00 - 21:00, F27");
+    const relatedSchedule = screen.getByText("F27");
+
+    expect(cellValue).toHaveTextContent("09:00 - 21:00, F27");
+    expect(cellValue).not.toHaveClass(styles.textValue);
+    expect(relatedSchedule).toHaveClass(styles.mutedSuffix);
+  });
+
   test("adds a dashed visual row guide for a partial selection without selecting the other cells", () => {
     render(
       <ContainerGraphMatrix

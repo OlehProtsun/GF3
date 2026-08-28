@@ -7,6 +7,8 @@ type AvailabilitySidebarSectionProps = {
   collapsed: boolean;
   collapsedIcon?: ReactNode;
   collapsedOffset?: "default" | "compact" | "flush";
+  attention?: boolean;
+  preserveCollapsedOnMobile?: boolean;
   onExpand: () => void;
   children: ReactNode;
 };
@@ -25,6 +27,8 @@ export function AvailabilitySidebarSection({
   collapsed,
   collapsedIcon,
   collapsedOffset = "default",
+  attention = false,
+  preserveCollapsedOnMobile = false,
   onExpand,
   children,
 }: AvailabilitySidebarSectionProps) {
@@ -40,6 +44,8 @@ export function AvailabilitySidebarSection({
       className={joinClassNames(
         styles.sectionShell,
         collapsed ? collapsedClassName : styles.sectionShellExpanded,
+        collapsed && attention ? styles.sectionShellAttention : undefined,
+        preserveCollapsedOnMobile ? styles.sectionShellPreserveCollapsed : undefined,
       )}
     >
       <button

@@ -25,6 +25,24 @@ export const useGraphShiftSwapLogQuery = (containerId: number | null, graphId: n
     queryFn: ({ signal }) => shiftSwapsApi.listGraphLog(containerId as number, graphId as number, signal),
   });
 
+export const useGraphShiftSwapHighlightSettingQuery = (containerId: number | null, graphId: number | null) =>
+  useQuery({
+    queryKey: queryKeys.shiftSwaps.graphHighlightSetting(containerId ?? 0, graphId ?? 0),
+    enabled: containerId !== null && graphId !== null,
+    staleTime: 300_000,
+    queryFn: ({ signal }) => shiftSwapsApi.getHighlightSetting(containerId as number, graphId as number, signal),
+  });
+
+export function useSaveGraphShiftSwapHighlightSettingMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ containerId, graphId, highlightColor }: { containerId: number; graphId: number; highlightColor: string }) =>
+      shiftSwapsApi.saveHighlightSetting(containerId, graphId, highlightColor),
+    onSuccess: (data, payload) =>
+      queryClient.setQueryData(queryKeys.shiftSwaps.graphHighlightSetting(payload.containerId, payload.graphId), data),
+  });
+}
+
 export const useContainerShiftSwapsQuery = (
   containerId: number | null,
   enabled = true,

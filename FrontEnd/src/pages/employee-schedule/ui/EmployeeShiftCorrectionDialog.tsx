@@ -18,7 +18,6 @@ type EmployeeShiftCorrectionDialogProps = {
   onSubmit: (input: CreateShiftCorrectionInput) => void;
 };
 
-const barColors = ["#2563eb", "#7c3aed", "#0891b2", "#db2777"];
 const weekdayFormatter = new Intl.DateTimeFormat("en-GB", { weekday: "short", timeZone: "UTC" });
 
 function toMinutes(value: string) {
@@ -38,12 +37,16 @@ function ownsSlot(slot: EmployeeScheduleSlot, employeeId: number | null) {
 }
 
 function formatAdjustment(minutes: number) {
-  if (minutes === 0) return "No adjustment";
-  const sign = minutes > 0 ? "+" : "−";
+  if (minutes === 0) return "No change yet";
+  const direction = minutes > 0 ? "later" : "earlier";
   const absolute = Math.abs(minutes);
   const hours = Math.floor(absolute / 60);
   const remainder = absolute % 60;
-  return `${sign}${hours ? `${hours}h` : ""}${hours && remainder ? " " : ""}${remainder ? `${remainder}m` : ""}`;
+  const amount = [
+    hours ? `${hours} ${hours === 1 ? "hour" : "hours"}` : "",
+    remainder ? `${remainder} min` : "",
+  ].filter(Boolean).join(" ");
+  return `${amount} ${direction}`;
 }
 
 export function EmployeeShiftCorrectionDialog({
@@ -106,17 +109,6 @@ export function EmployeeShiftCorrectionDialog({
     : "";
   const requestedFromMinutes = requestedFrom ? toMinutes(requestedFrom) : 0;
   const requestedToMinutes = requestedTo ? toMinutes(requestedTo) : 0;
-  const visibleBounds = selectedSlots.flatMap(slot => slot.id === selectedSlot?.id
-    ? [requestedFromMinutes, requestedToMinutes]
-    : [toMinutes(slot.fromTime), toMinutes(slot.toTime)]);
-  const rangeStart = visibleBounds.length > 0
-    ? Math.max(0, Math.floor((Math.min(...visibleBounds) - 60) / 60) * 60)
-    : 0;
-  const rangeEnd = visibleBounds.length > 0
-    ? Math.min(1440, Math.ceil((Math.max(...visibleBounds) + 60) / 60) * 60)
-    : 1440;
-  const rangeDuration = Math.max(60, rangeEnd - rangeStart);
-  const ticks = Array.from({ length: Math.floor(rangeDuration / 60) + 1 }, (_, index) => rangeStart + index * 60);
   const overlaps = selectedSlot
     ? selectedSlots.some(slot => slot.id !== selectedSlot.id
       && requestedFromMinutes < toMinutes(slot.toTime)
@@ -131,6 +123,19 @@ export function EmployeeShiftCorrectionDialog({
     setAdjustmentMinutes(0);
   };
 
+  const setRequestedBoundaryTime = (value: string) => {
+    if (!selectedSlot || !boundary) return;
+    const originalTime = boundary.edge === "start" ? selectedSlot.fromTime : selectedSlot.toTime;
+    setAdjustmentMinutes(toMinutes(value) - toMinutes(originalTime));
+  };
+
+  const moveRequestedBoundary = (deltaMinutes: number) => {
+    if (!selectedSlot || !boundary) return;
+    const originalTime = boundary.edge === "start" ? selectedSlot.fromTime : selectedSlot.toTime;
+    const nextMinutes = Math.max(0, Math.min(1439, toMinutes(originalTime) + adjustmentMinutes + deltaMinutes));
+    setAdjustmentMinutes(nextMinutes - toMinutes(originalTime));
+  };
+
   const handleOverlayMouseDown = (event: MouseEvent<HTMLDivElement>) => {
     if (event.target === event.currentTarget) onCancel();
   };
@@ -140,86 +145,97 @@ export function EmployeeShiftCorrectionDialog({
       <div className={styles.dialog}>
         <header className={styles.header}>
           <div className={styles.titleBlock}>
-            <span className={styles.eyebrow}><ScheduleIcon size={16} /> Shift correction</span>
-            <h2 id={titleId}>Adjust your shift</h2>
-            <p>{schedule.name} · Choose a day, then select one edge of a shift.</p>
+            <span className={styles.eyebrow}><ScheduleIcon size={16} /> Correction request</span>
+            <h2 id={titleId}>Request a shift change</h2>
+            <p>{schedule.name} · Change the start or end time of one shift.</p>
           </div>
           <button type="button" className={styles.closeButton} aria-label="Close shift correction dialog" onClick={onCancel}>
             <CloseIcon size={18} />
           </button>
         </header>
 
-        <div className={styles.dayList} role="tablist" aria-label="Working days">
-          {days.map(day => {
-            const weekday = weekdayFormatter.format(new Date(Date.UTC(schedule.year, schedule.month - 1, day))).replace(".", "");
-            return (
-              <button key={day} type="button" role="tab" aria-selected={day === selectedDay}
-                className={day === selectedDay ? styles.dayActive : ""}
-                onClick={() => { setSelectedDay(day); setBoundary(null); setAdjustmentMinutes(0); }}>
-                <span>{weekday}</span><strong>{day}</strong>
-              </button>
-            );
-          })}
-        </div>
+        <section className={styles.stepSection}>
+          <div className={styles.stepHeader}>
+            <span className={styles.stepNumber}>1</span>
+            <div><strong>Choose a workday</strong><small>Only days with your shifts are shown.</small></div>
+          </div>
+          <div className={styles.dayList} role="tablist" aria-label="Working days">
+            {days.map(day => {
+              const weekday = weekdayFormatter.format(new Date(Date.UTC(schedule.year, schedule.month - 1, day))).replace(".", "");
+              return (
+                <button key={day} type="button" role="tab" aria-selected={day === selectedDay}
+                  className={day === selectedDay ? styles.dayActive : ""}
+                  onClick={() => { setSelectedDay(day); setBoundary(null); setAdjustmentMinutes(0); }}>
+                  <span>{weekday}</span><strong>{day}</strong>
+                </button>
+              );
+            })}
+          </div>
+        </section>
 
-        {selectedSlots.length > 0 ? (
-          <section className={styles.timelineSection} aria-label="Shift timeline">
-            <div className={styles.axisLabels} aria-hidden="true">
-              {ticks.map((tick, index) => (
-                <span key={tick} style={{ left: `${(tick - rangeStart) / rangeDuration * 100}%` }}
-                  className={index === ticks.length - 1 ? styles.lastTick : ""}>{toTime(Math.min(tick, 1439))}</span>
-              ))}
-            </div>
-            <div className={styles.axis}>
-              {ticks.map(tick => <i key={tick} style={{ left: `${(tick - rangeStart) / rangeDuration * 100}%` }} />)}
+        <section className={styles.stepSection} aria-label="Choose shift and time">
+          <div className={styles.stepHeader}>
+            <span className={styles.stepNumber}>2</span>
+            <div><strong>Choose what to change</strong><small>Select the start or end time of a shift.</small></div>
+          </div>
+          {selectedSlots.length > 0 ? (
+            <div className={styles.shiftList}>
               {selectedSlots.map((slot, index) => {
-                const from = slot.id === selectedSlot?.id ? requestedFromMinutes : toMinutes(slot.fromTime);
-                const to = slot.id === selectedSlot?.id ? requestedToMinutes : toMinutes(slot.toTime);
                 const pending = pendingSlotIds.has(slot.id);
+                const selectedEdge = boundary?.slotId === slot.id ? boundary.edge : null;
                 return (
-                  <div key={slot.id} className={`${styles.shiftRow} ${pending ? styles.shiftPending : ""}`}>
-                    <div className={styles.shiftBar} style={{
-                      left: `${(from - rangeStart) / rangeDuration * 100}%`,
-                      width: `${Math.max(1, (to - from) / rangeDuration * 100)}%`,
-                      backgroundColor: barColors[index % barColors.length],
-                    }}>
-                      <button type="button" className={`${styles.handle} ${styles.handleStart} ${boundary?.slotId === slot.id && boundary.edge === "start" ? styles.handleSelected : ""}`}
-                        aria-label={`Adjust start of ${slot.fromTime} to ${slot.toTime}`} disabled={pending} onClick={() => selectBoundary(slot.id, "start")} />
-                      <span>{toTime(from)} – {toTime(to)}</span>
-                      <button type="button" className={`${styles.handle} ${styles.handleEnd} ${boundary?.slotId === slot.id && boundary.edge === "end" ? styles.handleSelected : ""}`}
-                        aria-label={`Adjust end of ${slot.fromTime} to ${slot.toTime}`} disabled={pending} onClick={() => selectBoundary(slot.id, "end")} />
+                  <article key={slot.id} className={`${styles.shiftCard} ${pending ? styles.shiftPending : ""}`}>
+                    <div className={styles.shiftCardHeader}>
+                      <span>Shift {index + 1}</span>
+                      <strong>{slot.fromTime} – {slot.toTime}</strong>
+                      {pending ? <em>Pending approval</em> : null}
                     </div>
-                    {pending ? <em>Request pending</em> : null}
-                  </div>
+                    <div className={styles.boundaryChoices} role="group" aria-label={`Change ${slot.fromTime} to ${slot.toTime}`}>
+                      <button type="button" className={selectedEdge === "start" ? styles.boundarySelected : ""}
+                        aria-label={`Change start time from ${slot.fromTime}`} aria-pressed={selectedEdge === "start"}
+                        disabled={pending} onClick={() => selectBoundary(slot.id, "start")}>
+                        <span>Start</span><strong>{slot.fromTime}</strong>
+                      </button>
+                      <i aria-hidden="true">→</i>
+                      <button type="button" className={selectedEdge === "end" ? styles.boundarySelected : ""}
+                        aria-label={`Change end time from ${slot.toTime}`} aria-pressed={selectedEdge === "end"}
+                        disabled={pending} onClick={() => selectBoundary(slot.id, "end")}>
+                        <span>End</span><strong>{slot.toTime}</strong>
+                      </button>
+                    </div>
+                  </article>
                 );
               })}
             </div>
-          </section>
-        ) : <p className={styles.empty}>No shifts are available for correction.</p>}
+          ) : <p className={styles.empty}>No shifts are available for correction.</p>}
+        </section>
 
-        <section className={styles.adjustmentPanel}>
+        <section className={`${styles.stepSection} ${styles.adjustmentPanel}`}>
+          <div className={styles.stepHeader}>
+            <span className={styles.stepNumber}>3</span>
+            <div><strong>Set the new time</strong><small>You can type the exact time or use a quick adjustment.</small></div>
+          </div>
           {boundary && selectedSlot ? (
             <>
-              <div className={styles.adjustmentHeader}>
-                <span>{boundary.edge === "start" ? "Shift start" : "Shift end"}</span>
-                <strong>{formatAdjustment(adjustmentMinutes)}</strong>
+              <div className={styles.timeEditor}>
+                <button type="button" aria-label="Move selected time 30 minutes earlier" onClick={() => moveRequestedBoundary(-30)}>−30 min</button>
+                <label>
+                  <span>New {boundary.edge} time</span>
+                  <input type="time" step="900" value={boundary.edge === "start" ? requestedFrom : requestedTo}
+                    onChange={event => setRequestedBoundaryTime(event.target.value)} />
+                </label>
+                <button type="button" aria-label="Move selected time 30 minutes later" onClick={() => moveRequestedBoundary(30)}>+30 min</button>
               </div>
-              <div className={styles.stepButtons} role="group" aria-label="Adjust selected boundary">
-                {[-60, -30, 30, 60].map(minutes => (
-                  <button key={minutes} type="button" onClick={() => setAdjustmentMinutes(current => current + minutes)}>
-                    {minutes > 0 ? "+" : "−"}{Math.abs(minutes) === 60 ? "1h" : "30m"}
-                  </button>
-                ))}
-                <label><span>Minutes</span><input type="number" step="15" value={adjustmentMinutes}
-                  onChange={event => setAdjustmentMinutes(Number(event.target.value) || 0)} /></label>
-              </div>
+              <p className={styles.movement}>{boundary.edge === "start" ? "Start time" : "End time"}: {formatAdjustment(adjustmentMinutes)}</p>
               <div className={styles.comparison}>
-                <span>{originalFrom} – {originalTo}</span><i>→</i><strong>{requestedFrom} – {requestedTo}</strong>
+                <div><span>Current shift</span><strong>{originalFrom} – {originalTo}</strong></div>
+                <i>→</i>
+                <div><span>Requested shift</span><strong>{requestedFrom} – {requestedTo}</strong></div>
               </div>
-              {overlaps ? <p className={styles.validation}>The adjusted shift overlaps another shift.</p> : null}
+              {overlaps ? <p className={styles.validation}>This time overlaps another shift on the same day.</p> : null}
               {requestedFromMinutes >= requestedToMinutes ? <p className={styles.validation}>The shift end must be after its start.</p> : null}
             </>
-          ) : <p className={styles.hint}>Click the round handle at the beginning or end of a colored shift.</p>}
+          ) : <p className={styles.hint}>Select a Start or End time above to continue.</p>}
           {errorMessage ? <p className={styles.validation}>{errorMessage}</p> : null}
         </section>
 

@@ -10,6 +10,7 @@ import styles from "./EmployeeSchedulePage.module.css";
 const mocks = vi.hoisted(() => ({
   scheduleQuery: vi.fn(),
   matrix: vi.fn(),
+  scrollIntoView: vi.fn(),
   uiStateQuery: {
     data: { scheduleColumnOrders: {}, readNotificationIds: [] },
     refetch: vi.fn(),
@@ -160,6 +161,11 @@ beforeEach(() => {
   window.localStorage.clear();
   mocks.scheduleQuery.mockReset();
   mocks.matrix.mockClear();
+  mocks.scrollIntoView.mockClear();
+  Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
+    configurable: true,
+    value: mocks.scrollIntoView,
+  });
 });
 
 describe("EmployeeSchedulePage", () => {
@@ -226,6 +232,30 @@ describe("EmployeeSchedulePage", () => {
     expect(matrixProps).not.toHaveProperty("onVisualHintCellClick");
   });
 
+  test("merges touching shifts in the employee schedule display map", () => {
+    mocks.scheduleQuery.mockReturnValue({
+      data: [{
+        ...schedules[0],
+        relatedScheduleAssignments: [],
+        slots: [
+          { id: 10, dayOfMonth: 10, slotNo: 1, employeeId: 12, fromTime: "09:00", toTime: "15:00", status: "ASSIGNED" },
+          { id: 11, dayOfMonth: 10, slotNo: 2, employeeId: 12, fromTime: "15:00", toTime: "21:00", status: "ASSIGNED" },
+          { id: 12, dayOfMonth: 11, slotNo: 1, employeeId: 12, fromTime: "09:00", toTime: "15:00", status: "ASSIGNED" },
+          { id: 13, dayOfMonth: 11, slotNo: 2, employeeId: 12, fromTime: "16:00", toTime: "21:00", status: "ASSIGNED" },
+        ],
+      }],
+      isLoading: false,
+      error: null,
+    });
+
+    renderPage();
+
+    expect(mocks.matrix.mock.calls.at(-1)?.[0].cellMap).toMatchObject({
+      "12:10": "09:00 - 21:00",
+      "12:11": "09:00 - 15:00, 16:00 - 21:00",
+    });
+  });
+
   test("switches to a daily view, marks work days, and orders early, all-day, and late workers", async () => {
     const user = userEvent.setup();
     const dailySchedule: EmployeeSchedule = {
@@ -254,6 +284,12 @@ describe("EmployeeSchedulePage", () => {
     const dayOff = screen.getByRole("tab", { name: "Saturday 9, day off" });
     expect(workDay).toHaveClass(styles.dailyScheduleDayWorking, styles.dailyScheduleDaySelected);
     expect(dayOff).toHaveClass(styles.dailyScheduleDayOff);
+    expect(mocks.scrollIntoView).toHaveBeenCalledWith({
+      behavior: "auto",
+      block: "nearest",
+      inline: "center",
+    });
+    expect(mocks.scrollIntoView.mock.contexts.at(-1)).toBe(workDay);
     expect(screen.getByRole("button", { name: "Show schedule matrix view" })).toHaveAttribute("aria-pressed", "true");
 
     const workerCards = within(screen.getByRole("tabpanel", { name: "Sunday 10" })).getAllByRole("article");
