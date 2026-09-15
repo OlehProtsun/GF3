@@ -1,9 +1,10 @@
+import { dateTimeFormat, t } from "@shared/i18n";
 ﻿import type { Container, Graph } from "./types";
 
 type ContainerIdentity = Pick<Container, "name">;
 type ContainerDetails = Pick<Container, "note">;
 
-export function getContainerDisplayName(container?: ContainerIdentity | null, fallback = "Container") {
+export function getContainerDisplayName(container?: ContainerIdentity | null, fallback = t("Container")) {
   const name = container?.name?.trim();
   return name || fallback;
 }
@@ -24,18 +25,18 @@ export function getContainerInitials(container?: ContainerIdentity | null, fallb
 
 export function getContainerState(scheduleCount: number, totalHoursText: string, note?: string | null) {
   if (scheduleCount > 0 && note?.trim()) {
-    return `${scheduleCount} schedules tracked, note available`;
+    return t("{0} schedules tracked, note available", scheduleCount);
   }
 
   if (scheduleCount > 0) {
-    return `${scheduleCount} schedules tracked, ${totalHoursText} assigned`;
+    return t("{0} schedules tracked, {1} assigned", scheduleCount, totalHoursText);
   }
 
   if (note?.trim()) {
-    return "Profile note available";
+    return t("Profile note available");
   }
 
-  return "No schedules yet";
+  return t("No schedules yet");
 }
 
 export function getContainerProfileDetails(
@@ -50,27 +51,27 @@ export function getContainerProfileDetails(
   return [
     {
       key: "note",
-      label: "Note",
+      label: t("Note"),
       value: container?.note?.trim() || null,
     },
     {
       key: "schedules",
-      label: "Schedules",
+      label: t("Schedules"),
       value: metrics ? String(metrics.scheduleCount) : null,
     },
     {
       key: "employees",
-      label: "Employees",
+      label: t("Employees"),
       value: metrics ? String(metrics.totalEmployees) : null,
     },
     {
       key: "shops",
-      label: "Shops",
+      label: t("Shops"),
       value: metrics ? String(metrics.totalShops) : null,
     },
     {
       key: "hours",
-      label: "Total hours",
+      label: t("Total hours"),
       value: metrics?.totalHoursText ?? null,
     },
   ] as const;
@@ -80,7 +81,7 @@ export function getGraphMonthYearLabel(graph: Pick<Graph, "year" | "month">) {
   const monthIndex = Math.min(Math.max(graph.month - 1, 0), 11);
   const date = new Date(Date.UTC(graph.year, monthIndex, 1));
 
-  return new Intl.DateTimeFormat("en-US", {
+  return dateTimeFormat("en-US", {
     month: "long",
     year: "numeric",
     timeZone: "UTC",

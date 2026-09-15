@@ -1,3 +1,4 @@
+import { dateTimeFormat, t } from "@shared/i18n";
 import { useEffect, useId, useMemo, type MouseEvent } from "react";
 import type { ShiftSwap, ShiftSwapScheduleSnapshot } from "@entities/shift-swaps";
 import {
@@ -40,7 +41,7 @@ function buildMatrix(snapshot?: ShiftSwapScheduleSnapshot | null) {
 }
 
 function formatSwapDate(swap: ShiftSwap) {
-  return new Intl.DateTimeFormat("en-GB", {
+  return dateTimeFormat("en-GB", {
     day: "2-digit",
     month: "short",
     year: "numeric",
@@ -102,17 +103,17 @@ export function ShiftSwapHistoryDialog({ open, swap, onCancel }: ShiftSwapHistor
           <div className={styles.titleBlock}>
             <div className={styles.eyebrow}>
               <EyeIcon size={16} />
-              <span>Swap comparison</span>
+              <span>{t("Swap comparison")}</span>
             </div>
             <h3 id={titleId} className={styles.title}>
-              {swap.fromEmployeeName} to {swap.acceptedByEmployeeName ?? "Employee"}
+              {swap.fromEmployeeName}  {t("to")} {swap.acceptedByEmployeeName ?? t("Employee")}
             </h3>
             <p id={descriptionId} className={styles.description}>
               {formatSwapDate(swap)} | {swap.fromTime.slice(0, 5)}-{swap.toTime.slice(0, 5)} | {swap.scheduleName}
             </p>
           </div>
 
-          <button type="button" className={styles.closeButton} aria-label="Close swap comparison" onClick={onCancel}>
+          <button type="button" className={styles.closeButton} aria-label={t("Close swap comparison")} onClick={onCancel}>
             <CloseIcon size={18} />
           </button>
         </header>
@@ -125,14 +126,14 @@ export function ShiftSwapHistoryDialog({ open, swap, onCancel }: ShiftSwapHistor
               graph={{ year: swap.year, month: swap.month }}
               columns={beforeMatrix.columns}
               cellMap={beforeMatrix.cellMap}
-              title="Before"
-              helperText="Schedule immediately before the swap was accepted."
+              title={t("Before")}
+              helperText={t("Schedule immediately before the swap was accepted.")}
               readOnly
               compactSize
               selectedCellKeys={selectedBeforeKeys}
               enableSelectionWhenReadOnly
               onSelectedCellKeysChange={NOOP}
-              emptyMessage="No before-swap schedule data is available."
+              emptyMessage={t("No before-swap schedule data is available.")}
             />
             <ContainerGraphMatrix
               className={styles.matrixCard}
@@ -140,20 +141,19 @@ export function ShiftSwapHistoryDialog({ open, swap, onCancel }: ShiftSwapHistor
               graph={{ year: swap.year, month: swap.month }}
               columns={afterMatrix.columns}
               cellMap={afterMatrix.cellMap}
-              title="After"
-              helperText="Schedule immediately after the swap was accepted."
+              title={t("After")}
+              helperText={t("Schedule immediately after the swap was accepted.")}
               readOnly
               compactSize
               selectedCellKeys={selectedAfterKeys}
               enableSelectionWhenReadOnly
               onSelectedCellKeysChange={NOOP}
-              emptyMessage="No after-swap schedule data is available."
+              emptyMessage={t("No after-swap schedule data is available.")}
             />
           </div>
         ) : (
           <div className={styles.emptyComparison}>
-            No one has accepted this swap yet. The comparison will appear after it is accepted.
-          </div>
+            {t("No one has accepted this swap yet. The comparison will appear after it is accepted.")}</div>
         )}
       </div>
     </div>

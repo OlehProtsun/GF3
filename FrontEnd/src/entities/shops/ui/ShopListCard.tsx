@@ -1,3 +1,4 @@
+import { t } from "@shared/i18n";
 import type { Shop } from "@entities/shops/model/types";
 import { getShopDisplayName } from "@entities/shops/model/presentation";
 import { usePinnedRecords } from "@shared/lib/records/usePinnedRecords";
@@ -33,7 +34,7 @@ export function ShopListCard({
   );
 
   const addShopAction = (
-    <IosButton label="Add New" icon={<PlusIcon size={18} />} onClick={onAddShop} />
+    <IosButton label={t("Add New")} icon={<PlusIcon size={18} />} onClick={onAddShop} />
   );
 
   return (
@@ -48,9 +49,9 @@ export function ShopListCard({
       emptyDescription="Start by creating your first shop record."
       emptyAction={addShopAction}
       searchEmptyTitle="Nothing found"
-      searchEmptyDescription={`No shop matches "${searchQuery}".`}
+      searchEmptyDescription={t("No shop matches \"{0}\".", searchQuery)}
       searchEmptyAction={
-        <IosButton label="Clear Search" variant="secondary" onClick={onClearSearch} />
+        <IosButton label={t("Clear Search")} variant="secondary" onClick={onClearSearch} />
       }
     >
       <RecordGrid>
@@ -60,8 +61,8 @@ export function ShopListCard({
           const metaItems: RecordTileMetaItem[] = [
             {
               key: "address",
-              label: "Address",
-              value: shop.address.trim() || "Not provided",
+              label: t("Address"),
+              value: shop.address.trim() || t("Not provided"),
             },
           ];
 
@@ -74,9 +75,9 @@ export function ShopListCard({
               metaItems={metaItems}
               isPinned={isPinned}
               onTogglePin={() => togglePin(shop.id)}
-              pinLabel={isPinned ? `Unpin ${displayName}` : `Pin ${displayName}`}
+              pinLabel={isPinned ? t("Unpin {0}", displayName) : t("Pin {0}", displayName)}
               onClick={() => onShopOpen(shop.id)}
-              ariaLabel={`Open ${displayName} profile`}
+              ariaLabel={t("Open {0} profile", displayName)}
             />
           );
         })}

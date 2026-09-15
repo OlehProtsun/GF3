@@ -1,3 +1,4 @@
+import { dateTimeFormat, t } from "@shared/i18n";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { PointerEvent } from "react";
 import {
@@ -11,7 +12,7 @@ import { ChevronLeftIcon, ChevronRightIcon, CloseIcon, NoteIcon } from "@shared/
 import styles from "./EmployeeCommunicationDialog.module.css";
 
 const emptyMessages: CommunicationMessageDto[] = [];
-const deadlineFormatter = new Intl.DateTimeFormat(undefined, {
+const deadlineFormatter = dateTimeFormat(undefined, {
   month: "short",
   day: "2-digit",
   year: "numeric",
@@ -34,7 +35,7 @@ function runMutation<TData, TVariables>(
 function formatDeadline(value: string) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) {
-    return "until the deadline";
+    return t("until the deadline");
   }
 
   return `until ${deadlineFormatter.format(date)}`;
@@ -141,9 +142,9 @@ export function EmployeeCommunicationDialog({ employeeId }: EmployeeCommunicatio
         setIsClosedForSession(true);
       }
     } catch (error) {
-      const message = getErrorMessage(error, "Could not save your communication preference.");
+      const message = getErrorMessage(error, t("Could not save your communication preference."));
       setInlineError(message);
-      pushErrorAlertFromError(error, "Could not save your communication preference.");
+      pushErrorAlertFromError(error, t("Could not save your communication preference."));
     }
   };
 
@@ -170,14 +171,14 @@ export function EmployeeCommunicationDialog({ employeeId }: EmployeeCommunicatio
               <NoteIcon size={18} />
             </span>
             <div>
-              <span className={styles.eyebrow}>Communication</span>
+              <span className={styles.eyebrow}>{t("Communication")}</span>
               <h2 id="employee-communication-title">{activeMessage.title}</h2>
             </div>
             <button
               type="button"
               className={styles.iconButton}
               onClick={() => void handleClose()}
-              aria-label="Close communication"
+              aria-label={t("Close communication")}
               disabled={dismissMutation.isPending}
             >
               <CloseIcon size={16} />
@@ -188,20 +189,20 @@ export function EmployeeCommunicationDialog({ employeeId }: EmployeeCommunicatio
 
           <div className={styles.metaLine}>
             <span>{formatDeadline(activeMessage.deadlineAtUtc)}</span>
-            <span>From {activeMessage.createdByManagerName}</span>
+            <span>{t("From")} {activeMessage.createdByManagerName}</span>
             {visibleMessages.length > 1 ? (
-              <span>{activeIndex + 1} of {visibleMessages.length}</span>
+              <span>{activeIndex + 1}  {t("of")} {visibleMessages.length}</span>
             ) : null}
           </div>
         </div>
 
         {visibleMessages.length > 1 ? (
-          <div className={styles.carouselNavigation} aria-label="Communication navigation">
+          <div className={styles.carouselNavigation} aria-label={t("Communication navigation")}>
             <button
               type="button"
               className={styles.carouselButton}
               onClick={showPrevious}
-              aria-label="Previous communication"
+              aria-label={t("Previous communication")}
             >
               <ChevronLeftIcon size={17} />
             </button>
@@ -216,7 +217,7 @@ export function EmployeeCommunicationDialog({ employeeId }: EmployeeCommunicatio
                     index === activeIndex ? styles.paginationDotActive : "",
                   ].filter(Boolean).join(" ")}
                   onClick={() => showMessage(index, index >= activeIndex ? "next" : "previous")}
-                  aria-label={`Show communication ${index + 1} of ${visibleMessages.length}`}
+                  aria-label={t("Show communication {0} of {1}", index + 1, visibleMessages.length)}
                   aria-current={index === activeIndex ? "true" : undefined}
                 />
               ))}
@@ -226,7 +227,7 @@ export function EmployeeCommunicationDialog({ employeeId }: EmployeeCommunicatio
               type="button"
               className={styles.carouselButton}
               onClick={showNext}
-              aria-label="Next communication"
+              aria-label={t("Next communication")}
             >
               <ChevronRightIcon size={17} />
             </button>
@@ -243,7 +244,7 @@ export function EmployeeCommunicationDialog({ employeeId }: EmployeeCommunicatio
               onChange={event => setDoNotShowAgain(event.target.checked)}
               disabled={dismissMutation.isPending}
             />
-            <span>Don't show this again</span>
+            <span>{t("Don't show this again")}</span>
           </label>
 
           <button
@@ -252,7 +253,7 @@ export function EmployeeCommunicationDialog({ employeeId }: EmployeeCommunicatio
             onClick={() => void handleClose()}
             disabled={dismissMutation.isPending}
           >
-            {dismissMutation.isPending ? "Saving..." : "Close"}
+            {dismissMutation.isPending ? t("Saving...") : t("Close")}
           </button>
         </div>
       </section>

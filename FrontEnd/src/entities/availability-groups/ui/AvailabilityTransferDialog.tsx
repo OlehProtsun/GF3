@@ -1,3 +1,4 @@
+import { t } from "@shared/i18n";
 import { useEffect, useId, useMemo, useState, type MouseEvent } from "react";
 import type { AvailabilityTransferSource } from "@entities/availability-groups/model/transfer";
 import {
@@ -72,7 +73,7 @@ export function AvailabilityTransferDialog({
   const sourceOptions = useMemo<SearchableSelectOption[]>(() => sources.map(source => ({
     value: String(source.groupId),
     label: source.groupName,
-    hint: `${source.days.filter(day => day.canTransfer).length} days available`,
+    hint: t("{0} days available", source.days.filter(day => day.canTransfer).length),
     keywords: `${source.groupName} ${source.groupId}`,
   })), [sources]);
   const cellMap = useMemo<AvailabilityMatrixCellMap>(() => (selectedSource?.days ?? []).reduce<AvailabilityMatrixCellMap>(
@@ -116,10 +117,9 @@ export function AvailabilityTransferDialog({
         <header className={styles.header}>
           <div className={styles.titleBlock}>
 
-            <h3 id={titleId} className={styles.title}>Move availability for {employeeName}</h3>
+            <h3 id={titleId} className={styles.title}>{t("Move availability for")} {employeeName}</h3>
             <p id={descriptionId} className={styles.description}>
-              Select another availability, then click or drag across the days to stage. Nothing moves until Save Changes.
-            </p>
+              {t("Select another availability, then click or drag across the days to stage. Nothing moves until Save Changes.")}</p>
           </div>
           <div className={styles.headerActions}>
             <div className={styles.sourceSelect}>
@@ -127,16 +127,16 @@ export function AvailabilityTransferDialog({
                 id="availability-transfer-source"
                 value={selectedSource ? String(selectedSource.groupId) : ""}
                 options={sourceOptions}
-                placeholder={isLoading ? "Loading availability..." : "Choose availability..."}
+                placeholder={isLoading ? t("Loading availability...") : t("Choose availability...")}
                 dropdownTitle="Availability in this month"
-                searchPlaceholder="Search availability..."
-                emptyMessage="No other filled availability was found for this employee in this month."
+                searchPlaceholder={t("Search availability...")}
+                emptyMessage={t("No other filled availability was found for this employee in this month.")}
                 ariaLabel="source availability"
                 disabled={isLoading || isPending || sourceOptions.length === 0}
                 onChange={value => setSelectedSourceId(value ? Number(value) : null)}
               />
             </div>
-            <button type="button" className={styles.closeButton} aria-label="Close availability transfer" onClick={onCancel} disabled={isPending}>
+            <button type="button" className={styles.closeButton} aria-label={t("Close availability transfer")} onClick={onCancel} disabled={isPending}>
               <CloseIcon size={18} />
             </button>
           </div>
@@ -144,7 +144,7 @@ export function AvailabilityTransferDialog({
 
         <div className={styles.controls}>
 
-          <span className={styles.selectionSummary}>{dayOfMonths.length} day(s) selected</span>
+          <span className={styles.selectionSummary}>{dayOfMonths.length}  {t("day(s) selected")}</span>
         </div>
 
         {errorMessage ? <ErrorBanner className={styles.error}>{errorMessage}</ErrorBanner> : null}
@@ -166,17 +166,17 @@ export function AvailabilityTransferDialog({
               selectedCellKeys={selectedCellKeys}
               onSelectedCellKeysChange={keys => setSelectedCellKeys(keys.filter(key => transferableCellKeys.has(key)))}
               title={selectedSource.groupName}
-              helperText="Blue selection marks days staged for this draft. Unavailable or already transferred days cannot be selected."
+              helperText={t("Blue selection marks days staged for this draft. Unavailable or already transferred days cannot be selected.")}
             />
           ) : (
-            <div className={styles.empty}>No source availability is available for this employee and month.</div>
+            <div className={styles.empty}>{t("No source availability is available for this employee and month.")}</div>
           )}
         </div>
 
         <footer className={styles.footer}>
-          <IosButton label="Cancel" variant="secondary" onClick={onCancel} disabled={isPending} />
+          <IosButton label={t("Cancel")} variant="secondary" onClick={onCancel} disabled={isPending} />
           <IosButton
-            label={isPending ? "Applying..." : `Add ${dayOfMonths.length || ""} day${dayOfMonths.length === 1 ? "" : "s"} to draft`.trim()}
+            label={isPending ? t("Applying...") : t("Add {0} day{1} to draft", dayOfMonths.length || "", dayOfMonths.length === 1 ? "" : "s").trim()}
             onClick={() => selectedSource && onConfirm(selectedSource.groupId, dayOfMonths)}
             disabled={!selectedSource || dayOfMonths.length === 0 || isPending}
           />

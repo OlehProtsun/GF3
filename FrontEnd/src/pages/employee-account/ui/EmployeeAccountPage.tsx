@@ -1,3 +1,6 @@
+import { t } from "@shared/i18n";
+import { useLanguageRevision } from "@shared/i18n/useLanguageRevision";
+import { LanguageSelector } from "@shared/i18n/LanguageSelector";
 import { useEffect, useState } from "react";
 import { useAuth } from "@app/providers/AuthProvider";
 import {
@@ -44,6 +47,7 @@ function runMutation<TData, TVariables>(
 }
 
 export function EmployeeAccountPage() {
+  useLanguageRevision();
   const { session, logout } = useAuth();
   const profileQuery = useEmployeeProfileQuery();
   const updateProfileMutation = useUpdateEmployeeProfileMutation();
@@ -52,7 +56,7 @@ export function EmployeeAccountPage() {
   const regulationHistoryQuery = useMyRegulationHistoryQuery(`employee:${session?.employeeId ?? 0}`);
 
   const profile = profileQuery.data;
-  const displayName = profile?.displayName ?? session?.displayName ?? "Employee";
+  const displayName = profile?.displayName ?? session?.displayName ?? t("Employee");
   const userName = profile?.username ?? session?.userName ?? "employee";
   const initials = getFallbackInitials(displayName);
 
@@ -126,7 +130,7 @@ export function EmployeeAccountPage() {
     }
 
     setInlineError(null);
-    setInlineSuccess("Profile updated.");
+    setInlineSuccess(t("Profile updated."));
 
     if (closeOnSuccess) {
       setIsEditing(false);
@@ -139,17 +143,17 @@ export function EmployeeAccountPage() {
     try {
       await persistProfileChanges(true);
     } catch (error) {
-      const message = getErrorMessage(error, "Could not update your profile.");
+      const message = getErrorMessage(error, t("Could not update your profile."));
       setInlineError(message);
       setInlineSuccess(null);
-      pushErrorAlertFromError(error, "Could not update your profile.");
+      pushErrorAlertFromError(error, t("Could not update your profile."));
     }
   };
 
   const handleSendPasswordCode = async () => {
     try {
       if (!hasRecoveryEmailForPassword) {
-        setInlineError("Add a recovery email before requesting a password code.");
+        setInlineError(t("Add a recovery email before requesting a password code."));
         setInlineSuccess(null);
         return;
       }
@@ -161,19 +165,19 @@ export function EmployeeAccountPage() {
       const result = await runMutation(sendPasswordCodeMutation.mutate, undefined);
       setCodeDeliveryHint(result.deliveryHint);
       setInlineError(null);
-      setInlineSuccess(`Code sent to ${result.deliveryHint}.`);
+      setInlineSuccess(t("Code sent to {0}.", result.deliveryHint));
     } catch (error) {
-      const message = getErrorMessage(error, "Could not send the password code.");
+      const message = getErrorMessage(error, t("Could not send the password code."));
       setInlineError(message);
       setInlineSuccess(null);
-      pushErrorAlertFromError(error, "Could not send the password code.");
+      pushErrorAlertFromError(error, t("Could not send the password code."));
     }
   };
 
   const handleConfirmPasswordReset = async () => {
     try {
       if (!/^\d{6}$/.test(newPassword)) {
-        setInlineError("Password must contain exactly 6 digits.");
+        setInlineError(t("Password must contain exactly 6 digits."));
         setInlineSuccess(null);
         return;
       }
@@ -186,12 +190,12 @@ export function EmployeeAccountPage() {
       setPasswordCode("");
       setNewPassword("");
       setInlineError(null);
-      setInlineSuccess("Password updated.");
+      setInlineSuccess(t("Password updated."));
     } catch (error) {
-      const message = getErrorMessage(error, "Could not update the password.");
+      const message = getErrorMessage(error, t("Could not update the password."));
       setInlineError(message);
       setInlineSuccess(null);
-      pushErrorAlertFromError(error, "Could not update the password.");
+      pushErrorAlertFromError(error, t("Could not update the password."));
     }
   };
 
@@ -205,29 +209,28 @@ export function EmployeeAccountPage() {
             </span>
 
             <div className={styles.profileIdentity}>
-              <span className={styles.profileEyebrow}>Profile</span>
+              <span className={styles.profileEyebrow}>{t("Profile")}</span>
               <h1 className={styles.profileName}>{displayName}</h1>
               <span className={styles.profileHandle}>@{userName}</span>
             </div>
           </div>
 
           <p className={styles.profileDescription}>
-            Keep your contact details current and manage password recovery securely.
-          </p>
+            {t("Keep your contact details current and manage password recovery securely.")}</p>
         </div>
 
         {inlineError || profileQuery.error || inlineSuccess ? (
           <div className={styles.feedbackStack}>
             {inlineError ? <ErrorBanner>{inlineError}</ErrorBanner> : null}
             {profileQuery.error ? (
-              <ErrorBanner bannerClassName={styles.errorBanner}>Could not load your profile right now.</ErrorBanner>
+              <ErrorBanner bannerClassName={styles.errorBanner}>{t("Could not load your profile right now.")}</ErrorBanner>
             ) : null}
             {inlineSuccess ? <div className={styles.successBanner}>{inlineSuccess}</div> : null}
           </div>
         ) : null}
 
         {profileQuery.isLoading && !profile ? (
-          <div className={styles.loadingState}>Loading your profile...</div>
+          <div className={styles.loadingState}>{t("Loading your profile...")}</div>
         ) : profile ? (
           <div className={styles.contentGrid}>
             <section className={styles.detailsSection} aria-labelledby="personal-details-heading">
@@ -236,27 +239,28 @@ export function EmployeeAccountPage() {
                   <EmployeeIcon size={20} />
                 </span>
                 <div>
-                  <h2 id="personal-details-heading" className={styles.sectionTitle}>Personal details</h2>
-                  <p className={styles.sectionText}>Your account and recovery contacts.</p>
+                  <h2 id="personal-details-heading" className={styles.sectionTitle}>{t("Personal details")}</h2>
+                  <p className={styles.sectionText}>{t("Your account and recovery contacts.")}</p>
                 </div>
               </div>
 
               <div className={styles.detailsList}>
+                <div className={styles.detailRow}><LanguageSelector disabled={isBusy} appearance="rounded" /></div>
                 <div className={styles.detailRow}>
-                  <span className={styles.cardLabel}>Login</span>
+                  <span className={styles.cardLabel}>{t("Login")}</span>
                   <span className={styles.cardValue}>@{profile.username}</span>
                 </div>
 
                 <div className={styles.detailRow}>
-                  <span className={styles.cardLabel}>Display name</span>
+                  <span className={styles.cardLabel}>{t("Display name")}</span>
                   <span className={styles.cardValue}>{profile.displayName}</span>
                 </div>
 
                 <div className={`${styles.detailRow} ${isEditing ? styles.detailRowEditing : ""}`}>
                   {isEditing ? (
                     <label className={styles.field}>
-                      <span className={styles.fieldLabel}>Recovery email</span>
-                      <span className={styles.fieldHint}>Used for secure password recovery.</span>
+                      <span className={styles.fieldLabel}>{t("Recovery email")}</span>
+                      <span className={styles.fieldHint}>{t("Used for secure password recovery.")}</span>
                       <input
                         type="email"
                         className={styles.input}
@@ -268,8 +272,8 @@ export function EmployeeAccountPage() {
                     </label>
                   ) : (
                     <>
-                      <span className={styles.cardLabel}>Recovery email</span>
-                      <span className={styles.cardValue}>{profile.recoveryEmail ?? "Not added yet"}</span>
+                      <span className={styles.cardLabel}>{t("Recovery email")}</span>
+                      <span className={styles.cardValue}>{profile.recoveryEmail ?? t("Not added yet")}</span>
                     </>
                   )}
                 </div>
@@ -277,8 +281,8 @@ export function EmployeeAccountPage() {
                 <div className={`${styles.detailRow} ${isEditing ? styles.detailRowEditing : ""}`}>
                   {isEditing ? (
                     <label className={styles.field}>
-                      <span className={styles.fieldLabel}>Phone</span>
-                      <span className={styles.fieldHint}>Optional contact number for your manager.</span>
+                      <span className={styles.fieldLabel}>{t("Phone")}</span>
+                      <span className={styles.fieldHint}>{t("Optional contact number for your manager.")}</span>
                       <input
                         type="tel"
                         className={styles.input}
@@ -290,8 +294,8 @@ export function EmployeeAccountPage() {
                     </label>
                   ) : (
                     <>
-                      <span className={styles.cardLabel}>Phone</span>
-                      <span className={styles.cardValue}>{profile.phone ?? "Not added yet"}</span>
+                      <span className={styles.cardLabel}>{t("Phone")}</span>
+                      <span className={styles.cardValue}>{profile.phone ?? t("Not added yet")}</span>
                     </>
                   )}
                 </div>
@@ -300,7 +304,7 @@ export function EmployeeAccountPage() {
               {!isEditing ? (
                 <div className={styles.detailsActions}>
                   <IosButton
-                    label="Edit"
+                    label={t("Edit")}
                     size="compact"
                     className={styles.profileButton}
                     onClick={handleOpenEdit}
@@ -316,38 +320,38 @@ export function EmployeeAccountPage() {
                   <CodeIcon size={20} />
                 </span>
                 <div>
-                  <h2 id="security-heading" className={styles.sectionTitle}>Password &amp; security</h2>
-                  <p className={styles.sectionText}>Confirm changes with a one-time email code.</p>
+                  <h2 id="security-heading" className={styles.sectionTitle}>{t("Password &amp; security")}</h2>
+                  <p className={styles.sectionText}>{t("Confirm changes with a one-time email code.")}</p>
                 </div>
               </div>
 
               <div className={`${styles.securityStatus} ${!hasRecoveryEmailForPassword ? styles.securityStatusMissing : ""}`}>
                 <span className={styles.statusDot} aria-hidden="true" />
-                <span>{hasRecoveryEmailForPassword ? "Recovery email connected" : "Recovery email required"}</span>
+                <span>{hasRecoveryEmailForPassword ? t("Recovery email connected") : t("Recovery email required")}</span>
               </div>
 
-              {codeDeliveryHint ? <div className={styles.passwordNotice}>Last code sent to {codeDeliveryHint}.</div> : null}
+              {codeDeliveryHint ? <div className={styles.passwordNotice}>{t("Last code sent to")} {codeDeliveryHint}.</div> : null}
 
               {isEditing ? (
                 <div className={styles.securityEditor}>
                   <div className={styles.passwordActions}>
                     <IosButton
-                      label={sendPasswordCodeMutation.isPending ? "Sending..." : "Send code"}
+                      label={sendPasswordCodeMutation.isPending ? t("Sending...") : t("Send code")}
                       size="compact"
                       className={styles.profileButton}
                       onClick={() => void handleSendPasswordCode()}
                       disabled={isBusy || !hasRecoveryEmailForPassword}
                     />
                     {!hasRecoveryEmailForPassword ? (
-                      <span className={styles.passwordMeta}>Add a recovery email first.</span>
+                      <span className={styles.passwordMeta}>{t("Add a recovery email first.")}</span>
                     ) : hasUnsavedChanges ? (
-                      <span className={styles.passwordMeta}>Contact changes will be saved first.</span>
+                      <span className={styles.passwordMeta}>{t("Contact changes will be saved first.")}</span>
                     ) : null}
                   </div>
 
                   <div className={styles.passwordFormGrid}>
                     <label className={styles.field}>
-                      <span className={styles.fieldLabel}>Verification code</span>
+                      <span className={styles.fieldLabel}>{t("Verification code")}</span>
                       <input
                         type="text"
                         inputMode="numeric"
@@ -361,7 +365,7 @@ export function EmployeeAccountPage() {
                     </label>
 
                     <label className={styles.field}>
-                      <span className={styles.fieldLabel}>New password</span>
+                      <span className={styles.fieldLabel}>{t("New password")}</span>
                       <input
                         type="password"
                         inputMode="numeric"
@@ -371,14 +375,14 @@ export function EmployeeAccountPage() {
                         className={styles.input}
                         value={newPassword}
                         onChange={(event) => setNewPassword(event.target.value.replace(/\D/g, "").slice(0, 6))}
-                        placeholder="Exactly 6 digits"
+                        placeholder={t("Exactly 6 digits")}
                         autoComplete="654321"
                       />
                     </label>
                   </div>
 
                   <IosButton
-                    label={confirmPasswordMutation.isPending ? "Updating..." : "Change password"}
+                    label={confirmPasswordMutation.isPending ? t("Updating...") : t("Change password")}
                     size="compact"
                     className={`${styles.profileButton} ${styles.changePasswordButton}`}
                     onClick={() => void handleConfirmPasswordReset()}
@@ -387,13 +391,12 @@ export function EmployeeAccountPage() {
                 </div>
               ) : (
                 <p className={styles.passwordReadonly}>
-                  Choose Edit to update your recovery details or change your password.
-                </p>
+                  {t("Choose Edit to update your recovery details or change your password.")}</p>
               )}
             </section>
           </div>
         ) : (
-          <div className={styles.loadingState}>Your profile is not available yet.</div>
+          <div className={styles.loadingState}>{t("Your profile is not available yet.")}</div>
         )}
 
         {profile ? (
@@ -407,9 +410,9 @@ export function EmployeeAccountPage() {
           <div className={panelFooterClassName}>
             {isEditing ? (
               <div className={styles.footerPrimaryActions}>
-                <IosButton label="Cancel" variant="secondary" size="compact" className={styles.profileButton} onClick={handleCancelEdit} disabled={isBusy} />
+                <IosButton label={t("Cancel")} variant="secondary" size="compact" className={styles.profileButton} onClick={handleCancelEdit} disabled={isBusy} />
                 <IosButton
-                  label={updateProfileMutation.isPending ? "Saving..." : "Save profile"}
+                  label={updateProfileMutation.isPending ? t("Saving...") : t("Save profile")}
                   icon={<SaveIcon size={17} />}
                   size="compact"
                   className={styles.profileButton}
@@ -420,7 +423,7 @@ export function EmployeeAccountPage() {
             ) : null}
 
             <IosButton
-              label="Log out"
+              label={t("Log out")}
               icon={<LogoutIcon size={17} />}
               variant="secondary"
               size="compact"

@@ -1,3 +1,4 @@
+import { dateTimeFormat, t } from "@shared/i18n";
 import { useMemo, useState, type FormEvent } from "react";
 import {
   regulationsApi,
@@ -15,7 +16,7 @@ import styles from "./RegulationsAdminPanel.module.css";
 
 type FormState = { title: string; version: string; message: string; pdf: File | null };
 const emptyForm: FormState = { title: "", version: "", message: "", pdf: null };
-const dateFormatter = new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" });
+const dateFormatter = dateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" });
 
 function downloadBlob(blob: Blob, fileName: string) {
   const url = URL.createObjectURL(blob);
@@ -71,10 +72,10 @@ export function RegulationsAdminPanel() {
     const input = { ...form };
     const callbacks = {
       onSuccess: () => {
-        setFeedback(editing ? "Draft updated." : "Draft created.");
+        setFeedback(editing ? t("Draft updated.") : t("Draft created."));
         resetForm();
       },
-      onError: (submitError: unknown) => setError(getErrorMessage(submitError, "Could not save the regulation.")),
+      onError: (submitError: unknown) => setError(getErrorMessage(submitError, t("Could not save the regulation."))),
     };
     if (editing) {
       updateMutation.mutate({ documentId: editing.id, input }, callbacks);
@@ -84,19 +85,19 @@ export function RegulationsAdminPanel() {
   };
 
   const publish = (document: RegulationDocument) => {
-    if (!window.confirm(`Publish ${document.title} (${document.version})? Users will be required to accept it.`)) return;
+    if (!window.confirm(t("Publish {0} ({1})? Users will be required to accept it.", document.title, document.version))) return;
     setError(null);
     publishMutation.mutate(document.id, {
-      onSuccess: () => setFeedback("Regulation published. It is now pending for managers and employees."),
-      onError: publishError => setError(getErrorMessage(publishError, "Could not publish the regulation.")),
+      onSuccess: () => setFeedback(t("Regulation published. It is now pending for managers and employees.")),
+      onError: publishError => setError(getErrorMessage(publishError, t("Could not publish the regulation."))),
     });
   };
 
   const remove = (document: RegulationDocument) => {
-    if (!window.confirm(`Delete draft ${document.title} (${document.version})?`)) return;
+    if (!window.confirm(t("Delete draft {0} ({1})?", document.title, document.version))) return;
     deleteMutation.mutate(document.id, {
-      onSuccess: () => { if (editing?.id === document.id) resetForm(); setFeedback("Draft deleted."); },
-      onError: deleteError => setError(getErrorMessage(deleteError, "Could not delete the draft.")),
+      onSuccess: () => { if (editing?.id === document.id) resetForm(); setFeedback(t("Draft deleted.")); },
+      onError: deleteError => setError(getErrorMessage(deleteError, t("Could not delete the draft."))),
     });
   };
 
@@ -105,7 +106,7 @@ export function RegulationsAdminPanel() {
       const file = await regulationsApi.adminDownloadPdf(document.id);
       downloadBlob(file.blob, file.fileName ?? document.pdfFileName);
     } catch (downloadError) {
-      setError(getErrorMessage(downloadError, "Could not download the PDF."));
+      setError(getErrorMessage(downloadError, t("Could not download the PDF.")));
     }
   };
 
@@ -113,11 +114,11 @@ export function RegulationsAdminPanel() {
     <section className={styles.panel} aria-labelledby="regulations-admin-title">
       <div className={styles.header}>
         <div>
-          <span className={styles.eyebrow}>Developer protected</span>
-          <h2 id="regulations-admin-title">Regulations &amp; acceptance</h2>
-          <p>Create immutable PDF versions, publish notices, and audit every user acceptance.</p>
+          <span className={styles.eyebrow}>{t("Developer protected")}</span>
+          <h2 id="regulations-admin-title">{t("Regulations &amp; acceptance")}</h2>
+          <p>{t("Create immutable PDF versions, publish notices, and audit every user acceptance.")}</p>
         </div>
-        <span className={styles.summary}>{documentsQuery.data?.length ?? 0} versions · {acceptancesQuery.data?.length ?? 0} acceptances</span>
+        <span className={styles.summary}>{documentsQuery.data?.length ?? 0}  {t("versions ·")} {acceptancesQuery.data?.length ?? 0}  {t("acceptances")}</span>
       </div>
 
       {error ? <div className={styles.error} role="alert">{error}</div> : null}
@@ -126,34 +127,34 @@ export function RegulationsAdminPanel() {
       <div className={styles.grid}>
         <form className={styles.form} onSubmit={submit}>
           <div className={styles.formHeader}>
-            <h3>{editing ? `Edit draft ${editing.version}` : "New regulation version"}</h3>
-            {editing ? <button type="button" onClick={resetForm}>Cancel edit</button> : null}
+            <h3>{editing ? t("Edit draft {0}", editing.version) : t("New regulation version")}</h3>
+            {editing ? <button type="button" onClick={resetForm}>{t("Cancel edit")}</button> : null}
           </div>
-          <label>Title<input value={form.title} maxLength={160} required onChange={event => setForm(current => ({ ...current, title: event.target.value }))} /></label>
-          <label>Version<input value={form.version} maxLength={80} required placeholder="2026.1" onChange={event => setForm(current => ({ ...current, version: event.target.value }))} /></label>
-          <label>Pop-up message<textarea value={form.message} maxLength={4000} required rows={5} onChange={event => setForm(current => ({ ...current, message: event.target.value }))} /></label>
-          <label>PDF file<input type="file" accept="application/pdf,.pdf" required={!editing} onChange={event => setForm(current => ({ ...current, pdf: event.target.files?.[0] ?? null }))} /></label>
-          {editing && !form.pdf ? <small>Current PDF stays unchanged unless a replacement is selected.</small> : null}
-          <IosButton label={isBusy ? "Saving..." : editing ? "Update draft" : "Create draft"} type="submit" disabled={isBusy} />
+          <label>{t("Title")}<input value={form.title} maxLength={160} required onChange={event => setForm(current => ({ ...current, title: event.target.value }))} /></label>
+          <label>{t("Version")}<input value={form.version} maxLength={80} required placeholder="2026.1" onChange={event => setForm(current => ({ ...current, version: event.target.value }))} /></label>
+          <label>{t("Pop-up message")}<textarea value={form.message} maxLength={4000} required rows={5} onChange={event => setForm(current => ({ ...current, message: event.target.value }))} /></label>
+          <label>{t("PDF file")}<input type="file" accept="application/pdf,.pdf" required={!editing} onChange={event => setForm(current => ({ ...current, pdf: event.target.files?.[0] ?? null }))} /></label>
+          {editing && !form.pdf ? <small>{t("Current PDF stays unchanged unless a replacement is selected.")}</small> : null}
+          <IosButton label={isBusy ? t("Saving...") : editing ? t("Update draft") : t("Create draft")} type="submit" disabled={isBusy} />
         </form>
 
         <div className={styles.documents}>
-          <h3>Document versions</h3>
-          {documentsQuery.isLoading ? <div className={styles.empty}>Loading documents...</div> : (documentsQuery.data ?? []).length === 0 ? (
-            <div className={styles.empty}>No regulation versions yet.</div>
+          <h3>{t("Document versions")}</h3>
+          {documentsQuery.isLoading ? <div className={styles.empty}>{t("Loading documents...")}</div> : (documentsQuery.data ?? []).length === 0 ? (
+            <div className={styles.empty}>{t("No regulation versions yet.")}</div>
           ) : (documentsQuery.data ?? []).map(document => (
             <article key={document.id} className={styles.document}>
               <div className={styles.documentTop}>
-                <div><strong>{document.title}</strong><span>Version {document.version}</span></div>
-                <span className={document.isPublished ? styles.published : styles.draft}>{document.isPublished ? "Published" : "Draft"}</span>
+                <div><strong>{document.title}</strong><span>{t("Version")} {document.version}</span></div>
+                <span className={document.isPublished ? styles.published : styles.draft}>{document.isPublished ? t("Published") : t("Draft")}</span>
               </div>
               <p>{document.message}</p>
-              <small>{document.pdfFileName} · SHA-256 {document.pdfSha256.slice(0, 14)}… · {document.acceptanceCount} accepted</small>
+              <small>{document.pdfFileName} · SHA-256 {document.pdfSha256.slice(0, 14)}… · {document.acceptanceCount}  {t("accepted")}</small>
               <div className={styles.actions}>
                 <button type="button" onClick={() => void download(document)}>PDF</button>
-                {!document.isPublished ? <button type="button" onClick={() => editDocument(document)}>Edit</button> : null}
-                {!document.isPublished ? <button type="button" onClick={() => publish(document)} disabled={isBusy}>Publish</button> : null}
-                {!document.isPublished ? <button type="button" className={styles.danger} onClick={() => remove(document)} disabled={isBusy}>Delete</button> : null}
+                {!document.isPublished ? <button type="button" onClick={() => editDocument(document)}>{t("Edit")}</button> : null}
+                {!document.isPublished ? <button type="button" onClick={() => publish(document)} disabled={isBusy}>{t("Publish")}</button> : null}
+                {!document.isPublished ? <button type="button" className={styles.danger} onClick={() => remove(document)} disabled={isBusy}>{t("Delete")}</button> : null}
               </div>
             </article>
           ))}
@@ -162,18 +163,18 @@ export function RegulationsAdminPanel() {
 
       <div className={styles.history}>
         <div className={styles.historyHeader}>
-          <div><h3>Acceptance history</h3><p>Managers and employees, including preserved account snapshots.</p></div>
-          <input value={historySearch} placeholder="Search person, role or version" onChange={event => setHistorySearch(event.target.value)} />
+          <div><h3>{t("Acceptance history")}</h3><p>{t("Managers and employees, including preserved account snapshots.")}</p></div>
+          <input value={historySearch} placeholder={t("Search person, role or version")} onChange={event => setHistorySearch(event.target.value)} />
         </div>
         <div className={styles.tableWrap}>
-          <table><thead><tr><th>User</th><th>Role</th><th>Regulation</th><th>Accepted</th></tr></thead>
+          <table><thead><tr><th>{t("User")}</th><th>{t("Role")}</th><th>{t("Regulation")}</th><th>{t("Accepted")}</th></tr></thead>
             <tbody>{acceptances.map(item => <tr key={item.id}>
               <td><strong>{item.displayName}</strong><small>@{item.username} · #{item.accountId}</small></td>
-              <td>{item.accountRole}</td><td>{item.regulationTitle}<small>Version {item.regulationVersion}</small></td>
+              <td>{item.accountRole}</td><td>{item.regulationTitle}<small>{t("Version")} {item.regulationVersion}</small></td>
               <td>{dateFormatter.format(new Date(item.acceptedAtUtc))}</td>
             </tr>)}</tbody>
           </table>
-          {!acceptancesQuery.isLoading && acceptances.length === 0 ? <div className={styles.empty}>No matching acceptances.</div> : null}
+          {!acceptancesQuery.isLoading && acceptances.length === 0 ? <div className={styles.empty}>{t("No matching acceptances.")}</div> : null}
         </div>
       </div>
     </section>

@@ -1,3 +1,4 @@
+import { t } from "@shared/i18n";
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties, ClipboardEvent, DragEvent, FocusEvent, KeyboardEvent, MouseEvent, ReactNode } from "react";
 import {
@@ -335,7 +336,7 @@ const MatrixDayCell = memo(function MatrixDayCell({
 }: MatrixDayCellProps) {
   const staffingLabel = shiftStaffingCounts?.join(",") ?? "";
   const staffingDescription = shiftStaffingCounts
-    ?.map((count, index) => `Shift ${index + 1}: ${count} ${count === 1 ? "employee" : "employees"}`)
+    ?.map((count, index) => t("Shift {0}: {1} {2}", index + 1, count, count === 1 ? "employee" : "employees"))
     .join("; ");
 
   return (
@@ -421,10 +422,10 @@ const MatrixValueCell = memo(function MatrixValueCell({
       <span className={styles.mutedSuffix}>{trimmedMutedSuffix}</span>
     </>
   ) : renderedPrefix;
-  const cellTitle = error ?? (hasVisualHint ? `Also works in: ${trimmedVisualHint}` : value);
+  const cellTitle = error ?? (hasVisualHint ? t("Also works in: {0}", trimmedVisualHint) : value);
   const interactiveCellTitle =
     hasVisualHint && onVisualHintClick
-      ? `${cellTitle}. Click for details.`
+      ? t("{0}. Click for details.", cellTitle)
       : cellTitle;
   const isInlineEditing = !readOnly && editMode === "inline";
   const isSelectionOnlyReadOnlyCell = readOnly && selectionEnabled;
@@ -482,7 +483,7 @@ const MatrixValueCell = memo(function MatrixValueCell({
           styles.visualHintButton,
           !isEmpty && styles.visualHintValue,
         )}
-        aria-label={`${columnLabel} day ${dayOfMonth}`}
+        aria-label={t("{0} day {1}", columnLabel, dayOfMonth)}
         aria-invalid={Boolean(error)}
         title={interactiveCellTitle}
         onClick={handleVisualHintButtonClick}
@@ -567,7 +568,7 @@ const MatrixValueCell = memo(function MatrixValueCell({
             onChange={event => onInlineValueChange?.(event.target.value)}
             onBlur={event => onInlineValueCommit?.(event.target.value)}
             onFocus={handleEditorFocus}
-            aria-label={`${columnLabel} day ${dayOfMonth}`}
+            aria-label={t("{0} day {1}", columnLabel, dayOfMonth)}
             aria-invalid={Boolean(error)}
             title={interactiveCellTitle}
             data-matrix-editor="true"
@@ -586,7 +587,7 @@ const MatrixValueCell = memo(function MatrixValueCell({
             onChange={event => onEditorValueChange(event.target.value)}
             onBlur={onEditorBlur}
             onFocus={handleEditorFocus}
-            aria-label={`${columnLabel} day ${dayOfMonth}`}
+            aria-label={t("{0} day {1}", columnLabel, dayOfMonth)}
             aria-invalid={Boolean(error)}
             title={interactiveCellTitle}
             data-matrix-editor="true"
@@ -615,7 +616,7 @@ const MatrixValueCell = memo(function MatrixValueCell({
               isDangerEmpty && styles.dangerEmptyValue,
               isEmpty && hasVisualHint && styles.visualHintValue,
             )}
-            aria-label={`${columnLabel} day ${dayOfMonth}`}
+            aria-label={t("{0} day {1}", columnLabel, dayOfMonth)}
             aria-invalid={Boolean(error)}
             title={interactiveCellTitle}
           >
@@ -637,7 +638,7 @@ export function ContainerGraphMatrix({
   lockVisualHintCells = false,
   styleMap = {},
   dayConflictMap = {},
-  title = "Schedule Matrix",
+  title = t("Schedule Matrix"),
   helperText,
   readOnly = false,
   highlightReadOnlyEmpty = false,
@@ -834,8 +835,8 @@ export function ContainerGraphMatrix({
   const resolvedEmptyMessage =
     emptyMessage ??
     (readOnly
-      ? "No employees are assigned to this schedule yet."
-      : "Add employees to the schedule to start filling the matrix.");
+      ? t("No employees are assigned to this schedule yet.")
+      : t("Add employees to the schedule to start filling the matrix."));
   const canReorderColumns = !readOnly && typeof onColumnMove === "function";
 
   useEffect(() => {
@@ -1607,7 +1608,7 @@ export function ContainerGraphMatrix({
                 </colgroup>
                 <thead>
                   <tr>
-                    <th className={styles.dayHeader}>Day</th>
+                    <th className={styles.dayHeader}>{t("Day")}</th>
                     {columns.map(column => {
                       const isEditableManualColumn =
                         !readOnly &&
@@ -1645,8 +1646,8 @@ export function ContainerGraphMatrix({
                               <input
                                 className={styles.manualHeaderInput}
                                 value={column.label}
-                                placeholder="Manual column"
-                                aria-label={`Manual column ${column.manualColumnId} header`}
+                                placeholder={t("Manual column")}
+                                aria-label={t("Manual column {0} header", column.manualColumnId)}
                                 draggable={false}
                                 onChange={event => onColumnLabelChange(column.manualColumnId as number, event.target.value)}
                               />
@@ -1657,7 +1658,7 @@ export function ContainerGraphMatrix({
                                 <button
                                   type="button"
                                   className={styles.headerLabelButton}
-                                  aria-label={`Customize columns from ${column.label}`}
+                                  aria-label={t("Customize columns from {0}", column.label)}
                                   onClick={() => onColumnHeaderClick(column)}
                                 >
                                   {column.label}

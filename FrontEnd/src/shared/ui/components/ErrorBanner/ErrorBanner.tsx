@@ -1,3 +1,4 @@
+import { t } from "@shared/i18n";
 import { useState, type ReactNode } from "react";
 import { CloseIcon } from "@shared/ui/icons";
 import styles from "./ErrorBanner.module.css";
@@ -22,7 +23,7 @@ export function ErrorBanner({
   bannerClassName,
   textClassName,
   dismissible = true,
-  closeLabel = "Dismiss error message",
+  closeLabel = t("Dismiss error message"),
   onDismiss,
 }: ErrorBannerProps) {
   const [dismissedChildren, setDismissedChildren] = useState<ReactNode | null>(null);

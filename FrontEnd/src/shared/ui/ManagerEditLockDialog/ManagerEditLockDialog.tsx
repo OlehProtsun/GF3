@@ -1,3 +1,4 @@
+import { t } from "@shared/i18n";
 import { useId } from "react";
 import { IosButton } from "@shared/ui/components/IosButton";
 import { BackIcon, WarnIcon } from "@shared/ui/icons";
@@ -13,9 +14,9 @@ type ManagerEditLockDialogProps = {
 
 export function ManagerEditLockDialog({
   open,
-  title = "Editing is locked",
+  title = t("Editing is locked"),
   message,
-  actionText = "Go back",
+  actionText = t("Go back"),
   onClose,
 }: ManagerEditLockDialogProps) {
   const titleId = useId();

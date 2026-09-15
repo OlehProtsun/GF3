@@ -1,3 +1,4 @@
+import { t } from "@shared/i18n";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   AVAILABILITY_NONE_MARK,
@@ -122,7 +123,7 @@ async function syncAvailabilityGroupGraph({
   const desiredSlots = selectedEmployeeIds.flatMap(employeeId => {
     const member = memberByEmployeeId.get(employeeId);
     if (!member) {
-      throw new Error(`Employee #${employeeId} could not be mapped to an availability member.`);
+      throw new Error(t("Employee #{0} could not be mapped to an availability member.", employeeId));
     }
 
     return Array.from({ length: daysInMonth }, (_, index) => {
@@ -131,7 +132,7 @@ async function syncAvailabilityGroupGraph({
       const parsedCode = parseAvailabilityCode(rawCode);
 
       if (!parsedCode.ok) {
-        throw new Error(`Employee #${employeeId}, day ${dayOfMonth}: ${parsedCode.error}`);
+        throw new Error(t("Employee #{0}, day {1}: {2}", employeeId, dayOfMonth, parsedCode.error));
       }
 
       return {
@@ -175,7 +176,7 @@ async function syncAvailabilityGroupGraph({
   for (const transfer of normalizedTransfers) {
     const member = memberByEmployeeId.get(transfer.employeeId);
     if (!member) {
-      throw new Error(`Employee #${transfer.employeeId} could not be mapped to an availability member for CFA.`);
+      throw new Error(t("Employee #{0} could not be mapped to an availability member for CFA.", transfer.employeeId));
     }
 
     await availabilityGroupsApi.transferDays(groupId as number, member.id, {

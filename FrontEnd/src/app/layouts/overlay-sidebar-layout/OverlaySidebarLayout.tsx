@@ -1,3 +1,5 @@
+import { t } from "@shared/i18n";
+import { useLanguageRevision } from "@shared/i18n/useLanguageRevision";
 import { useState } from "react";
 import type { ReactNode } from "react";
 import { NavLink, useLocation } from "react-router-dom";
@@ -56,6 +58,7 @@ function NavItem({
 }
 
 export function OverlaySidebarLayout({ children }: OverlaySidebarLayoutProps) {
+  useLanguageRevision();
   const [isCollapsed, setIsCollapsed] = useState(false);
   const { pathname } = useLocation();
   const { logout, session } = useAuth();
@@ -96,20 +99,20 @@ export function OverlaySidebarLayout({ children }: OverlaySidebarLayoutProps) {
   const mainNavItems: NavItemDefinition[] = isManager
     ? [
         {
-          label: "Home",
+          label: t("Home"),
           to: "/",
           icon: <img className={styles.navLogo} src="/gf-favicon.svg" alt="" aria-hidden="true" />,
         },
-        { label: "Employee", to: "/employee", icon: <EmployeeIcon size={22} /> },
-        { label: "Shop", to: "/shop", icon: <ShopIcon size={28} style={{ transform: "scaleY(-1)" }} /> },
-        { label: "Availability", to: "/availability", icon: <AvailabilityIcon size={22} /> },
-        { label: "Container", to: "/container", icon: <ContainerIcon size={25} /> },
-        { label: "Information", to: "/information", icon: <InfoIcon size={26} /> },
-        { label: "Message", to: "/communications", icon: <NoteIcon size={24} /> },
+        { label: t("Employee"), to: "/employee", icon: <EmployeeIcon size={22} /> },
+        { label: t("Shop"), to: "/shop", icon: <ShopIcon size={28} style={{ transform: "scaleY(-1)" }} /> },
+        { label: t("Availability"), to: "/availability", icon: <AvailabilityIcon size={22} /> },
+        { label: t("Container"), to: "/container", icon: <ContainerIcon size={25} /> },
+        { label: t("Information"), to: "/information", icon: <InfoIcon size={26} /> },
+        { label: t("Message"), to: "/communications", icon: <NoteIcon size={24} /> },
       ]
     : [
         {
-          label: "Home",
+          label: t("Home"),
           to: "/",
           icon: (
             <span className={`${styles.navIcon} ${styles.navIconHome}`}>
@@ -127,7 +130,7 @@ export function OverlaySidebarLayout({ children }: OverlaySidebarLayoutProps) {
           isCollapsed ? styles.openTabVisible : styles.openTabHidden
         }`}
         onClick={() => setIsCollapsed(false)}
-        aria-label="Open sidebar"
+        aria-label={t("Open sidebar")}
       >
         <span className={styles.navIcon}>
           <ArrowIcon size={20} className={styles.arrowDown} />
@@ -149,9 +152,9 @@ export function OverlaySidebarLayout({ children }: OverlaySidebarLayoutProps) {
 
           {isManager ? (
             <div className={styles.section}>
-              <div className={styles.sectionTitle}>Settings</div>
+              <div className={styles.sectionTitle}>{t("Settings")}</div>
               <div className={styles.nav}>
-                <NavItem label="DataBase" to="/database" icon={<DatabaseIcon size={30} />} />
+                <NavItem label={t("DataBase")} to="/database" icon={<DatabaseIcon size={30} />} />
               </div>
             </div>
           ) : null}
@@ -162,13 +165,13 @@ export function OverlaySidebarLayout({ children }: OverlaySidebarLayoutProps) {
             <NavLink
               to={accountPath}
               className={({ isActive }) => `${styles.navButton} ${isActive ? styles.navButtonActive : ""}`}
-              aria-label={isManager ? "Open manager profile" : "Open profile"}
-              title={`${session?.displayName ?? "Signed in"} (@${session?.userName ?? "account"})`}
+              aria-label={isManager ? t("Open manager profile") : t("Open profile")}
+              title={`${session?.displayName ?? t("Signed in")} (@${session?.userName ?? "account"})`}
             >
               <EmployeeIcon size={22} />
             </NavLink>
             <div className={styles.navLabel} aria-hidden="true">
-              {isManager ? "Manager" : "Profile"}
+              {isManager ? t("Manager") : t("Profile")}
             </div>
           </div>
 
@@ -179,20 +182,19 @@ export function OverlaySidebarLayout({ children }: OverlaySidebarLayoutProps) {
               onClick={() => {
                 void logout();
               }}
-              aria-label="Log out"
+              aria-label={t("Log out")}
             >
               <LogoutIcon size={22} />
             </button>
             <div className={styles.navLabel} aria-hidden="true">
-              Log out
-            </div>
+              {t("Log out")}</div>
           </div>
 
           <button
             type="button"
             className={styles.powerButton}
             onClick={() => setIsCollapsed(true)}
-            aria-label="Collapse sidebar"
+            aria-label={t("Collapse sidebar")}
           >
             <span className={styles.navIcon}>
               <ArrowIcon size={20} className={styles.arrowLeft} style={{ transform: "scaleY(-1)translateX(2px) translateY(2px)" }} />

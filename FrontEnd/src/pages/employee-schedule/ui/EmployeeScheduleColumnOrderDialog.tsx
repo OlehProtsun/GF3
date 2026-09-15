@@ -1,3 +1,4 @@
+import { t } from "@shared/i18n";
 import { useEffect, useId, useState, type MouseEvent } from "react";
 import type { GraphMatrixColumn } from "@entities/containers/model/graphWorkspace";
 import { IosButton } from "@shared/ui/components/IosButton";
@@ -104,18 +105,17 @@ export function EmployeeScheduleColumnOrderDialog({
           <div className={styles.titleBlock}>
             <span className={styles.eyebrow}>
               <EmployeeIcon size={16} />
-              Column order
-            </span>
-            <h2 id={titleId}>Customize schedule</h2>
-            <p id={descriptionId}>Move employees left or right to arrange the schedule for yourself.</p>
+              {t("Column order")}</span>
+            <h2 id={titleId}>{t("Customize schedule")}</h2>
+            <p id={descriptionId}>{t("Move employees left or right to arrange the schedule for yourself.")}</p>
           </div>
 
-          <button type="button" className={styles.closeButton} aria-label="Close column order dialog" onClick={onCancel}>
+          <button type="button" className={styles.closeButton} aria-label={t("Close column order dialog")} onClick={onCancel}>
             <CloseIcon size={18} />
           </button>
         </header>
 
-        <div className={styles.list} role="list" aria-label="Schedule columns">
+        <div className={styles.list} role="list" aria-label={t("Schedule columns")}>
           {draftColumns.map((column, index) => (
             <div
               key={column.employeeId}
@@ -127,7 +127,7 @@ export function EmployeeScheduleColumnOrderDialog({
               <span className={styles.controls}>
                 <button
                   type="button"
-                  aria-label={"Move " + column.label + " left"}
+                  aria-label={t("Move ") + column.label + t(" left")}
                   disabled={index === 0}
                   onClick={() => moveColumn(column.employeeId, -1)}
                 >
@@ -135,7 +135,7 @@ export function EmployeeScheduleColumnOrderDialog({
                 </button>
                 <button
                   type="button"
-                  aria-label={"Move " + column.label + " right"}
+                  aria-label={t("Move ") + column.label + t(" right")}
                   disabled={index === draftColumns.length - 1}
                   onClick={() => moveColumn(column.employeeId, 1)}
                 >
@@ -153,12 +153,11 @@ export function EmployeeScheduleColumnOrderDialog({
             disabled={isDefaultOrder}
             onClick={() => setDraftColumns(defaultColumns)}
           >
-            Reset default
-          </button>
+            {t("Reset default")}</button>
           <span className={styles.footerActions}>
-            <IosButton label="Cancel" variant="secondary" size="compact" onClick={onCancel} />
+            <IosButton label={t("Cancel")} variant="secondary" size="compact" onClick={onCancel} />
             <IosButton
-              label="Apply"
+              label={t("Apply")}
               size="compact"
               icon={<CheckIcon size={15} />}
               disabled={!hasChanges}

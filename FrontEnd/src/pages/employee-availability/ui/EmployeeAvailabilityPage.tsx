@@ -1,3 +1,4 @@
+import { dateTimeFormat, t } from "@shared/i18n";
 import { useEffect, useMemo, useState, type MouseEvent } from "react";
 import {
   useEmployeeAvailabilityListQuery,
@@ -45,7 +46,7 @@ const dayValuePresets = [
   { label: AVAILABILITY_NONE_MARK, value: AVAILABILITY_NONE_MARK },
 ] as const;
 
-const employeeDateTimeFormatter = new Intl.DateTimeFormat("en-GB", {
+const employeeDateTimeFormatter = dateTimeFormat("en-GB", {
   month: "short",
   day: "numeric",
   hour: "2-digit",
@@ -96,12 +97,12 @@ function getInitialDialogRange(day?: DayDraft) {
 
 function formatEmployeeDateTimeLabel(value?: string | null) {
   if (!value) {
-    return "Not set";
+    return t("Not set");
   }
 
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) {
-    return "Not set";
+    return t("Not set");
   }
 
   return employeeDateTimeFormatter.format(date);
@@ -112,7 +113,7 @@ function getEmployeeVisibilityWindowLabel(group: Pick<EmployeeAvailabilityGroup,
   const to = formatEmployeeDateTimeLabel(group.visibleToUtc);
 
   if (from === "Not set" && to === "Not set") {
-    return "Not configured";
+    return t("Not configured");
   }
 
   return `${from} - ${to}`;
@@ -121,8 +122,8 @@ function getEmployeeVisibilityWindowLabel(group: Pick<EmployeeAvailabilityGroup,
 const availabilityEditLockedMessagePrefix = "This availability is currently being edited by ";
 
 function getAvailabilityEditLockedMessage(group: Pick<EmployeeAvailabilityGroup, "editLockedBy">) {
-  const lockedBy = group.editLockedBy?.trim() || "a manager";
-  return `${availabilityEditLockedMessagePrefix}${lockedBy}. You cannot edit it right now.`;
+  const lockedBy = group.editLockedBy?.trim() || t("a manager");
+  return t("{0}{1}. You cannot edit it right now.", availabilityEditLockedMessagePrefix, lockedBy);
 }
 
 function isAvailabilityEditLockedMessage(value: string | null) {
@@ -135,10 +136,10 @@ function isAvailabilityOpen(group?: EmployeeAvailabilityGroup | null) {
 
 function getAvailabilityStatusLabel(group: EmployeeAvailabilityGroup) {
   if (group.isEditLocked) {
-    return "Locked";
+    return t("Locked");
   }
 
-  return group.canSubmit ? "Open" : "Closed";
+  return group.canSubmit ? t("Open") : t("Closed");
 }
 
 function isAvailableKind(kind: AvailabilityKind, intervalStr?: string | null) {
@@ -302,15 +303,15 @@ function AvailabilityDayDialog({
   };
 
   return (
-    <div className={styles.dialogOverlay} role="dialog" aria-modal="true" aria-label={`Day ${dayOfMonth} availability`} onMouseDown={handleOverlayMouseDown}>
+    <div className={styles.dialogOverlay} role="dialog" aria-modal="true" aria-label={t("Day {0} availability", dayOfMonth)} onMouseDown={handleOverlayMouseDown}>
       <div className={styles.dayDialog}>
         <div className={styles.dialogHeader}>
           <div>
-            <span className={styles.dialogEyebrow}>Day {dayOfMonth}</span>
-            <h3>Availability</h3>
+            <span className={styles.dialogEyebrow}>{t("Day")} {dayOfMonth}</span>
+            <h3>{t("Availability")}</h3>
           </div>
 
-          <button type="button" className={styles.iconButton} aria-label="Close" onClick={onClose}>
+          <button type="button" className={styles.iconButton} aria-label={t("Close")} onClick={onClose}>
             <CloseIcon size={16} />
           </button>
         </div>
@@ -341,14 +342,14 @@ function AvailabilityDayDialog({
 
         <div className={styles.timePanel}>
           <div className={styles.timeStepper}>
-            <button type="button" aria-label="Decrease start time" onClick={() => commitRange(stepTimeValue(fromTime, -15), toTime)}>
+            <button type="button" aria-label={t("Decrease start time")} onClick={() => commitRange(stepTimeValue(fromTime, -15), toTime)}>
               -
             </button>
             <span>
               <strong>{fromTime}</strong>
-              <small>From</small>
+              <small>{t("From")}</small>
             </span>
-            <button type="button" aria-label="Increase start time" onClick={() => commitRange(stepTimeValue(fromTime, 15), toTime)}>
+            <button type="button" aria-label={t("Increase start time")} onClick={() => commitRange(stepTimeValue(fromTime, 15), toTime)}>
               +
             </button>
           </div>
@@ -356,21 +357,21 @@ function AvailabilityDayDialog({
           <span className={styles.timeDash}>-</span>
 
           <div className={styles.timeStepper}>
-            <button type="button" aria-label="Decrease end time" onClick={() => commitRange(fromTime, stepTimeValue(toTime, -15))}>
+            <button type="button" aria-label={t("Decrease end time")} onClick={() => commitRange(fromTime, stepTimeValue(toTime, -15))}>
               -
             </button>
             <span>
               <strong>{toTime}</strong>
-              <small>To</small>
+              <small>{t("To")}</small>
             </span>
-            <button type="button" aria-label="Increase end time" onClick={() => commitRange(fromTime, stepTimeValue(toTime, 15))}>
+            <button type="button" aria-label={t("Increase end time")} onClick={() => commitRange(fromTime, stepTimeValue(toTime, 15))}>
               +
             </button>
           </div>
         </div>
 
         <label className={styles.customField}>
-          <span>Custom</span>
+          <span>{t("Custom")}</span>
           <input
             value={customValue}
             onChange={event => setCustomValue(event.target.value)}
@@ -383,14 +384,14 @@ function AvailabilityDayDialog({
 
         <div className={styles.dialogActions}>
           <IosButton
-            label="Clear"
+            label={t("Clear")}
             icon={<CloseIcon size={16} />}
             variant="secondary"
             disabled={false}
             onClick={handleClear}
           />
           <IosButton
-            label="Save"
+            label={t("Save")}
             icon={<CheckIcon size={16} />}
             disabled={hasError}
             onClick={handleApply}
@@ -494,10 +495,10 @@ export function EmployeeAvailabilityPage() {
 
   const canSubmit = isAvailabilityOpen(selectedAvailability) && !saveMutation.isPending;
   const queryErrorMessage = availabilityQuery.error
-    ? getErrorMessage(availabilityQuery.error, "Could not load availability.")
+    ? getErrorMessage(availabilityQuery.error, t("Could not load availability."))
     : null;
   const saveErrorMessage = saveMutation.error
-    ? getErrorMessage(saveMutation.error, "Could not save availability.")
+    ? getErrorMessage(saveMutation.error, t("Could not save availability."))
     : null;
 
   const handleSelectAvailability = (nextId: number) => {
@@ -515,7 +516,7 @@ export function EmployeeAvailabilityPage() {
     }
 
     if (!canSubmit) {
-      setClosedMessage("The time for editing this availability has expired.");
+      setClosedMessage(t("The time for editing this availability has expired."));
       return;
     }
 
@@ -578,7 +579,7 @@ export function EmployeeAvailabilityPage() {
 
           resetDraft(nextDraft);
           setCommittedDraftSnapshot(buildDraftSnapshot(nextDraft));
-          setSaveSuccessMessage("Availability saved successfully.");
+          setSaveSuccessMessage(t("Availability saved successfully."));
         },
       },
     );
@@ -598,7 +599,7 @@ export function EmployeeAvailabilityPage() {
             <button
               type="button"
               className={styles.successClose}
-              aria-label="Close success message"
+              aria-label={t("Close success message")}
               onClick={() => setSaveSuccessMessage(null)}
             >
               <CloseIcon size={14} />
@@ -609,18 +610,17 @@ export function EmployeeAvailabilityPage() {
 
       {availabilityQuery.isLoading ? (
         <section className={workspaceStyles.panel}>
-          <span className={workspaceStyles.panelEyebrow}>Loading</span>
-          <p className={workspaceStyles.panelText}>Checking public availability windows.</p>
+          <span className={workspaceStyles.panelEyebrow}>{t("Loading")}</span>
+          <p className={workspaceStyles.panelText}>{t("Checking public availability windows.")}</p>
         </section>
       ) : null}
 
       {!availabilityQuery.isLoading && groups.length === 0 ? (
         <section className={workspaceStyles.panel}>
-          <span className={workspaceStyles.panelEyebrow}>No active windows</span>
-          <h2 className={workspaceStyles.panelTitle}>Nothing is public for your account yet.</h2>
+          <span className={workspaceStyles.panelEyebrow}>{t("No active windows")}</span>
+          <h2 className={workspaceStyles.panelTitle}>{t("Nothing is public for your account yet.")}</h2>
           <p className={workspaceStyles.panelText}>
-            When a manager publishes an availability window for you, it will show up here.
-          </p>
+            {t("When a manager publishes an availability window for you, it will show up here.")}</p>
         </section>
       ) : null}
 
@@ -633,12 +633,12 @@ export function EmployeeAvailabilityPage() {
                   <AvailabilityIcon size={20} />
                 </span>
                 <div>
-                  <span className={workspaceStyles.panelEyebrow}>Public windows</span>
-                  <strong>{groups.length} active</strong>
+                  <span className={workspaceStyles.panelEyebrow}>{t("Public windows")}</span>
+                  <strong>{groups.length}  {t("active")}</strong>
                 </div>
               </div>
 
-              <span className={styles.availableCount}>{availableDaysCount} available</span>
+              <span className={styles.availableCount}>{availableDaysCount}  {t("available")}</span>
             </div>
 
             <div className={styles.groupList}>
@@ -694,11 +694,11 @@ export function EmployeeAvailabilityPage() {
 
             <div className={styles.detailsGrid}>
               <div className={styles.detailItem}>
-                <span>Visible</span>
+                <span>{t("Visible")}</span>
                 <strong>{getEmployeeVisibilityWindowLabel(selectedAvailability)}</strong>
               </div>
               <div className={styles.detailItem}>
-                <span>Closes</span>
+                <span>{t("Closes")}</span>
                 <strong>{formatEmployeeDateTimeLabel(selectedAvailability.visibleToUtc)}</strong>
               </div>
             </div>
@@ -740,7 +740,7 @@ export function EmployeeAvailabilityPage() {
 
             <div className={styles.actions}>
               <IosButton
-                label={saveMutation.isPending ? "Saving..." : "Save"}
+                label={saveMutation.isPending ? t("Saving...") : t("Save")}
                 icon={<SaveIcon size={14} />}
                 size="compact"
                 className={styles.editorActionButton}
@@ -748,7 +748,7 @@ export function EmployeeAvailabilityPage() {
                 onClick={handleSave}
               />
               <IosButton
-                label="Clear"
+                label={t("Clear")}
                 icon={<CloseIcon size={14} />}
                 variant="secondary"
                 size="compact"

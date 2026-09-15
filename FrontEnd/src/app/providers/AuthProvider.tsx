@@ -1,3 +1,4 @@
+import { t } from "@shared/i18n";
 import { createContext, startTransition, useContext, useEffect, useState, type PropsWithChildren } from "react";
 import { ApiError, getAuthAccessToken, getErrorMessage, setAuthAccessToken } from "@shared/api/httpClient";
 import { authApi } from "@entities/auth";
@@ -88,7 +89,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
         return;
       }
 
-      applyUnauthenticatedState(getErrorMessage(error, "Could not restore the current session."));
+      applyUnauthenticatedState(getErrorMessage(error, t("Could not restore the current session.")));
     }
   };
 

@@ -1,3 +1,4 @@
+import { dateTimeFormat, t } from "@shared/i18n";
 import { useEffect, useId, useMemo, useState, type ReactNode } from "react";
 import type { AvailabilityPublicationStatus } from "@entities/availability-groups/model/types";
 import { ErrorPill } from "@shared/ui/forms/Field";
@@ -21,7 +22,7 @@ type AvailabilityPublicationCardProps = {
   onVisibleToChange: (value: string) => void;
 };
 
-const monthYearFormatter = new Intl.DateTimeFormat("en-US", { month: "long", year: "numeric" });
+const monthYearFormatter = dateTimeFormat("en-US", { month: "long", year: "numeric" });
 const weekdayLabels = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"] as const;
 const quickTimes = ["09:00", "12:00", "18:00", "23:59"] as const;
 const datePickerOpenEvent = "gf-date-picker-open";
@@ -111,15 +112,15 @@ function wrapTimePart(value: number, maxExclusive: number) {
 
 function formatLocalDateTime(value: string) {
   if (!value) {
-    return "Select date and time";
+    return t("Select date and time");
   }
 
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) {
-    return "Select date and time";
+    return t("Select date and time");
   }
 
-  return new Intl.DateTimeFormat("en-US", {
+  return dateTimeFormat("en-US", {
     month: "short",
     day: "numeric",
     hour: "2-digit",
@@ -130,15 +131,15 @@ function formatLocalDateTime(value: string) {
 
 function formatLocalDate(value: string) {
   if (!value) {
-    return "Select date";
+    return t("Select date");
   }
 
   const date = new Date(value + "T00:00");
   if (Number.isNaN(date.getTime())) {
-    return "Select date";
+    return t("Select date");
   }
 
-  return new Intl.DateTimeFormat("en-US", {
+  return dateTimeFormat("en-US", {
     month: "short",
     day: "numeric",
     year: "numeric",
@@ -223,20 +224,20 @@ export function AvailabilityDateTimeField({
         onClick={openPicker}
       >
         <span className={styles.dateButtonValue}>{dateOnly ? formatLocalDate(value) : formatLocalDateTime(value)}</span>
-        <span className={styles.dateButtonHint}>Edit</span>
+        <span className={styles.dateButtonHint}>{t("Edit")}</span>
       </button>
 
       {isOpen ? (
         <div
           className={joinClassNames(styles.dateDialog, dateOnly && styles.dateDialogDateOnly)}
           role="dialog"
-          aria-label={`${label} picker`}
+          aria-label={t("{0} picker", label)}
         >
           <div className={styles.calendarHeader}>
             <button
               type="button"
               className={styles.calendarNavButton}
-              aria-label="Previous month"
+              aria-label={t("Previous month")}
               onClick={() => setViewDate(current => new Date(current.getFullYear(), current.getMonth() - 1, 1))}
             >
               {"<"}
@@ -245,7 +246,7 @@ export function AvailabilityDateTimeField({
             <button
               type="button"
               className={styles.calendarNavButton}
-              aria-label="Next month"
+              aria-label={t("Next month")}
               onClick={() => setViewDate(current => new Date(current.getFullYear(), current.getMonth() + 1, 1))}
             >
               {">"}
@@ -253,7 +254,7 @@ export function AvailabilityDateTimeField({
           </div>
 
           <div className={styles.weekdayGrid} aria-hidden="true">
-            {weekdayLabels.map(day => (
+            {weekdayLabels.map(value => t(value)).map(day => (
               <span key={day}>{day}</span>
             ))}
           </div>
@@ -279,14 +280,14 @@ export function AvailabilityDateTimeField({
 
           <div className={styles.timePanel}>
             <div className={styles.timeStepper}>
-              <button type="button" aria-label="Decrease hour" onClick={() => stepHour(-1)}>
+              <button type="button" aria-label={t("Decrease hour")} onClick={() => stepHour(-1)}>
                 -
               </button>
               <span>
                 <strong>{padDatePart(pickerParts.hour)}</strong>
-                <small>Hour</small>
+                <small>{t("Hour")}</small>
               </span>
-              <button type="button" aria-label="Increase hour" onClick={() => stepHour(1)}>
+              <button type="button" aria-label={t("Increase hour")} onClick={() => stepHour(1)}>
                 +
               </button>
             </div>
@@ -294,14 +295,14 @@ export function AvailabilityDateTimeField({
             <span className={styles.timeColon}>:</span>
 
             <div className={styles.timeStepper}>
-              <button type="button" aria-label="Decrease minute" onClick={() => stepMinute(-5)}>
+              <button type="button" aria-label={t("Decrease minute")} onClick={() => stepMinute(-5)}>
                 -
               </button>
               <span>
                 <strong>{padDatePart(pickerParts.minute)}</strong>
-                <small>Min</small>
+                <small>{t("Min")}</small>
               </span>
-              <button type="button" aria-label="Increase minute" onClick={() => stepMinute(5)}>
+              <button type="button" aria-label={t("Increase minute")} onClick={() => stepMinute(5)}>
                 +
               </button>
             </div>
@@ -329,11 +330,9 @@ export function AvailabilityDateTimeField({
                 setIsOpen(false);
               }}
             >
-              Clear
-            </button>
+              {t("Clear")}</button>
             <button type="button" className={styles.dateDialogActionPrimary} onClick={() => setIsOpen(false)}>
-              Done
-            </button>
+              {t("Done")}</button>
           </div>
         </div>
       ) : null}
@@ -358,12 +357,12 @@ export function AvailabilityPublicationCard({
   return (
     <CardSection
       className={styles.card}
-      title="Publication"
+      title={t("Publication")}
       icon={<EyeIcon size={18} />}
       headerRightSlot={headerRightSlot}
     >
       <div className={styles.layout}>
-        <div className={styles.segmentedControl} role="radiogroup" aria-label="Publication status">
+        <div className={styles.segmentedControl} role="radiogroup" aria-label={t("Publication status")}>
           <button
             type="button"
             className={joinClassNames(styles.segmentButton, publicationStatus === "private" && styles.segmentButtonActive)}
@@ -371,8 +370,7 @@ export function AvailabilityPublicationCard({
             aria-checked={publicationStatus === "private"}
             onClick={() => onPublicationStatusChange("private")}
           >
-            Private
-          </button>
+            {t("Private")}</button>
           <button
             type="button"
             className={joinClassNames(styles.segmentButton, publicationStatus === "public" && styles.segmentButtonActive)}
@@ -380,15 +378,14 @@ export function AvailabilityPublicationCard({
             aria-checked={publicationStatus === "public"}
             onClick={() => onPublicationStatusChange("public")}
           >
-            Public
-          </button>
+            {t("Public")}</button>
         </div>
 
-        <p className={styles.hint}>Public availability is visible only to assigned employees after saving.</p>
+        <p className={styles.hint}>{t("Public availability is visible only to assigned employees after saving.")}</p>
 
         <AvailabilityDateTimeField
           id={`${fieldId}-visible-from`}
-          label="Visible From"
+          label={t("Visible From")}
           value={visibleFrom}
           error={errors.visibleFrom}
           defaultTime="09:00"
@@ -397,7 +394,7 @@ export function AvailabilityPublicationCard({
 
         <AvailabilityDateTimeField
           id={`${fieldId}-visible-to`}
-          label="Visible To"
+          label={t("Visible To")}
           value={visibleTo}
           error={errors.visibleTo}
           defaultTime="23:59"

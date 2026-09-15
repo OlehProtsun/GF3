@@ -1,3 +1,4 @@
+import { t } from "@shared/i18n";
 ﻿import type { ChangeEvent, FormEvent } from "react";
 import { ErrorBanner } from "@shared/ui/components/ErrorBanner";
 import { RecordDetailsFormCard } from "@shared/ui/components/RecordDetailsFormCard";
@@ -41,11 +42,11 @@ export function ContainerDetailsForm({
       {submitError ? <ErrorBanner>{submitError}</ErrorBanner> : null}
 
       <FormRow>
-        <LabeledField id="name" label="Name" error={errors.name}>
+        <LabeledField id="name" label={t("Name")} error={errors.name}>
           <TextInput
             id="name"
             value={form.name}
-            placeholder="Example: Northern Cluster"
+            placeholder={t("Example: Northern Cluster")}
             onChange={onFieldChange("name")}
             aria-invalid={Boolean(errors.name)}
             aria-describedby={errors.name ? "name-error" : undefined}
@@ -53,11 +54,11 @@ export function ContainerDetailsForm({
         </LabeledField>
       </FormRow>
 
-      <LabeledField id="note" label="Note" error={errors.note}>
+      <LabeledField id="note" label={t("Note")} error={errors.note}>
         <TextArea
           id="note"
           rows={8}
-          placeholder="Optional context for this container workspace"
+          placeholder={t("Optional context for this container workspace")}
           value={form.note}
           onChange={onFieldChange("note")}
           aria-invalid={Boolean(errors.note)}

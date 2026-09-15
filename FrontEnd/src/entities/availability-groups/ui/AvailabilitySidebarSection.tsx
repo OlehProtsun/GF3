@@ -1,3 +1,4 @@
+import { t } from "@shared/i18n";
 import type { ReactNode } from "react";
 import { ArrowIcon } from "@shared/ui/icons";
 import styles from "./AvailabilitySidebarSection.module.css";
@@ -52,8 +53,8 @@ export function AvailabilitySidebarSection({
         type="button"
         className={styles.sectionExpandButton}
         onClick={onExpand}
-        aria-label={`Expand ${label}`}
-        title={`Expand ${label}`}
+        aria-label={t("Expand {0}", label)}
+        title={t("Expand {0}", label)}
       >
         {collapsedIcon ?? <ArrowIcon size={16} className={styles.sectionExpandArrow} />}
       </button>
@@ -72,8 +73,8 @@ export function AvailabilitySidebarCollapseButton({
       type="button"
       className={styles.sectionCollapseButton}
       onClick={onCollapse}
-      aria-label={`Collapse ${label}`}
-      title={`Collapse ${label}`}
+      aria-label={t("Collapse {0}", label)}
+      title={t("Collapse {0}", label)}
     >
       <ArrowIcon size={16} className={styles.sectionCollapseArrow} />
     </button>

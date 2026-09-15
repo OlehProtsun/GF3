@@ -1,3 +1,4 @@
+import { t } from "@shared/i18n";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { GraphEmployee, GraphSlot } from "@entities/containers/model/types";
 import {
@@ -185,7 +186,7 @@ async function syncGraphWorkspace({
   });
 
   if (Object.keys(draft.errors).length > 0) {
-    throw new Error(Object.values(draft.errors)[0] ?? "The schedule matrix contains invalid time ranges.");
+    throw new Error(Object.values(draft.errors)[0] ?? t("The schedule matrix contains invalid time ranges."));
   }
 
   await containersApi.replaceGraphSlots(containerId, resolvedGraphId as number, {

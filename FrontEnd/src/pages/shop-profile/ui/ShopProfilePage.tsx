@@ -1,3 +1,4 @@
+import { t } from "@shared/i18n";
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useDeleteShopMutation, useShopByIdQuery } from "@entities/shops/api/queries";
@@ -31,8 +32,8 @@ export function ShopProfilePage() {
   return (
     <div className={styles.page}>
       <PageHeader
-        title="Shop Profile"
-        subtitle="View shop details, location information and record status"
+        title={t("Shop Profile")}
+        subtitle={t("View shop details, location information and record status")}
         backTo="/shop"
       />
 
@@ -47,11 +48,11 @@ export function ShopProfilePage() {
 
       <ConfirmDialog
         open={isDeleteOpen}
-        title="Delete shop"
-        message="Are you sure you want to delete this shop? This action cannot be undone."
+        title={t("Delete shop")}
+        message={t("Are you sure you want to delete this shop? This action cannot be undone.")}
         onCancel={() => setIsDeleteOpen(false)}
         onConfirm={handleDeleteConfirm}
-        confirmText={deleteMutation.isPending ? "Deleting..." : "Delete"}
+        confirmText={deleteMutation.isPending ? t("Deleting...") : t("Delete")}
       />
     </div>
   );

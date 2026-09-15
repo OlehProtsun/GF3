@@ -329,6 +329,12 @@ namespace DataAccessLayer.Migrations
                         .HasColumnType("INTEGER")
                         .HasColumnName("employee_id");
 
+                    b.Property<string>("Language")
+                        .IsRequired()
+                        .HasMaxLength(2)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("language");
+
                     b.Property<DateTimeOffset?>("LastLoginAtUtc")
                         .HasColumnType("TEXT")
                         .HasColumnName("last_login_at_utc");
@@ -568,6 +574,12 @@ namespace DataAccessLayer.Migrations
                     b.Property<bool>("IsSystem")
                         .HasColumnType("INTEGER")
                         .HasColumnName("is_system");
+
+                    b.Property<string>("Language")
+                        .IsRequired()
+                        .HasMaxLength(2)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("language");
 
                     b.Property<DateTimeOffset?>("LastLoginAtUtc")
                         .HasColumnType("TEXT")

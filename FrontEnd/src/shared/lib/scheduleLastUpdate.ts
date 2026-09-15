@@ -1,4 +1,5 @@
-const scheduleLastUpdateFormatter = new Intl.DateTimeFormat("en-GB", {
+import { dateTimeFormat, t } from "@shared/i18n";
+const scheduleLastUpdateFormatter = dateTimeFormat("en-GB", {
   day: "2-digit",
   month: "short",
   year: "numeric",
@@ -9,12 +10,12 @@ const scheduleLastUpdateFormatter = new Intl.DateTimeFormat("en-GB", {
 
 export function formatScheduleLastUpdate(value?: string | null) {
   if (!value) {
-    return "Not recorded yet";
+    return t("Not recorded yet");
   }
 
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) {
-    return "Not recorded yet";
+    return t("Not recorded yet");
   }
 
   return scheduleLastUpdateFormatter.format(date);

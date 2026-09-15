@@ -1,3 +1,4 @@
+import { t } from "@shared/i18n";
 import type { ChangeEvent, FormEvent } from "react";
 import type { ShopFormErrors, ShopFormFieldElement, ShopFormState } from "@entities/shops/model/form";
 import { RecordDetailsFormCard } from "@shared/ui/components/RecordDetailsFormCard";
@@ -36,22 +37,22 @@ export function ShopDetailsForm({
       onSubmit={onSubmit}
     >
       <FormRow>
-        <LabeledField id="name" label="Name" error={errors.name}>
+        <LabeledField id="name" label={t("Name")} error={errors.name}>
           <TextInput
             id="name"
             value={form.name}
-            placeholder="Example: Central Store"
+            placeholder={t("Example: Central Store")}
             onChange={onFieldChange("name")}
             aria-invalid={Boolean(errors.name)}
             aria-describedby={errors.name ? "name-error" : undefined}
           />
         </LabeledField>
 
-        <LabeledField id="address" label="Address" error={errors.address}>
+        <LabeledField id="address" label={t("Address")} error={errors.address}>
           <TextInput
             id="address"
             value={form.address}
-            placeholder="Example: 123 Main Street"
+            placeholder={t("Example: 123 Main Street")}
             onChange={onFieldChange("address")}
             aria-invalid={Boolean(errors.address)}
             aria-describedby={errors.address ? "address-error" : undefined}
@@ -59,11 +60,11 @@ export function ShopDetailsForm({
         </LabeledField>
       </FormRow>
 
-      <LabeledField id="description" label="Description">
+      <LabeledField id="description" label={t("Description")}>
         <TextArea
           id="description"
           rows={5}
-          placeholder="Example: Main retail location with warehouse pickup"
+          placeholder={t("Example: Main retail location with warehouse pickup")}
           value={form.description}
           onChange={onFieldChange("description")}
         />

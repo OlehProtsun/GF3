@@ -1,3 +1,4 @@
+import { t } from "@shared/i18n";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
 import { ArrowIcon, CheckIcon, SearchIcon } from "@shared/ui/icons";
@@ -43,8 +44,8 @@ export function SearchableSelect({
   placeholder,
   dropdownTitle,
   size = "default",
-  searchPlaceholder = "Search...",
-  emptyMessage = "No matching options found.",
+  searchPlaceholder = t("Search..."),
+  emptyMessage = t("No matching options found."),
   fallbackHint,
   showSelectedHint = true,
   searchEnabled = true,
@@ -170,7 +171,7 @@ export function SearchableSelect({
   };
 
   const resolvedHint = showSelectedHint
-    ? (selectedOption?.hint ?? fallbackHint ?? `${options.length} options available`)
+    ? (selectedOption?.hint ?? fallbackHint ?? t("{0} options available", options.length))
     : "";
   const rootClassName = joinClassNames(styles.root, className);
   const dropdown = isOpen ? createPortal(

@@ -1,3 +1,4 @@
+import { t } from "@shared/i18n";
 import {
   buildGraphCellMap,
   buildGraphConflictDayMap,
@@ -85,7 +86,7 @@ type LoadedMonthGraph = {
 };
 
 function createAbortError() {
-  const error = new Error("Request was canceled.");
+  const error = new Error(t("Request was canceled."));
   error.name = "AbortError";
   return error;
 }
@@ -155,7 +156,7 @@ function buildHomeSchedulePreview(
     kind: "manual" as const,
     manualColumnId: column.id,
     graphEmployeeId: null,
-    label: column.label || `Custom ${column.id}`,
+    label: column.label || t("Custom {0}", column.id),
     minHoursMonth: null,
     totalMinutes: 0,
     totalText: "",
@@ -207,8 +208,8 @@ function buildHomeSchedulePreview(
 }
 
 function compareGraphs(left: LoadedMonthGraph, right: LoadedMonthGraph) {
-  const leftShop = left.shop?.name?.trim() || `Shop ${left.graph.shopId}`;
-  const rightShop = right.shop?.name?.trim() || `Shop ${right.graph.shopId}`;
+  const leftShop = left.shop?.name?.trim() || t("Shop {0}", left.graph.shopId);
+  const rightShop = right.shop?.name?.trim() || t("Shop {0}", right.graph.shopId);
   const shopComparison = leftShop.localeCompare(rightShop);
 
   if (shopComparison !== 0) {
@@ -307,7 +308,7 @@ export async function loadHomeDashboard(signal?: AbortSignal): Promise<HomeDashb
     monthShopIds.add(record.graph.shopId);
     activeContainerIds.add(record.container.id);
 
-    const shopName = record.shop?.name?.trim() || `Shop ${record.graph.shopId}`;
+    const shopName = record.shop?.name?.trim() || t("Shop {0}", record.graph.shopId);
     monthShopNames.add(shopName);
 
     record.graphEmployees.forEach(graphEmployee => {
@@ -317,7 +318,7 @@ export async function loadHomeDashboard(signal?: AbortSignal): Promise<HomeDashb
 
       monthEmployeeIds.add(graphEmployee.employeeId);
       monthEmployeeNames.add(
-        getEmployeeFullName(employeesById.get(graphEmployee.employeeId), `Employee ${graphEmployee.employeeId}`),
+        getEmployeeFullName(employeesById.get(graphEmployee.employeeId), t("Employee {0}", graphEmployee.employeeId)),
       );
     });
 
@@ -328,7 +329,7 @@ export async function loadHomeDashboard(signal?: AbortSignal): Promise<HomeDashb
 
       monthEmployeeIds.add(slot.employeeId);
       monthEmployeeNames.add(
-        getEmployeeFullName(employeesById.get(slot.employeeId), `Employee ${slot.employeeId}`),
+        getEmployeeFullName(employeesById.get(slot.employeeId), t("Employee {0}", slot.employeeId)),
       );
       monthTotalMinutes += getSlotDurationMinutes(slot);
 
@@ -336,7 +337,7 @@ export async function loadHomeDashboard(signal?: AbortSignal): Promise<HomeDashb
         return;
       }
 
-      const employeeName = getEmployeeFullName(employeesById.get(slot.employeeId), `Employee ${slot.employeeId}`);
+      const employeeName = getEmployeeFullName(employeesById.get(slot.employeeId), t("Employee {0}", slot.employeeId));
       const shift = `${slot.fromTime} - ${slot.toTime}`;
       const rowKey = `${record.graph.id}:${slot.id}`;
       if (todayRowsByKey.has(rowKey)) {
@@ -373,10 +374,10 @@ export async function loadHomeDashboard(signal?: AbortSignal): Promise<HomeDashb
 
   const currentMonthContainerName =
     activeContainerNames.length === 0
-      ? "No active containers"
+      ? t("No active containers")
       : activeContainerNames.length === 1
         ? activeContainerNames[0]
-        : `${activeContainerNames.length} active containers`;
+        : t("{0} active containers", activeContainerNames.length);
 
   const todayRows = [...todayRowsByKey.values()].sort((left, right) => {
     const shiftComparison = left.shift.localeCompare(right.shift);
@@ -409,8 +410,8 @@ export async function loadHomeDashboard(signal?: AbortSignal): Promise<HomeDashb
     currentMonthTotalShops: monthShopIds.size,
     todayActiveEmployeesCount: todayEmployeeIds.size,
     statusText: hasPartialData
-      ? "Home data loaded with a few missing schedule previews."
-      : "Home data is up to date.",
+      ? t("Home data loaded with a few missing schedule previews.")
+      : t("Home data is up to date."),
     todayRows,
     activeSchedules,
   };

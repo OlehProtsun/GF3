@@ -1,3 +1,4 @@
+import { t } from "@shared/i18n";
 import { useEffect, useId, useState, type MouseEvent } from "react";
 import { createPortal } from "react-dom";
 import { IosButton } from "@shared/ui/components/IosButton";
@@ -16,16 +17,16 @@ type ContainerGraphHighlightColorDialogProps = {
 };
 
 const highlightColors = [
-  { label: "Soft blue", value: "#DBEAFE" },
-  { label: "Sky", value: "#BAE6FD" },
-  { label: "Mint", value: "#BBF7D0" },
-  { label: "Aqua", value: "#99F6E4" },
-  { label: "Lavender", value: "#DDD6FE" },
-  { label: "Cream", value: "#FEF3C7" },
-  { label: "Amber", value: "#FDE68A" },
-  { label: "Peach", value: "#FED7AA" },
-  { label: "Rose", value: "#FECDD3" },
-  { label: "Lilac", value: "#F5D0FE" },
+  { get label() { return t("Soft blue"); }, value: "#DBEAFE" },
+  { get label() { return t("Sky"); }, value: "#BAE6FD" },
+  { get label() { return t("Mint"); }, value: "#BBF7D0" },
+  { get label() { return t("Aqua"); }, value: "#99F6E4" },
+  { get label() { return t("Lavender"); }, value: "#DDD6FE" },
+  { get label() { return t("Cream"); }, value: "#FEF3C7" },
+  { get label() { return t("Amber"); }, value: "#FDE68A" },
+  { get label() { return t("Peach"); }, value: "#FED7AA" },
+  { get label() { return t("Rose"); }, value: "#FECDD3" },
+  { get label() { return t("Lilac"); }, value: "#F5D0FE" },
 ];
 
 function normalizeHexColor(value: string) {
@@ -71,9 +72,9 @@ export function ContainerGraphHighlightColorDialog({
       <div className={styles.dialog}>
         <header className={styles.header}>
           <div><span>{eyebrow}</span><h3 id={titleId}>{title}</h3></div>
-          <button type="button" aria-label="Close color dialog" onClick={onCancel}><CloseIcon size={16} /></button>
+          <button type="button" aria-label={t("Close color dialog")} onClick={onCancel}><CloseIcon size={16} /></button>
         </header>
-        <div className={styles.palette} aria-label="Highlight colors">
+        <div className={styles.palette} aria-label={t("Highlight colors")}>
           {highlightColors.map(option => (
             <button key={option.value} type="button" aria-label={option.label}
               aria-pressed={normalizedDraft === option.value}
@@ -86,10 +87,10 @@ export function ContainerGraphHighlightColorDialog({
           <input value={draft} maxLength={7} aria-label={inputLabel}
             onChange={event => setDraft(event.target.value)} />
         </label>
-        {!normalizedDraft ? <p className={styles.error}>Enter a color like #BBF7D0.</p> : null}
+        {!normalizedDraft ? <p className={styles.error}>{t("Enter a color like #BBF7D0.")}</p> : null}
         <footer className={styles.actions}>
-          <IosButton label="Cancel" variant="secondary" size="compact" onClick={onCancel} />
-          <IosButton label={isSaving ? "Saving..." : "Use color"} size="compact" icon={<CheckIcon size={15} />}
+          <IosButton label={t("Cancel")} variant="secondary" size="compact" onClick={onCancel} />
+          <IosButton label={isSaving ? t("Saving...") : t("Use color")} size="compact" icon={<CheckIcon size={15} />}
             disabled={!normalizedDraft || isSaving} onClick={() => normalizedDraft && onSave(normalizedDraft)} />
         </footer>
       </div>

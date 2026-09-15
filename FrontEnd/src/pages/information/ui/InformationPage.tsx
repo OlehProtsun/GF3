@@ -1,3 +1,4 @@
+import { t, translateServerMessage } from "@shared/i18n";
 import { useMemo, useState } from "react";
 import {
   useBulkDeleteWorkflowLogsMutation,
@@ -25,9 +26,9 @@ import styles from "./InformationPage.module.css";
 
 const emptyLogs: WorkflowLog[] = [];
 const audienceOptions: Array<{ value: WorkflowLogAudience; label: string }> = [
-  { value: "all", label: "Everyone" },
-  { value: "managers", label: "Managers" },
-  { value: "employees", label: "Employees" },
+  { value: "all", get label() { return t("Everyone"); } },
+  { value: "managers", get label() { return t("Managers"); } },
+  { value: "employees", get label() { return t("Employees"); } },
 ];
 
 type DeleteIntent =
@@ -68,7 +69,7 @@ export function InformationPage() {
     setActionError(null);
     updateSettingsMutation.mutate(
       { isEnabled, audience },
-      { onError: error => setActionError(getErrorMessage(error, "Could not update logging settings.")) },
+      { onError: error => setActionError(getErrorMessage(error, t("Could not update logging settings."))) },
     );
   };
 
@@ -79,7 +80,7 @@ export function InformationPage() {
 
     const bounds = getWorkflowLogDayBounds(selectedDay.key);
     if (!bounds) {
-      setActionError("This day cannot be deleted because its date is unknown.");
+      setActionError(t("This day cannot be deleted because its date is unknown."));
       return;
     }
 
@@ -87,16 +88,16 @@ export function InformationPage() {
     setDeleteIntent({
       kind: "bulk",
       payload: { deleteAll: false, ...bounds },
-      title: "Delete this day",
-      message: `Delete all ${selectedDay.logs.length} log entries from ${selectedDay.fullLabel}?`,
-      confirmText: "Delete day",
+      title: t("Delete this day"),
+      message: t("Delete all {0} log entries from {1}?", selectedDay.logs.length, selectedDay.fullLabel),
+      confirmText: t("Delete day"),
     });
   };
 
   const requestDeleteRange = () => {
     const bounds = getWorkflowLogRangeBounds(rangeFrom, rangeTo);
     if (!bounds) {
-      setActionError("Choose a valid From and Through date.");
+      setActionError(t("Choose a valid From and Through date."));
       return;
     }
 
@@ -104,9 +105,9 @@ export function InformationPage() {
     setDeleteIntent({
       kind: "bulk",
       payload: { deleteAll: false, ...bounds },
-      title: "Delete date range",
-      message: `Delete all workflow logs from ${rangeFrom} through ${rangeTo}, inclusive?`,
-      confirmText: "Delete range",
+      title: t("Delete date range"),
+      message: t("Delete all workflow logs from {0} through {1}, inclusive?", rangeFrom, rangeTo),
+      confirmText: t("Delete range"),
     });
   };
 
@@ -119,7 +120,7 @@ export function InformationPage() {
     const options = {
       onSuccess: () => setDeleteIntent(null),
       onError: (error: unknown) => {
-        setActionError(getErrorMessage(error, "Could not delete workflow logs."));
+        setActionError(getErrorMessage(error, t("Could not delete workflow logs.")));
         setDeleteIntent(null);
       },
     };
@@ -134,7 +135,7 @@ export function InformationPage() {
 
   return (
     <div className={styles.page}>
-      <PageHeader title="Information" subtitle="Employee and manager workflow activity" backTo={-1} />
+      <PageHeader title={t("Information")} subtitle={t("Employee and manager workflow activity")} backTo={-1} />
 
       <section className={styles.panel}>
         <div className={styles.panelHeader}>
@@ -143,14 +144,14 @@ export function InformationPage() {
               <InformationIcon size={18} />
             </span>
             <div>
-              <span className={styles.eyebrow}>Workflow logs</span>
-              <strong>Live activity</strong>
+              <span className={styles.eyebrow}>{t("Workflow logs")}</span>
+              <strong>{t("Live activity")}</strong>
             </div>
           </div>
 
           <div className={styles.headerPills}>
             <span className={settings?.isEnabled === false ? styles.pausedPill : styles.livePill}>
-              {logsQuery.isFetching ? "Syncing" : settings?.isEnabled === false ? "Paused" : "Live"}
+              {logsQuery.isFetching ? t("Syncing") : settings?.isEnabled === false ? t("Paused") : t("Live")}
             </span>
             <span className={styles.countPill}>{logs.length}</span>
           </div>
@@ -160,8 +161,8 @@ export function InformationPage() {
           <div className={styles.managementCard}>
             <div className={styles.managementHeading}>
               <div>
-                <span className={styles.eyebrow}>Recording</span>
-                <strong>Logging control</strong>
+                <span className={styles.eyebrow}>{t("Recording")}</span>
+                <strong>{t("Logging control")}</strong>
               </div>
               <button
                 type="button"
@@ -170,11 +171,11 @@ export function InformationPage() {
                 disabled={!settings || updateSettingsMutation.isPending}
                 onClick={() => settings && updateSettings(!settings.isEnabled, settings.audience)}
               >
-                {settings?.isEnabled ? "Logging on" : "Logging off"}
+                {settings?.isEnabled ? t("Logging on") : t("Logging off")}
               </button>
             </div>
 
-            <div className={styles.audienceGroup} role="group" aria-label="Choose who is logged">
+            <div className={styles.audienceGroup} role="group" aria-label={t("Choose who is logged")}>
               {audienceOptions.map(option => (
                 <button
                   key={option.value}
@@ -189,15 +190,14 @@ export function InformationPage() {
               ))}
             </div>
             <p className={styles.managementHint}>
-              Turning logging off keeps existing history. Audience changes apply only to new activity.
-            </p>
+              {t("Turning logging off keeps existing history. Audience changes apply only to new activity.")}</p>
           </div>
 
           <div className={styles.managementCard}>
             <div className={styles.managementHeading}>
               <div>
-                <span className={styles.eyebrow}>History</span>
-                <strong>Delete by date</strong>
+                <span className={styles.eyebrow}>{t("History")}</span>
+                <strong>{t("Delete by date")}</strong>
               </div>
               <button
                 type="button"
@@ -208,20 +208,19 @@ export function InformationPage() {
                   setDeleteIntent({
                     kind: "bulk",
                     payload: { deleteAll: true },
-                    title: "Delete all history",
-                    message: "Delete every workflow log entry? This cannot be undone.",
-                    confirmText: "Delete all",
+                    title: t("Delete all history"),
+                    message: t("Delete every workflow log entry? This cannot be undone."),
+                    confirmText: t("Delete all"),
                   });
                 }}
               >
-                Delete all
-              </button>
+                {t("Delete all")}</button>
             </div>
 
             <div className={styles.rangeControls}>
               <AvailabilityDateTimeField
                 id="workflow-log-range-from"
-                label="From"
+                label={t("From")}
                 value={rangeFrom}
                 defaultTime="00:00"
                 dateOnly
@@ -229,35 +228,34 @@ export function InformationPage() {
               />
               <AvailabilityDateTimeField
                 id="workflow-log-range-through"
-                label="Through"
+                label={t("Through")}
                 value={rangeTo}
                 defaultTime="00:00"
                 dateOnly
                 onChange={setRangeTo}
               />
               <button type="button" className={styles.rangeDeleteButton} disabled={deletePending} onClick={requestDeleteRange}>
-                Delete range
-              </button>
+                {t("Delete range")}</button>
             </div>
-            <p className={styles.managementHint}>Dates use your local timezone and include the entire Through day.</p>
+            <p className={styles.managementHint}>{t("Dates use your local timezone and include the entire Through day.")}</p>
           </div>
         </div>
 
         {actionError ? <div className={styles.errorText}>{actionError}</div> : null}
         {settingsQuery.error ? (
-          <div className={styles.errorText}>{getErrorMessage(settingsQuery.error, "Could not load logging settings.")}</div>
+          <div className={styles.errorText}>{getErrorMessage(settingsQuery.error, t("Could not load logging settings."))}</div>
         ) : null}
 
         {logsQuery.isLoading ? (
-          <div className={styles.stateText}>Loading logs...</div>
+          <div className={styles.stateText}>{t("Loading logs...")}</div>
         ) : logsQuery.error ? (
-          <div className={styles.stateText}>{getErrorMessage(logsQuery.error, "Could not load workflow logs.")}</div>
+          <div className={styles.stateText}>{getErrorMessage(logsQuery.error, t("Could not load workflow logs."))}</div>
         ) : logs.length === 0 ? (
-          <div className={styles.stateText}>No workflow activity yet.</div>
+          <div className={styles.stateText}>{t("No workflow activity yet.")}</div>
         ) : (
           <div className={styles.activityLayout}>
             <div className={styles.dayRailShell}>
-              <div className={styles.dayRail} aria-label="Workflow log days">
+              <div className={styles.dayRail} aria-label={t("Workflow log days")}>
                 {logDays.map(day => {
                   const isSelected = day.key === selectedDay?.key;
 
@@ -280,14 +278,13 @@ export function InformationPage() {
             <div className={styles.timelinePanel}>
               <div className={styles.timelineHeader}>
                 <div>
-                  <span className={styles.eyebrow}>Selected day</span>
-                  <strong>{selectedDay?.fullLabel ?? "No day selected"}</strong>
+                  <span className={styles.eyebrow}>{t("Selected day")}</span>
+                  <strong>{selectedDay?.fullLabel ?? t("No day selected")}</strong>
                 </div>
                 <div className={styles.timelineHeaderActions}>
                   <span className={styles.countPill}>{filteredSelectedDayLogs.length}</span>
                   <button type="button" className={styles.dangerButton} disabled={!selectedDay || deletePending} onClick={requestDeleteDay}>
-                    Delete day
-                  </button>
+                    {t("Delete day")}</button>
                 </div>
               </div>
 
@@ -296,8 +293,8 @@ export function InformationPage() {
                 <input
                   type="search"
                   value={logSearch}
-                  placeholder="Search by name or time"
-                  aria-label="Search logs by actor name or time"
+                  placeholder={t("Search by name or time")}
+                  aria-label={t("Search logs by actor name or time")}
                   onChange={event => setLogSearch(event.target.value)}
                 />
               </label>
@@ -321,21 +318,21 @@ export function InformationPage() {
                           {getRoleLabel(log.actorRole)}
                         </span>
                       </div>
-                      <p>{log.action}</p>
+                      <p>{translateServerMessage(log.action)}</p>
                     </div>
                     <button
                       type="button"
                       className={styles.logDeleteButton}
                       disabled={deletePending}
-                      aria-label={`Delete log from ${log.actorName} at ${formatWorkflowLogTime(log.occurredAtUtc)}`}
+                      aria-label={t("Delete log from {0} at {1}", log.actorName, formatWorkflowLogTime(log.occurredAtUtc))}
                       onClick={() => {
                         setActionError(null);
                         setDeleteIntent({
                           kind: "entry",
                           id: log.id,
-                          title: "Delete log entry",
-                          message: `Delete this ${getRoleLabel(log.actorRole).toLowerCase()} log from ${log.actorName}?`,
-                          confirmText: "Delete entry",
+                          title: t("Delete log entry"),
+                          message: t("Delete this {0} log from {1}?", getRoleLabel(log.actorRole).toLowerCase(), log.actorName),
+                          confirmText: t("Delete entry"),
                         });
                       }}
                     >
@@ -344,7 +341,7 @@ export function InformationPage() {
                   </article>
                 ))}
                 {selectedDay && filteredSelectedDayLogs.length === 0 ? (
-                  <div className={styles.emptySearch}>No logs match this search.</div>
+                  <div className={styles.emptySearch}>{t("No logs match this search.")}</div>
                 ) : null}
               </div>
             </div>
@@ -354,9 +351,9 @@ export function InformationPage() {
 
       <ConfirmDialog
         open={deleteIntent !== null}
-        title={deleteIntent?.title ?? "Delete workflow logs"}
-        message={deleteIntent?.message ?? "Delete the selected workflow logs?"}
-        confirmText={deletePending ? "Deleting..." : deleteIntent?.confirmText ?? "Delete"}
+        title={deleteIntent?.title ?? t("Delete workflow logs")}
+        message={deleteIntent?.message ?? t("Delete the selected workflow logs?")}
+        confirmText={deletePending ? t("Deleting...") : deleteIntent?.confirmText ?? t("Delete")}
         confirmDisabled={deletePending}
         cancelDisabled={deletePending}
         onCancel={() => setDeleteIntent(null)}

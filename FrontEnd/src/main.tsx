@@ -2,6 +2,7 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import "./index.css";
 import App from "./App";
+import { LanguageProvider } from "@app/providers/LanguageProvider";
 import { AuthProvider } from "@app/providers/AuthProvider";
 import { PresenceProvider } from "@app/providers/PresenceProvider";
 import { QueryProvider } from "@app/providers/QueryProvider";
@@ -11,10 +12,10 @@ createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <QueryProvider>
       <AuthProvider>
-        <PresenceProvider>
+        <LanguageProvider><PresenceProvider>
           <App />
           <ErrorAlertsViewport />
-        </PresenceProvider>
+        </PresenceProvider></LanguageProvider>
       </AuthProvider>
     </QueryProvider>
   </StrictMode>,

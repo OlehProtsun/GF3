@@ -1,3 +1,4 @@
+import { t } from "@shared/i18n";
 import { useMemo, type CSSProperties, type ReactNode } from "react";
 import type { GraphMatrixColumn } from "@entities/containers";
 import { ContainerGraphMatrix } from "@entities/containers";
@@ -43,8 +44,8 @@ export function AvailabilityScheduleMatrix({
   columns,
   cellMap,
   visualHintMap,
-  title = "Availability Schedule",
-  helperText = `Use ${AVAILABILITY_ANY_MARK} for any shift, ${AVAILABILITY_NONE_MARK} for unavailable, a time interval like 08:00 - 16:00, or any text note. Text notes stay visible but are treated as unavailable during schedule generation.`,
+  title = t("Availability Schedule"),
+  helperText = t("Use {0} for any shift, {1} for unavailable, a time interval like 08:00 - 16:00, or any text note. Text notes stay visible but are treated as unavailable during schedule generation.", AVAILABILITY_ANY_MARK, AVAILABILITY_NONE_MARK),
   readOnly = false,
   emptyMessage,
   cellErrors = {},
@@ -104,8 +105,8 @@ export function AvailabilityScheduleMatrix({
       emptyMessage={
         emptyMessage ??
         (readOnly
-          ? "No employees are assigned to this availability group yet."
-          : "Add at least one employee to start filling the schedule.")
+          ? t("No employees are assigned to this availability group yet.")
+          : t("Add at least one employee to start filling the schedule."))
       }
       compactSize={compactSize}
       preserveShellHeightOnCompact

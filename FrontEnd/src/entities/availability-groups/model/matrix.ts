@@ -1,3 +1,4 @@
+import { getLanguage, t } from "@shared/i18n";
 import type { AvailabilityGroupItem, AvailabilityGroupMember, AvailabilityKind, AvailabilitySlot } from "./types";
 import { parseFlexibleTimeRange } from "@shared/lib/timeRange";
 
@@ -86,7 +87,7 @@ function getAvailabilityDate(year: number, month: number, dayOfMonth: number) {
 
 export function getAvailabilityWeekdayLabel(year: number, month: number, dayOfMonth: number) {
   const weekdayIndex = getAvailabilityDate(year, month, dayOfMonth).getDay();
-  const weekdayLabels = ["su", "mo", "tu", "we", "th", "fr", "sa"];
+  const weekdayLabels = getLanguage() === "pl" ? ["nd", "pn", "wt", "śr", "cz", "pt", "so"] : ["su", "mo", "tu", "we", "th", "fr", "sa"];
 
   return `${weekdayLabels[weekdayIndex]}.`;
 }
@@ -202,7 +203,7 @@ export function parseAvailabilityCode(input: string):
 
   return {
     ok: false,
-    error: "Use +, -, text, or a valid time range like 09:00 - 15:00.",
+    error: t("Use +, -, text, or a valid time range like 09:00 - 15:00."),
   };
 }
 
@@ -222,7 +223,7 @@ export function buildAvailabilityColumns(
       memberId: member.id,
       displayOrder: member.displayOrder,
       employeeLastModifiedAtUtc: member.employeeLastModifiedAtUtc ?? null,
-      label: employeeNameById.get(member.employeeId) ?? `Employee #${member.employeeId}`,
+      label: employeeNameById.get(member.employeeId) ?? t("Employee #{0}", member.employeeId),
     }))
   );
 }
@@ -275,7 +276,7 @@ export function buildAvailabilityColumnsFromItems(
       memberId: member.memberId,
       displayOrder: member.displayOrder,
       employeeLastModifiedAtUtc: member.employeeLastModifiedAtUtc,
-      label: employeeNameById.get(member.employeeId) ?? `Employee #${member.employeeId}`,
+      label: employeeNameById.get(member.employeeId) ?? t("Employee #{0}", member.employeeId),
     }))
   );
 }

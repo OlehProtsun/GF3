@@ -1,3 +1,4 @@
+import { t } from "@shared/i18n";
 import type { FormEvent, ReactNode } from "react";
 import { ErrorBanner } from "@shared/ui/components/ErrorBanner";
 import { IosButton } from "@shared/ui/components/IosButton";
@@ -28,7 +29,7 @@ export function RecordDetailsFormCard({
   children,
 }: RecordDetailsFormCardProps) {
   return (
-    <CardSection title="Details" icon={<InformationIcon size={18} className={styles.infoIcon} />}>
+    <CardSection title={t("Details")} icon={<InformationIcon size={18} className={styles.infoIcon} />}>
       {isLoading ? <div className={styles.loading}>{loadingMessage}</div> : null}
       {hasLoadError ? <ErrorBanner className={styles.errorBanner}>{errorMessage}</ErrorBanner> : null}
 
@@ -38,7 +39,7 @@ export function RecordDetailsFormCard({
 
           <FormActions>
             <IosButton
-              label="Cancel"
+              label={t("Cancel")}
               variant="secondary"
               icon={<CloseIcon size={18} />}
               onClick={onCancel}
@@ -47,7 +48,7 @@ export function RecordDetailsFormCard({
             />
 
             <IosButton
-              label={isSaving ? "Saving..." : "Save"}
+              label={isSaving ? t("Saving...") : t("Save")}
               variant="primary"
               icon={<CheckIcon size={18} />}
               type="submit"

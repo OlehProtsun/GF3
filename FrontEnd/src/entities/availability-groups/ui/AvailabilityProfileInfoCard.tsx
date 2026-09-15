@@ -1,3 +1,4 @@
+import { t } from "@shared/i18n";
 import type { ReactNode } from "react";
 import type { AvailabilityGroup } from "@entities/availability-groups/model/types";
 import {
@@ -34,36 +35,36 @@ export function AvailabilityProfileInfoCard({
   const publicationOverview = (
     <div className={styles.publicationOverview}>
       <div className={styles.publicationStatusPanel}>
-        <span className={styles.publicationLabel}>Status</span>
+        <span className={styles.publicationLabel}>{t("Status")}</span>
         <span className={[styles.statusBadge, publicationStatus === "public" ? styles.statusBadgePublic : ""].filter(Boolean).join(" ")}>
           {getAvailabilityPublicationStatusLabel(group.publicationStatus)}
         </span>
       </div>
 
       <div className={styles.visibilityPanel}>
-        <span className={styles.publicationLabel}>Visible</span>
+        <span className={styles.publicationLabel}>{t("Visible")}</span>
         {hasVisibilityWindow ? (
           <div className={styles.visibilityTimeline}>
             <span className={styles.visibilityEndpoint}>
-              <small>From</small>
+              <small>{t("From")}</small>
               <strong>{formatAvailabilityDateTimeLabel(group.visibleFromUtc)}</strong>
             </span>
             <span className={styles.visibilityLine} aria-hidden="true" />
             <span className={styles.visibilityEndpoint}>
-              <small>To</small>
+              <small>{t("To")}</small>
               <strong>{formatAvailabilityDateTimeLabel(group.visibleToUtc)}</strong>
             </span>
           </div>
         ) : (
-          <span className={styles.visibilityEmpty}>Not configured</span>
+          <span className={styles.visibilityEmpty}>{t("Not configured")}</span>
         )}
       </div>
     </div>
   );
   const detailItems = [
-    { key: "month", label: "Month", value: getAvailabilityMonthLabel(group.month) },
-    { key: "year", label: "Year", value: String(group.year) },
-    { key: "employees", label: "Employees", value: String(employeeCount) },
+    { key: "month", label: t("Month"), value: getAvailabilityMonthLabel(group.month) },
+    { key: "year", label: t("Year"), value: String(group.year) },
+    { key: "employees", label: t("Employees"), value: String(employeeCount) },
   ];
 
   return (
@@ -80,9 +81,9 @@ export function AvailabilityProfileInfoCard({
       details={detailItems}
       actions={
         <>
-          <IosButton label="Edit" onClick={onEdit} />
+          <IosButton label={t("Edit")} onClick={onEdit} />
           <IosButton
-            label={isDeleting ? "Deleting..." : "Delete"}
+            label={isDeleting ? t("Deleting...") : t("Delete")}
             variant="secondary"
             customColor="#dc2626"
             customBorderColor="#dc2626"

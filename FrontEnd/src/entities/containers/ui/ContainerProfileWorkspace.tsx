@@ -1,3 +1,4 @@
+import { dateTimeFormat, t } from "@shared/i18n";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { AvailabilitySidebarCollapseButton, AvailabilitySidebarSection } from "@entities/availability-groups/ui/AvailabilitySidebarSection";
 import {
@@ -65,7 +66,7 @@ function matchesEmployeeSearch(employeeName: string, searchQuery: string) {
 }
 
 function formatSwapDate(swap: ShiftSwap) {
-  return new Intl.DateTimeFormat("en-GB", {
+  return dateTimeFormat("en-GB", {
     day: "2-digit",
     month: "short",
     year: "numeric",
@@ -75,10 +76,10 @@ function formatSwapDate(swap: ShiftSwap) {
 
 function getSwapReceiver(swap: ShiftSwap) {
   if (swap.status === "accepted") {
-    return swap.acceptedByEmployeeName ?? "Employee";
+    return swap.acceptedByEmployeeName ?? t("Employee");
   }
 
-  return swap.targetEmployeeName ?? "Everyone";
+  return swap.targetEmployeeName ?? t("Everyone");
 }
 
 type SwapAction = { type: "cancel" | "delete"; swap: ShiftSwap } | null;
@@ -97,7 +98,7 @@ function MultiOpenHeaderToggle({ checked, onToggle }: MultiOpenHeaderToggleProps
       aria-pressed={checked}
       onClick={onToggle}
     >
-      <span className={styles.multiOpenToggleTitle}>MultiOpen</span>
+      <span className={styles.multiOpenToggleTitle}>{t("MultiOpen")}</span>
 
       <span className={styles.multiOpenToggleTrack} aria-hidden="true">
         <span className={styles.multiOpenToggleThumb} />
@@ -225,7 +226,7 @@ export function ContainerProfileWorkspace({
           setSwapAction(null);
           setSelectedSwap(current => current?.id === swapAction.swap.id ? null : current);
         },
-        onError: error => setSwapActionError(getErrorMessage(error, `Could not ${swapAction.type} this swap.`)),
+        onError: error => setSwapActionError(getErrorMessage(error, t("Could not {0} this swap.", swapAction.type))),
       },
     );
   };
@@ -246,17 +247,17 @@ export function ContainerProfileWorkspace({
       },
       {
         onSuccess: () => setSchedulePublicationAction(null),
-        onError: error => setSchedulePublicationError(getErrorMessage(error, "Could not update all schedules.")),
+        onError: error => setSchedulePublicationError(getErrorMessage(error, t("Could not update all schedules."))),
       },
     );
   };
 
   if (isLoading) {
-    return <div className={styles.state}>Loading container profile...</div>;
+    return <div className={styles.state}>{t("Loading container profile...")}</div>;
   }
 
   if (hasLoadError || !container) {
-    return <ErrorBanner className={styles.banner}>Could not load this container.</ErrorBanner>;
+    return <ErrorBanner className={styles.banner}>{t("Could not load this container.")}</ErrorBanner>;
   }
 
   const rawDetails = getContainerProfileDetails(container, {
@@ -271,10 +272,10 @@ export function ContainerProfileWorkspace({
     .map(item => ({
       key: item.key,
       label: item.label,
-      value: item.value ?? <span className={styles.mutedValue}>Not provided</span>,
+      value: item.value ?? <span className={styles.mutedValue}>{t("Not provided")}</span>,
     }));
   const hasNote = typeof noteDetail?.value === "string" ? noteDetail.value.trim().length > 0 : Boolean(noteDetail?.value);
-  const noteValue = noteDetail?.value ?? <span className={styles.mutedValue}>Not provided</span>;
+  const noteValue = noteDetail?.value ?? <span className={styles.mutedValue}>{t("Not provided")}</span>;
   const showGraphsEmpty = !isGraphsLoading && !hasGraphsError && totalGraphsCount === 0;
   const showSearchEmpty = !isGraphsLoading && totalGraphsCount > 0 && graphs.length === 0;
   const showStatisticsEmpty = statistics.pivotRows.length === 0;
@@ -297,7 +298,7 @@ export function ContainerProfileWorkspace({
       <div className={joinClassNames(styles.topRow, allSectionsCollapsed && styles.topRowAllCollapsed)}>
         <aside ref={sidebarRef} className={joinClassNames(styles.sidebar, allSectionsCollapsed && styles.sidebarAllCollapsed)}>
           <AvailabilitySidebarSection
-            label="Container Information"
+            label={t("Container Information")}
             collapsed={collapsedSections.information}
             collapsedIcon={<ContainerInfoIcon size={18} />}
             collapsedOffset="flush"
@@ -305,11 +306,11 @@ export function ContainerProfileWorkspace({
           >
             <CardSection
               className={joinClassNames(styles.sectionCard, styles.summaryCard)}
-              title="Container Information"
+              title={t("Container Information")}
               icon={<ContainerInfoIcon size={18} />}
               headerRightSlot={
                 <AvailabilitySidebarCollapseButton
-                  label="Container Information"
+                  label={t("Container Information")}
                   onCollapse={() => setCollapsedSections(current => ({ ...current, information: true }))}
                 />
               }
@@ -327,7 +328,7 @@ export function ContainerProfileWorkspace({
                 </div>
               </div>
 
-              <div className={styles.containerInfoLabels} role="group" aria-label="Container details">
+              <div className={styles.containerInfoLabels} role="group" aria-label={t("Container details")}>
                 <div className={styles.statisticsSummaryItem}>
                   <span className={styles.statisticsSummaryLabel}>ID</span>
                   <strong className={styles.statisticsSummaryValue}>{container.id}</strong>
@@ -341,13 +342,13 @@ export function ContainerProfileWorkspace({
               </div>
 
               <div className={joinClassNames(styles.containerNote, !hasNote && styles.containerNoteEmpty)}>
-                <span className={styles.containerNoteLabel}>{noteDetail?.label ?? "Note"}</span>
+                <span className={styles.containerNoteLabel}>{noteDetail?.label ?? t("Note")}</span>
                 <div className={styles.containerNoteValue}>{noteValue}</div>
               </div>
               <div className={styles.containerInfoActions}>
-                <IosButton label="Edit Container" onClick={() => onEditContainer(container.id)} />
+                <IosButton label={t("Edit Container")} onClick={() => onEditContainer(container.id)} />
                 <IosButton
-                  label={isDeleting ? "Deleting..." : "Delete Container"}
+                  label={isDeleting ? t("Deleting...") : t("Delete Container")}
                   variant="secondary"
                   customColor="#ef4444"
                   customBorderColor="#ef4444"
@@ -360,7 +361,7 @@ export function ContainerProfileWorkspace({
           </AvailabilitySidebarSection>
 
           <AvailabilitySidebarSection
-            label="Swaps"
+            label={t("Swaps")}
             collapsed={collapsedSections.swaps}
             collapsedIcon={<SwapOffersIcon size={18} />}
             collapsedOffset="flush"
@@ -368,13 +369,13 @@ export function ContainerProfileWorkspace({
           >
             <CardSection
               className={joinClassNames(styles.sectionCard, styles.swapsCard)}
-              title="Swaps"
+              title={t("Swaps")}
               icon={<SwapOffersIcon size={18} />}
               headerRightSlot={
                 <div className={styles.swapHeaderActions}>
                   <span className={styles.headerBadge}>{hasSwapSearch ? `${filteredSwaps.length}/${swaps.length}` : swaps.length}</span>
                   <AvailabilitySidebarCollapseButton
-                    label="Swaps"
+                    label={t("Swaps")}
                     onCollapse={() => setCollapsedSections(current => ({ ...current, swaps: true }))}
                   />
                 </div>
@@ -382,8 +383,7 @@ export function ContainerProfileWorkspace({
             >
               <div className={styles.swapsContent}>
                 <div className={styles.swapMonthLabel}>
-                  All schedules in this container
-                </div>
+                  {t("All schedules in this container")}</div>
 
                 <label className={joinClassNames(styles.searchField, styles.swapSearchField)} htmlFor="container-swaps-search">
                   <SearchIcon className={styles.searchIcon} />
@@ -393,19 +393,19 @@ export function ContainerProfileWorkspace({
                     type="search"
                     value={swapSearchQuery}
                     onChange={event => setSwapSearchQuery(event.target.value)}
-                    placeholder="Employee, date or schedule"
-                    aria-label="Search swaps by giver, receiver, date or schedule"
+                    placeholder={t("Employee, date or schedule")}
+                    aria-label={t("Search swaps by giver, receiver, date or schedule")}
                   />
                 </label>
 
                 {swapActionError ? <ErrorBanner className={styles.swapError}>{swapActionError}</ErrorBanner> : null}
-                {swapsQuery.isLoading ? <div className={styles.swapState}>Loading swaps...</div> : null}
-                {swapsQuery.isError ? <div className={styles.swapState}>Could not load swaps for this container.</div> : null}
+                {swapsQuery.isLoading ? <div className={styles.swapState}>{t("Loading swaps...")}</div> : null}
+                {swapsQuery.isError ? <div className={styles.swapState}>{t("Could not load swaps for this container.")}</div> : null}
                 {!swapsQuery.isLoading && !swapsQuery.isError && swaps.length === 0 ? (
-                  <div className={styles.swapState}>No swaps in this container.</div>
+                  <div className={styles.swapState}>{t("No swaps in this container.")}</div>
                 ) : null}
                 {!swapsQuery.isLoading && swaps.length > 0 && filteredSwaps.length === 0 ? (
-                  <div className={styles.swapState}>{`No swaps match "${swapSearchQuery.trim()}".`}</div>
+                  <div className={styles.swapState}>{t("No swaps match \"{0}\".", swapSearchQuery.trim())}</div>
                 ) : null}
 
                 {filteredSwaps.length > 0 ? (
@@ -415,7 +415,7 @@ export function ContainerProfileWorkspace({
                         <div className={styles.swapItemHeader}>
                           <div className={styles.swapPeople}>
                             <strong>{swap.fromEmployeeName}</strong>
-                            <span>to</span>
+                            <span>{t("to")}</span>
                             <strong>{getSwapReceiver(swap)}</strong>
                           </div>
                           <span className={joinClassNames(styles.swapStatus, styles[`swapStatus${swap.status}`])}>{swap.status}</span>
@@ -425,14 +425,13 @@ export function ContainerProfileWorkspace({
                           <span>{`${formatSwapDate(swap)} | ${swap.fromTime.slice(0, 5)}-${swap.toTime.slice(0, 5)}`}</span>
                         </div>
                         <div className={styles.swapActions}>
-                          <button type="button" onClick={() => setSelectedSwap(swap)} aria-label={`View ${swap.scheduleName} swap`}>
+                          <button type="button" onClick={() => setSelectedSwap(swap)} aria-label={t("View {0} swap", swap.scheduleName)}>
                             <EyeIcon size={16} />
-                            <span>View</span>
+                            <span>{t("View")}</span>
                           </button>
                           {swap.status === "open" ? (
                             <button type="button" disabled={isSwapActionPending} onClick={() => setSwapAction({ type: "cancel", swap })}>
-                              Cancel
-                            </button>
+                              {t("Cancel")}</button>
                           ) : null}
                           <button
                             type="button"
@@ -440,8 +439,7 @@ export function ContainerProfileWorkspace({
                             disabled={isSwapActionPending}
                             onClick={() => setSwapAction({ type: "delete", swap })}
                           >
-                            Delete
-                          </button>
+                            {t("Delete")}</button>
                         </div>
                       </article>
                     ))}
@@ -456,11 +454,11 @@ export function ContainerProfileWorkspace({
           <div className={styles.scheduleCardShell} style={scheduleCardShellStyle}>
             <CardSection
               className={joinClassNames(styles.sectionCard, styles.scheduleCard)}
-              title="Schedules"
+              title={t("Schedules")}
               icon={<ScheduleIcon size={18} />}
               headerRightSlot={
                 <div className={styles.scheduleHeaderRow}>
-                  <div className={styles.scheduleBulkActions} aria-label="Schedule publication actions">
+                  <div className={styles.scheduleBulkActions} aria-label={t("Schedule publication actions")}>
                     <button
                       type="button"
                       className={joinClassNames(styles.scheduleBulkButton, styles.scheduleBulkPublishButton)}
@@ -471,8 +469,7 @@ export function ContainerProfileWorkspace({
                         setSchedulePublicationAction("publish");
                       }}
                     >
-                      Publish all
-                    </button>
+                      {t("Publish all")}</button>
                     <button
                       type="button"
                       className={styles.scheduleBulkButton}
@@ -482,8 +479,7 @@ export function ContainerProfileWorkspace({
                         setSchedulePublicationAction("private");
                       }}
                     >
-                      Make private
-                    </button>
+                      {t("Make private")}</button>
                   </div>
 
                   <label className={styles.searchField} htmlFor="container-graphs-search">
@@ -493,28 +489,28 @@ export function ContainerProfileWorkspace({
                       className={styles.searchInput}
                       value={graphSearchQuery}
                       onChange={event => onGraphSearchChange(event.target.value)}
-                      placeholder="Search schedule"
-                      aria-label="Search schedule"
+                      placeholder={t("Search schedule")}
+                      aria-label={t("Search schedule")}
                     />
                   </label>
 
                   {graphSearchQuery.trim() ? (
-                    <IosButton label="Clear" variant="secondary" onClick={onClearGraphSearch} />
+                    <IosButton label={t("Clear")} variant="secondary" onClick={onClearGraphSearch} />
                   ) : null}
 
                   <div className={styles.scheduleHeaderActions}>
-                    <IosButton label="Add New" icon={<PlusIcon size={18} />} onClick={onAddGraph} />
+                    <IosButton label={t("Add New")} icon={<PlusIcon size={18} />} onClick={onAddGraph} />
                     <MultiOpenHeaderToggle checked={isMultiOpenEnabled} onToggle={onToggleMultiOpen} />
                     {isMultiOpenEnabled ? (
                       <>
                         <IosButton
-                          label={hasSelectedGraphs ? `Open (${selectedGraphIds.length})` : "Open"}
+                          label={hasSelectedGraphs ? t("Open ({0})", selectedGraphIds.length) : t("Open")}
                           disabled={!hasSelectedGraphs}
                           onClick={onOpenSelectedGraphs}
                         />
                       </>
                     ) : null}
-                    <span className={styles.headerBadge}>{`Total: ${totalGraphsCount}`}</span>
+                    <span className={styles.headerBadge}>{t("Total: {0}", totalGraphsCount)}</span>
                   </div>
                 </div>
               }
@@ -526,27 +522,26 @@ export function ContainerProfileWorkspace({
                   ) : null}
 
                   {isGraphsLoading && totalGraphsCount === 0 ? (
-                    <div className={styles.state}>Loading schedules...</div>
+                    <div className={styles.state}>{t("Loading schedules...")}</div>
                   ) : null}
 
                   {hasGraphsError && totalGraphsCount === 0 ? (
-                    <ErrorBanner className={styles.inlineBanner}>Could not load schedules for this container.</ErrorBanner>
+                    <ErrorBanner className={styles.inlineBanner}>{t("Could not load schedules for this container.")}</ErrorBanner>
                   ) : null}
 
                   {showGraphsEmpty ? (
                     <div className={`${styles.emptyState} ${styles.scheduleEmptyState}`}>
-                      <div className={styles.emptyTitle}>No schedules yet</div>
+                      <div className={styles.emptyTitle}>{t("No schedules yet")}</div>
                       <div className={styles.emptyDescription}>
-                        This container has not been linked to any saved schedules.
-                      </div>
+                        {t("This container has not been linked to any saved schedules.")}</div>
                     </div>
                   ) : null}
 
                   {showSearchEmpty ? (
                     <div className={styles.emptyState}>
-                      <div className={styles.emptyTitle}>Nothing found</div>
+                      <div className={styles.emptyTitle}>{t("Nothing found")}</div>
                       <div className={styles.emptyDescription}>
-                        No schedule matches "{graphSearchQuery}".
+                        {t("No schedule matches \"")}{graphSearchQuery}".
                       </div>
                     </div>
                   ) : null}
@@ -584,17 +579,17 @@ export function ContainerProfileWorkspace({
                           }}
                           ariaLabel={
                             isMultiOpenEnabled
-                              ? `${selectedGraphIdSet.has(summary.graph.id) ? "Deselect" : "Select"} schedule ${summary.graph.name}`
-                              : `Open schedule ${summary.graph.name}`
+                              ? t("{0} schedule {1}", selectedGraphIdSet.has(summary.graph.id) ? "Deselect" : "Select", summary.graph.name)
+                              : t("Open schedule {0}", summary.graph.name)
                           }
                           metaItems={[
-                            { key: "shop", label: "Shop", value: summary.shopName },
-                            { key: "employees", label: "Employees", value: String(summary.employeeCount) },
-                            { key: "hours", label: "Hours", value: summary.assignedHoursText },
-                            { key: "month-year", label: "Month Year", value: summary.monthYearLabel },
+                            { key: "shop", label: t("Shop"), value: summary.shopName },
+                            { key: "employees", label: t("Employees"), value: String(summary.employeeCount) },
+                            { key: "hours", label: t("Hours"), value: summary.assignedHoursText },
+                            { key: "month-year", label: t("Month Year"), value: summary.monthYearLabel },
                             {
                               key: "status",
-                              label: "Status",
+                              label: t("Status"),
                               value: (
                                 <span
                                   className={joinClassNames(
@@ -604,13 +599,13 @@ export function ContainerProfileWorkspace({
                                       : styles.scheduleStatusPrivate,
                                   )}
                                 >
-                                  {summary.graph.publicationStatus === "public" ? "Public" : "Private"}
+                                  {summary.graph.publicationStatus === "public" ? t("Public") : t("Private")}
                                 </span>
                               ),
                             },
                             {
                               key: "last-update",
-                              label: "Last Update",
+                              label: t("Last Update"),
                               value: (
                                 <span className={styles.scheduleLastUpdateValue}>
                                   {formatScheduleLastUpdate(summary.graph.lastUpdatedAtUtc)}
@@ -632,24 +627,24 @@ export function ContainerProfileWorkspace({
       <CardSection
         className={`${styles.sectionCard} ${styles.statisticsCard}`}
         headerClassName={styles.statisticsHeader}
-        title="Container Statistics"
+        title={t("Container Statistics")}
         icon={<InformationIcon size={18} />}
       >
-        <div className={styles.statisticsSummary} role="group" aria-label="Container totals">
+        <div className={styles.statisticsSummary} role="group" aria-label={t("Container totals")}>
           <div className={styles.statisticsSummaryItem}>
-            <span className={styles.statisticsSummaryLabel}>Total hours</span>
+            <span className={styles.statisticsSummaryLabel}>{t("Total hours")}</span>
             <strong className={styles.statisticsSummaryValue}>{statistics.totalHoursText}</strong>
           </div>
           <div className={styles.statisticsSummaryItem}>
-            <span className={styles.statisticsSummaryLabel}>Employees</span>
+            <span className={styles.statisticsSummaryLabel}>{t("Employees")}</span>
             <strong className={styles.statisticsSummaryValue}>{statistics.totalEmployees}</strong>
           </div>
           <div className={styles.statisticsSummaryItem}>
-            <span className={styles.statisticsSummaryLabel}>Shops</span>
+            <span className={styles.statisticsSummaryLabel}>{t("Shops")}</span>
             <strong className={styles.statisticsSummaryValue}>{statistics.totalShops}</strong>
           </div>
           <div className={styles.statisticsSummaryItem}>
-            <span className={styles.statisticsSummaryLabel}>Schedules</span>
+            <span className={styles.statisticsSummaryLabel}>{t("Schedules")}</span>
             <strong className={styles.statisticsSummaryValue}>{totalGraphsCount}</strong>
           </div>
           {!showStatisticsEmpty ? (
@@ -664,8 +659,8 @@ export function ContainerProfileWorkspace({
                 type="search"
                 value={statisticsSearchQuery}
                 onChange={event => setStatisticsSearchQuery(event.target.value)}
-                placeholder="Search by name or surname"
-                aria-label="Search statistics by employee name or surname"
+                placeholder={t("Search by name or surname")}
+                aria-label={t("Search statistics by employee name or surname")}
               />
             </label>
           ) : null}
@@ -673,16 +668,15 @@ export function ContainerProfileWorkspace({
 
         {showStatisticsEmpty ? (
           <div className={`${styles.emptyState} ${styles.statisticsEmptyState}`}>
-            <div className={styles.emptyTitle}>No statistics yet</div>
+            <div className={styles.emptyTitle}>{t("No statistics yet")}</div>
             <div className={styles.emptyDescription}>
-              Statistics will appear as soon as schedules contain assigned employees and slots.
-            </div>
+              {t("Statistics will appear as soon as schedules contain assigned employees and slots.")}</div>
           </div>
         ) : showStatisticsSearchEmpty ? (
           <div className={`${styles.emptyState} ${styles.statisticsSearchEmptyState}`} role="status">
-            <div className={styles.emptyTitle}>No employees found</div>
+            <div className={styles.emptyTitle}>{t("No employees found")}</div>
             <div className={styles.emptyDescription}>
-              No employee matches "{statisticsSearchQuery.trim()}".
+              {t("No employee matches \"")}{statisticsSearchQuery.trim()}".
             </div>
           </div>
         ) : (
@@ -691,10 +685,10 @@ export function ContainerProfileWorkspace({
               <table className={styles.table}>
                 <thead>
                   <tr>
-                    <th>Employee</th>
-                    <th>Work Days</th>
-                    <th>Free Days</th>
-                    <th>Hours Sum</th>
+                    <th>{t("Employee")}</th>
+                    <th>{t("Work Days")}</th>
+                    <th>{t("Free Days")}</th>
+                    <th>{t("Hours Sum")}</th>
                     {statistics.shopHeaders.map(shopHeader => (
                       <th key={shopHeader.key}>{shopHeader.name}</th>
                     ))}
@@ -724,18 +718,18 @@ export function ContainerProfileWorkspace({
       <ConfirmDialog
         open={schedulePublicationAction !== null}
         variant={schedulePublicationAction === "publish" ? "confirm" : "warning"}
-        title={schedulePublicationAction === "publish" ? "Publish all schedules" : "Make all schedules private"}
+        title={schedulePublicationAction === "publish" ? t("Publish all schedules") : t("Make all schedules private")}
         message={schedulePublicationError ?? (schedulePublicationAction === "publish"
-          ? `Publish all ${totalGraphsCount} schedules in this container?`
-          : `Make all ${totalGraphsCount} schedules private? Employees will no longer see them.`)}
+          ? t("Publish all {0} schedules in this container?", totalGraphsCount)
+          : t("Make all {0} schedules private? Employees will no longer see them.", totalGraphsCount))}
         confirmText={updateGraphsPublicationMutation.isPending
-          ? "Working..."
-          : schedulePublicationAction === "publish" ? "Publish all" : "Make private"}
+          ? t("Working...")
+          : schedulePublicationAction === "publish" ? t("Publish all") : t("Make private")}
         confirmDisabled={updateGraphsPublicationMutation.isPending}
         cancelDisabled={updateGraphsPublicationMutation.isPending}
         footerSlot={schedulePublicationAction === "publish" ? (
           <div className={styles.swapPermissionChoice}>
-            <span>Can swap</span>
+            <span>{t("Can swap")}</span>
             <div className={styles.swapPermissionOptions}>
               <button
                 type="button"
@@ -743,16 +737,14 @@ export function ContainerProfileWorkspace({
                 aria-pressed={bulkAllowSwap}
                 onClick={() => setBulkAllowSwap(true)}
               >
-                Yes
-              </button>
+                {t("Yes")}</button>
               <button
                 type="button"
                 className={!bulkAllowSwap ? styles.swapPermissionOptionActive : undefined}
                 aria-pressed={!bulkAllowSwap}
                 onClick={() => setBulkAllowSwap(false)}
               >
-                No
-              </button>
+                {t("No")}</button>
             </div>
           </div>
         ) : undefined}
@@ -763,11 +755,11 @@ export function ContainerProfileWorkspace({
       <ShiftSwapHistoryDialog open={selectedSwap !== null} swap={selectedSwap} onCancel={() => setSelectedSwap(null)} />
       <ConfirmDialog
         open={swapAction !== null}
-        title={swapAction?.type === "cancel" ? "Cancel swap" : "Delete swap"}
+        title={swapAction?.type === "cancel" ? t("Cancel swap") : t("Delete swap")}
         message={swapAction?.type === "cancel"
-          ? "Cancel this open swap? Employees will no longer be able to accept it."
-          : "Delete this swap record? This does not reverse an already accepted schedule change."}
-        confirmText={isSwapActionPending ? "Working..." : swapAction?.type === "cancel" ? "Cancel swap" : "Delete"}
+          ? t("Cancel this open swap? Employees will no longer be able to accept it.")
+          : t("Delete this swap record? This does not reverse an already accepted schedule change.")}
+        confirmText={isSwapActionPending ? t("Working...") : swapAction?.type === "cancel" ? t("Cancel swap") : t("Delete")}
         confirmDisabled={isSwapActionPending}
         cancelDisabled={isSwapActionPending}
         onCancel={() => setSwapAction(null)}

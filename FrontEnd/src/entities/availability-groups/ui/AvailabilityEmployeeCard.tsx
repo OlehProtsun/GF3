@@ -1,3 +1,4 @@
+import { t } from "@shared/i18n";
 import { useMemo, type ReactNode } from "react";
 import type { Employee } from "@entities/employees/model/types";
 import { getEmployeeFullName } from "@entities/employees/model/presentation";
@@ -40,7 +41,7 @@ export function AvailabilityEmployeeCard({
         .map(employee => ({
           value: String(employee.id),
           label: getEmployeeFullName(employee),
-          hint: `Employee ID: ${employee.id}`,
+          hint: t("Employee ID: {0}", employee.id),
           keywords: [
             String(employee.id),
             employee.firstName,
@@ -56,26 +57,26 @@ export function AvailabilityEmployeeCard({
   return (
     <CardSection
       className={styles.card}
-      title="Employee"
+      title={t("Employee")}
       icon={<EmployeeIcon size={18} />}
       headerRightSlot={headerRightSlot}
     >
       <div className={styles.layout}>
         <div className={styles.field}>
           <div className={styles.labelRow}>
-            <span className={styles.label}>Selected Employee</span>
-            <span className={styles.metaText}>Employee ID: {selectedEmployee?.id ?? "-"}</span>
+            <span className={styles.label}>{t("Selected Employee")}</span>
+            <span className={styles.metaText}>{t("Employee ID:")} {selectedEmployee?.id ?? "-"}</span>
           </div>
 
           <SearchableSelect
             id="availability-employee-select"
             value={selectedEmployeeId !== null ? String(selectedEmployeeId) : ""}
             options={employeeOptions}
-            placeholder={employeeOptions.length > 0 ? "Select employee..." : "No employees available"}
+            placeholder={employeeOptions.length > 0 ? t("Select employee...") : t("No employees available")}
             dropdownTitle="Employee list"
-            searchPlaceholder="Search employee..."
-            emptyMessage="No employees match your search."
-            fallbackHint={`${employeeOptions.length} employees found`}
+            searchPlaceholder={t("Search employee...")}
+            emptyMessage={t("No employees match your search.")}
+            fallbackHint={t("{0} employees found", employeeOptions.length)}
             invalid={Boolean(groupError)}
             ariaDescribedBy={employeeGroupErrorId}
             ariaLabel="employee list"
@@ -86,8 +87,8 @@ export function AvailabilityEmployeeCard({
         <div className={styles.assignedBlock}>
           <div className={`${styles.assignedPanel} ${groupError ? styles.assignedPanelInvalid : ""}`}>
             <div className={styles.labelRow}>
-              <span className={styles.label}>Assigned employees</span>
-              <span className={styles.metaText}>{assignedEmployees.length} total</span>
+              <span className={styles.label}>{t("Assigned employees")}</span>
+              <span className={styles.metaText}>{assignedEmployees.length}  {t("total")}</span>
             </div>
 
             {assignedEmployees.length > 0 ? (
@@ -99,8 +100,8 @@ export function AvailabilityEmployeeCard({
                       <button
                         type="button"
                         className={styles.chooseFromAnotherButton}
-                        aria-label={`Choose availability from another schedule for ${employee.label}`}
-                        title="Choose from another"
+                        aria-label={t("Choose availability from another schedule for {0}", employee.label)}
+                        title={t("Choose from another")}
                         onClick={() => onChooseFromAnother(employee.id)}
                         disabled={!employee.canChooseFromAnother}
                       >
@@ -109,8 +110,8 @@ export function AvailabilityEmployeeCard({
                       <button
                         type="button"
                         className={styles.removeEmployeeButton}
-                        aria-label={`Remove ${employee.label} from availability`}
-                        title="Remove employee"
+                        aria-label={t("Remove {0} from availability", employee.label)}
+                        title={t("Remove employee")}
                         onClick={() => onRemoveEmployee(employee.id)}
                       >
                         <CloseIcon size={15} />
@@ -120,7 +121,7 @@ export function AvailabilityEmployeeCard({
                 ))}
               </div>
             ) : (
-              <p className={styles.emptyText}>No employees added to this group yet.</p>
+              <p className={styles.emptyText}>{t("No employees added to this group yet.")}</p>
             )}
           </div>
 
@@ -128,7 +129,7 @@ export function AvailabilityEmployeeCard({
         </div>
 
         <div className={styles.actions}>
-          <IosButton label="Add" icon={<PlusIcon size={16} />} onClick={onAddEmployee} />
+          <IosButton label={t("Add")} icon={<PlusIcon size={16} />} onClick={onAddEmployee} />
         </div>
       </div>
     </CardSection>

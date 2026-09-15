@@ -1,3 +1,4 @@
+import { t } from "@shared/i18n";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigationBlocker } from "./react-router-dom";
 import { ConfirmDialog } from "@shared/ui/ConfirmDialog";
@@ -14,10 +15,10 @@ type PendingActionKind = "route" | "local" | null;
 
 export function useUnsavedChangesPrompt({
   when,
-  title = "Leave without saving?",
-  message = "You have unsaved changes on this page. If you leave now, those changes will be lost.",
-  confirmText = "Leave page",
-  cancelText = "Stay here",
+  title = t("Leave without saving?"),
+  message = t("You have unsaved changes on this page. If you leave now, those changes will be lost."),
+  confirmText = t("Leave page"),
+  cancelText = t("Stay here"),
 }: UseUnsavedChangesPromptOptions) {
   const [pendingActionKind, setPendingActionKind] = useState<PendingActionKind>(null);
   const localActionRef = useRef<(() => void) | null>(null);

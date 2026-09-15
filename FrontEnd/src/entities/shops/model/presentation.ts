@@ -1,9 +1,10 @@
+import { t } from "@shared/i18n";
 ﻿import type { Shop } from "./types";
 
 type ShopIdentity = Pick<Shop, "name">;
 type ShopDetails = Pick<Shop, "address" | "description">;
 
-export function getShopDisplayName(shop?: ShopIdentity | null, fallback = "Shop") {
+export function getShopDisplayName(shop?: ShopIdentity | null, fallback = t("Shop")) {
   const name = shop?.name?.trim();
   return name || fallback;
 }
@@ -27,30 +28,30 @@ export function getShopDetailsState(shop?: ShopDetails | null) {
   const hasDescription = Boolean(shop?.description?.trim());
 
   if (hasAddress && hasDescription) {
-    return "Address and description available";
+    return t("Address and description available");
   }
 
   if (hasAddress) {
-    return "Address available";
+    return t("Address available");
   }
 
   if (hasDescription) {
-    return "Description available";
+    return t("Description available");
   }
 
-  return "Shop details missing";
+  return t("Shop details missing");
 }
 
 export function getShopProfileDetails(shop?: ShopDetails | null) {
   return [
     {
       key: "address",
-      label: "Address",
+      label: t("Address"),
       value: shop?.address?.trim() || null,
     },
     {
       key: "description",
-      label: "Description",
+      label: t("Description"),
       value: shop?.description?.trim() || null,
     },
   ] as const;

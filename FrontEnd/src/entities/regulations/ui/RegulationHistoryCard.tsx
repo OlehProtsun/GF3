@@ -1,13 +1,14 @@
+import { dateTimeFormat, t } from "@shared/i18n";
 import type { RegulationAcceptance } from "@entities/regulations";
 import { regulationsApi } from "@entities/regulations";
 import styles from "./RegulationHistoryCard.module.css";
 
-const dateFormatter = new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" });
+const dateFormatter = dateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" });
 
 export function RegulationHistoryCard({
   acceptances,
   isLoading,
-  title = "Regulation history",
+  title = t("Regulation history"),
   className,
 }: {
   acceptances: RegulationAcceptance[];
@@ -27,19 +28,19 @@ export function RegulationHistoryCard({
       <div className={styles.header}>
         <div>
           <h2>{title}</h2>
-          <p>Recorded versions and acceptance dates.</p>
+          <p>{t("Recorded versions and acceptance dates.")}</p>
         </div>
         <span className={styles.count}>{acceptances.length}</span>
       </div>
-      {isLoading ? <div className={styles.empty}>Loading history...</div> : acceptances.length === 0 ? (
-        <div className={styles.empty}>No regulation has been accepted yet.</div>
+      {isLoading ? <div className={styles.empty}>{t("Loading history...")}</div> : acceptances.length === 0 ? (
+        <div className={styles.empty}>{t("No regulation has been accepted yet.")}</div>
       ) : (
         <div className={styles.list}>
           {acceptances.map(acceptance => (
             <button key={acceptance.id} type="button" className={styles.item} onClick={() => void download(acceptance)}>
               <span>
                 <strong>{acceptance.regulationTitle}</strong>
-                <small>Version {acceptance.regulationVersion} · PDF {acceptance.pdfSha256.slice(0, 12)}…</small>
+                <small>{t("Version")} {acceptance.regulationVersion} · PDF {acceptance.pdfSha256.slice(0, 12)}…</small>
               </span>
               <time dateTime={acceptance.acceptedAtUtc}>{dateFormatter.format(new Date(acceptance.acceptedAtUtc))}</time>
             </button>

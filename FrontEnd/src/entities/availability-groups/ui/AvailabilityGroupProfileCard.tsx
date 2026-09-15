@@ -1,3 +1,4 @@
+import { t } from "@shared/i18n";
 import { useState } from "react";
 import type { AvailabilityGroup } from "@entities/availability-groups/model/types";
 import { type AvailabilityMatrixCellMap, type AvailabilityMatrixColumn } from "@entities/availability-groups/model/editor";
@@ -40,11 +41,11 @@ export function AvailabilityGroupProfileCard({
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
   if (isLoading) {
-    return <div className={styles.state}>Loading availability profile...</div>;
+    return <div className={styles.state}>{t("Loading availability profile...")}</div>;
   }
 
   if (hasLoadError || !group) {
-    return <ErrorBanner className={styles.banner}>Could not load this availability group.</ErrorBanner>;
+    return <ErrorBanner className={styles.banner}>{t("Could not load this availability group.")}</ErrorBanner>;
   }
 
   return (
@@ -56,7 +57,7 @@ export function AvailabilityGroupProfileCard({
       mainBlockClassName={styles.mainBlock}
       sidebar={
         <AvailabilitySidebarSection
-          label="Availability Information"
+          label={t("Availability Information")}
           collapsed={isSidebarCollapsed}
           collapsedOffset="compact"
           onExpand={() => setIsSidebarCollapsed(false)}
@@ -67,7 +68,7 @@ export function AvailabilityGroupProfileCard({
             isDeleting={isDeleting}
             headerRightSlot={
               <AvailabilitySidebarCollapseButton
-                label="Availability Information"
+                label={t("Availability Information")}
                 onCollapse={() => setIsSidebarCollapsed(true)}
               />
             }
@@ -85,8 +86,8 @@ export function AvailabilityGroupProfileCard({
           cellMap={cellMap}
           visualHintMap={visualHintMap}
           readOnly
-          title="Availability Schedule"
-          helperText="This schedule is read-only. Open edit if you want to update assigned employees or day codes."
+          title={t("Availability Schedule")}
+          helperText={t("This schedule is read-only. Open edit if you want to update assigned employees or day codes.")}
           onVisualHintClick={onVisualHintClick}
         />
       }

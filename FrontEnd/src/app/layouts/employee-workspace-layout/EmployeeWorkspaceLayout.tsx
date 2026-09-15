@@ -1,3 +1,5 @@
+import { t } from "@shared/i18n";
+import { useLanguageRevision } from "@shared/i18n/useLanguageRevision";
 import { useEffect, useMemo, useState, type PropsWithChildren } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 import { useAuth } from "@app/providers/AuthProvider";
@@ -37,40 +39,40 @@ type EmployeeNavItem = {
 const employeeNavItems: readonly EmployeeNavItem[] = [
   {
     to: "/",
-    label: "Notifications",
-    mobileLabel: "Alerts",
-    description: "Live schedule, swap and manager updates.",
+    get label() { return t("Notifications"); },
+    get mobileLabel() { return t("Alerts"); },
+    get description() { return t("Live schedule, swap and manager updates."); },
     icon: <NoteIcon size={18} />,
     notificationTarget: "alerts",
   },
   {
     to: "/availability",
-    label: "Availability",
-    mobileLabel: "Avail.",
-    description: "Share available time when your manager opens access.",
+    get label() { return t("Availability"); },
+    get mobileLabel() { return t("Avail."); },
+    get description() { return t("Share available time when your manager opens access."); },
     icon: <AvailabilityIcon size={18} />,
     notificationTarget: "availability",
   },
   {
     to: "/schedule",
-    label: "Schedule",
-    mobileLabel: "Shifts",
-    description: "See published shifts and ready-made plans.",
+    get label() { return t("Schedule"); },
+    get mobileLabel() { return t("Shifts"); },
+    get description() { return t("See published shifts and ready-made plans."); },
     icon: <ScheduleIcon size={18} />,
     notificationTarget: "schedule",
   },
   {
     to: "/swap",
-    label: "Swap",
-    mobileLabel: "Swap",
-    description: "Give away shifts or accept open swaps.",
+    get label() { return t("Swap"); },
+    get mobileLabel() { return t("Swap"); },
+    get description() { return t("Give away shifts or accept open swaps."); },
     icon: <NoteIcon size={18} />,
     notificationTarget: "swap",
   },
   {
     to: "/profile",
-    label: "Profile",
-    description: "Review your account and contact details.",
+    get label() { return t("Profile"); },
+    get description() { return t("Review your account and contact details."); },
     icon: <EmployeeIcon size={18} />,
   },
 ] as const;
@@ -80,6 +82,7 @@ const emptySchedules: EmployeeSchedule[] = [];
 const emptyAvailabilityGroups: EmployeeAvailabilityGroup[] = [];
 
 export function EmployeeWorkspaceLayout({ children }: PropsWithChildren) {
+  useLanguageRevision();
   const [isMobileTabsCollapsed, setIsMobileTabsCollapsed] = useState(false);
   const { session } = useAuth();
   const { notifications } = useRealtime();
@@ -197,7 +200,7 @@ export function EmployeeWorkspaceLayout({ children }: PropsWithChildren) {
         type="button"
         className={mobileOpenTabClassName}
         onClick={() => setIsMobileTabsCollapsed(false)}
-        aria-label="Open navigation"
+        aria-label={t("Open navigation")}
       >
         <span className={[styles.controlIcon, styles.controlIconExpand].join(" ")}>
           <BackIcon size={14} />
@@ -206,7 +209,7 @@ export function EmployeeWorkspaceLayout({ children }: PropsWithChildren) {
 
       <div className={shellClassName}>
         <header className={topBarClassName}>
-          <nav className={styles.desktopTabs} aria-label="Employee sections">
+          <nav className={styles.desktopTabs} aria-label={t("Employee sections")}>
             {employeeNavItems.map((item) => {
               const hasUnreadDot = hasUnreadNavigationDot(item);
 
@@ -214,7 +217,7 @@ export function EmployeeWorkspaceLayout({ children }: PropsWithChildren) {
                 <NavLink
                   key={item.to}
                   to={item.to}
-                  aria-label={hasUnreadDot ? `${item.label}, new updates` : item.label}
+                  aria-label={hasUnreadDot ? t("{0}, new updates", item.label) : item.label}
                   className={({ isActive }) =>
                     [styles.desktopTab, isActive ? styles.desktopTabActive : ""].filter(Boolean).join(" ")
                   }
@@ -233,7 +236,7 @@ export function EmployeeWorkspaceLayout({ children }: PropsWithChildren) {
         <main className={styles.content}>{children}</main>
       </div>
 
-      <nav className={mobileTabsClassName} aria-label="Employee sections">
+      <nav className={mobileTabsClassName} aria-label={t("Employee sections")}>
         {employeeNavItems.map((item) => {
           const hasUnreadDot = hasUnreadNavigationDot(item);
 
@@ -241,7 +244,7 @@ export function EmployeeWorkspaceLayout({ children }: PropsWithChildren) {
             <NavLink
               key={item.to}
               to={item.to}
-              aria-label={hasUnreadDot ? `${item.mobileLabel ?? item.label}, new updates` : item.mobileLabel ?? item.label}
+              aria-label={hasUnreadDot ? t("{0}, new updates", item.mobileLabel ?? item.label) : item.mobileLabel ?? item.label}
               className={({ isActive }) =>
                 [styles.mobileTab, isActive ? styles.mobileTabActive : ""].filter(Boolean).join(" ")
               }
@@ -259,7 +262,7 @@ export function EmployeeWorkspaceLayout({ children }: PropsWithChildren) {
           type="button"
           className={styles.mobileToggleButton}
           onClick={() => setIsMobileTabsCollapsed(true)}
-          aria-label="Collapse navigation"
+          aria-label={t("Collapse navigation")}
         >
           <span className={styles.controlIcon}>
             <BackIcon size={14} />

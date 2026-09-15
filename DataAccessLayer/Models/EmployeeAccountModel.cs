@@ -11,6 +11,11 @@ namespace DataAccessLayer.Models;
 [Table("employee_account")]
 public class EmployeeAccountModel
 {
+    [Required]
+    [MaxLength(2)]
+    [Column("language")]
+    public string Language { get; set; } = "en";
+
     [Key]
     [Column("id")]
     public int Id { get; set; }

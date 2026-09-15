@@ -1,3 +1,4 @@
+import { t } from "@shared/i18n";
 import type { Employee } from "@entities/employees/model/types";
 import {
   getEmployeeContactDetails,
@@ -36,7 +37,7 @@ export function EmployeeProfileCard({
   onDeleteEmployee,
   onKickEmployee,
 }: EmployeeProfileCardProps) {
-  const fullName = getEmployeeFullName(employee, "Employee Profile");
+  const fullName = getEmployeeFullName(employee, t("Employee Profile"));
   const initials = getEmployeeInitials(employee);
   const presenceLabel = getEmployeeContactState(employee);
   const presenceTone = getEmployeePresenceTone(employee);
@@ -64,10 +65,10 @@ export function EmployeeProfileCard({
       actions={
         employee ? (
           <>
-            <IosButton label="Edit Employee" onClick={() => onEditEmployee(employee.id)} />
+            <IosButton label={t("Edit Employee")} onClick={() => onEditEmployee(employee.id)} />
             {employee.hasLoginAccount ? (
               <IosButton
-                label={isKicking ? "Kicking..." : "Kick Employee"}
+                label={isKicking ? t("Kicking...") : t("Kick Employee")}
                 variant="secondary"
                 customColor="#2563eb"
                 customBorderColor="#2563eb"
@@ -76,7 +77,7 @@ export function EmployeeProfileCard({
               />
             ) : null}
             <IosButton
-              label={isDeleting ? "Deleting..." : "Delete Employee"}
+              label={isDeleting ? t("Deleting...") : t("Delete Employee")}
               variant="secondary"
               customColor="#ef4444"
               customBorderColor="#ef4444"

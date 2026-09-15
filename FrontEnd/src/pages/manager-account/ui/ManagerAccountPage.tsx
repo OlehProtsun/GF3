@@ -1,3 +1,6 @@
+import { dateTimeFormat, t } from "@shared/i18n";
+import { useLanguageRevision } from "@shared/i18n/useLanguageRevision";
+import { LanguageSelector } from "@shared/i18n/LanguageSelector";
 import { useEffect, useMemo, useState } from "react";
 import type { ChangeEvent } from "react";
 import { useAuth } from "@app/providers/AuthProvider";
@@ -53,7 +56,7 @@ function isValidNumericPassword(value: string) {
   return /^\d{6}$/.test(value);
 }
 
-const lastOnlineFormatter = new Intl.DateTimeFormat(undefined, {
+const lastOnlineFormatter = dateTimeFormat(undefined, {
   month: "short",
   day: "2-digit",
   hour: "2-digit",
@@ -97,15 +100,15 @@ function isSameManager(manager: ManagerProfileDto, currentManagerId: number | nu
 
 function formatLastOnline(value?: string | null) {
   if (!value) {
-    return "No activity yet";
+    return t("No activity yet");
   }
 
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) {
-    return "Unknown activity";
+    return t("Unknown activity");
   }
 
-  return `Last online ${lastOnlineFormatter.format(date)}`;
+  return t("Last online {0}", lastOnlineFormatter.format(date));
 }
 
 function getLastOnlineTime(value?: string | null) {
@@ -118,6 +121,7 @@ function getLastOnlineTime(value?: string | null) {
 }
 
 export function ManagerAccountPage() {
+  useLanguageRevision();
   const { replaceLoginResult, session } = useAuth();
   const profileQuery = useManagerProfileQuery();
   const managerListQuery = useManagerListQuery();
@@ -202,13 +206,13 @@ export function ManagerAccountPage() {
   const handleSaveProfile = async () => {
     try {
       if (!normalize(form.displayName) || !normalize(form.userName)) {
-        setInlineError("Display name and username are required.");
+        setInlineError(t("Display name and username are required."));
         setInlineSuccess(null);
         return;
       }
 
       if (hasPasswordDraft && !isValidNumericPassword(form.newPassword)) {
-        setInlineError(PASSWORD_VALIDATION_MESSAGE);
+        setInlineError(t(PASSWORD_VALIDATION_MESSAGE));
         setInlineSuccess(null);
         return;
       }
@@ -223,26 +227,26 @@ export function ManagerAccountPage() {
       replaceLoginResult(result);
       setForm(current => ({ ...current, newPassword: "" }));
       setInlineError(null);
-      setInlineSuccess("Manager profile updated.");
+      setInlineSuccess(t("Manager profile updated."));
     } catch (error) {
-      const message = getErrorMessage(error, "Could not update manager profile.");
+      const message = getErrorMessage(error, t("Could not update manager profile."));
       setInlineError(message);
       setInlineSuccess(null);
-      pushErrorAlertFromError(error, "Could not update manager profile.");
+      pushErrorAlertFromError(error, t("Could not update manager profile."));
     }
   };
 
   const handleCreateManager = async () => {
     try {
       if (!normalize(newManagerForm.displayName) || !normalize(newManagerForm.userName) || !normalize(newManagerForm.password)) {
-        setInlineError("Display name, username and password are required for a new manager.");
+        setInlineError(t("Display name, username and password are required for a new manager."));
         setInlineSuccess(null);
         return;
       }
 
 
       if (!isValidNumericPassword(newManagerForm.password)) {
-        setInlineError(PASSWORD_VALIDATION_MESSAGE);
+        setInlineError(t(PASSWORD_VALIDATION_MESSAGE));
         setInlineSuccess(null);
         return;
       }
@@ -250,12 +254,12 @@ export function ManagerAccountPage() {
       const created = await runMutation(createManagerMutation.mutate, newManagerForm);
       setNewManagerForm(emptyNewManagerForm);
       setInlineError(null);
-      setInlineSuccess(`Manager account created for ${created.displayName}.`);
+      setInlineSuccess(t("Manager account created for {0}.", created.displayName));
     } catch (error) {
-      const message = getErrorMessage(error, "Could not create manager account.");
+      const message = getErrorMessage(error, t("Could not create manager account."));
       setInlineError(message);
       setInlineSuccess(null);
-      pushErrorAlertFromError(error, "Could not create manager account.");
+      pushErrorAlertFromError(error, t("Could not create manager account."));
     }
   };
 
@@ -267,19 +271,19 @@ export function ManagerAccountPage() {
     try {
       await runMutation(deleteManagerMutation.mutate, deleteTarget.id);
       setInlineError(null);
-      setInlineSuccess(`Manager account deleted for ${deleteTarget.displayName}.`);
+      setInlineSuccess(t("Manager account deleted for {0}.", deleteTarget.displayName));
       setDeleteTarget(null);
     } catch (error) {
-      const message = getErrorMessage(error, "Could not delete manager account.");
+      const message = getErrorMessage(error, t("Could not delete manager account."));
       setInlineError(message);
       setInlineSuccess(null);
-      pushErrorAlertFromError(error, "Could not delete manager account.");
+      pushErrorAlertFromError(error, t("Could not delete manager account."));
     }
   };
 
   return (
     <div className={styles.page}>
-      <PageHeader title="Manager profile" subtitle="Account access and manager team" backTo={-1} />
+      <PageHeader title={t("Manager profile")} subtitle={t("Account access and manager team")} backTo={-1} />
 
       <section className={styles.panel}>
         <div className={styles.profileHeader}>
@@ -287,44 +291,45 @@ export function ManagerAccountPage() {
             {initials}
           </span>
           <div className={styles.profileTitle}>
-            <span className={styles.eyebrow}>Current manager</span>
-            <strong>{profile?.displayName ?? session?.displayName ?? "Manager"}</strong>
+            <span className={styles.eyebrow}>{t("Current manager")}</span>
+            <strong>{profile?.displayName ?? session?.displayName ?? t("Manager")}</strong>
             <span>@{profile?.userName ?? session?.userName ?? "manager"}</span>
           </div>
         </div>
 
         {inlineError ? <ErrorBanner>{inlineError}</ErrorBanner> : null}
-        {profileQuery.error ? <ErrorBanner>Could not load manager profile.</ErrorBanner> : null}
+        {profileQuery.error ? <ErrorBanner>{t("Could not load manager profile.")}</ErrorBanner> : null}
         {inlineSuccess ? <div className={styles.successBanner}>{inlineSuccess}</div> : null}
 
         {profileQuery.isLoading && !profile ? (
-          <p className={styles.stateText}>Loading manager profile...</p>
+          <p className={styles.stateText}>{t("Loading manager profile...")}</p>
         ) : (
           <div className={styles.grid}>
             <div className={styles.profileColumn}>
               <div className={styles.card}>
                 <div className={styles.cardHeader}>
                   <div>
-                    <span className={styles.eyebrow}>Profile access</span>
-                    <h2>Sign-in details</h2>
+                    <span className={styles.eyebrow}>{t("Profile access")}</span>
+                    <h2>{t("Sign-in details")}</h2>
                   </div>
-                  <span className={styles.badge}>{isSystemManager ? "System account" : "Editable"}</span>
+                  <span className={styles.badge}>{isSystemManager ? t("System account") : t("Editable")}</span>
                 </div>
 
                 <div className={styles.formGrid}>
+                  <div className={styles.field}><LanguageSelector disabled={isBusy} appearance="rounded" /></div>
                   <label className={styles.field}>
-                    <span>Display name</span>
+                    <span>{t("Display name")}</span>
                     <input
                       type="text"
                       value={form.displayName}
                       onChange={updateForm("displayName")}
-                      placeholder="Manager name"
+                      placeholder={t("Manager name")}
                       autoComplete="name"
                     />
                   </label>
 
                   <label className={styles.field}>
-                    <span>Username</span>
+                    <span>{t("Username")}</span>
                     <input
                       type="text"
                       value={form.userName}
@@ -336,7 +341,7 @@ export function ManagerAccountPage() {
                   </label>
 
                   <label className={styles.field}>
-                    <span>Recovery email</span>
+                    <span>{t("Recovery email")}</span>
                     <input
                       type="email"
                       value={form.recoveryEmail}
@@ -347,7 +352,7 @@ export function ManagerAccountPage() {
                   </label>
 
                   <label className={styles.field}>
-                    <span>New password</span>
+                    <span>{t("New password")}</span>
                     <input
                       type="password"
                       inputMode="numeric"
@@ -356,7 +361,7 @@ export function ManagerAccountPage() {
                       maxLength={6}
                       value={form.newPassword}
                       onChange={updateForm("newPassword")}
-                      placeholder={isSystemManager ? "Managed through server environment" : "Exactly 6 digits"}
+                      placeholder={isSystemManager ? t("Managed through server environment") : t("Exactly 6 digits")}
                       autoComplete="654321"
                       disabled={isSystemManager}
                     />
@@ -365,7 +370,7 @@ export function ManagerAccountPage() {
 
                 <div className={styles.actions}>
                   <IosButton
-                    label={updateProfileMutation.isPending ? "Saving..." : "Save changes"}
+                    label={updateProfileMutation.isPending ? t("Saving...") : t("Save changes")}
                     onClick={() => void handleSaveProfile()}
                     disabled={isBusy || !profile || !hasProfileChanges}
                     className={styles.primaryButton}
@@ -376,17 +381,17 @@ export function ManagerAccountPage() {
               <div className={styles.card}>
                 <div className={styles.cardHeader}>
                   <div>
-                    <span className={styles.eyebrow}>Manager online</span>
-                    <h2>Active managers</h2>
+                    <span className={styles.eyebrow}>{t("Manager online")}</span>
+                    <h2>{t("Active managers")}</h2>
                   </div>
-                  <span className={styles.badge}>{onlineManagerCount} online</span>
+                  <span className={styles.badge}>{onlineManagerCount}  {t("online")}</span>
                 </div>
 
                 <div className={styles.onlineList}>
                   {managerListQuery.isLoading && managerPresenceItems.length === 0 ? (
-                    <p className={styles.stateText}>Loading manager activity...</p>
+                    <p className={styles.stateText}>{t("Loading manager activity...")}</p>
                   ) : managerPresenceItems.length === 0 ? (
-                    <p className={styles.stateText}>No manager activity yet.</p>
+                    <p className={styles.stateText}>{t("No manager activity yet.")}</p>
                   ) : (
                     managerPresenceItems.map(({ manager, isOnline }) => (
                       <article key={manager.id} className={styles.onlineItem}>
@@ -399,7 +404,7 @@ export function ManagerAccountPage() {
                           <span>@{manager.userName}</span>
                         </div>
                         <span className={isOnline ? styles.onlineNow : styles.lastOnline}>
-                          {isOnline ? "Online now" : formatLastOnline(manager.lastLoginAtUtc)}
+                          {isOnline ? t("Online now") : formatLastOnline(manager.lastLoginAtUtc)}
                         </span>
                       </article>
                     ))
@@ -411,17 +416,17 @@ export function ManagerAccountPage() {
             <div className={styles.card}>
               <div className={styles.cardHeader}>
                 <div>
-                  <span className={styles.eyebrow}>Manager team</span>
-                  <h2>Accounts in database</h2>
+                  <span className={styles.eyebrow}>{t("Manager team")}</span>
+                  <h2>{t("Accounts in database")}</h2>
                 </div>
                 <span className={styles.badge}>{managers.length}</span>
               </div>
 
               <div className={styles.managerList}>
                 {managerListQuery.isLoading && managers.length === 0 ? (
-                  <p className={styles.stateText}>Loading managers...</p>
+                  <p className={styles.stateText}>{t("Loading managers...")}</p>
                 ) : managers.length === 0 ? (
-                  <p className={styles.stateText}>No manager accounts yet.</p>
+                  <p className={styles.stateText}>{t("No manager accounts yet.")}</p>
                 ) : (
                   managers.map(manager => {
                     const isCurrent = isSameManager(manager, currentManagerId, currentUserName);
@@ -432,13 +437,13 @@ export function ManagerAccountPage() {
                         <div className={styles.managerDetails}>
                           <strong>{manager.displayName}</strong>
                           <span>@{manager.userName}</span>
-                          <span>{manager.recoveryEmail ?? "No recovery email"}</span>
+                          <span>{manager.recoveryEmail ?? t("No recovery email")}</span>
                         </div>
                         <div className={styles.managerActions}>
                           {manager.isSystem ? (
-                            <span className={styles.currentPill}>{isCurrent ? "You / System" : "System"}</span>
+                            <span className={styles.currentPill}>{isCurrent ? t("You / System") : t("System")}</span>
                           ) : isCurrent ? (
-                            <span className={styles.currentPill}>You</span>
+                            <span className={styles.currentPill}>{t("You")}</span>
                           ) : (
                             <button
                               type="button"
@@ -446,8 +451,7 @@ export function ManagerAccountPage() {
                               onClick={() => setDeleteTarget(manager)}
                               disabled={isBusy}
                             >
-                              Delete
-                            </button>
+                              {t("Delete")}</button>
                           )}
                         </div>
                       </article>
@@ -457,21 +461,22 @@ export function ManagerAccountPage() {
               </div>
 
               <div className={styles.createPanel}>
-                <span className={styles.eyebrow}>Add manager</span>
+                <span className={styles.eyebrow}>{t("Add manager")}</span>
                 <div className={styles.formGrid}>
+
                   <label className={styles.field}>
-                    <span>Display name</span>
+                    <span>{t("Display name")}</span>
                     <input
                       type="text"
                       value={newManagerForm.displayName}
                       onChange={updateNewManagerForm("displayName")}
-                      placeholder="New manager"
+                      placeholder={t("New manager")}
                       autoComplete="off"
                     />
                   </label>
 
                   <label className={styles.field}>
-                    <span>Username</span>
+                    <span>{t("Username")}</span>
                     <input
                       type="text"
                       value={newManagerForm.userName}
@@ -482,7 +487,7 @@ export function ManagerAccountPage() {
                   </label>
 
                   <label className={styles.field}>
-                    <span>Recovery email</span>
+                    <span>{t("Recovery email")}</span>
                     <input
                       type="email"
                       value={newManagerForm.recoveryEmail}
@@ -493,7 +498,7 @@ export function ManagerAccountPage() {
                   </label>
 
                   <label className={styles.field}>
-                    <span>Temporary password</span>
+                    <span>{t("Temporary password")}</span>
                     <input
                       type="password"
                       inputMode="numeric"
@@ -502,7 +507,7 @@ export function ManagerAccountPage() {
                       maxLength={6}
                       value={newManagerForm.password}
                       onChange={updateNewManagerForm("password")}
-                      placeholder="Exactly 6 digits"
+                      placeholder={t("Exactly 6 digits")}
                       autoComplete="654321"
                     />
                   </label>
@@ -510,7 +515,7 @@ export function ManagerAccountPage() {
 
                 <div className={styles.actions}>
                   <IosButton
-                    label={createManagerMutation.isPending ? "Creating..." : "Create manager"}
+                    label={createManagerMutation.isPending ? t("Creating...") : t("Create manager")}
                     variant="secondary"
                     onClick={() => void handleCreateManager()}
                     disabled={isBusy}
@@ -525,22 +530,22 @@ export function ManagerAccountPage() {
         <RegulationHistoryCard
           acceptances={regulationHistoryQuery.data ?? []}
           isLoading={regulationHistoryQuery.isLoading}
-          title="My regulation history"
+          title={t("My regulation history")}
           className={styles.regulationHistory}
         />
       </section>
 
       <ConfirmDialog
         open={deleteTarget !== null}
-        title="Delete manager"
-        message={`Delete ${deleteTarget?.displayName ?? "this manager"}? This removes their access to the manager workflow.`}
+        title={t("Delete manager")}
+        message={t("Delete {0}? This removes their access to the manager workflow.", deleteTarget?.displayName ?? "this manager")}
         onCancel={() => {
           if (!deleteManagerMutation.isPending) {
             setDeleteTarget(null);
           }
         }}
         onConfirm={() => void handleDeleteManager()}
-        confirmText={deleteManagerMutation.isPending ? "Deleting..." : "Delete"}
+        confirmText={deleteManagerMutation.isPending ? t("Deleting...") : t("Delete")}
         confirmDisabled={deleteManagerMutation.isPending}
         cancelDisabled={deleteManagerMutation.isPending}
       />

@@ -1,3 +1,4 @@
+import { t } from "@shared/i18n";
 import type { ChangeEvent, FormEvent } from "react";
 import type { EmployeeFormErrors, EmployeeFormState } from "@entities/employees/model/form";
 import { RecordDetailsFormCard } from "@shared/ui/components/RecordDetailsFormCard";
@@ -37,22 +38,22 @@ export function EmployeeDetailsForm({
     >
       <div className={styles.fields}>
         <div className={styles.compactRow}>
-          <LabeledField id="firstName" label="First Name" error={errors.firstName}>
+          <LabeledField id="firstName" label={t("First Name")} error={errors.firstName}>
             <TextInput
               id="firstName"
               value={form.firstName}
-              placeholder="Example: John"
+              placeholder={t("Example: John")}
               onChange={onFieldChange("firstName")}
               aria-invalid={Boolean(errors.firstName)}
               aria-describedby={errors.firstName ? "firstName-error" : undefined}
             />
           </LabeledField>
 
-          <LabeledField id="lastName" label="Last Name" error={errors.lastName}>
+          <LabeledField id="lastName" label={t("Last Name")} error={errors.lastName}>
             <TextInput
               id="lastName"
               value={form.lastName}
-              placeholder="Example: Doe"
+              placeholder={t("Example: Doe")}
               onChange={onFieldChange("lastName")}
               aria-invalid={Boolean(errors.lastName)}
               aria-describedby={errors.lastName ? "lastName-error" : undefined}
@@ -61,11 +62,11 @@ export function EmployeeDetailsForm({
         </div>
 
         <div className={styles.compactRow}>
-          <LabeledField id="email" label="Email" error={errors.email}>
+          <LabeledField id="email" label={t("Email")} error={errors.email}>
             <TextInput
               id="email"
               type="email"
-              placeholder="Example: john.doe@example.com"
+              placeholder={t("Example: john.doe@example.com")}
               value={form.email}
               onChange={onFieldChange("email")}
               aria-invalid={Boolean(errors.email)}
@@ -73,11 +74,11 @@ export function EmployeeDetailsForm({
             />
           </LabeledField>
 
-          <LabeledField id="phone" label="Phone">
+          <LabeledField id="phone" label={t("Phone")}>
             <TextInput
               id="phone"
               type="tel"
-              placeholder="Example: +1 (555) 123-4567"
+              placeholder={t("Example: +1 (555) 123-4567")}
               value={form.phone}
               onChange={onFieldChange("phone")}
             />
@@ -85,10 +86,10 @@ export function EmployeeDetailsForm({
         </div>
 
         <div className={styles.compactRow}>
-          <LabeledField id="username" label="Username" error={errors.username}>
+          <LabeledField id="username" label={t("Username")} error={errors.username}>
             <TextInput
               id="username"
-              placeholder="Example: john.doe"
+              placeholder={t("Example: john.doe")}
               value={form.username}
               onChange={onFieldChange("username")}
               aria-invalid={Boolean(errors.username)}
@@ -98,7 +99,7 @@ export function EmployeeDetailsForm({
             />
           </LabeledField>
 
-          <LabeledField id="password" label="Password" error={errors.password}>
+          <LabeledField id="password" label={t("Password")} error={errors.password}>
             <TextInput
               id="password"
               type="password"
@@ -106,7 +107,7 @@ export function EmployeeDetailsForm({
               pattern="[0-9]*"
               minLength={6}
               maxLength={6}
-              placeholder="Exactly 6 digits"
+              placeholder={t("Exactly 6 digits")}
               value={form.password}
               onChange={onFieldChange("password")}
               aria-invalid={Boolean(errors.password)}

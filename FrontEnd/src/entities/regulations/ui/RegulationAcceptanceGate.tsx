@@ -1,3 +1,4 @@
+import { t } from "@shared/i18n";
 import { useEffect, useState } from "react";
 import { useAcceptRegulationMutation, usePendingRegulationsQuery, regulationsApi } from "@entities/regulations";
 import { getErrorMessage } from "@shared/api/httpClient";
@@ -42,7 +43,7 @@ export function RegulationAcceptanceGate() {
       const file = await regulationsApi.downloadPdf(regulation.id);
       saveBlob(file.blob, file.fileName ?? regulation.pdfFileName);
     } catch (downloadError) {
-      setError(getErrorMessage(downloadError, "Could not download the regulation PDF."));
+      setError(getErrorMessage(downloadError, t("Could not download the regulation PDF.")));
     } finally {
       setIsDownloading(false);
     }
@@ -51,28 +52,28 @@ export function RegulationAcceptanceGate() {
   const handleAccept = () => {
     setError(null);
     acceptMutation.mutate(regulation.id, {
-      onError: acceptError => setError(getErrorMessage(acceptError, "Could not record your acceptance.")),
+      onError: acceptError => setError(getErrorMessage(acceptError, t("Could not record your acceptance."))),
     });
   };
 
   return (
     <div className={styles.overlay} role="dialog" aria-modal="true" aria-labelledby="regulation-dialog-title">
       <section className={styles.dialog}>
-        <div className={styles.badge}>Required document</div>
+        <div className={styles.badge}>{t("Required document")}</div>
         <h2 id="regulation-dialog-title">{regulation.title}</h2>
-        <div className={styles.version}>Version {regulation.version}</div>
+        <div className={styles.version}>{t("Version")} {regulation.version}</div>
         <p className={styles.message}>{regulation.message}</p>
         <button type="button" className={styles.pdfButton} onClick={() => void handleDownload()} disabled={isDownloading}>
-          {isDownloading ? "Downloading..." : `Download PDF · ${regulation.pdfFileName}`}
+          {isDownloading ? t("Downloading...") : t("Download PDF · {0}", regulation.pdfFileName)}
         </button>
         <label className={styles.confirmation}>
           <input type="checkbox" checked={confirmed} onChange={event => setConfirmed(event.target.checked)} />
-          <span>I have read this PDF and accept regulation version {regulation.version}.</span>
+          <span>{t("I have read this PDF and accept regulation version")} {regulation.version}.</span>
         </label>
         {error ? <div className={styles.error} role="alert">{error}</div> : null}
         <div className={styles.actions}>
           <IosButton
-            label={acceptMutation.isPending ? "Saving acceptance..." : "Accept and continue"}
+            label={acceptMutation.isPending ? t("Saving acceptance...") : t("Accept and continue")}
             onClick={handleAccept}
             disabled={!confirmed || acceptMutation.isPending}
           />

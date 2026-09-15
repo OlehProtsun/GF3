@@ -1,3 +1,4 @@
+import { dateTimeFormat, t } from "@shared/i18n";
 import { useState, type CSSProperties } from "react";
 import type { GraphVersionDto } from "@entities/containers/api/dto";
 import {
@@ -31,7 +32,7 @@ function formatCommitDate(value: string) {
   const date = new Date(value);
   return Number.isNaN(date.getTime())
     ? value
-    : new Intl.DateTimeFormat("en-GB", {
+    : dateTimeFormat("en-GB", {
       day: "2-digit",
       month: "short",
       year: "numeric",
@@ -125,7 +126,7 @@ export function ContainerGraphVersionsDialog({
           onCheckoutComplete();
         },
         onError: error => {
-          setActionError(getErrorMessage(error, "Could not checkout this commit."));
+          setActionError(getErrorMessage(error, t("Could not checkout this commit.")));
           setCheckoutTarget(null);
         },
       },
@@ -146,7 +147,7 @@ export function ContainerGraphVersionsDialog({
           setDeleteTarget(null);
         },
         onError: error => {
-          setActionError(getErrorMessage(error, "Could not delete this commit."));
+          setActionError(getErrorMessage(error, t("Could not delete this commit.")));
           setDeleteTarget(null);
         },
       },
@@ -158,11 +159,11 @@ export function ContainerGraphVersionsDialog({
       <section className={styles.dialog} role="dialog" aria-modal="true" aria-labelledby="graph-versions-title">
         <header className={styles.header}>
           <div className={styles.titleBlock}>
-            <span className={styles.eyebrow}><SwapHistoryIcon size={14} /> Version control</span>
-            <h2 id="graph-versions-title" className={styles.title}>Schedule history</h2>
-            <p className={styles.description}>Every successful Save creates an immutable commit. Checkout an older point and the next change starts a new branch automatically.</p>
+            <span className={styles.eyebrow}><SwapHistoryIcon size={14} />  {t("Version control")}</span>
+            <h2 id="graph-versions-title" className={styles.title}>{t("Schedule history")}</h2>
+            <p className={styles.description}>{t("Every successful Save creates an immutable commit. Checkout an older point and the next change starts a new branch automatically.")}</p>
           </div>
-          <button type="button" className={styles.closeButton} aria-label="Close version control" disabled={isBusy} onClick={onCancel}>
+          <button type="button" className={styles.closeButton} aria-label={t("Close version control")} disabled={isBusy} onClick={onCancel}>
             <CloseIcon size={18} />
           </button>
         </header>
@@ -170,10 +171,10 @@ export function ContainerGraphVersionsDialog({
         {actionError ? <ErrorBanner>{actionError}</ErrorBanner> : null}
 
         <div className={styles.treeShell}>
-          {versionsQuery.isLoading ? <div className={styles.state}>Loading commit tree...</div> : null}
-          {versionsQuery.isError ? <div className={styles.state}>Could not load schedule commits.</div> : null}
+          {versionsQuery.isLoading ? <div className={styles.state}>{t("Loading commit tree...")}</div> : null}
+          {versionsQuery.isError ? <div className={styles.state}>{t("Could not load schedule commits.")}</div> : null}
           {!versionsQuery.isLoading && !versionsQuery.isError && versions.length === 0 ? (
-            <div className={styles.state}>The first commit will appear after this schedule is saved.</div>
+            <div className={styles.state}>{t("The first commit will appear after this schedule is saved.")}</div>
           ) : null}
           {versions.length > 0 ? (
             <div className={styles.treeScroller}>
@@ -222,7 +223,7 @@ export function ContainerGraphVersionsDialog({
                       type="button"
                       className={`${styles.commitButton} ${version.isCurrent ? styles.commitCurrent : ""} ${isSelected ? styles.commitSelected : ""}`}
                       style={{ left: position.x, top: position.y }}
-                      aria-label={`Commit ${version.versionNumber}, ${version.branchName}${version.isCurrent ? ", current" : ""}`}
+                      aria-label={t("Commit {0}, {1}{2}", version.versionNumber, version.branchName, version.isCurrent ? t(", current") : "")}
                       aria-pressed={isSelected}
                       onClick={() => setSelectedVersionId(version.id)}
                     >
@@ -237,19 +238,19 @@ export function ContainerGraphVersionsDialog({
         </div>
 
         {selectedVersion ? (
-          <section className={styles.commitDetails} aria-label={`Commit ${selectedVersion.versionNumber} details`}>
+          <section className={styles.commitDetails} aria-label={t("Commit {0} details", selectedVersion.versionNumber)}>
             <div className={styles.commitIdentity}>
               <div className={styles.commitTitleRow}>
-                <strong>Commit #{selectedVersion.versionNumber}</strong>
+                <strong>{t("Commit #")}{selectedVersion.versionNumber}</strong>
                 <span className={styles.branchChip}>{selectedVersion.branchName}</span>
-                {selectedVersion.isCurrent ? <span className={styles.currentChip}>Current</span> : null}
+                {selectedVersion.isCurrent ? <span className={styles.currentChip}>{t("Current")}</span> : null}
               </div>
               <span>{formatCommitDate(selectedVersion.createdAtUtc)} · {selectedVersion.authorName}</span>
             </div>
             <div className={styles.commitStats}>
-              <span><strong>{selectedVersion.employeeCount}</strong> employees</span>
-              <span><strong>{selectedVersion.slotCount}</strong> shifts</span>
-              <span><strong>{selectedVersion.cellStyleCount}</strong> styles</span>
+              <span><strong>{selectedVersion.employeeCount}</strong>  {t("employees")}</span>
+              <span><strong>{selectedVersion.slotCount}</strong>  {t("shifts")}</span>
+              <span><strong>{selectedVersion.cellStyleCount}</strong>  {t("styles")}</span>
             </div>
             <div className={styles.actions}>
               <button
@@ -259,8 +260,7 @@ export function ContainerGraphVersionsDialog({
                 onClick={() => setDeleteTarget(selectedVersion)}
               >
                 <span className={styles.actionIcon}><CloseIcon size={14} /></span>
-                Delete
-              </button>
+                {t("Delete")}</button>
               <button
                 type="button"
                 className={`${styles.actionButton} ${styles.switchAction}`}
@@ -268,7 +268,7 @@ export function ContainerGraphVersionsDialog({
                 onClick={() => setCheckoutTarget(selectedVersion)}
               >
                 <span className={styles.actionIcon}><SwapOffersIcon size={15} /></span>
-                Switch
+                {t("Switch")}
               </button>
             </div>
           </section>
@@ -277,11 +277,11 @@ export function ContainerGraphVersionsDialog({
 
       <ConfirmDialog
         open={checkoutTarget !== null}
-        title={`Checkout commit #${checkoutTarget?.versionNumber ?? ""}`}
+        title={t("Checkout commit #{0}", checkoutTarget?.versionNumber ?? "")}
         message={hasUnsavedChanges
-          ? "This will replace the current schedule with the selected commit and discard the unsaved editor draft. The next Save will create a new branch."
-          : "This will replace the current schedule with the selected commit. The next Save from that point will create a new branch."}
-        confirmText={checkoutMutation.isPending ? "Checking out..." : "Checkout"}
+          ? t("This will replace the current schedule with the selected commit and discard the unsaved editor draft. The next Save will create a new branch.")
+          : t("This will replace the current schedule with the selected commit. The next Save from that point will create a new branch.")}
+        confirmText={checkoutMutation.isPending ? t("Checking out...") : t("Checkout")}
         confirmDisabled={checkoutMutation.isPending}
         cancelDisabled={checkoutMutation.isPending}
         onCancel={() => setCheckoutTarget(null)}
@@ -289,9 +289,9 @@ export function ContainerGraphVersionsDialog({
       />
       <ConfirmDialog
         open={deleteTarget !== null}
-        title={`Delete commit #${deleteTarget?.versionNumber ?? ""}`}
-        message="Delete this immutable snapshot? Any child commits will stay available and reconnect to its parent. This action cannot be undone."
-        confirmText={deleteMutation.isPending ? "Deleting..." : "Delete"}
+        title={t("Delete commit #{0}", deleteTarget?.versionNumber ?? "")}
+        message={t("Delete this immutable snapshot? Any child commits will stay available and reconnect to its parent. This action cannot be undone.")}
+        confirmText={deleteMutation.isPending ? t("Deleting...") : t("Delete")}
         confirmDisabled={deleteMutation.isPending}
         cancelDisabled={deleteMutation.isPending}
         variant="warning"

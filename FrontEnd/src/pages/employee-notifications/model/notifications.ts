@@ -1,3 +1,4 @@
+import { dateTimeFormat, t } from "@shared/i18n";
 import type { ShiftSwap } from "@entities/shift-swaps";
 import type { EmployeeSchedule } from "@entities/employee-schedule";
 import type { EmployeeAvailabilityGroup } from "@entities/employee-availability";
@@ -52,12 +53,12 @@ export function getEmployeeNotificationExpiryAtMs(value?: string | null) {
 export function formatEmployeeNotificationExpiry(value?: string | null, nowMs = Date.now()) {
   const expiresAtMs = getEmployeeNotificationExpiryAtMs(value);
   if (expiresAtMs === null) {
-    return "This notification will be deleted automatically after 7 days.";
+    return t("This notification will be deleted automatically after 7 days.");
   }
 
   const remainingMs = expiresAtMs - nowMs;
   if (remainingMs <= 0) {
-    return "This notification is being deleted.";
+    return t("This notification is being deleted.");
   }
 
   const totalMinutes = Math.max(1, Math.ceil(remainingMs / 60_000));
@@ -66,30 +67,30 @@ export function formatEmployeeNotificationExpiry(value?: string | null, nowMs = 
   const minutes = totalMinutes % 60;
 
   if (days > 0) {
-    return `This notification will be deleted in ${days}d${hours > 0 ? ` ${hours}h` : ""}.`;
+    return t("This notification will be deleted in {0}d{1}.", days, hours > 0 ? ` ${hours}h` : "");
   }
 
   if (hours > 0) {
-    return `This notification will be deleted in ${hours}h${minutes > 0 ? ` ${minutes}m` : ""}.`;
+    return t("This notification will be deleted in {0}h{1}.", hours, minutes > 0 ? ` ${minutes}m` : "");
   }
 
-  return `This notification will be deleted in ${minutes}m.`;
+  return t("This notification will be deleted in {0}m.", minutes);
 }
 
-const dayFormatter = new Intl.DateTimeFormat("en-GB", {
+const dayFormatter = dateTimeFormat("en-GB", {
   day: "2-digit",
   month: "short",
   timeZone: "UTC",
 });
 
-const notificationTimeFormatter = new Intl.DateTimeFormat("en-GB", {
+const notificationTimeFormatter = dateTimeFormat("en-GB", {
   day: "2-digit",
   month: "short",
   hour: "2-digit",
   minute: "2-digit",
 });
 
-const monthFormatter = new Intl.DateTimeFormat("en-GB", {
+const monthFormatter = dateTimeFormat("en-GB", {
   month: "long",
   year: "numeric",
   timeZone: "UTC",
@@ -105,11 +106,11 @@ export function formatSwapDay(swap: Pick<ShiftSwap, "year" | "month" | "dayOfMon
 
 export function formatNotificationTime(value?: string | null) {
   if (!value) {
-    return "Current";
+    return t("Current");
   }
 
   const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? "Just now" : notificationTimeFormatter.format(date);
+  return Number.isNaN(date.getTime()) ? t("Just now") : notificationTimeFormatter.format(date);
 }
 
 export function isOpenShiftPostedNotification(event: EmployeeRealtimeNotificationLike) {
@@ -171,15 +172,15 @@ export function buildOpenShiftLiveNotification(
   return {
     id,
     readIds,
-    title: "Open shift posted",
+    title: t("Open shift posted"),
     body: swap
-      ? `Open shift for ${swap.scheduleName}: ${formatSwapDay(swap)} ${swap.fromTime} - ${swap.toTime}.`
-      : "A new open shift is available.",
+      ? t("Open shift for {0}: {1} {2} - {3}.", swap.scheduleName, formatSwapDay(swap), swap.fromTime, swap.toTime)
+      : t("A new open shift is available."),
     meta: formatNotificationTime(event.occurredAtUtc),
     tone: "swap",
     occurredAtUtc: event.occurredAtUtc,
     actionPath: "/swap",
-    actionLabel: "Open swap",
+    actionLabel: t("Open swap"),
   };
 }
 
@@ -187,13 +188,13 @@ export function buildOpenShiftSnapshotNotification(swap: ShiftSwap): EmployeeNot
   return {
     id: getEmployeeOpenShiftNotificationId(swap.id),
     readIds: getOpenShiftSwapReadIds(swap),
-    title: "Open shift posted",
-    body: `Open shift for ${swap.scheduleName}: ${formatSwapDay(swap)} ${swap.fromTime} - ${swap.toTime}.`,
-    meta: `${swap.shopName || "Shop"} / ${swap.containerName || "Container"}`,
+    title: t("Open shift posted"),
+    body: t("Open shift for {0}: {1} {2} - {3}.", swap.scheduleName, formatSwapDay(swap), swap.fromTime, swap.toTime),
+    meta: `${swap.shopName || t("Shop")} / ${swap.containerName || t("Container")}`,
     tone: "swap",
     occurredAtUtc: swap.createdAtUtc,
     actionPath: "/swap",
-    actionLabel: "Open swap",
+    actionLabel: t("Open swap"),
   };
 }
 
@@ -252,13 +253,13 @@ function buildScheduleNotification(
   return {
     id,
     readIds: uniqueIds([id, event?.id]),
-    title: "New schedule published",
-    body: `"${schedule.name}" for ${formatMonth(schedule.year, schedule.month)} is now available at ${schedule.shopName || "your shop"}.`,
-    meta: `${schedule.shopName || "Shop"} / ${schedule.containerName || "Container"}`,
+    title: t("New schedule published"),
+    body: t("\"{0}\" for {1} is now available at {2}.", schedule.name, formatMonth(schedule.year, schedule.month), schedule.shopName || "your shop"),
+    meta: `${schedule.shopName || t("Shop")} / ${schedule.containerName || t("Container")}`,
     tone: "schedule",
     occurredAtUtc: event?.occurredAtUtc ?? schedule.lastUpdatedAtUtc ?? null,
     actionPath: "/schedule",
-    actionLabel: "Open schedule",
+    actionLabel: t("Open schedule"),
   };
 }
 
@@ -270,15 +271,15 @@ function buildAvailabilityNotification(
   return {
     id,
     readIds: uniqueIds([id, event?.id]),
-    title: "New availability published",
-    body: `"${availability.name}" for ${formatMonth(availability.year, availability.month)} is open for your availability.`,
+    title: t("New availability published"),
+    body: t("\"{0}\" for {1} is open for your availability.", availability.name, formatMonth(availability.year, availability.month)),
     meta: availability.visibleToUtc
-      ? `Submit by ${formatNotificationTime(availability.visibleToUtc)}`
-      : "Open now",
+      ? t("Submit by {0}", formatNotificationTime(availability.visibleToUtc))
+      : t("Open now"),
     tone: "availability",
     occurredAtUtc: event?.occurredAtUtc ?? availability.visibleFromUtc ?? null,
     actionPath: "/availability",
-    actionLabel: "Open availability",
+    actionLabel: t("Open availability"),
   };
 }
 
@@ -299,13 +300,13 @@ function buildSwapAvailableNotification(
   return {
     id,
     readIds: uniqueIds([id, event?.id]),
-    title: "Shift swap available",
-    body: `${swap.fromEmployeeName || "A coworker"} offered ${formatSwapDay(swap)} ${swap.fromTime} - ${swap.toTime} from "${swap.scheduleName}".`,
-    meta: `${swap.shopName || "Shop"} / ${swap.containerName || "Container"}`,
+    title: t("Shift swap available"),
+    body: t("{0} offered {1} {2} - {3} from \"{4}\".", swap.fromEmployeeName || "A coworker", formatSwapDay(swap), swap.fromTime, swap.toTime, swap.scheduleName),
+    meta: `${swap.shopName || t("Shop")} / ${swap.containerName || t("Container")}`,
     tone: "swap",
     occurredAtUtc: event?.occurredAtUtc ?? swap.createdAtUtc,
     actionPath: "/swap",
-    actionLabel: "Open swap",
+    actionLabel: t("Open swap"),
   };
 }
 
@@ -317,13 +318,13 @@ function buildAcceptedOwnSwapNotification(
   return {
     id,
     readIds: uniqueIds([id, event?.id]),
-    title: "Your shift was accepted",
-    body: `${swap.acceptedByEmployeeName || "A coworker"} accepted your ${formatSwapDay(swap)} ${swap.fromTime} - ${swap.toTime} shift from "${swap.scheduleName}".`,
-    meta: `${swap.shopName || "Shop"} / ${swap.containerName || "Container"}`,
+    title: t("Your shift was accepted"),
+    body: t("{0} accepted your {1} {2} - {3} shift from \"{4}\".", swap.acceptedByEmployeeName || "A coworker", formatSwapDay(swap), swap.fromTime, swap.toTime, swap.scheduleName),
+    meta: `${swap.shopName || t("Shop")} / ${swap.containerName || t("Container")}`,
     tone: "swap",
     occurredAtUtc: event?.occurredAtUtc ?? swap.acceptedAtUtc ?? swap.createdAtUtc,
     actionPath: "/swap",
-    actionLabel: "View swap",
+    actionLabel: t("View swap"),
   };
 }
 

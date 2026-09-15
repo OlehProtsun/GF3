@@ -1,3 +1,4 @@
+import { t } from "@shared/i18n";
 import { useMemo, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import {
@@ -193,7 +194,7 @@ export function AvailabilityProfilePage() {
   ]);
   const activeRelatedEmployeeId = activeTransferredAwayHint?.employeeId ?? activeSourceHint?.employeeId ?? 0;
   const activeRelatedEmployeeName = activeRelatedEmployeeId > 0
-    ? employeeNameById.get(activeRelatedEmployeeId) ?? `Employee #${activeRelatedEmployeeId}`
+    ? employeeNameById.get(activeRelatedEmployeeId) ?? t("Employee #{0}", activeRelatedEmployeeId)
     : "";
   const hasActiveRelatedHint = Boolean(activeTransferredAwayHint || activeSourceHint);
 
@@ -230,8 +231,8 @@ export function AvailabilityProfilePage() {
   return (
     <div className={styles.page}>
       <PageHeader
-        title="Availability Profile"
-        subtitle="View availability details, assigned employees and saved daily schedule"
+        title={t("Availability Profile")}
+        subtitle={t("View availability details, assigned employees and saved daily schedule")}
         backTo="/availability"
       />
 
@@ -265,18 +266,18 @@ export function AvailabilityProfilePage() {
         highlightedDayOfMonths={activeRelatedHighlightedDays}
         isLoading={Boolean(activeTransferredAwayHint) && (relatedGroupQuery.isLoading || relatedItemsQuery.isLoading)}
         errorMessage={activeTransferredAwayHint && (relatedGroupQuery.isError || relatedItemsQuery.isError)
-          ? "Could not load the related availability."
+          ? t("Could not load the related availability.")
           : undefined}
         onCancel={() => setActiveRelatedHintCellKey(null)}
       />
 
       <ConfirmDialog
         open={isDeleteOpen}
-        title="Delete availability group"
-        message="Are you sure you want to delete this availability group? This action cannot be undone."
+        title={t("Delete availability group")}
+        message={t("Are you sure you want to delete this availability group? This action cannot be undone.")}
         onCancel={() => setIsDeleteOpen(false)}
         onConfirm={handleDeleteConfirm}
-        confirmText={deleteMutation.isPending ? "Deleting..." : "Delete"}
+        confirmText={deleteMutation.isPending ? t("Deleting...") : t("Delete")}
       />
     </div>
   );

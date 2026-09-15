@@ -1,3 +1,4 @@
+import { getLanguage, dateTimeFormat, t } from "@shared/i18n";
 import type { Employee } from "@entities/employees/model/types";
 import { getEmployeeFullName } from "@entities/employees/model/presentation";
 import { parseFlexibleTimeSegment } from "@shared/lib/timeRange";
@@ -140,7 +141,7 @@ function getGraphDate(year: number, month: number, dayOfMonth: number) {
 
 export function getGraphWeekdayLabel(year: number, month: number, dayOfMonth: number) {
   const weekdayIndex = getGraphDate(year, month, dayOfMonth).getDay();
-  const weekdayLabels = ["su", "mo", "tu", "we", "th", "fr", "sa"];
+  const weekdayLabels = getLanguage() === "pl" ? ["nd", "pn", "wt", "śr", "cz", "pt", "so"] : ["su", "mo", "tu", "we", "th", "fr", "sa"];
   return `${weekdayLabels[weekdayIndex]}.`;
 }
 
@@ -151,7 +152,7 @@ export function isGraphWeekend(year: number, month: number, dayOfMonth: number) 
 
 export function formatGraphMonthYear(year: number, month: number) {
   const date = new Date(Date.UTC(clampGraphYear(year), clampGraphMonth(month) - 1, 1));
-  return new Intl.DateTimeFormat("en-US", {
+  return dateTimeFormat("en-US", {
     month: "long",
     year: "numeric",
     timeZone: "UTC",
@@ -564,11 +565,11 @@ export function tryParseGraphIntervals(input: string):
     .map(part => part.trim());
 
   if (parts.some(part => !part)) {
-    return { ok: false, error: "Enter a complete time range after each comma." };
+    return { ok: false, error: t("Enter a complete time range after each comma.") };
   }
 
   if (parts.length > GRAPH_MAX_INTERVALS_PER_CELL) {
-    return { ok: false, error: `A cell can contain no more than ${GRAPH_MAX_INTERVALS_PER_CELL} time ranges.` };
+    return { ok: false, error: t("A cell can contain no more than {0} time ranges.", GRAPH_MAX_INTERVALS_PER_CELL) };
   }
 
   const uniqueIntervals = new Set<string>();
@@ -582,23 +583,23 @@ export function tryParseGraphIntervals(input: string):
       .filter(Boolean);
 
     if (segments.length !== 2) {
-      return { ok: false, error: "Use time ranges like 09:00 - 15:00. Comma-separated ranges are allowed." };
+      return { ok: false, error: t("Use time ranges like 09:00 - 15:00. Comma-separated ranges are allowed.") };
     }
 
     const from = normalizeGraphTime(segments[0]);
     const to = normalizeGraphTime(segments[1]);
 
     if (!from || !to) {
-      return { ok: false, error: "Use time ranges like 09:00 - 15:00." };
+      return { ok: false, error: t("Use time ranges like 09:00 - 15:00.") };
     }
 
     if ((parseGraphTimeMinutes(to) ?? 0) <= (parseGraphTimeMinutes(from) ?? 0)) {
-      return { ok: false, error: "From must be earlier than To." };
+      return { ok: false, error: t("From must be earlier than To.") };
     }
 
     const key = `${from}:${to}`;
     if (uniqueIntervals.has(key)) {
-      return { ok: false, error: "The same time range cannot be entered more than once." };
+      return { ok: false, error: t("The same time range cannot be entered more than once.") };
     }
 
     uniqueIntervals.add(key);
@@ -619,7 +620,7 @@ export function tryParseGraphIntervals(input: string):
     const previousTo = parseGraphTimeMinutes(intervals[index - 1].to) ?? 0;
     const currentFrom = parseGraphTimeMinutes(intervals[index].from) ?? 0;
     if (currentFrom < previousTo) {
-      return { ok: false, error: "Time ranges in one cell cannot overlap." };
+      return { ok: false, error: t("Time ranges in one cell cannot overlap.") };
     }
   }
 
@@ -762,7 +763,7 @@ export function buildGraphSummaryHeaders(year: number, month: number) {
   return Array.from({ length: daysInMonth }, (_, index) => {
     const dayOfMonth = index + 1;
     const date = getGraphDate(year, month, dayOfMonth);
-    const weekday = new Intl.DateTimeFormat("en-US", {
+    const weekday = dateTimeFormat("en-US", {
       weekday: "short",
       timeZone: "UTC",
     }).format(date);
@@ -1200,7 +1201,7 @@ function formatSummaryMinutes(totalMinutes: number) {
 }
 
 function getEmployeeLabel(employeeId: number, employeesById?: Map<number, Employee>) {
-  return getEmployeeFullName(employeesById?.get(employeeId), `Employee ${employeeId}`);
+  return getEmployeeFullName(employeesById?.get(employeeId), t("Employee {0}", employeeId));
 }
 
 function containsAlphabeticCharacter(value: string) {
