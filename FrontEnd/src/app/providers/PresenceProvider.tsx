@@ -1,3 +1,4 @@
+import { t } from "@shared/i18n";
 import {
   createContext,
   useCallback,
@@ -149,8 +150,8 @@ export function buildManagerEditLockKey(target: Pick<ManagerEditLockTarget, "res
 }
 
 export function buildManagerEditLockMessage(state: ManagerEditLockState | null | undefined, fallbackName: string) {
-  const lockedBy = state?.lockedBy?.trim() || "another manager";
-  return `${fallbackName} is currently being edited by ${lockedBy}. You cannot edit it right now.`;
+  const lockedBy = state?.lockedBy?.trim() || t("another manager");
+  return t("{0} is currently being edited by {1}. You cannot edit it right now.", fallbackName, lockedBy);
 }
 
 function scheduleToManagerEditLockTarget(target: ScheduleEditLockTarget): ManagerEditLockTarget {

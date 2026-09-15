@@ -1,3 +1,5 @@
+import { dateTimeFormat } from "@shared/i18n";
+import { t } from "@shared/i18n";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import {
@@ -182,7 +184,7 @@ function toErrorMessage(error: unknown) {
     return error.message;
   }
 
-  return "Something went wrong while saving bind information.";
+  return t("Something went wrong while saving bind information.");
 }
 
 function toManualShiftPublishError(error: unknown) {
@@ -190,7 +192,7 @@ function toManualShiftPublishError(error: unknown) {
     return error.message;
   }
 
-  return "Could not publish this manual shift.";
+  return t("Could not publish this manual shift.");
 }
 
 function toEditableAvailabilityBind(bind: AvailabilityBind): EditableAvailabilityBind {
@@ -540,7 +542,7 @@ function createEditableEmployeeRows(
       employeeId: graphEmployee.employeeId,
       displayOrder: graphEmployee.displayOrder,
       minHoursMonth: graphEmployee.minHoursMonth != null ? String(graphEmployee.minHoursMonth) : "",
-      label: getEmployeeFullName(employeesById.get(graphEmployee.employeeId), `Employee ${graphEmployee.employeeId}`),
+      label: getEmployeeFullName(employeesById.get(graphEmployee.employeeId), t("Employee {0}", graphEmployee.employeeId)),
     })),
   ).map(item => ({
       id: item.id,
@@ -623,7 +625,7 @@ function joinClassNames(...values: Array<string | false | undefined>) {
 }
 
 function formatAvailabilityGroupPeriod(year: number, month: number) {
-  return new Intl.DateTimeFormat("en-GB", {
+  return dateTimeFormat("en-GB", {
     month: "long",
     year: "numeric",
     timeZone: "UTC",
@@ -638,7 +640,7 @@ function CompactSizeHeaderToggle({ checked, onToggle }: CompactSizeHeaderToggleP
       aria-pressed={checked}
       onClick={onToggle}
     >
-      <span className={styles.compactToggleTitle}>Compact Size</span>
+      <span className={styles.compactToggleTitle}>{t("Compact Size")}</span>
 
       <span className={styles.compactToggleTrack} aria-hidden="true">
         <span className={styles.compactToggleThumb} />
@@ -1321,10 +1323,10 @@ export function ContainerGraphEditPage() {
     });
     return result;
   }, [textColorBindsQuery.data]);
-  const bindDeleteLabel = bindDeleteTarget?.key.trim() || "this bind";
+  const bindDeleteLabel = bindDeleteTarget?.key.trim() || t("this bind");
   const employeeRemoveTargetLabel = employeeRemoveTargetId !== null
-    ? employeeNameById.get(employeeRemoveTargetId) ?? `Employee #${employeeRemoveTargetId}`
-    : "this employee";
+    ? employeeNameById.get(employeeRemoveTargetId) ?? t("Employee #{0}", employeeRemoveTargetId)
+    : t("this employee");
 
   const effectiveGraph = useMemo(
     () => ({
@@ -1613,7 +1615,7 @@ export function ContainerGraphEditPage() {
     }
 
     const fallbackName = effectiveGraph.name.trim();
-    return fallbackName ? [fallbackName] : ["New schedule"];
+    return fallbackName ? [fallbackName] : [t("New schedule")];
   }, [effectiveGraph.name, sessionGraphs]);
   const showSessionTabs = !isCreate && (openGraphIds.length > 1 || hasExplicitSession);
   const visibleSessionTabCount = Math.min(Math.max(sessionGraphs.length, 1), 3);
@@ -1635,7 +1637,7 @@ export function ContainerGraphEditPage() {
   );
   const { lockedByOtherState, isCheckingLocks } = useManagerEditLocks(editLockTargets);
   const editLockMessage = lockedByOtherState
-    ? buildManagerEditLockMessage(lockedByOtherState, "This schedule")
+    ? buildManagerEditLockMessage(lockedByOtherState, t("This schedule"))
     : null;
   const canEdit = !editLockMessage && !isCheckingLocks;
 
@@ -1664,17 +1666,17 @@ export function ContainerGraphEditPage() {
   const previewAvailabilityOptions = useMemo(() => {
     const linkedHint =
       selectedScheduleAvailabilityGroup
-        ? `${formatAvailabilityGroupPeriod(selectedScheduleAvailabilityGroup.year, selectedScheduleAvailabilityGroup.month)} - synced from Schedule Details`
-        : "Use the availability selected in Schedule Details.";
+        ? t("{0} - synced from Schedule Details", formatAvailabilityGroupPeriod(selectedScheduleAvailabilityGroup.year, selectedScheduleAvailabilityGroup.month))
+        : t("Use the availability selected in Schedule Details.");
 
     return [
       {
         value: FOLLOW_SCHEDULE_DETAILS_PREVIEW,
-        label: selectedScheduleAvailabilityGroup ? `Auto: ${selectedScheduleAvailabilityGroup.name}` : "Auto: Schedule Details",
+        label: selectedScheduleAvailabilityGroup ? t("Auto: {0}", selectedScheduleAvailabilityGroup.name) : t("Auto: Schedule Details"),
         hint: linkedHint,
         keywords: [
           "auto",
-          "schedule details",
+          t("schedule details"),
           "linked",
           "synced",
           selectedScheduleAvailabilityGroup?.name ?? "",
@@ -1685,7 +1687,7 @@ export function ContainerGraphEditPage() {
         value: String(group.id),
         label: group.name,
         hint: group.id === scheduleAvailabilityGroupId
-          ? `${formatAvailabilityGroupPeriod(group.year, group.month)} - selected in Schedule Details`
+          ? t("{0} - selected in Schedule Details", formatAvailabilityGroupPeriod(group.year, group.month))
           : formatAvailabilityGroupPeriod(group.year, group.month),
         keywords: `${group.id} ${group.name} ${group.month} ${group.year} ${formatAvailabilityGroupPeriod(group.year, group.month)}`,
       })),
@@ -2053,7 +2055,7 @@ export function ContainerGraphEditPage() {
   const handleApplySchedulePreset = (presetId: number) => {
     const preset = schedulePresetsQuery.data?.find(item => item.id === presetId);
     if (!preset) {
-      setSubmitError("Could not find the selected preset.");
+      setSubmitError(t("Could not find the selected preset."));
       return;
     }
 
@@ -2080,7 +2082,7 @@ export function ContainerGraphEditPage() {
 
   const handleCreateSchedulePreset = async (payload: SaveSchedulePresetDto) => {
     if (!containerId) {
-      throw new Error("Container is missing.");
+      throw new Error(t("Container is missing."));
     }
 
     const createdPreset = await runMutation(createSchedulePresetMutation.mutate, {
@@ -2098,12 +2100,12 @@ export function ContainerGraphEditPage() {
     setSubmitError(undefined);
 
     if (!selectedEmployeeId) {
-      setSubmitError("Select an employee first.");
+      setSubmitError(t("Select an employee first."));
       return;
     }
 
     if (graphEmployeeRows.some(row => row.employeeId === selectedEmployeeId)) {
-      setSubmitError("This employee is already added.");
+      setSubmitError(t("This employee is already added."));
       return;
     }
 
@@ -2155,14 +2157,14 @@ export function ContainerGraphEditPage() {
     const nextCellErrors = draftSlots.errors;
 
     if (requireAvailabilityGroup && !form.availabilityGroupId) {
-      nextFormErrors.availabilityGroupId = GENERATE_AVAILABILITY_GROUP_REQUIRED_MESSAGE;
+      nextFormErrors.availabilityGroupId = t(GENERATE_AVAILABILITY_GROUP_REQUIRED_MESSAGE);
     }
 
     setFormErrors(nextFormErrors);
     setCellErrors(nextCellErrors);
 
     if (graphEmployeeRows.length === 0) {
-      setSubmitError("Add at least one employee to this schedule.");
+      setSubmitError(t("Add at least one employee to this schedule."));
       return false;
     }
 
@@ -2175,8 +2177,8 @@ export function ContainerGraphEditPage() {
 
       setSubmitError(
         shouldShowAvailabilityMessage
-          ? GENERATE_AVAILABILITY_GROUP_REQUIRED_MESSAGE
-          : "Check highlighted fields before continuing.",
+          ? t(GENERATE_AVAILABILITY_GROUP_REQUIRED_MESSAGE)
+          : t("Check highlighted fields before continuing."),
       );
       return false;
     }
@@ -2186,7 +2188,7 @@ export function ContainerGraphEditPage() {
 
   const saveGraphDraft = async (draft: GraphEditorSessionDraft) => {
     if (!containerId) {
-      throw new Error("Container is missing.");
+      throw new Error(t("Container is missing."));
     }
 
     const orderedDraftRows = sortGraphEmployeeRowsByColumnOrder(draft.graphEmployeeRows, draft.scheduleColumnOrder);
@@ -2256,14 +2258,14 @@ export function ContainerGraphEditPage() {
     const nextFormErrors = buildGraphFormErrors(form, shopIdSet, availabilityGroupIdSet);
 
     if (!form.availabilityGroupId) {
-      nextFormErrors.availabilityGroupId = GENERATE_AVAILABILITY_GROUP_REQUIRED_MESSAGE;
+      nextFormErrors.availabilityGroupId = t(GENERATE_AVAILABILITY_GROUP_REQUIRED_MESSAGE);
     }
 
     setFormErrors(nextFormErrors);
     setCellErrors({});
 
     if (generationRows.length === 0) {
-      setSubmitError("No employees found for selected availability group.");
+      setSubmitError(t("No employees found for selected availability group."));
       return false;
     }
 
@@ -2274,8 +2276,8 @@ export function ContainerGraphEditPage() {
 
       setSubmitError(
         shouldShowAvailabilityMessage
-          ? GENERATE_AVAILABILITY_GROUP_REQUIRED_MESSAGE
-          : "Check highlighted fields before continuing.",
+          ? t(GENERATE_AVAILABILITY_GROUP_REQUIRED_MESSAGE)
+          : t("Check highlighted fields before continuing."),
       );
       return false;
     }
@@ -2292,7 +2294,7 @@ export function ContainerGraphEditPage() {
     }
 
     if (isCheckingLocks) {
-      setSubmitError("Checking edit access. Please wait a moment.");
+      setSubmitError(t("Checking edit access. Please wait a moment."));
       return;
     }
 
@@ -2351,7 +2353,7 @@ export function ContainerGraphEditPage() {
       }
 
       if (graphId !== null && !draftsToSave.has(graphId)) {
-        throw new Error("Current schedule draft is not ready yet.");
+        throw new Error(t("Current schedule draft is not ready yet."));
       }
 
       const graphIdsToSave = showSessionTabs
@@ -2359,7 +2361,7 @@ export function ContainerGraphEditPage() {
         : (currentDraft ? [currentDraft.graphId] : []);
 
       if (graphIdsToSave.length === 0) {
-        throw new Error("Nothing is ready to save yet.");
+        throw new Error(t("Nothing is ready to save yet."));
       }
 
       for (const openGraphId of graphIdsToSave) {
@@ -2384,7 +2386,7 @@ export function ContainerGraphEditPage() {
         return;
       }
 
-      setSubmitError(error instanceof Error ? error.message : "Could not save this schedule.");
+      setSubmitError(error instanceof Error ? error.message : t("Could not save this schedule."));
     } finally {
       setIsSessionSaving(false);
     }
@@ -2453,7 +2455,7 @@ export function ContainerGraphEditPage() {
         return;
       }
 
-      setSubmitError(error instanceof Error ? error.message : "Could not generate this schedule.");
+      setSubmitError(error instanceof Error ? error.message : t("Could not generate this schedule."));
     }
   };
 
@@ -2479,19 +2481,19 @@ export function ContainerGraphEditPage() {
     }
 
     if (!trimmedKey || !trimmedValue) {
-      setBindError("Bind key and value are required before the bind can be saved.");
+      setBindError(t("Bind key and value are required before the bind can be saved."));
       return;
     }
 
     const normalizedKey = normalizeBindKey(trimmedKey);
     if (!normalizedKey) {
-      setBindError("Invalid bind key format.");
+      setBindError(t("Invalid bind key format."));
       return;
     }
 
     const duplicateBindExists = bindRows.some(item => item.clientId !== clientId && normalizeBindKey(item.key) === normalizedKey);
     if (duplicateBindExists) {
-      setBindError(`Bind '${normalizedKey}' already exists.`);
+      setBindError(t("Bind '{0}' already exists.", normalizedKey));
       return;
     }
 
@@ -2560,7 +2562,7 @@ export function ContainerGraphEditPage() {
     setBindError(undefined);
 
     if (!selectedBindRow) {
-      setBindError("Select bind first.");
+      setBindError(t("Select bind first."));
       return;
     }
 
@@ -2730,23 +2732,23 @@ export function ContainerGraphEditPage() {
     setManualShiftPublishError(null);
 
     if (!form.allowSwap) {
-      setManualShiftPublishError("Swaps are not allowed for this schedule. Enable Allow swap in Publication first.");
+      setManualShiftPublishError(t("Swaps are not allowed for this schedule. Enable Allow swap in Publication first."));
       return;
     }
 
     if (!containerId || !graphId) {
-      setManualShiftPublishError("Save this schedule before adding manual shifts to swap.");
+      setManualShiftPublishError(t("Save this schedule before adding manual shifts to swap."));
       return;
     }
 
     if (!handleValidate()) {
-      setManualShiftPublishError("Check highlighted schedule fields before publishing this shift.");
+      setManualShiftPublishError(t("Check highlighted schedule fields before publishing this shift."));
       return;
     }
 
     const currentDraft = createCurrentGraphDraft();
     if (!currentDraft) {
-      setManualShiftPublishError("Current schedule draft is not ready yet.");
+      setManualShiftPublishError(t("Current schedule draft is not ready yet."));
       return;
     }
 
@@ -2760,7 +2762,7 @@ export function ContainerGraphEditPage() {
       shift.dayOfMonth === input.dayOfMonth);
 
     if (hasExistingOpenOffer || hasPendingOffer) {
-      setManualShiftPublishError("This manual shift already has an open or pending swap offer.");
+      setManualShiftPublishError(t("This manual shift already has an open or pending swap offer."));
       return;
     }
 
@@ -2784,7 +2786,7 @@ export function ContainerGraphEditPage() {
     setManualShiftPublishError(null);
 
     if (!containerId || !graphId) {
-      setManualShiftPublishError("Schedule is not ready yet.");
+      setManualShiftPublishError(t("Schedule is not ready yet."));
       return;
     }
 
@@ -2805,8 +2807,8 @@ export function ContainerGraphEditPage() {
   return (
     <div className={styles.page}>
       <PageHeader
-        title={isCreate ? "Add Schedule" : "Schedule Edit"}
-        subtitle={isCreate ? "Create a new saved schedule for this container" : "Update schedule details, employees, matrix content and styling"}
+        title={isCreate ? t("Add Schedule") : t("Schedule Edit")}
+        subtitle={isCreate ? t("Create a new saved schedule for this container") : t("Update schedule details, employees, matrix content and styling")}
         onBack={() => navigate(
           isCreate
             ? `/container?openContainerId=${containerId ?? ""}`
@@ -2841,7 +2843,7 @@ export function ContainerGraphEditPage() {
                 }}
                   actionSlot={
                     <IosButton
-                      label="Save"
+                      label={t("Save")}
                       icon={<SaveIcon size={18} />}
                       disabled={isSaving || Boolean(editLockMessage) || isCheckingLocks}
                       onClick={() => setIsSaveConfirmOpen(true)}
@@ -2863,8 +2865,8 @@ export function ContainerGraphEditPage() {
       {isCheckingLocks ? (
         <ManagerEditLockDialog
           open
-          title="Checking edit access"
-          message="Please wait while we check whether this schedule can be edited."
+          title={t("Checking edit access")}
+          message={t("Please wait while we check whether this schedule can be edited.")}
         />
       ) : null}
 
@@ -2937,7 +2939,7 @@ export function ContainerGraphEditPage() {
         isPublishingManualShift={createManualShiftSwapMutation.isPending || isSaving}
         isCancellingManualShift={cancelManualShiftSwapMutation.isPending}
         submitError={submitError}
-        bindErrorMessage={bindError ?? (bindsQuery.isError && bindRows.length === 0 ? "Could not load bind information." : undefined)}
+        bindErrorMessage={bindError ?? (bindsQuery.isError && bindRows.length === 0 ? t("Could not load bind information.") : undefined)}
         manualShiftPublishError={manualShiftPublishError}
         onFieldChange={setFieldValue}
         onSelectedEmployeeIdChange={setSelectedEmployeeId}
@@ -3060,36 +3062,36 @@ export function ContainerGraphEditPage() {
 
       <ConfirmDialog
         open={employeeRemoveTargetId !== null}
-        title="Remove employee"
-        message={`Are you sure you want to remove '${employeeRemoveTargetLabel}' from this schedule? Their schedule cells in this editor will be removed.`}
+        title={t("Remove employee")}
+        message={t("Are you sure you want to remove '{0}' from this schedule? Their schedule cells in this editor will be removed.", employeeRemoveTargetLabel)}
         onCancel={() => setEmployeeRemoveTargetId(null)}
         onConfirm={handleRemoveEmployeeConfirm}
         confirmText="Remove"
       />
       <ConfirmDialog
         open={bindDeleteTarget !== null}
-        title="Delete bind"
-        message={`Are you sure you want to delete '${bindDeleteLabel}' from the bind list?`}
+        title={t("Delete bind")}
+        message={t("Are you sure you want to delete '{0}' from the bind list?", bindDeleteLabel)}
         onCancel={() => setBindDeleteTarget(null)}
         onConfirm={handleDeleteBindConfirm}
-        confirmText={deleteBindMutation.isPending ? "Deleting..." : "Delete"}
+        confirmText={deleteBindMutation.isPending ? t("Deleting...") : t("Delete")}
         confirmDisabled={deleteBindMutation.isPending}
         cancelDisabled={deleteBindMutation.isPending}
       />
 
       <ConfirmDialog
         open={isSaveConfirmOpen}
-        title={sessionGraphNames.length > 1 ? "Save schedule session" : "Save schedule"}
+        title={sessionGraphNames.length > 1 ? t("Save schedule session") : t("Save schedule")}
         message={
           sessionGraphNames.length > 1
-            ? "Save changes for the schedules in this editing session?"
-            : `Save changes for '${sessionGraphNames[0]}'?`
+            ? t("Save changes for the schedules in this editing session?")
+            : t("Save changes for '{0}'?", sessionGraphNames[0])
         }
         footerSlot={
           sessionGraphNames.length > 0 ? (
             <div className={styles.dialogList}>
               <span className={styles.dialogListTitle}>
-                {sessionGraphNames.length > 1 ? "Open schedules" : "Selected schedule"}
+                {sessionGraphNames.length > 1 ? t("Open schedules") : t("Selected schedule")}
               </span>
               <span className={styles.dialogListValue}>{sessionGraphNames.join(", ")}</span>
             </div>
@@ -3097,7 +3099,7 @@ export function ContainerGraphEditPage() {
         }
         onCancel={() => setIsSaveConfirmOpen(false)}
         onConfirm={() => void handleSave()}
-        confirmText={isSaving ? "Saving..." : "Save"}
+        confirmText={isSaving ? t("Saving...") : t("Save")}
         confirmDisabled={isSaving}
         cancelDisabled={isSaving}
         variant="confirm"

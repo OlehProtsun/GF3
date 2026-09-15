@@ -1,3 +1,5 @@
+import { dateTimeFormat } from "@shared/i18n";
+import { t } from "@shared/i18n";
 import { useMemo, useState } from "react";
 import type { ChangeEvent, FormEvent } from "react";
 import {
@@ -25,7 +27,7 @@ type FormState = {
 };
 
 const emptyMessages: CommunicationMessageDto[] = [];
-const dateTimeFormatter = new Intl.DateTimeFormat(undefined, {
+const dateTimeFormatter = dateTimeFormat(undefined, {
   month: "short",
   day: "2-digit",
   year: "numeric",
@@ -64,7 +66,7 @@ function createInitialForm(): FormState {
 function formatDateTime(value: string) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) {
-    return "Unknown date";
+    return t("Unknown date");
   }
 
   return dateTimeFormatter.format(date);
@@ -73,21 +75,21 @@ function formatDateTime(value: string) {
 function getDeadlineTone(message: CommunicationMessageDto) {
   const visibleFrom = new Date(message.visibleFromUtc).getTime();
   if (visibleFrom > Date.now()) {
-    return "Scheduled";
+    return t("Scheduled");
   }
 
   if (!message.isActive) {
-    return "Expired";
+    return t("Expired");
   }
 
   const deadline = new Date(message.deadlineAtUtc).getTime();
   const hoursLeft = (deadline - Date.now()) / 3_600_000;
 
   if (hoursLeft <= 24) {
-    return "Due soon";
+    return t("Due soon");
   }
 
-  return "Active";
+  return t("Active");
 }
 
 function getMessageStatusClassName(message: CommunicationMessageDto) {
@@ -152,25 +154,25 @@ export function CommunicationsPage() {
     const visibleToDate = new Date(form.visibleToLocal);
 
     if (!title || !body) {
-      setInlineError("Title and message are required.");
+      setInlineError(t("Title and message are required."));
       setInlineSuccess(null);
       return;
     }
 
     if (Number.isNaN(visibleFromDate.getTime())) {
-      setInlineError("Visible from is required.");
+      setInlineError(t("Visible from is required."));
       setInlineSuccess(null);
       return;
     }
 
     if (Number.isNaN(visibleToDate.getTime()) || visibleToDate.getTime() <= Date.now()) {
-      setInlineError("Visible to must be in the future.");
+      setInlineError(t("Visible to must be in the future."));
       setInlineSuccess(null);
       return;
     }
 
     if (visibleToDate.getTime() <= visibleFromDate.getTime()) {
-      setInlineError("Visible to must be later than visible from.");
+      setInlineError(t("Visible to must be later than visible from."));
       setInlineSuccess(null);
       return;
     }
@@ -189,12 +191,12 @@ export function CommunicationsPage() {
       const successVerb = editingMessageId === null ? "created" : "updated";
       resetForm();
       setInlineError(null);
-      setInlineSuccess(`Communication "${saved.title}" was ${successVerb} and is visible until ${formatDateTime(saved.deadlineAtUtc)}.`);
+      setInlineSuccess(t("Communication \"{0}\" was {1} and is visible until {2}.", saved.title, successVerb, formatDateTime(saved.deadlineAtUtc)));
     } catch (error) {
-      const message = getErrorMessage(error, "Could not create communication.");
+      const message = getErrorMessage(error, t("Could not create communication."));
       setInlineError(message);
       setInlineSuccess(null);
-      pushErrorAlertFromError(error, "Could not create communication.");
+      pushErrorAlertFromError(error, t("Could not create communication."));
     }
   };
 
@@ -209,18 +211,18 @@ export function CommunicationsPage() {
         resetForm();
       }
       setInlineError(null);
-      setInlineSuccess(`Communication "${deleteTarget.title}" was deleted.`);
+      setInlineSuccess(t("Communication \"{0}\" was deleted.", deleteTarget.title));
       setDeleteTarget(null);
     } catch (error) {
-      const message = getErrorMessage(error, "Could not delete communication.");
+      const message = getErrorMessage(error, t("Could not delete communication."));
       setInlineError(message);
-      pushErrorAlertFromError(error, "Could not delete communication.");
+      pushErrorAlertFromError(error, t("Could not delete communication."));
     }
   };
 
   return (
     <div className={styles.page}>
-      <PageHeader title="Communications" subtitle="Employee messages with live deadlines" backTo={-1} />
+      <PageHeader title={t("Communications")} subtitle={t("Employee messages with live deadlines")} backTo={-1} />
 
       <div className={styles.layout}>
         <section className={styles.panel}>
@@ -230,8 +232,8 @@ export function CommunicationsPage() {
                 <NoteIcon size={18} />
               </span>
               <div>
-                <span className={styles.eyebrow}>{editingMessageId === null ? "New message" : "Editing message"}</span>
-                <strong>{editingMessageId === null ? "Create communication" : "Update communication"}</strong>
+                <span className={styles.eyebrow}>{editingMessageId === null ? t("New message") : t("Editing message")}</span>
+                <strong>{editingMessageId === null ? t("Create communication") : t("Update communication")}</strong>
               </div>
             </div>
           </div>
@@ -241,18 +243,18 @@ export function CommunicationsPage() {
 
           <form className={styles.form} onSubmit={handleSubmit}>
             <label className={styles.field}>
-              <span>Title</span>
+              <span>{t("Title")}</span>
               <input
                 value={form.title}
                 onChange={updateForm("title")}
                 maxLength={160}
-                placeholder="Short announcement title"
+                placeholder={t("Short announcement title")}
               />
             </label>
 
             <AvailabilityDateTimeField
               id="communication-visible-from"
-              label="Visible From"
+              label={t("Visible From")}
               value={form.visibleFromLocal}
               defaultTime="09:00"
               onChange={value => setForm(current => ({ ...current, visibleFromLocal: value }))}
@@ -260,20 +262,20 @@ export function CommunicationsPage() {
 
             <AvailabilityDateTimeField
               id="communication-visible-to"
-              label="Visible To"
+              label={t("Visible To")}
               value={form.visibleToLocal}
               defaultTime="23:59"
               onChange={value => setForm(current => ({ ...current, visibleToLocal: value }))}
             />
 
             <label className={styles.field}>
-              <span>Message</span>
+              <span>{t("Message")}</span>
               <textarea
                 value={form.body}
                 onChange={updateForm("body")}
                 maxLength={4000}
                 rows={8}
-                placeholder="Write the update employees need to see when they sign in."
+                placeholder={t("Write the update employees need to see when they sign in.")}
               />
             </label>
 
@@ -283,7 +285,7 @@ export function CommunicationsPage() {
                 {editingMessageId !== null ? (
                   <IosButton
                     type="button"
-                    label="Cancel edit"
+                    label={t("Cancel edit")}
                     variant="secondary"
                     onClick={resetForm}
                     disabled={isSaving}
@@ -291,7 +293,7 @@ export function CommunicationsPage() {
                 ) : null}
                 <IosButton
                   type="submit"
-                  label={isSaving ? "Saving..." : editingMessageId === null ? "Create" : "Save changes"}
+                  label={isSaving ? t("Saving...") : editingMessageId === null ? t("Create") : t("Save changes")}
                   icon={<PlusIcon size={15} />}
                   disabled={isSaving}
                 />
@@ -307,25 +309,25 @@ export function CommunicationsPage() {
                 <NoteIcon size={18} />
               </span>
               <div>
-                <span className={styles.eyebrow}>Published</span>
-                <strong>Message board</strong>
+                <span className={styles.eyebrow}>{t("Published")}</span>
+                <strong>{t("Message board")}</strong>
               </div>
             </div>
 
             <div className={styles.headerPills}>
-              <span className={styles.countPill}>{activeCount} active</span>
-              <span className={styles.countPill}>{messages.length} total</span>
+              <span className={styles.countPill}>{activeCount}  {t("active")}</span>
+              <span className={styles.countPill}>{messages.length}  {t("total")}</span>
             </div>
           </div>
 
           {communicationsQuery.error ? (
             <div className={styles.stateText}>
-              {getErrorMessage(communicationsQuery.error, "Could not load communications.")}
+              {getErrorMessage(communicationsQuery.error, t("Could not load communications."))}
             </div>
           ) : communicationsQuery.isLoading ? (
-            <div className={styles.stateText}>Loading communications...</div>
+            <div className={styles.stateText}>{t("Loading communications...")}</div>
           ) : messages.length === 0 ? (
-            <div className={styles.stateText}>No communications have been created yet.</div>
+            <div className={styles.stateText}>{t("No communications have been created yet.")}</div>
           ) : (
             <div className={styles.messageList}>
               {messages.map(message => (
@@ -338,23 +340,21 @@ export function CommunicationsPage() {
                   </div>
                   <p>{message.body}</p>
                   <div className={styles.messageMeta}>
-                    <span>Visible from {formatDateTime(message.visibleFromUtc)}</span>
-                    <span>Visible to {formatDateTime(message.deadlineAtUtc)}</span>
-                    <span>Created by {message.createdByManagerName}</span>
+                    <span>{t("Visible from")} {formatDateTime(message.visibleFromUtc)}</span>
+                    <span>{t("Visible to")} {formatDateTime(message.deadlineAtUtc)}</span>
+                    <span>{t("Created by")} {message.createdByManagerName}</span>
                     <span>{formatDateTime(message.createdAtUtc)}</span>
                   </div>
                   <div className={styles.messageActions}>
                     <button type="button" onClick={() => beginEdit(message)} disabled={isSaving}>
-                      Edit
-                    </button>
+                      {t("Edit")}</button>
                     <button
                       type="button"
                       className={styles.deleteButton}
                       onClick={() => setDeleteTarget(message)}
                       disabled={deleteCommunicationMutation.isPending}
                     >
-                      Delete
-                    </button>
+                      {t("Delete")}</button>
                   </div>
                 </article>
               ))}
@@ -365,9 +365,9 @@ export function CommunicationsPage() {
 
       <ConfirmDialog
         open={deleteTarget !== null}
-        title="Delete communication?"
-        message={deleteTarget ? `Employees will no longer see "${deleteTarget.title}".` : ""}
-        confirmText={deleteCommunicationMutation.isPending ? "Deleting..." : "Delete"}
+        title={t("Delete communication?")}
+        message={deleteTarget ? t("Employees will no longer see \"{0}\".", deleteTarget.title) : ""}
+        confirmText={deleteCommunicationMutation.isPending ? t("Deleting...") : t("Delete")}
         onConfirm={() => void handleDelete()}
         onCancel={() => setDeleteTarget(null)}
         confirmDisabled={deleteCommunicationMutation.isPending}

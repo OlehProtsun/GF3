@@ -1,3 +1,5 @@
+import { dateTimeFormat } from "@shared/i18n";
+import { t } from "@shared/i18n";
 import type { Employee } from "@entities/employees/model/types";
 import type { Shop } from "@entities/shops/model/types";
 import { getGraphVisibleNote } from "./graphNote";
@@ -103,9 +105,9 @@ export function buildContainerGraphSummaries(
         assignedHoursText: formatHoursMinutes(totalMinutes),
         assignedSlotCount,
         coverageDays: workedDays.size,
-        shopName: shopsById?.get(graph.shopId)?.name?.trim() || `Shop ${graph.shopId}`,
+        shopName: shopsById?.get(graph.shopId)?.name?.trim() || t("Shop {0}", graph.shopId),
         monthYearLabel: formatGraphMonthYear(graph.year, graph.month),
-        availabilityLabel: graph.availabilityGroupId ? `Group ${graph.availabilityGroupId}` : "None",
+        availabilityLabel: graph.availabilityGroupId ? t("Group {0}", graph.availabilityGroupId) : t("None"),
       };
     });
 }
@@ -129,7 +131,7 @@ export function buildContainerStatistics({
   graphs.forEach(graph => {
     const records = graphRecordsById[graph.id] ?? { employees: [], slots: [] };
     const shopKey = String(graph.shopId);
-    const shopName = shopsById?.get(graph.shopId)?.name?.trim() || `Shop ${graph.shopId}`;
+    const shopName = shopsById?.get(graph.shopId)?.name?.trim() || t("Shop {0}", graph.shopId);
     const daysInMonth = new Date(graph.year, graph.month, 0).getDate();
     const periodKey = `${graph.year}-${String(graph.month).padStart(2, "0")}`;
 
@@ -329,7 +331,7 @@ export function buildPreviewList(items: string[], previewCount = 8) {
   const remainingCount = sanitizedItems.length - visibleItems.length;
 
   return remainingCount > 0
-    ? `${visibleItems.join(", ")}, +${remainingCount} more`
+    ? t("{0}, +{1} more", visibleItems.join(", "), remainingCount)
     : visibleItems.join(", ");
 }
 
@@ -353,7 +355,7 @@ function formatGraphMonthYear(year: number, month: number) {
   const monthIndex = Math.min(Math.max(month - 1, 0), 11);
   const date = new Date(Date.UTC(year, monthIndex, 1));
 
-  return new Intl.DateTimeFormat("en-US", {
+  return dateTimeFormat("en-US", {
     month: "long",
     year: "numeric",
     timeZone: "UTC",
@@ -364,5 +366,5 @@ function getEmployeeLabel(employeeId: number, employeesById?: Map<number, Employ
   const employee = employeesById?.get(employeeId);
   const fullName = [employee?.firstName, employee?.lastName].filter(Boolean).join(" ").trim();
 
-  return fullName || `Employee ${employeeId}`;
+  return fullName || t("Employee {0}", employeeId);
 }

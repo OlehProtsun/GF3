@@ -1,3 +1,4 @@
+import { t } from "@shared/i18n";
 import { useMemo } from "react";
 import type { ChangeEvent } from "react";
 import { useSyncedDraft } from "@shared/lib/useSyncedDraft";
@@ -37,11 +38,11 @@ export function validateShopForm(form: ShopFormState): ShopFormErrors {
   const nextErrors: ShopFormErrors = {};
 
   if (!form.name.trim()) {
-    nextErrors.name = "Name is required";
+    nextErrors.name = t("Name is required");
   }
 
   if (!form.address.trim()) {
-    nextErrors.address = "Address is required";
+    nextErrors.address = t("Address is required");
   }
 
   return nextErrors;

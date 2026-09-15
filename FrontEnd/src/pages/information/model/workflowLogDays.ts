@@ -1,3 +1,5 @@
+import { dateTimeFormat } from "@shared/i18n";
+import { t } from "@shared/i18n";
 import type { WorkflowLog } from "@entities/workflow-logs";
 
 export type WorkflowLogDay = {
@@ -8,19 +10,19 @@ export type WorkflowLogDay = {
   sortValue: number;
 };
 
-const dayTabFormatter = new Intl.DateTimeFormat("en-US", {
+const dayTabFormatter = dateTimeFormat("en-US", {
   day: "2-digit",
   month: "short",
 });
 
-const fullDayFormatter = new Intl.DateTimeFormat("en-US", {
+const fullDayFormatter = dateTimeFormat("en-US", {
   weekday: "long",
   day: "2-digit",
   month: "long",
   year: "numeric",
 });
 
-const logTimeFormatter = new Intl.DateTimeFormat("en-US", {
+const logTimeFormatter = dateTimeFormat("en-US", {
   hour: "2-digit",
   minute: "2-digit",
   second: "2-digit",
@@ -84,7 +86,7 @@ export function formatWorkflowLogTime(value: string) {
 }
 
 export function getRoleLabel(role: string) {
-  return role.toLowerCase() === "employee" ? "Employee" : "Manager";
+  return role.toLowerCase() === "employee" ? t("Employee") : t("Manager");
 }
 
 export function groupWorkflowLogsByDay(logs: WorkflowLog[]) {
@@ -102,8 +104,8 @@ export function groupWorkflowLogsByDay(logs: WorkflowLog[]) {
 
     groups.set(key, {
       key,
-      label: date ? dayTabFormatter.format(date) : "Unknown",
-      fullLabel: date ? fullDayFormatter.format(date) : "Unknown date",
+      label: date ? dayTabFormatter.format(date) : t("Unknown"),
+      fullLabel: date ? fullDayFormatter.format(date) : t("Unknown date"),
       logs: [log],
       sortValue: date ? new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime() : 0,
     });

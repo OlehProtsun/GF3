@@ -1,3 +1,4 @@
+import { t, dateTimeFormat, numberFormat } from "@shared/i18n";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { NavLink } from "react-router-dom";
 import { useAuth } from "@app/providers/AuthProvider";
@@ -34,28 +35,28 @@ import { EmployeeScheduleColumnOrderDialog } from "./EmployeeScheduleColumnOrder
 import { EmployeeShiftCorrectionDialog } from "./EmployeeShiftCorrectionDialog";
 import styles from "./EmployeeSchedulePage.module.css";
 
-const scheduleMonthFormatter = new Intl.DateTimeFormat("en-GB", {
+const scheduleMonthFormatter = dateTimeFormat("en-GB", {
   month: "long",
   year: "numeric",
   timeZone: "UTC",
 });
 
-const scheduleMonthOnlyFormatter = new Intl.DateTimeFormat("en-GB", {
+const scheduleMonthOnlyFormatter = dateTimeFormat("en-GB", {
   month: "long",
   timeZone: "UTC",
 });
 
-const scheduleWeekdayFormatter = new Intl.DateTimeFormat("en-GB", {
+const scheduleWeekdayFormatter = dateTimeFormat("en-GB", {
   weekday: "long",
   timeZone: "UTC",
 });
 
-const scheduleWeekdayShortFormatter = new Intl.DateTimeFormat("en-GB", {
+const scheduleWeekdayShortFormatter = dateTimeFormat("en-GB", {
   weekday: "short",
   timeZone: "UTC",
 });
 
-const salaryAmountFormatter = new Intl.NumberFormat("en-GB", {
+const salaryAmountFormatter = numberFormat("en-GB", {
   minimumFractionDigits: 2,
   maximumFractionDigits: 2,
 });
@@ -205,7 +206,7 @@ function formatSummaryDay(schedule: Pick<EmployeeSchedule, "year" | "month">, da
 }
 
 function getScheduleSummaryName(schedule: EmployeeSchedule) {
-  return schedule.name.trim() || schedule.shopName.trim() || schedule.containerName.trim() || `Schedule #${schedule.id}`;
+  return schedule.name.trim() || schedule.shopName.trim() || schedule.containerName.trim() || t("Schedule #{0}", schedule.id);
 }
 
 function getScheduleSummaryPeriods(schedules: EmployeeSchedule[]) {
@@ -338,7 +339,7 @@ function buildManualScheduleMatrixColumn(column: { id: number; label: string }):
 }
 
 function getScheduleEmployeeLabel(employee: EmployeeScheduleEmployee) {
-  return employee.displayName?.trim() || getEmployeeFullName(employee, `Employee #${employee.employeeId}`);
+  return employee.displayName?.trim() || getEmployeeFullName(employee, t("Employee #{0}", employee.employeeId));
 }
 
 function sortScheduleEmployees(employees: EmployeeScheduleEmployee[]) {
@@ -379,7 +380,7 @@ function buildDailyScheduleWorkers(
   (schedule.relatedScheduleAssignments ?? [])
     .filter(assignment => assignment.dayOfMonth === dayOfMonth)
     .forEach(assignment => {
-      const scheduleName = assignment.scheduleName.trim() || `Schedule #${assignment.scheduleId}`;
+      const scheduleName = assignment.scheduleName.trim() || t("Schedule #{0}", assignment.scheduleId);
       const scheduleNames = relatedScheduleNamesByEmployeeId.get(assignment.employeeId) ?? new Set<string>();
       scheduleNames.add(scheduleName);
       relatedScheduleNamesByEmployeeId.set(assignment.employeeId, scheduleNames);
@@ -412,7 +413,7 @@ function buildDailyScheduleWorkers(
       employeeId,
       label: employee ? getScheduleEmployeeLabel(employee) : employeeId === fallbackEmployeeId
         ? fallbackLabel
-        : `Employee #${employeeId}`,
+        : t("Employee #{0}", employeeId),
       shifts: sortedSlots,
       relatedScheduleNames: [...(relatedScheduleNamesByEmployeeId.get(employeeId) ?? [])]
         .sort((left, right) => left.localeCompare(right)),
@@ -445,7 +446,7 @@ function formatDailyWorkerShifts(worker: DailyScheduleWorker) {
   }
 
   const shiftText = worker.isAllDay
-    ? "All day"
+    ? t("All day")
     : formatGraphIntervals(mergeGraphIntervalsForDisplay(worker.shifts, { mergeTouching: true }));
 
   return relatedScheduleText ? `${shiftText}, ${relatedScheduleText}` : shiftText;
@@ -555,7 +556,7 @@ function buildScheduleMatrixDisplayCellMap(
   const scheduleNamesByCell = new Map<string, Set<string>>();
   (selectedSchedule.relatedScheduleAssignments ?? []).forEach(assignment => {
     const cellKey = getGraphCellKey(assignment.employeeId, assignment.dayOfMonth);
-    const scheduleName = assignment.scheduleName.trim() || `Schedule #${assignment.scheduleId}`;
+    const scheduleName = assignment.scheduleName.trim() || t("Schedule #{0}", assignment.scheduleId);
     const scheduleNames = scheduleNamesByCell.get(cellKey) ?? new Set<string>();
     scheduleNames.add(scheduleName);
     scheduleNamesByCell.set(cellKey, scheduleNames);
@@ -859,7 +860,7 @@ function printSchedulePdf(
 ) {
   const printWindow = window.open("", "_blank", "width=1200,height=800");
   if (!printWindow) {
-    throw new Error("Could not open the PDF export window.");
+    throw new Error(t("Could not open the PDF export window."));
   }
 
   printWindow.document.open();
@@ -916,7 +917,7 @@ export function EmployeeSchedulePage() {
       void Promise.all(localOnlyOrders.map(([scheduleId, columnOrder]) =>
         employeeUiStateApi.saveScheduleColumnOrder(Number(scheduleId), columnOrder),
       )).then(() => refetchUiState())
-        .catch(error => setPreferenceSaveError(getErrorMessage(error, "Could not sync the column order.")));
+        .catch(error => setPreferenceSaveError(getErrorMessage(error, t("Could not sync the column order."))));
     }
   }, [columnOrderStorageKey, refetchUiState, setPreferenceSaveError, uiState]);
   const [selectedSummaryPeriodKey, setSelectedSummaryPeriodKey] = useState<string | null>(null);
@@ -971,7 +972,7 @@ export function EmployeeSchedulePage() {
     () => summaryYears.map(year => ({ value: String(year), label: String(year) })),
     [summaryYears],
   );
-  const displayName = session?.displayName?.trim() || session?.userName || "Employee";
+  const displayName = session?.displayName?.trim() || session?.userName || t("Employee");
   const currentEmployeeId = session?.employeeId && session.employeeId > 0 ? session.employeeId : null;
   const fallbackMatrixEmployeeId = currentEmployeeId ?? 1;
   const dailyScheduleDays = useMemo(() => {
@@ -1070,7 +1071,7 @@ export function EmployeeSchedulePage() {
     [scheduleMatrixCellMap, selectedSchedule],
   );
   const queryErrorMessage = scheduleQuery.error
-    ? getErrorMessage(scheduleQuery.error, "Could not load published schedules.")
+    ? getErrorMessage(scheduleQuery.error, t("Could not load published schedules."))
     : null;
 
   const handleSummaryYearChange = (value: string) => {
@@ -1129,7 +1130,7 @@ export function EmployeeSchedulePage() {
     setPreferenceSaveError(null);
     void employeeUiStateApi
       .saveScheduleColumnOrder(selectedSchedule.id, sanitizedOrder)
-      .catch(error => setPreferenceSaveError(getErrorMessage(error, "Could not sync the column order.")));
+      .catch(error => setPreferenceSaveError(getErrorMessage(error, t("Could not sync the column order."))));
     setColumnOrderDialogEmployeeId(null);
   };
 
@@ -1143,7 +1144,7 @@ export function EmployeeSchedulePage() {
     try {
       printSchedulePdf(selectedSchedule, scheduleMatrixColumns, scheduleMatrixDisplay.cellMap);
     } catch (error) {
-      setPdfExportError(error instanceof Error ? error.message : "Could not export this schedule to PDF.");
+      setPdfExportError(error instanceof Error ? error.message : t("Could not export this schedule to PDF."));
     }
   };
 
@@ -1153,9 +1154,9 @@ export function EmployeeSchedulePage() {
     createShiftCorrectionMutation.mutate(input, {
       onSuccess: () => {
         setIsShiftCorrectionDialogOpen(false);
-        setShiftCorrectionSuccess("Shift correction request sent to your manager.");
+        setShiftCorrectionSuccess(t("Shift correction request sent to your manager."));
       },
-      onError: error => setShiftCorrectionError(getErrorMessage(error, "Could not send the shift correction request.")),
+      onError: error => setShiftCorrectionError(getErrorMessage(error, t("Could not send the shift correction request."))),
     });
   };
 
@@ -1173,42 +1174,42 @@ export function EmployeeSchedulePage() {
               <ScheduleIcon size={20} />
             </span>
             <div>
-              <span className={workspaceStyles.panelEyebrow}>Statistics</span>
+              <span className={workspaceStyles.panelEyebrow}>{t("Statistics")}</span>
               <h1 className={workspaceStyles.panelTitle}>{displayName}</h1>
             </div>
           </div>
           <time className={styles.todayBadge} dateTime={new Date().toISOString().slice(0, 10)}>
-            {new Intl.DateTimeFormat("en-GB", { day: "2-digit", month: "short", year: "numeric" }).format(new Date())}
+            {dateTimeFormat("en-GB", { day: "2-digit", month: "short", year: "numeric" }).format(new Date())}
           </time>
         </div>
 
         <div className={styles.summaryStats}>
-          <span>{`${scheduleStats.scheduleCount} schedules`}</span>
-          <span>{`${scheduleStats.workDays} work days`}</span>
-          <span>{`${scheduleStats.freeDays} free days`}</span>
-          <span>{`${scheduleStats.totalHours} Total Hours`}</span>
-          <span>{`Month: ${scheduleStats.month}`}</span>
-          <span>{`Year: ${scheduleStats.year}`}</span>
+          <span>{t("{0} schedules", scheduleStats.scheduleCount)}</span>
+          <span>{t("{0} work days", scheduleStats.workDays)}</span>
+          <span>{t("{0} free days", scheduleStats.freeDays)}</span>
+          <span>{t("{0} Total Hours", scheduleStats.totalHours)}</span>
+          <span>{t("Month: {0}", scheduleStats.month)}</span>
+          <span>{t("Year: {0}", scheduleStats.year)}</span>
         </div>
       </section>
 
       {scheduleQuery.isLoading ? (
         <section className={workspaceStyles.panel}>
-          <span className={workspaceStyles.panelEyebrow}>Loading</span>
-          <p className={workspaceStyles.panelText}>Checking public schedules for your account.</p>
+          <span className={workspaceStyles.panelEyebrow}>{t("Loading")}</span>
+          <p className={workspaceStyles.panelText}>{t("Checking public schedules for your account.")}</p>
         </section>
       ) : null}
 
       {!scheduleQuery.isLoading && schedules.length === 0 ? (
         <section className={workspaceStyles.panel}>
-          <span className={workspaceStyles.panelEyebrow}>No published schedules</span>
-          <h2 className={workspaceStyles.panelTitle}>Nothing is public for your account yet.</h2>
+          <span className={workspaceStyles.panelEyebrow}>{t("No published schedules")}</span>
+          <h2 className={workspaceStyles.panelTitle}>{t("Nothing is public for your account yet.")}</h2>
           <NavLink to="/availability" className={workspaceStyles.linkCard}>
             <span className={workspaceStyles.linkIcon}>
               <AvailabilityIcon size={18} />
             </span>
-            <span className={workspaceStyles.linkTitle}>Go to Availability</span>
-            <span className={workspaceStyles.linkText}>Submit availability when a manager opens a window.</span>
+            <span className={workspaceStyles.linkTitle}>{t("Go to Availability")}</span>
+            <span className={workspaceStyles.linkText}>{t("Submit availability when a manager opens a window.")}</span>
           </NavLink>
         </section>
       ) : null}
@@ -1221,8 +1222,8 @@ export function EmployeeSchedulePage() {
                 <ScheduleDetailsIcon size={20} />
               </span>
               <div>
-                <span className={workspaceStyles.panelEyebrow}>Public schedules</span>
-                <strong>{`${schedules.length} schedules`}</strong>
+                <span className={workspaceStyles.panelEyebrow}>{t("Public schedules")}</span>
+                <strong>{t("{0} schedules", schedules.length)}</strong>
               </div>
             </div>
 
@@ -1252,15 +1253,14 @@ export function EmployeeSchedulePage() {
                     <span className={styles.scheduleButtonContent}>
                       <span className={styles.scheduleButtonName}>{schedule.name}</span>
                       <span className={styles.scheduleButtonMeta}>
-                        {`${schedule.shopName || `Shop ${schedule.shopId}`} / ${schedule.containerName || `Container ${schedule.containerId}`}`}
+                        {`${schedule.shopName || t("Shop {0}", schedule.shopId)} / ${schedule.containerName || t("Container {0}", schedule.containerId)}`}
                       </span>
                     </span>
 
-                    <span className={styles.lastUpdateField} aria-label={`Last Update: ${scheduleLastUpdateLabel}`}>
+                    <span className={styles.lastUpdateField} aria-label={t("Last Update: {0}", scheduleLastUpdateLabel)}>
                       <span>
                         <span className={styles.lastUpdateDot} aria-hidden="true" />
-                        Last Update
-                      </span>
+                        {t("Last Update")}</span>
                       <strong>
                         {schedule.lastUpdatedAtUtc ? (
                           <time dateTime={schedule.lastUpdatedAtUtc}>{scheduleLastUpdateLabel}</time>
@@ -1284,7 +1284,7 @@ export function EmployeeSchedulePage() {
           mutedSuffixMap={scheduleMatrixDisplay.mutedSuffixMap}
           title={
             <span className={styles.openScheduleTitleBlock}>
-              <span className={styles.openScheduleTitleLabel}>Schedules</span>
+              <span className={styles.openScheduleTitleLabel}>{t("Schedules")}</span>
               <span className={styles.openScheduleMeta}>
                 <span>{selectedSchedule.name}</span>
                 <span>{formatScheduleMonthOnly(selectedSchedule)}</span>
@@ -1296,9 +1296,9 @@ export function EmployeeSchedulePage() {
             <button
               type="button"
               className={styles.scheduleViewToggle}
-              aria-label="Show daily schedule view"
+              aria-label={t("Show daily schedule view")}
               aria-pressed="false"
-              title="Show daily schedule view"
+              title={t("Show daily schedule view")}
               onClick={() => setScheduleViewMode("daily")}
             >
               <ScheduleIcon size={20} />
@@ -1311,15 +1311,15 @@ export function EmployeeSchedulePage() {
           showColumnTotals={false}
           allowColumnResize={false}
           stretchColumns={false}
-          emptyMessage="No assigned shifts in this schedule yet."
+          emptyMessage={t("No assigned shifts in this schedule yet.")}
           onColumnHeaderClick={column => setColumnOrderDialogEmployeeId(column.employeeId)}
           headerRightSlot={
             <div className={styles.openScheduleActions}>
               <button type="button" className={styles.openSchedulePdfButton} onClick={handleExportPdf}
-                title="Export schedule to PDF" aria-label="Export schedule to PDF">PDF</button>
+                title={t("Export schedule to PDF")} aria-label={t("Export schedule to PDF")}>PDF</button>
               <button type="button" className={`${styles.openSchedulePdfButton} ${styles.openScheduleCorrectionButton}`}
                 onClick={() => { setShiftCorrectionError(null); setIsShiftCorrectionDialogOpen(true); }}
-                title="Request a shift correction" aria-label="Request a shift correction">Adjust</button>
+                title={t("Request a shift correction")} aria-label={t("Request a shift correction")}>{t("Adjust")}</button>
             </div>
           }
         />
@@ -1330,7 +1330,7 @@ export function EmployeeSchedulePage() {
           className={styles.dailyScheduleCard}
           title={
             <span className={styles.openScheduleTitleBlock}>
-              <span className={styles.openScheduleTitleLabel}>Schedules</span>
+              <span className={styles.openScheduleTitleLabel}>{t("Schedules")}</span>
               <span className={styles.openScheduleMeta}>
                 <span>{selectedSchedule.name}</span>
                 <span>{formatScheduleMonthOnly(selectedSchedule)}</span>
@@ -1342,9 +1342,9 @@ export function EmployeeSchedulePage() {
             <button
               type="button"
               className={`${styles.scheduleViewToggle} ${styles.scheduleViewToggleActive}`}
-              aria-label="Show schedule matrix view"
+              aria-label={t("Show schedule matrix view")}
               aria-pressed="true"
-              title="Show schedule matrix view"
+              title={t("Show schedule matrix view")}
               onClick={() => setScheduleViewMode("matrix")}
             >
               <ScheduleIcon size={20} />
@@ -1353,15 +1353,15 @@ export function EmployeeSchedulePage() {
           headerRightSlot={
             <div className={styles.openScheduleActions}>
               <button type="button" className={styles.openSchedulePdfButton} onClick={handleExportPdf}
-                title="Export schedule to PDF" aria-label="Export schedule to PDF">PDF</button>
+                title={t("Export schedule to PDF")} aria-label={t("Export schedule to PDF")}>PDF</button>
               <button type="button" className={`${styles.openSchedulePdfButton} ${styles.openScheduleCorrectionButton}`}
                 onClick={() => { setShiftCorrectionError(null); setIsShiftCorrectionDialogOpen(true); }}
-                title="Request a shift correction" aria-label="Request a shift correction">Adjust</button>
+                title={t("Request a shift correction")} aria-label={t("Request a shift correction")}>{t("Adjust")}</button>
             </div>
           }
         >
           <div className={styles.dailyScheduleShell}>
-            <div className={styles.dailyScheduleDays} role="tablist" aria-label="Schedule days">
+            <div className={styles.dailyScheduleDays} role="tablist" aria-label={t("Schedule days")}>
               {dailyScheduleDays.map(day => {
                 const isSelected = day.dayOfMonth === activeDailyScheduleDay;
                 return (
@@ -1372,7 +1372,7 @@ export function EmployeeSchedulePage() {
                     role="tab"
                     aria-selected={isSelected}
                     aria-controls="daily-schedule-content"
-                    aria-label={`${day.weekdayLong} ${day.dayOfMonth}, ${day.isWorkingDay ? "working day" : "day off"}`}
+                    aria-label={`${day.weekdayLong} ${day.dayOfMonth}, ${day.isWorkingDay ? t("working day") : t("day off")}`}
                     className={[
                       styles.dailyScheduleDay,
                       day.isWorkingDay ? styles.dailyScheduleDayWorking : styles.dailyScheduleDayOff,
@@ -1391,10 +1391,10 @@ export function EmployeeSchedulePage() {
               id="daily-schedule-content"
               className={styles.dailyScheduleBody}
               role="tabpanel"
-              aria-label={`${activeDailyScheduleDayInfo?.weekdayLong ?? "Day"} ${activeDailyScheduleDay}`}
+              aria-label={`${activeDailyScheduleDayInfo?.weekdayLong ?? t("Day")} ${activeDailyScheduleDay}`}
             >
               <div className={styles.dailyScheduleDate} aria-hidden="true">
-                <span>{activeDailyScheduleDayInfo?.weekdayLong ?? "Day"}</span>
+                <span>{activeDailyScheduleDayInfo?.weekdayLong ?? t("Day")}</span>
                 <strong>{activeDailyScheduleDay}</strong>
               </div>
 
@@ -1406,8 +1406,8 @@ export function EmployeeSchedulePage() {
                   </article>
                 )) : (
                   <div className={styles.dailyScheduleEmpty}>
-                    <strong>No one is scheduled.</strong>
-                    <span>This day has no assigned shifts.</span>
+                    <strong>{t("No one is scheduled.")}</strong>
+                    <span>{t("This day has no assigned shifts.")}</span>
                   </div>
                 )}
               </div>
@@ -1446,20 +1446,20 @@ export function EmployeeSchedulePage() {
                 <StatisticsIcon size={20} />
               </span>
               <div>
-                <span className={workspaceStyles.panelEyebrow}>Work hours</span>
-                <h2 className={workspaceStyles.panelTitle}>Summary</h2>
+                <span className={workspaceStyles.panelEyebrow}>{t("Work hours")}</span>
+                <h2 className={workspaceStyles.panelTitle}>{t("Summary")}</h2>
               </div>
             </div>
 
             <div className={styles.hoursSummaryActions}>
-              <div className={styles.summaryPeriodControls} role="group" aria-label="Summary period">
+              <div className={styles.summaryPeriodControls} role="group" aria-label={t("Summary period")}>
                 <div className={styles.summaryPeriodField}>
-                  <span>Month</span>
+                  <span>{t("Month")}</span>
                   <SearchableSelect
                     ariaLabel="Summary month"
                     value={activeSummaryPeriod ? String(activeSummaryPeriod.month) : ""}
                     options={summaryMonthOptions}
-                    placeholder="Month"
+                    placeholder={t("Month")}
                     dropdownTitle="Month"
                     size="summary"
                     shadow="soft"
@@ -1472,12 +1472,12 @@ export function EmployeeSchedulePage() {
                 </div>
 
                 <div className={styles.summaryPeriodField}>
-                  <span>Year</span>
+                  <span>{t("Year")}</span>
                   <SearchableSelect
                     ariaLabel="Summary year"
                     value={activeSummaryPeriod ? String(activeSummaryPeriod.year) : ""}
                     options={summaryYearOptions}
-                    placeholder="Year"
+                    placeholder={t("Year")}
                     dropdownTitle="Year"
                     size="summary"
                     shadow="soft"
@@ -1493,11 +1493,11 @@ export function EmployeeSchedulePage() {
           </div>
 
           {scheduleHoursSummary.rows.length > 0 ? (
-            <div className={styles.hoursSummaryGrid} role="table" aria-label="Schedule hours summary">
+            <div className={styles.hoursSummaryGrid} role="table" aria-label={t("Schedule hours summary")}>
               <div className={styles.hoursSummaryGridHeader} role="row">
-                <span role="columnheader">Day</span>
-                <span role="columnheader">Hours</span>
-                <span role="columnheader">Schedule</span>
+                <span role="columnheader">{t("Day")}</span>
+                <span role="columnheader">{t("Hours")}</span>
+                <span role="columnheader">{t("Schedule")}</span>
               </div>
 
               {scheduleHoursSummary.rows.map(row => (
@@ -1509,30 +1509,30 @@ export function EmployeeSchedulePage() {
               ))}
 
               <div className={styles.hoursSummaryTotalRow} role="row">
-                <span role="cell">Total</span>
+                <span role="cell">{t("Total")}</span>
                 <strong role="cell">{scheduleHoursSummary.totalHoursText}</strong>
-                <span role="cell">All schedules</span>
+                <span role="cell">{t("All schedules")}</span>
               </div>
             </div>
           ) : (
-            <p className={styles.hoursSummaryEmpty}>No assigned shifts in this period.</p>
+            <p className={styles.hoursSummaryEmpty}>{t("No assigned shifts in this period.")}</p>
           )}
           <section className={styles.salaryCalculator} aria-labelledby="salary-calculator-title">
             <div className={styles.salaryCalculatorHeader}>
               <span className={styles.salaryCalculatorMark} aria-hidden="true">=</span>
               <div>
-                <span>Quick estimate</span>
-                <h3 id="salary-calculator-title">Salary calculator</h3>
+                <span>{t("Quick estimate")}</span>
+                <h3 id="salary-calculator-title">{t("Salary calculator")}</h3>
               </div>
             </div>
 
             <form className={styles.salaryCalculatorForm} onSubmit={handleCalculateSalary}>
               <label className={styles.salaryCalculatorField}>
-                <span>Hours</span>
+                <span>{t("Hours")}</span>
                 <span className={styles.salaryCalculatorInputShell}>
                   <input
                     type="text"
-                    aria-label="Hours"
+                    aria-label={t("Hours")}
                     pattern="[0-9]*([.,][0-9]*)?"
                     inputMode="decimal"
                     value={salaryHoursInput}
@@ -1541,16 +1541,16 @@ export function EmployeeSchedulePage() {
                       setSalaryResult(null);
                     }}
                   />
-                  <small>h</small>
+                  <small>{t("h")}</small>
                 </span>
               </label>
 
               <label className={styles.salaryCalculatorField}>
-                <span>Hourly rate</span>
+                <span>{t("Hourly rate")}</span>
                 <span className={styles.salaryCalculatorInputShell}>
                   <input
                     type="text"
-                    aria-label="Hourly rate"
+                    aria-label={t("Hourly rate")}
                     pattern="[0-9]*([.,][0-9]*)?"
                     inputMode="decimal"
                     placeholder="0.00"
@@ -1560,27 +1560,26 @@ export function EmployeeSchedulePage() {
                       setSalaryResult(null);
                     }}
                   />
-                  <small>/ h</small>
+                  <small>{t("/ h")}</small>
                 </span>
               </label>
 
               <button
                 type="submit"
                 className={styles.salaryCalculatorEquals}
-                aria-label="Calculate salary"
+                aria-label={t("Calculate salary")}
                 disabled={!canCalculateSalary}
               >
                 =
               </button>
 
-              <output className={styles.salaryCalculatorResult} aria-label="Estimated pay" aria-live="polite">
-                <span>Estimated pay</span>
+              <output className={styles.salaryCalculatorResult} aria-label={t("Estimated pay")} aria-live="polite">
+                <span>{t("Estimated pay")}</span>
                 <strong>{salaryResult === null ? "—" : salaryAmountFormatter.format(salaryResult)}</strong>
               </output>
 
               <button type="button" className={styles.salaryCalculatorReset} onClick={handleResetSalaryHours}>
-                Reset
-              </button>
+                {t("Reset")}</button>
             </form>
           </section>
         </section>

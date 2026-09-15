@@ -1,3 +1,4 @@
+import { t } from "@shared/i18n";
 import type { CSSProperties, ReactNode } from "react";
 import styles from "./ContainerGraphSessionTabs.module.css";
 
@@ -23,7 +24,7 @@ export function ContainerGraphSessionTabs({
   items,
   onSelect,
   actionSlot,
-  ariaLabel = "Open schedules",
+  ariaLabel = t("Open schedules"),
   className,
 }: ContainerGraphSessionTabsProps) {
   const visibleTabCount = Math.min(Math.max(items.length, 1), 3);

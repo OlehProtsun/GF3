@@ -1,3 +1,4 @@
+import { t } from "@shared/i18n";
 import type { AvailabilityGroup } from "@entities/availability-groups/model/types";
 import {
   getAvailabilityGroupPeriodLabel,
@@ -38,7 +39,7 @@ export function AvailabilityGroupListCard({
     groups
   );
 
-  const addAction = <IosButton label="Add New" icon={<PlusIcon size={18} />} onClick={onAddGroup} />;
+  const addAction = <IosButton label={t("Add New")} icon={<PlusIcon size={18} />} onClick={onAddGroup} />;
 
   return (
     <ListCardSection
@@ -52,8 +53,8 @@ export function AvailabilityGroupListCard({
       emptyDescription="Start by creating your first availability group."
       emptyAction={addAction}
       searchEmptyTitle="Nothing found"
-      searchEmptyDescription={`No availability group matches "${searchQuery}".`}
-      searchEmptyAction={<IosButton label="Clear Search" variant="secondary" onClick={onClearSearch} />}
+      searchEmptyDescription={t("No availability group matches \"{0}\".", searchQuery)}
+      searchEmptyAction={<IosButton label={t("Clear Search")} variant="secondary" onClick={onClearSearch} />}
     >
       <RecordGrid>
         {sortedGroups.map(group => {
@@ -62,11 +63,11 @@ export function AvailabilityGroupListCard({
           const windowStatusLabel = getAvailabilityWindowStatusLabel(group);
           const publicationStatusLabel = getAvailabilityPublicationStatusLabel(group.publicationStatus);
           const metaItems: RecordTileMetaItem[] = [
-            { key: "month", label: "Month", value: getAvailabilityMonthLabel(group.month, "short") },
-            { key: "year", label: "Year", value: String(group.year) },
+            { key: "month", label: t("Month"), value: getAvailabilityMonthLabel(group.month, "short") },
+            { key: "year", label: t("Year"), value: String(group.year) },
             {
               key: "window-status",
-              label: "Status",
+              label: t("Status"),
               value: (
                 <span className={[
                   styles.statusPill,
@@ -79,7 +80,7 @@ export function AvailabilityGroupListCard({
             },
             {
               key: "publication-status",
-              label: "Public",
+              label: t("Public"),
               value: (
                 <span className={[
                   styles.statusPill,
@@ -96,14 +97,14 @@ export function AvailabilityGroupListCard({
             <RecordTile
               key={group.id}
               title={group.name}
-              description={`Availability schedule for ${periodLabel}`}
+              description={t("Availability schedule for {0}", periodLabel)}
               badge={`ID ${group.id}`}
               metaItems={metaItems}
               isPinned={isPinned}
               onTogglePin={() => togglePin(group.id)}
-              pinLabel={isPinned ? `Unpin ${group.name}` : `Pin ${group.name}`}
+              pinLabel={isPinned ? t("Unpin {0}", group.name) : t("Pin {0}", group.name)}
               onClick={() => onOpenGroup(group.id)}
-              ariaLabel={`Open availability group ${group.name}`}
+              ariaLabel={t("Open availability group {0}", group.name)}
             />
           );
         })}

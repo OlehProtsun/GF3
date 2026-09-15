@@ -1,3 +1,4 @@
+import { t } from "@shared/i18n";
 import { useState } from "react";
 import type { PropsWithChildren } from "react";
 import {
@@ -29,7 +30,7 @@ function createQueryClient() {
           return;
         }
 
-        pushErrorAlertFromError(error, "Could not load data from the server.");
+        pushErrorAlertFromError(error, t("Could not load data from the server."));
 
         if (isDev) {
           console.error("[Query error]", query.queryKey, error);
@@ -42,7 +43,7 @@ function createQueryClient() {
           return;
         }
 
-        pushErrorAlertFromError(error, "Could not complete the requested action.");
+        pushErrorAlertFromError(error, t("Could not complete the requested action."));
 
         if (isDev) {
           console.error("[Mutation error]", mutation.options.mutationKey, error);

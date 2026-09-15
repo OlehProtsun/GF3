@@ -1,3 +1,4 @@
+import { dateTimeFormat } from "@shared/i18n";
 import type { ShiftSwap } from "./types";
 
 function normalizeSearchValue(value: string) {
@@ -8,7 +9,7 @@ function formatDateSearchValues(date: Date) {
   const day = String(date.getUTCDate()).padStart(2, "0");
   const month = String(date.getUTCMonth() + 1).padStart(2, "0");
   const year = date.getUTCFullYear();
-  const monthName = new Intl.DateTimeFormat("en-GB", {
+  const monthName = dateTimeFormat("en-GB", {
     day: "2-digit",
     month: "short",
     year: "numeric",

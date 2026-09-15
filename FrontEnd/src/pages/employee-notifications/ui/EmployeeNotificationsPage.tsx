@@ -1,3 +1,5 @@
+import { getLocale } from "@shared/i18n";
+import { t } from "@shared/i18n";
 import { useEffect, useMemo, useState } from "react";
 import { NavLink } from "react-router-dom";
 import { useAuth } from "@app/providers/AuthProvider";
@@ -85,7 +87,7 @@ export function EmployeeNotificationsPage() {
   const activeUnreadCount = activeTab === "inbox" ? unreadCount : newsUnreadCount;
   const activeItemCount = activeTab === "inbox" ? notificationItems.length : newsItems.length;
   const queryError = swapsQuery.error ?? schedulesQuery.error ?? availabilityQuery.error ?? newsQuery.error;
-  const queryErrorMessage = queryError ? getErrorMessage(queryError, "Could not load notifications.") : null;
+  const queryErrorMessage = queryError ? getErrorMessage(queryError, t("Could not load notifications.")) : null;
 
   const handleMarkAllRead = () => {
     const nextReadIds = new Set([
@@ -97,7 +99,7 @@ export function EmployeeNotificationsPage() {
     setSyncError(null);
     void employeeUiStateApi.markNotificationsRead(notificationItems.flatMap(item => item.readIds))
       .then(() => refetchUiState())
-      .catch(error => setSyncError(getErrorMessage(error, "Could not sync notification state.")));
+      .catch(error => setSyncError(getErrorMessage(error, t("Could not sync notification state."))));
   };
 
   const handleMarkRead = (itemReadIds: string[]) => {
@@ -112,7 +114,7 @@ export function EmployeeNotificationsPage() {
     setSyncError(null);
     void employeeUiStateApi.markNotificationsRead(itemReadIds)
       .then(() => refetchUiState())
-      .catch(error => setSyncError(getErrorMessage(error, "Could not sync notification state.")));
+      .catch(error => setSyncError(getErrorMessage(error, t("Could not sync notification state."))));
   };
 
   const getYoutubeEmbedUrl = (value: string | null) => {
@@ -137,14 +139,14 @@ export function EmployeeNotificationsPage() {
               <InboxIcon size={20} />
             </span>
             <div className={styles.headingCopy}>
-              <span className={workspaceStyles.panelEyebrow}>Notifications</span>
+              <span className={workspaceStyles.panelEyebrow}>{t("Notifications")}</span>
               <div className={styles.tabsSummaryRow}>
-                <div className={styles.inboxTabs} role="tablist" aria-label="Notification type">
-                  <button type="button" role="tab" aria-selected={activeTab === "inbox"} className={activeTab === "inbox" ? styles.inboxTabActive : ""} onClick={() => setActiveTab("inbox")}>Inbox{unreadCount > 0 ? <span>{unreadCount}</span> : null}</button>
-                  <button type="button" role="tab" aria-selected={activeTab === "news"} className={activeTab === "news" ? styles.inboxTabActive : ""} onClick={() => setActiveTab("news")}>News{newsUnreadCount > 0 ? <span>{newsUnreadCount}</span> : null}</button>
+                <div className={styles.inboxTabs} role="tablist" aria-label={t("Notification type")}>
+                  <button type="button" role="tab" aria-selected={activeTab === "inbox"} className={activeTab === "inbox" ? styles.inboxTabActive : ""} onClick={() => setActiveTab("inbox")}>{t("Inbox")}{unreadCount > 0 ? <span>{unreadCount}</span> : null}</button>
+                  <button type="button" role="tab" aria-selected={activeTab === "news"} className={activeTab === "news" ? styles.inboxTabActive : ""} onClick={() => setActiveTab("news")}>{t("News")}{newsUnreadCount > 0 ? <span>{newsUnreadCount}</span> : null}</button>
                 </div>
                 <span className={`${styles.countBadge} ${activeUnreadCount > 0 ? styles.countBadgeUnread : ""}`}>
-                  {activeUnreadCount > 0 ? `${activeUnreadCount} unread` : activeItemCount}
+                  {activeUnreadCount > 0 ? t("{0} unread", activeUnreadCount) : activeItemCount}
                 </span>
               </div>
             </div>
@@ -153,8 +155,7 @@ export function EmployeeNotificationsPage() {
           <div className={styles.inboxHeaderActions}>
             {activeUnreadCount > 0 ? (
               <button type="button" className={styles.actionButton} onClick={activeTab === "inbox" ? handleMarkAllRead : () => markAllNewsRead.mutate(undefined)}>
-                Mark all read
-              </button>
+                {t("Mark all read")}</button>
             ) : null}
           </div>
         </div>
@@ -164,8 +165,8 @@ export function EmployeeNotificationsPage() {
             <span className={styles.emptyIcon}>
               <NoteIcon size={20} />
             </span>
-            <strong>No notifications yet</strong>
-            <span>Published schedules, availability and shift updates will appear here.</span>
+            <strong>{t("No notifications yet")}</strong>
+            <span>{t("Published schedules, availability and shift updates will appear here.")}</span>
           </div>
         ) : activeTab === "inbox" ? (
           <div className={styles.notificationList}>
@@ -186,7 +187,7 @@ export function EmployeeNotificationsPage() {
                   <div className={styles.notificationBody}>
                     <div className={styles.notificationTitleRow}>
                       <strong>{item.title}</strong>
-                      {isUnread ? <span className={styles.unreadDot} aria-label="Unread" /> : null}
+                      {isUnread ? <span className={styles.unreadDot} aria-label={t("Unread")} /> : null}
                     </div>
                     <p>{item.body}</p>
                     <span>{item.meta}</span>
@@ -202,7 +203,7 @@ export function EmployeeNotificationsPage() {
                       onClick={() => handleMarkRead(item.readIds)}
                       disabled={!isUnread}
                     >
-                      {isUnread ? "Mark as read" : "Read"}
+                      {isUnread ? t("Mark as read") : t("Read")}
                     </button>
 
                     <NavLink to={item.actionPath} className={styles.notificationAction}>
@@ -216,8 +217,8 @@ export function EmployeeNotificationsPage() {
         ) : newsItems.length === 0 ? (
           <div className={styles.emptyState}>
             <span className={styles.emptyIcon}><NoteIcon size={20} /></span>
-            <strong>No system news yet</strong>
-            <span>Product updates and announcements will appear here.</span>
+            <strong>{t("No system news yet")}</strong>
+            <span>{t("Product updates and announcements will appear here.")}</span>
           </div>
         ) : (
           <div className={styles.notificationList}>
@@ -227,14 +228,14 @@ export function EmployeeNotificationsPage() {
                 <article key={item.id} className={[styles.notificationItem, styles.newsItem, !item.isRead ? styles.notificationItemUnread : ""].filter(Boolean).join(" ")}>
                   <span className={styles.notificationIcon}><NoteIcon size={17} /></span>
                   <div className={styles.notificationBody}>
-                    <div className={styles.notificationTitleRow}><strong>{item.title}</strong>{!item.isRead ? <span className={styles.unreadDot} aria-label="Unread" /> : null}</div>
+                    <div className={styles.notificationTitleRow}><strong>{item.title}</strong>{!item.isRead ? <span className={styles.unreadDot} aria-label={t("Unread")} /> : null}</div>
                     <p className={styles.newsBody}>{item.body}</p>
-                    <span>{new Date(item.createdAtUtc).toLocaleString()}</span>
+                    <span>{new Date(item.createdAtUtc).toLocaleString(getLocale())}</span>
                     {item.imageUrl ? <img className={styles.newsImage} src={item.imageUrl} alt="" /> : null}
-                    {embedUrl ? <div className={styles.newsVideo}><iframe src={embedUrl} title={`${item.title} video`} allow="accelerometer; autoplay; encrypted-media; picture-in-picture" allowFullScreen /></div> : null}
+                    {embedUrl ? <div className={styles.newsVideo}><iframe src={embedUrl} title={t("{0} video", item.title)} allow="accelerometer; autoplay; encrypted-media; picture-in-picture" allowFullScreen /></div> : null}
                   </div>
                   <div className={styles.notificationActions}>
-                    <button type="button" className={styles.markReadButton} onClick={() => markNewsRead.mutate(item.id)} disabled={item.isRead}>{item.isRead ? "Read" : "Mark as read"}</button>
+                    <button type="button" className={styles.markReadButton} onClick={() => markNewsRead.mutate(item.id)} disabled={item.isRead}>{item.isRead ? t("Read") : t("Mark as read")}</button>
                   </div>
                 </article>
               );

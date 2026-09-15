@@ -1,3 +1,4 @@
+import { t } from "@shared/i18n";
 import { useEffect, useId, useMemo, type MouseEvent } from "react";
 import type { AvailabilityTransferSource } from "@entities/availability-groups/model/transfer";
 import {
@@ -89,21 +90,20 @@ export function AvailabilityRelatedHintDialog({
           <div className={styles.titleBlock}>
             <div className={styles.eyebrow}>
               <AvailabilityIcon size={16} />
-              <span>Related availability</span>
+              <span>{t("Related availability")}</span>
             </div>
             <h3 id={titleId} className={styles.title}>{employeeName}</h3>
             <p id={descriptionId} className={styles.description}>
-              Blue selection marks the days referenced by the blue text in the current availability.
-            </p>
+              {t("Blue selection marks the days referenced by the blue text in the current availability.")}</p>
           </div>
 
           <div className={styles.headerActions}>
             <div className={styles.summaryChip}>
               <EmployeeIcon size={16} />
-              <span>{source?.groupName ?? "Availability"}</span>
-              <strong>{selectedCellKeys.length} days</strong>
+              <span>{source?.groupName ?? t("Availability")}</span>
+              <strong>{selectedCellKeys.length}  {t("days")}</strong>
             </div>
-            <button type="button" className={styles.closeButton} aria-label="Close related availability" onClick={onCancel}>
+            <button type="button" className={styles.closeButton} aria-label={t("Close related availability")} onClick={onCancel}>
               <CloseIcon size={18} />
             </button>
           </div>
@@ -113,7 +113,7 @@ export function AvailabilityRelatedHintDialog({
 
         <div className={styles.content}>
           {isLoading ? (
-            <div className={styles.state}>Loading related availability...</div>
+            <div className={styles.state}>{t("Loading related availability...")}</div>
           ) : source ? (
             <AvailabilityScheduleMatrix
               className={styles.matrix}
@@ -130,10 +130,10 @@ export function AvailabilityRelatedHintDialog({
               compactSize
               selectedCellKeys={selectedCellKeys}
               title={source.groupName}
-              helperText="Highlighted days are the values currently shown in blue in the other availability."
+              helperText={t("Highlighted days are the values currently shown in blue in the other availability.")}
             />
           ) : (
-            <div className={styles.state}>This related availability is no longer available.</div>
+            <div className={styles.state}>{t("This related availability is no longer available.")}</div>
           )}
         </div>
       </div>

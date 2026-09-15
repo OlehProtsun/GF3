@@ -1,3 +1,4 @@
+import { t } from "@shared/i18n";
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
@@ -48,8 +49,8 @@ export function EmployeeProfilePage() {
   return (
     <div className={styles.page}>
       <PageHeader
-        title="Employee Profile"
-        subtitle="View employee details, contact information and record status"
+        title={t("Employee Profile")}
+        subtitle={t("View employee details, contact information and record status")}
         backTo="/employee"
       />
 
@@ -72,20 +73,20 @@ export function EmployeeProfilePage() {
 
       <ConfirmDialog
         open={isDeleteOpen}
-        title="Delete employee"
-        message="Are you sure you want to delete this employee? This action cannot be undone."
+        title={t("Delete employee")}
+        message={t("Are you sure you want to delete this employee? This action cannot be undone.")}
         onCancel={() => setIsDeleteOpen(false)}
         onConfirm={handleDeleteConfirm}
-        confirmText={deleteMutation.isPending ? "Deleting..." : "Delete"}
+        confirmText={deleteMutation.isPending ? t("Deleting...") : t("Delete")}
       />
 
       <ConfirmDialog
         open={isKickOpen}
-        title="Kick employee"
-        message="This will immediately sign the employee out of every active session. They can sign in again with the same credentials."
+        title={t("Kick employee")}
+        message={t("This will immediately sign the employee out of every active session. They can sign in again with the same credentials.")}
         onCancel={() => setIsKickOpen(false)}
         onConfirm={handleKickConfirm}
-        confirmText={kickMutation.isPending ? "Kicking..." : "Kick"}
+        confirmText={kickMutation.isPending ? t("Kicking...") : t("Kick")}
       />
     </div>
   );

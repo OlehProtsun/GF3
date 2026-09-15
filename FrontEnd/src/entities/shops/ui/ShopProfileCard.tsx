@@ -1,3 +1,4 @@
+import { t } from "@shared/i18n";
 import type { Shop } from "@entities/shops/model/types";
 import {
   getShopDetailsState,
@@ -27,7 +28,7 @@ export function ShopProfileCard({
   onEditShop,
   onDeleteShop,
 }: ShopProfileCardProps) {
-  const displayName = getShopDisplayName(shop, "Shop Profile");
+  const displayName = getShopDisplayName(shop, t("Shop Profile"));
   const initials = getShopInitials(shop);
   const detailsState = getShopDetailsState(shop);
   const details: ProfileSummaryDetail[] = shop
@@ -54,9 +55,9 @@ export function ShopProfileCard({
       actions={
         shop ? (
           <>
-            <IosButton label="Edit Shop" onClick={() => onEditShop(shop.id)} />
+            <IosButton label={t("Edit Shop")} onClick={() => onEditShop(shop.id)} />
             <IosButton
-              label={isDeleting ? "Deleting..." : "Delete Shop"}
+              label={isDeleting ? t("Deleting...") : t("Delete Shop")}
               variant="secondary"
               customColor="#ef4444"
               customBorderColor="#ef4444"

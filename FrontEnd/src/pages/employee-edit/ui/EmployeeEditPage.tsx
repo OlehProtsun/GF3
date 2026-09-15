@@ -1,3 +1,4 @@
+import { t } from "@shared/i18n";
 ﻿import { useMemo, type FormEvent } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
@@ -35,7 +36,7 @@ export function EmployeeEditPage() {
   );
   const { lockedByOtherState, isCheckingLocks } = useManagerEditLocks(editLockTargets);
   const editLockMessage = lockedByOtherState
-    ? buildManagerEditLockMessage(lockedByOtherState, "This employee")
+    ? buildManagerEditLockMessage(lockedByOtherState, t("This employee"))
     : null;
   const canEdit = !editLockMessage && !isCheckingLocks;
 
@@ -93,16 +94,16 @@ export function EmployeeEditPage() {
   return (
     <div className={styles.page}>
       <PageHeader
-        title={isCreate ? "Add Employee" : "Edit Employee"}
-        subtitle={isCreate ? "Create new employee record" : "Update employee information"}
+        title={isCreate ? t("Add Employee") : t("Edit Employee")}
+        subtitle={isCreate ? t("Create new employee record") : t("Update employee information")}
         backTo={backTo}
       />
 
       {isCheckingLocks ? (
         <ManagerEditLockDialog
           open
-          title="Checking edit access"
-          message="Please wait while we check whether this employee can be edited."
+          title={t("Checking edit access")}
+          message={t("Please wait while we check whether this employee can be edited.")}
         />
       ) : null}
 

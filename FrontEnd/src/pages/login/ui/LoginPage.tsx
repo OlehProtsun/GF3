@@ -1,3 +1,4 @@
+import { t } from "@shared/i18n";
 import { useEffect, useRef, useState, type FormEvent, type PointerEvent as ReactPointerEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@app/providers/AuthProvider";
@@ -120,7 +121,7 @@ export function LoginPage() {
   const submitCredentials = async (candidatePassword: string) => {
     if (isSubmitting) return;
     if (!username.trim()) {
-      setSubmitError("Enter your username first.");
+      setSubmitError(t("Enter your username first."));
       return;
     }
     if (!isValidPassword(candidatePassword)) {
@@ -133,7 +134,7 @@ export function LoginPage() {
     try {
       await login({ username, password: candidatePassword });
     } catch (error) {
-      setSubmitError(getErrorMessage(error, "Could not sign you in."));
+      setSubmitError(getErrorMessage(error, t("Could not sign you in.")));
       if (passwordMode === "phone") {
         updatePassword("");
         setFailedPinAttempts((current) => current + 1);
@@ -201,7 +202,7 @@ export function LoginPage() {
 
   const passwordModeSwitch = (
     <div className={styles.passwordLabelRow}>
-      <span className={styles.modeSwitch} role="group" aria-label="Password input mode">
+      <span className={styles.modeSwitch} role="group" aria-label={t("Password input mode")}>
         {(["pc", "phone"] as const).map((mode) => (
           <button
             key={mode}
@@ -210,7 +211,7 @@ export function LoginPage() {
             aria-pressed={passwordMode === mode}
             onClick={() => handlePasswordModeChange(mode)}
           >
-            {mode === "pc" ? "PC" : "Phone"}
+            {mode === "pc" ? "PC" : t("Phone")}
           </button>
         ))}
       </span>
@@ -223,28 +224,28 @@ export function LoginPage() {
         <section className={styles.card}>
           <div className={styles.cardHeader}>
             <div className={styles.brandRow}>
-              <span className={styles.cardEyebrow}>Access to GF</span>
+              <span className={styles.cardEyebrow}>{t("Access to GF")}</span>
               <img className={styles.brandLogo} src="/gf-favicon.svg" alt="" aria-hidden="true" />
             </div>
-            <h2 className={styles.cardTitle}>Sign in</h2>
-            <p className={styles.cardSubtitle}>Use the credentials created for your role.</p>
+            <h2 className={styles.cardTitle}>{t("Sign in")}</h2>
+            <p className={styles.cardSubtitle}>{t("Use the credentials created for your role.")}</p>
           </div>
 
           {bootstrapError ? <ErrorBanner className={styles.banner}>{bootstrapError}</ErrorBanner> : null}
           {submitError ? <ErrorBanner className={styles.banner}>{submitError}</ErrorBanner> : null}
 
           <form className={styles.form} onSubmit={handleSubmit}>
-            <LabeledField id="login-username" label="Username">
+            <LabeledField id="login-username" label={t("Username")}>
               <TextInput
                 id="login-username"
                 autoComplete="username"
                 value={username}
-                placeholder="Example User"
+                placeholder={t("Example User")}
                 onChange={(event) => handleUsernameChange(event.target.value)}
               />
             </LabeledField>
 
-            <LabeledField id="login-password" label="Password">
+            <LabeledField id="login-password" label={t("Password")}>
               {passwordModeSwitch}
               {passwordMode === "pc" ? (
                 <>
@@ -263,22 +264,22 @@ export function LoginPage() {
                       setSubmitError(null);
                     }}
                   />
-                  <span className={styles.passwordHint}>Exactly 6 digits</span>
+                  <span className={styles.passwordHint}>{t("Exactly 6 digits")}</span>
                 </>
               ) : (
-                <div className={styles.pinPanel} aria-label="Password PIN entry">
+                <div className={styles.pinPanel} aria-label={t("Password PIN entry")}>
                   <div
                     key={failedPinAttempts}
                     className={`${styles.pinDots} ${failedPinAttempts ? styles.pinDotsError : ""}`}
                     role="status"
-                    aria-label={`${password.length} of ${PASSWORD_LENGTH} digits entered`}
+                    aria-label={t("{0} of {1} digits entered", password.length, PASSWORD_LENGTH)}
                   >
                     {Array.from({ length: PASSWORD_LENGTH }, (_, index) => (
                       <span key={index} className={`${styles.pinDot} ${index < password.length ? styles.pinDotFilled : ""}`} aria-hidden="true" />
                     ))}
                   </div>
 
-                  <div className={styles.pinKeypad} aria-label="Numeric keypad">
+                  <div className={styles.pinKeypad} aria-label={t("Numeric keypad")}>
                     {KEYPAD_DIGITS.map((digit) => (
                       <button
                         key={digit}
@@ -306,29 +307,28 @@ export function LoginPage() {
                     <button
                       type="button"
                       className={styles.pinDelete}
-                      aria-label="Delete last digit"
+                      aria-label={t("Delete last digit")}
                       disabled={isSubmitting || password.length === 0}
                       onPointerDown={(event) => handlePinPointerDown(event, "delete", handlePinDelete)}
                       onClick={() => handlePinClick("delete", handlePinDelete)}
                     >
-                      Delete
-                    </button>
+                      {t("Delete")}</button>
                   </div>
                   <span className={styles.pinHint}>
-                    {isSubmitting ? "Checking…" : username.trim() ? "Enter your 6-digit PIN" : "Enter username to unlock keypad"}
+                    {isSubmitting ? t("Checking…") : username.trim() ? t("Enter your 6-digit PIN") : t("Enter username to unlock keypad")}
                   </span>
                 </div>
               )}
             </LabeledField>
 
             <div className={styles.inlineRecoveryAction}>
-              <button type="button" className={styles.textButton} onClick={handleOpenPasswordRecovery}>Forgot password?</button>
+              <button type="button" className={styles.textButton} onClick={handleOpenPasswordRecovery}>{t("Forgot password?")}</button>
             </div>
 
             {passwordMode === "pc" ? (
               <div className={styles.actions}>
                 <IosButton
-                  label={isSubmitting ? "Signing in..." : "Sign in"}
+                  label={isSubmitting ? t("Signing in...") : t("Sign in")}
                   type="submit"
                   disabled={isSubmitting || !username.trim() || !isValidPassword(password)}
                   className={styles.submitButton}
@@ -337,7 +337,7 @@ export function LoginPage() {
             ) : null}
           </form>
 
-          <p className={styles.supportText}>contact us <a href="mailto:support@app-gf.com">support@app-gf.com</a></p>
+          <p className={styles.supportText}>{t("contact us")} <a href="mailto:support@app-gf.com">support@app-gf.com</a></p>
         </section>
       </div>
     </div>

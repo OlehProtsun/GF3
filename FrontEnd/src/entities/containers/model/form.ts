@@ -1,3 +1,4 @@
+import { t } from "@shared/i18n";
 import { useMemo } from "react";
 import type { ChangeEvent } from "react";
 import { useSyncedDraft } from "@shared/lib/useSyncedDraft";
@@ -23,7 +24,7 @@ function buildValidationErrors(form: ContainerFormState): ContainerFormErrors {
   const nextErrors: ContainerFormErrors = {};
 
   if (!form.name.trim()) {
-    nextErrors.name = "Container name is required.";
+    nextErrors.name = t("Container name is required.");
   }
 
   return nextErrors;

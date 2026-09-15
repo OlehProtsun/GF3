@@ -1,3 +1,4 @@
+import { t } from "@shared/i18n";
 import type { KeyboardEvent, MouseEvent, ReactNode } from "react";
 import { PinIcon } from "@shared/ui/icons";
 import styles from "./RecordTile.module.css";
@@ -39,7 +40,7 @@ export function RecordTile({
   isPinned = false,
   isSelected = false,
   onTogglePin,
-  pinLabel = "Toggle pin",
+  pinLabel = t("Toggle pin"),
   ariaLabel,
   className,
 }: RecordTileProps) {

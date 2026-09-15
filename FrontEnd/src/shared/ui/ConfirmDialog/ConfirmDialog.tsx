@@ -1,3 +1,4 @@
+import { t } from "@shared/i18n";
 import { useEffect, useId, type MouseEvent, type ReactNode } from "react";
 import { IosButton } from "@shared/ui/components/IosButton";
 import { CheckIcon, CloseIcon, WarnIcon } from "@shared/ui/icons";
@@ -24,8 +25,8 @@ export function ConfirmDialog({
   variant = "warning",
   onConfirm,
   onCancel,
-  confirmText = "Confirm",
-  cancelText = "Cancel",
+  confirmText = t("Confirm"),
+  cancelText = t("Cancel"),
   footerSlot,
   confirmDisabled = false,
   cancelDisabled = false,

@@ -1,3 +1,4 @@
+import { t, translateServerMessage } from "@shared/i18n";
 export type ValidationErrors = Record<string, string[]>;
 type ValidationErrorPayload = ValidationErrors | string[];
 
@@ -24,7 +25,7 @@ export class ApiError extends Error {
 }
 
 export class RequestCanceledError extends Error {
-  constructor(message = "Request was canceled.") {
+  constructor(message = t("Request was canceled.")) {
     super(message);
     this.name = "RequestCanceledError";
   }
@@ -210,13 +211,13 @@ function normalizeValidationErrors(errors: ValidationErrorPayload | undefined): 
 
   if (Array.isArray(errors)) {
     const messages = errors.filter((message): message is string => typeof message === "string" && message.trim().length > 0);
-    return messages.length > 0 ? { general: messages } : undefined;
+    return messages.length > 0 ? { general: messages.map(translateServerMessage) } : undefined;
   }
 
   const entries = Object.entries(errors)
     .map(([field, messages]) => [
       field,
-      messages.filter((message): message is string => typeof message === "string" && message.trim().length > 0),
+      messages.filter((message): message is string => typeof message === "string" && message.trim().length > 0).map(translateServerMessage),
     ] as const)
     .filter(([, messages]) => messages.length > 0);
 
@@ -237,7 +238,7 @@ function toApiError(status: number, payload: unknown): ApiError {
   const problem = (payload ?? {}) as ProblemDetailsResponse;
   const validationErrors = normalizeValidationErrors(problem.errors);
   const textPayload = typeof payload === "string" ? payload.trim() : "";
-  const fallbackMessage = `Request failed with status ${status}`;
+  const fallbackMessage = t("Request failed with status {0}", status);
   const message =
     problem.detail?.trim() ||
     getFirstValidationErrorMessage(validationErrors) ||
@@ -247,14 +248,14 @@ function toApiError(status: number, payload: unknown): ApiError {
 
   return new ApiError({
     status,
-    message,
+    message: translateServerMessage(message),
     details: payload,
     traceId: problem.traceId,
     validationErrors,
   });
 }
 
-export function getErrorMessage(error: unknown, fallbackMessage = "Something went wrong."): string {
+export function getErrorMessage(error: unknown, fallbackMessage = t("Something went wrong.")): string {
   if (error instanceof ApiError) {
     return getFirstValidationErrorMessage(error.validationErrors) ?? error.message ?? fallbackMessage;
   }

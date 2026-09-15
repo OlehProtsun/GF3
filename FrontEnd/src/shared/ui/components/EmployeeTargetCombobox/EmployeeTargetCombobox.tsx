@@ -1,3 +1,4 @@
+import { t } from "@shared/i18n";
 import { useState, type FocusEvent } from "react";
 import { ArrowIcon, CheckIcon, EmployeeIcon } from "@shared/ui/icons";
 import styles from "./EmployeeTargetCombobox.module.css";
@@ -19,7 +20,7 @@ type EmployeeTargetComboboxProps<TEmployee extends EmployeeTargetComboboxEmploye
 
 function getEmployeeLabel(employee: EmployeeTargetComboboxEmployee) {
   const fullName = `${employee.firstName ?? ""} ${employee.lastName ?? ""}`.trim();
-  return employee.displayName?.trim() || fullName || `Employee #${employee.id}`;
+  return employee.displayName?.trim() || fullName || t("Employee #{0}", employee.id);
 }
 
 function getEmployeeInitials(employee: EmployeeTargetComboboxEmployee) {
@@ -36,7 +37,7 @@ export function EmployeeTargetCombobox<TEmployee extends EmployeeTargetComboboxE
   employees,
   selectedEmployeeId,
   loading = false,
-  ariaLabel = "Employees",
+  ariaLabel = t("Employees"),
   onChange,
 }: EmployeeTargetComboboxProps<TEmployee>) {
   const [isOpen, setIsOpen] = useState(false);
@@ -64,7 +65,7 @@ export function EmployeeTargetCombobox<TEmployee extends EmployeeTargetComboboxE
         </span>
         <span className={styles.comboContent}>
           <span className={styles.comboLabel}>
-            {loading ? "Loading employees" : selectedEmployee ? getEmployeeLabel(selectedEmployee) : "No employees"}
+            {loading ? t("Loading employees") : selectedEmployee ? getEmployeeLabel(selectedEmployee) : t("No employees")}
           </span>
         </span>
         <ArrowIcon className={[styles.comboArrow, isOpen ? styles.comboArrowOpen : ""].filter(Boolean).join(" ")} size={12} />

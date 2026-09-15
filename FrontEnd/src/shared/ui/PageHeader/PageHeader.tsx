@@ -1,3 +1,4 @@
+import { t } from "@shared/i18n";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
@@ -37,7 +38,7 @@ export function PageHeader({
   subtitle,
   backTo = null,
   onBack,
-  backLabel = "Back",
+  backLabel = t("Back"),
   rightSlot,
   searchMeta,
   search,
@@ -131,8 +132,8 @@ export function PageHeader({
                     type="button"
                     className={styles.headerToggleButton}
                     onClick={() => setIsCollapsed(true)}
-                    aria-label="Collapse header"
-                    title="Collapse header"
+                    aria-label={t("Collapse header")}
+                    title={t("Collapse header")}
                   >
                     <BackIcon className={`${styles.toggleIcon} ${styles.toggleIconUp}`} />
                   </button>
@@ -174,8 +175,8 @@ export function PageHeader({
                             className={styles.searchInput}
                             value={search.value}
                             onChange={event => search.onChange(event.target.value)}
-                            placeholder={search.placeholder ?? "Search"}
-                            aria-label={search.ariaLabel ?? "Search"}
+                            placeholder={search.placeholder ?? t("Search")}
+                            aria-label={search.ariaLabel ?? t("Search")}
                           />
                         </div>
                       </form>
@@ -195,8 +196,8 @@ export function PageHeader({
               type="button"
               className={styles.collapsedButton}
               onClick={() => setIsCollapsed(false)}
-              aria-label="Expand header"
-              title="Expand header"
+              aria-label={t("Expand header")}
+              title={t("Expand header")}
             >
               <BackIcon className={`${styles.toggleIcon} ${styles.toggleIconDown}`} />
               <span className={styles.collapsedTitle}>{title}</span>

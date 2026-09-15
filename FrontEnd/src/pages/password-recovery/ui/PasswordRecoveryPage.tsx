@@ -1,3 +1,4 @@
+import { t } from "@shared/i18n";
 import { useEffect, useState, type FormEvent } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { authApi } from "@entities/auth";
@@ -73,7 +74,7 @@ export function PasswordRecoveryPage() {
     event.preventDefault();
 
     if (!normalizedUsername) {
-      setFormErrors({ username: "Enter the username for this account." });
+      setFormErrors({ username: t("Enter the username for this account.") });
       setSubmitError(null);
       return;
     }
@@ -88,7 +89,7 @@ export function PasswordRecoveryPage() {
       setDeliveryHint(result.deliveryHint);
       setPasswordCode("");
       setNewPassword("");
-      setSuccessMessage(`Code sent to ${result.deliveryHint}.`);
+      setSuccessMessage(t("Code sent to {0}.", result.deliveryHint));
     } catch (error) {
       const nextErrors: RecoveryFormErrors = {
         username: getValidationMessage(error, "username"),
@@ -96,7 +97,7 @@ export function PasswordRecoveryPage() {
       };
 
       setFormErrors(nextErrors);
-      setSubmitError(hasFormErrors(nextErrors) ? null : getErrorMessage(error, "Could not send the password code."));
+      setSubmitError(hasFormErrors(nextErrors) ? null : getErrorMessage(error, t("Could not send the password code.")));
     } finally {
       setIsSendingCode(false);
     }
@@ -107,13 +108,13 @@ export function PasswordRecoveryPage() {
 
     const nextErrors: RecoveryFormErrors = {};
     if (!normalizedUsername) {
-      nextErrors.username = "Enter the username for this account.";
+      nextErrors.username = t("Enter the username for this account.");
     }
     if (normalizedCode.length !== 6) {
-      nextErrors.code = "Enter the 6-digit code from your email.";
+      nextErrors.code = t("Enter the 6-digit code from your email.");
     }
     if (!/^\d{6}$/.test(newPassword.trim())) {
-      nextErrors.newPassword = "Password must contain exactly 6 digits.";
+      nextErrors.newPassword = t("Password must contain exactly 6 digits.");
     }
 
     if (Object.keys(nextErrors).length > 0) {
@@ -137,7 +138,7 @@ export function PasswordRecoveryPage() {
       setPasswordCode("");
       setNewPassword("");
       setDeliveryHint(null);
-      setSuccessMessage("Password updated. You can sign in now.");
+      setSuccessMessage(t("Password updated. You can sign in now."));
     } catch (error) {
       const nextErrors: RecoveryFormErrors = {
         username: getValidationMessage(error, "username"),
@@ -147,7 +148,7 @@ export function PasswordRecoveryPage() {
       };
 
       setFormErrors(nextErrors);
-      setSubmitError(hasFormErrors(nextErrors) ? null : getErrorMessage(error, "Could not update the password."));
+      setSubmitError(hasFormErrors(nextErrors) ? null : getErrorMessage(error, t("Could not update the password.")));
     } finally {
       setIsConfirming(false);
     }
@@ -162,9 +163,9 @@ export function PasswordRecoveryPage() {
       <div className={styles.frame}>
         <section className={styles.card}>
           <div className={styles.cardHeader}>
-            <span className={styles.cardEyebrow}>Password recovery</span>
-            <h2 className={styles.cardTitle}>Reset password</h2>
-            <p className={styles.cardSubtitle}>A code will be sent to the recovery email saved on your account.</p>
+            <span className={styles.cardEyebrow}>{t("Password recovery")}</span>
+            <h2 className={styles.cardTitle}>{t("Reset password")}</h2>
+            <p className={styles.cardSubtitle}>{t("A code will be sent to the recovery email saved on your account.")}</p>
           </div>
 
           {submitError ? <ErrorBanner className={styles.banner}>{submitError}</ErrorBanner> : null}
@@ -172,12 +173,12 @@ export function PasswordRecoveryPage() {
           {successMessage ? <div className={styles.successBanner}>{successMessage}</div> : null}
 
           <form className={styles.form} onSubmit={handleSendCode}>
-            <LabeledField id="recovery-username" label="Username" error={formErrors.username}>
+            <LabeledField id="recovery-username" label={t("Username")} error={formErrors.username}>
               <TextInput
                 id="recovery-username"
                 autoComplete="username"
                 value={username}
-                placeholder="Example User"
+                placeholder={t("Example User")}
                 onChange={(event) => {
                   setUsername(event.target.value);
                   setDeliveryHint(null);
@@ -187,7 +188,7 @@ export function PasswordRecoveryPage() {
 
             <div className={styles.actions}>
               <IosButton
-                label={isSendingCode ? "Sending..." : deliveryHint ? "Send code again" : "Send code"}
+                label={isSendingCode ? t("Sending...") : deliveryHint ? t("Send code again") : t("Send code")}
                 type="submit"
                 disabled={!canSendCode}
                 className={styles.submitButton}
@@ -195,10 +196,10 @@ export function PasswordRecoveryPage() {
             </div>
           </form>
 
-          {deliveryHint ? <div className={styles.helperText}>Last code sent to {deliveryHint}.</div> : null}
+          {deliveryHint ? <div className={styles.helperText}>{t("Last code sent to")} {deliveryHint}.</div> : null}
 
           <form className={styles.form} onSubmit={handleConfirmPassword}>
-            <LabeledField id="recovery-code" label="Code" error={formErrors.code}>
+            <LabeledField id="recovery-code" label={t("Code")} error={formErrors.code}>
               <TextInput
                 id="recovery-code"
                 inputMode="numeric"
@@ -209,7 +210,7 @@ export function PasswordRecoveryPage() {
               />
             </LabeledField>
 
-            <LabeledField id="recovery-new-password" label="New password" error={formErrors.newPassword}>
+            <LabeledField id="recovery-new-password" label={t("New password")} error={formErrors.newPassword}>
               <TextInput
                 id="recovery-new-password"
                 type="password"
@@ -219,14 +220,14 @@ export function PasswordRecoveryPage() {
                 maxLength={6}
                 autoComplete="654321"
                 value={newPassword}
-                placeholder="Exactly 6 digits"
+                placeholder={t("Exactly 6 digits")}
                 onChange={(event) => setNewPassword(event.target.value.replace(/\D/g, "").slice(0, 6))}
               />
             </LabeledField>
 
             <div className={styles.actions}>
               <IosButton
-                label={isConfirming ? "Updating..." : "Change password"}
+                label={isConfirming ? t("Updating...") : t("Change password")}
                 type="submit"
                 disabled={!canConfirmPassword}
                 className={styles.submitButton}
@@ -236,8 +237,7 @@ export function PasswordRecoveryPage() {
 
           <div className={styles.secondaryActions}>
             <button type="button" className={styles.textButton} onClick={() => navigate("/login")}>
-              Back to sign in
-            </button>
+              {t("Back to sign in")}</button>
           </div>
         </section>
       </div>

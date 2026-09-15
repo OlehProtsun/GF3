@@ -1,3 +1,4 @@
+import { t } from "@shared/i18n";
 import { useMemo } from "react";
 import type { ChangeEvent } from "react";
 import { useSyncedDraft } from "@shared/lib/useSyncedDraft";
@@ -50,42 +51,42 @@ export function validateEmployeeForm(
   const nextErrors: EmployeeFormErrors = {};
 
   if (!form.firstName.trim()) {
-    nextErrors.firstName = "First name is required";
+    nextErrors.firstName = t("First name is required");
   }
 
   if (!form.lastName.trim()) {
-    nextErrors.lastName = "Last name is required";
+    nextErrors.lastName = t("Last name is required");
   }
 
   if (form.email && !/^\S+@\S+\.\S+$/.test(form.email)) {
-    nextErrors.email = "Invalid email format";
+    nextErrors.email = t("Invalid email format");
   }
 
   const normalizedUsername = form.username.trim();
   const normalizedPassword = form.password.trim();
 
   if (normalizedUsername && normalizedUsername.length < 3) {
-    nextErrors.username = "Username must be at least 3 characters long";
+    nextErrors.username = t("Username must be at least 3 characters long");
   }
 
   if (normalizedUsername && !/^[A-Za-z0-9._-]+$/.test(normalizedUsername)) {
-    nextErrors.username = "Username may use letters, numbers, dots, underscores, and dashes";
+    nextErrors.username = t("Username may use letters, numbers, dots, underscores, and dashes");
   }
 
   if (!normalizedUsername && normalizedPassword) {
-    nextErrors.username = "Username is required when setting a password";
+    nextErrors.username = t("Username is required when setting a password");
   }
 
   if (options.hasLoginAccount && !normalizedUsername) {
-    nextErrors.username = "Username is required for employees with an existing login";
+    nextErrors.username = t("Username is required for employees with an existing login");
   }
 
   if ((options.isCreate || !options.hasLoginAccount) && normalizedUsername && !normalizedPassword) {
-    nextErrors.password = "Password is required when creating a login";
+    nextErrors.password = t("Password is required when creating a login");
   }
 
   if (normalizedPassword && !/^\d{6}$/.test(normalizedPassword)) {
-    nextErrors.password = "Password must contain exactly 6 digits.";
+    nextErrors.password = t("Password must contain exactly 6 digits.");
   }
 
   return nextErrors;

@@ -1,3 +1,4 @@
+import { t } from "@shared/i18n";
 import { useEffect, useId, useMemo, useState, type MouseEvent } from "react";
 import {
   formatBindKeyFromKeyboardEvent,
@@ -43,43 +44,43 @@ type ContainerGraphColorDialogProps = {
 
 const COLOR_GROUPS: ColorGroup[] = [
   {
-    label: "Neutrals",
+    get label() { return t("Neutrals"); },
     options: [
-      { label: "Slate", value: "#f8fafc" },
-      { label: "Cloud", value: "#e2e8f0" },
-      { label: "Ash", value: "#cbd5e1" },
-      { label: "Ink", value: "#1e293b" },
-      { label: "Graphite", value: "#0f172a" },
+      { get label() { return t("Slate"); }, value: "#f8fafc" },
+      { get label() { return t("Cloud"); }, value: "#e2e8f0" },
+      { get label() { return t("Ash"); }, value: "#cbd5e1" },
+      { get label() { return t("Ink"); }, value: "#1e293b" },
+      { get label() { return t("Graphite"); }, value: "#0f172a" },
     ],
   },
   {
-    label: "Cool",
+    get label() { return t("Cool"); },
     options: [
-      { label: "Ice", value: "#dbeafe" },
-      { label: "Sky", value: "#bae6fd" },
-      { label: "Mint", value: "#bbf7d0" },
-      { label: "Aqua", value: "#99f6e4" },
-      { label: "Lavender", value: "#ddd6fe" },
+      { get label() { return t("Ice"); }, value: "#dbeafe" },
+      { get label() { return t("Sky"); }, value: "#bae6fd" },
+      { get label() { return t("Mint"); }, value: "#bbf7d0" },
+      { get label() { return t("Aqua"); }, value: "#99f6e4" },
+      { get label() { return t("Lavender"); }, value: "#ddd6fe" },
     ],
   },
   {
-    label: "Warm",
+    get label() { return t("Warm"); },
     options: [
-      { label: "Cream", value: "#fef3c7" },
-      { label: "Peach", value: "#fed7aa" },
-      { label: "Rose", value: "#fecdd3" },
-      { label: "Lilac", value: "#f5d0fe" },
-      { label: "Coral", value: "#fdba74" },
+      { get label() { return t("Cream"); }, value: "#fef3c7" },
+      { get label() { return t("Peach"); }, value: "#fed7aa" },
+      { get label() { return t("Rose"); }, value: "#fecdd3" },
+      { get label() { return t("Lilac"); }, value: "#f5d0fe" },
+      { get label() { return t("Coral"); }, value: "#fdba74" },
     ],
   },
   {
-    label: "Accent",
+    get label() { return t("Accent"); },
     options: [
-      { label: "Blue", value: "#2563eb" },
-      { label: "Indigo", value: "#4f46e5" },
-      { label: "Emerald", value: "#059669" },
-      { label: "Amber", value: "#d97706" },
-      { label: "Rose", value: "#e11d48" },
+      { get label() { return t("Blue"); }, value: "#2563eb" },
+      { get label() { return t("Indigo"); }, value: "#4f46e5" },
+      { get label() { return t("Emerald"); }, value: "#059669" },
+      { get label() { return t("Amber"); }, value: "#d97706" },
+      { get label() { return t("Rose"); }, value: "#e11d48" },
     ],
   },
 ];
@@ -171,19 +172,19 @@ export function ContainerGraphColorDialog({
         }
 
         if (isBindNavigationKey(event.key) || isCommonEditorShortcut(event)) {
-          setBindError("Choose a non-navigation key that is not a standard editor shortcut.");
+          setBindError(t("Choose a non-navigation key that is not a standard editor shortcut."));
           return;
         }
 
         const nextKey = formatBindKeyFromKeyboardEvent(event);
         const nextColor = normalizeHexColor(draftValue);
         if (!nextKey || !nextColor) {
-          setBindError(`Choose a valid ${mode} color before binding a key.`);
+          setBindError(t("Choose a valid {0} color before binding a key.", mode));
           return;
         }
 
         if (reservedValueBindKeys.has(nextKey)) {
-          setBindError(`Key '${nextKey}' is already used by a value bind.`);
+          setBindError(t("Key '{0}' is already used by a value bind.", nextKey));
           return;
         }
 
@@ -191,7 +192,7 @@ export function ContainerGraphColorDialog({
           .some(bind => bind.key.toUpperCase() === nextKey.toUpperCase());
         if (conflictingColorBind) {
           const conflictingMode = mode === "fill" ? "text" : "fill";
-          setBindError(`Key '${nextKey}' is already used by a ${conflictingMode} color bind.`);
+          setBindError(t("Key '{0}' is already used by a {1} color bind.", nextKey, conflictingMode));
           return;
         }
 
@@ -199,7 +200,7 @@ export function ContainerGraphColorDialog({
         const saveBinding = mode === "fill" ? onBindFillColor : onBindTextColor;
         void saveBinding(nextKey, nextColor.toUpperCase())
           .then(() => setIsCapturingBind(false))
-          .catch(() => setBindError("Could not save this key binding."));
+          .catch(() => setBindError(t("Could not save this key binding.")));
         return;
       }
 
@@ -223,19 +224,19 @@ export function ContainerGraphColorDialog({
       : textColorBinds.find(bind => bind.textColor.toLowerCase() === normalizedDraftValue)
     : undefined;
   const resolvedPreviewColor = getPreviewColor(mode, draftValue);
-  const title = mode === "fill" ? "Choose Fill Color" : "Choose Text Color";
+  const title = mode === "fill" ? t("Choose Fill Color") : t("Choose Text Color");
   const description =
     mode === "fill"
-      ? "Pick a clean background color for the selected schedule cells."
-      : "Pick a readable text color for the selected schedule cells.";
-  const saveLabel = mode === "fill" ? "Use Fill Color" : "Use Text Color";
+      ? t("Pick a clean background color for the selected schedule cells.")
+      : t("Pick a readable text color for the selected schedule cells.");
+  const saveLabel = mode === "fill" ? t("Use Fill Color") : t("Use Text Color");
   const displayValue = (normalizedDraftValue ?? draftValue).toUpperCase();
 
   const submit = () => {
     if (!normalizedDraftValue) {
       setDialogState((current) => ({
         ...current,
-        inputError: "Enter a valid hex color like #2563EB.",
+        inputError: t("Enter a valid hex color like #2563EB."),
       }));
       return;
     }
@@ -260,7 +261,7 @@ export function ContainerGraphColorDialog({
 
   const handleStartBinding = () => {
     if (!normalizedDraftValue) {
-      setBindError(`Choose a valid ${mode} color before binding a key.`);
+      setBindError(t("Choose a valid {0} color before binding a key.", mode));
       return;
     }
 
@@ -276,7 +277,7 @@ export function ContainerGraphColorDialog({
     setBindError(undefined);
     const deleteBinding = mode === "fill" ? onDeleteFillColorBind : onDeleteTextColorBind;
     void deleteBinding(currentColorBinding.id)
-      .catch(() => setBindError("Could not remove this key binding."));
+      .catch(() => setBindError(t("Could not remove this key binding.")));
   };
 
   return (
@@ -302,20 +303,20 @@ export function ContainerGraphColorDialog({
         </div>
 
         <div className={styles.previewPanel}>
-          <span className={styles.previewLabel}>Preview</span>
+          <span className={styles.previewLabel}>{t("Preview")}</span>
           <div
             className={styles.previewCell}
             style={mode === "fill" ? { backgroundColor: resolvedPreviewColor } : { color: resolvedPreviewColor }}
           >
             <span className={styles.previewDay}>12</span>
-            <span className={styles.previewShift}>Shift 09:00 - 18:00</span>
+            <span className={styles.previewShift}>{t("Shift 09:00 - 18:00")}</span>
           </div>
         </div>
 
         <div className={styles.paletteBlock}>
           <div className={styles.paletteHeader}>
-            <span className={styles.paletteTitle}>Palette</span>
-            <span className={styles.paletteHint}>Choose a swatch or enter your own hex color.</span>
+            <span className={styles.paletteTitle}>{t("Palette")}</span>
+            <span className={styles.paletteHint}>{t("Choose a swatch or enter your own hex color.")}</span>
           </div>
 
           <div className={styles.paletteSections}>
@@ -348,7 +349,7 @@ export function ContainerGraphColorDialog({
           </div>
         </div>
 
-        <LabeledField id={`graph-${mode}-color`} label="Hex color" error={inputError} className={styles.hexField}>
+        <LabeledField id={`graph-${mode}-color`} label={t("Hex color")} error={inputError} className={styles.hexField}>
           <div className={styles.hexInputRow}>
             <span className={styles.hexPreview} style={{ backgroundColor: resolvedPreviewColor }} aria-hidden="true" />
             <TextInput
@@ -379,7 +380,7 @@ export function ContainerGraphColorDialog({
           <div className={styles.bindBlock}>
               <div className={styles.bindActions}>
                 <IosButton
-                  label={isCapturingBind ? "Press a key..." : currentColorBinding ? `Bound: ${currentColorBinding.key}` : "Bind Key"}
+                  label={isCapturingBind ? t("Press a key...") : currentColorBinding ? t("Bound: {0}", currentColorBinding.key) : t("Bind Key")}
                   variant="secondary"
                   size="compact"
                   className={`${styles.bindButton} ${isCapturingBind ? styles.bindButtonCapturing : ""}`}
@@ -389,7 +390,7 @@ export function ContainerGraphColorDialog({
                 />
                 {currentColorBinding ? (
                   <IosButton
-                    label="Unbind"
+                    label={t("Unbind")}
                     variant="secondary"
                     size="compact"
                     className={styles.bindButton}
@@ -399,11 +400,11 @@ export function ContainerGraphColorDialog({
                 ) : null}
               </div>
               <span className={bindError ? styles.bindError : styles.bindHint}>
-                {bindError ?? (isCapturingBind ? `Press the shortcut to use for this ${mode} color. Esc cancels.` : `The shortcut applies this ${mode} color to the selected schedule cells.`)}
+                {bindError ?? (isCapturingBind ? t("Press the shortcut to use for this {0} color. Esc cancels.", mode) : t("The shortcut applies this {0} color to the selected schedule cells.", mode))}
               </span>
             </div>
           <div className={styles.footerActions}>
-            <IosButton label="Cancel" variant="secondary" icon={<CloseIcon size={16} />} onClick={onCancel} />
+            <IosButton label={t("Cancel")} variant="secondary" icon={<CloseIcon size={16} />} onClick={onCancel} />
             <IosButton label={saveLabel} icon={<CheckIcon size={16} />} onClick={submit} />
           </div>
         </div>

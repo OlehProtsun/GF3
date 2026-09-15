@@ -1,3 +1,4 @@
+import { t } from "@shared/i18n";
 import { startTransition, useDeferredValue, useEffect, useMemo, useState, type FormEvent } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
@@ -158,7 +159,7 @@ export function ContainerPage() {
   );
   const { lockedByOtherState, isCheckingLocks } = useManagerEditLocks(editLockTargets);
   const editLockMessage = lockedByOtherState
-    ? buildManagerEditLockMessage(lockedByOtherState, "This container")
+    ? buildManagerEditLockMessage(lockedByOtherState, t("This container"))
     : null;
   const canEdit = !editLockMessage && !isCheckingLocks;
 
@@ -406,7 +407,7 @@ export function ContainerPage() {
       return;
     }
 
-    setSubmitError("Could not save container.");
+    setSubmitError(t("Could not save container."));
   };
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
@@ -419,7 +420,7 @@ export function ContainerPage() {
     }
 
     if (isCheckingLocks) {
-      setSubmitError("Checking edit access. Please wait a moment.");
+      setSubmitError(t("Checking edit access. Please wait a moment."));
       return;
     }
 
@@ -492,7 +493,7 @@ export function ContainerPage() {
       const file = await runMutation(exportContainerExcelMutation.mutate, { containerId: profileContainer.id });
       downloadExportFile(file, buildContainerExportFallbackFilename("excel", profileContainer.name));
     } catch (error) {
-      setProfileExportError(getExportErrorMessage(error, "Could not export this container to Excel."));
+      setProfileExportError(getExportErrorMessage(error, t("Could not export this container to Excel.")));
     }
   };
 
@@ -507,7 +508,7 @@ export function ContainerPage() {
       const file = await runMutation(exportContainerSqlMutation.mutate, { containerId: profileContainer.id });
       downloadExportFile(file, buildContainerExportFallbackFilename("sql", profileContainer.name));
     } catch (error) {
-      setProfileExportError(getExportErrorMessage(error, "Could not export this container to code."));
+      setProfileExportError(getExportErrorMessage(error, t("Could not export this container to code.")));
     }
   };
 
@@ -515,8 +516,8 @@ export function ContainerPage() {
     if (mode === "edit") {
       return (
         <PageHeader
-          title={isCreateMode ? "Add Container" : "Edit Container"}
-          subtitle={isCreateMode ? "Create a new container workspace" : "Update container information"}
+          title={isCreateMode ? t("Add Container") : t("Edit Container")}
+          subtitle={isCreateMode ? t("Create a new container workspace") : t("Update container information")}
           onBack={handleCancelEdit}
         />
       );
@@ -525,8 +526,8 @@ export function ContainerPage() {
     if (mode === "profile") {
       return (
         <PageHeader
-          title="Container Profile"
-          subtitle="View container details, schedules and aggregate workload statistics"
+          title={t("Container Profile")}
+          subtitle={t("View container details, schedules and aggregate workload statistics")}
           onBack={handleBackFromProfile}
           rightSlot={
             profileContainer ? (
@@ -545,16 +546,16 @@ export function ContainerPage() {
 
     return (
       <PageHeader
-        title="Container List"
-        subtitle="Browse containers and open their schedule workspaces"
+        title={t("Container List")}
+        subtitle={t("Browse containers and open their schedule workspaces")}
         backTo="/"
-        rightSlot={<IosButton label="Add New" icon={<PlusIcon size={18} />} onClick={handleStartCreate} />}
-        searchMeta={`Total: ${filteredContainers.length}`}
+        rightSlot={<IosButton label={t("Add New")} icon={<PlusIcon size={18} />} onClick={handleStartCreate} />}
+        searchMeta={t("Total: {0}", filteredContainers.length)}
         search={{
           value: listSearchQuery,
           onChange: setListSearchQuery,
-          placeholder: "Search container",
-          ariaLabel: "Search container",
+          placeholder: t("Search container"),
+          ariaLabel: t("Search container"),
         }}
       />
     );
@@ -587,8 +588,8 @@ export function ContainerPage() {
             {isCheckingLocks ? (
               <ManagerEditLockDialog
                 open
-                title="Checking edit access"
-                message="Please wait while we check whether this container can be edited."
+                title={t("Checking edit access")}
+                message={t("Please wait while we check whether this container can be edited.")}
               />
             ) : null}
 
@@ -673,11 +674,11 @@ export function ContainerPage() {
 
       <ConfirmDialog
         open={isDeleteOpen}
-        title="Delete container"
-        message="Are you sure you want to delete this container? This action cannot be undone."
+        title={t("Delete container")}
+        message={t("Are you sure you want to delete this container? This action cannot be undone.")}
         onCancel={() => setIsDeleteOpen(false)}
         onConfirm={handleDeleteConfirm}
-        confirmText={deleteMutation.isPending ? "Deleting..." : "Delete"}
+        confirmText={deleteMutation.isPending ? t("Deleting...") : t("Delete")}
       />
 
       <SavingOverlay active={mode === "edit" && isSaving} />

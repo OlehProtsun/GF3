@@ -1,3 +1,5 @@
+import { getLocale } from "@shared/i18n";
+import { t } from "@shared/i18n";
 import {
   useEffect,
   useEffectEvent,
@@ -104,7 +106,7 @@ function richTextToPlainText(value: string) {
 }
 
 function notePreview(note: ManagerNote) {
-  return richTextToPlainText(note.content).trim().replace(/\s+/g, " ") || "Empty note";
+  return richTextToPlainText(note.content).trim().replace(/\s+/g, " ") || t("Empty note");
 }
 
 function ToolbarButton({
@@ -201,7 +203,7 @@ export function ManagerNotepad() {
 
   const saveWindowState = (state: ManagerNotepadState) => {
     stateMutation.mutate(state, {
-      onError: error => setActionError(getErrorMessage(error, "Could not save notepad position.")),
+      onError: error => setActionError(getErrorMessage(error, t("Could not save notepad position."))),
     });
   };
 
@@ -309,7 +311,7 @@ export function ManagerNotepad() {
   const handleSave = () => {
     const editorContent = editorRef.current ? sanitizeRichText(editorRef.current.innerHTML) : contentToEditorHtml(content);
     if (editorContent.length > MAX_CONTENT_LENGTH) {
-      setActionError(`Note content cannot exceed ${MAX_CONTENT_LENGTH.toLocaleString()} characters.`);
+      setActionError(t("Note content cannot exceed {0} characters.", MAX_CONTENT_LENGTH.toLocaleString(getLocale())));
       return;
     }
     const payload = { title, content: editorContent, color: noteColor };
@@ -323,7 +325,7 @@ export function ManagerNotepad() {
       setIsDirty(false);
       setActionError(null);
     };
-    const onError = (error: unknown) => setActionError(getErrorMessage(error, "Could not save this note."));
+    const onError = (error: unknown) => setActionError(getErrorMessage(error, t("Could not save this note.")));
 
     if (selectedNoteId === null) {
       createMutation.mutate(payload, { onSuccess, onError });
@@ -342,7 +344,7 @@ export function ManagerNotepad() {
         setIsDirty(false);
         setActionError(null);
       },
-      onError: error => setActionError(getErrorMessage(error, "Could not delete this note.")),
+      onError: error => setActionError(getErrorMessage(error, t("Could not delete this note."))),
     });
   };
 
@@ -404,8 +406,8 @@ export function ManagerNotepad() {
       <button
         type="button"
         className={[styles.openTab, isExpanded ? styles.openTabHidden : ""].filter(Boolean).join(" ")}
-        aria-label="Open notepad"
-        title="Open notepad"
+        aria-label={t("Open notepad")}
+        title={t("Open notepad")}
         onClick={handleToggleExpanded}
       >
         <NoteIcon size={17} />
@@ -415,20 +417,20 @@ export function ManagerNotepad() {
         ref={panelRef}
         className={[styles.notepad, isExpanded ? styles.notepadExpanded : styles.notepadCollapsed].join(" ")}
         style={{ height: clampHeight(height) }}
-        aria-label="Manager notepad"
+        aria-label={t("Manager notepad")}
         aria-hidden={!isExpanded}
       >
         <header className={styles.header}>
           <div className={styles.heading}>
             <span className={styles.headingIcon}><NoteIcon size={18} /></span>
             <div>
-              <strong>Notepad</strong>
+              <strong>{t("Notepad")}</strong>
               {view === "list" ? (
-                <span>{notes.length} notes</span>
+                <span>{notes.length}  {t("notes")}</span>
               ) : (
                 <button type="button" className={styles.headerBackButton} onClick={() => { setView("list"); setToolbarMenu(null); }}>
                   <ArrowIcon size={12} />
-                  <span>Notes</span>
+                  <span>{t("Notes")}</span>
                 </button>
               )}
             </div>
@@ -436,9 +438,9 @@ export function ManagerNotepad() {
           <button
             type="button"
             className={[styles.iconButton, isPinned ? styles.iconButtonActive : ""].filter(Boolean).join(" ")}
-            aria-label={isPinned ? "Unpin notepad" : "Pin notepad"}
+            aria-label={isPinned ? t("Unpin notepad") : t("Pin notepad")}
             aria-pressed={isPinned}
-            title={isPinned ? "Unpin notepad" : "Pin notepad"}
+            title={isPinned ? t("Unpin notepad") : t("Pin notepad")}
             onClick={handleTogglePinned}
           >
             <PinIcon size={16} />
@@ -447,7 +449,7 @@ export function ManagerNotepad() {
 
         <div className={styles.body}>
           {queryError || actionError ? (
-            <div className={styles.errorMessage}>{actionError ?? getErrorMessage(queryError, "Could not load notes.")}</div>
+            <div className={styles.errorMessage}>{actionError ?? getErrorMessage(queryError, t("Could not load notes."))}</div>
           ) : null}
 
           {view === "list" ? (
@@ -455,29 +457,29 @@ export function ManagerNotepad() {
               <div className={styles.listToolbar}>
                 <label className={styles.searchField}>
                   <SearchIcon size={15} />
-                  <input value={search} placeholder="Search notes" aria-label="Search notes" onChange={event => setSearch(event.target.value)} />
-                  {search ? <button type="button" aria-label="Clear note search" onClick={() => setSearch("")}><CloseIcon size={12} /></button> : null}
+                  <input value={search} placeholder={t("Search notes")} aria-label={t("Search notes")} onChange={event => setSearch(event.target.value)} />
+                  {search ? <button type="button" aria-label={t("Clear note search")} onClick={() => setSearch("")}><CloseIcon size={12} /></button> : null}
                 </label>
                 <button type="button" className={styles.newButton} onClick={createDraft}>
                   <PlusIcon size={16} />
-                  <span>New</span>
+                  <span>{t("New")}</span>
                 </button>
               </div>
 
               <div className={styles.noteList}>
-                {notepadQuery.isLoading ? <p className={styles.emptyState}>Loading notes...</p> : null}
+                {notepadQuery.isLoading ? <p className={styles.emptyState}>{t("Loading notes...")}</p> : null}
                 {!notepadQuery.isLoading && filteredNotes.length === 0 ? (
                   <div className={styles.emptyState}>
                     <NoteIcon size={26} />
-                    <strong>{search ? "No matching notes" : "Your notepad is empty"}</strong>
-                    <span>{search ? "Try another search." : "Create a note for something you want to keep close."}</span>
+                    <strong>{search ? t("No matching notes") : t("Your notepad is empty")}</strong>
+                    <span>{search ? t("Try another search.") : t("Create a note for something you want to keep close.")}</span>
                   </div>
                 ) : null}
                 {filteredNotes.map(note => (
                   <button type="button" key={note.id} className={styles.noteCard} onClick={() => openNote(note)}>
                     <strong>{note.title}</strong>
                     <span>{notePreview(note)}</span>
-                    <time dateTime={note.updatedAtUtc}>{new Date(note.updatedAtUtc).toLocaleDateString()}</time>
+                    <time dateTime={note.updatedAtUtc}>{new Date(note.updatedAtUtc).toLocaleDateString(getLocale())}</time>
                   </button>
                 ))}
               </div>
@@ -489,11 +491,11 @@ export function ManagerNotepad() {
                   className={styles.titleInput}
                   value={title}
                   maxLength={160}
-                  placeholder="Note title"
-                  aria-label="Note title"
+                  placeholder={t("Note title")}
+                  aria-label={t("Note title")}
                   onChange={event => { setTitle(event.target.value); setIsDirty(true); }}
                 />
-                {isDirty ? <span className={styles.unsaved}>Unsaved</span> : <span className={styles.saved}>Saved</span>}
+                {isDirty ? <span className={styles.unsaved}>{t("Unsaved")}</span> : <span className={styles.saved}>{t("Saved")}</span>}
               </div>
 
               <div className={styles.editorWorkspace}>
@@ -503,7 +505,7 @@ export function ManagerNotepad() {
                   className={styles.contentEditor}
                   contentEditable
                   role="textbox"
-                  aria-label="Note content"
+                  aria-label={t("Note content")}
                   aria-multiline="true"
                   data-placeholder="Write something..."
                   suppressContentEditableWarning
@@ -513,30 +515,30 @@ export function ManagerNotepad() {
                   onBlur={rememberSelection}
                 />
 
-                <div className={styles.formatToolbar} role="toolbar" aria-label="Text formatting">
-                  {formatButton("bold", "Bold", <strong>B</strong>)}
-                  {formatButton("italic", "Italic", <em>I</em>)}
-                  {formatButton("underline", "Underline", <span className={styles.underlineGlyph}>U</span>)}
-                  {formatButton("strikeThrough", "Strikethrough", <span className={styles.strikeGlyph}>S</span>)}
+                <div className={styles.formatToolbar} role="toolbar" aria-label={t("Text formatting")}>
+                  {formatButton("bold", t("Bold"), <strong>B</strong>)}
+                  {formatButton("italic", t("Italic"), <em>I</em>)}
+                  {formatButton("underline", t("Underline"), <span className={styles.underlineGlyph}>U</span>)}
+                  {formatButton("strikeThrough", t("Strikethrough"), <span className={styles.strikeGlyph}>S</span>)}
                   <span className={styles.toolbarSeparator} />
-                  <ToolbarButton label="Text size" active={toolbarMenu === "size"} onRememberSelection={rememberSelection} onClick={() => setToolbarMenu(menu => menu === "size" ? null : "size")}>
+                  <ToolbarButton label={t("Text size")} active={toolbarMenu === "size"} onRememberSelection={rememberSelection} onClick={() => setToolbarMenu(menu => menu === "size" ? null : "size")}>
                     <span className={styles.sizeGlyph}>Aa</span>
                   </ToolbarButton>
-                  <ToolbarButton label="Text color" active={toolbarMenu === "color"} onRememberSelection={rememberSelection} onClick={() => setToolbarMenu(menu => menu === "color" ? null : "color")}>
+                  <ToolbarButton label={t("Text color")} active={toolbarMenu === "color"} onRememberSelection={rememberSelection} onClick={() => setToolbarMenu(menu => menu === "color" ? null : "color")}>
                     <span className={styles.colorGlyph} style={{ "--text-color": textColor } as React.CSSProperties}>A</span>
                   </ToolbarButton>
                   <span className={styles.toolbarSeparator} />
-                  {formatButton("insertUnorderedList", "Bulleted list", "•≡")}
-                  {formatButton("insertOrderedList", "Numbered list", "1≡")}
+                  {formatButton("insertUnorderedList", t("Bulleted list"), "•≡")}
+                  {formatButton("insertOrderedList", t("Numbered list"), "1≡")}
                   <span className={styles.toolbarSeparator} />
-                  <ToolbarButton label="Undo" onRememberSelection={rememberSelection} onClick={() => runEditorCommand("undo")}>↶</ToolbarButton>
-                  <ToolbarButton label="Redo" onRememberSelection={rememberSelection} onClick={() => runEditorCommand("redo")}>↷</ToolbarButton>
-                  <ToolbarButton label="Clear formatting" onRememberSelection={rememberSelection} onClick={() => runEditorCommand("removeFormat")}>Tx</ToolbarButton>
+                  <ToolbarButton label={t("Undo")} onRememberSelection={rememberSelection} onClick={() => runEditorCommand("undo")}>↶</ToolbarButton>
+                  <ToolbarButton label={t("Redo")} onRememberSelection={rememberSelection} onClick={() => runEditorCommand("redo")}>↷</ToolbarButton>
+                  <ToolbarButton label={t("Clear formatting")} onRememberSelection={rememberSelection} onClick={() => runEditorCommand("removeFormat")}>Tx</ToolbarButton>
                 </div>
 
                 {toolbarMenu === "color" ? (
-                  <div className={styles.toolbarPopover} role="dialog" aria-label="Choose text color">
-                    <strong>Text color</strong>
+                  <div className={styles.toolbarPopover} role="dialog" aria-label={t("Choose text color")}>
+                    <strong>{t("Text color")}</strong>
                     <div className={styles.textColorGrid}>
                       {textColors.map(option => (
                         <button
@@ -544,7 +546,7 @@ export function ManagerNotepad() {
                           key={option}
                           className={[styles.textColorButton, textColor === option ? styles.textColorButtonActive : ""].filter(Boolean).join(" ")}
                           style={{ backgroundColor: option }}
-                          aria-label={`Text color ${option}`}
+                          aria-label={t("Text color {0}", option)}
                           aria-pressed={textColor === option}
                           onPointerDown={event => { event.preventDefault(); rememberSelection(); }}
                           onClick={() => { setTextColor(option); runEditorCommand("foreColor", option); }}
@@ -555,8 +557,8 @@ export function ManagerNotepad() {
                 ) : null}
 
                 {toolbarMenu === "size" ? (
-                  <div className={styles.toolbarPopover} role="dialog" aria-label="Choose text size">
-                    <strong>Text size</strong>
+                  <div className={styles.toolbarPopover} role="dialog" aria-label={t("Choose text size")}>
+                    <strong>{t("Text size")}</strong>
                     <div className={styles.sizeGrid}>
                       {fontSizes.map(option => (
                         <button
@@ -575,15 +577,15 @@ export function ManagerNotepad() {
 
               <div className={styles.editorFooter}>
                 <span className={[styles.contentLength, contentTooLong ? styles.contentLengthError : ""].filter(Boolean).join(" ")}>
-                  {contentTooLong ? `${contentLimit.length.toLocaleString()} / ${MAX_CONTENT_LENGTH.toLocaleString()}` : ""}
+                  {contentTooLong ? `${contentLimit.length.toLocaleString(getLocale())} / ${MAX_CONTENT_LENGTH.toLocaleString(getLocale())}` : ""}
                 </span>
                 <div className={styles.editorActions}>
                   {selectedNoteId !== null ? (
-                    <button type="button" className={styles.deleteButton} onClick={() => setDeleteNoteId(selectedNoteId)}>Delete</button>
+                    <button type="button" className={styles.deleteButton} onClick={() => setDeleteNoteId(selectedNoteId)}>{t("Delete")}</button>
                   ) : null}
                   <button type="button" className={styles.saveButton} disabled={isSaving || !isDirty || contentTooLong} onClick={handleSave}>
                     <SaveIcon size={15} />
-                    <span>{isSaving ? "Saving..." : "Save"}</span>
+                    <span>{isSaving ? t("Saving...") : t("Save")}</span>
                   </button>
                 </div>
               </div>
@@ -591,8 +593,8 @@ export function ManagerNotepad() {
           )}
         </div>
 
-        <div className={styles.bottomDock} role="separator" aria-label="Resize notepad" onPointerDown={handleResizeStart}>
-          <button type="button" aria-label="Collapse notepad" title="Collapse notepad" onClick={handleToggleExpanded}>
+        <div className={styles.bottomDock} role="separator" aria-label={t("Resize notepad")} onPointerDown={handleResizeStart}>
+          <button type="button" aria-label={t("Collapse notepad")} title={t("Collapse notepad")} onClick={handleToggleExpanded}>
             <ArrowIcon size={15} />
           </button>
         </div>
@@ -600,9 +602,9 @@ export function ManagerNotepad() {
 
       <ConfirmDialog
         open={deleteNoteId !== null}
-        title="Delete note?"
-        message="This note will be permanently deleted."
-        confirmText={deleteMutation.isPending ? "Deleting..." : "Delete"}
+        title={t("Delete note?")}
+        message={t("This note will be permanently deleted.")}
+        confirmText={deleteMutation.isPending ? t("Deleting...") : t("Delete")}
         confirmDisabled={deleteMutation.isPending}
         cancelDisabled={deleteMutation.isPending}
         onCancel={() => setDeleteNoteId(null)}

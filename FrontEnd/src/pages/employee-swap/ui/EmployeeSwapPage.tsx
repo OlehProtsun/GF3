@@ -1,3 +1,5 @@
+import { dateTimeFormat } from "@shared/i18n";
+import { t } from "@shared/i18n";
 import {
   useDeferredValue,
   useEffect,
@@ -34,19 +36,19 @@ import { ArrowIcon, CloseIcon, PinIcon, SearchIcon, ShiftGiveAwayIcon, SwapHisto
 import workspaceStyles from "@pages/shared/EmployeeWorkspacePage.module.css";
 import styles from "./EmployeeSwapPage.module.css";
 
-const scheduleMonthOnlyFormatter = new Intl.DateTimeFormat("en-GB", {
+const scheduleMonthOnlyFormatter = dateTimeFormat("en-GB", {
   month: "long",
   timeZone: "UTC",
 });
 
-const swapDateFormatter = new Intl.DateTimeFormat("en-GB", {
+const swapDateFormatter = dateTimeFormat("en-GB", {
   weekday: "short",
   day: "2-digit",
   month: "short",
   timeZone: "UTC",
 });
 
-const slotWeekdayFormatter = new Intl.DateTimeFormat("en-GB", {
+const slotWeekdayFormatter = dateTimeFormat("en-GB", {
   weekday: "short",
   timeZone: "UTC",
 });
@@ -110,7 +112,7 @@ function formatIntegerDelta(value: number) {
 
 function getTargetEmployeeLabel(employee: ShiftSwapEmployee) {
   const fullName = `${employee.firstName} ${employee.lastName}`.trim();
-  return employee.displayName?.trim() || fullName || `Employee #${employee.id}`;
+  return employee.displayName?.trim() || fullName || t("Employee #{0}", employee.id);
 }
 
 function padTimePart(value: number) {
@@ -304,10 +306,10 @@ function StatsCompareItem({
       <span>{label}</span>
       <div className={styles.statsCompareValues}>
         <strong>{kind === "hours" && typeof before === "number" ? formatHours(before) : before}</strong>
-        <small>before</small>
+        <small>{t("before")}</small>
         <span className={styles.statsArrow}>{"->"}</span>
         <strong>{kind === "hours" && typeof after === "number" ? formatHours(after) : after}</strong>
-        <small>after</small>
+        <small>{t("after")}</small>
         <StatsDeltaBadge value={delta} kind={kind} />
       </div>
     </div>
@@ -316,7 +318,7 @@ function StatsCompareItem({
 
 function SwapStatisticsCard({
   stats,
-  summary = "Your month",
+  summary = t("Your month"),
   collapsible = false,
   defaultExpanded = true,
 }: {
@@ -337,7 +339,7 @@ function SwapStatisticsCard({
     <div className={styles.statsPanel}>
       <div className={styles.statsHeader}>
         <div>
-          <span>Statistics</span>
+          <span>{t("Statistics")}</span>
           <strong>{summary}</strong>
         </div>
 
@@ -345,7 +347,7 @@ function SwapStatisticsCard({
           <button
             type="button"
             className={styles.statsToggleButton}
-            aria-label={isExpanded ? "Collapse statistics" : "Expand statistics"}
+            aria-label={isExpanded ? t("Collapse statistics") : t("Expand statistics")}
             aria-expanded={isExpanded}
             onClick={() => setIsExpanded(value => !value)}
           >
@@ -356,9 +358,9 @@ function SwapStatisticsCard({
 
       {shouldShowBody ? (
         <div className={styles.statsCompareGrid}>
-          <StatsCompareItem label="Total hours" before={stats.hoursBefore} after={stats.hoursAfter} kind="hours" />
-          <StatsCompareItem label="Work days" before={stats.workDaysBefore} after={stats.workDaysAfter} kind="days" />
-          <StatsCompareItem label="Free days" before={stats.freeDaysBefore} after={stats.freeDaysAfter} kind="days" />
+          <StatsCompareItem label={t("Total hours")} before={stats.hoursBefore} after={stats.hoursAfter} kind="hours" />
+          <StatsCompareItem label={t("Work days")} before={stats.workDaysBefore} after={stats.workDaysAfter} kind="days" />
+          <StatsCompareItem label={t("Free days")} before={stats.freeDaysBefore} after={stats.freeDaysAfter} kind="days" />
         </div>
       ) : null}
     </div>
@@ -378,9 +380,9 @@ function CollapseToggleButton({
     <button
       type="button"
       className={styles.collapseButton}
-      aria-label={isExpanded ? `Collapse ${label}` : `Expand ${label}`}
+      aria-label={isExpanded ? t("Collapse {0}", label) : t("Expand {0}", label)}
       aria-expanded={isExpanded}
-      title={isExpanded ? `Collapse ${label}` : `Expand ${label}`}
+      title={isExpanded ? t("Collapse {0}", label) : t("Expand {0}", label)}
       onClick={onToggle}
     >
       <ArrowIcon size={13} />
@@ -397,7 +399,7 @@ function PinToggleButton({
   label: string;
   onToggle: () => void;
 }) {
-  const actionLabel = `${isPinned ? "Unpin" : "Pin"} ${label}`;
+  const actionLabel = `${isPinned ? t("Unpin") : t("Pin")} ${label}`;
   return (
     <button
       type="button"
@@ -515,15 +517,15 @@ function ShiftPickerDialog({
   };
 
   return (
-    <div className={styles.dialogOverlay} role="dialog" aria-modal="true" aria-label="Choose shift" onMouseDown={handleOverlayMouseDown}>
+    <div className={styles.dialogOverlay} role="dialog" aria-modal="true" aria-label={t("Choose shift")} onMouseDown={handleOverlayMouseDown}>
       <div className={styles.shiftDialog}>
         <div className={styles.dialogHeader}>
           <div>
             <span className={styles.dialogEyebrow}>{formatScheduleMonth(schedule)}</span>
-            <h3>{`Schedule name: ${schedule.name}`}</h3>
+            <h3>{t("Schedule name: {0}", schedule.name)}</h3>
           </div>
 
-          <button type="button" className={styles.iconButton} aria-label="Close" onClick={onClose}>
+          <button type="button" className={styles.iconButton} aria-label={t("Close")} onClick={onClose}>
             <CloseIcon size={16} />
           </button>
         </div>
@@ -565,37 +567,35 @@ function ShiftPickerDialog({
           <div className={styles.confirmOverlay}>
             <div className={styles.confirmBox}>
               <div>
-                <span>Confirm shift</span>
+                <span>{t("Confirm shift")}</span>
                 <strong>{buildOwnShiftLabel(schedule, confirmSlot, selectedPeriod)}</strong>
               </div>
-              <p>Choose the whole shift or only the time period you want to give away.</p>
+              <p>{t("Choose the whole shift or only the time period you want to give away.")}</p>
               <div className={styles.periodModeRow}>
                 <button
                   type="button"
                   className={[styles.segmentButton, periodMode === "full" ? styles.segmentButtonActive : ""].filter(Boolean).join(" ")}
                   onClick={() => setPeriodMode("full")}
                 >
-                  Full shift
-                </button>
+                  {t("Full shift")}</button>
                 <button
                   type="button"
                   className={[styles.segmentButton, periodMode === "custom" ? styles.segmentButtonActive : ""].filter(Boolean).join(" ")}
                   onClick={() => setPeriodMode("custom")}
                 >
-                  Custom period
-                </button>
+                  {t("Custom period")}</button>
               </div>
               {periodMode === "custom" && selectedPeriod ? (
                 <div className={styles.timePanel}>
                   <div className={styles.timeStepper}>
-                    <button type="button" aria-label="Decrease start time" onClick={() => adjustCustomPeriod("from", -TIME_STEP_MINUTES)}>
+                    <button type="button" aria-label={t("Decrease start time")} onClick={() => adjustCustomPeriod("from", -TIME_STEP_MINUTES)}>
                       -
                     </button>
                     <span>
                       <strong>{selectedPeriod.fromTime}</strong>
-                      <small>From</small>
+                      <small>{t("From")}</small>
                     </span>
-                    <button type="button" aria-label="Increase start time" onClick={() => adjustCustomPeriod("from", TIME_STEP_MINUTES)}>
+                    <button type="button" aria-label={t("Increase start time")} onClick={() => adjustCustomPeriod("from", TIME_STEP_MINUTES)}>
                       +
                     </button>
                   </div>
@@ -603,14 +603,14 @@ function ShiftPickerDialog({
                   <span className={styles.timeDash}>-</span>
 
                   <div className={styles.timeStepper}>
-                    <button type="button" aria-label="Decrease end time" onClick={() => adjustCustomPeriod("to", -TIME_STEP_MINUTES)}>
+                    <button type="button" aria-label={t("Decrease end time")} onClick={() => adjustCustomPeriod("to", -TIME_STEP_MINUTES)}>
                       -
                     </button>
                     <span>
                       <strong>{selectedPeriod.toTime}</strong>
-                      <small>To</small>
+                      <small>{t("To")}</small>
                     </span>
-                    <button type="button" aria-label="Increase end time" onClick={() => adjustCustomPeriod("to", TIME_STEP_MINUTES)}>
+                    <button type="button" aria-label={t("Increase end time")} onClick={() => adjustCustomPeriod("to", TIME_STEP_MINUTES)}>
                       +
                     </button>
                   </div>
@@ -618,8 +618,7 @@ function ShiftPickerDialog({
               ) : null}
               <div className={styles.confirmActions}>
                 <button type="button" className={styles.secondaryButton} onClick={() => onConfirmSlotChange(null)}>
-                  Back
-                </button>
+                  {t("Back")}</button>
                 <button
                   type="button"
                   className={styles.primaryButton}
@@ -629,8 +628,7 @@ function ShiftPickerDialog({
                     }
                   }}
                 >
-                  Choose shift
-                </button>
+                  {t("Choose shift")}</button>
               </div>
             </div>
           </div>
@@ -663,9 +661,9 @@ function SwapOfferCard({
   const unavailableReason = isOpen && !swap.canAccept
     ? swap.acceptanceUnavailableReason
       ?? (isScheduleLocked
-        ? "Schedule is locked while a manager is editing it."
+        ? t("Schedule is locked while a manager is editing it.")
         : swap.isCreatedByCurrentEmployee
-          ? "This is your own swap offer."
+          ? t("This is your own swap offer.")
           : null)
     : null;
 
@@ -692,7 +690,7 @@ function SwapOfferCard({
       data-pinned={isPinned ? "true" : "false"}
       data-expanded={isExpanded ? "true" : "false"}
       tabIndex={0}
-      title={isExpanded ? "Click to collapse this swap" : "Click to expand this swap"}
+      title={isExpanded ? t("Click to collapse this swap") : t("Click to expand this swap")}
       onClick={handleCardClick}
       onKeyDown={handleCardKeyDown}
     >
@@ -708,24 +706,24 @@ function SwapOfferCard({
                 styles.badge,
                 swap.canAccept ? styles.badgeCan : styles.badgeCant,
               ].join(" ")}>
-                {swap.canAccept ? "Can" : "Can\u2019t"}
+                {swap.canAccept ? t("Can") : t("Can’t")}
               </span>
             ) : (
               <span className={[styles.badge, styles.badgeMuted].join(" ")}>
-                {swap.status === "accepted" ? "Accepted" : "Cancelled"}
+                {swap.status === "accepted" ? t("Accepted") : t("Cancelled")}
               </span>
             )}
             <span className={[
               styles.badge,
               swap.visibility === "private" ? styles.badgePrivate : "",
             ].filter(Boolean).join(" ")}>
-              {swap.visibility === "private" ? "Private" : "Public"}
+              {swap.visibility === "private" ? t("Private") : t("Public")}
             </span>
-            {isScheduleLocked ? <span className={[styles.badge, styles.badgeLocked].join(" ")}>Locked</span> : null}
+            {isScheduleLocked ? <span className={[styles.badge, styles.badgeLocked].join(" ")}>{t("Locked")}</span> : null}
           </div>
           <PinToggleButton
             isPinned={isPinned}
-            label={`${swap.scheduleName} swap`}
+            label={t("{0} swap", swap.scheduleName)}
             onToggle={() => onTogglePin(swap.id)}
           />
         </div>
@@ -739,24 +737,24 @@ function SwapOfferCard({
         <>
           <div className={styles.detailGrid}>
             <div className={styles.detailItem}>
-              <span>Location</span>
-              <strong>{swap.shopName || swap.containerName || "Schedule"}</strong>
+              <span>{t("Location")}</span>
+              <strong>{swap.shopName || swap.containerName || t("Schedule")}</strong>
             </div>
             <div className={styles.detailItem}>
-              <span>From</span>
+              <span>{t("From")}</span>
               <strong>{swap.fromEmployeeName}</strong>
             </div>
             <div className={styles.detailItem}>
-              <span>Target</span>
-              <strong>{swap.targetEmployeeName ?? "Everyone"}</strong>
+              <span>{t("Target")}</span>
+              <strong>{swap.targetEmployeeName ?? t("Everyone")}</strong>
             </div>
             <div className={styles.detailItem}>
-              <span>Shift hours</span>
+              <span>{t("Shift hours")}</span>
               <strong>{formatHours(swap.shiftHours)}</strong>
             </div>
             {swap.acceptedByEmployeeName ? (
               <div className={styles.detailItem}>
-                <span>Accepted by</span>
+                <span>{t("Accepted by")}</span>
                 <strong>{swap.acceptedByEmployeeName}</strong>
               </div>
             ) : null}
@@ -777,8 +775,7 @@ function SwapOfferCard({
                   disabled={isBusy}
                   onClick={() => onAccept(swap)}
                 >
-                  Accept
-                </button>
+                  {t("Accept")}</button>
               ) : null}
               {swap.canCancel ? (
                 <button
@@ -787,8 +784,7 @@ function SwapOfferCard({
                   disabled={isBusy}
                   onClick={() => onCancel(swap)}
                 >
-                  Cancel offer
-                </button>
+                  {t("Cancel offer")}</button>
               ) : null}
             </div>
           ) : null}
@@ -885,7 +881,7 @@ export function EmployeeSwapPage() {
 
     setSwapPinMutation.mutate(
       { swapId, pinned: true },
-      { onError: error => setActionError(getErrorMessage(error, "Could not pin this swap.")) },
+      { onError: error => setActionError(getErrorMessage(error, t("Could not pin this swap."))) },
     );
   };
 
@@ -893,7 +889,7 @@ export function EmployeeSwapPage() {
     if (pendingUnpinSwapId !== null) {
       setSwapPinMutation.mutate(
         { swapId: pendingUnpinSwapId, pinned: false },
-        { onError: error => setActionError(getErrorMessage(error, "Could not unpin this swap.")) },
+        { onError: error => setActionError(getErrorMessage(error, t("Could not unpin this swap."))) },
       );
     }
     setPendingUnpinSwapId(null);
@@ -901,7 +897,7 @@ export function EmployeeSwapPage() {
 
   const handleOpenSchedule = (schedule: EmployeeSchedule) => {
     if (schedule.allowSwap === false) {
-      setActionError(`Swaps are not allowed for “${schedule.name}”.`);
+      setActionError(t("Swaps are not allowed for “{0}”.", schedule.name));
       return;
     }
 
@@ -928,17 +924,17 @@ export function EmployeeSwapPage() {
     setActionError(null);
 
     if (!selectedSchedule || !selectedSlot) {
-      setActionError("Choose a published schedule and one of your shifts.");
+      setActionError(t("Choose a published schedule and one of your shifts."));
       return;
     }
 
     if (selectedSchedule.allowSwap === false) {
-      setActionError("Swaps are not allowed for this schedule.");
+      setActionError(t("Swaps are not allowed for this schedule."));
       return;
     }
 
     if (targetMode === "private" && !resolvedTargetEmployeeId) {
-      setActionError("Choose who should receive this private swap.");
+      setActionError(t("Choose who should receive this private swap."));
       return;
     }
 
@@ -955,7 +951,7 @@ export function EmployeeSwapPage() {
           setSelectedSlotId(null);
           setSelectedPeriod(null);
         },
-        onError: error => setActionError(getErrorMessage(error, "Could not create this swap offer.")),
+        onError: error => setActionError(getErrorMessage(error, t("Could not create this swap offer."))),
       },
     );
   };
@@ -963,20 +959,20 @@ export function EmployeeSwapPage() {
   const handleAccept = (swap: ShiftSwap) => {
     setActionError(null);
     acceptSwapMutation.mutate(swap.id, {
-      onError: error => setActionError(getErrorMessage(error, "Could not accept this swap offer.")),
+      onError: error => setActionError(getErrorMessage(error, t("Could not accept this swap offer."))),
     });
   };
 
   const handleCancel = (swap: ShiftSwap) => {
     setActionError(null);
     cancelSwapMutation.mutate(swap.id, {
-      onError: error => setActionError(getErrorMessage(error, "Could not cancel this swap offer.")),
+      onError: error => setActionError(getErrorMessage(error, t("Could not cancel this swap offer."))),
     });
   };
 
   return (
     <div className={workspaceStyles.page}>
-      {loadError ? <ErrorBanner dismissible={false}>{getErrorMessage(loadError, "Could not load swap data.")}</ErrorBanner> : null}
+      {loadError ? <ErrorBanner dismissible={false}>{getErrorMessage(loadError, t("Could not load swap data."))}</ErrorBanner> : null}
       {actionError ? <ErrorBanner dismissible={false}>{actionError}</ErrorBanner> : null}
 
       <section className={workspaceStyles.panel}>
@@ -986,14 +982,14 @@ export function EmployeeSwapPage() {
               <ShiftGiveAwayIcon size={20} />
             </span>
             <div>
-              <span className={workspaceStyles.panelEyebrow}>Give away a shift</span>
-              <h1 className={workspaceStyles.panelTitle}>Create a swap offer</h1>
+              <span className={workspaceStyles.panelEyebrow}>{t("Give away a shift")}</span>
+              <h1 className={workspaceStyles.panelTitle}>{t("Create a swap offer")}</h1>
             </div>
           </div>
 
           <CollapseToggleButton
             isExpanded={isGiveAwayExpanded}
-            label="give away a shift"
+            label={t("give away a shift")}
             onToggle={() => setIsGiveAwayExpanded(value => !value)}
           />
         </div>
@@ -1001,7 +997,7 @@ export function EmployeeSwapPage() {
         {isGiveAwayExpanded ? (
           <>
             {schedules.length === 0 ? (
-              <p className={styles.emptyText}>No published schedules are available for swap.</p>
+              <p className={styles.emptyText}>{t("No published schedules are available for swap.")}</p>
             ) : (
               <div className={styles.scheduleSwitcher}>
                 {schedules.map(schedule => {
@@ -1023,7 +1019,7 @@ export function EmployeeSwapPage() {
                       <span className={styles.scheduleButtonContent}>
                         <span className={styles.scheduleButtonName}>{schedule.name}</span>
                         <span className={styles.scheduleButtonMeta}>
-                          {`${schedule.shopName || `Shop ${schedule.shopId}`} / ${schedule.containerName || `Container ${schedule.containerId}`}${schedule.allowSwap === false ? " · Swaps disabled" : ""}`}
+                          {`${schedule.shopName || t("Shop {0}", schedule.shopId)} / ${schedule.containerName || t("Container {0}", schedule.containerId)}${schedule.allowSwap === false ? t(" · Swaps disabled") : ""}`}
                         </span>
                       </span>
                     </button>
@@ -1034,39 +1030,37 @@ export function EmployeeSwapPage() {
 
             {selectedSchedule && selectedSlot ? (
               <div className={styles.selectedShiftCard}>
-                <span>Selected shift</span>
+                <span>{t("Selected shift")}</span>
                 <strong>{buildOwnShiftLabel(selectedSchedule, selectedSlot, selectedPeriod)}</strong>
               </div>
             ) : (
-              <p className={styles.helperText}>Choose a schedule, then select one of your shifts from the dialog.</p>
+              <p className={styles.helperText}>{t("Choose a schedule, then select one of your shifts from the dialog.")}</p>
             )}
 
             <SwapStatisticsCard stats={swapPreviewStats} summary="Give away impact" collapsible defaultExpanded={false} />
 
             <div className={styles.formGrid}>
               <div className={`${styles.field} ${styles.fieldWide}`}>
-                <span className={styles.fieldLabel}>Receiver</span>
+                <span className={styles.fieldLabel}>{t("Receiver")}</span>
                 <div className={styles.segmentRow}>
                   <button
                     type="button"
                     className={[styles.segmentButton, targetMode === "public" ? styles.segmentButtonActive : ""].filter(Boolean).join(" ")}
                     onClick={() => setTargetMode("public")}
                   >
-                    Everyone
-                  </button>
+                    {t("Everyone")}</button>
                   <button
                     type="button"
                     className={[styles.segmentButton, targetMode === "private" ? styles.segmentButtonActive : ""].filter(Boolean).join(" ")}
                     onClick={() => setTargetMode("private")}
                   >
-                    Specific employee
-                  </button>
+                    {t("Specific employee")}</button>
                 </div>
               </div>
 
               {targetMode === "private" ? (
                 <div className={styles.field}>
-                  <span className={styles.fieldLabel}>Employee</span>
+                  <span className={styles.fieldLabel}>{t("Employee")}</span>
                   <EmployeeTargetCombobox
                     employees={sortedTargetEmployees}
                     selectedEmployeeId={resolvedTargetEmployeeId}
@@ -1088,7 +1082,7 @@ export function EmployeeSwapPage() {
                 }
                 onClick={handleCreateOffer}
               >
-                {createSwapMutation.isPending ? "Creating..." : "Offer shift"}
+                {createSwapMutation.isPending ? t("Creating...") : t("Offer shift")}
               </button>
             </div>
           </>
@@ -1114,8 +1108,8 @@ export function EmployeeSwapPage() {
             <SwapOffersIcon size={20} />
           </span>
           <div>
-            <span className={workspaceStyles.panelEyebrow}>Swap offers</span>
-            <h2 className={workspaceStyles.panelTitle}>Open swaps</h2>
+            <span className={workspaceStyles.panelEyebrow}>{t("Swap offers")}</span>
+            <h2 className={workspaceStyles.panelTitle}>{t("Open swaps")}</h2>
           </div>
         </div>
         <div className={styles.offerToolbar}>
@@ -1126,16 +1120,16 @@ export function EmployeeSwapPage() {
               className={styles.swapSearchInput}
               type="search"
               value={swapSearchQuery}
-              placeholder="Search employee, date or schedule"
-              aria-label="Search swaps by giver, receiver, date or schedule"
+              placeholder={t("Search employee, date or schedule")}
+              aria-label={t("Search swaps by giver, receiver, date or schedule")}
               onChange={event => setSwapSearchQuery(event.target.value)}
             />
             {hasSwapSearch ? (
               <button
                 type="button"
                 className={styles.clearSearchButton}
-                aria-label="Clear swap search"
-                title="Clear search"
+                aria-label={t("Clear swap search")}
+                title={t("Clear search")}
                 onClick={() => setSwapSearchQuery("")}
               >
                 <CloseIcon size={13} />
@@ -1143,7 +1137,7 @@ export function EmployeeSwapPage() {
             ) : null}
           </label>
           <span className={styles.searchResultText}>
-            {hasSwapSearch ? `${filteredOpenSwaps.length} of ${openSwaps.length}` : `${openSwaps.length} offers`}
+            {hasSwapSearch ? t("{0} of {1}", filteredOpenSwaps.length, openSwaps.length) : t("{0} offers", openSwaps.length)}
           </span>
         </div>
         <div className={[
@@ -1151,9 +1145,9 @@ export function EmployeeSwapPage() {
           filteredOpenSwaps.length >= 5 ? styles.offerListScrollable : "",
         ].filter(Boolean).join(" ")}>
           {openSwaps.length === 0 ? (
-            <p className={styles.emptyText}>No open swap offers right now.</p>
+            <p className={styles.emptyText}>{t("No open swap offers right now.")}</p>
           ) : filteredOpenSwaps.length === 0 ? (
-            <p className={styles.emptyText}>{`No open swap offers match "${swapSearchQuery.trim()}".`}</p>
+            <p className={styles.emptyText}>{t("No open swap offers match \"{0}\".", swapSearchQuery.trim())}</p>
           ) : filteredOpenSwaps.map(swap => (
             <SwapOfferCard
               key={swap.id}
@@ -1175,8 +1169,8 @@ export function EmployeeSwapPage() {
             <SwapHistoryIcon size={20} />
           </span>
           <div>
-            <span className={workspaceStyles.panelEyebrow}>History</span>
-            <h2 className={workspaceStyles.panelTitle}>Recent swap activity</h2>
+            <span className={workspaceStyles.panelEyebrow}>{t("History")}</span>
+            <h2 className={workspaceStyles.panelTitle}>{t("Recent swap activity")}</h2>
           </div>
         </div>
         <div className={[
@@ -1184,7 +1178,7 @@ export function EmployeeSwapPage() {
           swapHistory.length >= 5 ? styles.offerListScrollable : "",
         ].filter(Boolean).join(" ")}>
           {swapHistory.length === 0 ? (
-            <p className={styles.emptyText}>Accepted and cancelled swaps will appear here.</p>
+            <p className={styles.emptyText}>{t("Accepted and cancelled swaps will appear here.")}</p>
           ) : swapHistory.map(swap => (
             <SwapOfferCard
               key={swap.id}
@@ -1203,8 +1197,8 @@ export function EmployeeSwapPage() {
       <ConfirmDialog
         open={pendingUnpinSwapId !== null}
         variant="confirm"
-        title="Unpin swap?"
-        message={`Remove ${pendingUnpinSwap?.scheduleName ?? "this swap"} from your pinned swaps?`}
+        title={t("Unpin swap?")}
+        message={t("Remove {0} from your pinned swaps?", pendingUnpinSwap?.scheduleName ?? "this swap")}
         confirmText="Unpin"
         onCancel={() => setPendingUnpinSwapId(null)}
         onConfirm={handleConfirmUnpin}

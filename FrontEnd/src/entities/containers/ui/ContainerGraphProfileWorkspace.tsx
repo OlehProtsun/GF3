@@ -1,3 +1,4 @@
+import { dateTimeFormat, t } from "@shared/i18n";
 import { Fragment, useEffect, useState } from "react";
 import type { CSSProperties } from "react";
 import type { AvailabilityGroup } from "@entities/availability-groups/model/types";
@@ -77,14 +78,14 @@ function getGraphInitials(graph?: Graph | null) {
 }
 
 function getGraphMonthLabel(year: number, month: number) {
-  return new Intl.DateTimeFormat("en-US", {
+  return dateTimeFormat("en-US", {
     month: "long",
     timeZone: "UTC",
   }).format(new Date(Date.UTC(year, month - 1, 1)));
 }
 
 function formatGraphHintDateLabel(year: number, month: number, dayOfMonth: number) {
-  return new Intl.DateTimeFormat("en-GB", {
+  return dateTimeFormat("en-GB", {
     day: "2-digit",
     month: "short",
     year: "numeric",
@@ -178,11 +179,11 @@ export function ContainerGraphProfileWorkspace({
   }, []);
 
   if (isLoading) {
-    return <div className={styles.state}>Loading schedule profile...</div>;
+    return <div className={styles.state}>{t("Loading schedule profile...")}</div>;
   }
 
   if (hasLoadError || !graph) {
-    return <ErrorBanner className={styles.banner}>Could not load this schedule.</ErrorBanner>;
+    return <ErrorBanner className={styles.banner}>{t("Could not load this schedule.")}</ErrorBanner>;
   }
 
   const parsedGraphNote = parseGraphNoteContent(graph.note);
@@ -261,24 +262,24 @@ export function ContainerGraphProfileWorkspace({
       : null;
   const activeHintEmployeeName =
     activeRelatedHint
-      ? getEmployeeFullName(employeesById?.get(activeRelatedHint.employeeId), `Employee ${activeRelatedHint.employeeId}`)
+      ? getEmployeeFullName(employeesById?.get(activeRelatedHint.employeeId), t("Employee {0}", activeRelatedHint.employeeId))
       : "";
   const activeHintDayLabel =
     activeRelatedHint
       ? formatGraphHintDateLabel(graph.year, graph.month, activeRelatedHint.dayOfMonth)
       : "";
   const scheduleDetails = [
-    { key: "month", label: "Month", value: getGraphMonthLabel(graph.year, graph.month) },
-    { key: "year", label: "Year", value: String(graph.year) },
-    { key: "shop", label: "Shop", value: shop?.name ?? `Shop ${graph.shopId}` },
-    { key: "status", label: "Status", value: graph.publicationStatus === "public" ? "Public" : "Private" },
-    { key: "people", label: "People on Shift", value: String(graph.peoplePerShift) },
-    { key: "shift1", label: "Shift1", value: graph.shift1Time },
-    { key: "shift2", label: "Shift2", value: graph.shift2Time },
-    { key: "max-days", label: "Max Consecutive Days", value: String(graph.maxConsecutiveDays) },
-    { key: "max-consecutive-full", label: "Max Consecutive Full", value: String(graph.maxConsecutiveFull) },
-    { key: "max-full", label: "Max Full", value: String(graph.maxFullPerMonth) },
-    { key: "availability", label: "Availability", value: availabilityGroup?.name ?? "None" },
+    { key: "month", label: t("Month"), value: getGraphMonthLabel(graph.year, graph.month) },
+    { key: "year", label: t("Year"), value: String(graph.year) },
+    { key: "shop", label: t("Shop"), value: shop?.name ?? t("Shop {0}", graph.shopId) },
+    { key: "status", label: t("Status"), value: graph.publicationStatus === "public" ? t("Public") : t("Private") },
+    { key: "people", label: t("People on Shift"), value: String(graph.peoplePerShift) },
+    { key: "shift1", label: t("Shift1"), value: graph.shift1Time },
+    { key: "shift2", label: t("Shift2"), value: graph.shift2Time },
+    { key: "max-days", label: t("Max Consecutive Days"), value: String(graph.maxConsecutiveDays) },
+    { key: "max-consecutive-full", label: t("Max Consecutive Full"), value: String(graph.maxConsecutiveFull) },
+    { key: "max-full", label: t("Max Full"), value: String(graph.maxFullPerMonth) },
+    { key: "availability", label: t("Availability"), value: availabilityGroup?.name ?? t("None") },
   ] as const;
   const matrixCardShellStyle =
     shouldPreserveMatrixHeight
@@ -315,12 +316,12 @@ export function ContainerGraphProfileWorkspace({
       enableSelectionWhenReadOnly
       selectedCellKeys={selectedCellKeys}
       onSelectedCellKeysChange={setSelectedCellKeys}
-      helperText="This schedule is read-only. Open edit to update details, assigned employees, matrix values or cell styles."
+      helperText={t("This schedule is read-only. Open edit to update details, assigned employees, matrix values or cell styles.")}
       onVisualHintClick={detail => setActiveRelatedHintCellKey(`${detail.employeeId}:${detail.dayOfMonth}`)}
       headerRightSlot={
         <div className={styles.badges}>
-          <span className={styles.badge}>{`Total Employees: ${totals.totalEmployees}`}</span>
-          <span className={styles.badge}>{`Total Hours: ${totals.totalHoursText}`}</span>
+          <span className={styles.badge}>{t("Total Employees: {0}", totals.totalEmployees)}</span>
+          <span className={styles.badge}>{t("Total Hours: {0}", totals.totalHoursText)}</span>
         </div>
       }
     />
@@ -332,7 +333,7 @@ export function ContainerGraphProfileWorkspace({
         <div className={joinClassNames(styles.topRow, isSidebarCollapsed && styles.topRowCollapsed)}>
           <aside className={joinClassNames(styles.sidebar, isSidebarCollapsed && styles.sidebarCollapsed)}>
           <AvailabilitySidebarSection
-            label="Schedule Information"
+            label={t("Schedule Information")}
             preserveCollapsedOnMobile
             collapsed={isSidebarCollapsed}
             collapsedOffset="flush"
@@ -341,11 +342,11 @@ export function ContainerGraphProfileWorkspace({
             <div className={styles.summaryCardMeasure}>
               <CardSection
                 className={styles.summaryCard}
-                title="Schedule Information"
+                title={t("Schedule Information")}
                 icon={<ScheduleDetailsIcon size={18} />}
                 headerRightSlot={
                   <AvailabilitySidebarCollapseButton
-                    label="Schedule Information"
+                    label={t("Schedule Information")}
                     onCollapse={() => setIsSidebarCollapsed(true)}
                   />
                 }
@@ -362,13 +363,13 @@ export function ContainerGraphProfileWorkspace({
                   </div>
 
                   <div className={joinClassNames(styles.scheduleNote, !hasNote && styles.scheduleNoteEmpty)}>
-                    <span className={styles.scheduleInfoLabel}>Note</span>
+                    <span className={styles.scheduleInfoLabel}>{t("Note")}</span>
                     <div className={styles.scheduleNoteValue}>
-                      {note || <span className={styles.mutedValue}>No notes yet.</span>}
+                      {note || <span className={styles.mutedValue}>{t("No notes yet.")}</span>}
                     </div>
                   </div>
 
-                  <div className={styles.scheduleInfoLabels} role="group" aria-label="Schedule details">
+                  <div className={styles.scheduleInfoLabels} role="group" aria-label={t("Schedule details")}>
                     {scheduleDetails.map(item => (
                       <div key={item.key} className={styles.scheduleInfoItem}>
                         <span className={styles.scheduleInfoLabel}>{item.label}</span>
@@ -388,11 +389,10 @@ export function ContainerGraphProfileWorkspace({
                     ))}
                   </div>
 
-                  <div className={styles.lastUpdateField} aria-label={`Last Update: ${lastUpdateLabel}`}>
+                  <div className={styles.lastUpdateField} aria-label={t("Last Update: {0}", lastUpdateLabel)}>
                     <span className={styles.lastUpdateLabel}>
                       <span className={styles.lastUpdateDot} aria-hidden="true" />
-                      Last Update
-                    </span>
+                      {t("Last Update")}</span>
                     <strong className={styles.lastUpdateValue}>
                       {graph.lastUpdatedAtUtc ? (
                         <time dateTime={graph.lastUpdatedAtUtc}>{lastUpdateLabel}</time>
@@ -401,9 +401,9 @@ export function ContainerGraphProfileWorkspace({
                   </div>
 
                   <div className={styles.scheduleInfoActions}>
-                    {showEditAction ? <IosButton label="Edit Schedule" onClick={onEdit} /> : null}
+                    {showEditAction ? <IosButton label={t("Edit Schedule")} onClick={onEdit} /> : null}
                     <IosButton
-                      label={isDeleting ? "Deleting..." : "Delete Schedule"}
+                      label={isDeleting ? t("Deleting...") : t("Delete Schedule")}
                       variant="secondary"
                       customColor="#ef4444"
                       customBorderColor="#ef4444"
@@ -429,7 +429,7 @@ export function ContainerGraphProfileWorkspace({
         </div>
         <CardSection
           className={styles.summaryCardSection}
-          title="Schedule Summary"
+          title={t("Schedule Summary")}
           icon={<InformationIcon size={18} />}
           headerRightSlot={
             <div className={styles.summaryHeaderActions}>
@@ -442,35 +442,34 @@ export function ContainerGraphProfileWorkspace({
                     type="search"
                     value={summarySearchQuery}
                     onChange={event => setSummarySearchQuery(event.target.value)}
-                    placeholder="Search by name or surname"
-                    aria-label="Search schedule summary by employee name or surname"
+                    placeholder={t("Search by name or surname")}
+                    aria-label={t("Search schedule summary by employee name or surname")}
                   />
                 </label>
               ) : null}
               <div className={styles.summaryMeta}>
-                <span className={styles.metaBadge}>{`Employees: ${totals.totalEmployees}`}</span>
-                <span className={styles.metaBadge}>{`Hours: ${totals.totalHoursText}`}</span>
+                <span className={styles.metaBadge}>{t("Employees: {0}", totals.totalEmployees)}</span>
+                <span className={styles.metaBadge}>{t("Hours: {0}", totals.totalHoursText)}</span>
               </div>
             </div>
           }
         >
           {summaryRows.length === 0 ? (
             <div className={styles.emptyState}>
-              No employee schedule rows yet. Generate a schedule or assign matrix intervals to see the summary.
-            </div>
+              {t("No employee schedule rows yet. Generate a schedule or assign matrix intervals to see the summary.")}</div>
           ) : showSummarySearchEmpty ? (
             <div className={styles.emptyState} role="status">
-              {`No employees found for "${summarySearchQuery.trim()}".`}
+              {t("No employees found for \"{0}\".", summarySearchQuery.trim())}
             </div>
           ) : (
             <div className={styles.summaryTableScroll}>
               <table className={styles.summaryTable}>
                 <thead>
                   <tr>
-                    <th rowSpan={2} className={joinClassNames(styles.stickyColumn, styles.employeeColumn)}>Employee</th>
-                    <th rowSpan={2} className={joinClassNames(styles.stickyColumnSecondary, styles.statColumn)}>Work Days</th>
-                    <th rowSpan={2} className={joinClassNames(styles.stickyColumnTertiary, styles.statColumn)}>Free Days</th>
-                    <th rowSpan={2} className={joinClassNames(styles.stickyColumnQuaternary, styles.statColumn)}>Sum</th>
+                    <th rowSpan={2} className={joinClassNames(styles.stickyColumn, styles.employeeColumn)}>{t("Employee")}</th>
+                    <th rowSpan={2} className={joinClassNames(styles.stickyColumnSecondary, styles.statColumn)}>{t("Work Days")}</th>
+                    <th rowSpan={2} className={joinClassNames(styles.stickyColumnTertiary, styles.statColumn)}>{t("Free Days")}</th>
+                    <th rowSpan={2} className={joinClassNames(styles.stickyColumnQuaternary, styles.statColumn)}>{t("Sum")}</th>
                     {summaryHeaders.map(header => (
                       <th key={header.dayOfMonth} colSpan={3}>{header.label}</th>
                     ))}
@@ -478,9 +477,9 @@ export function ContainerGraphProfileWorkspace({
                   <tr>
                     {summaryHeaders.map(header => (
                       <Fragment key={`${header.dayOfMonth}-subcolumns`}>
-                        <th className={styles.subColumn}>From</th>
-                        <th className={styles.subColumn}>To</th>
-                        <th className={styles.subColumn}>Hours</th>
+                        <th className={styles.subColumn}>{t("From")}</th>
+                        <th className={styles.subColumn}>{t("To")}</th>
+                        <th className={styles.subColumn}>{t("Hours")}</th>
                       </Fragment>
                     ))}
                   </tr>

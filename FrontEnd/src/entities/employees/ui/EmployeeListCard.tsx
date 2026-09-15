@@ -1,3 +1,4 @@
+import { t } from "@shared/i18n";
 import type { Employee } from "@entities/employees/model/types";
 import {
   getEmployeeContactState,
@@ -39,7 +40,7 @@ export function EmployeeListCard({
   );
 
   const addEmployeeAction = (
-    <IosButton label="Add New" icon={<PlusIcon size={18} />} onClick={onAddEmployee} />
+    <IosButton label={t("Add New")} icon={<PlusIcon size={18} />} onClick={onAddEmployee} />
   );
 
   return (
@@ -54,9 +55,9 @@ export function EmployeeListCard({
       emptyDescription="Start by creating your first employee record."
       emptyAction={addEmployeeAction}
       searchEmptyTitle="Nothing found"
-      searchEmptyDescription={`No employee matches "${searchQuery}".`}
+      searchEmptyDescription={t("No employee matches \"{0}\".", searchQuery)}
       searchEmptyAction={
-        <IosButton label="Clear Search" variant="secondary" onClick={onClearSearch} />
+        <IosButton label={t("Clear Search")} variant="secondary" onClick={onClearSearch} />
       }
     >
       <RecordGrid className={styles.grid}>
@@ -68,18 +69,18 @@ export function EmployeeListCard({
           const metaItems: RecordTileMetaItem[] = [
             {
               key: "username",
-              label: "Login",
-              value: employee.username ?? "Not created",
+              label: t("Login"),
+              value: employee.username ?? t("Not created"),
             },
             {
               key: "email",
-              label: "Email",
-              value: employee.email ?? "Not provided",
+              label: t("Email"),
+              value: employee.email ?? t("Not provided"),
             },
             {
               key: "phone",
-              label: "Phone",
-              value: employee.phone ?? "Not provided",
+              label: t("Phone"),
+              value: employee.phone ?? t("Not provided"),
             },
           ];
 
@@ -94,9 +95,9 @@ export function EmployeeListCard({
               metaItems={metaItems}
               isPinned={isPinned}
               onTogglePin={() => togglePin(employee.id)}
-              pinLabel={isPinned ? `Unpin ${fullName}` : `Pin ${fullName}`}
+              pinLabel={isPinned ? t("Unpin {0}", fullName) : t("Pin {0}", fullName)}
               onClick={() => onEmployeeOpen(employee.id)}
-              ariaLabel={`Open ${fullName} profile`}
+              ariaLabel={t("Open {0} profile", fullName)}
             />
           );
         })}

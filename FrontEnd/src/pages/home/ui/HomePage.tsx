@@ -1,3 +1,5 @@
+import { dateTimeFormat } from "@shared/i18n";
+import { t } from "@shared/i18n";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
@@ -15,7 +17,7 @@ import {
 import { loadHomeDashboard, type HomeDashboardData } from "./homeDashboard";
 import styles from "./HomePage.module.css";
 
-const CURRENT_TIME_FORMATTER = new Intl.DateTimeFormat("en-GB", {
+const CURRENT_TIME_FORMATTER = dateTimeFormat("en-GB", {
   hour: "2-digit",
   minute: "2-digit",
   day: "2-digit",
@@ -29,7 +31,7 @@ const EMPTY_HOME_DASHBOARD: HomeDashboardData = {
   totalContainersCount: 0,
   todayAssignmentsCount: 0,
   activeShopsCount: 0,
-  currentMonthContainerName: "No active containers",
+  get currentMonthContainerName() { return t("No active containers"); },
   currentMonthLabel: "",
   currentMonthScheduleNames: [],
   currentMonthShopNames: [],
@@ -39,7 +41,7 @@ const EMPTY_HOME_DASHBOARD: HomeDashboardData = {
   currentMonthTotalHoursText: "0h 00m",
   currentMonthTotalShops: 0,
   todayActiveEmployeesCount: 0,
-  statusText: "Loading home data...",
+  get statusText() { return t("Loading home data..."); },
   todayRows: [],
   activeSchedules: [],
 };
@@ -79,7 +81,7 @@ function formatCurrentTimeText() {
 }
 
 function formatGraphHintDateLabel(year: number, month: number, dayOfMonth: number) {
-  return new Intl.DateTimeFormat("en-GB", {
+  return dateTimeFormat("en-GB", {
     day: "2-digit",
     month: "short",
     year: "numeric",
@@ -183,7 +185,7 @@ export function HomePage() {
     : null;
   const activeRelatedHintEmployeeName = activeRelatedHint
     ? activeRelatedHintSchedule?.columns.find(column => column.employeeId === activeRelatedHint.employeeId)?.label
-      ?? `Employee ${activeRelatedHint.employeeId}`
+      ?? t("Employee {0}", activeRelatedHint.employeeId)
     : "";
   const activeRelatedHintDayLabel = activeRelatedHint && activeRelatedHintSchedule
     ? formatGraphHintDateLabel(
@@ -263,11 +265,11 @@ export function HomePage() {
   return (
     <div className={styles.page}>
       <PageHeader
-        title="Home"
-        subtitle="Overview of current-month schedules and assignments."
+        title={t("Home")}
+        subtitle={t("Overview of current-month schedules and assignments.")}
         rightSlot={(
           <div className={styles.clockPanel}>
-            <span className={styles.clockLabel}>Current time</span>
+            <span className={styles.clockLabel}>{t("Current time")}</span>
             <strong className={styles.clockValue}>{currentTimeText}</strong>
           </div>
         )}
@@ -275,37 +277,36 @@ export function HomePage() {
 
       {homeQuery.error ? (
         <ErrorBanner className={styles.banner}>
-          Could not load the home dashboard.
-        </ErrorBanner>
+          {t("Could not load the home dashboard.")}</ErrorBanner>
       ) : null}
 
       <div className={styles.topGrid}>
         <CardSection
           className={styles.todayCard}
-          title="Who Works Today?"
+          title={t("Who Works Today?")}
           icon={<AvailabilityIcon size={18} />}
           headerRightSlot={
             !isInitialLoading ? (
               <span className={styles.sectionBadge}>
-                {`${homeData.todayActiveEmployeesCount} active employees`}
+                {t("{0} active employees", homeData.todayActiveEmployeesCount)}
               </span>
             ) : null
           }
         >
           {isInitialLoading ? (
-            <div className={styles.stateBlock}>Loading current-day assignments...</div>
+            <div className={styles.stateBlock}>{t("Loading current-day assignments...")}</div>
           ) : homeData.todayRows.length === 0 ? (
-            <div className={styles.stateBlock}>No assignments for today in the current month.</div>
+            <div className={styles.stateBlock}>{t("No assignments for today in the current month.")}</div>
           ) : (
             <div className={styles.tableShell}>
               <div className={styles.tableScroll}>
                 <table className={styles.todayTable}>
                   <thead>
                     <tr>
-                      <th>Date</th>
-                      <th>Employee</th>
-                      <th>Shift</th>
-                      <th>Shop</th>
+                      <th>{t("Date")}</th>
+                      <th>{t("Employee")}</th>
+                      <th>{t("Shift")}</th>
+                      <th>{t("Shop")}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -317,8 +318,8 @@ export function HomePage() {
                             type="button"
                             className={styles.employeeFocusButton}
                             onClick={() => handleTodayEmployeeClick(row.graphId)}
-                            aria-label={`Show ${row.employee}'s schedule`}
-                            title="Show schedule on this page"
+                            aria-label={t("Show {0}'s schedule", row.employee)}
+                            title={t("Show schedule on this page")}
                           >
                             {row.employee}
                           </button>
@@ -337,16 +338,16 @@ export function HomePage() {
         <div className={styles.sideColumn}>
           <CardSection
             className={styles.monthCard}
-            title="This Month"
+            title={t("This Month")}
             icon={<ScheduleDetailsIcon size={18} />}
             headerRightSlot={(
               <button
                 type="button"
                 className={`${styles.matrixIconButton} ${styles.collapseButton}`}
-                aria-label={isMonthDetailsExpanded ? "Collapse this month details" : "Expand this month details"}
+                aria-label={isMonthDetailsExpanded ? t("Collapse this month details") : t("Expand this month details")}
                 aria-expanded={isMonthDetailsExpanded}
                 aria-controls="home-month-details"
-                title={isMonthDetailsExpanded ? "Collapse details" : "Expand details"}
+                title={isMonthDetailsExpanded ? t("Collapse details") : t("Expand details")}
                 onClick={() => setIsMonthDetailsExpanded(current => !current)}
               >
                 <ArrowIcon size={13} />
@@ -356,15 +357,15 @@ export function HomePage() {
             <div className={styles.monthContent}>
               <div className={styles.summaryHeader}>
                 <div className={styles.summaryCard}>
-                  <span className={styles.summaryLabel}>Date</span>
+                  <span className={styles.summaryLabel}>{t("Date")}</span>
                   <strong className={styles.summaryValue}>
-                    {isInitialLoading ? "Loading..." : homeData.currentMonthLabel || "Current month"}
+                    {isInitialLoading ? t("Loading...") : homeData.currentMonthLabel || t("Current month")}
                   </strong>
                 </div>
                 <div className={styles.summaryCard}>
-                  <span className={styles.summaryLabel}>Container focus</span>
+                  <span className={styles.summaryLabel}>{t("Container focus")}</span>
                   <strong className={styles.summaryValue}>
-                    {isInitialLoading ? "Loading..." : homeData.currentMonthContainerName}
+                    {isInitialLoading ? t("Loading...") : homeData.currentMonthContainerName}
                   </strong>
                 </div>
               </div>
@@ -380,40 +381,40 @@ export function HomePage() {
               >
                 <div className={styles.collapsibleInner}>
                   {isInitialLoading ? (
-                    <div className={styles.compactStateBlock}>Loading month overview...</div>
+                    <div className={styles.compactStateBlock}>{t("Loading month overview...")}</div>
                   ) : (
                     <div className={styles.monthDetails}>
                       <div className={styles.totalGrid}>
                         <div className={styles.totalCard}>
-                          <span className={styles.totalLabel}>Total hours</span>
+                          <span className={styles.totalLabel}>{t("Total hours")}</span>
                           <strong className={styles.totalValue}>{homeData.currentMonthTotalHoursText}</strong>
                         </div>
                         <div className={styles.totalCard}>
-                          <span className={styles.totalLabel}>Employees</span>
+                          <span className={styles.totalLabel}>{t("Employees")}</span>
                           <strong className={styles.totalValue}>{homeData.currentMonthTotalEmployees}</strong>
                         </div>
                         <div className={styles.totalCard}>
-                          <span className={styles.totalLabel}>Schedules</span>
+                          <span className={styles.totalLabel}>{t("Schedules")}</span>
                           <strong className={styles.totalValue}>{homeData.currentMonthTotalSchedules}</strong>
                         </div>
                         <div className={styles.totalCard}>
-                          <span className={styles.totalLabel}>Shops</span>
+                          <span className={styles.totalLabel}>{t("Shops")}</span>
                           <strong className={styles.totalValue}>{homeData.currentMonthTotalShops}</strong>
                         </div>
                       </div>
 
                       <HomePillList
-                        title="Schedules in this month"
+                        title={t("Schedules in this month")}
                         items={homeData.currentMonthScheduleNames}
                         emptyLabel="No schedules yet."
                       />
                       <HomePillList
-                        title="Shops in this month"
+                        title={t("Shops in this month")}
                         items={homeData.currentMonthShopNames}
                         emptyLabel="No shops connected yet."
                       />
                       <HomePillList
-                        title="Employees in this month"
+                        title={t("Employees in this month")}
                         items={homeData.currentMonthEmployeeNames}
                         emptyLabel="No assigned employees yet."
                       />
@@ -431,30 +432,28 @@ export function HomePage() {
         className={styles.activeSchedulesCard}
         headerClassName={styles.activeSchedulesHeader}
         headerRightClassName={styles.activeSchedulesHeaderRight}
-        title="Active Schedules This Month"
+        title={t("Active Schedules This Month")}
         icon={<ScheduleDetailsIcon size={18} />}
         headerRightSlot={
           !isInitialLoading ? (
             <div className={styles.schedulesHeaderActions}>
-              <span className={styles.sectionBadge}>{`${homeData.activeSchedules.length} previews`}</span>
+              <span className={styles.sectionBadge}>{t("{0} previews", homeData.activeSchedules.length)}</span>
               {homeData.activeSchedules.length > 0 ? (
-                <div className={styles.bulkControls} role="group" aria-label="Schedule preview controls">
+                <div className={styles.bulkControls} role="group" aria-label={t("Schedule preview controls")}>
                   <button
                     type="button"
                     className={styles.bulkButton}
                     onClick={() => setExpandedScheduleIds(new Set(activeScheduleIds))}
                     disabled={allSchedulesExpanded}
                   >
-                    Expand all
-                  </button>
+                    {t("Expand all")}</button>
                   <button
                     type="button"
                     className={styles.bulkButton}
                     onClick={() => setExpandedScheduleIds(new Set())}
                     disabled={!hasExpandedSchedules}
                   >
-                    Collapse all
-                  </button>
+                    {t("Collapse all")}</button>
                 </div>
               ) : null}
             </div>
@@ -462,9 +461,9 @@ export function HomePage() {
         }
       >
         {isInitialLoading ? (
-          <div className={styles.stateBlock}>Building active schedule previews...</div>
+          <div className={styles.stateBlock}>{t("Building active schedule previews...")}</div>
         ) : homeData.activeSchedules.length === 0 ? (
-          <div className={styles.stateBlock}>No active schedules found for the current month.</div>
+          <div className={styles.stateBlock}>{t("No active schedules found for the current month.")}</div>
         ) : (
           <div className={styles.scheduleGrid}>
             {homeData.activeSchedules.map(schedule => {
@@ -495,14 +494,14 @@ export function HomePage() {
                     </div>
 
                     <div className={styles.matrixHeaderActions}>
-                      <span className={styles.matrixBadge}>{`Employees: ${schedule.totals.totalEmployees}`}</span>
-                      <span className={styles.matrixBadge}>{`Hours: ${schedule.totals.totalHoursText}`}</span>
+                      <span className={styles.matrixBadge}>{t("Employees: {0}", schedule.totals.totalEmployees)}</span>
+                      <span className={styles.matrixBadge}>{t("Hours: {0}", schedule.totals.totalHoursText)}</span>
                       <button
                         type="button"
                         className={styles.matrixIconButton}
                         onClick={() => navigate(schedule.route)}
-                        aria-label="Open schedule"
-                        title="Open schedule"
+                        aria-label={t("Open schedule")}
+                        title={t("Open schedule")}
                       >
                         <EyeIcon size={16} />
                       </button>
@@ -516,8 +515,8 @@ export function HomePage() {
 
                           navigate(`/container?openContainerId=${schedule.container.id}`);
                         }}
-                        aria-label="Open container"
-                        title="Open container"
+                        aria-label={t("Open container")}
+                        title={t("Open container")}
                         disabled={!schedule.container}
                       >
                         <ContainerIcon size={16} />
@@ -526,10 +525,10 @@ export function HomePage() {
                         type="button"
                         className={`${styles.matrixIconButton} ${styles.collapseButton}`}
                         onClick={() => handleScheduleToggle(schedule.graph.id)}
-                        aria-label={isExpanded ? `Collapse ${schedule.graph.name}` : `Expand ${schedule.graph.name}`}
+                        aria-label={isExpanded ? t("Collapse {0}", schedule.graph.name) : t("Expand {0}", schedule.graph.name)}
                         aria-expanded={isExpanded}
                         aria-controls={contentId}
-                        title={isExpanded ? "Collapse schedule" : "Expand schedule"}
+                        title={isExpanded ? t("Collapse schedule") : t("Expand schedule")}
                       >
                         <ArrowIcon size={13} />
                       </button>

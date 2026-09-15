@@ -1,3 +1,6 @@
+import { getLanguage } from "@shared/i18n";
+import { dateTimeFormat } from "@shared/i18n";
+import { t } from "@shared/i18n";
 import type { Employee } from "@entities/employees/model/types";
 import { getEmployeeFullName } from "@entities/employees/model/presentation";
 import { parseFlexibleTimeSegment } from "@shared/lib/timeRange";
@@ -140,7 +143,7 @@ function getGraphDate(year: number, month: number, dayOfMonth: number) {
 
 export function getGraphWeekdayLabel(year: number, month: number, dayOfMonth: number) {
   const weekdayIndex = getGraphDate(year, month, dayOfMonth).getDay();
-  const weekdayLabels = ["su", "mo", "tu", "we", "th", "fr", "sa"];
+  const weekdayLabels = getLanguage() === "pl" ? ["nd", "pn", "wt", "śr", "cz", "pt", "so"] : ["su", "mo", "tu", "we", "th", "fr", "sa"];
   return `${weekdayLabels[weekdayIndex]}.`;
 }
 
@@ -151,7 +154,7 @@ export function isGraphWeekend(year: number, month: number, dayOfMonth: number) 
 
 export function formatGraphMonthYear(year: number, month: number) {
   const date = new Date(Date.UTC(clampGraphYear(year), clampGraphMonth(month) - 1, 1));
-  return new Intl.DateTimeFormat("en-US", {
+  return dateTimeFormat("en-US", {
     month: "long",
     year: "numeric",
     timeZone: "UTC",
@@ -582,18 +585,18 @@ export function tryParseGraphIntervals(input: string):
       .filter(Boolean);
 
     if (segments.length !== 2) {
-      return { ok: false, error: "Use time ranges like 09:00 - 15:00. Comma-separated ranges are allowed." };
+      return { ok: false, error: t("Use time ranges like 09:00 - 15:00. Comma-separated ranges are allowed.") };
     }
 
     const from = normalizeGraphTime(segments[0]);
     const to = normalizeGraphTime(segments[1]);
 
     if (!from || !to) {
-      return { ok: false, error: "Use time ranges like 09:00 - 15:00." };
+      return { ok: false, error: t("Use time ranges like 09:00 - 15:00.") };
     }
 
     if ((parseGraphTimeMinutes(to) ?? 0) <= (parseGraphTimeMinutes(from) ?? 0)) {
-      return { ok: false, error: "From must be earlier than To." };
+      return { ok: false, error: t("From must be earlier than To.") };
     }
 
     const key = `${from}:${to}`;
@@ -762,7 +765,7 @@ export function buildGraphSummaryHeaders(year: number, month: number) {
   return Array.from({ length: daysInMonth }, (_, index) => {
     const dayOfMonth = index + 1;
     const date = getGraphDate(year, month, dayOfMonth);
-    const weekday = new Intl.DateTimeFormat("en-US", {
+    const weekday = dateTimeFormat("en-US", {
       weekday: "short",
       timeZone: "UTC",
     }).format(date);
@@ -1200,7 +1203,7 @@ function formatSummaryMinutes(totalMinutes: number) {
 }
 
 function getEmployeeLabel(employeeId: number, employeesById?: Map<number, Employee>) {
-  return getEmployeeFullName(employeesById?.get(employeeId), `Employee ${employeeId}`);
+  return getEmployeeFullName(employeesById?.get(employeeId), t("Employee {0}", employeeId));
 }
 
 function containsAlphabeticCharacter(value: string) {

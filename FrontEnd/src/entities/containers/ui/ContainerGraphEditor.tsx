@@ -1,3 +1,4 @@
+import { dateTimeFormat, t } from "@shared/i18n";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import type { Employee } from "@entities/employees/model/types";
 import { getEmployeeFullName } from "@entities/employees/model/presentation";
@@ -211,7 +212,7 @@ function joinClassNames(...values: Array<string | undefined | false>) {
 }
 
 function formatGraphHintDateLabel(year: number, month: number, dayOfMonth: number) {
-  return new Intl.DateTimeFormat("en-GB", {
+  return dateTimeFormat("en-GB", {
     day: "2-digit",
     month: "short",
     year: "numeric",
@@ -219,13 +220,13 @@ function formatGraphHintDateLabel(year: number, month: number, dayOfMonth: numbe
   }).format(new Date(Date.UTC(year, month - 1, dayOfMonth)));
 }
 
-const shiftSwapLogDayFormatter = new Intl.DateTimeFormat("en-GB", {
+const shiftSwapLogDayFormatter = dateTimeFormat("en-GB", {
   day: "2-digit",
   month: "short",
   timeZone: "UTC",
 });
 
-const shiftSwapLogAcceptedAtFormatter = new Intl.DateTimeFormat("en-GB", {
+const shiftSwapLogAcceptedAtFormatter = dateTimeFormat("en-GB", {
   day: "2-digit",
   month: "short",
   hour: "2-digit",
@@ -248,7 +249,7 @@ function formatShiftSwapLogHours(value: number) {
 
 function formatShiftSwapAcceptedAt(value?: string | null) {
   if (!value) {
-    return "Unknown";
+    return t("Unknown");
   }
 
   return shiftSwapLogAcceptedAtFormatter.format(new Date(value));
@@ -298,7 +299,7 @@ function SplitColorButton({
         type="button"
         className={styles.splitColorPicker}
         disabled={pickerDisabled}
-        aria-label={`Open ${label.toLowerCase()} color palette`}
+        aria-label={t("Open {0} color palette", label.toLowerCase())}
         onClick={onOpenDialog}
       >
         <span className={styles.splitColorDots} aria-hidden="true" />
@@ -338,7 +339,7 @@ function PreviewLayoutButton({ mode, active, onClick }: PreviewLayoutButtonProps
       type="button"
       className={joinClassNames(styles.previewLayoutButton, active && styles.previewLayoutButtonActive)}
       aria-pressed={active}
-      aria-label={mode === "side" ? "Show Availability Preview on the right" : "Show Availability Preview below"}
+      aria-label={mode === "side" ? t("Show Availability Preview on the right") : t("Show Availability Preview below")}
       onClick={onClick}
     >
       <span
@@ -511,7 +512,7 @@ export function ContainerGraphEditor({
     setIsSwapColorDialogOpen(false);
     setSwapColorError(null);
     saveSwapHighlightSettingMutation.mutate({ containerId: graphContainerId, graphId, highlightColor }, {
-      onError: error => setSwapColorError(getErrorMessage(error, "Could not save the accepted swap highlight color.")),
+      onError: error => setSwapColorError(getErrorMessage(error, t("Could not save the accepted swap highlight color."))),
     });
   };
 
@@ -620,11 +621,11 @@ export function ContainerGraphEditor({
   );
 
   if (isLoading) {
-    return <div className={styles.state}>Loading schedule editor...</div>;
+    return <div className={styles.state}>{t("Loading schedule editor...")}</div>;
   }
 
   if (hasLoadError) {
-    return <ErrorBanner className={styles.banner}>Could not load this schedule editor.</ErrorBanner>;
+    return <ErrorBanner className={styles.banner}>{t("Could not load this schedule editor.")}</ErrorBanner>;
   }
 
   const scheduleMatrixBaseMinHeight = Math.max(
@@ -675,14 +676,14 @@ export function ContainerGraphEditor({
   const showGenerationOverlay = isGenerating && isGenerationOverlayArmed;
   const displayGraphYear = Number(form.year) || graph?.year || new Date().getFullYear();
   const displayGraphMonth = Number(form.month) || graph?.month || 1;
-  const displayGraphName = form.name.trim() || graph?.name?.trim() || "Current schedule";
+  const displayGraphName = form.name.trim() || graph?.name?.trim() || t("Current schedule");
   const activeRelatedHint =
     activeRelatedHintCellKey
       ? visualHintDetailMap[activeRelatedHintCellKey] ?? null
       : null;
   const activeHintEmployeeName =
     activeRelatedHint
-      ? getEmployeeFullName(employeeById.get(activeRelatedHint.employeeId), `Employee ${activeRelatedHint.employeeId}`)
+      ? getEmployeeFullName(employeeById.get(activeRelatedHint.employeeId), t("Employee {0}", activeRelatedHint.employeeId))
       : "";
   const activeHintDayLabel =
     activeRelatedHint
@@ -727,7 +728,7 @@ export function ContainerGraphEditor({
         sidebar={
           <>
             <AvailabilitySidebarSection
-              label="Schedule Details"
+              label={t("Schedule Details")}
               preserveCollapsedOnMobile
               collapsed={collapsedSections.details}
               collapsedIcon={<ScheduleDetailsIcon size={18} />}
@@ -736,9 +737,9 @@ export function ContainerGraphEditor({
             >
               <CardSection
                 className={styles.sidebarCard}
-                title="Schedule Details"
+                title={t("Schedule Details")}
                 icon={<ScheduleDetailsIcon size={18} />}
-                headerRightSlot={renderCollapseButton("Schedule Details", "details")}
+                headerRightSlot={renderCollapseButton(t("Schedule Details"), "details")}
               >
                 <ContainerGraphDetailsFields
                   form={form}
@@ -764,7 +765,7 @@ export function ContainerGraphEditor({
                 <div className={styles.detailsActions}>
                   <IosButton
                     className={styles.generateButton}
-                    label={isGenerating ? "Generating..." : "Generate"}
+                    label={isGenerating ? t("Generating...") : t("Generate")}
                     disabled={isGenerating || isSaving}
                     onClick={handleGenerate}
                   />
@@ -773,7 +774,7 @@ export function ContainerGraphEditor({
             </AvailabilitySidebarSection>
 
             <AvailabilitySidebarSection
-              label="Publication"
+              label={t("Publication")}
               preserveCollapsedOnMobile
               collapsed={collapsedSections.publication}
               collapsedIcon={<EyeIcon size={18} />}
@@ -782,13 +783,13 @@ export function ContainerGraphEditor({
             >
               <CardSection
                 className={styles.sidebarCard}
-                title="Publication"
+                title={t("Publication")}
                 icon={<EyeIcon size={18} />}
-                headerRightSlot={renderCollapseButton("Publication", "publication")}
+                headerRightSlot={renderCollapseButton(t("Publication"), "publication")}
               >
                 <div className={styles.publicationHeaderTools}>
                   <button type="button" className={styles.publicationColorControl}
-                    title="Accepted swap highlight color" aria-label="Accepted swap highlight color"
+                    title={t("Accepted swap highlight color")} aria-label={t("Accepted swap highlight color")}
                     disabled={graphId === null || saveSwapHighlightSettingMutation.isPending}
                     onClick={() => setIsSwapColorDialogOpen(true)}>
                     <span className={styles.publicationColorSwatch}
@@ -797,13 +798,13 @@ export function ContainerGraphEditor({
                 </div>
 
                 <ContainerGraphHighlightColorDialog open={isSwapColorDialogOpen} value={swapHighlightColor}
-                  eyebrow="Publication" title="Choose accepted swap color" inputLabel="Accepted swap highlight hex color"
+                  eyebrow="Publication" title={t("Choose accepted swap color")} inputLabel="Accepted swap highlight hex color"
                   isSaving={saveSwapHighlightSettingMutation.isPending}
                   onCancel={() => setIsSwapColorDialogOpen(false)} onSave={handleSwapHighlightColorChange} />
 
                 <div className={styles.publicationCard}>
                   {swapColorError ? <ErrorBanner dismissible={false}>{swapColorError}</ErrorBanner> : null}
-                  <div className={styles.publicationControl} role="radiogroup" aria-label="Schedule publication status">
+                  <div className={styles.publicationControl} role="radiogroup" aria-label={t("Schedule publication status")}>
                     <button
                       type="button"
                       role="radio"
@@ -814,8 +815,7 @@ export function ContainerGraphEditor({
                       )}
                       onClick={() => onFieldChange("publicationStatus")("private")}
                     >
-                      Private
-                    </button>
+                      {t("Private")}</button>
 
                     <button
                       type="button"
@@ -827,24 +827,23 @@ export function ContainerGraphEditor({
                       )}
                       onClick={() => onFieldChange("publicationStatus")("public")}
                     >
-                      Public
-                    </button>
+                      {t("Public")}</button>
                   </div>
 
                   <div className={styles.swapPermission}>
                     <div className={styles.swapPermissionCopy}>
-                      <strong>Allow swap</strong>
-                      <span>Controls employee offers and manager Manual-column swaps.</span>
+                      <strong>{t("Allow swap")}</strong>
+                      <span>{t("Controls employee offers and manager Manual-column swaps.")}</span>
                     </div>
-                    <div className={styles.swapPermissionControl} role="radiogroup" aria-label="Allow schedule swaps">
-                      <button type="button" role="radio" aria-checked={!form.allowSwap} className={joinClassNames(styles.publicationSegment, !form.allowSwap && styles.publicationSegmentActive)} onClick={() => onFieldChange("allowSwap")(false)}>Off</button>
-                      <button type="button" role="radio" aria-checked={form.allowSwap} className={joinClassNames(styles.publicationSegment, form.allowSwap && styles.publicationSegmentActive)} onClick={() => onFieldChange("allowSwap")(true)}>On</button>
+                    <div className={styles.swapPermissionControl} role="radiogroup" aria-label={t("Allow schedule swaps")}>
+                      <button type="button" role="radio" aria-checked={!form.allowSwap} className={joinClassNames(styles.publicationSegment, !form.allowSwap && styles.publicationSegmentActive)} onClick={() => onFieldChange("allowSwap")(false)}>{t("Off")}</button>
+                      <button type="button" role="radio" aria-checked={form.allowSwap} className={joinClassNames(styles.publicationSegment, form.allowSwap && styles.publicationSegmentActive)} onClick={() => onFieldChange("allowSwap")(true)}>{t("On")}</button>
                     </div>
                   </div>
 
                   <div className={styles.publicationLog}>
                     <div className={styles.publicationLogHeader}>
-                      <span>Swap log</span>
+                      <span>{t("Swap log")}</span>
                       <strong>
                         {shiftSwapLogSearch.trim()
                           ? `${filteredAcceptedShiftSwapLog.length}/${acceptedShiftSwapLog.length}`
@@ -857,18 +856,18 @@ export function ContainerGraphEditor({
                       <input
                         type="search"
                         value={shiftSwapLogSearch}
-                        placeholder="Search employee, date or schedule..."
-                        aria-label="Search accepted swaps by giver, receiver, date or schedule"
+                        placeholder={t("Search employee, date or schedule...")}
+                        aria-label={t("Search accepted swaps by giver, receiver, date or schedule")}
                         onChange={event => setShiftSwapLogSearch(event.target.value)}
                       />
                     </label>
 
                     {isShiftSwapLogLoading ? (
-                      <p className={styles.publicationLogState}>Loading swap log...</p>
+                      <p className={styles.publicationLogState}>{t("Loading swap log...")}</p>
                     ) : acceptedShiftSwapLog.length === 0 ? (
-                      <p className={styles.publicationLogState}>No accepted swaps yet.</p>
+                      <p className={styles.publicationLogState}>{t("No accepted swaps yet.")}</p>
                     ) : filteredAcceptedShiftSwapLog.length === 0 ? (
-                      <p className={styles.publicationLogState}>No swaps match this search.</p>
+                      <p className={styles.publicationLogState}>{t("No swaps match this search.")}</p>
                     ) : (
                       <div className={styles.publicationLogList}>
                         {filteredAcceptedShiftSwapLog.map(item => (
@@ -876,14 +875,14 @@ export function ContainerGraphEditor({
                             <div className={styles.publicationLogItemHeader}>
                               <div className={styles.publicationLogItemMain}>
                                 <strong>{item.fromEmployeeName}</strong>
-                                <span>to</span>
-                                <strong>{item.acceptedByEmployeeName ?? "Employee"}</strong>
+                                <span>{t("to")}</span>
+                                <strong>{item.acceptedByEmployeeName ?? t("Employee")}</strong>
                               </div>
                               <button
                                 type="button"
                                 className={styles.publicationLogViewButton}
-                                aria-label={`View swap comparison for ${item.fromEmployeeName}`}
-                                title="View before and after"
+                                aria-label={t("View swap comparison for {0}", item.fromEmployeeName)}
+                                title={t("View before and after")}
                                 onClick={() => setSelectedShiftSwapHistory(item)}
                               >
                                 <EyeIcon size={17} />
@@ -891,11 +890,11 @@ export function ContainerGraphEditor({
                             </div>
                             <div className={styles.publicationLogDetails}>
                               <div className={styles.publicationLogDetail}>
-                                <span>Shift:</span>
+                                <span>{t("Shift:")}</span>
                                 <strong>{formatShiftSwapLogShift(item)}</strong>
                               </div>
                               <div className={styles.publicationLogDetail}>
-                                <span>When was accepted:</span>
+                                <span>{t("When was accepted:")}</span>
                                 <strong>{formatShiftSwapAcceptedAt(item.acceptedAtUtc)}</strong>
                               </div>
                             </div>
@@ -909,7 +908,7 @@ export function ContainerGraphEditor({
             </AvailabilitySidebarSection>
 
             <AvailabilitySidebarSection
-              label="Shift Corrections"
+              label={t("Shift Corrections")}
               preserveCollapsedOnMobile
               collapsed={collapsedSections.corrections}
               collapsedIcon={<ScheduleIcon size={18} />}
@@ -919,9 +918,9 @@ export function ContainerGraphEditor({
             >
               <CardSection
                 className={styles.sidebarCard}
-                title="Shift Corrections"
+                title={t("Shift Corrections")}
                 icon={<ScheduleIcon size={18} />}
-                headerRightSlot={renderCollapseButton("Shift Corrections", "corrections")}
+                headerRightSlot={renderCollapseButton(t("Shift Corrections"), "corrections")}
               >
                 <ContainerGraphShiftCorrectionsCard
                   containerId={graph?.containerId ?? null}
@@ -935,7 +934,7 @@ export function ContainerGraphEditor({
             </AvailabilitySidebarSection>
 
           <AvailabilitySidebarSection
-            label="Employees"
+            label={t("Employees")}
             preserveCollapsedOnMobile
             collapsed={collapsedSections.employees}
             collapsedIcon={<EmployeeIcon size={18} />}
@@ -944,9 +943,9 @@ export function ContainerGraphEditor({
           >
             <CardSection
               className={styles.sidebarCard}
-              title="Employees"
+              title={t("Employees")}
               icon={<EmployeeIcon size={18} />}
-              headerRightSlot={renderCollapseButton("Employees", "employees")}
+              headerRightSlot={renderCollapseButton(t("Employees"), "employees")}
             >
               <div className={styles.employeeSection}>
                 <div className={styles.employeeControls}>
@@ -957,17 +956,17 @@ export function ContainerGraphEditor({
                       size="compact"
                       value={selectedEmployeeId !== null ? String(selectedEmployeeId) : ""}
                       options={employeeOptions}
-                      placeholder={availableEmployees.length > 0 ? "Select employee..." : "No employees available"}
+                      placeholder={availableEmployees.length > 0 ? t("Select employee...") : t("No employees available")}
                       dropdownTitle="Employees"
-                      searchPlaceholder="Search employee..."
-                      emptyMessage="No employees match your search."
+                      searchPlaceholder={t("Search employee...")}
+                      emptyMessage={t("No employees match your search.")}
                       fallbackHint=""
                       ariaLabel="employee list"
                       onChange={value => onSelectedEmployeeIdChange(value ? Number(value) : null)}
                     />
 
                     <IosButton
-                      label="Add"
+                      label={t("Add")}
                       icon={<PlusIcon size={16} />}
                       disabled={selectedEmployeeId === null}
                       onClick={onAddEmployee}
@@ -978,18 +977,17 @@ export function ContainerGraphEditor({
                 {graphEmployeeRows.length === 0 ? (
                   <div className={joinClassNames(styles.detailsMinHoursBlock, styles.employeeRosterBlock)}>
                     <div className={styles.detailsMinHoursHeader}>
-                      <span className={styles.detailsMinHoursTitle}>Employees in schedule</span>
-                      <span className={styles.detailsMinHoursMeta}>{`${graphEmployeeRows.length} assigned`}</span>
+                      <span className={styles.detailsMinHoursTitle}>{t("Employees in schedule")}</span>
+                      <span className={styles.detailsMinHoursMeta}>{t("{0} assigned", graphEmployeeRows.length)}</span>
                     </div>
                     <div className={joinClassNames(styles.detailsMinHoursEmpty, styles.employeeEmpty)}>
-                      No employees added yet.
-                    </div>
+                      {t("No employees added yet.")}</div>
                   </div>
                 ) : (
                   <div className={joinClassNames(styles.detailsMinHoursBlock, styles.employeeRosterBlock)}>
                     <div className={styles.detailsMinHoursHeader}>
-                      <span className={styles.detailsMinHoursTitle}>Employees in schedule</span>
-                      <span className={styles.detailsMinHoursMeta}>{`${graphEmployeeRows.length} assigned`}</span>
+                      <span className={styles.detailsMinHoursTitle}>{t("Employees in schedule")}</span>
+                      <span className={styles.detailsMinHoursMeta}>{t("{0} assigned", graphEmployeeRows.length)}</span>
                     </div>
                     <div
                       className={joinClassNames(
@@ -999,7 +997,7 @@ export function ContainerGraphEditor({
                     >
                       {graphEmployeeRows.map(row => {
                         const employee = employeeById.get(row.employeeId);
-                        const employeeLabel = getEmployeeFullName(employee, `Employee ${row.employeeId}`);
+                        const employeeLabel = getEmployeeFullName(employee, t("Employee {0}", row.employeeId));
 
                         return (
                           <div key={row.employeeId} className={styles.employeeRow}>
@@ -1009,8 +1007,8 @@ export function ContainerGraphEditor({
                               <button
                                 type="button"
                                 className={styles.removeEmployeeButton}
-                                aria-label={`Remove ${employeeLabel} from schedule`}
-                                title="Remove employee"
+                                aria-label={t("Remove {0} from schedule", employeeLabel)}
+                                title={t("Remove employee")}
                                 onClick={() => onRemoveEmployee(row.employeeId)}
                               >
                                 <CloseIcon size={15} />
@@ -1027,7 +1025,7 @@ export function ContainerGraphEditor({
           </AvailabilitySidebarSection>
 
           <AvailabilitySidebarSection
-            label="Bind Information"
+            label={t("Bind Information")}
             preserveCollapsedOnMobile
             collapsed={collapsedSections.bind}
             collapsedIcon={<BindIcon size={18} />}
@@ -1040,7 +1038,7 @@ export function ContainerGraphEditor({
               isLoading={isBindsLoading}
               isBusy={isBindBusy}
               errorMessage={bindErrorMessage}
-              headerRightSlot={renderCollapseButton("Bind Information", "bind")}
+              headerRightSlot={renderCollapseButton(t("Bind Information"), "bind")}
               onSelectedBindChange={onSelectedBindChange}
               onBindFieldChange={onBindFieldChange}
               onBindCommit={onBindCommit}
@@ -1050,7 +1048,7 @@ export function ContainerGraphEditor({
           </AvailabilitySidebarSection>
 
           <AvailabilitySidebarSection
-            label="Manual Columns"
+            label={t("Manual Columns")}
             preserveCollapsedOnMobile
             collapsed={collapsedSections.manualColumns}
             collapsedIcon={<InformationIcon size={18} />}
@@ -1068,7 +1066,7 @@ export function ContainerGraphEditor({
               publishError={manualShiftPublishError}
               publishedShifts={openManagerManualShifts}
               pendingPublishedShifts={pendingManualShiftPublishes}
-              headerRightSlot={renderCollapseButton("Manual Columns", "manualColumns")}
+              headerRightSlot={renderCollapseButton(t("Manual Columns"), "manualColumns")}
               onAddColumn={onAddManualColumn}
               onDeleteColumn={onDeleteManualColumn}
               onPublishShift={onPublishManualShift}
@@ -1078,7 +1076,7 @@ export function ContainerGraphEditor({
           </AvailabilitySidebarSection>
 
           <AvailabilitySidebarSection
-            label="Note"
+            label={t("Note")}
             preserveCollapsedOnMobile
             collapsed={collapsedSections.note}
             collapsedIcon={<NoteIcon size={18} />}
@@ -1087,16 +1085,16 @@ export function ContainerGraphEditor({
           >
             <CardSection
               className={styles.sidebarCard}
-              title="Note"
+              title={t("Note")}
               icon={<NoteIcon size={18} />}
-              headerRightSlot={renderCollapseButton("Note", "note")}
+              headerRightSlot={renderCollapseButton(t("Note"), "note")}
             >
-              <LabeledField id="graph-note" label="Schedule note" error={formErrors.note} className={styles.noteField}>
+              <LabeledField id="graph-note" label={t("Schedule note")} error={formErrors.note} className={styles.noteField}>
                 <TextArea
                   id="graph-note"
                   rows={12}
                   className={styles.noteInput}
-                  placeholder="Add scheduling notes, constraints, or handoff details..."
+                  placeholder={t("Add scheduling notes, constraints, or handoff details...")}
                   value={form.note}
                   onChange={event => onFieldChange("note")(event.target.value)}
                 />
@@ -1161,13 +1159,13 @@ export function ContainerGraphEditor({
                   toolbar={
                     <div className={styles.matrixToolbar}>
                       <ToolbarActionButton
-                        label="Undo"
+                        label={t("Undo")}
                         icon={<BackIcon size={15} />}
                         disabled={!canUndo || isSaving || isGenerating || isStylingBusy}
                         onClick={onUndo}
                       />
                       <SplitColorButton
-                        label={isStylingBusy ? "Applying Fill..." : "Fill"}
+                        label={isStylingBusy ? t("Applying Fill...") : t("Fill")}
                         color={fillColor}
                         disabled={!canApplySelectedStyles}
                         pickerDisabled={isStylingBusy}
@@ -1175,7 +1173,7 @@ export function ContainerGraphEditor({
                         onOpenDialog={() => setColorDialogMode("fill")}
                       />
                       <SplitColorButton
-                        label={isStylingBusy ? "Applying Text..." : "Text"}
+                        label={isStylingBusy ? t("Applying Text...") : t("Text")}
                         color={textColor}
                         disabled={!canApplySelectedStyles}
                         pickerDisabled={isStylingBusy}
@@ -1183,19 +1181,19 @@ export function ContainerGraphEditor({
                         onOpenDialog={() => setColorDialogMode("text")}
                       />
                       <ToolbarActionButton
-                        label="C. Selected"
+                        label={t("C. Selected")}
                         icon={<ClearFormatIcon size={15} />}
                         disabled={!hasSelection || isStylingBusy}
                         onClick={onClearCellStyle}
                       />
                       <ToolbarActionButton
-                        label="C. All"
+                        label={t("C. All")}
                         icon={<ClearFormatAllIcon size={15} />}
                         disabled={!hasStyledCells || isStylingBusy}
                         onClick={onClearAllCellStyles}
                       />
                       <ToolbarActionButton
-                        label="Versions"
+                        label={t("Versions")}
                         icon={<SwapHistoryIcon size={15} />}
                         disabled={!graph || isSaving || isGenerating || isStylingBusy}
                         onClick={() => setIsVersionsDialogOpen(true)}
@@ -1205,11 +1203,11 @@ export function ContainerGraphEditor({
                   }
                   headerRightSlot={
                     <div className={styles.matrixHeaderActions}>
-                      <span className={styles.headerBadge}>{`Employees: ${totals.totalEmployees}`}</span>
-                      <span className={styles.headerBadge}>{`Hours: ${totals.totalHoursText}`}</span>
+                      <span className={styles.headerBadge}>{t("Employees: {0}", totals.totalEmployees)}</span>
+                      <span className={styles.headerBadge}>{t("Hours: {0}", totals.totalHoursText)}</span>
                       {showMatrixSaveAction ? (
                         <IosButton
-                          label={isSaving ? "Saving..." : "Save"}
+                          label={isSaving ? t("Saving...") : t("Save")}
                           icon={<SaveIcon size={18} />}
                           disabled={isSaving || isGenerating}
                           onClick={onSave}
@@ -1232,7 +1230,7 @@ export function ContainerGraphEditor({
                   )}
                   style={previewMatrixCardStyle}
                   compactSize={compactSize}
-                  title="Availability Preview"
+                  title={t("Availability Preview")}
                   helperText=""
                   graph={{
                     year: previewYear,
@@ -1243,7 +1241,7 @@ export function ContainerGraphEditor({
                   readOnly
                   enableSelectionWhenReadOnly
                   highlightReadOnlyEmpty
-                  emptyMessage="No availability preview is available for the selected group yet."
+                  emptyMessage={t("No availability preview is available for the selected group yet.")}
                   selectedCellKeys={previewSelectedCellKeys}
                   onSelectedCellKeysChange={onPreviewSelectedCellKeysChange}
                   headerRightSlot={
@@ -1254,10 +1252,10 @@ export function ContainerGraphEditor({
                         size="compact"
                         value={previewAvailabilitySelection}
                         options={previewAvailabilityOptions}
-                        placeholder="Select preview availability..."
+                        placeholder={t("Select preview availability...")}
                         dropdownTitle="Availability Preview"
-                        searchPlaceholder="Search availability..."
-                        emptyMessage="No availability groups match your search."
+                        searchPlaceholder={t("Search availability...")}
+                        emptyMessage={t("No availability groups match your search.")}
                         showSelectedHint={false}
                         ariaLabel="availability preview groups"
                         onChange={onPreviewAvailabilitySelectionChange}
@@ -1332,18 +1330,17 @@ export function ContainerGraphEditor({
         onCancel={() => setSelectedShiftSwapHistory(null)}
       />
       {showGenerationOverlay ? (
-        <div className={styles.generationOverlay} role="status" aria-live="polite" aria-label="Generating schedule">
+        <div className={styles.generationOverlay} role="status" aria-live="polite" aria-label={t("Generating schedule")}>
           <div className={styles.generationOverlayCard}>
             <div className={styles.generationOverlaySpinner} aria-hidden="true">
               <span />
               <span />
               <span />
             </div>
-            <div className={styles.generationOverlayEyebrow}>Schedule Generator</div>
-            <div className={styles.generationOverlayTitle}>Generating schedule...</div>
+            <div className={styles.generationOverlayEyebrow}>{t("Schedule Generator")}</div>
+            <div className={styles.generationOverlayTitle}>{t("Generating schedule...")}</div>
             <div className={styles.generationOverlayText}>
-              We are filling the grid using availability and workload limits. The matrix will refresh automatically when it is ready.
-            </div>
+              {t("We are filling the grid using availability and workload limits. The matrix will refresh automatically when it is ready.")}</div>
           </div>
         </div>
       ) : null}

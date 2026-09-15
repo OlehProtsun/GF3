@@ -1,3 +1,4 @@
+import { t } from "@shared/i18n";
 ﻿import { useMemo, type FormEvent } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
@@ -35,7 +36,7 @@ export function ShopEditPage() {
   );
   const { lockedByOtherState, isCheckingLocks } = useManagerEditLocks(editLockTargets);
   const editLockMessage = lockedByOtherState
-    ? buildManagerEditLockMessage(lockedByOtherState, "This shop")
+    ? buildManagerEditLockMessage(lockedByOtherState, t("This shop"))
     : null;
   const canEdit = !editLockMessage && !isCheckingLocks;
 
@@ -93,16 +94,16 @@ export function ShopEditPage() {
   return (
     <div className={styles.page}>
       <PageHeader
-        title={isCreate ? "Add Shop" : "Edit Shop"}
-        subtitle={isCreate ? "Create new shop record" : "Update shop information"}
+        title={isCreate ? t("Add Shop") : t("Edit Shop")}
+        subtitle={isCreate ? t("Create new shop record") : t("Update shop information")}
         backTo={backTo}
       />
 
       {isCheckingLocks ? (
         <ManagerEditLockDialog
           open
-          title="Checking edit access"
-          message="Please wait while we check whether this shop can be edited."
+          title={t("Checking edit access")}
+          message={t("Please wait while we check whether this shop can be edited.")}
         />
       ) : null}
 

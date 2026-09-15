@@ -1,3 +1,5 @@
+import { dateTimeFormat } from "@shared/i18n";
+import { t } from "@shared/i18n";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import type { Employee } from "@entities/employees";
@@ -70,13 +72,13 @@ type ManualColumnShiftCell = {
 
 const timeRangePattern = /(\d{1,2}):(\d{2})\s*(?:-|\u2013|\u2014)\s*(\d{1,2}):(\d{2})/;
 
-const dayFormatter = new Intl.DateTimeFormat("en-GB", {
+const dayFormatter = dateTimeFormat("en-GB", {
   day: "2-digit",
   month: "short",
   timeZone: "UTC",
 });
 
-const weekdayFormatter = new Intl.DateTimeFormat("en-GB", {
+const weekdayFormatter = dateTimeFormat("en-GB", {
   weekday: "short",
   timeZone: "UTC",
 });
@@ -147,14 +149,14 @@ function getTimeRangeDurationHours(fromTime: string, toTime: string) {
 
 function getEmployeeLabel(employee: Employee) {
   const fullName = `${employee.firstName} ${employee.lastName}`.trim();
-  return fullName || `Employee #${employee.id}`;
+  return fullName || t("Employee #{0}", employee.id);
 }
 
 function buildManualShiftGroups(columns: ManualColumnSummary[], year: number, month: number): ManualColumnShiftGroup[] {
   const dayNumbers = Array.from({ length: getDaysInMonth(year, month) }, (_, index) => index + 1);
 
   return columns.map((column, index) => {
-    const columnLabel = column.label.trim() || `Manual column ${index + 1}`;
+    const columnLabel = column.label.trim() || t("Manual column {0}", index + 1);
     const cells = dayNumbers.map(dayOfMonth => {
       const rawValue = column.cells[String(dayOfMonth)]?.trim() || "";
       const timeRange = parseManualShiftTime(rawValue);
@@ -234,14 +236,14 @@ function ManualShiftPickerDialog({
         }
       }}
     >
-      <div className={styles.shiftDialog} role="dialog" aria-modal="true" aria-label="Choose manual shift">
+      <div className={styles.shiftDialog} role="dialog" aria-modal="true" aria-label={t("Choose manual shift")}>
         <div className={styles.shiftDialogHeader}>
           <div>
             <span>{`${String(month).padStart(2, "0")}.${year}`}</span>
-            <strong>Manual Columns</strong>
+            <strong>{t("Manual Columns")}</strong>
           </div>
 
-          <button type="button" className={styles.shiftDialogClose} aria-label="Close" onClick={onClose}>
+          <button type="button" className={styles.shiftDialogClose} aria-label={t("Close")} onClick={onClose}>
             <CloseIcon size={16} />
           </button>
         </div>
@@ -257,7 +259,7 @@ function ManualShiftPickerDialog({
             </colgroup>
             <thead>
               <tr>
-                <th className={styles.shiftMatrixDayHeader}>Day</th>
+                <th className={styles.shiftMatrixDayHeader}>{t("Day")}</th>
                 {groups.map(group => (
                   <th key={group.columnId} className={styles.shiftMatrixHeader}>
                     <span>{group.columnLabel}</span>
@@ -332,7 +334,7 @@ export function ContainerGraphManualColumnsCard({
   onCancelPublishedShift,
   onCancelPendingPublishedShift,
 }: ContainerGraphManualColumnsCardProps) {
-  const columnsCountLabel = `${columns.length} column${columns.length === 1 ? "" : "s"}`;
+  const columnsCountLabel = t("{0} column{1}", columns.length, columns.length === 1 ? "" : "s");
   const shiftGroups = useMemo(() => buildManualShiftGroups(columns, year, month), [columns, month, year]);
   const sortedEmployees = useMemo(
     () => [...employees].sort((left, right) => getEmployeeLabel(left).localeCompare(getEmployeeLabel(right))),
@@ -345,7 +347,7 @@ export function ContainerGraphManualColumnsCard({
       return {
         value: String(employee.id),
         label,
-        hint: `Employee ID: ${employee.id}`,
+        hint: t("Employee ID: {0}", employee.id),
         keywords: [
           String(employee.id),
           employee.firstName,
@@ -398,7 +400,7 @@ export function ContainerGraphManualColumnsCard({
       className={styles.card}
       title={(
         <span className={styles.titleWrap}>
-          <span>Manual Columns</span>
+          <span>{t("Manual Columns")}</span>
           <span className={styles.titleMeta}>{columnsCountLabel}</span>
         </span>
       )}
@@ -407,24 +409,23 @@ export function ContainerGraphManualColumnsCard({
     >
       <div className={styles.layout}>
         <p className={styles.description}>
-          Add extra free-form columns and edit their header and cells directly inside Schedule Matrix.
-        </p>
+          {t("Add extra free-form columns and edit their header and cells directly inside Schedule Matrix.")}</p>
 
         {columns.length === 0 ? (
-          <div className={styles.emptyState}>No manual columns yet. Add one when you need an extra editable column.</div>
+          <div className={styles.emptyState}>{t("No manual columns yet. Add one when you need an extra editable column.")}</div>
         ) : (
           <div className={styles.list}>
             {columns.map((column, index) => (
               <div key={column.columnId} className={styles.item}>
                 <div className={styles.itemText}>
-                  <span className={styles.itemTitle}>{column.label.trim() || `Untitled column ${index + 1}`}</span>
-                  <span className={styles.itemHint}>Edit header and values in the grid</span>
+                  <span className={styles.itemTitle}>{column.label.trim() || t("Untitled column {0}", index + 1)}</span>
+                  <span className={styles.itemHint}>{t("Edit header and values in the grid")}</span>
                 </div>
 
                 <button
                   type="button"
                   className={styles.deleteButton}
-                  aria-label={`Delete ${column.label.trim() || `manual column ${index + 1}`}`}
+                  aria-label={t("Delete {0}", column.label.trim() || `manual column ${index + 1}`)}
                   onClick={() => onDeleteColumn(column.columnId)}
                 >
                   <CloseIcon size={14} />
@@ -435,26 +436,26 @@ export function ContainerGraphManualColumnsCard({
         )}
 
         <div className={styles.actions}>
-          <IosButton label="Add Column" icon={<PlusIcon size={16} />} onClick={onAddColumn} />
+          <IosButton label={t("Add Column")} icon={<PlusIcon size={16} />} onClick={onAddColumn} />
         </div>
 
         <div className={styles.publishBox}>
           <div className={styles.publishHeader}>
             <div>
-              <span>Publish manual shift</span>
-              <strong>Select one manual cell and publish it to Swap.</strong>
+              <span>{t("Publish manual shift")}</span>
+              <strong>{t("Select one manual cell and publish it to Swap.")}</strong>
             </div>
             <span className={styles.publishCount}>{shiftOptions.length}</span>
           </div>
 
           {!allowSwap ? (
-            <div className={styles.swapDisabledNotice}>Swaps are not allowed for this schedule. Enable Allow swap in Publication first.</div>
+            <div className={styles.swapDisabledNotice}>{t("Swaps are not allowed for this schedule. Enable Allow swap in Publication first.")}</div>
           ) : shiftOptions.length === 0 ? (
-            <div className={styles.emptyState}>Write a time range like 09:00-15:00 in a manual column cell first.</div>
+            <div className={styles.emptyState}>{t("Write a time range like 09:00-15:00 in a manual column cell first.")}</div>
           ) : (
             <div className={styles.publishForm}>
               <div className={styles.field}>
-                <span>Shift</span>
+                <span>{t("Shift")}</span>
                 <button
                   type="button"
                   className={styles.shiftPickerButton}
@@ -467,10 +468,10 @@ export function ContainerGraphManualColumnsCard({
                         <strong>{`${formatDay(year, month, selectedShift.dayOfMonth)} ${selectedShift.fromTime}-${selectedShift.toTime}`}</strong>
                       </>
                     ) : (
-                      <strong>Choose shift</strong>
+                      <strong>{t("Choose shift")}</strong>
                     )}
                   </span>
-                  <span className={styles.shiftPickerAction}>Choose</span>
+                  <span className={styles.shiftPickerAction}>{t("Choose")}</span>
                 </button>
               </div>
 
@@ -480,29 +481,27 @@ export function ContainerGraphManualColumnsCard({
                   className={[styles.segmentButton, targetMode === "public" ? styles.segmentButtonActive : ""].filter(Boolean).join(" ")}
                   onClick={() => setTargetMode("public")}
                 >
-                  Everyone
-                </button>
+                  {t("Everyone")}</button>
                 <button
                   type="button"
                   className={[styles.segmentButton, targetMode === "private" ? styles.segmentButtonActive : ""].filter(Boolean).join(" ")}
                   onClick={() => setTargetMode("private")}
                 >
-                  Specific employee
-                </button>
+                  {t("Specific employee")}</button>
               </div>
 
               {targetMode === "private" ? (
                 <div className={styles.field}>
-                  <span>Employee</span>
+                  <span>{t("Employee")}</span>
                   <SearchableSelect
                     id="manual-shift-target-employee-select"
                     value={selectedEmployeeId !== null ? String(selectedEmployeeId) : ""}
                     options={employeeOptions}
-                    placeholder={employeeOptions.length > 0 ? "Select employee..." : "No employees available"}
+                    placeholder={employeeOptions.length > 0 ? t("Select employee...") : t("No employees available")}
                     dropdownTitle="Employee list"
-                    searchPlaceholder="Search employee..."
-                    emptyMessage="No employees match your search."
-                    fallbackHint={`${employeeOptions.length} employees found`}
+                    searchPlaceholder={t("Search employee...")}
+                    emptyMessage={t("No employees match your search.")}
+                    fallbackHint={t("{0} employees found", employeeOptions.length)}
                     ariaLabel="employee list"
                     onChange={value => setTargetEmployeeId(value ? Number(value) : null)}
                   />
@@ -512,7 +511,7 @@ export function ContainerGraphManualColumnsCard({
               {publishError ? <p className={styles.errorText}>{publishError}</p> : null}
 
               <IosButton
-                label={isPublishingShift ? "Publishing..." : "Publish shift"}
+                label={isPublishingShift ? t("Publishing...") : t("Publish shift")}
                 icon={<PlusIcon size={16} />}
                 disabled={!canPublishShift}
                 onClick={() => {
@@ -550,19 +549,19 @@ export function ContainerGraphManualColumnsCard({
         <div className={styles.offeredBox}>
           <div className={styles.publishHeader}>
             <div>
-              <span>Offered shifts</span>
-              <strong>Manual shifts waiting in employee Swap.</strong>
+              <span>{t("Offered shifts")}</span>
+              <strong>{t("Manual shifts waiting in employee Swap.")}</strong>
             </div>
             <span className={styles.publishCount}>{offerCount}</span>
           </div>
 
           {offerCount === 0 ? (
-            <div className={styles.emptyState}>Published manual shifts that are still waiting for an employee will appear here.</div>
+            <div className={styles.emptyState}>{t("Published manual shifts that are still waiting for an employee will appear here.")}</div>
           ) : (
             <div className={styles.offeredList}>
               {pendingPublishedShifts.map(shift => {
-                const targetName = shift.targetEmployeeId ? employeeNameById.get(shift.targetEmployeeId) ?? "Selected employee" : "Everyone";
-                const visibilityLabel = shift.targetEmployeeId ? "Private" : "Public";
+                const targetName = shift.targetEmployeeId ? employeeNameById.get(shift.targetEmployeeId) ?? t("Selected employee") : t("Everyone");
+                const visibilityLabel = shift.targetEmployeeId ? t("Private") : t("Public");
 
                 return (
                   <article key={shift.clientId} className={styles.offeredItem}>
@@ -573,7 +572,7 @@ export function ContainerGraphManualColumnsCard({
                     </div>
 
                     <IosButton
-                      label="Remove"
+                      label={t("Remove")}
                       variant="secondary"
                       size="compact"
                       disabled={!onCancelPendingPublishedShift}
@@ -587,12 +586,12 @@ export function ContainerGraphManualColumnsCard({
                 <article key={shift.id} className={styles.offeredItem}>
                   <div className={styles.offeredMain}>
                     <strong>{`${formatDay(shift.year, shift.month, shift.dayOfMonth)} ${formatPublishedShiftTime(shift.fromTime)}-${formatPublishedShiftTime(shift.toTime)}`}</strong>
-                    <span>{`${shift.scheduleName} / ${shift.targetEmployeeName ?? "Everyone"}`}</span>
-                    <small>{`${formatPublishedShiftHours(shift.shiftHours)} / ${shift.visibility === "private" ? "Private" : "Public"}`}</small>
+                    <span>{`${shift.scheduleName} / ${shift.targetEmployeeName ?? t("Everyone")}`}</span>
+                    <small>{`${formatPublishedShiftHours(shift.shiftHours)} / ${shift.visibility === "private" ? t("Private") : t("Public")}`}</small>
                   </div>
 
                   <IosButton
-                    label={isCancellingPublishedShift ? "Cancelling..." : "Cancel"}
+                    label={isCancellingPublishedShift ? t("Cancelling...") : t("Cancel")}
                     variant="secondary"
                     size="compact"
                     disabled={isCancellingPublishedShift || !onCancelPublishedShift}

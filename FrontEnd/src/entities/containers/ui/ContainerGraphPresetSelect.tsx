@@ -1,3 +1,4 @@
+import { t } from "@shared/i18n";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
 import type { SchedulePreset } from "@entities/containers/model/types";
@@ -35,18 +36,18 @@ function joinClassNames(...values: Array<string | undefined | false>) {
 }
 
 function getMonthLabel(month: number) {
-  return MONTH_LABELS[Math.min(Math.max(month - 1, 0), MONTH_LABELS.length - 1)] ?? `Month ${month}`;
+  return t(MONTH_LABELS[Math.min(Math.max(month - 1, 0), MONTH_LABELS.length - 1)]) ?? t("Month {0}", month);
 }
 
 function getPresetHint(preset: SchedulePreset, shopNameById: Map<number, string>) {
-  const shopName = shopNameById.get(preset.shopId) ?? `Shop ${preset.shopId}`;
+  const shopName = shopNameById.get(preset.shopId) ?? t("Shop {0}", preset.shopId);
   return `${preset.scheduleName} - ${shopName} - ${getMonthLabel(preset.month)} ${preset.year}`;
 }
 
 function getPresetMeta(preset: SchedulePreset) {
   const employeeOverrides = preset.employees.length;
-  const employeeLabel = employeeOverrides === 1 ? "1 employee override" : `${employeeOverrides} employee overrides`;
-  return `${preset.shift1Time} / ${preset.shift2Time} - ${preset.peoplePerShift} per shift - ${employeeLabel}`;
+  const employeeLabel = employeeOverrides === 1 ? t("1 employee override") : t("{0} employee overrides", employeeOverrides);
+  return t("{0} / {1} - {2} per shift - {3}", preset.shift1Time, preset.shift2Time, preset.peoplePerShift, employeeLabel);
 }
 
 export function ContainerGraphPresetSelect({
@@ -163,14 +164,14 @@ export function ContainerGraphPresetSelect({
     closeDropdown();
   };
 
-  const triggerLabel = selectedPreset?.name ?? "Apply preset";
+  const triggerLabel = selectedPreset?.name ?? t("Apply preset");
   const triggerHint = selectedPreset
     ? getPresetHint(selectedPreset, shopNameById)
     : isLoading
-      ? "Loading saved presets..."
+      ? t("Loading saved presets...")
       : presets.length > 0
-        ? `${presets.length} presets ready to reuse`
-        : "Save your first Schedule Details preset";
+        ? t("{0} presets ready to reuse", presets.length)
+        : t("Save your first Schedule Details preset");
 
   const dropdown = isOpen
     ? createPortal(
@@ -178,8 +179,8 @@ export function ContainerGraphPresetSelect({
         <div className={styles.dropdown}>
           <div className={styles.dropdownHeader}>
             <div className={styles.dropdownTitleBlock}>
-              <span className={styles.dropdownTitle}>Schedule presets</span>
-              <span className={styles.dropdownHint}>Reuse saved detail setups or add a new one.</span>
+              <span className={styles.dropdownTitle}>{t("Schedule presets")}</span>
+              <span className={styles.dropdownHint}>{t("Reuse saved detail setups or add a new one.")}</span>
             </div>
             <span className={styles.dropdownCount}>{isLoading ? "..." : filteredPresets.length}</span>
           </div>
@@ -191,14 +192,14 @@ export function ContainerGraphPresetSelect({
               className={styles.searchInput}
               value={searchText}
               onChange={event => setSearchText(event.target.value)}
-              placeholder="Search presets..."
-              aria-label="Search presets"
+              placeholder={t("Search presets...")}
+              aria-label={t("Search presets")}
             />
           </div>
 
-          <div className={styles.optionList} role="listbox" aria-label="Schedule presets">
+          <div className={styles.optionList} role="listbox" aria-label={t("Schedule presets")}>
             {isLoading ? (
-              <div className={styles.emptyState}>Loading presets...</div>
+              <div className={styles.emptyState}>{t("Loading presets...")}</div>
             ) : filteredPresets.length > 0 ? (
               filteredPresets.map(preset => {
                 const isSelected = preset.id === selectedPresetId;
@@ -225,15 +226,15 @@ export function ContainerGraphPresetSelect({
             ) : (
               <div className={styles.emptyState}>
                 {presets.length === 0
-                  ? "No presets yet. Save one from your current Schedule Details."
-                  : "No presets match your search."}
+                  ? t("No presets yet. Save one from your current Schedule Details.")
+                  : t("No presets match your search.")}
               </div>
             )}
           </div>
 
           <div className={styles.footer}>
             <IosButton
-              label="Add preset"
+              label={t("Add preset")}
               icon={<PlusIcon size={16} />}
               onClick={() => {
                 closeDropdown();
@@ -263,7 +264,7 @@ export function ContainerGraphPresetSelect({
           }}
           aria-haspopup="listbox"
           aria-expanded={isOpen}
-          aria-label="Open schedule preset list"
+          aria-label={t("Open schedule preset list")}
         >
           <div className={styles.triggerText}>
             <span className={styles.triggerLabel}>{triggerLabel}</span>

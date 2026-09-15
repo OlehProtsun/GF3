@@ -1,3 +1,4 @@
+import { t } from "@shared/i18n";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import type { Employee } from "@entities/employees/model/types";
@@ -249,11 +250,11 @@ export function AvailabilityGroupEditor({
   );
 
   if (isLoading) {
-    return <div className={styles.state}>Loading availability editor...</div>;
+    return <div className={styles.state}>{t("Loading availability editor...")}</div>;
   }
 
   if (hasLoadError) {
-    return <ErrorBanner className={styles.banner}>Could not load this availability group.</ErrorBanner>;
+    return <ErrorBanner className={styles.banner}>{t("Could not load this availability group.")}</ErrorBanner>;
   }
 
   const scheduleMatrixBaseMinHeight =
@@ -329,7 +330,7 @@ export function AvailabilityGroupEditor({
       sidebar={
         <>
           <AvailabilitySidebarSection
-            label="Information"
+            label={t("Information")}
             collapsed={collapsedSections.information}
             collapsedIcon={<InformationIcon size={18} />}
             collapsedOffset={allSectionsCollapsed ? "flush" : "default"}
@@ -340,7 +341,7 @@ export function AvailabilityGroupEditor({
               month={month}
               year={year}
               errors={informationErrors}
-              headerRightSlot={renderCollapseButton("Information", "information")}
+              headerRightSlot={renderCollapseButton(t("Information"), "information")}
               onNameChange={onNameChange}
               onMonthChange={onMonthChange}
               onYearChange={onYearChange}
@@ -348,7 +349,7 @@ export function AvailabilityGroupEditor({
           </AvailabilitySidebarSection>
 
           <AvailabilitySidebarSection
-            label="Publication"
+            label={t("Publication")}
             collapsed={collapsedSections.publication}
             collapsedIcon={<EyeIcon size={18} />}
             collapsedOffset={allSectionsCollapsed ? "flush" : "default"}
@@ -359,7 +360,7 @@ export function AvailabilityGroupEditor({
               visibleFrom={visibleFrom}
               visibleTo={visibleTo}
               errors={publicationErrors}
-              headerRightSlot={renderCollapseButton("Publication", "publication")}
+              headerRightSlot={renderCollapseButton(t("Publication"), "publication")}
               onPublicationStatusChange={onPublicationStatusChange}
               onVisibleFromChange={onVisibleFromChange}
               onVisibleToChange={onVisibleToChange}
@@ -367,7 +368,7 @@ export function AvailabilityGroupEditor({
           </AvailabilitySidebarSection>
 
           <AvailabilitySidebarSection
-            label="Employee"
+            label={t("Employee")}
             collapsed={collapsedSections.employee}
             collapsedIcon={<EmployeeIcon size={18} />}
             collapsedOffset={allSectionsCollapsed ? "flush" : "default"}
@@ -378,7 +379,7 @@ export function AvailabilityGroupEditor({
               selectedEmployeeId={selectedEmployeeId}
               assignedEmployees={assignedEmployees}
               groupError={employeeError}
-              headerRightSlot={renderCollapseButton("Employee", "employee")}
+              headerRightSlot={renderCollapseButton(t("Employee"), "employee")}
               onSelectedEmployeeIdChange={onSelectedEmployeeIdChange}
               onAddEmployee={onAddEmployee}
               onRemoveEmployee={onRemoveEmployee}
@@ -387,7 +388,7 @@ export function AvailabilityGroupEditor({
           </AvailabilitySidebarSection>
 
           <AvailabilitySidebarSection
-            label="Bind Information"
+            label={t("Bind Information")}
             collapsed={collapsedSections.bind}
             collapsedIcon={<BindIcon size={18} />}
             collapsedOffset={allSectionsCollapsed ? "flush" : "default"}
@@ -399,7 +400,7 @@ export function AvailabilityGroupEditor({
               isLoading={isBindsLoading}
               isBusy={isBindBusy}
               errorMessage={bindErrorMessage}
-              headerRightSlot={renderCollapseButton("Bind Information", "bind")}
+              headerRightSlot={renderCollapseButton(t("Bind Information"), "bind")}
               onSelectedBindChange={onSelectedBindChange}
               onBindFieldChange={onBindFieldChange}
               onBindCommit={onBindCommit}
@@ -445,7 +446,7 @@ export function AvailabilityGroupEditor({
             headerRightSlot={
               <IosButton
                 className={styles.scheduleSaveButton}
-                label={isSaving ? "Saving..." : "Save Changes"}
+                label={isSaving ? t("Saving...") : t("Save Changes")}
                 icon={<SaveIcon size={18} />}
                 onClick={onSave}
                 disabled={isSaving}

@@ -1,3 +1,5 @@
+import { dateTimeFormat } from "@shared/i18n";
+import { t } from "@shared/i18n";
 import type { Employee } from "./types";
 
 type EmployeeIdentity = Pick<Employee, "firstName" | "lastName">;
@@ -8,7 +10,7 @@ type EmployeeContact = Pick<
 export type EmployeePresenceTone = "online" | "offline" | "inactive";
 type PresenceLabelMode = "default" | "compact";
 
-const employeeLastLoginFormatter = new Intl.DateTimeFormat("en-GB", {
+const employeeLastLoginFormatter = dateTimeFormat("en-GB", {
   day: "2-digit",
   month: "short",
   year: "numeric",
@@ -17,7 +19,7 @@ const employeeLastLoginFormatter = new Intl.DateTimeFormat("en-GB", {
   hour12: false,
 });
 
-export function getEmployeeFullName(employee?: EmployeeIdentity | null, fallback = "Employee") {
+export function getEmployeeFullName(employee?: EmployeeIdentity | null, fallback = t("Employee")) {
   const fullName = [employee?.firstName, employee?.lastName].filter(Boolean).join(" ").trim();
   return fullName || fallback;
 }
@@ -41,17 +43,17 @@ export function getEmployeeContactState(
 ) {
   switch (getEmployeePresenceTone(employee)) {
     case "online":
-      return mode === "compact" ? "Online" : "Online now";
+      return mode === "compact" ? t("Online") : t("Online now");
     case "offline":
-      return "Offline";
+      return t("Offline");
     default:
-      return mode === "compact" ? "No login" : "No login account";
+      return mode === "compact" ? t("No login") : t("No login account");
   }
 }
 
 export function formatEmployeeLastLogin(lastLoginAtUtc?: string | null) {
   if (!lastLoginAtUtc) {
-    return "Never";
+    return t("Never");
   }
 
   const parsedValue = new Date(lastLoginAtUtc);
@@ -66,25 +68,25 @@ export function getEmployeeContactDetails(employee?: EmployeeContact | null) {
   return [
     {
       key: "last-login",
-      label: "Last Login",
+      label: t("Last Login"),
       value: formatEmployeeLastLogin(employee?.lastLoginAtUtc),
       href: undefined,
     },
     {
       key: "username",
-      label: "Username",
+      label: t("Username"),
       value: employee?.username ?? null,
       href: undefined,
     },
     {
       key: "email",
-      label: "Recovery Email",
+      label: t("Recovery Email"),
       value: employee?.email ?? null,
       href: employee?.email ? `mailto:${employee.email}` : undefined,
     },
     {
       key: "phone",
-      label: "Phone",
+      label: t("Phone"),
       value: employee?.phone ?? null,
       href: employee?.phone ? `tel:${employee.phone}` : undefined,
     },

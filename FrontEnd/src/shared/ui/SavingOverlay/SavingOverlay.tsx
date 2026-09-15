@@ -1,3 +1,4 @@
+import { t } from "@shared/i18n";
 import { useEffect, useId, useState } from "react";
 import { SaveIcon } from "@shared/ui/icons";
 import styles from "./SavingOverlay.module.css";
@@ -12,8 +13,8 @@ type SavingOverlayProps = {
 export function SavingOverlay({
   active,
   delayMs = 650,
-  title = "Saving changes",
-  message = "Please wait while we finish saving this page.",
+  title = t("Saving changes"),
+  message = t("Please wait while we finish saving this page."),
 }: SavingOverlayProps) {
   const titleId = useId();
   const messageId = useId();
@@ -61,7 +62,7 @@ export function SavingOverlay({
           </div>
         </div>
 
-        <span className={styles.hint}>You can keep this page open while the save finishes.</span>
+        <span className={styles.hint}>{t("You can keep this page open while the save finishes.")}</span>
       </div>
     </div>
   );

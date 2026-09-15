@@ -1,3 +1,4 @@
+import { t } from "@shared/i18n";
 import type { Graph, GraphPublicationStatus } from "./types";
 import { getGraphVisibleNote } from "./graphNote";
 
@@ -122,56 +123,56 @@ export function buildGraphFormErrors(
   const availabilityGroupId = form.availabilityGroupId ? parseIntegerField(form.availabilityGroupId) : null;
 
   if (!form.name.trim()) {
-    errors.name = "Name is required.";
+    errors.name = t("Name is required.");
   }
 
   if (availableShopIds.size === 0) {
-    errors.shopId = "Create at least one shop before adding a schedule.";
+    errors.shopId = t("Create at least one shop before adding a schedule.");
   } else if (shopId === null || !availableShopIds.has(shopId)) {
-    errors.shopId = "Select a valid shop.";
+    errors.shopId = t("Select a valid shop.");
   }
 
   if (month === null || month < 1 || month > 12) {
-    errors.month = "Month must be between 1 and 12.";
+    errors.month = t("Month must be between 1 and 12.");
   }
 
   if (year === null || year < 2000 || year > 2100) {
-    errors.year = "Enter a valid year.";
+    errors.year = t("Enter a valid year.");
   }
 
   if (peoplePerShift === null || peoplePerShift < 1) {
-    errors.peoplePerShift = "People per shift must be at least 1.";
+    errors.peoplePerShift = t("People per shift must be at least 1.");
   }
 
   if (!isValidGraphShiftTime(form.shift1Time)) {
-    errors.shift1Time = "Use HH:mm - HH:mm format.";
+    errors.shift1Time = t("Use HH:mm - HH:mm format.");
   }
 
   if (!isValidGraphShiftTime(form.shift2Time)) {
-    errors.shift2Time = "Use HH:mm - HH:mm format.";
+    errors.shift2Time = t("Use HH:mm - HH:mm format.");
   }
 
   if (maxHoursPerEmpMonth === null || maxHoursPerEmpMonth < 1) {
-    errors.maxHoursPerEmpMonth = "Max hours must be at least 1.";
+    errors.maxHoursPerEmpMonth = t("Max hours must be at least 1.");
   }
 
   if (maxConsecutiveDays === null || maxConsecutiveDays < 0) {
-    errors.maxConsecutiveDays = "Use 0 or more.";
+    errors.maxConsecutiveDays = t("Use 0 or more.");
   }
 
   if (maxConsecutiveFull === null || maxConsecutiveFull < 0) {
-    errors.maxConsecutiveFull = "Use 0 or more.";
+    errors.maxConsecutiveFull = t("Use 0 or more.");
   }
 
   if (maxFullPerMonth === null || maxFullPerMonth < 0) {
-    errors.maxFullPerMonth = "Use 0 or more.";
+    errors.maxFullPerMonth = t("Use 0 or more.");
   }
 
   if (
     availabilityGroupId !== null &&
     (availabilityGroupId <= 0 || !availableAvailabilityGroupIds.has(availabilityGroupId))
   ) {
-    errors.availabilityGroupId = "Select a valid availability group.";
+    errors.availabilityGroupId = t("Select a valid availability group.");
   }
 
   return errors;
