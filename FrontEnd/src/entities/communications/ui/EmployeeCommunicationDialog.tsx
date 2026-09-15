@@ -1,5 +1,4 @@
-import { dateTimeFormat } from "@shared/i18n";
-import { t } from "@shared/i18n";
+import { dateTimeFormat, t } from "@shared/i18n";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { PointerEvent } from "react";
 import {

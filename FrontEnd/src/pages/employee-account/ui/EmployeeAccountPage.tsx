@@ -1,5 +1,5 @@
-import { useLanguageRevision } from "@shared/i18n/useLanguageRevision";
 import { t } from "@shared/i18n";
+import { useLanguageRevision } from "@shared/i18n/useLanguageRevision";
 import { LanguageSelector } from "@shared/i18n/LanguageSelector";
 import { useEffect, useState } from "react";
 import { useAuth } from "@app/providers/AuthProvider";
@@ -245,7 +245,7 @@ export function EmployeeAccountPage() {
               </div>
 
               <div className={styles.detailsList}>
-                <label className={styles.detailRow}><LanguageSelector disabled={isBusy} /></label>
+                <div className={styles.detailRow}><LanguageSelector disabled={isBusy} appearance="rounded" /></div>
                 <div className={styles.detailRow}>
                   <span className={styles.cardLabel}>{t("Login")}</span>
                   <span className={styles.cardValue}>@{profile.username}</span>
@@ -437,4 +437,3 @@ export function EmployeeAccountPage() {
     </div>
   );
 }
-

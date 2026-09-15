@@ -1,5 +1,4 @@
-import { dateTimeFormat } from "@shared/i18n";
-import { t } from "@shared/i18n";
+import { dateTimeFormat, t } from "@shared/i18n";
 ﻿import type { Container, Graph } from "./types";
 
 type ContainerIdentity = Pick<Container, "name">;

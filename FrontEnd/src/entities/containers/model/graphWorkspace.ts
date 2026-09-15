@@ -1,6 +1,4 @@
-import { getLanguage } from "@shared/i18n";
-import { dateTimeFormat } from "@shared/i18n";
-import { t } from "@shared/i18n";
+import { getLanguage, dateTimeFormat, t } from "@shared/i18n";
 import type { Employee } from "@entities/employees/model/types";
 import { getEmployeeFullName } from "@entities/employees/model/presentation";
 import { parseFlexibleTimeSegment } from "@shared/lib/timeRange";
@@ -567,11 +565,11 @@ export function tryParseGraphIntervals(input: string):
     .map(part => part.trim());
 
   if (parts.some(part => !part)) {
-    return { ok: false, error: "Enter a complete time range after each comma." };
+    return { ok: false, error: t("Enter a complete time range after each comma.") };
   }
 
   if (parts.length > GRAPH_MAX_INTERVALS_PER_CELL) {
-    return { ok: false, error: `A cell can contain no more than ${GRAPH_MAX_INTERVALS_PER_CELL} time ranges.` };
+    return { ok: false, error: t("A cell can contain no more than {0} time ranges.", GRAPH_MAX_INTERVALS_PER_CELL) };
   }
 
   const uniqueIntervals = new Set<string>();
@@ -601,7 +599,7 @@ export function tryParseGraphIntervals(input: string):
 
     const key = `${from}:${to}`;
     if (uniqueIntervals.has(key)) {
-      return { ok: false, error: "The same time range cannot be entered more than once." };
+      return { ok: false, error: t("The same time range cannot be entered more than once.") };
     }
 
     uniqueIntervals.add(key);
@@ -622,7 +620,7 @@ export function tryParseGraphIntervals(input: string):
     const previousTo = parseGraphTimeMinutes(intervals[index - 1].to) ?? 0;
     const currentFrom = parseGraphTimeMinutes(intervals[index].from) ?? 0;
     if (currentFrom < previousTo) {
-      return { ok: false, error: "Time ranges in one cell cannot overlap." };
+      return { ok: false, error: t("Time ranges in one cell cannot overlap.") };
     }
   }
 

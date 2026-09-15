@@ -1,5 +1,4 @@
-import { getLocale } from "@shared/i18n";
-import { t } from "@shared/i18n";
+import { getLocale, t } from "@shared/i18n";
 import { useDeferredValue, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { ChangeEvent, FormEvent } from "react";
 import { useNavigate } from "react-router-dom";

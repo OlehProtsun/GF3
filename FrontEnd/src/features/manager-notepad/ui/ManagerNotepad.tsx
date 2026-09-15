@@ -1,5 +1,4 @@
-import { getLocale } from "@shared/i18n";
-import { t } from "@shared/i18n";
+import { getLocale, t } from "@shared/i18n";
 import {
   useEffect,
   useEffectEvent,

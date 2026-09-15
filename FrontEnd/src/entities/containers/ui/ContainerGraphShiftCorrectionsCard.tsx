@@ -1,3 +1,4 @@
+import { dateTimeFormat, t } from "@shared/i18n";
 import { useEffect, useMemo, useState } from "react";
 import { containersApi } from "@entities/containers/api/containersApi";
 import {
@@ -24,7 +25,7 @@ type ContainerGraphShiftCorrectionsCardProps = {
   onPendingCountChange?: (count: number) => void;
 };
 
-const createdAtFormatter = new Intl.DateTimeFormat("en-GB", {
+const createdAtFormatter = dateTimeFormat("en-GB", {
   day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit",
 });
 
@@ -34,7 +35,7 @@ function toMinutes(value: string) {
 }
 
 function formatDelta(minutes: number) {
-  if (minutes === 0) return "unchanged";
+  if (minutes === 0) return t("unchanged");
   const sign = minutes > 0 ? "+" : "−";
   const absolute = Math.abs(minutes);
   const hours = Math.floor(absolute / 60);
@@ -43,7 +44,7 @@ function formatDelta(minutes: number) {
 }
 
 function statusLabel(status: ShiftCorrectionRequest["status"]) {
-  return status === "pending" ? "Pending" : status === "approved" ? "Approved" : "Rejected";
+  return status === "pending" ? t("Pending") : status === "approved" ? t("Approved") : t("Rejected");
 }
 
 export function ContainerGraphShiftCorrectionsCard({
@@ -89,7 +90,7 @@ export function ContainerGraphShiftCorrectionsCard({
     setIsColorDialogOpen(false);
     setActionError(null);
     saveSettingMutation.mutate(value, {
-      onError: error => setActionError(getErrorMessage(error, "Could not save the correction highlight color.")),
+      onError: error => setActionError(getErrorMessage(error, t("Could not save the correction highlight color."))),
     });
   };
 
@@ -100,9 +101,9 @@ export function ContainerGraphShiftCorrectionsCard({
       onSuccess: () => {
         void containersApi.commitGraphVersion(containerId, graphId)
           .then(onApproved)
-          .catch(error => setActionError(getErrorMessage(error, "The correction was applied, but its schedule version could not be recorded.")));
+          .catch(error => setActionError(getErrorMessage(error, t("The correction was applied, but its schedule version could not be recorded."))));
       },
-      onError: error => setActionError(getErrorMessage(error, "Could not approve this correction.")),
+      onError: error => setActionError(getErrorMessage(error, t("Could not approve this correction."))),
     });
   };
 
@@ -110,7 +111,7 @@ export function ContainerGraphShiftCorrectionsCard({
     if (!selected || containerId === null || graphId === null) return;
     setActionError(null);
     rejectMutation.mutate({ containerId, graphId, id: selected.id }, {
-      onError: error => setActionError(getErrorMessage(error, "Could not reject this correction.")),
+      onError: error => setActionError(getErrorMessage(error, t("Could not reject this correction."))),
     });
   };
 
@@ -120,39 +121,39 @@ export function ContainerGraphShiftCorrectionsCard({
   const selectedDetails = selected ? (
     <article key={selected.id} className={styles.details} role="listitem">
       <div className={styles.detailsHeader}>
-        <div><span>Selected request</span><strong>{selected.employeeName}</strong></div>
+        <div><span>{t("Selected request")}</span><strong>{selected.employeeName}</strong></div>
         <div className={styles.detailsHeaderActions}>
           <time dateTime={selected.createdAtUtc}>{createdAtFormatter.format(new Date(selected.createdAtUtc))}</time>
-          <button type="button" aria-label={`Collapse request from ${selected.employeeName}`}
+          <button type="button" aria-label={t("Collapse request from {0}", selected.employeeName)}
             onClick={() => setSelectedId(null)}><CloseIcon size={14} /></button>
         </div>
       </div>
       <dl className={styles.detailGrid}>
-        <div><dt>Schedule</dt><dd>{selected.scheduleName} · {selected.shopName}</dd></div>
-        <div><dt>Date</dt><dd>{String(selected.dayOfMonth).padStart(2, "0")}.{String(selected.month).padStart(2, "0")}.{selected.year}</dd></div>
+        <div><dt>{t("Schedule")}</dt><dd>{selected.scheduleName} · {selected.shopName}</dd></div>
+        <div><dt>{t("Date")}</dt><dd>{String(selected.dayOfMonth).padStart(2, "0")}.{String(selected.month).padStart(2, "0")}.{selected.year}</dd></div>
       </dl>
       <div className={styles.comparison}>
-        <div><span>Current</span><strong>{selected.originalFromTime} – {selected.originalToTime}</strong></div>
+        <div><span>{t("Current")}</span><strong>{selected.originalFromTime} – {selected.originalToTime}</strong></div>
         <i>→</i>
-        <div><span>Requested</span><strong>{selected.requestedFromTime} – {selected.requestedToTime}</strong></div>
+        <div><span>{t("Requested")}</span><strong>{selected.requestedFromTime} – {selected.requestedToTime}</strong></div>
       </div>
       <div className={styles.deltaRow}>
-        <span>Start {formatDelta(toMinutes(selected.requestedFromTime) - toMinutes(selected.originalFromTime))}</span>
-        <span>End {formatDelta(toMinutes(selected.requestedToTime) - toMinutes(selected.originalToTime))}</span>
-        <strong>Duration {formatDelta(requestedDuration - originalDuration)}</strong>
+        <span>{t("Start")} {formatDelta(toMinutes(selected.requestedFromTime) - toMinutes(selected.originalFromTime))}</span>
+        <span>{t("End")} {formatDelta(toMinutes(selected.requestedToTime) - toMinutes(selected.originalToTime))}</span>
+        <strong>{t("Duration")} {formatDelta(requestedDuration - originalDuration)}</strong>
       </div>
       {selected.status === "pending" ? (
         <>
-          {hasUnsavedChanges ? <p className={styles.saveHint}>Save your current schedule edits before approving.</p> : null}
+          {hasUnsavedChanges ? <p className={styles.saveHint}>{t("Save your current schedule edits before approving.")}</p> : null}
           <div className={styles.actions}>
-            <IosButton label={rejectMutation.isPending ? "Rejecting..." : "Reject"} variant="secondary" size="compact"
+            <IosButton label={rejectMutation.isPending ? t("Rejecting...") : t("Reject")} variant="secondary" size="compact"
               icon={<CloseIcon size={15} />} disabled={isBusy} onClick={handleReject} />
-            <IosButton label={approveMutation.isPending ? "Applying..." : "Approve"} size="compact"
+            <IosButton label={approveMutation.isPending ? t("Applying...") : t("Approve")} size="compact"
               icon={<CheckIcon size={15} />} disabled={isBusy || hasUnsavedChanges} onClick={handleApprove} />
           </div>
         </>
       ) : (
-        <p className={styles.reviewed}>Reviewed {selected.reviewedByManagerName ? `by ${selected.reviewedByManagerName}` : ""}</p>
+        <p className={styles.reviewed}>{t("Reviewed")} {selected.reviewedByManagerName ? `by ${selected.reviewedByManagerName}` : ""}</p>
       )}
     </article>
   ) : null;
@@ -160,31 +161,31 @@ export function ContainerGraphShiftCorrectionsCard({
   return (
     <>
       <div className={styles.headerTools}>
-        <button type="button" className={styles.colorControl} title="Approved correction highlight color"
-          aria-label="Approved correction highlight color" disabled={saveSettingMutation.isPending}
+        <button type="button" className={styles.colorControl} title={t("Approved correction highlight color")}
+          aria-label={t("Approved correction highlight color")} disabled={saveSettingMutation.isPending}
           onClick={() => setIsColorDialogOpen(true)}>
           <span className={styles.colorSwatch} style={{ backgroundColor: highlightColor }} aria-hidden="true" />
         </button>
       </div>
 
       <ContainerGraphHighlightColorDialog open={isColorDialogOpen} value={highlightColor}
-        eyebrow="Shift corrections" title="Choose approval color" inputLabel="Approval highlight hex color"
+        eyebrow="Shift corrections" title={t("Choose approval color")} inputLabel="Approval highlight hex color"
         isSaving={saveSettingMutation.isPending} onCancel={() => setIsColorDialogOpen(false)} onSave={handleColorChange} />
 
       {actionError ? <ErrorBanner dismissible={false}>{actionError}</ErrorBanner> : null}
 
       <div className={styles.summary}>
-        <span>Employee requests</span><strong>{pendingCount} pending</strong>
+        <span>{t("Employee requests")}</span><strong>{pendingCount}  {t("pending")}</strong>
       </div>
 
-      {requestsQuery.isLoading ? <p className={styles.state}>Loading requests...</p> : null}
-      {requestsQuery.isError ? <p className={styles.state}>Could not load shift corrections.</p> : null}
+      {requestsQuery.isLoading ? <p className={styles.state}>{t("Loading requests...")}</p> : null}
+      {requestsQuery.isError ? <p className={styles.state}>{t("Could not load shift corrections.")}</p> : null}
       {!requestsQuery.isLoading && !requestsQuery.isError && requests.length === 0 ? (
-        <p className={styles.state}>No correction requests yet.</p>
+        <p className={styles.state}>{t("No correction requests yet.")}</p>
       ) : null}
 
       {requests.length > 0 ? (
-        <div className={styles.list} role="list" aria-label="Shift correction requests">
+        <div className={styles.list} role="list" aria-label={t("Shift correction requests")}>
           {requests.map(request => selected?.id === request.id ? selectedDetails : (
             <button key={request.id} type="button" role="listitem"
               className={`${styles.requestButton} ${selected?.id === request.id ? styles.requestButtonActive : ""}`}
@@ -193,7 +194,7 @@ export function ContainerGraphShiftCorrectionsCard({
               <span className={styles.avatar}>{request.employeeName.trim().charAt(0).toUpperCase()}</span>
               <span className={styles.requestCopy}>
                 <strong>{request.employeeName}</strong>
-                <small>Day {request.dayOfMonth} · {request.originalFromTime}–{request.originalToTime}</small>
+                <small>{t("Day")} {request.dayOfMonth} · {request.originalFromTime}–{request.originalToTime}</small>
               </span>
               <em className={`${styles.status} ${styles[`status${request.status}`]}`}>{statusLabel(request.status)}</em>
             </button>

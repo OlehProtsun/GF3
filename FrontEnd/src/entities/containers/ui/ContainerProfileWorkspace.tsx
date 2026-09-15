@@ -1,5 +1,4 @@
-import { dateTimeFormat } from "@shared/i18n";
-import { t } from "@shared/i18n";
+import { dateTimeFormat, t } from "@shared/i18n";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { AvailabilitySidebarCollapseButton, AvailabilitySidebarSection } from "@entities/availability-groups/ui/AvailabilitySidebarSection";
 import {

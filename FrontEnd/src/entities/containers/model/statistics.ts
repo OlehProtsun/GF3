@@ -1,5 +1,4 @@
-import { dateTimeFormat } from "@shared/i18n";
-import { t } from "@shared/i18n";
+import { dateTimeFormat, t } from "@shared/i18n";
 import type { Employee } from "@entities/employees/model/types";
 import type { Shop } from "@entities/shops/model/types";
 import { getGraphVisibleNote } from "./graphNote";

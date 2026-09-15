@@ -66,7 +66,7 @@ export function EmployeeDetailsForm({
             <TextInput
               id="email"
               type="email"
-              placeholder="Example: john.doe@example.com"
+              placeholder={t("Example: john.doe@example.com")}
               value={form.email}
               onChange={onFieldChange("email")}
               aria-invalid={Boolean(errors.email)}

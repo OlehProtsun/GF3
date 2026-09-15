@@ -1,5 +1,4 @@
-import { dateTimeFormat } from "@shared/i18n";
-import { t } from "@shared/i18n";
+import { dateTimeFormat, t } from "@shared/i18n";
 import type { RegulationAcceptance } from "@entities/regulations";
 import { regulationsApi } from "@entities/regulations";
 import styles from "./RegulationHistoryCard.module.css";

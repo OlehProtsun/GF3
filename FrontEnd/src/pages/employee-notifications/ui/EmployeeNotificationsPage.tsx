@@ -1,5 +1,4 @@
-import { getLocale } from "@shared/i18n";
-import { t } from "@shared/i18n";
+import { getLocale, t } from "@shared/i18n";
 import { useEffect, useMemo, useState } from "react";
 import { NavLink } from "react-router-dom";
 import { useAuth } from "@app/providers/AuthProvider";

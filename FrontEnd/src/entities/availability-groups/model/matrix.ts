@@ -1,5 +1,4 @@
-import { getLanguage } from "@shared/i18n";
-import { t } from "@shared/i18n";
+import { getLanguage, t } from "@shared/i18n";
 import type { AvailabilityGroupItem, AvailabilityGroupMember, AvailabilityKind, AvailabilitySlot } from "./types";
 import { parseFlexibleTimeRange } from "@shared/lib/timeRange";
 

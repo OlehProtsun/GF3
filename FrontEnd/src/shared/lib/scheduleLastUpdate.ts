@@ -1,5 +1,4 @@
-import { dateTimeFormat } from "@shared/i18n";
-import { t } from "@shared/i18n";
+import { dateTimeFormat, t } from "@shared/i18n";
 const scheduleLastUpdateFormatter = dateTimeFormat("en-GB", {
   day: "2-digit",
   month: "short",

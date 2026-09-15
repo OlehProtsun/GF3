@@ -1,5 +1,5 @@
-import { useLanguageRevision } from "@shared/i18n/useLanguageRevision";
 import { t } from "@shared/i18n";
+import { useLanguageRevision } from "@shared/i18n/useLanguageRevision";
 import { useState } from "react";
 import type { ReactNode } from "react";
 import { NavLink, useLocation } from "react-router-dom";

@@ -1,6 +1,5 @@
+import { dateTimeFormat, t } from "@shared/i18n";
 import { useLanguageRevision } from "@shared/i18n/useLanguageRevision";
-import { dateTimeFormat } from "@shared/i18n";
-import { t } from "@shared/i18n";
 import { LanguageSelector } from "@shared/i18n/LanguageSelector";
 import { useEffect, useMemo, useState } from "react";
 import type { ChangeEvent } from "react";
@@ -317,7 +316,7 @@ export function ManagerAccountPage() {
                 </div>
 
                 <div className={styles.formGrid}>
-                  <label className={styles.field}><LanguageSelector disabled={isBusy} /></label>
+                  <div className={styles.field}><LanguageSelector disabled={isBusy} appearance="rounded" /></div>
                   <label className={styles.field}>
                     <span>{t("Display name")}</span>
                     <input
@@ -464,7 +463,7 @@ export function ManagerAccountPage() {
               <div className={styles.createPanel}>
                 <span className={styles.eyebrow}>{t("Add manager")}</span>
                 <div className={styles.formGrid}>
-                  <label className={styles.field}><LanguageSelector disabled={hasProfileChanges || isBusy} /></label>
+
                   <label className={styles.field}>
                     <span>{t("Display name")}</span>
                     <input
@@ -553,4 +552,3 @@ export function ManagerAccountPage() {
     </div>
   );
 }
-
