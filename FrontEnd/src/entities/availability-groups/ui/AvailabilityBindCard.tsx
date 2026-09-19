@@ -1,5 +1,5 @@
 import { t } from "@shared/i18n";
-﻿import type { FocusEvent, KeyboardEvent, ReactNode } from "react";
+import type { FocusEvent, KeyboardEvent, ReactNode } from "react";
 import {
   formatBindKeyFromKeyboardEvent,
   isCommonEditorShortcut,

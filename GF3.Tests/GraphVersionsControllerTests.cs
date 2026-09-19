@@ -92,6 +92,52 @@ public sealed class GraphVersionsControllerTests
         Assert.Equal("Current name", (await db.Schedules.AsNoTracking().SingleAsync(item => item.Id == fixture.ScheduleId)).Name);
     }
 
+    [Theory]
+    [InlineData(ShiftSwapStatus.Accepted)]
+    [InlineData(ShiftSwapStatus.Cancelled)]
+    public async Task CheckoutCurrentVersion_PreservesCompletedSwapsAndPins(ShiftSwapStatus status)
+    {
+        await using var database = await SqliteTestDatabase.CreateAsync();
+        await using var db = database.CreateContext();
+        var fixture = await SeedScheduleAsync(db);
+        var controller = CreateController(db);
+        await controller.GetTree(fixture.ContainerId, fixture.ScheduleId, CancellationToken.None);
+        var initial = await db.ScheduleVersions.SingleAsync();
+        var schedule = await db.Schedules.SingleAsync();
+        schedule.Name = "Uncommitted changes";
+        schedule.AcceptedSwapHighlightColor = "#FF0000";
+        var swap = new ShiftSwapRequestModel
+        {
+            ScheduleId = fixture.ScheduleId, ScheduleSlotId = fixture.SlotId,
+            FromEmployeeId = fixture.EmployeeId, Status = status,
+            AcceptedByEmployeeId = status == ShiftSwapStatus.Accepted ? fixture.EmployeeId : null,
+            CreatedAtUtc = DateTimeOffset.UtcNow,
+        };
+        db.ShiftSwapRequests.Add(swap);
+        await db.SaveChangesAsync();
+        db.EmployeePinnedSwaps.Add(new EmployeePinnedSwapModel
+        {
+            EmployeeId = fixture.EmployeeId, ShiftSwapId = swap.Id, PinnedAtUtc = DateTimeOffset.UtcNow,
+        });
+        await db.SaveChangesAsync();
+        var result = await controller.Checkout(fixture.ContainerId, fixture.ScheduleId, initial.Id, CancellationToken.None);
+        Assert.IsType<OkObjectResult>(result.Result);
+        db.ChangeTracker.Clear();
+        var archived = await db.ShiftSwapRequests.SingleAsync();
+        Assert.Null(archived.ScheduleSlotId);
+        Assert.NotNull(archived.ArchivedViewsJson);
+        using var views = System.Text.Json.JsonDocument.Parse(archived.ArchivedViewsJson);
+        Assert.Equal(fixture.SlotId, views.RootElement.GetProperty(fixture.EmployeeId.ToString()).GetProperty("scheduleSlotId").GetInt32());
+        Assert.Single(await db.EmployeePinnedSwaps.ToListAsync());
+        schedule = await db.Schedules.SingleAsync();
+        Assert.Equal("Initial snapshot", schedule.Name);
+        Assert.Equal("#BBF7D0", schedule.AcceptedSwapHighlightColor);
+        Assert.Single(await db.ScheduleSlots.ToListAsync());
+        var snapshot = archived.ArchivedViewsJson;
+        await controller.Checkout(fixture.ContainerId, fixture.ScheduleId, initial.Id, CancellationToken.None);
+        Assert.Equal(snapshot, (await db.ShiftSwapRequests.AsNoTracking().SingleAsync()).ArchivedViewsJson);
+        Assert.Single(await db.EmployeePinnedSwaps.ToListAsync());
+    }
     private static GraphVersionsController CreateController(DataAccessLayer.Models.DataBaseContext.AppDbContext db)
     {
         var controller = new GraphVersionsController(db, new NoopWorkflowLogService(), new NoopRealtimeNotifier());

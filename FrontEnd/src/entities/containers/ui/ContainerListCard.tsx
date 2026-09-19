@@ -1,5 +1,5 @@
 import { t } from "@shared/i18n";
-﻿import type { Container } from "@entities/containers/model/types";
+import type { Container } from "@entities/containers/model/types";
 import { getContainerDisplayName } from "@entities/containers/model/presentation";
 import { usePinnedRecords } from "@shared/lib/records/usePinnedRecords";
 import { IosButton } from "@shared/ui/components/IosButton";

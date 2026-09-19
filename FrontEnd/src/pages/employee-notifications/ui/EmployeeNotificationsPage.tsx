@@ -16,6 +16,8 @@ import {
 } from "@entities/employee-availability";
 import { getErrorMessage } from "@shared/api/httpClient";
 import {
+  employeeNotificationReadStateEventName,
+  getEmployeeNotificationReadStorageKeys,
   readEmployeeNotificationIdsForAccount,
   writeEmployeeNotificationIdsForAccount,
 } from "@shared/lib/employeeNotificationReadState";
@@ -50,8 +52,20 @@ export function EmployeeNotificationsPage() {
   );
 
   useEffect(() => {
-    setReadIds(readEmployeeNotificationIdsForAccount(session?.userName, session?.employeeId));
-  }, [session?.employeeId, session?.userName]);
+    const refresh = () => setReadIds(new Set([
+      ...readEmployeeNotificationIdsForAccount(session?.userName, session?.employeeId),
+      ...(uiState?.readNotificationIds ?? []),
+    ]));
+    const keys = getEmployeeNotificationReadStorageKeys(session?.userName, session?.employeeId);
+    const onStorage = (event: StorageEvent) => { if (!event.key || keys.includes(event.key)) refresh(); };
+    refresh();
+    window.addEventListener(employeeNotificationReadStateEventName, refresh);
+    window.addEventListener("storage", onStorage);
+    return () => {
+      window.removeEventListener(employeeNotificationReadStateEventName, refresh);
+      window.removeEventListener("storage", onStorage);
+    };
+  }, [session?.employeeId, session?.userName, uiState]);
   useEffect(() => {
     if (!uiState) {
       return;
@@ -85,7 +99,7 @@ export function EmployeeNotificationsPage() {
   const newsUnreadCount = newsItems.filter(item => !item.isRead).length;
   const activeUnreadCount = activeTab === "inbox" ? unreadCount : newsUnreadCount;
   const activeItemCount = activeTab === "inbox" ? notificationItems.length : newsItems.length;
-  const queryError = swapsQuery.error ?? schedulesQuery.error ?? availabilityQuery.error ?? newsQuery.error;
+  const queryError = swapsQuery.error ?? schedulesQuery.error ?? availabilityQuery.error ?? newsQuery.error ?? markNewsRead.error ?? markAllNewsRead.error;
   const queryErrorMessage = queryError ? getErrorMessage(queryError, t("Could not load notifications.")) : null;
 
   const handleMarkAllRead = () => {

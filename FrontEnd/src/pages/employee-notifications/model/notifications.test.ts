@@ -150,45 +150,26 @@ describe("employee notification model", () => {
     expect(items[0]?.id).toBe("open-shift:2");
   });
 
-  it("keeps read state when a schedule-only live event resolves to a swap snapshot after login", () => {
-    const liveItems = buildEmployeeNotificationItems(
-      [
-        createNotification({
-          id: "open-shift-schedule:10",
-          shiftSwapId: null,
-          scheduleId: 10,
-          graphId: 10,
-        }),
-      ],
-      [],
-      [],
-      [],
-      Date.parse("2026-05-10T12:00:00.000Z"),
-    );
-    const readIds = new Set(liveItems[0]?.readIds ?? []);
-    const snapshotItems = buildEmployeeNotificationItems(
-      [],
-      [createSwap({ id: 7, scheduleId: 10 })],
-      [],
-      [],
-      Date.parse("2026-05-10T12:00:00.000Z"),
-    );
-
-    expect(liveItems[0]?.id).toBe("open-shift-schedule:10");
-    expect(snapshotItems[0]?.id).toBe("open-shift:7");
-    expect(isEmployeeNotificationRead(snapshotItems[0]!, readIds)).toBe(true);
-    expect(getUnreadEmployeeNotificationTargets([], [createSwap({ id: 7, scheduleId: 10 })], [], [], readIds, TEST_NOW_MS))
-      .toEqual({ alerts: false, availability: false, schedule: false, swap: false });
+  it("requires an authorized open snapshot and never revives accepted or removed offers", () => {
+    expect(buildEmployeeNotificationItems([createNotification()], [], [], [], TEST_NOW_MS)).toEqual([]);
+    expect(buildEmployeeNotificationItems([createNotification()], [createSwap({status: "accepted"})], [], [], TEST_NOW_MS)).toEqual([]);
   });
 
-  it("hides open shift notifications after seven days", () => {
+  it("reading one open shift does not mark another shift in the same schedule read", () => {
+    const items = buildEmployeeNotificationItems([], [createSwap(), createSwap({id: 2})], [], [], TEST_NOW_MS);
+    const read = new Set(items[0]!.readIds);
+    expect(isEmployeeNotificationRead(items[0]!, read)).toBe(true);
+    expect(isEmployeeNotificationRead(items[1]!, read)).toBe(false);
+  });
+
+  it("hides open shift notifications after five days", () => {
     const nowMs = Date.parse("2026-05-18T12:00:00.000Z");
     const items = buildEmployeeNotificationItems(
       [
         createNotification({
           id: "recent-live",
           shiftSwapId: 2,
-          occurredAtUtc: "2026-05-12T12:00:00.000Z",
+          occurredAtUtc: "2026-05-14T12:00:00.000Z",
         }),
         createNotification({
           id: "expired-live",
@@ -197,7 +178,7 @@ describe("employee notification model", () => {
         }),
       ],
       [
-        createSwap({ id: 2, createdAtUtc: "2026-05-12T12:00:00.000Z" }),
+        createSwap({ id: 2, createdAtUtc: "2026-05-14T12:00:00.000Z" }),
         createSwap({ id: 3, createdAtUtc: "2026-05-10T11:59:59.000Z" }),
       ],
       [],
@@ -232,6 +213,7 @@ describe("employee notification model", () => {
       shopId: 3,
       shopName: "Central shop",
       name: "June schedule",
+      publishedAtUtc: "2026-05-10T10:00:00.000Z",
       year: 2026,
       month: 6,
       publicationStatus: "public",
@@ -296,9 +278,9 @@ describe("employee notification model", () => {
 
     expect(items.map(item => item.id)).toEqual([
       "swap-accepted:10",
-      "schedule-public:21",
-      "availability-public:31:2026-05-10T08:00:00.000Z",
+      "schedule-public:21:2026-05-10T10:00:00.000Z",
       "swap-public:9",
+      "availability-public:31:2026-05-10T08:00:00.000Z",
     ]);
     expect(items.map(item => item.title)).toEqual(expect.arrayContaining([
       "New schedule published",
@@ -367,3 +349,26 @@ describe("employee notification model", () => {
     expect(isOpenShiftPostedNotification(createNotification({ kind: "schedule" }))).toBe(false);
   });
 });
+
+ describe("notification expiration regressions", () => {
+  it("expires all notification types exactly five days after the source event", () => {
+    const date = new Date(TEST_NOW_MS - 5 * 86_400_000).toISOString();
+    const schedule = {id: 21, name: "Schedule", year: 2026, month: 5, publishedAtUtc: date, lastUpdatedAtUtc: new Date(TEST_NOW_MS).toISOString()} as EmployeeSchedule;
+    const availability = {id: 31, name: "Availability", year: 2026, month: 5, visibleFromUtc: date} as EmployeeAvailabilityGroup;
+    const swaps = [createSwap({createdAtUtc: date}), createSwap({id: 2, isManagerCreated: false, createdAtUtc: date}), createSwap({id: 3, status: "accepted", isCreatedByCurrentEmployee: true, acceptedAtUtc: date})];
+    expect(buildEmployeeNotificationItems([], swaps, [schedule], [availability], TEST_NOW_MS - 1)).toHaveLength(5);
+    expect(buildEmployeeNotificationItems([], swaps, [schedule], [availability], TEST_NOW_MS)).toEqual([]);
+    expect(getUnreadEmployeeNotificationTargets([], swaps, [schedule], [availability], new Set(), TEST_NOW_MS)).toEqual({alerts: false, schedule: false, availability: false, swap: false});
+  });
+  it("rejects missing and invalid dates instead of keeping notifications forever", () => {
+    const schedules = [undefined, null, "invalid"].map(publishedAtUtc => ({id: 1, name: "Schedule", year: 2026, month: 5, publishedAtUtc}) as EmployeeSchedule);
+    expect(buildEmployeeNotificationItems([], [], schedules, [], TEST_NOW_MS)).toEqual([]);
+  });
+  it("republished schedules are unread and retain their publication date after an edit", () => {
+    const publishedAtUtc = new Date(TEST_NOW_MS - 1000).toISOString();
+    const schedule = {id: 21, name: "Schedule", year: 2026, month: 5, publishedAtUtc, lastUpdatedAtUtc: new Date(TEST_NOW_MS).toISOString()} as EmployeeSchedule;
+    const [item] = buildEmployeeNotificationItems([], [], [schedule], [], TEST_NOW_MS);
+    expect(item!.occurredAtUtc).toBe(publishedAtUtc);
+    expect(isEmployeeNotificationRead(item!, new Set(["schedule-public:21", "schedule-public:21:old"]))).toBe(false);
+  });
+ });

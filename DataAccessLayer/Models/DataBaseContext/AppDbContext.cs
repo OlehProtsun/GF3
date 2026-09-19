@@ -49,6 +49,38 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<AvailabilityGroupDayModel> AvailabilityGroupDays => Set<AvailabilityGroupDayModel>();
     public DbSet<AvailabilityGroupDayTransferModel> AvailabilityGroupDayTransfers => Set<AvailabilityGroupDayTransferModel>();
 
+    public override int SaveChanges(bool acceptAllChangesOnSuccess)
+    {
+        UpdateSchedulePublicationTimestamps();
+        return base.SaveChanges(acceptAllChangesOnSuccess);
+    }
+
+    public override Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
+    {
+        UpdateSchedulePublicationTimestamps();
+        return base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+    }
+
+    private void UpdateSchedulePublicationTimestamps()
+    {
+        foreach (var entry in ChangeTracker.Entries<ScheduleModel>())
+        {
+            var publication = entry.Property(schedule => schedule.PublicationStatus);
+            var timestamp = entry.Property(schedule => schedule.PublishedAtUtc);
+            if (entry.State == EntityState.Added)
+            {
+                timestamp.CurrentValue = publication.CurrentValue == SchedulePublicationStatus.Public
+                    ? DateTimeOffset.UtcNow : null;
+            }
+            else if (entry.State == EntityState.Modified)
+            {
+                timestamp.CurrentValue = publication.CurrentValue == SchedulePublicationStatus.Public &&
+                    publication.OriginalValue != SchedulePublicationStatus.Public
+                    ? DateTimeOffset.UtcNow : timestamp.OriginalValue;
+            }
+        }
+    }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         ConfigureContainer(modelBuilder);

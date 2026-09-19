@@ -51,6 +51,7 @@ public sealed class AuthService : IAuthService
                 UserName = managerAccount.UserName,
                 DisplayName = managerAccount.DisplayName,
                 ManagerId = managerAccount.Id,
+                CredentialVersion = managerAccount.PasswordUpdatedAtUtc.UtcTicks,
             };
         }
 

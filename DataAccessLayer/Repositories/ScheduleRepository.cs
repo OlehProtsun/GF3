@@ -46,15 +46,23 @@ public class ScheduleRepository : GenericRepository<ScheduleModel>, IScheduleRep
         CancellationToken ct = default)
     {
         var query = _set.Where(schedule => schedule.ContainerId == containerId);
+        var now = DateTimeOffset.UtcNow;
 
         return allowSwap.HasValue
             ? await query.ExecuteUpdateAsync(
                 setters => setters
+                    .SetProperty(schedule => schedule.PublishedAtUtc, schedule =>
+                        publicationStatus == SchedulePublicationStatus.Public && schedule.PublicationStatus != SchedulePublicationStatus.Public
+                            ? now : schedule.PublishedAtUtc)
                     .SetProperty(schedule => schedule.PublicationStatus, publicationStatus)
                     .SetProperty(schedule => schedule.AllowSwap, allowSwap.Value),
                 ct).ConfigureAwait(false)
             : await query.ExecuteUpdateAsync(
-                setters => setters.SetProperty(schedule => schedule.PublicationStatus, publicationStatus),
+                setters => setters
+                    .SetProperty(schedule => schedule.PublishedAtUtc, schedule =>
+                        publicationStatus == SchedulePublicationStatus.Public && schedule.PublicationStatus != SchedulePublicationStatus.Public
+                            ? now : schedule.PublishedAtUtc)
+                    .SetProperty(schedule => schedule.PublicationStatus, publicationStatus),
                 ct).ConfigureAwait(false);
     }
 

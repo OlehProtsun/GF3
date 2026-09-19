@@ -153,18 +153,15 @@ public sealed class DatabaseMigrationStartupTests
         context.ScheduleSlots.Add(slot);
         await context.SaveChangesAsync();
 
-        context.ShiftSwapRequests.Add(new ShiftSwapRequestModel
-        {
-            ScheduleId = scheduleId,
-            ScheduleSlotId = slot.Id,
-            FromEmployeeId = alice.Id,
-            AcceptedByEmployeeId = bob.Id,
-            Visibility = ShiftSwapVisibility.Public,
-            Status = ShiftSwapStatus.Accepted,
-            CreatedAtUtc = new DateTimeOffset(2026, 6, 25, 8, 0, 0, TimeSpan.Zero),
-            AcceptedAtUtc = new DateTimeOffset(2026, 6, 25, 9, 0, 0, TimeSpan.Zero),
-        });
-        await context.SaveChangesAsync();
+        // Seed the historical schema without columns introduced by later migrations.
+        await context.Database.ExecuteSqlInterpolatedAsync($"""
+            INSERT INTO shift_swap_request
+                (schedule_id, schedule_slot_id, from_employee_id, accepted_by_employee_id,
+                 visibility, status, created_at_utc, accepted_at_utc)
+            VALUES ({scheduleId}, {slot.Id}, {alice.Id}, {bob.Id}, {"Public"}, {"Accepted"},
+                {new DateTimeOffset(2026, 6, 25, 8, 0, 0, TimeSpan.Zero)},
+                {new DateTimeOffset(2026, 6, 25, 9, 0, 0, TimeSpan.Zero)});
+            """);
     }
 
     private static string CreateTempRoot()

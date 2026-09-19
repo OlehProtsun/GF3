@@ -95,6 +95,13 @@ export function EmployeeWorkspaceLayout({ children }: PropsWithChildren) {
   const schedules = schedulesQuery.data ?? emptySchedules;
   const availabilityGroups = availabilityQuery.data ?? emptyAvailabilityGroups;
   const { pathname } = useLocation();
+  const [nowMs, setNowMs] = useState(() => Date.now());
+  useEffect(() => {
+    const refresh = () => setNowMs(Date.now());
+    const timer = window.setInterval(refresh, 30_000);
+    window.addEventListener("focus", refresh);
+    return () => { window.clearInterval(timer); window.removeEventListener("focus", refresh); };
+  }, []);
   const [readNotificationIds, setReadNotificationIds] = useState<Set<string>>(() =>
     readEmployeeNotificationIdsForAccount(session?.userName, session?.employeeId),
   );
@@ -107,7 +114,7 @@ export function EmployeeWorkspaceLayout({ children }: PropsWithChildren) {
     isProfileRoute ? styles.layoutProfile : "",
     isAvailabilityRoute ? styles.layoutAvailability : "",
     isScheduleRoute ? styles.layoutSchedule : "",
-    isSwapRoute ? styles.layoutSchedule : "",
+    isSwapRoute ? styles.layoutSwap : "",
   ]
     .filter(Boolean)
     .join(" ");
@@ -143,14 +150,18 @@ export function EmployeeWorkspaceLayout({ children }: PropsWithChildren) {
       schedules,
       availabilityGroups,
       readNotificationIds,
+      nowMs,
     ),
-    [availabilityGroups, notifications, readNotificationIds, schedules, swaps],
+    [availabilityGroups, notifications, readNotificationIds, schedules, swaps, nowMs],
   );
 
   useEffect(() => {
     const storageKeys = getEmployeeNotificationReadStorageKeys(session?.userName, session?.employeeId);
     const refreshReadState = () => {
-      setReadNotificationIds(readEmployeeNotificationIdsForAccount(session?.userName, session?.employeeId));
+      setReadNotificationIds(new Set([
+        ...readEmployeeNotificationIdsForAccount(session?.userName, session?.employeeId),
+        ...(uiState?.readNotificationIds ?? []),
+      ]));
     };
 
     refreshReadState();
@@ -168,7 +179,7 @@ export function EmployeeWorkspaceLayout({ children }: PropsWithChildren) {
       window.removeEventListener("storage", handleStorage);
       window.removeEventListener(employeeNotificationReadStateEventName, refreshReadState);
     };
-  }, [session?.employeeId, session?.userName]);
+  }, [session?.employeeId, session?.userName, uiState]);
   useEffect(() => {
     if (!uiState) {
       return;

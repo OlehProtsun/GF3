@@ -275,6 +275,13 @@ export class QueryClient {
     record.invalidatedWhileFetching = true;
     record.controller?.abort();
   }
+
+  clear(): void {
+    const records = [...this.records.values()];
+    this.records.clear();
+    this.bumps.clear();
+    records.forEach(record => record.controller?.abort());
+  }
 }
 
 const QueryClientContext = createContext<QueryClient | null>(null);

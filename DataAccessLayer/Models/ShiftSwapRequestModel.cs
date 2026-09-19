@@ -21,11 +21,13 @@ public class ShiftSwapRequestModel
 
     public ScheduleModel Schedule { get; set; } = null!;
 
-    [Required]
     [Column("schedule_slot_id")]
-    public int ScheduleSlotId { get; set; }
+    public int? ScheduleSlotId { get; set; }
 
-    public ScheduleSlotModel ScheduleSlot { get; set; } = null!;
+    public ScheduleSlotModel? ScheduleSlot { get; set; }
+
+    [Column("archived_views_json")]
+    public string? ArchivedViewsJson { get; set; }
 
     [Column("offered_from_time")]
     public string? OfferedFromTime { get; set; }

@@ -276,6 +276,8 @@ function invalidateRealtimeBaselineQueries(queryClient: QueryClient) {
   invalidateRealtimeQuery(queryClient, queryKeys.employeeSchedules.all);
   invalidateRealtimeQuery(queryClient, queryKeys.shiftSwaps.all);
   invalidateRealtimeQuery(queryClient, queryKeys.workflowLogs.all);
+  invalidateRealtimeQuery(queryClient, queryKeys.employeeAvailability.all);
+  invalidateRealtimeQuery(queryClient, queryKeys.employeeUiState.current());
 }
 
 function invalidateGraphRealtimeQueries(queryClient: QueryClient, containerId: number, graphId: number) {
@@ -317,7 +319,7 @@ export function PresenceProvider({ children }: PropsWithChildren) {
 
   useEffect(() => {
     setNotifications([]);
-  }, [session?.role, session?.userName]);
+  }, [session?.role, session?.userName, session?.employeeId]);
 
   const pushEmployeeNotification = useEffectEvent((notification: EmployeeRealtimeNotification) => {
     if (session?.role !== "employee") {

@@ -39,7 +39,7 @@ export type EmployeeNotificationItem = {
 
 export type EmployeeNavNotificationTarget = "alerts" | "availability" | "schedule" | "swap";
 
-export const employeeNotificationRetentionMs = 7 * 24 * 60 * 60 * 1000;
+export const employeeNotificationRetentionMs = 5 * 24 * 60 * 60 * 1000;
 
 export function getEmployeeNotificationExpiryAtMs(value?: string | null) {
   if (!value) {
@@ -53,7 +53,7 @@ export function getEmployeeNotificationExpiryAtMs(value?: string | null) {
 export function formatEmployeeNotificationExpiry(value?: string | null, nowMs = Date.now()) {
   const expiresAtMs = getEmployeeNotificationExpiryAtMs(value);
   if (expiresAtMs === null) {
-    return t("This notification will be deleted automatically after 7 days.");
+    return t("This notification will be deleted automatically after 5 days.");
   }
 
   const remainingMs = expiresAtMs - nowMs;
@@ -128,8 +128,6 @@ function getRelatedScheduleId(event: EmployeeRealtimeNotificationLike) {
 function getOpenShiftSwapReadIds(swap: Pick<ShiftSwap, "id" | "scheduleId">) {
   return uniqueIds([
     getEmployeeOpenShiftNotificationId(swap.id),
-    getEmployeeOpenShiftScheduleNotificationId(swap.scheduleId),
-    getEmployeeOpenShiftNotificationId(swap.scheduleId),
   ]);
 }
 
@@ -152,7 +150,7 @@ export function isEmployeeNotificationRead(item: Pick<EmployeeNotificationItem, 
 
 export function isWithinEmployeeNotificationRetention(value?: string | null, nowMs = Date.now()) {
   const expiresAtMs = getEmployeeNotificationExpiryAtMs(value);
-  return expiresAtMs === null || nowMs < expiresAtMs;
+  return expiresAtMs !== null && nowMs < expiresAtMs;
 }
 
 export function buildOpenShiftLiveNotification(
@@ -249,15 +247,15 @@ function buildScheduleNotification(
   schedule: EmployeeSchedule,
   event?: EmployeeRealtimeNotificationLike,
 ): EmployeeNotificationItem {
-  const id = getEmployeeScheduleNotificationId(schedule.id);
+  const id = getEmployeeScheduleNotificationId(schedule.id, schedule.publishedAtUtc);
   return {
     id,
-    readIds: uniqueIds([id, event?.id]),
+    readIds: [id],
     title: t("New schedule published"),
     body: t("\"{0}\" for {1} is now available at {2}.", schedule.name, formatMonth(schedule.year, schedule.month), schedule.shopName || "your shop"),
     meta: `${schedule.shopName || t("Shop")} / ${schedule.containerName || t("Container")}`,
     tone: "schedule",
-    occurredAtUtc: event?.occurredAtUtc ?? schedule.lastUpdatedAtUtc ?? null,
+    occurredAtUtc: schedule.publishedAtUtc ?? event?.occurredAtUtc ?? null,
     actionPath: "/schedule",
     actionLabel: t("Open schedule"),
   };
@@ -270,14 +268,14 @@ function buildAvailabilityNotification(
   const id = getEmployeeAvailabilityNotificationId(availability.id, availability.visibleFromUtc);
   return {
     id,
-    readIds: uniqueIds([id, event?.id]),
+    readIds: [id],
     title: t("New availability published"),
     body: t("\"{0}\" for {1} is open for your availability.", availability.name, formatMonth(availability.year, availability.month)),
     meta: availability.visibleToUtc
       ? t("Submit by {0}", formatNotificationTime(availability.visibleToUtc))
       : t("Open now"),
     tone: "availability",
-    occurredAtUtc: event?.occurredAtUtc ?? availability.visibleFromUtc ?? null,
+    occurredAtUtc: availability.visibleFromUtc ?? event?.occurredAtUtc ?? null,
     actionPath: "/availability",
     actionLabel: t("Open availability"),
   };
@@ -292,7 +290,7 @@ function buildSwapAvailableNotification(
     return {
       ...item,
       readIds: uniqueIds([...item.readIds, event?.id]),
-      occurredAtUtc: event?.occurredAtUtc ?? item.occurredAtUtc,
+      occurredAtUtc: item.occurredAtUtc,
     };
   }
 
@@ -304,7 +302,7 @@ function buildSwapAvailableNotification(
     body: t("{0} offered {1} {2} - {3} from \"{4}\".", swap.fromEmployeeName || "A coworker", formatSwapDay(swap), swap.fromTime, swap.toTime, swap.scheduleName),
     meta: `${swap.shopName || t("Shop")} / ${swap.containerName || t("Container")}`,
     tone: "swap",
-    occurredAtUtc: event?.occurredAtUtc ?? swap.createdAtUtc,
+    occurredAtUtc: swap.createdAtUtc,
     actionPath: "/swap",
     actionLabel: t("Open swap"),
   };
@@ -322,7 +320,7 @@ function buildAcceptedOwnSwapNotification(
     body: t("{0} accepted your {1} {2} - {3} shift from \"{4}\".", swap.acceptedByEmployeeName || "A coworker", formatSwapDay(swap), swap.fromTime, swap.toTime, swap.scheduleName),
     meta: `${swap.shopName || t("Shop")} / ${swap.containerName || t("Container")}`,
     tone: "swap",
-    occurredAtUtc: event?.occurredAtUtc ?? swap.acceptedAtUtc ?? swap.createdAtUtc,
+    occurredAtUtc: swap.acceptedAtUtc ?? swap.createdAtUtc,
     actionPath: "/swap",
     actionLabel: t("View swap"),
   };
@@ -358,24 +356,6 @@ export function buildEmployeeNotificationItems(
       availability,
       findAvailabilityPublicationEvent(realtimeNotifications, availability.id),
     ));
-  });
-
-  realtimeNotifications.forEach(event => {
-    if (!isOpenShiftPostedNotification(event) || !isWithinEmployeeNotificationRetention(event.occurredAtUtc, nowMs)) {
-      return;
-    }
-
-    const hasMatchingSnapshot = swaps.some(swap =>
-      swap.isManagerCreated &&
-      swap.status === "open" &&
-      (
-        event.shiftSwapId === swap.id ||
-        (event.shiftSwapId == null && getRelatedScheduleId(event) === swap.scheduleId)
-      ),
-    );
-    if (!hasMatchingSnapshot) {
-      items.push(buildOpenShiftLiveNotification(event, null));
-    }
   });
 
   swaps.forEach(swap => {

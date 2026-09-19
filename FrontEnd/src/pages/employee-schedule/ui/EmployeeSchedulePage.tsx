@@ -34,6 +34,7 @@ import workspaceStyles from "@pages/shared/EmployeeWorkspacePage.module.css";
 import { EmployeeScheduleColumnOrderDialog } from "./EmployeeScheduleColumnOrderDialog";
 import { EmployeeShiftCorrectionDialog } from "./EmployeeShiftCorrectionDialog";
 import styles from "./EmployeeSchedulePage.module.css";
+import { EmployeeScheduleHero } from "./EmployeeScheduleHero";
 
 const scheduleMonthFormatter = dateTimeFormat("en-GB", {
   month: "long",
@@ -1167,31 +1168,13 @@ export function EmployeeSchedulePage() {
       {preferenceSaveError ? <ErrorBanner dismissible>{preferenceSaveError}</ErrorBanner> : null}
       {shiftCorrectionSuccess ? <div className={styles.shiftCorrectionSuccess} role="status">{shiftCorrectionSuccess}</div> : null}
 
-      <section className={`${workspaceStyles.panel} ${styles.summaryPanel}`}>
-        <div className={styles.summaryHeader}>
-          <div className={styles.summaryHeading}>
-            <span className={styles.summaryIcon} aria-hidden="true">
-              <ScheduleIcon size={20} />
-            </span>
-            <div>
-              <span className={workspaceStyles.panelEyebrow}>{t("Statistics")}</span>
-              <h1 className={workspaceStyles.panelTitle}>{displayName}</h1>
-            </div>
-          </div>
-          <time className={styles.todayBadge} dateTime={new Date().toISOString().slice(0, 10)}>
-            {dateTimeFormat("en-GB", { day: "2-digit", month: "short", year: "numeric" }).format(new Date())}
-          </time>
-        </div>
-
-        <div className={styles.summaryStats}>
-          <span>{t("{0} schedules", scheduleStats.scheduleCount)}</span>
-          <span>{t("{0} work days", scheduleStats.workDays)}</span>
-          <span>{t("{0} free days", scheduleStats.freeDays)}</span>
-          <span>{t("{0} Total Hours", scheduleStats.totalHours)}</span>
-          <span>{t("Month: {0}", scheduleStats.month)}</span>
-          <span>{t("Year: {0}", scheduleStats.year)}</span>
-        </div>
-      </section>
+      <EmployeeScheduleHero
+        schedules={schedules}
+        employeeId={currentEmployeeId}
+        displayName={displayName}
+        isLoading={scheduleQuery.isLoading}
+        hasError={Boolean(scheduleQuery.error)}
+      />
 
       {scheduleQuery.isLoading ? (
         <section className={workspaceStyles.panel}>

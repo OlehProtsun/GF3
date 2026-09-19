@@ -184,6 +184,11 @@ function renderPage() {
 }
 
 beforeEach(() => {
+  // jsdom does not implement the browser's modal dialog methods.
+  Object.defineProperties(HTMLDialogElement.prototype, {
+    showModal: { configurable: true, value(this: HTMLDialogElement) { this.open = true; } },
+    close: { configurable: true, value(this: HTMLDialogElement) { this.open = false; } },
+  });
   window.localStorage.clear();
   mocks.schedulesQuery.mockReset();
   mocks.swapsQuery.mockReset();
@@ -207,7 +212,7 @@ describe("EmployeeSwapPage", () => {
     const user = userEvent.setup();
     renderPage();
 
-    await user.click(screen.getByRole("button", { name: "Expand give away a shift" }));
+    await user.click(screen.getByRole("button", { name: "Create offer" }));
     await user.click(screen.getByRole("button", { name: /May Schedule/i }));
 
     const dialog = screen.getByRole("dialog", { name: "Choose shift" });
@@ -251,7 +256,7 @@ describe("EmployeeSwapPage", () => {
     });
     renderPage();
 
-    await user.click(screen.getByRole("button", { name: "Expand give away a shift" }));
+    await user.click(screen.getByRole("button", { name: "Create offer" }));
     await user.click(screen.getByRole("button", { name: /May Schedule/i }));
     const dialog = screen.getByRole("dialog", { name: "Choose shift" });
     await user.click(within(dialog).getByRole("button", { name: /11:00 - 15:00/i }));
@@ -280,7 +285,7 @@ describe("EmployeeSwapPage", () => {
     const user = userEvent.setup();
     renderPage();
 
-    await user.click(screen.getByRole("button", { name: "Expand give away a shift" }));
+    await user.click(screen.getByRole("button", { name: "Create offer" }));
 
     expect(screen.getByText("Choose a schedule, then select one of your shifts from the dialog.")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Offer shift" })).toBeDisabled();
@@ -387,7 +392,8 @@ describe("EmployeeSwapPage", () => {
     expect(mocks.setPinMutate).toHaveBeenLastCalledWith({ swapId: 6, pinned: false });
   });
 
-  test("adds independent scroll containers when offers and history contain five swaps", () => {
+  test("keeps long offer and history lists available in their dedicated panels", async () => {
+    const user = userEvent.setup();
     mocks.swapsQuery.mockReturnValue({
       data: [
         ...Array.from({ length: 5 }, (_, index) => createSwap({
@@ -407,6 +413,7 @@ describe("EmployeeSwapPage", () => {
     renderPage();
 
     const offersSection = screen.getByRole("heading", { name: "Open swaps" }).closest("section");
+    await user.click(screen.getByRole("button", { name: "Swap history" }));
     const historySection = screen.getByRole("heading", { name: "Recent swap activity" }).closest("section");
     expect(offersSection?.querySelector(`.${styles.offerListScrollable}`)).not.toBeNull();
     expect(historySection?.querySelector(`.${styles.offerListScrollable}`)).not.toBeNull();
@@ -420,6 +427,7 @@ describe("EmployeeSwapPage", () => {
         createSwap({
           id: 6,
           scheduleName: "Own offer",
+          acceptanceUnavailableReason: "This is your own swap offer.",
           visibility: "private",
           targetEmployeeId: 7,
           targetEmployeeName: "Target Worker",
@@ -474,8 +482,10 @@ describe("EmployeeSwapPage", () => {
     expect(screen.getByText("Schedule is locked while a manager is editing it.")).toBeInTheDocument();
     expect(screen.getByText("You already work during this time.")).toBeInTheDocument();
     expect(screen.getAllByText("Locked")).toHaveLength(1);
-    expect(screen.getAllByText("Can")).toHaveLength(1);
-    expect(screen.getAllByText("Can\u2019t")).toHaveLength(3);
+    expect(screen.getAllByText("Can")).toHaveLength(2);
+    expect(screen.getAllByText("Can\u2019t")).toHaveLength(2);
+    expect(screen.getByText("My offer")).toBeInTheDocument();
+    expect(screen.queryByText("This is your own swap offer.")).not.toBeInTheDocument();
     expect(screen.getByText("Private")).toBeInTheDocument();
   });
 });

@@ -45,6 +45,7 @@ public sealed class EmployeeProfileController(
     }
 
     [HttpPost("me/password/send-code")]
+    [AuthAttemptLimit("reset-code")]
     [ProducesResponseType(typeof(PasswordResetCodeDispatchDto), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
     public async Task<ActionResult<PasswordResetCodeDispatchDto>> SendPasswordResetCode(CancellationToken cancellationToken)
@@ -58,6 +59,7 @@ public sealed class EmployeeProfileController(
     }
 
     [HttpPost("me/password/confirm")]
+    [AuthAttemptLimit("reset-confirm")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> ConfirmPasswordReset(

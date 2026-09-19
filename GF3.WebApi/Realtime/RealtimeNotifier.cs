@@ -67,7 +67,7 @@ public sealed class RealtimeNotifier(IHubContext<EmployeePresenceHub, IEmployeeP
         });
 
     public Task NotifyWorkflowLogCreatedAsync(WorkflowLogEntryModel entry)
-        => hubContext.Clients.All.WorkflowLogCreated(ToDto(entry));
+        => hubContext.Clients.Group(EmployeePresenceHub.ManagersGroupName).WorkflowLogCreated(ToDto(entry));
 
     public Task NotifyScheduleEditLockChangedAsync(ScheduleEditLockState state)
         => hubContext.Clients.All.ScheduleEditLockChanged(new ScheduleEditLockChangedMessage

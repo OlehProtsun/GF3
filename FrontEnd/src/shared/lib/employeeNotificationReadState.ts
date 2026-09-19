@@ -1,7 +1,6 @@
 const readStoragePrefix = "gf3.employee-notifications.read";
 const readStateStorageVersion = 2;
-const maxStoredReadIds = 300;
-const readStateRetentionMs = 7 * 24 * 60 * 60 * 1000;
+const readStateRetentionMs = 5 * 24 * 60 * 60 * 1000;
 
 export const employeeNotificationReadStateEventName = "gf3:employee-notifications-read-state-changed";
 
@@ -31,8 +30,8 @@ export function getEmployeeOpenShiftScheduleNotificationId(scheduleId: number | 
   return `open-shift-schedule:${scheduleId ?? "current"}`;
 }
 
-export function getEmployeeScheduleNotificationId(scheduleId: number | string | null | undefined) {
-  return `schedule-public:${scheduleId ?? "current"}`;
+export function getEmployeeScheduleNotificationId(scheduleId: number | string | null | undefined, publishedAtUtc?: string | null) {
+  return `schedule-public:${scheduleId ?? "current"}${publishedAtUtc ? `:${publishedAtUtc}` : ""}`;
 }
 
 export function getEmployeeAvailabilityNotificationId(
@@ -50,21 +49,13 @@ export function getEmployeeSwapAcceptedNotificationId(shiftSwapId: number | stri
   return `swap-accepted:${shiftSwapId ?? "current"}`;
 }
 
-function isPersistentNotificationId(id: string) {
-  return id.startsWith("schedule-public:") || id.startsWith("availability-public:");
-}
-
-function isFreshReadRecord(id: string, readAtUtc: unknown, nowMs: number) {
-  if (isPersistentNotificationId(id)) {
-    return true;
-  }
-
+function isFreshReadRecord(readAtUtc: unknown, nowMs: number) {
   if (typeof readAtUtc !== "string") {
     return true;
   }
 
   const parsed = new Date(readAtUtc).getTime();
-  return Number.isNaN(parsed) || nowMs - parsed <= readStateRetentionMs;
+  return Number.isNaN(parsed) || nowMs - parsed < readStateRetentionMs;
 }
 
 function readIdFromStoredItem(item: unknown, nowMs: number) {
@@ -77,7 +68,7 @@ function readIdFromStoredItem(item: unknown, nowMs: number) {
   }
 
   const { id, readAtUtc } = item as { id?: unknown; readAtUtc?: unknown };
-  return typeof id === "string" && isFreshReadRecord(id, readAtUtc, nowMs) ? id : null;
+  return typeof id === "string" && isFreshReadRecord(readAtUtc, nowMs) ? id : null;
 }
 
 function parseStoredReadIds(parsed: unknown, nowMs: number) {
@@ -105,18 +96,33 @@ export function readEmployeeNotificationIds(storageKey: string, nowMs = Date.now
   }
 }
 
+function serializeReadIds(storageKeys: string[], ids: Set<string>, now: Date) {
+  const existing = new Map<string, string>();
+  for (const key of storageKeys) {
+    try {
+      const stored = JSON.parse(window.localStorage.getItem(key) ?? "null");
+      for (const item of stored?.items ?? []) {
+        if (typeof item?.id === "string" && typeof item.readAtUtc === "string" && Number.isFinite(Date.parse(item.readAtUtc))) {
+          const previous = existing.get(item.id);
+          if (!previous || Date.parse(item.readAtUtc) < Date.parse(previous)) existing.set(item.id, item.readAtUtc);
+        }
+      }
+    } catch { /* Ignore unavailable or corrupt browser storage. */ }
+  }
+  const items = [...ids].filter(id => id.trim().length > 0).map(id => ({
+    id, readAtUtc: existing.get(id) ?? now.toISOString(),
+  })).filter(item => isFreshReadRecord(item.readAtUtc, now.getTime()));
+  return JSON.stringify({ version: readStateStorageVersion, items });
+}
+
 export function writeEmployeeNotificationIds(storageKey: string, ids: Set<string>, now = new Date()) {
   if (typeof window === "undefined") {
     return;
   }
 
-  const readAtUtc = now.toISOString();
-  const items = [...ids]
-    .filter(id => id.trim().length > 0)
-    .slice(-maxStoredReadIds)
-    .map(id => ({ id, readAtUtc }));
-
-  window.localStorage.setItem(storageKey, JSON.stringify({ version: readStateStorageVersion, items }));
+  try {
+    window.localStorage.setItem(storageKey, serializeReadIds([storageKey], ids, now));
+  } catch { /* Server persistence remains available when browser storage is blocked. */ }
   window.dispatchEvent(new Event(employeeNotificationReadStateEventName));
 }
 export function readEmployeeNotificationIdsForAccount(
@@ -140,15 +146,10 @@ export function writeEmployeeNotificationIdsForAccount(
     return;
   }
 
-  const readAtUtc = now.toISOString();
-  const items = [...ids]
-    .filter(id => id.trim().length > 0)
-    .slice(-maxStoredReadIds)
-    .map(id => ({ id, readAtUtc }));
-  const value = JSON.stringify({ version: readStateStorageVersion, items });
-
-  getEmployeeNotificationReadStorageKeys(username, employeeId).forEach(storageKey => {
-    window.localStorage.setItem(storageKey, value);
+  const keys = getEmployeeNotificationReadStorageKeys(username, employeeId);
+  const value = serializeReadIds(keys, ids, now);
+  keys.forEach(storageKey => {
+    try { window.localStorage.setItem(storageKey, value); } catch { /* Keep server sync working. */ }
   });
   window.dispatchEvent(new Event(employeeNotificationReadStateEventName));
 }

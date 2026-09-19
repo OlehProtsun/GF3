@@ -16,4 +16,6 @@ public sealed class AuthenticatedSessionDto
     public int? EmployeeId { get; set; }
 
     public int? SessionVersion { get; set; }
+
+    public long? CredentialVersion { get; set; }
 }

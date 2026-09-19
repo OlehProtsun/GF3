@@ -1,5 +1,5 @@
 import { t } from "@shared/i18n";
-﻿import type { ReactNode } from "react";
+import type { ReactNode } from "react";
 import { NumberStepperInput } from "@shared/ui/components/NumberStepperInput";
 import { ErrorPill, TextInput } from "@shared/ui/forms/Field";
 import { InformationIcon } from "@shared/ui/icons";

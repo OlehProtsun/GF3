@@ -17,4 +17,6 @@ public sealed class ManagerProfileDto
     public bool IsSystem { get; set; }
 
     public DateTimeOffset CreatedAtUtc { get; set; }
+
+    public DateTimeOffset PasswordUpdatedAtUtc { get; set; }
 }

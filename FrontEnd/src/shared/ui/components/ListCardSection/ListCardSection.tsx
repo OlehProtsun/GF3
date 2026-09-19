@@ -1,5 +1,5 @@
 import { t } from "@shared/i18n";
-﻿import type { ReactNode } from "react";
+import type { ReactNode } from "react";
 import { ErrorBanner } from "@shared/ui/components/ErrorBanner";
 import styles from "./ListCardSection.module.css";
 

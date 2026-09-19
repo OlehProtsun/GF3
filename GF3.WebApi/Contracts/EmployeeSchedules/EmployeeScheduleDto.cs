@@ -17,6 +17,7 @@ public sealed class EmployeeScheduleDto
     public string PublicationStatus { get; set; } = "public";
     public bool AllowSwap { get; set; } = true;
     public DateTimeOffset? LastUpdatedAtUtc { get; set; }
+    public DateTimeOffset? PublishedAtUtc { get; set; }
     public IReadOnlyList<EmployeeScheduleEmployeeDto> Employees { get; set; } = Array.Empty<EmployeeScheduleEmployeeDto>();
     public IReadOnlyList<EmployeeScheduleSlotDto> Slots { get; set; } = Array.Empty<EmployeeScheduleSlotDto>();
     public IReadOnlyList<EmployeeScheduleRelatedAssignmentDto> RelatedScheduleAssignments { get; set; } = Array.Empty<EmployeeScheduleRelatedAssignmentDto>();

@@ -1,5 +1,5 @@
 import { t } from "@shared/i18n";
-﻿import type { Shop } from "./types";
+import type { Shop } from "./types";
 
 type ShopIdentity = Pick<Shop, "name">;
 type ShopDetails = Pick<Shop, "address" | "description">;

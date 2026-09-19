@@ -1,4 +1,6 @@
 using System.Security.Claims;
+using DataAccessLayer.Repositories.Abstractions;
+using WebApi.Realtime;
 using System.Text.Encodings.Web;
 using BusinessLogicLayer.Services.Abstractions;
 using Microsoft.AspNetCore.Authentication;
@@ -14,17 +16,20 @@ public sealed class JwtAuthenticationHandler : AuthenticationHandler<Authenticat
 {
     private readonly JwtAuthOptions _jwtOptions;
     private readonly IEmployeeAccountService? _employeeAccountService;
+    private readonly IManagerAccountRepository? _managerAccounts;
 
     public JwtAuthenticationHandler(
         IOptionsMonitor<AuthenticationSchemeOptions> options,
         ILoggerFactory logger,
         UrlEncoder encoder,
         IOptions<JwtAuthOptions> jwtOptions,
-        IEmployeeAccountService? employeeAccountService = null)
+        IEmployeeAccountService? employeeAccountService = null,
+        IManagerAccountRepository? managerAccounts = null)
         : base(options, logger, encoder)
     {
         _jwtOptions = jwtOptions.Value;
         _employeeAccountService = employeeAccountService;
+        _managerAccounts = managerAccounts;
     }
 
     protected override async Task<AuthenticateResult> HandleAuthenticateAsync()
@@ -48,6 +53,17 @@ public sealed class JwtAuthenticationHandler : AuthenticationHandler<Authenticat
             if (account is null || account.SessionVersion != (session.SessionVersion ?? 0))
             {
                 return AuthenticateResult.Fail("Employee session was revoked.");
+            }
+        }
+
+        if (session.Role == AuthRoles.Manager)
+        {
+            var account = session.ManagerId is > 0 && _managerAccounts is not null
+                ? await _managerAccounts.GetByIdAsync(session.ManagerId.Value, Context.RequestAborted).ConfigureAwait(false)
+                : null;
+            if (account is null || session.CredentialVersion != account.PasswordUpdatedAtUtc.UtcTicks)
+            {
+                return AuthenticateResult.Fail("Manager session was revoked.");
             }
         }
 
@@ -90,7 +106,8 @@ public sealed class JwtAuthenticationHandler : AuthenticationHandler<Authenticat
             }
         }
 
-        if (Request.Query.TryGetValue("access_token", out var queryTokenValues))
+        if (Request.Path.StartsWithSegments(EmployeePresenceHub.RoutePattern) &&
+            Request.Query.TryGetValue("access_token", out var queryTokenValues))
         {
             var queryToken = queryTokenValues.ToString().Trim();
             if (!string.IsNullOrWhiteSpace(queryToken))

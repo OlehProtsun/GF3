@@ -1077,6 +1077,10 @@ namespace DataAccessLayer.Migrations
                         .HasDefaultValue("Private")
                         .HasColumnName("publication_status");
 
+                    b.Property<DateTimeOffset?>("PublishedAtUtc")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("published_at_utc");
+
                     b.Property<string>("Shift1Time")
                         .IsRequired()
                         .HasColumnType("TEXT")
@@ -1670,6 +1674,10 @@ namespace DataAccessLayer.Migrations
                         .HasColumnType("INTEGER")
                         .HasColumnName("accepted_by_employee_id");
 
+                    b.Property<string>("ArchivedViewsJson")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("archived_views_json");
+
                     b.Property<DateTimeOffset?>("CancelledAtUtc")
                         .HasColumnType("TEXT")
                         .HasColumnName("cancelled_at_utc");
@@ -1704,7 +1712,7 @@ namespace DataAccessLayer.Migrations
                         .HasColumnType("INTEGER")
                         .HasColumnName("schedule_id");
 
-                    b.Property<int>("ScheduleSlotId")
+                    b.Property<int?>("ScheduleSlotId")
                         .HasColumnType("INTEGER")
                         .HasColumnName("schedule_slot_id");
 
@@ -2376,8 +2384,7 @@ namespace DataAccessLayer.Migrations
                     b.HasOne("DataAccessLayer.Models.ScheduleSlotModel", "ScheduleSlot")
                         .WithMany()
                         .HasForeignKey("ScheduleSlotId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.Cascade);
 
                     b.HasOne("DataAccessLayer.Models.EmployeeModel", "TargetEmployee")
                         .WithMany()

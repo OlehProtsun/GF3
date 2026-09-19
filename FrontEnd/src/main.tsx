@@ -10,13 +10,13 @@ import { ErrorAlertsViewport } from "@shared/ui/feedback/error-alerts/ErrorAlert
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <QueryProvider>
-      <AuthProvider>
+    <AuthProvider>
+      <QueryProvider>
         <LanguageProvider><PresenceProvider>
           <App />
           <ErrorAlertsViewport />
         </PresenceProvider></LanguageProvider>
-      </AuthProvider>
-    </QueryProvider>
+      </QueryProvider>
+    </AuthProvider>
   </StrictMode>,
 );

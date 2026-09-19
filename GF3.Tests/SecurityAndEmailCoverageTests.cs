@@ -168,15 +168,16 @@ public sealed class SecurityAndEmailCoverageTests
             new AuthenticatedSessionDto
             {
                 UserName = "manager",
-                Role = AuthRoles.Manager,
+                Role = AuthRoles.Employee,
                 DisplayName = "Main Manager",
-                ManagerId = 7,
+                EmployeeId = 7,
             },
             DateTimeOffset.UtcNow.AddMinutes(-1),
             DateTimeOffset.UtcNow.AddMinutes(10));
 
         var result = await AuthenticateRequestAsync(options, context =>
         {
+            context.Request.Path = WebApi.Realtime.EmployeePresenceHub.RoutePattern;
             context.Request.Headers.Authorization = "Bearer   ";
             context.Request.QueryString = QueryString.Create("access_token", token);
         });
@@ -184,9 +185,9 @@ public sealed class SecurityAndEmailCoverageTests
         Assert.True(result.Succeeded);
         Assert.NotNull(result.Principal);
         Assert.Equal("manager", result.Principal!.Identity?.Name);
-        Assert.True(result.Principal.IsInRole(AuthRoles.Manager));
-        Assert.Equal("7", result.Principal.FindFirst("manager_id")?.Value);
-        Assert.Null(result.Principal.FindFirst("employee_id"));
+        Assert.True(result.Principal.IsInRole(AuthRoles.Employee));
+        Assert.Equal("7", result.Principal.FindFirst("employee_id")?.Value);
+        Assert.Null(result.Principal.FindFirst("manager_id"));
     }
 
     [Fact]

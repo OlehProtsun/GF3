@@ -51,6 +51,7 @@ public sealed class WebApiEmployeeSurfaceTests
             .AuthenticateAsync(headerContext, JwtAuthenticationDefaults.SchemeName);
 
         var queryContext = new DefaultHttpContext { RequestServices = provider };
+        queryContext.Request.Path = EmployeePresenceHub.RoutePattern;
         queryContext.Request.QueryString = QueryString.Create("access_token", token.AccessToken);
         var queryResult = await provider
             .GetRequiredService<IAuthenticationService>()

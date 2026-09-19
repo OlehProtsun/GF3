@@ -275,6 +275,7 @@ public class ScheduleModel
     /// Publication state that controls employee visibility.
     /// </summary>
     public SchedulePublicationStatus PublicationStatus { get; set; } = SchedulePublicationStatus.Private;
+    public DateTimeOffset? PublishedAtUtc { get; set; }
 
     /// <summary>Controls whether shift swaps are allowed for this schedule.</summary>
     public bool AllowSwap { get; set; } = true;
