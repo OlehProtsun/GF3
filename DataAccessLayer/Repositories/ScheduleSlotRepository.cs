@@ -105,17 +105,17 @@ public class ScheduleSlotRepository : GenericRepository<ScheduleSlotModel>, ISch
                 request.ScheduleId == scheduleId &&
                 request.IsManagerCreated &&
                 request.Status == ShiftSwapStatus.Open &&
-                request.ScheduleSlot.EmployeeId == null)
+                request.ScheduleSlot!.EmployeeId == null)
             .Select(request => new ScheduleSlotModel
             {
-                Id = request.ScheduleSlot.Id,
-                ScheduleId = request.ScheduleSlot.ScheduleId,
-                DayOfMonth = request.ScheduleSlot.DayOfMonth,
-                SlotNo = request.ScheduleSlot.SlotNo,
-                EmployeeId = request.ScheduleSlot.EmployeeId,
-                Status = request.ScheduleSlot.Status,
-                FromTime = request.ScheduleSlot.FromTime,
-                ToTime = request.ScheduleSlot.ToTime,
+                Id = request.ScheduleSlot!.Id,
+                ScheduleId = request.ScheduleSlot!.ScheduleId,
+                DayOfMonth = request.ScheduleSlot!.DayOfMonth,
+                SlotNo = request.ScheduleSlot!.SlotNo,
+                EmployeeId = request.ScheduleSlot!.EmployeeId,
+                Status = request.ScheduleSlot!.Status,
+                FromTime = request.ScheduleSlot!.FromTime,
+                ToTime = request.ScheduleSlot!.ToTime,
             })
             .ToListAsync(ct)
             .ConfigureAwait(false);

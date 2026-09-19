@@ -1,5 +1,5 @@
 import { t } from "@shared/i18n";
-﻿import { useMemo, type FormEvent } from "react";
+import { useMemo, type FormEvent } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   buildManagerEditLockMessage,

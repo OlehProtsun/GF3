@@ -38,6 +38,7 @@ export type EmployeeSchedule = {
   publicationStatus: "public" | "private";
   allowSwap?: boolean;
   lastUpdatedAtUtc?: string | null;
+  publishedAtUtc?: string | null;
   employees?: EmployeeScheduleEmployee[];
   slots: EmployeeScheduleSlot[];
   relatedScheduleAssignments?: EmployeeScheduleRelatedAssignment[];

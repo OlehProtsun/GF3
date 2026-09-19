@@ -49,14 +49,14 @@ describe("employee notification read state", () => {
     window.removeEventListener(employeeNotificationReadStateEventName, listener);
   });
 
-  it("drops timestamped read ids after seven days", () => {
+  it("drops timestamped read ids after five days", () => {
     const storageKey = getEmployeeNotificationReadStorageKey("worker");
     const nowMs = Date.parse("2026-05-18T12:00:00.000Z");
     window.localStorage.setItem(storageKey, JSON.stringify({
       version: 2,
       items: [
         { id: "open-shift:old", readAtUtc: "2026-05-10T11:59:59.000Z" },
-        { id: "open-shift:fresh", readAtUtc: "2026-05-12T12:00:00.000Z" },
+        { id: "open-shift:fresh", readAtUtc: "2026-05-14T12:00:00.000Z" },
         { id: "open-shift:legacy" },
         { id: "schedule-public:10", readAtUtc: "2026-05-01T00:00:00.000Z" },
       ],
@@ -65,7 +65,6 @@ describe("employee notification read state", () => {
     expect(readEmployeeNotificationIds(storageKey, nowMs)).toEqual(new Set([
       "open-shift:fresh",
       "open-shift:legacy",
-      "schedule-public:10",
     ]));
   });
 
@@ -80,7 +79,7 @@ describe("employee notification read state", () => {
     const legacyKey = getEmployeeNotificationReadStorageKey("OPR");
     window.localStorage.setItem(legacyKey, JSON.stringify({
       version: 2,
-      items: [{ id: "schedule-public:10", readAtUtc: "2026-05-01T00:00:00.000Z" }],
+      items: [{ id: "schedule-public:10", readAtUtc: "2026-05-09T00:00:00.000Z" }],
     }));
 
     expect(getEmployeeNotificationReadStorageKeys("OPR", 42)).toEqual([
@@ -88,7 +87,7 @@ describe("employee notification read state", () => {
       "gf3.employee-notifications.read.OPR",
       "gf3.employee-notifications.read.opr",
     ]);
-    expect(readEmployeeNotificationIdsForAccount("OPR", 42)).toEqual(new Set(["schedule-public:10"]));
+    expect(readEmployeeNotificationIdsForAccount("OPR", 42, Date.parse("2026-05-02T00:00:00Z"))).toEqual(new Set(["schedule-public:10"]));
 
     writeEmployeeNotificationIdsForAccount(
       "OPR",
@@ -105,4 +104,22 @@ describe("employee notification read state", () => {
       new Set(["schedule-public:10", "swap-public:7"]),
     );
   });
+});
+
+it("does not renew old read timestamps when unrelated notifications are read", () => {
+  const key = getEmployeeNotificationReadStorageKey("timestamps");
+  writeEmployeeNotificationIds(key, new Set(["open-shift:1"]), new Date("2026-05-10T12:00:00Z"));
+  writeEmployeeNotificationIds(key, new Set(["open-shift:1", "open-shift:2"]), new Date("2026-05-14T12:00:00Z"));
+  expect(readEmployeeNotificationIds(key, Date.parse("2026-05-15T12:00:00Z"))).toEqual(new Set(["open-shift:2"]));
+});
+it("does not throw when localStorage writes are blocked", () => {
+  const spy = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => { throw new Error("blocked"); });
+  try { expect(() => writeEmployeeNotificationIdsForAccount("worker", 42, new Set(["open-shift:1"]))).not.toThrow(); }
+  finally { spy.mockRestore(); }
+});
+
+it("keeps every recent read id when more than one API batch is synchronized", () => {
+  const ids = new Set(Array.from({length: 350}, (_, i) => "swap-public:" + i));
+  writeEmployeeNotificationIdsForAccount("many", 99, ids);
+  expect(readEmployeeNotificationIdsForAccount("many", 99)).toEqual(ids);
 });

@@ -20,6 +20,7 @@ public sealed class AuthController(
 {
     [AllowAnonymous]
     [HttpPost("login")]
+    [AuthAttemptLimit("login")]
     [ProducesResponseType(typeof(LoginResponseDto), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
     public async Task<ActionResult<LoginResponseDto>> Login([FromBody] LoginRequest request, CancellationToken cancellationToken)
@@ -76,6 +77,7 @@ public sealed class AuthController(
 
     [AllowAnonymous]
     [HttpPost("password/send-code")]
+    [AuthAttemptLimit("reset-code")]
     [ProducesResponseType(typeof(PasswordResetCodeDispatchDto), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
     public async Task<ActionResult<PasswordResetCodeDispatchDto>> SendPasswordResetCode(
@@ -92,6 +94,7 @@ public sealed class AuthController(
 
     [AllowAnonymous]
     [HttpPost("password/confirm")]
+    [AuthAttemptLimit("reset-confirm")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> ConfirmPasswordReset(

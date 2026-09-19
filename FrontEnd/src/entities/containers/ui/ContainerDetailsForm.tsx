@@ -1,5 +1,5 @@
 import { t } from "@shared/i18n";
-﻿import type { ChangeEvent, FormEvent } from "react";
+import type { ChangeEvent, FormEvent } from "react";
 import { ErrorBanner } from "@shared/ui/components/ErrorBanner";
 import { RecordDetailsFormCard } from "@shared/ui/components/RecordDetailsFormCard";
 import { LabeledField, TextArea, TextInput } from "@shared/ui/forms/Field";

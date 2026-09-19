@@ -10,11 +10,15 @@ export const employeeUiStateApi = {
       method: "PUT",
       body: { columnOrder },
     }),
-  markNotificationsRead: (notificationIds: string[]) =>
-    request<void>(`${endpoint}/notifications/read`, {
-      method: "POST",
-      body: { notificationIds },
-    }),
+  markNotificationsRead: async (notificationIds: string[]) => {
+    const ids = [...new Set(notificationIds.map(id => id.trim()).filter(Boolean))];
+    for (let offset = 0; offset < ids.length; offset += 300) {
+      await request<void>(`${endpoint}/notifications/read`, {
+        method: "POST",
+        body: { notificationIds: ids.slice(offset, offset + 300) },
+      });
+    }
+  },
   pinSwap: (swapId: number) =>
     request<void>(`${endpoint}/swap-pins/${swapId}`, { method: "PUT" }),
   unpinSwap: (swapId: number) =>

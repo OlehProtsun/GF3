@@ -129,7 +129,7 @@ public sealed class EmployeePresenceHub : Hub<IEmployeePresenceClient>
 {
     public const string RoutePattern = "/api/realtime/presence";
 
-    private const string ManagersGroupName = "presence:managers";
+    public const string ManagersGroupName = "presence:managers";
     private readonly IEmployeePresenceService _employeePresenceService;
     private readonly IManagerPresenceService _managerPresenceService;
     private readonly IEmployeeAccountService _employeeAccountService;

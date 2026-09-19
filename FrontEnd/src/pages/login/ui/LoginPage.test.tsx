@@ -74,7 +74,7 @@ describe("LoginPage password modes", () => {
     await waitFor(() => expect(mocks.login).toHaveBeenCalledWith({ username: "manager", password: "123456" }));
   });
 
-  test("locks and restores the page viewport in phone mode", () => {
+  test("preserves zoom and restores the page viewport in phone mode", () => {
     const viewportMeta = document.querySelector<HTMLMetaElement>('meta[name="viewport"]') ?? document.createElement("meta");
     viewportMeta.name = "viewport";
     viewportMeta.content = "width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes";
@@ -85,7 +85,8 @@ describe("LoginPage password modes", () => {
 
     expect(document.documentElement).toHaveClass("login-phone-mode");
     expect(document.body).toHaveClass("login-phone-mode");
-    expect(viewportMeta.content).toContain("user-scalable=no");
+    expect(viewportMeta.content).not.toContain("user-scalable=no");
+    expect(viewportMeta.content).not.toContain("maximum-scale=1.0");
 
     page.unmount();
 

@@ -57,15 +57,16 @@ public sealed class EmployeeSchedulesController(
             .ToDictionary(
                 group => group.Key,
                 group => group.Select(schedule => (schedule.Year, schedule.Month)).ToHashSet());
-        var summaryGroups = await Task.WhenAll(visiblePeriodsByContainer.Select(async entry =>
+        var summaryGroups = new List<List<ScheduleModel>>();
+        foreach (var entry in visiblePeriodsByContainer)
         {
             var graphs = await containerService.GetGraphsAsync(entry.Key, cancellationToken).ConfigureAwait(false) ?? [];
-            return graphs
+            summaryGroups.Add(graphs
                 .Where(graph =>
                     graph.PublicationStatus == SchedulePublicationStatus.Public &&
                     entry.Value.Contains((graph.Year, graph.Month)))
-                .ToList();
-        })).ConfigureAwait(false);
+                .ToList());
+        }
         var visibleKeys = visibleSchedules
             .Select(schedule => (schedule.ContainerId, schedule.Id))
             .ToHashSet();
@@ -75,16 +76,16 @@ public sealed class EmployeeSchedulesController(
             .Select(group => group.First())
             .Where(schedule => !visibleKeys.Contains((schedule.ContainerId, schedule.Id)))
             .ToList();
-        var relatedSchedules = await Task.WhenAll(relatedSummaries.Select(async schedule =>
+        foreach (var schedule in relatedSummaries)
         {
             schedule.Slots = await containerService
                 .GetGraphSlotsAsync(schedule.ContainerId, schedule.Id, cancellationToken)
                 .ConfigureAwait(false) ?? [];
-            return schedule;
-        })).ConfigureAwait(false);
+
+        }
 
         return visibleSchedules
-            .Concat(relatedSchedules)
+            .Concat(relatedSummaries)
             .ToList();
     }
     private int GetRequiredEmployeeId()
@@ -121,6 +122,7 @@ public sealed class EmployeeSchedulesController(
             PublicationStatus = model.PublicationStatus == SchedulePublicationStatus.Public ? "public" : "private",
             AllowSwap = model.AllowSwap,
             LastUpdatedAtUtc = lastUpdatedAtUtc,
+            PublishedAtUtc = model.PublishedAtUtc,
             Employees = model.Employees
                 .OrderBy(employee => employee.DisplayOrder)
                 .ThenBy(employee => employee.Employee?.FirstName)

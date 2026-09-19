@@ -30,7 +30,7 @@ jobs:
           cache-dependency-path: FrontEnd/package-lock.json
 
       - name: Restore backend
-        run: dotnet restore GF3.WebApi/WebApi.csproj
+        run: dotnet restore GF3.Tests/GF3.Tests.csproj
 
       - name: Test backend
         run: dotnet test GF3.Tests/GF3.Tests.csproj --configuration Release --no-restore

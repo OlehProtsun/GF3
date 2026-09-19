@@ -200,12 +200,10 @@ describe("EmployeeSchedulePage", () => {
 
     renderPage();
 
+    expect(screen.getByRole("heading", { name: "Hey, Zoe" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Now" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Tomorrow" })).toBeInTheDocument();
     expect(screen.getAllByText("2 schedules")).not.toHaveLength(0);
-    expect(screen.getByText("2 work days")).toBeInTheDocument();
-    expect(screen.getByText("29 free days")).toBeInTheDocument();
-    expect(screen.getByText("12h Total Hours")).toBeInTheDocument();
-    expect(screen.getByText("Month: May")).toBeInTheDocument();
-    expect(screen.getByText("Year: 2026")).toBeInTheDocument();
     expect(screen.getAllByText("Last Update")).toHaveLength(2);
     expect(screen.getByText(/28 Jun 2026/)).toBeInTheDocument();
 

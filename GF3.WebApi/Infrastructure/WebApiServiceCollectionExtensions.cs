@@ -38,6 +38,8 @@ public static class WebApiServiceCollectionExtensions
     {
         var jwtOptions = JwtAuthOptions.FromConfiguration(configuration, requireExplicitJwtSigningKey);
 
+        services.AddSingleton(TimeProvider.System);
+        services.AddSingleton<AuthAttemptLimiter>();
         services.AddApiMvc(jwtOptions);
         services.AddApiDocumentation();
         services.AddFrontendDevelopmentCors();
@@ -67,6 +69,7 @@ public static class WebApiServiceCollectionExtensions
 
         services.AddBusinessLogicStack(connectionString);
         services.AddHostedService<DatabaseAutoBackupHostedService>();
+        services.AddHostedService<EmployeeNotificationCleanupHostedService>();
         return services;
     }
 

@@ -1,3 +1,4 @@
+using static WebApi.ShiftSwaps.ShiftSwapRules;
 using System.Globalization;
 using System.Security.Claims;
 using System.Text;
@@ -28,10 +29,6 @@ public sealed class EmployeeShiftSwapsController(
     IWorkflowLogService workflowLogService,
     IRealtimeNotifier realtimeNotifier) : ControllerBase
 {
-    private static readonly Regex GraphNoteMetaRegex = new(
-        @"(?:\r?\n\r?\n)?(?:<!--GF3_GRAPH_META:([\s\S]*?)-->|\[\[GF3_GRAPH_META:([\s\S]*?)\]\])$",
-        RegexOptions.Compiled);
-
     [HttpGet("employees")]
     [ProducesResponseType(typeof(IEnumerable<ShiftSwapEmployeeDto>), StatusCodes.Status200OK)]
     public async Task<ActionResult<IEnumerable<ShiftSwapEmployeeDto>>> GetEmployees(CancellationToken cancellationToken)
@@ -69,7 +66,7 @@ public sealed class EmployeeShiftSwapsController(
             .Select(schedule => schedule.ContainerId);
         var requests = await BuildSwapRequestQuery()
             .Where(request =>
-                request.Schedule.PublicationStatus == SchedulePublicationStatus.Public &&
+                (request.ArchivedViewsJson != null || request.Schedule.PublicationStatus == SchedulePublicationStatus.Public) &&
                 (request.FromEmployeeId == employeeId ||
                  request.TargetEmployeeId == employeeId ||
                  request.AcceptedByEmployeeId == employeeId ||
@@ -210,6 +207,8 @@ public sealed class EmployeeShiftSwapsController(
             throw new ValidationException("This swap belongs to a schedule that is no longer public.");
         }
 
+        if (swap.Status != ShiftSwapStatus.Open)
+            throw new ValidationException("This swap offer is no longer open.");
         EnsureSwapAllowed(swap.Schedule);
 
         if (swap.Visibility == ShiftSwapVisibility.Public)
@@ -319,7 +318,7 @@ public sealed class EmployeeShiftSwapsController(
             {
                 SourceShiftSwapRequestId = swap.Id,
                 ScheduleId = swap.ScheduleId,
-                ScheduleSlotId = swap.ScheduleSlotId,
+                ScheduleSlotId = slot.Id,
                 ScheduleName = swap.Schedule.Name,
                 ContainerName = swap.Schedule.Container?.Name ?? string.Empty,
                 ShopName = swap.Schedule.Shop?.Name ?? string.Empty,
@@ -359,7 +358,7 @@ public sealed class EmployeeShiftSwapsController(
         await workflowLogService
             .LogAsync(
                 User,
-                $"Accepted {(accepted.FromEmployeeId.HasValue ? $"{GetEmployeeName(accepted.FromEmployee, accepted.FromEmployeeId.Value)}'s shift" : "an open shift")} from schedule \"{accepted.Schedule.Name}\" for {accepted.Schedule.Year}-{accepted.Schedule.Month:00}-{accepted.ScheduleSlot.DayOfMonth:00}, {offeredPeriod.FromTime}-{offeredPeriod.ToTime}.",
+                $"Accepted {(accepted.FromEmployeeId.HasValue ? $"{GetEmployeeName(accepted.FromEmployee, accepted.FromEmployeeId.Value)}'s shift" : "an open shift")} from schedule \"{accepted.Schedule.Name}\" for {accepted.Schedule.Year}-{accepted.Schedule.Month:00}-{accepted.ScheduleSlot!.DayOfMonth:00}, {offeredPeriod.FromTime}-{offeredPeriod.ToTime}.",
                 cancellationToken)
             .ConfigureAwait(false);
         await realtimeNotifier
@@ -405,7 +404,7 @@ public sealed class EmployeeShiftSwapsController(
         await workflowLogService
             .LogAsync(
                 User,
-                $"Cancelled the shift swap from schedule \"{swap.Schedule.Name}\" for {swap.Schedule.Year}-{swap.Schedule.Month:00}-{swap.ScheduleSlot.DayOfMonth:00}, {swap.OfferedFromTime ?? swap.ScheduleSlot.FromTime}-{swap.OfferedToTime ?? swap.ScheduleSlot.ToTime}.",
+                $"Cancelled the shift swap from schedule \"{swap.Schedule.Name}\" for {swap.Schedule.Year}-{swap.Schedule.Month:00}-{swap.ScheduleSlot!.DayOfMonth:00}, {swap.OfferedFromTime ?? swap.ScheduleSlot!.FromTime}-{swap.OfferedToTime ?? swap.ScheduleSlot!.ToTime}.",
                 cancellationToken)
             .ConfigureAwait(false);
         await realtimeNotifier
@@ -456,7 +455,7 @@ public sealed class EmployeeShiftSwapsController(
         var existingStyles = await db.ScheduleCellStyles
             .Where(style =>
                 style.ScheduleId == swap.ScheduleId &&
-                style.DayOfMonth == swap.ScheduleSlot.DayOfMonth &&
+                style.DayOfMonth == swap.ScheduleSlot!.DayOfMonth &&
                 affectedEmployeeIds.Contains(style.EmployeeId))
             .ToDictionaryAsync(style => style.EmployeeId, cancellationToken)
             .ConfigureAwait(false);
@@ -472,7 +471,7 @@ public sealed class EmployeeShiftSwapsController(
             db.ScheduleCellStyles.Add(new ScheduleCellStyleModel
             {
                 ScheduleId = swap.ScheduleId,
-                DayOfMonth = swap.ScheduleSlot.DayOfMonth,
+                DayOfMonth = swap.ScheduleSlot!.DayOfMonth,
                 EmployeeId = employeeId,
                 BackgroundColorArgb = highlightColorArgb,
             });
@@ -564,566 +563,4 @@ public sealed class EmployeeShiftSwapsController(
         }
     }
 
-    private static ShiftSwapDto ToDto(
-        ShiftSwapRequestModel model,
-        int currentEmployeeId,
-        bool isScheduleLocked,
-        IReadOnlyList<ScheduleSlotModel> currentEmployeeMonthSlots)
-    {
-        var slot = model.Schedule.Slots.FirstOrDefault(slot => slot.Id == model.ScheduleSlotId) ?? model.ScheduleSlot;
-        var offeredPeriod = GetSwapPeriod(model, slot);
-        var shiftHours = GetTimeRangeDurationHours(offeredPeriod.FromTime, offeredPeriod.ToTime);
-        var fromHoursBefore = model.FromEmployeeId.HasValue ? GetEmployeeHours(model.Schedule.Slots, model.FromEmployeeId.Value) : 0;
-        var isOpen = model.Status == ShiftSwapStatus.Open;
-        var isOwner = model.FromEmployeeId == currentEmployeeId;
-        var acceptanceUnavailableReason = GetAcceptanceUnavailableReason(
-            model,
-            currentEmployeeId,
-            isScheduleLocked,
-            currentEmployeeMonthSlots,
-            slot,
-            offeredPeriod);
-        var canAccept = isOpen && acceptanceUnavailableReason is null;
-        var currentEmployeeStats = GetCurrentEmployeeSwapStats(
-            model,
-            currentEmployeeId,
-            currentEmployeeMonthSlots,
-            slot,
-            shiftHours,
-            canAccept);
-        var fromHoursAfter = fromHoursBefore;
-
-        if (isOpen)
-        {
-            if (isOwner)
-            {
-                fromHoursAfter = Math.Max(0, fromHoursBefore - shiftHours);
-            }
-            else if (canAccept)
-            {
-                fromHoursAfter = model.IsManagerCreated ? fromHoursBefore : Math.Max(0, fromHoursBefore - shiftHours);
-            }
-        }
-
-        var manualColumnName = model.IsManagerCreated
-            ? GraphManualColumnLabelResolver.Resolve(model.Schedule.Note, model.ManualColumnId)
-            : null;
-
-        return new ShiftSwapDto
-        {
-            Id = model.Id,
-            ScheduleId = model.ScheduleId,
-            ScheduleSlotId = model.ScheduleSlotId,
-            ScheduleName = model.Schedule.Name,
-            ContainerName = model.Schedule.Container?.Name ?? string.Empty,
-            ShopName = model.Schedule.Shop?.Name ?? string.Empty,
-            Year = model.Schedule.Year,
-            Month = model.Schedule.Month,
-            DayOfMonth = slot.DayOfMonth,
-            FromTime = offeredPeriod.FromTime,
-            ToTime = offeredPeriod.ToTime,
-            FromEmployeeId = model.FromEmployeeId,
-            FromEmployeeName = manualColumnName ?? GetEmployeeName(model.FromEmployee, model.FromEmployeeId),
-            TargetEmployeeId = model.TargetEmployeeId,
-            TargetEmployeeName = model.TargetEmployeeId.HasValue ? GetEmployeeName(model.TargetEmployee, model.TargetEmployeeId.Value) : null,
-            AcceptedByEmployeeId = model.AcceptedByEmployeeId,
-            AcceptedByEmployeeName = model.AcceptedByEmployeeId.HasValue
-                ? GetEmployeeName(model.AcceptedByEmployee, model.AcceptedByEmployeeId.Value)
-                : null,
-            Visibility = model.Visibility == ShiftSwapVisibility.Private ? "private" : "public",
-            Status = model.Status switch
-            {
-                ShiftSwapStatus.Accepted => "accepted",
-                ShiftSwapStatus.Cancelled => "cancelled",
-                _ => "open",
-            },
-            CreatedAtUtc = model.CreatedAtUtc,
-            AcceptedAtUtc = model.AcceptedAtUtc,
-            ShiftHours = Math.Round(shiftHours, 2),
-            CurrentEmployeeHoursBefore = Math.Round(currentEmployeeStats.HoursBefore, 2),
-            CurrentEmployeeHoursAfter = Math.Round(currentEmployeeStats.HoursAfter, 2),
-            CurrentEmployeeWorkDaysBefore = currentEmployeeStats.WorkDaysBefore,
-            CurrentEmployeeWorkDaysAfter = currentEmployeeStats.WorkDaysAfter,
-            CurrentEmployeeFreeDaysBefore = currentEmployeeStats.FreeDaysBefore,
-            CurrentEmployeeFreeDaysAfter = currentEmployeeStats.FreeDaysAfter,
-            FromEmployeeHoursBefore = Math.Round(fromHoursBefore, 2),
-            FromEmployeeHoursAfter = Math.Round(fromHoursAfter, 2),
-            IsManagerCreated = model.IsManagerCreated,
-            ManualColumnId = model.ManualColumnId,
-            ManualColumnName = manualColumnName,
-            IsCreatedByCurrentEmployee = isOwner,
-            IsScheduleLocked = isScheduleLocked,
-            CanAccept = canAccept,
-            AcceptanceUnavailableReason = isOpen ? acceptanceUnavailableReason : null,
-            CanCancel = isOwner && isOpen,
-        };
-    }
-
-    private static string? GetAcceptanceUnavailableReason(
-        ShiftSwapRequestModel swap,
-        int employeeId,
-        bool isScheduleLocked,
-        IReadOnlyList<ScheduleSlotModel> employeeMonthSlots,
-        ScheduleSlotModel slot,
-        ShiftSwapPeriod offeredPeriod)
-    {
-        if (swap.Status != ShiftSwapStatus.Open)
-        {
-            return "This swap offer is no longer open.";
-        }
-
-        if (!swap.Schedule.AllowSwap)
-        {
-            return "Swaps are not allowed for this schedule.";
-        }
-
-        if (isScheduleLocked)
-        {
-            return "Schedule is locked while a manager is editing it.";
-        }
-
-        if (swap.FromEmployeeId == employeeId)
-        {
-            return "This is your own swap offer.";
-        }
-
-        if (swap.TargetEmployeeId.HasValue && swap.TargetEmployeeId.Value != employeeId)
-        {
-            return "This private swap offer is for another employee.";
-        }
-
-        if (HasOverlappingShift(
-            employeeMonthSlots,
-            slot.DayOfMonth,
-            offeredPeriod.FromTime,
-            offeredPeriod.ToTime,
-            employeeId,
-            slot.Id))
-        {
-            return "You already work during this time.";
-        }
-
-        return null;
-    }
-
-    private static CurrentEmployeeSwapStats GetCurrentEmployeeSwapStats(
-        ShiftSwapRequestModel swap,
-        int employeeId,
-        IReadOnlyList<ScheduleSlotModel> employeeMonthSlots,
-        ScheduleSlotModel offeredSlot,
-        double shiftHours,
-        bool canAccept)
-    {
-        var daysInMonth = DateTime.DaysInMonth(swap.Schedule.Year, swap.Schedule.Month);
-        var actualHours = employeeMonthSlots.Sum(GetSlotDurationHours);
-        var actualWorkDays = employeeMonthSlots.Select(slot => slot.DayOfMonth).ToHashSet();
-        var beforeHours = actualHours;
-        var afterHours = actualHours;
-        var beforeWorkDays = new HashSet<int>(actualWorkDays);
-        var afterWorkDays = new HashSet<int>(actualWorkDays);
-
-        if (swap.Status == ShiftSwapStatus.Open && swap.FromEmployeeId == employeeId)
-        {
-            afterHours = Math.Max(0, actualHours - shiftHours);
-            RemoveTransferredWorkDay(afterWorkDays, employeeMonthSlots, offeredSlot, shiftHours);
-        }
-        else if (swap.Status == ShiftSwapStatus.Open && canAccept)
-        {
-            afterHours = actualHours + shiftHours;
-            afterWorkDays.Add(offeredSlot.DayOfMonth);
-        }
-        else if (swap.Status == ShiftSwapStatus.Accepted && swap.AcceptedByEmployeeId == employeeId)
-        {
-            beforeHours = Math.Max(0, actualHours - shiftHours);
-            RemoveTransferredWorkDay(beforeWorkDays, employeeMonthSlots, offeredSlot, shiftHours);
-        }
-        else if (swap.Status == ShiftSwapStatus.Accepted && swap.FromEmployeeId == employeeId)
-        {
-            beforeHours = actualHours + shiftHours;
-            beforeWorkDays.Add(offeredSlot.DayOfMonth);
-        }
-
-        return new CurrentEmployeeSwapStats(
-            beforeHours,
-            afterHours,
-            beforeWorkDays.Count,
-            afterWorkDays.Count,
-            Math.Max(0, daysInMonth - beforeWorkDays.Count),
-            Math.Max(0, daysInMonth - afterWorkDays.Count));
-    }
-
-    private static void RemoveTransferredWorkDay(
-        ISet<int> workDays,
-        IReadOnlyList<ScheduleSlotModel> employeeMonthSlots,
-        ScheduleSlotModel offeredSlot,
-        double transferredHours)
-    {
-        var otherSameDayHours = employeeMonthSlots
-            .Where(slot => slot.DayOfMonth == offeredSlot.DayOfMonth && slot.Id != offeredSlot.Id)
-            .Sum(GetSlotDurationHours);
-        var offeredSlotHours = employeeMonthSlots
-            .Where(slot => slot.Id == offeredSlot.Id)
-            .Sum(GetSlotDurationHours);
-        var remainingOfferedSlotHours = Math.Max(0, offeredSlotHours - transferredHours);
-
-        if (otherSameDayHours + remainingOfferedSlotHours <= 0.001)
-        {
-            workDays.Remove(offeredSlot.DayOfMonth);
-        }
-    }
-
-    private readonly record struct CurrentEmployeeSwapStats(
-        double HoursBefore,
-        double HoursAfter,
-        int WorkDaysBefore,
-        int WorkDaysAfter,
-        int FreeDaysBefore,
-        int FreeDaysAfter);
-
-    private static string GetEmployeeName(EmployeeModel? employee, int? employeeId)
-    {
-        var fullName = $"{employee?.FirstName} {employee?.LastName}".Trim();
-        if (!string.IsNullOrWhiteSpace(fullName))
-        {
-            return fullName;
-        }
-
-        return employeeId.HasValue ? $"Employee #{employeeId.Value}" : "Manual column";
-    }
-
-    private static double GetEmployeeHours(IEnumerable<ScheduleSlotModel> slots, int employeeId)
-        => slots
-            .Where(slot => slot.EmployeeId == employeeId)
-            .Sum(GetSlotDurationHours);
-
-    private readonly record struct ShiftSwapPeriod(string FromTime, string ToTime);
-
-    private static ShiftSwapPeriod ResolveRequestedPeriod(CreateEmployeeShiftSwapRequest request, ScheduleSlotModel slot)
-    {
-        var fromTime = string.IsNullOrWhiteSpace(request.FromTime) ? slot.FromTime : request.FromTime;
-        var toTime = string.IsNullOrWhiteSpace(request.ToTime) ? slot.ToTime : request.ToTime;
-        var period = NormalizePeriod(fromTime!, toTime!, nameof(request.FromTime), nameof(request.ToTime));
-        EnsurePeriodWithinSlot(slot, period);
-
-        return period;
-    }
-
-    private static ShiftSwapPeriod GetSwapPeriod(ShiftSwapRequestModel model, ScheduleSlotModel slot)
-    {
-        var fromTime = string.IsNullOrWhiteSpace(model.OfferedFromTime) ? slot.FromTime : model.OfferedFromTime;
-        var toTime = string.IsNullOrWhiteSpace(model.OfferedToTime) ? slot.ToTime : model.OfferedToTime;
-
-        return NormalizePeriod(fromTime!, toTime!, nameof(model.OfferedFromTime), nameof(model.OfferedToTime));
-    }
-
-    private static ShiftSwapPeriod NormalizePeriod(string fromTime, string toTime, string fromFieldName, string toFieldName)
-    {
-        var normalizedFrom = NormalizeTimeText(fromTime, fromFieldName);
-        var normalizedTo = NormalizeTimeText(toTime, toFieldName);
-        var normalizedFromMinutes = ParseTimeMinutes(normalizedFrom)!.Value;
-        var normalizedToMinutes = ParseTimeMinutes(normalizedTo)!.Value;
-
-        if (normalizedToMinutes <= normalizedFromMinutes)
-        {
-            throw ValidationException.ForField(toFieldName, "The end time must be after the start time.");
-        }
-
-        return new ShiftSwapPeriod(normalizedFrom, normalizedTo);
-    }
-
-    private static string NormalizeTimeText(string value, string fieldName)
-    {
-        var minutes = ParseTimeMinutes(value);
-        if (minutes is null)
-        {
-            throw ValidationException.ForField(fieldName, "Use HH:mm time format.");
-        }
-
-        return $"{minutes.Value / 60:00}:{minutes.Value % 60:00}";
-    }
-
-    private static void EnsurePeriodWithinSlot(ScheduleSlotModel slot, ShiftSwapPeriod period)
-    {
-        var slotFrom = ParseTimeMinutes(slot.FromTime);
-        var slotTo = ParseTimeMinutes(slot.ToTime);
-        var periodFrom = ParseTimeMinutes(period.FromTime);
-        var periodTo = ParseTimeMinutes(period.ToTime);
-        if (slotFrom is null || slotTo is null || periodFrom is null || periodTo is null || slotTo <= slotFrom)
-        {
-            throw new ValidationException("The selected shift has an invalid time range.");
-        }
-
-        if (periodFrom < slotFrom || periodTo > slotTo)
-        {
-            throw new ValidationException("The offered period must stay inside the selected shift.");
-        }
-    }
-
-    private static IReadOnlyList<ScheduleSlotModel> ApplyAcceptedSwapPeriod(
-        ScheduleSlotModel slot,
-        int originalEmployeeId,
-        int acceptingEmployeeId,
-        ShiftSwapPeriod period)
-    {
-        var remainingSlots = new List<ScheduleSlotModel>();
-        var originalFrom = slot.FromTime;
-        var originalTo = slot.ToTime;
-        var originalFromMinutes = ParseTimeMinutes(originalFrom)!.Value;
-        var originalToMinutes = ParseTimeMinutes(originalTo)!.Value;
-        var periodFromMinutes = ParseTimeMinutes(period.FromTime)!.Value;
-        var periodToMinutes = ParseTimeMinutes(period.ToTime)!.Value;
-
-        if (periodFromMinutes > originalFromMinutes)
-        {
-            remainingSlots.Add(CreateRemainingSlot(slot, originalEmployeeId, originalFrom, period.FromTime));
-        }
-
-        if (periodToMinutes < originalToMinutes)
-        {
-            remainingSlots.Add(CreateRemainingSlot(slot, originalEmployeeId, period.ToTime, originalTo));
-        }
-
-        slot.FromTime = period.FromTime;
-        slot.ToTime = period.ToTime;
-        slot.EmployeeId = acceptingEmployeeId;
-        slot.Status = SlotStatus.ASSIGNED;
-
-        return remainingSlots;
-    }
-
-    private static ScheduleSlotModel CreateRemainingSlot(ScheduleSlotModel sourceSlot, int employeeId, string fromTime, string toTime)
-        => new()
-        {
-            ScheduleId = sourceSlot.ScheduleId,
-            DayOfMonth = sourceSlot.DayOfMonth,
-            SlotNo = sourceSlot.SlotNo,
-            EmployeeId = employeeId,
-            Status = SlotStatus.ASSIGNED,
-            FromTime = fromTime,
-            ToTime = toTime,
-        };
-
-    private static double GetSlotDurationHours(ScheduleSlotModel slot)
-        => GetTimeRangeDurationHours(slot.FromTime, slot.ToTime);
-
-    private static double GetTimeRangeDurationHours(string fromTime, string toTime)
-    {
-        var fromMinutes = ParseTimeMinutes(fromTime);
-        var toMinutes = ParseTimeMinutes(toTime);
-        if (fromMinutes is null || toMinutes is null)
-        {
-            return 0;
-        }
-
-        var duration = toMinutes.Value - fromMinutes.Value;
-        if (duration <= 0)
-        {
-            return 0;
-        }
-
-        return duration / 60d;
-    }
-
-    private static int? ParseTimeMinutes(string value)
-    {
-        var parts = value.Split(':', StringSplitOptions.TrimEntries);
-        if (parts.Length < 2 ||
-            !int.TryParse(parts[0], NumberStyles.Integer, CultureInfo.InvariantCulture, out var hour) ||
-            !int.TryParse(parts[1], NumberStyles.Integer, CultureInfo.InvariantCulture, out var minute))
-        {
-            return null;
-        }
-
-        if (hour is < 0 or > 23 || minute is < 0 or > 59)
-        {
-            return null;
-        }
-
-        return hour * 60 + minute;
-    }
-
-    private static bool HasOverlappingShift(
-        IEnumerable<ScheduleSlotModel> slots,
-        int dayOfMonth,
-        string fromTime,
-        string toTime,
-        int employeeId,
-        int excludedSlotId)
-        => slots.Any(slot =>
-            slot.Id != excludedSlotId &&
-            slot.EmployeeId == employeeId &&
-            slot.DayOfMonth == dayOfMonth &&
-            TimesOverlap(slot.FromTime, slot.ToTime, fromTime, toTime));
-
-    private static bool TimesOverlap(string leftFrom, string leftTo, string rightFrom, string rightTo)
-    {
-        var leftStart = ParseTimeMinutes(leftFrom);
-        var leftEnd = ParseTimeMinutes(leftTo);
-        var rightStart = ParseTimeMinutes(rightFrom);
-        var rightEnd = ParseTimeMinutes(rightTo);
-        if (leftStart is null || leftEnd is null || rightStart is null || rightEnd is null)
-        {
-            return false;
-        }
-
-        return leftStart.Value < rightEnd.Value && rightStart.Value < leftEnd.Value;
-    }
-
-    private static string? RemoveManualColumnCellFromNote(string? rawNote, int manualColumnId, int dayOfMonth)
-    {
-        if (string.IsNullOrWhiteSpace(rawNote))
-        {
-            return rawNote;
-        }
-
-        var match = GraphNoteMetaRegex.Match(rawNote);
-        if (!match.Success || match.Index < 0)
-        {
-            return rawNote;
-        }
-
-        var rawMeta = match.Groups[2].Success ? match.Groups[2].Value : match.Groups[1].Value;
-        var meta = ParseGraphNoteMeta(rawMeta);
-        if (meta is null)
-        {
-            return rawNote;
-        }
-
-        var changed =
-            RemoveCompactManualColumnCell(meta["m"] as JsonArray, manualColumnId, dayOfMonth) ||
-            RemoveLegacyManualColumnCell(meta["manualColumns"] as JsonArray, manualColumnId, dayOfMonth);
-
-        if (!changed)
-        {
-            return rawNote;
-        }
-
-        var visibleNote = rawNote[..match.Index].TrimEnd();
-        var encodedMeta = $"b64:{EncodeGraphNoteMetaValue(meta.ToJsonString())}";
-        var suffix = $"[[GF3_GRAPH_META:{encodedMeta}]]";
-
-        return string.IsNullOrEmpty(visibleNote) ? suffix : $"{visibleNote}\n\n{suffix}";
-    }
-
-    private static JsonObject? ParseGraphNoteMeta(string rawMeta)
-    {
-        var payload = rawMeta.Trim();
-        if (payload.Length == 0)
-        {
-            return null;
-        }
-
-        if (payload.StartsWith("b64:", StringComparison.Ordinal))
-        {
-            return TryParseJsonObject(DecodeGraphNoteMetaValue(payload[4..]));
-        }
-
-        return TryParseJsonObject(payload) ?? TryParseJsonObject(Uri.UnescapeDataString(payload));
-    }
-
-    private static JsonObject? TryParseJsonObject(string? value)
-    {
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            return null;
-        }
-
-        try
-        {
-            return JsonNode.Parse(value) as JsonObject;
-        }
-        catch (JsonException)
-        {
-            return null;
-        }
-    }
-
-    private static string DecodeGraphNoteMetaValue(string value)
-    {
-        var normalized = value
-            .Replace('-', '+')
-            .Replace('_', '/')
-            .PadRight((int)Math.Ceiling(value.Length / 4d) * 4, '=');
-
-        return Encoding.UTF8.GetString(Convert.FromBase64String(normalized));
-    }
-
-    private static string EncodeGraphNoteMetaValue(string value)
-        => Convert.ToBase64String(Encoding.UTF8.GetBytes(value))
-            .Replace('+', '-')
-            .Replace('/', '_')
-            .TrimEnd('=');
-
-    private static bool RemoveCompactManualColumnCell(JsonArray? manualColumns, int manualColumnId, int dayOfMonth)
-    {
-        if (manualColumns is null)
-        {
-            return false;
-        }
-
-        var dayKey = dayOfMonth.ToString(CultureInfo.InvariantCulture);
-        foreach (var rawColumn in manualColumns)
-        {
-            if (rawColumn is not JsonArray column || GetJsonInt(column.ElementAtOrDefault(0)) != manualColumnId)
-            {
-                continue;
-            }
-
-            if (column.Count < 3 || column[2] is not JsonObject cells || !cells.Remove(dayKey))
-            {
-                return false;
-            }
-
-            if (cells.Count == 0)
-            {
-                column.RemoveAt(2);
-            }
-
-            return true;
-        }
-
-        return false;
-    }
-
-    private static bool RemoveLegacyManualColumnCell(JsonArray? manualColumns, int manualColumnId, int dayOfMonth)
-    {
-        if (manualColumns is null)
-        {
-            return false;
-        }
-
-        var dayKey = dayOfMonth.ToString(CultureInfo.InvariantCulture);
-        foreach (var rawColumn in manualColumns)
-        {
-            if (rawColumn is not JsonObject column || GetJsonInt(column["id"]) != manualColumnId)
-            {
-                continue;
-            }
-
-            return column["cells"] is JsonObject cells && cells.Remove(dayKey);
-        }
-
-        return false;
-    }
-
-    private static int? GetJsonInt(JsonNode? node)
-    {
-        if (node is null)
-        {
-            return null;
-        }
-
-        try
-        {
-            return node.GetValue<int>();
-        }
-        catch (FormatException)
-        {
-            return null;
-        }
-        catch (InvalidOperationException)
-        {
-            return null;
-        }
-    }
 }

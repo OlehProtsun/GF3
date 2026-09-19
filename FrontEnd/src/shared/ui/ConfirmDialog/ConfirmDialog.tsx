@@ -64,6 +64,7 @@ export function ConfirmDialog({
       role={open ? "dialog" : undefined}
       aria-modal={open ? true : undefined}
       aria-hidden={open ? undefined : true}
+      inert={!open}
       aria-labelledby={open ? titleId : undefined}
       aria-describedby={open ? messageId : undefined}
       onMouseDown={handleOverlayMouseDown}

@@ -91,6 +91,8 @@ public sealed class EmployeeAccountService : IEmployeeAccountService
         {
             existingAccount.PasswordHash = _passwordHasher.HashPassword(normalizedPassword);
             existingAccount.PasswordUpdatedAtUtc = DateTimeOffset.UtcNow;
+            existingAccount.SessionVersion++;
+            ClearPasswordResetChallengeFields(existingAccount);
         }
 
         await _accountRepository.UpdateAsync(existingAccount, ct).ConfigureAwait(false);
@@ -171,6 +173,7 @@ public sealed class EmployeeAccountService : IEmployeeAccountService
 
         account.PasswordHash = _passwordHasher.HashPassword(normalizedPassword);
         account.PasswordUpdatedAtUtc = DateTimeOffset.UtcNow;
+        account.SessionVersion++;
         ClearPasswordResetChallengeFields(account);
 
         await _accountRepository.UpdateAsync(account, ct).ConfigureAwait(false);

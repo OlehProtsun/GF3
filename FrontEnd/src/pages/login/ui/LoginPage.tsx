@@ -14,7 +14,7 @@ type PasswordMode = "pc" | "phone";
 const USERNAME_STORAGE_KEY = "gf3.auth.last-username";
 const PASSWORD_MODE_STORAGE_KEY = "gf3.auth.password-mode";
 const KEYPAD_DIGITS = ["1", "2", "3", "4", "5", "6", "7", "8", "9"];
-const PHONE_VIEWPORT_CONTENT = "width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover";
+const PHONE_VIEWPORT_CONTENT = "width=device-width, initial-scale=1.0, viewport-fit=cover";
 
 function readStoredValue(key: string) {
   if (typeof window === "undefined") return "";

@@ -1,5 +1,5 @@
 import { t } from "@shared/i18n";
-import { createContext, startTransition, useContext, useEffect, useState, type PropsWithChildren } from "react";
+import { createContext, startTransition, useCallback, useContext, useEffect, useRef, useState, type PropsWithChildren } from "react";
 import { ApiError, getAuthAccessToken, getErrorMessage, setAuthAccessToken } from "@shared/api/httpClient";
 import { authApi } from "@entities/auth";
 import type { AuthLoginResult, AuthSession, LoginInput } from "@entities/auth";
@@ -24,8 +24,12 @@ function readStoredAccessToken() {
     return null;
   }
 
-  const storedValue = window.localStorage.getItem(AUTH_TOKEN_STORAGE_KEY);
-  return storedValue && storedValue.trim().length > 0 ? storedValue.trim() : null;
+  try {
+    const storedValue = window.localStorage.getItem(AUTH_TOKEN_STORAGE_KEY);
+    return storedValue && storedValue.trim().length > 0 ? storedValue.trim() : null;
+  } catch {
+    return null;
+  }
 }
 
 function persistAccessToken(token: string | null) {
@@ -33,12 +37,15 @@ function persistAccessToken(token: string | null) {
     return;
   }
 
-  if (token && token.trim().length > 0) {
-    window.localStorage.setItem(AUTH_TOKEN_STORAGE_KEY, token.trim());
-    return;
+  try {
+    if (token && token.trim().length > 0) {
+      window.localStorage.setItem(AUTH_TOKEN_STORAGE_KEY, token.trim());
+    } else {
+      window.localStorage.removeItem(AUTH_TOKEN_STORAGE_KEY);
+    }
+  } catch {
+    // The session remains usable in memory when storage is unavailable.
   }
-
-  window.localStorage.removeItem(AUTH_TOKEN_STORAGE_KEY);
 }
 
 export function AuthProvider({ children }: PropsWithChildren) {
@@ -46,30 +53,33 @@ export function AuthProvider({ children }: PropsWithChildren) {
   const [session, setSession] = useState<AuthSession | null>(null);
   const [bootstrapError, setBootstrapError] = useState<string | null>(null);
 
-  const applyUnauthenticatedState = (nextBootstrapError: string | null = null) => {
+  const generation = useRef(0);
+
+  const applyUnauthenticatedState = useCallback((nextBootstrapError: string | null = null) => {
     startTransition(() => {
       setSession(null);
       setStatus("unauthenticated");
       setBootstrapError(nextBootstrapError);
     });
-  };
+  }, []);
 
-  const storeAccessToken = (token: string | null) => {
+  const storeAccessToken = useCallback((token: string | null) => {
     const normalizedToken = token && token.trim().length > 0 ? token.trim() : null;
     setAuthAccessToken(normalizedToken);
     persistAccessToken(normalizedToken);
     return normalizedToken;
-  };
+  }, []);
 
-  const applyAuthenticatedState = (nextSession: AuthSession) => {
+  const applyAuthenticatedState = useCallback((nextSession: AuthSession) => {
     startTransition(() => {
       setSession(nextSession);
       setStatus("authenticated");
       setBootstrapError(null);
     });
-  };
+  }, []);
 
-  const refreshSession = async () => {
+  const refreshSession = useCallback(async () => {
+    const requestGeneration = ++generation.current;
     const activeToken = getAuthAccessToken() ?? readStoredAccessToken();
     if (!activeToken) {
       storeAccessToken(null);
@@ -81,8 +91,10 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
     try {
       const nextSession = await authApi.session();
+      if (requestGeneration !== generation.current) return;
       applyAuthenticatedState(nextSession);
     } catch (error) {
+      if (requestGeneration !== generation.current) return;
       if (error instanceof ApiError && error.status === 401) {
         storeAccessToken(null);
         applyUnauthenticatedState(null);
@@ -91,25 +103,41 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
       applyUnauthenticatedState(getErrorMessage(error, t("Could not restore the current session.")));
     }
-  };
+  }, [applyAuthenticatedState, applyUnauthenticatedState, storeAccessToken]);
 
   useEffect(() => {
     void refreshSession();
-  }, []);
+    return () => { generation.current++; };
+  }, [refreshSession]);
+
+  useEffect(() => {
+    const handleStorage = (event: StorageEvent) => {
+      if (event.key !== AUTH_TOKEN_STORAGE_KEY && event.key !== null) return;
+      generation.current++;
+      setAuthAccessToken(null);
+      applyUnauthenticatedState();
+    };
+    window.addEventListener("storage", handleStorage);
+    return () => window.removeEventListener("storage", handleStorage);
+  }, [applyUnauthenticatedState]);
 
   const login = async (input: LoginInput) => {
+    const requestGeneration = ++generation.current;
     const result = await authApi.login(input);
+    if (requestGeneration !== generation.current) throw new Error(t("Request was canceled."));
     storeAccessToken(result.accessToken);
     applyAuthenticatedState(result.session);
     return result.session;
   };
 
   const replaceLoginResult = (result: AuthLoginResult) => {
+    generation.current++;
     storeAccessToken(result.accessToken);
     applyAuthenticatedState(result.session);
   };
 
   const logout = async () => {
+    generation.current++;
     try {
       await authApi.logout();
     } finally {

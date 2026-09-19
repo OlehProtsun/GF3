@@ -151,7 +151,7 @@ public sealed class ShiftSwapLogsController(
             swap.Status = ShiftSwapStatus.Cancelled;
             swap.CancelledAtUtc = DateTimeOffset.UtcNow;
             db.ShiftSwapRequests.Remove(swap);
-            if (swap.ScheduleSlot.EmployeeId is null)
+            if (swap.ScheduleSlot!.EmployeeId is null)
             {
                 db.ScheduleSlots.Remove(swap.ScheduleSlot);
             }
@@ -166,7 +166,7 @@ public sealed class ShiftSwapLogsController(
         await workflowLogService
             .LogAsync(
                 User,
-                $"Cancelled the shift swap in schedule \"{swap.Schedule.Name}\" for {swap.Schedule.Year}-{swap.Schedule.Month:00}-{swap.ScheduleSlot.DayOfMonth:00}, {swap.OfferedFromTime ?? swap.ScheduleSlot.FromTime}-{swap.OfferedToTime ?? swap.ScheduleSlot.ToTime}.",
+                $"Cancelled the shift swap in schedule \"{swap.Schedule.Name}\" for {swap.Schedule.Year}-{swap.Schedule.Month:00}-{swap.ScheduleSlot!.DayOfMonth:00}, {swap.OfferedFromTime ?? swap.ScheduleSlot!.FromTime}-{swap.OfferedToTime ?? swap.ScheduleSlot!.ToTime}.",
                 cancellationToken)
             .ConfigureAwait(false);
         if (swap.IsManagerCreated)
@@ -208,10 +208,10 @@ public sealed class ShiftSwapLogsController(
             {
                 db.ShiftSwapHistories.Remove(matchingHistory);
             }
-            var removesManualSlot = request.IsManagerCreated && request.ScheduleSlot.EmployeeId is null;
+            var removesManualSlot = request.IsManagerCreated && request.ScheduleSlot is { EmployeeId: null };
             if (removesManualSlot)
             {
-                db.ScheduleSlots.Remove(request.ScheduleSlot);
+                db.ScheduleSlots.Remove(request.ScheduleSlot!);
             }
 
             await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
@@ -310,7 +310,7 @@ public sealed class ShiftSwapLogsController(
                 swap.ScheduleId == graphId &&
                 swap.Status == ShiftSwapStatus.Open &&
                 swap.ManualColumnId == request.ManualColumnId &&
-                swap.ScheduleSlot.DayOfMonth == request.DayOfMonth,
+                swap.ScheduleSlot!.DayOfMonth == request.DayOfMonth,
                 cancellationToken)
             .ConfigureAwait(false);
         if (hasOpenManualOffer)
@@ -471,7 +471,7 @@ public sealed class ShiftSwapLogsController(
         }
 
         db.ShiftSwapRequests.Remove(swap);
-        if (swap.ScheduleSlot.EmployeeId is null)
+        if (swap.ScheduleSlot!.EmployeeId is null)
         {
             db.ScheduleSlots.Remove(swap.ScheduleSlot);
         }
@@ -480,7 +480,7 @@ public sealed class ShiftSwapLogsController(
         await workflowLogService
             .LogAsync(
                 User,
-                $"Cancelled the open shift in schedule \"{swap.Schedule.Name}\" for {swap.Schedule.Year}-{swap.Schedule.Month:00}-{swap.ScheduleSlot.DayOfMonth:00}, {swap.OfferedFromTime ?? swap.ScheduleSlot.FromTime}-{swap.OfferedToTime ?? swap.ScheduleSlot.ToTime}.",
+                $"Cancelled the open shift in schedule \"{swap.Schedule.Name}\" for {swap.Schedule.Year}-{swap.Schedule.Month:00}-{swap.ScheduleSlot!.DayOfMonth:00}, {swap.OfferedFromTime ?? swap.ScheduleSlot!.FromTime}-{swap.OfferedToTime ?? swap.ScheduleSlot!.ToTime}.",
                 cancellationToken)
             .ConfigureAwait(false);
         await realtimeNotifier
@@ -522,7 +522,9 @@ public sealed class ShiftSwapLogsController(
 
     private static ShiftSwapDto ToLogDto(ShiftSwapRequestModel model, bool managerCanCancel = false)
     {
-        var slot = model.ScheduleSlot;
+        if (model.ArchivedViewsJson is not null)
+            return ShiftSwapArchive.ReadView(model.ArchivedViewsJson, 0);
+        var slot = model.ScheduleSlot ?? throw new InvalidOperationException("The swap has no shift or archived snapshot.");
         var fromTime = string.IsNullOrWhiteSpace(model.OfferedFromTime) ? slot.FromTime : model.OfferedFromTime;
         var toTime = string.IsNullOrWhiteSpace(model.OfferedToTime) ? slot.ToTime : model.OfferedToTime;
         var shiftHours = Math.Round(GetTimeRangeDurationHours(fromTime!, toTime!), 2);
@@ -535,7 +537,7 @@ public sealed class ShiftSwapLogsController(
         {
             Id = model.Id,
             ScheduleId = model.ScheduleId,
-            ScheduleSlotId = model.ScheduleSlotId,
+            ScheduleSlotId = model.ScheduleSlotId ?? 0,
             ScheduleName = model.Schedule.Name,
             ContainerName = model.Schedule.Container?.Name ?? string.Empty,
             ShopName = model.Schedule.Shop?.Name ?? string.Empty,

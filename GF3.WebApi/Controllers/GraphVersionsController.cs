@@ -1,3 +1,4 @@
+using WebApi.ShiftSwaps;
 using System.Security.Claims;
 using System.Text.Json;
 using DataAccessLayer.Models;
@@ -129,11 +130,6 @@ public sealed class GraphVersionsController(
         var state = await db.ScheduleVersionStates
             .SingleOrDefaultAsync(item => item.ScheduleId == graphId, cancellationToken)
             .ConfigureAwait(false);
-        if (state?.CurrentVersionId == versionId)
-        {
-            return Ok(await BuildTreeAsync(graphId, cancellationToken).ConfigureAwait(false));
-        }
-
         var hasOpenSwaps = await db.ShiftSwapRequests
             .AnyAsync(request => request.ScheduleId == graphId && request.Status == ShiftSwapStatus.Open, cancellationToken)
             .ConfigureAwait(false);
@@ -156,9 +152,16 @@ public sealed class GraphVersionsController(
         }
 
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
+        await ShiftSwapArchive.PreserveCompletedAsync(db, graphId, cancellationToken).ConfigureAwait(false);
         await db.ScheduleCellStyles.Where(style => style.ScheduleId == graphId).ExecuteDeleteAsync(cancellationToken).ConfigureAwait(false);
         await db.ScheduleSlots.Where(slot => slot.ScheduleId == graphId).ExecuteDeleteAsync(cancellationToken).ConfigureAwait(false);
         await db.ScheduleEmployees.Where(employee => employee.ScheduleId == graphId).ExecuteDeleteAsync(cancellationToken).ConfigureAwait(false);
+
+        foreach (var entry in db.ChangeTracker.Entries().Where(entry =>
+            entry.Entity is ScheduleSlotModel slot && slot.ScheduleId == graphId ||
+            entry.Entity is ScheduleEmployeeModel employee && employee.ScheduleId == graphId ||
+            entry.Entity is ScheduleCellStyleModel style && style.ScheduleId == graphId).ToList())
+            entry.State = EntityState.Detached;
 
         RestoreSchedule(schedule, snapshot);
         db.ScheduleEmployees.AddRange(snapshot.Employees.Select(employee => new ScheduleEmployeeModel
@@ -429,7 +432,7 @@ public sealed class GraphVersionsController(
                 style.DayOfMonth,
                 style.EmployeeId,
                 style.BackgroundColorArgb,
-                style.TextColorArgb)).ToList());
+                style.TextColorArgb)).ToList(), schedule.AcceptedSwapHighlightColor);
 
     private static ScheduleVersionSnapshot DeserializeSnapshot(string snapshotJson)
         => JsonSerializer.Deserialize<ScheduleVersionSnapshot>(snapshotJson, SnapshotJsonOptions)
@@ -443,6 +446,7 @@ public sealed class GraphVersionsController(
         schedule.Month = snapshot.Month;
         schedule.PublicationStatus = ParseEnum<SchedulePublicationStatus>(snapshot.PublicationStatus, "publication status");
         schedule.AllowSwap = snapshot.AllowSwap;
+        schedule.AcceptedSwapHighlightColor = snapshot.AcceptedSwapHighlightColor ?? schedule.AcceptedSwapHighlightColor;
         schedule.PeoplePerShift = snapshot.PeoplePerShift;
         schedule.Shift1Time = snapshot.Shift1Time;
         schedule.Shift2Time = snapshot.Shift2Time;
@@ -509,7 +513,7 @@ public sealed class GraphVersionsController(
         int? AvailabilityGroupId,
         List<ScheduleVersionEmployeeSnapshot> Employees,
         List<ScheduleVersionSlotSnapshot> Slots,
-        List<ScheduleVersionCellStyleSnapshot> CellStyles);
+        List<ScheduleVersionCellStyleSnapshot> CellStyles, string? AcceptedSwapHighlightColor = null);
 
     private sealed record ScheduleVersionEmployeeSnapshot(int EmployeeId, int? MinHoursMonth, int DisplayOrder);
     private sealed record ScheduleVersionSlotSnapshot(

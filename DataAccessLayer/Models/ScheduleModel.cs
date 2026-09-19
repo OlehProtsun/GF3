@@ -53,6 +53,9 @@ public class ScheduleModel
     [Column("publication_status")]
     public SchedulePublicationStatus PublicationStatus { get; set; } = SchedulePublicationStatus.Private;
 
+    [Column("published_at_utc")]
+    public DateTimeOffset? PublishedAtUtc { get; set; }
+
     [Required]
     [Column("allow_swap")]
     public bool AllowSwap { get; set; } = true;

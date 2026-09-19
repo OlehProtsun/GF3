@@ -146,6 +146,7 @@ public sealed class ManagerProfileController(
         UserName = profile.UserName,
         DisplayName = profile.DisplayName,
         ManagerId = profile.Id,
+        CredentialVersion = profile.PasswordUpdatedAtUtc.UtcTicks,
     };
 
     private static SessionDto ToSessionDto(AuthenticatedSessionDto session) => new()

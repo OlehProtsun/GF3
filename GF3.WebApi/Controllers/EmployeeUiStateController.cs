@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using WebApi.Auth;
+using WebApi.Services;
 
 namespace WebApi.Controllers;
 
@@ -18,7 +19,7 @@ public sealed class EmployeeUiStateController(AppDbContext db) : ControllerBase
     private const int MaxColumnCount = 200;
     private const int MaxNotificationIdLength = 256;
     private const int MaxReadNotificationIds = 300;
-    private static readonly TimeSpan TransientNotificationRetention = TimeSpan.FromDays(7);
+    private static readonly TimeSpan TransientNotificationRetention = EmployeeNotificationRetention.Duration;
 
     [HttpGet]
     [ProducesResponseType(typeof(EmployeeUiStateDto), StatusCodes.Status200OK)]
@@ -32,19 +33,19 @@ public sealed class EmployeeUiStateController(AppDbContext db) : ControllerBase
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
         var cutoff = DateTimeOffset.UtcNow.Subtract(TransientNotificationRetention);
+        await db.Database.ExecuteSqlInterpolatedAsync(
+            $"""
+            DELETE FROM employee_notification_read
+            WHERE employee_id = {employeeId} AND julianday(read_at_utc) <= julianday({cutoff})
+            """, cancellationToken).ConfigureAwait(false);
         var readNotificationIds = await db.EmployeeNotificationReads
             .FromSqlInterpolated(
                 $"""
                 SELECT id, employee_id, notification_id, read_at_utc
                 FROM employee_notification_read
                 WHERE employee_id = {employeeId}
-                  AND (
-                    read_at_utc >= {cutoff}
-                    OR notification_id LIKE 'schedule-public:%'
-                    OR notification_id LIKE 'availability-public:%'
-                  )
+                  AND julianday(read_at_utc) > julianday({cutoff})
                 ORDER BY read_at_utc DESC
-                LIMIT {MaxReadNotificationIds}
                 """)
             .AsNoTracking()
             .Select(read => read.NotificationId)
@@ -181,7 +182,7 @@ public sealed class EmployeeUiStateController(AppDbContext db) : ControllerBase
     {
         var employeeId = GetRequiredEmployeeId();
         var notificationIds = (request.NotificationIds ?? [])
-            .Select(notificationId => notificationId.Trim())
+            .Select(notificationId => notificationId?.Trim() ?? string.Empty)
             .Where(notificationId => notificationId.Length > 0)
             .Distinct(StringComparer.Ordinal)
             .Take(MaxReadNotificationIds + 1)
@@ -195,6 +196,7 @@ public sealed class EmployeeUiStateController(AppDbContext db) : ControllerBase
         }
 
         var readAtUtc = DateTimeOffset.UtcNow;
+        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
         foreach (var notificationId in notificationIds)
         {
             await db.Database.ExecuteSqlInterpolatedAsync(
@@ -207,6 +209,7 @@ public sealed class EmployeeUiStateController(AppDbContext db) : ControllerBase
                 cancellationToken).ConfigureAwait(false);
         }
 
+        await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
         return NoContent();
     }
 
@@ -236,7 +239,7 @@ public sealed class EmployeeUiStateController(AppDbContext db) : ControllerBase
             .AsNoTracking()
             .AnyAsync(request =>
                 request.Id == swapId &&
-                request.Schedule.PublicationStatus == SchedulePublicationStatus.Public &&
+                (request.ArchivedViewsJson != null || request.Schedule.PublicationStatus == SchedulePublicationStatus.Public) &&
                 (request.FromEmployeeId == employeeId ||
                  request.TargetEmployeeId == employeeId ||
                  request.AcceptedByEmployeeId == employeeId ||

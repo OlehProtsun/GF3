@@ -20,6 +20,20 @@ namespace GF3.Tests;
 public sealed class RealtimeMiddlewareAndGenericCoverageTests
 {
     [Fact]
+    public async Task WorkflowLog_IsSentOnlyToManagers()
+    {
+        var all = new RecordingPresenceClient();
+        var managers = new RecordingPresenceClient();
+        var notifier = new RealtimeNotifier(new FakeHubContext(all, managers));
+        await notifier.NotifyWorkflowLogCreatedAsync(new WorkflowLogEntryModel
+        {
+            Id = 42, ActorRole = "Manager", ActorName = "Manager", Action = "Private action",
+            OccurredAtUtc = DateTimeOffset.UtcNow,
+        });
+        Assert.Empty(all.WorkflowLogMessages);
+        Assert.Equal(42, Assert.Single(managers.WorkflowLogMessages).Id);
+    }
+    [Fact]
     public async Task EmployeePresenceHub_ConnectsAndDisconnectsEmployeePresence()
     {
         var client = new RecordingPresenceClient();
@@ -364,14 +378,14 @@ public sealed class RealtimeMiddlewareAndGenericCoverageTests
         }
     }
 
-    private sealed class FakeHubContext(RecordingPresenceClient client) : IHubContext<EmployeePresenceHub, IEmployeePresenceClient>
+    private sealed class FakeHubContext(RecordingPresenceClient client, RecordingPresenceClient? managers = null) : IHubContext<EmployeePresenceHub, IEmployeePresenceClient>
     {
-        public IHubClients<IEmployeePresenceClient> Clients { get; } = new FakeHubClients(client);
+        public IHubClients<IEmployeePresenceClient> Clients { get; } = new FakeHubClients(client, managers);
 
         public IGroupManager Groups { get; } = new FakeGroupManager();
     }
 
-    private sealed class FakeHubClients(RecordingPresenceClient client) : IHubClients<IEmployeePresenceClient>
+    private sealed class FakeHubClients(RecordingPresenceClient client, RecordingPresenceClient? managers = null) : IHubClients<IEmployeePresenceClient>
     {
         public IEmployeePresenceClient All => client;
 
@@ -381,7 +395,7 @@ public sealed class RealtimeMiddlewareAndGenericCoverageTests
 
         public IEmployeePresenceClient Clients(IReadOnlyList<string> connectionIds) => client;
 
-        public IEmployeePresenceClient Group(string groupName) => client;
+        public IEmployeePresenceClient Group(string groupName) => groupName == EmployeePresenceHub.ManagersGroupName ? managers ?? client : client;
 
         public IEmployeePresenceClient GroupExcept(string groupName, IReadOnlyList<string> excludedConnectionIds) => client;
 
