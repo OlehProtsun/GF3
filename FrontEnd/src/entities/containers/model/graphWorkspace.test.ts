@@ -145,18 +145,46 @@ describe("container graph workspace model", () => {
     expect(normalizeGraphCellValue("  note  ")).toBe("note");
   });
 
-  test("keeps touching split shifts separate in data and can merge them for visual display", () => {
+  test("displays generated touching shifts as one interval without changing slots", () => {
     const touchingSlots: GraphSlot[] = [
       { id: 1, scheduleId: 1, dayOfMonth: 1, slotNo: 1, fromTime: "09:00", toTime: "15:00", employeeId: 1, status: 1 },
       { id: 2, scheduleId: 1, dayOfMonth: 1, slotNo: 1, fromTime: "15:00", toTime: "21:00", employeeId: 1, status: 1 },
     ];
 
     expect(buildGraphCellMap(touchingSlots)).toEqual({
-      "1:1": "09:00 - 15:00, 15:00 - 21:00",
+      "1:1": "09:00 - 21:00",
     });
     expect(mergeGraphIntervalsForDisplay(touchingSlots, { mergeTouching: true })).toEqual([
       { from: "09:00", to: "21:00" },
     ]);
+    expect(touchingSlots.map(slot => [slot.fromTime, slot.toTime])).toEqual([
+      ["09:00", "15:00"], ["15:00", "21:00"],
+    ]);
+  });
+
+  test.each([
+    [["15:00", "21:00"], ["09:00", "15:00"]],
+    [["18:00", "21:00"], ["09:00", "12:00"], ["12:00", "18:00"]],
+  ])("merges a chain of touching intervals regardless of order: %j", (...ranges) => {
+    const slots = ranges.map(([fromTime, toTime], index) => ({
+      id: index + 1, scheduleId: 1, dayOfMonth: 1, slotNo: index + 1,
+      fromTime, toTime, employeeId: 1, status: 1,
+    }));
+    expect(buildGraphCellMap(slots)).toEqual({ "1:1": "09:00 - 21:00" });
+  });
+
+  test("preserves breaks and keeps employees and days separate", () => {
+    const slots: GraphSlot[] = [
+      { id: 1, scheduleId: 1, dayOfMonth: 1, slotNo: 1, fromTime: "09:00", toTime: "15:00", employeeId: 1, status: 1 },
+      { id: 2, scheduleId: 1, dayOfMonth: 1, slotNo: 1, fromTime: "15:01", toTime: "21:00", employeeId: 1, status: 1 },
+      { id: 3, scheduleId: 1, dayOfMonth: 1, slotNo: 2, fromTime: "15:00", toTime: "21:00", employeeId: 2, status: 1 },
+      { id: 4, scheduleId: 1, dayOfMonth: 2, slotNo: 1, fromTime: "15:00", toTime: "21:00", employeeId: 1, status: 1 },
+    ];
+    expect(buildGraphCellMap(slots)).toEqual({
+      "1:1": "09:00 - 15:00, 15:01 - 21:00",
+      "2:1": "15:00 - 21:00",
+      "1:2": "15:00 - 21:00",
+    });
   });
 
   test("builds and sanitizes graph cell and style maps", () => {

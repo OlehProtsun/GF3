@@ -130,9 +130,8 @@ public static class ScheduleMatrixEngine
     }
 
     /// <summary>
-    /// Merges overlapping time ranges for one employee/day into user-friendly display intervals.
-    /// We deduplicate identical intervals first, then merge overlapping windows. Touching windows
-    /// remain separate because they can represent an intentionally split shift.
+    /// Merges overlapping or touching time ranges for one employee/day into display intervals,
+    /// preserving separate intervals only when there is a break.
     /// </summary>
     public static List<(string from, string to)> MergeIntervalsForDisplay(IEnumerable<ScheduleSlotModel> slots)
     {
@@ -174,7 +173,7 @@ public static class ScheduleMatrixEngine
         for (var i = 1; i < parsedIntervals.Count; i++)
         {
             var next = parsedIntervals[i];
-            if (next.fromMin < current.toMin)
+            if (next.fromMin <= current.toMin)
             {
                 current.toMin = Math.Max(current.toMin, next.toMin);
                 continue;
