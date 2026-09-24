@@ -235,7 +235,7 @@ export function buildGraphCellMap(slots: GraphSlot[]) {
 
   const cellMap: GraphMatrixCellMap = {};
   slotsByEmployeeByDay.forEach((daySlots, key) => {
-    cellMap[key] = formatGraphIntervals(mergeGraphIntervalsForDisplay(daySlots));
+    cellMap[key] = formatGraphIntervals(mergeGraphIntervalsForDisplay(daySlots, { mergeTouching: true }));
   });
 
   return cellMap;

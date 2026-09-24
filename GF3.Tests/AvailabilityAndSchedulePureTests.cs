@@ -105,8 +105,7 @@ public sealed class AvailabilityAndSchedulePureTests
         Assert.Equal(
             [
                 ("08:00", "14:00"),
-                ("15:00", "16:00"),
-                ("16:00", "18:00"),
+                ("15:00", "18:00"),
             ],
             intervals);
     }
