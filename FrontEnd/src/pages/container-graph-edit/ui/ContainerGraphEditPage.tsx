@@ -2873,7 +2873,7 @@ export function ContainerGraphEditPage() {
         <ManagerEditLockDialog
           open
           message={editLockMessage}
-          actionText="Back to schedule"
+          actionText={t("Back to schedule")}
           onClose={handleEditLockDialogClose}
         />
       ) : null}
@@ -3065,7 +3065,7 @@ export function ContainerGraphEditPage() {
         message={t("Are you sure you want to remove '{0}' from this schedule? Their schedule cells in this editor will be removed.", employeeRemoveTargetLabel)}
         onCancel={() => setEmployeeRemoveTargetId(null)}
         onConfirm={handleRemoveEmployeeConfirm}
-        confirmText="Remove"
+        confirmText={t("Remove")}
       />
       <ConfirmDialog
         open={bindDeleteTarget !== null}

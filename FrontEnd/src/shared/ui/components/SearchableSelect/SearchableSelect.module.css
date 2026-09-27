@@ -138,12 +138,16 @@
 }
 
 .dropdownPortal {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr);
   position: fixed;
   z-index: 1900;
 }
 
 .dropdown {
-  overflow: hidden;
+  min-height: 0;
+  overscroll-behavior: contain;
+  overflow: auto;
   border-radius: 24px;
   border: 1px solid rgba(113, 113, 122, 0.14);
   background:
@@ -262,4 +266,8 @@
   padding: 18px 14px;
   color: rgba(17, 24, 39, 0.56);
   text-align: center;
+}
+
+.dropdown {
+  animation: var(--motion-reveal) 160ms var(--motion-ease);
 }

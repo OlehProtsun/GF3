@@ -161,7 +161,7 @@ export function ContainerGraphDetailsFields({
             value={getStepperValue(form.peoplePerShift, 1)}
             min={1}
             onChange={value => onFieldChange("peoplePerShift")(String(value))}
-            ariaLabel="people per shift"
+            ariaLabel={t("people per shift")}
           />
         </LabeledField>
       </div>
@@ -175,13 +175,13 @@ export function ContainerGraphDetailsFields({
             value={form.month}
             options={monthOptions}
             placeholder={t("Select month...")}
-            dropdownTitle="Schedule months"
+            dropdownTitle={t("Schedule months")}
             fallbackHint=""
             searchEnabled={false}
             invalid={Boolean(formErrors.month)}
             dropdownPlacement={selectDropdownPlacement}
             ariaDescribedBy={formErrors.month ? `${idPrefix}-month-error` : undefined}
-            ariaLabel="schedule months"
+            ariaLabel={t("schedule months")}
             onChange={value => onFieldChange("month")(value)}
           />
         </LabeledField>
@@ -198,7 +198,7 @@ export function ContainerGraphDetailsFields({
             min={2000}
             max={2100}
             onChange={value => onFieldChange("year")(String(value))}
-            ariaLabel="schedule year"
+            ariaLabel={t("schedule year")}
           />
         </LabeledField>
       </div>
@@ -239,7 +239,7 @@ export function ContainerGraphDetailsFields({
             value={getStepperValue(form.maxHoursPerEmpMonth, 160)}
             min={1}
             onChange={value => onFieldChange("maxHoursPerEmpMonth")(String(value))}
-            ariaLabel="max hours per employee"
+            ariaLabel={t("max hours per employee")}
           />
         </LabeledField>
 
@@ -254,7 +254,7 @@ export function ContainerGraphDetailsFields({
             value={getStepperValue(form.maxConsecutiveDays, 0)}
             min={0}
             onChange={value => onFieldChange("maxConsecutiveDays")(String(value))}
-            ariaLabel="max consecutive days"
+            ariaLabel={t("max consecutive days")}
           />
         </LabeledField>
 
@@ -269,7 +269,7 @@ export function ContainerGraphDetailsFields({
             value={getStepperValue(form.maxConsecutiveFull, 0)}
             min={0}
             onChange={value => onFieldChange("maxConsecutiveFull")(String(value))}
-            ariaLabel="max consecutive full"
+            ariaLabel={t("max consecutive full")}
           />
         </LabeledField>
 
@@ -284,7 +284,7 @@ export function ContainerGraphDetailsFields({
             value={getStepperValue(form.maxFullPerMonth, 0)}
             min={0}
             onChange={value => onFieldChange("maxFullPerMonth")(String(value))}
-            ariaLabel="max full per month"
+            ariaLabel={t("max full per month")}
           />
         </LabeledField>
       </div>
@@ -305,14 +305,14 @@ export function ContainerGraphDetailsFields({
             value={form.shopId}
             options={shopOptions}
             placeholder={shops.length > 0 ? t("Select shop...") : t("No shops available")}
-            dropdownTitle="Shop list"
+            dropdownTitle={t("Shop list")}
             searchPlaceholder={t("Search shop...")}
             emptyMessage={t("No shops match your search.")}
             invalid={Boolean(formErrors.shopId)}
             dropdownPlacement={selectDropdownPlacement}
             shadow={shopSelectShadow}
             ariaDescribedBy={formErrors.shopId ? `${idPrefix}-shop-error` : undefined}
-            ariaLabel="shop list"
+            ariaLabel={t("shop list")}
             onChange={value => onFieldChange("shopId")(value)}
           />
         </LabeledField>
@@ -325,13 +325,13 @@ export function ContainerGraphDetailsFields({
               value={form.availabilityGroupId}
               options={availabilityOptions}
               placeholder={t("Select availability...")}
-              dropdownTitle="Availability groups"
+              dropdownTitle={t("Availability groups")}
               searchPlaceholder={t("Search availability...")}
               emptyMessage={t("No availability groups match your search.")}
               invalid={Boolean(formErrors.availabilityGroupId)}
               dropdownPlacement={selectDropdownPlacement}
               ariaDescribedBy={formErrors.availabilityGroupId ? `${idPrefix}-availability-error` : undefined}
-              ariaLabel="availability groups"
+              ariaLabel={t("availability groups")}
               onChange={value => onFieldChange("availabilityGroupId")(value)}
             />
           </LabeledField>

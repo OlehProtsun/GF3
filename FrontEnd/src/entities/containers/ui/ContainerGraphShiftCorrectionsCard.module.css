@@ -28,6 +28,7 @@
 .saveHint,.reviewed { margin: 0; color: #b45309; font-size: .65rem; font-weight: 800; line-height: 1.35; text-align: center; }.reviewed { color: #64748b; }
 
 .colorDialogOverlay {
+  composes: overlay from "../../../shared/ui/ViewportOverlay.module.css";
   position: fixed;
   inset: 0;
   z-index: 1900;
@@ -39,6 +40,7 @@
 }
 
 .colorDialog {
+  composes: surface from "../../../shared/ui/ViewportOverlay.module.css";
   width: min(286px, calc(100vw - 24px));
   display: grid;
   gap: 11px;

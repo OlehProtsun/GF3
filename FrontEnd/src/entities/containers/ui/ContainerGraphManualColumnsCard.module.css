@@ -396,6 +396,7 @@
 }
 
 .shiftDialogOverlay {
+  composes: overlay from "../../../shared/ui/ViewportOverlay.module.css";
   position: fixed;
   inset: 0;
   z-index: 2600;
@@ -409,8 +410,9 @@
 }
 
 .shiftDialog {
+  composes: surface from "../../../shared/ui/ViewportOverlay.module.css";
   width: min(100%, 1120px);
-  height: min(88vh, 780px);
+  height: min(88dvh, 780px);
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
   gap: 12px;
@@ -737,7 +739,7 @@
   }
 
   .shiftDialog {
-    height: min(88vh, 620px);
+    height: min(88dvh, 620px);
     border-radius: 22px;
     padding: 12px;
   }

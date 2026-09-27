@@ -1439,11 +1439,11 @@ export function EmployeeSchedulePage() {
                 <div className={styles.summaryPeriodField}>
                   <span>{t("Month")}</span>
                   <SearchableSelect
-                    ariaLabel="Summary month"
+                    ariaLabel={t("Summary month")}
                     value={activeSummaryPeriod ? String(activeSummaryPeriod.month) : ""}
                     options={summaryMonthOptions}
                     placeholder={t("Month")}
-                    dropdownTitle="Month"
+                    dropdownTitle={t("Month")}
                     size="summary"
                     shadow="soft"
                     searchEnabled={false}
@@ -1457,11 +1457,11 @@ export function EmployeeSchedulePage() {
                 <div className={styles.summaryPeriodField}>
                   <span>{t("Year")}</span>
                   <SearchableSelect
-                    ariaLabel="Summary year"
+                    ariaLabel={t("Summary year")}
                     value={activeSummaryPeriod ? String(activeSummaryPeriod.year) : ""}
                     options={summaryYearOptions}
                     placeholder={t("Year")}
-                    dropdownTitle="Year"
+                    dropdownTitle={t("Year")}
                     size="summary"
                     shadow="soft"
                     searchEnabled={false}

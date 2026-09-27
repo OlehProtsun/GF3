@@ -111,7 +111,7 @@ export function EmployeeEditPage() {
         <ManagerEditLockDialog
           open
           message={editLockMessage}
-          actionText="Back to employee"
+          actionText={t("Back to employee")}
           onClose={handleEditLockDialogClose}
         />
       ) : null}

@@ -424,7 +424,7 @@ export function ContainerGraphManualColumnsCard({
                 <button
                   type="button"
                   className={styles.deleteButton}
-                  aria-label={t("Delete {0}", column.label.trim() || `manual column ${index + 1}`)}
+                  aria-label={t("Delete {0}", column.label.trim() || t("manual column {0}", index + 1))}
                   onClick={() => onDeleteColumn(column.columnId)}
                 >
                   <CloseIcon size={14} />
@@ -497,11 +497,11 @@ export function ContainerGraphManualColumnsCard({
                     value={selectedEmployeeId !== null ? String(selectedEmployeeId) : ""}
                     options={employeeOptions}
                     placeholder={employeeOptions.length > 0 ? t("Select employee...") : t("No employees available")}
-                    dropdownTitle="Employee list"
+                    dropdownTitle={t("Employee list")}
                     searchPlaceholder={t("Search employee...")}
                     emptyMessage={t("No employees match your search.")}
                     fallbackHint={t("{0} employees found", employeeOptions.length)}
-                    ariaLabel="employee list"
+                    ariaLabel={t("employee list")}
                     onChange={value => setTargetEmployeeId(value ? Number(value) : null)}
                   />
                 </div>
@@ -566,7 +566,7 @@ export function ContainerGraphManualColumnsCard({
                   <article key={shift.clientId} className={styles.offeredItem}>
                     <div className={styles.offeredMain}>
                       <strong>{`${formatDay(year, month, shift.dayOfMonth)} ${shift.fromTime}-${shift.toTime}`}</strong>
-                      <span>{`Pending save / ${targetName}`}</span>
+                      <span>{t("Pending save / {0}", targetName)}</span>
                       <small>{`${formatPublishedShiftHours(getTimeRangeDurationHours(shift.fromTime, shift.toTime))} / ${visibilityLabel}`}</small>
                     </div>
 

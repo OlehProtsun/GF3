@@ -1,5 +1,7 @@
+import { createPortal } from "react-dom";
+import { useDropdownPosition } from "@shared/lib/useDropdownPosition";
 import { dateTimeFormat, t } from "@shared/i18n";
-import { useEffect, useId, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
 import type { AvailabilityPublicationStatus } from "@entities/availability-groups/model/types";
 import { ErrorPill } from "@shared/ui/forms/Field";
 import { EyeIcon } from "@shared/ui/icons";
@@ -164,6 +166,9 @@ export function AvailabilityDateTimeField({
   onChange: (value: string) => void;
 }) {
   const [isOpen, setIsOpen] = useState(false);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const dropdownStyle = useDropdownPosition(isOpen && dateOnly, triggerRef, dropdownRef, "down", 320);
   const [viewDate, setViewDate] = useState(() => getPickerBaseDate(value));
   const pickerParts = useMemo(() => getPickerParts(value, defaultTime), [defaultTime, value]);
   const calendarCells = useMemo(
@@ -212,11 +217,122 @@ export function AvailabilityDateTimeField({
     commitDateTime(pickerParts.date, pickerParts.hour, wrapTimePart(pickerParts.minute + delta, 60));
   };
 
+  const picker = isOpen ? (
+    <div
+      className={joinClassNames(styles.dateDialog, dateOnly && styles.dateDialogDateOnly)}
+      role="dialog"
+      aria-label={t("{0} picker", label)}
+    >
+      <div className={styles.calendarHeader}>
+        <button
+          type="button"
+          className={styles.calendarNavButton}
+          aria-label={t("Previous month")}
+          onClick={() => setViewDate(current => new Date(current.getFullYear(), current.getMonth() - 1, 1))}
+        >
+          {"<"}
+        </button>
+        <strong>{monthYearFormatter.format(viewDate)}</strong>
+        <button
+          type="button"
+          className={styles.calendarNavButton}
+          aria-label={t("Next month")}
+          onClick={() => setViewDate(current => new Date(current.getFullYear(), current.getMonth() + 1, 1))}
+        >
+          {">"}
+        </button>
+      </div>
+
+      <div className={styles.weekdayGrid} aria-hidden="true">
+        {weekdayLabels.map(value => t(value)).map(day => (
+          <span key={day}>{day}</span>
+        ))}
+      </div>
+
+      <div className={styles.calendarGrid}>
+        {calendarCells.map(cell => (
+          <button
+            key={cell.key}
+            type="button"
+            className={joinClassNames(
+              styles.calendarDay,
+              !cell.isCurrentMonth && styles.calendarDayMuted,
+              cell.isToday && styles.calendarDayToday,
+              cell.value === pickerParts.date && styles.calendarDaySelected,
+            )}
+            aria-pressed={cell.value === pickerParts.date}
+            onClick={() => commitDateTime(cell.value)}
+          >
+            {cell.day}
+          </button>
+        ))}
+      </div>
+
+      <div className={styles.timePanel}>
+        <div className={styles.timeStepper}>
+          <button type="button" aria-label={t("Decrease hour")} onClick={() => stepHour(-1)}>
+            -
+          </button>
+          <span>
+            <strong>{padDatePart(pickerParts.hour)}</strong>
+            <small>{t("Hour")}</small>
+          </span>
+          <button type="button" aria-label={t("Increase hour")} onClick={() => stepHour(1)}>
+            +
+          </button>
+        </div>
+
+        <span className={styles.timeColon}>:</span>
+
+        <div className={styles.timeStepper}>
+          <button type="button" aria-label={t("Decrease minute")} onClick={() => stepMinute(-5)}>
+            -
+          </button>
+          <span>
+            <strong>{padDatePart(pickerParts.minute)}</strong>
+            <small>{t("Min")}</small>
+          </span>
+          <button type="button" aria-label={t("Increase minute")} onClick={() => stepMinute(5)}>
+            +
+          </button>
+        </div>
+      </div>
+
+      <div className={styles.quickTimeGrid}>
+        {quickTimes.map(time => (
+          <button
+            key={time}
+            type="button"
+            className={joinClassNames(styles.quickTimeButton, selectedTime === time && styles.quickTimeButtonActive)}
+            onClick={() => commitQuickTime(time)}
+          >
+            {time}
+          </button>
+        ))}
+      </div>
+
+      <div className={styles.dateDialogActions}>
+        <button
+          type="button"
+          className={styles.dateDialogAction}
+          onClick={() => {
+            onChange("");
+            setIsOpen(false);
+          }}
+        >
+          {t("Clear")}</button>
+        <button type="button" className={styles.dateDialogActionPrimary} onClick={() => setIsOpen(false)}>
+          {t("Done")}</button>
+      </div>
+    </div>
+  ) : null;
+
   return (
     <div className={styles.field}>
       <span className={styles.label}>{label}</span>
       <button
         type="button"
+        ref={triggerRef}
         className={joinClassNames(styles.dateButton, isOpen && styles.dateButtonOpen, Boolean(error) && styles.dateButtonInvalid)}
         aria-expanded={isOpen}
         aria-invalid={Boolean(error)}
@@ -227,115 +343,10 @@ export function AvailabilityDateTimeField({
         <span className={styles.dateButtonHint}>{t("Edit")}</span>
       </button>
 
-      {isOpen ? (
-        <div
-          className={joinClassNames(styles.dateDialog, dateOnly && styles.dateDialogDateOnly)}
-          role="dialog"
-          aria-label={t("{0} picker", label)}
-        >
-          <div className={styles.calendarHeader}>
-            <button
-              type="button"
-              className={styles.calendarNavButton}
-              aria-label={t("Previous month")}
-              onClick={() => setViewDate(current => new Date(current.getFullYear(), current.getMonth() - 1, 1))}
-            >
-              {"<"}
-            </button>
-            <strong>{monthYearFormatter.format(viewDate)}</strong>
-            <button
-              type="button"
-              className={styles.calendarNavButton}
-              aria-label={t("Next month")}
-              onClick={() => setViewDate(current => new Date(current.getFullYear(), current.getMonth() + 1, 1))}
-            >
-              {">"}
-            </button>
-          </div>
-
-          <div className={styles.weekdayGrid} aria-hidden="true">
-            {weekdayLabels.map(value => t(value)).map(day => (
-              <span key={day}>{day}</span>
-            ))}
-          </div>
-
-          <div className={styles.calendarGrid}>
-            {calendarCells.map(cell => (
-              <button
-                key={cell.key}
-                type="button"
-                className={joinClassNames(
-                  styles.calendarDay,
-                  !cell.isCurrentMonth && styles.calendarDayMuted,
-                  cell.isToday && styles.calendarDayToday,
-                  cell.value === pickerParts.date && styles.calendarDaySelected,
-                )}
-                aria-pressed={cell.value === pickerParts.date}
-                onClick={() => commitDateTime(cell.value)}
-              >
-                {cell.day}
-              </button>
-            ))}
-          </div>
-
-          <div className={styles.timePanel}>
-            <div className={styles.timeStepper}>
-              <button type="button" aria-label={t("Decrease hour")} onClick={() => stepHour(-1)}>
-                -
-              </button>
-              <span>
-                <strong>{padDatePart(pickerParts.hour)}</strong>
-                <small>{t("Hour")}</small>
-              </span>
-              <button type="button" aria-label={t("Increase hour")} onClick={() => stepHour(1)}>
-                +
-              </button>
-            </div>
-
-            <span className={styles.timeColon}>:</span>
-
-            <div className={styles.timeStepper}>
-              <button type="button" aria-label={t("Decrease minute")} onClick={() => stepMinute(-5)}>
-                -
-              </button>
-              <span>
-                <strong>{padDatePart(pickerParts.minute)}</strong>
-                <small>{t("Min")}</small>
-              </span>
-              <button type="button" aria-label={t("Increase minute")} onClick={() => stepMinute(5)}>
-                +
-              </button>
-            </div>
-          </div>
-
-          <div className={styles.quickTimeGrid}>
-            {quickTimes.map(time => (
-              <button
-                key={time}
-                type="button"
-                className={joinClassNames(styles.quickTimeButton, selectedTime === time && styles.quickTimeButtonActive)}
-                onClick={() => commitQuickTime(time)}
-              >
-                {time}
-              </button>
-            ))}
-          </div>
-
-          <div className={styles.dateDialogActions}>
-            <button
-              type="button"
-              className={styles.dateDialogAction}
-              onClick={() => {
-                onChange("");
-                setIsOpen(false);
-              }}
-            >
-              {t("Clear")}</button>
-            <button type="button" className={styles.dateDialogActionPrimary} onClick={() => setIsOpen(false)}>
-              {t("Done")}</button>
-          </div>
-        </div>
-      ) : null}
+      {isOpen && dateOnly ? createPortal(
+        <div ref={dropdownRef} className={styles.datePortal} style={dropdownStyle}>{picker}</div>,
+        document.body,
+      ) : picker}
 
       {error ? <ErrorPill id={errorId}>{error}</ErrorPill> : null}
     </div>

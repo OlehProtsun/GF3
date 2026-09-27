@@ -368,6 +368,7 @@
 }
 
 .successBanner {
+  composes: overlay from "../../../shared/ui/ViewportOverlay.module.css";
   position: fixed;
   inset: 0;
   z-index: 90;
@@ -382,6 +383,7 @@
 }
 
 .successToast {
+  composes: surface from "../../../shared/ui/ViewportOverlay.module.css";
   width: min(100%, 360px);
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
@@ -449,6 +451,7 @@
 }
 
 .dialogOverlay {
+  composes: overlay from "../../../shared/ui/ViewportOverlay.module.css";
   position: fixed;
   inset: 0;
   z-index: 80;
@@ -462,6 +465,7 @@
 }
 
 .dayDialog {
+  composes: surface from "../../../shared/ui/ViewportOverlay.module.css";
   width: min(100%, 430px);
   display: grid;
   gap: 14px;

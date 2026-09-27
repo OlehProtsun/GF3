@@ -43,7 +43,7 @@ export function LanguageSelector({ disabled = false, selectClassName, appearance
         id={id}
         className={styles.select}
         value={language}
-        options={[{ value: "en", label: "English" }, { value: "pl", label: "Polska" }]}
+        options={[{ value: "en", label: "English" }, { value: "pl", label: "Polski" }]}
         placeholder={t("Application language")}
         dropdownTitle={t("Application language")}
         ariaLabel={t("Application language")}
@@ -72,7 +72,7 @@ export function LanguageSelector({ disabled = false, selectClassName, appearance
     <select className={selectClassName} aria-label={t("Application language")} value={language} disabled={disabled || pending || !ready}
       onChange={event => void change(event.target.value as Language)}>
       <option value="en" lang="en">English</option>
-      <option value="pl" lang="pl">Polska</option>
+      <option value="pl" lang="pl">Polski</option>
     </select>
     {error ? <small role="alert">{t("Could not save language. Please try again.")}</small> : null}
   </>;

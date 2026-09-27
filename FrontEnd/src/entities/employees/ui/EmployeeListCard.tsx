@@ -49,12 +49,12 @@ export function EmployeeListCard({
       isFetching={isLoading}
       hasData={employees.length > 0}
       searchQuery={searchQuery}
-      loadingMessage="Loading employees..."
-      errorMessage="Could not load employees."
-      emptyTitle="No employees yet"
-      emptyDescription="Start by creating your first employee record."
+      loadingMessage={t("Loading employees...")}
+      errorMessage={t("Could not load employees.")}
+      emptyTitle={t("No employees yet")}
+      emptyDescription={t("Start by creating your first employee record.")}
       emptyAction={addEmployeeAction}
-      searchEmptyTitle="Nothing found"
+      searchEmptyTitle={t("Nothing found")}
       searchEmptyDescription={t("No employee matches \"{0}\".", searchQuery)}
       searchEmptyAction={
         <IosButton label={t("Clear Search")} variant="secondary" onClick={onClearSearch} />

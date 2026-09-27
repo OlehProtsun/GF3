@@ -1,5 +1,6 @@
+import { useDropdownPosition } from "@shared/lib/useDropdownPosition";
 import { t } from "@shared/i18n";
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { SchedulePreset } from "@entities/containers/model/types";
 import type { Shop } from "@entities/shops/model/types";
@@ -63,7 +64,7 @@ export function ContainerGraphPresetSelect({
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   const [isOpen, setIsOpen] = useState(false);
   const [searchText, setSearchText] = useState("");
-  const [dropdownStyle, setDropdownStyle] = useState<CSSProperties>({});
+  const dropdownStyle = useDropdownPosition(isOpen, triggerRef, dropdownRef);
 
   const shopNameById = useMemo(
     () => new Map(shops.map(shop => [shop.id, shop.name])),
@@ -98,33 +99,6 @@ export function ContainerGraphPresetSelect({
     setSearchText("");
     setIsOpen(true);
   }, []);
-
-  useLayoutEffect(() => {
-    if (!isOpen || !triggerRef.current) {
-      return;
-    }
-
-    const updateDropdownPosition = () => {
-      const rect = triggerRef.current?.getBoundingClientRect();
-      if (!rect) {
-        return;
-      }
-
-      setDropdownStyle({
-        left: rect.left,
-        top: rect.bottom + 10,
-        width: rect.width,
-      });
-    };
-
-    updateDropdownPosition();
-    window.addEventListener("resize", updateDropdownPosition);
-    window.addEventListener("scroll", updateDropdownPosition, true);
-    return () => {
-      window.removeEventListener("resize", updateDropdownPosition);
-      window.removeEventListener("scroll", updateDropdownPosition, true);
-    };
-  }, [isOpen]);
 
   useEffect(() => {
     if (!isOpen) {

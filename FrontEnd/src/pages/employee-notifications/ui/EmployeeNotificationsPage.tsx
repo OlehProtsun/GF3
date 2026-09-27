@@ -182,7 +182,7 @@ export function EmployeeNotificationsPage() {
             <span>{t("Published schedules, availability and shift updates will appear here.")}</span>
           </div>
         ) : activeTab === "inbox" ? (
-          <div className={styles.notificationList}>
+          <div className={styles.notificationList} data-motion-list>
             {notificationItems.map(item => {
               const isUnread = !isEmployeeNotificationRead(item, readIds);
               const itemClassName = [
@@ -234,7 +234,7 @@ export function EmployeeNotificationsPage() {
             <span>{t("Product updates and announcements will appear here.")}</span>
           </div>
         ) : (
-          <div className={styles.notificationList}>
+          <div className={styles.notificationList} data-motion-list>
             {newsItems.map(item => {
               const embedUrl = getYoutubeEmbedUrl(item.videoUrl);
               return (

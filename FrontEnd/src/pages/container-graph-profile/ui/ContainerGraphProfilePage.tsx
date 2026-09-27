@@ -358,7 +358,7 @@ export function ContainerGraphProfilePage() {
         }
         onCancel={() => setIsEditConfirmOpen(false)}
         onConfirm={handleOpenEdit}
-        confirmText="Edit"
+        confirmText={t("Edit")}
         variant="confirm"
       />
     </div>

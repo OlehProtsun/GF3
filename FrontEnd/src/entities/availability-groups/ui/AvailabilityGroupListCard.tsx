@@ -47,12 +47,12 @@ export function AvailabilityGroupListCard({
       isFetching={isLoading}
       hasData={groups.length > 0}
       searchQuery={searchQuery}
-      loadingMessage="Loading availability groups..."
-      errorMessage="Could not load availability groups."
-      emptyTitle="No availability groups yet"
-      emptyDescription="Start by creating your first availability group."
+      loadingMessage={t("Loading availability groups...")}
+      errorMessage={t("Could not load availability groups.")}
+      emptyTitle={t("No availability groups yet")}
+      emptyDescription={t("Start by creating your first availability group.")}
       emptyAction={addAction}
-      searchEmptyTitle="Nothing found"
+      searchEmptyTitle={t("Nothing found")}
       searchEmptyDescription={t("No availability group matches \"{0}\".", searchQuery)}
       searchEmptyAction={<IosButton label={t("Clear Search")} variant="secondary" onClick={onClearSearch} />}
     >

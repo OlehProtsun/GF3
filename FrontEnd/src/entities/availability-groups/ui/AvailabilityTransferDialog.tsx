@@ -128,10 +128,10 @@ export function AvailabilityTransferDialog({
                 value={selectedSource ? String(selectedSource.groupId) : ""}
                 options={sourceOptions}
                 placeholder={isLoading ? t("Loading availability...") : t("Choose availability...")}
-                dropdownTitle="Availability in this month"
+                dropdownTitle={t("Availability in this month")}
                 searchPlaceholder={t("Search availability...")}
                 emptyMessage={t("No other filled availability was found for this employee in this month.")}
-                ariaLabel="source availability"
+                ariaLabel={t("source availability")}
                 disabled={isLoading || isPending || sourceOptions.length === 0}
                 onChange={value => setSelectedSourceId(value ? Number(value) : null)}
               />

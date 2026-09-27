@@ -41,13 +41,13 @@ export function ShopProfileCard({
 
   return (
     <RecordProfileCard
-      sectionTitle="Shop Profile"
+      sectionTitle={t("Shop Profile")}
       icon={<ShopIcon size={18} style={{ transform: "scaleY(-1)" }} />}
       headerMeta={shop ? `ID ${shop.id}` : undefined}
       isLoading={isLoading}
       hasLoadError={hasLoadError}
-      loadingMessage="Loading shop details..."
-      errorMessage="Could not load shop."
+      loadingMessage={t("Loading shop details...")}
+      errorMessage={t("Could not load shop.")}
       avatar={shop ? initials : undefined}
       name={shop ? displayName : undefined}
       subtitle={shop ? detailsState : undefined}

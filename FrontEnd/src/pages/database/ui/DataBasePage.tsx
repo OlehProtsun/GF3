@@ -1165,7 +1165,7 @@ function DataBaseWorkspace() {
 
                         <div className={styles.viewerSqlSection}>
                           <p className={styles.sectionCaption}>{t("SQL definition")}</p>
-                          <pre className={styles.sqlPreview}>{selectedObject.sql || "-- No SQL definition available for this object."}</pre>
+                          <pre className={styles.sqlPreview}>{selectedObject.sql || t("-- No SQL definition available for this object.")}</pre>
                         </div>
                       </>
                     ) : (

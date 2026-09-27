@@ -43,12 +43,12 @@ export function ShopListCard({
       isFetching={isLoading}
       hasData={shops.length > 0}
       searchQuery={searchQuery}
-      loadingMessage="Loading shops..."
-      errorMessage="Could not load shops."
-      emptyTitle="No shops yet"
-      emptyDescription="Start by creating your first shop record."
+      loadingMessage={t("Loading shops...")}
+      errorMessage={t("Could not load shops.")}
+      emptyTitle={t("No shops yet")}
+      emptyDescription={t("Start by creating your first shop record.")}
       emptyAction={addShopAction}
-      searchEmptyTitle="Nothing found"
+      searchEmptyTitle={t("Nothing found")}
       searchEmptyDescription={t("No shop matches \"{0}\".", searchQuery)}
       searchEmptyAction={
         <IosButton label={t("Clear Search")} variant="secondary" onClick={onClearSearch} />

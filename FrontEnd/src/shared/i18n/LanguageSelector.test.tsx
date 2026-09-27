@@ -5,12 +5,19 @@ import { LanguageSelector } from "./LanguageSelector";
 const context = vi.hoisted(() => ({ language: "en", ready: true, save: vi.fn() }));
 vi.mock("@app/providers/LanguageProvider", () => ({ useLanguage: () => context }));
 
-beforeEach(() => { context.save.mockReset(); vi.useFakeTimers(); });
-afterEach(() => { cleanup(); vi.useRealTimers(); });
+beforeEach(() => {
+  context.save.mockReset();
+  vi.useFakeTimers();
+  vi.stubGlobal("ResizeObserver", class {
+    observe() {}
+    disconnect() {}
+  });
+});
+afterEach(() => { cleanup(); vi.useRealTimers(); vi.unstubAllGlobals(); });
 
 function choosePolish() {
   fireEvent.click(screen.getByRole("button", { name: "Application language" }));
-  fireEvent.click(screen.getByRole("option", { name: "Polska" }));
+  fireEvent.click(screen.getByRole("option", { name: "Polski" }));
 }
 
 it("shows confirmation only after saving succeeds and removes it after 2.4 seconds", async () => {

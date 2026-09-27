@@ -1125,7 +1125,7 @@ export function AvailabilityEditPage() {
         <ManagerEditLockDialog
           open
           message={editLockMessage}
-          actionText="Back to availability"
+          actionText={t("Back to availability")}
           onClose={handleEditLockDialogClose}
         />
       ) : null}
@@ -1309,7 +1309,7 @@ export function AvailabilityEditPage() {
         message={t("Are you sure you want to remove '{0}' from this availability? Their availability data in this editor will be removed.", employeeRemoveTargetLabel)}
         onCancel={() => setEmployeeRemoveTargetId(null)}
         onConfirm={handleRemoveEmployeeConfirm}
-        confirmText="Remove"
+        confirmText={t("Remove")}
       />
       <ConfirmDialog
         open={bindDeleteTarget !== null}

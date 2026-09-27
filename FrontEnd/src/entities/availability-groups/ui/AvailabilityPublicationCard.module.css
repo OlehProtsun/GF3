@@ -373,10 +373,15 @@
 }
 
 .dateDialogDateOnly {
-  position: absolute;
-  top: calc(100% + 8px);
-  left: 0;
-  z-index: 30;
-  width: min(320px, calc(100vw - 48px));
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
   box-sizing: border-box;
+}
+
+.datePortal {
+  position: fixed;
+  z-index: 1900;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr);
 }

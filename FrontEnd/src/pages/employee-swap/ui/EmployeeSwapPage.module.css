@@ -904,6 +904,7 @@
 }
 
 .dialogOverlay {
+  composes: overlay from "../../../shared/ui/ViewportOverlay.module.css";
   position: fixed;
   inset: 0;
   width: 100%;
@@ -924,8 +925,9 @@
 }
 
 .shiftDialog {
+  composes: surface from "../../../shared/ui/ViewportOverlay.module.css";
   width: min(100%, 520px);
-  max-height: min(760px, calc(100svh - 32px));
+  max-height: min(760px, calc(100dvh - 32px));
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
   gap: 14px;
@@ -2336,4 +2338,28 @@
 
 .offerCard[data-expanded="true"]:not(:has(.offerUnavailableReason)) .cardActions {
   grid-row: actions-start / reason-end;
+}
+
+.shortActionLabel {
+  display: none;
+}
+
+@media (max-width: 460px) {
+  .fullActionLabel {
+    display: none;
+  }
+
+  .shortActionLabel {
+    display: inline;
+  }
+
+  .historyButton {
+    padding-inline: 8px;
+    gap: 5px;
+  }
+
+  .historyButton > span:first-child {
+    width: 28px;
+    height: 28px;
+  }
 }

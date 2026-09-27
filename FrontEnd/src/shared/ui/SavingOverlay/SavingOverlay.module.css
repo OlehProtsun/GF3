@@ -1,4 +1,5 @@
 .overlay {
+  composes: overlay from "../ViewportOverlay.module.css";
   position: fixed;
   inset: 0;
   z-index: 1580;
@@ -11,6 +12,7 @@
 }
 
 .panel {
+  composes: surface from "../ViewportOverlay.module.css";
   width: min(420px, calc(100vw - 32px));
   display: grid;
   gap: 18px;

@@ -38,7 +38,7 @@ function formatDeadline(value: string) {
     return t("until the deadline");
   }
 
-  return `until ${deadlineFormatter.format(date)}`;
+  return t("until {0}", deadlineFormatter.format(date));
 }
 
 type EmployeeCommunicationDialogProps = {

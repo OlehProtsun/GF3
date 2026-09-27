@@ -405,17 +405,17 @@ export function HomePage() {
                       <HomePillList
                         title={t("Schedules in this month")}
                         items={homeData.currentMonthScheduleNames}
-                        emptyLabel="No schedules yet."
+                        emptyLabel={t("No schedules yet.")}
                       />
                       <HomePillList
                         title={t("Shops in this month")}
                         items={homeData.currentMonthShopNames}
-                        emptyLabel="No shops connected yet."
+                        emptyLabel={t("No shops connected yet.")}
                       />
                       <HomePillList
                         title={t("Employees in this month")}
                         items={homeData.currentMonthEmployeeNames}
-                        emptyLabel="No assigned employees yet."
+                        emptyLabel={t("No assigned employees yet.")}
                       />
                     </div>
                   )}
