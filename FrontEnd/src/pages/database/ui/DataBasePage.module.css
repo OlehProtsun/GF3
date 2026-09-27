@@ -24,6 +24,7 @@
 }
 
 .accessOverlay {
+  composes: overlay from "../../../shared/ui/ViewportOverlay.module.css";
   position: fixed;
   inset: 0;
   z-index: 1600;
@@ -36,6 +37,7 @@
 }
 
 .accessDialog {
+  composes: surface from "../../../shared/ui/ViewportOverlay.module.css";
   box-sizing: border-box;
   width: min(480px, calc(100vw - 32px));
   display: grid;
@@ -195,7 +197,7 @@
 .executorCard,
 .importCard {
   grid-column: span 3;
-  height: clamp(760px, calc(100vh - 156px), 920px);
+  height: clamp(760px, calc(100dvh - 156px), 920px);
 }
 
 .executorCard {

@@ -6,6 +6,7 @@ import { OverlaySidebarLayout } from "@app/layouts/overlay-sidebar-layout";
 import { useAuth } from "@app/providers/AuthProvider";
 import { renderMatched } from "@shared/lib/react-router-dom";
 import { RouteFallback } from "./RouteFallback";
+import { PageTransition } from "./PageTransition";
 import { RegulationAcceptanceGate } from "@entities/regulations/ui/RegulationAcceptanceGate";
 
 function lazyPage<TModule>(
@@ -142,7 +143,9 @@ function RoutedShell() {
   const shouldUseLayout = status === "authenticated" && pathname !== "/login" && pathname !== "/password-recovery";
   const content = (
     <Suspense fallback={<RouteFallback />}>
-      <RoutedContent />
+      <PageTransition pathname={pathname}>
+        <RoutedContent />
+      </PageTransition>
     </Suspense>
   );
 

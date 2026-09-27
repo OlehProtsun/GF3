@@ -207,7 +207,7 @@ export function ManagerSystemNews() {
           </section>
         </div>
       ) : null}
-      <ConfirmDialog open={deleteId !== null} title={t("Delete update?")} message={t("This system news message and its read history will be permanently deleted.")} confirmText="Delete" onConfirm={confirmDelete} onCancel={() => setDeleteId(null)} confirmDisabled={deleteNews.isPending} cancelDisabled={deleteNews.isPending} />
+      <ConfirmDialog open={deleteId !== null} title={t("Delete update?")} message={t("This system news message and its read history will be permanently deleted.")} confirmText={t("Delete")} onConfirm={confirmDelete} onCancel={() => setDeleteId(null)} confirmDisabled={deleteNews.isPending} cancelDisabled={deleteNews.isPending} />
     </>
   );
 }

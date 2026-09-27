@@ -597,7 +597,7 @@ export function ContainerPage() {
               <ManagerEditLockDialog
                 open
                 message={editLockMessage}
-                actionText="Back to container"
+                actionText={t("Back to container")}
                 onClose={handleEditLockDialogClose}
               />
             ) : null}

@@ -1,5 +1,6 @@
+import { useDropdownPosition } from "@shared/lib/useDropdownPosition";
 import { t } from "@shared/i18n";
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { ArrowIcon, CheckIcon, SearchIcon } from "@shared/ui/icons";
 import styles from "./SearchableSelect.module.css";
@@ -63,7 +64,7 @@ export function SearchableSelect({
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   const [isOpen, setIsOpen] = useState(false);
   const [searchText, setSearchText] = useState("");
-  const [dropdownStyle, setDropdownStyle] = useState<CSSProperties>({});
+  const dropdownStyle = useDropdownPosition(isOpen, triggerRef, dropdownRef, dropdownPlacement);
 
   const selectedOption = options.find(option => option.value === value) ?? null;
   const filteredOptions = useMemo(() => {
@@ -91,44 +92,6 @@ export function SearchableSelect({
     setSearchText("");
     setIsOpen(true);
   }, []);
-
-  useLayoutEffect(() => {
-    if (!isOpen || !triggerRef.current || !dropdownRef.current) {
-      return;
-    }
-
-    const viewportPadding = 12;
-    const dropdownOffset = 10;
-    const updateDropdownPosition = () => {
-      const triggerRect = triggerRef.current?.getBoundingClientRect();
-      const dropdownRect = dropdownRef.current?.getBoundingClientRect();
-      if (!triggerRect || !dropdownRect) {
-        return;
-      }
-
-      const maxLeft = Math.max(viewportPadding, window.innerWidth - triggerRect.width - viewportPadding);
-      const left = Math.min(Math.max(triggerRect.left, viewportPadding), maxLeft);
-      const preferredTop =
-        dropdownPlacement === "up"
-          ? triggerRect.top - dropdownRect.height - dropdownOffset
-          : triggerRect.bottom + dropdownOffset;
-      const maxTop = Math.max(viewportPadding, window.innerHeight - dropdownRect.height - viewportPadding);
-
-      setDropdownStyle({
-        left,
-        top: Math.min(Math.max(preferredTop, viewportPadding), maxTop),
-        width: triggerRect.width,
-      });
-    };
-
-    updateDropdownPosition();
-    window.addEventListener("resize", updateDropdownPosition);
-    window.addEventListener("scroll", updateDropdownPosition, true);
-    return () => {
-      window.removeEventListener("resize", updateDropdownPosition);
-      window.removeEventListener("scroll", updateDropdownPosition, true);
-    };
-  }, [dropdownPlacement, isOpen]);
 
   useEffect(() => {
     if (!isOpen) {

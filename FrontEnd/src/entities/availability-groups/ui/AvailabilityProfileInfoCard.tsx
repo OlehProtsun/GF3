@@ -70,7 +70,7 @@ export function AvailabilityProfileInfoCard({
   return (
     <ProfileSummaryCard
       className={styles.card}
-      sectionTitle="Availability Information"
+      sectionTitle={t("Availability Information")}
       icon={<AvailabilityIcon size={18} />}
       headerMeta={`ID ${group.id}`}
       headerRightWrap="nowrap"

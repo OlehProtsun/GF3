@@ -51,13 +51,13 @@ export function EmployeeProfileCard({
 
   return (
     <RecordProfileCard
-      sectionTitle="Employee Profile"
+      sectionTitle={t("Employee Profile")}
       icon={<EmployeeIcon size={18} />}
       headerMeta={employee ? `ID ${employee.id}` : undefined}
       isLoading={isLoading}
       hasLoadError={hasLoadError}
-      loadingMessage="Loading employee details..."
-      errorMessage="Could not load employee."
+      loadingMessage={t("Loading employee details...")}
+      errorMessage={t("Could not load employee.")}
       avatar={employee ? initials : undefined}
       name={employee ? fullName : undefined}
       subtitle={employee ? <PresenceBadge label={presenceLabel} tone={presenceTone} /> : undefined}

@@ -31,8 +31,8 @@ export function EmployeeDetailsForm({
       isLoading={isLoading}
       hasLoadError={hasLoadError}
       isSaving={isSaving}
-      loadingMessage="Loading..."
-      errorMessage="Could not load employee."
+      loadingMessage={t("Loading...")}
+      errorMessage={t("Could not load employee.")}
       onCancel={onCancel}
       onSubmit={onSubmit}
     >

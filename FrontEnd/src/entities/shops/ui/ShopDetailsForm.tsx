@@ -31,8 +31,8 @@ export function ShopDetailsForm({
       isLoading={isLoading}
       hasLoadError={hasLoadError}
       isSaving={isSaving}
-      loadingMessage="Loading..."
-      errorMessage="Could not load shop."
+      loadingMessage={t("Loading...")}
+      errorMessage={t("Could not load shop.")}
       onCancel={onCancel}
       onSubmit={onSubmit}
     >

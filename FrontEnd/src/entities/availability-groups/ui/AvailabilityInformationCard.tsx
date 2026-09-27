@@ -63,7 +63,7 @@ export function AvailabilityInformationCard({
               min={1}
               max={12}
               onChange={onMonthChange}
-              ariaLabel="availability month"
+              ariaLabel={t("availability month")}
             />
             {errors.month ? <ErrorPill id="availability-month-error">{errors.month}</ErrorPill> : null}
           </label>
@@ -76,7 +76,7 @@ export function AvailabilityInformationCard({
               min={2026}
               max={4000}
               onChange={onYearChange}
-              ariaLabel="availability year"
+              ariaLabel={t("availability year")}
             />
             {errors.year ? <ErrorPill id="availability-year-error">{errors.year}</ErrorPill> : null}
           </label>

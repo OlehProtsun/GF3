@@ -798,7 +798,7 @@ export function ContainerGraphEditor({
                 </div>
 
                 <ContainerGraphHighlightColorDialog open={isSwapColorDialogOpen} value={swapHighlightColor}
-                  eyebrow="Publication" title={t("Choose accepted swap color")} inputLabel="Accepted swap highlight hex color"
+                  eyebrow={t("Publication")} title={t("Choose accepted swap color")} inputLabel={t("Accepted swap highlight hex color")}
                   isSaving={saveSwapHighlightSettingMutation.isPending}
                   onCancel={() => setIsSwapColorDialogOpen(false)} onSave={handleSwapHighlightColorChange} />
 
@@ -957,11 +957,11 @@ export function ContainerGraphEditor({
                       value={selectedEmployeeId !== null ? String(selectedEmployeeId) : ""}
                       options={employeeOptions}
                       placeholder={availableEmployees.length > 0 ? t("Select employee...") : t("No employees available")}
-                      dropdownTitle="Employees"
+                      dropdownTitle={t("Employees")}
                       searchPlaceholder={t("Search employee...")}
                       emptyMessage={t("No employees match your search.")}
                       fallbackHint=""
-                      ariaLabel="employee list"
+                      ariaLabel={t("employee list")}
                       onChange={value => onSelectedEmployeeIdChange(value ? Number(value) : null)}
                     />
 
@@ -1253,11 +1253,11 @@ export function ContainerGraphEditor({
                         value={previewAvailabilitySelection}
                         options={previewAvailabilityOptions}
                         placeholder={t("Select preview availability...")}
-                        dropdownTitle="Availability Preview"
+                        dropdownTitle={t("Availability Preview")}
                         searchPlaceholder={t("Search availability...")}
                         emptyMessage={t("No availability groups match your search.")}
                         showSelectedHint={false}
-                        ariaLabel="availability preview groups"
+                        ariaLabel={t("availability preview groups")}
                         onChange={onPreviewAvailabilitySelectionChange}
                       />
 

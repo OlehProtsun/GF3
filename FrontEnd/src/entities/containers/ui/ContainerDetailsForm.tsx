@@ -34,8 +34,8 @@ export function ContainerDetailsForm({
       isLoading={isLoading}
       hasLoadError={hasLoadError}
       isSaving={isSaving}
-      loadingMessage="Loading container..."
-      errorMessage="Could not load this container."
+      loadingMessage={t("Loading container...")}
+      errorMessage={t("Could not load this container.")}
       onCancel={onCancel}
       onSubmit={onSubmit}
     >

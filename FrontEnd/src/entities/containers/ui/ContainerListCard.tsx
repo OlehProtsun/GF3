@@ -43,12 +43,12 @@ export function ContainerListCard({
       isFetching={isLoading}
       hasData={containers.length > 0}
       searchQuery={searchQuery}
-      loadingMessage="Loading containers..."
-      errorMessage="Could not load containers."
-      emptyTitle="No containers yet"
-      emptyDescription="Start by creating your first container workspace."
+      loadingMessage={t("Loading containers...")}
+      errorMessage={t("Could not load containers.")}
+      emptyTitle={t("No containers yet")}
+      emptyDescription={t("Start by creating your first container workspace.")}
       emptyAction={addContainerAction}
-      searchEmptyTitle="Nothing found"
+      searchEmptyTitle={t("Nothing found")}
       searchEmptyDescription={t("No container matches \"{0}\".", searchQuery)}
       searchEmptyAction={
         <IosButton label={t("Clear Search")} variant="secondary" onClick={onClearSearch} />

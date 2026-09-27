@@ -1,0 +1,23 @@
+/* A definite grid track lets the surface shrink to the available viewport. */
+.overlay {
+  box-sizing: border-box;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+.surface {
+  box-sizing: border-box;
+  min-width: 0;
+  min-height: 0;
+  max-width: 100%;
+  max-height: 100%;
+  overflow: auto;
+  overscroll-behavior: contain;
+  overflow-wrap: anywhere;
+}
+
+.surface {
+  animation: var(--motion-reveal) 180ms var(--motion-ease);
+}

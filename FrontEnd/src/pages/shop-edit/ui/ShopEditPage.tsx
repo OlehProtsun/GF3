@@ -111,7 +111,7 @@ export function ShopEditPage() {
         <ManagerEditLockDialog
           open
           message={editLockMessage}
-          actionText="Back to shop"
+          actionText={t("Back to shop")}
           onClose={handleEditLockDialogClose}
         />
       ) : null}

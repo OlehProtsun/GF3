@@ -169,7 +169,7 @@ export function ContainerGraphShiftCorrectionsCard({
       </div>
 
       <ContainerGraphHighlightColorDialog open={isColorDialogOpen} value={highlightColor}
-        eyebrow="Shift corrections" title={t("Choose approval color")} inputLabel="Approval highlight hex color"
+        eyebrow={t("Shift corrections")} title={t("Choose approval color")} inputLabel={t("Approval highlight hex color")}
         isSaving={saveSettingMutation.isPending} onCancel={() => setIsColorDialogOpen(false)} onSave={handleColorChange} />
 
       {actionError ? <ErrorBanner dismissible={false}>{actionError}</ErrorBanner> : null}

@@ -60,8 +60,8 @@ export function ContainerGraphDetailsForm({
       isLoading={false}
       hasLoadError={false}
       isSaving={isSaving}
-      loadingMessage="Preparing schedule form..."
-      errorMessage="Could not open the schedule form."
+      loadingMessage={t("Preparing schedule form...")}
+      errorMessage={t("Could not open the schedule form.")}
       onCancel={onCancel}
       onSubmit={onSubmit}
     >

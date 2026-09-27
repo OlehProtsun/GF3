@@ -73,13 +73,13 @@ export function AvailabilityEmployeeCard({
             value={selectedEmployeeId !== null ? String(selectedEmployeeId) : ""}
             options={employeeOptions}
             placeholder={employeeOptions.length > 0 ? t("Select employee...") : t("No employees available")}
-            dropdownTitle="Employee list"
+            dropdownTitle={t("Employee list")}
             searchPlaceholder={t("Search employee...")}
             emptyMessage={t("No employees match your search.")}
             fallbackHint={t("{0} employees found", employeeOptions.length)}
             invalid={Boolean(groupError)}
             ariaDescribedBy={employeeGroupErrorId}
-            ariaLabel="employee list"
+            ariaLabel={t("employee list")}
             onChange={value => onSelectedEmployeeIdChange(value ? Number(value) : null)}
           />
         </div>

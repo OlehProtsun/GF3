@@ -813,6 +813,7 @@ function SwapOfferCard({
 export function EmployeeSwapPage() {
   const stageRef = useRef<HTMLDivElement>(null);
   const creationDialogRef = useRef<HTMLDialogElement>(null);
+  const createOfferTriggerRef = useRef<HTMLButtonElement>(null);
   const historyDialogRef = useRef<HTMLDialogElement>(null);
   const [historyDialogElement, setHistoryDialogElement] = useState<HTMLDialogElement | null>(null);
   const setHistoryDialogRef = useCallback((element: HTMLDialogElement | null) => {
@@ -864,6 +865,7 @@ export function EmployeeSwapPage() {
     document.body.style.overflow = "hidden";
     return () => {
       dialog.close();
+      createOfferTriggerRef.current?.focus({ preventScroll: true });
       document.body.style.overflow = previousOverflow;
     };
   }, [isGiveAwayExpanded]);
@@ -1066,13 +1068,17 @@ export function EmployeeSwapPage() {
 
           <button
             type="button"
+            ref={createOfferTriggerRef}
             className={styles.createOfferButton}
             aria-expanded={isGiveAwayExpanded}
             aria-controls="create-swap-panel"
+            aria-label={t("Create offer")}
+            title={t("Create offer")}
             onClick={() => setIsGiveAwayExpanded(value => !value)}
           >
             <PlusIcon size={25} />
-            <span>{t("Create offer")}</span>
+            <span className={styles.fullActionLabel}>{t("Create offer")}</span>
+            <span className={styles.shortActionLabel}>{t("Add")}</span>
           </button>
         </header>
 
@@ -1131,7 +1137,7 @@ export function EmployeeSwapPage() {
               </div>
             </div>
 
-            <div className={[
+            <div data-motion-list className={[
               styles.offerList,
               filteredOpenSwaps.length >= 5 ? styles.offerListScrollable : "",
             ].filter(Boolean).join(" ")}>
@@ -1161,10 +1167,13 @@ export function EmployeeSwapPage() {
           className={styles.historyButton}
           aria-expanded={isHistoryExpanded}
           aria-controls="swap-history-panel"
+          aria-label={t("Swap history")}
+          title={t("Swap history")}
           onClick={() => setIsHistoryExpanded(value => !value)}
         >
           <span aria-hidden="true"><SwapHistoryIcon size={22} /></span>
-          <span className={styles.historyButtonLabel}>{t("Swap history")}</span>
+          <span className={`${styles.historyButtonLabel} ${styles.fullActionLabel}`}>{t("Swap history")}</span>
+          <span className={styles.shortActionLabel}>{t("History")}</span>
         </button>
       </div>
 
@@ -1178,7 +1187,7 @@ export function EmployeeSwapPage() {
             </div>
             <button type="button" className={styles.dialogCloseButton} aria-label={t("Close")} onClick={() => setIsHistoryExpanded(false)}><CloseIcon size={20} /></button>
           </div>
-          <div className={[styles.offerList, swapHistory.length >= 5 ? styles.offerListScrollable : ""].filter(Boolean).join(" ")}>
+          <div data-motion-list className={[styles.offerList, swapHistory.length >= 5 ? styles.offerListScrollable : ""].filter(Boolean).join(" ")}>
             {swapHistory.length === 0 ? (
               <p className={styles.emptyText}>{t("Accepted and cancelled swaps will appear here.")}</p>
             ) : swapHistory.map(swap => (
@@ -1322,7 +1331,7 @@ export function EmployeeSwapPage() {
         variant="confirm"
         title={t("Unpin swap?")}
         message={t("Remove {0} from your pinned swaps?", pendingUnpinSwap?.scheduleName ?? "this swap")}
-        confirmText="Unpin"
+        confirmText={t("Unpin")}
         onCancel={() => setPendingUnpinSwapId(null)}
         onConfirm={handleConfirmUnpin}
       />, isHistoryExpanded && historyDialogElement ? historyDialogElement : document.body)}

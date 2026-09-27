@@ -506,7 +506,7 @@ export function ManagerNotepad() {
                   role="textbox"
                   aria-label={t("Note content")}
                   aria-multiline="true"
-                  data-placeholder="Write something..."
+                  data-placeholder={t("Write something...")}
                   suppressContentEditableWarning
                   onInput={syncEditorContent}
                   onMouseUp={() => { rememberSelection(); refreshActiveFormats(); }}
