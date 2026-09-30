@@ -1819,5 +1819,9 @@
   "Swap history": "Historia zamian",
   "-- No SQL definition available for this object.": "-- Brak definicji SQL tego obiektu.",
   "All": "Wszystkie",
-  "until {0}": "do {0}"
+  "until {0}": "do {0}",
+  "Edit preset": "Edytuj szablon",
+  "Edit preset {0}": "Edytuj szablon {0}",
+  "Time range": "Zakres godzin",
+  "Use a valid time range like 09:00 - 15:00.": "Wpisz poprawny zakres godzin, np. 09:00 - 15:00."
 }

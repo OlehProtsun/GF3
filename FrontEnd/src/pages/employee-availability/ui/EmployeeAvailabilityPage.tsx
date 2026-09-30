@@ -1,5 +1,6 @@
 import { dateTimeFormat, t } from "@shared/i18n";
 import { useEffect, useMemo, useState, type MouseEvent } from "react";
+import { useAuth } from "@app/providers/AuthProvider";
 import {
   useEmployeeAvailabilityListQuery,
   useSaveEmployeeAvailabilityMutation,
@@ -38,13 +39,65 @@ type DayDraft = {
 
 type DayDraftMap = Record<number, DayDraft>;
 
-const dayValuePresets = [
-  { label: "9:00 - 15:00", value: "09:00 - 15:00" },
-  { label: "15:00 - 21:00", value: "15:00 - 21:00" },
-  { label: "9:00 - 21:00", value: "09:00 - 21:00" },
-  { label: AVAILABILITY_ANY_MARK, value: AVAILABILITY_ANY_MARK },
-  { label: AVAILABILITY_NONE_MARK, value: AVAILABILITY_NONE_MARK },
-] as const;
+const defaultTimePresets = ["09:00 - 15:00", "15:00 - 21:00", "09:00 - 21:00"];
+
+function readTimePresets(storageKey: string | null): string[] {
+  if (!storageKey) return [...defaultTimePresets];
+
+  try {
+    const stored: unknown = JSON.parse(window.localStorage.getItem(storageKey) ?? "null");
+    if (!Array.isArray(stored) || stored.length !== defaultTimePresets.length) return [...defaultTimePresets];
+    const ranges = stored.map(value => typeof value === "string" ? parseFlexibleTimeRange(value) : null);
+    return ranges.every(range => range !== null)
+      ? ranges.map(range => range!.label)
+      : [...defaultTimePresets];
+  } catch {
+    return [...defaultTimePresets];
+  }
+}
+
+function AvailabilityTimePresetEditor({ value, onSave, onCancel }: {
+  value: string;
+  onSave: (value: string) => void;
+  onCancel: () => void;
+}) {
+  const [draft, setDraft] = useState(value);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const range = parseFlexibleTimeRange(draft);
+  const hasError = !range;
+
+  return (
+    <form className={styles.presetEditor} onSubmit={event => {
+      event.preventDefault();
+      if (!range) return;
+      try {
+        onSave(range.label);
+      } catch {
+        setSaveError(t("Could not save this preset."));
+      }
+    }}>
+      <label className={styles.customField}>
+        <span>{t("Time range")}</span>
+        <input
+          autoFocus
+          value={draft}
+          onChange={event => { setDraft(event.target.value); setSaveError(null); }}
+          placeholder="09:00 - 15:00"
+          aria-invalid={hasError}
+          aria-describedby={hasError ? "availability-preset-error" : undefined}
+        />
+      </label>
+      {hasError ? <p id="availability-preset-error" className={styles.dialogError}>
+        {t("Use a valid time range like 09:00 - 15:00.")}
+      </p> : null}
+      {saveError ? <p className={styles.dialogError} role="alert">{saveError}</p> : null}
+      <div className={styles.dialogActions}>
+        <IosButton label={t("Cancel")} variant="secondary" onClick={onCancel} />
+        <IosButton label={t("Save")} type="submit" disabled={hasError} />
+      </div>
+    </form>
+  );
+}
 
 const employeeDateTimeFormatter = dateTimeFormat("en-GB", {
   month: "short",
@@ -231,18 +284,22 @@ function AvailabilityDayDialog({
   open,
   dayOfMonth,
   day,
+  storageKey,
   onClose,
   onApply,
 }: {
   open: boolean;
   dayOfMonth: number | null;
   day?: DayDraft;
+  storageKey: string | null;
   onClose: () => void;
   onApply: (dayOfMonth: number, value: string) => void;
 }) {
   const [fromTime, setFromTime] = useState("09:00");
   const [toTime, setToTime] = useState("15:00");
   const [customValue, setCustomValue] = useState("");
+  const [timePresets, setTimePresets] = useState(() => readTimePresets(storageKey));
+  const [editingPresetIndex, setEditingPresetIndex] = useState<number | null>(null);
 
   useEffect(() => {
     if (!open) {
@@ -253,6 +310,7 @@ function AvailabilityDayDialog({
     setFromTime(nextRange.from);
     setToTime(nextRange.to);
     setCustomValue(nextRange.value);
+    setEditingPresetIndex(null);
   }, [day, open]);
 
   useEffect(() => {
@@ -276,6 +334,11 @@ function AvailabilityDayDialog({
 
   const parsedValue = parseAvailabilityCode(customValue);
   const hasError = customValue.trim().length > 0 && !parsedValue.ok;
+  const dayValuePresets = [
+    ...timePresets.map((value, index) => ({ label: value.replace(/\b0(?=\d:)/g, ""), value, index })),
+    { label: AVAILABILITY_ANY_MARK, value: AVAILABILITY_ANY_MARK, index: null },
+    { label: AVAILABILITY_NONE_MARK, value: AVAILABILITY_NONE_MARK, index: null },
+  ];
   const selectedPreset = dayValuePresets.find(preset => preset.value === customValue.trim());
 
   const handleOverlayMouseDown = (event: MouseEvent<HTMLDivElement>) => {
@@ -308,7 +371,7 @@ function AvailabilityDayDialog({
         <div className={styles.dialogHeader}>
           <div>
             <span className={styles.dialogEyebrow}>{t("Day")} {dayOfMonth}</span>
-            <h3>{t("Availability")}</h3>
+            <h3>{editingPresetIndex === null ? t("Availability") : t("Edit preset")}</h3>
           </div>
 
           <button type="button" className={styles.iconButton} aria-label={t("Close")} onClick={onClose}>
@@ -316,93 +379,120 @@ function AvailabilityDayDialog({
           </button>
         </div>
 
-        <div className={styles.presetGrid}>
-          {dayValuePresets.map(preset => (
-            <button
-              key={preset.value}
-              type="button"
-              className={joinClassNames(
-                styles.presetButton,
-                selectedPreset?.value === preset.value && styles.presetButtonActive,
-              )}
-              onClick={() => {
-                const parsedRange = parseFlexibleTimeRange(preset.value);
-                if (parsedRange) {
-                  setFromTime(parsedRange.from);
-                  setToTime(parsedRange.to);
-                }
+        {editingPresetIndex !== null ? (
+          <AvailabilityTimePresetEditor
+            value={timePresets[editingPresetIndex]}
+            onCancel={() => setEditingPresetIndex(null)}
+            onSave={value => {
+              if (!storageKey) return;
+              const nextPresets = timePresets.map((preset, index) => index === editingPresetIndex ? value : preset);
+              window.localStorage.setItem(storageKey, JSON.stringify(nextPresets));
+              setTimePresets(nextPresets);
+              setEditingPresetIndex(null);
+            }}
+          />
+        ) : <>
+          <div className={styles.presetGrid}>
+            {dayValuePresets.map(preset => (
+              <div key={preset.index ?? preset.value} className={styles.presetItem}>
+                <button
+                  type="button"
+                  aria-pressed={selectedPreset?.value === preset.value}
+                  className={joinClassNames(
+                    styles.presetButton,
+                    selectedPreset?.value === preset.value && styles.presetButtonActive,
+                  )}
+                  onClick={() => {
+                    const parsedRange = parseFlexibleTimeRange(preset.value);
+                    if (parsedRange) {
+                      setFromTime(parsedRange.from);
+                      setToTime(parsedRange.to);
+                    }
 
-                setCustomValue(preset.value);
-              }}
-            >
-              {preset.label}
-            </button>
-          ))}
-        </div>
-
-        <div className={styles.timePanel}>
-          <div className={styles.timeStepper}>
-            <button type="button" aria-label={t("Decrease start time")} onClick={() => commitRange(stepTimeValue(fromTime, -15), toTime)}>
-              -
-            </button>
-            <span>
-              <strong>{fromTime}</strong>
-              <small>{t("From")}</small>
-            </span>
-            <button type="button" aria-label={t("Increase start time")} onClick={() => commitRange(stepTimeValue(fromTime, 15), toTime)}>
-              +
-            </button>
+                    setCustomValue(preset.value);
+                  }}
+                >
+                  {preset.label}
+                </button>
+                {preset.index !== null ? <button
+                  type="button"
+                  className={styles.presetEditButton}
+                  aria-label={t("Edit preset {0}", preset.label)}
+                  disabled={!storageKey}
+                  onClick={() => setEditingPresetIndex(preset.index)}
+                >{t("Edit")}</button> : null}
+              </div>
+            ))}
           </div>
 
-          <span className={styles.timeDash}>-</span>
+          <div className={styles.timePanel}>
+            <div className={styles.timeStepper}>
+              <button type="button" aria-label={t("Decrease start time")} onClick={() => commitRange(stepTimeValue(fromTime, -15), toTime)}>
+                -
+              </button>
+              <span>
+                <strong>{fromTime}</strong>
+                <small>{t("From")}</small>
+              </span>
+              <button type="button" aria-label={t("Increase start time")} onClick={() => commitRange(stepTimeValue(fromTime, 15), toTime)}>
+                +
+              </button>
+            </div>
 
-          <div className={styles.timeStepper}>
-            <button type="button" aria-label={t("Decrease end time")} onClick={() => commitRange(fromTime, stepTimeValue(toTime, -15))}>
-              -
-            </button>
-            <span>
-              <strong>{toTime}</strong>
-              <small>{t("To")}</small>
-            </span>
-            <button type="button" aria-label={t("Increase end time")} onClick={() => commitRange(fromTime, stepTimeValue(toTime, 15))}>
-              +
-            </button>
+            <span className={styles.timeDash}>-</span>
+
+            <div className={styles.timeStepper}>
+              <button type="button" aria-label={t("Decrease end time")} onClick={() => commitRange(fromTime, stepTimeValue(toTime, -15))}>
+                -
+              </button>
+              <span>
+                <strong>{toTime}</strong>
+                <small>{t("To")}</small>
+              </span>
+              <button type="button" aria-label={t("Increase end time")} onClick={() => commitRange(fromTime, stepTimeValue(toTime, 15))}>
+                +
+              </button>
+            </div>
           </div>
-        </div>
 
-        <label className={styles.customField}>
-          <span>{t("Custom")}</span>
-          <input
-            value={customValue}
-            onChange={event => setCustomValue(event.target.value)}
-            placeholder="09:00 - 15:00"
-            aria-invalid={hasError}
-          />
-        </label>
+          <label className={styles.customField}>
+            <span>{t("Custom")}</span>
+            <input
+              value={customValue}
+              onChange={event => setCustomValue(event.target.value)}
+              placeholder="09:00 - 15:00"
+              aria-invalid={hasError}
+            />
+          </label>
 
-        {hasError ? <p className={styles.dialogError}>{parsedValue.error}</p> : null}
+          {hasError ? <p className={styles.dialogError}>{parsedValue.error}</p> : null}
 
-        <div className={styles.dialogActions}>
-          <IosButton
-            label={t("Clear")}
-            icon={<CloseIcon size={16} />}
-            variant="secondary"
-            disabled={false}
-            onClick={handleClear}
-          />
-          <IosButton
-            label={t("Save")}
-            icon={<CheckIcon size={16} />}
-            disabled={hasError}
-            onClick={handleApply}
-          />
-        </div>
+          <div className={styles.dialogActions}>
+            <IosButton
+              label={t("Clear")}
+              icon={<CloseIcon size={16} />}
+              variant="secondary"
+              disabled={false}
+              onClick={handleClear}
+            />
+            <IosButton
+              label={t("Save")}
+              icon={<CheckIcon size={16} />}
+              disabled={hasError}
+              onClick={handleApply}
+            />
+          </div>
+        </>}
       </div>
     </div>
   );
 }
 
 export function EmployeeAvailabilityPage() {
+  const { session } = useAuth();
+  const presetStorageKey = session?.employeeId
+    ? `gf3:employee-availability:time-presets:${session.employeeId}`
+    : null;
   const availabilityQuery = useEmployeeAvailabilityListQuery();
   const saveMutation = useSaveEmployeeAvailabilityMutation();
   const groups = availabilityQuery.data ?? [];
@@ -609,14 +699,14 @@ export function EmployeeAvailabilityPage() {
       ) : null}
 
       {availabilityQuery.isLoading ? (
-        <section className={workspaceStyles.panel}>
+        <section className={workspaceStyles.panel} data-employee-motion>
           <span className={workspaceStyles.panelEyebrow}>{t("Loading")}</span>
           <p className={workspaceStyles.panelText}>{t("Checking public availability windows.")}</p>
         </section>
       ) : null}
 
       {!availabilityQuery.isLoading && groups.length === 0 ? (
-        <section className={workspaceStyles.panel}>
+        <section className={workspaceStyles.panel} data-employee-motion>
           <span className={workspaceStyles.panelEyebrow}>{t("No active windows")}</span>
           <h2 className={workspaceStyles.panelTitle}>{t("Nothing is public for your account yet.")}</h2>
           <p className={workspaceStyles.panelText}>
@@ -626,7 +716,7 @@ export function EmployeeAvailabilityPage() {
 
       {selectedAvailability ? (
         <div className={styles.shell}>
-          <section className={`${workspaceStyles.panel} ${styles.windowsPanel}`}>
+          <section className={`${workspaceStyles.panel} ${styles.windowsPanel}`} data-employee-motion>
             <div className={styles.windowsHeader}>
               <div className={styles.windowsHeading}>
                 <span className={styles.windowsIcon} aria-hidden="true">
@@ -641,7 +731,7 @@ export function EmployeeAvailabilityPage() {
               <span className={styles.availableCount}>{availableDaysCount}  {t("available")}</span>
             </div>
 
-            <div className={styles.groupList}>
+            <div className={styles.groupList} data-motion-list>
               {groups.map(group => {
                 const isSelected = group.id === selectedAvailability.id;
 
@@ -676,7 +766,7 @@ export function EmployeeAvailabilityPage() {
             </div>
           </section>
 
-          <section className={`${workspaceStyles.panel} ${styles.editorPanel}`}>
+          <section className={`${workspaceStyles.panel} ${styles.editorPanel}`} data-employee-motion data-motion-key={selectedAvailability.id}>
             <div className={styles.editorHeader}>
               <div className={styles.editorTitleBlock}>
                 <h2 className={workspaceStyles.panelTitle}>{selectedAvailability.name}</h2>
@@ -760,6 +850,8 @@ export function EmployeeAvailabilityPage() {
           </section>
 
           <AvailabilityDayDialog
+            key={presetStorageKey}
+            storageKey={presetStorageKey}
             open={editingDayOfMonth !== null}
             dayOfMonth={editingDayOfMonth}
             day={editingDayOfMonth === null ? undefined : draft[editingDayOfMonth]}

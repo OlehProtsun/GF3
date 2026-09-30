@@ -13,6 +13,11 @@ const mocks = vi.hoisted(() => ({
     isPending: false,
     error: null as Error | null,
   },
+  employeeId: 12,
+}));
+
+vi.mock("@app/providers/AuthProvider", () => ({
+  useAuth: () => ({ session: { employeeId: mocks.employeeId } }),
 }));
 
 vi.mock("@entities/employee-availability", () => ({
@@ -73,6 +78,8 @@ function getDayButton(dayOfMonth: number) {
 }
 
 beforeEach(() => {
+  window.localStorage.clear();
+  mocks.employeeId = 12;
   mocks.availabilityQuery.mockReset();
   mocks.mutate.mockReset();
   mocks.mutationState.isPending = false;
@@ -80,6 +87,98 @@ beforeEach(() => {
 });
 
 describe("EmployeeAvailabilityPage", () => {
+  test("saves an edited preset across days and remounts without changing the current day", async () => {
+    const user = userEvent.setup();
+    mocks.availabilityQuery.mockReturnValue({ data: [openAvailability], isLoading: false, error: null });
+    const view = renderPage();
+    await user.click(getDayButton(1));
+    const dialog = screen.getByRole("dialog", { name: "Day 1 availability" });
+    await user.click(within(dialog).getByRole("button", { name: "Edit preset 9:00 - 15:00" }));
+    const input = within(dialog).getByRole("textbox", { name: "Time range" });
+    await user.clear(input);
+    await user.type(input, "830-1630");
+    await user.click(within(dialog).getByRole("button", { name: "Save" }));
+    expect(within(dialog).getByRole("textbox", { name: "Custom" })).toHaveValue("");
+    expect(mocks.mutate).not.toHaveBeenCalled();
+    await user.click(within(dialog).getByRole("button", { name: "Close" }));
+    expect(getDayButton(1)).toHaveTextContent("-");
+    view.unmount();
+
+    renderPage();
+    await user.click(getDayButton(3));
+    const nextDialog = screen.getByRole("dialog", { name: "Day 3 availability" });
+    await user.click(within(nextDialog).getByRole("button", { name: "8:30 - 16:30", exact: true }));
+    await user.click(within(nextDialog).getByRole("button", { name: "Save" }));
+    await user.click(screen.getByRole("button", { name: "Save" }));
+    expect(mocks.mutate.mock.calls[0][0].payload.slots[2]).toEqual({
+      dayOfMonth: 3, kind: AVAILABILITY_KIND_INTERVAL, intervalStr: "08:30 - 16:30",
+    });
+  });
+
+  test("validates preset ranges and cancels without changing the preset or day draft", async () => {
+    const user = userEvent.setup();
+    mocks.availabilityQuery.mockReturnValue({ data: [openAvailability], isLoading: false, error: null });
+    renderPage();
+    await user.click(getDayButton(1));
+    const dialog = screen.getByRole("dialog", { name: "Day 1 availability" });
+    await user.click(within(dialog).getByRole("button", { name: "15:00 - 21:00", exact: true }));
+    await user.click(within(dialog).getByRole("button", { name: "Edit preset 9:00 - 15:00" }));
+    const input = within(dialog).getByRole("textbox", { name: "Time range" });
+    for (const value of ["", "20:00 - 09:00", "+", "day off", "25:00 - 26:00"]) {
+      await user.clear(input);
+      if (value) await user.type(input, value);
+      expect(within(dialog).getByRole("button", { name: "Save" })).toBeDisabled();
+    }
+    await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    expect(within(dialog).getByRole("textbox", { name: "Custom" })).toHaveValue("15:00 - 21:00");
+    expect(within(dialog).getByRole("button", { name: "9:00 - 15:00", exact: true })).toBeInTheDocument();
+    expect(window.localStorage.length).toBe(0);
+  });
+
+  test("keeps presets separate when the employee account changes", async () => {
+    const user = userEvent.setup();
+    window.localStorage.setItem("gf3:employee-availability:time-presets:12", JSON.stringify([
+      "08:00 - 16:00", "15:00 - 21:00", "09:00 - 21:00",
+    ]));
+    mocks.availabilityQuery.mockReturnValue({ data: [openAvailability], isLoading: false, error: null });
+    const view = renderPage();
+    await user.click(getDayButton(1));
+    expect(screen.getByRole("button", { name: "8:00 - 16:00", exact: true })).toBeInTheDocument();
+    mocks.employeeId = 13;
+    view.rerender(<BrowserRouter><EmployeeAvailabilityPage /></BrowserRouter>);
+    expect(screen.queryByRole("button", { name: "8:00 - 16:00", exact: true })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "9:00 - 15:00", exact: true })).toBeInTheDocument();
+  });
+
+  test("reports blocked storage writes and allows cancelling the preset edit", async () => {
+    const user = userEvent.setup();
+    mocks.availabilityQuery.mockReturnValue({ data: [openAvailability], isLoading: false, error: null });
+    renderPage();
+    await user.click(getDayButton(1));
+    const dialog = screen.getByRole("dialog", { name: "Day 1 availability" });
+    await user.click(within(dialog).getByRole("button", { name: "Edit preset 9:00 - 15:00" }));
+    const spy = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => { throw new Error("blocked"); });
+    try {
+      await user.click(within(dialog).getByRole("button", { name: "Save" }));
+      expect(within(dialog).getByRole("alert")).toHaveTextContent("Could not save this preset.");
+      await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
+      expect(within(dialog).getByRole("button", { name: "9:00 - 15:00", exact: true })).toBeInTheDocument();
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  test.each(["{invalid", JSON.stringify(["bad", "15:00 - 21:00", "09:00 - 21:00"])])(
+    "falls back to default presets for malformed stored values: %s", async stored => {
+      const user = userEvent.setup();
+      window.localStorage.setItem("gf3:employee-availability:time-presets:12", stored);
+      mocks.availabilityQuery.mockReturnValue({ data: [openAvailability], isLoading: false, error: null });
+      renderPage();
+      await user.click(getDayButton(1));
+      expect(screen.getByRole("button", { name: "9:00 - 15:00", exact: true })).toBeInTheDocument();
+    },
+  );
+
   test("edits a day value and saves a full month payload", async () => {
     const user = userEvent.setup();
     mocks.availabilityQuery.mockReturnValue({

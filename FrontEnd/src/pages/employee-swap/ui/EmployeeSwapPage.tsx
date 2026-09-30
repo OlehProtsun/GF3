@@ -766,7 +766,7 @@ function SwapOfferCard({
       ) : null}
 
       {isExpanded ? (
-        <div className={styles.offerExpandedContent}>
+        <div className={styles.offerExpandedContent} data-employee-motion>
           <div className={styles.detailGrid}>
             <div className={styles.detailItem}>
               <span>{t("Location")}</span>
@@ -1055,7 +1055,7 @@ export function EmployeeSwapPage() {
           <path d={backdropPath} />
         </svg>
 
-        <header className={styles.swapHeader}>
+        <header className={styles.swapHeader} data-employee-motion>
           <div className={styles.swapIdentity}>
             <span className={styles.swapLogo} aria-hidden="true">
               <span className={styles.swapLogoMark}>⇄</span>
@@ -1089,7 +1089,7 @@ export function EmployeeSwapPage() {
 
           <section className={styles.offersSection} aria-labelledby="open-swaps-heading">
             <h2 id="open-swaps-heading" className={styles.visuallyHidden}>{t("Open swaps")}</h2>
-            <div className={styles.offerToolbar}>
+            <div className={styles.offerToolbar} data-employee-motion>
           <label className={styles.swapSearchField} htmlFor="employee-swap-search">
             <SearchIcon size={16} className={styles.swapSearchIcon} />
             <input

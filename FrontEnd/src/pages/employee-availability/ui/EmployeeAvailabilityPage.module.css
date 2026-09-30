@@ -467,6 +467,8 @@
 .dayDialog {
   composes: surface from "../../../shared/ui/ViewportOverlay.module.css";
   width: min(100%, 430px);
+  max-height: 100%;
+  overflow-y: auto;
   display: grid;
   gap: 14px;
   box-sizing: border-box;
@@ -535,6 +537,39 @@
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
+}
+
+.presetItem {
+  min-width: 0;
+  display: flex;
+  gap: 4px;
+}
+
+.presetItem .presetButton {
+  min-width: 0;
+  flex: 1;
+}
+
+.presetEditButton {
+  padding: 0 8px;
+  border-radius: 13px;
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  background: rgba(255, 255, 255, 0.86);
+  color: #475569;
+  font: inherit;
+  font-size: 0.76rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.presetEditButton:hover {
+  color: #1d4ed8;
+  background: #ffffff;
+}
+
+.presetEditor {
+  display: grid;
+  gap: 14px;
 }
 
 .presetButton {

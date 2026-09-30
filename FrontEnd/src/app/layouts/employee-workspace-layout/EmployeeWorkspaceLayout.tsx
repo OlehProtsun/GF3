@@ -1,6 +1,6 @@
 import { t } from "@shared/i18n";
 import { useLanguageRevision } from "@shared/i18n/useLanguageRevision";
-import { useEffect, useMemo, useState, type PropsWithChildren } from "react";
+import { useEffect, useMemo, useRef, useState, type PropsWithChildren } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 import { useAuth } from "@app/providers/AuthProvider";
 import { useRealtime } from "@app/providers/PresenceProvider";
@@ -25,6 +25,7 @@ import {
 } from "@pages/employee-notifications/model/notifications";
 import { AvailabilityIcon, BackIcon, EmployeeIcon, NoteIcon, ScheduleIcon } from "@shared/ui/icons";
 import styles from "./EmployeeWorkspaceLayout.module.css";
+import { useEmployeeMotion } from "./useEmployeeMotion";
 
 type EmployeeNavItem = {
   to: string;
@@ -84,6 +85,15 @@ const emptyAvailabilityGroups: EmployeeAvailabilityGroup[] = [];
 export function EmployeeWorkspaceLayout({ children }: PropsWithChildren) {
   useLanguageRevision();
   const [isMobileTabsCollapsed, setIsMobileTabsCollapsed] = useState(false);
+  const mobileOpenTabRef = useRef<HTMLButtonElement>(null);
+  const mobileNavRef = useRef<HTMLElement>(null);
+  const previousTabsCollapsed = useRef(isMobileTabsCollapsed);
+  useEffect(() => {
+    if (previousTabsCollapsed.current === isMobileTabsCollapsed) return;
+    previousTabsCollapsed.current = isMobileTabsCollapsed;
+    if (isMobileTabsCollapsed) mobileOpenTabRef.current?.focus({ preventScroll: true });
+    else mobileNavRef.current?.querySelector<HTMLAnchorElement>('[aria-current="page"]')?.focus({ preventScroll: true });
+  }, [isMobileTabsCollapsed]);
   const { session } = useAuth();
   const { notifications } = useRealtime();
   const swapsQuery = useEmployeeShiftSwapsQuery();
@@ -95,6 +105,8 @@ export function EmployeeWorkspaceLayout({ children }: PropsWithChildren) {
   const schedules = schedulesQuery.data ?? emptySchedules;
   const availabilityGroups = availabilityQuery.data ?? emptyAvailabilityGroups;
   const { pathname } = useLocation();
+  const motionScope = useRef<HTMLDivElement>(null);
+  useEmployeeMotion(motionScope, pathname);
   const [nowMs, setNowMs] = useState(() => Date.now());
   useEffect(() => {
     const refresh = () => setNowMs(Date.now());
@@ -206,12 +218,14 @@ export function EmployeeWorkspaceLayout({ children }: PropsWithChildren) {
       (item.notificationTarget === "alerts" && (newsQuery.data ?? []).some(message => !message.isRead)) : false;
 
   return (
-    <div className={layoutClassName}>
+    <div ref={motionScope} className={layoutClassName}>
       <button
+        ref={mobileOpenTabRef}
         type="button"
         className={mobileOpenTabClassName}
         onClick={() => setIsMobileTabsCollapsed(false)}
         aria-label={t("Open navigation")}
+        inert={!isMobileTabsCollapsed}
       >
         <span className={[styles.controlIcon, styles.controlIconExpand].join(" ")}>
           <BackIcon size={14} />
@@ -220,7 +234,8 @@ export function EmployeeWorkspaceLayout({ children }: PropsWithChildren) {
 
       <div className={shellClassName}>
         <header className={topBarClassName}>
-          <nav className={styles.desktopTabs} aria-label={t("Employee sections")}>
+          <nav data-employee-nav className={styles.desktopTabs} aria-label={t("Employee sections")}>
+            <span data-employee-nav-indicator className={styles.navIndicator} aria-hidden="true" />
             {employeeNavItems.map((item) => {
               const hasUnreadDot = hasUnreadNavigationDot(item);
 
@@ -228,6 +243,7 @@ export function EmployeeWorkspaceLayout({ children }: PropsWithChildren) {
                 <NavLink
                   key={item.to}
                   to={item.to}
+                  aria-current={pathname === item.to ? "page" : undefined}
                   aria-label={hasUnreadDot ? t("{0}, new updates", item.label) : item.label}
                   className={({ isActive }) =>
                     [styles.desktopTab, isActive ? styles.desktopTabActive : ""].filter(Boolean).join(" ")
@@ -247,7 +263,8 @@ export function EmployeeWorkspaceLayout({ children }: PropsWithChildren) {
         <main className={styles.content}>{children}</main>
       </div>
 
-      <nav className={mobileTabsClassName} aria-label={t("Employee sections")}>
+      <nav ref={mobileNavRef} data-employee-nav className={mobileTabsClassName} aria-label={t("Employee sections")} inert={isMobileTabsCollapsed}>
+        <span data-employee-nav-indicator className={styles.navIndicator} aria-hidden="true" />
         {employeeNavItems.map((item) => {
           const hasUnreadDot = hasUnreadNavigationDot(item);
 
@@ -255,6 +272,7 @@ export function EmployeeWorkspaceLayout({ children }: PropsWithChildren) {
             <NavLink
               key={item.to}
               to={item.to}
+              aria-current={pathname === item.to ? "page" : undefined}
               aria-label={hasUnreadDot ? t("{0}, new updates", item.mobileLabel ?? item.label) : item.mobileLabel ?? item.label}
               className={({ isActive }) =>
                 [styles.mobileTab, isActive ? styles.mobileTabActive : ""].filter(Boolean).join(" ")
