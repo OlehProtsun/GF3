@@ -5,6 +5,11 @@
   color: #fff;
   background: radial-gradient(ellipse at 100% 110%, #007a9b 0%, transparent 58%), linear-gradient(135deg, #2b91ec 0%, #396bcc 70%, #1464b3 100%);
   box-shadow: 0 14px 32px rgba(29, 78, 150, .14);
+  animation: hero-enter 680ms cubic-bezier(.22, .61, .36, 1);
+}
+@keyframes hero-enter {
+  from { opacity: .35; transform: translate3d(0, -44px, 0); }
+  to { opacity: 1; transform: translate3d(0, 0, 0); }
 }
 .heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 24px; }
 .greeting { min-width: 0; }

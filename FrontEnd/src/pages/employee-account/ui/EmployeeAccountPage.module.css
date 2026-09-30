@@ -313,7 +313,7 @@
 }
 
 .securityEditor {
-  animation: gf3-enter 180ms var(--motion-ease);
+  animation: var(--motion-reveal) var(--motion-enter) var(--motion-ease);
   display: grid;
   gap: 14px;
 }
@@ -352,7 +352,7 @@
 
 .passwordNotice,
 .successBanner {
-  animation: gf3-enter 180ms var(--motion-ease);
+  animation: var(--motion-reveal) var(--motion-enter) var(--motion-ease);
   padding: 0.78rem 0.9rem;
   border: 1px solid rgba(59, 130, 246, 0.16);
   border-radius: 18px;

@@ -73,15 +73,44 @@
 }
 
 .scheduleViewToggleActive {
-  border-color: rgba(124, 58, 237, 0.24);
-  background: rgba(237, 233, 254, 0.92);
-  color: #7c3aed;
-  box-shadow: 0 10px 24px rgba(124, 58, 237, 0.12);
+  border-color: rgba(37, 99, 235, 0.4);
+  background: rgba(191, 219, 254, 0.92);
+  color: #1d4ed8;
+  box-shadow: 0 8px 20px rgba(37, 99, 235, 0.16);
 }
 
 .scheduleViewToggleActive:hover {
-  border-color: rgba(124, 58, 237, 0.36);
-  background: rgba(237, 233, 254, 1);
+  border-color: rgba(37, 99, 235, 0.5);
+  background: #bfdbfe;
+}
+
+.scheduleViewTogglePulse {
+  animation: schedule-toggle-pulse 640ms var(--motion-ease);
+}
+
+@keyframes schedule-toggle-pulse {
+  0% {
+    transform: scale(0.72) rotate(-8deg);
+    background: #dbeafe;
+    color: #1d4ed8;
+    box-shadow: 0 0 0 0 rgba(37, 99, 235, 0);
+  }
+  45% {
+    transform: scale(1.16) rotate(3deg);
+    background: #2563eb;
+    color: #ffffff;
+    box-shadow: 0 0 0 7px rgba(37, 99, 235, 0.16), 0 8px 20px rgba(37, 99, 235, 0.22);
+  }
+  100% { transform: scale(1) rotate(0deg); }
+}
+
+.scheduleViewEnter {
+  animation: schedule-view-enter 540ms var(--motion-ease);
+}
+
+@keyframes schedule-view-enter {
+  from { transform: translate3d(0, 14px, 0); }
+  to { transform: translate3d(0, 0, 0); }
 }
 
 .summaryStats {
@@ -410,7 +439,7 @@
 }
 
 .shiftCorrectionSuccess {
-  animation: gf3-enter 180ms var(--motion-ease);
+  animation: var(--motion-reveal) var(--motion-enter) var(--motion-ease);
   padding: 10px 14px;
   border: 1px solid rgba(16, 185, 129, 0.2);
   border-radius: 15px;
