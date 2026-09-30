@@ -91,9 +91,8 @@ public sealed class GraphVersionsController(
         }
 
         await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
-        await workflowLogService
-            .LogAsync(User, $"Created schedule commit #{version.VersionNumber} on {version.BranchName} for {schedule.Name}.", cancellationToken)
-            .ConfigureAwait(false);
+        await PostCommitActions.RunAsync(HttpContext, () => workflowLogService
+            .LogAsync(User, $"Created schedule commit #{version.VersionNumber} on {version.BranchName} for {schedule.Name}.", cancellationToken)).ConfigureAwait(false);
 
         return CreatedAtAction(
             nameof(GetTree),
@@ -201,9 +200,8 @@ public sealed class GraphVersionsController(
         await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
         db.ChangeTracker.Clear();
 
-        await workflowLogService
-            .LogAsync(User, $"Checked out schedule commit #{version.VersionNumber} ({version.BranchName}) for {schedule.Name}.", cancellationToken)
-            .ConfigureAwait(false);
+        await PostCommitActions.RunAsync(HttpContext, () => workflowLogService
+            .LogAsync(User, $"Checked out schedule commit #{version.VersionNumber} ({version.BranchName}) for {schedule.Name}.", cancellationToken)).ConfigureAwait(false);
         await NotifyGraphChangedAsync(containerId, graphId, "manager-schedule-version-checked-out").ConfigureAwait(false);
         return Ok(await BuildTreeAsync(graphId, cancellationToken).ConfigureAwait(false));
     }
@@ -252,9 +250,8 @@ public sealed class GraphVersionsController(
         await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
         await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
 
-        await workflowLogService
-            .LogAsync(User, $"Deleted schedule commit #{version.VersionNumber} ({version.BranchName}).", cancellationToken)
-            .ConfigureAwait(false);
+        await PostCommitActions.RunAsync(HttpContext, () => workflowLogService
+            .LogAsync(User, $"Deleted schedule commit #{version.VersionNumber} ({version.BranchName}).", cancellationToken)).ConfigureAwait(false);
         return NoContent();
     }
 
@@ -478,11 +475,10 @@ public sealed class GraphVersionsController(
 
     private async Task NotifyGraphChangedAsync(int containerId, int graphId, string reason)
     {
-        await realtimeNotifier
-            .NotifyManagerDataChangedAsync(ManagerEditResourceTypes.Schedule, $"{containerId}:{graphId}", reason, containerId, graphId)
-            .ConfigureAwait(false);
-        await realtimeNotifier.NotifyScheduleChangedAsync(containerId, graphId, reason).ConfigureAwait(false);
-        await realtimeNotifier.NotifyShiftSwapsChangedAsync(containerId, graphId, graphId, reason).ConfigureAwait(false);
+        await PostCommitActions.RunAsync(HttpContext, () => realtimeNotifier
+            .NotifyManagerDataChangedAsync(ManagerEditResourceTypes.Schedule, $"{containerId}:{graphId}", reason, containerId, graphId)).ConfigureAwait(false);
+        await PostCommitActions.RunAsync(HttpContext, () => realtimeNotifier.NotifyScheduleChangedAsync(containerId, graphId, reason)).ConfigureAwait(false);
+        await PostCommitActions.RunAsync(HttpContext, () => realtimeNotifier.NotifyShiftSwapsChangedAsync(containerId, graphId, graphId, reason)).ConfigureAwait(false);
     }
 
     private ProblemDetails CreateProblem(int status, string title, string detail)

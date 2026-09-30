@@ -1,3 +1,11 @@
+.successBanner {
+  padding: 0.75rem 1rem;
+  border-radius: 12px;
+  color: #166534;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+}
+
 :global(html.login-page-active),
 :global(body.login-page-active),
 :global(#root.login-page-active) {
@@ -260,7 +268,7 @@
   font-size: 1.42rem;
   font-weight: 520;
   cursor: pointer;
-  transition: transform 100ms ease, background 100ms ease;
+  transition: background 100ms ease;
   touch-action: manipulation;
   user-select: none;
   -webkit-user-select: none;
@@ -268,7 +276,12 @@
 }
 
 .pinKey:hover:not(:disabled) { background: rgba(226, 232, 240, 0.96); }
-.pinKey:active:not(:disabled) { transform: scale(0.92); background: rgba(203, 213, 225, 0.92); }
+.pinKey:active:not(:disabled) { background: rgba(203, 213, 225, 0.92); }
+.pinKey:active:not(:disabled):not([aria-disabled="true"]),
+.pinDelete:active:not(:disabled):not([aria-disabled="true"]) {
+  /* Keep edge taps inside the hit area instead of applying the global press scale. */
+  animation: none;
+}
 .pinKey:disabled,
 .pinDelete:disabled { cursor: default; opacity: 0.42; }
 

@@ -38,7 +38,7 @@ function readStoredPasswordMode(): PasswordMode {
 }
 
 export function LoginPage() {
-  const { bootstrapError, login } = useAuth();
+  const { bootstrapError, passwordChanged, login } = useAuth();
   const navigate = useNavigate();
   const [username, setUsername] = useState(() => readStoredValue(USERNAME_STORAGE_KEY));
   const [passwordMode, setPasswordMode] = useState<PasswordMode>(readStoredPasswordMode);
@@ -231,6 +231,11 @@ export function LoginPage() {
             <p className={styles.cardSubtitle}>{t("Use the credentials created for your role.")}</p>
           </div>
 
+          {passwordChanged ? (
+            <div role="status" className={styles.successBanner}>
+              {t("Password changed successfully. Sign in with your new password.")}
+            </div>
+          ) : null}
           {bootstrapError ? <ErrorBanner className={styles.banner}>{bootstrapError}</ErrorBanner> : null}
           {submitError ? <ErrorBanner className={styles.banner}>{submitError}</ErrorBanner> : null}
 

@@ -44,7 +44,7 @@ export function IosButton({
       paddingRight: "-31.4px"
     }}>
       {icon ? <span className={styles.icon}>{icon}</span> : null}
-      <span>{label}</span>
+      <span className={styles.label} title={label}>{label}</span>
     </button>
   );
 }

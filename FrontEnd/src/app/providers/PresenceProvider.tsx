@@ -359,6 +359,13 @@ export function PresenceProvider({ children }: PropsWithChildren) {
   });
 
   const applyManagerDataChanged = useEffectEvent((update: ManagerDataChangedUpdate) => {
+    // The update response installs the replacement token before refreshing the profile/list.
+    if (update.resourceType === managerEditResourceTypes.managerProfile &&
+        update.reason === "manager-profile-updated" &&
+        Number(update.resourceId) === session?.managerId &&
+        queryClient.getQueryState<boolean>(queryKeys.managerProfile.updating()).data) {
+      return;
+    }
     invalidateRealtimeBaselineQueries(queryClient);
 
     const parsedResourceId = update.resourceId ? Number(update.resourceId) : null;

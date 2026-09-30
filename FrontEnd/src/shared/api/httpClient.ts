@@ -42,6 +42,7 @@ export type DownloadedFile = {
 };
 
 type RequestOptions = {
+  anonymous?: boolean;
   method?: RequestMethod;
   body?: unknown;
   headers?: HeadersInit;
@@ -117,9 +118,18 @@ export function isRequestCanceledError(error: unknown): boolean {
 
 const defaultBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim() || "/api";
 let authAccessToken: string | null = null;
+let authGeneration = 0;
+const unauthorizedListeners = new Set<() => void>();
+
+export function subscribeUnauthorized(listener: () => void) {
+  unauthorizedListeners.add(listener);
+  return () => { unauthorizedListeners.delete(listener); };
+}
 
 export function setAuthAccessToken(token: string | null) {
-  authAccessToken = token && token.trim().length > 0 ? token.trim() : null;
+  const nextToken = token && token.trim().length > 0 ? token.trim() : null;
+  if (nextToken !== authAccessToken) authGeneration++;
+  authAccessToken = nextToken;
 }
 
 export function getAuthAccessToken() {
@@ -267,7 +277,12 @@ export function getErrorMessage(error: unknown, fallbackMessage = t("Something w
   return fallbackMessage;
 }
 
-async function executeRequest(path: string, options: RequestOptions = {}): Promise<Response> {
+async function executeRequest(path: string, options: RequestOptions = {}) {
+  const requestToken = authAccessToken;
+  const requestGeneration = authGeneration;
+  const ensureCurrent = () => {
+    if (requestGeneration !== authGeneration || options.signal?.aborted) throw new RequestCanceledError();
+  };
   const method = options.method ?? "GET";
   const hasBody = options.body !== undefined;
   const responseType = options.responseType ?? "json";
@@ -275,7 +290,7 @@ async function executeRequest(path: string, options: RequestOptions = {}): Promi
   const headers = new Headers(options.headers);
   headers.set("Accept", responseType === "blob" ? "*/*" : "application/json");
 
-  if (authAccessToken && !headers.has("Authorization")) {
+  if (!options.anonymous && authAccessToken && !headers.has("Authorization")) {
     headers.set("Authorization", `Bearer ${authAccessToken}`);
   }
 
@@ -291,35 +306,53 @@ async function executeRequest(path: string, options: RequestOptions = {}): Promi
       body: requestBody,
     });
   } catch (error) {
-    if (options.signal?.aborted || isRequestCanceledError(error)) {
+    if (requestGeneration !== authGeneration || options.signal?.aborted || isRequestCanceledError(error)) {
       throw new RequestCanceledError();
     }
 
     throw error;
   }
 
-  return response;
+  ensureCurrent();
+  const readBody = async (type: ResponseType) => {
+    try {
+      return await parseBody(response, type);
+    } finally {
+      ensureCurrent();
+    }
+  };
+  const notifyUnauthorized = () => {
+    ensureCurrent();
+    if (response.status === 401 && requestToken && !options.anonymous &&
+        headers.get("Authorization") === `Bearer ${requestToken}`) {
+      unauthorizedListeners.forEach(listener => listener());
+    }
+  };
+  return { response, readBody, notifyUnauthorized, ensureCurrent };
 }
 
 export async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
-  const response = await executeRequest(path, options);
+  const { response, readBody, notifyUnauthorized, ensureCurrent } = await executeRequest(path, options);
+  ensureCurrent();
 
   if (response.status === 204) {
     return undefined as T;
   }
 
   if (!response.ok) {
-    const errorPayload = await parseBody(response, "json");
+    const errorPayload = await readBody("json");
+    notifyUnauthorized();
     throw toApiError(response.status, errorPayload);
   }
 
   const responseType = options.responseType ?? "json";
-  const payload = await parseBody(response, responseType);
+  const payload = await readBody(responseType);
   return payload as T;
 }
 
 export async function requestFile(path: string, options: Omit<RequestOptions, "responseType"> = {}): Promise<DownloadedFile> {
-  const response = await executeRequest(path, { ...options, responseType: "blob" });
+  const { response, readBody, notifyUnauthorized, ensureCurrent } = await executeRequest(path, { ...options, responseType: "blob" });
+  ensureCurrent();
 
   if (response.status === 204) {
     return {
@@ -330,12 +363,13 @@ export async function requestFile(path: string, options: Omit<RequestOptions, "r
   }
 
   if (!response.ok) {
-    const errorPayload = await parseBody(response, "json");
+    const errorPayload = await readBody("json");
+    notifyUnauthorized();
     throw toApiError(response.status, errorPayload);
   }
 
   return {
-    blob: await response.blob(),
+    blob: await readBody("blob") as Blob,
     fileName: parseContentDispositionFileName(response.headers.get("content-disposition")),
     contentType: response.headers.get("content-type"),
   };

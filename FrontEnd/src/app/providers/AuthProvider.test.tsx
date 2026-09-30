@@ -1,7 +1,7 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AuthProvider, useAuth } from "./AuthProvider";
-import { getAuthAccessToken, setAuthAccessToken } from "@shared/api/httpClient";
+import { ApiError, getAuthAccessToken, request, setAuthAccessToken } from "@shared/api/httpClient";
 
 const api = vi.hoisted(() => ({ session: vi.fn(), login: vi.fn(), logout: vi.fn() }));
 vi.mock("@entities/auth", () => ({ authApi: api }));
@@ -20,6 +20,49 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.restoreAllMocks(); setAuthAccessToken(null); });
 
 describe("authentication lifecycle", () => {
+  it("clears credentials and session after a protected request returns 401", async () => {
+    render(<AuthProvider><Harness /></AuthProvider>);
+    await screen.findByText("unauthenticated");
+    fireEvent.click(screen.getByText("login"));
+    await screen.findByText("authenticated");
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json({ detail: "Expired" }, { status: 401 }));
+    await act(async () => { await expect(request("employee-profile/me")).rejects.toBeInstanceOf(ApiError); });
+    await screen.findByText("unauthenticated");
+    expect(getAuthAccessToken()).toBeNull();
+    expect(window.localStorage.getItem("gf3.auth.access-token")).toBeNull();
+  });
+
+  it("logs out immediately and a delayed logout cannot clear a newer login", async () => {
+    let finish!: () => void;
+    api.logout.mockImplementationOnce(() => new Promise<void>(resolve => { finish = resolve; }));
+    render(<AuthProvider><Harness /></AuthProvider>);
+    await screen.findByText("unauthenticated");
+    fireEvent.click(screen.getByText("login"));
+    await screen.findByText("authenticated");
+    fireEvent.click(screen.getByText("logout"));
+    await screen.findByText("unauthenticated");
+    expect(window.localStorage.getItem("gf3.auth.access-token")).toBeNull();
+    expect(getAuthAccessToken()).toBeNull();
+    api.login.mockResolvedValueOnce({ session, accessToken: "new-token" });
+    fireEvent.click(screen.getByText("login"));
+    await screen.findByText("authenticated");
+    await act(async () => { finish(); });
+    expect(getAuthAccessToken()).toBe("new-token");
+    expect(screen.getByText("authenticated")).toBeInTheDocument();
+  });
+
+  it("finishes local logout even when the server is offline", async () => {
+    api.logout.mockRejectedValueOnce(new TypeError("Failed to fetch"));
+    render(<AuthProvider><Harness /></AuthProvider>);
+    await screen.findByText("unauthenticated");
+    fireEvent.click(screen.getByText("login"));
+    await screen.findByText("authenticated");
+    fireEvent.click(screen.getByText("logout"));
+    await screen.findByText("unauthenticated");
+    expect(getAuthAccessToken()).toBeNull();
+    expect(window.localStorage.getItem("gf3.auth.access-token")).toBeNull();
+  });
+
   it("supports login and logout when all storage operations fail", async () => {
     for (const operation of ["getItem", "setItem", "removeItem"] as const) {
       vi.spyOn(Storage.prototype, operation).mockImplementation(() => { throw new Error("storage blocked"); });

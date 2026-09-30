@@ -122,7 +122,7 @@ function getLastOnlineTime(value?: string | null) {
 
 export function ManagerAccountPage() {
   useLanguageRevision();
-  const { replaceLoginResult, session } = useAuth();
+  const { session } = useAuth();
   const profileQuery = useManagerProfileQuery();
   const managerListQuery = useManagerListQuery();
   const updateProfileMutation = useUpdateManagerProfileMutation();
@@ -217,14 +217,13 @@ export function ManagerAccountPage() {
         return;
       }
 
-      const result = await runMutation(updateProfileMutation.mutate, {
+      await runMutation(updateProfileMutation.mutate, {
         displayName: form.displayName,
         userName: form.userName,
         recoveryEmail: form.recoveryEmail,
         newPassword: isSystemManager ? "" : form.newPassword,
       });
 
-      replaceLoginResult(result);
       setForm(current => ({ ...current, newPassword: "" }));
       setInlineError(null);
       setInlineSuccess(t("Manager profile updated."));

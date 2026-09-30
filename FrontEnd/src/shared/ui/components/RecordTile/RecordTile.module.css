@@ -3,6 +3,8 @@
   display: grid;
   gap: 12px;
   min-height: 0;
+  min-width: 0;
+  grid-template-columns: minmax(0, 1fr);
   padding: 18px;
   border: 1px solid rgba(113, 113, 122, 0.14);
   border-radius: 30px;
@@ -112,6 +114,7 @@
 }
 
 .titleWrap {
+  max-width: 100%;
   min-width: 0;
   flex: 1 1 160px;
 }
@@ -123,6 +126,10 @@
 }
 
 .title {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-size: 1.25rem;
   line-height: 1.15;
   font-weight: 900;
@@ -210,6 +217,8 @@
 }
 
 .description {
+  min-width: 0;
+  overflow-wrap: anywhere;
   color: rgba(17, 24, 39, 0.66);
   line-height: 1.55;
   display: -webkit-box;
@@ -278,6 +287,10 @@
 }
 
 .metaValue {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   color: rgba(17, 24, 39, 0.72);
   word-break: break-word;
   min-width: 0;

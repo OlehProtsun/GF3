@@ -40,7 +40,7 @@ public sealed class JwtAuthenticationHandler : AuthenticationHandler<Authenticat
             return AuthenticateResult.NoResult();
         }
 
-        if (!JwtTokenCodec.TryReadAccessToken(token, _jwtOptions, TimeSpan.FromMinutes(1), out var session, out var error))
+        if (!JwtTokenCodec.TryReadAccessToken(token, _jwtOptions, TimeSpan.Zero, out var session, out var error, out var expiresAtUtc))
         {
             return AuthenticateResult.Fail(error ?? "Invalid bearer token.");
         }
@@ -86,7 +86,8 @@ public sealed class JwtAuthenticationHandler : AuthenticationHandler<Authenticat
 
         var identity = new ClaimsIdentity(claims, JwtAuthenticationDefaults.SchemeName, ClaimTypes.Name, ClaimTypes.Role);
         var principal = new ClaimsPrincipal(identity);
-        var ticket = new AuthenticationTicket(principal, JwtAuthenticationDefaults.SchemeName);
+        var ticket = new AuthenticationTicket(principal,
+            new AuthenticationProperties { ExpiresUtc = expiresAtUtc }, JwtAuthenticationDefaults.SchemeName);
         return AuthenticateResult.Success(ticket);
     }
 

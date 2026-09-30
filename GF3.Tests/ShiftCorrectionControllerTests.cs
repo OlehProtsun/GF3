@@ -15,6 +15,97 @@ namespace GF3.Tests;
 
 public sealed class ShiftCorrectionControllerTests
 {
+    [Theory]
+    [InlineData("12:00", 2026, 8, true)]
+    [InlineData("12:30", 2026, 8, false)]
+    [InlineData("12:00", 2026, 9, false)]
+    [InlineData("12:00", 2027, 8, false)]
+    public async Task Create_ChecksOtherPublishedSchedulesByCalendarDate(string otherFrom, int year, int month, bool rejects)
+    {
+        await using var database = await SqliteTestDatabase.CreateAsync();
+        await using var db = database.CreateContext();
+        var fixture = await SeedAsync(db);
+        await AddOtherScheduleAsync(db, fixture, otherFrom, year, month);
+        var controller = new EmployeeShiftCorrectionsController(db, new ManagerEditLockService(), new NoopWorkflowLogService(), new NoopRealtimeNotifier());
+        SetEmployeeUser(controller, fixture.EmployeeId);
+        Task<ActionResult<ShiftCorrectionRequestDto>> Create() => controller.Create(new CreateShiftCorrectionRequest
+        {
+            ScheduleId = fixture.ScheduleId, ScheduleSlotId = fixture.MorningSlotId,
+            RequestedFromTime = "08:00", RequestedToTime = "12:30",
+        }, CancellationToken.None);
+        if (rejects)
+        {
+            await Assert.ThrowsAsync<ValidationException>(Create);
+            Assert.False(await db.ShiftCorrectionRequests.AnyAsync());
+        }
+        else Assert.IsType<CreatedAtActionResult>((await Create()).Result);
+    }
+
+    [Fact]
+    public async Task Approve_RechecksConflictsIntroducedAfterSubmission()
+    {
+        await using var database = await SqliteTestDatabase.CreateAsync();
+        await using var db = database.CreateContext();
+        var fixture = await SeedAsync(db);
+        var employee = new EmployeeShiftCorrectionsController(db, new ManagerEditLockService(), new NoopWorkflowLogService(), new NoopRealtimeNotifier());
+        SetEmployeeUser(employee, fixture.EmployeeId);
+        var created = Assert.IsType<ShiftCorrectionRequestDto>(Assert.IsType<CreatedAtActionResult>((await employee.Create(new CreateShiftCorrectionRequest
+        {
+            ScheduleId = fixture.ScheduleId, ScheduleSlotId = fixture.MorningSlotId,
+            RequestedFromTime = "08:00", RequestedToTime = "12:30",
+        }, CancellationToken.None)).Result).Value);
+        await AddOtherScheduleAsync(db, fixture, "12:00", 2026, 8);
+        var manager = new ManagerShiftCorrectionsController(db, new NoopWorkflowLogService(), new NoopRealtimeNotifier());
+        SetManagerUser(manager, fixture.ManagerId);
+        await Assert.ThrowsAsync<ValidationException>(() => manager.Approve(fixture.ContainerId, fixture.ScheduleId, created.Id,
+            new ApproveShiftCorrectionRequest(), CancellationToken.None));
+        db.ChangeTracker.Clear();
+        Assert.Equal(ShiftCorrectionStatus.Pending, (await db.ShiftCorrectionRequests.SingleAsync()).Status);
+        Assert.Equal("12:00", (await db.ScheduleSlots.SingleAsync(slot => slot.Id == fixture.MorningSlotId)).ToTime);
+    }
+
+    [Fact]
+    public async Task CreateAndApprove_SucceedDespitePostCommitFailures_AndRetryDoesNotApplyTwice()
+    {
+        await using var database = await SqliteTestDatabase.CreateAsync();
+        await using var db = database.CreateContext();
+        var fixture = await SeedAsync(db);
+        var logs = System.Reflection.DispatchProxy.Create<WebApi.Services.IWorkflowLogService, FailingPostCommitProxy>();
+        var notifier = System.Reflection.DispatchProxy.Create<IRealtimeNotifier, FailingPostCommitProxy>();
+        var employee = new EmployeeShiftCorrectionsController(db, new ManagerEditLockService(), logs, notifier);
+        SetEmployeeUser(employee, fixture.EmployeeId);
+        var created = Assert.IsType<ShiftCorrectionRequestDto>(Assert.IsType<CreatedAtActionResult>((await employee.Create(new CreateShiftCorrectionRequest
+        {
+            ScheduleId = fixture.ScheduleId, ScheduleSlotId = fixture.MorningSlotId,
+            RequestedFromTime = "08:00", RequestedToTime = "12:30",
+        }, CancellationToken.None)).Result).Value);
+        var manager = new ManagerShiftCorrectionsController(db, logs, notifier);
+        SetManagerUser(manager, fixture.ManagerId);
+        var result = await manager.Approve(fixture.ContainerId, fixture.ScheduleId, created.Id, new ApproveShiftCorrectionRequest(), CancellationToken.None);
+        Assert.Equal("approved", Assert.IsType<ShiftCorrectionRequestDto>(Assert.IsType<OkObjectResult>(result.Result).Value).Status);
+        await Assert.ThrowsAsync<ValidationException>(() => manager.Approve(fixture.ContainerId, fixture.ScheduleId, created.Id,
+            new ApproveShiftCorrectionRequest(), CancellationToken.None));
+        Assert.Single(await db.ShiftCorrectionRequests.ToListAsync());
+        Assert.Equal("12:30", (await db.ScheduleSlots.SingleAsync(slot => slot.Id == fixture.MorningSlotId)).ToTime);
+    }
+
+    public class FailingPostCommitProxy : System.Reflection.DispatchProxy
+    {
+        protected override object? Invoke(System.Reflection.MethodInfo? targetMethod, object?[]? args)
+            => throw new InvalidOperationException("Injected post-commit outage");
+    }
+
+    private static async Task AddOtherScheduleAsync(DataAccessLayer.Models.DataBaseContext.AppDbContext db, Fixture fixture, string from, int year, int month)
+    {
+        var original = await db.Schedules.SingleAsync(schedule => schedule.Id == fixture.ScheduleId);
+        var other = TestDataFactory.CreateDalSchedule(fixture.ContainerId, original.ShopId, year: year, month: month);
+        other.PublicationStatus = SchedulePublicationStatus.Public;
+        db.Schedules.Add(other);
+        await db.SaveChangesAsync();
+        db.ScheduleSlots.Add(TestDataFactory.CreateDalSlot(other.Id, 12, 1, fixture.EmployeeId, from, "14:00"));
+        await db.SaveChangesAsync();
+    }
+
     [Fact]
     public async Task CreateAndApprove_SplitShiftUpdatesOnlyRequestedSlotAndMarksCell()
     {

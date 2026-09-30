@@ -169,15 +169,13 @@ public sealed class EmployeeShiftSwapsController(
             .FirstAsync(swap => swap.Id == model.Id, cancellationToken)
             .ConfigureAwait(false);
 
-        await workflowLogService
+        await PostCommitActions.RunAsync(HttpContext, () => workflowLogService
             .LogAsync(
                 User,
                 $"Published a shift swap from schedule \"{created.Schedule.Name}\" at {created.Schedule.Shop?.Name ?? "the assigned shop"} for {created.Schedule.Year}-{created.Schedule.Month:00}-{slot.DayOfMonth:00}, {offeredPeriod.FromTime}-{offeredPeriod.ToTime}; offered to {(created.TargetEmployeeId.HasValue ? GetEmployeeName(created.TargetEmployee, created.TargetEmployeeId.Value) : "all eligible employees") }.",
-                cancellationToken)
-            .ConfigureAwait(false);
-        await realtimeNotifier
-            .NotifyShiftSwapsChangedAsync(created.Schedule.ContainerId, created.ScheduleId, created.ScheduleId, "employee-swap-created", created.Id)
-            .ConfigureAwait(false);
+                cancellationToken)).ConfigureAwait(false);
+        await PostCommitActions.RunAsync(HttpContext, () => realtimeNotifier
+            .NotifyShiftSwapsChangedAsync(created.Schedule.ContainerId, created.ScheduleId, created.ScheduleId, "employee-swap-created", created.Id)).ConfigureAwait(false);
 
         var employeeMonthSlots = await LoadPublishedEmployeeMonthSlotsAsync(
             employeeId,
@@ -355,18 +353,15 @@ public sealed class EmployeeShiftSwapsController(
             .FirstAsync(request => request.Id == id, cancellationToken)
             .ConfigureAwait(false);
 
-        await workflowLogService
+        await PostCommitActions.RunAsync(HttpContext, () => workflowLogService
             .LogAsync(
                 User,
                 $"Accepted {(accepted.FromEmployeeId.HasValue ? $"{GetEmployeeName(accepted.FromEmployee, accepted.FromEmployeeId.Value)}'s shift" : "an open shift")} from schedule \"{accepted.Schedule.Name}\" for {accepted.Schedule.Year}-{accepted.Schedule.Month:00}-{accepted.ScheduleSlot!.DayOfMonth:00}, {offeredPeriod.FromTime}-{offeredPeriod.ToTime}.",
-                cancellationToken)
-            .ConfigureAwait(false);
-        await realtimeNotifier
-            .NotifyScheduleChangedAsync(accepted.Schedule.ContainerId, accepted.ScheduleId, "employee-swap-accepted")
-            .ConfigureAwait(false);
-        await realtimeNotifier
-            .NotifyShiftSwapsChangedAsync(accepted.Schedule.ContainerId, accepted.ScheduleId, accepted.ScheduleId, "employee-swap-accepted", accepted.Id)
-            .ConfigureAwait(false);
+                cancellationToken)).ConfigureAwait(false);
+        await PostCommitActions.RunAsync(HttpContext, () => realtimeNotifier
+            .NotifyScheduleChangedAsync(accepted.Schedule.ContainerId, accepted.ScheduleId, "employee-swap-accepted")).ConfigureAwait(false);
+        await PostCommitActions.RunAsync(HttpContext, () => realtimeNotifier
+            .NotifyShiftSwapsChangedAsync(accepted.Schedule.ContainerId, accepted.ScheduleId, accepted.ScheduleId, "employee-swap-accepted", accepted.Id)).ConfigureAwait(false);
 
         var updatedEmployeeMonthSlots = await LoadPublishedEmployeeMonthSlotsAsync(
             employeeId,
@@ -401,15 +396,13 @@ public sealed class EmployeeShiftSwapsController(
         swap.CancelledAtUtc = DateTimeOffset.UtcNow;
         await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
 
-        await workflowLogService
+        await PostCommitActions.RunAsync(HttpContext, () => workflowLogService
             .LogAsync(
                 User,
                 $"Cancelled the shift swap from schedule \"{swap.Schedule.Name}\" for {swap.Schedule.Year}-{swap.Schedule.Month:00}-{swap.ScheduleSlot!.DayOfMonth:00}, {swap.OfferedFromTime ?? swap.ScheduleSlot!.FromTime}-{swap.OfferedToTime ?? swap.ScheduleSlot!.ToTime}.",
-                cancellationToken)
-            .ConfigureAwait(false);
-        await realtimeNotifier
-            .NotifyShiftSwapsChangedAsync(swap.Schedule.ContainerId, swap.ScheduleId, swap.ScheduleId, "employee-swap-cancelled", swap.Id)
-            .ConfigureAwait(false);
+                cancellationToken)).ConfigureAwait(false);
+        await PostCommitActions.RunAsync(HttpContext, () => realtimeNotifier
+            .NotifyShiftSwapsChangedAsync(swap.Schedule.ContainerId, swap.ScheduleId, swap.ScheduleId, "employee-swap-cancelled", swap.Id)).ConfigureAwait(false);
 
         var employeeMonthSlots = await LoadPublishedEmployeeMonthSlotsAsync(
             employeeId,

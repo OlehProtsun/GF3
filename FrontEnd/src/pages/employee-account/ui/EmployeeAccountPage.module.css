@@ -1,6 +1,8 @@
 .profilePanel {
   display: grid;
   gap: 14px;
+  min-width: 0;
+  grid-template-columns: minmax(0, 1fr);
   padding: clamp(12px, 2.6vw, 18px);
   border: 1px solid rgba(148, 163, 184, 0.14);
   border-radius: 32px;
@@ -76,6 +78,9 @@
 }
 
 .profileName {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   min-width: 0;
   margin: 0;
   color: #0f172a;
@@ -87,6 +92,10 @@
 }
 
 .profileHandle {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   color: #64748b;
   font-size: 0.86rem;
   font-weight: 750;
@@ -211,6 +220,9 @@
 }
 
 .cardValue {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   min-width: 0;
   color: #0f172a;
   font-size: 0.94rem;

@@ -1,8 +1,9 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { queryKeys } from "@shared/api/queryKeys";
+import { getAuthAccessToken, setAuthAccessToken } from "@shared/api/httpClient";
 import {
   useCreateManagerMutation,
   useDeleteManagerMutation,
@@ -16,6 +17,8 @@ const apiMocks = vi.hoisted(() => ({
   createManager: vi.fn(),
   deleteManager: vi.fn(),
 }));
+const replaceLoginResult = vi.hoisted(() => vi.fn());
+vi.mock("@app/providers/AuthProvider", () => ({ useAuth: () => ({ replaceLoginResult }) }));
 
 vi.mock("./managerProfileApi", () => ({
   managerProfileApi: apiMocks,
@@ -77,8 +80,10 @@ function renderHarness(client: QueryClient) {
 }
 
 beforeEach(() => {
+  setAuthAccessToken("old-token");
+  replaceLoginResult.mockReset().mockImplementation(result => setAuthAccessToken(result.accessToken));
   Object.values(apiMocks).forEach(mock => mock.mockReset());
-  apiMocks.update.mockResolvedValue({ profile: updatedProfile });
+  apiMocks.update.mockResolvedValue({ profile: updatedProfile, accessToken: "new-token" });
   apiMocks.createManager.mockResolvedValue({
     id: 4,
     userName: "second",
@@ -91,6 +96,32 @@ beforeEach(() => {
 });
 
 describe("manager profile query mutations", () => {
+  test("installs the replacement token before refreshing active manager queries", async () => {
+    const client = new QueryClient();
+    const invalidate = vi.spyOn(client, "invalidateQueries").mockImplementation(async () => {
+      expect(getAuthAccessToken()).toBe("new-token");
+    });
+    renderHarness(client);
+    await userEvent.click(screen.getByRole("button", { name: "update profile" }));
+    await waitFor(() => expect(invalidate).toHaveBeenCalledOnce());
+    expect(replaceLoginResult).toHaveBeenCalledOnce();
+  });
+
+  test("does not restore a manager session from a profile response arriving after logout", async () => {
+    let finish!: (result: unknown) => void;
+    apiMocks.update.mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
+    const client = new QueryClient();
+    const invalidate = vi.spyOn(client, "invalidateQueries");
+    renderHarness(client);
+    await userEvent.click(screen.getByRole("button", { name: "update profile" }));
+    setAuthAccessToken(null);
+    await act(async () => { finish({ profile: updatedProfile, accessToken: "new-token" }); });
+    await waitFor(() => expect(client.getQueryState(queryKeys.managerProfile.updating()).data).toBe(false));
+    expect(replaceLoginResult).not.toHaveBeenCalled();
+    expect(invalidate).not.toHaveBeenCalled();
+    expect(getAuthAccessToken()).toBeNull();
+  });
+
   test("hydrates the current profile cache and invalidates the manager list after manager mutations", async () => {
     const user = userEvent.setup();
     const client = new QueryClient();

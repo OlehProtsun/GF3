@@ -1,4 +1,7 @@
 import { stressCases } from "./viewport-stress";
+import { IosButton } from "../../src/shared/ui/components/IosButton";
+import { RecordTile } from "../../src/shared/ui/components/RecordTile";
+import { ProfileSummaryCard } from "../../src/shared/ui/components/ProfileSummaryCard";
 import { AvailabilityDateTimeField } from "../../src/entities/availability-groups/ui/AvailabilityPublicationCard";
 import { createRoot } from "react-dom/client";
 import "../../src/index.css";
@@ -19,6 +22,11 @@ const save = async () => {};
 const common = { open: true, onCancel: noop, onSave: save };
 const columns = Array.from({ length: 25 }, (_, i) => ({ employeeId: i + 1, label: `Employee ${i + 1}`, kind: "employee" as const, manualColumnId: null, graphEmployeeId: null, minHoursMonth: null, totalMinutes: 0, totalText: "" }));
 const cases = {
+  longText: <div style={{ width: "100%", maxWidth: 400, boxSizing: "border-box", padding: 16, display: "grid", gap: 16 }}>
+    <IosButton label={"LongActionLabel".repeat(20)} icon={<span>+</span>} />
+    <RecordTile title={"LongEmployeeName".repeat(20)} description={"LongDescription".repeat(20)} metaItems={[{ label: "Email", value: "longemail".repeat(20) + "@example.com" }]} />
+    <ProfileSummaryCard sectionTitle="Profile" name={"LongEmployeeName".repeat(20)} subtitle={"longusername".repeat(20)} details={[{ label: "Email", value: "longemail".repeat(20) + "@example.com" }]} />
+  </div>,
   ...stressCases,
   confirm: <ConfirmDialog {...common} title="Confirm changes" message={"A detailed explanation of the changes and their consequences. ".repeat(35)} onConfirm={noop} />,
   group: <AvailabilityGroupFormDialog {...common} mode="create" isSubmitting={false} submitError={"Please review the availability group settings. ".repeat(15)} />,

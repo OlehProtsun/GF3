@@ -82,13 +82,8 @@ public sealed class EmployeeShiftCorrectionsController(
             throw new ValidationException("Change at least one boundary before sending the request.");
         }
 
-        ShiftCorrectionRules.ValidateEmployeeOverlap(
-            schedule.Slots,
-            slot.Id,
-            employeeId,
-            slot.DayOfMonth,
-            requestedFromTime,
-            requestedToTime);
+        await ShiftCorrectionRules.ValidateEmployeeOverlapAsync(
+            db, schedule, slot, requestedFromTime, requestedToTime, cancellationToken).ConfigureAwait(false);
 
         var hasPendingRequest = await db.ShiftCorrectionRequests
             .AnyAsync(item =>
@@ -117,16 +112,16 @@ public sealed class EmployeeShiftCorrectionsController(
         db.ShiftCorrectionRequests.Add(model);
         await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
 
-        await workflowLogService.LogAsync(
+        await PostCommitActions.RunAsync(HttpContext, () => workflowLogService.LogAsync(
             User,
             $"Requested a shift correction in schedule \"{schedule.Name}\" for {schedule.Year}-{schedule.Month:00}-{slot.DayOfMonth:00}: {slot.FromTime}-{slot.ToTime} to {requestedFromTime}-{requestedToTime}.",
-            cancellationToken).ConfigureAwait(false);
-        await realtimeNotifier.NotifyShiftSwapsChangedAsync(
+            cancellationToken)).ConfigureAwait(false);
+        await PostCommitActions.RunAsync(HttpContext, () => realtimeNotifier.NotifyShiftSwapsChangedAsync(
             schedule.ContainerId,
             schedule.Id,
             schedule.Id,
             "employee-shift-correction-created",
-            model.Id).ConfigureAwait(false);
+            model.Id)).ConfigureAwait(false);
 
         var created = await ShiftCorrectionRules.BuildRequestQuery(db)
             .SingleAsync(item => item.Id == model.Id, cancellationToken)
@@ -225,6 +220,7 @@ public sealed class ManagerShiftCorrectionsController(
             return conflict;
         }
 
+        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
         var correction = await ShiftCorrectionRules.BuildRequestQuery(db)
             .SingleOrDefaultAsync(item =>
                 item.Id == id &&
@@ -251,13 +247,9 @@ public sealed class ManagerShiftCorrectionsController(
             .Where(item => item.ScheduleId == graphId)
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
-        ShiftCorrectionRules.ValidateEmployeeOverlap(
-            otherSlots,
-            slot.Id,
-            correction.EmployeeId,
-            correction.DayOfMonth,
-            correction.RequestedFromTime,
-            correction.RequestedToTime);
+        await ShiftCorrectionRules.ValidateEmployeeOverlapAsync(
+            db, correction.Schedule, slot, correction.RequestedFromTime,
+            correction.RequestedToTime, cancellationToken).ConfigureAwait(false);
         var collidesWithSlotNumber = otherSlots.Any(item =>
             item.Id != slot.Id &&
             item.DayOfMonth == slot.DayOfMonth &&
@@ -274,7 +266,6 @@ public sealed class ManagerShiftCorrectionsController(
             ? await ShiftCorrectionRules.GetSettingColorAsync(db, managerId, cancellationToken).ConfigureAwait(false)
             : ShiftCorrectionRules.NormalizeColor(request.HighlightColor, nameof(request.HighlightColor));
 
-        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
         slot.FromTime = correction.RequestedFromTime;
         slot.ToTime = correction.RequestedToTime;
 
@@ -302,10 +293,10 @@ public sealed class ManagerShiftCorrectionsController(
         await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
         await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
 
-        await workflowLogService.LogAsync(
+        await PostCommitActions.RunAsync(HttpContext, () => workflowLogService.LogAsync(
             User,
             $"Approved {correction.Employee.FirstName} {correction.Employee.LastName}'s shift correction in schedule \"{correction.Schedule.Name}\" for {correction.Schedule.Year}-{correction.Schedule.Month:00}-{correction.DayOfMonth:00}: {correction.OriginalFromTime}-{correction.OriginalToTime} to {correction.RequestedFromTime}-{correction.RequestedToTime}.",
-            cancellationToken).ConfigureAwait(false);
+            cancellationToken)).ConfigureAwait(false);
         await NotifyChangedAsync(correction, "manager-shift-correction-approved", scheduleChanged: true).ConfigureAwait(false);
 
         db.ChangeTracker.Clear();
@@ -342,10 +333,10 @@ public sealed class ManagerShiftCorrectionsController(
         correction.ReviewedByManagerId = GetRequiredManagerId();
         await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
 
-        await workflowLogService.LogAsync(
+        await PostCommitActions.RunAsync(HttpContext, () => workflowLogService.LogAsync(
             User,
             $"Rejected {correction.Employee.FirstName} {correction.Employee.LastName}'s shift correction in schedule \"{correction.Schedule.Name}\" for {correction.Schedule.Year}-{correction.Schedule.Month:00}-{correction.DayOfMonth:00}.",
-            cancellationToken).ConfigureAwait(false);
+            cancellationToken)).ConfigureAwait(false);
         await NotifyChangedAsync(correction, "manager-shift-correction-rejected", scheduleChanged: false).ConfigureAwait(false);
 
         db.ChangeTracker.Clear();
@@ -379,21 +370,20 @@ public sealed class ManagerShiftCorrectionsController(
     {
         if (scheduleChanged)
         {
-            await realtimeNotifier.NotifyScheduleChangedAsync(correction.Schedule.ContainerId, correction.ScheduleId, reason)
-                .ConfigureAwait(false);
+            await PostCommitActions.RunAsync(HttpContext, () => realtimeNotifier.NotifyScheduleChangedAsync(correction.Schedule.ContainerId, correction.ScheduleId, reason)).ConfigureAwait(false);
         }
-        await realtimeNotifier.NotifyManagerDataChangedAsync(
+        await PostCommitActions.RunAsync(HttpContext, () => realtimeNotifier.NotifyManagerDataChangedAsync(
             ManagerEditResourceTypes.Schedule,
             $"{correction.Schedule.ContainerId}:{correction.ScheduleId}",
             reason,
             correction.Schedule.ContainerId,
-            correction.ScheduleId).ConfigureAwait(false);
-        await realtimeNotifier.NotifyShiftSwapsChangedAsync(
+            correction.ScheduleId)).ConfigureAwait(false);
+        await PostCommitActions.RunAsync(HttpContext, () => realtimeNotifier.NotifyShiftSwapsChangedAsync(
             correction.Schedule.ContainerId,
             correction.ScheduleId,
             correction.ScheduleId,
             reason,
-            correction.Id).ConfigureAwait(false);
+            correction.Id)).ConfigureAwait(false);
     }
 }
 
@@ -451,18 +441,22 @@ internal static class ShiftCorrectionRules
         }
     }
 
-    internal static void ValidateEmployeeOverlap(
-        IEnumerable<ScheduleSlotModel> slots,
-        int excludedSlotId,
-        int employeeId,
-        int dayOfMonth,
+    internal static async Task ValidateEmployeeOverlapAsync(
+        AppDbContext db,
+        ScheduleModel schedule,
+        ScheduleSlotModel correctedSlot,
         string fromTime,
-        string toTime)
+        string toTime,
+        CancellationToken cancellationToken)
     {
+        var slots = await db.ScheduleSlots.AsNoTracking()
+            .Where(slot => slot.Id != correctedSlot.Id &&
+                slot.EmployeeId == correctedSlot.EmployeeId &&
+                slot.DayOfMonth == correctedSlot.DayOfMonth &&
+                slot.Schedule.Year == schedule.Year && slot.Schedule.Month == schedule.Month &&
+                (slot.ScheduleId == schedule.Id || slot.Schedule.PublicationStatus == SchedulePublicationStatus.Public))
+            .ToListAsync(cancellationToken).ConfigureAwait(false);
         var overlaps = slots.Any(slot =>
-            slot.Id != excludedSlotId &&
-            slot.EmployeeId == employeeId &&
-            slot.DayOfMonth == dayOfMonth &&
             string.CompareOrdinal(slot.FromTime, toTime) < 0 &&
             string.CompareOrdinal(fromTime, slot.ToTime) < 0);
         if (overlaps)

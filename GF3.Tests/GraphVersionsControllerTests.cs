@@ -12,13 +12,15 @@ namespace GF3.Tests;
 
 public sealed class GraphVersionsControllerTests
 {
-    [Fact]
-    public async Task CommitCheckoutAndDelete_PreserveTreeAndCreateBranchFromOldCommit()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task CommitCheckoutAndDelete_PreserveTreeAndCreateBranchFromOldCommit(bool failPostCommit)
     {
         await using var database = await SqliteTestDatabase.CreateAsync();
         await using var db = database.CreateContext();
         var fixture = await SeedScheduleAsync(db);
-        var controller = CreateController(db);
+        var controller = CreateController(db, failPostCommit);
 
         await controller.GetTree(fixture.ContainerId, fixture.ScheduleId, CancellationToken.None);
         var initial = Assert.Single(await db.ScheduleVersions.AsNoTracking().ToListAsync());
@@ -138,9 +140,11 @@ public sealed class GraphVersionsControllerTests
         Assert.Equal(snapshot, (await db.ShiftSwapRequests.AsNoTracking().SingleAsync()).ArchivedViewsJson);
         Assert.Single(await db.EmployeePinnedSwaps.ToListAsync());
     }
-    private static GraphVersionsController CreateController(DataAccessLayer.Models.DataBaseContext.AppDbContext db)
+    private static GraphVersionsController CreateController(DataAccessLayer.Models.DataBaseContext.AppDbContext db, bool failPostCommit = false)
     {
-        var controller = new GraphVersionsController(db, new NoopWorkflowLogService(), new NoopRealtimeNotifier());
+        var controller = new GraphVersionsController(db,
+            failPostCommit ? System.Reflection.DispatchProxy.Create<WebApi.Services.IWorkflowLogService, ShiftCorrectionControllerTests.FailingPostCommitProxy>() : new NoopWorkflowLogService(),
+            failPostCommit ? System.Reflection.DispatchProxy.Create<WebApi.Realtime.IRealtimeNotifier, ShiftCorrectionControllerTests.FailingPostCommitProxy>() : new NoopRealtimeNotifier());
         controller.ControllerContext = new ControllerContext
         {
             HttpContext = new DefaultHttpContext

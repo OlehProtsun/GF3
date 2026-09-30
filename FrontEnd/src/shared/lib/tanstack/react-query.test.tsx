@@ -85,6 +85,21 @@ function renderWithClient(client: QueryClient, element: React.ReactNode) {
 }
 
 describe("react-query shim", () => {
+  test("keeps query errors across equivalent key rerenders and recovers on retry", async () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: 0 } } });
+    const queryFn = vi.fn().mockRejectedValueOnce(new Error("server failed")).mockResolvedValue("recovered");
+    const view = renderWithClient(client, <QueryHarness queryFn={queryFn} />);
+    await waitFor(() => expect(screen.getByLabelText("error")).toHaveTextContent("server failed"));
+    expect(screen.getByLabelText("loading")).toHaveTextContent("false");
+    view.rerender(<QueryClientProvider client={client}><QueryHarness queryFn={queryFn} /></QueryClientProvider>);
+    expect(screen.getByLabelText("error")).toHaveTextContent("server failed");
+    expect(queryFn).toHaveBeenCalledTimes(1);
+    await userEvent.click(screen.getByText("invalidate"));
+    await waitFor(() => expect(screen.getByLabelText("data")).toHaveTextContent("recovered"));
+    expect(screen.getByLabelText("error")).toBeEmptyDOMElement();
+    expect(screen.getByLabelText("loading")).toHaveTextContent("false");
+  });
+
   test("QueryClient retries failed fetches, stores data, and notifies subscribers", async () => {
     const events: string[] = [];
     const client = new QueryClient({

@@ -56,9 +56,8 @@ public sealed class ManagerProfileController(
 
         var session = CreateSession(profile);
         var token = jwtTokenService.CreateAccessToken(session);
-        await workflowLogService
-            .LogAsync(AuthRoles.Manager, profile.DisplayName, null, "Updated manager profile.", cancellationToken)
-            .ConfigureAwait(false);
+        await PostCommitActions.RunAsync(HttpContext, () => workflowLogService
+            .LogAsync(AuthRoles.Manager, profile.DisplayName, null, "Updated manager profile.", cancellationToken)).ConfigureAwait(false);
         await NotifyManagerProfileChangedAsync(profile.Id, "manager-profile-updated").ConfigureAwait(false);
 
         return Ok(new ManagerProfileUpdateResponseDto
@@ -100,9 +99,8 @@ public sealed class ManagerProfileController(
                 cancellationToken)
             .ConfigureAwait(false);
 
-        await workflowLogService
-            .LogAsync(AuthRoles.Manager, GetCurrentDisplayName(), null, $"Created manager account {profile.DisplayName}.", cancellationToken)
-            .ConfigureAwait(false);
+        await PostCommitActions.RunAsync(HttpContext, () => workflowLogService
+            .LogAsync(AuthRoles.Manager, GetCurrentDisplayName(), null, $"Created manager account {profile.DisplayName}.", cancellationToken)).ConfigureAwait(false);
         await NotifyManagerProfileChangedAsync(profile.Id, "manager-account-created").ConfigureAwait(false);
 
         return Ok(ToApiDto(profile));
@@ -117,19 +115,18 @@ public sealed class ManagerProfileController(
             .DeleteAsync(managerId, GetCurrentManagerId(), GetCurrentUserName(), cancellationToken)
             .ConfigureAwait(false);
 
-        await workflowLogService
-            .LogAsync(AuthRoles.Manager, GetCurrentDisplayName(), null, $"Deleted manager account {deletedProfile.DisplayName}.", cancellationToken)
-            .ConfigureAwait(false);
+        await PostCommitActions.RunAsync(HttpContext, () => workflowLogService
+            .LogAsync(AuthRoles.Manager, GetCurrentDisplayName(), null, $"Deleted manager account {deletedProfile.DisplayName}.", cancellationToken)).ConfigureAwait(false);
         await NotifyManagerProfileChangedAsync(managerId, "manager-account-deleted").ConfigureAwait(false);
 
         return NoContent();
     }
 
     private Task NotifyManagerProfileChangedAsync(int managerId, string reason)
-        => realtimeNotifier?.NotifyManagerDataChangedAsync(
+        => PostCommitActions.RunAsync(HttpContext, () => realtimeNotifier?.NotifyManagerDataChangedAsync(
             ManagerEditResourceTypes.ManagerProfile,
             managerId.ToString(),
-            reason) ?? Task.CompletedTask;
+            reason) ?? Task.CompletedTask);
 
     private int? GetCurrentManagerId()
         => int.TryParse(User.FindFirstValue("manager_id"), out var parsed) ? parsed : null;
