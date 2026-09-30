@@ -25,7 +25,7 @@ export function useEmployeeMotion(scope: RefObject<HTMLDivElement | null>, pathn
         };
         gsap.killTweensOf(indicator);
         if (animate && positionedIndicators.current.has(indicator)) {
-          gsap.to(indicator, { ...position, duration: 0.26, ease: "power3.out" });
+          gsap.to(indicator, { ...position, duration: 0.56, ease: "power2.inOut" });
         } else {
           gsap.set(indicator, position);
         }
@@ -55,11 +55,18 @@ export function useEmployeeMotion(scope: RefObject<HTMLDivElement | null>, pathn
     const seen = new WeakMap<HTMLElement, string | null>();
     const reveal = contextSafe((elements: HTMLElement[]) => {
       elements.forEach((element, index) => {
+        // The hero uses a compositor animation so throttled JS frames cannot step its movement.
+        if (element.dataset.employeeMotion === "from-top") return;
         gsap.killTweensOf(element);
-        gsap.fromTo(element, { opacity: 0.5, y: 8 }, {
-          opacity: 1, y: 0, duration: 0.22,
-          delay: Math.min(index, 5) * 0.012,
-          ease: "power3.out", clearProps: "opacity,transform",
+        const schedulePanel = element.dataset.employeeMotion === "schedule-panel";
+        gsap.fromTo(element, {
+          opacity: schedulePanel ? 0.35 : 0,
+          y: schedulePanel ? 18 : 26,
+          scale: schedulePanel ? 1 : 0.975,
+        }, {
+          opacity: 1, y: 0, scale: 1, duration: 0.68,
+          delay: Math.min(index, 4) * 0.06,
+          ease: "power2.out", clearProps: "opacity,transform",
         });
       });
     });

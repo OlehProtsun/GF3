@@ -143,7 +143,7 @@ function RoutedShell() {
   const shouldUseLayout = status === "authenticated" && pathname !== "/login" && pathname !== "/password-recovery";
   const content = (
     <Suspense fallback={<RouteFallback />}>
-      <PageTransition pathname={pathname}>
+      <PageTransition pathname={pathname} employeeMotion={shouldUseLayout && session?.role === "employee"}>
         <RoutedContent />
       </PageTransition>
     </Suspense>

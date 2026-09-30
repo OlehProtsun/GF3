@@ -888,7 +888,37 @@ export function EmployeeSchedulePage() {
   );
   const [columnOrderDialogEmployeeId, setColumnOrderDialogEmployeeId] = useState<number | null>(null);
   const [selectedScheduleId, setSelectedScheduleId] = useState<number | null>(null);
+  const handleSelectSchedule = (button: HTMLButtonElement, scheduleId: number) => {
+    setSelectedScheduleId(scheduleId);
+    const dateBadge = button.querySelector<HTMLElement>(`.${styles.scheduleCardDate}`);
+    for (const element of [button, dateBadge]) {
+      for (const animation of element?.getAnimations?.() ?? []) {
+        if (animation.id === "schedule-card-press") animation.cancel();
+      }
+    }
+    const cardAnimation = button.animate?.([
+      { transform: "scale(0.965)" },
+      { transform: "scale(1.015)", offset: 0.65 },
+      { transform: "scale(1)" },
+    ], { duration: 520, easing: "cubic-bezier(0.22, 0.61, 0.36, 1)" });
+    const badgeAnimation = dateBadge?.animate?.([
+      { transform: "rotate(-6deg) scale(0.9)" },
+      { transform: "rotate(2deg) scale(1.08)", offset: 0.6 },
+      { transform: "rotate(0deg) scale(1)" },
+    ], { duration: 580, easing: "cubic-bezier(0.22, 0.61, 0.36, 1)" });
+    if (cardAnimation) cardAnimation.id = "schedule-card-press";
+    if (badgeAnimation) badgeAnimation.id = "schedule-card-press";
+  };
   const [scheduleViewMode, setScheduleViewMode] = useState<"matrix" | "daily">("matrix");
+  const [hasSwitchedScheduleView, setHasSwitchedScheduleView] = useState(false);
+  const scheduleViewToggleRef = useRef<HTMLButtonElement>(null);
+  const handleToggleScheduleView = () => {
+    setHasSwitchedScheduleView(true);
+    setScheduleViewMode(current => current === "matrix" ? "daily" : "matrix");
+  };
+  useLayoutEffect(() => {
+    if (hasSwitchedScheduleView) scheduleViewToggleRef.current?.focus({ preventScroll: true });
+  }, [scheduleViewMode, hasSwitchedScheduleView]);
   const [selectedDayOfMonth, setSelectedDayOfMonth] = useState<number | null>(null);
   const activeDailyScheduleDayRef = useRef<HTMLButtonElement | null>(null);
   const [isShiftCorrectionDialogOpen, setIsShiftCorrectionDialogOpen] = useState(false);
@@ -1177,14 +1207,14 @@ export function EmployeeSchedulePage() {
       />
 
       {scheduleQuery.isLoading ? (
-        <section className={workspaceStyles.panel} data-employee-motion>
+        <section className={workspaceStyles.panel} data-employee-motion="schedule-panel">
           <span className={workspaceStyles.panelEyebrow}>{t("Loading")}</span>
           <p className={workspaceStyles.panelText}>{t("Checking public schedules for your account.")}</p>
         </section>
       ) : null}
 
       {!scheduleQuery.isLoading && schedules.length === 0 ? (
-        <section className={workspaceStyles.panel} data-employee-motion>
+        <section className={workspaceStyles.panel} data-employee-motion="schedule-panel">
           <span className={workspaceStyles.panelEyebrow}>{t("No published schedules")}</span>
           <h2 className={workspaceStyles.panelTitle}>{t("Nothing is public for your account yet.")}</h2>
           <NavLink to="/availability" className={workspaceStyles.linkCard}>
@@ -1198,7 +1228,7 @@ export function EmployeeSchedulePage() {
       ) : null}
 
       {schedules.length > 0 ? (
-        <section className={`${workspaceStyles.panel} ${styles.publicSchedulesPanel}`} data-employee-motion>
+        <section className={`${workspaceStyles.panel} ${styles.publicSchedulesPanel}`} data-employee-motion="schedule-panel">
           <div className={styles.publicSchedulesHeader}>
             <div className={styles.publicSchedulesHeading}>
               <span className={styles.summaryIcon} aria-hidden="true">
@@ -1214,7 +1244,7 @@ export function EmployeeSchedulePage() {
               <span className={styles.selectedSchedulePill}>{scheduleStats.period}</span>
             </div>
           </div>
-          <div className={styles.scheduleSwitcher} data-motion-list>
+          <div className={styles.scheduleSwitcher}>
             {schedules.map(schedule => {
               const isSelected = schedule.id === selectedSchedule?.id;
               const scheduleLastUpdateLabel = formatScheduleLastUpdate(schedule.lastUpdatedAtUtc);
@@ -1225,7 +1255,7 @@ export function EmployeeSchedulePage() {
                   type="button"
                   className={[styles.scheduleButton, isSelected ? styles.scheduleButtonActive : ""].filter(Boolean).join(" ")}
                   aria-pressed={isSelected}
-                  onClick={() => setSelectedScheduleId(schedule.id)}
+                  onClick={event => handleSelectSchedule(event.currentTarget, schedule.id)}
                 >
                   <span className={styles.scheduleCardDate} aria-hidden="true">
                     <span>{formatScheduleMonthOnly(schedule).slice(0, 3)}</span>
@@ -1260,7 +1290,7 @@ export function EmployeeSchedulePage() {
 
       {selectedSchedule && scheduleViewMode === "matrix" ? (
         <ContainerGraphMatrix
-          className={styles.openScheduleMatrix}
+          className={[styles.openScheduleMatrix, hasSwitchedScheduleView ? styles.scheduleViewEnter : ""].filter(Boolean).join(" ")}
           graph={selectedSchedule}
           columns={scheduleMatrixColumns}
           cellMap={scheduleMatrixDisplay.cellMap}
@@ -1277,12 +1307,13 @@ export function EmployeeSchedulePage() {
           }
           icon={
             <button
+              ref={scheduleViewToggleRef}
               type="button"
-              className={styles.scheduleViewToggle}
+              className={[styles.scheduleViewToggle, hasSwitchedScheduleView ? styles.scheduleViewTogglePulse : ""].filter(Boolean).join(" ")}
               aria-label={t("Show daily schedule view")}
               aria-pressed="false"
               title={t("Show daily schedule view")}
-              onClick={() => setScheduleViewMode("daily")}
+              onClick={handleToggleScheduleView}
             >
               <ScheduleIcon size={20} />
             </button>
@@ -1310,7 +1341,7 @@ export function EmployeeSchedulePage() {
 
       {selectedSchedule && scheduleViewMode === "daily" ? (
         <CardSection
-          className={styles.dailyScheduleCard}
+          className={[styles.dailyScheduleCard, hasSwitchedScheduleView ? styles.scheduleViewEnter : ""].filter(Boolean).join(" ")}
           title={
             <span className={styles.openScheduleTitleBlock}>
               <span className={styles.openScheduleTitleLabel}>{t("Schedules")}</span>
@@ -1323,12 +1354,13 @@ export function EmployeeSchedulePage() {
           }
           icon={
             <button
+              ref={scheduleViewToggleRef}
               type="button"
-              className={`${styles.scheduleViewToggle} ${styles.scheduleViewToggleActive}`}
+              className={[styles.scheduleViewToggle, styles.scheduleViewToggleActive, hasSwitchedScheduleView ? styles.scheduleViewTogglePulse : ""].filter(Boolean).join(" ")}
               aria-label={t("Show schedule matrix view")}
               aria-pressed="true"
               title={t("Show schedule matrix view")}
-              onClick={() => setScheduleViewMode("matrix")}
+              onClick={handleToggleScheduleView}
             >
               <ScheduleIcon size={20} />
             </button>
@@ -1372,7 +1404,7 @@ export function EmployeeSchedulePage() {
 
             <div
               id="daily-schedule-content"
-              data-employee-motion
+              data-employee-motion="schedule-panel"
               data-motion-key={`${selectedSchedule.id}:${activeDailyScheduleDay}`}
               className={styles.dailyScheduleBody}
               role="tabpanel"
@@ -1422,7 +1454,7 @@ export function EmployeeSchedulePage() {
       />
 
       {selectedSchedule ? (
-        <section className={`${workspaceStyles.panel} ${styles.hoursSummaryPanel}`} data-employee-motion>
+        <section className={`${workspaceStyles.panel} ${styles.hoursSummaryPanel}`} data-employee-motion="schedule-panel">
           <span className={styles.hoursSummaryTotalPill}>{scheduleHoursSummary.totalHoursText}</span>
 
           <div className={styles.hoursSummaryHeader}>

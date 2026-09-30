@@ -19,5 +19,5 @@
 }
 
 .surface {
-  animation: var(--motion-reveal) 180ms var(--motion-ease);
+  animation: var(--motion-reveal) var(--motion-enter) var(--motion-ease);
 }

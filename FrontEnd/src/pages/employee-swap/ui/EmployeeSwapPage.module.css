@@ -1487,11 +1487,11 @@
 }
 
 .creationDialog[open] {
-  animation: gf3-enter 180ms var(--motion-ease) backwards;
+  animation: var(--motion-reveal) var(--motion-enter) var(--motion-ease) backwards;
 }
 
 .creationDialog[open]::backdrop {
-  animation: swap-backdrop-enter 160ms ease-out both;
+  animation: swap-backdrop-enter 360ms ease-out both;
 }
 
 @keyframes swap-backdrop-enter {
