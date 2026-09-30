@@ -19,6 +19,38 @@ namespace GF3.Tests;
 
 public sealed class ReviewSecurityTests
 {
+    [Fact]
+    public async Task PasswordReset_ReturnsSuccessAfterLogFailure_AndConsumesCodeOnce()
+    {
+        await using var database = await SqliteTestDatabase.CreateAsync();
+        await using var db = database.CreateContext();
+        var employee = new EmployeeModel { FirstName = "Reset", LastName = "Worker" };
+        db.Employees.Add(employee);
+        await db.SaveChangesAsync();
+        var accounts = CreateEmployeeService(db);
+        await accounts.UpsertForEmployeeAsync(employee.Id, "reset.worker", "111111");
+        var challenge = await accounts.CreatePasswordResetChallengeAsync(employee.Id);
+        var service = new EmployeeProfileService(new EmployeeService(new EmployeeRepository(db)), accounts,
+            System.Reflection.DispatchProxy.Create<IEmailSender, ShiftCorrectionControllerTests.FailingPostCommitProxy>());
+        var controller = new WebApi.Controllers.EmployeeProfileController(service,
+            System.Reflection.DispatchProxy.Create<WebApi.Services.IWorkflowLogService, ShiftCorrectionControllerTests.FailingPostCommitProxy>());
+        controller.ControllerContext = new Microsoft.AspNetCore.Mvc.ControllerContext
+        {
+            HttpContext = new DefaultHttpContext
+            {
+                User = new System.Security.Claims.ClaimsPrincipal(new System.Security.Claims.ClaimsIdentity([
+                    new System.Security.Claims.Claim("employee_id", employee.Id.ToString()),
+                ], "test")),
+            },
+        };
+        var request = new WebApi.Contracts.EmployeeProfile.CompletePasswordResetRequest { Code = challenge.Code, NewPassword = "222222" };
+        Assert.IsType<Microsoft.AspNetCore.Mvc.NoContentResult>(await controller.ConfirmPasswordReset(request, CancellationToken.None));
+        var updated = await accounts.GetByEmployeeIdAsync(employee.Id);
+        Assert.True(new PasswordHasher().VerifyPassword("222222", updated!.PasswordHash));
+        Assert.False(new PasswordHasher().VerifyPassword("111111", updated.PasswordHash));
+        await Assert.ThrowsAsync<BusinessLogicLayer.Common.ValidationException>(() => controller.ConfirmPasswordReset(request, CancellationToken.None));
+    }
+
     [Theory]
     [InlineData("login", 10)]
     [InlineData("reset-code", 3)]
@@ -72,7 +104,10 @@ public sealed class ReviewSecurityTests
             CredentialVersion = account.PasswordUpdatedAtUtc.UtcTicks,
         };
         var token = new JwtTokenService(Options.Create(JwtOptions)).CreateAccessToken(session).AccessToken;
-        Assert.True((await Authenticate(db, token)).Succeeded);
+        var authenticated = await Authenticate(db, token);
+        Assert.True(authenticated.Succeeded);
+        Assert.True(JwtTokenCodec.TryReadAccessToken(token, JwtOptions, TimeSpan.Zero, out _, out _, out var expiration));
+        Assert.Equal(expiration, authenticated.Properties!.ExpiresUtc);
         account.PasswordUpdatedAtUtc = account.PasswordUpdatedAtUtc.AddTicks(1);
         await db.SaveChangesAsync();
         Assert.False((await Authenticate(db, token)).Succeeded);

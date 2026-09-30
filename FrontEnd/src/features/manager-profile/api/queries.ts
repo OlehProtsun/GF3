@@ -2,6 +2,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { queryKeys } from "@shared/api/queryKeys";
 import type { CreateManagerDto, UpdateManagerProfileDto } from "./dto";
 import { managerProfileApi } from "./managerProfileApi";
+import { useAuth } from "@app/providers/AuthProvider";
+import { getAuthAccessToken, RequestCanceledError } from "@shared/api/httpClient";
 
 export function useManagerProfileQuery() {
   return useQuery({
@@ -19,9 +21,21 @@ export function useManagerListQuery() {
 
 export function useUpdateManagerProfileMutation() {
   const queryClient = useQueryClient();
+  const { replaceLoginResult } = useAuth();
 
   return useMutation({
-    mutationFn: (payload: UpdateManagerProfileDto) => managerProfileApi.update(payload),
+    mutationFn: async (payload: UpdateManagerProfileDto) => {
+      const requestToken = getAuthAccessToken();
+      queryClient.setQueryData(queryKeys.managerProfile.updating(), true);
+      try {
+        const result = await managerProfileApi.update(payload);
+        if (requestToken !== getAuthAccessToken()) throw new RequestCanceledError();
+        replaceLoginResult(result);
+        return result;
+      } finally {
+        queryClient.setQueryData(queryKeys.managerProfile.updating(), false);
+      }
+    },
     onSuccess: (result) => {
       queryClient.setQueryData(queryKeys.managerProfile.me(), result.profile);
       queryClient.invalidateQueries({ queryKey: queryKeys.managerProfile.list() });

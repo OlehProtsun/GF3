@@ -48,7 +48,7 @@ function runMutation<TData, TVariables>(
 
 export function EmployeeAccountPage() {
   useLanguageRevision();
-  const { session, logout } = useAuth();
+  const { session, logout, completePasswordChange } = useAuth();
   const profileQuery = useEmployeeProfileQuery();
   const updateProfileMutation = useUpdateEmployeeProfileMutation();
   const sendPasswordCodeMutation = useSendEmployeePasswordResetCodeMutation();
@@ -190,7 +190,7 @@ export function EmployeeAccountPage() {
       setPasswordCode("");
       setNewPassword("");
       setInlineError(null);
-      setInlineSuccess(t("Password updated."));
+      completePasswordChange();
     } catch (error) {
       const message = getErrorMessage(error, t("Could not update the password."));
       setInlineError(message);
@@ -320,7 +320,7 @@ export function EmployeeAccountPage() {
                   <CodeIcon size={20} />
                 </span>
                 <div>
-                  <h2 id="security-heading" className={styles.sectionTitle}>{t("Password &amp; security")}</h2>
+                  <h2 id="security-heading" className={styles.sectionTitle}>{t("Password & security")}</h2>
                   <p className={styles.sectionText}>{t("Confirm changes with a one-time email code.")}</p>
                 </div>
               </div>

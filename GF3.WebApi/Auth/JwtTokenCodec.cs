@@ -38,9 +38,19 @@ internal static class JwtTokenCodec
         TimeSpan clockSkew,
         out AuthenticatedSessionDto session,
         out string? error)
+        => TryReadAccessToken(token, options, clockSkew, out session, out error, out _);
+
+    public static bool TryReadAccessToken(
+        string token,
+        JwtAuthOptions options,
+        TimeSpan clockSkew,
+        out AuthenticatedSessionDto session,
+        out string? error,
+        out DateTimeOffset expiresAtUtc)
     {
         session = new AuthenticatedSessionDto();
         error = null;
+        expiresAtUtc = default;
 
         var parts = token.Split('.');
         if (parts.Length != 3)
@@ -107,7 +117,15 @@ internal static class JwtTokenCodec
                 return false;
             }
 
-            if (nowUnixTime > expiresAtUnixTime.Value + clockSkewSeconds)
+            if (expiresAtUnixTime.Value < DateTimeOffset.MinValue.ToUnixTimeSeconds() ||
+                expiresAtUnixTime.Value > DateTimeOffset.MaxValue.ToUnixTimeSeconds())
+            {
+                error = "Token expiration is invalid.";
+                return false;
+            }
+            expiresAtUtc = DateTimeOffset.FromUnixTimeSeconds(expiresAtUnixTime.Value);
+
+            if (nowUnixTime >= expiresAtUnixTime.Value + clockSkewSeconds)
             {
                 error = "Token expired.";
                 return false;

@@ -8,6 +8,7 @@ import {
   request,
   requestFile,
   setAuthAccessToken,
+  subscribeUnauthorized,
 } from "./httpClient";
 
 function mockFetch(response: Response | Promise<Response>) {
@@ -31,6 +32,76 @@ afterEach(() => {
 });
 
 describe("httpClient", () => {
+  test.each([200, 401])("discards a late JSON body (%s) without revoking the new session", async (status) => {
+    let finish!: (value: unknown) => void;
+    const response = Response.json({}, { status });
+    const read = vi.spyOn(response, "json").mockImplementation(() => new Promise(resolve => { finish = resolve; }));
+    mockFetch(response);
+    const revoked = vi.fn();
+    const unsubscribe = subscribeUnauthorized(revoked);
+    try {
+      setAuthAccessToken("old-token");
+      const pending = request("profile");
+      const rejected = expect(pending).rejects.toBeInstanceOf(RequestCanceledError);
+      await vi.waitFor(() => expect(read).toHaveBeenCalled());
+      setAuthAccessToken(null);
+      setAuthAccessToken("old-token");
+      finish({ account: "previous-session" });
+      await rejected;
+      expect(revoked).not.toHaveBeenCalled();
+    } finally { unsubscribe(); }
+  });
+
+  test("discards a download body completed after switching accounts", async () => {
+    let finish!: (value: Blob) => void;
+    const response = new Response("report");
+    const read = vi.spyOn(response, "blob").mockImplementation(() => new Promise(resolve => { finish = resolve; }));
+    mockFetch(response);
+    setAuthAccessToken("old-token");
+    const pending = requestFile("export");
+    const rejected = expect(pending).rejects.toBeInstanceOf(RequestCanceledError);
+    await vi.waitFor(() => expect(read).toHaveBeenCalled());
+    setAuthAccessToken("new-token");
+    finish(new Blob(["old report"]));
+    await rejected;
+  });
+
+  test("only signals 401 for requests authenticated with the current session", async () => {
+    const revoked = vi.fn();
+    const unsubscribe = subscribeUnauthorized(revoked);
+    setAuthAccessToken("current-token");
+    try {
+      for (const options of [{ anonymous: true }, { headers: { Authorization: "Bearer other" } }, {}]) {
+        mockFetch(Response.json({ detail: "Unauthorized" }, { status: 401 }));
+        await expect(request("profile", options)).rejects.toBeInstanceOf(ApiError);
+      }
+      expect(revoked).toHaveBeenCalledTimes(1);
+    } finally { unsubscribe(); }
+  });
+
+  test.each([200, 401])("discards a late %s response from the previous session", async (status) => {
+    let finish!: (response: Response) => void;
+    mockFetch(new Promise<Response>(resolve => { finish = resolve; }));
+    setAuthAccessToken("old-token");
+    const pending = request("employees");
+    const rejected = expect(pending).rejects.toBeInstanceOf(RequestCanceledError);
+    setAuthAccessToken("new-token");
+    finish(Response.json({ detail: "old session response" }, { status }));
+    await rejected;
+    expect(getAuthAccessToken()).toBe("new-token");
+  });
+
+  test("discards a download that finishes after logout", async () => {
+    let finish!: (response: Response) => void;
+    mockFetch(new Promise<Response>(resolve => { finish = resolve; }));
+    setAuthAccessToken("old-token");
+    const pending = requestFile("export");
+    const rejected = expect(pending).rejects.toBeInstanceOf(RequestCanceledError);
+    setAuthAccessToken(null);
+    finish(new Response("old account data"));
+    await rejected;
+  });
+
   test("buildApiUrl appends query values and skips nullish values", () => {
     expect(buildApiUrl("/employees", { search: "Ann Smith", page: 2, active: true, empty: null, missing: undefined }))
       .toBe("/api/employees?search=Ann+Smith&page=2&active=true");

@@ -49,11 +49,12 @@ function toLoginDto(input: LoginInput) {
 
 export const authApi = {
   login: async (input: LoginInput) =>
-    toLoginResultModel(await request<LoginResponseDto>("auth/login", { method: "POST", body: toLoginDto(input) })),
+    toLoginResultModel(await request<LoginResponseDto>("auth/login", { method: "POST", body: toLoginDto(input), anonymous: true })),
   session: async () => toSessionModel(await request<SessionDto>("auth/session")),
-  logout: () => request<void>("auth/logout", { method: "POST" }),
+  logout: () => request<void>("auth/logout", { method: "POST", anonymous: true }),
   sendPasswordResetCode: (input: SendPasswordResetCodeInput) =>
     request<PasswordResetCodeDispatch>("auth/password/send-code", {
+      anonymous: true,
       method: "POST",
       body: {
         username: input.username.trim(),
@@ -61,6 +62,7 @@ export const authApi = {
     }),
   confirmPasswordReset: (input: CompleteForgotPasswordResetInput) =>
     request<void>("auth/password/confirm", {
+      anonymous: true,
       method: "POST",
       body: {
         username: input.username.trim(),

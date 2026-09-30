@@ -4,6 +4,8 @@
   display: grid;
   gap: 16px;
   align-content: start;
+  min-width: 0;
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .hero {
@@ -64,6 +66,11 @@
 }
 
 .heroTitle {
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   margin: 0;
   font-size: clamp(1.45rem, 5vw, 2.45rem);
   line-height: 1.02;
@@ -122,6 +129,8 @@
 }
 
 .panel {
+  min-width: 0;
+  grid-template-columns: minmax(0, 1fr);
   display: grid;
   gap: 12px;
   padding: 18px;
@@ -147,6 +156,10 @@
 }
 
 .panelTitle {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   margin: 0;
   color: #0f172a;
   font-size: 1.02rem;
@@ -185,6 +198,10 @@
 }
 
 .statValue {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   color: #0f172a;
   font-size: 0.98rem;
   line-height: 1.2;
@@ -237,6 +254,10 @@
 }
 
 .linkTitle {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   color: #0f172a;
   font-size: 0.96rem;
   line-height: 1.2;

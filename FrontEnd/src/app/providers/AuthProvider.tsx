@@ -1,6 +1,6 @@
 import { t } from "@shared/i18n";
 import { createContext, startTransition, useCallback, useContext, useEffect, useRef, useState, type PropsWithChildren } from "react";
-import { ApiError, getAuthAccessToken, getErrorMessage, setAuthAccessToken } from "@shared/api/httpClient";
+import { ApiError, getAuthAccessToken, getErrorMessage, setAuthAccessToken, subscribeUnauthorized } from "@shared/api/httpClient";
 import { authApi } from "@entities/auth";
 import type { AuthLoginResult, AuthSession, LoginInput } from "@entities/auth";
 
@@ -10,6 +10,8 @@ type AuthContextValue = {
   status: AuthStatus;
   session: AuthSession | null;
   bootstrapError: string | null;
+  passwordChanged: boolean;
+  completePasswordChange: () => void;
   login: (input: LoginInput) => Promise<AuthSession>;
   logout: () => Promise<void>;
   refreshSession: () => Promise<void>;
@@ -52,6 +54,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
   const [status, setStatus] = useState<AuthStatus>("loading");
   const [session, setSession] = useState<AuthSession | null>(null);
   const [bootstrapError, setBootstrapError] = useState<string | null>(null);
+  const [passwordChanged, setPasswordChanged] = useState(false);
 
   const generation = useRef(0);
 
@@ -72,6 +75,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
   const applyAuthenticatedState = useCallback((nextSession: AuthSession) => {
     startTransition(() => {
+      setPasswordChanged(false);
       setSession(nextSession);
       setStatus("authenticated");
       setBootstrapError(null);
@@ -104,6 +108,12 @@ export function AuthProvider({ children }: PropsWithChildren) {
       applyUnauthenticatedState(getErrorMessage(error, t("Could not restore the current session.")));
     }
   }, [applyAuthenticatedState, applyUnauthenticatedState, storeAccessToken]);
+
+  useEffect(() => subscribeUnauthorized(() => {
+    generation.current++;
+    storeAccessToken(null);
+    applyUnauthenticatedState();
+  }), [applyUnauthenticatedState, storeAccessToken]);
 
   useEffect(() => {
     void refreshSession();
@@ -138,12 +148,23 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
   const logout = async () => {
     generation.current++;
+    storeAccessToken(null);
+    applyUnauthenticatedState(null);
     try {
       await authApi.logout();
-    } finally {
-      storeAccessToken(null);
-      applyUnauthenticatedState(null);
+    } catch {
+      // Local logout must finish even when the anonymous logout endpoint is unavailable.
     }
+  };
+
+  const completePasswordChange = () => {
+    // The password reset has already revoked this token on the server.
+    generation.current++;
+    storeAccessToken(null);
+    startTransition(() => {
+      setPasswordChanged(true);
+      applyUnauthenticatedState(null);
+    });
   };
 
   return (
@@ -152,6 +173,8 @@ export function AuthProvider({ children }: PropsWithChildren) {
         status,
         session,
         bootstrapError,
+        passwordChanged,
+        completePasswordChange,
         login,
         logout,
         refreshSession,

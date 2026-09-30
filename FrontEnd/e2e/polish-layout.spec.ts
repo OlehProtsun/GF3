@@ -47,7 +47,21 @@ for (const role of ["manager", "employee"]) {
             const range = document.createRange();
             range.selectNodeContents(node);
             const text = range.getBoundingClientRect();
-            if (text.width && (text.left < box.left - 2 || text.right > box.right + 2)) return [element.textContent?.trim()];
+            if (text.width && (text.left < box.left - 2 || text.right > box.right + 2)) {
+              let clipped = false;
+              let ancestor: HTMLElement | null = node.parentElement;
+              while (ancestor && element.contains(ancestor)) {
+                const ancestorStyle = getComputedStyle(ancestor);
+                const bounds = ancestor.getBoundingClientRect();
+                if (ancestorStyle.overflowX === "hidden" && ancestorStyle.textOverflow === "ellipsis" &&
+                    bounds.width > 0 && bounds.left >= box.left - 2 && bounds.right <= box.right + 2) {
+                  clipped = true;
+                  break;
+                }
+                ancestor = ancestor.parentElement;
+              }
+              if (!clipped) return [element.textContent?.trim()];
+            }
           }
           return [];
         })), { message: `${path} at ${width}px` }).toEqual([]);

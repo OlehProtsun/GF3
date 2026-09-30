@@ -9,6 +9,7 @@ export const queryKeys = {
     me: () => ["employeeProfile", "me"] as const,
   },
   managerProfile: {
+    updating: () => ["managerProfile", "updating"] as const,
     me: () => ["managerProfile", "me"] as const,
     list: () => ["managerProfile", "list"] as const,
   },

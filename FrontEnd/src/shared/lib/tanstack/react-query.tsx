@@ -357,9 +357,9 @@ export function useQuery<TData>(options: QueryOptions<TData>) {
   }, [client, keyString]);
 
   useEffect(() => {
-    client.trackQuery(options.queryKey);
+    client.trackQuery(queryKeyRef.current);
 
-    const snapshot = client.getQueryState<TData>(options.queryKey);
+    const snapshot = client.getQueryState<TData>(queryKeyRef.current);
     setData(snapshot.data);
     setError(null);
     setIsFetching(false);
@@ -371,7 +371,7 @@ export function useQuery<TData>(options: QueryOptions<TData>) {
     }
 
     setIsLoading(snapshot.data === undefined);
-  }, [client, keyString, options.enabled, options.queryKey]);
+  }, [client, keyString, options.enabled]);
 
   useEffect(() => {
     if (options.enabled === false) {

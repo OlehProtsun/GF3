@@ -1,10 +1,15 @@
 ﻿.field {
   display: flex;
   flex-direction: column;
+  min-width: 0;
   gap: 6px;
 }
 
 .label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-size: 0.85rem;
   font-weight: 800;
   color: #000000;
@@ -13,6 +18,8 @@
 
 .input,
 .textArea {
+  min-width: 0;
+  max-width: 100%;
   box-sizing: border-box;
   border-radius: 16px;
   border: 1px solid #e5e5ea;

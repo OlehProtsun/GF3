@@ -37,9 +37,8 @@ public sealed class EmployeeProfileController(
             .UpdateContactAsync(GetRequiredEmployeeId(), request.RecoveryEmail, request.Phone, cancellationToken)
             .ConfigureAwait(false);
 
-        await workflowLogService
-            .LogAsync(User, "Updated profile contact information.", cancellationToken)
-            .ConfigureAwait(false);
+        await PostCommitActions.RunAsync(HttpContext, () => workflowLogService
+            .LogAsync(User, "Updated profile contact information.", cancellationToken)).ConfigureAwait(false);
 
         return Ok(ToApiDto(profile));
     }
@@ -70,9 +69,8 @@ public sealed class EmployeeProfileController(
             .ConfirmPasswordResetAsync(GetRequiredEmployeeId(), request.Code, request.NewPassword, cancellationToken)
             .ConfigureAwait(false);
 
-        await workflowLogService
-            .LogAsync(User, "Changed account password.", cancellationToken)
-            .ConfigureAwait(false);
+        await PostCommitActions.RunAsync(HttpContext, () => workflowLogService
+            .LogAsync(User, "Changed account password.", cancellationToken)).ConfigureAwait(false);
 
         return NoContent();
     }
