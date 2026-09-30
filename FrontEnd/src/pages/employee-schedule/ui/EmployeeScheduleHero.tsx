@@ -34,7 +34,7 @@ export function EmployeeScheduleHero({ schedules, employeeId, displayName, isLoa
     return tomorrow ? t("Starts in {0}", duration) : t("Ends in {0}", duration);
   };
   return (
-    <section className={styles.hero} aria-label={t("Your upcoming shifts")}>
+    <section className={styles.hero} data-employee-motion aria-label={t("Your upcoming shifts")}>
       <div className={styles.heading}>
         <div className={styles.greeting}>
           <time dateTime={now.toISOString()}>{dateTimeFormat("en-GB", { weekday: "long", month: "long", day: "numeric" }).format(now)}</time>

@@ -148,6 +148,22 @@
 
 .desktopTabs {
   display: none;
+  position: relative;
+  isolation: isolate;
+}
+
+.navIndicator {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: -1;
+  visibility: hidden;
+  pointer-events: none;
+  box-sizing: border-box;
+  border: 1px solid rgba(59, 130, 246, 0.24);
+  border-radius: 18px;
+  background: linear-gradient(180deg, rgba(219, 234, 254, 0.96), rgba(191, 219, 254, 0.92));
+  box-shadow: 0 8px 20px rgba(37, 99, 235, 0.16), inset 0 1px 0 rgba(255, 255, 255, 0.74);
 }
 
 .content {
@@ -160,6 +176,7 @@
   right: max(12px, env(safe-area-inset-right));
   bottom: max(10px, env(safe-area-inset-bottom));
   z-index: 40;
+  isolation: isolate;
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr)) auto;
   align-items: center;
@@ -173,7 +190,7 @@
   -webkit-backdrop-filter: blur(20px) saturate(180%);
   transition:
     opacity 220ms cubic-bezier(0.2, 0.8, 0.2, 1),
-    transform 300ms cubic-bezier(0.2, 0.8, 0.2, 1);
+    transform 260ms var(--motion-ease);
   will-change: opacity, transform;
 }
 
@@ -215,12 +232,6 @@
 
 .mobileTabActive {
   color: #1d4ed8;
-  border-color: rgba(59, 130, 246, 0.24);
-  background: linear-gradient(180deg, rgba(219, 234, 254, 0.96), rgba(191, 219, 254, 0.92));
-  box-shadow:
-    0 12px 24px rgba(37, 99, 235, 0.22),
-    inset 0 1px 0 rgba(255, 255, 255, 0.74);
-  transform: translateY(-1px);
 }
 
 .mobileTabActive .tabIcon {
@@ -307,7 +318,7 @@
     0 1px 0 rgba(255, 255, 255, 0.38) inset;
   transition:
     opacity 220ms cubic-bezier(0.2, 0.8, 0.2, 1),
-    transform 300ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    transform 260ms var(--motion-ease),
     background 0.18s ease,
     border-color 0.18s ease,
     color 0.18s ease;
@@ -331,6 +342,32 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  transition: translate 180ms var(--motion-ease), color 180ms ease;
+}
+
+.mobileTabActive .tabIcon,
+.desktopTabActive .tabIcon {
+  translate: 0 -2px;
+}
+
+.mobileTab:focus-visible,
+.desktopTab:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
+}
+
+.content :where(button, a) > svg {
+  transition: translate 160ms var(--motion-ease);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .content :where(button:not(:disabled), a):not([aria-disabled="true"]):hover > svg {
+    translate: 0 -1px;
+  }
+}
+
+.content :where(button:not(:disabled), a):not([aria-disabled="true"]):active > svg {
+  translate: 0 0;
 }
 
 .navUnreadDot {
@@ -402,7 +439,6 @@
   }
 
   .desktopTab:hover {
-    transform: translateY(-1px);
     color: #0f172a;
     border-color: rgba(59, 130, 246, 0.16);
     background: rgba(255, 255, 255, 0.88);
@@ -410,11 +446,17 @@
 
   .desktopTabActive {
     color: #1d4ed8;
-    border-color: rgba(59, 130, 246, 0.28);
-    background: linear-gradient(180deg, rgba(219, 234, 254, 0.96), rgba(191, 219, 254, 0.92));
-    box-shadow:
-      0 14px 30px rgba(37, 99, 235, 0.16),
-      inset 0 1px 0 rgba(255, 255, 255, 0.72);
+    border-color: transparent;
+    background: transparent;
+  }
+
+  .desktopTabActive:hover {
+    border-color: transparent;
+    background: transparent;
+  }
+
+  .desktopTabs .navIndicator {
+    border-radius: 999px;
   }
 
   .desktopTabActive .tabIcon {

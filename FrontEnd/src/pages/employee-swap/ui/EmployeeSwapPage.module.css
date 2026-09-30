@@ -1486,6 +1486,19 @@
   overscroll-behavior: contain;
 }
 
+.creationDialog[open] {
+  animation: gf3-enter 180ms var(--motion-ease) backwards;
+}
+
+.creationDialog[open]::backdrop {
+  animation: swap-backdrop-enter 160ms ease-out both;
+}
+
+@keyframes swap-backdrop-enter {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
 .creationDialog::backdrop {
   background: rgba(10, 15, 28, 0.34);
   backdrop-filter: blur(10px);

@@ -1177,14 +1177,14 @@ export function EmployeeSchedulePage() {
       />
 
       {scheduleQuery.isLoading ? (
-        <section className={workspaceStyles.panel}>
+        <section className={workspaceStyles.panel} data-employee-motion>
           <span className={workspaceStyles.panelEyebrow}>{t("Loading")}</span>
           <p className={workspaceStyles.panelText}>{t("Checking public schedules for your account.")}</p>
         </section>
       ) : null}
 
       {!scheduleQuery.isLoading && schedules.length === 0 ? (
-        <section className={workspaceStyles.panel}>
+        <section className={workspaceStyles.panel} data-employee-motion>
           <span className={workspaceStyles.panelEyebrow}>{t("No published schedules")}</span>
           <h2 className={workspaceStyles.panelTitle}>{t("Nothing is public for your account yet.")}</h2>
           <NavLink to="/availability" className={workspaceStyles.linkCard}>
@@ -1198,7 +1198,7 @@ export function EmployeeSchedulePage() {
       ) : null}
 
       {schedules.length > 0 ? (
-        <section className={`${workspaceStyles.panel} ${styles.publicSchedulesPanel}`}>
+        <section className={`${workspaceStyles.panel} ${styles.publicSchedulesPanel}`} data-employee-motion>
           <div className={styles.publicSchedulesHeader}>
             <div className={styles.publicSchedulesHeading}>
               <span className={styles.summaryIcon} aria-hidden="true">
@@ -1214,7 +1214,7 @@ export function EmployeeSchedulePage() {
               <span className={styles.selectedSchedulePill}>{scheduleStats.period}</span>
             </div>
           </div>
-          <div className={styles.scheduleSwitcher}>
+          <div className={styles.scheduleSwitcher} data-motion-list>
             {schedules.map(schedule => {
               const isSelected = schedule.id === selectedSchedule?.id;
               const scheduleLastUpdateLabel = formatScheduleLastUpdate(schedule.lastUpdatedAtUtc);
@@ -1372,6 +1372,8 @@ export function EmployeeSchedulePage() {
 
             <div
               id="daily-schedule-content"
+              data-employee-motion
+              data-motion-key={`${selectedSchedule.id}:${activeDailyScheduleDay}`}
               className={styles.dailyScheduleBody}
               role="tabpanel"
               aria-label={`${activeDailyScheduleDayInfo?.weekdayLong ?? t("Day")} ${activeDailyScheduleDay}`}
@@ -1420,7 +1422,7 @@ export function EmployeeSchedulePage() {
       />
 
       {selectedSchedule ? (
-        <section className={`${workspaceStyles.panel} ${styles.hoursSummaryPanel}`}>
+        <section className={`${workspaceStyles.panel} ${styles.hoursSummaryPanel}`} data-employee-motion>
           <span className={styles.hoursSummaryTotalPill}>{scheduleHoursSummary.totalHoursText}</span>
 
           <div className={styles.hoursSummaryHeader}>

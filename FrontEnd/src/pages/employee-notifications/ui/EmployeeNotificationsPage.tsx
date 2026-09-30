@@ -146,7 +146,7 @@ export function EmployeeNotificationsPage() {
       {syncError ? <ErrorBanner dismissible>{syncError}</ErrorBanner> : null}
 
       <section className={`${workspaceStyles.panel} ${styles.inboxPanel}`}>
-        <div className={styles.sectionHeader}>
+        <div className={styles.sectionHeader} data-employee-motion>
           <div className={styles.sectionHeading}>
             <span className={styles.sectionIcon} aria-hidden="true">
               <InboxIcon size={20} />
@@ -174,7 +174,7 @@ export function EmployeeNotificationsPage() {
         </div>
 
         {activeTab === "inbox" && notificationItems.length === 0 ? (
-          <div className={styles.emptyState}>
+          <div className={styles.emptyState} data-employee-motion data-motion-key={activeTab}>
             <span className={styles.emptyIcon}>
               <NoteIcon size={20} />
             </span>
@@ -228,7 +228,7 @@ export function EmployeeNotificationsPage() {
             })}
           </div>
         ) : newsItems.length === 0 ? (
-          <div className={styles.emptyState}>
+          <div className={styles.emptyState} data-employee-motion data-motion-key={activeTab}>
             <span className={styles.emptyIcon}><NoteIcon size={20} /></span>
             <strong>{t("No system news yet")}</strong>
             <span>{t("Product updates and announcements will appear here.")}</span>

@@ -202,7 +202,7 @@ export function EmployeeAccountPage() {
   return (
     <div className={sharedStyles.page}>
       <section className={styles.profilePanel}>
-        <div className={styles.panelHeader}>
+        <div className={styles.panelHeader} data-employee-motion>
           <div className={styles.profileSummaryBlock}>
             <span className={styles.profileAvatar} aria-hidden="true">
               {initials}
@@ -233,7 +233,7 @@ export function EmployeeAccountPage() {
           <div className={styles.loadingState}>{t("Loading your profile...")}</div>
         ) : profile ? (
           <div className={styles.contentGrid}>
-            <section className={styles.detailsSection} aria-labelledby="personal-details-heading">
+            <section className={styles.detailsSection} data-employee-motion aria-labelledby="personal-details-heading">
               <div className={styles.sectionHeader}>
                 <span className={styles.sectionIcon} aria-hidden="true">
                   <EmployeeIcon size={20} />
@@ -314,7 +314,7 @@ export function EmployeeAccountPage() {
               ) : null}
             </section>
 
-            <section className={styles.securitySection} aria-labelledby="security-heading">
+            <section className={styles.securitySection} data-employee-motion aria-labelledby="security-heading">
               <div className={styles.sectionHeader}>
                 <span className={`${styles.sectionIcon} ${styles.sectionIconSecurity}`} aria-hidden="true">
                   <CodeIcon size={20} />
