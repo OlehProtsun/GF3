@@ -279,7 +279,9 @@ describe("EmployeeSchedulePage", () => {
     mocks.scheduleQuery.mockReturnValue({ data: [dailySchedule], isLoading: false, error: null });
 
     renderPage();
-    await user.click(screen.getByRole("button", { name: "Show daily schedule view" }));
+    const viewToggle = screen.getByRole("button", { name: "Show daily schedule view" });
+    expect(viewToggle).toHaveAttribute("aria-pressed", "false");
+    await user.click(viewToggle);
 
     const workDay = screen.getByRole("tab", { name: "Sunday 10, working day" });
     const dayOff = screen.getByRole("tab", { name: "Saturday 9, day off" });
@@ -292,6 +294,7 @@ describe("EmployeeSchedulePage", () => {
     });
     expect(mocks.scrollIntoView.mock.contexts.at(-1)).toBe(workDay);
     expect(screen.getByRole("button", { name: "Show schedule matrix view" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "Show schedule matrix view" })).toHaveFocus();
 
     const workerCards = within(screen.getByRole("tabpanel", { name: "Sunday 10" })).getAllByRole("article");
     expect(workerCards.map(card => card.textContent)).toEqual([
@@ -311,6 +314,7 @@ describe("EmployeeSchedulePage", () => {
 
     await user.click(screen.getByRole("button", { name: "Show schedule matrix view" }));
     expect(screen.getByTestId("schedule-matrix")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Show daily schedule view" })).toHaveFocus();
   });
 
   test("calculates estimated salary and restores the Work hours total", async () => {
@@ -475,6 +479,23 @@ describe("EmployeeSchedulePage", () => {
 
 
 describe("schedule selector", () => {
+  test("keeps Adjust independent from schedule selection in both view modes", async () => {
+    mocks.scheduleQuery.mockReturnValue({ data: schedules, isLoading: false, error: null });
+    const user = userEvent.setup();
+    renderPage();
+
+    for (const mode of ["matrix", "daily"]) {
+      const trigger = screen.getByRole("button", { name: "Select schedule. Current schedule: May Schedule" });
+      const adjust = screen.getByRole("button", { name: "Request a shift correction" });
+      expect(trigger.parentElement).toBe(adjust.parentElement);
+      expect(trigger).not.toContainElement(adjust);
+      await user.click(adjust);
+      expect(screen.getByRole("dialog", { name: "Request a shift change" })).toBeInTheDocument();
+      expect(screen.queryByRole("dialog", { name: "Select schedule" })).not.toBeInTheDocument();
+      await user.keyboard("{Escape}");
+      if (mode === "matrix") await user.click(screen.getByRole("button", { name: "Show daily schedule view" }));
+    }
+  });
   test("selects another schedule and updates matrix and metadata", async () => {
     const user = userEvent.setup();
     const second = { ...schedules[1], month: 10, lastUpdatedAtUtc: "2026-10-04T12:01:00Z" };

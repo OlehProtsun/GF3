@@ -28,7 +28,7 @@ import { getErrorMessage } from "@shared/api/httpClient";
 import { formatScheduleLastUpdate } from "@shared/lib/scheduleLastUpdate";
 import { ErrorBanner } from "@shared/ui/components/ErrorBanner";
 import { SearchableSelect, type SearchableSelectOption } from "@shared/ui/components/SearchableSelect";
-import { AvailabilityIcon, EmployeeIcon, ScheduleIcon, StatisticsIcon } from "@shared/ui/icons";
+import { AvailabilityIcon, EyeIcon, NewsIcon, ScheduleIcon, StatisticsIcon } from "@shared/ui/icons";
 import { CardSection } from "@shared/ui/sections";
 import workspaceStyles from "@pages/shared/EmployeeWorkspacePage.module.css";
 import { EmployeeScheduleColumnOrderDialog } from "./EmployeeScheduleColumnOrderDialog";
@@ -1127,12 +1127,14 @@ export function EmployeeSchedulePage() {
     });
   };
 
-  const scheduleSelector = selectedSchedule ? (
+  const scheduleSelectorRow = selectedSchedule ? (
+    <div className={styles.scheduleSelectorRow}>
       <button type="button" className={styles.scheduleSelectTrigger}
         aria-haspopup="dialog" aria-expanded={isScheduleSelectOpen}
         aria-label={t("Select schedule. Current schedule: {0}", selectedSchedule.name)}
         onClick={() => setIsScheduleSelectOpen(true)}>
-        <span className={styles.scheduleSelectTriggerIcon} aria-hidden="true"><EmployeeIcon size={20} /></span>
+        <span className={styles.scheduleSelectTriggerIcon} aria-hidden="true"><ScheduleIcon size={20} /></span>
+        <span className={styles.scheduleSelectDivider} aria-hidden="true" />
         <span className={styles.scheduleSelectTriggerCopy}>
           <span className={styles.scheduleSelectNameRow}>
             <span className={styles.scheduleSelectName}>{selectedSchedule.name}</span>
@@ -1144,7 +1146,34 @@ export function EmployeeSchedulePage() {
             : formatScheduleLastUpdate(selectedSchedule.lastUpdatedAtUtc)}</span>
         </span>
       </button>
+      <button type="button" className={`${styles.openSchedulePdfButton} ${styles.openScheduleCorrectionButton}`}
+        onClick={() => { setShiftCorrectionError(null); setIsShiftCorrectionDialogOpen(true); }}
+        title={t("Request a shift correction")} aria-label={t("Request a shift correction")}>{t("Adjust")}</button>
+    </div>
   ) : null;
+
+  const scheduleViewToggleLabel = t(scheduleViewMode === "matrix" ? "Show daily schedule view" : "Show schedule matrix view");
+  const scheduleHeaderActions = (
+    <div className={styles.openScheduleActions}>
+      <button
+        ref={scheduleViewToggleRef}
+        type="button"
+        className={[
+          styles.scheduleViewToggle,
+          scheduleViewMode === "daily" ? styles.scheduleViewToggleActive : "",
+          hasSwitchedScheduleView ? styles.scheduleViewTogglePulse : "",
+        ].filter(Boolean).join(" ")}
+        aria-label={scheduleViewToggleLabel}
+        aria-pressed={scheduleViewMode === "daily"}
+        title={scheduleViewToggleLabel}
+        onClick={handleToggleScheduleView}
+      >
+        <EyeIcon size={20} />
+      </button>
+      <button type="button" className={styles.openSchedulePdfButton} onClick={handleExportPdf}
+        title={t("Export schedule to PDF")} aria-label={t("Export schedule to PDF")}><NewsIcon size={14} />PDF</button>
+    </div>
+  );
 
   return (
     <div className={workspaceStyles.page}>
@@ -1185,28 +1214,16 @@ export function EmployeeSchedulePage() {
       {selectedSchedule && scheduleViewMode === "matrix" ? (
         <ContainerGraphMatrix
           className={[styles.openScheduleMatrix, hasSwitchedScheduleView ? styles.scheduleViewEnter : ""].filter(Boolean).join(" ")}
+          icon={null}
           graph={selectedSchedule}
           columns={scheduleMatrixColumns}
           cellMap={scheduleMatrixDisplay.cellMap}
           mutedSuffixMap={scheduleMatrixDisplay.mutedSuffixMap}
           title={t("Schedules")}
-          headerCenterSlot={scheduleSelector}
+          headerCenterSlot={scheduleSelectorRow}
           headerClassName={styles.openScheduleHeader}
           titleClassName={styles.openScheduleHeaderTitle}
           headerRightClassName={styles.openScheduleHeaderRight}
-          icon={
-            <button
-              ref={scheduleViewToggleRef}
-              type="button"
-              className={[styles.scheduleViewToggle, hasSwitchedScheduleView ? styles.scheduleViewTogglePulse : ""].filter(Boolean).join(" ")}
-              aria-label={t("Show daily schedule view")}
-              aria-pressed="false"
-              title={t("Show daily schedule view")}
-              onClick={handleToggleScheduleView}
-            >
-              <ScheduleIcon size={20} />
-            </button>
-          }
           readOnly
           compactSize
           compactHeader
@@ -1216,15 +1233,7 @@ export function EmployeeSchedulePage() {
           stretchColumns={false}
           emptyMessage={t("No assigned shifts in this schedule yet.")}
           onColumnHeaderClick={column => setColumnOrderDialogEmployeeId(column.employeeId)}
-          headerRightSlot={
-            <div className={styles.openScheduleActions}>
-              <button type="button" className={styles.openSchedulePdfButton} onClick={handleExportPdf}
-                title={t("Export schedule to PDF")} aria-label={t("Export schedule to PDF")}>PDF</button>
-              <button type="button" className={`${styles.openSchedulePdfButton} ${styles.openScheduleCorrectionButton}`}
-                onClick={() => { setShiftCorrectionError(null); setIsShiftCorrectionDialogOpen(true); }}
-                title={t("Request a shift correction")} aria-label={t("Request a shift correction")}>{t("Adjust")}</button>
-            </div>
-          }
+          headerRightSlot={scheduleHeaderActions}
         />
       ) : null}
 
@@ -1232,32 +1241,11 @@ export function EmployeeSchedulePage() {
         <CardSection
           className={[styles.dailyScheduleCard, hasSwitchedScheduleView ? styles.scheduleViewEnter : ""].filter(Boolean).join(" ")}
           title={t("Schedules")}
-          headerCenterSlot={scheduleSelector}
+          headerCenterSlot={scheduleSelectorRow}
           headerClassName={styles.openScheduleHeader}
           titleClassName={styles.openScheduleHeaderTitle}
           headerRightClassName={styles.openScheduleHeaderRight}
-          icon={
-            <button
-              ref={scheduleViewToggleRef}
-              type="button"
-              className={[styles.scheduleViewToggle, styles.scheduleViewToggleActive, hasSwitchedScheduleView ? styles.scheduleViewTogglePulse : ""].filter(Boolean).join(" ")}
-              aria-label={t("Show schedule matrix view")}
-              aria-pressed="true"
-              title={t("Show schedule matrix view")}
-              onClick={handleToggleScheduleView}
-            >
-              <ScheduleIcon size={20} />
-            </button>
-          }
-          headerRightSlot={
-            <div className={styles.openScheduleActions}>
-              <button type="button" className={styles.openSchedulePdfButton} onClick={handleExportPdf}
-                title={t("Export schedule to PDF")} aria-label={t("Export schedule to PDF")}>PDF</button>
-              <button type="button" className={`${styles.openSchedulePdfButton} ${styles.openScheduleCorrectionButton}`}
-                onClick={() => { setShiftCorrectionError(null); setIsShiftCorrectionDialogOpen(true); }}
-                title={t("Request a shift correction")} aria-label={t("Request a shift correction")}>{t("Adjust")}</button>
-            </div>
-          }
+          headerRightSlot={scheduleHeaderActions}
         >
           <div className={styles.dailyScheduleShell}>
             <div className={styles.dailyScheduleDays} role="tablist" aria-label={t("Schedule days")}>
