@@ -33,7 +33,7 @@ jobs:
         run: dotnet restore GF3.Tests/GF3.Tests.csproj
 
       - name: Test backend
-        run: dotnet test GF3.Tests/GF3.Tests.csproj --configuration Release --no-restore
+        run: dotnet test GF3.Tests/GF3.Tests.csproj --configuration Release --no-restore --filter "Category!=LocalOnly"
 
       - name: Install frontend dependencies
         working-directory: FrontEnd

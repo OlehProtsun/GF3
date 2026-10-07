@@ -46,23 +46,22 @@
 }
 
 .scheduleViewToggle {
-  width: 44px;
-  height: 44px;
+  width: 36px;
+  height: 36px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   flex: 0 0 auto;
   padding: 0;
-  border-radius: 18px;
-  border: 1px solid rgba(37, 99, 235, 0.16);
-  background: rgba(219, 234, 254, 0.8);
-  color: #1d4ed8;
+  border-radius: 13px;
+  border: 1px solid rgba(37, 99, 235, 0.2);
+  background: rgba(239, 246, 255, 0.94);
+  color: #2563eb;
   cursor: pointer;
-  transition: color 160ms ease, border-color 160ms ease, background 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+  transition: border-color 160ms ease, background 160ms ease, box-shadow 160ms ease, transform 160ms ease;
 }
 
 .scheduleViewToggle:hover {
-  transform: translateY(-1px);
   border-color: rgba(37, 99, 235, 0.3);
   background: rgba(219, 234, 254, 0.96);
 }
@@ -84,43 +83,13 @@
   background: #bfdbfe;
 }
 
-.scheduleViewTogglePulse {
-  animation: schedule-toggle-pulse 640ms var(--motion-ease);
-}
-
-@keyframes schedule-toggle-pulse {
-  0% {
-    transform: scale(0.72) rotate(-8deg);
-    background: #dbeafe;
-    color: #1d4ed8;
-    box-shadow: 0 0 0 0 rgba(37, 99, 235, 0);
-  }
-  45% {
-    transform: scale(1.16) rotate(3deg);
-    background: #2563eb;
-    color: #ffffff;
-    box-shadow: 0 0 0 7px rgba(37, 99, 235, 0.16), 0 8px 20px rgba(37, 99, 235, 0.22);
-  }
-  100% { transform: scale(1) rotate(0deg); }
-}
-
-.scheduleViewEnter {
-  animation: schedule-view-enter 540ms var(--motion-ease);
-}
-
-@keyframes schedule-view-enter {
-  from { transform: translate3d(0, 14px, 0); }
-  to { transform: translate3d(0, 0, 0); }
-}
-
 .summaryStats {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
 }
 
-.summaryStats span,
-.selectedSchedulePill {
+.summaryStats span {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -134,219 +103,20 @@
   font-weight: 850;
 }
 
-.publicSchedulesPanel {
-  align-content: start;
-}
-
-.publicSchedulesHeader {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.publicSchedulesHeading {
-  min-width: 0;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.publicSchedulesHeading > div {
-  min-width: 0;
-  display: grid;
-  gap: 4px;
-}
-.publicSchedulesHeader strong {
-  color: #0f172a;
-  font-size: 1.05rem;
-  line-height: 1.15;
-  font-weight: 900;
-  letter-spacing: 0;
-}
-
-.publicSchedulesHeaderMeta {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.lastUpdateField {
-  display: grid;
-  gap: 2px;
-  min-width: 0;
-  width: 100%;
-  max-width: 100%;
-  box-sizing: border-box;
-  justify-self: stretch;
-  padding: 7px 9px;
-  border: 1px solid rgba(37, 99, 235, 0.14);
-  border-radius: 12px;
-  background: linear-gradient(135deg, rgba(239, 246, 255, 0.92), rgba(248, 250, 252, 0.96));
-}
-
-.lastUpdateField > span {
+.openSchedulePdfButton {
   display: inline-flex;
   align-items: center;
-  gap: 7px;
-  color: #64748b;
-  font-size: 0.63rem;
-  font-weight: 850;
-  letter-spacing: 0.05em;
-  line-height: 1.2;
-  text-transform: uppercase;
-}
-
-.lastUpdateField > strong {
-  color: #1e3a8a;
-  font-size: 0.76rem;
-  font-weight: 900;
-  line-height: 1.25;
-  white-space: nowrap;
-}
-
-.lastUpdateDot {
-  width: 6px;
-  height: 6px;
-  border-radius: 999px;
-  background: #2563eb;
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
-}
-
-.selectedSchedulePill {
-  flex-shrink: 0;
-  border-color: rgba(37, 99, 235, 0.14);
-  background: rgba(219, 234, 254, 0.76);
-  color: #1d4ed8;
-  font-weight: 900;
-}
-
-.scheduleSwitcher {
-  display: grid;
-  gap: 10px;
-}
-
-.scheduleButton {
-  width: 100%;
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  gap: 10px;
-  align-items: center;
-  box-sizing: border-box;
-  padding: 14px;
-  border-radius: 24px;
-  border: 1px solid rgba(148, 163, 184, 0.14);
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(248, 250, 252, 0.9));
-  color: inherit;
-  text-align: left;
-  cursor: pointer;
-  box-shadow:
-    0 10px 24px rgba(15, 23, 42, 0.045),
-    inset 0 1px 0 rgba(255, 255, 255, 0.8);
-  transition:
-    transform 0.16s ease,
-    border-color 0.18s ease,
-    background 0.18s ease,
-    box-shadow 0.18s ease;
-}
-
-.scheduleButton:hover {
-  transform: translateY(-1px);
-  background: rgba(255, 255, 255, 0.98);
-  box-shadow: 0 12px 26px rgba(15, 23, 42, 0.06);
-}
-
-.scheduleButtonActive {
-  border-color: rgba(37, 99, 235, 0.34);
-  background:
-    linear-gradient(180deg, rgba(239, 246, 255, 0.98), rgba(219, 234, 254, 0.74));
-  box-shadow: 0 14px 30px rgba(37, 99, 235, 0.1);
-}
-
-.scheduleCardDate {
-  width: 52px;
-  min-height: 76px;
-  display: grid;
-  place-items: center;
-  align-content: center;
-  gap: 5px;
-  align-self: stretch;
-  border-radius: 18px;
-  border: 1px solid rgba(37, 99, 235, 0.16);
-  background: #ffffff;
-}
-
-.scheduleCardDate span {
-  color: #64748b;
-  font-size: 0.68rem;
-  font-weight: 900;
-  line-height: 1;
-  text-transform: uppercase;
-}
-
-.scheduleCardDate strong {
-  color: #0f172a;
-  font-size: 0.86rem;
-  font-weight: 900;
-  line-height: 1;
-}
-
-.scheduleButtonDetails {
-  min-width: 0;
-  display: grid;
-  gap: 9px;
-}
-
-.scheduleButtonContent {
-  min-width: 0;
-  display: grid;
-  gap: 5px;
-}
-
-.scheduleButtonName {
-  min-width: 0;
-  color: #0f172a;
-  font-size: 0.95rem;
-  line-height: 1.2;
-  font-weight: 900;
-  letter-spacing: 0;
-  overflow-wrap: anywhere;
-}
-
-.scheduleButtonMeta {
-  color: #64748b;
-  font-size: 0.76rem;
-  line-height: 1.25;
-  font-weight: 800;
-  overflow-wrap: anywhere;
-}
-
-.openScheduleTitleBlock {
-  min-width: 0;
-  display: grid;
-  gap: 5px;
-}
-
-.openScheduleTitleLabel {
-  color: #64748b;
-  font-size: 0.76rem;
-  font-weight: 850;
-  line-height: 1.1;
-}
-
-.openSchedulePdfButton {
-  min-height: 24px;
+  justify-content: center;
+  gap: 6px;
+  min-height: 36px;
   flex: 0 0 auto;
-  padding: 0 9px;
+  padding: 0 12px;
   border-radius: 999px;
-  border: 1px solid rgba(220, 38, 38, 0.18);
-  background: rgba(255, 241, 242, 0.94);
-  color: #be123c;
+  border: 1px solid #fecdd3;
+  background: #fff1f2;
+  color: #e11d48;
   font-size: 0.72rem;
-  font-weight: 900;
+  font-weight: 800;
   line-height: 1;
   cursor: pointer;
   transition:
@@ -364,34 +134,6 @@
 .openSchedulePdfButton:focus-visible {
   outline: none;
   box-shadow: 0 0 0 3px rgba(244, 63, 94, 0.16);
-}
-
-.openScheduleMeta {
-  display: flex;
-  flex-wrap: nowrap;
-  gap: 4px;
-  min-width: 0;
-}
-
-.openScheduleMeta span {
-  display: inline-flex;
-  align-items: center;
-  min-height: 24px;
-  min-width: 0;
-  padding: 0 8px;
-  border-radius: 999px;
-  border: 1px solid rgba(148, 163, 184, 0.14);
-  background: rgba(248, 250, 252, 0.86);
-  color: rgba(71, 85, 105, 0.92);
-  font-size: 0.72rem;
-  font-weight: 850;
-  white-space: nowrap;
-}
-
-.openScheduleMeta span:first-child {
-  max-width: 92px;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 .openScheduleMatrix {
@@ -418,17 +160,12 @@
   border-radius: 24px;
 }
 
-.openScheduleActions {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 3px;
-  margin-top: -6px;
-}
-
 .openScheduleCorrectionButton {
-  border-color: rgba(37, 99, 235, 0.18);
-  background: rgba(239, 246, 255, 0.94);
+  min-height: 34px;
+  padding-inline: 12px;
+  white-space: nowrap;
+  border-color: #bfdbfe;
+  background: #eff6ff;
   color: #2563eb;
 }
 
@@ -439,7 +176,6 @@
 }
 
 .shiftCorrectionSuccess {
-  animation: var(--motion-reveal) var(--motion-enter) var(--motion-ease);
   padding: 10px 14px;
   border: 1px solid rgba(16, 185, 129, 0.2);
   border-radius: 15px;
@@ -453,7 +189,7 @@
 .dailyScheduleShell { min-width: 0; overflow: hidden; border: 1px solid rgba(148, 163, 184, 0.14); border-radius: 20px; background: rgba(248, 250, 252, 0.74); }
 .dailyScheduleDays { display: flex; gap: 7px; padding: 10px; overflow-x: auto; scrollbar-width: thin; overscroll-behavior-x: contain; background: linear-gradient(135deg, rgba(248, 250, 252, 0.98), rgba(241, 245, 249, 0.92)); border-bottom: 1px solid rgba(148, 163, 184, 0.14); }
 .dailyScheduleDay { width: 48px; min-width: 48px; min-height: 58px; display: grid; place-items: center; align-content: center; gap: 4px; padding: 5px; border: 1px solid transparent; border-radius: 16px; color: #475569; cursor: pointer; box-shadow: 0 5px 14px rgba(15, 23, 42, 0.045); transition: transform 150ms ease, border-color 150ms ease, box-shadow 150ms ease; }
-.dailyScheduleDay:hover { transform: translateY(-1px); }
+
 .dailyScheduleDay:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.16); }
 .dailyScheduleDay span { font-size: 0.64rem; font-weight: 900; line-height: 1; text-transform: uppercase; }
 .dailyScheduleDay strong { color: #0f172a; font-size: 0.9rem; font-weight: 950; line-height: 1; }
@@ -474,8 +210,15 @@
 .dailyScheduleEmpty span { font-size: 0.76rem; font-weight: 750; }
 
 .hoursSummaryPanel {
-  position: relative;
-  gap: 14px;
+  gap: 10px;
+  padding: 14px;
+  border-radius: 24px;
+}
+
+.hoursSummaryHeading .summaryIcon {
+  width: 38px;
+  height: 38px;
+  border-radius: 14px;
 }
 
 .hoursSummaryHeader {
@@ -490,7 +233,6 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  padding-right: 82px;
 }
 
 .hoursSummaryHeading > div {
@@ -499,51 +241,20 @@
   gap: 4px;
 }
 
-.hoursSummaryActions {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  flex-wrap: wrap;
-  gap: 10px;
-  margin-left: auto;
-}
-
 .summaryPeriodControls {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.summaryPeriodField {
   display: grid;
-  gap: 5px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  width: 100%;
+}
+
+.summaryPeriodSelect {
   min-width: 0;
-}
-
-.summaryPeriodField > span {
-  color: #64748b;
-  padding-left: 4px;
-  font-size: 0.62rem;
-  font-weight: 900;
-  letter-spacing: 0.06em;
-  line-height: 1;
-  text-transform: uppercase;
-}
-
-.summaryMonthSelect {
-  width: 132px;
-}
-
-.summaryYearSelect {
-  width: 96px;
+  width: 100%;
 }
 
 .hoursSummaryTotalPill {
-  position: absolute;
-  top: 16px;
-  right: 16px;
-  z-index: 1;
-  min-height: 32px;
+  min-height: 30px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -575,7 +286,7 @@
   display: grid;
   grid-template-columns: minmax(80px, 0.8fr) minmax(74px, 0.54fr) minmax(120px, 1.35fr);
   align-items: center;
-  min-height: 40px;
+  min-height: 36px;
 }
 
 .hoursSummaryGridHeader {
@@ -595,7 +306,7 @@
 .hoursSummaryTotalRow span,
 .hoursSummaryTotalRow strong {
   min-width: 0;
-  padding: 10px 12px;
+  padding: 8px 10px;
   overflow-wrap: anywhere;
 }
 
@@ -636,6 +347,17 @@
   color: #15803d;
 }
 
+.hoursSummaryTotalLabel {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-weight: 950;
+}
+
+.hoursSummaryTotalRow .hoursSummaryTotalLabel > span {
+  padding: 0;
+}
+
 .hoursSummaryEmpty {
   margin: 0;
   padding: 14px;
@@ -648,245 +370,7 @@
   font-weight: 800;
 }
 
-.salaryCalculator {
-  display: grid;
-  gap: 12px;
-  margin-top: 2px;
-  padding-top: 16px;
-  border-top: 1px solid rgba(148, 163, 184, 0.16);
-}
-
-.salaryCalculatorHeader {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.salaryCalculatorMark {
-  width: 34px;
-  height: 34px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex: 0 0 auto;
-  border-radius: 12px;
-  border: 1px solid rgba(37, 99, 235, 0.14);
-  background: rgba(239, 246, 255, 0.92);
-  color: #2563eb;
-  font-size: 1.05rem;
-  font-weight: 950;
-}
-
-.salaryCalculatorHeader > div {
-  min-width: 0;
-  display: grid;
-  gap: 2px;
-}
-
-.salaryCalculatorHeader > div > span,
-.salaryCalculatorField > span:first-child,
-.salaryCalculatorResult > span {
-  color: #64748b;
-  font-size: 0.62rem;
-  font-weight: 900;
-  letter-spacing: 0.06em;
-  line-height: 1;
-  text-transform: uppercase;
-}
-
-.salaryCalculatorHeader h3 {
-  margin: 0;
-  color: #0f172a;
-  font-size: 0.94rem;
-  font-weight: 950;
-}
-
-.salaryCalculatorForm {
-  display: grid;
-  grid-template-columns: minmax(96px, 1fr) minmax(112px, 1fr) 46px minmax(132px, 0.9fr) auto;
-  align-items: end;
-  gap: 8px;
-}
-
-.salaryCalculatorField {
-  min-width: 0;
-  display: grid;
-  gap: 6px;
-}
-
-.salaryCalculatorField > span:first-child {
-  padding-left: 4px;
-}
-
-.salaryCalculatorInputShell {
-  min-width: 0;
-  min-height: 46px;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 0 10px;
-  border: 1px solid rgba(148, 163, 184, 0.22);
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.9);
-  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.04);
-  transition: border-color 160ms ease, box-shadow 160ms ease, background 160ms ease;
-}
-
-.salaryCalculatorInputShell:focus-within {
-  border-color: rgba(37, 99, 235, 0.48);
-  background: #ffffff;
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
-}
-
-.salaryCalculatorInputShell input {
-  width: 100%;
-  min-width: 0;
-  padding: 0;
-  border: 0;
-  outline: 0;
-  background: transparent;
-  color: #0f172a;
-  font: inherit;
-  font-size: 0.86rem;
-  font-weight: 900;
-}
-
-.salaryCalculatorInputShell input::placeholder {
-  color: #94a3b8;
-}
-
-.salaryCalculatorInputShell small {
-  flex: 0 0 auto;
-  color: #94a3b8;
-  font-size: 0.68rem;
-  font-weight: 900;
-  white-space: nowrap;
-}
-
-.salaryCalculatorEquals,
-.salaryCalculatorReset {
-  min-height: 46px;
-  border: 0;
-  cursor: pointer;
-  font: inherit;
-  font-weight: 950;
-  transition: transform 150ms ease, box-shadow 150ms ease, opacity 150ms ease;
-}
-
-.salaryCalculatorEquals {
-  width: 46px;
-  border-radius: 14px;
-  background: linear-gradient(135deg, #3b82f6, #2563eb);
-  box-shadow: 0 10px 22px rgba(37, 99, 235, 0.24);
-  color: #ffffff;
-  font-size: 1.15rem;
-}
-
-.salaryCalculatorEquals:disabled {
-  cursor: not-allowed;
-  box-shadow: none;
-  opacity: 0.42;
-}
-
-.salaryCalculatorResult {
-  min-width: 0;
-  min-height: 46px;
-  display: grid;
-  align-content: center;
-  gap: 3px;
-  padding: 7px 12px;
-  border: 1px solid rgba(22, 163, 74, 0.16);
-  border-radius: 14px;
-  background: rgba(240, 253, 244, 0.88);
-}
-
-.salaryCalculatorResult > span {
-  color: #16a34a;
-}
-
-.salaryCalculatorResult strong {
-  min-width: 0;
-  overflow: hidden;
-  color: #15803d;
-  font-size: 0.92rem;
-  font-weight: 950;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.salaryCalculatorReset {
-  padding: 0 12px;
-  border: 1px solid rgba(148, 163, 184, 0.18);
-  border-radius: 14px;
-  background: rgba(248, 250, 252, 0.92);
-  color: #475569;
-  font-size: 0.72rem;
-}
-
-.salaryCalculatorEquals:not(:disabled):hover,
-.salaryCalculatorReset:hover {
-  transform: translateY(-1px);
-}
-
-.salaryCalculatorEquals:focus-visible,
-.salaryCalculatorReset:focus-visible {
-  outline: 3px solid rgba(37, 99, 235, 0.18);
-  outline-offset: 2px;
-}
-@media (max-width: 760px) {
-  .hoursSummaryHeader {
-    align-items: stretch;
-    flex-direction: column;
-  }
-
-  .hoursSummaryActions {
-    margin-left: 0;
-    justify-content: space-between;
-  }
-}
-
-@media (max-width: 640px) {
-  .salaryCalculatorForm {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 46px;
-  }
-
-  .salaryCalculatorResult {
-    grid-column: 1 / 3;
-  }
-
-  .salaryCalculatorReset {
-    grid-column: 3;
-    padding-inline: 4px;
-    font-size: 0.64rem;
-  }
-}
 @media (max-width: 520px) {
-  .hoursSummaryActions {
-    align-items: stretch;
-  }
-
-  .summaryPeriodControls {
-    flex: 1 1 auto;
-  }
-
-  .summaryPeriodField {
-    flex: 1 1 0;
-  }
-
-  .summaryMonthSelect,
-  .summaryYearSelect {
-    width: 100%;
-  }
-
-  .publicSchedulesHeaderMeta {
-    flex: 0 0 auto;
-  }
-
-  .lastUpdateField {
-    min-width: 0;
-    padding-inline: 8px;
-  }
-
   .hoursSummaryGridHeader,
   .hoursSummaryGridRow,
   .hoursSummaryTotalRow {
@@ -902,9 +386,6 @@
   }
 
 
-  .selectedSchedulePill {
-    width: fit-content;
-  }
 
   .dailyScheduleBody {
     grid-template-columns: 82px minmax(0, 1fr);
@@ -922,4 +403,74 @@
   .dailyScheduleWorkers {
     padding-left: 10px;
   }
+}
+
+.openScheduleMatrix, .dailyScheduleCard { background: #fff; border: 1px solid rgba(148, 163, 184, 0.14); box-shadow: 0 10px 24px rgba(15, 23, 42, 0.045); }
+.scheduleSelectorRow { width: 100%; display: flex; align-items: center; gap: 8px; min-width: 0; padding: 9px; border: 1px solid rgba(37, 99, 235, 0.16); border-radius: 22px; background: linear-gradient(135deg, rgba(239, 246, 255, 0.88), rgba(255, 255, 255, 0.96)); }
+.scheduleSelectTrigger { flex: 1 1 auto; display: grid; grid-template-columns: 44px 1px minmax(0, 1fr); align-items: center; gap: 8px; min-width: 0; padding: 0; border: 0; border-radius: 10px; background: transparent; text-align: left; cursor: pointer; }
+.scheduleSelectDivider { width: 1px; align-self: stretch; background: rgba(148, 163, 184, 0.24); }
+.scheduleSelectTrigger:hover .scheduleSelectName { color: #2563eb; }
+.scheduleSelectTrigger:focus-visible { outline: 2px solid #2563eb; outline-offset: 3px; }
+.scheduleSelectTriggerIcon { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 15px; background: #dbeafe; color: #2563eb; }
+.scheduleSelectTriggerCopy { display: grid; gap: 4px; min-width: 0; white-space: normal; }
+.scheduleSelectNameRow { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.scheduleSelectName { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #0f172a; font-size: 0.95rem; font-weight: 900; }
+.scheduleSelectChevron { flex: 0 0 6px; height: 6px; border-right: 2px solid #64748b; border-bottom: 2px solid #64748b; transform: rotate(45deg); margin-top: -4px; }
+.scheduleSelectPeriod { color: #64748b; font-size: 0.76rem; font-weight: 600; }
+.scheduleSelectUpdated { color: #3b82f6; font-size: 0.72rem; font-weight: 600; overflow-wrap: anywhere; white-space: normal; }
+
+.openScheduleHeader.openScheduleHeader {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-rows: auto 1px auto;
+  align-items: start;
+  gap: 9px 12px;
+  padding: 0;
+  margin-bottom: 10px;
+}
+.openScheduleHeader .openScheduleHeaderTitle {
+  grid-column: 1;
+  grid-row: 1;
+  display: flex;
+  align-items: center;
+  align-self: center;
+  padding-left: 4px;
+  font-size: 1.08rem;
+  font-weight: 900;
+  color: #0f172a;
+}
+.openScheduleHeader > :nth-child(2) {
+  grid-column: 1 / -1;
+  grid-row: 3;
+  width: 100%;
+  min-width: 0;
+  order: 0;
+  justify-self: stretch;
+}
+.openScheduleHeader .openScheduleHeaderRight,
+.openScheduleActions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
+.openScheduleHeader .openScheduleHeaderRight { grid-column: 2; grid-row: 1; }
+
+.openScheduleHeader::before {
+  content: "";
+  grid-column: 1 / -1;
+  grid-row: 2;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.18);
+}
+
+.scheduleViewStage { min-width: 0; width: 100%; }
+.scheduleSelectTrigger, .openSchedulePdfButton, .dailyScheduleDay {
+  transition: transform 180ms var(--motion-ease), color 180ms ease, border-color 180ms ease, background-color 180ms ease, box-shadow 180ms ease;
+}
+.scheduleSelectName { transition: color 180ms ease; }
+.scheduleSelectChevron { transition: transform 180ms var(--motion-ease); }
+.scheduleSelectChevronOpen { transform: rotate(225deg) translate(-1px, -1px); }
+.dailyScheduleDaySelected { transform: translateY(-1px); }
+@media (hover: hover) {
+  .scheduleSelectTrigger:hover, .openSchedulePdfButton:hover, .scheduleViewToggle:hover, .dailyScheduleDay:hover { transform: translateY(-1px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .scheduleSelectTrigger, .openSchedulePdfButton, .scheduleViewToggle, .dailyScheduleDay, .scheduleSelectName, .scheduleSelectChevron { transition: none; }
+  .scheduleSelectTrigger:hover, .openSchedulePdfButton:hover, .scheduleViewToggle:hover, .dailyScheduleDay:hover, .dailyScheduleDaySelected { transform: none; }
+  .shiftCorrectionSuccess { animation: none; }
 }

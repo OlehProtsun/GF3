@@ -21,3 +21,6 @@
 .surface {
   animation: var(--motion-reveal) var(--motion-enter) var(--motion-ease);
 }
+@media (prefers-reduced-motion: reduce) {
+  .surface { animation: none; }
+}

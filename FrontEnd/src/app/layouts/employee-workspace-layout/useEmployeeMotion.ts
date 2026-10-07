@@ -24,7 +24,7 @@ export function useEmployeeMotion(scope: RefObject<HTMLDivElement | null>, pathn
           visibility: "visible",
         };
         gsap.killTweensOf(indicator);
-        if (animate && positionedIndicators.current.has(indicator)) {
+        if (animate && !window.matchMedia?.("(prefers-reduced-motion: reduce)").matches && positionedIndicators.current.has(indicator)) {
           gsap.to(indicator, { ...position, duration: 0.56, ease: "power2.inOut" });
         } else {
           gsap.set(indicator, position);
@@ -51,21 +51,26 @@ export function useEmployeeMotion(scope: RefObject<HTMLDivElement | null>, pathn
 
   useGSAP((_context, contextSafe) => {
     const root = scope.current;
-    if (!root || !contextSafe) return;
+    if (!root || !contextSafe || window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
     const seen = new WeakMap<HTMLElement, string | null>();
+    const presets: Record<string, { opacity: number; y: number; scale: number; duration: number }> = {
+      "schedule-panel": { opacity: 0.35, y: 18, scale: 1, duration: 0.52 },
+      "schedule-content": { opacity: 0.45, y: 12, scale: 0.99, duration: 0.42 },
+      "schedule-value": { opacity: 0.6, y: 0, scale: 0.96, duration: 0.3 },
+    };
     const reveal = contextSafe((elements: HTMLElement[]) => {
       elements.forEach((element, index) => {
         // The hero uses a compositor animation so throttled JS frames cannot step its movement.
         if (element.dataset.employeeMotion === "from-top") return;
         gsap.killTweensOf(element);
-        const schedulePanel = element.dataset.employeeMotion === "schedule-panel";
+        const preset = presets[element.dataset.employeeMotion ?? ""];
         gsap.fromTo(element, {
-          opacity: schedulePanel ? 0.35 : 0,
-          y: schedulePanel ? 18 : 26,
-          scale: schedulePanel ? 1 : 0.975,
+          opacity: preset?.opacity ?? 0,
+          y: preset?.y ?? 26,
+          scale: preset?.scale ?? 0.975,
         }, {
-          opacity: 1, y: 0, scale: 1, duration: 0.68,
-          delay: Math.min(index, 4) * 0.06,
+          opacity: 1, y: 0, scale: 1, duration: preset?.duration ?? 0.68,
+          delay: Math.min(index, 4) * (preset ? 0.045 : 0.06),
           ease: "power2.out", clearProps: "opacity,transform",
         });
       });

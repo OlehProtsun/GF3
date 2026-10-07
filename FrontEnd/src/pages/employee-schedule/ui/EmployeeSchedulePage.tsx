@@ -1,5 +1,5 @@
-import { t, dateTimeFormat, numberFormat } from "@shared/i18n";
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { t, dateTimeFormat } from "@shared/i18n";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { NavLink } from "react-router-dom";
 import { useAuth } from "@app/providers/AuthProvider";
 import {
@@ -28,13 +28,18 @@ import { getErrorMessage } from "@shared/api/httpClient";
 import { formatScheduleLastUpdate } from "@shared/lib/scheduleLastUpdate";
 import { ErrorBanner } from "@shared/ui/components/ErrorBanner";
 import { SearchableSelect, type SearchableSelectOption } from "@shared/ui/components/SearchableSelect";
-import { AvailabilityIcon, ScheduleDetailsIcon, ScheduleIcon, StatisticsIcon } from "@shared/ui/icons";
+import { AvailabilityIcon, EyeIcon, NewsIcon, ScheduleIcon, StatisticsIcon } from "@shared/ui/icons";
 import { CardSection } from "@shared/ui/sections";
 import workspaceStyles from "@pages/shared/EmployeeWorkspacePage.module.css";
 import { EmployeeScheduleColumnOrderDialog } from "./EmployeeScheduleColumnOrderDialog";
+import { EmployeeScheduleSelectDialog } from "./EmployeeScheduleSelectDialog";
 import { EmployeeShiftCorrectionDialog } from "./EmployeeShiftCorrectionDialog";
 import styles from "./EmployeeSchedulePage.module.css";
 import { EmployeeScheduleHero } from "./EmployeeScheduleHero";
+
+function prefersReducedMotion() {
+  return window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
+}
 
 const scheduleMonthFormatter = dateTimeFormat("en-GB", {
   month: "long",
@@ -57,23 +62,6 @@ const scheduleWeekdayShortFormatter = dateTimeFormat("en-GB", {
   timeZone: "UTC",
 });
 
-const salaryAmountFormatter = numberFormat("en-GB", {
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 2,
-});
-
-function formatSalaryHours(value: number) {
-  return String(Math.round(value * 100) / 100);
-}
-
-function parseSalaryValue(value: string) {
-  if (!value.trim()) {
-    return null;
-  }
-
-  const parsedValue = Number(value.trim().replace(",", "."));
-  return Number.isFinite(parsedValue) && parsedValue >= 0 ? parsedValue : null;
-}
 function formatScheduleMonth(schedule: Pick<EmployeeSchedule, "year" | "month">) {
   return scheduleMonthFormatter.format(new Date(Date.UTC(schedule.year, schedule.month - 1, 1)));
 }
@@ -136,51 +124,6 @@ function isCurrentEmployeeSlot(slot: EmployeeScheduleSlot, employeeId: number | 
   }
 
   return slot.employeeId === undefined || slot.employeeId === null || slot.employeeId === employeeId;
-}
-
-function getScheduleStats(
-  schedules: EmployeeSchedule[],
-  selectedSchedule: EmployeeSchedule | null,
-  employeeId: number | null,
-) {
-  if (!selectedSchedule) {
-    return {
-      scheduleCount: 0,
-      workDays: 0,
-      freeDays: 0,
-      totalHours: "0h",
-      month: "-",
-      year: "-",
-      period: "-",
-    };
-  }
-
-  const monthSchedules = schedules.filter(
-    schedule => schedule.year === selectedSchedule.year && schedule.month === selectedSchedule.month,
-  );
-  const workDays = new Set<number>();
-  const totalHours = monthSchedules.reduce((sum, schedule) => {
-    const employeeSlots = schedule.slots.filter(slot => isCurrentEmployeeSlot(slot, employeeId));
-
-    employeeSlots.forEach(slot => {
-      if (slot.dayOfMonth >= 1 && slot.dayOfMonth <= getDaysInMonth(schedule.year, schedule.month)) {
-        workDays.add(slot.dayOfMonth);
-      }
-    });
-
-    return sum + employeeSlots.reduce((slotSum, slot) => slotSum + getSlotDurationHours(slot), 0);
-  }, 0);
-  const daysInMonth = getDaysInMonth(selectedSchedule.year, selectedSchedule.month);
-
-  return {
-    scheduleCount: monthSchedules.length,
-    workDays: workDays.size,
-    freeDays: Math.max(0, daysInMonth - workDays.size),
-    totalHours: formatHours(totalHours),
-    month: formatScheduleMonthOnly(selectedSchedule),
-    year: String(selectedSchedule.year),
-    period: formatScheduleMonth(selectedSchedule),
-  };
 }
 
 const summaryWeekdayLabels = ["su.", "mo.", "tu.", "we.", "th.", "fr.", "sa."] as const;
@@ -888,26 +831,10 @@ export function EmployeeSchedulePage() {
   );
   const [columnOrderDialogEmployeeId, setColumnOrderDialogEmployeeId] = useState<number | null>(null);
   const [selectedScheduleId, setSelectedScheduleId] = useState<number | null>(null);
-  const handleSelectSchedule = (button: HTMLButtonElement, scheduleId: number) => {
+  const [isScheduleSelectOpen, setIsScheduleSelectOpen] = useState(false);
+  const handleSelectSchedule = (scheduleId: number) => {
     setSelectedScheduleId(scheduleId);
-    const dateBadge = button.querySelector<HTMLElement>(`.${styles.scheduleCardDate}`);
-    for (const element of [button, dateBadge]) {
-      for (const animation of element?.getAnimations?.() ?? []) {
-        if (animation.id === "schedule-card-press") animation.cancel();
-      }
-    }
-    const cardAnimation = button.animate?.([
-      { transform: "scale(0.965)" },
-      { transform: "scale(1.015)", offset: 0.65 },
-      { transform: "scale(1)" },
-    ], { duration: 520, easing: "cubic-bezier(0.22, 0.61, 0.36, 1)" });
-    const badgeAnimation = dateBadge?.animate?.([
-      { transform: "rotate(-6deg) scale(0.9)" },
-      { transform: "rotate(2deg) scale(1.08)", offset: 0.6 },
-      { transform: "rotate(0deg) scale(1)" },
-    ], { duration: 580, easing: "cubic-bezier(0.22, 0.61, 0.36, 1)" });
-    if (cardAnimation) cardAnimation.id = "schedule-card-press";
-    if (badgeAnimation) badgeAnimation.id = "schedule-card-press";
+    setIsScheduleSelectOpen(false);
   };
   const [scheduleViewMode, setScheduleViewMode] = useState<"matrix" | "daily">("matrix");
   const [hasSwitchedScheduleView, setHasSwitchedScheduleView] = useState(false);
@@ -1051,7 +978,7 @@ export function EmployeeSchedulePage() {
     }
 
     activeDailyScheduleDayRef.current?.scrollIntoView({
-      behavior: "auto",
+      behavior: prefersReducedMotion() ? "auto" : "smooth",
       block: "nearest",
       inline: "center",
     });
@@ -1063,25 +990,11 @@ export function EmployeeSchedulePage() {
       : [],
     [activeDailyScheduleDay, displayName, fallbackMatrixEmployeeId, selectedSchedule],
   );
-  const scheduleStats = useMemo(
-    () => getScheduleStats(schedules, selectedSchedule, currentEmployeeId),
-    [currentEmployeeId, schedules, selectedSchedule],
-  );
   const scheduleHoursSummary = useMemo(
     () => buildScheduleHoursSummary(schedules, activeSummaryPeriod, currentEmployeeId),
     [activeSummaryPeriod, currentEmployeeId, schedules],
   );
-  const [salaryHoursInput, setSalaryHoursInput] = useState(() => formatSalaryHours(scheduleHoursSummary.totalHours));
-  const [salaryRateInput, setSalaryRateInput] = useState("");
-  const [salaryResult, setSalaryResult] = useState<number | null>(null);
-  const parsedSalaryHours = parseSalaryValue(salaryHoursInput);
-  const parsedSalaryRate = parseSalaryValue(salaryRateInput);
-  const canCalculateSalary = parsedSalaryHours !== null && parsedSalaryRate !== null;
-
-  useEffect(() => {
-    setSalaryHoursInput(formatSalaryHours(scheduleHoursSummary.totalHours));
-    setSalaryResult(null);
-  }, [scheduleHoursSummary.totalHours]);  const defaultScheduleMatrixColumns = useMemo(
+  const defaultScheduleMatrixColumns = useMemo(
     () => buildScheduleMatrixColumns(selectedSchedule, fallbackMatrixEmployeeId, displayName),
     [displayName, fallbackMatrixEmployeeId, selectedSchedule],
   );
@@ -1127,19 +1040,6 @@ export function EmployeeSchedulePage() {
     }
   };
 
-  const handleCalculateSalary = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (parsedSalaryHours === null || parsedSalaryRate === null) {
-      return;
-    }
-
-    setSalaryResult(parsedSalaryHours * parsedSalaryRate);
-  };
-
-  const handleResetSalaryHours = () => {
-    setSalaryHoursInput(formatSalaryHours(scheduleHoursSummary.totalHours));
-    setSalaryResult(null);
-  };
   const handleSaveColumnOrder = (columnOrder: number[]) => {
     if (!selectedSchedule) {
       return;
@@ -1191,12 +1091,59 @@ export function EmployeeSchedulePage() {
     });
   };
 
+  const scheduleSelectorRow = selectedSchedule ? (
+    <div className={styles.scheduleSelectorRow}>
+      <button type="button" className={styles.scheduleSelectTrigger}
+        aria-haspopup="dialog" aria-expanded={isScheduleSelectOpen}
+        aria-label={t("Select schedule. Current schedule: {0}", selectedSchedule.name)}
+        onClick={() => setIsScheduleSelectOpen(true)}>
+        <span className={styles.scheduleSelectTriggerIcon} aria-hidden="true"><ScheduleIcon size={20} /></span>
+        <span className={styles.scheduleSelectDivider} aria-hidden="true" />
+        <span className={styles.scheduleSelectTriggerCopy}>
+          <span className={styles.scheduleSelectNameRow}>
+            <span className={styles.scheduleSelectName}>{selectedSchedule.name}</span>
+            <span className={`${styles.scheduleSelectChevron} ${isScheduleSelectOpen ? styles.scheduleSelectChevronOpen : ""}`} aria-hidden="true" />
+          </span>
+          <span className={styles.scheduleSelectPeriod}>{formatScheduleMonth(selectedSchedule)}</span>
+          <span className={styles.scheduleSelectUpdated}>{selectedSchedule.lastUpdatedAtUtc
+            ? t("Updated {0}", formatScheduleLastUpdate(selectedSchedule.lastUpdatedAtUtc))
+            : formatScheduleLastUpdate(selectedSchedule.lastUpdatedAtUtc)}</span>
+        </span>
+      </button>
+      <button type="button" className={`${styles.openSchedulePdfButton} ${styles.openScheduleCorrectionButton}`}
+        onClick={() => { setShiftCorrectionError(null); setIsShiftCorrectionDialogOpen(true); }}
+        title={t("Request a shift correction")} aria-label={t("Request a shift correction")}>{t("Adjust")}</button>
+    </div>
+  ) : null;
+
+  const scheduleViewToggleLabel = t(scheduleViewMode === "matrix" ? "Show daily schedule view" : "Show schedule matrix view");
+  const scheduleHeaderActions = (
+    <div className={styles.openScheduleActions}>
+      <button
+        ref={scheduleViewToggleRef}
+        type="button"
+        className={[
+          styles.scheduleViewToggle,
+          scheduleViewMode === "daily" ? styles.scheduleViewToggleActive : "",
+        ].filter(Boolean).join(" ")}
+        aria-label={scheduleViewToggleLabel}
+        aria-pressed={scheduleViewMode === "daily"}
+        title={scheduleViewToggleLabel}
+        onClick={handleToggleScheduleView}
+      >
+        <EyeIcon size={20} />
+      </button>
+      <button type="button" className={styles.openSchedulePdfButton} onClick={handleExportPdf}
+        title={t("Export schedule to PDF")} aria-label={t("Export schedule to PDF")}><NewsIcon size={14} />PDF</button>
+    </div>
+  );
+
   return (
     <div className={workspaceStyles.page}>
-      {queryErrorMessage ? <ErrorBanner dismissible={false}>{queryErrorMessage}</ErrorBanner> : null}
-      {pdfExportError ? <ErrorBanner dismissible={false}>{pdfExportError}</ErrorBanner> : null}
-      {preferenceSaveError ? <ErrorBanner dismissible>{preferenceSaveError}</ErrorBanner> : null}
-      {shiftCorrectionSuccess ? <div className={styles.shiftCorrectionSuccess} role="status">{shiftCorrectionSuccess}</div> : null}
+      {queryErrorMessage ? <div data-employee-motion="schedule-content" data-motion-key={`queryErrorMessage:${queryErrorMessage}`}><ErrorBanner dismissible={false}>{queryErrorMessage}</ErrorBanner></div> : null}
+      {pdfExportError ? <div data-employee-motion="schedule-content" data-motion-key={`pdfExportError:${pdfExportError}`}><ErrorBanner dismissible={false}>{pdfExportError}</ErrorBanner></div> : null}
+      {preferenceSaveError ? <div data-employee-motion="schedule-content" data-motion-key={`preferenceSaveError:${preferenceSaveError}`}><ErrorBanner dismissible>{preferenceSaveError}</ErrorBanner></div> : null}
+      {shiftCorrectionSuccess ? <div className={styles.shiftCorrectionSuccess} role="status" data-employee-motion="schedule-content" data-motion-key={shiftCorrectionSuccess}>{shiftCorrectionSuccess}</div> : null}
 
       <EmployeeScheduleHero
         schedules={schedules}
@@ -1227,212 +1174,112 @@ export function EmployeeSchedulePage() {
         </section>
       ) : null}
 
-      {schedules.length > 0 ? (
-        <section className={`${workspaceStyles.panel} ${styles.publicSchedulesPanel}`} data-employee-motion="schedule-panel">
-          <div className={styles.publicSchedulesHeader}>
-            <div className={styles.publicSchedulesHeading}>
-              <span className={styles.summaryIcon} aria-hidden="true">
-                <ScheduleDetailsIcon size={20} />
-              </span>
-              <div>
-                <span className={workspaceStyles.panelEyebrow}>{t("Public schedules")}</span>
-                <strong>{t("{0} schedules", schedules.length)}</strong>
-              </div>
-            </div>
+      {selectedSchedule ? (
+        <div className={styles.scheduleViewStage} data-employee-motion="schedule-content" data-motion-key={`${selectedSchedule.id}:${scheduleViewMode}`}>
+          {scheduleViewMode === "matrix" ? (
+            <ContainerGraphMatrix
+              className={styles.openScheduleMatrix}
+              icon={null}
+              graph={selectedSchedule}
+              columns={scheduleMatrixColumns}
+              cellMap={scheduleMatrixDisplay.cellMap}
+              mutedSuffixMap={scheduleMatrixDisplay.mutedSuffixMap}
+              title={t("Schedules")}
+              headerCenterSlot={scheduleSelectorRow}
+              headerClassName={styles.openScheduleHeader}
+              titleClassName={styles.openScheduleHeaderTitle}
+              headerRightClassName={styles.openScheduleHeaderRight}
+              readOnly
+              compactSize
+              compactHeader
+              neutralStyle
+              showColumnTotals={false}
+              allowColumnResize={false}
+              stretchColumns={false}
+              emptyMessage={t("No assigned shifts in this schedule yet.")}
+              onColumnHeaderClick={column => setColumnOrderDialogEmployeeId(column.employeeId)}
+              headerRightSlot={scheduleHeaderActions}
+            />
+          ) : null}
 
-            <div className={styles.publicSchedulesHeaderMeta}>
-              <span className={styles.selectedSchedulePill}>{scheduleStats.period}</span>
-            </div>
-          </div>
-          <div className={styles.scheduleSwitcher}>
-            {schedules.map(schedule => {
-              const isSelected = schedule.id === selectedSchedule?.id;
-              const scheduleLastUpdateLabel = formatScheduleLastUpdate(schedule.lastUpdatedAtUtc);
+          {scheduleViewMode === "daily" ? (
+            <CardSection
+              className={styles.dailyScheduleCard}
+              title={t("Schedules")}
+              headerCenterSlot={scheduleSelectorRow}
+              headerClassName={styles.openScheduleHeader}
+              titleClassName={styles.openScheduleHeaderTitle}
+              headerRightClassName={styles.openScheduleHeaderRight}
+              headerRightSlot={scheduleHeaderActions}
+            >
+              <div className={styles.dailyScheduleShell}>
+                <div className={styles.dailyScheduleDays} role="tablist" aria-label={t("Schedule days")}>
+                  {dailyScheduleDays.map(day => {
+                    const isSelected = day.dayOfMonth === activeDailyScheduleDay;
+                    return (
+                      <button
+                        key={day.dayOfMonth}
+                        ref={isSelected ? activeDailyScheduleDayRef : undefined}
+                        type="button"
+                        role="tab"
+                        aria-selected={isSelected}
+                        aria-controls="daily-schedule-content"
+                        aria-label={`${day.weekdayLong} ${day.dayOfMonth}, ${day.isWorkingDay ? t("working day") : t("day off")}`}
+                        className={[
+                          styles.dailyScheduleDay,
+                          day.isWorkingDay ? styles.dailyScheduleDayWorking : styles.dailyScheduleDayOff,
+                          isSelected ? styles.dailyScheduleDaySelected : "",
+                        ].filter(Boolean).join(" ")}
+                        onClick={() => setSelectedDayOfMonth(day.dayOfMonth)}
+                      >
+                        <span>{day.weekdayShort}</span>
+                        <strong>{day.dayOfMonth}</strong>
+                      </button>
+                    );
+                  })}
+                </div>
 
-              return (
-                <button
-                  key={schedule.id}
-                  type="button"
-                  className={[styles.scheduleButton, isSelected ? styles.scheduleButtonActive : ""].filter(Boolean).join(" ")}
-                  aria-pressed={isSelected}
-                  onClick={event => handleSelectSchedule(event.currentTarget, schedule.id)}
+                <div
+                  id="daily-schedule-content"
+                  data-employee-motion="schedule-content"
+                  data-motion-key={`${selectedSchedule.id}:${activeDailyScheduleDay}`}
+                  className={styles.dailyScheduleBody}
+                  role="tabpanel"
+                  aria-label={`${activeDailyScheduleDayInfo?.weekdayLong ?? t("Day")} ${activeDailyScheduleDay}`}
                 >
-                  <span className={styles.scheduleCardDate} aria-hidden="true">
-                    <span>{formatScheduleMonthOnly(schedule).slice(0, 3)}</span>
-                    <strong>{schedule.year}</strong>
-                  </span>
-
-                  <span className={styles.scheduleButtonDetails}>
-                    <span className={styles.scheduleButtonContent}>
-                      <span className={styles.scheduleButtonName}>{schedule.name}</span>
-                      <span className={styles.scheduleButtonMeta}>
-                        {`${schedule.shopName || t("Shop {0}", schedule.shopId)} / ${schedule.containerName || t("Container {0}", schedule.containerId)}`}
-                      </span>
-                    </span>
-
-                    <span className={styles.lastUpdateField} aria-label={t("Last Update: {0}", scheduleLastUpdateLabel)}>
-                      <span>
-                        <span className={styles.lastUpdateDot} aria-hidden="true" />
-                        {t("Last Update")}</span>
-                      <strong>
-                        {schedule.lastUpdatedAtUtc ? (
-                          <time dateTime={schedule.lastUpdatedAtUtc}>{scheduleLastUpdateLabel}</time>
-                        ) : scheduleLastUpdateLabel}
-                      </strong>
-                    </span>
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-        </section>
-      ) : null}
-
-      {selectedSchedule && scheduleViewMode === "matrix" ? (
-        <ContainerGraphMatrix
-          className={[styles.openScheduleMatrix, hasSwitchedScheduleView ? styles.scheduleViewEnter : ""].filter(Boolean).join(" ")}
-          graph={selectedSchedule}
-          columns={scheduleMatrixColumns}
-          cellMap={scheduleMatrixDisplay.cellMap}
-          mutedSuffixMap={scheduleMatrixDisplay.mutedSuffixMap}
-          title={
-            <span className={styles.openScheduleTitleBlock}>
-              <span className={styles.openScheduleTitleLabel}>{t("Schedules")}</span>
-              <span className={styles.openScheduleMeta}>
-                <span>{selectedSchedule.name}</span>
-                <span>{formatScheduleMonthOnly(selectedSchedule)}</span>
-                <span>{selectedSchedule.year}</span>
-              </span>
-            </span>
-          }
-          icon={
-            <button
-              ref={scheduleViewToggleRef}
-              type="button"
-              className={[styles.scheduleViewToggle, hasSwitchedScheduleView ? styles.scheduleViewTogglePulse : ""].filter(Boolean).join(" ")}
-              aria-label={t("Show daily schedule view")}
-              aria-pressed="false"
-              title={t("Show daily schedule view")}
-              onClick={handleToggleScheduleView}
-            >
-              <ScheduleIcon size={20} />
-            </button>
-          }
-          readOnly
-          compactSize
-          compactHeader
-          neutralStyle
-          showColumnTotals={false}
-          allowColumnResize={false}
-          stretchColumns={false}
-          emptyMessage={t("No assigned shifts in this schedule yet.")}
-          onColumnHeaderClick={column => setColumnOrderDialogEmployeeId(column.employeeId)}
-          headerRightSlot={
-            <div className={styles.openScheduleActions}>
-              <button type="button" className={styles.openSchedulePdfButton} onClick={handleExportPdf}
-                title={t("Export schedule to PDF")} aria-label={t("Export schedule to PDF")}>PDF</button>
-              <button type="button" className={`${styles.openSchedulePdfButton} ${styles.openScheduleCorrectionButton}`}
-                onClick={() => { setShiftCorrectionError(null); setIsShiftCorrectionDialogOpen(true); }}
-                title={t("Request a shift correction")} aria-label={t("Request a shift correction")}>{t("Adjust")}</button>
-            </div>
-          }
-        />
-      ) : null}
-
-      {selectedSchedule && scheduleViewMode === "daily" ? (
-        <CardSection
-          className={[styles.dailyScheduleCard, hasSwitchedScheduleView ? styles.scheduleViewEnter : ""].filter(Boolean).join(" ")}
-          title={
-            <span className={styles.openScheduleTitleBlock}>
-              <span className={styles.openScheduleTitleLabel}>{t("Schedules")}</span>
-              <span className={styles.openScheduleMeta}>
-                <span>{selectedSchedule.name}</span>
-                <span>{formatScheduleMonthOnly(selectedSchedule)}</span>
-                <span>{selectedSchedule.year}</span>
-              </span>
-            </span>
-          }
-          icon={
-            <button
-              ref={scheduleViewToggleRef}
-              type="button"
-              className={[styles.scheduleViewToggle, styles.scheduleViewToggleActive, hasSwitchedScheduleView ? styles.scheduleViewTogglePulse : ""].filter(Boolean).join(" ")}
-              aria-label={t("Show schedule matrix view")}
-              aria-pressed="true"
-              title={t("Show schedule matrix view")}
-              onClick={handleToggleScheduleView}
-            >
-              <ScheduleIcon size={20} />
-            </button>
-          }
-          headerRightSlot={
-            <div className={styles.openScheduleActions}>
-              <button type="button" className={styles.openSchedulePdfButton} onClick={handleExportPdf}
-                title={t("Export schedule to PDF")} aria-label={t("Export schedule to PDF")}>PDF</button>
-              <button type="button" className={`${styles.openSchedulePdfButton} ${styles.openScheduleCorrectionButton}`}
-                onClick={() => { setShiftCorrectionError(null); setIsShiftCorrectionDialogOpen(true); }}
-                title={t("Request a shift correction")} aria-label={t("Request a shift correction")}>{t("Adjust")}</button>
-            </div>
-          }
-        >
-          <div className={styles.dailyScheduleShell}>
-            <div className={styles.dailyScheduleDays} role="tablist" aria-label={t("Schedule days")}>
-              {dailyScheduleDays.map(day => {
-                const isSelected = day.dayOfMonth === activeDailyScheduleDay;
-                return (
-                  <button
-                    key={day.dayOfMonth}
-                    ref={isSelected ? activeDailyScheduleDayRef : undefined}
-                    type="button"
-                    role="tab"
-                    aria-selected={isSelected}
-                    aria-controls="daily-schedule-content"
-                    aria-label={`${day.weekdayLong} ${day.dayOfMonth}, ${day.isWorkingDay ? t("working day") : t("day off")}`}
-                    className={[
-                      styles.dailyScheduleDay,
-                      day.isWorkingDay ? styles.dailyScheduleDayWorking : styles.dailyScheduleDayOff,
-                      isSelected ? styles.dailyScheduleDaySelected : "",
-                    ].filter(Boolean).join(" ")}
-                    onClick={() => setSelectedDayOfMonth(day.dayOfMonth)}
-                  >
-                    <span>{day.weekdayShort}</span>
-                    <strong>{day.dayOfMonth}</strong>
-                  </button>
-                );
-              })}
-            </div>
-
-            <div
-              id="daily-schedule-content"
-              data-employee-motion="schedule-panel"
-              data-motion-key={`${selectedSchedule.id}:${activeDailyScheduleDay}`}
-              className={styles.dailyScheduleBody}
-              role="tabpanel"
-              aria-label={`${activeDailyScheduleDayInfo?.weekdayLong ?? t("Day")} ${activeDailyScheduleDay}`}
-            >
-              <div className={styles.dailyScheduleDate} aria-hidden="true">
-                <span>{activeDailyScheduleDayInfo?.weekdayLong ?? t("Day")}</span>
-                <strong>{activeDailyScheduleDay}</strong>
-              </div>
-
-              <div className={styles.dailyScheduleWorkers}>
-                {dailyScheduleWorkers.length > 0 ? dailyScheduleWorkers.map(worker => (
-                  <article key={worker.employeeId} className={styles.dailyScheduleWorker}>
-                    <span>{worker.label}</span>
-                    <strong>{formatDailyWorkerShifts(worker)}</strong>
-                  </article>
-                )) : (
-                  <div className={styles.dailyScheduleEmpty}>
-                    <strong>{t("No one is scheduled.")}</strong>
-                    <span>{t("This day has no assigned shifts.")}</span>
+                  <div className={styles.dailyScheduleDate} aria-hidden="true">
+                    <span>{activeDailyScheduleDayInfo?.weekdayLong ?? t("Day")}</span>
+                    <strong>{activeDailyScheduleDay}</strong>
                   </div>
-                )}
+
+                  <div className={styles.dailyScheduleWorkers}>
+                    {dailyScheduleWorkers.length > 0 ? dailyScheduleWorkers.map(worker => (
+                      <article key={worker.employeeId} className={styles.dailyScheduleWorker}>
+                        <span>{worker.label}</span>
+                        <strong>{formatDailyWorkerShifts(worker)}</strong>
+                      </article>
+                    )) : (
+                      <div className={styles.dailyScheduleEmpty}>
+                        <strong>{t("No one is scheduled.")}</strong>
+                        <span>{t("This day has no assigned shifts.")}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
-            </div>
-          </div>
-        </CardSection>
+            </CardSection>
+          ) : null}
+
+        </div>
       ) : null}
 
+      <EmployeeScheduleSelectDialog
+        open={isScheduleSelectOpen}
+        schedules={schedules}
+        selectedScheduleId={selectedSchedule?.id ?? null}
+        onSelect={handleSelectSchedule}
+        onClose={() => setIsScheduleSelectOpen(false)}
+      />
       <EmployeeScheduleColumnOrderDialog
         open={columnOrderDialogEmployeeId !== null}
         columns={scheduleMatrixColumns}
@@ -1455,8 +1302,6 @@ export function EmployeeSchedulePage() {
 
       {selectedSchedule ? (
         <section className={`${workspaceStyles.panel} ${styles.hoursSummaryPanel}`} data-employee-motion="schedule-panel">
-          <span className={styles.hoursSummaryTotalPill}>{scheduleHoursSummary.totalHoursText}</span>
-
           <div className={styles.hoursSummaryHeader}>
             <div className={styles.hoursSummaryHeading}>
               <span className={styles.summaryIcon} aria-hidden="true">
@@ -1468,49 +1313,45 @@ export function EmployeeSchedulePage() {
               </div>
             </div>
 
-            <div className={styles.hoursSummaryActions}>
-              <div className={styles.summaryPeriodControls} role="group" aria-label={t("Summary period")}>
-                <div className={styles.summaryPeriodField}>
-                  <span>{t("Month")}</span>
-                  <SearchableSelect
-                    ariaLabel={t("Summary month")}
-                    value={activeSummaryPeriod ? String(activeSummaryPeriod.month) : ""}
-                    options={summaryMonthOptions}
-                    placeholder={t("Month")}
-                    dropdownTitle={t("Month")}
-                    size="summary"
-                    shadow="soft"
-                    searchEnabled={false}
-                    showSelectedHint={false}
-                    disabled={summaryMonths.length <= 1}
-                    className={styles.summaryMonthSelect}
-                    onChange={handleSummaryMonthChange}
-                  />
-                </div>
+            <span className={styles.hoursSummaryTotalPill} data-employee-motion="schedule-value" data-motion-key={`${activeSummaryPeriod?.key}:${scheduleHoursSummary.totalHoursText}`}>{scheduleHoursSummary.totalHoursText}</span>
+          </div>
 
-                <div className={styles.summaryPeriodField}>
-                  <span>{t("Year")}</span>
-                  <SearchableSelect
-                    ariaLabel={t("Summary year")}
-                    value={activeSummaryPeriod ? String(activeSummaryPeriod.year) : ""}
-                    options={summaryYearOptions}
-                    placeholder={t("Year")}
-                    dropdownTitle={t("Year")}
-                    size="summary"
-                    shadow="soft"
-                    searchEnabled={false}
-                    showSelectedHint={false}
-                    disabled={summaryYears.length <= 1}
-                    className={styles.summaryYearSelect}
-                    onChange={handleSummaryYearChange}
-                  />
-                </div>
-              </div>
-            </div>
+          <div className={styles.summaryPeriodControls} role="group" aria-label={t("Summary period")}>
+            <SearchableSelect
+              ariaLabel={t("Summary month")}
+              value={activeSummaryPeriod ? String(activeSummaryPeriod.month) : ""}
+              options={summaryMonthOptions}
+              placeholder={t("Month")}
+              dropdownTitle={t("Month")}
+              leadingIcon={<ScheduleIcon size={16} />}
+              size="summary"
+              shadow="soft"
+              searchEnabled={false}
+              showSelectedHint={false}
+              disabled={summaryMonths.length <= 1}
+              className={styles.summaryPeriodSelect}
+              onChange={handleSummaryMonthChange}
+            />
+
+            <SearchableSelect
+              ariaLabel={t("Summary year")}
+              value={activeSummaryPeriod ? String(activeSummaryPeriod.year) : ""}
+              options={summaryYearOptions}
+              placeholder={t("Year")}
+              dropdownTitle={t("Year")}
+              leadingIcon={<ScheduleIcon size={16} />}
+              size="summary"
+              shadow="soft"
+              searchEnabled={false}
+              showSelectedHint={false}
+              disabled={summaryYears.length <= 1}
+              className={styles.summaryPeriodSelect}
+              onChange={handleSummaryYearChange}
+            />
           </div>
 
           {scheduleHoursSummary.rows.length > 0 ? (
-            <div className={styles.hoursSummaryGrid} role="table" aria-label={t("Schedule hours summary")}>
+            <div className={styles.hoursSummaryGrid} data-employee-motion="schedule-content" data-motion-key={`${activeSummaryPeriod?.key}:rows`} role="table" aria-label={t("Schedule hours summary")}>
               <div className={styles.hoursSummaryGridHeader} role="row">
                 <span role="columnheader">{t("Day")}</span>
                 <span role="columnheader">{t("Hours")}</span>
@@ -1526,79 +1367,14 @@ export function EmployeeSchedulePage() {
               ))}
 
               <div className={styles.hoursSummaryTotalRow} role="row">
-                <span role="cell">{t("Total")}</span>
+                <span role="cell" className={styles.hoursSummaryTotalLabel}><span aria-hidden="true">Σ</span> {t("Total")}</span>
                 <strong role="cell">{scheduleHoursSummary.totalHoursText}</strong>
                 <span role="cell">{t("All schedules")}</span>
               </div>
             </div>
           ) : (
-            <p className={styles.hoursSummaryEmpty}>{t("No assigned shifts in this period.")}</p>
+            <p className={styles.hoursSummaryEmpty} data-employee-motion="schedule-content" data-motion-key={`${activeSummaryPeriod?.key}:empty`}>{t("No assigned shifts in this period.")}</p>
           )}
-          <section className={styles.salaryCalculator} aria-labelledby="salary-calculator-title">
-            <div className={styles.salaryCalculatorHeader}>
-              <span className={styles.salaryCalculatorMark} aria-hidden="true">=</span>
-              <div>
-                <span>{t("Quick estimate")}</span>
-                <h3 id="salary-calculator-title">{t("Salary calculator")}</h3>
-              </div>
-            </div>
-
-            <form className={styles.salaryCalculatorForm} onSubmit={handleCalculateSalary}>
-              <label className={styles.salaryCalculatorField}>
-                <span>{t("Hours")}</span>
-                <span className={styles.salaryCalculatorInputShell}>
-                  <input
-                    type="text"
-                    aria-label={t("Hours")}
-                    pattern="[0-9]*([.,][0-9]*)?"
-                    inputMode="decimal"
-                    value={salaryHoursInput}
-                    onChange={event => {
-                      setSalaryHoursInput(event.target.value);
-                      setSalaryResult(null);
-                    }}
-                  />
-                  <small>{t("h")}</small>
-                </span>
-              </label>
-
-              <label className={styles.salaryCalculatorField}>
-                <span>{t("Hourly rate")}</span>
-                <span className={styles.salaryCalculatorInputShell}>
-                  <input
-                    type="text"
-                    aria-label={t("Hourly rate")}
-                    pattern="[0-9]*([.,][0-9]*)?"
-                    inputMode="decimal"
-                    placeholder="0.00"
-                    value={salaryRateInput}
-                    onChange={event => {
-                      setSalaryRateInput(event.target.value);
-                      setSalaryResult(null);
-                    }}
-                  />
-                  <small>{t("/ h")}</small>
-                </span>
-              </label>
-
-              <button
-                type="submit"
-                className={styles.salaryCalculatorEquals}
-                aria-label={t("Calculate salary")}
-                disabled={!canCalculateSalary}
-              >
-                =
-              </button>
-
-              <output className={styles.salaryCalculatorResult} aria-label={t("Estimated pay")} aria-live="polite">
-                <span>{t("Estimated pay")}</span>
-                <strong>{salaryResult === null ? "—" : salaryAmountFormatter.format(salaryResult)}</strong>
-              </output>
-
-              <button type="button" className={styles.salaryCalculatorReset} onClick={handleResetSalaryHours}>
-                {t("Reset")}</button>
-            </form>
-          </section>
         </section>
       ) : null}
     </div>

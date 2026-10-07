@@ -2,7 +2,7 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { BrowserRouter } from "react-router-dom";
-import { beforeEach, describe, expect, test, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import type { EmployeeSchedule } from "@entities/employee-schedule";
 import { buildSchedulePdfHtml, EmployeeSchedulePage } from "./EmployeeSchedulePage";
 import styles from "./EmployeeSchedulePage.module.css";
@@ -44,8 +44,10 @@ vi.mock("@entities/employee-ui-state", () => ({
 }));
 vi.mock("@entities/containers/ui/ContainerGraphMatrix", () => ({
   ContainerGraphMatrix: (props: {
-    title: string;
+    title: ReactNode;
     icon?: ReactNode;
+    headerCenterSlot?: ReactNode;
+    headerRightSlot?: ReactNode;
     graph: EmployeeSchedule;
     columns: Array<{ employeeId: number; label: string }>;
     cellMap: Record<string, string>;
@@ -57,6 +59,8 @@ vi.mock("@entities/containers/ui/ContainerGraphMatrix", () => ({
       <section data-testid="schedule-matrix">
         {props.icon}
         <h2>{props.title}</h2>
+        {props.headerCenterSlot}
+        {props.headerRightSlot}
         <span>{props.graph.name}</span>
         <span>{props.columns.map(column => column.label).join(", ")}</span>
         {props.onColumnHeaderClick
@@ -157,7 +161,20 @@ function renderPage() {
   );
 }
 
+function mockReducedMotion(reduced = false) {
+  vi.stubGlobal("matchMedia", vi.fn((query: string) => ({
+    matches: reduced && query === "(prefers-reduced-motion: reduce)",
+    media: query,
+    onchange: null,
+    addListener: vi.fn(), removeListener: vi.fn(),
+    addEventListener: vi.fn(), removeEventListener: vi.fn(), dispatchEvent: vi.fn(),
+  })));
+}
+
+afterEach(() => vi.unstubAllGlobals());
+
 beforeEach(() => {
+  mockReducedMotion();
   window.localStorage.clear();
   mocks.scheduleQuery.mockReset();
   mocks.matrix.mockClear();
@@ -169,6 +186,26 @@ beforeEach(() => {
 });
 
 describe("EmployeeSchedulePage", () => {
+  test.each([true, undefined])("centers the Daily day safely with reduced motion %s", async reduced => {
+    if (reduced === undefined) vi.stubGlobal("matchMedia", undefined);
+    else mockReducedMotion(reduced);
+    mocks.scheduleQuery.mockReturnValue({ data: schedules, isLoading: false, error: null });
+    renderPage();
+    await userEvent.setup().click(screen.getByRole("button", { name: "Show daily schedule view" }));
+    expect(mocks.scrollIntoView).toHaveBeenCalledWith({ behavior: reduced ? "auto" : "smooth", block: "nearest", inline: "center" });
+    expect(screen.getByRole("button", { name: "Show schedule matrix view" })).toHaveFocus();
+  });
+
+  test("keeps the stage stable when selecting another schedule", async () => {
+    mocks.scheduleQuery.mockReturnValue({ data: schedules, isLoading: false, error: null });
+    renderPage();
+    const stage = screen.getByTestId("schedule-matrix").parentElement;
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "Select schedule. Current schedule: May Schedule" }));
+    await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: /Second May Schedule/ }));
+    expect(screen.getByTestId("schedule-matrix").parentElement).toBe(stage);
+    expect(stage).toHaveAttribute("data-motion-key", "2:matrix");
+  });
   test("uses intrinsic PDF column sizing with minimal cell padding", () => {
     const html = buildSchedulePdfHtml(
       schedules[0],
@@ -199,12 +236,12 @@ describe("EmployeeSchedulePage", () => {
     });
 
     renderPage();
+    expect(screen.queryByRole("region", { name: "Salary calculator" })).not.toBeInTheDocument();
 
     expect(screen.getByRole("heading", { name: "Hey, Zoe" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Now" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Tomorrow" })).toBeInTheDocument();
-    expect(screen.getAllByText("2 schedules")).not.toHaveLength(0);
-    expect(screen.getAllByText("Last Update")).toHaveLength(2);
+    expect(screen.getByRole("button", { name: "Select schedule. Current schedule: May Schedule" })).toHaveTextContent("May 2026");
     expect(screen.getByText(/28 Jun 2026/)).toBeInTheDocument();
 
     expect(within(screen.getByRole("table", { name: "Schedule hours summary" }))
@@ -276,19 +313,26 @@ describe("EmployeeSchedulePage", () => {
     mocks.scheduleQuery.mockReturnValue({ data: [dailySchedule], isLoading: false, error: null });
 
     renderPage();
-    await user.click(screen.getByRole("button", { name: "Show daily schedule view" }));
+    const viewToggle = screen.getByRole("button", { name: "Show daily schedule view" });
+    const stage = screen.getByTestId("schedule-matrix").parentElement;
+    expect(stage).toHaveAttribute("data-employee-motion", "schedule-content");
+    expect(stage).toHaveAttribute("data-motion-key", "1:matrix");
+    expect(viewToggle).toHaveAttribute("aria-pressed", "false");
+    await user.click(viewToggle);
 
+    expect(stage).toHaveAttribute("data-motion-key", "1:daily");
     const workDay = screen.getByRole("tab", { name: "Sunday 10, working day" });
     const dayOff = screen.getByRole("tab", { name: "Saturday 9, day off" });
     expect(workDay).toHaveClass(styles.dailyScheduleDayWorking, styles.dailyScheduleDaySelected);
     expect(dayOff).toHaveClass(styles.dailyScheduleDayOff);
     expect(mocks.scrollIntoView).toHaveBeenCalledWith({
-      behavior: "auto",
+      behavior: "smooth",
       block: "nearest",
       inline: "center",
     });
     expect(mocks.scrollIntoView.mock.contexts.at(-1)).toBe(workDay);
     expect(screen.getByRole("button", { name: "Show schedule matrix view" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "Show schedule matrix view" })).toHaveFocus();
 
     const workerCards = within(screen.getByRole("tabpanel", { name: "Sunday 10" })).getAllByRole("article");
     expect(workerCards.map(card => card.textContent)).toEqual([
@@ -308,39 +352,9 @@ describe("EmployeeSchedulePage", () => {
 
     await user.click(screen.getByRole("button", { name: "Show schedule matrix view" }));
     expect(screen.getByTestId("schedule-matrix")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Show daily schedule view" })).toHaveFocus();
   });
 
-  test("calculates estimated salary and restores the Work hours total", async () => {
-    const user = userEvent.setup();
-    mocks.scheduleQuery.mockReturnValue({
-      data: schedules,
-      isLoading: false,
-      error: null,
-    });
-
-    renderPage();
-
-    const calculator = screen.getByRole("region", { name: "Salary calculator" });
-    const hoursInput = within(calculator).getByRole("textbox", { name: "Hours" });
-    const rateInput = within(calculator).getByRole("textbox", { name: "Hourly rate" });
-    const result = within(calculator).getByLabelText("Estimated pay");
-
-    expect(hoursInput).toHaveValue("12");
-    expect(result).toHaveTextContent("—");
-
-    await user.clear(hoursInput);
-    await user.type(hoursInput, "10");
-    await user.type(rateInput, "31,4");
-    await user.click(within(calculator).getByRole("button", { name: "Calculate salary" }));
-
-    expect(result).toHaveTextContent("314.00");
-
-    await user.click(within(calculator).getByRole("button", { name: "Reset" }));
-
-    expect(hoursInput).toHaveValue("12");
-    expect(rateInput).toHaveValue("31,4");
-    expect(result).toHaveTextContent("—");
-  });
   test("lets the employee customize and persist the schedule column order", async () => {
     const user = userEvent.setup();
     mocks.scheduleQuery.mockReturnValue({
@@ -429,6 +443,8 @@ describe("EmployeeSchedulePage", () => {
     const monthOptions = screen.getByRole("listbox", { name: "Summary month" });
     await user.click(within(monthOptions).getByRole("option", { name: "June" }));
 
+    expect(summaryTable).toHaveAttribute("data-motion-key", "2026:6:rows");
+    expect(document.querySelector('[data-employee-motion="schedule-value"]')).toHaveAttribute("data-motion-key", "2026:6:2h");
     expect(monthSelect).toHaveTextContent("June");
     expect(within(summaryTable).getByText("June Schedule")).toBeInTheDocument();
     expect(within(summaryTable).getAllByText("2h")).toHaveLength(2);
@@ -437,6 +453,8 @@ describe("EmployeeSchedulePage", () => {
     const yearOptions = screen.getByRole("listbox", { name: "Summary year" });
     await user.click(within(yearOptions).getByRole("option", { name: "2025" }));
 
+    expect(summaryTable).toHaveAttribute("data-motion-key", "2025:5:rows");
+    expect(document.querySelector('[data-employee-motion="schedule-value"]')).toHaveAttribute("data-motion-key", "2025:5:3h");
     expect(yearSelect).toHaveTextContent("2025");
     expect(monthSelect).toHaveTextContent("May");
     expect(within(summaryTable).getByText("May 2025 Schedule")).toBeInTheDocument();
@@ -467,5 +485,76 @@ describe("EmployeeSchedulePage", () => {
 
     expect(screen.getByText("Nothing is public for your account yet.")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /Go to Availability/i })).toHaveAttribute("href", "/availability");
+  });
+});
+
+
+describe("schedule selector", () => {
+  test("keeps Adjust independent from schedule selection in both view modes", async () => {
+    mocks.scheduleQuery.mockReturnValue({ data: schedules, isLoading: false, error: null });
+    const user = userEvent.setup();
+    renderPage();
+
+    for (const mode of ["matrix", "daily"]) {
+      const trigger = screen.getByRole("button", { name: "Select schedule. Current schedule: May Schedule" });
+      const adjust = screen.getByRole("button", { name: "Request a shift correction" });
+      expect(trigger.parentElement).toBe(adjust.parentElement);
+      expect(trigger).not.toContainElement(adjust);
+      await user.click(adjust);
+      expect(screen.getByRole("dialog", { name: "Request a shift change" })).toBeInTheDocument();
+      expect(screen.queryByRole("dialog", { name: "Select schedule" })).not.toBeInTheDocument();
+      await user.keyboard("{Escape}");
+      if (mode === "matrix") await user.click(screen.getByRole("button", { name: "Show daily schedule view" }));
+    }
+  });
+  test("selects another schedule and updates matrix and metadata", async () => {
+    const user = userEvent.setup();
+    const second = { ...schedules[1], month: 10, lastUpdatedAtUtc: "2026-10-04T12:01:00Z" };
+    mocks.scheduleQuery.mockReturnValue({ data: [schedules[0], second], isLoading: false });
+    renderPage();
+    await user.click(screen.getByRole("button", { name: "Select schedule. Current schedule: May Schedule" }));
+    const dialog = screen.getByRole("dialog", { name: "Select schedule" });
+    const firstRow = within(dialog).getByRole("button", { name: /^May Schedule.*May 2026/ });
+    expect(screen.getByRole("button", { name: "Export schedule to PDF" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Request a shift correction" })).toBeInTheDocument();
+    expect(firstRow).toHaveAttribute("aria-pressed", "true");
+    expect(firstRow).toHaveFocus();
+    expect(within(dialog).getByText(/Updated 28 Jun 2026/)).toBeVisible();
+    await user.click(within(dialog).getByRole("button", { name: /Second May Schedule.*October 2026/ }));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    const trigger = screen.getByRole("button", { name: "Select schedule. Current schedule: Second May Schedule" });
+    expect(trigger).toHaveTextContent("October 2026");
+    expect(trigger).toHaveTextContent(/Updated 04 Oct 2026/);
+    expect(mocks.matrix.mock.calls.at(-1)?.[0].graph.id).toBe(2);
+  });
+
+  test("Escape, close button and overlay dismiss without changing selection", async () => {
+    const user = userEvent.setup();
+    mocks.scheduleQuery.mockReturnValue({ data: schedules, isLoading: false });
+    renderPage();
+    const trigger = screen.getByRole("button", { name: "Select schedule. Current schedule: May Schedule" });
+    for (const method of ["escape", "close", "overlay"]) {
+      await user.click(trigger);
+      const dialog = screen.getByRole("dialog", { name: "Select schedule" });
+      if (method === "escape") await user.keyboard("{Escape}");
+      else if (method === "close") await user.click(within(dialog).getByRole("button", { name: "Close" }));
+      else await user.click(dialog);
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+      expect(trigger).toHaveFocus();
+      expect(mocks.matrix.mock.calls.at(-1)?.[0].graph.id).toBe(1);
+    }
+  });
+
+  test("one schedule without update uses fallback in header and selector", async () => {
+    const user = userEvent.setup();
+    mocks.scheduleQuery.mockReturnValue({ data: [schedules[1]], isLoading: false });
+    renderPage();
+    const trigger = screen.getByRole("button", { name: "Select schedule. Current schedule: Second May Schedule" });
+    expect(trigger).toHaveTextContent("Not recorded yet");
+    expect(trigger).not.toHaveTextContent("Updated Not recorded yet");
+    await user.click(trigger);
+    const dialog = screen.getByRole("dialog", { name: "Select schedule" });
+    expect(within(dialog).getByText("Not recorded yet")).toBeVisible();
+    expect(dialog.querySelector('time[datetime=""]')).toBeNull();
   });
 });

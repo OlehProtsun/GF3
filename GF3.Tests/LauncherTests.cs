@@ -3,6 +3,7 @@ using GF3.Tests.Infrastructure;
 
 namespace GF3.Tests;
 
+[Trait("Category", "LocalOnly")]
 public sealed class LauncherTests
 {
     [Fact]

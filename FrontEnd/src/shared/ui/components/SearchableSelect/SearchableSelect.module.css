@@ -271,3 +271,34 @@
 .dropdown {
   animation: var(--motion-reveal) 160ms var(--motion-ease);
 }
+
+.selectButtonWithIcon {
+  gap: 8px;
+}
+
+.selectButtonWithIcon .selectButtonText {
+  flex: 1 1 0;
+}
+
+.selectButtonWithIcon .selectButtonLabel {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.leadingIcon {
+  width: 26px;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  border-radius: 9px;
+  background: #eff6ff;
+  color: #2563eb;
+}
+@media (prefers-reduced-motion: reduce) {
+  .dropdown { animation: none; }
+  .selectButton, .option, .selectChevron { transition: none; }
+  .selectButton:active:not(:disabled), .option:active { transform: none; }
+}
