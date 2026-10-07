@@ -1823,5 +1823,8 @@
   "Edit preset": "Edytuj szablon",
   "Edit preset {0}": "Edytuj szablon {0}",
   "Time range": "Zakres godzin",
-  "Use a valid time range like 09:00 - 15:00.": "Wpisz poprawny zakres godzin, np. 09:00 - 15:00."
+  "Use a valid time range like 09:00 - 15:00.": "Wpisz poprawny zakres godzin, np. 09:00 - 15:00.",
+  "Select schedule": "Wybierz grafik",
+  "Select schedule. Current schedule: {0}": "Wybierz grafik. Aktualny grafik: {0}",
+  "Updated {0}": "Aktualizacja: {0}"
 }

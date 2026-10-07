@@ -28,10 +28,11 @@ import { getErrorMessage } from "@shared/api/httpClient";
 import { formatScheduleLastUpdate } from "@shared/lib/scheduleLastUpdate";
 import { ErrorBanner } from "@shared/ui/components/ErrorBanner";
 import { SearchableSelect, type SearchableSelectOption } from "@shared/ui/components/SearchableSelect";
-import { AvailabilityIcon, ScheduleDetailsIcon, ScheduleIcon, StatisticsIcon } from "@shared/ui/icons";
+import { AvailabilityIcon, EmployeeIcon, ScheduleIcon, StatisticsIcon } from "@shared/ui/icons";
 import { CardSection } from "@shared/ui/sections";
 import workspaceStyles from "@pages/shared/EmployeeWorkspacePage.module.css";
 import { EmployeeScheduleColumnOrderDialog } from "./EmployeeScheduleColumnOrderDialog";
+import { EmployeeScheduleSelectDialog } from "./EmployeeScheduleSelectDialog";
 import { EmployeeShiftCorrectionDialog } from "./EmployeeShiftCorrectionDialog";
 import styles from "./EmployeeSchedulePage.module.css";
 import { EmployeeScheduleHero } from "./EmployeeScheduleHero";
@@ -136,51 +137,6 @@ function isCurrentEmployeeSlot(slot: EmployeeScheduleSlot, employeeId: number | 
   }
 
   return slot.employeeId === undefined || slot.employeeId === null || slot.employeeId === employeeId;
-}
-
-function getScheduleStats(
-  schedules: EmployeeSchedule[],
-  selectedSchedule: EmployeeSchedule | null,
-  employeeId: number | null,
-) {
-  if (!selectedSchedule) {
-    return {
-      scheduleCount: 0,
-      workDays: 0,
-      freeDays: 0,
-      totalHours: "0h",
-      month: "-",
-      year: "-",
-      period: "-",
-    };
-  }
-
-  const monthSchedules = schedules.filter(
-    schedule => schedule.year === selectedSchedule.year && schedule.month === selectedSchedule.month,
-  );
-  const workDays = new Set<number>();
-  const totalHours = monthSchedules.reduce((sum, schedule) => {
-    const employeeSlots = schedule.slots.filter(slot => isCurrentEmployeeSlot(slot, employeeId));
-
-    employeeSlots.forEach(slot => {
-      if (slot.dayOfMonth >= 1 && slot.dayOfMonth <= getDaysInMonth(schedule.year, schedule.month)) {
-        workDays.add(slot.dayOfMonth);
-      }
-    });
-
-    return sum + employeeSlots.reduce((slotSum, slot) => slotSum + getSlotDurationHours(slot), 0);
-  }, 0);
-  const daysInMonth = getDaysInMonth(selectedSchedule.year, selectedSchedule.month);
-
-  return {
-    scheduleCount: monthSchedules.length,
-    workDays: workDays.size,
-    freeDays: Math.max(0, daysInMonth - workDays.size),
-    totalHours: formatHours(totalHours),
-    month: formatScheduleMonthOnly(selectedSchedule),
-    year: String(selectedSchedule.year),
-    period: formatScheduleMonth(selectedSchedule),
-  };
 }
 
 const summaryWeekdayLabels = ["su.", "mo.", "tu.", "we.", "th.", "fr.", "sa."] as const;
@@ -888,26 +844,10 @@ export function EmployeeSchedulePage() {
   );
   const [columnOrderDialogEmployeeId, setColumnOrderDialogEmployeeId] = useState<number | null>(null);
   const [selectedScheduleId, setSelectedScheduleId] = useState<number | null>(null);
-  const handleSelectSchedule = (button: HTMLButtonElement, scheduleId: number) => {
+  const [isScheduleSelectOpen, setIsScheduleSelectOpen] = useState(false);
+  const handleSelectSchedule = (scheduleId: number) => {
     setSelectedScheduleId(scheduleId);
-    const dateBadge = button.querySelector<HTMLElement>(`.${styles.scheduleCardDate}`);
-    for (const element of [button, dateBadge]) {
-      for (const animation of element?.getAnimations?.() ?? []) {
-        if (animation.id === "schedule-card-press") animation.cancel();
-      }
-    }
-    const cardAnimation = button.animate?.([
-      { transform: "scale(0.965)" },
-      { transform: "scale(1.015)", offset: 0.65 },
-      { transform: "scale(1)" },
-    ], { duration: 520, easing: "cubic-bezier(0.22, 0.61, 0.36, 1)" });
-    const badgeAnimation = dateBadge?.animate?.([
-      { transform: "rotate(-6deg) scale(0.9)" },
-      { transform: "rotate(2deg) scale(1.08)", offset: 0.6 },
-      { transform: "rotate(0deg) scale(1)" },
-    ], { duration: 580, easing: "cubic-bezier(0.22, 0.61, 0.36, 1)" });
-    if (cardAnimation) cardAnimation.id = "schedule-card-press";
-    if (badgeAnimation) badgeAnimation.id = "schedule-card-press";
+    setIsScheduleSelectOpen(false);
   };
   const [scheduleViewMode, setScheduleViewMode] = useState<"matrix" | "daily">("matrix");
   const [hasSwitchedScheduleView, setHasSwitchedScheduleView] = useState(false);
@@ -1063,10 +1003,6 @@ export function EmployeeSchedulePage() {
       : [],
     [activeDailyScheduleDay, displayName, fallbackMatrixEmployeeId, selectedSchedule],
   );
-  const scheduleStats = useMemo(
-    () => getScheduleStats(schedules, selectedSchedule, currentEmployeeId),
-    [currentEmployeeId, schedules, selectedSchedule],
-  );
   const scheduleHoursSummary = useMemo(
     () => buildScheduleHoursSummary(schedules, activeSummaryPeriod, currentEmployeeId),
     [activeSummaryPeriod, currentEmployeeId, schedules],
@@ -1191,6 +1127,28 @@ export function EmployeeSchedulePage() {
     });
   };
 
+  const scheduleTitle = selectedSchedule ? (
+    <span className={styles.openScheduleTitleBlock}>
+      <span className={styles.openScheduleTitleLabel}>{t("Schedules")}</span>
+      <button type="button" className={styles.scheduleSelectTrigger}
+        aria-haspopup="dialog" aria-expanded={isScheduleSelectOpen}
+        aria-label={t("Select schedule. Current schedule: {0}", selectedSchedule.name)}
+        onClick={() => setIsScheduleSelectOpen(true)}>
+        <span className={styles.scheduleSelectTriggerIcon} aria-hidden="true"><EmployeeIcon size={20} /></span>
+        <span className={styles.scheduleSelectTriggerCopy}>
+          <span className={styles.scheduleSelectNameRow}>
+            <span className={styles.scheduleSelectName}>{selectedSchedule.name}</span>
+            <span className={styles.scheduleSelectChevron} aria-hidden="true" />
+          </span>
+          <span className={styles.scheduleSelectPeriod}>{formatScheduleMonth(selectedSchedule)}</span>
+          <span className={styles.scheduleSelectUpdated}>{selectedSchedule.lastUpdatedAtUtc
+            ? t("Updated {0}", formatScheduleLastUpdate(selectedSchedule.lastUpdatedAtUtc))
+            : formatScheduleLastUpdate(selectedSchedule.lastUpdatedAtUtc)}</span>
+        </span>
+      </button>
+    </span>
+  ) : null;
+
   return (
     <div className={workspaceStyles.page}>
       {queryErrorMessage ? <ErrorBanner dismissible={false}>{queryErrorMessage}</ErrorBanner> : null}
@@ -1227,67 +1185,6 @@ export function EmployeeSchedulePage() {
         </section>
       ) : null}
 
-      {schedules.length > 0 ? (
-        <section className={`${workspaceStyles.panel} ${styles.publicSchedulesPanel}`} data-employee-motion="schedule-panel">
-          <div className={styles.publicSchedulesHeader}>
-            <div className={styles.publicSchedulesHeading}>
-              <span className={styles.summaryIcon} aria-hidden="true">
-                <ScheduleDetailsIcon size={20} />
-              </span>
-              <div>
-                <span className={workspaceStyles.panelEyebrow}>{t("Public schedules")}</span>
-                <strong>{t("{0} schedules", schedules.length)}</strong>
-              </div>
-            </div>
-
-            <div className={styles.publicSchedulesHeaderMeta}>
-              <span className={styles.selectedSchedulePill}>{scheduleStats.period}</span>
-            </div>
-          </div>
-          <div className={styles.scheduleSwitcher}>
-            {schedules.map(schedule => {
-              const isSelected = schedule.id === selectedSchedule?.id;
-              const scheduleLastUpdateLabel = formatScheduleLastUpdate(schedule.lastUpdatedAtUtc);
-
-              return (
-                <button
-                  key={schedule.id}
-                  type="button"
-                  className={[styles.scheduleButton, isSelected ? styles.scheduleButtonActive : ""].filter(Boolean).join(" ")}
-                  aria-pressed={isSelected}
-                  onClick={event => handleSelectSchedule(event.currentTarget, schedule.id)}
-                >
-                  <span className={styles.scheduleCardDate} aria-hidden="true">
-                    <span>{formatScheduleMonthOnly(schedule).slice(0, 3)}</span>
-                    <strong>{schedule.year}</strong>
-                  </span>
-
-                  <span className={styles.scheduleButtonDetails}>
-                    <span className={styles.scheduleButtonContent}>
-                      <span className={styles.scheduleButtonName}>{schedule.name}</span>
-                      <span className={styles.scheduleButtonMeta}>
-                        {`${schedule.shopName || t("Shop {0}", schedule.shopId)} / ${schedule.containerName || t("Container {0}", schedule.containerId)}`}
-                      </span>
-                    </span>
-
-                    <span className={styles.lastUpdateField} aria-label={t("Last Update: {0}", scheduleLastUpdateLabel)}>
-                      <span>
-                        <span className={styles.lastUpdateDot} aria-hidden="true" />
-                        {t("Last Update")}</span>
-                      <strong>
-                        {schedule.lastUpdatedAtUtc ? (
-                          <time dateTime={schedule.lastUpdatedAtUtc}>{scheduleLastUpdateLabel}</time>
-                        ) : scheduleLastUpdateLabel}
-                      </strong>
-                    </span>
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-        </section>
-      ) : null}
-
       {selectedSchedule && scheduleViewMode === "matrix" ? (
         <ContainerGraphMatrix
           className={[styles.openScheduleMatrix, hasSwitchedScheduleView ? styles.scheduleViewEnter : ""].filter(Boolean).join(" ")}
@@ -1295,16 +1192,7 @@ export function EmployeeSchedulePage() {
           columns={scheduleMatrixColumns}
           cellMap={scheduleMatrixDisplay.cellMap}
           mutedSuffixMap={scheduleMatrixDisplay.mutedSuffixMap}
-          title={
-            <span className={styles.openScheduleTitleBlock}>
-              <span className={styles.openScheduleTitleLabel}>{t("Schedules")}</span>
-              <span className={styles.openScheduleMeta}>
-                <span>{selectedSchedule.name}</span>
-                <span>{formatScheduleMonthOnly(selectedSchedule)}</span>
-                <span>{selectedSchedule.year}</span>
-              </span>
-            </span>
-          }
+          title={scheduleTitle}
           icon={
             <button
               ref={scheduleViewToggleRef}
@@ -1342,16 +1230,7 @@ export function EmployeeSchedulePage() {
       {selectedSchedule && scheduleViewMode === "daily" ? (
         <CardSection
           className={[styles.dailyScheduleCard, hasSwitchedScheduleView ? styles.scheduleViewEnter : ""].filter(Boolean).join(" ")}
-          title={
-            <span className={styles.openScheduleTitleBlock}>
-              <span className={styles.openScheduleTitleLabel}>{t("Schedules")}</span>
-              <span className={styles.openScheduleMeta}>
-                <span>{selectedSchedule.name}</span>
-                <span>{formatScheduleMonthOnly(selectedSchedule)}</span>
-                <span>{selectedSchedule.year}</span>
-              </span>
-            </span>
-          }
+          title={scheduleTitle}
           icon={
             <button
               ref={scheduleViewToggleRef}
@@ -1433,6 +1312,13 @@ export function EmployeeSchedulePage() {
         </CardSection>
       ) : null}
 
+      <EmployeeScheduleSelectDialog
+        open={isScheduleSelectOpen}
+        schedules={schedules}
+        selectedScheduleId={selectedSchedule?.id ?? null}
+        onSelect={handleSelectSchedule}
+        onClose={() => setIsScheduleSelectOpen(false)}
+      />
       <EmployeeScheduleColumnOrderDialog
         open={columnOrderDialogEmployeeId !== null}
         columns={scheduleMatrixColumns}

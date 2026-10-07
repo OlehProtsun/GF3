@@ -44,7 +44,7 @@ vi.mock("@entities/employee-ui-state", () => ({
 }));
 vi.mock("@entities/containers/ui/ContainerGraphMatrix", () => ({
   ContainerGraphMatrix: (props: {
-    title: string;
+    title: ReactNode;
     icon?: ReactNode;
     graph: EmployeeSchedule;
     columns: Array<{ employeeId: number; label: string }>;
@@ -203,8 +203,7 @@ describe("EmployeeSchedulePage", () => {
     expect(screen.getByRole("heading", { name: "Hey, Zoe" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Now" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Tomorrow" })).toBeInTheDocument();
-    expect(screen.getAllByText("2 schedules")).not.toHaveLength(0);
-    expect(screen.getAllByText("Last Update")).toHaveLength(2);
+    expect(screen.getByRole("button", { name: "Select schedule. Current schedule: May Schedule" })).toHaveTextContent("May 2026");
     expect(screen.getByText(/28 Jun 2026/)).toBeInTheDocument();
 
     expect(within(screen.getByRole("table", { name: "Schedule hours summary" }))
@@ -467,5 +466,57 @@ describe("EmployeeSchedulePage", () => {
 
     expect(screen.getByText("Nothing is public for your account yet.")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /Go to Availability/i })).toHaveAttribute("href", "/availability");
+  });
+});
+
+
+describe("schedule selector", () => {
+  test("selects another schedule and updates matrix and metadata", async () => {
+    const user = userEvent.setup();
+    const second = { ...schedules[1], month: 10, lastUpdatedAtUtc: "2026-10-04T12:01:00Z" };
+    mocks.scheduleQuery.mockReturnValue({ data: [schedules[0], second], isLoading: false });
+    renderPage();
+    await user.click(screen.getByRole("button", { name: "Select schedule. Current schedule: May Schedule" }));
+    const dialog = screen.getByRole("dialog", { name: "Select schedule" });
+    const firstRow = within(dialog).getByRole("button", { name: /^May Schedule.*May 2026/ });
+    expect(firstRow).toHaveAttribute("aria-pressed", "true");
+    expect(firstRow).toHaveFocus();
+    expect(within(dialog).getByText(/Updated 28 Jun 2026/)).toBeVisible();
+    await user.click(within(dialog).getByRole("button", { name: /Second May Schedule.*October 2026/ }));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    const trigger = screen.getByRole("button", { name: "Select schedule. Current schedule: Second May Schedule" });
+    expect(trigger).toHaveTextContent("October 2026");
+    expect(trigger).toHaveTextContent(/Updated 04 Oct 2026/);
+    expect(mocks.matrix.mock.calls.at(-1)?.[0].graph.id).toBe(2);
+  });
+
+  test("Escape, close button and overlay dismiss without changing selection", async () => {
+    const user = userEvent.setup();
+    mocks.scheduleQuery.mockReturnValue({ data: schedules, isLoading: false });
+    renderPage();
+    const trigger = screen.getByRole("button", { name: "Select schedule. Current schedule: May Schedule" });
+    for (const method of ["escape", "close", "overlay"]) {
+      await user.click(trigger);
+      const dialog = screen.getByRole("dialog", { name: "Select schedule" });
+      if (method === "escape") await user.keyboard("{Escape}");
+      else if (method === "close") await user.click(within(dialog).getByRole("button", { name: "Close" }));
+      else await user.click(dialog);
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+      expect(trigger).toHaveFocus();
+      expect(mocks.matrix.mock.calls.at(-1)?.[0].graph.id).toBe(1);
+    }
+  });
+
+  test("one schedule without update uses fallback in header and selector", async () => {
+    const user = userEvent.setup();
+    mocks.scheduleQuery.mockReturnValue({ data: [schedules[1]], isLoading: false });
+    renderPage();
+    const trigger = screen.getByRole("button", { name: "Select schedule. Current schedule: Second May Schedule" });
+    expect(trigger).toHaveTextContent("Not recorded yet");
+    expect(trigger).not.toHaveTextContent("Updated Not recorded yet");
+    await user.click(trigger);
+    const dialog = screen.getByRole("dialog", { name: "Select schedule" });
+    expect(within(dialog).getByText("Not recorded yet")).toBeVisible();
+    expect(dialog.querySelector('time[datetime=""]')).toBeNull();
   });
 });

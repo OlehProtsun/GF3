@@ -2,1389 +2,994 @@
 
 ## 1. Objective
 
-Create exactly one new design-reference artifact:
+Redesign the employee **Schedule** page at repository state `DEV2 / 55bf0e9` so that the separate **Public schedules** selection panel is removed and schedule selection is integrated directly into the existing schedule card, matching the approved mockup.
 
-- `docs/design-system.json`
+The final UI must have:
 
-The file must describe the **current UI design of GF3 at branch `DEV2`, commit `b4a08ad`** in a machine-readable form so that a developer or coding agent can later change existing UI or add new UI by referencing a single design inventory instead of rediscovering the frontend structure and styling.
+- the existing gray page background;
+- one white schedule surface below the hero;
+- `Schedules` as the section title;
+- existing PDF action in the upper-right;
+- selected schedule name, e.g. `F27`, directly inside this section;
+- a small downward chevron indicating that the schedule can be changed;
+- month/year directly under the schedule name, e.g. `October 2026`;
+- `Updated 04 Oct 2026, 14:01` directly below it;
+- the `Updated ...` text in a clearly visible light blue;
+- existing `Adjust` action on the right;
+- the schedule matrix directly below the compact header;
+- no separate Public schedules card;
+- no extra date/month selector;
+- no month navigation arrows;
+- no duplicated `F27 / October / 2026` pill row;
+- tapping the selected schedule opens a **Select schedule** bottom sheet;
+- the bottom sheet lists all published schedules with name, month/year and update time;
+- selecting another schedule closes the sheet and immediately updates the displayed schedule.
 
-This task is documentation/inventory work only. The JSON must describe the current implementation; it must **not** become a runtime dependency and must **not** redesign, normalize, or refactor the application.
+The existing `EmployeeSchedule` model already provides `name`, `year`, `month` and `lastUpdatedAtUtc`, so this redesign requires no API/model expansion.
 
-For this plan, “complete design description” means:
-
-- global visual foundations that are actually present in the code;
-- manager, employee, and public/auth layout models;
-- reusable UI primitives and their contracts;
-- reusable record/form/profile patterns;
-- the exported icon catalog;
-- every routed page and its role-aware route binding;
-- important page sections and user-visible/interactive controls;
-- component variants;
-- important visual/interaction states;
-- responsive behavior;
-- navigation and dialog behavior relevant to UI composition;
-- accessibility semantics explicitly implemented in the source;
-- localization usage relevant to labels/content;
-- source-file provenance for every design entry;
-- known implementation/design divergences that must not be silently “corrected” in the snapshot;
-- maintenance rules for keeping the JSON aligned with future UI changes.
-
-The JSON is a **descriptive snapshot**, not the runtime source of truth.
+This plan is intentionally implementation-ready and scoped to the requested UI change.
 
 ---
 
-## 2. Existing Components and Sources to Reuse
+## 2. Existing Components to Reuse
 
-### 2.1 Core frontend sources
+### REUSE — `ContainerGraphMatrix`
 
-**REUSE AS REFERENCE — do not modify**
+File:
 
-- `FrontEnd/src/app/router/AppRouter.tsx`
-  - authoritative source for current page/route/role bindings.
-- `FrontEnd/src/index.css`
-  - global font, page/background, base controls, scrolling, and common global styling.
-- `FrontEnd/src/shared/ui/motion.css`
-  - shared motion durations, easing, reveal animation, press animation, and motion-list behavior.
-- `FrontEnd/src/app/layouts/overlay-sidebar-layout/OverlaySidebarLayout.tsx`
-- `FrontEnd/src/app/layouts/overlay-sidebar-layout/OverlaySidebarLayout.module.css`
-  - manager shell, sidebar, navigation, collapse/open behavior, responsive layout.
-- `FrontEnd/src/app/layouts/employee-workspace-layout/EmployeeWorkspaceLayout.tsx`
-- `FrontEnd/src/app/layouts/employee-workspace-layout/EmployeeWorkspaceLayout.module.css`
-  - employee shell, desktop/mobile navigation, unread indicators, responsive behavior.
-- `FrontEnd/src/pages/shared/EmployeeWorkspacePage.module.css`
-  - shared employee-page visual vocabulary.
+`FrontEnd/src/entities/containers/ui/ContainerGraphMatrix.tsx`
 
-### 2.2 Shared UI primitives
+Keep this component unchanged.
 
-**REUSE AS REFERENCE — define each once in `components`**
+It already supports:
 
-At minimum catalog these existing components and their matching CSS modules when present:
+- `title: ReactNode`;
+- `icon`;
+- `headerRightSlot`;
+- compact header mode;
+- read-only schedule rendering.
 
-- `FrontEnd/src/shared/ui/components/IosButton/IosButton.tsx`
-- `FrontEnd/src/shared/ui/components/IosButton/IosButton.module.css`
-- `FrontEnd/src/shared/ui/PageHeader/PageHeader.tsx`
-- `FrontEnd/src/shared/ui/PageHeader/PageHeader.module.css`
-- `FrontEnd/src/shared/ui/sections/CardSection/CardSection.tsx`
-- `FrontEnd/src/shared/ui/sections/CardSection/CardSection.module.css`
-- `FrontEnd/src/shared/ui/components/ErrorBanner/ErrorBanner.tsx`
-- `FrontEnd/src/shared/ui/components/ErrorBanner/ErrorBanner.module.css`
-- `FrontEnd/src/shared/ui/components/ListCardSection/ListCardSection.tsx`
-- `FrontEnd/src/shared/ui/components/ListCardSection/ListCardSection.module.css`
-- `FrontEnd/src/shared/ui/components/RecordGrid/RecordGrid.tsx`
-- `FrontEnd/src/shared/ui/components/RecordGrid/RecordGrid.module.css`
-- `FrontEnd/src/shared/ui/components/RecordTile/RecordTile.tsx`
-- `FrontEnd/src/shared/ui/components/RecordTile/RecordTile.module.css`
-- `FrontEnd/src/shared/ui/components/ProfileSummaryCard/ProfileSummaryCard.tsx`
-- `FrontEnd/src/shared/ui/components/ProfileSummaryCard/ProfileSummaryCard.module.css`
-- `FrontEnd/src/shared/ui/components/RecordProfileCard/RecordProfileCard.tsx`
-- `FrontEnd/src/shared/ui/components/RecordProfileCard/RecordProfileCard.module.css`
-- `FrontEnd/src/shared/ui/components/RecordDetailsFormCard/RecordDetailsFormCard.tsx`
-- `FrontEnd/src/shared/ui/components/RecordDetailsFormCard/RecordDetailsFormCard.module.css`
-- `FrontEnd/src/shared/ui/components/PresenceBadge/PresenceBadge.tsx`
-- `FrontEnd/src/shared/ui/components/PresenceBadge/PresenceBadge.module.css`
-- `FrontEnd/src/shared/ui/forms/Field/Field.tsx`
-- the matching `Field` CSS module used by that source
-- `FrontEnd/src/shared/ui/components/SearchableSelect/SearchableSelect.tsx`
-- its matching CSS module
-- `FrontEnd/src/shared/ui/components/EmployeeTargetCombobox/EmployeeTargetCombobox.tsx`
-- its matching CSS module
-- existing `ConfirmDialog`
-- existing `SavingOverlay`
-- existing `ManagerEditLockDialog`
-- existing `ErrorAlertsViewport`
-- existing `DetailList` / `DetailItem`
-- existing `FormLayout` primitives used by entity forms.
+It delegates these header values to the existing `CardSection`, so the new selector UI can be supplied from `EmployeeSchedulePage` without changing the shared matrix component.
 
-Do not create replacement primitives and do not duplicate these definitions inside every page entry.
+### REUSE — `CardSection`
 
-### 2.3 Icon source
+File:
 
-**REUSE AS REFERENCE**
+`FrontEnd/src/shared/ui/sections/CardSection/CardSection.tsx`
 
-- `FrontEnd/src/shared/ui/icons/index.ts`
+Keep this component unchanged.
 
-The JSON icon catalog must include every icon exported by this file at `b4a08ad`, including:
+Continue using its existing title/header/right-slot composition rather than introducing another schedule-specific card primitive.
 
-`InfoIcon`, `WarnIcon`, `ErrorIcon`, `BackIcon`, `InboxIcon`, `BindIcon`, `StatisticsIcon`, `ShiftGiveAwayIcon`, `SwapOffersIcon`, `SwapHistoryIcon`, `ScheduleDetailsIcon`, `InformationIcon`, `SaveIcon`, `CodeIcon`, `AvailabilityIcon`, `ExcelIcon`, `ClearFormatAllIcon`, `ImportIcon`, `ClearFormatIcon`, `EmployeeIcon`, `ShopIcon`, `SearchIcon`, `NoteIcon`, `ScheduleIcon`, `ContainerInfoIcon`, `ContainerIcon`, `EyeIcon`, `EyeOffIcon`, `HomeIcon`, `DatabaseIcon`, `ArrowIcon`, `LogoutIcon`, `PlusIcon`, `CheckIcon`, `CloseIcon`, `ChevronLeftIcon`, `ChevronRightIcon`, `PinIcon`, `NewsIcon`, and `SettingsIcon`.
+### REUSE — existing schedule data/state
 
-### 2.4 Reusable entity UI
+Continue using:
 
-**REUSE AS REFERENCE**
+- `useEmployeeScheduleListQuery`;
+- `selectedScheduleId`;
+- `selectedSchedule`;
+- `formatScheduleLastUpdate`;
+- `formatScheduleMonth(...)`;
+- `formatScheduleMonthOnly(...)`;
+- existing schedule matrix derivation;
+- existing daily/matrix view switching;
+- existing PDF export;
+- existing Adjust / shift-correction flow.
 
-Shops:
+The current selected schedule already drives matrix columns, cells, daily view and related state.
 
-- `FrontEnd/src/entities/shops/ui/ShopListCard.tsx`
-- `FrontEnd/src/entities/shops/ui/ShopProfileCard.tsx`
-- `FrontEnd/src/entities/shops/ui/ShopDetailsForm.tsx`
+### REUSE — overlay infrastructure
 
-Employees:
+Reuse:
 
-- `FrontEnd/src/entities/employees/ui/EmployeeListCard.tsx`
-- `FrontEnd/src/entities/employees/ui/EmployeeProfileCard.tsx`
-- `FrontEnd/src/entities/employees/ui/EmployeeDetailsForm.tsx`
+`FrontEnd/src/shared/ui/ViewportOverlay.module.css`
 
-These entries must reference the shared primitives they compose rather than restating those primitive definitions.
+through CSS Modules `composes`, as existing project dialogs already do.
+
+### REUSE — icons
+
+Reuse existing icons from:
+
+`@shared/ui/icons`
+
+Specifically:
+
+- `CloseIcon`;
+- `CheckIcon`;
+- `EmployeeIcon`;
+- existing `ScheduleIcon`.
+
+Do not add a new icon library.
 
 ---
 
 ## 3. Constraints
 
-1. **CREATE only `docs/design-system.json`.**
-2. Do not modify React, TypeScript, CSS, backend, test, configuration, or documentation files as part of this task.
-3. Do not make the application import, parse, or consume `docs/design-system.json`.
-4. Do not create a runtime theme engine or design-token provider.
-5. Do not refactor CSS literals into CSS custom properties.
-6. Do not add npm/NuGet dependencies.
-7. Do not create a CSS/AST parser or generator.
-8. Do not change routes, component APIs, page behavior, translations, icons, accessibility, or responsive behavior.
-9. Do not “clean up” or normalize current styling while documenting it.
-10. Do not infer design values that are not supported by the current source.
-11. Do not treat a component-local CSS variable fallback as a global token unless the code actually establishes it globally.
-12. Preserve role-dependent route meaning. A route path alone is not a unique page identity.
-13. Source references in JSON must use repository-relative file paths and stable symbol/selector names; do not use fragile GitHub line numbers.
-14. The JSON must contain no comments or trailing commas.
-15. Use stable `kebab-case` IDs for catalog entries.
-16. Text rendered through `t(...)` must be marked as localized. Do not claim English literals are the only supported copy.
-17. When a shared component already represents an element, pages should reference that component by ID rather than duplicate its full style contract.
-18. Page-specific controls that are not represented by a shared component must still be described on the page or page-specific component that owns them.
-19. Keep business/domain data out of the JSON except where its presentation state changes UI design, for example presence tone, unread indicator, loading state, selected state, pinned state, or error state.
-20. The snapshot metadata must explicitly identify commit `b4a08ad` so future readers can detect drift.
+- Do not change backend code.
+- Do not change API endpoints.
+- Do not change schedule persistence.
+- Do not change `EmployeeSchedule`.
+- Do not add npm dependencies.
+- Do not modify `ContainerGraphMatrix`.
+- Do not modify the shared `CardSection`.
+- Do not alter the schedule table/matrix business logic.
+- Do not alter PDF generation.
+- Do not alter column customization.
+- Do not alter Adjust / shift-correction behavior.
+- Do not remove the existing daily/matrix presentation toggle.
+- Do not redesign the hero.
+- Do not redesign Work hours / salary sections.
+- Do not introduce month navigation arrows.
+- Do not introduce another date picker.
+- Do not preserve the old large Public schedules panel alongside the new selector.
+- Do not perform unrelated CSS cleanup/refactoring.
+
+The task is a localized presentation/state-wiring change.
 
 ---
 
-## 4. Required JSON Contract
+## 4. Implementation Steps
 
-### Step 1 — Create the design manifest shell
+### Step 1 — Create the schedule-selection bottom sheet
 
 **Action:** CREATE
 
+**Files:**
+
+- `FrontEnd/src/pages/employee-schedule/ui/EmployeeScheduleSelectDialog.tsx`
+- `FrontEnd/src/pages/employee-schedule/ui/EmployeeScheduleSelectDialog.module.css`
+
+### Component contract
+
+Create:
+
+```ts
+type EmployeeScheduleSelectDialogProps = {
+  open: boolean;
+  schedules: EmployeeSchedule[];
+  selectedScheduleId: number | null;
+  onSelect: (scheduleId: number) => void;
+  onClose: () => void;
+};
+```
+
+Responsibility:
+
+Present the existing published schedules as a compact selector only. It must not own schedule fetching or selection state.
+
+### Dialog structure
+
+Render only while `open === true`.
+
+Structure:
+
+```text
+overlay
+└── sheet/dialog
+    ├── drag handle
+    ├── header
+    │   ├── "Select schedule"
+    │   └── close button
+    └── schedule list
+        ├── F27
+        │   ├── October 2026
+        │   └── Updated ...
+        └── F35
+            ├── October 2026
+            └── Updated ...
+```
+
+Each schedule row must:
+
+- be a `<button type="button">`;
+- display `schedule.name`;
+- display localized month + year;
+- display last-update information using the existing `formatScheduleLastUpdate(...)`;
+- use `aria-pressed={isSelected}`;
+- visually distinguish the selected schedule;
+- show a blue circular selected indicator containing `CheckIcon`;
+- show an outlined empty indicator when not selected;
+- use `EmployeeIcon` or the equivalent existing employee/schedule visual on the left.
+
+For a schedule with `lastUpdatedAtUtc`:
+
+```text
+Updated 04 Oct 2026, 14:01
+```
+
+For a schedule without an update timestamp, display the existing fallback from `formatScheduleLastUpdate(...)` without constructing the awkward phrase `Updated Not recorded yet`.
+
+### Interaction
+
+Selecting a row must call:
+
+```ts
+onSelect(schedule.id)
+```
+
+The parent will own closing the sheet.
+
+Support:
+
+- close button;
+- Escape key;
+- clicking the overlay outside the sheet.
+
+Do not create confirmation/cancel steps: selecting a schedule is immediate.
+
+### Accessibility
+
+The overlay must use:
+
+```text
+role="dialog"
+aria-modal="true"
+aria-labelledby=<dialog title id>
+```
+
+Use `useId()` for the title id.
+
+When the sheet opens, autofocus the currently selected schedule row. If no row is selected, autofocus the close button.
+
+### Styling
+
+Reuse the existing overlay/surface primitives through:
+
+```css
+composes: overlay from "../../../shared/ui/ViewportOverlay.module.css";
+```
+
+and:
+
+```css
+composes: surface from "../../../shared/ui/ViewportOverlay.module.css";
+```
+
+Desktop/tablet:
+
+- compact modal width around the existing 420–460px dialog vocabulary;
+- white surface;
+- rounded corners;
+- existing project shadow/border language.
+
+Mobile (`max-width: 640px`):
+
+- attach sheet to the bottom of the viewport;
+- width `100%`;
+- no horizontal page margin;
+- rounded top-left/top-right corners;
+- bottom corners may be `0`;
+- include `env(safe-area-inset-bottom)` in bottom padding;
+- max-height approximately `80–85dvh`;
+- list becomes vertically scrollable when necessary.
+
+The underlying page must receive the existing dimmed + blurred overlay treatment.
+
+Add a small horizontal drag handle at the top for visual parity with the approved mockup. It is decorative only.
+
+### Colors
+
+Selected schedule:
+
+- blue border;
+- very light blue background;
+- solid blue selected indicator.
+
+Normal schedule:
+
+- white/light neutral surface;
+- subtle neutral border.
+
+Last update:
+
+```css
+color: #3b82f6;
+```
+
+Use this same update color in the selector and in the selected-schedule header.
+
+---
+
+### Step 2 — Replace the old schedule-card click handler with selector state
+
+**Action:** MODIFY
+
 **File:**
 
-- `docs/design-system.json`
+`FrontEnd/src/pages/employee-schedule/ui/EmployeeSchedulePage.tsx`
 
-Create these top-level keys in this exact order:
+Add:
 
-1. `schemaVersion`
-2. `project`
-3. `foundations`
-4. `assets`
-5. `layouts`
-6. `components`
-7. `pages`
-8. `routeBindings`
-9. `patterns`
-10. `knownImplementationDivergences`
-11. `maintenance`
+```ts
+const [isScheduleSelectOpen, setIsScheduleSelectOpen] = useState(false);
+```
 
-Required metadata:
+Keep:
 
-- `schemaVersion`: `"1.0.0"`
-- `project.name`: `"GF3"`
-- `project.repository`: `"https://github.com/OlehProtsun/GF3"`
-- `project.frontendRoot`: `"FrontEnd"`
-- `project.branch`: `"DEV2"`
-- `project.commit`: `"b4a08ad"`
-- `project.artifactPurpose`: concise statement that this is a design-reference snapshot.
-- `project.runtimeSourceOfTruth`: `false`
-- `project.sourceOfTruth`: state that React/TypeScript/CSS at the recorded commit remains authoritative.
-- `project.scope`: state that the manifest covers user-visible frontend design and UI composition, not backend/domain architecture.
+```ts
+const [selectedScheduleId, setSelectedScheduleId] = useState<number | null>(null);
+```
 
-For every source-backed object, use this source-reference shape:
+Replace the existing `handleSelectSchedule(button, scheduleId)` implementation.
 
-- `path`: repository-relative path.
-- `symbolOrSelector`: exported symbol, component name, CSS selector, or CSS custom property.
-- `notes`: optional, only when necessary to explain provenance.
+The existing handler currently depends on DOM lookup and Web Animations specifically for the old large schedule cards. Those cards will no longer exist.
 
-Do not store line numbers.
+Use the simplified responsibility:
 
-**Behavior after change:**
+```text
+select ID
+→ close selector
+→ existing selectedSchedule memo recalculates
+→ existing matrix/daily derived state recalculates
+```
 
-A reader can immediately identify what project/snapshot the JSON describes and whether it is meant to control runtime styling.
+Conceptual contract:
 
----
+```ts
+const handleSelectSchedule = (scheduleId: number) => {
+  setSelectedScheduleId(scheduleId);
+  setIsScheduleSelectOpen(false);
+};
+```
 
-### Step 2 — Populate `foundations`
+Do not preserve:
 
-**Action:** CREATE CONTENT IN THE NEW FILE
+- `button.querySelector(...)`;
+- `.scheduleCardDate` lookup;
+- `button.animate(...)`;
+- badge rotation animation;
+- `schedule-card-press` animation IDs.
 
-**Primary source files:**
+Those only support the removed card selector.
 
-- `FrontEnd/src/index.css`
-- `FrontEnd/src/shared/ui/motion.css`
-- shared primitive CSS modules;
-- the two layout CSS modules;
-- `FrontEnd/src/pages/shared/EmployeeWorkspacePage.module.css`.
-
-Create these foundation groups:
-
-- `typography`
-- `colors`
-- `surfaces`
-- `spacing`
-- `radii`
-- `borders`
-- `shadows`
-- `motion`
-- `responsive`
-
-#### 2.1 Typography
-
-Capture:
-
-- global font-family stack;
-- global/default text color;
-- font weights and sizes only when they represent a reusable/currently repeated visual role;
-- component-specific typography must remain under the component when it is not a global/repeated role.
-
-#### 2.2 Colors and surfaces
-
-At minimum capture supported semantic roles discovered in the current source, such as:
-
-- application/page background;
-- primary text;
-- secondary/muted text;
-- primary blue/accent;
-- danger/red;
-- neutral/secondary button;
-- glass/surface background;
-- border/focus colors where reusable;
-- employee-shell blue/slate surface roles where those are shared by employee pages.
-
-Each token entry must include:
-
-- `value`;
-- `semanticRole`;
-- `sources`.
-
-If the same semantic role has different values in manager vs employee UI, do not collapse them into one token. Use separate contextual entries.
-
-#### 2.3 Spacing, radii, borders, shadows
-
-Only promote values that are meaningfully reusable in the current implementation.
-
-Examples that must be represented from the existing code when applicable:
-
-- pill/fully-rounded button radius;
-- card radius;
-- sidebar/nav-item radius;
-- PageHeader/card surface radius;
-- common card/glass shadows;
-- border styles and opacity;
-- manager layout inset/sidebar width if they are layout constants.
-
-Do not invent a synthetic spacing scale such as `4/8/12/16` unless the source actually defines one.
-
-#### 2.4 Motion
-
-Capture the actual shared values from `motion.css`:
-
-- shared easing;
-- fast duration;
-- enter duration;
-- reveal animation;
-- press animation;
-- stagger/list behavior.
-
-Also record employee-layout motion overrides separately if they differ from the shared values.
-
-#### 2.5 Responsive
-
-Record breakpoints and their owner/source.
-
-Do not merge all breakpoints into a fictional global breakpoint system. For each breakpoint record:
-
-- value;
-- owner/context;
-- effect;
-- source.
-
-Include manager-layout, employee-layout, PageHeader/CardSection, and employee shared-page breakpoints that materially change composition.
+Keep the existing effect that resets the selected daily day when `selectedSchedule.id` changes.
 
 ---
 
-### Step 3 — Populate `assets.icons`
+### Step 3 — Remove the separate Public schedules section
 
-**Action:** CREATE CONTENT IN THE NEW FILE
+**Action:** REMOVE
 
-**Source:**
+**File:**
 
-- `FrontEnd/src/shared/ui/icons/index.ts`
+`FrontEnd/src/pages/employee-schedule/ui/EmployeeSchedulePage.tsx`
 
-Create one icon entry per exported icon.
+Remove the complete render block currently beginning with:
 
-Each icon entry must contain:
+```tsx
+{schedules.length > 0 ? (
+  <section className={`${workspaceStyles.panel} ${styles.publicSchedulesPanel}`}>
+```
 
-- stable ID;
-- exported component name;
-- category/purpose when obvious from current usage/name;
-- source reference;
-- known default/used sizing only if supported by source or repeated usage;
-- pages/components that use it when this is important for navigation or core actions.
+and containing:
 
-Do not copy SVG path data into the JSON. The design manifest should point to the existing icon implementation.
-
----
-
-### Step 4 — Populate reusable `components`
-
-**Action:** CREATE CONTENT IN THE NEW FILE
-
-For each component, use this common entry contract:
-
-- `id`
-- `name`
-- `category`
-- `responsibility`
-- `source`
-- `styleSources`
-- `composition`
-- `publicContract`
-- `variants`
-- `elements`
-- `states`
-- `visual`
-- `responsive`
-- `interactions`
-- `accessibility`
-- `localization`
-- `usedBy`
-
-`publicContract` must describe only props that affect appearance, visible content, interaction, or composition. Do not dump irrelevant implementation-only props.
-
-Each `elements` item must describe a user-visible or interaction-relevant element and contain as applicable:
-
-- `id`
-- `type`
-- `componentRef`
-- `content`
-- `purpose`
-- `action`
-- `visualRef`
-- `states`
-- `accessibility`
-
-#### 4.1 `ios-button`
-
-Capture the existing contract, including:
-
-- label;
-- optional icon;
-- `primary` / `secondary`;
-- `default` / `compact`;
-- disabled;
-- custom color;
-- custom border color;
-- button type;
-- click action;
-- hover;
-- active/press;
-- focus-visible;
-- disabled visual state.
-
-Record the current CSS-backed dimensions, radius, colors, shadow, typography, and compact sizing.
-
-Do not silently treat the inline padding anomaly as canonical intended spacing; record it later in `knownImplementationDivergences`.
-
-#### 4.2 `page-header`
-
-Capture:
-
-- eyebrow;
-- title;
-- subtitle;
-- back navigation/action;
-- back label;
-- right action slot;
-- search metadata;
-- search control;
-- `card` / `plain` variant;
-- full-bleed/gutter/max-width behavior;
-- collapse/expand state;
-- fixed/glass surface behavior;
-- responsive changes.
-
-#### 4.3 `card-section`
-
-Capture:
-
-- optional icon;
-- title;
-- centered/right header slots;
-- children/content;
-- glass surface;
-- width constraint;
-- radius;
-- padding;
-- border/shadow/blur;
-- responsive header composition.
-
-#### 4.4 `error-banner`
-
-Capture:
-
-- alert purpose;
-- dismissible behavior;
-- danger surface/text/border treatment;
-- dismiss button;
-- accessibility role/semantics that are explicitly present.
-
-#### 4.5 Record/list/profile/form primitives
-
-Create separate entries for:
-
-- `list-card-section`
-- `record-grid`
-- `record-tile`
-- `profile-summary-card`
-- `record-profile-card`
-- `record-details-form-card`
-- `presence-badge`
-- `text-input`
-- `text-area`
-- `labeled-field`
-- `error-pill`
-- `searchable-select`
-- `employee-target-combobox`
-- `detail-list`
-- `detail-item`
-- form-row/layout primitives used by shop/employee forms.
-
-Required state coverage includes where applicable:
-
-- loading;
-- load error;
-- empty;
-- search empty;
-- interactive;
-- selected;
-- pinned;
-- default/compact density;
-- wrap/stacked metadata;
-- online/offline/inactive;
-- invalid field;
-- disabled;
-- saving.
-
-For `RecordTile`, explicitly record keyboard activation for Enter/Space, pin button semantics, `aria-pressed`, and the selected/pinned states.
-
-#### 4.6 Dialogs and overlays
-
-Create component entries for existing:
-
-- `confirm-dialog`
-- `saving-overlay`
-- `manager-edit-lock-dialog`
-- `error-alerts-viewport`
-
-Capture:
-
-- open/closed state;
-- blocking vs non-blocking behavior;
-- visible actions;
-- destructive confirmation styling when present;
-- loading/saving state;
-- edit-lock state;
-- dismiss behavior;
-- relevant accessibility semantics from source.
-
----
-
-### Step 5 — Populate `layouts`
-
-**Action:** CREATE CONTENT IN THE NEW FILE
-
-Create exactly these layout identities:
-
-- `manager-overlay-sidebar`
-- `employee-workspace`
-- `public-auth`
-
-#### 5.1 Manager layout
-
-Source:
-
-- `FrontEnd/src/app/layouts/overlay-sidebar-layout/OverlaySidebarLayout.tsx`
-- matching CSS module.
-
-Describe:
-
-- fixed sidebar;
-- collapsed/expanded/open-tab behavior;
-- backdrop behavior;
-- main content relationship to sidebar;
-- manager navigation items and icon references;
-- settings/database destination;
-- profile/account footer;
-- logout action;
-- auxiliary `ManagerSystemNews`;
-- auxiliary `ManagerNotepad`;
-- wide-content route behavior;
-- responsive behavior and breakpoints.
-
-Manager navigation destinations must include:
-
-- Home
-- Employee
-- Shop
-- Availability
-- Container
-- Information
-- Message/Communications
-- DataBase/Settings
-- manager profile/account.
-
-#### 5.2 Employee layout
-
-Source:
-
-- `FrontEnd/src/app/layouts/employee-workspace-layout/EmployeeWorkspaceLayout.tsx`
-- matching CSS module;
-- `FrontEnd/src/pages/shared/EmployeeWorkspacePage.module.css`.
-
-Describe:
-
-- desktop navigation;
-- mobile/bottom-tab navigation;
-- collapsed/open state;
-- unread indicators;
-- employee communication dialog;
-- shared employee-page hero/card/panel vocabulary;
-- employee blue/slate surface treatment;
-- responsive changes.
-
-Employee navigation destinations:
-
-- Notifications
-- Availability
-- Schedule
-- Swap
-- Profile.
-
-#### 5.3 Public/auth layout
-
-Describe the public unauthenticated presentation used by Login and Password Recovery. This may be represented as a lightweight layout identity even if there is no dedicated shared React layout component.
-
-Do not invent a shared runtime component.
-
----
-
-### Step 6 — Populate reusable entity/pattern entries
-
-**Action:** CREATE CONTENT IN THE NEW FILE
-
-Create component/pattern entries for the existing reusable shop and employee presentation components.
-
-#### Shops
-
-`shop-list-card`
-
-- composes `list-card-section`, `record-grid`, `record-tile`, `ios-button`;
-- includes Add New and Clear Search actions;
-- supports pinned records;
-- displays address metadata and optional description;
-- loading/error/empty/search-empty states.
-
-`shop-profile-card`
-
-- composes `record-profile-card`;
-- includes shop identity/details;
-- Edit Shop action;
-- destructive Delete Shop action using the existing custom red button treatment.
-
-`shop-details-form`
-
-- composes `record-details-form-card`;
-- Name;
-- Address;
-- Description;
-- field error state;
-- Cancel;
-- Save;
-- loading/load-error/saving states.
-
-#### Employees
-
-`employee-list-card`
-
-- composes list/grid/tile primitives;
-- compact/stacked record presentation;
-- presence badge;
-- pinned state;
-- Add New and Clear Search;
-- loading/error/empty/search-empty states.
-
-`employee-profile-card`
-
-- composes `record-profile-card`;
-- identity/details/presence;
-- Edit Employee;
-- optional Kick Employee;
-- destructive Delete Employee;
-- pending/disabled states.
-
-`employee-details-form`
-
-Capture its actual existing fields and visible validation, including:
-
-- first name;
-- last name;
-- email;
-- phone;
-- username;
-- password/PIN field behavior as implemented;
-- Cancel/Save;
-- field-level errors;
-- loading/error/saving states.
-
-Do not move validation logic into the JSON. Record only the visual/interaction contract that the current form exposes.
-
----
-
-### Step 7 — Populate `pages` and `routeBindings`
-
-**Action:** CREATE CONTENT IN THE NEW FILE
-
-Pages must be keyed by stable page IDs, not by route strings.
-
-Each page entry must contain:
-
-- `id`
-- `name`
-- `source`
-- `styleSources`
-- `layoutRef`
-- `roles`
-- `purpose`
-- `composes`
-- `sections`
-- `controls`
-- `dialogs`
-- `states`
-- `responsive`
-- `navigation`
-- `localization`
-- `accessibility`
-
-`routeBindings` must be a separate array with records containing:
-
-- `role`: `public`, `manager`, or `employee`;
-- `path`;
-- `pageRef`;
-- optional `notes`.
-
-This separation is mandatory because `/` and `/availability` are role-dependent.
-
-#### 7.1 Public route coverage
-
-Create bindings for exactly:
-
-| Role | Path | Page |
-|---|---|---|
-| public | `/login` | `login-page` |
-| public | `/password-recovery` | `password-recovery-page` |
-
-`login-page` must capture:
-
-- auth card;
-- username field;
-- PC/Phone authentication mode switch;
-- password field in PC mode;
-- six-digit/PIN keypad presentation in Phone mode as implemented;
-- PIN dots;
-- delete/backspace action;
-- forgot-password action;
-- Sign In action;
-- error/loading/disabled states present in source.
-
-`password-recovery-page` must capture:
-
-- username step;
-- send-code action;
-- code input;
-- new-password input;
-- change-password action;
-- Back to sign in;
-- step/error/loading states implemented in source.
-
-#### 7.2 Manager route coverage
-
-Create bindings for all of the following:
-
-| Role | Path | Page |
-|---|---|---|
-| manager | `/` | `home-page` |
-| manager | `/shop` | `shop-list-page` |
-| manager | `/shop/new` | `shop-edit-page` |
-| manager | `/shop/:shopId` | `shop-profile-page` |
-| manager | `/shop/:shopId/edit` | `shop-edit-page` |
-| manager | `/availability` | `availability-page` |
-| manager | `/availability/new` | `availability-edit-page` |
-| manager | `/availability/:availabilityId` | `availability-profile-page` |
-| manager | `/availability/:availabilityId/edit` | `availability-edit-page` |
-| manager | `/container` | `container-page` |
-| manager | `/container/:containerId/graphs/new` | `container-graph-edit-page` |
-| manager | `/container/:containerId/graphs/:graphId` | `container-graph-profile-page` |
-| manager | `/container/:containerId/graphs/:graphId/edit` | `container-graph-edit-page` |
-| manager | `/information` | `information-page` |
-| manager | `/communications` | `communications-page` |
-| manager | `/database` | `database-page` |
-| manager | `/manager-profile` | `manager-account-page` |
-| manager | `/employee` | `employee-list-page` |
-| manager | `/employee/new` | `employee-edit-page` |
-| manager | `/employee/:employeeId` | `employee-profile-page` |
-| manager | `/employee/:employeeId/edit` | `employee-edit-page` |
-
-Required manager page sources include:
-
-- `FrontEnd/src/pages/home/ui/HomePage.tsx`
-- `FrontEnd/src/pages/shop-list/ui/ShopListPage.tsx`
-- `FrontEnd/src/pages/shop-profile/ui/ShopProfilePage.tsx`
-- `FrontEnd/src/pages/shop-edit/ui/ShopEditPage.tsx`
-- `FrontEnd/src/pages/availability-edit/ui/AvailabilityEditPage.tsx`
-- `FrontEnd/src/pages/availability-profile/ui/AvailabilityProfilePage.tsx`
-- `FrontEnd/src/pages/container/ui/ContainerPage.tsx`
-- the existing Availability list page loaded by `AppRouter`;
-- the existing Container Graph Profile page loaded by `AppRouter`;
-- the existing Container Graph Edit page loaded by `AppRouter`;
-- the existing Information page loaded by `AppRouter`;
-- the existing Communications page loaded by `AppRouter`;
-- the existing DataBase page loaded by `AppRouter`;
-- the existing Manager Account page loaded by `AppRouter`;
-- `FrontEnd/src/pages/employee-list/ui/EmployeeListPage.tsx`
-- `FrontEnd/src/pages/employee-profile/ui/EmployeeProfilePage.tsx`
-- `FrontEnd/src/pages/employee-edit/ui/EmployeeEditPage.tsx`.
-
-For source files whose exact directory name is already resolved by `AppRouter` imports during execution, write that exact repository-relative path into the JSON. Do not shorten it to a display name.
-
-#### 7.3 Employee route coverage
-
-Create bindings for:
-
-| Role | Path | Page |
-|---|---|---|
-| employee | `/` | `employee-notifications-page` |
-| employee | `/notifications` | `employee-notifications-page` |
-| employee | `/availability` | `employee-availability-page` |
-| employee | `/schedule` | `employee-schedule-page` |
-| employee | `/swap` | `employee-swap-page` |
-| employee | `/profile` | `employee-account-page` |
-
-Required employee pages:
-
-- Employee Notifications
-- Employee Availability
-- Employee Schedule
-- Employee Swap
-- Employee Account/Profile.
-
-Each must reference `employee-workspace` and the shared employee workspace visual pattern.
-
----
-
-### Step 8 — Capture complex page design without duplicating internals
-
-**Action:** CREATE CONTENT IN THE NEW FILE
-
-The following pages are too complex to represent as a flat list of CSS declarations. Describe them compositionally.
-
-#### `home-page`
-
-Record:
-
-- `PageHeader` with title/current-time context;
-- “Who Works Today?” section;
-- employee table/list presentation;
-- employee-focus action;
-- “This Month” section;
-- collapse/expand state;
-- summary cards/pill lists;
-- “Active Schedules This Month” section;
-- expand/collapse-all controls;
+- Public schedules eyebrow;
+- `{n} schedules`;
+- period pill;
+- `scheduleSwitcher`;
 - schedule cards;
-- `ContainerGraphMatrix` usage and related dialog where present.
+- date badge;
+- shop/container metadata;
+- Last Update field.
 
-#### `employee-notifications-page`
+Do not replace it with another standalone panel.
 
-Record:
+After this step, when schedules exist, the first schedule content after the hero must be the actual unified schedule card.
 
-- Notifications/News tabs;
-- unread/count indicators;
-- Mark all read;
-- empty states;
-- notification list;
-- per-notification Mark as read;
-- navigation link/action;
-- optional news image/video presentation.
-
-#### `employee-availability-page`
-
-Record the main page shell plus:
-
-- calendar;
-- day selection;
-- day/detail dialog;
-- preset editor;
-- save/update actions;
-- loading/error/empty/disabled states;
-- responsive layout.
-
-Do not copy scheduling business rules.
-
-#### `employee-schedule-page`
-
-Record:
-
-- hero/summary;
-- schedule matrix/container graph presentation;
-- search/select controls;
-- column order controls/dialog;
-- shift correction action/dialog;
-- loading/error/empty states;
-- responsive changes.
-
-#### `employee-swap-page`
-
-Record:
-
-- major swap tabs/sections;
-- employee-target combobox;
-- search/filter controls;
-- pinning;
-- offer/request cards or lists;
-- confirmation dialogs;
-- create/accept/reject/cancel actions as present;
-- empty/loading/error/pending states.
-
-#### `employee-account-page`
-
-Record:
-
-- profile/account sections;
-- language selector;
-- password reset/change controls;
-- regulations/history presentation;
-- logout;
-- error/loading/success states.
-
-#### `availability-page`, `availability-profile-page`, `availability-edit-page`
-
-Record the existing:
-
-- list/profile/editor modes;
-- headers;
-- groups/cards;
-- related-hint UI;
-- transfer dialog;
-- edit-lock dialog;
-- confirm dialog;
-- unsaved-change dialog;
-- save/saving overlay;
-- current editor controls and states.
-
-Reference existing `AvailabilityGroup*` components by component identity instead of re-describing their internals on every page.
-
-#### `container-page`
-
-Record:
-
-- current list/profile/edit mode structure;
-- `ContainerListCard`;
-- `ContainerProfileWorkspace`;
-- `ContainerDetailsForm`;
-- export actions;
-- confirmation;
-- edit lock;
-- saving overlay;
-- error banner;
-- primary/secondary actions.
-
-#### `container-graph-profile-page`
-
-Record:
-
-- session tabs;
-- profile workspace;
-- export actions;
-- compact-size toggle;
-- confirmation;
-- error state;
-- header actions.
-
-#### `container-graph-edit-page`
-
-Record:
-
-- session tabs;
-- main graph editor;
-- toolbar/control groups;
-- selectable/editable graph/matrix surface;
-- current editor modes;
-- dialogs;
-- destructive/confirm actions;
-- save/saving/error/validation states;
-- responsive/large-content behavior.
-
-For the 2,000+ line editor, catalog subcomponents and visible control families; do not duplicate internal data algorithms.
-
-#### `information-page`
-
-Record:
-
-- workflow/log list;
-- date-time field/control;
-- search/filter;
-- delete/clear/settings actions;
-- confirmation dialog;
-- empty/loading/error states.
-
-#### `communications-page`
-
-Record:
-
-- create/edit communication form;
-- title;
-- visible-from;
-- visible-to;
-- message;
-- Cancel;
-- Create/Save Changes;
-- published message board;
-- status/badges;
-- edit/delete actions;
-- confirmation dialog;
-- empty/loading/error states.
-
-#### `database-page`
-
-Record:
-
-- header;
-- developer-access/password dialog;
-- database selection;
-- schema list/search;
-- query executor;
-- import/manual-copy controls;
-- regulations admin panel;
-- error banner;
-- button/action hierarchy;
-- protected/locked/unlocked states.
-
-Do not document backend database schema as part of the design file.
-
-#### `manager-account-page`
-
-Record:
-
-- manager profile;
-- team/account details;
-- language selector;
-- regulation/history sections;
-- relevant dialogs/actions;
-- loading/error states.
+Loading and no-schedule states must remain unchanged.
 
 ---
 
-### Step 9 — Populate `patterns`
+### Step 4 — Build one compact selected-schedule header
 
-**Action:** CREATE CONTENT IN THE NEW FILE
+**Action:** MODIFY
 
-Create reusable UX/design patterns that are demonstrably present:
+**File:**
 
-- `glass-surface`
-- `manager-fixed-page-header`
-- `employee-hero-card`
-- `record-list`
-- `record-profile`
-- `record-edit-form`
-- `search-with-result-meta`
-- `pinned-record`
-- `empty-state`
-- `search-empty-state`
-- `load-error-state`
-- `saving-state`
-- `destructive-confirmation`
-- `manager-edit-lock`
-- `unsaved-changes-guard`
-- `responsive-navigation`
-- `motion-list-reveal`
+`FrontEnd/src/pages/employee-schedule/ui/EmployeeSchedulePage.tsx`
 
-Each pattern must:
+Replace the existing title metadata:
 
-- reference existing component IDs/pages;
-- describe when it is used;
-- point to source files;
-- avoid inventing new runtime abstractions.
+```text
+Schedules
+[F27] [October] [2026]
+```
+
+with the approved compact layout:
+
+```text
+Schedules                         PDF
+
+[icon] F27 ▼                     Adjust
+       October 2026
+       Updated 04 Oct 2026, 14:01
+
+---------------------------------------
+schedule matrix
+```
+
+### Selected-schedule trigger
+
+Inside the existing `openScheduleTitleBlock`, render a button representing the active schedule.
+
+It must contain:
+
+- a compact blue/light-blue icon surface;
+- `EmployeeIcon`;
+- selected schedule name;
+- CSS-created downward chevron;
+- month + year;
+- last update.
+
+Do not introduce a new chevron SVG/icon file. Create the small chevron with CSS using borders/rotation.
+
+The button must:
+
+```text
+type="button"
+aria-haspopup="dialog"
+aria-expanded={isScheduleSelectOpen}
+```
+
+and have an accessible name equivalent to:
+
+```text
+Select schedule. Current schedule: F27
+```
+
+Click:
+
+```ts
+setIsScheduleSelectOpen(true)
+```
+
+### Period
+
+Render one combined period string:
+
+```text
+October 2026
+```
+
+Do not render separate:
+
+```text
+October
+2026
+```
+
+pills.
+
+Do not add left/right arrows.
+
+Do not add another month selector.
+
+### Updated text
+
+Use:
+
+```text
+Updated <formatted last update>
+```
+
+when a timestamp exists.
+
+Make only this metadata line light blue:
+
+```css
+color: #3b82f6;
+```
+
+It should be visually distinct from:
+
+- schedule name: dark;
+- month/year: muted slate.
+
+Use the same presentation in matrix and daily modes.
+
+### Reuse one ReactNode
+
+Build the compact schedule title once in `EmployeeSchedulePage` and pass the same ReactNode to:
+
+- `ContainerGraphMatrix` in matrix mode;
+- `CardSection` in daily mode.
+
+Do not duplicate two independently authored copies of the selector header.
 
 ---
 
-### Step 10 — Populate `knownImplementationDivergences`
+### Step 5 — Preserve PDF, Adjust, and matrix/daily switching
 
-**Action:** CREATE CONTENT IN THE NEW FILE
+**Action:** REUSE / MODIFY LAYOUT ONLY
 
-This section exists to keep the design snapshot truthful.
+**File:**
 
-At minimum include an entry for the current `IosButton` implementation:
+`FrontEnd/src/pages/employee-schedule/ui/EmployeeSchedulePage.tsx`
 
-- ID: `ios-button-inline-padding`
-- source: `FrontEnd/src/shared/ui/components/IosButton/IosButton.tsx`
-- observed current state:
-  - inline vertical padding values conflict with the fixed-height CSS model;
-  - inline horizontal padding uses negative CSS length strings, which are invalid for padding.
-- treatment:
-  - document this as an implementation divergence;
-  - do not alter the component in this task;
-  - do not promote these values to shared foundation tokens;
-  - use the valid CSS module contract when describing the reusable visual component, while explicitly preserving the divergence record.
+Keep the existing:
 
-Also record, as a structural divergence rather than an error:
+```tsx
+headerRightSlot={
+  <div className={styles.openScheduleActions}>
+```
 
-- styling/token values are distributed across global CSS, layout CSS modules, and component CSS modules;
-- many CSS variables are component-local fallbacks and are not global design tokens.
+and existing actions.
 
-Do not add speculative bugs or aesthetic opinions.
+PDF must continue calling:
 
----
+```ts
+handleExportPdf
+```
 
-### Step 11 — Populate `maintenance`
+Adjust must continue opening the existing shift correction dialog.
 
-**Action:** CREATE CONTENT IN THE NEW FILE
+These handlers already operate on `selectedSchedule`; therefore changing schedule selection will naturally make them operate on the new selection.
 
-Add rules for future updates:
+Keep the existing `ScheduleIcon` button and:
 
-1. Any PR that changes a cataloged component’s visible contract must update its JSON entry.
-2. Any added/removed route must update `pages` and `routeBindings`.
-3. Any newly shared visual token must be added to `foundations` with source provenance.
-4. A component-local override must stay component-local unless the implementation itself becomes shared.
-5. New icons exported from `shared/ui/icons/index.ts` must be added to `assets.icons`.
-6. New states/variants must be added to the owning component/page.
-7. If an implementation divergence is fixed in production code, remove or update the matching divergence entry in the same change.
-8. Update `project.branch`/`project.commit` when intentionally refreshing the full design snapshot.
-9. Keep IDs stable across snapshots unless the underlying design entity is removed or renamed.
-10. Do not make future runtime code depend on this file without a separate architectural decision.
+```ts
+handleToggleScheduleView
+```
+
+unchanged.
+
+The redesign must not silently remove daily view.
 
 ---
 
-## 5. Data, API, Persistence, DI, and Configuration Changes
+### Step 6 — Mount the schedule selector dialog once
+
+**Action:** MODIFY
+
+**File:**
+
+`FrontEnd/src/pages/employee-schedule/ui/EmployeeSchedulePage.tsx`
+
+Import:
+
+```ts
+EmployeeScheduleSelectDialog
+```
+
+Render a single instance near the other page dialogs.
+
+Pass:
+
+```text
+open = isScheduleSelectOpen
+schedules = schedules
+selectedScheduleId = selectedSchedule?.id ?? null
+onSelect = handleSelectSchedule
+onClose = () => setIsScheduleSelectOpen(false)
+```
+
+The dialog must not perform queries.
+
+The dialog must not mutate server state.
+
+Selection remains local UI state exactly as it does now.
+
+---
+
+### Step 7 — Convert the existing schedule card to the single white content surface
+
+**Action:** MODIFY
+
+**File:**
+
+`FrontEnd/src/pages/employee-schedule/ui/EmployeeSchedulePage.module.css`
+
+Preserve the gray application/page background.
+
+The actual schedule card must remain visually separated as one white layer.
+
+Update both:
+
+- `.openScheduleMatrix`
+- `.dailyScheduleCard`
+
+so they share the same visual vocabulary:
+
+- white/near-white background;
+- 24px rounded card;
+- current subtle border;
+- current subtle shadow;
+- same width;
+- no second surrounding Public schedules card.
+
+Do not modify the global page background or global `CardSection` styles.
+
+The matrix currently already owns the compact page-specific card dimensions and 24px radius, so extend this page-level styling instead of changing the shared component.
+
+---
+
+### Step 8 — Replace obsolete Public-schedules CSS
+
+**Action:** MODIFY / REMOVE
+
+**File:**
+
+`FrontEnd/src/pages/employee-schedule/ui/EmployeeSchedulePage.module.css`
+
+Remove selectors used exclusively by the removed standalone selector:
+
+```text
+.publicSchedulesPanel
+.publicSchedulesHeader
+.publicSchedulesHeading
+.publicSchedulesHeaderMeta
+.lastUpdateField
+.lastUpdateDot
+.selectedSchedulePill
+.scheduleSwitcher
+.scheduleButton
+.scheduleButtonActive
+.scheduleCardDate
+.scheduleButtonDetails
+.scheduleButtonContent
+.scheduleButtonName
+.scheduleButtonMeta
+```
+
+Add page-specific classes for the new compact header, for example:
+
+```text
+.scheduleSelectTrigger
+.scheduleSelectTriggerIcon
+.scheduleSelectTriggerCopy
+.scheduleSelectName
+.scheduleSelectNameRow
+.scheduleSelectChevron
+.scheduleSelectPeriod
+.scheduleSelectUpdated
+```
+
+Requirements:
+
+- no browser-default button background/border;
+- full trigger remains visibly clickable;
+- name is bold/dark;
+- period is smaller muted text;
+- updated line uses `#3b82f6`;
+- trigger has a visible keyboard focus ring;
+- long schedule names truncate or wrap without pushing PDF/Adjust outside the card;
+- mobile layout must remain inside viewport.
+
+Do not remove unrelated CSS such as:
+
+- daily schedule day tabs;
+- matrix variables;
+- salary styles;
+- shift correction styles;
+- hours-summary styles.
+
+---
+
+## 5. Data / API / Persistence Changes
 
 ### API
 
-**NONE**
+None.
 
-Do not add or modify HTTP endpoints, request DTOs, response DTOs, authorization, or SignalR behavior.
+### Backend
+
+None.
+
+### Models / DTOs
+
+None.
+
+The existing schedule DTO already contains all information required by this UI.
 
 ### Persistence
 
-**NONE**
+None.
 
-Do not change SQLite, EF Core entities, repositories, migrations, seed data, or persistence configuration.
+Do not persist the selected schedule as part of this task.
 
 ### Dependency Injection
 
-**NONE**
+None.
 
-Do not register any service for this feature.
+### Configuration
 
-### Runtime configuration
+None.
 
-**NONE**
+### New dependencies
 
-Do not modify Vite configuration, environment variables, app settings, build configuration, or frontend providers.
-
-### Dependencies
-
-**NONE**
-
-Do not add npm or NuGet packages.
+None.
 
 ---
 
-## 6. Error and Edge-Case Requirements
+## 6. Error and Edge Case Requirements
 
-The JSON itself has no runtime failure path, but its content must handle these documentation edge cases deterministically.
+### Zero schedules
 
-1. **Role-colliding routes**
-   - Never use the route path as the page key.
-   - Model manager and employee route bindings separately.
+Preserve the existing:
 
-2. **One page bound to multiple routes**
-   - Reuse one page entry and add multiple `routeBindings`.
-   - Example: employee notifications for `/` and `/notifications`.
+- loading state;
+- `No published schedules`;
+- Availability link.
 
-3. **One page component used for create/edit**
-   - Reuse one page entry.
-   - Describe create/edit visual state differences.
-   - Add separate route bindings.
+Do not show the selector when no schedule exists.
 
-4. **Shared component + page-specific override**
-   - Keep the base definition in `components`.
-   - Keep the override in the owning page/entity entry.
-   - Do not mutate the base component description to fit a single page.
+### One schedule
 
-5. **Localized labels**
-   - Mark copy sourced through `t(...)` as localized.
-   - Record the current semantic label/purpose, not an assumption that only the displayed English string exists.
+Still render the selected-schedule trigger and metadata consistently.
 
-6. **Dynamic/user data**
-   - Describe format and presentation role, not snapshot values.
-   - Example: document “employee presence badge” rather than hardcoding an employee’s current presence.
+Opening the selector is allowed and shows the single selected schedule.
 
-7. **Conditional UI**
-   - Record the condition/state name and resulting visible element.
-   - Examples: unread dot, edit lock, saving overlay, load error, empty state, collapsed sidebar, selected/pinned tile.
+Do not special-case the entire header into a different design.
 
-8. **Implementation anomalies**
-   - Put confirmed anomalies in `knownImplementationDivergences`.
-   - Do not silently normalize them and do not fix them.
+### Multiple schedules
 
-9. **CSS values with uncertain semantic status**
-   - Keep them under the component/layout where authored.
-   - Do not promote to `foundations` without evidence of shared use or global definition.
+All schedules returned by `useEmployeeScheduleListQuery` must appear in the sheet.
 
-10. **Very large editor components**
-    - Describe visible surfaces and composed subcomponents.
-    - Do not dump internal algorithms, DTOs, or every DOM wrapper.
+### Schedule without `lastUpdatedAtUtc`
+
+Use the existing fallback formatter.
+
+Do not display an empty line.
+
+Do not render an invalid `<time dateTime="">`.
+
+### Schedule changes
+
+After selecting another schedule:
+
+- bottom sheet closes;
+- trigger displays new schedule name;
+- month/year updates;
+- update timestamp updates;
+- matrix switches to the selected schedule;
+- PDF uses selected schedule;
+- Adjust uses selected schedule;
+- daily schedule state resets using the existing selected-schedule effect.
+
+### Long schedule names
+
+Do not allow the name to push:
+
+- PDF;
+- Adjust;
+- card boundaries;
+- table width.
+
+Use ellipsis/wrapping within the compact trigger.
+
+### Many schedules
+
+The bottom-sheet list must scroll internally instead of exceeding viewport height.
+
+### Mobile safe area
+
+Bottom sheet content must not be hidden behind the device home indicator.
 
 ---
 
-## 7. Tests and Static Validation
+## 7. Tests
 
-Do not create a new automated test project or test file for this documentation-only change.
+### MODIFY
 
-### 7.1 JSON syntax validation
+`FrontEnd/src/pages/employee-schedule/ui/EmployeeSchedulePage.test.tsx`
 
-From the repository root run:
+### Update existing expectations
 
-```bash
-node -e "const fs=require('fs'); JSON.parse(fs.readFileSync('docs/design-system.json','utf8')); console.log('design-system.json: valid JSON')"
-```
+The current test expects:
 
-Expected result:
+- `2 schedules`;
+- two `Last Update` fields;
 
-- exit code `0`;
-- output confirms valid JSON.
+because those values come from the old separate Public schedules section.
 
-### 7.2 Required top-level sections
+Remove those obsolete assertions.
 
-Run:
+Replace them with assertions that initial render contains:
 
-```bash
-node -e "const fs=require('fs'); const d=JSON.parse(fs.readFileSync('docs/design-system.json','utf8')); const k=['schemaVersion','project','foundations','assets','layouts','components','pages','routeBindings','patterns','knownImplementationDivergences','maintenance']; const m=k.filter(x=>!(x in d)); if(m.length){console.error('Missing:',m);process.exit(1)} console.log('required sections: ok')"
-```
+- selected schedule name in the compact trigger;
+- period;
+- formatted updated text;
+- matrix for the first/default schedule.
 
-### 7.3 Snapshot metadata
+### Add schedule-selector integration test
+
+Test flow:
+
+1. Mock at least two schedules.
+2. Render page.
+3. Confirm first schedule is active.
+4. Click the `Select schedule...` trigger.
+5. Assert dialog `Select schedule` appears.
+6. Assert both schedules are listed.
+7. Assert first one is selected.
+8. Assert update text is visible in the sheet.
+9. Click second schedule.
+10. Assert dialog closes.
+11. Assert compact header now displays second schedule.
+12. Assert matrix receives second schedule (`graph.id` changed).
+13. Assert month/update metadata corresponds to the second schedule.
+
+### Add close-behavior test
+
+At minimum verify Escape:
+
+1. open selector;
+2. press Escape;
+3. dialog disappears;
+4. selected schedule remains unchanged.
+
+### Add missing-update coverage
+
+Use a schedule with no `lastUpdatedAtUtc`.
 
 Verify:
 
-- `project.branch === "DEV2"`
-- `project.commit === "b4a08ad"`
-- `project.runtimeSourceOfTruth === false`
+- fallback text is rendered;
+- no invalid update date is produced.
 
-### 7.4 Route coverage validation
+### Preserve all existing tests for
 
-The implementation agent must compare `routeBindings` against `FrontEnd/src/app/router/AppRouter.tsx`.
+- PDF layout;
+- matrix data;
+- touching-shift merging;
+- daily schedule mode;
+- salary calculation;
+- column ordering;
+- summary month/year selection;
+- loading/no schedules.
 
-Required route-role pairs are exactly the 29 bindings listed in Step 7:
+Do not weaken those assertions merely to make the redesign pass.
 
-- 2 public;
-- 21 manager;
-- 6 employee.
+### Adjust matrix test mock if required
 
-Do not count unique path strings because role collisions are intentional.
-
-The validation must fail the task if any `AppRouter` route at `b4a08ad` is absent from the JSON.
-
-### 7.5 Shared primitive coverage
-
-Verify that JSON contains component entries for at least:
-
-- `ios-button`
-- `page-header`
-- `card-section`
-- `error-banner`
-- `list-card-section`
-- `record-grid`
-- `record-tile`
-- `profile-summary-card`
-- `record-profile-card`
-- `record-details-form-card`
-- `presence-badge`
-- `text-input`
-- `text-area`
-- `labeled-field`
-- `searchable-select`
-- `employee-target-combobox`
-- `confirm-dialog`
-- `saving-overlay`
-- `manager-edit-lock-dialog`.
-
-### 7.6 Icon coverage
-
-Compare `assets.icons` to exports in:
-
-- `FrontEnd/src/shared/ui/icons/index.ts`
-
-Every exported icon at `b4a08ad` must have exactly one catalog entry.
-
-### 7.7 Source-reference validation
-
-For every `source.path` / `styleSources[].path` in the JSON:
-
-- the referenced file must exist at `b4a08ad`;
-- paths must be repository-relative;
-- no path may point to a file created only by the plan other than `docs/design-system.json`;
-- no GitHub URL or line-number reference should be used instead of a repository-relative path.
-
-### 7.8 Existing frontend verification
-
-Because no production source should change, verify that the existing frontend remains healthy:
-
-```bash
-cd FrontEnd
-npm run lint
-npm run build
-```
-
-Do not fix unrelated pre-existing lint/build failures as part of this plan. If either command already fails on the untouched snapshot, report the pre-existing failure separately rather than expanding scope.
+The page already passes a React node as `title`; make the test mock's `title` type `ReactNode` rather than `string` if needed so the new interactive title/header renders correctly in tests.
 
 ---
 
-## 8. Manual Completeness Verification
+## 8. Verification
 
-Before considering the task complete, perform one focused pass using the manifest against the known UI source set.
+From:
 
-### Foundations
+```bash
+cd FrontEnd
+```
 
-- [ ] Global font/background/text behavior is represented.
-- [ ] Shared motion values are represented.
-- [ ] Manager-specific layout constants are represented.
-- [ ] Employee-specific layout/shared-page values are represented.
-- [ ] Component-local values have not been falsely promoted to global tokens.
+run:
 
-### Layouts
+```bash
+npm test -- src/pages/employee-schedule/ui/EmployeeSchedulePage.test.tsx
+```
 
-- [ ] Manager sidebar/navigation/collapse behavior is represented.
-- [ ] Employee desktop/mobile navigation is represented.
-- [ ] Public/auth presentation is represented.
-- [ ] Role-specific auxiliary UI is represented.
+Then:
 
-### Components
+```bash
+npm run lint
+```
 
-- [ ] Shared buttons, headers, cards, banners, record primitives, profile primitives, form primitives, selectors/comboboxes, dialogs, overlays, and badges are cataloged.
-- [ ] Variants and important states are cataloged.
-- [ ] Keyboard/ARIA behavior explicitly implemented in source is represented.
-- [ ] Reusable components are not redundantly redefined in pages.
+Then:
 
-### Pages
+```bash
+npm run build
+```
 
-- [ ] Every route from `AppRouter.tsx` maps to a page.
-- [ ] Shop and employee list/profile/edit compositions are represented.
-- [ ] Home major sections are represented.
-- [ ] Employee Notifications major controls/states are represented.
-- [ ] Employee Availability major controls/states are represented.
-- [ ] Employee Schedule major controls/dialogs are represented.
-- [ ] Employee Swap major controls/dialogs are represented.
-- [ ] Employee Account major controls are represented.
-- [ ] Availability list/profile/editor major controls/dialogs are represented.
-- [ ] Container list/profile/edit surfaces are represented.
-- [ ] Container Graph profile/editor surfaces are represented.
-- [ ] Information controls are represented.
-- [ ] Communications form/board/actions are represented.
-- [ ] Database page protected/tooling surfaces are represented.
-- [ ] Manager Account sections/actions are represented.
-- [ ] Login and Password Recovery flows are represented.
+If the focused tests pass, run the complete frontend suite:
 
-### Provenance
+```bash
+npm test
+```
 
-- [ ] Every component/page/layout has at least one source reference.
-- [ ] Style-owning entries have style source references.
-- [ ] Known `IosButton` divergence is recorded.
-- [ ] Snapshot commit and branch are present.
+### Manual visual verification
+
+Check `/schedule` with at least two schedules at:
+
+```text
+360px mobile width
+390px mobile width
+>= 860px desktop layout
+```
+
+Verify visually:
+
+```text
+Hero
+
+[ ONE white Schedules card                  ]
+[ Schedules                           PDF   ]
+[                                             ]
+[ icon  F27 ▼                       Adjust ]
+[       October 2026                        ]
+[       Updated 04 Oct 2026, 14:01          ]
+[                                             ]
+[ schedule matrix                            ]
+```
+
+Confirm:
+
+- gray page remains visible around the card;
+- Public schedules card is gone;
+- no large vertical gap exists between selector and matrix;
+- no month navigation control exists;
+- no arrows for changing month/date exist;
+- `Updated ...` is light blue;
+- PDF/Adjust remain readable;
+- bottom navigation does not cover content;
+- schedule selector opens as a bottom sheet on mobile;
+- page behind the sheet is dimmed/blurred;
+- the selected row is clearly marked.
 
 ---
 
 ## 9. Acceptance Checklist
 
-The task is complete only when all items below are true.
-
-- [ ] `docs/design-system.json` exists.
-- [ ] It is valid JSON with no comments or trailing commas.
-- [ ] `schemaVersion` is `"1.0.0"`.
-- [ ] The snapshot identifies repository GF3, branch `DEV2`, commit `b4a08ad`.
-- [ ] It explicitly states that the file is descriptive and not the runtime source of truth.
-- [ ] Foundations describe the actual current typography, colors/surfaces, relevant spacing/radii/borders/shadows, motion, and responsive rules with source provenance.
-- [ ] Manager, employee, and public/auth layouts are represented.
-- [ ] Shared UI primitives are represented once and reused by reference.
-- [ ] The complete exported icon set is represented.
-- [ ] Shop reusable list/profile/form design is represented.
-- [ ] Employee reusable list/profile/form design is represented.
-- [ ] All 29 role-route bindings from the analyzed `AppRouter` snapshot are represented.
-- [ ] Role collisions for `/` and `/availability` are unambiguous.
-- [ ] Public login and password-recovery design flows are represented.
-- [ ] Complex manager and employee pages are documented compositionally without duplicating business logic.
-- [ ] Loading, error, empty, search-empty, selected, pinned, collapsed/expanded, disabled, saving, destructive-confirmation, and edit-lock states are represented where applicable.
-- [ ] Responsive behavior is tied to its actual owner/source instead of being invented as one global system.
-- [ ] Localized UI text is identified as localized where sourced through `t(...)`.
-- [ ] Explicit accessibility semantics in the source are captured.
-- [ ] `IosButton` implementation divergence is documented and not fixed.
-- [ ] No production React/TypeScript/CSS file was changed.
-- [ ] No backend/API/persistence/DI/configuration file was changed.
-- [ ] No dependency was added.
-- [ ] No runtime import or loader for the JSON was created.
-- [ ] JSON syntax validation passes.
-- [ ] Top-level-section validation passes.
-- [ ] Route coverage validation passes.
-- [ ] Icon coverage validation passes.
-- [ ] Source-reference validation passes.
-- [ ] Existing frontend lint/build behavior is unchanged.
-- [ ] The final diff contains the intended new JSON artifact only.
+- [ ] Separate `Public schedules` section is removed.
+- [ ] Schedule selector and actual schedule are visually one card.
+- [ ] Existing gray page background remains unchanged.
+- [ ] Unified schedule card is white/near-white.
+- [ ] `Schedules` remains visible as section title.
+- [ ] Selected schedule name is visible.
+- [ ] Selected schedule has a downward selection chevron.
+- [ ] Month and year appear as one line.
+- [ ] No duplicate F27/October/2026 pills remain.
+- [ ] No date/month navigation arrows are introduced.
+- [ ] Last-update text appears directly below the month/year.
+- [ ] Last-update text uses light blue `#3b82f6`.
+- [ ] PDF remains available.
+- [ ] Adjust remains available.
+- [ ] Matrix remains directly below the compact header.
+- [ ] Daily/matrix toggle still works.
+- [ ] Tapping selected schedule opens `Select schedule`.
+- [ ] Selector is a bottom sheet on mobile.
+- [ ] All published schedules appear in the sheet.
+- [ ] Each row shows name, period and update status.
+- [ ] Selected schedule has a blue check indicator.
+- [ ] Selecting a schedule closes the sheet.
+- [ ] Matrix updates immediately.
+- [ ] PDF/Adjust subsequently operate on the newly selected schedule.
+- [ ] Missing update timestamps remain valid.
+- [ ] Zero/one/many schedule states remain valid.
+- [ ] Existing schedule business logic is unchanged.
+- [ ] No backend/API/database changes are made.
+- [ ] No new npm dependency is introduced.
+- [ ] Focused page tests pass.
+- [ ] Full frontend build succeeds.
+- [ ] Lint succeeds.
 
 ---
 
 ## 10. Do Not Change
 
-**DO NOT TOUCH**
+Do not modify:
 
-- `BusinessLogicLayer/`
-- `DataAccessLayer/`
-- `GF3.WebApi/`
-- `GF3.Launcher/`
-- `GF3.Tests/`
-- backend contracts or database schema;
-- `FrontEnd/src/app/router/AppRouter.tsx`;
-- `FrontEnd/src/index.css`;
-- `FrontEnd/src/shared/ui/motion.css`;
-- manager or employee layout implementation;
-- shared UI primitives;
-- page components;
-- entity UI components;
-- localization implementation/translations;
-- icon implementations;
-- API/query/mutation code;
-- presence/edit-lock behavior;
-- authentication/authorization;
-- build configuration;
-- package manifests/lockfiles.
+```text
+BusinessLogicLayer/
+DataAccessLayer/
+GF3.WebApi/
+GF3.Launcher/
+```
 
-These files are sources for the design inventory, not implementation targets.
+Do not modify schedule APIs or DTO contracts.
 
----
+Do not modify:
 
-## 11. Execution Rule for the Coding Agent
+```text
+FrontEnd/src/entities/containers/ui/ContainerGraphMatrix.tsx
+FrontEnd/src/shared/ui/sections/CardSection/CardSection.tsx
+FrontEnd/src/pages/employee-schedule/ui/EmployeeScheduleHero.tsx
+```
 
-Execute this plan as a **source-grounded extraction task**, not as a new architecture/design task.
+unless compilation proves an unavoidable existing incompatibility. In that case, stop and report the blocker rather than expanding scope automatically.
 
-The coding agent may open the exact source files listed above and the components directly imported by those files to extract the current visual/interaction facts required by the JSON. That inspection is for populating the already-decided schema only.
+Do not redesign:
 
-The coding agent must not:
+- employee navigation;
+- Availability;
+- Swap;
+- Profile;
+- Work hours summary;
+- salary calculator;
+- shift correction;
+- column customization.
 
-- perform another full repository architecture analysis;
-- choose a different output format;
-- split the design description across several files;
-- introduce a schema library;
-- redesign the UI;
-- refactor CSS;
-- make the JSON executable/runtime-driven;
-- fix unrelated code;
-- change the scope defined by this plan.
+Do not perform general schedule-page refactoring even though `EmployeeSchedulePage.tsx` is large.
 
-If a UI fact cannot be proven from the `b4a08ad` source, omit it or mark the corresponding JSON field as unknown/not explicitly defined rather than inventing a value.
+The execution goal is only the approved schedule-selection UX redesign.
