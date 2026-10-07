@@ -2,851 +2,835 @@
 
 ## 1. Objective
 
-Redesign the employee **Schedule** page at repository state `DEV2 / 55bf0e9` so that the separate **Public schedules** selection panel is removed and schedule selection is integrated directly into the existing schedule card, matching the approved mockup.
+Redesign **only the mobile employee bottom navigation**:
 
-The final UI must have:
+The current mobile navigation contains five employee destinations plus the collapse button. Every navigation item currently renders both its icon and mobile label, while the container uses five equal grid columns plus the collapse control.
 
-- the existing gray page background;
-- one white schedule surface below the hero;
-- `Schedules` as the section title;
-- existing PDF action in the upper-right;
-- selected schedule name, e.g. `F27`, directly inside this section;
-- a small downward chevron indicating that the schedule can be changed;
-- month/year directly under the schedule name, e.g. `October 2026`;
-- `Updated 04 Oct 2026, 14:01` directly below it;
-- the `Updated ...` text in a clearly visible light blue;
-- existing `Adjust` action on the right;
-- the schedule matrix directly below the compact header;
-- no separate Public schedules card;
-- no extra date/month selector;
-- no month navigation arrows;
-- no duplicated `F27 / October / 2026` pill row;
-- tapping the selected schedule opens a **Select schedule** bottom sheet;
-- the bottom sheet lists all published schedules with name, month/year and update time;
-- selecting another schedule closes the sheet and immediately updates the displayed schedule.
+Replace that visual behavior with the approved design:
 
-The existing `EmployeeSchedule` model already provides `name`, `year`, `month` and `lastUpdatedAtUtc`, so this redesign requires no API/model expansion.
+```text
+Inactive tabs: ICON ONLY
 
-This plan is intentionally implementation-ready and scoped to the requested UI change.
+Active tab:
+┌──────────────────┐
+│  [icon]  Shifts  │
+└──────────────────┘
+
+Full navigation:
+
+╭─────────────────────────────────────────────╮
+│  [icon]  [icon]  [icon + LABEL] [icon] [icon]  (↩) │
+╰─────────────────────────────────────────────╯
+```
+
+For example, on `/schedule`:
+
+```text
+[Alerts icon] [Avail icon] [ calendar  Shifts ] [Swap icon] [Profile icon] [↩]
+                         ↑
+                    active expanded pill
+```
+
+When the user navigates to another section:
+
+```text
+[Alerts icon + Alerts] [Avail icon] [Shifts icon] [Swap icon] [Profile icon] [↩]
+```
+
+The active pill moves conceptually to the newly selected section because that item becomes expanded while the previous one collapses.
+
+### Required visual behavior
+
+- Inactive navigation destinations show **only their icons**.
+- The currently active destination shows icon + label immediately to the **right** of the icon.
+- Active destination is wider than inactive destinations.
+- Active destination is a horizontally expanded rounded pill.
+- Outer navigation is a strongly rounded/capsule shape.
+- Existing matte/frosted glass material of the outer navigation must be preserved.
+- Existing blue GF3 active-navigation palette must be preserved.
+- Collapse/back control remains at the far right as a separate circular control.
+- Navigation transition should be smooth when route changes.
+- Existing unread notification dots continue working.
+- Existing collapse/reopen behavior continues working.
 
 ---
 
 ## 2. Existing Components to Reuse
 
-### REUSE — `ContainerGraphMatrix`
+### REUSE — `EmployeeWorkspaceLayout`
 
 File:
 
-`FrontEnd/src/entities/containers/ui/ContainerGraphMatrix.tsx`
+`FrontEnd/src/app/layouts/employee-workspace-layout/EmployeeWorkspaceLayout.tsx`
 
-Keep this component unchanged.
+Continue using the existing `employeeNavItems` with:
 
-It already supports:
+- `/` → Alerts;
+- `/availability` → Avail.;
+- `/schedule` → Shifts;
+- `/swap` → Swap;
+- `/profile` → Profile.
 
-- `title: ReactNode`;
-- `icon`;
-- `headerRightSlot`;
-- compact header mode;
-- read-only schedule rendering.
+Do not duplicate this navigation configuration.
 
-It delegates these header values to the existing `CardSection`, so the new selector UI can be supplied from `EmployeeSchedulePage` without changing the shared matrix component.
+Continue using the existing:
 
-### REUSE — `CardSection`
+- `NavLink`;
+- `isActive`;
+- `aria-current`;
+- translated `mobileLabel`;
+- unread-target logic;
+- `navUnreadDot`;
+- collapse state;
+- `mobileNavRef`;
+- focus-transfer behavior;
+- `mobileToggleButton`;
+- `mobileOpenTab`.
+
+Use the existing route-derived active state to control the new expanded pill. Do not introduce new active-tab React state.
+
+### REUSE — current glass navigation material
 
 File:
 
-`FrontEnd/src/shared/ui/sections/CardSection/CardSection.tsx`
+`FrontEnd/src/app/layouts/employee-workspace-layout/EmployeeWorkspaceLayout.module.css`
 
-Keep this component unchanged.
+Preserve the existing `.mobileTabs` material:
 
-Continue using its existing title/header/right-slot composition rather than introducing another schedule-specific card primitive.
+```text
+background: rgba(255, 255, 255, 0.16)
+border: 1px solid rgba(0, 0, 0, 0.08)
+box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08)
+backdrop-filter: blur(20px) saturate(180%)
+```
 
-### REUSE — existing schedule data/state
+Do **not** replace it with solid white, opaque gray, opaque blue, dark navigation, or a new glass library.
 
-Continue using:
+### REUSE — current colors
 
-- `useEmployeeScheduleListQuery`;
-- `selectedScheduleId`;
-- `selectedSchedule`;
-- `formatScheduleLastUpdate`;
-- `formatScheduleMonth(...)`;
-- `formatScheduleMonthOnly(...)`;
-- existing schedule matrix derivation;
-- existing daily/matrix view switching;
-- existing PDF export;
-- existing Adjust / shift-correction flow.
+Continue using the existing navigation colors:
 
-The current selected schedule already drives matrix columns, cells, daily view and related state.
+```text
+muted/inactive: #64748b
+active:         #1d4ed8
+primary blue:   #2563eb
+```
 
-### REUSE — overlay infrastructure
+### REUSE — current icons
 
-Reuse:
+Do not replace or redraw:
 
-`FrontEnd/src/shared/ui/ViewportOverlay.module.css`
-
-through CSS Modules `composes`, as existing project dialogs already do.
-
-### REUSE — icons
-
-Reuse existing icons from:
-
-`@shared/ui/icons`
-
-Specifically:
-
-- `CloseIcon`;
-- `CheckIcon`;
+- `NoteIcon`;
+- `AvailabilityIcon`;
+- `ScheduleIcon`;
 - `EmployeeIcon`;
-- existing `ScheduleIcon`.
+- `BackIcon`.
 
-Do not add a new icon library.
+### REUSE — collapse mechanics
+
+Keep:
+
+```ts
+isMobileTabsCollapsed
+setIsMobileTabsCollapsed(...)
+```
+
+and existing focus behavior.
+
+The right-side control must continue collapsing the navigation. The separate `mobileOpenTab` must continue reopening it.
 
 ---
 
 ## 3. Constraints
 
-- Do not change backend code.
-- Do not change API endpoints.
-- Do not change schedule persistence.
-- Do not change `EmployeeSchedule`.
-- Do not add npm dependencies.
-- Do not modify `ContainerGraphMatrix`.
-- Do not modify the shared `CardSection`.
-- Do not alter the schedule table/matrix business logic.
-- Do not alter PDF generation.
-- Do not alter column customization.
-- Do not alter Adjust / shift-correction behavior.
-- Do not remove the existing daily/matrix presentation toggle.
-- Do not redesign the hero.
-- Do not redesign Work hours / salary sections.
-- Do not introduce month navigation arrows.
-- Do not introduce another date picker.
-- Do not preserve the old large Public schedules panel alongside the new selector.
-- Do not perform unrelated CSS cleanup/refactoring.
+This task is a **mobile navigation visual redesign only**.
 
-The task is a localized presentation/state-wiring change.
+Do not:
 
----
+- change routing;
+- change employee destinations;
+- add navigation destinations;
+- remove destinations;
+- alter notification fetching;
+- alter unread-dot calculation;
+- change authentication;
+- change APIs;
+- change backend code;
+- change database code;
+- change employee pages;
+- add dependencies;
+- introduce a navigation component library;
+- replace existing icons;
+- change desktop navigation design;
+- redesign the collapse architecture;
+- change the mobile navigation's fixed positioning;
+- change its safe-area behavior;
+- introduce JavaScript width calculations;
+- use absolute positioning for normal tab layout;
+- calculate widths from `window.innerWidth`;
+- hardcode per-route positions.
 
-## 4. Implementation Steps
-
-### Step 1 — Create the schedule-selection bottom sheet
-
-**Action:** CREATE
-
-**Files:**
-
-- `FrontEnd/src/pages/employee-schedule/ui/EmployeeScheduleSelectDialog.tsx`
-- `FrontEnd/src/pages/employee-schedule/ui/EmployeeScheduleSelectDialog.module.css`
-
-### Component contract
-
-Create:
-
-```ts
-type EmployeeScheduleSelectDialogProps = {
-  open: boolean;
-  schedules: EmployeeSchedule[];
-  selectedScheduleId: number | null;
-  onSelect: (scheduleId: number) => void;
-  onClose: () => void;
-};
-```
-
-Responsibility:
-
-Present the existing published schedules as a compact selector only. It must not own schedule fetching or selection state.
-
-### Dialog structure
-
-Render only while `open === true`.
-
-Structure:
-
-```text
-overlay
-└── sheet/dialog
-    ├── drag handle
-    ├── header
-    │   ├── "Select schedule"
-    │   └── close button
-    └── schedule list
-        ├── F27
-        │   ├── October 2026
-        │   └── Updated ...
-        └── F35
-            ├── October 2026
-            └── Updated ...
-```
-
-Each schedule row must:
-
-- be a `<button type="button">`;
-- display `schedule.name`;
-- display localized month + year;
-- display last-update information using the existing `formatScheduleLastUpdate(...)`;
-- use `aria-pressed={isSelected}`;
-- visually distinguish the selected schedule;
-- show a blue circular selected indicator containing `CheckIcon`;
-- show an outlined empty indicator when not selected;
-- use `EmployeeIcon` or the equivalent existing employee/schedule visual on the left.
-
-For a schedule with `lastUpdatedAtUtc`:
-
-```text
-Updated 04 Oct 2026, 14:01
-```
-
-For a schedule without an update timestamp, display the existing fallback from `formatScheduleLastUpdate(...)` without constructing the awkward phrase `Updated Not recorded yet`.
-
-### Interaction
-
-Selecting a row must call:
-
-```ts
-onSelect(schedule.id)
-```
-
-The parent will own closing the sheet.
-
-Support:
-
-- close button;
-- Escape key;
-- clicking the overlay outside the sheet.
-
-Do not create confirmation/cancel steps: selecting a schedule is immediate.
-
-### Accessibility
-
-The overlay must use:
-
-```text
-role="dialog"
-aria-modal="true"
-aria-labelledby=<dialog title id>
-```
-
-Use `useId()` for the title id.
-
-When the sheet opens, autofocus the currently selected schedule row. If no row is selected, autofocus the close button.
-
-### Styling
-
-Reuse the existing overlay/surface primitives through:
-
-```css
-composes: overlay from "../../../shared/ui/ViewportOverlay.module.css";
-```
-
-and:
-
-```css
-composes: surface from "../../../shared/ui/ViewportOverlay.module.css";
-```
-
-Desktop/tablet:
-
-- compact modal width around the existing 420–460px dialog vocabulary;
-- white surface;
-- rounded corners;
-- existing project shadow/border language.
-
-Mobile (`max-width: 640px`):
-
-- attach sheet to the bottom of the viewport;
-- width `100%`;
-- no horizontal page margin;
-- rounded top-left/top-right corners;
-- bottom corners may be `0`;
-- include `env(safe-area-inset-bottom)` in bottom padding;
-- max-height approximately `80–85dvh`;
-- list becomes vertically scrollable when necessary.
-
-The underlying page must receive the existing dimmed + blurred overlay treatment.
-
-Add a small horizontal drag handle at the top for visual parity with the approved mockup. It is decorative only.
-
-### Colors
-
-Selected schedule:
-
-- blue border;
-- very light blue background;
-- solid blue selected indicator.
-
-Normal schedule:
-
-- white/light neutral surface;
-- subtle neutral border.
-
-Last update:
-
-```css
-color: #3b82f6;
-```
-
-Use this same update color in the selector and in the selected-schedule header.
+Use CSS flex/layout state instead.
 
 ---
 
-### Step 2 — Replace the old schedule-card click handler with selector state
+# 4. Implementation Steps
+
+## Step 1 — Change the mobile navigation label markup
 
 **Action:** MODIFY
 
 **File:**
 
-`FrontEnd/src/pages/employee-schedule/ui/EmployeeSchedulePage.tsx`
+`FrontEnd/src/app/layouts/employee-workspace-layout/EmployeeWorkspaceLayout.tsx`
 
-Add:
+Keep every label in the DOM but give it a dedicated mobile-navigation class:
 
-```ts
-const [isScheduleSelectOpen, setIsScheduleSelectOpen] = useState(false);
+```text
+mobileTabLabel
+```
+
+The mobile item must conceptually become:
+
+```tsx
+<NavLink ...>
+  <span className={styles.tabIcon}>
+    {item.icon}
+    {unread dot}
+  </span>
+
+  <span
+    className={styles.mobileTabLabel}
+    aria-hidden="true"
+  >
+    {item.mobileLabel ?? item.label}
+  </span>
+</NavLink>
+```
+
+Do not conditionally mount/unmount it based on `isActive`.
+
+Keeping it present allows CSS to animate:
+
+```text
+width/max-width
+opacity
+transform
+```
+
+when the tab becomes active.
+
+Keep the existing `aria-label` on `NavLink`. Because that already provides the accessible navigation name, make the visual label `aria-hidden="true"` to avoid redundant screen-reader output.
+
+Do not change unread information in the `aria-label`.
+
+---
+
+## Step 2 — Remove the animated background indicator from the MOBILE navigation only
+
+**Action:** MODIFY
+
+**File:**
+
+`FrontEnd/src/app/layouts/employee-workspace-layout/EmployeeWorkspaceLayout.tsx`
+
+For the **mobile navigation only**, remove the `data-employee-nav-indicator` span.
+
+Keep the indicator in `desktopTabs` unchanged.
+
+Mobile selection styling will now belong directly to `.mobileTabActive` instead of a separately positioned background indicator.
+
+Do not modify:
+
+`FrontEnd/src/app/layouts/employee-workspace-layout/useEmployeeMotion.ts`
+
+---
+
+## Step 3 — Convert the mobile navigation from equal-column grid to adaptive flex layout
+
+**Action:** MODIFY
+
+**File:**
+
+`FrontEnd/src/app/layouts/employee-workspace-layout/EmployeeWorkspaceLayout.module.css`
+
+Replace the current equal-column grid layout with flex layout:
+
+```text
+display: flex
+align-items: center
+```
+
+Keep a small consistent gap between controls.
+
+The five `NavLink` items must share the available width flexibly.
+
+Conceptual sizing:
+
+```text
+inactive tab → flex-grow approximately 1
+active tab   → flex-grow approximately 2–2.2
+collapse     → fixed width
+```
+
+Use CSS flex factors, **not viewport calculations**.
+
+The intended geometry at mobile widths is approximately:
+
+```text
+| icon | icon | icon + Shifts | icon | icon | circle |
+```
+
+The layout must automatically redistribute when another item becomes active.
+
+---
+
+## Step 4 — Change the outer navigation shape to a capsule
+
+**Action:** MODIFY
+
+**File:**
+
+`FrontEnd/src/app/layouts/employee-workspace-layout/EmployeeWorkspaceLayout.module.css`
+
+Change the outer `.mobileTabs` shape to a stronger capsule.
+
+Target:
+
+```css
+border-radius: 999px;
+```
+
+Preserve exactly:
+
+- fixed positioning;
+- left/right safe-area calculations;
+- bottom safe-area calculation;
+- z-index;
+- glass background;
+- glass border;
+- glass shadow;
+- backdrop blur;
+- saturation;
+- expanded/collapsed transition.
+
+Do not increase opacity enough to lose the matte-glass appearance.
+
+---
+
+## Step 5 — Redesign inactive mobile tabs
+
+**Action:** MODIFY
+
+**File:**
+
+`FrontEnd/src/app/layouts/employee-workspace-layout/EmployeeWorkspaceLayout.module.css`
+
+Change `.mobileTab` to centered inline-flex content.
+
+Required base behavior:
+
+```text
+display: inline-flex
+align-items: center
+justify-content: center
+min-width: 0
 ```
 
 Keep:
 
-```ts
-const [selectedScheduleId, setSelectedScheduleId] = useState<number | null>(null);
-```
+- transparent base border;
+- muted `#64748b` color;
+- sufficient touch height;
+- rounded shape;
+- existing focus-visible behavior.
 
-Replace the existing `handleSelectSchedule(button, scheduleId)` implementation.
-
-The existing handler currently depends on DOM lookup and Web Animations specifically for the old large schedule cards. Those cards will no longer exist.
-
-Use the simplified responsibility:
+Inactive tab:
 
 ```text
-select ID
-→ close selector
-→ existing selectedSchedule memo recalculates
-→ existing matrix/daily derived state recalculates
+[ icon ]
 ```
 
-Conceptual contract:
+The `.mobileTabLabel` must be visually collapsed.
 
-```ts
-const handleSelectSchedule = (scheduleId: number) => {
-  setSelectedScheduleId(scheduleId);
-  setIsScheduleSelectOpen(false);
-};
+### Inactive label state
+
+Implement with CSS equivalent to:
+
+```text
+max-width: 0
+opacity: 0
+overflow: hidden
+white-space: nowrap
+transform: translateX(-4px)
 ```
 
-Do not preserve:
-
-- `button.querySelector(...)`;
-- `.scheduleCardDate` lookup;
-- `button.animate(...)`;
-- badge rotation animation;
-- `schedule-card-press` animation IDs.
-
-Those only support the removed card selector.
-
-Keep the existing effect that resets the selected daily day when `selectedSchedule.id` changes.
+Do not use `display: none` because the label should transition smoothly when active state changes.
 
 ---
 
-### Step 3 — Remove the separate Public schedules section
-
-**Action:** REMOVE
-
-**File:**
-
-`FrontEnd/src/pages/employee-schedule/ui/EmployeeSchedulePage.tsx`
-
-Remove the complete render block currently beginning with:
-
-```tsx
-{schedules.length > 0 ? (
-  <section className={`${workspaceStyles.panel} ${styles.publicSchedulesPanel}`}>
-```
-
-and containing:
-
-- Public schedules eyebrow;
-- `{n} schedules`;
-- period pill;
-- `scheduleSwitcher`;
-- schedule cards;
-- date badge;
-- shop/container metadata;
-- Last Update field.
-
-Do not replace it with another standalone panel.
-
-After this step, when schedules exist, the first schedule content after the hero must be the actual unified schedule card.
-
-Loading and no-schedule states must remain unchanged.
-
----
-
-### Step 4 — Build one compact selected-schedule header
+## Step 6 — Implement the expanded active tab
 
 **Action:** MODIFY
 
 **File:**
 
-`FrontEnd/src/pages/employee-schedule/ui/EmployeeSchedulePage.tsx`
+`FrontEnd/src/app/layouts/employee-workspace-layout/EmployeeWorkspaceLayout.module.css`
 
-Replace the existing title metadata:
+`.mobileTabActive` becomes the selected expanded capsule.
 
-```text
-Schedules
-[F27] [October] [2026]
-```
-
-with the approved compact layout:
+### Structure
 
 ```text
-Schedules                         PDF
-
-[icon] F27 ▼                     Adjust
-       October 2026
-       Updated 04 Oct 2026, 14:01
-
----------------------------------------
-schedule matrix
+╭──────────────────╮
+│ [icon]  Shifts   │
+╰──────────────────╯
 ```
 
-### Selected-schedule trigger
-
-Inside the existing `openScheduleTitleBlock`, render a button representing the active schedule.
-
-It must contain:
-
-- a compact blue/light-blue icon surface;
-- `EmployeeIcon`;
-- selected schedule name;
-- CSS-created downward chevron;
-- month + year;
-- last update.
-
-Do not introduce a new chevron SVG/icon file. Create the small chevron with CSS using borders/rotation.
-
-The button must:
-
-```text
-type="button"
-aria-haspopup="dialog"
-aria-expanded={isScheduleSelectOpen}
-```
-
-and have an accessible name equivalent to:
-
-```text
-Select schedule. Current schedule: F27
-```
-
-Click:
-
-```ts
-setIsScheduleSelectOpen(true)
-```
-
-### Period
-
-Render one combined period string:
-
-```text
-October 2026
-```
-
-Do not render separate:
-
-```text
-October
-2026
-```
-
-pills.
-
-Do not add left/right arrows.
-
-Do not add another month selector.
-
-### Updated text
+### Active layout
 
 Use:
 
 ```text
-Updated <formatted last update>
+display: inline-flex
+align-items: center
+justify-content: center
 ```
 
-when a timestamp exists.
+with approximately `6–8px` gap between icon and label.
 
-Make only this metadata line light blue:
+### Active width
+
+Increase its flex share relative to inactive controls.
+
+Target concept:
+
+```text
+inactive flex factor: 1
+active flex factor:   ~2.1
+```
+
+Exact value may be adjusted within the stylesheet only to make the layout fit cleanly at required widths, but do not use fixed per-route pixel positions.
+
+### Active surface
+
+Use a light-blue glass/pill treatment consistent with GF3:
+
+```text
+very-light-blue translucent background
+thin blue border
+blue foreground
+soft blue shadow
+subtle white inset highlight
+```
+
+Use existing GF3 blue values.
+
+Target visual direction:
+
+```text
+background:
+linear-gradient(
+  180deg,
+  rgba(239, 246, 255, ~0.96),
+  rgba(219, 234, 254, ~0.9)
+)
+
+border:
+rgba(59, 130, 246, ~0.24)
+
+text:
+#1d4ed8
+
+icon:
+#2563eb
+```
+
+Do not make the selected pill solid dark blue.
+
+---
+
+## Step 7 — Reveal the active label beside the icon
+
+**Action:** MODIFY
+
+**File:**
+
+`FrontEnd/src/app/layouts/employee-workspace-layout/EmployeeWorkspaceLayout.module.css`
+
+Add styles for:
+
+```text
+.mobileTabLabel
+.mobileTabActive .mobileTabLabel
+```
+
+Inactive:
+
+```text
+width collapsed
+opacity 0
+slightly shifted left
+```
+
+Active:
+
+```text
+max-width enough for compact mobile label
+opacity 1
+translateX(0)
+```
+
+Active label must:
+
+- stay on one line;
+- use existing compact mobile label text;
+- use `overflow: hidden`;
+- use `text-overflow: ellipsis` if localized text becomes too long;
+- never push neighboring buttons outside the navigation.
+
+Continue using:
+
+```text
+Alerts
+Avail.
+Shifts
+Swap
+Profile
+```
+
+through the existing translation mechanism.
+
+Do not hardcode these strings in CSS or duplicate them in another data structure.
+
+---
+
+## Step 8 — Add smooth active-tab transitions
+
+**Action:** MODIFY
+
+**File:**
+
+`FrontEnd/src/app/layouts/employee-workspace-layout/EmployeeWorkspaceLayout.module.css`
+
+Animate the change using CSS only.
+
+Use the existing `--motion-ease` for the main expansion.
+
+Animate relevant properties such as:
+
+```text
+flex-grow
+background
+border-color
+box-shadow
+color
+gap
+```
+
+and for the label:
+
+```text
+max-width
+opacity
+transform
+```
+
+Target duration:
+
+```text
+~260–360ms for expansion
+~160–220ms for label opacity
+```
+
+Do not introduce another GSAP animation for this behavior.
+
+---
+
+## Step 9 — Remove the old mobile active-icon vertical jump
+
+**Action:** MODIFY
+
+**File:**
+
+`FrontEnd/src/app/layouts/employee-workspace-layout/EmployeeWorkspaceLayout.module.css`
+
+Current styling applies a vertical lift/scale to active icons.
+
+Split the rule.
+
+### Mobile
+
+Active icon must remain vertically centered:
+
+```text
+translate: 0 0
+```
+
+A subtle scale around `1.04–1.08` is acceptable.
+
+### Desktop
+
+Preserve the existing desktop behavior.
+
+Do not visually redesign desktop navigation.
+
+---
+
+## Step 10 — Preserve unread notification dots
+
+**Action:** REUSE
+
+No logic changes.
+
+Existing unread dot remains a child of `.tabIcon` and must remain visible on both active and inactive tabs.
+
+Do not move unread-dot logic into the label.
+
+Do not change its business rules.
+
+---
+
+## Step 11 — Make the collapse control circular
+
+**Action:** MODIFY
+
+**File:**
+
+`FrontEnd/src/app/layouts/employee-workspace-layout/EmployeeWorkspaceLayout.module.css`
+
+Keep `mobileToggleButton` at the far right of the expanded navigation.
+
+Change its visual shape to a circle:
 
 ```css
-color: #3b82f6;
+border-radius: 999px;
 ```
 
-It should be visually distinct from:
+Preserve its current dimensions depending on breakpoint.
 
-- schedule name: dark;
-- month/year: muted slate.
+Keep:
 
-Use the same presentation in matrix and daily modes.
+- `BackIcon`;
+- click behavior;
+- glass background;
+- border;
+- hover;
+- active;
+- focus-visible behavior.
 
-### Reuse one ReactNode
-
-Build the compact schedule title once in `EmployeeSchedulePage` and pass the same ReactNode to:
-
-- `ContainerGraphMatrix` in matrix mode;
-- `CardSection` in daily mode.
-
-Do not duplicate two independently authored copies of the selector header.
+Do not merge this control into the active tab.
 
 ---
 
-### Step 5 — Preserve PDF, Adjust, and matrix/daily switching
+## Step 12 — Keep collapsed-navigation mechanics untouched
 
-**Action:** REUSE / MODIFY LAYOUT ONLY
+**Action:** REUSE
 
-**File:**
-
-`FrontEnd/src/pages/employee-schedule/ui/EmployeeSchedulePage.tsx`
-
-Keep the existing:
-
-```tsx
-headerRightSlot={
-  <div className={styles.openScheduleActions}>
-```
-
-and existing actions.
-
-PDF must continue calling:
-
-```ts
-handleExportPdf
-```
-
-Adjust must continue opening the existing shift correction dialog.
-
-These handlers already operate on `selectedSchedule`; therefore changing schedule selection will naturally make them operate on the new selection.
-
-Keep the existing `ScheduleIcon` button and:
-
-```ts
-handleToggleScheduleView
-```
-
-unchanged.
-
-The redesign must not silently remove daily view.
-
----
-
-### Step 6 — Mount the schedule selector dialog once
-
-**Action:** MODIFY
-
-**File:**
-
-`FrontEnd/src/pages/employee-schedule/ui/EmployeeSchedulePage.tsx`
-
-Import:
-
-```ts
-EmployeeScheduleSelectDialog
-```
-
-Render a single instance near the other page dialogs.
-
-Pass:
+Do not change:
 
 ```text
-open = isScheduleSelectOpen
-schedules = schedules
-selectedScheduleId = selectedSchedule?.id ?? null
-onSelect = handleSelectSchedule
-onClose = () => setIsScheduleSelectOpen(false)
+.mobileTabsExpanded
+.mobileTabsCollapsed
+.mobileOpenTab
+.mobileOpenTabVisible
+.mobileOpenTabHidden
+.shellTabsCollapsed
 ```
 
-The dialog must not perform queries.
+except for any minimal inherited layout compatibility caused by changing `.mobileTabs` from grid to flex.
 
-The dialog must not mutate server state.
-
-Selection remains local UI state exactly as it does now.
+Existing inert/focus behavior must remain unchanged.
 
 ---
 
-### Step 7 — Convert the existing schedule card to the single white content surface
+## Step 13 — Preserve safe-area and fixed positioning
 
-**Action:** MODIFY
+**Action:** REUSE
 
-**File:**
+Do not alter the current safe-area-aware left/right/bottom positioning.
 
-`FrontEnd/src/pages/employee-schedule/ui/EmployeeSchedulePage.module.css`
+Do not move the navigation flush against the screen edges.
 
-Preserve the gray application/page background.
+Do not make it full-bleed.
 
-The actual schedule card must remain visually separated as one white layer.
-
-Update both:
-
-- `.openScheduleMatrix`
-- `.dailyScheduleCard`
-
-so they share the same visual vocabulary:
-
-- white/near-white background;
-- 24px rounded card;
-- current subtle border;
-- current subtle shadow;
-- same width;
-- no second surrounding Public schedules card.
-
-Do not modify the global page background or global `CardSection` styles.
-
-The matrix currently already owns the compact page-specific card dimensions and 24px radius, so extend this page-level styling instead of changing the shared component.
+The navigation must continue to visually float above the lower edge.
 
 ---
 
-### Step 8 — Replace obsolete Public-schedules CSS
+# 5. Final Expected States
 
-**Action:** MODIFY / REMOVE
-
-**File:**
-
-`FrontEnd/src/pages/employee-schedule/ui/EmployeeSchedulePage.module.css`
-
-Remove selectors used exclusively by the removed standalone selector:
+## Alerts active
 
 ```text
-.publicSchedulesPanel
-.publicSchedulesHeader
-.publicSchedulesHeading
-.publicSchedulesHeaderMeta
-.lastUpdateField
-.lastUpdateDot
-.selectedSchedulePill
-.scheduleSwitcher
-.scheduleButton
-.scheduleButtonActive
-.scheduleCardDate
-.scheduleButtonDetails
-.scheduleButtonContent
-.scheduleButtonName
-.scheduleButtonMeta
+╭─────────────────────────────────────────────────╮
+│ [📝 Alerts]    [✓]    [▦]    [⇄]    [👤]   (↩) │
+╰─────────────────────────────────────────────────╯
 ```
 
-Add page-specific classes for the new compact header, for example:
+## Availability active
 
 ```text
-.scheduleSelectTrigger
-.scheduleSelectTriggerIcon
-.scheduleSelectTriggerCopy
-.scheduleSelectName
-.scheduleSelectNameRow
-.scheduleSelectChevron
-.scheduleSelectPeriod
-.scheduleSelectUpdated
+╭─────────────────────────────────────────────────╮
+│ [📝]    [✓ Avail.]    [▦]    [⇄]    [👤]   (↩) │
+╰─────────────────────────────────────────────────╯
 ```
 
-Requirements:
+## Shifts active
 
-- no browser-default button background/border;
-- full trigger remains visibly clickable;
-- name is bold/dark;
-- period is smaller muted text;
-- updated line uses `#3b82f6`;
-- trigger has a visible keyboard focus ring;
-- long schedule names truncate or wrap without pushing PDF/Adjust outside the card;
-- mobile layout must remain inside viewport.
+```text
+╭─────────────────────────────────────────────────╮
+│ [📝]    [✓]    [▦ Shifts]    [⇄]    [👤]   (↩) │
+╰─────────────────────────────────────────────────╯
+```
 
-Do not remove unrelated CSS such as:
+## Swap active
 
-- daily schedule day tabs;
-- matrix variables;
-- salary styles;
-- shift correction styles;
-- hours-summary styles.
+```text
+╭─────────────────────────────────────────────────╮
+│ [📝]    [✓]    [▦]    [⇄ Swap]    [👤]    (↩) │
+╰─────────────────────────────────────────────────╯
+```
 
----
+## Profile active
 
-## 5. Data / API / Persistence Changes
+```text
+╭─────────────────────────────────────────────────╮
+│ [📝]    [✓]    [▦]    [⇄]    [👤 Profile] (↩) │
+╰─────────────────────────────────────────────────╯
+```
 
-### API
-
-None.
-
-### Backend
-
-None.
-
-### Models / DTOs
-
-None.
-
-The existing schedule DTO already contains all information required by this UI.
-
-### Persistence
-
-None.
-
-Do not persist the selected schedule as part of this task.
-
-### Dependency Injection
-
-None.
-
-### Configuration
-
-None.
-
-### New dependencies
-
-None.
+Only **one** destination label is visible at any time.
 
 ---
 
-## 6. Error and Edge Case Requirements
+# 6. Data / API / Persistence Changes
 
-### Zero schedules
+## API
 
-Preserve the existing:
+None.
 
-- loading state;
-- `No published schedules`;
-- Availability link.
+## Backend
 
-Do not show the selector when no schedule exists.
+None.
 
-### One schedule
+## Models / DTOs
 
-Still render the selected-schedule trigger and metadata consistently.
+None.
 
-Opening the selector is allowed and shows the single selected schedule.
+## Persistence
 
-Do not special-case the entire header into a different design.
+None.
 
-### Multiple schedules
+## Dependency Injection
 
-All schedules returned by `useEmployeeScheduleListQuery` must appear in the sheet.
+None.
 
-### Schedule without `lastUpdatedAtUtc`
+## Configuration
 
-Use the existing fallback formatter.
+None.
 
-Do not display an empty line.
+## Dependencies
 
-Do not render an invalid `<time dateTime="">`.
-
-### Schedule changes
-
-After selecting another schedule:
-
-- bottom sheet closes;
-- trigger displays new schedule name;
-- month/year updates;
-- update timestamp updates;
-- matrix switches to the selected schedule;
-- PDF uses selected schedule;
-- Adjust uses selected schedule;
-- daily schedule state resets using the existing selected-schedule effect.
-
-### Long schedule names
-
-Do not allow the name to push:
-
-- PDF;
-- Adjust;
-- card boundaries;
-- table width.
-
-Use ellipsis/wrapping within the compact trigger.
-
-### Many schedules
-
-The bottom-sheet list must scroll internally instead of exceeding viewport height.
-
-### Mobile safe area
-
-Bottom sheet content must not be hidden behind the device home indicator.
+None.
 
 ---
 
-## 7. Tests
+# 7. Error and Edge Case Requirements
 
-### MODIFY
+### Very narrow mobile viewport
 
-`FrontEnd/src/pages/employee-schedule/ui/EmployeeSchedulePage.test.tsx`
+At `360px` width:
 
-### Update existing expectations
+- all five destination icons remain visible;
+- collapse button remains visible;
+- active label remains visible when practical;
+- overly long localized active labels truncate with ellipsis rather than overflowing;
+- no horizontal page scrolling is introduced.
 
-The current test expects:
+### Long translations
 
-- `2 schedules`;
-- two `Last Update` fields;
+The label container must have:
 
-because those values come from the old separate Public schedules section.
+```text
+min-width: 0
+overflow: hidden
+text-overflow: ellipsis
+white-space: nowrap
+```
 
-Remove those obsolete assertions.
+or equivalent behavior.
 
-Replace them with assertions that initial render contains:
+### Route switch
 
-- selected schedule name in the compact trigger;
-- period;
-- formatted updated text;
-- matrix for the first/default schedule.
+When active route changes:
 
-### Add schedule-selector integration test
+- previous tab loses its label;
+- previous tab returns to icon-only state;
+- new active tab expands;
+- new label appears;
+- only one active label remains.
 
-Test flow:
+No additional component state should be required.
 
-1. Mock at least two schedules.
-2. Render page.
-3. Confirm first schedule is active.
-4. Click the `Select schedule...` trigger.
-5. Assert dialog `Select schedule` appears.
-6. Assert both schedules are listed.
-7. Assert first one is selected.
-8. Assert update text is visible in the sheet.
-9. Click second schedule.
-10. Assert dialog closes.
-11. Assert compact header now displays second schedule.
-12. Assert matrix receives second schedule (`graph.id` changed).
-13. Assert month/update metadata corresponds to the second schedule.
+### Unread tab
 
-### Add close-behavior test
+If an inactive item contains an unread dot, the dot remains attached to its icon.
 
-At minimum verify Escape:
+If that item becomes active, the dot remains visible unless existing application logic marks it read.
 
-1. open selector;
-2. press Escape;
-3. dialog disappears;
-4. selected schedule remains unchanged.
+### Collapsed navigation
 
-### Add missing-update coverage
+Changing the visual structure must not affect:
 
-Use a schedule with no `lastUpdatedAtUtc`.
+- collapse click;
+- reopen click;
+- `inert`;
+- focus restoration.
 
-Verify:
+### Desktop boundary
 
-- fallback text is rendered;
-- no invalid update date is produced.
-
-### Preserve all existing tests for
-
-- PDF layout;
-- matrix data;
-- touching-shift merging;
-- daily schedule mode;
-- salary calculation;
-- column ordering;
-- summary month/year selection;
-- loading/no schedules.
-
-Do not weaken those assertions merely to make the redesign pass.
-
-### Adjust matrix test mock if required
-
-The page already passes a React node as `title`; make the test mock's `title` type `ReactNode` rather than `string` if needed so the new interactive title/header renders correctly in tests.
+At `min-width: 860px`, the existing desktop navigation must continue replacing the mobile navigation.
 
 ---
 
-## 8. Verification
+# 8. Tests
+
+This is primarily a CSS/layout change.
+
+Do not create a dedicated testing abstraction or visual-regression framework for this task.
+
+No backend tests are required.
+
+### Existing automated suite
+
+Run the existing frontend tests after implementation.
+
+### Manual interaction verification
+
+For each route:
+
+```text
+/
+/availability
+/schedule
+/swap
+/profile
+```
+
+verify:
+
+1. route navigation works;
+2. only selected tab displays its label;
+3. previous tab collapses to icon only;
+4. selected pill expands horizontally;
+5. unread dot remains correct;
+6. collapse button works;
+7. reopen button works.
+
+---
+
+# 9. Verification
 
 From:
 
@@ -857,106 +841,142 @@ cd FrontEnd
 run:
 
 ```bash
-npm test -- src/pages/employee-schedule/ui/EmployeeSchedulePage.test.tsx
+npm test
 ```
 
-Then:
+then:
 
 ```bash
 npm run lint
 ```
 
-Then:
+then:
 
 ```bash
 npm run build
 ```
 
-If the focused tests pass, run the complete frontend suite:
+### Responsive visual verification
 
-```bash
-npm test
-```
-
-### Manual visual verification
-
-Check `/schedule` with at least two schedules at:
+Verify manually at:
 
 ```text
-360px mobile width
-390px mobile width
->= 860px desktop layout
+360px
+390px
+430px
+520px
+859px
+860px
 ```
 
-Verify visually:
+### 360 / 390 / 430 / 520 / 859
 
-```text
-Hero
+Expected:
 
-[ ONE white Schedules card                  ]
-[ Schedules                           PDF   ]
-[                                             ]
-[ icon  F27 ▼                       Adjust ]
-[       October 2026                        ]
-[       Updated 04 Oct 2026, 14:01          ]
-[                                             ]
-[ schedule matrix                            ]
-```
+- mobile glass navigation visible;
+- outer capsule shape;
+- one expanded selected pill;
+- selected icon + label horizontally aligned;
+- all other destinations icon-only;
+- circular collapse button;
+- no horizontal overflow;
+- no labels below inactive icons;
+- no active icon vertical jump;
+- matte glass still clearly visible.
 
-Confirm:
+### 860px
 
-- gray page remains visible around the card;
-- Public schedules card is gone;
-- no large vertical gap exists between selector and matrix;
-- no month navigation control exists;
-- no arrows for changing month/date exist;
-- `Updated ...` is light blue;
-- PDF/Adjust remain readable;
-- bottom navigation does not cover content;
-- schedule selector opens as a bottom sheet on mobile;
-- page behind the sheet is dimmed/blurred;
-- the selected row is clearly marked.
+Expected:
+
+- mobile navigation disappears;
+- existing desktop navigation appears;
+- desktop navigation is visually unchanged.
 
 ---
 
-## 9. Acceptance Checklist
+# 10. Acceptance Checklist
 
-- [ ] Separate `Public schedules` section is removed.
-- [ ] Schedule selector and actual schedule are visually one card.
-- [ ] Existing gray page background remains unchanged.
-- [ ] Unified schedule card is white/near-white.
-- [ ] `Schedules` remains visible as section title.
-- [ ] Selected schedule name is visible.
-- [ ] Selected schedule has a downward selection chevron.
-- [ ] Month and year appear as one line.
-- [ ] No duplicate F27/October/2026 pills remain.
-- [ ] No date/month navigation arrows are introduced.
-- [ ] Last-update text appears directly below the month/year.
-- [ ] Last-update text uses light blue `#3b82f6`.
-- [ ] PDF remains available.
-- [ ] Adjust remains available.
-- [ ] Matrix remains directly below the compact header.
-- [ ] Daily/matrix toggle still works.
-- [ ] Tapping selected schedule opens `Select schedule`.
-- [ ] Selector is a bottom sheet on mobile.
-- [ ] All published schedules appear in the sheet.
-- [ ] Each row shows name, period and update status.
-- [ ] Selected schedule has a blue check indicator.
-- [ ] Selecting a schedule closes the sheet.
-- [ ] Matrix updates immediately.
-- [ ] PDF/Adjust subsequently operate on the newly selected schedule.
-- [ ] Missing update timestamps remain valid.
-- [ ] Zero/one/many schedule states remain valid.
-- [ ] Existing schedule business logic is unchanged.
-- [ ] No backend/API/database changes are made.
-- [ ] No new npm dependency is introduced.
-- [ ] Focused page tests pass.
-- [ ] Full frontend build succeeds.
-- [ ] Lint succeeds.
+- [ ] Mobile navigation keeps the current matte/frosted glass background.
+- [ ] Outer navigation is capsule-shaped.
+- [ ] Alerts inactive state shows icon only.
+- [ ] Availability inactive state shows icon only.
+- [ ] Shifts inactive state shows icon only.
+- [ ] Swap inactive state shows icon only.
+- [ ] Profile inactive state shows icon only.
+- [ ] Exactly one active destination displays its label.
+- [ ] Active label is positioned to the right of its icon.
+- [ ] Active tab expands horizontally.
+- [ ] Inactive tabs shrink back to icon-only controls.
+- [ ] Selected tab uses light-blue GF3 styling.
+- [ ] Selected tab is not a solid dark-blue block.
+- [ ] Active change animates smoothly.
+- [ ] Mobile tab icons remain vertically centered.
+- [ ] Existing desktop active icon animation remains unchanged.
+- [ ] Existing unread dots continue working.
+- [ ] Existing translations continue being used.
+- [ ] Existing `aria-label` navigation naming remains intact.
+- [ ] Existing focus-visible behavior remains intact.
+- [ ] Collapse button is circular.
+- [ ] Collapse button still collapses navigation.
+- [ ] Open-navigation button still restores navigation.
+- [ ] Expanded/collapsed focus transfer continues working.
+- [ ] Mobile safe-area positioning remains unchanged.
+- [ ] No horizontal overflow at 360px.
+- [ ] Desktop navigation is unchanged at `>=860px`.
+- [ ] No API change.
+- [ ] No backend change.
+- [ ] No database change.
+- [ ] No dependency added.
+- [ ] `npm test` passes.
+- [ ] `npm run lint` passes.
+- [ ] `npm run build` passes.
 
 ---
 
-## 10. Do Not Change
+# 11. Exact Change Scope
+
+## MODIFY
+
+```text
+FrontEnd/src/app/layouts/employee-workspace-layout/EmployeeWorkspaceLayout.tsx
+```
+
+Responsibilities of change:
+
+- add dedicated class to visual mobile labels;
+- mark visual label presentation-only;
+- remove mobile-only animated indicator element;
+- preserve all routing/accessibility/unread/collapse logic.
+
+## MODIFY
+
+```text
+FrontEnd/src/app/layouts/employee-workspace-layout/EmployeeWorkspaceLayout.module.css
+```
+
+Responsibilities of change:
+
+- capsule outer navigation;
+- grid → flex mobile layout;
+- icon-only inactive tabs;
+- horizontally expanded active pill;
+- active label reveal;
+- responsive width redistribution;
+- transitions;
+- circular collapse button;
+- split mobile vs desktop active-icon transform.
+
+## REUSE UNCHANGED
+
+```text
+FrontEnd/src/app/layouts/employee-workspace-layout/useEmployeeMotion.ts
+```
+
+Desktop indicator continues to use it; mobile no longer requires an indicator.
+
+---
+
+# 12. Do Not Change
 
 Do not modify:
 
@@ -967,29 +987,31 @@ GF3.WebApi/
 GF3.Launcher/
 ```
 
-Do not modify schedule APIs or DTO contracts.
-
-Do not modify:
+Do not change employee page implementations:
 
 ```text
-FrontEnd/src/entities/containers/ui/ContainerGraphMatrix.tsx
-FrontEnd/src/shared/ui/sections/CardSection/CardSection.tsx
-FrontEnd/src/pages/employee-schedule/ui/EmployeeScheduleHero.tsx
+employee-notifications
+employee-availability
+employee-schedule
+employee-swap
+employee-account/profile
 ```
 
-unless compilation proves an unavoidable existing incompatibility. In that case, stop and report the blocker rather than expanding scope automatically.
+Do not change:
 
-Do not redesign:
+- route definitions;
+- employee navigation destination list;
+- data queries;
+- SignalR/realtime behavior;
+- unread-notification calculations;
+- notification read-state persistence;
+- authentication/session behavior;
+- schedule logic;
+- availability logic;
+- swap logic;
+- communication dialog;
+- global design system architecture.
 
-- employee navigation;
-- Availability;
-- Swap;
-- Profile;
-- Work hours summary;
-- salary calculator;
-- shift correction;
-- column customization.
+Do not update desktop navigation merely to make its appearance match mobile.
 
-Do not perform general schedule-page refactoring even though `EmployeeSchedulePage.tsx` is large.
-
-The execution goal is only the approved schedule-selection UX redesign.
+The implementation should remain a focused two-file mobile navigation redesign.

@@ -190,12 +190,12 @@
   bottom: max(10px, env(safe-area-inset-bottom));
   z-index: 40;
   isolation: isolate;
-  display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr)) auto;
+  display: flex;
   align-items: center;
   gap: 5px;
   padding: 5px;
-  border-radius: 22px;
+  padding-right: 10px;
+  border-radius: 999px;
   background: rgba(255, 255, 255, 0.16);
   border: 1px solid rgba(0, 0, 0, 0.08);
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
@@ -225,26 +225,58 @@
 }
 
 .mobileTab {
-  display: grid;
-  place-items: center;
-  gap: 3px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1 1 0;
+  min-width: 0;
+  gap: 0;
   min-height: 46px;
   padding: 7px 4px;
   border: 1px solid transparent;
-  border-radius: 18px;
+  border-radius: 999px;
   color: #64748b;
   font-size: 0.6rem;
   font-weight: 800;
   line-height: 1;
   letter-spacing: -0.01em;
   transition:
-    background 0.18s ease,
-    color 0.18s ease,
-    transform 0.18s ease;
+    flex-grow 320ms var(--motion-ease),
+    gap 320ms var(--motion-ease),
+    background 320ms var(--motion-ease),
+    border-color 320ms var(--motion-ease),
+    box-shadow 320ms var(--motion-ease),
+    color 200ms ease;
 }
 
 .mobileTabActive {
+  flex-grow: 2.1;
+  gap: 6px;
+  background: linear-gradient(180deg, rgba(239, 246, 255, 0.96), rgba(219, 234, 254, 0.9));
+  border-color: rgba(59, 130, 246, 0.24);
+  box-shadow: 0 8px 20px rgba(37, 99, 235, 0.16), inset 0 1px 0 rgba(255, 255, 255, 0.74);
   color: #1d4ed8;
+}
+
+.mobileTabLabel {
+  min-width: 0;
+  max-width: 0;
+  opacity: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  transform: translateX(-4px);
+  transition: max-width 320ms var(--motion-ease), opacity 200ms ease, transform 320ms var(--motion-ease);
+}
+
+.mobileTabActive .mobileTabLabel {
+  max-width: 10em;
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.mobileTab .tabIcon {
+  flex-shrink: 0;
 }
 
 .mobileTabActive .tabIcon {
@@ -287,9 +319,10 @@
 }
 
 .mobileToggleButton {
+  flex-shrink: 0;
   width: 42px;
   height: 42px;
-  border-radius: 16px;
+  border-radius: 999px;
   transition:
     background 0.18s ease,
     border-color 0.18s ease,
@@ -358,7 +391,11 @@
   transition: translate 420ms var(--motion-ease), scale 420ms var(--motion-ease), color 260ms ease;
 }
 
-.mobileTabActive .tabIcon,
+.mobileTabActive .tabIcon {
+  translate: 0 0;
+  scale: 1.06;
+}
+
 .desktopTabActive .tabIcon {
   translate: 0 -3px;
   scale: 1.12;

@@ -264,7 +264,6 @@ export function EmployeeWorkspaceLayout({ children }: PropsWithChildren) {
       </div>
 
       <nav ref={mobileNavRef} data-employee-nav className={mobileTabsClassName} aria-label={t("Employee sections")} inert={isMobileTabsCollapsed}>
-        <span data-employee-nav-indicator className={styles.navIndicator} aria-hidden="true" />
         {employeeNavItems.map((item) => {
           const hasUnreadDot = hasUnreadNavigationDot(item);
 
@@ -282,7 +281,7 @@ export function EmployeeWorkspaceLayout({ children }: PropsWithChildren) {
                 {item.icon}
                 {hasUnreadDot ? <span className={styles.navUnreadDot} aria-hidden="true" /> : null}
               </span>
-              <span>{item.mobileLabel ?? item.label}</span>
+              <span className={styles.mobileTabLabel} aria-hidden="true">{item.mobileLabel ?? item.label}</span>
             </NavLink>
           );
         })}
