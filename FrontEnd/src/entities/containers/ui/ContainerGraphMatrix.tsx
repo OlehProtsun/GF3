@@ -66,6 +66,9 @@ type ContainerGraphMatrixProps = {
   cellErrors?: Record<string, string>;
   validationSignal?: number;
   toolbar?: ReactNode;
+  headerClassName?: string;
+  titleClassName?: string;
+  headerRightClassName?: string;
   headerCenterSlot?: ReactNode;
   headerRightSlot?: ReactNode;
   bindValueByKey?: ReadonlyMap<string, string>;
@@ -660,6 +663,9 @@ export function ContainerGraphMatrix({
   cellErrors = {},
   validationSignal = 0,
   toolbar,
+  headerClassName,
+  titleClassName,
+  headerRightClassName,
   headerCenterSlot,
   headerRightSlot,
   bindValueByKey,
@@ -1566,9 +1572,9 @@ export function ContainerGraphMatrix({
       style={cardStyle}
       title={title}
       icon={icon}
-      headerClassName={compactHeader ? styles.compactHeader : undefined}
-      titleClassName={compactHeader ? styles.compactTitle : undefined}
-      headerRightClassName={compactHeader ? styles.compactHeaderRight : undefined}
+      headerClassName={[compactHeader ? styles.compactHeader : "", headerClassName].filter(Boolean).join(" ")}
+      titleClassName={[compactHeader ? styles.compactTitle : "", titleClassName].filter(Boolean).join(" ")}
+      headerRightClassName={[compactHeader ? styles.compactHeaderRight : "", headerRightClassName].filter(Boolean).join(" ")}
       headerCenterSlot={headerCenterSlot}
       headerRightSlot={headerRightSlot}
     >

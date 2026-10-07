@@ -1127,9 +1127,7 @@ export function EmployeeSchedulePage() {
     });
   };
 
-  const scheduleTitle = selectedSchedule ? (
-    <span className={styles.openScheduleTitleBlock}>
-      <span className={styles.openScheduleTitleLabel}>{t("Schedules")}</span>
+  const scheduleSelector = selectedSchedule ? (
       <button type="button" className={styles.scheduleSelectTrigger}
         aria-haspopup="dialog" aria-expanded={isScheduleSelectOpen}
         aria-label={t("Select schedule. Current schedule: {0}", selectedSchedule.name)}
@@ -1146,7 +1144,6 @@ export function EmployeeSchedulePage() {
             : formatScheduleLastUpdate(selectedSchedule.lastUpdatedAtUtc)}</span>
         </span>
       </button>
-    </span>
   ) : null;
 
   return (
@@ -1192,7 +1189,11 @@ export function EmployeeSchedulePage() {
           columns={scheduleMatrixColumns}
           cellMap={scheduleMatrixDisplay.cellMap}
           mutedSuffixMap={scheduleMatrixDisplay.mutedSuffixMap}
-          title={scheduleTitle}
+          title={t("Schedules")}
+          headerCenterSlot={scheduleSelector}
+          headerClassName={styles.openScheduleHeader}
+          titleClassName={styles.openScheduleHeaderTitle}
+          headerRightClassName={styles.openScheduleHeaderRight}
           icon={
             <button
               ref={scheduleViewToggleRef}
@@ -1230,7 +1231,11 @@ export function EmployeeSchedulePage() {
       {selectedSchedule && scheduleViewMode === "daily" ? (
         <CardSection
           className={[styles.dailyScheduleCard, hasSwitchedScheduleView ? styles.scheduleViewEnter : ""].filter(Boolean).join(" ")}
-          title={scheduleTitle}
+          title={t("Schedules")}
+          headerCenterSlot={scheduleSelector}
+          headerClassName={styles.openScheduleHeader}
+          titleClassName={styles.openScheduleHeaderTitle}
+          headerRightClassName={styles.openScheduleHeaderRight}
           icon={
             <button
               ref={scheduleViewToggleRef}

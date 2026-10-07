@@ -46,6 +46,8 @@ vi.mock("@entities/containers/ui/ContainerGraphMatrix", () => ({
   ContainerGraphMatrix: (props: {
     title: ReactNode;
     icon?: ReactNode;
+    headerCenterSlot?: ReactNode;
+    headerRightSlot?: ReactNode;
     graph: EmployeeSchedule;
     columns: Array<{ employeeId: number; label: string }>;
     cellMap: Record<string, string>;
@@ -57,6 +59,8 @@ vi.mock("@entities/containers/ui/ContainerGraphMatrix", () => ({
       <section data-testid="schedule-matrix">
         {props.icon}
         <h2>{props.title}</h2>
+        {props.headerCenterSlot}
+        {props.headerRightSlot}
         <span>{props.graph.name}</span>
         <span>{props.columns.map(column => column.label).join(", ")}</span>
         {props.onColumnHeaderClick
@@ -479,6 +483,8 @@ describe("schedule selector", () => {
     await user.click(screen.getByRole("button", { name: "Select schedule. Current schedule: May Schedule" }));
     const dialog = screen.getByRole("dialog", { name: "Select schedule" });
     const firstRow = within(dialog).getByRole("button", { name: /^May Schedule.*May 2026/ });
+    expect(screen.getByRole("button", { name: "Export schedule to PDF" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Request a shift correction" })).toBeInTheDocument();
     expect(firstRow).toHaveAttribute("aria-pressed", "true");
     expect(firstRow).toHaveFocus();
     expect(within(dialog).getByText(/Updated 28 Jun 2026/)).toBeVisible();
