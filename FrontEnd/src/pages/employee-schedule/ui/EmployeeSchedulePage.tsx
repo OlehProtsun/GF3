@@ -1,5 +1,5 @@
-import { t, dateTimeFormat, numberFormat } from "@shared/i18n";
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { t, dateTimeFormat } from "@shared/i18n";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { NavLink } from "react-router-dom";
 import { useAuth } from "@app/providers/AuthProvider";
 import {
@@ -58,23 +58,6 @@ const scheduleWeekdayShortFormatter = dateTimeFormat("en-GB", {
   timeZone: "UTC",
 });
 
-const salaryAmountFormatter = numberFormat("en-GB", {
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 2,
-});
-
-function formatSalaryHours(value: number) {
-  return String(Math.round(value * 100) / 100);
-}
-
-function parseSalaryValue(value: string) {
-  if (!value.trim()) {
-    return null;
-  }
-
-  const parsedValue = Number(value.trim().replace(",", "."));
-  return Number.isFinite(parsedValue) && parsedValue >= 0 ? parsedValue : null;
-}
 function formatScheduleMonth(schedule: Pick<EmployeeSchedule, "year" | "month">) {
   return scheduleMonthFormatter.format(new Date(Date.UTC(schedule.year, schedule.month - 1, 1)));
 }
@@ -1007,17 +990,7 @@ export function EmployeeSchedulePage() {
     () => buildScheduleHoursSummary(schedules, activeSummaryPeriod, currentEmployeeId),
     [activeSummaryPeriod, currentEmployeeId, schedules],
   );
-  const [salaryHoursInput, setSalaryHoursInput] = useState(() => formatSalaryHours(scheduleHoursSummary.totalHours));
-  const [salaryRateInput, setSalaryRateInput] = useState("");
-  const [salaryResult, setSalaryResult] = useState<number | null>(null);
-  const parsedSalaryHours = parseSalaryValue(salaryHoursInput);
-  const parsedSalaryRate = parseSalaryValue(salaryRateInput);
-  const canCalculateSalary = parsedSalaryHours !== null && parsedSalaryRate !== null;
-
-  useEffect(() => {
-    setSalaryHoursInput(formatSalaryHours(scheduleHoursSummary.totalHours));
-    setSalaryResult(null);
-  }, [scheduleHoursSummary.totalHours]);  const defaultScheduleMatrixColumns = useMemo(
+  const defaultScheduleMatrixColumns = useMemo(
     () => buildScheduleMatrixColumns(selectedSchedule, fallbackMatrixEmployeeId, displayName),
     [displayName, fallbackMatrixEmployeeId, selectedSchedule],
   );
@@ -1063,19 +1036,6 @@ export function EmployeeSchedulePage() {
     }
   };
 
-  const handleCalculateSalary = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (parsedSalaryHours === null || parsedSalaryRate === null) {
-      return;
-    }
-
-    setSalaryResult(parsedSalaryHours * parsedSalaryRate);
-  };
-
-  const handleResetSalaryHours = () => {
-    setSalaryHoursInput(formatSalaryHours(scheduleHoursSummary.totalHours));
-    setSalaryResult(null);
-  };
   const handleSaveColumnOrder = (columnOrder: number[]) => {
     if (!selectedSchedule) {
       return;
@@ -1334,8 +1294,6 @@ export function EmployeeSchedulePage() {
 
       {selectedSchedule ? (
         <section className={`${workspaceStyles.panel} ${styles.hoursSummaryPanel}`} data-employee-motion="schedule-panel">
-          <span className={styles.hoursSummaryTotalPill}>{scheduleHoursSummary.totalHoursText}</span>
-
           <div className={styles.hoursSummaryHeader}>
             <div className={styles.hoursSummaryHeading}>
               <span className={styles.summaryIcon} aria-hidden="true">
@@ -1347,45 +1305,41 @@ export function EmployeeSchedulePage() {
               </div>
             </div>
 
-            <div className={styles.hoursSummaryActions}>
-              <div className={styles.summaryPeriodControls} role="group" aria-label={t("Summary period")}>
-                <div className={styles.summaryPeriodField}>
-                  <span>{t("Month")}</span>
-                  <SearchableSelect
-                    ariaLabel={t("Summary month")}
-                    value={activeSummaryPeriod ? String(activeSummaryPeriod.month) : ""}
-                    options={summaryMonthOptions}
-                    placeholder={t("Month")}
-                    dropdownTitle={t("Month")}
-                    size="summary"
-                    shadow="soft"
-                    searchEnabled={false}
-                    showSelectedHint={false}
-                    disabled={summaryMonths.length <= 1}
-                    className={styles.summaryMonthSelect}
-                    onChange={handleSummaryMonthChange}
-                  />
-                </div>
+            <span className={styles.hoursSummaryTotalPill}>{scheduleHoursSummary.totalHoursText}</span>
+          </div>
 
-                <div className={styles.summaryPeriodField}>
-                  <span>{t("Year")}</span>
-                  <SearchableSelect
-                    ariaLabel={t("Summary year")}
-                    value={activeSummaryPeriod ? String(activeSummaryPeriod.year) : ""}
-                    options={summaryYearOptions}
-                    placeholder={t("Year")}
-                    dropdownTitle={t("Year")}
-                    size="summary"
-                    shadow="soft"
-                    searchEnabled={false}
-                    showSelectedHint={false}
-                    disabled={summaryYears.length <= 1}
-                    className={styles.summaryYearSelect}
-                    onChange={handleSummaryYearChange}
-                  />
-                </div>
-              </div>
-            </div>
+          <div className={styles.summaryPeriodControls} role="group" aria-label={t("Summary period")}>
+            <SearchableSelect
+              ariaLabel={t("Summary month")}
+              value={activeSummaryPeriod ? String(activeSummaryPeriod.month) : ""}
+              options={summaryMonthOptions}
+              placeholder={t("Month")}
+              dropdownTitle={t("Month")}
+              leadingIcon={<ScheduleIcon size={16} />}
+              size="summary"
+              shadow="soft"
+              searchEnabled={false}
+              showSelectedHint={false}
+              disabled={summaryMonths.length <= 1}
+              className={styles.summaryPeriodSelect}
+              onChange={handleSummaryMonthChange}
+            />
+
+            <SearchableSelect
+              ariaLabel={t("Summary year")}
+              value={activeSummaryPeriod ? String(activeSummaryPeriod.year) : ""}
+              options={summaryYearOptions}
+              placeholder={t("Year")}
+              dropdownTitle={t("Year")}
+              leadingIcon={<ScheduleIcon size={16} />}
+              size="summary"
+              shadow="soft"
+              searchEnabled={false}
+              showSelectedHint={false}
+              disabled={summaryYears.length <= 1}
+              className={styles.summaryPeriodSelect}
+              onChange={handleSummaryYearChange}
+            />
           </div>
 
           {scheduleHoursSummary.rows.length > 0 ? (
@@ -1405,7 +1359,7 @@ export function EmployeeSchedulePage() {
               ))}
 
               <div className={styles.hoursSummaryTotalRow} role="row">
-                <span role="cell">{t("Total")}</span>
+                <span role="cell" className={styles.hoursSummaryTotalLabel}><span aria-hidden="true">Σ</span> {t("Total")}</span>
                 <strong role="cell">{scheduleHoursSummary.totalHoursText}</strong>
                 <span role="cell">{t("All schedules")}</span>
               </div>
@@ -1413,71 +1367,6 @@ export function EmployeeSchedulePage() {
           ) : (
             <p className={styles.hoursSummaryEmpty}>{t("No assigned shifts in this period.")}</p>
           )}
-          <section className={styles.salaryCalculator} aria-labelledby="salary-calculator-title">
-            <div className={styles.salaryCalculatorHeader}>
-              <span className={styles.salaryCalculatorMark} aria-hidden="true">=</span>
-              <div>
-                <span>{t("Quick estimate")}</span>
-                <h3 id="salary-calculator-title">{t("Salary calculator")}</h3>
-              </div>
-            </div>
-
-            <form className={styles.salaryCalculatorForm} onSubmit={handleCalculateSalary}>
-              <label className={styles.salaryCalculatorField}>
-                <span>{t("Hours")}</span>
-                <span className={styles.salaryCalculatorInputShell}>
-                  <input
-                    type="text"
-                    aria-label={t("Hours")}
-                    pattern="[0-9]*([.,][0-9]*)?"
-                    inputMode="decimal"
-                    value={salaryHoursInput}
-                    onChange={event => {
-                      setSalaryHoursInput(event.target.value);
-                      setSalaryResult(null);
-                    }}
-                  />
-                  <small>{t("h")}</small>
-                </span>
-              </label>
-
-              <label className={styles.salaryCalculatorField}>
-                <span>{t("Hourly rate")}</span>
-                <span className={styles.salaryCalculatorInputShell}>
-                  <input
-                    type="text"
-                    aria-label={t("Hourly rate")}
-                    pattern="[0-9]*([.,][0-9]*)?"
-                    inputMode="decimal"
-                    placeholder="0.00"
-                    value={salaryRateInput}
-                    onChange={event => {
-                      setSalaryRateInput(event.target.value);
-                      setSalaryResult(null);
-                    }}
-                  />
-                  <small>{t("/ h")}</small>
-                </span>
-              </label>
-
-              <button
-                type="submit"
-                className={styles.salaryCalculatorEquals}
-                aria-label={t("Calculate salary")}
-                disabled={!canCalculateSalary}
-              >
-                =
-              </button>
-
-              <output className={styles.salaryCalculatorResult} aria-label={t("Estimated pay")} aria-live="polite">
-                <span>{t("Estimated pay")}</span>
-                <strong>{salaryResult === null ? "—" : salaryAmountFormatter.format(salaryResult)}</strong>
-              </output>
-
-              <button type="button" className={styles.salaryCalculatorReset} onClick={handleResetSalaryHours}>
-                {t("Reset")}</button>
-            </form>
-          </section>
         </section>
       ) : null}
     </div>

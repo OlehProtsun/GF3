@@ -2,924 +2,603 @@
 
 ## 1. Objective
 
-Update the employee **Schedule** section UI at:
+Redesign only the **Work Hours → Summary** section of the employee Schedule page at:
 
 - Repository: `https://github.com/OlehProtsun/GF3`
 - Branch: `DEV2`
-- Commit: `c91ca1e56360f13df86d1eaac2eb1f8e595b5a96`
+- Commit: `6b35a1ab32a7bc543ca7838d13f9ab9e7e61d713`
 
-The goal is to make the schedule header and schedule selector match the approved reference image while preserving all existing schedule behavior.
-
-The current implementation already has:
-
-- matrix and daily schedule modes;
-- `scheduleViewMode`;
-- `handleToggleScheduleView`;
-- focus restoration through `scheduleViewToggleRef`;
-- schedule selection bottom sheet;
-- PDF export;
-- Adjust / shift-correction flow.
-
-Currently, however, the schedule-view mode is changed by clicking the large icon on the left side of `Schedules`. The schedule selector below uses a second `EmployeeIcon`, creating the duplicated-icon appearance the redesign is intended to remove.
-
-The target layout is:
+The target is the approved compact mockup supplied by the user:
 
 ```text
-┌───────────────────────────────────────┐
-│ Schedules                  [view] PDF │
-│ ───────────────────────────────────── │
-│                                       │
-│ ╭───────────────────────────────────╮ │
-│ │ [calendar] │ F27 ▼       Adjust  │ │
-│ │            │ July 2026            │ │
-│ │            │ Updated ...          │ │
-│ ╰───────────────────────────────────╯ │
-│                                       │
-│ schedule matrix / daily view          │
-└───────────────────────────────────────┘
+╭──────────────────────────────────────╮
+│ [chart] WORK HOURS          [208.5h] │
+│         Summary                      │
+│                                      │
+│ [📅 July       ▼] [📅 2026       ▼] │
+│                                      │
+│ ┌──────────────────────────────────┐ │
+│ │ DAY       HOURS       SCHEDULE   │ │
+│ │ we./01    9.5h        8989       │ │
+│ │ th./02    15h         8989       │ │
+│ │ fr./03    14h         8989,...   │ │
+│ │ ...                              │ │
+│ │ Σ Total   208.5h      All...     │ │
+│ └──────────────────────────────────┘ │
+╰──────────────────────────────────────╯
 ```
 
-The target must reproduce these key characteristics from the approved mockup:
+The redesign must make the entire section:
 
-- `Schedules` is a clean text heading with **no icon attached to it**.
-- View-mode switching becomes a **dedicated icon-only button immediately before PDF**.
-- PDF remains a pale-red pill.
-- The selected schedule becomes one visually unified rounded/capsule control.
-- The selector has one calendar icon on the left.
-- A subtle vertical separator appears after that icon.
-- Schedule name, month/year and updated timestamp form one information block.
-- `Adjust` is visually inside the same rounded selector surface, but remains its own button.
-- `Updated ...` stays light blue.
-- The matrix/daily content begins directly below the selector.
+- smaller;
+- cleaner;
+- more compact;
+- more consistent with the recently redesigned Schedule UI;
+- visually close to the approved generated reference;
+- still based on the current GF3 glass/soft-card design language.
+
+The current Summary already correctly calculates work hours across published schedules for the selected month/year and renders Day / Hours / Schedule plus a total row. That data logic must remain intact.
+
+The current implementation additionally contains a complete Salary Calculator directly inside the Summary panel. The approved target does **not** contain this calculator, so it must be removed together with its now-unused page-local state/helpers/styles/tests.
 
 No business logic, API, persistence, or backend behavior changes are required.
 
 ---
 
-## 2. Existing Components to Reuse
+## 2. Existing Behavior to Preserve
 
-### REUSE — existing view-mode state and behavior
-
-File:
-
-`FrontEnd/src/pages/employee-schedule/ui/EmployeeSchedulePage.tsx`
-
-Keep unchanged:
-
-```ts
-const [scheduleViewMode, setScheduleViewMode] =
-  useState<"matrix" | "daily">("matrix");
-
-const [hasSwitchedScheduleView, setHasSwitchedScheduleView] =
-  useState(false);
-
-const scheduleViewToggleRef = useRef<HTMLButtonElement>(null);
-
-const handleToggleScheduleView = () => {
-  setHasSwitchedScheduleView(true);
-  setScheduleViewMode(current =>
-    current === "matrix" ? "daily" : "matrix"
-  );
-};
-```
-
-Also keep the existing `useLayoutEffect` that restores focus to the toggle after changing mode.
-
-The redesign changes **where the button is rendered**, not how schedule mode works.
-
----
-
-### REUSE — `ContainerGraphMatrix`
-
-File:
-
-`FrontEnd/src/entities/containers/ui/ContainerGraphMatrix.tsx`
-
-Keep this shared component unchanged.
-
-It already supports:
-
-- `title`;
-- `icon`;
-- `headerCenterSlot`;
-- `headerRightSlot`;
-- page-specific header classes.
-
-Therefore the new composition can be implemented entirely from `EmployeeSchedulePage` without changing matrix architecture.
-
----
-
-### REUSE — `CardSection`
-
-File:
-
-`FrontEnd/src/shared/ui/sections/CardSection/CardSection.tsx`
-
-Keep unchanged.
-
-Its structure already provides:
-
-```text
-sectionTitle
-headerCenter
-headerRight
-```
-
-and accepts page-specific classes.
-
-Use the same header composition for both matrix and daily modes.
-
----
-
-### REUSE — existing schedule selector dialog
+### REUSE — work-hours aggregation
 
 Keep:
 
-`FrontEnd/src/pages/employee-schedule/ui/EmployeeScheduleSelectDialog.tsx`
+```ts
+buildScheduleHoursSummary(...)
+```
 
-unchanged unless compilation exposes an unrelated existing issue.
+unchanged.
 
-The compact selector in the card must continue opening this existing bottom sheet.
+It currently:
 
-Existing tests already verify:
+- filters schedules by the selected Summary year/month;
+- filters slots for the current employee;
+- combines hours from multiple schedules on the same day;
+- deduplicates schedule names;
+- creates rows for every day in the month;
+- formats empty days as `-`;
+- calculates total hours.
 
-- opening it;
-- selected row;
-- changing schedule;
-- metadata update;
-- Escape;
-- close button;
-- overlay closing;
-- missing update timestamp fallback.
-
-Do not redesign the bottom sheet in this task.
+Do not move or redesign this logic.
 
 ---
 
-### REUSE — existing icons
+### REUSE — Summary period state
 
-Use existing icons from:
+Keep:
 
-`@shared/ui/icons`
+```ts
+selectedSummaryPeriodKey
+summaryPeriods
+activeSummaryPeriod
+summaryYears
+summaryMonths
+summaryMonthOptions
+summaryYearOptions
+```
 
-Specifically:
+The current code already resolves a Summary period independently while defaulting to the opened schedule's month/year when possible.
 
-- `ScheduleIcon` → calendar icon inside the selected-schedule capsule;
-- `ScheduleDetailsIcon` → new schedule-view mode button near PDF;
-- `StatisticsIcon` → continue using where already used.
+---
 
-`ScheduleDetailsIcon` already exists and is exported by the shared icon package, so no new SVG/icon dependency is required.
+### REUSE — period change handlers
 
-Remove `EmployeeIcon` from this page if it becomes unused after the redesign.
+Keep the behavior of:
+
+```ts
+handleSummaryMonthChange(...)
+handleSummaryYearChange(...)
+```
+
+unchanged.
+
+Month selection must continue updating only to an available period within the active year.
+
+Year selection must continue attempting to keep the same month first and falling back to an available period in the selected year.
+
+---
+
+### REUSE — `SearchableSelect`
+
+Continue using:
+
+`FrontEnd/src/shared/ui/components/SearchableSelect/SearchableSelect.tsx`
+
+for month and year.
+
+The component already supports the required Summary size, no-search mode, disabled state, portal dropdown, keyboard/Escape behavior, and ARIA semantics.
+
+Do not replace it with native `<select>` or create a second dropdown component.
+
+---
+
+### REUSE — `StatisticsIcon`
+
+Continue using the existing:
+
+```ts
+StatisticsIcon
+```
+
+for the Summary header.
+
+Do not introduce another chart icon package.
 
 ---
 
 ## 3. Constraints
 
-Do not:
+Do not change:
 
-- change schedule fetching;
-- change `selectedScheduleId`;
-- change schedule selection logic;
-- change `EmployeeScheduleSelectDialog` behavior;
-- change matrix construction;
-- change daily-view calculations;
-- change PDF export logic;
-- change shift-correction logic;
-- change column ordering;
-- change localStorage/server synchronization for column order;
-- change Work hours;
-- change Salary calculator;
-- change the hero;
-- change navigation;
-- change backend;
-- change API;
-- change DTOs;
-- change database;
-- add dependencies;
-- modify `ContainerGraphMatrix`;
-- modify shared `CardSection`.
+- schedule APIs;
+- schedule DTOs/entities;
+- backend;
+- database;
+- authentication;
+- employee identification;
+- work-hour calculation;
+- handling of overnight shifts;
+- Summary month/year behavior;
+- schedule matrix;
+- daily schedule view;
+- schedule selector;
+- PDF export;
+- Adjust / shift correction;
+- column ordering;
+- hero;
+- navigation.
 
-Do not create another view-mode state.
+Do not create:
 
-Do not move the view-mode behavior into a new component.
+- a new Summary component hierarchy unless required by compilation;
+- a new dropdown implementation;
+- another work-hours calculator;
+- another date/period state;
+- new dependencies.
 
-Do not nest the `Adjust` button inside the schedule-selection `<button>` because nested interactive controls are invalid HTML.
-
-Do not use absolute positioning or viewport-width hacks to reproduce the reference.
+The work is a focused UI redesign plus removal of the Salary Calculator.
 
 ---
 
 # 4. Implementation Steps
 
-## Step 1 — Update schedule-page icon imports
+## Step 1 — Remove Salary Calculator imports and helpers
 
-**Action:** MODIFY
+**Action:** REMOVE
 
 **File:**
 
 `FrontEnd/src/pages/employee-schedule/ui/EmployeeSchedulePage.tsx`
 
-Current imports include:
+Remove salary-specific functionality such as:
 
 ```ts
-EmployeeIcon
-ScheduleIcon
+numberFormat
+FormEvent
+salaryAmountFormatter
+formatSalaryHours(...)
+parseSalaryValue(...)
 ```
 
-Change the icon imports so the page uses:
+Do not remove `dateTimeFormat`.
 
-```text
-ScheduleIcon
-ScheduleDetailsIcon
-StatisticsIcon
-AvailabilityIcon
-```
-
-Remove `EmployeeIcon` from this file if no other usage remains.
-
-Responsibilities:
-
-- `ScheduleIcon` = selected schedule;
-- `ScheduleDetailsIcon` = switch matrix/daily display mode.
-
-Do not create a new icon.
+Do not remove `useEffect`; it is still used elsewhere on the page.
 
 ---
 
-## Step 2 — Convert the current schedule selector into the main interactive area of a capsule
+## Step 2 — Remove Salary Calculator state and handlers
+
+**Action:** REMOVE
+
+**File:**
+
+`EmployeeSchedulePage.tsx`
+
+Remove:
+
+```ts
+salaryHoursInput
+setSalaryHoursInput
+
+salaryRateInput
+setSalaryRateInput
+
+salaryResult
+setSalaryResult
+
+parsedSalaryHours
+parsedSalaryRate
+
+canCalculateSalary
+```
+
+Remove the effect that synchronizes:
+
+```ts
+salaryHoursInput
+```
+
+with:
+
+```ts
+scheduleHoursSummary.totalHours
+```
+
+Remove:
+
+```ts
+handleCalculateSalary(...)
+handleResetSalaryHours(...)
+```
+
+The work-hours Summary computation itself must remain.
+
+---
+
+## Step 3 — Remove Salary Calculator markup
+
+**Action:** REMOVE
+
+**File:**
+
+`EmployeeSchedulePage.tsx`
+
+Remove the entire Salary Calculator section, including:
+
+- `Quick estimate`;
+- `Salary calculator`;
+- Hours input;
+- Hourly rate input;
+- `=` action;
+- Estimated pay;
+- Reset.
+
+The Summary panel must end immediately after:
+
+```text
+hoursSummaryGrid
+```
+
+or:
+
+```text
+hoursSummaryEmpty
+```
+
+depending on state.
+
+Do not leave an empty separator or empty container where the calculator used to be.
+
+---
+
+# 5. Restructure the Summary Header
+
+## Step 4 — Convert Summary header into one compact top row
 
 **Action:** MODIFY
 
 **File:**
 
-`FrontEnd/src/pages/employee-schedule/ui/EmployeeSchedulePage.tsx`
+`EmployeeSchedulePage.tsx`
 
-The current selector is a standalone button containing:
-
-```text
-EmployeeIcon
-schedule name
-chevron
-month/year
-updated timestamp
-```
-
-Preserve:
+Replace the presentation structure with:
 
 ```text
-aria-haspopup="dialog"
-aria-expanded
-aria-label="Select schedule. Current schedule: ..."
-onClick={() => setIsScheduleSelectOpen(true)}
+hoursSummaryHeader
+├── hoursSummaryHeading
+│   ├── summaryIcon
+│   └── title block
+│       ├── WORK HOURS
+│       └── Summary
+│
+└── hoursSummaryTotalPill
 ```
 
-Change its visual content to:
+The total pill must now be physically inside the header flex row rather than positioned absolutely relative to the panel.
 
-```text
-[ ScheduleIcon ] | schedule name ▼
-                   month/year
-                   Updated ...
-```
-
-### Required DOM concept
-
-Inside `scheduleSelectTrigger`, use:
-
-```text
-scheduleSelectTriggerIcon
-scheduleSelectDivider
-scheduleSelectTriggerCopy
-```
-
-Conceptually:
+Conceptual JSX:
 
 ```tsx
-<button className={styles.scheduleSelectTrigger}>
-    <span className={styles.scheduleSelectTriggerIcon}>
-        <ScheduleIcon />
-    </span>
-
-    <span className={styles.scheduleSelectDivider} />
-
-    <span className={styles.scheduleSelectTriggerCopy}>
+<div className={styles.hoursSummaryHeader}>
+    <div className={styles.hoursSummaryHeading}>
         ...
+    </div>
+
+    <span className={styles.hoursSummaryTotalPill}>
+        {scheduleHoursSummary.totalHoursText}
     </span>
-</button>
+</div>
 ```
 
-The divider is decorative:
+Then render the period controls as their own row **below** the header.
+
+Final order:
+
+```text
+Header
+↓
+Period controls
+↓
+Table
+```
+
+---
+
+## Step 5 — Keep the compact icon/title hierarchy
+
+**Action:** MODIFY / REUSE
+
+Continue rendering:
+
+```text
+StatisticsIcon
+WORK HOURS
+Summary
+```
+
+but make the block more compact like the reference.
+
+Keep:
+
+```tsx
+<span className={workspaceStyles.panelEyebrow}>
+  {t("Work hours")}
+</span>
+
+<h2 className={workspaceStyles.panelTitle}>
+  {t("Summary")}
+</h2>
+```
+
+Do not replace these texts.
+
+Do not merge them into a single heading.
+
+Target hierarchy:
+
+```text
+WORK HOURS     ← small muted uppercase
+Summary        ← stronger dark title
+```
+
+---
+
+# 6. Redesign Month / Year Controls
+
+## Step 6 — Remove visible `MONTH` and `YEAR` labels
+
+**Action:** MODIFY
+
+**File:**
+
+`EmployeeSchedulePage.tsx`
+
+Remove the visible `MONTH` and `YEAR` labels from the UI.
+
+Do **not** remove accessibility names.
+
+Continue using:
+
+```ts
+ariaLabel={t("Summary month")}
+ariaLabel={t("Summary year")}
+```
+
+The target must visually show only:
+
+```text
+[calendar] July  ▼
+[calendar] 2026  ▼
+```
+
+not:
+
+```text
+MONTH
+[July]
+
+YEAR
+[2026]
+```
+
+---
+
+## Step 7 — Render month and year as two equal-width controls
+
+**Action:** MODIFY
+
+**Files:**
+
+- `EmployeeSchedulePage.tsx`
+- `EmployeeSchedulePage.module.css`
+
+Render the two existing `SearchableSelect` controls directly inside:
+
+```text
+summaryPeriodControls
+```
+
+Use one shared page class:
+
+```text
+summaryPeriodSelect
+```
+
+for both.
+
+Target:
+
+```text
+┌────────────────┐  ┌────────────────┐
+│ 📅  July    ▼ │  │ 📅  2026    ▼ │
+└────────────────┘  └────────────────┘
+```
+
+Use CSS Grid:
+
+```text
+2 × minmax(0, 1fr)
+```
+
+rather than hardcoded widths.
+
+Remove obsolete page styles:
+
+```text
+.summaryPeriodField
+.summaryPeriodField > span
+.summaryMonthSelect
+.summaryYearSelect
+```
+
+after their JSX usage has been removed.
+
+The controls should remain equal width on mobile.
+
+---
+
+# 7. Extend SearchableSelect for a Leading Icon
+
+## Step 8 — Add an optional `leadingIcon` prop
+
+**Action:** EXTEND
+
+**File:**
+
+`FrontEnd/src/shared/ui/components/SearchableSelect/SearchableSelect.tsx`
+
+Add:
+
+```ts
+leadingIcon?: ReactNode;
+```
+
+to `SearchableSelectProps`.
+
+Import:
+
+```ts
+type ReactNode
+```
+
+from React.
+
+This prop must be optional.
+
+All existing `SearchableSelect` usages without it must render exactly as before.
+
+---
+
+## Step 9 — Render the icon before the selected value
+
+**Action:** EXTEND
+
+**File:**
+
+`SearchableSelect.tsx`
+
+When `leadingIcon` is provided, render:
+
+```text
+leading icon
+selected value
+chevron
+```
+
+inside the existing select button.
+
+Do not change:
+
+- dropdown behavior;
+- dropdown portal;
+- option rendering;
+- search;
+- Escape;
+- `onChange`;
+- disabled state;
+- ARIA label;
+- listbox semantics.
+
+The icon must be decorative:
 
 ```text
 aria-hidden="true"
 ```
 
-Do not change the text/data formatting logic.
-
-Keep:
-
-```text
-selectedSchedule.name
-formatScheduleMonth(selectedSchedule)
-formatScheduleLastUpdate(...)
-```
-
-unchanged.
+because the select already has an accessible name.
 
 ---
 
-## Step 3 — Create one composite schedule-control row
+## Step 10 — Style the optional leading icon
 
 **Action:** MODIFY
 
 **File:**
 
-`FrontEnd/src/pages/employee-schedule/ui/EmployeeSchedulePage.tsx`
+`FrontEnd/src/shared/ui/components/SearchableSelect/SearchableSelect.module.css`
 
-The approved UI visually makes the selected schedule and `Adjust` action one element.
+Add styles for the optional icon slot.
 
-Do **not** put `Adjust` inside `scheduleSelectTrigger`.
-
-Instead create one ReactNode, conceptually:
+For Summary-sized selects, target approximately:
 
 ```text
-scheduleSelectorRow
+icon container: 24–28px
+icon size:      14–16px
+border-radius:  8–9px
 ```
 
-with this structure:
+Visual direction:
 
 ```text
-<div class="scheduleSelectorRow">
-
-    <button class="scheduleSelectTrigger">
-        calendar
-        divider
-        schedule metadata
-    </button>
-
-    <button class="openScheduleCorrectionButton">
-        Adjust
-    </button>
-
-</div>
-```
-
-### Selector row responsibility
-
-The wrapper is presentation only.
-
-It owns:
-
-- rounded capsule background;
-- border;
-- horizontal layout;
-- shared padding;
-- spacing.
-
-It owns **no business state**.
-
-### Main trigger
-
-Click:
-
-```text
-→ opens EmployeeScheduleSelectDialog
-```
-
-### Adjust
-
-Click:
-
-```text
-→ setShiftCorrectionError(null)
-→ setIsShiftCorrectionDialogOpen(true)
-```
-
-This is exactly the current Adjust behavior and must remain unchanged.
-
-Build this schedule-control row once and reuse the same ReactNode in both matrix and daily rendering branches.
-
-Do not duplicate independently authored versions.
-
----
-
-## Step 4 — Move the schedule-view toggle to the top-right actions
-
-**Action:** MODIFY
-
-**File:**
-
-`FrontEnd/src/pages/employee-schedule/ui/EmployeeSchedulePage.tsx`
-
-### Remove current behavior from `icon`
-
-Currently both matrix and daily views pass an interactive button through the `icon` prop.
-
-Remove these `icon={...}` props from both:
-
-- `ContainerGraphMatrix`;
-- `CardSection`.
-
-After this change:
-
-```text
-Schedules
-```
-
-must be plain title text.
-
-The title must no longer have a clickable icon beside it.
-
----
-
-## Step 5 — Create one top-right actions ReactNode
-
-**Action:** MODIFY
-
-**File:**
-
-`FrontEnd/src/pages/employee-schedule/ui/EmployeeSchedulePage.tsx`
-
-Create one shared ReactNode for:
-
-```text
-[view-mode icon] [PDF]
-```
-
-Conceptually:
-
-```text
-scheduleHeaderActions
-```
-
-The order must be:
-
-```text
-View mode button
-PDF button
-```
-
-matching the approved reference.
-
-### View-mode button
-
-Reuse:
-
-```text
-scheduleViewToggleRef
-handleToggleScheduleView
-```
-
-Use:
-
-```tsx
-<ScheduleDetailsIcon size={...} />
-```
-
-instead of `ScheduleIcon`.
-
-It must remain icon-only.
-
-Do not render text such as:
-
-```text
-View
-Mode
-Daily
-Matrix
-```
-
-inside the control.
-
-### Accessibility
-
-When matrix is currently displayed:
-
-```text
-aria-label="Show daily schedule view"
-title="Show daily schedule view"
-aria-pressed="false"
-```
-
-When daily is currently displayed:
-
-```text
-aria-label="Show schedule matrix view"
-title="Show schedule matrix view"
-aria-pressed="true"
-```
-
-Derive these values from `scheduleViewMode`, instead of maintaining two separate manually authored copies.
-
-### PDF
-
-Keep:
-
-```text
-handleExportPdf
-aria-label="Export schedule to PDF"
-title="Export schedule to PDF"
-```
-
-unchanged.
-
----
-
-## Step 6 — Reuse the new header composition in matrix mode
-
-**Action:** MODIFY
-
-**File:**
-
-`FrontEnd/src/pages/employee-schedule/ui/EmployeeSchedulePage.tsx`
-
-For `ContainerGraphMatrix`, the final header props must conceptually become:
-
-```text
-title = "Schedules"
-
-icon = NONE
-
-headerRightSlot =
-    [view-mode button] [PDF]
-
-headerCenterSlot =
-    [rounded schedule selector + Adjust]
-```
-
-Keep matrix data/behavior props unchanged.
-
-Do not change matrix behavior.
-
----
-
-## Step 7 — Reuse exactly the same header composition in daily mode
-
-**Action:** MODIFY
-
-**File:**
-
-`FrontEnd/src/pages/employee-schedule/ui/EmployeeSchedulePage.tsx`
-
-For daily `CardSection`, use the same:
-
-```text
-title = "Schedules"
-
-icon = NONE
-
-headerRightSlot =
-    [view-mode button] [PDF]
-
-headerCenterSlot =
-    [rounded schedule selector + Adjust]
-```
-
-Do not create a separate CSS/DOM version specifically for daily mode.
-
-Keep daily content unchanged:
-
-- day tabs;
-- active day;
-- scrolling;
-- workers;
-- related schedules;
-- empty-day UI.
-
----
-
-# 5. Styling Changes
-
-## Step 8 — Restyle the top header
-
-**Action:** MODIFY
-
-**File:**
-
-`FrontEnd/src/pages/employee-schedule/ui/EmployeeSchedulePage.module.css`
-
-Keep the existing general three-row structure:
-
-```text
-row 1
-divider
-row 3
-```
-
-Target:
-
-```text
-grid-template-columns:
-    minmax(0, 1fr) auto
-
-row 1:
-Schedules             View PDF
-
-row 2:
-divider
-
-row 3:
-schedule selector row spanning all columns
-```
-
-### Title
-
-Update `.openScheduleHeaderTitle` so it no longer expects an icon column.
-
-Remove the page-specific two-column title grid.
-
-Style the title as a simple text heading.
-
-Target:
-
-```text
-color: #0f172a
-font-weight: 850–900
-```
-
-Use a size visually consistent with the reference while keeping the current compact page proportions.
-
-Do not make it an oversized page-level H1.
-
----
-
-## Step 9 — Change `.openScheduleHeaderRight` / `.openScheduleActions`
-
-**Action:** MODIFY
-
-**File:**
-
-`EmployeeSchedulePage.module.css`
-
-The current implementation uses `display: contents` to place PDF and Adjust into different grid rows.
-
-This is no longer appropriate.
-
-After the redesign:
-
-- top-right contains only View + PDF;
-- Adjust belongs to `scheduleSelectorRow`.
-
-Change the top-right action container to a normal flex group.
-
-Target:
-
-```text
-display: flex
-align-items: center
-justify-content: flex-end
-gap: 8px
-```
-
-Do not use `display: contents`.
-
----
-
-## Step 10 — Style the new view-mode button
-
-**Action:** MODIFY
-
-**File:**
-
-`EmployeeSchedulePage.module.css`
-
-Reuse `.scheduleViewToggle` but change it to match the approved icon-only button near PDF.
-
-Target visual:
-
-```text
-╭──────╮
-│ list │
-╰──────╯
-```
-
-Recommended geometry:
-
-```text
-width: 34–38px
-height: 34–38px
-padding: 0
-border-radius: 12–14px
-```
-
-Visual:
-
-```text
-border:
-1px solid rgba(37, 99, 235, 0.20)
-
-background:
-rgba(239, 246, 255, 0.94)
-
-color:
-#2563eb
-```
-
-Hover:
-
-- very small upward shift or background increase;
-- no large movement.
-
-Focus-visible:
-
-- existing blue focus ring.
-
-Daily-mode active state may use slightly stronger blue border/background but must remain visually within the same component style.
-
-Do not make the button solid blue.
-
----
-
-## Step 11 — Reduce the current toggle pulse animation
-
-**Action:** MODIFY
-
-**File:**
-
-`EmployeeSchedulePage.module.css`
-
-Replace the existing strong pulse/rotation with a subtler interaction.
-
-Target concept:
-
-```text
-start  0.96
-middle 1.04
-end    1
-```
-
-Allow a small blue glow.
-
-Remove:
-
-- strong rotation;
-- solid dark-blue flash;
-- large pulse ring.
-
-Keep:
-
-```text
-hasSwitchedScheduleView
-scheduleViewTogglePulse
-```
-
-logic unchanged.
-
----
-
-## Step 12 — Keep and refine PDF button styling
-
-**Action:** MODIFY / REUSE
-
-**File:**
-
-`EmployeeSchedulePage.module.css`
-
-Keep the existing semantic colors:
-
-```text
-#fff1f2 background
-#fecdd3 border
-#e11d48 text
-```
-
-Adjust only sizing if necessary so that PDF aligns visually with the new View button.
-
-Target:
-
-```text
-height: roughly equal to view button
-padding-inline: 12–14px
-border-radius: 999px
-```
-
-Do not make PDF solid red.
-
----
-
-# 6. Selected Schedule Capsule
-
-## Step 13 — Create `.scheduleSelectorRow`
-
-**Action:** MODIFY
-
-**File:**
-
-`EmployeeSchedulePage.module.css`
-
-Add a dedicated class:
-
-```text
-.scheduleSelectorRow
-```
-
-Target visual:
-
-```text
-╭────────────────────────────────────────────╮
-│ [calendar] │ F27 ▼                 Adjust │
-│            │ July 2026                    │
-│            │ Updated ...                  │
-╰────────────────────────────────────────────╯
-```
-
-Recommended structure:
-
-```text
-display: flex
-align-items: center
-gap: 8–10px
-min-width: 0
-```
-
-Target surface:
-
-```text
-border:
-1px solid rgba(37, 99, 235, 0.14–0.18)
-
-background:
-light blue/white glass gradient
-
-border-radius:
-20–24px
-
-padding:
-8–10px
-```
-
-Recommended background direction:
-
-```css
-linear-gradient(
-    135deg,
-    rgba(239, 246, 255, 0.88),
-    rgba(255, 255, 255, 0.96)
-)
-```
-
-Keep it subtle.
-
-It should appear as **one component**, not another large section.
-
----
-
-## Step 14 — Restyle `.scheduleSelectTrigger`
-
-**Action:** MODIFY
-
-Remove the current isolated-button visual behavior.
-
-The trigger now lives inside `.scheduleSelectorRow`.
-
-Target:
-
-```text
-flex: 1 1 auto
-min-width: 0
-display: grid
-```
-
-Its own background should remain transparent so the outer capsule remains the visual surface.
-
-Do not create an additional rounded rectangle on hover.
-
-A subtle internal hover/focus effect is acceptable, but the outer capsule must remain visually unified.
-
----
-
-## Step 15 — Use a calendar icon for the schedule
-
-**Action:** MODIFY
-
-Style:
-
-```text
-.scheduleSelectTriggerIcon
-```
-
-Target:
-
-```text
-44px × 44px
-border-radius: 14–16px
-background: #dbeafe / equivalent translucent blue
+background: soft blue
 color: #2563eb
 ```
 
-Render:
+When a leading icon exists:
 
-```text
-ScheduleIcon
-```
+- icon stays fixed-width;
+- selected text receives the remaining width;
+- chevron stays pinned to the right;
+- long labels truncate;
+- no wrapping occurs.
 
-not `EmployeeIcon`.
-
-There must now be only one prominent schedule/calendar icon in the selector area.
+Do not change visual layout of selects without a leading icon.
 
 ---
 
-## Step 16 — Add the selector's internal vertical divider
+## Step 11 — Supply calendar icons from Summary
+
+**Action:** MODIFY
+
+**File:**
+
+`EmployeeSchedulePage.tsx`
+
+For both existing Summary `SearchableSelect`s add:
+
+```tsx
+leadingIcon={<ScheduleIcon size={...} />}
+```
+
+Reuse the already imported/shared `ScheduleIcon`.
+
+Do not create separate Month and Year icon files.
+
+Both controls intentionally use the same calendar vocabulary, matching the approved reference.
+
+---
+
+# 8. Summary Panel Styling
+
+## Step 12 — Make the outer Summary panel more compact
 
 **Action:** MODIFY
 
@@ -927,121 +606,93 @@ There must now be only one prominent schedule/calendar icon in the selector area
 
 `EmployeeSchedulePage.module.css`
 
-Create:
+Update:
 
 ```text
-.scheduleSelectDivider
+.hoursSummaryPanel
 ```
 
 Target:
 
-```text
-width: 1px
-align-self: stretch
-```
+- maintain the existing white/glass employee-panel appearance;
+- compact vertical rhythm;
+- rounded card;
+- no calculator space underneath.
 
-Use a subtle color such as:
-
-```text
-rgba(148, 163, 184, 0.24)
-```
-
-It should visually divide:
+Recommended direction:
 
 ```text
-calendar icon | metadata
+gap: 10px
+padding: ~14px 12–14px
+border-radius: ~24px
 ```
 
-Do not extend beyond the internal padded height of the capsule.
+Do not create another nested outer card.
 
 ---
 
-## Step 17 — Keep metadata hierarchy
-
-**Action:** MODIFY / REUSE
-
-Keep:
-
-```text
-.scheduleSelectNameRow
-.scheduleSelectName
-.scheduleSelectChevron
-.scheduleSelectPeriod
-.scheduleSelectUpdated
-```
-
-Target hierarchy:
-
-```text
-F27 ▼                  darkest / boldest
-
-July 2026              muted
-
-Updated ...            blue
-```
-
-Keep:
-
-```css
-.scheduleSelectUpdated {
-    color: #3b82f6;
-}
-```
-
-Long schedule names must:
-
-```text
-overflow hidden
-text-overflow ellipsis
-white-space nowrap
-```
-
----
-
-## Step 18 — Move Adjust into the selector capsule
+## Step 13 — Compact the Summary header icon
 
 **Action:** MODIFY
 
-Use the existing correction behavior and existing blue semantic styling.
+**File:**
 
-The Adjust button becomes the right-side sibling inside:
+`EmployeeSchedulePage.module.css`
+
+Make the Work Hours Summary icon visually closer to the reference:
 
 ```text
-.scheduleSelectorRow
+~36–40px
 ```
 
-Target:
+with:
+
+- soft blue surface;
+- blue Statistics icon;
+- rounded-square shape;
+- subtle border.
+
+Do not make it smaller than a clearly recognizable UI icon.
+
+---
+
+## Step 14 — Remove absolute total-pill positioning
+
+**Action:** MODIFY
+
+**File:**
+
+`EmployeeSchedulePage.module.css`
+
+Remove any absolute positioning from `.hoursSummaryTotalPill`.
+
+Set `.hoursSummaryTotalPill` to participate normally in the flex header.
+
+Keep:
+
+- green text;
+- pale-green background;
+- subtle green border;
+- pill radius.
+
+Target height:
 
 ```text
-light-blue pill
-thin blue border
-blue text
+~28–30px
 ```
 
-Keep colors based on existing:
+Keep:
 
 ```text
-#eff6ff
-#bfdbfe
-#2563eb
-```
-
-Target geometry:
-
-```text
-min-height: 32–36px
-padding-inline: 12–14px
-border-radius: 999px
 flex: 0 0 auto
+white-space: nowrap
 ```
 
-Do not allow Adjust to shrink or wrap.
+Remove now-unnecessary heading padding that existed only to compensate for absolute positioning.
 
 ---
 
-# 7. Header Grid Finalization
-
-## Step 19 — Make the center slot span the full header width
+## Step 15 — Keep header on one row on mobile
 
 **Action:** MODIFY
 
@@ -1049,104 +700,324 @@ Do not allow Adjust to shrink or wrap.
 
 `EmployeeSchedulePage.module.css`
 
-Change the center-slot rule so the new selector capsule spans:
+Remove mobile rules that turn `.hoursSummaryHeader` into a column.
+
+Header must remain:
 
 ```text
-grid-column: 1 / -1
-grid-row: 3
+[icon + Work Hours / Summary]        [208.5h]
 ```
 
-This gives the selector the full inner width of the Schedule card.
-
-The Adjust button will therefore align naturally inside the capsule rather than being aligned through the outer header grid.
-
----
-
-## Step 20 — Preserve the horizontal divider
-
-**Action:** REUSE
-
-Keep the current header divider between:
-
-```text
-Schedules / View / PDF
-```
-
-and:
-
-```text
-schedule selector capsule
-```
-
-Only spacing may be adjusted.
-
-Do not remove it.
-
----
-
-# 8. Responsive Behavior
-
-## Step 21 — Verify compact mobile layouts
-
-**Action:** MODIFY CSS ONLY WHERE REQUIRED
-
-Target viewport widths:
+at:
 
 ```text
 360px
 390px
 430px
-520px
 ```
-
-Required behavior:
-
-### Top row
-
-Always remain:
-
-```text
-Schedules          [view] [PDF]
-```
-
-Do not wrap View or PDF to a second line under normal supported mobile widths.
-
-### Selector
-
-Always remain conceptually:
-
-```text
-[calendar] | metadata         Adjust
-```
-
-At narrower widths:
-
-- metadata receives remaining flexible width;
-- schedule name truncates;
-- Updated text may wrap;
-- Adjust stays visible;
-- no horizontal overflow.
-
-Do not hide Adjust.
-
-Do not hide the schedule icon.
-
-Do not introduce viewport-width calculations.
 
 Use:
 
 ```text
 min-width: 0
 flex
-grid
 gap
 ```
 
+rather than wrapping the pill below the title.
+
 ---
 
-# 9. Tests
+# 9. Period Controls Styling
 
-## Step 22 — Update `EmployeeSchedulePage.test.tsx`
+## Step 16 — Create compact two-control filter row
+
+**Action:** MODIFY
+
+**File:**
+
+`EmployeeSchedulePage.module.css`
+
+Change `.summaryPeriodControls` to:
+
+```text
+display: grid
+grid-template-columns: repeat(2, minmax(0, 1fr))
+gap: 8px
+width: 100%
+```
+
+The controls must look balanced and equal.
+
+Do not stack Month and Year on normal mobile widths.
+
+At extremely constrained width below the supported layout, content may truncate rather than cause horizontal overflow.
+
+---
+
+## Step 17 — Preserve the existing Summary select design foundation
+
+**Action:** REUSE / REFINE
+
+Keep using:
+
+```ts
+size="summary"
+shadow="soft"
+searchEnabled={false}
+showSelectedHint={false}
+```
+
+Do not introduce a new button style from scratch.
+
+Only refine spacing required for the new leading calendar icon.
+
+---
+
+# 10. Table Styling
+
+## Step 18 — Keep existing table semantics and data
+
+**Action:** REUSE
+
+Keep:
+
+```text
+role="table"
+role="row"
+role="columnheader"
+role="cell"
+```
+
+Keep columns:
+
+```text
+DAY
+HOURS
+SCHEDULE
+```
+
+Keep:
+
+```text
+row.dayLabel
+row.hoursText
+row.scheduleName
+```
+
+unchanged.
+
+Do not alter data calculations to make the table match the screenshot.
+
+---
+
+## Step 19 — Make the table visually more compact
+
+**Action:** MODIFY
+
+**File:**
+
+`EmployeeSchedulePage.module.css`
+
+Reduce visual density slightly toward the approved reference.
+
+Target approximately:
+
+```text
+row min-height: 34–36px
+cell padding:   7–8px 10px
+```
+
+Keep text readable.
+
+Keep current responsive three-column proportions unless a small adjustment is required to prevent schedule text crowding.
+
+Do not reduce touch-target requirements because the table itself is read-only.
+
+---
+
+## Step 20 — Preserve the sticky header and total row
+
+**Action:** REUSE
+
+Keep:
+
+```text
+hoursSummaryGridHeader → sticky top
+hoursSummaryTotalRow   → sticky bottom
+```
+
+Do not remove scrolling.
+
+Do not render all 28–31 days directly into page height.
+
+---
+
+## Step 21 — Match table header to the reference
+
+**Action:** MODIFY / REFINE
+
+Keep a pale slate/light-blue header.
+
+Target:
+
+```text
+DAY        HOURS        SCHEDULE
+```
+
+with:
+
+- small uppercase text;
+- muted blue-gray foreground;
+- strong weight;
+- no heavy borders.
+
+Keep current table border and rounded outer shell.
+
+---
+
+# 11. Total Row
+
+## Step 22 — Add Sigma symbol before `Total`
+
+**Action:** MODIFY
+
+**File:**
+
+`EmployeeSchedulePage.tsx`
+
+Change the first total-row cell from simple `Total` text to:
+
+```text
+Σ Total
+```
+
+Use a dedicated class such as:
+
+```text
+hoursSummaryTotalLabel
+```
+
+The Sigma symbol is decorative:
+
+```text
+aria-hidden="true"
+```
+
+Screen readers must continue to hear simply:
+
+```text
+Total
+```
+
+Do not add a new icon dependency for Sigma.
+
+---
+
+## Step 23 — Style the total row as the strongest table accent
+
+**Action:** MODIFY
+
+**File:**
+
+`EmployeeSchedulePage.module.css`
+
+Keep the existing pale-green total background.
+
+Refine it to match the mockup:
+
+```text
+Σ Total      208.5h      All schedules
+```
+
+with:
+
+- Sigma green;
+- Total green and bold;
+- hours green and bold;
+- `All schedules` muted slate;
+- no excessive height.
+
+Do not color `All schedules` green.
+
+---
+
+# 12. Remove Obsolete Salary Styles
+
+## Step 24 — Delete Salary Calculator CSS
+
+**Action:** REMOVE
+
+**File:**
+
+`EmployeeSchedulePage.module.css`
+
+Remove all styles exclusively associated with the removed calculator:
+
+```text
+.salaryCalculator
+.salaryCalculatorHeader
+.salaryCalculatorMark
+.salaryCalculatorForm
+.salaryCalculatorField
+.salaryCalculatorInputShell
+.salaryCalculatorEquals
+.salaryCalculatorResult
+.salaryCalculatorReset
+```
+
+including:
+
+- hover states;
+- focus states;
+- disabled states;
+- child selectors;
+- calculator-specific responsive rules.
+
+Also remove calculator-only rules from mobile media queries.
+
+Do not remove unrelated responsive rules.
+
+---
+
+# 13. Clean Up Obsolete Summary CSS
+
+## Step 25 — Remove old layout rules no longer used
+
+**Action:** REMOVE / CONSOLIDATE
+
+**File:**
+
+`EmployeeSchedulePage.module.css`
+
+After JSX restructuring, remove unused:
+
+```text
+.hoursSummaryActions
+.summaryPeriodField
+.summaryPeriodField > span
+.summaryMonthSelect
+.summaryYearSelect
+```
+
+if no references remain.
+
+Replace with the new:
+
+```text
+.summaryPeriodControls
+.summaryPeriodSelect
+```
+
+Do not leave old declarations merely overridden later in the stylesheet.
+
+Keep Summary styling in one coherent block.
+
+---
+
+# 14. Tests
+
+## Step 26 — Remove Salary Calculator test
 
 **Action:** MODIFY
 
@@ -1154,168 +1025,186 @@ gap
 
 `FrontEnd/src/pages/employee-schedule/ui/EmployeeSchedulePage.test.tsx`
 
-Keep the existing schedule-mode switching tests using the accessible names:
+Remove the current test for calculating estimated salary and restoring the Work hours total.
 
-```text
-Show daily schedule view
-Show schedule matrix view
-```
-
-### Add/adjust assertions
-
-Initial matrix state:
-
-```text
-button "Show daily schedule view"
-aria-pressed="false"
-```
-
-After clicking it:
-
-```text
-button "Show schedule matrix view"
-aria-pressed="true"
-```
-
-Click again:
-
-```text
-schedule matrix exists
-```
-
-This confirms that moving the button did not change the functionality.
+Do not retain an obsolete test for functionality that no longer exists.
 
 ---
 
-## Step 23 — Preserve selector tests
+## Step 27 — Add regression assertion that calculator is absent
 
-**Action:** REUSE / UPDATE ONLY IF DOM TEXT STRUCTURE REQUIRES
+**Action:** MODIFY
 
-Do not weaken the existing selector tests.
+**File:**
 
-They must continue verifying:
+`EmployeeSchedulePage.test.tsx`
 
-- trigger opens selector;
-- selected schedule is focused;
-- switching to another schedule updates metadata;
-- matrix receives new schedule;
-- Escape closes;
-- close button closes;
-- overlay closes;
-- missing timestamp fallback works.
-
-The schedule-selection `aria-label` must remain:
+Inside the main Summary/render test, add an assertion equivalent to:
 
 ```text
-Select schedule. Current schedule: ...
+Salary calculator region is not present
 ```
+
+This protects the approved simplified UI from accidental reintroduction.
+
+Do not test CSS geometry through Vitest.
 
 ---
 
-## Step 24 — Preserve PDF and Adjust accessibility
+## Step 28 — Preserve work-hours Summary aggregation test
 
-Ensure tests still find:
+**Action:** REUSE
+
+Keep the existing test verifying that work from multiple public schedules appears in:
 
 ```text
-Export schedule to PDF
-Request a shift correction
+Schedule hours summary
 ```
 
-Do not change those accessible names merely for the redesign.
+Do not weaken these assertions.
 
 ---
 
-# 10. Data / API / Persistence Changes
+## Step 29 — Preserve period-selection integration test
 
-## API
+**Action:** REUSE / MINIMAL UPDATE ONLY
+
+Keep the existing test that lets the employee choose the month and year used by Summary.
+
+The accessible names must remain:
+
+```text
+Summary month
+Summary year
+```
+
+Therefore this test should continue working even though visible `MONTH` / `YEAR` labels are removed.
+
+Only update the test if the leading icon affects DOM text unexpectedly.
+
+Do not change the functional assertions.
+
+---
+
+## Step 30 — Add optional leading-icon regression coverage
+
+**Action:** MODIFY
+
+**Preferred file:**
+
+`EmployeeSchedulePage.test.tsx`
+
+Verify indirectly through the Summary page that:
+
+- Summary month control exists;
+- Summary year control exists;
+- both remain usable;
+- their period-selection behavior remains correct.
+
+The icon itself is decorative and does not require a semantic assertion.
+
+---
+
+# 15. Data / API / Persistence Changes
+
+### API
 
 None.
 
-## Backend
+### Backend
 
 None.
 
-## DTOs / entities
+### DTO / entity changes
 
 None.
 
-## Persistence
+### Persistence
 
 None.
 
-## Database
+### Database migration
 
 None.
 
-## Dependency Injection
+### Dependency injection
 
 None.
 
-## Configuration
+### Configuration
 
 None.
 
-## New dependencies
+### Dependencies
 
 None.
 
 ---
 
-# 11. Error and Edge Case Requirements
+# 16. Error and Edge Case Requirements
 
-### No selected schedule
+### No schedules
 
-Preserve the current loading/empty states.
+Preserve the existing page loading/empty states.
 
-Do not render the selector row when no selected schedule exists.
+Do not render Summary when the current condition prevents it today.
 
-### One schedule
+### Only one available month
 
-The capsule still renders normally.
+Continue disabling the month select exactly as the current logic does.
 
-Clicking it can still open the selector containing one schedule.
+### Only one available year
 
-### Long schedule name
+Continue disabling the year select exactly as the current logic does.
 
-Truncate name with ellipsis.
+Do not alter this behavior only for visual consistency.
 
-Do not allow it to collide with Adjust.
+### Month unavailable in newly selected year
 
-### Missing `lastUpdatedAtUtc`
+Preserve the current year-handler fallback to the first available period for that year.
 
-Preserve:
+### Empty working month
 
-```text
-Not recorded yet
-```
-
-Do not produce:
+Keep the existing:
 
 ```text
-Updated Not recorded yet
+No assigned shifts in this period.
 ```
 
-### Daily/matrix mode
+UI.
 
-View toggle remains available in both modes at exactly the same visual location.
+### 28 / 29 / 30 / 31 day months
 
-### Focus after toggle
+Keep `buildScheduleHoursSummary(...)` as the source of rows.
 
-Continue focusing `scheduleViewToggleRef` after a mode switch.
+Do not hardcode the number of visible days from the mockup.
 
-Moving the button must not break this behavior.
+### Long schedule names
 
-### Selector + Adjust interaction
+Keep schedule cells able to wrap.
 
-Clicking the selector opens the schedule dialog.
+Do not increase the entire table width.
 
-Clicking Adjust must **not** open the schedule selector.
+### Large month
 
-They are sibling controls, not nested controls.
+Table must scroll internally and retain:
+
+- sticky header;
+- sticky Total row.
+
+### Small mobile width
+
+At `360px`:
+
+- heading and total pill remain on the same row;
+- Month and Year remain side-by-side;
+- no horizontal page overflow;
+- period labels may truncate;
+- table remains usable.
 
 ---
 
-# 12. Verification
+# 17. Verification
 
 From:
 
@@ -1341,7 +1230,7 @@ Then:
 npm run build
 ```
 
-If focused tests pass:
+Then:
 
 ```bash
 npm test
@@ -1349,101 +1238,102 @@ npm test
 
 ---
 
-# 13. Manual Visual Verification
+# 18. Manual Visual Verification
 
-Test:
+Verify the Summary at:
 
 ```text
 360px
 390px
 430px
+520px
 >= 860px
 ```
 
-Both:
+The mobile target must visually read approximately as:
 
 ```text
-matrix mode
-daily mode
+╭────────────────────────────────────╮
+│ [▥] WORK HOURS           [208.5h] │
+│     Summary                        │
+│                                    │
+│ [📅 July     ▼] [📅 2026      ▼] │
+│                                    │
+│ DAY        HOURS       SCHEDULE    │
+│ we./01     9.5h        8989        │
+│ th./02     15h         8989        │
+│ fr./03     14h         8989,...    │
+│ ...                                │
+│ Σ Total    208.5h      All...      │
+╰────────────────────────────────────╯
 ```
 
-Final visual target:
+Confirm:
 
-```text
-┌───────────────────────────────────────┐
-│ Schedules                  [▤]  PDF  │
-│ ───────────────────────────────────── │
-│                                       │
-│ ╭───────────────────────────────────╮ │
-│ │ [📅] │ F27 ▼             Adjust │ │
-│ │      │ July 2026                  │ │
-│ │      │ Updated 04 Jul ...         │ │
-│ ╰───────────────────────────────────╯ │
-│                                       │
-│ Day              OLEH PROTSUN         │
-│ ...                                   │
-└───────────────────────────────────────┘
-```
-
-Verify:
-
-- no calendar/view icon exists to the left of `Schedules`;
-- `Schedules` is plain heading text;
-- dedicated icon-only view button appears before PDF;
-- view button toggles display mode;
-- selector is one rounded surface;
-- one calendar icon exists inside selector;
-- internal vertical divider exists;
-- Adjust is inside the same visual surface;
-- Adjust remains an independent button;
-- PDF style matches reference;
-- View style matches reference;
-- selector opening still works;
-- bottom sheet still works;
-- Updated text remains blue;
-- matrix and daily view both retain the same header structure.
+- no Salary Calculator exists;
+- no `Quick estimate`;
+- no Hours input;
+- no Hourly rate input;
+- no Reset;
+- no `=` calculator action;
+- Summary card becomes substantially shorter;
+- total-hours pill is top-right;
+- icon/title remain top-left;
+- Month and Year are immediately below;
+- both selects contain calendar icons;
+- no visible `MONTH` / `YEAR` labels;
+- table is compact;
+- Total row has Sigma;
+- existing period switching still works.
 
 ---
 
-# 14. Acceptance Checklist
+# 19. Acceptance Checklist
 
-- [ ] `Schedules` no longer has an interactive icon to its left.
-- [ ] Schedule-mode switching is moved to a dedicated icon-only button near PDF.
-- [ ] View-mode button uses `ScheduleDetailsIcon`.
-- [ ] View-mode button still calls `handleToggleScheduleView`.
-- [ ] Matrix → daily works.
-- [ ] Daily → matrix works.
-- [ ] Focus restoration still works.
-- [ ] View button has correct dynamic `aria-label`.
-- [ ] View button has correct `aria-pressed`.
-- [ ] PDF remains immediately beside the view button.
-- [ ] PDF export behavior is unchanged.
-- [ ] Schedule selector is one rounded capsule.
-- [ ] Selector uses `ScheduleIcon`.
-- [ ] `EmployeeIcon` is removed from the inline selector.
-- [ ] Selector includes a subtle vertical divider.
-- [ ] Schedule name and chevron are visible.
-- [ ] Month/year is visible.
-- [ ] Updated timestamp remains light blue.
-- [ ] Adjust appears inside the selector capsule visually.
-- [ ] Adjust remains a separate button semantically.
-- [ ] Adjust functionality is unchanged.
-- [ ] Clicking Adjust does not open schedule selection.
-- [ ] Clicking the schedule portion opens the existing selector bottom sheet.
-- [ ] Selector bottom-sheet behavior is unchanged.
-- [ ] Matrix content is unchanged.
-- [ ] Daily content is unchanged.
+- [ ] Summary visually matches the selected reference.
+- [ ] Salary Calculator is completely removed.
+- [ ] Salary calculator state is removed.
+- [ ] Salary calculator helpers are removed.
+- [ ] Salary calculator CSS is removed.
+- [ ] Salary calculator test is removed.
+- [ ] `numberFormat` is no longer imported by this page if unused.
+- [ ] `FormEvent` is no longer imported by this page if unused.
+- [ ] Work Hours calculation remains unchanged.
+- [ ] Summary month/year selection remains unchanged.
+- [ ] `Work hours` eyebrow remains.
+- [ ] `Summary` title remains.
+- [ ] Statistics icon remains.
+- [ ] Total hours pill appears in the top-right header.
+- [ ] Total pill no longer uses absolute positioning.
+- [ ] Month and Year controls are directly below the header.
+- [ ] Visible `MONTH` label is removed.
+- [ ] Visible `YEAR` label is removed.
+- [ ] Summary Month retains accessible name `Summary month`.
+- [ ] Summary Year retains accessible name `Summary year`.
+- [ ] Month and Year controls are equal width.
+- [ ] Both controls contain a calendar icon.
+- [ ] `SearchableSelect.leadingIcon` is optional.
+- [ ] Existing SearchableSelect usages without an icon are unchanged.
+- [ ] Table columns remain Day / Hours / Schedule.
+- [ ] Table remains scrollable.
+- [ ] Header remains sticky.
+- [ ] Total row remains sticky.
+- [ ] Sigma appears before `Total`.
+- [ ] Total and total hours use green accent.
+- [ ] `All schedules` stays muted.
+- [ ] Empty Summary state still works.
 - [ ] No API changes.
 - [ ] No backend changes.
-- [ ] No persistence changes.
+- [ ] No database changes.
 - [ ] No new dependencies.
 - [ ] Focused tests pass.
+- [ ] Full tests pass.
 - [ ] Lint passes.
 - [ ] Build passes.
 
 ---
 
-# 15. Exact Change Scope
+# 20. Exact Change Scope
 
 ### MODIFY
 
@@ -1451,14 +1341,13 @@ Verify:
 
 Responsibilities:
 
-- replace selector's Employee icon with Schedule icon;
-- add internal divider;
-- create unified selector + Adjust row;
-- move mode toggle from `icon` prop into top-right header actions;
-- use `ScheduleDetailsIcon`;
-- remove `icon` prop from matrix/daily header;
-- reuse one header action composition across modes;
-- preserve all existing behavior.
+- restructure Summary header;
+- move total pill into header;
+- simplify period controls;
+- add leading calendar icons;
+- add Sigma to Total;
+- remove Salary Calculator markup;
+- remove Salary Calculator state/helpers/handlers/imports.
 
 ### MODIFY
 
@@ -1466,14 +1355,35 @@ Responsibilities:
 
 Responsibilities:
 
-- restyle header;
-- top-right View + PDF actions;
-- selector capsule;
-- internal vertical divider;
-- calendar icon block;
-- Adjust placement;
-- responsive behavior;
-- subtle toggle animation.
+- compact Summary card;
+- compact Summary header;
+- inline total pill;
+- two-column period selector;
+- compact table;
+- Total/Sigma styling;
+- remove calculator styles;
+- remove obsolete Summary styles;
+- maintain mobile responsiveness.
+
+### EXTEND
+
+`FrontEnd/src/shared/ui/components/SearchableSelect/SearchableSelect.tsx`
+
+Responsibility:
+
+- add optional `leadingIcon?: ReactNode`;
+- render the icon decoratively before selected value;
+- preserve all existing behavior for calls without it.
+
+### MODIFY
+
+`FrontEnd/src/shared/ui/components/SearchableSelect/SearchableSelect.module.css`
+
+Responsibility:
+
+- support leading-icon alignment;
+- style Summary leading icon consistently;
+- preserve existing select appearance when no icon is supplied.
 
 ### MODIFY
 
@@ -1481,25 +1391,14 @@ Responsibilities:
 
 Responsibilities:
 
-- preserve view-mode integration test;
-- verify relocated mode toggle semantics;
-- preserve selector/PDF/Adjust behavior.
-
-### REUSE UNCHANGED
-
-`FrontEnd/src/pages/employee-schedule/ui/EmployeeScheduleSelectDialog.tsx`
-
-`FrontEnd/src/entities/containers/ui/ContainerGraphMatrix.tsx`
-
-`FrontEnd/src/shared/ui/sections/CardSection/CardSection.tsx`
-
-`FrontEnd/src/shared/ui/icons/ScheduleIcon.tsx`
-
-`FrontEnd/src/shared/ui/icons/ScheduleDetailsIcon.tsx`
+- remove calculator behavior test;
+- protect calculator removal;
+- preserve Summary calculations;
+- preserve month/year interaction tests.
 
 ---
 
-# 16. Do Not Change
+# 21. Do Not Change
 
 Do not modify:
 
@@ -1510,21 +1409,29 @@ GF3.WebApi/
 GF3.Launcher/
 ```
 
-Do not change:
+Do not modify:
 
-- schedule API;
-- schedule entities;
-- shift-correction API;
+```text
+EmployeeScheduleSelectDialog
+EmployeeShiftCorrectionDialog
+EmployeeScheduleColumnOrderDialog
+ContainerGraphMatrix
+CardSection
+EmployeeScheduleHero
+employee workspace navigation
+```
+
+Do not modify:
+
+- schedule endpoint contracts;
+- schedule persistence;
+- employee UI state persistence;
 - PDF generation;
-- Work hours logic;
-- salary logic;
-- column ordering;
-- employee UI-state persistence;
-- schedule hero;
-- employee navigation;
-- global CardSection styling;
-- global matrix styling.
+- shift-correction requests;
+- matrix/daily switching;
+- schedule-selector behavior;
+- summary aggregation rules.
 
-Do not create a new shared abstraction for this page-only visual change.
+Do not perform unrelated refactoring.
 
-The task must remain a focused Schedule-header/selector redesign.
+This plan intentionally limits the change to the approved Work Hours Summary redesign and the small reusable `SearchableSelect` extension required by the reference UI.

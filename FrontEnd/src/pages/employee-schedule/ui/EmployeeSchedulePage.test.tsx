@@ -203,6 +203,7 @@ describe("EmployeeSchedulePage", () => {
     });
 
     renderPage();
+    expect(screen.queryByRole("region", { name: "Salary calculator" })).not.toBeInTheDocument();
 
     expect(screen.getByRole("heading", { name: "Hey, Zoe" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Now" })).toBeInTheDocument();
@@ -317,37 +318,6 @@ describe("EmployeeSchedulePage", () => {
     expect(screen.getByRole("button", { name: "Show daily schedule view" })).toHaveFocus();
   });
 
-  test("calculates estimated salary and restores the Work hours total", async () => {
-    const user = userEvent.setup();
-    mocks.scheduleQuery.mockReturnValue({
-      data: schedules,
-      isLoading: false,
-      error: null,
-    });
-
-    renderPage();
-
-    const calculator = screen.getByRole("region", { name: "Salary calculator" });
-    const hoursInput = within(calculator).getByRole("textbox", { name: "Hours" });
-    const rateInput = within(calculator).getByRole("textbox", { name: "Hourly rate" });
-    const result = within(calculator).getByLabelText("Estimated pay");
-
-    expect(hoursInput).toHaveValue("12");
-    expect(result).toHaveTextContent("—");
-
-    await user.clear(hoursInput);
-    await user.type(hoursInput, "10");
-    await user.type(rateInput, "31,4");
-    await user.click(within(calculator).getByRole("button", { name: "Calculate salary" }));
-
-    expect(result).toHaveTextContent("314.00");
-
-    await user.click(within(calculator).getByRole("button", { name: "Reset" }));
-
-    expect(hoursInput).toHaveValue("12");
-    expect(rateInput).toHaveValue("31,4");
-    expect(result).toHaveTextContent("—");
-  });
   test("lets the employee customize and persist the schedule column order", async () => {
     const user = userEvent.setup();
     mocks.scheduleQuery.mockReturnValue({

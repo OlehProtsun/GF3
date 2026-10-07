@@ -1,6 +1,6 @@
 import { useDropdownPosition } from "@shared/lib/useDropdownPosition";
 import { t } from "@shared/i18n";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { ArrowIcon, CheckIcon, SearchIcon } from "@shared/ui/icons";
 import styles from "./SearchableSelect.module.css";
@@ -31,6 +31,7 @@ type SearchableSelectProps = {
   ariaDescribedBy?: string;
   ariaLabel?: string;
   className?: string;
+  leadingIcon?: ReactNode;
   onChange: (value: string) => void;
 };
 
@@ -57,6 +58,7 @@ export function SearchableSelect({
   ariaDescribedBy,
   ariaLabel,
   className,
+  leadingIcon,
   onChange,
 }: SearchableSelectProps) {
   const triggerRef = useRef<HTMLDivElement | null>(null);
@@ -199,6 +201,7 @@ export function SearchableSelect({
           type="button"
           className={joinClassNames(
             styles.selectButton,
+            leadingIcon != null && styles.selectButtonWithIcon,
             size === "compact" && styles.selectButtonCompact,
             size === "field" && styles.selectButtonField,
             size === "summary" && styles.selectButtonSummary,
@@ -224,6 +227,7 @@ export function SearchableSelect({
           aria-label={ariaLabel ?? dropdownTitle}
           disabled={disabled}
         >
+          {leadingIcon != null ? <span className={styles.leadingIcon} aria-hidden="true">{leadingIcon}</span> : null}
           <div className={styles.selectButtonText}>
             <span className={styles.selectButtonLabel}>{selectedOption?.label ?? placeholder}</span>
             {resolvedHint ? <span className={styles.selectButtonHint}>{resolvedHint}</span> : null}
