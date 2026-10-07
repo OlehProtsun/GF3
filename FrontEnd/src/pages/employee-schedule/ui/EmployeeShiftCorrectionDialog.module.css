@@ -425,3 +425,28 @@
     justify-content: center;
   }
 }
+
+@keyframes overlay-enter { from { opacity: 0; } to { opacity: 1; } }
+@keyframes surface-enter {
+  from { opacity: 0; transform: translateY(var(--surface-offset, 14px)) scale(var(--surface-scale, .99)); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes item-enter {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.overlay { animation: overlay-enter 180ms ease; }
+.dialog { animation: surface-enter 300ms var(--motion-ease); }
+.dayList button, .shiftCard, .boundaryChoices button, .timeEditor > button, .closeButton { transition: background-color 180ms ease, border-color 180ms ease, color 180ms ease, box-shadow 180ms ease, transform 180ms var(--motion-ease); }
+.stepSection { animation: item-enter 280ms var(--motion-ease) 100ms backwards; }
+.stepSection:nth-of-type(1) { animation-delay: 30ms; }
+.stepSection:nth-of-type(2) { animation-delay: 65ms; }
+.adjustmentPanel, .validation, .empty, .hint { animation: item-enter 200ms var(--motion-ease); }
+@media (hover: hover) {
+  :is(.dayList button, .boundaryChoices button, .timeEditor > button, .closeButton):hover:not(:disabled) { background-color: #dbeafe; }
+}
+:is(.dayList button, .boundaryChoices button, .timeEditor > button, .closeButton):active:not(:disabled) { transform: translateY(1px); }
+@media (prefers-reduced-motion: reduce) {
+  .overlay, .dialog, .dayList button, .shiftCard, .boundaryChoices button, .timeEditor > button, .closeButton, .stepSection, .adjustmentPanel, .validation, .empty, .hint { animation: none; transition: none; }
+  :is(.dayList button, .boundaryChoices button, .timeEditor > button, .closeButton):active:not(:disabled) { transform: none; }
+}

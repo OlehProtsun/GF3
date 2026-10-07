@@ -297,3 +297,8 @@
   background: #eff6ff;
   color: #2563eb;
 }
+@media (prefers-reduced-motion: reduce) {
+  .dropdown { animation: none; }
+  .selectButton, .option, .selectChevron { transition: none; }
+  .selectButton:active:not(:disabled), .option:active { transform: none; }
+}

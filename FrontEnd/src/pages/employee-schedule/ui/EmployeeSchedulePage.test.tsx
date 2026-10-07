@@ -2,7 +2,7 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { BrowserRouter } from "react-router-dom";
-import { beforeEach, describe, expect, test, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import type { EmployeeSchedule } from "@entities/employee-schedule";
 import { buildSchedulePdfHtml, EmployeeSchedulePage } from "./EmployeeSchedulePage";
 import styles from "./EmployeeSchedulePage.module.css";
@@ -161,7 +161,20 @@ function renderPage() {
   );
 }
 
+function mockReducedMotion(reduced = false) {
+  vi.stubGlobal("matchMedia", vi.fn((query: string) => ({
+    matches: reduced && query === "(prefers-reduced-motion: reduce)",
+    media: query,
+    onchange: null,
+    addListener: vi.fn(), removeListener: vi.fn(),
+    addEventListener: vi.fn(), removeEventListener: vi.fn(), dispatchEvent: vi.fn(),
+  })));
+}
+
+afterEach(() => vi.unstubAllGlobals());
+
 beforeEach(() => {
+  mockReducedMotion();
   window.localStorage.clear();
   mocks.scheduleQuery.mockReset();
   mocks.matrix.mockClear();
@@ -173,6 +186,26 @@ beforeEach(() => {
 });
 
 describe("EmployeeSchedulePage", () => {
+  test.each([true, undefined])("centers the Daily day safely with reduced motion %s", async reduced => {
+    if (reduced === undefined) vi.stubGlobal("matchMedia", undefined);
+    else mockReducedMotion(reduced);
+    mocks.scheduleQuery.mockReturnValue({ data: schedules, isLoading: false, error: null });
+    renderPage();
+    await userEvent.setup().click(screen.getByRole("button", { name: "Show daily schedule view" }));
+    expect(mocks.scrollIntoView).toHaveBeenCalledWith({ behavior: reduced ? "auto" : "smooth", block: "nearest", inline: "center" });
+    expect(screen.getByRole("button", { name: "Show schedule matrix view" })).toHaveFocus();
+  });
+
+  test("keeps the stage stable when selecting another schedule", async () => {
+    mocks.scheduleQuery.mockReturnValue({ data: schedules, isLoading: false, error: null });
+    renderPage();
+    const stage = screen.getByTestId("schedule-matrix").parentElement;
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "Select schedule. Current schedule: May Schedule" }));
+    await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: /Second May Schedule/ }));
+    expect(screen.getByTestId("schedule-matrix").parentElement).toBe(stage);
+    expect(stage).toHaveAttribute("data-motion-key", "2:matrix");
+  });
   test("uses intrinsic PDF column sizing with minimal cell padding", () => {
     const html = buildSchedulePdfHtml(
       schedules[0],
@@ -281,15 +314,19 @@ describe("EmployeeSchedulePage", () => {
 
     renderPage();
     const viewToggle = screen.getByRole("button", { name: "Show daily schedule view" });
+    const stage = screen.getByTestId("schedule-matrix").parentElement;
+    expect(stage).toHaveAttribute("data-employee-motion", "schedule-content");
+    expect(stage).toHaveAttribute("data-motion-key", "1:matrix");
     expect(viewToggle).toHaveAttribute("aria-pressed", "false");
     await user.click(viewToggle);
 
+    expect(stage).toHaveAttribute("data-motion-key", "1:daily");
     const workDay = screen.getByRole("tab", { name: "Sunday 10, working day" });
     const dayOff = screen.getByRole("tab", { name: "Saturday 9, day off" });
     expect(workDay).toHaveClass(styles.dailyScheduleDayWorking, styles.dailyScheduleDaySelected);
     expect(dayOff).toHaveClass(styles.dailyScheduleDayOff);
     expect(mocks.scrollIntoView).toHaveBeenCalledWith({
-      behavior: "auto",
+      behavior: "smooth",
       block: "nearest",
       inline: "center",
     });
@@ -406,6 +443,8 @@ describe("EmployeeSchedulePage", () => {
     const monthOptions = screen.getByRole("listbox", { name: "Summary month" });
     await user.click(within(monthOptions).getByRole("option", { name: "June" }));
 
+    expect(summaryTable).toHaveAttribute("data-motion-key", "2026:6:rows");
+    expect(document.querySelector('[data-employee-motion="schedule-value"]')).toHaveAttribute("data-motion-key", "2026:6:2h");
     expect(monthSelect).toHaveTextContent("June");
     expect(within(summaryTable).getByText("June Schedule")).toBeInTheDocument();
     expect(within(summaryTable).getAllByText("2h")).toHaveLength(2);
@@ -414,6 +453,8 @@ describe("EmployeeSchedulePage", () => {
     const yearOptions = screen.getByRole("listbox", { name: "Summary year" });
     await user.click(within(yearOptions).getByRole("option", { name: "2025" }));
 
+    expect(summaryTable).toHaveAttribute("data-motion-key", "2025:5:rows");
+    expect(document.querySelector('[data-employee-motion="schedule-value"]')).toHaveAttribute("data-motion-key", "2025:5:3h");
     expect(yearSelect).toHaveTextContent("2025");
     expect(monthSelect).toHaveTextContent("May");
     expect(within(summaryTable).getByText("May 2025 Schedule")).toBeInTheDocument();
