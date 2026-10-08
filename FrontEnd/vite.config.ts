@@ -8,6 +8,14 @@ const projectRoot = process.cwd();
 export default defineConfig({
   root: projectRoot,
   plugins: [react(), svgr()],
+  build: {
+    rollupOptions: {
+      input: {
+        app: path.resolve(projectRoot, "index.html"),
+        promo: path.resolve(projectRoot, "promo.html"),
+      },
+    },
+  },
   resolve: {
     dedupe: ["react", "react-dom"],
     alias: {

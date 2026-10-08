@@ -10,7 +10,11 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "promo:render": "node scripts/render-promo.mjs",
+    "promo:film": "node scripts/promo/render-film.mjs",
+    "promo:verify": "node scripts/promo/verify-film.mjs",
+    "promo:capture-ui": "node scripts/promo/capture-product-ui.mjs"
   },
   "dependencies": {
     "@gsap/react": "^2.1.2",

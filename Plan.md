@@ -1,325 +1,428 @@
-# Plan.md — GF3: legal onboarding, client meeting, employee documents and launch runbook
+# Plan.md — GF3 Premium UI Motion Product Film (MP4, authentic GF3 visuals)
 
-**Repository:** `https://github.com/OlehProtsun/GF3`  
-**Branch / pinned commit:** `DEV2` / `37540cfffb9fd89bd2a22a54c00cf3f451ce58a3`  
-**Prepared:** 2026-10-08 (Poland)  
-**Status:** IMPLEMENTATION PLAN ONLY. No code or project files have been modified.  
-**Audience:** CODEX (the implementation instructions in part A) and the GF3 operator (plain-language operating instructions in part B).  
-**Important:** This is not an approved contract, a legal opinion, a release authorization or proof of production security. The existing legal texts are explicitly `DRAFT`; real identities, technical controls, agreements and lawyer/accountant approvals must be supplied by humans. Never fabricate them.
+> **CODEX EXECUTION PLAN — IMPLEMENT AND DELIVER THE VIDEO FILE, NOT JUST A WEBSITE.**
+> Read and execute the steps in order. Do not perform another full repository analysis, replace the existing promo implementation from scratch, or stop when `promo.html` looks good. The work is **not complete** until an actual playable MP4 exists on disk and has passed the verification gates below.
 
----
+## 0. Baseline, objective, and non-negotiable distinction
 
-# PART A — EXACT CODEX EXECUTION PLAN
+- **Repository:** `https://github.com/OlehProtsun/GF3`, local working branch `DEV2`.
+- **Previously verified historical commit:** `b63b35d44222b22122689bf6fe96f310e1e733a8`. The user's CODEX agent has **subsequently generated `promo.html` locally**. Those local changes are **not verifiable in the linked remote branch**; they are the implementation starting point. **Never reset, discard, or overwrite them wholesale.**
+- **User goal:** a polished, high-end, cinematic **finished MP4 product pitch** using **the user's own GF3 visual components and genuinely recognizable interfaces**, with animated demonstrations of all major customer-facing workflows. The desired aesthetic is a modern premium software/product launch (restrained, editorial, bold typography, elegant motion), **not** an assertion that GF3 itself uses AI.
+- **Mandatory master:** `FrontEnd/artifacts/promo/gf3-product-film-1080p.mp4`, exactly **75 seconds**, **1920×1080**, **30 fps**, H.264, `yuv420p`, standard MP4 faststart, playable without development software. **Audio:** a subtle, original, locally synthesized soundtrack + occasional interface transition sounds, encoded AAC 48 kHz stereo. All necessary content remains fully understandable when muted.
+- **Additional required deliverables:** `FrontEnd/artifacts/promo/gf3-product-film-poster.png` (1920×1080), `FrontEnd/artifacts/promo/contact-sheet.png` (one frame from every scene), `FrontEnd/artifacts/promo/qa-report.json` (technical probe, scene checks, real-UI provenance, errors), and `FrontEnd/PROMO.md` with one-command reproduction and troubleshooting.
+- **Working preview:** preserve and improve existing `FrontEnd/promo.html` as the editable/seekable source for producing the MP4. It is a production tool, **not the final deliverable**.
+- **Language:** all on-screen marketing copy Polish, including correct diacritics. Developer docs and code comments English.
+- **No invented features or metrics:** no claims of AI scheduling, instant auto-approval of swaps, automatic task allocation, percentage savings or customer counts unless demonstrably implemented. All people, shifts and messages in promotional material must be **synthetic**.
+- **Privacy:** no filming production customer accounts; no real staff names, identities, schedules, JWTs, credentials or client data inside the final MP4, intermediate captures or committed repo.
 
-## 1. Objective and scope
+### 0.1 Actual project paths/source-of-truth established from the repository
 
-Make the **already-existing legal documentation** coherent, practical and ready for *human review* rather than generating more disconnected legal drafts. Produce a single Ukrainian operator playbook and a clear document map. Eliminate contradictory instructions about which B2B document is primary and whether the current application records employee/manager PDF acceptance. Add only the two missing *draft operational templates* needed to make an onboarding handoff repeatable: an onboarding card and an activation/handover protocol. **Do not claim legal approval or implement a new onboarding feature**: the repository already has a regulation publication/acceptance mechanism.
+- `FrontEnd/package.json`: React + TypeScript + Vite, GSAP, `@gsap/react`, Playwright and Vitest already exist at baseline.
+- `docs/design-system.json`: detailed design snapshot, metadata points at **older** commit `d8e752a` and says `runtimeSourceOfTruth: false`. Use it as a design index; the **current React/CSS implementation** wins on discrepancies.
+- `FrontEnd/src/index.css`, `FrontEnd/src/shared/ui/motion.css`, source-specific CSS modules: actual styling and motion references.
+- `FrontEnd/src/pages/container/ui/ContainerPage.tsx`: manager planning/workspace. Known reusable UI exports from `@entities/containers` include `ContainerProfileWorkspace`, `ContainerListCard`, etc. Avoid importing the entire stateful page into a standalone preview without its providers.
+- `FrontEnd/src/pages/employee-availability/ui/EmployeeAvailabilityPage.tsx`: employee availability workflow.
+- `FrontEnd/src/pages/employee-schedule/ui/EmployeeSchedulePage.tsx`: published schedule, view and summary.
+- `FrontEnd/src/pages/employee-swap/ui/EmployeeSwapPage.tsx`: employee swap flow, confirmation, filters/history.
+- `FrontEnd/src/app/router/AppRouter.tsx`: manager `/container`, `/availability`, `/employee`, `/communications`; employee `/availability`, `/schedule`, `/swap`, `/notifications` (routes are role-protected).
+- `FrontEnd/src/shared/ui/PageHeader`, `FrontEnd/src/shared/ui/components/IosButton`, `FrontEnd/src/shared/ui/sections/CardSection/CardSection.tsx`: verified existing UI building-block references.
+- The previous Plan.md specified `FrontEnd/src/promo/`, `FrontEnd/scripts/render-promo.mjs`, `FrontEnd/PROMO.md` and `FrontEnd/promo.html`, **but CODEX must check which of these were actually created locally**; do not assume a previous plan was implemented in full.
 
-**Boundary of scope:** document edits only. Do not alter .NET, React, DB, APIs, DI, auth, regulation persistence, deployment topology or UI. The actual contractual finalization, security remediation and client-specific data inputs are non-CODEX tasks and remain release blockers.
+### 0.2 The critical new acceptance rule — real product visuals
 
-## 2. Pin to observed state (do not re-analyze the entire repository)
+**The previous promo plan permitted custom illustrated lookalikes (`DemoWorkspace`, `DemoSwap`, etc.). That is no longer sufficient.**
 
-1. `docs/legal/README.md` describes the existing commercial flow: operator facts → review/STOP-SHIP → B2B order and DPA signed *outside the repository* → single-client isolated deployment → approved regulation PDF/version/hash → publication by system manager → manager/employee sees pending PDF → individual unticked checkbox → acceptance record → API access. Each changed version requires acknowledgement.
-2. `GF3.WebApi/Controllers/RegulationsController.cs`: existing `GET /api/regulations/pending`, `GET /api/regulations/history/me`, `GET /api/regulations/history/employees/{employeeId}`, `GET /api/regulations/{documentId}/pdf`, and `POST /api/regulations/{documentId}/accept`.
-3. `GF3.WebApi/Middleware/RegulationAcceptanceGuardMiddleware.cs`: guards manager/employee API operations when published required regulations are pending, returns **HTTP 428**; auth and regulation routes have exemptions. It is not a contract signature mechanism.
-4. `FrontEnd/src/entities/regulations/ui/RegulationAcceptanceGate.tsx`: presents title/version, PDF download, unticked checkbox, acceptance action, and the explicit explanation that the acknowledgement is personal, not the employer's signature or GDPR consent.
-5. `GF3.Tests/RegulationAcceptanceGuardTests.cs` covers the guarded workflow. `docs/legal/README.md` reports previously run test successes, but those historical reports are **not a fresh local test** for this plan.
-6. `FrontEnd/public/legal/*.html` is the **public document set**. `docs/legal/templates/*` and `docs/legal/internal/*` contain private drafts/checklists and must not enter the public build or worker acceptance by accident.
-7. `docs/legal/saas-agreement/umowa-saas-b2b-pl.md` is a **long, detailed pre-existing negotiated SaaS agreement draft**, with `zalacznik-1-zakres-uslug.md`, `checklista-przed-podpisaniem.md`, `generate-html.mjs`, and rendered `umowa-saas-b2b-pl.html`. Its draft contains a negotiated/example **500 PLN/month**, seven-day payment, and other terms: none are confirmed business terms merely because written in that template.
-8. `docs/legal/templates/Zamowienie_Umowa_B2B.md` is a **second, shorter commercial draft**, not an additional contract employees must accept. Avoid two contradictory master agreements.
-9. `docs/legal/electronic-services-regulations/README.md` currently contains stale pre-implementation text saying acceptance/version is not stored; that **conflicts** with the current controller, guard, UI, and tests. Its `regulamin-swiadczenia-uslug-elektronicznych-pl.md` is another editable working source, while `FrontEnd/public/legal/regulamin.html` is currently the canonical published-path HTML draft. They are not guaranteed to have identical wording.
-10. `docs/legal/LEGAL_REVIEW.md` labels documents `DRAFT`. `docs/legal/OPERATOR_INPUTS.md` has unchecked operator identity, finance, privacy, subcontractors, retention and technical data. `docs/legal/internal/CHECKLIST_PRZED_STARTEM.md` is a real **STOP-SHIP checklist**, including PIN/token/auth, backups, TLS, isolation, browser storage and legal review.
-11. `scripts/validate-legal-documents.mjs` checks the seven public pages, links and headings. With `--release`, it checks absence of draft markers and the actual approved document **version and SHA-256** in `docs/legal/LEGAL_REVIEW.md`; failure while files remain drafts is expected and must not be hidden.
-12. Existing backend/UX allows PDF publication for the applicable roles; **no separate privacy-consent flow is established**. Do not repurpose the acknowledgement endpoint to claim workers consent to GDPR processing.
+1. Primary product footage must consist of either **(A)** real production GF3 presentational React components, mounted with frozen synthetic props while preserving their own styles; or **(B)** actual screenshots/frame sequences captured from the running GF3 UI using Playwright with a completely synthetic demonstration dataset. These are **authentic GF3 pixels**, not hand-redrawn miniatures.
+2. Use **A** for cleanly separable presentational components, including existing shared icons, buttons, typography, panels, schedules/graph summaries as available. Use **B** for tightly coupled manager/employee pages requiring auth, query providers and routing. It is legitimate to edit/direct/crop/camera-animate a real GF3 capture; it is **not** legitimate to replace it with an unrelated CSS imitation.
+3. The film must visually demonstrate **at least four real-UI feature families**: manager scheduling, availability, employee schedule, shift swaps. A fifth segment must show **one** verified supplementary customer feature: notifications, schedule overview/summary, employee records, or existing export controls. The preferred fifth family is **schedule summary + notifications/export** if these exist in the locally available implementation.
+4. For every feature shot, record source path(s), acquisition mode `production-component` or `actual-app-capture`, original route if relevant, and how synthetic data was supplied in `FrontEnd/src/promo/real-ui/shot-manifest.ts`. Add one contact-sheet preview per shot.
+5. **Do not mark the video complete** if the main feature footage uses only promo-only recreated demo cards. An MP4 may be generated for diagnostic purposes, but report that as **provisional**, with the missing authentic shots listed in `qa-report.json`.
+6. The cinematic typography, background, compositional frames, cursor illustration, masks, and scene transitions **are new promotional graphics** and need not be literal production UI. Clearly separate those layers from product content.
 
-## 3. Exact file change matrix
+## 1. Locked visual/narrative direction
 
-| Action | Exact repository path | Responsibility |
+### 1.0 Reference-based creative brief (new approval of visual direction)
+
+This section **overrides any older instruction implying that a polished screen recording or a simple sequence of flat screenshots is sufficient**. A realistic product walkthrough is the *raw material*, not the finished treatment. Final film must have **motion-designed, visually integrated REAL GF3 UI**, with intentional art direction, storytelling, camera choreography, sound cues, transitions and graphic composition.
+
+**User-provided references** (creative inspiration, not assets to reproduce):
+
+- `https://www.youtube.com/watch?v=SgmuplXU2iY` — independently identified as *Best SaaS Product Launch Ad Video | LangEase*. Reference for polished animated SaaS storytelling and branded UI motion.
+- `https://www.youtube.com/watch?v=jX4dLxiso6A` — independently identified as *Video Ad for AI / SaaS Product | Doks.AI* (Zelios). Reference for persuasive problem → solution storytelling and animated explanations rather than tutorial screen recordings.
+- `https://www.youtube.com/watch?v=pZv7me6dFns` — **provided by the user, visual details not independently verified in planning environment**. If CODEX can open it in a browser, include it in the 3-reference moodboard. If inaccessible, state that in `PROMO.md` and follow the concrete treatment below; never invent claims about its footage or block video export solely for unavailable external inspiration.
+
+**Evidence limit:** The planning environment verified video identity and some third-party descriptions, **not a full frame-by-frame viewing**. Thus the directions below are *original production specifications inspired by the requested genre*, not assertions that particular cuts, camera angles, typography, colors or timing occur in the source videos. Do not scrape/reupload the original ads or use their video frames, audio, trademarks or proprietary graphics.
+
+**Mandatory GF3-specific creative identity:**
+
+1. The dominant visual language must come from `docs/design-system.json` **and current** GF3 React/CSS. The JSON is an older descriptive snapshot; actual UI at the local working tree wins. Preserve the real GF3 visual language (especially its calendar cells, button geometry, cards, labels, employee/workspace panels, shadows, radius, colors, type choices and spacing). Current GF3 primary blue is documented as `#2563eb` at historical commit; resolve exact current CSS tokens before rendering.
+2. Render scenes on tasteful dark ink and soft paper/neutral backgrounds derived from GF3 tokens, with blue highlights, occasional accent gradients only if harmonious with GF3. No wholesale transformation into the LangEase/Doks palette or generic purple neon AI theme.
+3. Each feature chapter must contain **at least one hero product UI composition** and **one close-up** of *an identifiable real GF3 component* (calendar, scheduling slot, availability selector, swap modal, status/badge/summary). The viewer should be able to name the product workflow from the animation alone.
+4. The real GF3 components are the moving subjects: independent shift cards slide and align; calendar rows build a weekly schedule; availability elements respond to a meaningful selection; a real swap modal emerges from its real button; confirmation/state change remains true to existing app logic. Decorative graphics orbit or spotlight them, but never fake app states.
+5. Avoid an amateur "capture browser → add music → zoom on screenshot" aesthetic. The camera must travel purposefully between component groups, with seamless match-cut geometry, foreground/background layers, authored graphic shapes and punchy but readable titles. Avoid changing every frame merely for spectacle: clarity takes priority.
+
+**Visual hierarchy of each feature chapter:** (i) <=7-word primary hook for ~1–2 sec; (ii) 2–4 sec product close-up / interaction; (iii) 2–4 sec readable feature outcome; (iv) animated physical carry-over of an existing GF3 UI shape into the next scene. These segments may overlap the existing 75-second fixed chapters; do not change the total duration.
+
+**Music / sound guidance:** Original legally usable music bed with modern clean electronic/percussive pulse and restrained tonal layers, beat-aligned clicks/soft swishes/confirmation cues. Narration is **not required**; the film communicates silently from its Polish on-screen copy. Do not borrow reference-track music. Synthesize a custom original bed with deliberate musical structure, not a piercing single oscillator; if user-supplied licensed music is already available, it can be used only with recorded provenance and permission (no dependence on a new external source).
+
+### 1.0.1 Signature motion grammar (implementation must demonstrate each, not merely mention)
+
+| Motion motif | Real GF3 material | Choreography | Minimum appearance |
+|---|---|---|---|
+| **Grid assembly** | Genuine schedule grid, rows, shift cells | Cells/rows arrive from separate directions and snap into their **correct real layout**, camera lands on final unchanged app | `manager` and `connected` |
+| **Card-to-screen match cut** | Existing shift/availability card or genuine cropped UI element | Preserve an on-screen card's bounding box (position, size, corner radius) while changing depth/background to reveal its location inside the real complete screen; no fake morphing of its content | at least 2 transitions |
+| **Layered camera travel** | Real GF3 UI layers captured/mounted independently | Screen planes tilt subtly in 2.5D perspective, parallax foreground text and background, settle to head-on for readability. Avoid aggressive perspective during data reading | at least 3 feature chapters |
+| **Interaction micro-cinema** | Real button/calendar selection/confirmation | Cursor/touch indicator arrives, button reacts using true press styling, matching actual before/after product state, soft audio hit | at least 3 distinct feature workflows |
+| **Kinetic type** | Promo-only Polish copy over GF3 colors | Large text revealed by mask/line split/word stagger in sync with camera/sound, not generic repeated fade-in | problem, reveal, 2 features, outro |
+| **Focus extraction** | Real existing badge, date cell, summary, notification | Exact pixels from UI are isolated by non-destructive crop/alpha mask, briefly enlarged as a spotlight, then seamlessly returned to original place | at least 2 scenes |
+| **Continuity move** | Same genuine UI shape/color across shots | Foreground card/blue line serves as animated bridge so adjacent clips feel like one continuous camera move | at least 4 of 8 boundaries |
+| **Hero composition** | Real app canvas | Strong legible central shot with negative space, restrained shadow and a clear reason to look at a specific interaction | at least 4 scenes |
+
+**Technical authenticity boundary:** A separate photographic/captured UI piece may be used as a 2.5D foreground layer if it is an unaltered crop of authentic GF3 output. Allowed transformations: affine/perspective movement, clip, mask, scale, opacity, shadow, blur on **background layers**, short outlines and callouts. **Not allowed:** redrawing calendar text or controls with marketing CSS and then claiming they are app components; inventing new screens or effects pretending to be native interactions; deforming real text beyond legibility.
+
+### 1.0.2 Measurable polish rubric (manual + automated checks)
+
+- **First 3 seconds:** an immediately comprehensible friction point. Avoid a logo-only opening or 3 seconds of empty abstract particle graphics.
+- **Editorial tempo:** transition event approximately every 2–4 seconds, but each main product UI chapter contains at least one >=2.5-second continuous period during which the genuine relevant interface is readable. Do not turn the 75 seconds into 75 independent slide reveals.
+- **Scene variety:** at least 3 clearly different camera compositions (macro crop, isometric 2.5D, broad product view); at least 2 scenes with very clean/minimal backgrounds; at least one deliberate pause after a strong feature reveal. Do not keep every scene at identical scale/angle.
+- **Accents:** every prominent blue stroke/button/line is either a true GF3 token or a promo graphic clearly related to the selected real control; use sparingly. No random colored glowing orbs, glitch effects, excessive bounce, spinning logos or gratuitous stock mockups.
+- **Legibility:** 1920x1080 output; avoid clipping titles, blurred full UI, microtext on unscaled complex tables; for detail-heavy captures, move camera to exact relevant row/card, not to a 400px-wide whole-page thumbnail. At steady product shots, date/status/shift labels must be human-readable.
+- **Truthful content:** marketing title and illustrated problem metaphors are creatively authored; any alleged visible GF3 workflow/result must be sourced from actual rendered components/captures and traced in the shot manifest.
+- **Professional finish:** smooth acceleration/deceleration, stable color and font rendering, no SVG/CSS aliasing or pixel jump between composited PNG layers; audio should have balanced clean intro, sync points and smooth outro.
+
+### 1.0.3 Scene-by-scene cinematography over the FIXED 75-second storyboard
+
+The exact nine chapter boundaries and Polish copy below remain binding. Implement **these specific directorial beats** inside the existing chapter windows. A real rendered UI source remains visible wherever a feature is claimed.
+
+| Time | Visual choreography and authentic feature proof | Transition anchor / cue |
 |---|---|---|
-| CREATE | `docs/legal/OPERATOR_ONBOARDING_PLAYBOOK_UA.md` | One practical human-readable guide: before meeting, negotiation, signatures, instance setup, worker notification and acknowledgement, operations, incidents, offboarding |
-| CREATE | `docs/legal/templates/Karta_Wdrozenia_Klienta_Wzor.md` | Client-by-client intake form; only placeholder fields, no real customer information |
-| CREATE | `docs/legal/templates/Protokol_Uruchomienia_i_Przekazania_Wzor.md` | Evidence of handed-over instance/access/training/testing and start date; not a replacement for signed B2B/DPA |
-| MODIFY | `docs/legal/README.md` | Canonical navigation and flow, links to the new files, distinction between app PDFs and contractual files, STOP-SHIP status |
-| MODIFY | `docs/legal/saas-agreement/README.md` | Mark the longer SaaS agreement as the primary **working basis**, not a legally approved master; explain short order template may be used only as a cover/order after legal reconciliation, not as a competing second signed agreement |
-| MODIFY | `docs/legal/electronic-services-regulations/README.md` | Correct obsolete assertion that no acceptance is saved; distinguish historical intent from 37540cf implementation; show canonical production URL and review requirement |
-| MODIFY | `docs/legal/internal/CHECKLIST_PRZED_STARTEM.md` | Add procedural gates for meeting, approved signatures, correct PDF categorization, worker information evidence, tenant isolation, dry-run and offboarding; preserve original risk list |
-| MODIFY | `docs/legal/LEGAL_REVIEW.md` | Add a *DRAFT* tracking row for each new private template/guide as appropriate; do not alter status of existing rows or invent hashes, reviewer names or signatures |
-| REUSE | `docs/legal/templates/Umowa_Powierzenia_Danych_DPA.md` | Processor agreement framework under GDPR Article 28; requires customer-specific finalization |
-| REUSE | `docs/legal/templates/Zalacznik_TOMs_i_Retencja.md` | Security measures, backups, retention, deletion and evidence |
-| REUSE | `docs/legal/templates/Zalacznik_SLA_i_Wsparcie.md` | Optional contractual support commitments; never silently promise a performance guarantee |
-| REUSE | `docs/legal/templates/Klauzula_Informacyjna_Dla_Pracownikow_Wzor.md` | Employer-customized GDPR notice for employees; informational delivery, not consent |
-| REUSE | `FrontEnd/public/legal/{index,regulamin,polityka-prywatnosci,pliki-cookies,zasady-korzystania,podwykonawcy,bezpieczenstwo}.html` | Public web documents; no change until *real operator data and lawyer approval* exist |
-| REUSE | `docs/legal/internal/{Rejestr_Czynnosci_Przetwarzania,Rejestr_Podwykonawcow_i_Transferow,Procedura_Incydentow_i_Naruszen,Procedura_DSAR_Retencji_Usuwania,Ocena_Ryzyka_i_DPIA_Screening}.md` | Private compliance records and procedures, not worker acceptance PDFs |
+| `00–06` pain | Oversized Polish headline on neutral field; editorial stacks of **abstract** shift-notes/messages collide, misalign, then halt. Problem graphics must not masquerade as a broken GF3 interface. Punch into the visual gap that will become the GF3 workspace. | One hard accent at 0.3s, fast stagger 1.0–3.0, white-space pause 4.0–5.0, converging masks 5.2–6.0 |
+| `06–12` reveal | One tiny authentic GF3 schedule/calendar tile appears at center; other true UI fragments assemble into a recognizable GF3 product frame. Camera smoothly expands to hero view, GF3 name/title types in. Keep first on-screen GF3 view unambiguously real. | Calendar/card geometry becomes next manager grid |
+| `12–23` manager | Start macro on a real shift card and date cell, tilt/reframe to reveal the manager scheduling grid. Animate actual before/action/after layout or truthful highlights. Push slightly into genuine occupied shift cell; stabilize full readable context. | Real blue selection/shift-card edge travels into availability page |
+| `23–33` availability | Real GF3 availability selectors emerge as isolated authored **crops of actual UI**, arrange in a rhythmic row, then reattach to the complete availability calendar. One genuine selection action + true visual result, hold on legible changed cell(s). | Selected calendar cell's dimensions match the opening schedule day tile |
+| `33–44` schedule | Close on a real date + assigned shift detail; pull out into actual employee weekly/monthly schedule. A subtle line guides eye to shift details/summary, then hierarchy settles. Show published state; do not animate fictional publishing. | Authentic shift card scales into swap offer card |
+| `44–55` swap | Make a real swap offer card the focal subject, actual real button click and real dialog open. Stage swap confirmation in a legible 2.5D foreground card **only if the app really displays that state**; otherwise show genuine offer/details and do not imply it was automatically accepted. The swap flow is the emotional highlight. | Real modal/card rectangle collapses into source-compatible notifications/summary tile |
+| `55–63` more | Two quick cut-ins of confirmed, actually implemented UI only (schedule summary, notifications or export control by priority). Pan through authentic real visual details; do not show new fabricated analytics. | Tiles fan out into connected collage |
+| `63–69` connected | Bring real manager, availability, employee schedule and swap frames into one clean four-part composition, using their genuine captures. Draw one restrained blue continuity line through key cards while camera floats slightly, then compress into a simple GF3 mark. | Blue line becomes GF3 brand accent |
+| `69–75` outro | Quiet high-contrast hero; GF3 brand lockup, concise Polish value line, CTA. Hold final frame steadily for >=3 sec, no background screen noise or intrusive particle effects. | Soft audio resolve, full fade-out by end |
 
-Do **not** create a fake new mandatory employee `regulamin pracy` as an operator document. Such employment regulations belong to the employer, are subject to labor-law thresholds and must be written/approved by that employer. The existing electronic-services/usage rules can be the basis of a **separately approved app-usage PDF**; prepare it through human legal review, not auto-conversion of draft boilerplate.
+**Storytelling rule:** Each middle chapter must exhibit an event the real product makes possible, not a passive collage. There must be a clear visual "before → user gesture → visible outcome" chain for manager/availability/swap where supported; the employee schedule must show the readable result of a genuinely published schedule.
 
-## 4. Ordered deterministic implementation steps
+### 1.0.4 Mandatory previsualization artifacts (not permission to stop early)
 
-### Step 1 — CREATE operator playbook
+Create the following **original GF3** shot-design artifacts *in addition* to the current plan's MP4/poster/contact sheet and provenance, under `FrontEnd/artifacts/promo/`:
 
-**File:** `docs/legal/OPERATOR_ONBOARDING_PLAYBOOK_UA.md`.
+- `styleframes/01-pain.png`, `02-reveal.png`, `03-manager.png`, `04-availability.png`, `05-schedule.png`, `06-swap.png`, `07-more.png`, `08-connected.png`, `09-outro.png` — exactly nine 1920×1080 representative creative frames from the actual film compositor, not AI-generated substitute mockups. Use original/captured GF3 pixels for all feature frames. These must be available before full export for targeted QA.
+- `motion-cue-sheet.json` — timeline array `{sceneId, startSec, endSec, headline, realUiShotIds, cameraMoves, transitionAnchor, soundCueSec}` derived from the actual deterministic timeline; no invented demo operations.
+- `creative-qa.md` — yes/no evaluation of the above motion grammar, scene variety, source authenticity, readability, sound design and visual polish, with links to frame names and known limitations. Never claim the film has achieved agency-grade subjective quality solely from passing ffprobe.
 
-Create these named, numbered sections, with concrete instructions and no fabricated data:
+These are **QA artifacts**, not new web pages or a second promotional system. Preserve the old `promo.html`, previous film renderer and prior asset organization.
 
-1. Purpose, roles, distinction between provider/operator, customer/employer, and user/employee; when provider is processor vs separate controller for own activities; mark latter for privacy-law review.
-2. Readiness traffic light: `DEMO ONLY`, `LEGAL REVIEW PENDING`, `READY TO SIGN`, `READY FOR PRODUCTION`, with **preconditions**; don't automatically infer status from passing tests.
-3. Document inventory with exact source paths and columns: document, purpose, actor completing, actor signing/accepting, where stored, whether uploaded to regulation gate. Include long agreement, short order, SaaS scope annex, DPA, TOMs, optional SLA, public terms, privacy/cookies, worker information, app usage PDF, employer HR work rules, internal records.
-4. Meeting flow: what to take/ask/demo; verify customer identity and representation; collect contacts, staff counts, locations, job/scheduling process, scope of swap approval, price, term, invoicing, service region, use of work/personal phone and e-mail, onboarding limits, permitted data categories; never collect real staff spreadsheets before DPA and secure provision.
-5. Signature flow: identify parties, negotiate a **single** commercial agreement (long SaaS draft as primary base), scope annex, DPA and TOMs; optional SLA only when promised; obtain representative authority and retain signature/e-delivery evidence *outside Git and public hosting*. Make approval by Polish lawyer and finance advisor a gate.
-6. Technical onboarding: one client → isolated instance, domain, DB/volume, secrets, backup and restoration, TLS; customer manager account; publish only approved, correctly scoped/versioned PDF; verify each role sees only applicable documents; download/history and HTTP 428; train manager to create/manage user accounts and control swaps; never claim automatic payroll/working-time legal compliance.
-7. Employee journey: employer provides GDPR notice; operator makes site usage terms accessible; **only** relevant versioned platform/app-usage regulation gets affirmative acceptance in the current gate; no DPA, SaaS, invoices, internal controller audit docs, or GDPR 'consent' checkbox to be pushed as a regulation.
-8. Operations: invoices, contract contacts, support/escalation, change/new versions, employee departure, audit trail, incident reporting, data subject access request, backup, cancellation/export/delete, record retention.
-9. Go/no-go checklist, unknowns, source references and precise operational ownership.
 
-**Requirement:** The playbook must be Ukrainian in very plain language, with an exact illustrative timeline (e.g. Friday 2026-10-09 discovery meeting), an example of which party signs what, and a small FAQ about mandatory regulations and worker acceptance. Use the longer usable instructions provided in **Part B of this plan** as the content contract, but reformulate cleanly for a standalone document.
 
-### Step 2 — CREATE customer intake card
+### 1.1 Aesthetic
 
-**File:** `docs/legal/templates/Karta_Wdrozenia_Klienta_Wzor.md`.
+- 16:9 film frame with exceptionally clear UI: oversized editorial headings, generous whitespace, deep navy/near-black contrast, white product canvases, restrained GF3 blue `#2563eb` accents; final color decisions use current application CSS.
+- Motion language: rapid-but-readable type masks, elegant springless transforms, smooth reframing, tasteful UI zooms, clean match cuts, precise highlighting, subtle depth/parallax, one or two dramatic pauses, no unmotivated camera shakes, excessive blooms, generic sci-fi particles, stock imagery or fake devices.
+- Show **actual readable app screen areas** for at least 3 seconds of every core feature chapter. Avoid product screenshots too tiny to recognize. Limit software-screen movement during text-heavy moments. If the screen is complex, crop into the relevant existing UI area using non-destructive scale/translate.
+- Render at full native 1920×1080; use `deviceScaleFactor:1` and wait for fonts before capture. All essential text should remain safely within 80px inset from film edges. No strobing, illegible microtext, overflow or blurry CSS scale.
+- Original licensed assets only. Do not reproduce OpenAI/Google/Grok brand designs, logos, slogans, proprietary fonts or voice tracks. Do not access external image/music/AI APIs to satisfy this job.
 
-Polish-language private **draft** form with explicit placeholders:
+### 1.2 Exact 75-second storyline and Polish copy
 
-- Client legal name, KRS/CEIDG, NIP, address, authorized representative and authority verification, emails for billing/support/privacy/incidents; owner/date/source of verification.
-- Provider legal identity/business status to be separately validated (no assumption of registered company or automatically valid nonregistered activity).
-- Contract version, order/reference, signed date, start date, subscription amount and currency, tax treatment **pending accountant**, duration/notice/first invoice, agreed optional SLA.
-- Locations, expected number of users, role mapping manager/employee, needed functions, who approves swaps, what does **not** constitute legally valid working time approval.
-- Data matrix: employee names/identifiers, contact type, schedules, availability, swap records, manager messages, account/access logs, storage region, transfer/subprocessor review, lawful basis decided by employer, retention, exports/deletion.
-- Secure delivery contact/method (do not paste personal data or credentials into the template); DPA and privacy notice delivery/approval evidence.
-- Deployment checklist: instance ID (nonsecret), domain, isolated DB/volume, TLS, backups/restore, least privilege, test accounts, regulation PDF ID/version/hash, acceptance evidence; date and tester.
-- Signatures/approval status, link to *external protected repository* containing final signed PDFs. Never store real customer data in Git.
+Keep the following feature ordering and boundaries **exact**. Motion choreography inside a window may be refined for readability; do not add scenes or extend runtime.
 
-### Step 3 — CREATE activation/handover record
+| ID | Time (start inclusive, end exclusive) | Real product material and action | Primary on-screen Polish copy |
+|---|---|---|---|
+| `pain` | `00.0–06.0` | Many disconnected schedule cards/messages; cinematic editorial graphics (no fake GF3 UI claim). | `Grafiki. Wiadomości. Zmiany.` → `Chaos, który zabiera czas.` |
+| `reveal` | `06.0–12.0` | Chaos converges into brand GF3 and one **real** product frame. | `A gdyby wszystko było w jednym miejscu?` → `Poznaj GF3.` |
+| `manager` | `12.0–23.0` | Authentic manager planning/container/graph UI. Animate attention to a genuine shift row/grid and show existing workflow state before/after; do not imply magical automatic creation. | `Planowanie zmian. Pod kontrolą.` → `Przejrzysty grafik w jednym miejscu.` |
+| `availability` | `23.0–33.0` | Authentic employee/manager availability interface with demonstrable availability selection and readable calendar. | `Dostępność bez zgadywania.` → `Wiesz, kto i kiedy może pracować.` |
+| `schedule` | `33.0–44.0` | Authentic employee `/schedule` view: week/month shifts, summary/clear day highlight. Show the result of a **previously published** schedule, not a fake publish operation. | `Każdy widzi swój grafik.` → `Jasno. Zawsze pod ręką.` |
+| `swap` | `44.0–55.0` | Authentic employee `/swap` interface: shift offer, clear confirmation and accepted state **only if represented by actual functionality**. Use two synthetic employees; no unverified auto-approval. | `Plany się zmieniają?` → `Zamiany zmian w jednym miejscu.` |
+| `more` | `55.0–63.0` | Authentic existing summary, employee notifications, or export controls (choose by verified availability, priority: summary + notifications; **do not fabricate functionality**). | `Wszystko, co ważne. Czytelnie.` |
+| `connected` | `63.0–69.0` | Multi-screen composition made from **genuine** captured manager/schedule/availability/swap material; editorial flow line connects them. | `Jeden system. Jeden rytm pracy.` |
+| `outro` | `69.0–75.0` | GF3 logo/wordmark, quiet hold ≥3 s with no residual obscuring motion. | `GF3` → `Grafiki bez niepotrzebnego chaosu.` → `Zobacz, jak działa.` |
 
-**File:** `docs/legal/templates/Protokol_Uruchomienia_i_Przekazania_Wzor.md`.
+**Interaction choreography per chapter:**
+- `manager`: 12–14 headline; 14–18 push into existing schedule grid; 18–21 reveal affected real cell / state; 21–23 hold + transition.
+- `availability`: 23–25 title; 25–29 actual availability selection/highlight; 29–31 associated view/summary; 31–33 legible hold/transition.
+- `schedule`: 33–35 title; 35–39 calendar day focus; 39–42 show real shift details/summary; 42–44 transition.
+- `swap`: 44–46 title; 46–50 actual UI offer/details; 50–53 genuine confirmation/accepted presentation; 53–55 hold/transition.
+- `more`: 55–57 title; 57–61 real supporting UI; 61–63 transition.
+- `connected`: 63–66 align actual UI images; 66–69 one flowing composition with caption.
+- `outro`: 69–71 logo reveal; 71–72 supporting line; 72–75 static legible ending.
 
-Polish draft capturing client/provider identity, signed agreement reference, isolated instance URL, activation datetime, actual delivered features, account handover done securely, basic training provided, customer receipt, smoke test of management/employee roles and swaps, backup/restore test evidence, approved regulations, contact/support details, unresolved issues and acceptance of delivery by authorized representatives. Explicitly say: does not replace DPA, employment contracts, GDPR notices or the SaaS agreement. Never auto-certify testing.
+## 2. Final architecture — one approach, reuse the existing work
 
-### Step 4 — MODIFY legal navigation
+**Keep the existing Vite/React/GSAP promo project as the film compositor, and add an authentic-product-footage ingestion + deterministic Playwright/FFmpeg MP4 pipeline.** Do **not** introduce Remotion, After Effects, a second video app, a new backend, or a custom redesign of the GF3 product.
 
-**File:** `docs/legal/README.md`.
+**Data flow:** real GF3 presentational components OR controlled local app pages → synthetic demo state → reusable stills/frame sequences captured/arranged in the promo asset directory → current `promo.html` film stage with GSAP-driven titles/camera/scene transitions → frame-accurate `window.__GF3_PROMO__.seek()` → Playwright screenshots streamed to FFmpeg → H.264/AAC MP4 → FFprobe and visual/audio QA.
 
-Keep currently documented 37540cf behavior and test history. Add a top-of-file mini-directory linking to the new playbook, the two new templates, existing SaaS and DPA, employee notice and internal STOP-SHIP. Define **three separate tracks**:
+### 2.1 Preflight: inspect only what has changed since the prior plan
 
-- **Commercial:** provider ↔ company: one SaaS agreement + scope, DPA/TOMs, optional negotiated SLA.
-- **Public site:** legal pages accessible without login, after real operator identity and approval.
-- **Individual user:** approved app regulation PDF acknowledged by each relevant manager/employee, while employer delivers GDPR information separately.
+**Action: READ ONLY.** Check these local paths first, preserving local uncommitted changes:
 
-Add a note: a worker's checkbox never signs company agreements, grants generalized GDPR consent or replaces employment documents.
+- `FrontEnd/promo.html`
+- `FrontEnd/src/promo/**` (only this subtree)
+- `FrontEnd/scripts/render-promo.mjs` (if present)
+- `FrontEnd/package.json`, `FrontEnd/vite.config.ts`, `FrontEnd/.gitignore`, `FrontEnd/PROMO.md`
+- `docs/design-system.json` and only the five page/UI sources in section 0.1 needed for authentic captures.
 
-### Step 5 — MODIFY SaaS source selection
+Record a 10-line inventory in `FrontEnd/PROMO.md`: what already exists, whether capture controller renders deterministic frames, and which screenshots were authentic vs recreated. **Do not run a full repo scan or reset/reset hard/pull/rebase.** Keep previously functional promo scenes and renderer; extend them.
 
-**File:** `docs/legal/saas-agreement/README.md`.
+### 2.2 CREATE — minimal new source assets and utilities
 
-Add a section `Which document to give the client?` which states:
+All paths below are relative to the repository root.
 
-- use `docs/legal/saas-agreement/umowa-saas-b2b-pl.md` (generated `.html` for print-to-PDF) as **primary longer negotiation draft**;
-- `docs/legal/templates/Zamowienie_Umowa_B2B.md` is an alternative short order/cover concept **not an independently approved second contract**. If a finalized SaaS agreement already includes the full order terms, do not hand over a contradictory second master agreement; an order cover must explicitly incorporate the finalized master and be vetted;
-- `zalacznik-1-zakres-uslug.md` specifies delivered functions;
-- attach negotiated DPA plus its security and subprocessors instructions; optional SLA only where agreed;
-- 500 PLN, billing direction and termination provisions are **draft default/example terms, not fixed by verified sales agreement**;
-- export the edited HTML to PDF (Chrome/Edge Ctrl+P A4) and keep the human-signed output privately; never imply Node generation signs or approves it.
+| Action | Path | Exact responsibility |
+|---|---|---|
+| CREATE | `FrontEnd/src/promo/motion-cue-sheet.ts` (or exact existing storyboard equivalent) | Single source for 75-second cue timing, per-scene camera keyframes, title reveals, transition anchors, feature-shot mapping and effect markers. Only one timeline authority; do not duplicate the existing storyboard. |
+| CREATE | `FrontEnd/src/promo/real-ui/shot-manifest.ts` | Typed immutable feature-shot provenance catalog. Map `{id, feature, acquisition, sourcePaths, sourceRoute?, dataSet, assets, notes}` with IDs `manager`, `availability`, `schedule`, `swap`, `more`. No invented API URLs. |
+| CREATE | `FrontEnd/src/promo/real-ui/RealFeatureShot.tsx` | Pure presentational component placing **real** captured UI media or an existing production presentational component inside stable `data-promo-real-shot` wrapper. Crop/reframe via props (CSS transform), not through painting a replacement UI. |
+| CREATE | `FrontEnd/src/promo/real-ui/RealFeatureShot.module.css` | Local aspect-preserving masks/shadows/device frames/sharp rendering; NEVER override global GF3 product CSS. |
+| CREATE | `FrontEnd/scripts/promo/capture-product-ui.mjs` | A targeted Playwright script to capture frames of actual running app demo routes, where direct component mounts cannot satisfy the shot. Include real route and provenance metadata. Inputs and error behavior in §3.2. |
+| CREATE | `FrontEnd/scripts/promo/render-film.mjs` | Mandatory reusable deterministic 75-second H.264/AAC encoder; reuse the previous `render-promo.mjs` implementation via a wrapper or refactor, but keep `npm run promo:render` working. |
+| CREATE | `FrontEnd/scripts/promo/generate-audio.mjs` | Produce a subtle **original** 75s WAV bed and short cue accents using deterministic local mathematical audio synthesis (no online TTS, music generators or licensed samples). Do not overpower legible copy; avoid loudness spikes. |
+| CREATE | `FrontEnd/scripts/promo/verify-film.mjs` | Probe MP4 technical parameters, input source provenance, thumbnails/black-frame diagnostics; produce `qa-report.json` and fail on mandatory criteria. |
+| CREATE | `FrontEnd/src/promo/real-ui/real-ui.test.ts` | Unit checks for source provenance/catalog, five selected feature shots, no empty data, no production credential references. |
+| CREATE | `FrontEnd/e2e/promo-video.spec.ts` | Preview/capture/seek order tests on existing promo entry and actual feature shots. |
+| MODIFY | `FrontEnd/src/promo/` existing scene modules and existing storyboard/timeline | Retain working code; change duration to **75** and replace promo-only faux feature previews with real shots. Add camera, annotations, titles and scene transitions defined in §1. |
+| MODIFY | `FrontEnd/package.json` | Add `promo:film`, `promo:verify`, and `promo:capture-ui` script commands while preserving `promo:render` as backward-compatible alias. No new animation framework. |
+| MODIFY | `FrontEnd/PROMO.md` | Exact run, capture, render, verify, problem-solving commands; include real-UI provenance table, three reference links with third marked unverified if inaccessible, directorial style rubric and asset provenance. |
+| MODIFY | `FrontEnd/.gitignore` | Ignore local output under `artifacts/promo/`, and any `src/promo/real-ui/private-captures/`/playwright authentication state. |
 
-Do not rewrite the underlying commercial clauses, tax status or worker privacy bases.
+If the local implementation uses equivalent names/paths, **extend the existing module rather than create a duplicate of the same responsibility**; preserve all public routes and scripts. Fixed external filenames and commands below remain binding.
 
-### Step 6 — MODIFY stale acceptance description
+### 2.3 REUSE/DO NOT TOUCH
 
-**File:** `docs/legal/electronic-services-regulations/README.md`.
+**REUSE:** GSAP 3 timeline/`@gsap/react`, Vite, React 19/TS, existing real shared GF3 visual components, their current CSS modules and fonts, Playwright Chromium, and FFmpeg. Use no external video generation services. Preserve existing actual app CSS implementation.
 
-Replace the stale language in the `Rejestrowanie akceptacji` and `Funkcje wyłączone` sections that wrongly claims the current code does not store acceptance with a precise dated statement:
+**DO NOT TOUCH:** .NET backend, SQLite/migrations, auth/permission gates, app router, application providers, data/business/swap calculations, user-facing production page behavior, `docs/design-system.json`, and normal `index.html`. No commits of auth storage-state, synthetic fake customer identities that resemble actual employees, browser videos containing real data, or giant generated MP4 files (the final MP4 is local in ignored `artifacts/`).
 
-- As of pinned commit, manager and employee regulation acceptances already have published-PDF pending/list/history/accept endpoints and a 428 guard.
-- `FrontEnd/src/entities/regulations/ui/RegulationAcceptanceGate.tsx` requires a deliberately checked box; it offers PDF download; this proves a submitted acknowledgement, **not** that the person read every word and not consent to personal-data processing.
-- An approved and uploaded PDF is separate from the web `regulamin.html` URL; keep textual versions aligned by an explicit human review/checklist, rather than assume one is generated automatically from another.
-- Keep other historical sections if they are still relevant, but label historical audit findings `as of before 37540cf` if superseded; don't imply changes to unrelated account features.
+## 3. Authentic footage acquisition, step by step
 
-### Step 7 — MODIFY pre-launch checklist and legal review register
+### Step 1 — Verify and preserve existing promo pipeline
 
-**Files:** `docs/legal/internal/CHECKLIST_PRZED_STARTEM.md` and `docs/legal/LEGAL_REVIEW.md`.
+**Action: MODIFY minimally.** Inspect exactly the preflight files above. Confirm `promo.html` actually serves at local Vite port and check if a `?capture=1` deterministic `window.__GF3_PROMO__` controller exists. Keep existing good transitions/visuals. Record any broken render condition precisely. Do not start new React app or migrate the existing scenes to another framework.
 
-Append independently testable, human-owned gates: `operator verified`, `client representative verified`, `single executed SaaS contract`, `executed DPA/TOMs`, `support and finance ready`, `subprocessors accounted for`, `employee notice approved by employer and delivered`, `separate production instance verified`, `published PDF approved/scope and history checked`, `test user acceptance/428/manager employee history`, `exit/export/delete process validated`, `incident contact tested`. Each gate needs `owner / evidence location / test date / status` placeholders. Preserve all present STOP-SHIP items and historical draft rows. Add DRAFT rows for new private documents only; **do not set `APPROVED`**, create false SHA hashes, or silently turn release validator green.
+If `window.__GF3_PROMO__` exists, retain contract. Otherwise add a **capture-only** controller:
 
-### Step 8 — Documentation consistency and static validation
+```ts
+type GF3FilmController = {
+  ready: boolean;
+  duration: 75;
+  fps: 30;
+  width: 1920;
+  height: 1080;
+  seek(seconds: number): void;
+  getTime(): number;
+};
+```
 
-1. In repo root, `git diff --check` — no whitespace defects in changes made by Codex.
-2. `node scripts/validate-legal-documents.mjs` — expected to pass existing **draft mode**, assuming untouched public HTML.
-3. `node scripts/validate-legal-documents.mjs --release` — **expected to fail until a real reviewer has approved the final public texts**; a failure is a valid STOP-SHIP, do not bypass or fake its inputs.
-4. Search *only changed legal docs* for unqualified statements `no acceptance exists` and `500 PLN is obligatory for employees`: there must be none.
-5. Validate every new relative markdown link resolves to a real path in the pinned repo.
-6. Verify no generated documents with actual customer information, secrets or signed contracts are added to Git.
-7. No need for `dotnet build`/`dotnet test` or `npm build` to validate documentation-only changes; no runtime artifacts touched. Existing tests should be run before actual release after any other implementation/security changes.
+`seek(t)` must be finite-input validated, pause playback and synchronously yield the same image at time `t` regardless of seek history. Every scene remains mounted in the DOM. No CSS auto-keyframes, timers, `Math.random()` or network-driven content may change film-critical pixels during capture.
 
-## 5. API, data, dependency and configuration contract
+### Step 2 — Prepare synthetic GF3 demo states **without modifying production business rules**
 
-**API:** NONE. Preserve `GET /api/regulations/pending`, `GET /api/regulations/history/me`, `GET /api/regulations/history/employees/{employeeId}`, `GET /api/regulations/{documentId}/pdf`, `POST /api/regulations/{documentId}/accept` and existing publication/upload flows without modification.  
-**Persistence / migration:** NONE. Preserve existing version/history/acceptance persistence.  
-**Dependency injection:** NONE.  
-**Configuration / `.env`:** NONE. Do not make up production secrets or client identities.  
-**UI:** NONE. Do not build a new checkbox, duplicate gate or a new signup funnel.  
-**Operational release:** Outside Codex; requires signed contracts, verified controls and legal approvals.  
-**Error behavior:** Do not mask existing `428`, errors, unpublished PDF checks or validator failures. A document link missing or inconsistent is a documentation verification failure; don't publish it.
+**Action: REUSE/CREATE in promo only.** Use one coherent fictional October 2026 workweek, 3–6 synthetic employees, plausible shift times, availability selections and a plausible shift swap. Preserve role separation: manager visual data on manager material; employee visual data on employee material. Ensure the visuals and actions reflect the app's actual supported transitions.
 
-## 6. Acceptance checklist for CODEX
+Preference order **for every feature**:
 
-- [ ] One coherent Ukrainian operator playbook exists at exact path, describing every phase from client discovery to data deletion.
-- [ ] Polish intake card + activation protocol are marked **templates/drafts** and contain no real client information.
-- [ ] Navigation points to all relevant existing and new files.
-- [ ] The long SaaS agreement is clearly identified as primary *working draft*, not an approved agreement; shorter document is explicitly non-competing.
-- [ ] The historical "no acceptance stored" assertion is corrected using the pinned version's code evidence.
-- [ ] Clear distinction among operator site regulation, employer labor regulations and employer GDPR notice.
-- [ ] No employee is described as signing B2B/DPA or "consenting to RODO" via the regulation checkbox.
-- [ ] STOP-SHIP is retained; none of the DRAFT statuses, missing operator facts, unresolved security warnings or release checks are falsified.
-- [ ] Validator draft mode passes (where tool runtime is available); release mode remains blocked if still genuinely unapproved.
-- [ ] No production code, packages, schema, infrastructure or unrelated files changed.
+1. Use existing exported **production presentational component** and current CSS with typed synthetic props; capture it isolated with a promo-only wrapper and no backend.
+2. If the page is API/auth-stateful, use Playwright to capture **actual production page DOM** at existing app routes in an isolated **local demonstration instance** with synthetic records. Reuse test/fixture or local seeded demo mechanisms that are *already present*; do not run it on production or real user data.
+3. If a genuine screenshot cannot be obtained (no demo state, credentials, no backend), **fail that authenticity check explicitly**. Never silently substitute the `Demo*.tsx` promotional lookalike and label it a production feature capture.
 
-## 7. DO NOT TOUCH
+For the source/route family, use the exact paths in §0.1; supplementary shot priority order `employee schedule summary` > `notifications` > `existing export actions` > `employee listing`. Do not add a new product feature.
 
-`GF3.WebApi/**`, `GF3.Tests/**`, `FrontEnd/src/**`, `FrontEnd/public/**`, `BusinessLogicLayer/**`, `DataAccessLayer/**`, `scripts/**`, deployment/CI files, account/swap/schedule services and existing real DB. Preserve the originally pinned commit as the analysis baseline and implement only the documentation changes above.
+### Step 3 — Capture authentic GF3 UI where direct React component rendering is impractical
+
+**Action: CREATE.** `FrontEnd/scripts/promo/capture-product-ui.mjs`.
+
+**Environment contract:**
+
+- `PROMO_APP_URL` — address of local **demo-only** GF3 app (default `http://localhost:5173` when applicable); the script must verify local origin and reject remote production hosts by default.
+- `PROMO_MANAGER_STATE` and `PROMO_EMPLOYEE_STATE` — optional paths to **locally prepared ignored** Playwright `storageState` files. Do not print, package, or copy their contents into promo artifacts. They must reference synthetic/demo users only.
+- `PROMO_DEMO_DATASET` — optional path to already available local synthetic fixtures or a demo seed recipe. If production flow requires a backend that is absent, emit a descriptive blocked-source error with setup requirements. Do not create or migrate a production DB.
+- `PROMO_CAPTURE_DIR` — default `FrontEnd/src/promo/real-ui/captures/` for **verified sanitized demo material**; no real employee content.
+
+Script behavior:
+
+1. Launch existing Playwright Chromium at fixed 1440×900 viewport, DPR 1, `locale:'pl-PL'` (only if the app supports Polish; otherwise use the existing supported UI language and keep Polish marketing headlines separate), stable `colorScheme` and time zone `Europe/Warsaw`. Wait for app bootstrap and font readiness.
+2. Open exact manager/employee route(s) from §1, using correct demo session when the page requires it. Explicitly check that the expected real page loaded (not login, empty/spinner, 403, error banner, or an unconfigured mock UI).
+3. For each scenario, acquire a clearly named **beginning, interaction, outcome** capture where a real UI state is available; drive clicks/hover/scroll via role/label-based selectors and **only actual controls**. For screen transitions requiring real mutation, operate only against a disposable synthetic fixture/demo instance and keep the result consistent across film takes; seed/reset between takes.
+4. Save full-resolution PNGs or tightly-scoped PNG frame sequences into `real-ui/captures/{feature}/`; omit browser chrome, devtools, real usernames, passwords, notifications, tokens and scrollbars not meant for the product showcase. Preserve the **real product styling**.
+5. Write/update provenance in `shot-manifest.ts` with source code path, route, frame filenames, and acquisition method; clean up any saved storage state references from output.
+6. Capture a stable screenshot before and after each genuinely demonstrated product operation. A cinematic highlight or simulated cursor overlay may **focus** attention; it must **not** invent a success state absent from the captured workflow.
+
+**Concrete target scenes:** `manager` planning grid; `availability` selections; `schedule` day/month shift detail; `swap` offer + dialog/confirmation; `more` genuine summary/notification/export. The script should fail with a per-scene list, not falsely say “success” when screenshots are missing.
+
+### Step 4 — Replace decorative fake previews with real visual sources
+
+**Action: MODIFY existing `FrontEnd/src/promo` scenes + CREATE `RealFeatureShot.tsx`.**
+
+- Mount `RealFeatureShot` in `manager`, `availability`, `schedule`, `swap`, `more` and `connected` scenes. For production-component shots, render real reusable React component with synthetic props and import its **existing CSS module**. For Playwright-capture shots, display the captured full-res image(s) without recoloring/repainting product UI.
+- Apply GSAP camera movement (`x`,`y`,`scale`,`opacity`, clip/mask) **to the wrapper only**; keep text and product pixels crisp. Use at most one clear cursor/click moment and one outcome highlight per feature scene. Pan/zoom should be motivated by the user action, not just decorative movement.
+- Play back real **before → interaction → after** screenshots/frames as synchronized states from the same captured interface. Use real live GIF/video frames only if they were captured from the actual app; PNG state transitions can be animated by positioning two genuine screen states.
+- Remove or repurpose the older `DemoWorkspace`, `DemoAvailability`, `DemoEmployeeSchedule`, `DemoSwap` from the **final film** if they are promo-only imitations. They may remain as development reference code, but do not appear in the exported core feature chapters.
+- Keep the original graphic intro, brand reveal and outro as cinematic promotional visuals (they do not need to be actual app UI).
+- Onscreen caption/annotation layers must not cover buttons, shift dates or app data important to the demonstration.
+- No cross-scene blank frames, z-index leaks, stretched app shots, stale highlight after a cut, or two competing headline layers.
+
+### Step 5 — Refine motion to launch-film standard
+
+**Action: MODIFY existing GSAP timeline and stylesheet.**
+
+- Encode exact start/end times from §1.2 in one central immutable `storyboard.ts` / current equivalent, `PROMO_DURATION_SECONDS=75`, `PROMO_FPS=30` and `2250` frames.
+- Use eased cinematic camera moves, matched component geometry across adjacent scenes, and masks revealing authentic UI at high visual weight; avoid simple hard cuts between static PowerPoint-like slides.
+- Problem/reveal are kinetic type-driven; each feature segment highlights a product workflow, and the ending is intentionally quiet. Build all 7 motion motifs from §1.0.1. Follow exact scene choreography from §1.0.3, not a flat slideshow.
+- Assemble 2.5D compositions from real presentational components or verified actual-app cropped media (with authentic source rects). Use real UI pieces as moving subjects; static full-page screenshot pans by themselves **do not meet acceptance**.
+- Generate all nine source-derived `styleframes/` and `motion-cue-sheet.json` before final export, then use them for visual QA.
+- Implement time-locked effects **inside** the GSAP timeline only. All product captures/assets must be preloaded and fully decoded before `__GF3_PROMO__.ready=true`. Expose `seek` only in `?capture=1`; preserve interactive preview play/pause/scrub and `prefers-reduced-motion` handling outside export.
+- At the final frame (`t=74.999…`), the GF3 CTA is visible; there must be no auto-rewind or black flash.
+
+## 4. Mandatory actual MP4 production pipeline
+
+### Step 6 — Audio generation and licensing safety
+
+**Action: CREATE** `FrontEnd/scripts/promo/generate-audio.mjs`.
+
+- Generate reproducible **original** ambient sound design locally in uncompressed WAV using Node built-ins: an extremely soft sustained musical bed with 2–3 harmonious simple intervals, plus subtle transient sounds synchronized to `6`, `12`, `23`, `33`, `44`, `55`, `63`, `69` seconds. No music download, samples, external network TTS, or alleged celebrity voice. Original WAV should be exactly `75s`, `48000Hz`, stereo, and avoid clipping.
+- Keep audio restrained: transitions perceptible but not intrusive, film remains clear without sound. Add a 0.6s fade-in and ~1.5s fade-out. Do not generate loud harsh sine beeps; layer envelopes/low-pass soft edges and limiter. The existing quiet cinematic aesthetic takes priority over audible effects.
+- Output to ignored `FrontEnd/artifacts/promo/audio-bed.wav`.
+- Audio-generation errors must terminate export clearly rather than quietly yielding malformed streams. Validate duration and sample rate.
+
+### Step 7 — Render every deterministic frame and encode MP4
+
+**Action: CREATE or EXTEND.** `FrontEnd/scripts/promo/render-film.mjs`; reuse existing `FrontEnd/scripts/render-promo.mjs` where working.
+
+**Command interface:** from `FrontEnd/`:
+
+```bash
+npm run promo:film
+```
+
+This command MUST, unattended after prerequisites are installed:
+
+1. Resolve `ffmpeg` and `ffprobe` on `PATH`; if missing, show exact actionable Windows (`winget`) or Ubuntu (`apt`) installation command and fail clearly. Do not claim a video was rendered. Use already installed system FFmpeg; no unnecessary new npm video dependencies. Use a local Vite server if available; if not, **spawn Vite on a free fixed port internally** and wait for readiness, then stop only the spawned child when done. Do not kill unrelated processes on port 5173.
+2. Start/attach Playwright Chromium and navigate to `promo.html?capture=1` on the resolved local server. Use a 1920×1080 viewport, DPR=1, `pl-PL`, stable film-stage CSS. Block unrelated external requests, wait for the film controller, `document.fonts.ready`, every image decode and scene ready signal. Do not stream unfinished images.
+3. Validate `__GF3_PROMO__.duration===75`, `fps===30`, stage bounds exactly 1920×1080 and shot-manifest completeness **before encoding**.
+4. For each integer frame `i=0..2249`, call `seek(i/30)` and allow deterministic layout/paint synchronization. Screenshot **only the 1920×1080 film stage**, not devtools, browser chrome, preview controls or page margins.
+5. Stream frame PNG buffers immediately with backpressure to FFmpeg stdin; do not store all 2250 frames in RAM. Encode `-c:v libx264 -preset medium -crf 17 -pix_fmt yuv420p -r 30 -movflags +faststart` with exactly 2250 frames; merge the original 48 kHz WAV as AAC stereo (`-c:a aac -b:a 192k -ar 48000`); use `-t 75`/`-shortest` carefully so neither stream truncates the video below 75.0 seconds.
+6. Write first to `FrontEnd/artifacts/promo/gf3-product-film-1080p.partial.mp4`, only atomically rename to `gf3-product-film-1080p.mp4` when FFmpeg exits successfully AND `verify-film` passes. Delete failed `.partial.mp4` only; never delete unrelated files.
+7. Create the poster as the clean frame `t=71.5s` before the end CTA, or adjust poster time within `69–74s` to capture a completely legible hero. Create a contact sheet containing one thumbnail centered in each of the nine storyboard scenes. Save nine full-resolution `styleframes/` from compositor time points, as defined in §1.0.4. Write `motion-cue-sheet.json` and `creative-qa.md` alongside the video; all artifacts must correspond to the **final** timeline.
+8. Print the **absolute final MP4 path**, output size, exact duration, resolution, codec, number of frames, and QA report location. Exit nonzero on failure.
+
+**Implementation constraints:**
+- `npm run promo:render` MUST remain an alias to the final 75-second movie pipeline; don't leave a separate silent 52-second renderer mislabeled as final.
+- Frame count `75×30=2250`, frame timestamp `i/30`, expected display duration 75s (last actual frame timestamp 74.9667s). No hidden additional trailing blank or encoder-introduced 5s hold.
+- Do not encode raw real-user browser captures with a screen-recorder unless provenance confirms synthetic data.
+- A separate 4-second sample mode may be added as an **internal** performance check, but it is not the final deliverable and cannot count as task completion.
+- If render speed is slow, keep fidelity and optimize source asset caching/effects. Do not silently lower resolution/fps or skip frames.
+- If script previously uses arbitrary Vite server URL, preserve environment override `PROMO_BASE_URL` and do not break the previous preview workflow.
+
+### Step 8 — Automated objective QA
+
+**Action: CREATE** `FrontEnd/scripts/promo/verify-film.mjs` and `FrontEnd/e2e/promo-video.spec.ts`.
+
+**Mandatory technical checks:**
+
+- MP4 file exists and is substantial (at least 1 MiB; this threshold only detects empty/truncated files, not visual quality).
+- Probe via `ffprobe` JSON: `codec_name=h264`, `width=1920`, `height=1080`, `pix_fmt=yuv420p`, nominal `r_frame_rate=30/1`, actual decoded/stream frame count **2250** when available, duration between `74.95` and `75.05` seconds; audio is AAC, stereo, 48000 Hz, duration approximately 75 s.
+- Use FFmpeg `blackdetect` on a temporary diagnostics pass; fail if an unexpected black interval >0.20s occurs **after the intentionally dark problem scene**. Avoid treating brand-intentional dark/navy backgrounds as automatically black: inspect contrast and headlines.
+- Extract representative scene stills at `3`, `9`, `17`, `28`, `38`, `49`, `59`, `66`, `72` seconds and boundary stills at `6`, `12`, `23`, `33`, `44`, `55`, `63`, `69`. Ensure visible nonempty composition, meaningful target real UI on the five feature segments and correct Polish captions without clipping.
+- Check audio RMS/peak (must not be completely silent, peak must not clip at 0 dBFS); inspect several cue periods and confirm complete fade-out. Do not claim audio quality can be fully assessed by RMS alone.
+- Generate contact sheet and `qa-report.json` with `status: PASS | FAIL | PROVISIONAL`, `duration`, `fps`, `width`, `height`, `videoCodec`, `audioCodec`, `frameCount`, `sourceProvenance`, `authenticScenes`, `missingAuthenticScenes`, `visualWarnings`, `renderCommand`, `outputPath`, `timestamp`.
+
+**Vitest/Playwright tests:**
+
+- Storyboard has nine nonoverlapping contiguous scenes covering exactly `0–75` in prescribed order.
+- All five real product shot sources have a valid acquisition mode and a corresponding file or component; no empty manifest or fabricated fallback.
+- Capture mode displays no preview controls and exports `window.__GF3_PROMO__` with exact expected contract.
+- Determinism: screenshots at t=28 and t=49 are byte-identical after seek order `49→3→28→49→28` for repeated target times.
+- All scene centers show legible title and expected feature shot, not a loading placeholder or login gate; final CTA is still visible at t=74.9.
+- Browser does not attempt production domain requests, authenticated customer APIs or telemetry from the preview/capture page.
+- Normal app Vite `index.html` remains usable and route handling is unchanged.
+
+**Visual human review:** Inspect the nine styleframes and generated contact sheet and spot-watch actual MP4 at playback speed. Score all seven motion motifs from §1.0.1 and specific choreography from §1.0.3 in `creative-qa.md`; reject a film comprised of plain cuts, screenshot slide-zooms or marketing-reconstructed product screens, even when MP4 technical tests pass. All three user URLs are recorded in `PROMO.md`; the third reference may be unviewable and must be identified as such, never fabricated.
+
+Inspect the generated contact sheet and spot-watch actual MP4 at playback speed. Identify blurry fonts, unreadable small schedules, awkward crops, repeated footage, fake interactions, too-rapid changes, clipped screen edges, sound harshness, or redundant logo moments. Fix the specific shot/cue and re-render the finished MP4 once. Do **not** endlessly redesign unrelated pages.
+
+## 5. Error behavior and fallbacks
+
+- **Missing preview/capture source:** re-use the working HTML and add only the absent controller/wiring. Do not rebuild all promo components.
+- **Missing demo backend or auth state:** try the production-component pathway using typed synthetic props and real CSS. If still impossible, record a precise per-feature blocker in QA rather than passing off a fake preview as authentic.
+- **Feature not actually implemented:** show an alternative verified customer-facing workflow from §1 (`more` priority) and adjust only its supporting caption, not the entire structure. Never simulate a nonexistent success.
+- **Screenshots contain private data:** fail validation, delete/replace affected capture with synthetic demo material and re-export. Never put secret storage-state files in the media directory.
+- **Encoder unavailable or crashes:** return nonzero, keep diagnostics, never announce completion or leave an empty final MP4. A `.partial` may be deleted after an error.
+- **Seeking produces different pixels:** fix non-deterministic React state/CSS timers/network/images; do not hide the failure by tolerating mismatches.
+- **Audio generator fails:** do not silently report a valid audio-supported export; fix source generator or flag explicit blocker and do not pass final acceptance.
+- **No access to local changed promo code from the planning AI:** CODEX itself sees its local working tree; only do targeted inspection in §2.1, not a full audit or architectural restart.
+
+## 6. Exact executable sequence for CODEX
+
+Execute sequentially, reporting commands and results; **do not stop after build or after viewing promo.html**:
+
+1. Preserve worktree; targeted inspect existing promo modules/renderer.
+2. Implement five authentic-product shot sources + manifest; validate real UI capture or genuine reused components.
+3. Replace promo-only faux feature previews in 75-second storyboard and implement all seven signature motion motifs using the real GF3 components/media, per detailed §1.0.1–§1.0.3 scene direction. Produce authentic nine-scene styleframes and a motion cue sheet.
+4. Implement/repair deterministic capture seek and 1920×1080 stage readiness.
+5. Implement 75s original audio-bed generator and renderer; add package.json command aliases.
+6. Run targeted tests, then perform FULL 2250-frame encoding into actual H.264/AAC MP4.
+7. Run technical verification, extract all thumbnails/styleframes, perform §1.0 creative-qa review (the product UI must move as the subject), fix major flaws and re-render.
+8. Verify normal frontend builds and no app regressions; document exact video path and final test results.
+
+Expected developer commands:
+
+```bash
+# From repository root
+cd FrontEnd
+npm install
+npx playwright install chromium
+# Ensure ffmpeg and ffprobe are installed and on PATH; see PROMO.md
+npm run lint
+npm run build
+npm run test
+npx playwright test e2e/promo-video.spec.ts --project=chromium
+npm run promo:film
+npm run promo:verify
+
+# The actual deliverable must exist here:
+# FrontEnd/artifacts/promo/gf3-product-film-1080p.mp4
+```
+
+For development on Ubuntu, only if FFmpeg is absent and package installation is permitted: `sudo apt-get update && sudo apt-get install -y ffmpeg`. For Windows, only if absent and permitted: `winget install --id Gyan.FFmpeg -e`, restart shell and verify `ffmpeg -version` + `ffprobe -version`. Never claim an installation succeeded without checking it. If permissions or system prerequisites block encoding, state **the exact blocker** and leave a valid, runnable command for the user; do not report the user goal as completed.
+
+## 7. Acceptance criteria — all required for `PASS`
+
+- [ ] Existing working `promo.html` is retained and upgraded; no wholesale rewrite or loss of previous work.
+- [ ] Film story tells a coherent product problem → GF3 → authentic walkthrough → value → brand pitch.
+- [ ] Manager scheduling, availability, employee schedule, swaps, and one additional verified workflow use real GF3 visual UI sources, not independently recreated marketing imitation cards.
+- [ ] The actual screen interactions/states shown are plausible and supported by the app; no false AI or performance claims.
+- [ ] Every authentic feature shot is traceable to real components/route and synthetic demo data.
+- [ ] Clear Polish captions, consistent brand styling from current CSS, readable interface crops, smooth scene rhythm and no visual glitches.
+- [ ] Motion-designed real GF3 interface: real card/grid assembly, actual interaction before/after, matched transitions, 2.5D camera layers, kinetic type, source-authentic focus extractions (requirements §1.0.1). **A basic screenshot recording, a zoom/pan slideshow or recreated marketing UI FAILS.**
+- [ ] Exactly nine film-derived 1920×1080 styleframes, `motion-cue-sheet.json`, `creative-qa.md` exist and accurately reflect the final MP4.
+- [ ] All three reference URLs preserved as creative inspiration; no copied copyrighted frames/audio, and any inaccessible reference acknowledged honestly.
+- [ ] One 75s / 1920×1080 / 30fps H.264 `yuv420p` MP4 with AAC audio is physically present at fixed required output path and plays to the GF3 closing CTA.
+- [ ] Poster PNG, nine-scene contact sheet and `qa-report.json` exist at fixed output paths.
+- [ ] `ffprobe` and video frame/audio checks pass; `qa-report.json` says `PASS`, not `PROVISIONAL`.
+- [ ] Targeted Vitest/Playwright and frontend build/lint pass or failures are accurately reported.
+- [ ] No backend, auth, SQLite, business logic, app router or non-promo production UI behavior was modified.
+- [ ] No real user/customer data or private auth state was included in exported/committed media.
+- [ ] Final CODEX reply provides actual MP4 absolute path, file size, ffprobe summary, provenance count, QA report path and preview commands. **Do not say “done” solely because an HTML page renders.**
+
+## 8. Codex final response contract
+
+CODEX must finish with:
+
+1. **Video:** absolute path to existing `gf3-product-film-1080p.mp4`, human-readable size, verified codec, dimensions, duration and fps.
+2. **Actual GF3 UI used:** table of `manager`, `availability`, `schedule`, `swap`, `more`, with source code location or demo route, and acquisition mode; explicitly list any blockers or unverified visuals.
+3. **Supporting deliverables:** exact poster, contact-sheet, nine styleframes, motion cue sheet, creative QA report and technical QA-report paths.
+4. **Verification:** lint, build, unit/E2E, frame+audio probe results; mark failures and environmental blockers truthfully.
+5. **Worktree:** concise list of files changed/created; no unrelated changes.
+
+**STOP CONDITION:** only stop with `PASS` after the MP4 and all acceptance artifacts are actually created and verified. If a required external prerequisite is unavailable, stop with `BLOCKED`, explicit reason and precise reproducible commands; never misrepresent an unrendered or non-authentic promo as completed video.
 
 ---
 
-# PART B — ПРАКТИЧНА ІНСТРУКЦІЯ ДЛЯ ВЛАСНИКА GF3 (користуватися вже зараз)
-
-> **Статус на 8 жовтня 2026 року:** у репозиторії є хороші чернетки, але НЕ готовий юридично затверджений пакет. Нижче — робочий сценарій і карта документів. Це не замінює перевірку польського юриста, бухгалтера чи аудит конкретного сервера. Не підписуй незаповнену версію з `[DO UZUPEŁNIENIA]`.
-
-## Б1. Хто є ким і чому це важливо
-
-**Ти / оператор GF3:** надаєш компанії доступ до вебзастосунку для графіків, доступності, замін, сповіщень. Для даних персоналу, які обробляєш за дорученням роботодавця, зазвичай ти — `podmiot przetwarzający` (процесор). За власні дані щодо рахунків, продажів і ділового зв'язку можеш мати окрему роль адміністратора; це потрібно визначити за фактичними цілями обробки.
-
-**Клієнт / компанія-роботодавець:** купує сервіс, призначає менеджерів, вводить працівників, визначає, навіщо обробляються їхні дані. Для кадрових даних зазвичай є `administrator danych` — відповідає за законну підставу, інформування працівників і законність трудових графіків.
-
-**Менеджер клієнта:** користувач з рольовим доступом, керує графіками, працівниками і swap. Зазвичай не підписує від імені компанії B2B, якщо немає окремих повноважень.
-
-**Працівник клієнта:** звичайний користувач GF3. Не платить тобі за підписку; не укладає B2B і DPA; може персонально підтвердити правила користування застосунком. Його особистий checkbox **не є** юридичною згодою на всі операції з персональними даними і не замінює трудові документи.
-
-## Б2. Які бувають документи: точно кому і куди
-
-| Документ | Де вже є заготовка | Що заповнити | Хто підписує / отримує | В `RegulationAcceptanceGate`? |
-|---|---|---|---|---|
-| Основний платний **договір SaaS B2B** | `docs/legal/saas-agreement/umowa-saas-b2b-pl.md` та `.html` | Твої правдиві реквізити/статус; юридичні дані клієнта; ціну; VAT; оплату; строк; припинення; підтримку | Уповноважений оператор та уповноважений представник компанії | **НІ** |
-| Додаток із конкретними функціями | `docs/legal/saas-agreement/zalacznik-1-zakres-uslug.md` | Кількість акаунтів, об'єкти, включені функції, запуск, межі послуги | Компанія + оператор разом із договором | **НІ** |
-| Коротке `Zamówienie / Umowa B2B` | `docs/legal/templates/Zamowienie_Umowa_B2B.md` | Комерційні параметри за однією узгодженою схемою | Лише якщо юрист узгодить із основним договором; **не підписуй два суперечливі договори** | **НІ** |
-| **DPA / umowa powierzenia** (ст. 28 GDPR/RODO) | `docs/legal/templates/Umowa_Powierzenia_Danych_DPA.md` | Сторони, дані/категорії людей, мета, строки, інструкції, субпроцесори, ризики, допомога, видалення | Компанія-адміністратор і оператор-процесор | **НІ** |
-| **TOMs/retencja** — засоби захисту, строки зберігання | `docs/legal/templates/Zalacznik_TOMs_i_Retencja.md` | РЕАЛЬНІ HTTPS, backup, відновлення, доступи, зберігання, експорт, видалення | Як погоджений додаток до DPA | **НІ** |
-| **SLA / підтримка** | `docs/legal/templates/Zalacznik_SLA_i_Wsparcie.md` | Контакт, дні/години, час реагування, обмеження, backup, RPO/RTO лише підтверджені | Тільки якщо сторони справді погодили | **НІ** |
-| **Regulamin świadczenia usług drogą elektroniczną / правила платформи** | `docs/legal/electronic-services-regulations/regulamin-swiadczenia-uslug-elektronicznych-pl.md` + **публічний** `FrontEnd/public/legal/regulamin.html` | Дані оператора, функції, техвимоги, обмеження, скарги, припинення, дата й версія; узгодити обидва тексти | Оператор публікує ДО користування/контракту; користувачам забезпечити доступ | **Може бути** погоджена, релевантна версія PDF для персонального підтвердження; не публікувати чернетку |
-| **Zasady korzystania** / практичні правила користувачів | `FrontEnd/public/legal/zasady-korzystania.html` | Особисті акаунти, безпека, заборонені дії, графіки/swap; після review може бути єдиний узгоджений PDF | Користувачі бачать / за потреби підтверджують | **ТАК**, якщо людино- та рольово-доречний затверджений PDF |
-| **Політика приватності / cookies** | `FrontEnd/public/legal/polityka-prywatnosci.html`, `pliki-cookies.html` | Реальні ролі й цілі, дані, основи, строки, cookies, контакти, провайдери | Оператор публікує, користувачі читають; додаткові cookie-згоди лише якщо застосовні | **НІ як універсальна GDPR-згода** |
-| **Інформаційне повідомлення для працівника (GDPR art. 13/14)** | `docs/legal/templates/Klauzula_Informacyjna_Dla_Pracownikow_Wzor.md` | Реальні дані **роботодавця**, мета/основи, види даних, GF3 як процесор, строк/права/контакт/одержувачі | Роботодавець надає працівникам та фіксує факт інформування | **Не через кнопку «zgadzam się na RODO»**. Передати окремо, можливе підтвердження отримання |
-| **Regulamin pracy / правила роботи компанії** | У GF3 немає універсального затвердженого регламенту роботодавця | Створює сам роботодавець за польським трудовим правом, якщо застосовно | Роботодавець ознайомлює працівників | **Не замінювати правилом оператора**. Не завантажувати автоматично |
-| **Внутрішні RODO-реєстри, DPIA, інциденти** | `docs/legal/internal/*.md` | Фактичні процеси, відповідальні, докази | Оператор/клієнт всередині своїх структур | **НІ**, внутрішні документи |
-
-**Принцип:** якщо ти не можеш пояснити, *чому кожен працівник має саме це підтверджувати*, не публікуй цей файл як обов'язкову регуляцію через gate. Комерційні й кадрові папери — інша юридична взаємодія.
-
-## Б3. Завтра, п'ятниця 9 жовтня 2026: зустріч із потенційним клієнтом
-
-### Що підготувати ДО зустрічі
-
-1. **Демо на синтетичних даних**, без справжніх прізвищ/номерів телефону співробітників. Показати manager → створення графіка → публікацію → працівник бачить графік → доступність → swap та підтвердження → історію; визнати, що це не кадрова система, не зарплатний калькулятор і не юридична перевірка графіка.
-2. **Односторінкову комерційну пропозицію**: що саме отримує компанія, приблизна кількість співробітників/локацій, ціна й умови як *пропозиція*, не неперевірений рахунок чи підписаний договір. 500 PLN/місяць — лише число, закладене в чинному **чернетковому** SaaS договорі; його треба підтвердити/узгодити.
-3. **Чернетку основного договору**: `docs/legal/saas-agreement/umowa-saas-b2b-pl.html`. Можна показати як матеріал для переговорів. HTML → Chrome/Edge → `Ctrl+P` → Save as PDF, A4; не прибирати юридичні caveats до погодження з юристом.
-4. **Чорнові DPA/TOMs** (для розмови про дані), **scope annex**, окремо **список запитань** з `docs/legal/saas-agreement/checklista-przed-podpisaniem.md`.
-5. **Свою перевірену особу й комерційний статус**. Якщо ти ще не маєш зареєстрованої діяльності, НЕ заявляй автоматично, що можеш підписати як компанія без CEIDG або що немає ZUS/VAT. Чинний шаблон прямо передбачає можливу `działalność nierejestrowana`; для безперервного SaaS і контрактної класифікації потрібна перевірка бухгалтером/юристом (див. також нормативні джерела в Б9).
-6. **Картку питань клієнту**: повна назва/NIP/KRS або CEIDG, хто має право підписати, юридична адреса, контакт ІТ/HR/RODO, адреса для рахунків, кількість робітників і локацій, чи потрібні окремі ролі, як схвалюється swap, строки договору, види даних, чи будуть особисті номери/пошти, вимоги до експорту/видалення, бажана дата запуску.
-
-### Як провести зустріч — репліки простими словами
-
-«GF3 — вебсервіс для створення та публікації графіків, доступності й замін змін. Ви як роботодавець залишаєтеся відповідальними за своїх працівників і законність графіків. Ми надаємо інструмент, а не беремо на себе payroll, трудове право чи кадрову документацію. Якщо домовимося, фіксуємо точний обсяг і ціну в договорі SaaS, окремо підписуємо угоду про обробку персональних даних DPA, готуємо вашу ізольовану інстанцію і тільки після перевірки вносимо дані співробітників. Працівники не підписують з нами ваш корпоративний договір: вони отримують інформацію від роботодавця і бачать затверджені правила користування системою».
-
-**Не роби завтра:** не вимагай підписів під `DRAFT`; не проси Excel із реальними працівниками на незахищену пошту; не обіцяй 24/7, SOC2, ISO, 99,9%, автоматичну відповідність трудовому праву, юридичну сертифікацію; не вписуй вигадані строки видалення; не підписуй від імені компанії без повноважень.
-
-### ПІСЛЯ зустрічі
-
-Занеси результати у приватну картку клієнта. Уточни оферту/ціну, звір повноваження підписанта, передай юридичні питання адвокату/radca prawny, облік/VAT/ZUS — бухгалтеру. Тільки після погодження сторони підписують фінальну комерційну угоду + scope + DPA/узгоджені додатки і отримують копії. Підписані PDF зберігай у захищеному сховищі з контрольованим доступом, **не в GitHub і не в публічному `public/legal`**.
-
-## Б4. Як заповнити найважливіші поля договору
-
-**У SaaS договорі:**
-
-- `Usługodawca` — **справжня юридична особа/фізична особа у законній формі**; ПІБ/назва, адреса та відповідні ідентифікатори. Якщо форма діяльності неясна — STOP, фінансово-правова перевірка.
-- `Klient` — точна назва й організаційна форма, KRS/CEIDG, NIP, адреса, хто представляє та за яким правом (не просто менеджер із графіків).
-- `Platforma` — домен конкретного клієнта/інстанції, реальні доступні функції, число користувачів, дата старту.
-- `Opłata` — узгоджена сума/валюта та спосіб податкового опису, перший період, оплата наперед/після, термін платежу, форма бухгалтерського документа.
-- `Okres / wypowiedzenie` — строк дії, повідомлення про припинення, коли зупиняється доступ, як клієнт експортує дані й коли вони видаляються.
-- `Odpowiedzialność / SLA` — тільки умови, на які погодився юрист і які реально можеш виконати. Межі відповідальності не встановлювати навмання.
-
-**У DPA:** компанія = адміністратор даних; оператор GF3 = процесор на стороні обслуговування персоналу. Зазначити категорії співробітників, які поля обробляються, задачі (графіки, swaps, повідомлення, права доступу), дозволених менеджерів, місця хостингу, субпроцесорів, процедури інциденту, строки, видалення та допомогу із запитами людей. Додаток TOMs повинен описувати **дійсно наявний** захист, не плани.
-
-**У повідомленні працівнику:** роботодавець вказує себе як адміністратора, зв'язок/відповідального, цілі та підстави для кожної категорії обробки, одержувачів, строки, права та шлях звернення. Зазвичай правова підстава у кадровому процесі **не** зводиться до «натиснув кнопку — дав згоду». Не збирай добровільну GDPR-згоду там, де обробка об'єктивно потрібна для виконання трудових обов'язків/правових зобов'язань.
-
-## Б5. Працівник зайшов на сайт: що він реально побачить у нинішньому GF3
-
-1. Компанія **попередньо законно** включила потрібні дані, забезпечила GDPR-повідомлення і створила обліковий запис через менеджера. Самореєстрація кожної незалежної фірми в цій версії не підтверджена.
-2. Застосунок перевіряє автентифікацію, роль, опубліковані обов'язкові документи **для цього користувача** і вже підтверджені версії.
-3. За наявності pending PDF користувач бачить назву і версію, може **завантажити PDF**, ставить **порожній за замовчуванням checkbox** «ознайомився і приймаю версію…», тисне «Accept and continue».
-4. Сервер записує прийняття за користувачем/роллю/документом/версією в наявному механізмі; у разі незавершеного прийняття звичайні захищені API відповідають **HTTP 428**. Після прийняття доступ поновлюється.
-5. Коли опублікована **нова обов'язкова версія**, потрібно підтвердити її окремо; старі записи й історію зберегти. Менеджер має endpoint перегляду історії конкретного працівника, у межах поточних дозволів.
-6. **Важливе обмеження:** чекбокс доводить факт заявленого підтвердження, **не доводить фактичного уважного читання** й не є підписом роботодавця. Не можна змушувати працівника підтверджувати DPA/рахунок або видавати це за згоду на будь-яку RODO-обробку.
-
-### Який саме PDF ставити на acceptance?
-
-**Перший кандидат:** один перевірений юристом, датований, версійний **Regulamin korzystania z platformy GF3 dla upoważnionych użytkowników**, погоджений з опублікованими операторськими `Regulamin`/`Zasady korzystania`. Зміст: призначення GF3; хто створює акаунти; особисте користування; захист пароля/PIN; кому звертатись щодо доступу; що графіки і swaps потребують організаційного/юридичного підтвердження роботодавцем; заборона стороннього використання, контакт підтримки і процедура скарг; дата/номер версії. Не писати в ньому «працівник дає добровільну згоду на всю обробку RODO».
-
-**Що НЕ прикріплювати як acceptance:** SaaS/B2B; DPA; конфіденційні TOMs; SLA; рахунок; внутрішній реєстр RODO; інформаційну клаузулу роботодавця у вигляді «zgadzam się na przetwarzanie»; трудовий контракт; неузгоджений «regulamin pracy» іншої компанії.
-
-**Якщо компанія хоче підтвердження власних HR-правил:** спочатку обговорити зі своїм HR/польським трудовим юристом, чи саме цей документ належить працівникам і чи належним способом він доводиться до відома. Поточний загальний gate не слід автоматично вважати повноцінним кадровим документообігом; для цього потрібне окреме погоджене призначення й аудит.
-
-## Б6. Чи взагалі потрібен «regulamin»? Не плутай три різні речі
-
-**1) `Regulamin świadczenia usług drogą elektroniczną` оператора GF3:** загалом потрібен для дистанційної електронної послуги; польський закон вимагає визначити та **безоплатно надати його до укладання договору**, щоб можна було зберегти/відтворити; описати функції, технічні умови, заборони, укладення/розірвання, рекламації (art. 8 UŚUDE). Це НЕ «regulamin pracy». Наявні draft HTML ще треба завершити.
-
-**2) `Zasady korzystania z aplikacji` працівника/менеджера:** зрозуміла інструкція та правила користування сервісом. Її доцільно показувати й документувати персональне ознайомлення/прийняття, якщо текст коректний і його застосування узгоджене з юридичною моделлю договору. Не кожна політика за законом вимагає окремого checkbox; документ має бути наданий належним чином.
-
-**3) `Regulamin pracy` роботодавця:** це кадровий акт **клієнта, не власника GF3**. За польським Кодексом праці загалом обов'язковий від **50 працівників**, за **20–49** — якщо за умовами закону звернулася профспілкова організація; для менших компаній можливий добровільний; є винятки для колективних договорів. Роботодавець повинен ознайомити працівника з чинними правилами перед початком роботи. Це не означає, що ти маєш генерувати його клієнтам або додавати до кожного GF3-логіну.
-
-## Б7. Як запускати реального клієнта без хаосу
-
-**Фаза 0 — Legal & security gate:** підтверджена законна форма продажу послуги, рахунки, VAT/ZUS/KSeF за конкретними обставинами; юрист затвердив публічний regulamin, політики, SaaS, DPA; перевірені безпечні PIN/auth/token, HTTPS, доступи, ізоляція, копії і restore, субпроцесори, cookie/storage, персональна інформація. Поточний `CHECKLIST_PRZED_STARTEM.md` окремо позначає ризики 6-значних паролів, localStorage JWT тощо — не вважати проєкт готовим тільки через успішні unit tests.
-
-**Фаза 1 — Угода:** фінальні, узгоджені й підписані SaaS + scope та DPA/TOMs; погоджене SLA лише коли справді є. Контакти юридичні/фінансові/інцидентні з обох сторін і зовнішній захищений архів підписів.
-
-**Фаза 2 — Ізольована інстанція:** окрема організація → свій домен, база/volume, конфігурація і секрети, резервні копії; окремо перевірити реальне серверне оточення. **Не** розміщати двох незалежних роботодавців у спільній інстанції, бо поточний пакунок не підтверджує відповідну ізоляцію.
-
-**Фаза 3 — Налаштування:** створити уповноваженого менеджера, налаштувати локації/акаунти, перевірити безпечний канал початкових доступів, не завантажувати більше персональних даних, ніж потрібно, і переконатися у можливості відкликати доступ.
-
-**Фаза 4 — Документи для людей:** опублікований та затверджений публічний `regulamin.html` доступний до підпису, інформаційні повідомлення від роботодавця доставлені; **окремий придатний PDF** — через існуючий системний інтерфейс upload/publish відповідальним системним менеджером, в правильній інстанції. Не заливати PDF із написом DRAFT.
-
-**Фаза 5 — Контрольний тест:** свіжий тестовий manager/employee, pending → PDF → checkbox → accept → API працює; без підтвердження — HTTP 428; нова версія знову просить підтвердження; відновлюються графік, swaps і відображається історія. Перевірити доступність старого PDF/історії в погодженому архіві.
-
-**Фаза 6 — Акт введення:** заповнити протокол запуску/передачі, хто отримав доступ, проведено навчання, що протестовано та які проблеми залишилися. Він не замінює підписаний договір.
-
-## Б8. Що робити після запуску — повсякденний цикл
-
-**Кожного місяця / розрахунковий період:** перевірка вартості договору, виставлення правильного документа й отримання оплати, запис платежів, підтримка й обробка звернень, перевірка резервних копій. GF3 не має підтвердженого автоматичного білінгу — не покладайся на відсутню функцію.
-
-**Коли додають працівника:** компанія забезпечує інформацію та підставу обробки, менеджер створює акаунт, працівник має доступ до правильних правил; лише за необхідності окремо підтверджує approved PDF.
-
-**Коли змінюється правило:** юрист/відповідальна особа затверджує нову редакцію, зазначається версія і дата, публікується новий PDF, зберігаються попередні версії і підтвердження. Не змінюй існуючий файл 'тихо' без версіонування й доказу.
-
-**Коли працівник звільняється:** клієнт відкликає доступ; за погодженими політиками зберігає/видаляє відповідні кадрові дані, графіки й слід аудиту. Не знищувати все відразу без перевірки трудових строків і DPA; не залишати активний доступ.
-
-**Якщо витік чи підозра на витік:** зареєструвати інцидент, локалізувати, зберегти докази, без зволікання повідомити клієнта-адміністратора через контакт DPA. **72 години** стосуються оцінки повідомлення наглядового органу адміністратором за відповідних умов GDPR, а не універсального права процесора чекати 72 години, перш ніж повідомити клієнта.
-
-**Коли працівник просить видалити дані / доступ:** не видаляй самовільно дані роботодавця; верифікуй запит, передай адміністратору-роботодавцю за DPA, допоможи виконати його рішення, збережи журнал дій.
-
-**Коли клієнт припиняє підписку:** за підписаними SaaS/DPA надай погоджений експорт у доступному форматі, закрий доступ, поверни/видали дані згідно з інструкцією і обов'язковими винятками, перевір бекапи/ретенцію, збережи протокол. Не обіцяй PDF-експорт із поточного UI або спеціальну міграцію, якщо це не наявна функція.
-
-## Б9. Що не можна вважати вирішеним (реальні блокери)
-
-- У `docs/legal/LEGAL_REVIEW.md` документи все ще **DRAFT**, без реальних затверджень і SHA-256. Публічні HTML містять `[DO UZUPEŁNIENIA]`.
-- Треба підтвердити, чи маєш **законну форму надання постійного SaaS**, які ZUS/VAT/податки та потрібні рахунки. Польська `działalność nierejestrowana` має специфічні вимоги та навіть за такого статусу договори послуг можуть створювати обов'язки платника внесків у клієнта. Не вважати, що просто слово "B2B" обходить ці правила.
-- Не визначені фактичні субпроцесори/хостинг, терміни зберігання, тест restore і політика cookie/storage на реальній доменній конфігурації.
-- У STOP-SHIP є окремі питання реальної безпеки акаунтів; їх треба вирішити **до** реальних даних персоналу, незалежно від цього документаційного плану.
-- Розрізнення старих `docs/legal/electronic-services-regulations/*` та нового `FrontEnd/public/legal/*` потребує узгодження остаточного затвердженого тексту; не вважати будь-який markdown автоматично опублікованим.
-- Докази підписання/повноважень та передачі GDPR-повідомлень не з'являються від того, що тест чекбокса зелений.
-
-## Б10. Джерела для юриста та фінансової перевірки (станом на 2026-10-08)
-
-- GF3 pinned legal README: https://github.com/OlehProtsun/GF3/blob/37540cfffb9fd89bd2a22a54c00cf3f451ce58a3/docs/legal/README.md
-- GF3 launch blocker list: https://github.com/OlehProtsun/GF3/blob/37540cfffb9fd89bd2a22a54c00cf3f451ce58a3/docs/legal/internal/CHECKLIST_PRZED_STARTEM.md
-- EU GDPR/RODO arts. 13, 28, 30, 32–34: https://eur-lex.europa.eu/legal-content/PL/TXT/?uri=CELEX:32016R0679
-- Polish electronic services law, art. 8: https://eli.gov.pl/api/acts/DU/2024/1513/text.html
-- Polish UODO — controllers vs processors: https://www.uodo.gov.pl/pl/675/4234
-- Polish PIP — employer duties and workplace regulations: https://www.pip.gov.pl/dla-pracodawcow/niezbednik-pracodawcy/jak-zatrudnic-pracownika-w-ramach-umowy-o-prace
-- Polish government — nonregistered activity 2026, conditions and services/ZUS: https://biznes.gov.pl/pl/firma/zakladanie-firmy/chce-wiedziec-jak-zalozyc-wlasna-firme/dzialalnosc-nierejestrowa-oraz-inne-sytuacje-w-ktorych-nie-trzeba-rejestrowac-firmy
-
-**Final operational rule:** For the meeting you may bring *drafts* and present the product. For **paid production with real employees**, first close the legal, contractual, fiscal, security and GDPR release gates. CODEX can improve documentation, but cannot certify those gates or sign anything for the parties.
+**CODEX MODEL EXECUTION GUIDANCE (not part of architecture):** This is **High implementation complexity**, primarily authentic multi-role UI acquisition, cinema-grade GSAP timeline integration, and deterministic video encoding/QA. Prefer a **Strong CODEX model with Medium reasoning** (use High if debugging real UI fixture/auth dependencies becomes nontrivial). Use an exact currently available model name only after checking CODEX's model selector. Avoid highest reasoning by default: core architecture, narrative, file ownership and quality gates are already decided in this plan.
