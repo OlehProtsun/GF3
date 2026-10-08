@@ -63,6 +63,7 @@ export function OverlaySidebarLayout({ children }: OverlaySidebarLayoutProps) {
   const { pathname } = useLocation();
   const { logout, session } = useAuth();
   const isManager = session?.role === "manager";
+  const isSystemManager = isManager && session?.isSystemManager === true;
   const accountPath = isManager ? "/manager-profile" : "/profile";
   const isContainerWideContent = pathname === "/container";
   const isHomeWideContent = pathname === "/";
@@ -107,7 +108,7 @@ export function OverlaySidebarLayout({ children }: OverlaySidebarLayoutProps) {
         { label: t("Shop"), to: "/shop", icon: <ShopIcon size={28} style={{ transform: "scaleY(-1)" }} /> },
         { label: t("Availability"), to: "/availability", icon: <AvailabilityIcon size={22} /> },
         { label: t("Container"), to: "/container", icon: <ContainerIcon size={25} /> },
-        { label: t("Information"), to: "/information", icon: <InfoIcon size={26} /> },
+        ...(isSystemManager ? [{ label: t("Information"), to: "/information", icon: <InfoIcon size={26} /> }] : []),
         { label: t("Message"), to: "/communications", icon: <NoteIcon size={24} /> },
       ]
     : [
@@ -150,7 +151,7 @@ export function OverlaySidebarLayout({ children }: OverlaySidebarLayoutProps) {
             ))}
           </div>
 
-          {isManager ? (
+          {isSystemManager ? (
             <div className={styles.section}>
               <div className={styles.sectionTitle}>{t("Settings")}</div>
               <div className={styles.nav}>
@@ -204,6 +205,11 @@ export function OverlaySidebarLayout({ children }: OverlaySidebarLayoutProps) {
       </aside>
       <main className={contentClassName}>
         <div className="container">{children}</div>
+        <nav className={styles.legalLinks} aria-label={t("Legal documents")}>
+            <a href="/legal/index.html">{t("Legal documents")}</a>
+            <a href="/legal/regulamin.html">{t("Terms")}</a>
+            <a href="/legal/polityka-prywatnosci.html">{t("Privacy policy")}</a>
+          </nav>
       </main>
 
       <div

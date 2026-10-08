@@ -5,17 +5,14 @@ import { BrowserRouter } from "react-router-dom";
 import { OverlaySidebarLayout } from "./OverlaySidebarLayout";
 
 const authMock = vi.hoisted(() => ({
+  session: { role: "manager" as "manager" | "employee", displayName: "Synthetic manager", userName: "manager", isSystemManager: undefined as boolean | undefined },
   logout: vi.fn<() => Promise<void>>(() => Promise.resolve()),
 }));
 
 vi.mock("@app/providers/AuthProvider", () => ({
   useAuth: () => ({
     logout: authMock.logout,
-    session: {
-      role: "manager",
-      displayName: "OlehProtsun",
-      userName: "manager",
-    },
+    session: authMock.session,
   }),
 }));
 
@@ -42,6 +39,8 @@ function renderManagerLayout(pathname = "/") {
 describe("OverlaySidebarLayout", () => {
   beforeEach(() => {
     authMock.logout.mockClear();
+    authMock.session.role = "manager";
+    authMock.session.isSystemManager = undefined;
     window.history.replaceState({}, "", "/");
   });
 
@@ -73,6 +72,11 @@ describe("OverlaySidebarLayout", () => {
     await user.click(screen.getByRole("button", { name: "Collapse sidebar" }));
 
     expect(container.querySelector("aside")?.getAttribute("aria-hidden")).toBe("true");
+    for (const name of ["Legal documents", "Terms", "Privacy policy"]) {
+      const link = screen.getByRole("link", { name });
+      expect(link.closest('[aria-hidden="true"]')).toBeNull();
+      expect(link).toBeVisible();
+    }
 
     const openButton = screen.getByRole("button", { name: "Open sidebar" });
     const openButtonArrow = openButton.querySelector("svg");
@@ -83,6 +87,44 @@ describe("OverlaySidebarLayout", () => {
     await user.click(openButton);
 
     expect(container.querySelector("aside")?.getAttribute("aria-hidden")).toBe("false");
+  });
+
+  it("shows system tools and Settings only for a system manager", () => {
+    authMock.session.isSystemManager = true;
+    renderManagerLayout();
+    expect(screen.getByRole("link", { name: "Information" })).toHaveAttribute("href", "/information");
+    expect(screen.getByRole("link", { name: "DataBase" })).toHaveAttribute("href", "/database");
+    expect(screen.getByText("Settings")).toBeInTheDocument();
+  });
+
+  it.each([false, undefined])("keeps ordinary manager navigation with privilege %s", async privilege => {
+    authMock.session.isSystemManager = privilege;
+    const user = userEvent.setup();
+    renderManagerLayout();
+    expect(screen.queryByRole("link", { name: "Information" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "DataBase" })).not.toBeInTheDocument();
+    expect(screen.queryByText("Settings")).not.toBeInTheDocument();
+    for (const name of ["Home", "Employee", "Shop", "Availability", "Container", "Message", "Open manager profile"]) {
+      expect(screen.getByRole("link", { name })).toBeInTheDocument();
+    }
+    expect(screen.getByTestId("manager-notepad")).toBeInTheDocument();
+    expect(screen.getByTestId("manager-system-news")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Collapse sidebar" }));
+    await user.click(screen.getByRole("button", { name: "Open sidebar" }));
+    expect(screen.getByRole("link", { name: "Message" })).toBeInTheDocument();
+  });
+
+  it.each([true, false, undefined])("does not grant employee system links with flag %s", privilege => {
+    authMock.session.role = "employee";
+    authMock.session.isSystemManager = privilege;
+    renderManagerLayout();
+    expect(screen.getByRole("link", { name: "Open profile" })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Information" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "DataBase" })).not.toBeInTheDocument();
+    expect(screen.queryByText("Settings")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("manager-notepad")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("manager-system-news")).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Legal documents" })).toHaveAttribute("href", "/legal/index.html");
   });
 
   it("logs out through the shared nav-style action button", async () => {

@@ -6,6 +6,7 @@ using DataAccessLayer.Models.Enums;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 using WebApi.Auth;
 using WebApi.Contracts.ShiftSwaps;
 using WebApi.Realtime;
@@ -121,6 +122,16 @@ public sealed class ShiftSwapLogsController(
         int id,
         CancellationToken cancellationToken)
     {
+        IDbContextTransaction transaction;
+        try
+        {
+            transaction = await db.Database.BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception exception) when (ShiftSwapRules.IsSqliteWriterConflict(exception))
+        {
+            throw new ValidationException("This swap changed during another request. Refresh and try again.");
+        }
+        await using var transactionLifetime = transaction;
         var swap = await db.ShiftSwapRequests
             .Include(request => request.Schedule)
                 .ThenInclude(schedule => schedule.Container)
@@ -146,23 +157,34 @@ public sealed class ShiftSwapLogsController(
             throw new ValidationException("Only open shift swaps can be cancelled.");
         }
 
-        if (swap.IsManagerCreated)
+        var cancelledAtUtc = DateTimeOffset.UtcNow;
+        try
         {
+            var affectedRows = await db.ShiftSwapRequests
+                .Where(request => request.Id == id && request.Schedule.ContainerId == containerId && request.Status == ShiftSwapStatus.Open)
+                .ExecuteUpdateAsync(update => update
+                    .SetProperty(request => request.Status, ShiftSwapStatus.Cancelled)
+                    .SetProperty(request => request.CancelledAtUtc, cancelledAtUtc), cancellationToken)
+                .ConfigureAwait(false);
+            if (affectedRows != 1)
+                throw new ValidationException("Only open shift swaps can be cancelled.");
             swap.Status = ShiftSwapStatus.Cancelled;
-            swap.CancelledAtUtc = DateTimeOffset.UtcNow;
-            db.ShiftSwapRequests.Remove(swap);
-            if (swap.ScheduleSlot!.EmployeeId is null)
+            swap.CancelledAtUtc = cancelledAtUtc;
+            if (swap.IsManagerCreated)
             {
-                db.ScheduleSlots.Remove(swap.ScheduleSlot);
+                db.ShiftSwapRequests.Remove(swap);
+                if (swap.ScheduleSlot!.EmployeeId is null)
+                    db.ScheduleSlots.Remove(swap.ScheduleSlot);
             }
-        }
-        else
-        {
-            swap.Status = ShiftSwapStatus.Cancelled;
-            swap.CancelledAtUtc = DateTimeOffset.UtcNow;
-        }
 
-        await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+            await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+            await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception exception) when (ShiftSwapRules.IsSqliteWriterConflict(exception))
+        {
+            await transaction.RollbackAsync(cancellationToken).ConfigureAwait(false);
+            throw new ValidationException("This swap changed during another request. Refresh and try again.");
+        }
         await workflowLogService
             .LogAsync(
                 User,
@@ -444,6 +466,16 @@ public sealed class ShiftSwapLogsController(
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     public async Task<IActionResult> CancelManualOffer(int containerId, int graphId, int id, CancellationToken cancellationToken)
     {
+        IDbContextTransaction transaction;
+        try
+        {
+            transaction = await db.Database.BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception exception) when (ShiftSwapRules.IsSqliteWriterConflict(exception))
+        {
+            throw new ValidationException("This swap changed during another request. Refresh and try again.");
+        }
+        await using var transactionLifetime = transaction;
         if (CreateEditLockConflictResult(containerId, graphId) is { } conflict)
         {
             return conflict;
@@ -470,13 +502,25 @@ public sealed class ShiftSwapLogsController(
             throw new ValidationException("Only open manual shift offers can be cancelled.");
         }
 
-        db.ShiftSwapRequests.Remove(swap);
-        if (swap.ScheduleSlot!.EmployeeId is null)
+        try
         {
-            db.ScheduleSlots.Remove(swap.ScheduleSlot);
+            var affectedRows = await db.ShiftSwapRequests
+                .Where(request => request.Id == id && request.ScheduleId == graphId &&
+                    request.Schedule.ContainerId == containerId && request.IsManagerCreated && request.Status == ShiftSwapStatus.Open)
+                .ExecuteDeleteAsync(cancellationToken).ConfigureAwait(false);
+            if (affectedRows != 1)
+                throw new ValidationException("Only open manual shift offers can be cancelled.");
+            db.Entry(swap).State = EntityState.Detached;
+            if (swap.ScheduleSlot!.EmployeeId is null)
+                db.ScheduleSlots.Remove(swap.ScheduleSlot);
+            await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+            await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
         }
-
-        await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        catch (Exception exception) when (ShiftSwapRules.IsSqliteWriterConflict(exception))
+        {
+            await transaction.RollbackAsync(cancellationToken).ConfigureAwait(false);
+            throw new ValidationException("This swap changed during another request. Refresh and try again.");
+        }
         await workflowLogService
             .LogAsync(
                 User,

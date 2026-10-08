@@ -1,4 +1,3 @@
-using System.Security.Claims;
 using BusinessLogicLayer.Contracts.Regulations;
 using BusinessLogicLayer.Services.Abstractions;
 using Microsoft.AspNetCore.Authorization;
@@ -50,21 +49,5 @@ public sealed class RegulationsController(
         return Ok(acceptance);
     }
 
-    private RegulationSubject GetSubject()
-    {
-        var role = User.FindFirstValue(ClaimTypes.Role) ?? string.Empty;
-        var accountIdClaim = role == AuthRoles.Manager ? "manager_id" : "employee_id";
-        if (!int.TryParse(User.FindFirstValue(accountIdClaim), out var accountId) || accountId <= 0)
-        {
-            throw new BadHttpRequestException("The current account session is invalid.");
-        }
-
-        return new RegulationSubject
-        {
-            Role = role,
-            AccountId = accountId,
-            Username = User.Identity?.Name ?? string.Empty,
-            DisplayName = User.FindFirstValue("display_name") ?? User.Identity?.Name ?? string.Empty,
-        };
-    }
+    private RegulationSubject GetSubject() => RegulationSubjectResolver.Resolve(User);
 }

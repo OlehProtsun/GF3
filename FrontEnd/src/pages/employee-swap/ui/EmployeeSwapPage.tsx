@@ -1,4 +1,6 @@
 import { createPortal } from "react-dom";
+import { useQueryClient } from "@tanstack/react-query";
+import { queryKeys } from "@shared/api/queryKeys";
 import { dateTimeFormat, t } from "@shared/i18n";
 import {
   useCallback,
@@ -884,6 +886,10 @@ export function EmployeeSwapPage() {
   const [swapSearchQuery, setSwapSearchQuery] = useState("");
   const [swapFilter, setSwapFilter] = useState<SwapFilter>("all");
   const [pendingUnpinSwapId, setPendingUnpinSwapId] = useState<number | null>(null);
+  const [pendingAcceptSwap, setPendingAcceptSwap] = useState<ShiftSwap | null>(null);
+  const [isAcceptSubmitting, setIsAcceptSubmitting] = useState(false);
+  const acceptInFlightRef = useRef(false);
+  const queryClient = useQueryClient();
   const deferredSwapSearchQuery = useDeferredValue(swapSearchQuery);
   const selectedSchedule = useMemo(
     () => getSelectedSchedule(schedules, selectedScheduleId),
@@ -941,7 +947,7 @@ export function EmployeeSwapPage() {
   const pendingUnpinSwap = pendingUnpinSwapId === null
     ? null
     : swaps.find(swap => swap.id === pendingUnpinSwapId) ?? null;
-  const isActionBusy = createSwapMutation.isPending || acceptSwapMutation.isPending || cancelSwapMutation.isPending;
+  const isActionBusy = createSwapMutation.isPending || acceptSwapMutation.isPending || cancelSwapMutation.isPending || isAcceptSubmitting;
   const loadError = schedulesQuery.error ?? swapsQuery.error ?? targetEmployeesQuery.error ?? uiStateQuery.error;
   const resolvedTargetEmployeeId = targetMode === "private" ? targetEmployeeId ?? sortedTargetEmployees[0]?.id ?? null : null;
   const hasSwapSearch = swapSearchQuery.trim().length > 0;
@@ -1035,9 +1041,36 @@ export function EmployeeSwapPage() {
   };
 
   const handleAccept = (swap: ShiftSwap) => {
+    if (swap.status !== "open" || !swap.canAccept || isActionBusy || acceptInFlightRef.current) return;
     setActionError(null);
-    acceptSwapMutation.mutate(swap.id, {
-      onError: error => setActionError(getErrorMessage(error, t("Could not accept this swap offer."))),
+    setPendingAcceptSwap(swap);
+  };
+
+  const handleConfirmAccept = () => {
+    if (!pendingAcceptSwap || isActionBusy || acceptInFlightRef.current) return;
+    const currentSwap = swaps.find(swap => swap.id === pendingAcceptSwap.id);
+    if (!currentSwap || currentSwap.status !== "open" || !currentSwap.canAccept) {
+      setPendingAcceptSwap(null);
+      setActionError(t("This offer is no longer available. The swap list has been refreshed."));
+      void queryClient.invalidateQueries({ queryKey: queryKeys.shiftSwaps.employee() });
+      return;
+    }
+    acceptInFlightRef.current = true;
+    setIsAcceptSubmitting(true);
+    setActionError(null);
+    const finish = () => {
+      acceptInFlightRef.current = false;
+      setIsAcceptSubmitting(false);
+      setPendingAcceptSwap(null);
+    };
+    acceptSwapMutation.mutate(currentSwap.id, {
+      onSuccess: finish,
+      onError: error => {
+        finish();
+        setActionError(getErrorMessage(error, t("Could not accept this swap offer.")));
+        void queryClient.invalidateQueries({ queryKey: queryKeys.shiftSwaps.employee() });
+        void queryClient.invalidateQueries({ queryKey: queryKeys.employeeSchedules.all });
+      },
     });
   };
 
@@ -1326,6 +1359,25 @@ export function EmployeeSwapPage() {
           ) : null}
 
       </dialog>
+      {createPortal(<ConfirmDialog
+        open={pendingAcceptSwap !== null}
+        variant="confirm"
+        title={t("Accept this shift?")}
+        message={pendingAcceptSwap ? t(
+          "Take the shift from {0} in {1}{2} on {3}, {4}–{5} ({6})? Acceptance updates your schedule.",
+          pendingAcceptSwap.isManagerCreated ? pendingAcceptSwap.manualColumnName || t("Open shift") : pendingAcceptSwap.fromEmployeeName,
+          pendingAcceptSwap.scheduleName,
+          pendingAcceptSwap.shopName ? ` · ${pendingAcceptSwap.shopName}` : "",
+          formatSwapDate(pendingAcceptSwap), pendingAcceptSwap.fromTime, pendingAcceptSwap.toTime,
+          formatHours(pendingAcceptSwap.shiftHours),
+        ) : ""}
+        confirmText={t("Accept shift")}
+        cancelText={t("Back")}
+        confirmDisabled={acceptSwapMutation.isPending || isAcceptSubmitting}
+        cancelDisabled={acceptSwapMutation.isPending || isAcceptSubmitting}
+        onCancel={() => { if (!acceptInFlightRef.current && !acceptSwapMutation.isPending) setPendingAcceptSwap(null); }}
+        onConfirm={handleConfirmAccept}
+      />, document.body)}
       {createPortal(<ConfirmDialog
         open={pendingUnpinSwapId !== null}
         variant="confirm"

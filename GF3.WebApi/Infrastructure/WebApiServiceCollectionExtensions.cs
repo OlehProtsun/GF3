@@ -90,7 +90,11 @@ public static class WebApiServiceCollectionExtensions
             .AddScheme<AuthenticationSchemeOptions, JwtAuthenticationHandler>(
                 JwtAuthenticationDefaults.SchemeName,
                 _ => { });
-        services.AddAuthorization();
+        services.AddAuthorization(options =>
+            options.AddPolicy(AuthPolicies.SystemManager, policy => policy
+                .RequireAuthenticatedUser()
+                .RequireRole(AuthRoles.Manager)
+                .RequireClaim(AuthPolicies.SystemManagerClaim, "true")));
         services.AddControllers(options =>
         {
             options.Filters.AddService<ApiExceptionFilter>();

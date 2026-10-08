@@ -60,8 +60,6 @@ export type ShiftSwapEmployee = {
   firstName: string;
   lastName: string;
   displayName: string;
-  email?: string | null;
-  phone?: string | null;
 };
 
 export type CreateShiftSwapInput = {

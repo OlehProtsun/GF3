@@ -16,6 +16,15 @@
   "Accent": "Akcent",
   "Accept and continue": "Zaakceptuj i kontynuuj",
   "Accept": "Akceptuj",
+  "Accept this shift?": "Przejąć tę zmianę?",
+  "Accept shift": "Przejmij zmianę",
+  "Open shift": "Zmiana do przejęcia",
+  "Take the shift from {0} in {1}{2} on {3}, {4}–{5} ({6})? Acceptance updates your schedule.": "Przejąć zmianę od {0} w grafiku {1}{2}, {3}, {4}–{5} ({6})? Twój grafik zostanie zaktualizowany.",
+  "This offer is no longer available. The swap list has been refreshed.": "Ta oferta nie jest już dostępna. Lista zamian została odświeżona.",
+  "Supply both start and end times.": "Podaj godzinę rozpoczęcia i zakończenia.",
+  "This shift is no longer available.": "Ta zmiana nie jest już dostępna.",
+  "The manual shift metadata is invalid or the cell is missing.": "Dane ręcznej zmiany są nieprawidłowe lub brakuje komórki.",
+  "This swap changed during another request. Refresh and try again.": "Ta zamiana została zmieniona w innym żądaniu. Odśwież i spróbuj ponownie.",
   "Acceptance history": "Historia akceptacji",
   "Accepted and cancelled swaps will appear here.": "Tutaj pojawią się zaakceptowane i anulowane zamiany.",
   "Accepted by": "Zaakceptowane przez",
@@ -1826,5 +1835,10 @@
   "Use a valid time range like 09:00 - 15:00.": "Wpisz poprawny zakres godzin, np. 09:00 - 15:00.",
   "Select schedule": "Wybierz grafik",
   "Select schedule. Current schedule: {0}": "Wybierz grafik. Aktualny grafik: {0}",
-  "Updated {0}": "Aktualizacja: {0}"
+  "Updated {0}": "Aktualizacja: {0}",
+  "Legal documents": "Dokumenty prawne",
+  "Terms": "Regulamin",
+  "Privacy policy": "Polityka prywatności",
+  "Cookies": "Cookies",
+  "You acknowledge this document personally, not on behalf of your employer. This is not GDPR consent or a company contract.": "Potwierdzasz dokument osobiście, nie w imieniu pracodawcy. Nie jest to zgoda RODO ani umowa firmy."
 }

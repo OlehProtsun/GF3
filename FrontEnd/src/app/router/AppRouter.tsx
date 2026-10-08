@@ -133,6 +133,12 @@ function RoutedContent() {
     return <Navigate to="/" />;
   }
 
+  if (session?.role === "manager" &&
+      (pathname === "/information" || pathname === "/database") &&
+      session.isSystemManager !== true) {
+    return <Navigate to="/" replace />;
+  }
+
   const matched = renderMatched(pathname, session?.role === "manager" ? managerRoutes : employeeRoutes);
   return matched ?? <Navigate to="/" />;
 }

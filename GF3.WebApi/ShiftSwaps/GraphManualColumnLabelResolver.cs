@@ -1,5 +1,3 @@
-using System.Text;
-using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 
@@ -83,7 +81,7 @@ internal static class GraphManualColumnLabelResolver
                 continue;
             }
 
-            return column.ElementAtOrDefault(1)?.GetValue<string>();
+            return ReadString(column.ElementAtOrDefault(1));
         }
 
         return null;
@@ -103,7 +101,7 @@ internal static class GraphManualColumnLabelResolver
                 continue;
             }
 
-            return column["label"]?.GetValue<string>();
+            return ReadString(column["label"]);
         }
 
         return null;
@@ -164,7 +162,7 @@ internal static class GraphManualColumnLabelResolver
                 continue;
             }
 
-            var value = cell.Value?.GetValue<string>()?.Trim();
+            var value = ReadString(cell.Value)?.Trim();
             if (!string.IsNullOrWhiteSpace(value))
             {
                 result[day] = value;
@@ -175,47 +173,10 @@ internal static class GraphManualColumnLabelResolver
     }
 
     private static JsonObject? ParseGraphNoteMeta(string rawMeta)
-    {
-        var payload = rawMeta.Trim();
-        if (payload.Length == 0)
-        {
-            return null;
-        }
+        => ShiftSwapRules.ParseGraphNoteMeta(rawMeta);
 
-        if (payload.StartsWith("b64:", StringComparison.Ordinal))
-        {
-            return TryParseJsonObject(DecodeGraphNoteMetaValue(payload[4..]));
-        }
-
-        return TryParseJsonObject(payload) ?? TryParseJsonObject(Uri.UnescapeDataString(payload));
-    }
-
-    private static JsonObject? TryParseJsonObject(string? value)
-    {
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            return null;
-        }
-
-        try
-        {
-            return JsonNode.Parse(value) as JsonObject;
-        }
-        catch (JsonException)
-        {
-            return null;
-        }
-    }
-
-    private static string DecodeGraphNoteMetaValue(string value)
-    {
-        var normalized = value
-            .Replace('-', '+')
-            .Replace('_', '/')
-            .PadRight((int)Math.Ceiling(value.Length / 4d) * 4, '=');
-
-        return Encoding.UTF8.GetString(Convert.FromBase64String(normalized));
-    }
+    private static string? ReadString(JsonNode? node)
+        => node is JsonValue value && value.TryGetValue<string>(out var text) ? text : null;
 
     private static int? GetJsonInt(JsonNode? node)
     {

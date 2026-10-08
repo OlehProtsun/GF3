@@ -63,6 +63,8 @@ export function RegulationAcceptanceGate() {
         <h2 id="regulation-dialog-title">{regulation.title}</h2>
         <div className={styles.version}>{t("Version")} {regulation.version}</div>
         <p className={styles.message}>{regulation.message}</p>
+        <p className={styles.message}>{t("You acknowledge this document personally, not on behalf of your employer. This is not GDPR consent or a company contract.")}</p>
+        <a href="/legal/index.html">{t("Legal documents")}</a>
         <button type="button" className={styles.pdfButton} onClick={() => void handleDownload()} disabled={isDownloading}>
           {isDownloading ? t("Downloading...") : t("Download PDF · {0}", regulation.pdfFileName)}
         </button>

@@ -261,6 +261,11 @@ export function EmployeeWorkspaceLayout({ children }: PropsWithChildren) {
         </header>
 
         <main className={styles.content}>{children}</main>
+        <nav className={styles.legalLinks} aria-label={t("Legal documents")}>
+            <a href="/legal/index.html">{t("Legal documents")}</a>
+            <a href="/legal/regulamin.html">{t("Terms")}</a>
+            <a href="/legal/polityka-prywatnosci.html">{t("Privacy policy")}</a>
+          </nav>
       </div>
 
       <nav ref={mobileNavRef} data-employee-nav className={mobileTabsClassName} aria-label={t("Employee sections")} inert={isMobileTabsCollapsed}>

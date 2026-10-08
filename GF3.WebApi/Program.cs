@@ -47,6 +47,7 @@ static void ConfigureCommonMiddleware(WebApplication app)
         apiBranch =>
         {
             apiBranch.UseMiddleware<ApiExceptionMiddleware>();
+            apiBranch.UseMiddleware<RegulationAcceptanceGuardMiddleware>();
             apiBranch.UseMiddleware<EmployeePresenceMiddleware>();
             apiBranch.UseMiddleware<AdminToolsGuardMiddleware>();
         });

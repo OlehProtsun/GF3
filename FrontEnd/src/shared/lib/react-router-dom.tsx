@@ -20,6 +20,7 @@ type PendingNavigationAttempt =
   | {
       kind: "push";
       location: RouterLocation;
+      replace?: boolean;
     }
   | {
       kind: "delta";
@@ -28,7 +29,7 @@ type PendingNavigationAttempt =
 
 type RouterContextValue = {
   location: RouterLocation;
-  navigate: (to: NavigateTo) => void;
+  navigate: (to: NavigateTo, options?: { replace?: boolean }) => void;
   setNavigationBlocker: (blocker: NavigationBlocker | null) => void;
   proceedBlockedNavigation: () => void;
   cancelBlockedNavigation: () => void;
@@ -113,10 +114,14 @@ export function BrowserRouter({ children }: PropsWithChildren) {
     setLocation(nextLocation);
   }, []);
 
-  const commitPushNavigation = useCallback((nextLocation: RouterLocation) => {
-    const nextHistoryIndex = historyIndexRef.current + 1;
+  const commitPushNavigation = useCallback((nextLocation: RouterLocation, replace = false) => {
+    const nextHistoryIndex = historyIndexRef.current + (replace ? 0 : 1);
     historyIndexRef.current = nextHistoryIndex;
-    window.history.pushState(createRouterHistoryState(nextHistoryIndex), "", toLocationHref(nextLocation));
+    if (replace) {
+      window.history.replaceState(createRouterHistoryState(nextHistoryIndex), "", toLocationHref(nextLocation));
+    } else {
+      window.history.pushState(createRouterHistoryState(nextHistoryIndex), "", toLocationHref(nextLocation));
+    }
     updateLocation(nextLocation);
   }, [updateLocation]);
 
@@ -133,7 +138,7 @@ export function BrowserRouter({ children }: PropsWithChildren) {
     pendingNavigationRef.current = null;
 
     if (pendingNavigation.kind === "push") {
-      commitPushNavigation(pendingNavigation.location);
+      commitPushNavigation(pendingNavigation.location, pendingNavigation.replace);
       return;
     }
 
@@ -204,7 +209,7 @@ export function BrowserRouter({ children }: PropsWithChildren) {
     return () => window.removeEventListener("popstate", onPopState);
   }, [updateLocation]);
 
-  const navigate = useCallback((to: NavigateTo) => {
+  const navigate = useCallback((to: NavigateTo, options?: { replace?: boolean }) => {
     if (typeof to === "number") {
       if (to === 0) {
         return;
@@ -230,12 +235,12 @@ export function BrowserRouter({ children }: PropsWithChildren) {
 
     const blocker = navigationBlockerRef.current;
     if (blocker?.shouldBlock(nextLocation)) {
-      pendingNavigationRef.current = { kind: "push", location: nextLocation };
+      pendingNavigationRef.current = { kind: "push", location: nextLocation, replace: options?.replace };
       blocker.onBlocked();
       return;
     }
 
-    commitPushNavigation(nextLocation);
+    commitPushNavigation(nextLocation, options?.replace);
   }, [commitPushNavigation]);
 
   const value = useMemo(
@@ -372,14 +377,15 @@ export function NavLink({ to, className, children, ...rest }: NavLinkProps) {
 
 type NavigateProps = {
   to: string;
+  replace?: boolean;
 };
 
-export function Navigate({ to }: NavigateProps) {
+export function Navigate({ to, replace = false }: NavigateProps) {
   const navigate = useNavigate();
 
   useEffect(() => {
-    navigate(to);
-  }, [navigate, to]);
+    navigate(to, { replace });
+  }, [navigate, to, replace]);
 
   return null;
 }

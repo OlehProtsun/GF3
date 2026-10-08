@@ -1,14 +1,14 @@
 {
-  "schemaVersion": "1.0.0",
+  "schemaVersion": "1.1.0",
   "project": {
     "name": "GF3",
     "repository": "https://github.com/OlehProtsun/GF3",
     "frontendRoot": "FrontEnd",
     "branch": "DEV2",
-    "commit": "b4a08ad",
-    "artifactPurpose": "Descriptive design-reference snapshot of existing frontend UI.",
+    "commit": "d8e752a8b75c8f1542fdb1d95a80b2ab39e1ad38",
+    "artifactPurpose": "Descriptive UI design, interaction and motion snapshot for future presentation and scene planning.",
     "runtimeSourceOfTruth": false,
-    "sourceOfTruth": "React, TypeScript and CSS at b4a08ad remain authoritative.",
+    "sourceOfTruth": "React, TypeScript and CSS at d8e752a8b75c8f1542fdb1d95a80b2ab39e1ad38 remain authoritative; privilege metadata includes the Task A execution delta.",
     "scope": "User-visible frontend design and UI composition; excludes backend and domain architecture."
   },
   "foundations": {
@@ -487,7 +487,8 @@
             "path": "FrontEnd/src/shared/ui/motion.css",
             "symbolOrSelector": "@keyframes gf3-press, :where(button, a[role=\"button\"]):active"
           }
-        ]
+        ],
+        "reducedMotion": "Shared motion.css disables this animation with !important under reduce."
       },
       {
         "id": "list-stagger",
@@ -507,7 +508,8 @@
             "path": "FrontEnd/src/shared/ui/motion.css",
             "symbolOrSelector": "[data-motion-list]"
           }
-        ]
+        ],
+        "reducedMotion": "Shared motion.css disables this animation with !important under reduce."
       },
       {
         "id": "employee-motion",
@@ -534,6 +536,48 @@
           {
             "path": "FrontEnd/src/shared/ui/motion.css",
             "symbolOrSelector": "@keyframes gf3-employee-enter"
+          }
+        ]
+      },
+      {
+        "id": "route-transition",
+        "value": {
+          "managerSeconds": 0.22,
+          "employeeSeconds": 0.62,
+          "fromOpacity": {
+            "manager": 0.55,
+            "employee": 0.15
+          },
+          "toOpacity": 1,
+          "ease": "power2.out",
+          "clearProps": "opacity",
+          "conditions": "Route changes; employee /schedule skipped; no reduced-motion condition in this source"
+        },
+        "semanticRole": "GSAP parent page opacity transition",
+        "sources": [
+          {
+            "path": "FrontEnd/src/app/router/PageTransition.tsx",
+            "symbolOrSelector": "PageTransition"
+          }
+        ]
+      },
+      {
+        "id": "employee-gsap-reveal",
+        "value": {
+          "seconds": 0.68,
+          "opacity": 0,
+          "y": 26,
+          "scale": 0.975,
+          "ease": "power2.out",
+          "staggerSeconds": 0.06,
+          "staggerCapIndex": 4,
+          "conditions": "New/changed data-employee-motion nodes; from-top excluded; schedule presets described by employee-schedule-page.motion; reduced motion skips reveals"
+        },
+        "semanticRole": "Employee node reveals",
+        "sources": [
+          {
+            "path": "FrontEnd/src/app/layouts/employee-workspace-layout/useEmployeeMotion.ts",
+            "symbolOrSelector": "reveal"
           }
         ]
       }
@@ -1630,7 +1674,8 @@
           "label": "Information",
           "path": "/information",
           "iconRef": "info-icon",
-          "localized": true
+          "localized": true,
+          "visibility": "Manager session with isSystemManager === true"
         },
         {
           "label": "Message",
@@ -1642,7 +1687,8 @@
           "label": "DataBase",
           "path": "/database",
           "iconRef": "database-icon",
-          "localized": true
+          "localized": true,
+          "visibility": "Manager session with isSystemManager === true"
         },
         {
           "label": "Manager",
@@ -1700,7 +1746,8 @@
       "interactions": [
         "Collapse/footer/open-tab toggle state",
         "Backdrop click collapses",
-        "Logout action invokes logout"
+        "Logout action invokes logout",
+        "Information and the entire Settings section require manager role and isSystemManager === true; other manager navigation, profile, news and notepad remain available."
       ],
       "accessibility": [
         "NavLink aria-label; decorative navLabel aria-hidden",
@@ -1709,7 +1756,17 @@
       ],
       "localization": {
         "mode": "t(...) navigation/actions; account identity dynamic"
-      }
+      },
+      "accessSources": [
+        {
+          "path": "FrontEnd/src/app/router/AppRouter.tsx",
+          "symbolOrSelector": "RoutedContent"
+        },
+        {
+          "path": "FrontEnd/src/app/layouts/overlay-sidebar-layout/OverlaySidebarLayout.tsx",
+          "symbolOrSelector": "OverlaySidebarLayout"
+        }
+      ]
     },
     {
       "id": "employee-workspace",
@@ -1737,7 +1794,7 @@
         "Fixed bottom mobile tabs",
         "Collapse/open navigation controls",
         "Unread dots",
-        "Animated navigation indicator"
+        "Desktop animated navigation indicator; mobile active pill with only active label visible"
       ],
       "navigation": [
         {
@@ -1796,10 +1853,10 @@
           "bottomPadding": "82px + safe-area; collapsed 58px + safe-area"
         },
         "mobileTabs": {
-          "radius": "22px",
+          "radius": "999px",
           "glass": "rgba(255,255,255,0.16)",
           "blur": "20px saturate(180%)",
-          "grid": "5 equal tabs plus collapse control"
+          "grid": "Flex row: five tabs plus fixed collapse control; active tab flex-grow 2.1, inactive tabs flex-grow 1"
         },
         "unreadDot": {
           "size": "5px",
@@ -1807,8 +1864,8 @@
         },
         "active": {
           "color": "#1d4ed8",
-          "iconTranslate": "0 -3px",
-          "iconScale": 1.12
+          "iconTranslate": "Desktop: 0 -3px; mobile: 0 0",
+          "iconScale": "Desktop: 1.12; mobile: 1.06"
         },
         "swapOverride": {
           "maxWidth": "100%",
@@ -1843,10 +1900,20 @@
         "nav aria-label Employee sections",
         "Explicit aria-current=page for exact item path",
         "Unread updates included in aria-label; dot/indicator decorative",
-        "Collapsed mobile navigation inert; hidden open control inert"
+        "Collapsed mobile navigation inert; hidden open control inert",
+        "Mobile visual labels aria-hidden; each link retains localized aria-label and unread feedback."
       ],
       "localization": {
         "mode": "t(...) labels including compact mobile labels; identity/news dynamic"
+      },
+      "motion": {
+        "source": {
+          "path": "FrontEnd/src/app/layouts/employee-workspace-layout/EmployeeWorkspaceLayout.module.css",
+          "symbolOrSelector": ".mobileTab, .mobileTabLabel"
+        },
+        "mobile": "Flex, gap, backgrounds, border, shadow and label position/max-width 320ms var(--motion-ease); color/opacity 200ms ease; icon translate/scale 420ms var(--motion-ease).",
+        "navigation": "Desktop indicator GSAP 0.56s power2.inOut; set immediately on initial positioning/resize or reduced motion. Mobile has no indicator.",
+        "reveal": "useEmployeeMotion skips GSAP reveals when reduced motion is requested; layout CSS retains its existing employee overrides."
       }
     },
     {
@@ -3681,7 +3748,8 @@
         "shadow: default | soft",
         "ariaDescribedBy/ariaLabel",
         "className",
-        "onChange"
+        "onChange",
+        "leadingIcon?: ReactNode (decorative)"
       ],
       "variants": [
         "default",
@@ -3716,6 +3784,11 @@
           "id": "searchable-select-4",
           "type": "presentation",
           "purpose": "Empty message"
+        },
+        {
+          "id": "leading-icon",
+          "type": "presentation",
+          "purpose": "Optional 26px icon tile, 9px radius, blue on #eff6ff; long selected label ellipsizes"
         }
       ],
       "states": [
@@ -3762,7 +3835,8 @@
       "interactions": [
         "Open focuses search if enabled",
         "Outside mousedown/Escape close and clear search",
-        "Select invokes onChange and closes"
+        "Select invokes onChange and closes",
+        "Dropdown enters 160ms shared reveal/ease; reduced motion disables entrance, transitions and press transforms."
       ],
       "accessibility": [
         "aria-haspopup=listbox",
@@ -3963,7 +4037,8 @@
       ],
       "interactions": [
         "Escape/backdrop mousedown cancel unless cancelDisabled",
-        "Confirm/cancel callbacks"
+        "Confirm/cancel callbacks",
+        "Shared ViewportOverlay surface entrance is disabled under prefers-reduced-motion: reduce."
       ],
       "accessibility": [
         "Open role=dialog aria-modal; title/message IDs",
@@ -4063,7 +4138,8 @@
         "Reduced motion disables spinner"
       ],
       "interactions": [
-        "Appears after delay; inactive hides immediately; no dismiss action"
+        "Appears after delay; inactive hides immediately; no dismiss action",
+        "Shared ViewportOverlay surface entrance is disabled under prefers-reduced-motion: reduce."
       ],
       "accessibility": [
         "role=status aria-live=polite; title/message associations",
@@ -5643,7 +5719,8 @@
         "cellErrors/validationSignal",
         "styleMap/dayConflictMap/visualHintMap/visualHintDetailMap",
         "staffing counts",
-        "column/cell/selection/shortcut/hint callbacks"
+        "column/cell/selection/shortcut/hint callbacks",
+        "headerClassName/titleClassName/headerRightClassName merged with compact header classes"
       ],
       "variants": [],
       "elements": [
@@ -6208,7 +6285,8 @@
       },
       "responsive": [],
       "interactions": [
-        "Select message; previous/next; dismiss/suppress through existing controls"
+        "Select message; previous/next; dismiss/suppress through existing controls",
+        "Shared ViewportOverlay surface entrance is disabled under prefers-reduced-motion: reduce."
       ],
       "accessibility": [
         "role=dialog aria-modal aria-labelledby; content aria-live=polite; pagination aria-current; localized buttons"
@@ -6424,7 +6502,7 @@
         {
           "id": "phone-keypad",
           "type": "control",
-          "purpose": "1–9, 0, delete; six PIN dots",
+          "purpose": "1â€“9, 0, delete; six PIN dots",
           "action": "Sixth digit automatically submits; touch/pointer activation deduplicated",
           "states": [
             "username-empty-disabled",
@@ -8516,7 +8594,8 @@
       "accessibility": [
         "Logging/audience/day aria-pressed; audience role=group",
         "time dateTime; localized delete/search aria-labels"
-      ]
+      ],
+      "requiresSystemManager": true
     },
     {
       "id": "communications-page",
@@ -8870,7 +8949,8 @@
       "accessibility": [
         "Developer dialog role=dialog aria-modal, labelled/described IDs; error role=alert",
         "Native select, labels, textareas and result tables"
-      ]
+      ],
+      "requiresSystemManager": true
     },
     {
       "id": "manager-account-page",
@@ -9337,6 +9417,22 @@
         {
           "path": "FrontEnd/src/pages/shared/EmployeeWorkspacePage.module.css",
           "symbolOrSelector": ".page, .panel"
+        },
+        {
+          "path": "FrontEnd/src/pages/employee-schedule/ui/EmployeeScheduleHero.module.css",
+          "symbolOrSelector": ".hero"
+        },
+        {
+          "path": "FrontEnd/src/pages/employee-schedule/ui/EmployeeScheduleSelectDialog.module.css",
+          "symbolOrSelector": ".overlay, .sheet, .row"
+        },
+        {
+          "path": "FrontEnd/src/pages/employee-schedule/ui/EmployeeScheduleColumnOrderDialog.module.css",
+          "symbolOrSelector": ".overlay, .dialog, .row"
+        },
+        {
+          "path": "FrontEnd/src/pages/employee-schedule/ui/EmployeeShiftCorrectionDialog.module.css",
+          "symbolOrSelector": ".overlay, .dialog, .stepSection"
         }
       ],
       "layoutRef": "employee-workspace",
@@ -9357,7 +9453,7 @@
         },
         {
           "id": "public",
-          "purpose": "Published schedule cards, month/year and last update"
+          "purpose": "Published schedule selector within the shared matrix/daily header; selected name, month/year, last update and Adjust action"
         },
         {
           "id": "schedule",
@@ -9367,10 +9463,6 @@
         {
           "id": "summary",
           "purpose": "Work hours summary with month/year selectors and total table"
-        },
-        {
-          "id": "salary",
-          "purpose": "Salary calculator: hours/rate, calculate/reset and estimated pay"
         }
       ],
       "controls": [
@@ -9378,7 +9470,7 @@
           "id": "schedule-select",
           "type": "control",
           "purpose": "Select published schedule",
-          "action": "Switch active schedule",
+          "action": "Open schedule selection modal; choosing a row switches schedule and closes modal",
           "states": []
         },
         {
@@ -9423,13 +9515,6 @@
           "componentRef": "searchable-select",
           "action": "Filter summary",
           "states": []
-        },
-        {
-          "id": "salary",
-          "type": "control",
-          "purpose": "Hours/rate Calculate/Reset",
-          "action": "Calculate displayed estimate",
-          "states": []
         }
       ],
       "dialogs": [
@@ -9447,13 +9532,25 @@
         },
         {
           "id": "correction",
-          "purpose": "EmployeeShiftCorrectionDialog: workday, start/end edge, time input and ±30 minutes, comparison, Cancel/Send request",
+          "purpose": "EmployeeShiftCorrectionDialog: workday, start/end edge, time input and Â±30 minutes, comparison, Cancel/Send request",
           "source": {
             "path": "FrontEnd/src/pages/employee-schedule/ui/EmployeeShiftCorrectionDialog.tsx",
             "symbolOrSelector": "EmployeeShiftCorrectionDialog"
           },
           "states": [
             "open",
+            "closed"
+          ]
+        },
+        {
+          "id": "schedule-select",
+          "purpose": "EmployeeScheduleSelectDialog: synthetic schedule name, localized month/year and last update; selected row; Close/Escape/backdrop",
+          "source": {
+            "path": "FrontEnd/src/pages/employee-schedule/ui/EmployeeScheduleSelectDialog.tsx",
+            "symbolOrSelector": "EmployeeScheduleSelectDialog"
+          },
+          "states": [
+            "schedule-select-open",
             "closed"
           ]
         }
@@ -9469,34 +9566,43 @@
         "pdf-error",
         "preference-error",
         "correction-pending/success",
-        "salary-estimate"
+        "schedule-select-open"
       ],
       "responsive": [
         {
-          "value": "(max-width: 760px)",
+          "value": "(max-width: 520px)",
           "owner": "employee-schedule-page",
-          "effect": "Hours summary heading stacks",
+          "effect": "Compact summary table columns and daily date/workers gutters",
           "source": {
             "path": "FrontEnd/src/pages/employee-schedule/ui/EmployeeSchedulePage.module.css",
-            "symbolOrSelector": "@media (max-width: 760px)"
+            "symbolOrSelector": "@media (max-width: 520px)"
           }
         },
         {
           "value": "(max-width: 640px)",
           "owner": "employee-schedule-page",
-          "effect": "Calculator form two fields plus 46px action; result spans two columns",
+          "effect": "Schedule selector becomes bottom sheet, full width, 26px top corners, safe-area padding; entrance offset 24px and scale 1",
           "source": {
-            "path": "FrontEnd/src/pages/employee-schedule/ui/EmployeeSchedulePage.module.css",
+            "path": "FrontEnd/src/pages/employee-schedule/ui/EmployeeScheduleSelectDialog.module.css",
             "symbolOrSelector": "@media (max-width: 640px)"
           }
         },
         {
-          "value": "(max-width: 520px)",
+          "value": "(max-width: 859px)",
           "owner": "employee-schedule-page",
-          "effect": "Summary selectors stretch",
+          "effect": "Schedule shell starts at viewport top; hero has square top corners and safe-area top padding",
           "source": {
-            "path": "FrontEnd/src/pages/employee-schedule/ui/EmployeeSchedulePage.module.css",
-            "symbolOrSelector": "@media (max-width: 520px)"
+            "path": "FrontEnd/src/pages/employee-schedule/ui/EmployeeScheduleHero.module.css",
+            "symbolOrSelector": "@media (max-width: 859px)"
+          }
+        },
+        {
+          "value": "(max-width: 360px)",
+          "owner": "employee-schedule-page",
+          "effect": "Compact hero padding, clock and greeting text",
+          "source": {
+            "path": "FrontEnd/src/pages/employee-schedule/ui/EmployeeScheduleHero.module.css",
+            "symbolOrSelector": "@media (max-width: 360px)"
           }
         }
       ],
@@ -9504,15 +9610,44 @@
         "No schedules -> Availability link"
       ],
       "localization": {
-        "mode": "Semantic labels, actions, placeholders and feedback use t(...); identifiers, user content and literal technical values remain dynamic/literal",
+        "mode": "Semantic labels, actions, placeholders and feedback use t(...); identifiers, user content and literal technical values remain dynamic/literal; selected-schedule trigger, selection dialog and Updated {0} have Polish translations in shared/i18n/pl.json.",
         "dynamicContent": "Describe presentation formats; do not persist live record values"
       },
       "accessibility": [
         "Schedule aria-pressed; daily tablist/tab/tabpanel",
         "Summary role=table/row/columnheader/cell",
-        "Correction success role=status; calculator output aria-live=polite",
-        "Dialogs aria-modal with labelled titles"
-      ]
+        "Dialogs aria-modal with labelled titles",
+        "Correction success role=status; schedule selector aria-haspopup=dialog and aria-expanded; selection modal traps Tab, focuses selected row and restores focus."
+      ],
+      "motion": {
+        "sourceRefs": [
+          {
+            "path": "FrontEnd/src/app/layouts/employee-workspace-layout/useEmployeeMotion.ts",
+            "symbolOrSelector": "presets, reveal"
+          },
+          {
+            "path": "FrontEnd/src/pages/employee-schedule/ui/EmployeeScheduleHero.module.css",
+            "symbolOrSelector": "hero-enter, hero-detail-enter"
+          },
+          {
+            "path": "FrontEnd/src/pages/employee-schedule/ui/EmployeeScheduleSelectDialog.module.css",
+            "symbolOrSelector": "overlay-enter, surface-enter, item-enter"
+          },
+          {
+            "path": "FrontEnd/src/pages/employee-schedule/ui/EmployeeScheduleColumnOrderDialog.module.css",
+            "symbolOrSelector": "overlay-enter, surface-enter, item-enter"
+          },
+          {
+            "path": "FrontEnd/src/pages/employee-schedule/ui/EmployeeShiftCorrectionDialog.module.css",
+            "symbolOrSelector": "overlay-enter, surface-enter, item-enter"
+          }
+        ],
+        "hero": "640ms cubic-bezier(.22,.61,.36,1), opacity .35 and y -24px to 1/0; heading/shifts 420ms at 70/120ms; day 360ms at 170ms then 220ms.",
+        "sections": "GSAP power2.out: schedule-panel 0.52s from opacity .35/y18/scale1; schedule-content 0.42s from .45/y12/.99; schedule-value 0.3s from .6/y0/.96; stagger min(index,4)*.045s; data-motion-key retriggers changed content.",
+        "dialogs": "Overlay 180ms ease; surface 300ms shared ease from opacity0/y14/scale.99; selection mobile y24/scale1. Selection/column rows 240ms, delays 0/25/50/75/100/125ms; correction step sections 280ms, 30/65ms; feedback 200ms.",
+        "controls": "180ms shared ease transforms, borders/background/shadow; selection chevron rotates 45 to 225 degrees. Daily selected tab scrolls smoothly unless reduced motion.",
+        "reducedMotion": "Hero/dialog/control CSS disables animations/transitions; GSAP reveal skipped; daily scroll becomes auto; parent PageTransition is skipped for employee /schedule."
+      }
     },
     {
       "id": "employee-swap-page",
@@ -9592,7 +9727,7 @@
           "id": "accept",
           "type": "control",
           "purpose": "Accept eligible offer",
-          "action": "Accept",
+          "action": "Open acceptance confirmation; no mutation until Accept shift is confirmed",
           "states": [
             "busy/unavailable-disabled"
           ]
@@ -9655,6 +9790,26 @@
           "purpose": "Swap history / History",
           "action": "Open history dialog",
           "states": []
+        },
+        {
+          "id": "confirm-accept",
+          "type": "control",
+          "purpose": "Accept shift confirmation",
+          "componentRef": "confirm-dialog",
+          "action": "Revalidate current open/canAccept offer, then submit once; success closes dialog; stale/failing offer closes and refreshes queries",
+          "states": [
+            "submitting-disabled"
+          ]
+        },
+        {
+          "id": "back-accept",
+          "type": "control",
+          "purpose": "Back from acceptance confirmation",
+          "componentRef": "confirm-dialog",
+          "action": "Close without accepting; disabled during submission",
+          "states": [
+            "submitting-disabled"
+          ]
         }
       ],
       "dialogs": [
@@ -9702,6 +9857,20 @@
             "open",
             "closed"
           ]
+        },
+        {
+          "id": "acceptance",
+          "purpose": "Accept this shift? Synthetic giver/open shift, schedule/shop/date/time/hours summary; Accept shift or Back; both disabled in flight; portal to document.body",
+          "componentRef": "confirm-dialog",
+          "source": {
+            "path": "FrontEnd/src/pages/employee-swap/ui/EmployeeSwapPage.tsx",
+            "symbolOrSelector": "EmployeeSwapPage"
+          },
+          "states": [
+            "acceptance-open",
+            "acceptance-submitting",
+            "closed"
+          ]
         }
       ],
       "states": [
@@ -9718,7 +9887,10 @@
         "cancelled",
         "schedule-locked",
         "unavailable-reason",
-        "public/private-receiver"
+        "public/private-receiver",
+        "acceptance-open",
+        "acceptance-submitting",
+        "offer-no-longer-available"
       ],
       "responsive": [
         {
@@ -9762,14 +9934,15 @@
         "Creation/history stay on page"
       ],
       "localization": {
-        "mode": "Semantic labels, actions, placeholders and feedback use t(...); identifiers, user content and literal technical values remain dynamic/literal",
+        "mode": "Semantic labels, actions, placeholders and feedback use t(...); identifiers, user content and literal technical values remain dynamic/literal; acceptance title, summary, Accept shift and stale-offer feedback have Polish translations in shared/i18n/pl.json.",
         "dynamicContent": "Describe presentation formats; do not persist live record values"
       },
       "accessibility": [
         "Filters/pins/schedules aria-pressed",
         "Create/history aria-expanded and aria-controls",
         "Native dialog labelled headings; close/cancel handling",
-        "Offer card keyboard expansion handlers; labeled search/actions"
+        "Offer card keyboard expansion handlers; labeled search/actions",
+        "Acceptance reuses ConfirmDialog labelled modal, Escape/backdrop cancellation; cancellation blocked while accepting."
       ]
     },
     {
@@ -10026,7 +10199,8 @@
     {
       "role": "manager",
       "path": "/information",
-      "pageRef": "information-page"
+      "pageRef": "information-page",
+      "requiresSystemManager": true
     },
     {
       "role": "manager",
@@ -10036,7 +10210,8 @@
     {
       "role": "manager",
       "path": "/database",
-      "pageRef": "database-page"
+      "pageRef": "database-page",
+      "requiresSystemManager": true
     },
     {
       "role": "manager",
@@ -10527,5 +10702,1746 @@
     "Update project.branch and project.commit when intentionally refreshing the full snapshot.",
     "Keep IDs stable unless the underlying design entity is removed or renamed.",
     "Do not make runtime code depend on this file without a separate architectural decision."
-  ]
+  ],
+  "presentationCapture": {
+    "purpose": "Static guide for future UI showcase scene planning; not an executable capture script.",
+    "snapshotCommit": "d8e752a8b75c8f1542fdb1d95a80b2ab39e1ad38",
+    "dataPolicy": "Synthetic-only demo fixtures. Redact or hide credentials, private names, access tokens, sensitive admin SQL, personal logs and business records.",
+    "viewports": [
+      {
+        "id": "desktop",
+        "width": 1440,
+        "height": 900,
+        "pixelRatio": 1
+      },
+      {
+        "id": "mobile",
+        "width": 390,
+        "height": 844,
+        "pixelRatio": 1
+      }
+    ],
+    "scenes": [
+      {
+        "id": "public-login-page-login",
+        "role": "public",
+        "path": "/login",
+        "pageRef": "login-page",
+        "layoutRef": "public-auth",
+        "requiresSystemManager": false,
+        "viewportRefs": [
+          "desktop",
+          "mobile"
+        ],
+        "initialState": "default",
+        "captureStates": [
+          "pc",
+          "phone",
+          "bootstrap-error",
+          "submit-error",
+          "submitting",
+          "password-changed-success"
+        ],
+        "controlRefs": [
+          "username",
+          "password-mode",
+          "pc-password",
+          "phone-keypad",
+          "forgot-password",
+          "sign-in"
+        ],
+        "dialogRefs": [],
+        "motionRefs": [
+          "route-transition",
+          "shared-press"
+        ],
+        "fixtureNeeds": [
+          "synthetic sign-in account; hide credential entry"
+        ],
+        "sourceRefs": [
+          {
+            "path": "FrontEnd/src/pages/login/ui/LoginPage.tsx",
+            "symbolOrSelector": "LoginPage"
+          },
+          {
+            "path": "FrontEnd/src/app/router/AppRouter.tsx",
+            "symbolOrSelector": "RoutedContent"
+          }
+        ]
+      },
+      {
+        "id": "public-password-recovery-page-password-recovery",
+        "role": "public",
+        "path": "/password-recovery",
+        "pageRef": "password-recovery-page",
+        "layoutRef": "public-auth",
+        "requiresSystemManager": false,
+        "viewportRefs": [
+          "desktop",
+          "mobile"
+        ],
+        "initialState": "default",
+        "captureStates": [
+          "sending-code",
+          "code-delivered",
+          "confirming",
+          "field-error",
+          "request-error",
+          "password-updated-success"
+        ],
+        "controlRefs": [
+          "username",
+          "send-code",
+          "code",
+          "new-password",
+          "change-password",
+          "back"
+        ],
+        "dialogRefs": [],
+        "motionRefs": [
+          "route-transition",
+          "shared-press"
+        ],
+        "fixtureNeeds": [
+          "synthetic recovery flow; hide credential and code entry"
+        ],
+        "sourceRefs": [
+          {
+            "path": "FrontEnd/src/pages/password-recovery/ui/PasswordRecoveryPage.tsx",
+            "symbolOrSelector": "PasswordRecoveryPage"
+          },
+          {
+            "path": "FrontEnd/src/app/router/AppRouter.tsx",
+            "symbolOrSelector": "RoutedContent"
+          },
+          {
+            "path": "FrontEnd/src/pages/login/ui/LoginPage.tsx",
+            "symbolOrSelector": "LoginPage"
+          }
+        ]
+      },
+      {
+        "id": "manager-home-page-root",
+        "role": "manager",
+        "path": "/",
+        "pageRef": "home-page",
+        "layoutRef": "manager-overlay-sidebar",
+        "requiresSystemManager": false,
+        "viewportRefs": [
+          "desktop",
+          "mobile"
+        ],
+        "initialState": "default",
+        "captureStates": [
+          "loading-day/month/previews",
+          "load-error",
+          "empty-today/month/schedules",
+          "month-expanded/collapsed",
+          "schedule-expanded/collapsed",
+          "focused-schedule",
+          "open",
+          "closed"
+        ],
+        "controlRefs": [
+          "employee-focus",
+          "month-collapse",
+          "expand-collapse-all",
+          "schedule-open",
+          "card-expand"
+        ],
+        "dialogRefs": [
+          "related-hint"
+        ],
+        "motionRefs": [
+          "route-transition",
+          "shared-press"
+        ],
+        "fixtureNeeds": [
+          "an authenticated synthetic manager account",
+          "synthetic schedules and day/month assignments"
+        ],
+        "sourceRefs": [
+          {
+            "path": "FrontEnd/src/pages/home/ui/HomePage.tsx",
+            "symbolOrSelector": "HomePage"
+          },
+          {
+            "path": "FrontEnd/src/app/router/AppRouter.tsx",
+            "symbolOrSelector": "RoutedContent"
+          },
+          {
+            "path": "FrontEnd/src/app/layouts/overlay-sidebar-layout/OverlaySidebarLayout.tsx",
+            "symbolOrSelector": "OverlaySidebarLayout"
+          }
+        ]
+      },
+      {
+        "id": "manager-shop-list-page-shop",
+        "role": "manager",
+        "path": "/shop",
+        "pageRef": "shop-list-page",
+        "layoutRef": "manager-overlay-sidebar",
+        "requiresSystemManager": false,
+        "viewportRefs": [
+          "desktop",
+          "mobile"
+        ],
+        "initialState": "default",
+        "captureStates": [
+          "loading",
+          "load-error",
+          "empty",
+          "search-empty",
+          "pinned"
+        ],
+        "controlRefs": [
+          "search",
+          "add",
+          "clear",
+          "open-record"
+        ],
+        "dialogRefs": [],
+        "motionRefs": [
+          "route-transition",
+          "shared-press"
+        ],
+        "fixtureNeeds": [
+          "an authenticated synthetic manager account",
+          "at least one mock shop"
+        ],
+        "sourceRefs": [
+          {
+            "path": "FrontEnd/src/pages/shop-list/ui/ShopListPage.tsx",
+            "symbolOrSelector": "ShopListPage"
+          },
+          {
+            "path": "FrontEnd/src/app/router/AppRouter.tsx",
+            "symbolOrSelector": "RoutedContent"
+          },
+          {
+            "path": "FrontEnd/src/app/layouts/overlay-sidebar-layout/OverlaySidebarLayout.tsx",
+            "symbolOrSelector": "OverlaySidebarLayout"
+          }
+        ]
+      },
+      {
+        "id": "manager-shop-edit-page-shop-new",
+        "role": "manager",
+        "path": "/shop/new",
+        "pageRef": "shop-edit-page",
+        "layoutRef": "manager-overlay-sidebar",
+        "requiresSystemManager": false,
+        "viewportRefs": [
+          "desktop",
+          "mobile"
+        ],
+        "initialState": "create",
+        "captureStates": [
+          "create",
+          "edit",
+          "loading",
+          "load-error",
+          "checking-lock",
+          "locked",
+          "dirty",
+          "field-errors",
+          "saving",
+          "open",
+          "closed"
+        ],
+        "controlRefs": [
+          "fields",
+          "cancel",
+          "save"
+        ],
+        "dialogRefs": [
+          "checking-lock",
+          "edit-lock",
+          "unsaved",
+          "saving"
+        ],
+        "motionRefs": [
+          "route-transition",
+          "shared-press"
+        ],
+        "fixtureNeeds": [
+          "an authenticated synthetic manager account",
+          "mock shop edit data"
+        ],
+        "sourceRefs": [
+          {
+            "path": "FrontEnd/src/pages/shop-edit/ui/ShopEditPage.tsx",
+            "symbolOrSelector": "ShopEditPage"
+          },
+          {
+            "path": "FrontEnd/src/app/router/AppRouter.tsx",
+            "symbolOrSelector": "RoutedContent"
+          },
+          {
+            "path": "FrontEnd/src/app/layouts/overlay-sidebar-layout/OverlaySidebarLayout.tsx",
+            "symbolOrSelector": "OverlaySidebarLayout"
+          }
+        ]
+      },
+      {
+        "id": "manager-shop-profile-page-shop-shopId",
+        "role": "manager",
+        "path": "/shop/:shopId",
+        "pageRef": "shop-profile-page",
+        "layoutRef": "manager-overlay-sidebar",
+        "requiresSystemManager": false,
+        "viewportRefs": [
+          "desktop",
+          "mobile"
+        ],
+        "initialState": "default",
+        "captureStates": [
+          "loading",
+          "invalid-id/load-error",
+          "loaded",
+          "deleting",
+          "open",
+          "closed"
+        ],
+        "controlRefs": [
+          "edit",
+          "delete"
+        ],
+        "dialogRefs": [
+          "delete"
+        ],
+        "motionRefs": [
+          "route-transition",
+          "shared-press"
+        ],
+        "fixtureNeeds": [
+          "an authenticated synthetic manager account",
+          "a mock shop and synthetic shopId"
+        ],
+        "sourceRefs": [
+          {
+            "path": "FrontEnd/src/pages/shop-profile/ui/ShopProfilePage.tsx",
+            "symbolOrSelector": "ShopProfilePage"
+          },
+          {
+            "path": "FrontEnd/src/app/router/AppRouter.tsx",
+            "symbolOrSelector": "RoutedContent"
+          },
+          {
+            "path": "FrontEnd/src/app/layouts/overlay-sidebar-layout/OverlaySidebarLayout.tsx",
+            "symbolOrSelector": "OverlaySidebarLayout"
+          }
+        ]
+      },
+      {
+        "id": "manager-shop-edit-page-shop-shopId-edit",
+        "role": "manager",
+        "path": "/shop/:shopId/edit",
+        "pageRef": "shop-edit-page",
+        "layoutRef": "manager-overlay-sidebar",
+        "requiresSystemManager": false,
+        "viewportRefs": [
+          "desktop",
+          "mobile"
+        ],
+        "initialState": "edit",
+        "captureStates": [
+          "create",
+          "edit",
+          "loading",
+          "load-error",
+          "checking-lock",
+          "locked",
+          "dirty",
+          "field-errors",
+          "saving",
+          "open",
+          "closed"
+        ],
+        "controlRefs": [
+          "fields",
+          "cancel",
+          "save"
+        ],
+        "dialogRefs": [
+          "checking-lock",
+          "edit-lock",
+          "unsaved",
+          "saving"
+        ],
+        "motionRefs": [
+          "route-transition",
+          "shared-press"
+        ],
+        "fixtureNeeds": [
+          "an authenticated synthetic manager account",
+          "mock shop edit data",
+          "a synthetic shopId resolving to the mock record"
+        ],
+        "sourceRefs": [
+          {
+            "path": "FrontEnd/src/pages/shop-edit/ui/ShopEditPage.tsx",
+            "symbolOrSelector": "ShopEditPage"
+          },
+          {
+            "path": "FrontEnd/src/app/router/AppRouter.tsx",
+            "symbolOrSelector": "RoutedContent"
+          },
+          {
+            "path": "FrontEnd/src/app/layouts/overlay-sidebar-layout/OverlaySidebarLayout.tsx",
+            "symbolOrSelector": "OverlaySidebarLayout"
+          }
+        ]
+      },
+      {
+        "id": "manager-availability-page-availability",
+        "role": "manager",
+        "path": "/availability",
+        "pageRef": "availability-page",
+        "layoutRef": "manager-overlay-sidebar",
+        "requiresSystemManager": false,
+        "viewportRefs": [
+          "desktop",
+          "mobile"
+        ],
+        "initialState": "default",
+        "captureStates": [
+          "loading",
+          "load-error",
+          "empty",
+          "search-empty",
+          "pinned"
+        ],
+        "controlRefs": [
+          "search",
+          "add",
+          "pin-open",
+          "clear"
+        ],
+        "dialogRefs": [],
+        "motionRefs": [
+          "route-transition",
+          "shared-press"
+        ],
+        "fixtureNeeds": [
+          "an authenticated synthetic manager account",
+          "mock availability windows"
+        ],
+        "sourceRefs": [
+          {
+            "path": "FrontEnd/src/pages/availability/ui/AvailabilityPage.tsx",
+            "symbolOrSelector": "AvailabilityPage"
+          },
+          {
+            "path": "FrontEnd/src/app/router/AppRouter.tsx",
+            "symbolOrSelector": "RoutedContent"
+          },
+          {
+            "path": "FrontEnd/src/app/layouts/overlay-sidebar-layout/OverlaySidebarLayout.tsx",
+            "symbolOrSelector": "OverlaySidebarLayout"
+          }
+        ]
+      },
+      {
+        "id": "manager-availability-edit-page-availability-new",
+        "role": "manager",
+        "path": "/availability/new",
+        "pageRef": "availability-edit-page",
+        "layoutRef": "manager-overlay-sidebar",
+        "requiresSystemManager": false,
+        "viewportRefs": [
+          "desktop",
+          "mobile"
+        ],
+        "initialState": "create",
+        "captureStates": [
+          "create",
+          "edit",
+          "loading",
+          "load-error",
+          "validation-error",
+          "bind-error",
+          "checking-lock",
+          "locked",
+          "dirty",
+          "saving",
+          "compact",
+          "section-collapsed",
+          "open",
+          "closed"
+        ],
+        "controlRefs": [
+          "compact",
+          "editor-controls",
+          "matrix",
+          "save"
+        ],
+        "dialogRefs": [
+          "transfer",
+          "related",
+          "remove-employee",
+          "delete-bind",
+          "edit-lock",
+          "unsaved",
+          "saving"
+        ],
+        "motionRefs": [
+          "route-transition",
+          "shared-press"
+        ],
+        "fixtureNeeds": [
+          "an authenticated synthetic manager account",
+          "mock availability edit data"
+        ],
+        "sourceRefs": [
+          {
+            "path": "FrontEnd/src/pages/availability-edit/ui/AvailabilityEditPage.tsx",
+            "symbolOrSelector": "AvailabilityEditPage"
+          },
+          {
+            "path": "FrontEnd/src/app/router/AppRouter.tsx",
+            "symbolOrSelector": "RoutedContent"
+          },
+          {
+            "path": "FrontEnd/src/app/layouts/overlay-sidebar-layout/OverlaySidebarLayout.tsx",
+            "symbolOrSelector": "OverlaySidebarLayout"
+          }
+        ]
+      },
+      {
+        "id": "manager-availability-profile-page-availability-availabilityId",
+        "role": "manager",
+        "path": "/availability/:availabilityId",
+        "pageRef": "availability-profile-page",
+        "layoutRef": "manager-overlay-sidebar",
+        "requiresSystemManager": false,
+        "viewportRefs": [
+          "desktop",
+          "mobile"
+        ],
+        "initialState": "default",
+        "captureStates": [
+          "loading",
+          "load-error",
+          "read-only",
+          "empty",
+          "sidebar-collapsed",
+          "deleting",
+          "open",
+          "closed"
+        ],
+        "controlRefs": [
+          "edit",
+          "delete",
+          "hint"
+        ],
+        "dialogRefs": [
+          "related-hint",
+          "delete"
+        ],
+        "motionRefs": [
+          "route-transition",
+          "shared-press"
+        ],
+        "fixtureNeeds": [
+          "an authenticated synthetic manager account",
+          "a mock availability window and availabilityId"
+        ],
+        "sourceRefs": [
+          {
+            "path": "FrontEnd/src/pages/availability-profile/ui/AvailabilityProfilePage.tsx",
+            "symbolOrSelector": "AvailabilityProfilePage"
+          },
+          {
+            "path": "FrontEnd/src/app/router/AppRouter.tsx",
+            "symbolOrSelector": "RoutedContent"
+          },
+          {
+            "path": "FrontEnd/src/app/layouts/overlay-sidebar-layout/OverlaySidebarLayout.tsx",
+            "symbolOrSelector": "OverlaySidebarLayout"
+          }
+        ]
+      },
+      {
+        "id": "manager-availability-edit-page-availability-availabilityId-edit",
+        "role": "manager",
+        "path": "/availability/:availabilityId/edit",
+        "pageRef": "availability-edit-page",
+        "layoutRef": "manager-overlay-sidebar",
+        "requiresSystemManager": false,
+        "viewportRefs": [
+          "desktop",
+          "mobile"
+        ],
+        "initialState": "edit",
+        "captureStates": [
+          "create",
+          "edit",
+          "loading",
+          "load-error",
+          "validation-error",
+          "bind-error",
+          "checking-lock",
+          "locked",
+          "dirty",
+          "saving",
+          "compact",
+          "section-collapsed",
+          "open",
+          "closed"
+        ],
+        "controlRefs": [
+          "compact",
+          "editor-controls",
+          "matrix",
+          "save"
+        ],
+        "dialogRefs": [
+          "transfer",
+          "related",
+          "remove-employee",
+          "delete-bind",
+          "edit-lock",
+          "unsaved",
+          "saving"
+        ],
+        "motionRefs": [
+          "route-transition",
+          "shared-press"
+        ],
+        "fixtureNeeds": [
+          "an authenticated synthetic manager account",
+          "mock availability edit data",
+          "a synthetic availabilityId resolving to the mock record"
+        ],
+        "sourceRefs": [
+          {
+            "path": "FrontEnd/src/pages/availability-edit/ui/AvailabilityEditPage.tsx",
+            "symbolOrSelector": "AvailabilityEditPage"
+          },
+          {
+            "path": "FrontEnd/src/app/router/AppRouter.tsx",
+            "symbolOrSelector": "RoutedContent"
+          },
+          {
+            "path": "FrontEnd/src/app/layouts/overlay-sidebar-layout/OverlaySidebarLayout.tsx",
+            "symbolOrSelector": "OverlaySidebarLayout"
+          }
+        ]
+      },
+      {
+        "id": "manager-container-page-container",
+        "role": "manager",
+        "path": "/container",
+        "pageRef": "container-page",
+        "layoutRef": "manager-overlay-sidebar",
+        "requiresSystemManager": false,
+        "viewportRefs": [
+          "desktop",
+          "mobile"
+        ],
+        "initialState": "default",
+        "captureStates": [
+          "list",
+          "profile",
+          "edit-create",
+          "edit-update",
+          "loading",
+          "load-error",
+          "export-error",
+          "saving",
+          "delete-pending",
+          "checking-lock",
+          "locked",
+          "dirty",
+          "open",
+          "closed"
+        ],
+        "controlRefs": [
+          "add",
+          "record-mode",
+          "export",
+          "profile-controls",
+          "save-cancel"
+        ],
+        "dialogRefs": [
+          "delete",
+          "edit-lock",
+          "unsaved",
+          "saving"
+        ],
+        "motionRefs": [
+          "route-transition",
+          "shared-press"
+        ],
+        "fixtureNeeds": [
+          "an authenticated synthetic manager account",
+          "a mock container with synthetic schedules"
+        ],
+        "sourceRefs": [
+          {
+            "path": "FrontEnd/src/pages/container/ui/ContainerPage.tsx",
+            "symbolOrSelector": "ContainerPage"
+          },
+          {
+            "path": "FrontEnd/src/app/router/AppRouter.tsx",
+            "symbolOrSelector": "RoutedContent"
+          },
+          {
+            "path": "FrontEnd/src/app/layouts/overlay-sidebar-layout/OverlaySidebarLayout.tsx",
+            "symbolOrSelector": "OverlaySidebarLayout"
+          }
+        ]
+      },
+      {
+        "id": "manager-container-graph-edit-page-container-containerId-graphs-new",
+        "role": "manager",
+        "path": "/container/:containerId/graphs/new",
+        "pageRef": "container-graph-edit-page",
+        "layoutRef": "manager-overlay-sidebar",
+        "requiresSystemManager": false,
+        "viewportRefs": [
+          "desktop",
+          "mobile"
+        ],
+        "initialState": "create",
+        "captureStates": [
+          "create",
+          "edit",
+          "load-error",
+          "checking-lock",
+          "locked",
+          "validation-error",
+          "dirty",
+          "selected-cells",
+          "compact",
+          "generating",
+          "saving",
+          "styling-busy",
+          "open",
+          "closed"
+        ],
+        "controlRefs": [
+          "compact",
+          "session",
+          "details",
+          "toolbar",
+          "preview",
+          "save"
+        ],
+        "dialogRefs": [
+          "remove",
+          "delete-bind",
+          "save-session",
+          "lock",
+          "unsaved",
+          "saving"
+        ],
+        "motionRefs": [
+          "route-transition",
+          "shared-press"
+        ],
+        "fixtureNeeds": [
+          "an authenticated synthetic manager account",
+          "mock graph edit data",
+          "a synthetic containerId resolving to the mock record"
+        ],
+        "sourceRefs": [
+          {
+            "path": "FrontEnd/src/pages/container-graph-edit/ui/ContainerGraphEditPage.tsx",
+            "symbolOrSelector": "ContainerGraphEditPage"
+          },
+          {
+            "path": "FrontEnd/src/app/router/AppRouter.tsx",
+            "symbolOrSelector": "RoutedContent"
+          },
+          {
+            "path": "FrontEnd/src/app/layouts/overlay-sidebar-layout/OverlaySidebarLayout.tsx",
+            "symbolOrSelector": "OverlaySidebarLayout"
+          }
+        ]
+      },
+      {
+        "id": "manager-container-graph-profile-page-container-containerId-graphs-graphId",
+        "role": "manager",
+        "path": "/container/:containerId/graphs/:graphId",
+        "pageRef": "container-graph-profile-page",
+        "layoutRef": "manager-overlay-sidebar",
+        "requiresSystemManager": false,
+        "viewportRefs": [
+          "desktop",
+          "mobile"
+        ],
+        "initialState": "default",
+        "captureStates": [
+          "loading",
+          "load-error",
+          "empty",
+          "compact",
+          "session-active",
+          "export-error",
+          "deleting",
+          "open",
+          "closed"
+        ],
+        "controlRefs": [
+          "export",
+          "compact",
+          "session-select",
+          "edit-all",
+          "edit-delete"
+        ],
+        "dialogRefs": [
+          "delete",
+          "edit-session"
+        ],
+        "motionRefs": [
+          "route-transition",
+          "shared-press"
+        ],
+        "fixtureNeeds": [
+          "an authenticated synthetic manager account",
+          "a mock container and graph with synthetic containerId and graphId"
+        ],
+        "sourceRefs": [
+          {
+            "path": "FrontEnd/src/pages/container-graph-profile/ui/ContainerGraphProfilePage.tsx",
+            "symbolOrSelector": "ContainerGraphProfilePage"
+          },
+          {
+            "path": "FrontEnd/src/app/router/AppRouter.tsx",
+            "symbolOrSelector": "RoutedContent"
+          },
+          {
+            "path": "FrontEnd/src/app/layouts/overlay-sidebar-layout/OverlaySidebarLayout.tsx",
+            "symbolOrSelector": "OverlaySidebarLayout"
+          }
+        ]
+      },
+      {
+        "id": "manager-container-graph-edit-page-container-containerId-graphs-graphId-edit",
+        "role": "manager",
+        "path": "/container/:containerId/graphs/:graphId/edit",
+        "pageRef": "container-graph-edit-page",
+        "layoutRef": "manager-overlay-sidebar",
+        "requiresSystemManager": false,
+        "viewportRefs": [
+          "desktop",
+          "mobile"
+        ],
+        "initialState": "edit",
+        "captureStates": [
+          "create",
+          "edit",
+          "load-error",
+          "checking-lock",
+          "locked",
+          "validation-error",
+          "dirty",
+          "selected-cells",
+          "compact",
+          "generating",
+          "saving",
+          "styling-busy",
+          "open",
+          "closed"
+        ],
+        "controlRefs": [
+          "compact",
+          "session",
+          "details",
+          "toolbar",
+          "preview",
+          "save"
+        ],
+        "dialogRefs": [
+          "remove",
+          "delete-bind",
+          "save-session",
+          "lock",
+          "unsaved",
+          "saving"
+        ],
+        "motionRefs": [
+          "route-transition",
+          "shared-press"
+        ],
+        "fixtureNeeds": [
+          "an authenticated synthetic manager account",
+          "mock graph edit data",
+          "a synthetic containerId resolving to the mock record",
+          "a synthetic graphId resolving to the mock record"
+        ],
+        "sourceRefs": [
+          {
+            "path": "FrontEnd/src/pages/container-graph-edit/ui/ContainerGraphEditPage.tsx",
+            "symbolOrSelector": "ContainerGraphEditPage"
+          },
+          {
+            "path": "FrontEnd/src/app/router/AppRouter.tsx",
+            "symbolOrSelector": "RoutedContent"
+          },
+          {
+            "path": "FrontEnd/src/app/layouts/overlay-sidebar-layout/OverlaySidebarLayout.tsx",
+            "symbolOrSelector": "OverlaySidebarLayout"
+          }
+        ]
+      },
+      {
+        "id": "manager-information-page-information",
+        "role": "manager",
+        "path": "/information",
+        "pageRef": "information-page",
+        "layoutRef": "manager-overlay-sidebar",
+        "requiresSystemManager": true,
+        "viewportRefs": [
+          "desktop",
+          "mobile"
+        ],
+        "initialState": "default",
+        "captureStates": [
+          "loading",
+          "settings-error",
+          "log-error",
+          "action-error",
+          "empty",
+          "search-empty",
+          "recording-live/paused",
+          "day-selected",
+          "delete-pending",
+          "open",
+          "closed"
+        ],
+        "controlRefs": [
+          "logging",
+          "audience",
+          "date-range",
+          "delete-range-all",
+          "day",
+          "search",
+          "delete"
+        ],
+        "dialogRefs": [
+          "delete"
+        ],
+        "motionRefs": [
+          "route-transition",
+          "shared-press"
+        ],
+        "fixtureNeeds": [
+          "an authorized synthetic system-manager account with synthetic logs"
+        ],
+        "sourceRefs": [
+          {
+            "path": "FrontEnd/src/pages/information/ui/InformationPage.tsx",
+            "symbolOrSelector": "InformationPage"
+          },
+          {
+            "path": "FrontEnd/src/app/router/AppRouter.tsx",
+            "symbolOrSelector": "RoutedContent"
+          },
+          {
+            "path": "FrontEnd/src/app/layouts/overlay-sidebar-layout/OverlaySidebarLayout.tsx",
+            "symbolOrSelector": "OverlaySidebarLayout"
+          }
+        ]
+      },
+      {
+        "id": "manager-communications-page-communications",
+        "role": "manager",
+        "path": "/communications",
+        "pageRef": "communications-page",
+        "layoutRef": "manager-overlay-sidebar",
+        "requiresSystemManager": false,
+        "viewportRefs": [
+          "desktop",
+          "mobile"
+        ],
+        "initialState": "default",
+        "captureStates": [
+          "create",
+          "edit",
+          "saving",
+          "inline-error",
+          "success",
+          "board-loading",
+          "board-error",
+          "empty",
+          "active/scheduled/expired-message",
+          "delete-pending",
+          "open",
+          "closed"
+        ],
+        "controlRefs": [
+          "title",
+          "visible-from",
+          "visible-to",
+          "message",
+          "cancel-edit",
+          "submit",
+          "edit",
+          "delete"
+        ],
+        "dialogRefs": [
+          "delete"
+        ],
+        "motionRefs": [
+          "route-transition",
+          "shared-press"
+        ],
+        "fixtureNeeds": [
+          "an authenticated synthetic manager account",
+          "synthetic messages and recipients"
+        ],
+        "sourceRefs": [
+          {
+            "path": "FrontEnd/src/pages/communications/ui/CommunicationsPage.tsx",
+            "symbolOrSelector": "CommunicationsPage"
+          },
+          {
+            "path": "FrontEnd/src/app/router/AppRouter.tsx",
+            "symbolOrSelector": "RoutedContent"
+          },
+          {
+            "path": "FrontEnd/src/app/layouts/overlay-sidebar-layout/OverlaySidebarLayout.tsx",
+            "symbolOrSelector": "OverlaySidebarLayout"
+          }
+        ]
+      },
+      {
+        "id": "manager-database-page-database",
+        "role": "manager",
+        "path": "/database",
+        "pageRef": "database-page",
+        "layoutRef": "manager-overlay-sidebar",
+        "requiresSystemManager": true,
+        "viewportRefs": [
+          "desktop",
+          "mobile"
+        ],
+        "initialState": "locked",
+        "captureStates": [
+          "locked",
+          "checking-access",
+          "unlock-error",
+          "unlocked",
+          "connecting",
+          "access-blocked",
+          "metadata-loading",
+          "empty/schema-search-empty",
+          "object-selected",
+          "query/import-success/error",
+          "write-disabled",
+          "over-limit",
+          "executing",
+          "importing",
+          "database-action-pending",
+          "open",
+          "closed"
+        ],
+        "controlRefs": [
+          "unlock",
+          "database-select",
+          "use-database",
+          "manual-copy",
+          "schema-search",
+          "object",
+          "execute",
+          "import",
+          "regulations"
+        ],
+        "dialogRefs": [
+          "developer-access"
+        ],
+        "motionRefs": [
+          "route-transition",
+          "shared-press"
+        ],
+        "fixtureNeeds": [
+          "an authorized synthetic system-manager account",
+          "isolated synthetic database and mock regulation documents",
+          "existing admin enable/local/write guards and developer access must be satisfied; never record credentials or SQL contents"
+        ],
+        "sourceRefs": [
+          {
+            "path": "FrontEnd/src/pages/database/ui/DataBasePage.tsx",
+            "symbolOrSelector": "DataBasePage"
+          },
+          {
+            "path": "FrontEnd/src/app/router/AppRouter.tsx",
+            "symbolOrSelector": "RoutedContent"
+          },
+          {
+            "path": "FrontEnd/src/app/layouts/overlay-sidebar-layout/OverlaySidebarLayout.tsx",
+            "symbolOrSelector": "OverlaySidebarLayout"
+          }
+        ]
+      },
+      {
+        "id": "manager-manager-account-page-manager-profile",
+        "role": "manager",
+        "path": "/manager-profile",
+        "pageRef": "manager-account-page",
+        "layoutRef": "manager-overlay-sidebar",
+        "requiresSystemManager": false,
+        "viewportRefs": [
+          "desktop",
+          "mobile"
+        ],
+        "initialState": "default",
+        "captureStates": [
+          "loading-profile/managers/activity",
+          "load-error",
+          "success",
+          "empty-team/activity",
+          "busy",
+          "system-account",
+          "current-manager",
+          "online/offline",
+          "delete-pending",
+          "open",
+          "closed"
+        ],
+        "controlRefs": [
+          "language",
+          "profile-fields",
+          "save",
+          "new-manager",
+          "create",
+          "delete"
+        ],
+        "dialogRefs": [
+          "delete-manager"
+        ],
+        "motionRefs": [
+          "route-transition",
+          "shared-press"
+        ],
+        "fixtureNeeds": [
+          "an authenticated synthetic manager account",
+          "synthetic manager team and activity"
+        ],
+        "sourceRefs": [
+          {
+            "path": "FrontEnd/src/pages/manager-account/ui/ManagerAccountPage.tsx",
+            "symbolOrSelector": "ManagerAccountPage"
+          },
+          {
+            "path": "FrontEnd/src/app/router/AppRouter.tsx",
+            "symbolOrSelector": "RoutedContent"
+          },
+          {
+            "path": "FrontEnd/src/app/layouts/overlay-sidebar-layout/OverlaySidebarLayout.tsx",
+            "symbolOrSelector": "OverlaySidebarLayout"
+          }
+        ]
+      },
+      {
+        "id": "manager-employee-list-page-employee",
+        "role": "manager",
+        "path": "/employee",
+        "pageRef": "employee-list-page",
+        "layoutRef": "manager-overlay-sidebar",
+        "requiresSystemManager": false,
+        "viewportRefs": [
+          "desktop",
+          "mobile"
+        ],
+        "initialState": "default",
+        "captureStates": [
+          "loading",
+          "load-error",
+          "empty",
+          "search-empty",
+          "pinned"
+        ],
+        "controlRefs": [
+          "search",
+          "add",
+          "clear",
+          "open-record"
+        ],
+        "dialogRefs": [],
+        "motionRefs": [
+          "route-transition",
+          "shared-press"
+        ],
+        "fixtureNeeds": [
+          "an authenticated synthetic manager account",
+          "synthetic employee profiles"
+        ],
+        "sourceRefs": [
+          {
+            "path": "FrontEnd/src/pages/employee-list/ui/EmployeeListPage.tsx",
+            "symbolOrSelector": "EmployeeListPage"
+          },
+          {
+            "path": "FrontEnd/src/app/router/AppRouter.tsx",
+            "symbolOrSelector": "RoutedContent"
+          },
+          {
+            "path": "FrontEnd/src/app/layouts/overlay-sidebar-layout/OverlaySidebarLayout.tsx",
+            "symbolOrSelector": "OverlaySidebarLayout"
+          }
+        ]
+      },
+      {
+        "id": "manager-employee-edit-page-employee-new",
+        "role": "manager",
+        "path": "/employee/new",
+        "pageRef": "employee-edit-page",
+        "layoutRef": "manager-overlay-sidebar",
+        "requiresSystemManager": false,
+        "viewportRefs": [
+          "desktop",
+          "mobile"
+        ],
+        "initialState": "create",
+        "captureStates": [
+          "create",
+          "edit",
+          "loading",
+          "load-error",
+          "checking-lock",
+          "locked",
+          "dirty",
+          "field-errors",
+          "saving",
+          "open",
+          "closed"
+        ],
+        "controlRefs": [
+          "fields",
+          "cancel",
+          "save"
+        ],
+        "dialogRefs": [
+          "checking-lock",
+          "edit-lock",
+          "unsaved",
+          "saving"
+        ],
+        "motionRefs": [
+          "route-transition",
+          "shared-press"
+        ],
+        "fixtureNeeds": [
+          "an authenticated synthetic manager account",
+          "synthetic employee edit data"
+        ],
+        "sourceRefs": [
+          {
+            "path": "FrontEnd/src/pages/employee-edit/ui/EmployeeEditPage.tsx",
+            "symbolOrSelector": "EmployeeEditPage"
+          },
+          {
+            "path": "FrontEnd/src/app/router/AppRouter.tsx",
+            "symbolOrSelector": "RoutedContent"
+          },
+          {
+            "path": "FrontEnd/src/app/layouts/overlay-sidebar-layout/OverlaySidebarLayout.tsx",
+            "symbolOrSelector": "OverlaySidebarLayout"
+          }
+        ]
+      },
+      {
+        "id": "manager-employee-profile-page-employee-employeeId",
+        "role": "manager",
+        "path": "/employee/:employeeId",
+        "pageRef": "employee-profile-page",
+        "layoutRef": "manager-overlay-sidebar",
+        "requiresSystemManager": false,
+        "viewportRefs": [
+          "desktop",
+          "mobile"
+        ],
+        "initialState": "default",
+        "captureStates": [
+          "loading",
+          "invalid-id/load-error",
+          "loaded",
+          "deleting",
+          "kicking",
+          "regulation-history-loading/empty",
+          "open",
+          "closed"
+        ],
+        "controlRefs": [
+          "edit",
+          "delete",
+          "kick"
+        ],
+        "dialogRefs": [
+          "delete",
+          "kick"
+        ],
+        "motionRefs": [
+          "route-transition",
+          "shared-press"
+        ],
+        "fixtureNeeds": [
+          "an authenticated synthetic manager account",
+          "a synthetic employee profile and employeeId"
+        ],
+        "sourceRefs": [
+          {
+            "path": "FrontEnd/src/pages/employee-profile/ui/EmployeeProfilePage.tsx",
+            "symbolOrSelector": "EmployeeProfilePage"
+          },
+          {
+            "path": "FrontEnd/src/app/router/AppRouter.tsx",
+            "symbolOrSelector": "RoutedContent"
+          },
+          {
+            "path": "FrontEnd/src/app/layouts/overlay-sidebar-layout/OverlaySidebarLayout.tsx",
+            "symbolOrSelector": "OverlaySidebarLayout"
+          }
+        ]
+      },
+      {
+        "id": "manager-employee-edit-page-employee-employeeId-edit",
+        "role": "manager",
+        "path": "/employee/:employeeId/edit",
+        "pageRef": "employee-edit-page",
+        "layoutRef": "manager-overlay-sidebar",
+        "requiresSystemManager": false,
+        "viewportRefs": [
+          "desktop",
+          "mobile"
+        ],
+        "initialState": "edit",
+        "captureStates": [
+          "create",
+          "edit",
+          "loading",
+          "load-error",
+          "checking-lock",
+          "locked",
+          "dirty",
+          "field-errors",
+          "saving",
+          "open",
+          "closed"
+        ],
+        "controlRefs": [
+          "fields",
+          "cancel",
+          "save"
+        ],
+        "dialogRefs": [
+          "checking-lock",
+          "edit-lock",
+          "unsaved",
+          "saving"
+        ],
+        "motionRefs": [
+          "route-transition",
+          "shared-press"
+        ],
+        "fixtureNeeds": [
+          "an authenticated synthetic manager account",
+          "synthetic employee edit data",
+          "a synthetic employeeId resolving to the mock record"
+        ],
+        "sourceRefs": [
+          {
+            "path": "FrontEnd/src/pages/employee-edit/ui/EmployeeEditPage.tsx",
+            "symbolOrSelector": "EmployeeEditPage"
+          },
+          {
+            "path": "FrontEnd/src/app/router/AppRouter.tsx",
+            "symbolOrSelector": "RoutedContent"
+          },
+          {
+            "path": "FrontEnd/src/app/layouts/overlay-sidebar-layout/OverlaySidebarLayout.tsx",
+            "symbolOrSelector": "OverlaySidebarLayout"
+          }
+        ]
+      },
+      {
+        "id": "employee-employee-notifications-page-root",
+        "role": "employee",
+        "path": "/",
+        "pageRef": "employee-notifications-page",
+        "layoutRef": "employee-workspace",
+        "requiresSystemManager": false,
+        "viewportRefs": [
+          "desktop",
+          "mobile"
+        ],
+        "initialState": "default",
+        "captureStates": [
+          "load-error",
+          "sync-error",
+          "inbox",
+          "news",
+          "unread",
+          "read",
+          "empty-inbox",
+          "empty-news"
+        ],
+        "controlRefs": [
+          "tabs",
+          "mark-all",
+          "mark-one",
+          "navigate"
+        ],
+        "dialogRefs": [],
+        "motionRefs": [
+          "route-transition",
+          "shared-press",
+          "employee-motion",
+          "employee-gsap-reveal"
+        ],
+        "fixtureNeeds": [
+          "an authenticated synthetic employee account",
+          "synthetic notifications and news"
+        ],
+        "sourceRefs": [
+          {
+            "path": "FrontEnd/src/pages/employee-notifications/ui/EmployeeNotificationsPage.tsx",
+            "symbolOrSelector": "EmployeeNotificationsPage"
+          },
+          {
+            "path": "FrontEnd/src/app/router/AppRouter.tsx",
+            "symbolOrSelector": "RoutedContent"
+          },
+          {
+            "path": "FrontEnd/src/app/layouts/employee-workspace-layout/EmployeeWorkspaceLayout.tsx",
+            "symbolOrSelector": "EmployeeWorkspaceLayout"
+          }
+        ]
+      },
+      {
+        "id": "employee-employee-notifications-page-notifications",
+        "role": "employee",
+        "path": "/notifications",
+        "pageRef": "employee-notifications-page",
+        "layoutRef": "employee-workspace",
+        "requiresSystemManager": false,
+        "viewportRefs": [
+          "desktop",
+          "mobile"
+        ],
+        "initialState": "default",
+        "captureStates": [
+          "load-error",
+          "sync-error",
+          "inbox",
+          "news",
+          "unread",
+          "read",
+          "empty-inbox",
+          "empty-news"
+        ],
+        "controlRefs": [
+          "tabs",
+          "mark-all",
+          "mark-one",
+          "navigate"
+        ],
+        "dialogRefs": [],
+        "motionRefs": [
+          "route-transition",
+          "shared-press",
+          "employee-motion",
+          "employee-gsap-reveal"
+        ],
+        "fixtureNeeds": [
+          "an authenticated synthetic employee account",
+          "synthetic notifications and news"
+        ],
+        "sourceRefs": [
+          {
+            "path": "FrontEnd/src/pages/employee-notifications/ui/EmployeeNotificationsPage.tsx",
+            "symbolOrSelector": "EmployeeNotificationsPage"
+          },
+          {
+            "path": "FrontEnd/src/app/router/AppRouter.tsx",
+            "symbolOrSelector": "RoutedContent"
+          },
+          {
+            "path": "FrontEnd/src/app/layouts/employee-workspace-layout/EmployeeWorkspaceLayout.tsx",
+            "symbolOrSelector": "EmployeeWorkspaceLayout"
+          }
+        ]
+      },
+      {
+        "id": "employee-employee-availability-page-availability",
+        "role": "employee",
+        "path": "/availability",
+        "pageRef": "employee-availability-page",
+        "layoutRef": "employee-workspace",
+        "requiresSystemManager": false,
+        "viewportRefs": [
+          "desktop",
+          "mobile"
+        ],
+        "initialState": "default",
+        "captureStates": [
+          "loading",
+          "load-error",
+          "no-active-windows",
+          "selected-window",
+          "open/closed",
+          "edit-locked",
+          "available/unavailable-day",
+          "day-dialog",
+          "preset-edit-invalid",
+          "dirty",
+          "saving",
+          "save-error",
+          "success",
+          "open",
+          "closed"
+        ],
+        "controlRefs": [
+          "window",
+          "day",
+          "presets",
+          "time",
+          "day-clear-save",
+          "preset-save",
+          "save-clear",
+          "success-dismiss"
+        ],
+        "dialogRefs": [
+          "day",
+          "unsaved"
+        ],
+        "motionRefs": [
+          "route-transition",
+          "shared-press",
+          "employee-motion",
+          "employee-gsap-reveal"
+        ],
+        "fixtureNeeds": [
+          "an authenticated synthetic employee account",
+          "a mock active availability window"
+        ],
+        "sourceRefs": [
+          {
+            "path": "FrontEnd/src/pages/employee-availability/ui/EmployeeAvailabilityPage.tsx",
+            "symbolOrSelector": "EmployeeAvailabilityPage"
+          },
+          {
+            "path": "FrontEnd/src/app/router/AppRouter.tsx",
+            "symbolOrSelector": "RoutedContent"
+          },
+          {
+            "path": "FrontEnd/src/app/layouts/employee-workspace-layout/EmployeeWorkspaceLayout.tsx",
+            "symbolOrSelector": "EmployeeWorkspaceLayout"
+          }
+        ]
+      },
+      {
+        "id": "employee-employee-schedule-page-schedule",
+        "role": "employee",
+        "path": "/schedule",
+        "pageRef": "employee-schedule-page",
+        "layoutRef": "employee-workspace",
+        "requiresSystemManager": false,
+        "viewportRefs": [
+          "desktop",
+          "mobile"
+        ],
+        "initialState": "default",
+        "captureStates": [
+          "loading",
+          "load-error",
+          "no-published-schedules",
+          "selected",
+          "daily-view",
+          "matrix-view",
+          "empty-day",
+          "pdf-error",
+          "preference-error",
+          "correction-pending/success",
+          "schedule-select-open",
+          "open",
+          "closed"
+        ],
+        "controlRefs": [
+          "schedule-select",
+          "daily-matrix",
+          "pdf",
+          "adjust",
+          "columns",
+          "day",
+          "summary-period"
+        ],
+        "dialogRefs": [
+          "column-order",
+          "correction",
+          "schedule-select"
+        ],
+        "motionRefs": [
+          "shared-press",
+          "employee-motion",
+          "employee-gsap-reveal"
+        ],
+        "fixtureNeeds": [
+          "an authenticated synthetic employee account",
+          "synthetic published schedules, shifts and correction requests"
+        ],
+        "sourceRefs": [
+          {
+            "path": "FrontEnd/src/pages/employee-schedule/ui/EmployeeSchedulePage.tsx",
+            "symbolOrSelector": "EmployeeSchedulePage"
+          },
+          {
+            "path": "FrontEnd/src/app/router/AppRouter.tsx",
+            "symbolOrSelector": "RoutedContent"
+          },
+          {
+            "path": "FrontEnd/src/app/layouts/employee-workspace-layout/EmployeeWorkspaceLayout.tsx",
+            "symbolOrSelector": "EmployeeWorkspaceLayout"
+          }
+        ],
+        "pageMotionRef": "pages.employee-schedule-page.motion"
+      },
+      {
+        "id": "employee-employee-swap-page-swap",
+        "role": "employee",
+        "path": "/swap",
+        "pageRef": "employee-swap-page",
+        "layoutRef": "employee-workspace",
+        "requiresSystemManager": false,
+        "viewportRefs": [
+          "desktop",
+          "mobile"
+        ],
+        "initialState": "default",
+        "captureStates": [
+          "loading",
+          "load-error",
+          "action-error",
+          "empty-offers/history",
+          "search-empty",
+          "selected-shift",
+          "pinned",
+          "offer-expanded",
+          "pending",
+          "accepted",
+          "cancelled",
+          "schedule-locked",
+          "unavailable-reason",
+          "public/private-receiver",
+          "acceptance-open",
+          "acceptance-submitting",
+          "offer-no-longer-available",
+          "open",
+          "closed"
+        ],
+        "controlRefs": [
+          "search",
+          "filter",
+          "pin",
+          "offer-expand",
+          "accept",
+          "cancel",
+          "create",
+          "schedule",
+          "shift",
+          "receiver-mode",
+          "target",
+          "publish",
+          "history",
+          "confirm-accept",
+          "back-accept"
+        ],
+        "dialogRefs": [
+          "creation",
+          "shift-picker",
+          "history",
+          "unpin",
+          "acceptance"
+        ],
+        "motionRefs": [
+          "route-transition",
+          "shared-press",
+          "employee-motion",
+          "employee-gsap-reveal"
+        ],
+        "fixtureNeeds": [
+          "an authenticated synthetic employee account",
+          "a synthetic open eligible swap offer, own offer and swap history"
+        ],
+        "sourceRefs": [
+          {
+            "path": "FrontEnd/src/pages/employee-swap/ui/EmployeeSwapPage.tsx",
+            "symbolOrSelector": "EmployeeSwapPage"
+          },
+          {
+            "path": "FrontEnd/src/app/router/AppRouter.tsx",
+            "symbolOrSelector": "RoutedContent"
+          },
+          {
+            "path": "FrontEnd/src/app/layouts/employee-workspace-layout/EmployeeWorkspaceLayout.tsx",
+            "symbolOrSelector": "EmployeeWorkspaceLayout"
+          }
+        ]
+      },
+      {
+        "id": "employee-employee-account-page-profile",
+        "role": "employee",
+        "path": "/profile",
+        "pageRef": "employee-account-page",
+        "layoutRef": "employee-workspace",
+        "requiresSystemManager": false,
+        "viewportRefs": [
+          "desktop",
+          "mobile"
+        ],
+        "initialState": "default",
+        "captureStates": [
+          "loading",
+          "load-error",
+          "profile-unavailable",
+          "view",
+          "editing",
+          "busy",
+          "recovery-email-missing/connected",
+          "code-sent",
+          "inline-error",
+          "success"
+        ],
+        "controlRefs": [
+          "language",
+          "edit",
+          "contact",
+          "send-code",
+          "password",
+          "change-password",
+          "cancel-save",
+          "logout"
+        ],
+        "dialogRefs": [],
+        "motionRefs": [
+          "route-transition",
+          "shared-press",
+          "employee-motion",
+          "employee-gsap-reveal"
+        ],
+        "fixtureNeeds": [
+          "an authenticated synthetic employee account",
+          "a synthetic employee profile"
+        ],
+        "sourceRefs": [
+          {
+            "path": "FrontEnd/src/pages/employee-account/ui/EmployeeAccountPage.tsx",
+            "symbolOrSelector": "EmployeeAccountPage"
+          },
+          {
+            "path": "FrontEnd/src/app/router/AppRouter.tsx",
+            "symbolOrSelector": "RoutedContent"
+          },
+          {
+            "path": "FrontEnd/src/app/layouts/employee-workspace-layout/EmployeeWorkspaceLayout.tsx",
+            "symbolOrSelector": "EmployeeWorkspaceLayout"
+          }
+        ]
+      }
+    ]
+  }
 }

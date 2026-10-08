@@ -48,6 +48,7 @@ public sealed class AuthService : IAuthService
             return new AuthenticatedSessionDto
             {
                 Role = ManagerRole,
+                IsSystemManager = managerAccount.IsSystem,
                 UserName = managerAccount.UserName,
                 DisplayName = managerAccount.DisplayName,
                 ManagerId = managerAccount.Id,

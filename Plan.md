@@ -1,659 +1,428 @@
-# Plan
-
-## 1. Objective
-
-Modernize motion on the Employee `/schedule` workflow without changing its business behavior, data contracts, or architecture.
-
-The finished page must feel gradual, dynamic, energetic, colorful, minimal, and responsive through:
-
-- coherent section entrance motion;
-- smooth Matrix ↔ Daily state changes;
-- animated schedule/day/summary state changes;
-- responsive button, tab, selector, and dialog micro-interactions;
-- smooth centering of the selected Daily day;
-- lightweight list/dialog entrance choreography;
-- immediate visual feedback for success/error states;
-- a complete `prefers-reduced-motion` fallback;
-- compositor-friendly animation that does not create continuous CPU/GPU work when the page is idle.
-
-The implementation must reuse the existing Employee motion infrastructure and existing GSAP dependency. Do not add a new animation library.
-
-## 2. Existing Components to Reuse
-
-Reuse these existing mechanisms as the implementation foundation:
-
-- `FrontEnd/src/app/layouts/employee-workspace-layout/useEmployeeMotion.ts`
-  - existing scoped Employee GSAP orchestration;
-  - existing `[data-employee-motion]` discovery;
-  - existing `data-motion-key` replay mechanism;
-  - existing `MutationObserver` cleanup and tween cancellation.
-- `FrontEnd/src/shared/ui/motion.css`
-  - global easing;
-  - global press animation;
-  - existing list-reveal convention.
-- `gsap` and `@gsap/react` already installed in `FrontEnd/package.json`.
-- `EmployeeWorkspaceLayout` motion scope. Do not create a second schedule-specific GSAP root/provider.
-- `EmployeeScheduleHero`, `ContainerGraphMatrix`, `CardSection`, `SearchableSelect`, `ViewportOverlay`, and the three existing Schedule dialogs.
-- Existing `aria-*`, focus restoration, keyboard behavior, and semantic roles.
-- Existing schedule query/calculation/PDF/export/UI-state persistence logic.
-
-Do not create a parallel motion service, context provider, event bus, animation store, or second observer.
+# Plan.md — GF3 Premium UI Motion Product Film (MP4, authentic GF3 visuals)
 
-## 3. Constraints
+> **CODEX EXECUTION PLAN — IMPLEMENT AND DELIVER THE VIDEO FILE, NOT JUST A WEBSITE.**
+> Read and execute the steps in order. Do not perform another full repository analysis, replace the existing promo implementation from scratch, or stop when `promo.html` looks good. The work is **not complete** until an actual playable MP4 exists on disk and has passed the verification gates below.
 
-### Scope
+## 0. Baseline, objective, and non-negotiable distinction
+
+- **Repository:** `https://github.com/OlehProtsun/GF3`, local working branch `DEV2`.
+- **Previously verified historical commit:** `b63b35d44222b22122689bf6fe96f310e1e733a8`. The user's CODEX agent has **subsequently generated `promo.html` locally**. Those local changes are **not verifiable in the linked remote branch**; they are the implementation starting point. **Never reset, discard, or overwrite them wholesale.**
+- **User goal:** a polished, high-end, cinematic **finished MP4 product pitch** using **the user's own GF3 visual components and genuinely recognizable interfaces**, with animated demonstrations of all major customer-facing workflows. The desired aesthetic is a modern premium software/product launch (restrained, editorial, bold typography, elegant motion), **not** an assertion that GF3 itself uses AI.
+- **Mandatory master:** `FrontEnd/artifacts/promo/gf3-product-film-1080p.mp4`, exactly **75 seconds**, **1920×1080**, **30 fps**, H.264, `yuv420p`, standard MP4 faststart, playable without development software. **Audio:** a subtle, original, locally synthesized soundtrack + occasional interface transition sounds, encoded AAC 48 kHz stereo. All necessary content remains fully understandable when muted.
+- **Additional required deliverables:** `FrontEnd/artifacts/promo/gf3-product-film-poster.png` (1920×1080), `FrontEnd/artifacts/promo/contact-sheet.png` (one frame from every scene), `FrontEnd/artifacts/promo/qa-report.json` (technical probe, scene checks, real-UI provenance, errors), and `FrontEnd/PROMO.md` with one-command reproduction and troubleshooting.
+- **Working preview:** preserve and improve existing `FrontEnd/promo.html` as the editable/seekable source for producing the MP4. It is a production tool, **not the final deliverable**.
+- **Language:** all on-screen marketing copy Polish, including correct diacritics. Developer docs and code comments English.
+- **No invented features or metrics:** no claims of AI scheduling, instant auto-approval of swaps, automatic task allocation, percentage savings or customer counts unless demonstrably implemented. All people, shifts and messages in promotional material must be **synthetic**.
+- **Privacy:** no filming production customer accounts; no real staff names, identities, schedules, JWTs, credentials or client data inside the final MP4, intermediate captures or committed repo.
 
-- Frontend-only change.
-- Target only Employee workflow `/schedule`, except for narrowly required shared reduced-motion safeguards.
-- No backend, API, DTO, entity, persistence, database, dependency-injection, authentication, routing, or configuration changes.
-- No changes to schedule calculations, shift-correction business rules, PDF generation, saved column-order semantics, or query/mutation contracts.
-- Do not restore the removed Salary calculator or any other old Schedule content.
+### 0.1 Actual project paths/source-of-truth established from the repository
 
-### Dependency constraints
+- `FrontEnd/package.json`: React + TypeScript + Vite, GSAP, `@gsap/react`, Playwright and Vitest already exist at baseline.
+- `docs/design-system.json`: detailed design snapshot, metadata points at **older** commit `d8e752a` and says `runtimeSourceOfTruth: false`. Use it as a design index; the **current React/CSS implementation** wins on discrepancies.
+- `FrontEnd/src/index.css`, `FrontEnd/src/shared/ui/motion.css`, source-specific CSS modules: actual styling and motion references.
+- `FrontEnd/src/pages/container/ui/ContainerPage.tsx`: manager planning/workspace. Known reusable UI exports from `@entities/containers` include `ContainerProfileWorkspace`, `ContainerListCard`, etc. Avoid importing the entire stateful page into a standalone preview without its providers.
+- `FrontEnd/src/pages/employee-availability/ui/EmployeeAvailabilityPage.tsx`: employee availability workflow.
+- `FrontEnd/src/pages/employee-schedule/ui/EmployeeSchedulePage.tsx`: published schedule, view and summary.
+- `FrontEnd/src/pages/employee-swap/ui/EmployeeSwapPage.tsx`: employee swap flow, confirmation, filters/history.
+- `FrontEnd/src/app/router/AppRouter.tsx`: manager `/container`, `/availability`, `/employee`, `/communications`; employee `/availability`, `/schedule`, `/swap`, `/notifications` (routes are role-protected).
+- `FrontEnd/src/shared/ui/PageHeader`, `FrontEnd/src/shared/ui/components/IosButton`, `FrontEnd/src/shared/ui/sections/CardSection/CardSection.tsx`: verified existing UI building-block references.
+- The previous Plan.md specified `FrontEnd/src/promo/`, `FrontEnd/scripts/render-promo.mjs`, `FrontEnd/PROMO.md` and `FrontEnd/promo.html`, **but CODEX must check which of these were actually created locally**; do not assume a previous plan was implemented in full.
 
-- Do not add Framer Motion, Motion One, React Spring, ScrollTrigger, another GSAP package, or any new npm dependency.
-- Do not change `FrontEnd/package.json`.
-- Do not import GSAP directly into individual Schedule components unless explicitly listed in this plan. The page-level state choreography must continue through `useEmployeeMotion`.
+### 0.2 The critical new acceptance rule — real product visuals
 
-### Motion/performance constraints
+**The previous promo plan permitted custom illustrated lookalikes (`DemoWorkspace`, `DemoSwap`, etc.). That is no longer sufficient.**
 
-- Structural entrance/state animations must animate only compositor-friendly `opacity` and `transform`/GSAP `x`, `y`, `scale`.
-- Color/border/background/shadow transitions are allowed only for short interaction feedback on a small number of controls.
-- Do not animate `width`, `height`, `top`, `left`, grid tracks, table dimensions, or matrix cell geometry.
-- Do not animate every `ContainerGraphMatrix` cell, every Schedule summary row, or all 28–31 Daily-day buttons independently.
-- Do not add scroll listeners, pointer-move loops, `requestAnimationFrame` loops, intersection-observer choreography, or continuous idle animation.
-- Do not animate the hero clock every second; its text may continue updating exactly as it does now, but the entrance animation must not replay on clock updates.
-- Do not apply persistent `will-change` to large groups of elements.
-- Keep list stagger bounded: only the first small set of visible dialog rows may be staggered; later rows enter together.
-- On rapid state changes, existing tweens for the affected element must be killed before the next tween begins.
+1. Primary product footage must consist of either **(A)** real production GF3 presentational React components, mounted with frozen synthetic props while preserving their own styles; or **(B)** actual screenshots/frame sequences captured from the running GF3 UI using Playwright with a completely synthetic demonstration dataset. These are **authentic GF3 pixels**, not hand-redrawn miniatures.
+2. Use **A** for cleanly separable presentational components, including existing shared icons, buttons, typography, panels, schedules/graph summaries as available. Use **B** for tightly coupled manager/employee pages requiring auth, query providers and routing. It is legitimate to edit/direct/crop/camera-animate a real GF3 capture; it is **not** legitimate to replace it with an unrelated CSS imitation.
+3. The film must visually demonstrate **at least four real-UI feature families**: manager scheduling, availability, employee schedule, shift swaps. A fifth segment must show **one** verified supplementary customer feature: notifications, schedule overview/summary, employee records, or existing export controls. The preferred fifth family is **schedule summary + notifications/export** if these exist in the locally available implementation.
+4. For every feature shot, record source path(s), acquisition mode `production-component` or `actual-app-capture`, original route if relevant, and how synthetic data was supplied in `FrontEnd/src/promo/real-ui/shot-manifest.ts`. Add one contact-sheet preview per shot.
+5. **Do not mark the video complete** if the main feature footage uses only promo-only recreated demo cards. An MP4 may be generated for diagnostic purposes, but report that as **provisional**, with the missing authentic shots listed in `qa-report.json`.
+6. The cinematic typography, background, compositional frames, cursor illustration, masks, and scene transitions **are new promotional graphics** and need not be literal production UI. Clearly separate those layers from product content.
 
-### Accessibility constraints
+## 1. Locked visual/narrative direction
 
-- Respect `prefers-reduced-motion: reduce` for JS and CSS motion.
-- Reduced-motion mode must preserve all state changes and focus behavior but use immediate/near-immediate visual updates and non-smooth scrolling.
-- Do not remove focus outlines, `aria-expanded`, `aria-pressed`, tab roles, dialog roles, or current focus restoration behavior.
+### 1.0 Reference-based creative brief (new approval of visual direction)
 
-## 4. Implementation Steps
+This section **overrides any older instruction implying that a polished screen recording or a simple sequence of flat screenshots is sufficient**. A realistic product walkthrough is the *raw material*, not the finished treatment. Final film must have **motion-designed, visually integrated REAL GF3 UI**, with intentional art direction, storytelling, camera choreography, sound cues, transitions and graphic composition.
 
-### Step 1 — Extend the existing Employee GSAP motion presets and add reduced-motion handling
+**User-provided references** (creative inspiration, not assets to reproduce):
 
-**Action:** EXTEND
+- `https://www.youtube.com/watch?v=SgmuplXU2iY` — independently identified as *Best SaaS Product Launch Ad Video | LangEase*. Reference for polished animated SaaS storytelling and branded UI motion.
+- `https://www.youtube.com/watch?v=jX4dLxiso6A` — independently identified as *Video Ad for AI / SaaS Product | Doks.AI* (Zelios). Reference for persuasive problem → solution storytelling and animated explanations rather than tutorial screen recordings.
+- `https://www.youtube.com/watch?v=pZv7me6dFns` — **provided by the user, visual details not independently verified in planning environment**. If CODEX can open it in a browser, include it in the 3-reference moodboard. If inaccessible, state that in `PROMO.md` and follow the concrete treatment below; never invent claims about its footage or block video export solely for unavailable external inspiration.
 
-**File:**
-- `FrontEnd/src/app/layouts/employee-workspace-layout/useEmployeeMotion.ts`
+**Evidence limit:** The planning environment verified video identity and some third-party descriptions, **not a full frame-by-frame viewing**. Thus the directions below are *original production specifications inspired by the requested genre*, not assertions that particular cuts, camera angles, typography, colors or timing occur in the source videos. Do not scrape/reupload the original ads or use their video frames, audio, trademarks or proprietary graphics.
 
-**Changes:**
+**Mandatory GF3-specific creative identity:**
 
-1. Keep the current public hook contract unchanged:
-   - `useEmployeeMotion(scope, pathname)` remains the only exported API.
-2. Preserve the existing navigation-indicator measurement/positioning logic and `ResizeObserver`.
-3. Add a `prefers-reduced-motion` check to navigation-indicator movement:
-   - when reduced motion is not requested, retain the existing animated route-indicator movement;
-   - when reduced motion is requested, kill any active indicator tween and position the indicator immediately with `gsap.set`.
-4. Keep `data-employee-motion="from-top"` excluded from GSAP because the Schedule hero owns its CSS entrance.
-5. Refactor the `reveal(...)` branch into explicit presets selected by `element.dataset.employeeMotion`:
-   - existing/default Employee reveal: preserve the current visual behavior and duration for non-Schedule consumers;
-   - `schedule-panel`: `opacity 0.35 → 1`, `y 18 → 0`, no scale change, duration approximately `0.52s`, `power2.out`;
-   - `schedule-content`: `opacity 0.45 → 1`, `y 12 → 0`, `scale 0.99 → 1`, duration approximately `0.42s`, `power2.out`;
-   - `schedule-value`: `opacity 0.60 → 1`, `y 0`, `scale 0.96 → 1`, duration approximately `0.30s`, `power2.out`.
-6. For Schedule presets, cap sequential reveal delay at four items and use approximately `45ms` between items. Keep the current default delay behavior for non-Schedule presets.
-7. Preserve `clearProps: "opacity,transform"` after each completed tween so transformed elements do not keep unnecessary inline animation state.
-8. Preserve the existing `WeakMap` + `data-motion-key` replay semantics.
-9. Preserve the existing removed-node tween cleanup.
-10. Wrap the reveal observer branch in a reduced-motion condition:
-    - in `no-preference`, create the existing scoped `MutationObserver` and perform GSAP reveals;
-    - in `reduce`, do not create a reveal observer solely for animation and do not run entrance/state tweens; DOM nodes must render naturally in their final state.
-11. Use GSAP/context cleanup already provided by `useGSAP`; do not create a global animation registry.
-
-**Behavior after change:**
-
-- `/schedule` can request predictable motion categories without creating local GSAP code.
-- Other Employee routes retain their existing default animation.
-- Employee navigation and reveals stop moving when the OS/browser requests reduced motion.
-
-**Dependencies:**
-- Existing GSAP and `@gsap/react` only.
-
-**Do not:**
-- change the hook signature;
-- add route-specific DOM queries for individual Schedule CSS classes;
-- animate matrix/table descendants from this hook.
-
----
-
-### Step 2 — Add shared reduced-motion safeguards for existing CSS motion primitives
-
-**Action:** EXTEND
-
-**Files:**
-- `FrontEnd/src/shared/ui/motion.css`
-- `FrontEnd/src/shared/ui/ViewportOverlay.module.css`
-- `FrontEnd/src/shared/ui/components/SearchableSelect/SearchableSelect.module.css`
-
-**Changes in `motion.css`:**
-
-1. Keep all existing keyframes and default behavior unchanged for `prefers-reduced-motion: no-preference`.
-2. Add `@media (prefers-reduced-motion: reduce)` rules that:
-   - disable the global `gf3-press` active animation;
-   - disable `[data-motion-list]` child entrance animations.
-3. Do not globally disable color/focus-state changes.
-
-**Changes in `ViewportOverlay.module.css`:**
-
-1. Add a reduced-motion rule for `.surface` that disables its entrance animation.
-2. Do not change overlay sizing, scrolling, overscroll, or viewport behavior.
-
-**Changes in `SearchableSelect.module.css`:**
-
-1. Keep normal SearchableSelect animation unchanged.
-2. Under reduced motion:
-   - disable `.dropdown` entrance animation;
-   - make chevron/state transitions immediate;
-   - remove active translate movement from `.selectButton` and `.option` while preserving visual selected/focus states.
-3. Do not modify `SearchableSelect.tsx` or its public props/API.
-
-**Behavior after change:**
-
-- Existing shared controls used by `/schedule` stop spatial motion when reduced motion is requested.
-- Normal animation on other pages remains unchanged.
-
-**Do not:**
-- redesign shared component visuals;
-- change normal-duration tokens application-wide;
-- change SearchableSelect portal positioning or listbox behavior.
-
----
-
-### Step 3 — Wire deterministic motion keys into the `/schedule` state flow
-
-**Action:** MODIFY
-
-**File:**
-- `FrontEnd/src/pages/employee-schedule/ui/EmployeeSchedulePage.tsx`
-
-**Changes:**
-
-1. Keep all existing query, memoized calculation, persistence, mutation, and PDF logic unchanged.
-2. Keep `hasSwitchedScheduleView` only for the existing post-toggle focus behavior. Stop using it as the trigger for CSS entrance animation.
-3. Remove `styles.scheduleViewEnter` from both:
-   - `ContainerGraphMatrix.className`;
-   - `CardSection.className` for Daily mode.
-4. Remove `styles.scheduleViewTogglePulse` from the view-toggle class list. The button already has global press feedback and its active state; view-content motion will provide the transition feedback.
-5. Add one stable Schedule view-stage wrapper rendered whenever `selectedSchedule` exists:
-   - class: `styles.scheduleViewStage`;
-   - `data-employee-motion="schedule-content"`;
-   - `data-motion-key` exactly derived from selected schedule id and view mode, for example `${selectedSchedule.id}:${scheduleViewMode}`.
-6. Render either the existing Matrix `ContainerGraphMatrix` or existing Daily `CardSection` inside that wrapper without changing their props or business behavior.
-7. Preserve `scheduleViewToggleRef` focus restoration with `preventScroll: true`.
-8. Change the existing Daily tabpanel motion preset from `schedule-panel` to `schedule-content`; keep its existing key based on `selectedSchedule.id` + selected day so day changes replay only the Daily content transition.
-9. Add reduced-motion-aware Daily-day centering:
-   - default/no-preference: `scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" })`;
-   - reduced motion: keep `behavior: "auto"`;
-   - preserve `block` and `inline` values.
-   - use a small safe helper local to this module for the media query; do not create a new shared hook solely for this call.
-10. Do not animate every day tab while scrolling. The strip itself scrolls normally; only the selected chip changes visual state.
-11. Make the schedule-selector chevron reflect the already existing `isScheduleSelectOpen` state with a CSS modifier class, while preserving `aria-expanded`.
-12. Animate feedback states through the existing Employee motion layer:
-   - wrap each conditional `ErrorBanner` in a neutral layout wrapper with `data-employee-motion="schedule-content"` and a motion key derived from the current message/type;
-   - add `data-employee-motion="schedule-content"` and a message-derived motion key to the shift-correction success status.
-13. Animate Summary state changes without animating individual table rows:
-   - add `data-employee-motion="schedule-value"` to `.hoursSummaryTotalPill`;
-   - set its `data-motion-key` from `activeSummaryPeriod.key` plus `scheduleHoursSummary.totalHoursText`;
-   - add `data-employee-motion="schedule-content"` to the Summary grid or the Summary empty-state element;
-   - key that content by the active period key and whether it is `rows` or `empty`.
-14. Keep the outer Summary panel's existing initial `data-employee-motion="schedule-panel"` reveal.
-15. Do not add `data-motion-list` to:
-   - the 28–31 Daily date tabs;
-   - Summary rows;
-   - matrix cells/columns.
-16. Preserve stable worker keys (`worker.employeeId`). Do not force remounts just to restart CSS animations; the keyed parent Daily body is the state-transition animation boundary.
-
-**Behavior after change:**
-
-- Initial Schedule sections reveal coherently.
-- Selecting another published schedule animates the large Schedule content once.
-- Matrix ↔ Daily transitions animate through one central GSAP path rather than duplicate CSS keyframes.
-- Changing a Daily date animates only the tabpanel content and smoothly centers the selected tab.
-- Changing Summary month/year animates only the total and Summary content container.
-- Rapid changes are safe because `useEmployeeMotion` kills the previous tween before starting the next.
-
-**Dependencies:**
-- Step 1 presets.
-
-**Do not:**
-- change Schedule selection semantics;
-- change matrix props;
-- change Summary calculations;
-- remount data-heavy tables solely for animation.
-
----
-
-### Step 4 — Replace duplicate Schedule view keyframes with lightweight interaction motion
-
-**Action:** MODIFY
-
-**File:**
-- `FrontEnd/src/pages/employee-schedule/ui/EmployeeSchedulePage.module.css`
-
-**Changes:**
-
-1. Add `.scheduleViewStage` with layout-only rules required to preserve the current page geometry:
-   - `min-width: 0`;
-   - `width: 100%`;
-   - no new fixed height or overflow clipping.
-2. Add a neutral wrapper class for animated feedback/error blocks if required by Step 3; it must not alter ErrorBanner sizing or semantics.
-3. Remove the obsolete `.scheduleViewEnter` animation rule/keyframes because Matrix/Daily entrance is now owned by `useEmployeeMotion`.
-4. Remove the obsolete `.scheduleViewTogglePulse` rule/keyframes.
-5. Keep the existing blue/white Employee visual language; do not redesign the page.
-6. Refine existing interactive controls using short transitions in the approximate `140–220ms` range:
-   - `.scheduleSelectTrigger`;
-   - `.openSchedulePdfButton` / correction action;
-   - `.scheduleViewToggle`;
-   - `.dailyScheduleDay`.
-7. Transitions may use subtle translate (`1–2px`), color, border-color, background, and small shadow changes. Do not use large bounce/spring movement.
-8. Use `@media (hover: hover)` for hover-only movement so touch devices do not retain hover transforms.
-9. Add an open-state class for `.scheduleSelectChevron` with a small rotation/translation transition. The state must derive from `isScheduleSelectOpen`; no independent animation state.
-10. Improve selected Daily-day feedback with a restrained transform/outline/shadow while keeping existing work-day/off-day color semantics and `aria-selected` behavior.
-11. Keep non-interactive worker rows and Summary rows visually stable. Do not add hover movement that would imply clickability.
-12. Under `@media (prefers-reduced-motion: reduce)`:
-    - disable spatial transforms and transition motion for Schedule controls;
-    - keep instant color/border/selected-state feedback;
-    - disable any Schedule-local keyframe animation added in this file.
-
-**Behavior after change:**
-
-- Controls feel responsive and modern without competing with page-level GSAP motion.
-- Duplicate Matrix/Daily animation logic is removed.
-- Touch and reduced-motion users do not receive unnecessary transform effects.
-
-**Dependencies:**
-- Step 3 markup classes.
-
-**Do not:**
-- add animated gradients;
-- animate large shadows continuously;
-- change responsive layout breakpoints unless a motion rule requires only a selector-specific override.
-
----
-
-### Step 5 — Stage the hero entrance without reanimating its live clock
-
-**Action:** MODIFY
-
-**File:**
-- `FrontEnd/src/pages/employee-schedule/ui/EmployeeScheduleHero.module.css`
-
-**Changes:**
-
-1. Keep `EmployeeScheduleHero.tsx` unchanged unless a CSS selector cannot target an existing structural element. Prefer CSS-only work here.
-2. Keep `data-employee-motion="from-top"`; do not move the hero into the JS reveal pipeline.
-3. Refine `.hero` entrance so it remains gradual but less mechanically large:
-   - approximately `600–680ms`;
-   - opacity fade plus translate from roughly `-24px` to `0`, rather than the current larger `-44px` travel;
-   - use the existing Employee cubic-bezier style.
-4. Add one-time nested entrance choreography using existing structural elements:
-   - `.heading`: subtle opacity + `y` reveal after the hero begins;
-   - `.shifts`: subtle opacity + `y` reveal after the heading;
-   - the two `.day` columns: small stagger after `.shifts`.
-5. Keep delays bounded; the complete hero should settle in well under one second.
-6. Do not attach animation to `.clock`, `.countdown`, or text values individually. Their existing periodic re-render must not replay animation.
-7. Add `@media (prefers-reduced-motion: reduce)` that removes hero/nested entrance animations and leaves the final layout visible immediately.
-
-**Behavior after change:**
-
-- Hero arrives with layered but restrained depth.
-- Clock/countdown updates remain static and inexpensive after initial render.
-
-**Do not:**
-- add parallax;
-- add infinite shimmer/pulse/background animation;
-- change the existing timer interval or shift logic.
-
----
-
-### Step 6 — Animate the Schedule selection dialog and its list with bounded CSS choreography
-
-**Action:** MODIFY
-
-**File:**
-- `FrontEnd/src/pages/employee-schedule/ui/EmployeeScheduleSelectDialog.module.css`
-
-**Changes:**
-
-1. Preserve the existing portal, dialog semantics, focus handling, close behavior, and markup.
-2. Add a short overlay opacity entrance; do not animate `backdrop-filter` itself.
-3. Override/augment the sheet entrance with a Schedule-specific `opacity + translateY + slight scale` animation around `280–340ms`.
-4. On mobile bottom-sheet layout, use a slightly larger vertical start offset and no excessive scale.
-5. Add row entrance choreography:
-   - `.row` uses a short opacity/translate entrance;
-   - stagger only the first approximately 6 rows using `nth-child` delays of roughly `20–30ms`;
-   - all later rows share the final capped delay rather than extending the animation timeline indefinitely.
-6. Add short hover/focus/selected transitions for `.row`, `.close`, and `.indicator` using the existing blue palette.
-7. Keep selected-state contrast and focus-visible outline intact.
-8. Add reduced-motion rules that disable overlay/sheet/row spatial entrance and transform transitions while preserving immediate state styling.
-
-**Behavior after change:**
-
-- Opening the Schedule picker feels like a deliberate sheet/list reveal.
-- Large Schedule lists do not produce an unbounded stagger or long animation chain.
-
-**Do not:**
-- add JS timers or presence state for exit animation;
-- modify `EmployeeScheduleSelectDialog.tsx` unless required only to expose an already existing state class; CSS-only implementation is preferred.
-
----
-
-### Step 7 — Add restrained dialog/list micro-motion to column ordering
-
-**Action:** MODIFY
-
-**File:**
-- `FrontEnd/src/pages/employee-schedule/ui/EmployeeScheduleColumnOrderDialog.module.css`
-
-**Changes:**
-
-1. Preserve existing dialog markup, working-order state, focus behavior, save/reset behavior, and column-order persistence.
-2. Add a short overlay/surface entrance consistent with Step 6; do not animate blur.
-3. Add a bounded initial reveal for `.row` items, capped after the first approximately 6 rows.
-4. Add transitions for:
-   - `.row` / `.activeRow` border/background state;
-   - `.position` color/background state;
-   - `.controls button`, `.resetButton`, and `.closeButton` hover/press feedback.
-5. Keep actual row reorder layout updates immediate in this task. Do not add GSAP Flip or force React remounts solely to animate list reordering; preserving focus/stability and bundle/runtime simplicity has priority.
-6. Reduced-motion rules disable spatial entrance/press transitions and preserve immediate selected/disabled/focus states.
-
-**Behavior after change:**
-
-- The dialog and list appear smoothly, and every interactive control has immediate feedback.
-- Reordering remains reliable and focus-safe with no layout-animation measurement overhead.
-
-**Do not:**
-- change the column order algorithm;
-- change stable React keys;
-- introduce FLIP/layout animation in this task.
-
----
-
-### Step 8 — Add state motion to the Shift Correction dialog without changing its workflow
-
-**Action:** MODIFY
+1. The dominant visual language must come from `docs/design-system.json` **and current** GF3 React/CSS. The JSON is an older descriptive snapshot; actual UI at the local working tree wins. Preserve the real GF3 visual language (especially its calendar cells, button geometry, cards, labels, employee/workspace panels, shadows, radius, colors, type choices and spacing). Current GF3 primary blue is documented as `#2563eb` at historical commit; resolve exact current CSS tokens before rendering.
+2. Render scenes on tasteful dark ink and soft paper/neutral backgrounds derived from GF3 tokens, with blue highlights, occasional accent gradients only if harmonious with GF3. No wholesale transformation into the LangEase/Doks palette or generic purple neon AI theme.
+3. Each feature chapter must contain **at least one hero product UI composition** and **one close-up** of *an identifiable real GF3 component* (calendar, scheduling slot, availability selector, swap modal, status/badge/summary). The viewer should be able to name the product workflow from the animation alone.
+4. The real GF3 components are the moving subjects: independent shift cards slide and align; calendar rows build a weekly schedule; availability elements respond to a meaningful selection; a real swap modal emerges from its real button; confirmation/state change remains true to existing app logic. Decorative graphics orbit or spotlight them, but never fake app states.
+5. Avoid an amateur "capture browser → add music → zoom on screenshot" aesthetic. The camera must travel purposefully between component groups, with seamless match-cut geometry, foreground/background layers, authored graphic shapes and punchy but readable titles. Avoid changing every frame merely for spectacle: clarity takes priority.
 
-**File:**
-- `FrontEnd/src/pages/employee-schedule/ui/EmployeeShiftCorrectionDialog.module.css`
+**Visual hierarchy of each feature chapter:** (i) <=7-word primary hook for ~1–2 sec; (ii) 2–4 sec product close-up / interaction; (iii) 2–4 sec readable feature outcome; (iv) animated physical carry-over of an existing GF3 UI shape into the next scene. These segments may overlap the existing 75-second fixed chapters; do not change the total duration.
 
-**Changes:**
+**Music / sound guidance:** Original legally usable music bed with modern clean electronic/percussive pulse and restrained tonal layers, beat-aligned clicks/soft swishes/confirmation cues. Narration is **not required**; the film communicates silently from its Polish on-screen copy. Do not borrow reference-track music. Synthesize a custom original bed with deliberate musical structure, not a piercing single oscillator; if user-supplied licensed music is already available, it can be used only with recorded provenance and permission (no dependence on a new external source).
 
-1. Preserve all existing Shift Correction component logic, validation, mutation inputs, pending states, and dialog semantics.
-2. Add a short overlay/dialog entrance consistent with the other Schedule dialogs.
-3. Add subtle staged entrance for the existing `.stepSection` blocks; keep the total delay bounded.
-4. Add short interaction transitions to:
-   - `.dayList button` / `.dayActive`;
-   - `.shiftCard` / pending state;
-   - `.boundaryChoices button` / `.boundarySelected`;
-   - `.timeEditor > button`;
-   - `.closeButton`.
-5. Give conditionally rendered `.adjustmentPanel`, `.validation`, and similar feedback blocks a short one-time opacity/translate reveal when they mount.
-6. Do not animate text input values or cause any movement on every keystroke.
-7. Do not automatically scroll the horizontal day list unless existing behavior already requires it; no new scroll-management logic is needed for this dialog.
-8. Add reduced-motion rules disabling spatial/keyframe motion while preserving state-color changes and focus styles.
-
-**Behavior after change:**
+### 1.0.1 Signature motion grammar (implementation must demonstrate each, not merely mention)
 
-- The multi-step correction workflow communicates progression and selected states clearly without changing its logic.
-- No animation runs continuously while the user edits times.
+| Motion motif | Real GF3 material | Choreography | Minimum appearance |
+|---|---|---|---|
+| **Grid assembly** | Genuine schedule grid, rows, shift cells | Cells/rows arrive from separate directions and snap into their **correct real layout**, camera lands on final unchanged app | `manager` and `connected` |
+| **Card-to-screen match cut** | Existing shift/availability card or genuine cropped UI element | Preserve an on-screen card's bounding box (position, size, corner radius) while changing depth/background to reveal its location inside the real complete screen; no fake morphing of its content | at least 2 transitions |
+| **Layered camera travel** | Real GF3 UI layers captured/mounted independently | Screen planes tilt subtly in 2.5D perspective, parallax foreground text and background, settle to head-on for readability. Avoid aggressive perspective during data reading | at least 3 feature chapters |
+| **Interaction micro-cinema** | Real button/calendar selection/confirmation | Cursor/touch indicator arrives, button reacts using true press styling, matching actual before/after product state, soft audio hit | at least 3 distinct feature workflows |
+| **Kinetic type** | Promo-only Polish copy over GF3 colors | Large text revealed by mask/line split/word stagger in sync with camera/sound, not generic repeated fade-in | problem, reveal, 2 features, outro |
+| **Focus extraction** | Real existing badge, date cell, summary, notification | Exact pixels from UI are isolated by non-destructive crop/alpha mask, briefly enlarged as a spotlight, then seamlessly returned to original place | at least 2 scenes |
+| **Continuity move** | Same genuine UI shape/color across shots | Foreground card/blue line serves as animated bridge so adjacent clips feel like one continuous camera move | at least 4 of 8 boundaries |
+| **Hero composition** | Real app canvas | Strong legible central shot with negative space, restrained shadow and a clear reason to look at a specific interaction | at least 4 scenes |
 
-**Do not:**
-- change mutation payloads or validation;
-- add new React state only for decorative animation;
-- add timers for exit transitions.
+**Technical authenticity boundary:** A separate photographic/captured UI piece may be used as a 2.5D foreground layer if it is an unaltered crop of authentic GF3 output. Allowed transformations: affine/perspective movement, clip, mask, scale, opacity, shadow, blur on **background layers**, short outlines and callouts. **Not allowed:** redrawing calendar text or controls with marketing CSS and then claiming they are app components; inventing new screens or effects pretending to be native interactions; deforming real text beyond legibility.
 
----
+### 1.0.2 Measurable polish rubric (manual + automated checks)
 
-### Step 9 — Update Schedule tests for motion-aware scrolling and preserve current behavior
+- **First 3 seconds:** an immediately comprehensible friction point. Avoid a logo-only opening or 3 seconds of empty abstract particle graphics.
+- **Editorial tempo:** transition event approximately every 2–4 seconds, but each main product UI chapter contains at least one >=2.5-second continuous period during which the genuine relevant interface is readable. Do not turn the 75 seconds into 75 independent slide reveals.
+- **Scene variety:** at least 3 clearly different camera compositions (macro crop, isometric 2.5D, broad product view); at least 2 scenes with very clean/minimal backgrounds; at least one deliberate pause after a strong feature reveal. Do not keep every scene at identical scale/angle.
+- **Accents:** every prominent blue stroke/button/line is either a true GF3 token or a promo graphic clearly related to the selected real control; use sparingly. No random colored glowing orbs, glitch effects, excessive bounce, spinning logos or gratuitous stock mockups.
+- **Legibility:** 1920x1080 output; avoid clipping titles, blurred full UI, microtext on unscaled complex tables; for detail-heavy captures, move camera to exact relevant row/card, not to a 400px-wide whole-page thumbnail. At steady product shots, date/status/shift labels must be human-readable.
+- **Truthful content:** marketing title and illustrated problem metaphors are creatively authored; any alleged visible GF3 workflow/result must be sourced from actual rendered components/captures and traced in the shot manifest.
+- **Professional finish:** smooth acceleration/deceleration, stable color and font rendering, no SVG/CSS aliasing or pixel jump between composited PNG layers; audio should have balanced clean intro, sync points and smooth outro.
 
-**Action:** MODIFY
+### 1.0.3 Scene-by-scene cinematography over the FIXED 75-second storyboard
 
-**File:**
-- `FrontEnd/src/pages/employee-schedule/ui/EmployeeSchedulePage.test.tsx`
+The exact nine chapter boundaries and Polish copy below remain binding. Implement **these specific directorial beats** inside the existing chapter windows. A real rendered UI source remains visible wherever a feature is claimed.
 
-**Changes:**
+| Time | Visual choreography and authentic feature proof | Transition anchor / cue |
+|---|---|---|
+| `00–06` pain | Oversized Polish headline on neutral field; editorial stacks of **abstract** shift-notes/messages collide, misalign, then halt. Problem graphics must not masquerade as a broken GF3 interface. Punch into the visual gap that will become the GF3 workspace. | One hard accent at 0.3s, fast stagger 1.0–3.0, white-space pause 4.0–5.0, converging masks 5.2–6.0 |
+| `06–12` reveal | One tiny authentic GF3 schedule/calendar tile appears at center; other true UI fragments assemble into a recognizable GF3 product frame. Camera smoothly expands to hero view, GF3 name/title types in. Keep first on-screen GF3 view unambiguously real. | Calendar/card geometry becomes next manager grid |
+| `12–23` manager | Start macro on a real shift card and date cell, tilt/reframe to reveal the manager scheduling grid. Animate actual before/action/after layout or truthful highlights. Push slightly into genuine occupied shift cell; stabilize full readable context. | Real blue selection/shift-card edge travels into availability page |
+| `23–33` availability | Real GF3 availability selectors emerge as isolated authored **crops of actual UI**, arrange in a rhythmic row, then reattach to the complete availability calendar. One genuine selection action + true visual result, hold on legible changed cell(s). | Selected calendar cell's dimensions match the opening schedule day tile |
+| `33–44` schedule | Close on a real date + assigned shift detail; pull out into actual employee weekly/monthly schedule. A subtle line guides eye to shift details/summary, then hierarchy settles. Show published state; do not animate fictional publishing. | Authentic shift card scales into swap offer card |
+| `44–55` swap | Make a real swap offer card the focal subject, actual real button click and real dialog open. Stage swap confirmation in a legible 2.5D foreground card **only if the app really displays that state**; otherwise show genuine offer/details and do not imply it was automatically accepted. The swap flow is the emotional highlight. | Real modal/card rectangle collapses into source-compatible notifications/summary tile |
+| `55–63` more | Two quick cut-ins of confirmed, actually implemented UI only (schedule summary, notifications or export control by priority). Pan through authentic real visual details; do not show new fabricated analytics. | Tiles fan out into connected collage |
+| `63–69` connected | Bring real manager, availability, employee schedule and swap frames into one clean four-part composition, using their genuine captures. Draw one restrained blue continuity line through key cards while camera floats slightly, then compress into a simple GF3 mark. | Blue line becomes GF3 brand accent |
+| `69–75` outro | Quiet high-contrast hero; GF3 brand lockup, concise Polish value line, CTA. Hold final frame steadily for >=3 sec, no background screen noise or intrusive particle effects. | Soft audio resolve, full fade-out by end |
 
-1. Add a deterministic `window.matchMedia` mock/helper used by this test file.
-2. Default the helper to `prefers-reduced-motion: no-preference` in `beforeEach` and reset it between tests.
-3. Update the existing Daily-view scroll expectation:
-   - normal mode must expect `behavior: "smooth"`;
-   - keep `block: "nearest"` and `inline: "center"`.
-4. Add a focused test with reduced motion enabled and verify Daily-day centering uses `behavior: "auto"`.
-5. Keep the existing assertion that the Matrix/Daily toggle returns focus to the toggle button.
-6. Add a small DOM-wiring assertion for the state animation boundary:
-   - the rendered Matrix/Daily stage has `data-employee-motion="schedule-content"`;
-   - its `data-motion-key` changes when switching view or selecting another schedule.
-7. Add/extend a Summary test so that changing month/year changes the Summary content/total motion key without changing calculated values.
-8. Preserve all current Schedule behavior tests, including:
-   - matrix data;
-   - Daily worker ordering;
-   - empty Daily state;
-   - column ordering;
-   - PDF behavior;
-   - summary calculations;
-   - loading/empty/error states;
-   - explicit absence of the Salary calculator.
-9. Do not attempt to assert frame timing or CSS keyframe duration in Vitest/JSDOM.
+**Storytelling rule:** Each middle chapter must exhibit an event the real product makes possible, not a passive collage. There must be a clear visual "before → user gesture → visible outcome" chain for manager/availability/swap where supported; the employee schedule must show the readable result of a genuinely published schedule.
 
-**Behavior after change:**
+### 1.0.4 Mandatory previsualization artifacts (not permission to stop early)
 
-- Tests protect the new JS behavior and ensure animation wiring does not alter functional behavior.
+Create the following **original GF3** shot-design artifacts *in addition* to the current plan's MP4/poster/contact sheet and provenance, under `FrontEnd/artifacts/promo/`:
 
-**Do not:**
-- add snapshot tests for generated CSS class names;
-- make tests depend on real animation timing.
+- `styleframes/01-pain.png`, `02-reveal.png`, `03-manager.png`, `04-availability.png`, `05-schedule.png`, `06-swap.png`, `07-more.png`, `08-connected.png`, `09-outro.png` — exactly nine 1920×1080 representative creative frames from the actual film compositor, not AI-generated substitute mockups. Use original/captured GF3 pixels for all feature frames. These must be available before full export for targeted QA.
+- `motion-cue-sheet.json` — timeline array `{sceneId, startSec, endSec, headline, realUiShotIds, cameraMoves, transitionAnchor, soundCueSec}` derived from the actual deterministic timeline; no invented demo operations.
+- `creative-qa.md` — yes/no evaluation of the above motion grammar, scene variety, source authenticity, readability, sound design and visual polish, with links to frame names and known limitations. Never claim the film has achieved agency-grade subjective quality solely from passing ffprobe.
 
-## 5. Data / API / Persistence Changes
+These are **QA artifacts**, not new web pages or a second promotional system. Preserve the old `promo.html`, previous film renderer and prior asset organization.
 
-### Data model
 
-None.
 
-### API
+### 1.1 Aesthetic
 
-None.
+- 16:9 film frame with exceptionally clear UI: oversized editorial headings, generous whitespace, deep navy/near-black contrast, white product canvases, restrained GF3 blue `#2563eb` accents; final color decisions use current application CSS.
+- Motion language: rapid-but-readable type masks, elegant springless transforms, smooth reframing, tasteful UI zooms, clean match cuts, precise highlighting, subtle depth/parallax, one or two dramatic pauses, no unmotivated camera shakes, excessive blooms, generic sci-fi particles, stock imagery or fake devices.
+- Show **actual readable app screen areas** for at least 3 seconds of every core feature chapter. Avoid product screenshots too tiny to recognize. Limit software-screen movement during text-heavy moments. If the screen is complex, crop into the relevant existing UI area using non-destructive scale/translate.
+- Render at full native 1920×1080; use `deviceScaleFactor:1` and wait for fonts before capture. All essential text should remain safely within 80px inset from film edges. No strobing, illegible microtext, overflow or blurry CSS scale.
+- Original licensed assets only. Do not reproduce OpenAI/Google/Grok brand designs, logos, slogans, proprietary fonts or voice tracks. Do not access external image/music/AI APIs to satisfy this job.
 
-### Persistence
+### 1.2 Exact 75-second storyline and Polish copy
 
-None.
+Keep the following feature ordering and boundaries **exact**. Motion choreography inside a window may be refined for readability; do not add scenes or extend runtime.
 
-The following existing flows must remain exactly as they are:
+| ID | Time (start inclusive, end exclusive) | Real product material and action | Primary on-screen Polish copy |
+|---|---|---|---|
+| `pain` | `00.0–06.0` | Many disconnected schedule cards/messages; cinematic editorial graphics (no fake GF3 UI claim). | `Grafiki. Wiadomości. Zmiany.` → `Chaos, który zabiera czas.` |
+| `reveal` | `06.0–12.0` | Chaos converges into brand GF3 and one **real** product frame. | `A gdyby wszystko było w jednym miejscu?` → `Poznaj GF3.` |
+| `manager` | `12.0–23.0` | Authentic manager planning/container/graph UI. Animate attention to a genuine shift row/grid and show existing workflow state before/after; do not imply magical automatic creation. | `Planowanie zmian. Pod kontrolą.` → `Przejrzysty grafik w jednym miejscu.` |
+| `availability` | `23.0–33.0` | Authentic employee/manager availability interface with demonstrable availability selection and readable calendar. | `Dostępność bez zgadywania.` → `Wiesz, kto i kiedy może pracować.` |
+| `schedule` | `33.0–44.0` | Authentic employee `/schedule` view: week/month shifts, summary/clear day highlight. Show the result of a **previously published** schedule, not a fake publish operation. | `Każdy widzi swój grafik.` → `Jasno. Zawsze pod ręką.` |
+| `swap` | `44.0–55.0` | Authentic employee `/swap` interface: shift offer, clear confirmation and accepted state **only if represented by actual functionality**. Use two synthetic employees; no unverified auto-approval. | `Plany się zmieniają?` → `Zamiany zmian w jednym miejscu.` |
+| `more` | `55.0–63.0` | Authentic existing summary, employee notifications, or export controls (choose by verified availability, priority: summary + notifications; **do not fabricate functionality**). | `Wszystko, co ważne. Czytelnie.` |
+| `connected` | `63.0–69.0` | Multi-screen composition made from **genuine** captured manager/schedule/availability/swap material; editorial flow line connects them. | `Jeden system. Jeden rytm pracy.` |
+| `outro` | `69.0–75.0` | GF3 logo/wordmark, quiet hold ≥3 s with no residual obscuring motion. | `GF3` → `Grafiki bez niepotrzebnego chaosu.` → `Zobacz, jak działa.` |
 
-- published Schedule query;
-- Employee UI-state query/save;
-- local column-order storage;
-- shift-correction query/mutation;
-- PDF export generation.
+**Interaction choreography per chapter:**
+- `manager`: 12–14 headline; 14–18 push into existing schedule grid; 18–21 reveal affected real cell / state; 21–23 hold + transition.
+- `availability`: 23–25 title; 25–29 actual availability selection/highlight; 29–31 associated view/summary; 31–33 legible hold/transition.
+- `schedule`: 33–35 title; 35–39 calendar day focus; 39–42 show real shift details/summary; 42–44 transition.
+- `swap`: 44–46 title; 46–50 actual UI offer/details; 50–53 genuine confirmation/accepted presentation; 53–55 hold/transition.
+- `more`: 55–57 title; 57–61 real supporting UI; 61–63 transition.
+- `connected`: 63–66 align actual UI images; 66–69 one flowing composition with caption.
+- `outro`: 69–71 logo reveal; 71–72 supporting line; 72–75 static legible ending.
 
-### Dependency injection
+## 2. Final architecture — one approach, reuse the existing work
 
-None.
+**Keep the existing Vite/React/GSAP promo project as the film compositor, and add an authentic-product-footage ingestion + deterministic Playwright/FFmpeg MP4 pipeline.** Do **not** introduce Remotion, After Effects, a second video app, a new backend, or a custom redesign of the GF3 product.
 
-### Configuration
+**Data flow:** real GF3 presentational components OR controlled local app pages → synthetic demo state → reusable stills/frame sequences captured/arranged in the promo asset directory → current `promo.html` film stage with GSAP-driven titles/camera/scene transitions → frame-accurate `window.__GF3_PROMO__.seek()` → Playwright screenshots streamed to FFmpeg → H.264/AAC MP4 → FFprobe and visual/audio QA.
 
-None.
+### 2.1 Preflight: inspect only what has changed since the prior plan
 
-### npm dependencies
+**Action: READ ONLY.** Check these local paths first, preserving local uncommitted changes:
 
-None. `package.json` and lockfiles must not change for this task.
+- `FrontEnd/promo.html`
+- `FrontEnd/src/promo/**` (only this subtree)
+- `FrontEnd/scripts/render-promo.mjs` (if present)
+- `FrontEnd/package.json`, `FrontEnd/vite.config.ts`, `FrontEnd/.gitignore`, `FrontEnd/PROMO.md`
+- `docs/design-system.json` and only the five page/UI sources in section 0.1 needed for authentic captures.
 
-## 6. Error and Edge Case Requirements
+Record a 10-line inventory in `FrontEnd/PROMO.md`: what already exists, whether capture controller renders deterministic frames, and which screenshots were authentic vs recreated. **Do not run a full repo scan or reset/reset hard/pull/rebase.** Keep previously functional promo scenes and renderer; extend them.
 
-1. **No schedules / loading:** existing panels remain usable and receive only their existing `schedule-panel` entrance.
-2. **Query/PDF/preference errors:** the message itself must remain readable immediately; animation must never delay or hide it after settling.
-3. **Shift-correction success:** status remains `role="status"`; animation is presentation-only.
-4. **Rapid Matrix/Daily toggles:** previous tween is killed and the newest state wins; no stacked GSAP timelines.
-5. **Rapid Daily-day changes:** only the current tabpanel finishes visible; no stale opacity/transform inline styles after GSAP cleanup.
-6. **Rapid Summary period changes:** only the current total/grid key is animated; no per-row tween accumulation.
-7. **Same state selected twice:** unchanged `data-motion-key` must not deliberately replay animation.
-8. **`prefers-reduced-motion`:** all functionality and focus changes work with no spatial entrance animation and with non-smooth day centering.
-9. **`matchMedia` unavailable in the test/runtime environment:** the local scroll helper must fail safely and treat the environment as normal/no-preference rather than throwing.
-10. **Large lists:** list stagger remains capped; do not make duration proportional to list length.
-11. **Mobile:** no entrance transform may cause horizontal page overflow; dialog/sheet animations must keep current safe-area and viewport sizing.
-12. **Keyboard:** animation must not move focus, trap focus differently, or require pointer input.
-13. **Live hero clock:** every-second updates must not recreate/restart hero animation.
+### 2.2 CREATE — minimal new source assets and utilities
 
-## 7. Tests
+All paths below are relative to the repository root.
 
-### Automated tests
+| Action | Path | Exact responsibility |
+|---|---|---|
+| CREATE | `FrontEnd/src/promo/motion-cue-sheet.ts` (or exact existing storyboard equivalent) | Single source for 75-second cue timing, per-scene camera keyframes, title reveals, transition anchors, feature-shot mapping and effect markers. Only one timeline authority; do not duplicate the existing storyboard. |
+| CREATE | `FrontEnd/src/promo/real-ui/shot-manifest.ts` | Typed immutable feature-shot provenance catalog. Map `{id, feature, acquisition, sourcePaths, sourceRoute?, dataSet, assets, notes}` with IDs `manager`, `availability`, `schedule`, `swap`, `more`. No invented API URLs. |
+| CREATE | `FrontEnd/src/promo/real-ui/RealFeatureShot.tsx` | Pure presentational component placing **real** captured UI media or an existing production presentational component inside stable `data-promo-real-shot` wrapper. Crop/reframe via props (CSS transform), not through painting a replacement UI. |
+| CREATE | `FrontEnd/src/promo/real-ui/RealFeatureShot.module.css` | Local aspect-preserving masks/shadows/device frames/sharp rendering; NEVER override global GF3 product CSS. |
+| CREATE | `FrontEnd/scripts/promo/capture-product-ui.mjs` | A targeted Playwright script to capture frames of actual running app demo routes, where direct component mounts cannot satisfy the shot. Include real route and provenance metadata. Inputs and error behavior in §3.2. |
+| CREATE | `FrontEnd/scripts/promo/render-film.mjs` | Mandatory reusable deterministic 75-second H.264/AAC encoder; reuse the previous `render-promo.mjs` implementation via a wrapper or refactor, but keep `npm run promo:render` working. |
+| CREATE | `FrontEnd/scripts/promo/generate-audio.mjs` | Produce a subtle **original** 75s WAV bed and short cue accents using deterministic local mathematical audio synthesis (no online TTS, music generators or licensed samples). Do not overpower legible copy; avoid loudness spikes. |
+| CREATE | `FrontEnd/scripts/promo/verify-film.mjs` | Probe MP4 technical parameters, input source provenance, thumbnails/black-frame diagnostics; produce `qa-report.json` and fail on mandatory criteria. |
+| CREATE | `FrontEnd/src/promo/real-ui/real-ui.test.ts` | Unit checks for source provenance/catalog, five selected feature shots, no empty data, no production credential references. |
+| CREATE | `FrontEnd/e2e/promo-video.spec.ts` | Preview/capture/seek order tests on existing promo entry and actual feature shots. |
+| MODIFY | `FrontEnd/src/promo/` existing scene modules and existing storyboard/timeline | Retain working code; change duration to **75** and replace promo-only faux feature previews with real shots. Add camera, annotations, titles and scene transitions defined in §1. |
+| MODIFY | `FrontEnd/package.json` | Add `promo:film`, `promo:verify`, and `promo:capture-ui` script commands while preserving `promo:render` as backward-compatible alias. No new animation framework. |
+| MODIFY | `FrontEnd/PROMO.md` | Exact run, capture, render, verify, problem-solving commands; include real-UI provenance table, three reference links with third marked unverified if inaccessible, directorial style rubric and asset provenance. |
+| MODIFY | `FrontEnd/.gitignore` | Ignore local output under `artifacts/promo/`, and any `src/promo/real-ui/private-captures/`/playwright authentication state. |
 
-Run from `FrontEnd`:
+If the local implementation uses equivalent names/paths, **extend the existing module rather than create a duplicate of the same responsibility**; preserve all public routes and scripts. Fixed external filenames and commands below remain binding.
 
-```bash
-npm test -- EmployeeSchedulePage.test.tsx
-npm run lint
-npm run build
-npm test
+### 2.3 REUSE/DO NOT TOUCH
+
+**REUSE:** GSAP 3 timeline/`@gsap/react`, Vite, React 19/TS, existing real shared GF3 visual components, their current CSS modules and fonts, Playwright Chromium, and FFmpeg. Use no external video generation services. Preserve existing actual app CSS implementation.
+
+**DO NOT TOUCH:** .NET backend, SQLite/migrations, auth/permission gates, app router, application providers, data/business/swap calculations, user-facing production page behavior, `docs/design-system.json`, and normal `index.html`. No commits of auth storage-state, synthetic fake customer identities that resemble actual employees, browser videos containing real data, or giant generated MP4 files (the final MP4 is local in ignored `artifacts/`).
+
+## 3. Authentic footage acquisition, step by step
+
+### Step 1 — Verify and preserve existing promo pipeline
+
+**Action: MODIFY minimally.** Inspect exactly the preflight files above. Confirm `promo.html` actually serves at local Vite port and check if a `?capture=1` deterministic `window.__GF3_PROMO__` controller exists. Keep existing good transitions/visuals. Record any broken render condition precisely. Do not start new React app or migrate the existing scenes to another framework.
+
+If `window.__GF3_PROMO__` exists, retain contract. Otherwise add a **capture-only** controller:
+
+```ts
+type GF3FilmController = {
+  ready: boolean;
+  duration: 75;
+  fps: 30;
+  width: 1920;
+  height: 1080;
+  seek(seconds: number): void;
+  getTime(): number;
+};
 ```
 
-Required automated coverage:
+`seek(t)` must be finite-input validated, pause playback and synchronously yield the same image at time `t` regardless of seek history. Every scene remains mounted in the DOM. No CSS auto-keyframes, timers, `Math.random()` or network-driven content may change film-critical pixels during capture.
 
-- normal Daily switch uses smooth selected-day centering;
-- reduced-motion Daily switch uses automatic centering;
-- Matrix/Daily focus restoration remains intact;
-- motion key changes for view/schedule state;
-- Summary state key changes while summary values remain correct;
-- all existing Schedule behavior tests still pass.
+### Step 2 — Prepare synthetic GF3 demo states **without modifying production business rules**
 
-### Manual interaction verification
+**Action: REUSE/CREATE in promo only.** Use one coherent fictional October 2026 workweek, 3–6 synthetic employees, plausible shift times, availability selections and a plausible shift swap. Preserve role separation: manager visual data on manager material; employee visual data on employee material. Ensure the visuals and actions reflect the app's actual supported transitions.
 
-With `npm run dev`, verify `/schedule` on desktop and a narrow mobile viewport:
+Preference order **for every feature**:
 
-1. First load:
-   - hero settles first with layered internal reveal;
-   - Schedule content and Summary follow without a long blocking sequence.
-2. Matrix ↔ Daily:
-   - button press feedback is immediate;
-   - content transition is smooth and does not flash/reflow;
-   - toggle retains focus.
-3. Daily day strip:
-   - selected date centers smoothly in normal mode;
-   - only Daily body content transitions;
-   - 28–31 tabs do not independently cascade into view.
-4. Schedule picker:
-   - overlay/sheet/list entrance is clean;
-   - selected/focus/hover states remain clear;
-   - long list entrance remains bounded.
-5. Column-order dialog:
-   - open/list/control feedback is animated;
-   - moving rows still works and does not lose focus because no layout FLIP is added.
-6. Shift Correction:
-   - sections and conditional panels appear smoothly;
-   - selecting a day/boundary and editing time remains immediate.
-7. Summary:
-   - month/year dropdowns retain existing SearchableSelect behavior;
-   - total and grid transition on period change as a whole;
-   - rows are not individually animated.
-8. Error/success feedback:
-   - messages enter once and remain static/readable.
-9. Reduced motion:
-   - emulate `prefers-reduced-motion: reduce`;
-   - no hero/section/dialog/list spatial animation;
-   - no button press scaling;
-   - selected-day scroll is not smooth;
-   - all state and focus feedback remains understandable.
+1. Use existing exported **production presentational component** and current CSS with typed synthetic props; capture it isolated with a promo-only wrapper and no backend.
+2. If the page is API/auth-stateful, use Playwright to capture **actual production page DOM** at existing app routes in an isolated **local demonstration instance** with synthetic records. Reuse test/fixture or local seeded demo mechanisms that are *already present*; do not run it on production or real user data.
+3. If a genuine screenshot cannot be obtained (no demo state, credentials, no backend), **fail that authenticity check explicitly**. Never silently substitute the `Demo*.tsx` promotional lookalike and label it a production feature capture.
 
-### Performance verification
+For the source/route family, use the exact paths in §0.1; supplementary shot priority order `employee schedule summary` > `notifications` > `existing export actions` > `employee listing`. Do not add a new product feature.
 
-Use browser Performance/Rendering tools during the manual checks:
+### Step 3 — Capture authentic GF3 UI where direct React component rendering is impractical
 
-- page must become idle after entrance animations settle;
-- no newly introduced recurring timers, RAF loops, scroll listeners, or animation observers should produce work while idle;
-- structural animation should show transform/opacity compositing rather than repeated layout of the matrix/table;
-- rapidly switch views/days/summary periods and verify old tweens are cancelled rather than accumulating;
-- verify no animation is applied per matrix cell or per Summary row.
+**Action: CREATE.** `FrontEnd/scripts/promo/capture-product-ui.mjs`.
 
-## 8. Verification
+**Environment contract:**
 
-### Build
+- `PROMO_APP_URL` — address of local **demo-only** GF3 app (default `http://localhost:5173` when applicable); the script must verify local origin and reject remote production hosts by default.
+- `PROMO_MANAGER_STATE` and `PROMO_EMPLOYEE_STATE` — optional paths to **locally prepared ignored** Playwright `storageState` files. Do not print, package, or copy their contents into promo artifacts. They must reference synthetic/demo users only.
+- `PROMO_DEMO_DATASET` — optional path to already available local synthetic fixtures or a demo seed recipe. If production flow requires a backend that is absent, emit a descriptive blocked-source error with setup requirements. Do not create or migrate a production DB.
+- `PROMO_CAPTURE_DIR` — default `FrontEnd/src/promo/real-ui/captures/` for **verified sanitized demo material**; no real employee content.
 
-- `npm run build` completes successfully.
+Script behavior:
 
-### Lint
+1. Launch existing Playwright Chromium at fixed 1440×900 viewport, DPR 1, `locale:'pl-PL'` (only if the app supports Polish; otherwise use the existing supported UI language and keep Polish marketing headlines separate), stable `colorScheme` and time zone `Europe/Warsaw`. Wait for app bootstrap and font readiness.
+2. Open exact manager/employee route(s) from §1, using correct demo session when the page requires it. Explicitly check that the expected real page loaded (not login, empty/spinner, 403, error banner, or an unconfigured mock UI).
+3. For each scenario, acquire a clearly named **beginning, interaction, outcome** capture where a real UI state is available; drive clicks/hover/scroll via role/label-based selectors and **only actual controls**. For screen transitions requiring real mutation, operate only against a disposable synthetic fixture/demo instance and keep the result consistent across film takes; seed/reset between takes.
+4. Save full-resolution PNGs or tightly-scoped PNG frame sequences into `real-ui/captures/{feature}/`; omit browser chrome, devtools, real usernames, passwords, notifications, tokens and scrollbars not meant for the product showcase. Preserve the **real product styling**.
+5. Write/update provenance in `shot-manifest.ts` with source code path, route, frame filenames, and acquisition method; clean up any saved storage state references from output.
+6. Capture a stable screenshot before and after each genuinely demonstrated product operation. A cinematic highlight or simulated cursor overlay may **focus** attention; it must **not** invent a success state absent from the captured workflow.
 
-- `npm run lint` completes successfully.
+**Concrete target scenes:** `manager` planning grid; `availability` selections; `schedule` day/month shift detail; `swap` offer + dialog/confirmation; `more` genuine summary/notification/export. The script should fail with a per-scene list, not falsely say “success” when screenshots are missing.
 
-### Tests
+### Step 4 — Replace decorative fake previews with real visual sources
 
-- targeted Schedule test file passes;
-- full `npm test` passes.
+**Action: MODIFY existing `FrontEnd/src/promo` scenes + CREATE `RealFeatureShot.tsx`.**
 
-### Integration
+- Mount `RealFeatureShot` in `manager`, `availability`, `schedule`, `swap`, `more` and `connected` scenes. For production-component shots, render real reusable React component with synthetic props and import its **existing CSS module**. For Playwright-capture shots, display the captured full-res image(s) without recoloring/repainting product UI.
+- Apply GSAP camera movement (`x`,`y`,`scale`,`opacity`, clip/mask) **to the wrapper only**; keep text and product pixels crisp. Use at most one clear cursor/click moment and one outcome highlight per feature scene. Pan/zoom should be motivated by the user action, not just decorative movement.
+- Play back real **before → interaction → after** screenshots/frames as synchronized states from the same captured interface. Use real live GIF/video frames only if they were captured from the actual app; PNG state transitions can be animated by positioning two genuine screen states.
+- Remove or repurpose the older `DemoWorkspace`, `DemoAvailability`, `DemoEmployeeSchedule`, `DemoSwap` from the **final film** if they are promo-only imitations. They may remain as development reference code, but do not appear in the exported core feature chapters.
+- Keep the original graphic intro, brand reveal and outro as cinematic promotional visuals (they do not need to be actual app UI).
+- Onscreen caption/annotation layers must not cover buttons, shift dates or app data important to the demonstration.
+- No cross-scene blank frames, z-index leaks, stretched app shots, stale highlight after a cut, or two competing headline layers.
 
-- `EmployeeWorkspaceLayout` still owns the Employee GSAP scope;
-- `/schedule` uses `data-employee-motion` + `data-motion-key` for dynamic block transitions;
-- no second motion system/provider/observer exists.
+### Step 5 — Refine motion to launch-film standard
 
-### Runtime
+**Action: MODIFY existing GSAP timeline and stylesheet.**
 
-- no animation leaves an element stuck transparent or transformed;
-- dialogs, Schedule selection, Matrix/Daily, Daily-day switching, Summary selection, PDF export, column order, and shift correction all remain functional;
-- desktop and mobile layouts remain unchanged except for motion/micro-interaction styling.
+- Encode exact start/end times from §1.2 in one central immutable `storyboard.ts` / current equivalent, `PROMO_DURATION_SECONDS=75`, `PROMO_FPS=30` and `2250` frames.
+- Use eased cinematic camera moves, matched component geometry across adjacent scenes, and masks revealing authentic UI at high visual weight; avoid simple hard cuts between static PowerPoint-like slides.
+- Problem/reveal are kinetic type-driven; each feature segment highlights a product workflow, and the ending is intentionally quiet. Build all 7 motion motifs from §1.0.1. Follow exact scene choreography from §1.0.3, not a flat slideshow.
+- Assemble 2.5D compositions from real presentational components or verified actual-app cropped media (with authentic source rects). Use real UI pieces as moving subjects; static full-page screenshot pans by themselves **do not meet acceptance**.
+- Generate all nine source-derived `styleframes/` and `motion-cue-sheet.json` before final export, then use them for visual QA.
+- Implement time-locked effects **inside** the GSAP timeline only. All product captures/assets must be preloaded and fully decoded before `__GF3_PROMO__.ready=true`. Expose `seek` only in `?capture=1`; preserve interactive preview play/pause/scrub and `prefers-reduced-motion` handling outside export.
+- At the final frame (`t=74.999…`), the GF3 CTA is visible; there must be no auto-rewind or black flash.
 
-### Regression
+## 4. Mandatory actual MP4 production pipeline
 
-- other Employee routes keep their normal existing animation when reduced motion is not requested;
-- reduced-motion users get less movement throughout the shared Employee/shared-control primitives touched by this task;
-- SearchableSelect functionality and ViewportOverlay layout remain unchanged;
-- Salary calculator remains absent from `/schedule`.
+### Step 6 — Audio generation and licensing safety
 
-### Scope
+**Action: CREATE** `FrontEnd/scripts/promo/generate-audio.mjs`.
 
-- no backend files changed;
-- no package/lock files changed;
-- no unrelated refactor.
+- Generate reproducible **original** ambient sound design locally in uncompressed WAV using Node built-ins: an extremely soft sustained musical bed with 2–3 harmonious simple intervals, plus subtle transient sounds synchronized to `6`, `12`, `23`, `33`, `44`, `55`, `63`, `69` seconds. No music download, samples, external network TTS, or alleged celebrity voice. Original WAV should be exactly `75s`, `48000Hz`, stereo, and avoid clipping.
+- Keep audio restrained: transitions perceptible but not intrusive, film remains clear without sound. Add a 0.6s fade-in and ~1.5s fade-out. Do not generate loud harsh sine beeps; layer envelopes/low-pass soft edges and limiter. The existing quiet cinematic aesthetic takes priority over audible effects.
+- Output to ignored `FrontEnd/artifacts/promo/audio-bed.wav`.
+- Audio-generation errors must terminate export clearly rather than quietly yielding malformed streams. Validate duration and sample rate.
 
-## 9. Acceptance Checklist
+### Step 7 — Render every deterministic frame and encode MP4
 
-- [ ] `/schedule` has one coherent motion language instead of independent competing Matrix/Daily keyframes.
-- [ ] Existing `useEmployeeMotion` remains the only page-level JS motion orchestrator.
-- [ ] No new animation dependency was added.
-- [ ] Hero entrance is layered, restrained, and does not replay on clock updates.
-- [ ] Loading/empty panels reveal smoothly.
-- [ ] Error and success feedback enters once and remains accessible.
-- [ ] Selecting another schedule replays only the Schedule content boundary.
-- [ ] Matrix ↔ Daily content transition is smooth and focus remains on the toggle.
-- [ ] Daily selected day centers with smooth scrolling in normal mode.
-- [ ] Daily selected day centers instantly under reduced motion.
-- [ ] Daily tabpanel content reanimates on day change through `data-motion-key`.
-- [ ] Schedule picker sheet and a bounded subset of list rows reveal progressively.
-- [ ] Column-order and Shift Correction dialogs have responsive control/state motion without changing logic.
-- [ ] Summary total and grid animate on period changes as containers, not as dozens of row animations.
-- [ ] Buttons/tabs/selectors provide short press/hover/selected feedback without bounce-heavy motion.
-- [ ] `prefers-reduced-motion: reduce` suppresses JS GSAP spatial reveal, global press animation, overlay entrance, SearchableSelect dropdown entrance, Schedule hero/dialog/list motion, and smooth scrolling.
-- [ ] No matrix-cell animation was added.
-- [ ] No Summary-row animation was added.
-- [ ] No scroll listener, RAF loop, ScrollTrigger, or continuous decorative animation was added.
-- [ ] No persistent `will-change` was added to large element groups.
-- [ ] `npm run lint` passes.
-- [ ] `npm run build` passes.
-- [ ] targeted Schedule tests pass.
-- [ ] full Vitest suite passes.
-- [ ] existing functional Schedule behavior is unchanged.
-- [ ] Salary calculator remains absent.
-- [ ] No unrelated files were modified.
+**Action: CREATE or EXTEND.** `FrontEnd/scripts/promo/render-film.mjs`; reuse existing `FrontEnd/scripts/render-promo.mjs` where working.
 
-## 10. Do Not Change
+**Command interface:** from `FrontEnd/`:
 
-Do not modify as part of this task:
+```bash
+npm run promo:film
+```
 
-- backend projects, controllers, services, DTOs, persistence, migrations, or API contracts;
-- Employee Schedule domain/calculation helpers except where a test import is mechanically required;
-- `ContainerGraphMatrix` internals or its public API;
-- `CardSection` internals;
-- `SearchableSelect.tsx` public API/behavior;
-- Employee Schedule PDF-generation behavior;
-- schedule/shift-correction API calls;
-- column-order persistence format or storage keys;
-- authentication/session logic;
-- route definitions;
-- the hero timer/update interval;
-- dependencies in `package.json` or lockfiles;
-- old/removed Salary calculator functionality;
-- unrelated Employee pages or Manager workflows;
-- repository-level `Plan.md` or unrelated documentation during implementation unless the user separately requests documentation updates.
+This command MUST, unattended after prerequisites are installed:
+
+1. Resolve `ffmpeg` and `ffprobe` on `PATH`; if missing, show exact actionable Windows (`winget`) or Ubuntu (`apt`) installation command and fail clearly. Do not claim a video was rendered. Use already installed system FFmpeg; no unnecessary new npm video dependencies. Use a local Vite server if available; if not, **spawn Vite on a free fixed port internally** and wait for readiness, then stop only the spawned child when done. Do not kill unrelated processes on port 5173.
+2. Start/attach Playwright Chromium and navigate to `promo.html?capture=1` on the resolved local server. Use a 1920×1080 viewport, DPR=1, `pl-PL`, stable film-stage CSS. Block unrelated external requests, wait for the film controller, `document.fonts.ready`, every image decode and scene ready signal. Do not stream unfinished images.
+3. Validate `__GF3_PROMO__.duration===75`, `fps===30`, stage bounds exactly 1920×1080 and shot-manifest completeness **before encoding**.
+4. For each integer frame `i=0..2249`, call `seek(i/30)` and allow deterministic layout/paint synchronization. Screenshot **only the 1920×1080 film stage**, not devtools, browser chrome, preview controls or page margins.
+5. Stream frame PNG buffers immediately with backpressure to FFmpeg stdin; do not store all 2250 frames in RAM. Encode `-c:v libx264 -preset medium -crf 17 -pix_fmt yuv420p -r 30 -movflags +faststart` with exactly 2250 frames; merge the original 48 kHz WAV as AAC stereo (`-c:a aac -b:a 192k -ar 48000`); use `-t 75`/`-shortest` carefully so neither stream truncates the video below 75.0 seconds.
+6. Write first to `FrontEnd/artifacts/promo/gf3-product-film-1080p.partial.mp4`, only atomically rename to `gf3-product-film-1080p.mp4` when FFmpeg exits successfully AND `verify-film` passes. Delete failed `.partial.mp4` only; never delete unrelated files.
+7. Create the poster as the clean frame `t=71.5s` before the end CTA, or adjust poster time within `69–74s` to capture a completely legible hero. Create a contact sheet containing one thumbnail centered in each of the nine storyboard scenes. Save nine full-resolution `styleframes/` from compositor time points, as defined in §1.0.4. Write `motion-cue-sheet.json` and `creative-qa.md` alongside the video; all artifacts must correspond to the **final** timeline.
+8. Print the **absolute final MP4 path**, output size, exact duration, resolution, codec, number of frames, and QA report location. Exit nonzero on failure.
+
+**Implementation constraints:**
+- `npm run promo:render` MUST remain an alias to the final 75-second movie pipeline; don't leave a separate silent 52-second renderer mislabeled as final.
+- Frame count `75×30=2250`, frame timestamp `i/30`, expected display duration 75s (last actual frame timestamp 74.9667s). No hidden additional trailing blank or encoder-introduced 5s hold.
+- Do not encode raw real-user browser captures with a screen-recorder unless provenance confirms synthetic data.
+- A separate 4-second sample mode may be added as an **internal** performance check, but it is not the final deliverable and cannot count as task completion.
+- If render speed is slow, keep fidelity and optimize source asset caching/effects. Do not silently lower resolution/fps or skip frames.
+- If script previously uses arbitrary Vite server URL, preserve environment override `PROMO_BASE_URL` and do not break the previous preview workflow.
+
+### Step 8 — Automated objective QA
+
+**Action: CREATE** `FrontEnd/scripts/promo/verify-film.mjs` and `FrontEnd/e2e/promo-video.spec.ts`.
+
+**Mandatory technical checks:**
+
+- MP4 file exists and is substantial (at least 1 MiB; this threshold only detects empty/truncated files, not visual quality).
+- Probe via `ffprobe` JSON: `codec_name=h264`, `width=1920`, `height=1080`, `pix_fmt=yuv420p`, nominal `r_frame_rate=30/1`, actual decoded/stream frame count **2250** when available, duration between `74.95` and `75.05` seconds; audio is AAC, stereo, 48000 Hz, duration approximately 75 s.
+- Use FFmpeg `blackdetect` on a temporary diagnostics pass; fail if an unexpected black interval >0.20s occurs **after the intentionally dark problem scene**. Avoid treating brand-intentional dark/navy backgrounds as automatically black: inspect contrast and headlines.
+- Extract representative scene stills at `3`, `9`, `17`, `28`, `38`, `49`, `59`, `66`, `72` seconds and boundary stills at `6`, `12`, `23`, `33`, `44`, `55`, `63`, `69`. Ensure visible nonempty composition, meaningful target real UI on the five feature segments and correct Polish captions without clipping.
+- Check audio RMS/peak (must not be completely silent, peak must not clip at 0 dBFS); inspect several cue periods and confirm complete fade-out. Do not claim audio quality can be fully assessed by RMS alone.
+- Generate contact sheet and `qa-report.json` with `status: PASS | FAIL | PROVISIONAL`, `duration`, `fps`, `width`, `height`, `videoCodec`, `audioCodec`, `frameCount`, `sourceProvenance`, `authenticScenes`, `missingAuthenticScenes`, `visualWarnings`, `renderCommand`, `outputPath`, `timestamp`.
+
+**Vitest/Playwright tests:**
+
+- Storyboard has nine nonoverlapping contiguous scenes covering exactly `0–75` in prescribed order.
+- All five real product shot sources have a valid acquisition mode and a corresponding file or component; no empty manifest or fabricated fallback.
+- Capture mode displays no preview controls and exports `window.__GF3_PROMO__` with exact expected contract.
+- Determinism: screenshots at t=28 and t=49 are byte-identical after seek order `49→3→28→49→28` for repeated target times.
+- All scene centers show legible title and expected feature shot, not a loading placeholder or login gate; final CTA is still visible at t=74.9.
+- Browser does not attempt production domain requests, authenticated customer APIs or telemetry from the preview/capture page.
+- Normal app Vite `index.html` remains usable and route handling is unchanged.
+
+**Visual human review:** Inspect the nine styleframes and generated contact sheet and spot-watch actual MP4 at playback speed. Score all seven motion motifs from §1.0.1 and specific choreography from §1.0.3 in `creative-qa.md`; reject a film comprised of plain cuts, screenshot slide-zooms or marketing-reconstructed product screens, even when MP4 technical tests pass. All three user URLs are recorded in `PROMO.md`; the third reference may be unviewable and must be identified as such, never fabricated.
+
+Inspect the generated contact sheet and spot-watch actual MP4 at playback speed. Identify blurry fonts, unreadable small schedules, awkward crops, repeated footage, fake interactions, too-rapid changes, clipped screen edges, sound harshness, or redundant logo moments. Fix the specific shot/cue and re-render the finished MP4 once. Do **not** endlessly redesign unrelated pages.
+
+## 5. Error behavior and fallbacks
+
+- **Missing preview/capture source:** re-use the working HTML and add only the absent controller/wiring. Do not rebuild all promo components.
+- **Missing demo backend or auth state:** try the production-component pathway using typed synthetic props and real CSS. If still impossible, record a precise per-feature blocker in QA rather than passing off a fake preview as authentic.
+- **Feature not actually implemented:** show an alternative verified customer-facing workflow from §1 (`more` priority) and adjust only its supporting caption, not the entire structure. Never simulate a nonexistent success.
+- **Screenshots contain private data:** fail validation, delete/replace affected capture with synthetic demo material and re-export. Never put secret storage-state files in the media directory.
+- **Encoder unavailable or crashes:** return nonzero, keep diagnostics, never announce completion or leave an empty final MP4. A `.partial` may be deleted after an error.
+- **Seeking produces different pixels:** fix non-deterministic React state/CSS timers/network/images; do not hide the failure by tolerating mismatches.
+- **Audio generator fails:** do not silently report a valid audio-supported export; fix source generator or flag explicit blocker and do not pass final acceptance.
+- **No access to local changed promo code from the planning AI:** CODEX itself sees its local working tree; only do targeted inspection in §2.1, not a full audit or architectural restart.
+
+## 6. Exact executable sequence for CODEX
+
+Execute sequentially, reporting commands and results; **do not stop after build or after viewing promo.html**:
+
+1. Preserve worktree; targeted inspect existing promo modules/renderer.
+2. Implement five authentic-product shot sources + manifest; validate real UI capture or genuine reused components.
+3. Replace promo-only faux feature previews in 75-second storyboard and implement all seven signature motion motifs using the real GF3 components/media, per detailed §1.0.1–§1.0.3 scene direction. Produce authentic nine-scene styleframes and a motion cue sheet.
+4. Implement/repair deterministic capture seek and 1920×1080 stage readiness.
+5. Implement 75s original audio-bed generator and renderer; add package.json command aliases.
+6. Run targeted tests, then perform FULL 2250-frame encoding into actual H.264/AAC MP4.
+7. Run technical verification, extract all thumbnails/styleframes, perform §1.0 creative-qa review (the product UI must move as the subject), fix major flaws and re-render.
+8. Verify normal frontend builds and no app regressions; document exact video path and final test results.
+
+Expected developer commands:
+
+```bash
+# From repository root
+cd FrontEnd
+npm install
+npx playwright install chromium
+# Ensure ffmpeg and ffprobe are installed and on PATH; see PROMO.md
+npm run lint
+npm run build
+npm run test
+npx playwright test e2e/promo-video.spec.ts --project=chromium
+npm run promo:film
+npm run promo:verify
+
+# The actual deliverable must exist here:
+# FrontEnd/artifacts/promo/gf3-product-film-1080p.mp4
+```
+
+For development on Ubuntu, only if FFmpeg is absent and package installation is permitted: `sudo apt-get update && sudo apt-get install -y ffmpeg`. For Windows, only if absent and permitted: `winget install --id Gyan.FFmpeg -e`, restart shell and verify `ffmpeg -version` + `ffprobe -version`. Never claim an installation succeeded without checking it. If permissions or system prerequisites block encoding, state **the exact blocker** and leave a valid, runnable command for the user; do not report the user goal as completed.
+
+## 7. Acceptance criteria — all required for `PASS`
+
+- [ ] Existing working `promo.html` is retained and upgraded; no wholesale rewrite or loss of previous work.
+- [ ] Film story tells a coherent product problem → GF3 → authentic walkthrough → value → brand pitch.
+- [ ] Manager scheduling, availability, employee schedule, swaps, and one additional verified workflow use real GF3 visual UI sources, not independently recreated marketing imitation cards.
+- [ ] The actual screen interactions/states shown are plausible and supported by the app; no false AI or performance claims.
+- [ ] Every authentic feature shot is traceable to real components/route and synthetic demo data.
+- [ ] Clear Polish captions, consistent brand styling from current CSS, readable interface crops, smooth scene rhythm and no visual glitches.
+- [ ] Motion-designed real GF3 interface: real card/grid assembly, actual interaction before/after, matched transitions, 2.5D camera layers, kinetic type, source-authentic focus extractions (requirements §1.0.1). **A basic screenshot recording, a zoom/pan slideshow or recreated marketing UI FAILS.**
+- [ ] Exactly nine film-derived 1920×1080 styleframes, `motion-cue-sheet.json`, `creative-qa.md` exist and accurately reflect the final MP4.
+- [ ] All three reference URLs preserved as creative inspiration; no copied copyrighted frames/audio, and any inaccessible reference acknowledged honestly.
+- [ ] One 75s / 1920×1080 / 30fps H.264 `yuv420p` MP4 with AAC audio is physically present at fixed required output path and plays to the GF3 closing CTA.
+- [ ] Poster PNG, nine-scene contact sheet and `qa-report.json` exist at fixed output paths.
+- [ ] `ffprobe` and video frame/audio checks pass; `qa-report.json` says `PASS`, not `PROVISIONAL`.
+- [ ] Targeted Vitest/Playwright and frontend build/lint pass or failures are accurately reported.
+- [ ] No backend, auth, SQLite, business logic, app router or non-promo production UI behavior was modified.
+- [ ] No real user/customer data or private auth state was included in exported/committed media.
+- [ ] Final CODEX reply provides actual MP4 absolute path, file size, ffprobe summary, provenance count, QA report path and preview commands. **Do not say “done” solely because an HTML page renders.**
+
+## 8. Codex final response contract
+
+CODEX must finish with:
+
+1. **Video:** absolute path to existing `gf3-product-film-1080p.mp4`, human-readable size, verified codec, dimensions, duration and fps.
+2. **Actual GF3 UI used:** table of `manager`, `availability`, `schedule`, `swap`, `more`, with source code location or demo route, and acquisition mode; explicitly list any blockers or unverified visuals.
+3. **Supporting deliverables:** exact poster, contact-sheet, nine styleframes, motion cue sheet, creative QA report and technical QA-report paths.
+4. **Verification:** lint, build, unit/E2E, frame+audio probe results; mark failures and environmental blockers truthfully.
+5. **Worktree:** concise list of files changed/created; no unrelated changes.
+
+**STOP CONDITION:** only stop with `PASS` after the MP4 and all acceptance artifacts are actually created and verified. If a required external prerequisite is unavailable, stop with `BLOCKED`, explicit reason and precise reproducible commands; never misrepresent an unrendered or non-authentic promo as completed video.
+
+---
+
+**CODEX MODEL EXECUTION GUIDANCE (not part of architecture):** This is **High implementation complexity**, primarily authentic multi-role UI acquisition, cinema-grade GSAP timeline integration, and deterministic video encoding/QA. Prefer a **Strong CODEX model with Medium reasoning** (use High if debugging real UI fixture/auth dependencies becomes nontrivial). Use an exact currently available model name only after checking CODEX's model selector. Avoid highest reasoning by default: core architecture, narrative, file ownership and quality gates are already decided in this plan.

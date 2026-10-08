@@ -26,6 +26,19 @@ describe("LoginPage password modes", () => {
     mocks.login.mockReset().mockResolvedValue({ role: "manager" });
   });
 
+  test("legal links are ordinary navigation and never submit credentials", () => {
+    renderPage();
+    for (const [name, href] of [
+      ["Legal documents", "/legal/index.html"], ["Terms", "/legal/regulamin.html"],
+      ["Privacy policy", "/legal/polityka-prywatnosci.html"], ["Cookies", "/legal/pliki-cookies.html"],
+    ]) {
+      const link = screen.getByRole("link", { name });
+      expect(link).toHaveAttribute("href", href);
+      fireEvent.click(link);
+    }
+    expect(mocks.login).not.toHaveBeenCalled();
+  });
+
   test("restores the last username and password mode", () => {
     window.localStorage.setItem("gf3.auth.last-username", "saved.manager");
     window.localStorage.setItem("gf3.auth.password-mode", "phone");

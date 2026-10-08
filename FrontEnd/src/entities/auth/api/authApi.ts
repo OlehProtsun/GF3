@@ -10,6 +10,7 @@ import type {
 
 type SessionDto = {
   role: AuthSession["role"];
+  isSystemManager?: boolean;
   userName: string;
   displayName: string;
   managerId?: number | null;
@@ -25,6 +26,7 @@ type LoginResponseDto = {
 function toSessionModel(dto: SessionDto): AuthSession {
   return {
     role: dto.role,
+    isSystemManager: dto.isSystemManager === true,
     userName: dto.userName,
     displayName: dto.displayName,
     managerId: dto.managerId ?? null,

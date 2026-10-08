@@ -7,11 +7,15 @@ using BusinessLogicLayer.Common;
 using DataAccessLayer.Models;
 using DataAccessLayer.Models.Enums;
 using WebApi.Contracts.ShiftSwaps;
+using Microsoft.Data.Sqlite;
 
 namespace WebApi.ShiftSwaps;
 
 internal static class ShiftSwapRules
 {
+    internal static bool IsSqliteWriterConflict(Exception exception)
+        => exception is SqliteException { SqliteErrorCode: 5 or 6 } ||
+            exception.InnerException is SqliteException { SqliteErrorCode: 5 or 6 };
     private static readonly Regex GraphNoteMetaRegex = new(
         @"(?:\r?\n\r?\n)?(?:<!--GF3_GRAPH_META:([\s\S]*?)-->|\[\[GF3_GRAPH_META:([\s\S]*?)\]\])$",
         RegexOptions.Compiled);
@@ -26,7 +30,15 @@ internal static class ShiftSwapRules
             return ShiftSwapArchive.ReadView(model.ArchivedViewsJson, currentEmployeeId);
         var slot = model.Schedule.Slots.FirstOrDefault(slot => slot.Id == model.ScheduleSlotId) ?? model.ScheduleSlot
             ?? throw new InvalidOperationException("The swap has no shift or archived snapshot.");
-        var offeredPeriod = GetSwapPeriod(model, slot);
+        ShiftSwapPeriod offeredPeriod;
+        try
+        {
+            offeredPeriod = GetSwapPeriod(model, slot);
+        }
+        catch (ValidationException)
+        {
+            offeredPeriod = new(model.OfferedFromTime ?? slot.FromTime, model.OfferedToTime ?? slot.ToTime);
+        }
         var shiftHours = GetTimeRangeDurationHours(offeredPeriod.FromTime, offeredPeriod.ToTime);
         var fromHoursBefore = model.FromEmployeeId.HasValue ? GetEmployeeHours(model.Schedule.Slots, model.FromEmployeeId.Value) : 0;
         var isOpen = model.Status == ShiftSwapStatus.Open;
@@ -125,6 +137,28 @@ internal static class ShiftSwapRules
         if (swap.Status != ShiftSwapStatus.Open)
         {
             return "This swap offer is no longer open.";
+        }
+
+        if (swap.Schedule.PublicationStatus != SchedulePublicationStatus.Public)
+            return "This swap belongs to a schedule that is no longer public.";
+
+        if (swap.ScheduleSlotId != slot.Id || slot.ScheduleId != swap.ScheduleId)
+            return "This shift is no longer available.";
+        if (swap.IsManagerCreated ? slot.EmployeeId.HasValue :
+            !swap.FromEmployeeId.HasValue || slot.EmployeeId != swap.FromEmployeeId)
+            return swap.IsManagerCreated ? "This open shift is no longer available." :
+                "This shift is no longer assigned to the employee who opened the swap.";
+
+        try
+        {
+            NormalizePeriod(offeredPeriod.FromTime, offeredPeriod.ToTime, "FromTime", "ToTime");
+            EnsurePeriodWithinSlot(slot, offeredPeriod);
+            if (swap.IsManagerCreated && swap.ManualColumnId.HasValue)
+                RemoveManualColumnCellFromNote(swap.Schedule.Note, swap.ManualColumnId.Value, slot.DayOfMonth);
+        }
+        catch (ValidationException exception)
+        {
+            return exception.Message;
         }
 
         if (!swap.Schedule.AllowSwap)
@@ -255,6 +289,9 @@ internal static class ShiftSwapRules
 
     internal static ShiftSwapPeriod ResolveRequestedPeriod(CreateEmployeeShiftSwapRequest request, ScheduleSlotModel slot)
     {
+        if (string.IsNullOrWhiteSpace(request.FromTime) != string.IsNullOrWhiteSpace(request.ToTime))
+            throw ValidationException.ForField(string.IsNullOrWhiteSpace(request.FromTime) ? nameof(request.FromTime) : nameof(request.ToTime),
+                "Supply both start and end times.");
         var fromTime = string.IsNullOrWhiteSpace(request.FromTime) ? slot.FromTime : request.FromTime;
         var toTime = string.IsNullOrWhiteSpace(request.ToTime) ? slot.ToTime : request.ToTime;
         var period = NormalizePeriod(fromTime!, toTime!, nameof(request.FromTime), nameof(request.ToTime));
@@ -318,7 +355,8 @@ internal static class ShiftSwapRules
         ScheduleSlotModel slot,
         int originalEmployeeId,
         int acceptingEmployeeId,
-        ShiftSwapPeriod period)
+        ShiftSwapPeriod period,
+        IReadOnlyCollection<ScheduleSlotModel> scheduleSlots)
     {
         var remainingSlots = new List<ScheduleSlotModel>();
         var originalFrom = slot.FromTime;
@@ -328,15 +366,36 @@ internal static class ShiftSwapRules
         var periodFromMinutes = ParseTimeMinutes(period.FromTime)!.Value;
         var periodToMinutes = ParseTimeMinutes(period.ToTime)!.Value;
 
+        int AllocateSlotNo(string fromTime, string toTime)
+        {
+            var occupied = scheduleSlots
+                .Where(existing => existing.Id != slot.Id)
+                .Concat(remainingSlots)
+                .Where(existing => existing.ScheduleId == slot.ScheduleId &&
+                    existing.DayOfMonth == slot.DayOfMonth &&
+                    existing.FromTime == fromTime && existing.ToTime == toTime)
+                .Select(existing => existing.SlotNo)
+                .ToHashSet();
+            var slotNo = 1;
+            while (occupied.Contains(slotNo))
+                slotNo++;
+            return slotNo;
+        }
+
         if (periodFromMinutes > originalFromMinutes)
         {
-            remainingSlots.Add(CreateRemainingSlot(slot, originalEmployeeId, originalFrom, period.FromTime));
+            remainingSlots.Add(CreateRemainingSlot(slot, originalEmployeeId, originalFrom, period.FromTime,
+                AllocateSlotNo(originalFrom, period.FromTime)));
         }
 
         if (periodToMinutes < originalToMinutes)
         {
-            remainingSlots.Add(CreateRemainingSlot(slot, originalEmployeeId, period.ToTime, originalTo));
+            remainingSlots.Add(CreateRemainingSlot(slot, originalEmployeeId, period.ToTime, originalTo,
+                AllocateSlotNo(period.ToTime, originalTo)));
         }
+
+        if (remainingSlots.Count > 0)
+            slot.SlotNo = AllocateSlotNo(period.FromTime, period.ToTime);
 
         slot.FromTime = period.FromTime;
         slot.ToTime = period.ToTime;
@@ -346,12 +405,12 @@ internal static class ShiftSwapRules
         return remainingSlots;
     }
 
-    internal static ScheduleSlotModel CreateRemainingSlot(ScheduleSlotModel sourceSlot, int employeeId, string fromTime, string toTime)
+    internal static ScheduleSlotModel CreateRemainingSlot(ScheduleSlotModel sourceSlot, int employeeId, string fromTime, string toTime, int slotNo)
         => new()
         {
             ScheduleId = sourceSlot.ScheduleId,
             DayOfMonth = sourceSlot.DayOfMonth,
-            SlotNo = sourceSlot.SlotNo,
+            SlotNo = slotNo,
             EmployeeId = employeeId,
             Status = SlotStatus.ASSIGNED,
             FromTime = fromTime,
@@ -381,6 +440,9 @@ internal static class ShiftSwapRules
 
     internal static int? ParseTimeMinutes(string value)
     {
+        if (value.Length != 5 || value[2] != ':' ||
+            value.Where((_, index) => index != 2).Any(character => character is < '0' or > '9'))
+            return null;
         var parts = value.Split(':', StringSplitOptions.TrimEntries);
         if (parts.Length < 2 ||
             !int.TryParse(parts[0], NumberStyles.Integer, CultureInfo.InvariantCulture, out var hour) ||
@@ -428,20 +490,20 @@ internal static class ShiftSwapRules
     {
         if (string.IsNullOrWhiteSpace(rawNote))
         {
-            return rawNote;
+            throw new ValidationException("The manual shift metadata is invalid or the cell is missing.");
         }
 
         var match = GraphNoteMetaRegex.Match(rawNote);
         if (!match.Success || match.Index < 0)
         {
-            return rawNote;
+            throw new ValidationException("The manual shift metadata is invalid or the cell is missing.");
         }
 
         var rawMeta = match.Groups[2].Success ? match.Groups[2].Value : match.Groups[1].Value;
         var meta = ParseGraphNoteMeta(rawMeta);
         if (meta is null)
         {
-            return rawNote;
+            throw new ValidationException("The manual shift metadata is invalid or the cell is missing.");
         }
 
         var changed =
@@ -450,7 +512,7 @@ internal static class ShiftSwapRules
 
         if (!changed)
         {
-            return rawNote;
+            throw new ValidationException("The manual shift metadata is invalid or the cell is missing.");
         }
 
         var visibleNote = rawNote[..match.Index].TrimEnd();
@@ -470,7 +532,14 @@ internal static class ShiftSwapRules
 
         if (payload.StartsWith("b64:", StringComparison.Ordinal))
         {
-            return TryParseJsonObject(DecodeGraphNoteMetaValue(payload[4..]));
+            try
+            {
+                return TryParseJsonObject(DecodeGraphNoteMetaValue(payload[4..]));
+            }
+            catch (FormatException)
+            {
+                return null;
+            }
         }
 
         return TryParseJsonObject(payload) ?? TryParseJsonObject(Uri.UnescapeDataString(payload));
@@ -524,7 +593,9 @@ internal static class ShiftSwapRules
                 continue;
             }
 
-            if (column.Count < 3 || column[2] is not JsonObject cells || !cells.Remove(dayKey))
+            if (column.Count < 3 || column[2] is not JsonObject cells ||
+                cells[dayKey] is not JsonValue cell || !cell.TryGetValue<string>(out var text) ||
+                string.IsNullOrWhiteSpace(text) || !cells.Remove(dayKey))
             {
                 return false;
             }
@@ -555,7 +626,8 @@ internal static class ShiftSwapRules
                 continue;
             }
 
-            return column["cells"] is JsonObject cells && cells.Remove(dayKey);
+            return column["cells"] is JsonObject cells && cells[dayKey] is JsonValue cell &&
+                cell.TryGetValue<string>(out var text) && !string.IsNullOrWhiteSpace(text) && cells.Remove(dayKey);
         }
 
         return false;

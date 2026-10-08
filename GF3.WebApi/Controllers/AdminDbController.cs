@@ -17,7 +17,7 @@ namespace WebApi.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/admin/db")]
-[Authorize(Roles = AuthRoles.Manager)]
+[Authorize(Policy = AuthPolicies.SystemManager)]
 public sealed class AdminDbController : ControllerBase
 {
     private readonly IAdminDbService _adminDbService;
