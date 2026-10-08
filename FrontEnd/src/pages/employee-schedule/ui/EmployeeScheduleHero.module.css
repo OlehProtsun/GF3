@@ -1,6 +1,6 @@
 .hero {
   min-width: 0;
-  padding: clamp(22px, 5vw, 34px) clamp(18px, 4vw, 28px) 26px;
+  padding: clamp(22px, 5cqw, 34px) clamp(18px, 4cqw, 28px) 26px;
   border-radius: 28px 28px 36px 36px;
   color: #fff;
   background: radial-gradient(ellipse at 100% 110%, #007a9b 0%, transparent 58%), linear-gradient(135deg, #2b91ec 0%, #396bcc 70%, #1464b3 100%);
@@ -14,26 +14,26 @@
 .heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 24px; }
 .greeting { min-width: 0; }
 .greeting time { display: block; color: #e0edff; font-size: .8rem; line-height: 1.5; }
-.greeting h1 { margin: 5px 0 0; color: #fff; font-size: clamp(1.65rem, 5vw, 2rem); font-weight: 700; letter-spacing: -.045em; line-height: 1.15; overflow-wrap: anywhere; }
+.greeting h1 { margin: 5px 0 0; color: #fff; font-size: clamp(1.65rem, 5cqw, 2rem); font-weight: 700; letter-spacing: -.045em; line-height: 1.15; overflow-wrap: anywhere; }
 .clock { display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; min-height: 39px; padding: 0 13px; border-radius: 999px; color: #fff; background: rgba(255,255,255,.14); font-size: .94rem; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .shifts { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); padding: 18px 0; border-radius: 25px; background: linear-gradient(115deg, rgba(255,255,255,.20), rgba(255,255,255,.10)); }
-.day { min-width: 0; padding: 0 clamp(12px,3vw,20px); }
+.day { min-width: 0; padding: 0 clamp(12px,3cqw,20px); }
 .day + .day { border-left: 1px solid rgba(255,255,255,.25); }
 .day h2 { margin: 0 0 10px; color: #deebff; font-size: .68rem; font-weight: 500; text-transform: uppercase; letter-spacing: .06em; }
 .shift { display: grid; gap: 4px; }
 .shift + .shift { margin-top: 14px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,.18); }
-.shift strong { font-size: clamp(.92rem,3vw,1.14rem); line-height: 1.25; font-weight: 650; overflow-wrap: anywhere; }
-.range { color: #fff; font-size: clamp(.79rem,2.8vw,.96rem); font-weight: 550; white-space: nowrap; }
+.shift strong { font-size: clamp(.92rem,3cqw,1.14rem); line-height: 1.25; font-weight: 650; overflow-wrap: anywhere; }
+.range { color: #fff; font-size: clamp(.79rem,2.8cqw,.96rem); font-weight: 550; white-space: nowrap; }
 .countdown { margin-top: 3px; color: #e0edff; font-size: .74rem; line-height: 1.4; }
 .dayOff { margin: 0; font-size: 1.05rem; font-weight: 600; }
 .status { margin: 0; font-size: .8rem; line-height: 1.5; }
-@media (max-width: 360px) { .hero { padding: 22px 14px; } .clock { min-height: 33px; padding: 0 10px; font-size: .82rem; } .heading { gap: 8px; } .greeting time { font-size: .72rem; } }
+@container employee-workspace (max-width: 360px) { .hero { padding: 22px 14px; } .clock { min-height: 33px; padding: 0 10px; font-size: .82rem; } .heading { gap: 8px; } .greeting time { font-size: .72rem; } }
 
-@media (max-width: 859px) {
+@container employee-workspace (max-width: 859px) {
   .hero {
     border-top-left-radius: 0;
     border-top-right-radius: 0;
-    padding-top: calc(clamp(22px, 5vw, 34px) + env(safe-area-inset-top));
+    padding-top: calc(clamp(22px, 5cqw, 34px) + env(safe-area-inset-top));
   }
 }
 

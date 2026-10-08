@@ -290,7 +290,7 @@
   background: rgba(219, 234, 254, 0.86);
 }
 
-@media (max-width: 620px) {
+@container employee-workspace (max-width: 620px) {
   .inboxPanel {
     gap: 10px;
     padding: 14px;
@@ -406,7 +406,7 @@
   }
 }
 
-@media (max-width: 420px) {
+@container employee-workspace (max-width: 420px) {
   .inboxHeaderActions {
     width: 100%;
     justify-content: flex-end;
@@ -455,7 +455,7 @@
   max-width: 100%;
 }
 
-@media (max-width: 620px) {
+@container employee-workspace (max-width: 620px) {
   .newsImage,
   .newsVideo {
     max-width: 100%;
