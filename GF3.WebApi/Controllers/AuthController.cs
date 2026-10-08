@@ -62,6 +62,7 @@ public sealed class AuthController(
 
         return Ok(new SessionDto
         {
+            IsSystemManager = User.IsInRole(AuthRoles.Manager) && User.HasClaim(AuthPolicies.SystemManagerClaim, "true"),
             Role = User.FindFirstValue(ClaimTypes.Role) ?? string.Empty,
             UserName = User.Identity.Name ?? string.Empty,
             DisplayName = User.FindFirstValue("display_name") ?? User.Identity.Name ?? string.Empty,
@@ -110,6 +111,7 @@ public sealed class AuthController(
 
     private static SessionDto ToSessionDto(BusinessLogicLayer.Contracts.Auth.AuthenticatedSessionDto session) => new()
     {
+        IsSystemManager = session.IsSystemManager,
         Role = session.Role,
         UserName = session.UserName,
         DisplayName = session.DisplayName,

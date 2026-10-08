@@ -5,6 +5,8 @@ namespace BusinessLogicLayer.Contracts.Auth;
 /// </summary>
 public sealed class AuthenticatedSessionDto
 {
+    public bool IsSystemManager { get; set; }
+
     public string Role { get; set; } = string.Empty;
 
     public string UserName { get; set; } = string.Empty;

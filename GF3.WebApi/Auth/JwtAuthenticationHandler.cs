@@ -56,6 +56,7 @@ public sealed class JwtAuthenticationHandler : AuthenticationHandler<Authenticat
             }
         }
 
+        var isSystemManager = false;
         if (session.Role == AuthRoles.Manager)
         {
             var account = session.ManagerId is > 0 && _managerAccounts is not null
@@ -65,6 +66,8 @@ public sealed class JwtAuthenticationHandler : AuthenticationHandler<Authenticat
             {
                 return AuthenticateResult.Fail("Manager session was revoked.");
             }
+
+            isSystemManager = account.IsSystem;
         }
 
         var claims = new List<Claim>
@@ -73,6 +76,11 @@ public sealed class JwtAuthenticationHandler : AuthenticationHandler<Authenticat
             new(ClaimTypes.Role, session.Role),
             new("display_name", session.DisplayName),
         };
+
+        if (isSystemManager)
+        {
+            claims.Add(new Claim(AuthPolicies.SystemManagerClaim, "true"));
+        }
 
         if (session.EmployeeId.HasValue)
         {

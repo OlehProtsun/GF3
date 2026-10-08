@@ -11,7 +11,7 @@ namespace WebApi.Controllers;
 
 [ApiController]
 [Route("api/admin/regulations")]
-[Authorize(Roles = AuthRoles.Manager)]
+[Authorize(Policy = AuthPolicies.SystemManager)]
 public sealed class AdminRegulationsController(
     IRegulationService regulationService,
     IWorkflowLogService workflowLogService) : ControllerBase

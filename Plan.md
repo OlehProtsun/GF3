@@ -1,272 +1,369 @@
-# Plan — Shift Swap Safety Audit, Hardening, and Accept Confirmation
+# Plan.md — GF3: System-manager-only tools and versioned UI presentation snapshot
 
-**Repository:** `https://github.com/OlehProtsun/GF3`  
-**Branch:** `DEV2`  
-**Immutable baseline:** `842f223ce923fdf2094e99e4089e3d65f6f675af`  
-**Mode:** CODEX implementation handoff. **Do not execute this plan during planning.**
+## 0. Execution contract and pinned baseline
 
-## 1. Objective and acceptance contract
+- **Repository:** `https://github.com/OlehProtsun/GF3`
+- **Branch:** `DEV2`
+- **Analyze/execute against commit:** `d8e752a8b75c8f1542fdb1d95a80b2ab39e1ad38`.
+- **Task A:** display and allow access to `/information` and `/database` only for the existing persisted **system manager**; ordinary managers and employees must not see or enter these pages and must not be able to use their privileged APIs.
+- **Task B:** bring the existing `docs/design-system.json` up to the pinned current UI and augment it into a comprehensive, deterministic design/interaction/motion reference for **future** presentation-video production. Do not produce videos or introduce capture infrastructure now.
+- **Workflow:** implement only the numbered steps below and run their tests. No second full repository investigation or architecture redesign. The old in-repository `Plan.md` concerns an unrelated task: **do not edit that file as part of implementation**. This delivered `Plan.md` is an external execution artifact.
+- **Baseline safety check:** run `git rev-parse HEAD`, `git branch --show-current`, `git status --short`. The source baseline is the pinned SHA. Preserve any pre-existing local changes. Stop and report a baseline conflict if local files in the target scope differ in ways that prevent applying the deltas safely; never discard uncommitted work.
 
-Protect existing employee-created public/private shift offers and manager-created open shifts from invalid input, stale state, double processing, concurrent accept/cancel operations, and accidentally exposed employee contact information. Preserve partial-shift transfer and history. Add an explicit **Accept swap?** confirmation to the employee `/swap` page. A successful acceptance must transfer the specified offered interval **exactly once**, persist one coherent request/status/history change, and emit post-commit notifications only for committed operations. A failed action must leave the schedule, request and history unchanged.
+## 1. Confirmed current state (reference, not another analysis task)
 
-This is **not** an implementation of two-way shift exchange, manager approval, new business limits, or a new scheduling subsystem. Preserve the existing meaning of “swap” (giving away an assigned interval / claiming an open shift).
+1. `BusinessLogicLayer/Services/ManagerAccountService.cs` bootstraps/updates a system-manager account (`IsSystem = true`); `GF3_BOOTSTRAP_MANAGER_PASSWORD` configures **its password**, not its role/name selection. The persisted model (`DataAccessLayer/Models/ManagerAccountModel.cs`) and business contract (`BusinessLogicLayer/Contracts/Managers/ManagerAccountModel.cs`) already expose `IsSystem`. A database with existing managers and no system manager is intentionally not automatically re-seeded: authorization must fail closed.
+2. `BusinessLogicLayer/Services/AuthService.cs` creates `AuthenticatedSessionDto` after manager/employee login. `GF3.WebApi/Controllers/AuthController.cs` projects that object to the `SessionDto` used by `POST /api/auth/login`, and constructs a new `SessionDto` from authenticated claims for `GET /api/auth/session`.
+3. `GF3.WebApi/Auth/JwtAuthenticationHandler.cs` already loads the manager account from `IManagerAccountRepository` for **every authenticated manager request** and validates its credential version. It currently has no system-manager claim. This existing database lookup is the trust boundary; no new token format or repository is required.
+4. `FrontEnd/src/entities/auth/model/types.ts` exposes `AuthSession`; `FrontEnd/src/app/providers/AuthProvider.tsx` stores it on login and refresh. `FrontEnd/src/app/router/AppRouter.tsx` allows all manager sessions to match `/information` and `/database`. `FrontEnd/src/app/layouts/overlay-sidebar-layout/OverlaySidebarLayout.tsx` displays Information and the DataBase Settings entry for all managers.
+5. The three relevant controller areas are `GF3.WebApi/Controllers/WorkflowLogsController.cs` (`/api/workflow-logs`), `GF3.WebApi/Controllers/AdminDbController.cs` (`/api/admin/db`) and `GF3.WebApi/Controllers/AdminRegulationsController.cs` (`/api/admin/regulations`). They currently authorize `manager` rather than `system manager`. The Database page embeds `RegulationsAdminPanel`.
+6. `GF3.WebApi/Middleware/AdminToolsGuardMiddleware.cs` imposes additional pre-existing developer-password, enable/write and local-access checks for admin tooling. These **remain cumulative**, not replaced by the new policy.
+7. Existing `docs/design-system.json` is a substantial non-runtime descriptive catalog: `foundations`, reusable UI/components and layouts, `pages`, `routeBindings`, `patterns`, `knownImplementationDivergences`. Its `project.commit` is `b4a08ad`; it is stale relative to the pinned target. Existing `routeBindings` include 2 public, 21 manager and 6 employee entries (29 total). The current TSX/CSS remain the actual runtime authority.
+8. There are already Vitest/Testing Library front-end tests, xUnit back-end tests, GSAP transitions (`FrontEnd/src/app/router/PageTransition.tsx`) and CSS motion (`FrontEnd/src/shared/ui/motion.css`). Reuse their existing test and styling conventions.
 
-## 2. Verified Analysis Context — baseline facts and audit findings
+## 2. Architecture and non-negotiable choices
 
-### 2.1 Confirmed code and mechanisms
+### 2.1 One trusted authorization fact
 
-- `GF3.WebApi/Controllers/EmployeeShiftSwapsController.cs`: `[Authorize(Roles = AuthRoles.Employee)]`, `GET /api/employee-shift-swaps`, `GET /employees`, `POST /`, `POST /{id}/accept`, `POST /{id}/cancel`.
-- `Accept`: starts an EF transaction, reads request with schedule/slots, validates status/publication/target/container/manager lock/overlap, mutates tracked slot, records before/after history snapshots, commits, logs and sends SignalR notifications **after** commit.
-- `GF3.WebApi/ShiftSwaps/ShiftSwapRules.cs`: partial transfer uses `ApplyAcceptedSwapPeriod(..., scheduleSlots)`, which now allocates non-conflicting `SlotNo`s. `GetAcceptanceUnavailableReason` is reused for DTO availability and acceptance checks.
-- `DataAccessLayer/Models/DataBaseContext/AppDbContext.cs`: already has a **filtered unique index** `ux_shift_swap_open_slot` on `(ScheduleSlotId, Status)` for `status = 'Open'`, and unique/validity constraints on schedule slots. The new `SlotNo` regression tests are in `GF3.Tests/ShiftSwapSlotNoConflictTests.cs`. **Do not remove either mechanism.**
-- `FrontEnd/src/pages/employee-swap/ui/EmployeeSwapPage.tsx`: `handleAccept` immediately calls `acceptSwapMutation.mutate(swap.id)` with no user confirmation; `SwapOfferCard` calls it directly. This page already uses `ConfirmDialog` to unpin swaps.
-- `FrontEnd/src/shared/ui/ConfirmDialog/ConfirmDialog.tsx`: reusable dialog supports `open`, `title`, `message`, `variant`, `onConfirm`, `onCancel`, `confirmText`, `confirmDisabled`, `cancelDisabled`.
-- `FrontEnd/src/entities/shift-swaps/api/queries.ts` + `shiftSwapsApi.ts`: existing accept mutation, cache invalidation, and backend `POST /{id}/accept` contract. Tests already exist at `FrontEnd/src/pages/employee-swap/ui/EmployeeSwapPage.test.tsx` (Vitest/Testing Library).
-- `FrontEnd/src/shared/i18n/index.ts` uses English literal keys and `FrontEnd/src/shared/i18n/pl.json` for Polish translations.
+`ManagerAccountModel.IsSystem` loaded from the **server-side database** is the only source of system-manager entitlement. A username such as `manager`, environment variable, request header, query string, JavaScript session object, or independently supplied JWT claim may **not** grant it. An employee never has that entitlement. There is no new user role: it is a boolean attribute of an existing `manager` account. `GF3_BOOTSTRAP_MANAGER_PASSWORD` stays the only relevant already-existing bootstrap env variable. Do not print its value, create a competing system username variable, or put a password in the UI design snapshot.
 
-### 2.2 Confirmed risks to remedy
+For all UI paths and APIs, missing/null/false entitlement means **deny**. Client gating is UX only; authorization must be enforced by the API server.
 
-**S1 — critical, stale/concurrent status changes.** `Accept` checks `swap.Status == Open` before mutating, then writes `Accepted` with ordinary tracked `SaveChanges`; employee `Cancel` independently checks Open then writes Cancelled. There is no **conditional, database-enforced Open → terminal-state claim** shared by these handlers. SQLite transactions mitigate some interleavings, but controller-level checks alone must not be relied on to guarantee first-writer-wins across request paths.
+### 2.2 Existing framework and components to REUSE
 
-**S2 — medium, race in create.** `Create` does an `AnyAsync(Open)` precheck then inserts. The existing database unique index correctly prevents a second open offer for the same slot, but the Create path does not translate that specific losing write into a controlled user-facing conflict.
+- ASP.NET Core authentication claims, authorization policies, controller-level `[Authorize]` and current `JwtAuthenticationHandler`.
+- `IManagerAccountRepository.GetByIdAsync` already called by the authentication handler, business `ManagerAccountModel.IsSystem`, existing login/session endpoints and `SessionDto`.
+- React `useAuth()`, `AuthProvider`, `OverlaySidebarLayout`, `AppRouter`, existing `Navigate`, `renderMatched`.
+- The current developer-password/configuration guard, application roles, error/401/403 handling, SPA page components, and RegulationsAdminPanel.
+- `docs/design-system.json` as the **one canonical design snapshot**; the existing TSX/CSS component definitions, page entries, page `controls`, `states`, `dialogs`, responsive descriptors, navigation and motion definitions.
 
-**S3 — medium, misleading availability / stale slot.** `GetAcceptanceUnavailableReason` validates swap status, permissions, manager lock and recipient overlap but does **not** validate that the source slot still belongs to the offering employee (or remains unassigned for manager-created offers), that the offered interval still fits the source slot, or that the referenced slot actually exists. `Accept` checks some of these later; GET can therefore incorrectly report `canAccept=true`, and `Accept` uses `First(...)`, which can throw if slot is missing.
+### 2.3 What NOT to introduce
 
-**S4 — medium, malformed input treated as public.** `Create` converts a supplied `TargetEmployeeId <= 0` to null, silently turning invalid private-recipient identifiers into a **public** offer. If one of the requested times is blank, the current resolver substitutes a source boundary; malformed partial offers can silently expand.
+No database migration, new privilege table, secondary repository, fresh authentication mechanism, JWT codec change, new npm/runtime dependency, video renderer, screenshot automation, CSS refactor, new design JSON under a different name, or changes to unrelated swap/business features.
 
-**S5 — medium, unnecessary PII in employee picker API.** `GET /api/employee-shift-swaps/employees` returns all employee emails and phone numbers even though the swap recipient UI uses only ID and display names. This endpoint is available to every authenticated employee. Limit the response to the fields actually necessary for recipient selection.
+## 3. Implementation steps — Task A: Privileged pages and APIs
 
-**S6 — UX, irreversible-feeling action without confirmation.** `Accept` takes the shift immediately on one click. Reuse the project's existing `ConfirmDialog` rather than adding a second dialog library or custom modal.
+### Step A1 — EXTEND the internal login session contract
 
-**Targeted robustness findings:** the backend `ParseTimeMinutes` currently ignores a third colon-separated component (e.g. `12:30:45`) despite requiring `HH:mm`; malformed graph-note base64 can throw `FormatException` while consuming manager-created manual-slot metadata. Validate/handle at the existing boundaries; never swallow a corrupt record and claim a successful transfer.
+**File:** `BusinessLogicLayer/Contracts/Auth/AuthenticatedSessionDto.cs`
 
-### 2.3 Boundaries and unknowns
+- Add `public bool IsSystemManager { get; set; }` with default `false` (normal C# bool default).
+- Keep role, IDs, token-related version fields and their types unchanged.
 
-The immutable GitHub source was read; **the application and concurrent .NET integration tests were not executed in this planning environment**. For targeted manager cancel/delete entry points, route contracts are verified from `FrontEnd/src/entities/shift-swaps/api/shiftSwapsApi.ts`, but their **controller filenames were not available** through the source browser. Step 2 includes a **bounded symbol lookup**, not a whole-repository investigation. No claims are made about an already demonstrated double-accept in production, or about atomicity across external realtime transports.
+**File:** `BusinessLogicLayer/Services/AuthService.cs`
 
-## 3. Technical Decision (completed Reasoning phase)
+- In the existing **manager** return object of `AuthenticateAsync(...)`, add `IsSystemManager = managerAccount.IsSystem` after manager credentials have been verified.
+- The **employee** return object stays false by default; set explicitly to `false` only if consistency makes it clearer.
+- Do not change password checking, marking successful login, account bootstrapping, or session versioning.
 
-Use existing EF Core/SQLite, controllers, `ShiftSwapRules`, DTOs, transaction, notifications, UI component, and test fixtures. Do **not** introduce a swap service framework, separate lock service, external queue, migration, new dependency, or a new approval state.
+**Dependency:** existing manager contract `IsSystem`; no new DI registration.
 
-1. Make every **Open → Accepted** and **Open → Cancelled** transition in the relevant endpoints a **conditional database update** (`WHERE Id = ... AND Status = Open`) and require **exactly one affected row**. For `Accept`, execute the conditional update **inside the existing transaction**, after preconditions and before applying slot changes; maintain consistency with the already tracked swap model. Concurrent losers receive the existing validation/conflict mechanism and commit nothing. For cancellation, use an atomic conditional transition as the write of record, not stale tracked `SaveChanges`.
-2. Reuse the existing **filtered unique index** and translate a Create insert conflict to a clear duplicate-offer response. Do not replace the index with application-only checks.
-3. Consolidate *existing* static acceptance preconditions in `GetAcceptanceUnavailableReason`; add only missing source-slot/period validity checks. Ensure the same validation is used at read/accept time, with authorization enforced on the server.
-4. Reject invalid target IDs and partially supplied time boundaries. Keep the established full-slot fallback **only when both optional times are absent/blank**. Enforce strict normalized `HH:mm` for supplied values.
-5. Reduce exposure from employee picker to `id`, `firstName`, `lastName`, `displayName`; leave private-target behavior intact (do not invent a new cross-container policy).
-6. Add a pending-swap state and reuse the current `ConfirmDialog` with the actual sender, schedule, date, time interval and hours. **Only the second explicit confirmation click** calls the existing mutation.
+### Step A2 — CREATE one authorization policy/claim constant holder
 
-**Why:** minimal change radius, SQLite provides the authoritative uniqueness/atomic write boundary, and existing UI infrastructure provides accessible confirmation without architectural work. **Do not** attempt to fix manager-edit concurrency by assuming the in-memory edit-lock service is cross-process; that is a separate architectural concern. This plan can recheck the existing lock, but cannot promise global cross-process edit coordination.
+**File (new):** `GF3.WebApi/Auth/AuthPolicies.cs`
 
-## 4. Change inventory
+- **Namespace:** `WebApi.Auth`.
+- **Type:** `public static class AuthPolicies`.
+- **Public constants:**
+  - `public const string SystemManager = "GF3.SystemManager";` (policy name).
+  - `public const string SystemManagerClaim = "gf3.system_manager";` (trusted claim type).
+- No authorization logic in this class. Do not duplicate the string values in controllers or handler.
 
-| Action | Exact file or narrow code owner | Responsibility |
-|---|---|---|
-| MODIFY | `GF3.WebApi/Controllers/EmployeeShiftSwapsController.cs` | Claim-once Accept/Cancel, input and conflict handling, no duplicate side effects, privacy projection |
-| MODIFY | `GF3.WebApi/ShiftSwaps/ShiftSwapRules.cs` | Source/offer validity available to both DTO and Accept, strict time parsing, malformed note handling |
-| MODIFY | `GF3.WebApi/Contracts/ShiftSwaps/ShiftSwapEmployeeDto.cs` | Remove unused email/phone fields |
-| MODIFY | Manager swap cancel action(s) found by **route-bound targeted lookup** in `GF3.WebApi/Controllers` | Prevent stale manager cancel from overwriting an accepted/cancelled state; retain manager authorization and delete semantics |
-| MODIFY | `FrontEnd/src/entities/shift-swaps/model/types.ts` | Remove unused employee-picker email/phone type fields; no ShiftSwap API shape change |
-| MODIFY | `FrontEnd/src/pages/employee-swap/ui/EmployeeSwapPage.tsx` | Explicit Accept confirmation and one-shot mutation |
-| MODIFY | `FrontEnd/src/shared/i18n/pl.json` | Polish strings for confirmation and new user-facing messages where translated |
-| MODIFY | `FrontEnd/src/pages/employee-swap/ui/EmployeeSwapPage.test.tsx` | UI confirmation regressions |
-| EXTEND | `GF3.Tests/ShiftSwapSlotNoConflictTests.cs` | Existing SQLite acceptance regression cases stay green |
-| CREATE | `GF3.Tests/ShiftSwapSafetyTests.cs` | SQLite-backed authorization, validation, atomicity, rollback tests |
-| REUSE AS-IS | `AppDbContext` slot and swap filtered unique indexes, `ShiftSwapHistorySnapshotBuilder`, notifier, workflow log, `PostCommitActions`, `ConfirmDialog`, React Query mutations, `SqliteTestDatabase` | Existing platform mechanisms |
-| DO NOT TOUCH | launcher, CI, auth architecture, unrelated schedule generator, broad styling, app shell, other frontend pages, existing historic swaps | Out of scope |
+### Step A3 — EXTEND trusted claims in the existing authentication handler
 
-No entity field, schema/index, EF migration, DI registration, environment setting, external package or HTTP route is required. The picker response intentionally drops unused contact fields; `ShiftSwapDto` and the Accept request/response contract remain unchanged.
+**File:** `GF3.WebApi/Auth/JwtAuthenticationHandler.cs`
 
-## 5. Ordered implementation steps
+- Within `HandleAuthenticateAsync`, retain the existing manager-account lookup and credential-version check exactly as the gate for a valid manager identity.
+- Preserve the loaded manager account for use while constructing the `List<Claim>` (e.g., a nullable `isSystemManager` boolean declared before the manager branch, assigned only from `account.IsSystem` **after** successful validation).
+- If **and only if** `session.Role == AuthRoles.Manager`, the repository account exists, the credential version matches **and** `account.IsSystem` is true, append `new Claim(AuthPolicies.SystemManagerClaim, "true")` to the resulting claims.
+- For regular managers, employees, or absent privileges, add **no** system-manager claim.
+- If manager record is missing or version mismatches, preserve existing failed-authentication behavior rather than creating an anonymous principal with a privileged claim.
+- **Do not modify** `GF3.WebApi/Auth/JwtTokenCodec.cs` or token payload creation. Existing signed tokens continue to work; newly derived privilege is reevaluated against persisted `IsSystem` on every authenticated request.
 
-### Step 0 — Baseline and bounded inspection
+### Step A4 — REGISTER standard authorization policy
 
-**Action:** VERIFY ONLY. `git rev-parse HEAD` must equal `842f223ce923fdf2094e99e4089e3d65f6f675af`; if working on a later commit, stop rather than silently adapt this plan. `git status --short`; protect unrelated uncommitted edits. Inspect **only** files in §4 and the manager swap action owners from this bounded search:
+**File:** `GF3.WebApi/Infrastructure/WebApiServiceCollectionExtensions.cs`
+
+- In existing `AddApiMvc(...)`, replace plain `services.AddAuthorization();` with the same call configured via an options lambda registering **one** policy named `AuthPolicies.SystemManager`.
+- Policy requirements must all hold:
+  1. authenticated principal: `.RequireAuthenticatedUser()`;
+  2. manager role: `.RequireRole(AuthRoles.Manager)`;
+  3. claim: `.RequireClaim(AuthPolicies.SystemManagerClaim, "true")`.
+- Keep default global controller authentication filter, bearer authentication scheme and other service registrations intact.
+- No extra lifetime/DI service; built-in authorization handles it.
+
+### Step A5 — EXTEND public session DTO and both session projections
+
+**File:** `GF3.WebApi/Contracts/Auth/SessionDto.cs`
+
+- Add `public bool IsSystemManager { get; set; }`, serialized as `isSystemManager` by existing JSON naming conventions. The field is non-nullable and false by default.
+
+**File:** `GF3.WebApi/Controllers/AuthController.cs`
+
+- `ToSessionDto(AuthenticatedSessionDto session)` used by `POST /api/auth/login`: set `IsSystemManager = session.IsSystemManager`.
+- `GetSession()` used by `GET /api/auth/session`: set `IsSystemManager` to **exactly** `User.IsInRole(AuthRoles.Manager) && User.HasClaim(AuthPolicies.SystemManagerClaim, "true")`; preserve existing role, name and ID projections.
+- Never use `User.Identity.Name`, a password/environment variable, or `managerId` alone as a shortcut to privilege.
+- Preserve route, status codes, JWT token structure and existing login/logout/password recovery behavior.
+
+**API contract delta:** both successful session payloads gain `isSystemManager: boolean`. No other API request/response or database field changes. Older frontend consumers may ignore the additive property; older tokens remain valid subject to existing credential-revocation rules.
+
+### Step A6 — MODIFY authorization for privileged controllers
+
+**Files:**
+
+1. `GF3.WebApi/Controllers/WorkflowLogsController.cs` — `[Route("api/workflow-logs")]`.
+2. `GF3.WebApi/Controllers/AdminDbController.cs` — `[Route("api/admin/db")]`.
+3. `GF3.WebApi/Controllers/AdminRegulationsController.cs` — `[Route("api/admin/regulations")]`.
+
+- Replace each controller-level `[Authorize(Roles = AuthRoles.Manager)]` with `[Authorize(Policy = AuthPolicies.SystemManager)]` (add `using WebApi.Auth` only where missing).
+- Protect **every action** on each controller, including GET/list/export/settings and POST/PUT/DELETE; no action should allow a regular manager by an override or `[AllowAnonymous]`.
+- Preserve methods, routes, request/response DTOs, status handling, business logic, file-upload size checks and existing permission/feature flags.
+- The manager system news area (`/api/admin/system-news`) is **out of scope**; do not change its permissions, since the ordinary-manager sidebar news feature remains intact. Likewise, leave employee-facing regulation acceptance/download routes outside `AdminRegulationsController` unchanged.
+- Developer password, `GF3_ADMIN_ENABLED`, `GF3_ADMIN_ALLOW_REMOTE`, `GF3_ADMIN_ALLOW_WRITE`, and middleware rules remain a second independent layer. System manager authorization does **not** bypass them.
+
+**Expected status semantics:** authenticated but non-system manager/employee receives HTTP 403 for protected endpoints when the request reaches ASP.NET Core authorization. Absent/invalid authentication receives HTTP 401 where auth runs first. Existing admin guard can separately return its currently implemented denial/status; **do not normalize or weaken it**.
+
+### Step A7 — EXTEND front-end session type, preserve provider
+
+**File:** `FrontEnd/src/entities/auth/model/types.ts`
+
+- Extend `AuthSession` with `isSystemManager?: boolean`. Optional only to maintain type compatibility with existing test fixtures and cached/legacy objects. **All new backend login/session responses contain a concrete boolean.**
+- Consumers check `=== true`, not truthiness/coercion, to fail closed when absent.
+
+**File:** `FrontEnd/src/app/providers/AuthProvider.tsx` — **REUSE AS-IS**. It already consumes the session object from login and restore. No custom localStorage privilege variable, no independent entitlement cache and no new provider/service.
+
+### Step A8 — MODIFY navigation visibility
+
+**File:** `FrontEnd/src/app/layouts/overlay-sidebar-layout/OverlaySidebarLayout.tsx`
+
+- Adjacent to existing `const isManager = session?.role === "manager";`, compute `const isSystemManager = isManager && session?.isSystemManager === true;`.
+- In manager `mainNavItems` retain all existing links/order/icons except wrap the `/information` Information item in a conditional inclusion for `isSystemManager`, keeping Message and all other manager entries visible to regular managers. Use existing array/conditional-spread pattern, not a new sidebar component.
+- Render the **entire** existing `Settings` section (including title and `/database` item) only when `isSystemManager`. No empty Settings heading for regular managers.
+- Keep collapse, active nav, responsive behavior, localizations, account link, and news/notepad exactly as they are.
+
+### Step A9 — MODIFY direct route protection
+
+**File:** `FrontEnd/src/app/router/AppRouter.tsx`
+
+- In `RoutedContent`, after the existing loading/unauthenticated/public-route redirects and **before** calling `renderMatched`, add a deny rule for authenticated managers who request exactly `/information` or `/database` without `session?.isSystemManager === true`.
+- Use existing `<Navigate to="/" replace />` for denial. Do not instantiate/render lazy privileged pages while denied.
+- Employees already use `employeeRoutes`, so they keep their current fallback to `/`; do not change employee route definitions.
+- Preserve both existing entries in `managerRoutes`, lazy imports, suspense fallback, and layouts; only the additional guard changes access.
+- On refresh/session restore, the provider's initial `loading` state must still show the existing loading fallback. Once the authoritative `GET /api/auth/session` result resolves, privileged routes open only for `isSystemManager:true`; if it is missing/false, redirect to `/`.
+
+## 4. Implementation steps — Task B: Accurate presentation-oriented design snapshot
+
+### Step B1 — REUSE and synchronize existing canonical JSON (no new catalog)
+
+**File:** `docs/design-system.json` (MODIFY, not replace/rebuild).
+
+- Preserve existing top-level schema domains (`foundations`, component/layout inventories, `pages`, `routeBindings`, `patterns`, `knownImplementationDivergences`) and existing stable IDs whenever those UI entities still exist.
+- Update `project.commit` to the **full** pinned SHA `d8e752a8b75c8f1542fdb1d95a80b2ab39e1ad38`, `project.branch` to `DEV2`, `project.sourceOfTruth` to explicitly identify React/TypeScript/CSS at that SHA, and `project.artifactPurpose` to include future presentation/scene planning.
+- Keep `project.runtimeSourceOfTruth: false`. This file is a **snapshot/reference**, not a runtime theme/configuration driver.
+- Synchronize actual UI changes since catalog baseline `b4a08ad`: run **only** the bounded targeted diff `git diff --name-only b4a08ad d8e752a8b75c8f1542fdb1d95a80b2ab39e1ad38 -- FrontEnd/src` (and check changed design-linked `FrontEnd/public` assets) to identify affected page, layout, shared UI, CSS and motion sources. Open those changed sources and the current catalog entries they own; also inspect `AppRouter.tsx`, `OverlaySidebarLayout.tsx`, `PageTransition.tsx`, `FrontEnd/src/shared/ui/motion.css`, and the two protected pages. **Do not rescan unrelated backend, domain or entire repository**.
+- For each affected existing design entry, amend factual `source`, `styleSources`, `composes`, `sections`, `controls` (`id`, type, purpose, componentRef, action, states), `dialogs`, `states`, responsive breakpoints, transitions and localization/accessibility notes to match **real TSX/CSS behavior at the pinned SHA**. Preserve IDs for unchanged elements. Remove claims contradicted by current code; add changed UI elements and state transitions that really exist. Do not invent components or interactions for dramatic effect.
+- In particular update `employee-swap-page` against the pinned swap UI (including any **actually implemented** acceptance confirmation dialog, modal states, mobile behavior and real button actions), and keep all currently implemented schedule/animation patterns documented if changed since `b4a08ad`.
+- For `information-page` and `database-page`, record the new privilege metadata `"requiresSystemManager": true`, retaining `roles:["manager"]`; regular manager pages must omit this property or set false. Mirror `"requiresSystemManager": true` on the corresponding `routeBindings` entries only. Preserve route strings exactly.
+- Document sidebar distinction for `manager` vs `system manager` (visibility of Information and entire Settings section) in the existing layout entry. Include source links to `OverlaySidebarLayout.tsx`/`AppRouter.tsx` as applicable. The metadata must describe access to existing pages, not create a third role/parallel layout.
+- Keep `knownImplementationDivergences` accurate and source-linked; resolve/remove an entry only when code at pinned SHA proves it is obsolete.
+- Refresh motion descriptions from `PageTransition.tsx`, shared motion CSS and affected page CSS/GSAP sources. Capture real duration/easing/stagger/enter/exit, reduced-motion behavior and conditions, **only where code provides them**. Never write a duration without source evidence.
+- Do **not** insert real users, email addresses, credentials, API keys, production shifts, employee records, actual log content, or screenshots into JSON.
+
+### Step B2 — EXTEND snapshot with compact future-recording manifest
+
+**File:** `docs/design-system.json` (same file as B1).
+
+Add one top-level `presentationCapture` object with a stable, documented structure. Set `schemaVersion` from `1.0.0` to `1.1.0` because this is an **additive metadata-schema extension** (do not change existing readers' field meanings).
+
+**Mandatory `presentationCapture` fields and exact semantics:**
+
+- `purpose`: string — static guide for future UI showcase production, **not an executable capture script**.
+- `snapshotCommit`: pinned full SHA, matching `project.commit`.
+- `dataPolicy`: string — use **synthetic-only** demo data; redact/hide credentials, private names, access tokens, sensitive admin SQL, personal logs and business records.
+- `viewports`: stable array with the following identifiers/dimensions as **planned presentation frame sizes** (not claims about design breakpoints):
+  - `{ "id": "desktop", "width": 1440, "height": 900, "pixelRatio": 1 }`;
+  - `{ "id": "mobile", "width": 390, "height": 844, "pixelRatio": 1 }`.
+  These are two recording targets for all scenes; existing page `responsive` descriptors remain the source for actual behavior at each size.
+- `scenes`: **one descriptor for each `routeBindings` entry**, including both public routes and all existing manager and employee entries (29 scenes at baseline). Keep the scene order identical to `routeBindings`. Each descriptor must have:
+  - `id`: unique stable slug `<role>-<pageRef>-<route-suffix>`; for multiple paths with the same page, use a distinct suffix from route segments to avoid collisions.
+  - `role`: exactly the routeBinding role (`public`, `manager`, `employee`), **not** a new role string.
+  - `path`: exact router template from routeBinding (keep `:parameter` placeholders, no real IDs).
+  - `pageRef`: same existing page ID as routeBinding.
+  - `layoutRef`: existing `pages` item's layoutRef, not a fabricated layout.
+  - `requiresSystemManager`: boolean; `true` **only** for manager `/information` and `/database`.
+  - `viewportRefs`: `["desktop","mobile"]`.
+  - `initialState`: `"default"` when the page has an ordinary loaded view; if it does not, use one existing page state exactly.
+  - `captureStates`: array of **real page state IDs** from `pages[].states` and/or dialog `states`; include a default/loaded view and meaningful available states (`loading`, `empty`, `error`, `confirmation-open`, `success`, etc. *only if documented in that page*). For pages with empty states, use `[]` and explicitly describe the ordinary view with `initialState:"default"`. Do not create fake UI states for completeness.
+  - `controlRefs`: local IDs from that page's existing `controls` array (all real available controls; `[]` if none), enabling future video work to highlight every actual interactive element without duplicating its definition. For complex screens include the page's real dialog IDs in `dialogRefs`.
+  - `dialogRefs`: IDs of existing `pages[].dialogs` for that page, or empty array.
+  - `motionRefs`: stable IDs existing under `foundations.motion`, where relevant (otherwise `[]`), plus reference to the page's existing per-element motion description if applicable; do not invent animations.
+  - `fixtureNeeds`: an array of **generic synthetic data prerequisites** such as `"at least one mock shop"`, `"a synthetic swap offer"`, `"a system-manager test account with synthetic logs"`; no real record values. Parameterized routes must specify fixtures sufficient to fill each path parameter.
+  - `sourceRefs`: one or more `{ "path": "FrontEnd/...", "symbolOrSelector": "..." }` objects pointing to the existing page TSX and any route/layout/motion files necessary to locate the scene.
+- For pages whose default content depends on API data, specify only fixture **types**, not fixed personally identifying data or assertions about actual current runtime records.
+- Represent interactions **through** `controlRefs` → existing `pages[].controls[].action` and `dialogRefs` → existing dialog descriptions; do not duplicate a second potentially divergent action catalog in `presentationCapture`.
+- For system-manager-only scenes, fixture needs must include an authorized synthetic system account; the extra developer-password/admin flags remain prerequisites for an actual `/database` backend recording, but **never** store the password or token in the snapshot.
+- Reuse page `localization`, responsive and accessibility entries; scenes should reference them via `pageRef`, not copy huge descriptions 29 times.
+
+**Source of truth / contract:** `routeBindings` remains the sole list of routes, `pages` remains the sole catalog of controls/states/dialogs, `foundations.motion` remains the sole common motion token collection, and `presentationCapture` remains an index joining them for future creators. Keep the JSON human-readable and properly indented.
+
+### Step B3 — CREATE lightweight snapshot consistency checker (Node standard library only)
+
+**New file:** `scripts/validate-design-system.mjs` (repo-root script, no npm package change/dependency).
+
+**Responsibility:** fail with nonzero exit status and a clear error for invalid/mismatched static snapshot data. Use `node:fs`, `node:path`, built-in JS. No browser, React import, screenshots or external schema library.
+
+Required checks:
+
+1. `JSON.parse` of `docs/design-system.json` succeeds; schemaVersion is `1.1.0`; `project.commit === presentationCapture.snapshotCommit === pinned SHA`; `project.runtimeSourceOfTruth === false`.
+2. `routeBindings` is an array with unique compound keys `${role}|${path}`; `presentationCapture.scenes` is an array with **exactly one scene per compound route key**, no missing/extra entries or duplicate `id`; scene's `role`, `path`, `pageRef` and ordering match the corresponding binding.
+3. Every `pageRef` resolves to a `pages[].id`; every `layoutRef` resolves to an existing documented layout id; scene `controlRefs`/`dialogRefs` reference IDs of that same page's `controls`/`dialogs`; `motionRefs` resolve to `foundations.motion[].id`.
+4. `initialState` is `default` or one of that page's real `states`/dialog states. Every `captureStates` item resolves to an existing page state or dialog state. No duplicate refs per scene.
+5. Viewport IDs are unique with integer positive widths/heights and positive pixel ratio; each `viewportRefs` resolves to an existing viewport id.
+6. All `sourceRefs` and page `source.path`/`styleSources[].path` that are relative repo paths resolve to existing files (repo-root based); do not treat a source selector as a file path.
+7. Exactly two route bindings (`manager|/information` and `manager|/database`) and their scenes carry `requiresSystemManager:true`, and both respective pages carry that property; no other binding/scene/page is accidentally privileged. Note: other routes may reuse pages; validate this via IDs rather than assuming one page per route.
+8. Required scene fields have the declared types and `fixtureNeeds` contains descriptions rather than actual credentials or private records; perform simple deny-pattern checks for common secret keys and never write secrets to the error output.
+9. Print short success summary: total routes, scenes, pages, components, and snapshot commit; on failure, print only item ID/path and reason, no sensitive content.
+
+**Execution:** `node scripts/validate-design-system.mjs` from repository root. Do not add a brittle custom parser for TSX/JSX: independently compare the routes in `AppRouter.tsx` against snapshot once during B1 and re-run the validator for snapshot-internal consistency.
+
+**Dependencies:** B1 and B2; checker validates the completed JSON.
+
+## 5. Tests (explicit, focused coverage)
+
+### Step T1 — EXTEND frontend sidebar unit tests
+
+**File:** `FrontEnd/src/app/layouts/overlay-sidebar-layout/OverlaySidebarLayout.test.tsx`.
+
+- Reuse current Testing Library/Vitest patterns and existing `useAuth()` mock, make mock session privilege adjustable **without** changing production AuthProvider.
+- Verify system manager shows `Information`, `DataBase` and `Settings` section.
+- Verify regular manager (`role:manager, isSystemManager:false`) and legacy manager (`isSystemManager` omitted) show **none** of the three, while `Home`, `Employee`, `Shop`, `Availability`, `Container`, `Message`, manager profile, notepad/news (subject to existing mocks) remain available.
+- Verify employee layout behavior remains unchanged by this flag; no privilege is inferred from `userName:"manager"`.
+- Exercise the existing collapse/expand nav interaction so the conditional array does not break layout.
+
+### Step T2 — CREATE frontend routing regression tests
+
+**New file:** `FrontEnd/src/app/router/AppRouter.test.tsx`.
+
+- Reuse existing Vitest, Testing Library and router/component mocks. Mock `useAuth` return values, use `window.history.replaceState` before mounting the actual `AppRouter`; assert resulting route/content or canonical current pathname after `<Navigate>`.
+- Both `/information` and `/database`: `isSystemManager:true` manager may render matching protected page; false/missing manager redirects to `/`; employee redirects under existing route rules; unauthenticated redirects to `/login`.
+- Keep `loading` state on a protected deep-link as fallback until auth has resolved; on transition to authenticated **non-system** manager redirect without protected page mounting.
+- Verify `/communications` stays reachable to a regular manager and that unrelated manager and employee routes are unaffected.
+- Never call live backend or use an actual privileged account for unit tests.
+
+### Step T3 — CREATE backend authentication + policy regression tests
+
+**New file:** `GF3.Tests/SystemManagerAccessTests.cs` (xUnit; use existing test helpers and the real registration/auth stack where supported).
+
+- Reuse existing `GF3.Tests` testing patterns (SQLite test DB / `WebApplication` in-process or loopback HTTP tests as currently used in `GF3.Tests/ShiftSwapSafetyTests.cs`). No new `TestServer` dependency is required.
+- Seed separate synthetic persisted accounts: **system manager** (`IsSystem=true`), **regular manager** (`IsSystem=false`), employee; use only synthetic credentials and disposable database. Include an account with username literally `manager` **but** `IsSystem=false` to prove name grants nothing.
+- `POST /api/auth/login`: successful system manager session response has JSON `isSystemManager:true`; regular manager/employee have false; no changes to token issuance.
+- `GET /api/auth/session`: same booleans after using the issued bearer tokens. Test old-format/current signed tokens without a special claim still authorize the system manager because the handler derives the claim from the database.
+- Test `JwtAuthenticationHandler` principal claims: system manager gets exactly the trusted true claim; regular manager/employee no such claim. Missing manager row, revoked credential version, or cleared `IsSystem` must not confer system rights; **clearing `IsSystem` while the token remains otherwise valid must remove privilege on the next request**.
+- Policy assertion/endpoint tests for all three controllers: anonymous/invalid token blocked; regular manager and employee forbidden **for both safe reads and at least one write action**; system manager may reach the controller if all *existing* developer-password, enable/local/write guard requirements also hold. Assert policy denial before any DB mutation; no privileged action actually modifies a persistent developer database.
+- Specifically test at least these representatives: `GET /api/workflow-logs`, `GET /api/admin/db/...` selecting a real route from that controller, `GET /api/admin/regulations`, and one respective mutation endpoint per controller where present (e.g. settings update, DB execute, regulation creation). Do not invent route templates; use controller attributes already defined.
+- Verify an ordinary-manager endpoint and manager system news existing flow retain their current auth semantics. Verify employee-facing published regulation acceptance remains available under its existing rules.
+- Test the system manager **still** fails existing admin guard when required flags/password are absent. Expected errors may originate from either guard or policy according to current middleware order; assert denial, not a guessed uniform error body.
+- Use the same auth handler, service registration and authorization policy as runtime. No hand-rolled test-only privilege logic that can pass while production handler is incorrect.
+
+### Step T4 — VERIFY design checker, shape and privacy
+
+- Execute the new validator against the real design JSON.
+- Temporarily (without committing) use in-memory transformed JSON fixtures or throwaway copies to prove the checker rejects: missing scene, duplicate role/path, broken `controlRef`, broken `layoutRef`, stale commit, incorrect `requiresSystemManager`, invalid viewport. Restore source immediately afterward; no modified fixture files retained.
+- Manually inspect at least `employee-swap-page`, `information-page`, `database-page`, the manager layout, a public page and an employee page, tracing `controls`, `dialogs`, layout, CSS and GSAP/motion sources to current code.
+- Verify all 29 baseline role/path keys are represented and no snapshot scene includes live or sensitive values. If the pinned router differs from the documented 29 baseline, the **actual router at pinned SHA wins** and the catalog/scene count is updated accordingly; document that observation in CODEX's execution summary rather than silently creating fake routes.
+
+## 6. Error, security and compatibility behavior
+
+- **No system account present:** no one gains privileged UI or controller access; no `username=="manager"` fallback. Do not alter bootstrap behavior as an unrelated migration/recovery project.
+- **Privilege removed in DB:** next successful manager authentication handling does not produce the claim, `/api/auth/session` reports false and all protected controllers deny; after client refresh or next session restoration, links/routes are hidden. Already-mounted clients may temporarily show stale nav until session refresh, but server blocks operations immediately; do not introduce polling or websockets for this task.
+- **Expired or invalid token:** current 401/login path; do not return system-manager status based on stale local user objects.
+- **Legacy frontend mocks/session without property:** deny both pages by default; no crash or unsafe assumption.
+- **Developer password / admin enable flags:** existing middleware continues to enforce it even for system account; any UI-only visibility change must not cause the admin guard to be relaxed.
+- **Role vs privilege:** use existing `manager` role and additional `IsSystem` claim; never grant access merely because a session claims `role:manager` on the client.
+- **Confidentiality:** snapshot may identify that a sensitive UI control/dialog exists, but must not include passwords, raw SQL contents, real employee/shift data, user identifiers from production, or access tokens.
+- **API changes:** only additive boolean `isSystemManager` to login/session DTOs; no endpoint renaming or HTTP verb changes.
+- **Persistence:** no schema change, no migration, no index, no changed write flow. Read existing `manager_account.is_system` through existing repository lookup.
+- **DI:** authorization policy registration only; no new services or lifetimes.
+- **Frontend visual regression:** no CSS modifications required for hiding the two nav entries; preserve current spacing and responsive layout.
+
+## 7. Verification sequence for CODEX
+
+Run from the pinned branch/worktree; commands are scoped and must be completed **after** code and snapshot edits:
 
 ```bash
-rg -n 'ShiftSwapRequests|shift-swaps|ShiftSwapStatus\.(Open|Cancelled|Accepted)' GF3.WebApi/Controllers --glob '*.cs'
-```
+git rev-parse HEAD
+git branch --show-current
+git status --short
+# Scope discovery only for presentation snapshot delta, not a full new analysis:
+git diff --name-only b4a08ad d8e752a8b75c8f1542fdb1d95a80b2ab39e1ad38 -- FrontEnd/src FrontEnd/public
 
-Map just the existing manager endpoints `POST /api/containers/{containerId}/graphs/{graphId}/shift-swaps/{id}/cancel`, `POST /api/containers/{containerId}/shift-swaps/{id}/cancel`, and `DELETE /api/containers/{containerId}/shift-swaps/{id}` to their current actions. Change only those actions that perform **Open → Cancelled**; do not alter any deliberate hard-delete/archive behavior for already-terminal swaps. Use `GF3.Tests/Infrastructure/SqliteTestDatabase.cs` for persistence tests.
-
-### Step 1 — Shared acceptance preconditions (server)
-
-**Action:** MODIFY `GF3.WebApi/ShiftSwaps/ShiftSwapRules.cs`.
-
-1. Change the **existing** `GetAcceptanceUnavailableReason(ShiftSwapRequestModel swap, int employeeId, bool isScheduleLocked, IReadOnlyList<ScheduleSlotModel> employeeMonthSlots, ScheduleSlotModel slot, ShiftSwapPeriod offeredPeriod)` to return a specific existing-style reason when:
-   - `swap.ScheduleSlotId` is null or does not match `slot.Id`, or slot/schedule IDs differ;
-   - a manager-created offer's `slot.EmployeeId` is no longer null;
-   - an employee-created offer has null `FromEmployeeId` or `slot.EmployeeId != swap.FromEmployeeId`;
-   - the normalized offered interval no longer fits the current slot's valid interval;
-   - the current request is not Open, swaps are disabled, a manager lock is active, user is source, private target is wrong, or recipient has overlapping **published** shifts (existing checks preserved).
-2. Put **nonthrowing** interval checking inside the availability path (return reason for malformed times/slots rather than throwing and breaking the whole GET list). The mutating Accept path must still reject the same invalid data.
-3. Accept must look up the slot using `FirstOrDefault`, fail with the project's existing `ValidationException` if absent, and call the shared predicate with the resolved period. Keep server-side authorization/visibility checks; `canAccept` is only a UI hint, not authorization.
-4. Make `ParseTimeMinutes` reject any non-`HH:mm` shape (exactly two two-digit groups, ASCII `:` separator, valid 00–23 / 00–59), including `12:30:45`, `9:30`, signs, and out-of-range values. Keep valid normalized stored intervals and zero-length/end-before-start rejection. Reuse `NormalizePeriod`, `EnsurePeriodWithinSlot`, `TimesOverlap` and `ApplyAcceptedSwapPeriod`.
-5. When decoding malformed manual graph-note metadata, catch **narrow parse/decode exceptions** locally (`FormatException` from base64 and JSON decode exceptions) and return an invalid-metadata indication to the manager-created validation at item 7. Do not silently return an unchanged note and then commit the accepted swap if `ManualColumnId` proves that a specific manual cell was expected. Preserve readable note text and rollback the whole Accept on invalid metadata.
-6. In `GetVisible`, exclude a malformed **open** request whose source slot is missing and cannot support any truthful `ShiftSwapDto` (the current `ToDto` would otherwise throw). For an extant but stale slot, use `GetAcceptanceUnavailableReason` to expose `CanAccept=false` plus a reason. Do not change archived-snapshot projections for valid historic records, and test both paths.
-7. For a manager-created manual offer with `ManualColumnId.HasValue`, validate the referenced graph-note manual cell can be parsed and located before consuming it; malformed base64, missing cell or invalid metadata must cause a **controlled validation failure and transaction rollback**, not silent acceptance leaving an undeleted duplicate manual cell. Reuse existing note parsing/manipulation helpers; for a normal manager-created open slot with no `ManualColumnId`, do not require graph-note metadata.
-
-**Dependency:** existing rules are the source for server-side condition checks; no new public service.
-
-### Step 2 — Atomic status transitions and rollback
-
-**Action:** MODIFY `GF3.WebApi/Controllers/EmployeeShiftSwapsController.cs` and **only relevant Open → Cancelled manager actions** located in Step 0.
-
-**Accept** (`POST /api/employee-shift-swaps/{id}/accept`):
-
-1. Preserve the existing `BeginTransactionAsync`, eager-loading, recipient membership for public offers, direct target for private offers, status, schedule publication, `AllowSwap`, manager-lock checks, slot validation and recipient overlapping published shifts.
-2. Compute `beforeSnapshotJson` **before** touching the shift. After all validations but **before** `ApplyAcceptedSwapPeriod`, issue ONE database-atomic EF Core `ExecuteUpdateAsync` against `db.ShiftSwapRequests.Where(s => s.Id == id && s.Status == ShiftSwapStatus.Open)`; set `Status=Accepted`, `AcceptedByEmployeeId=employeeId`, `AcceptedAtUtc=acceptedAtUtc`. This must run inside the *same* transaction. Require `affectedRows == 1` or throw an existing-style controlled conflict; no slot changes or notification for `0` rows.
-3. Because `ExecuteUpdateAsync` bypasses EF tracking, explicitly synchronize the loaded `swap` object to the **same** status/recipient/timestamp. Do **not** call `Reload`/`Clear` on the entire tracked schedule graph. The normal existing `SaveChangesAsync` may persist tracked changes later in the same transaction; no second independent status transition.
-4. Keep `ApplyAcceptedSwapPeriod`'s existing non-conflicting `SlotNo` algorithm, manager-created handling, `EnsureScheduleEmployee`, highlights, before/after snapshots, **one** history record, existing two SaveChanges boundaries as needed for snapshot generation, and Commit. **Never** commit the conditional status claim separately from schedule and history.
-5. If the claim, slot update, history insertion or Commit fails, roll back the entire transaction (including the claim), return the existing controlled validation/conflict response for expected races/uniqueness problems, and emit **zero** success notifications/workflow logs. Limit catch translation to known concurrency/SQLite constraint codes; do not hide unrelated `DbUpdateException`s as a false time-overlap diagnosis.
-6. After commit, reuse existing post-commit log/SignalR calls exactly once. Do not retry the **whole** acceptance flow automatically on `SQLITE_BUSY`/`SQLITE_LOCKED`; treat a genuine writer conflict as retryable-by-user, return a clear conflict response, and avoid recording a second history row.
-
-**Employee Cancel** (`POST /api/employee-shift-swaps/{id}/cancel`):
-
-7. Preserve creator-only authorization; replace tracked check-then-save status mutation with `ExecuteUpdateAsync` filtered by `Id`, `FromEmployeeId=employeeId`, `Status=Open`; set `Status=Cancelled`, `CancelledAtUtc=now`. If `affectedRows == 0`, return a controlled no-longer-open error. Synchronize/re-query the response DTO without another stale tracked write. Log/notify only after the successful atomic write.
-
-**Manager Cancel** (existing actions from Step 0):
-
-8. For every manager action that transitions Open → Cancelled, apply the same `Status=Open` guarded database update **together with its existing manager/container authorization**, inside its existing transaction when the action also modifies slots or archived data; preserve existing archive/log/notification semantics. A manager cancellation must not overwrite `Accepted`; an employee Accept must not overwrite `Cancelled`. Do not modify unrelated manager hard-delete behavior or allow an employee to bypass manager rules.
-
-**Invariant:** across concurrent Accept/Accept and Accept/Cancel contenders only **one terminal transition** succeeds for a request; the losing request returns a conflict and cannot alter schedule, history or send acceptance events.
-
-### Step 3 — Create validation and duplicate conflicts
-
-**Action:** MODIFY `EmployeeShiftSwapsController.Create(...)`, `ShiftSwapRules.ResolveRequestedPeriod(...)`.
-
-1. `TargetEmployeeId == null` means public. `TargetEmployeeId > 0` means targeted private. **Reject** any supplied ID `<= 0` with `ValidationException.ForField(nameof(request.TargetEmployeeId), ...)`; never quietly publish instead. Preserve self-target and nonexistent-target rejection.
-2. Both `FromTime` and `ToTime` absent/whitespace => whole source slot; both valid supplied values => normalized bounded partial offer; **exactly one supplied** => validation error on the missing side, not fallback to the opposite source boundary. The UI always supplies both.
-3. Keep `hasOpenRequest` as an early friendly preflight and the existing `ux_shift_swap_open_slot` filtered unique index as the authoritative last line of defense.
-4. Catch only the unique-index failure resulting from concurrent inserts for **this** slot. Prefer checking the provider-specific SQLite constraint and then querying for an existing Open swap to distinguish from other DB failures (a fresh context/query if the current context is unusable). Return the project's existing validation/conflict response: `This shift already has an open swap offer.` Do not suppress or retry unknown write errors. Do not log/notify/CreateAtAction on a failed insert.
-5. Do not change `ShiftSwapRequestModel`, the table, the filtered unique index, or allow multiple Open swaps against the same source slot even if the offered periods do not overlap.
-
-### Step 4 — Minimize employee-picker data
-
-**Action:** MODIFY `GF3.WebApi/Contracts/ShiftSwaps/ShiftSwapEmployeeDto.cs`, the `GetEmployees` projection in the controller, and `FrontEnd/src/entities/shift-swaps/model/types.ts`.
-
-1. Keep `Id`, `FirstName`, `LastName`, `DisplayName`; remove `Email` and `Phone` from **this picker DTO/API response and frontend type only**. No employee table or general-profile API changes.
-2. Preserve existing employee name sorting and the ability to select a named recipient as currently implemented. Do not introduce a speculative target-container restriction or leak whether a private swap exists through the picker.
-3. Add a response-contract test verifying JSON does not include email/phone and that only authenticated employees access the picker through existing role policy. Do not write real contact data to test snapshots.
-
-### Step 5 — Add explicit Accept confirmation UI
-
-**Action:** MODIFY `FrontEnd/src/pages/employee-swap/ui/EmployeeSwapPage.tsx`; REUSE `FrontEnd/src/shared/ui/ConfirmDialog/ConfirmDialog.tsx` **without editing it**.
-
-1. Add `pendingAcceptSwap: ShiftSwap | null` local state. Change `handleAccept(swap)` so it only opens confirmation when `swap.status === 'open'`, `swap.canAccept === true`, and no swap action is pending. **Remove the direct mutation from this first-click handler**.
-2. Render a second `ConfirmDialog` via `createPortal(..., document.body)` in the same place/pattern as existing unpin dialog, not within a hidden scrolling card. Set `variant='confirm'`, title `Accept this shift?`, confirm button `Accept shift`, cancel button `Back` (localize using `t`). The message must identify `fromEmployeeName` (or `manualColumnName` / `Open shift` for manager-created), `scheduleName`, `shopName` if present, `formatSwapDate`, `fromTime–toTime`, and `shiftHours`; say explicitly that acceptance updates the user's schedule. Use **existing** formatters and safe `t` placeholders.
-3. On **Back**, Escape or backdrop cancel, clear `pendingAcceptSwap`; **no API call**. Disable confirm and cancel while `acceptSwapMutation.isPending`. Guard against double submit with an immediate local in-flight ref/state to cover repeated clicks before React rerenders. Never send the API request more than once for one confirmation interaction.
-4. On confirm, check the current query cache/list for the same swap ID and `status === 'open'` and `canAccept`; if absent or now ineligible, close, invalidate/refetch the swap query, show a localized stale-offer message and **do not** submit. If eligible, call **existing** `acceptSwapMutation.mutate(id, { onSuccess, onError })` once. On success close/clear pending state; existing mutation invalidates swaps and employee schedules.
-5. On error close/clear pending state, release busy guard, call existing `getErrorMessage` / `ErrorBanner`, and invalidate swaps/schedules to show authoritative server state. Never optimistically reassign UI schedule prior to HTTP success. The server independently rechecks all invariants even if UI data was fresh.
-6. Make the same confirmation behavior apply to employee-created public offers, employee-created private offers and manager-created open shifts. Do not insert confirmation for creating, pinning, cancelling or history browsing (except existing unpin confirmation).
-
-### Step 6 — Polish localization
-
-**Action:** MODIFY `FrontEnd/src/shared/i18n/pl.json`.
-
-Add translations for **each new UI literal** from Step 5 (`Accept this shift?`, `Accept shift`, `Back`, confirmation detail template, `Open shift`, stale/unavailable offer message). Keep English via literal source strings. Reuse existing translations for shared keys. If new backend validation text is displayed and belongs to `serverMessages.json`'s explicit translation catalogue, add matching entries to `FrontEnd/src/shared/i18n/serverMessages.json` and `pl.json` using current translation conventions; no new translation engine.
-
-### Step 7 — SQLite security/consistency integration tests
-
-**Action:** CREATE `GF3.Tests/ShiftSwapSafetyTests.cs`; EXTEND existing `GF3.Tests/ShiftSwapSlotNoConflictTests.cs` **only if required** by changed rules/contracts.
-
-Reuse `SqliteTestDatabase.CreateAsync()` with real EF SQLite migrations/indexes and fresh contexts per parallel actor. Reuse existing claims principal/controller fixture and fakes. Do not use EF InMemory for concurrency/unique checks.
-
-Implement focused tests with named scenarios:
-
-1. `Create_InvalidTargetId_DoesNotPublish`: `0`, `-1` rejected; no request inserted, no notification.
-2. `Create_PartiallyProvidedPeriod_IsRejected`: only From or only To; original slot intact.
-3. `Create_MalformedTime_IsRejected`: `12:30:45`, `9:30`, end-before-start, outside assigned slot; valid `09:00–15:00` accepted.
-4. `Create_DuplicateOpenSlot_ExistingIndexEnforced`: two distinct contexts create same slot offer; exactly one Open persisted; losing write returns controlled error instead of 500. **Make concurrency deterministic** with barriers where supported; also exercise a controlled unique insert race directly if SQLite lock scheduling makes HTTP interleaving nondeterministic.
-5. `Accept_OpenOffer_PersistsExactlyOnce`: accepted slot (including partial split), status, recipient, timestamp, exactly one before/after history; maintain `SlotNo` and hours. No duplicate notifications.
-6. `Accept_SameOfferTwice_SecondIsConflict`: sequential and two-context racing requests; one success, one controlled rejection, one history, transfer once, one success notification. Use bounded timeout/barriers, avoid flaky sleeps.
-7. `Accept_RacesOwnerCancel_OnlyOneTerminalState`: across separate contexts, accepted **or** cancelled, never both, no orphan slot edits/history, expected side effects only for winner.
-8. `Accept_NotTargetAndNoSharedPublicContainer_Denied`: non-target private request and unrelated-container public request cannot be accepted or leaked through list; no slot mutations.
-9. `Accept_OwnerAcceptAndWrongAccount_Denied`: current employee cannot take their own offer; API role authorization enforced by existing integration/auth test facilities (not merely hand-created principal).
-10. `Accept_StaleSourceSlot_IsUnavailable`: source owner changed, manager-created slot assigned, offered times no longer fit, request source slot missing where fixture permits; `CanAccept=false` or record omitted safely, POST controlled rejection, zero writes.
-11. `Accept_AlreadyWorks_Rejects`: cross-schedule published overlap in same calendar month, exact adjacent non-overlap allowed, no conflict in other months/days.
-12. `Accept_WhenDisallowedOrLockedOrUnpublished_Rejects`: guard status/publication/AllowSwap/manager lock; no history.
-13. `Accept_PartialSplitWithOccupiedSlotNos_RemainsValid`: original F35 regression stays green for prefix, suffix, middle and whole-slot transfers.
-14. `Accept_FailedHistoryOrSlotWrite_RollsBackEntireClaim`: deliberately trigger a **real SQLite constraint violation** inside transaction; request remains Open, original slot unchanged, history absent, no success SignalR.
-15. `Cancel_OnlyOwnerCanCancelAndOnlyOnce`: unauthorized and already terminal requests never mutate; legitimate owner cancels once, correct timestamp.
-16. `ManagerCancel_RacesAccept_PreservesWinningState`: invoke existing manager action for Open offers; no Accepted → Cancelled overwrite. Test manager-created offer acceptance unaffected.
-17. `GetEmployees_ExcludesContactData`: picker JSON includes expected names/IDs and **never** email/phone.
-18. `ManagerManualNote_MalformedMetadataFailsSafely`: malformed base64/JSON does not cause an unhandled 500 nor accidentally delete the note/cell or produce success.
-
-For concurrency tests, use **separate `AppDbContext` objects and connections** backed by the same `SqliteTestDatabase` file, capture return statuses/exceptions, query committed DB state using a third fresh context, and keep test data synthetic. If a tested manager behavior is intentionally archival rather than cancellation, assert its existing semantics without inventing a terminal transition.
-
-### Step 8 — Frontend tests
-
-**Action:** MODIFY `FrontEnd/src/pages/employee-swap/ui/EmployeeSwapPage.test.tsx`.
-
-Reuse the current mock `acceptMutate`, current `createSwap(...)` fixture and Testing Library/user-event. Update the existing `accepts open offers, cancels own offers, and disables locked offers` test: first click opens dialog and **does not call** `acceptMutate`; explicit `Accept shift` does.
-
-Add tests for: public/private/manager-created summary data; Back/Escape/backdrop sends zero requests; double-click Confirm sends exactly one request; pending disables controls; success closes and cache mutation is invoked once; server error displays `ErrorBanner` and can be retried via a fresh confirmation; stale swap disappears or becomes `canAccept=false` during dialog so confirmation refuses mutation; locked/overlap/own offers never expose Accept action; existing unpin confirmation still works. Use current `pl.json` translation conventions rather than snapshotting English in Polish mode.
-
-### Step 9 — Verify in this order
-
-**Targeted backend:**
-
-```bash
-dotnet test GF3.Tests/GF3.Tests.csproj --configuration Release --filter "FullyQualifiedName~ShiftSwapSafetyTests|FullyQualifiedName~ShiftSwapSlotNoConflictTests"
-```
-
-**Backend CI-style tests and build:**
-
-```bash
-dotnet test GF3.Tests/GF3.Tests.csproj --configuration Release --filter "Category!=LocalOnly"
+# Backend:
 dotnet build GF3.Tests/GF3.Tests.csproj --configuration Release
-```
+dotnet test GF3.Tests/GF3.Tests.csproj --configuration Release --filter "FullyQualifiedName~SystemManagerAccessTests"
+dotnet test GF3.Tests/GF3.Tests.csproj --configuration Release
 
-**Frontend (from `FrontEnd/`):**
-
-```bash
-npx vitest run src/pages/employee-swap/ui/EmployeeSwapPage.test.tsx
+# Frontend (existing dependencies must already be installed, otherwise npm ci):
+cd FrontEnd
+npm run test -- src/app/layouts/overlay-sidebar-layout/OverlaySidebarLayout.test.tsx src/app/router/AppRouter.test.tsx
 npm run build
 npm run lint
+cd ..
+
+# Snapshot and patch integrity:
+node scripts/validate-design-system.mjs
+git diff --check
+git status --short
+git diff --stat
 ```
 
-`npm install` only if dependencies are missing; respect the existing lockfile. Do not modify unrelated frontend warnings merely to satisfy a scoped swap plan.
+Expected runtime smoke checks (isolated local test setup, **never** against production data):
 
-**Diff/quality:** `git diff --check`, `git diff --stat`, verify only §4 files (plus verified manager action owner / server translation catalogue if needed) changed, no migrations/packages/launcher/CI changes. Report test commands and results accurately; never claim success if they were not run.
+1. Sign in as a system manager backed by `IsSystem=true`. Both sidebar links and direct URLs open; matching controllers obey both the new policy and existing AdminTools guard.
+2. Sign in as a separate regular manager. Both links and the empty Settings block are hidden; direct URLs redirect to `/`; requests to privileged API endpoints are blocked. Ordinary manager pages, profile, communications, and system-news widget remain functional.
+3. Sign in as an employee: existing employee sidebar/workspace and routes remain unchanged; attempting privileged URLs/API endpoints does not grant access.
+4. Reload `/information` or `/database` under each account, checking auth-loading and restored session behavior. Logout and login with another account must not leak the previous account's privileges.
+5. Review `docs/design-system.json` with checker success, realistic coverage of shared and page-level controls, dialogs, responsive values, transitions and source file pointers. Verify JSON has no secrets or production snapshots.
 
-**Manual in a throwaway/local DB (never production data):** create a public offer, a targeted private offer, and a manager-created manual open shift; verify Cancel on dialog leaves no change, Confirm takes only offered hours, monthly summary and shift table reload correctly, history snapshot is coherent, manager manual note/cell/highlight remains correct. Try a stale card from two tabs (accept in A, confirm in B): B sees a controlled rejection and refresh. Try owner Cancel racing another employee's Accept. Reload and verify persistence/notifications.
+If a test is unavailable because a local tool or runtime prerequisite is missing, document **which command was not executed**, the missing prerequisite and the remaining risk; never claim it passed.
 
-## 6. Data/API/persistence/error guarantees
+## 8. Acceptance checklist
 
-**Existing routes (unchanged):**
+### Task A — visible behavior and security
 
-- `GET /api/employee-shift-swaps`: valid visible offers and accepted/cancelled history. `CanAccept` must not be true for a stale/invalid source.
-- `GET /api/employee-shift-swaps/employees`: employee picker now returns only four name/ID fields (intentional minimal response change).
-- `POST /api/employee-shift-swaps`: 201 on success; invalid input and duplicate-open-offer return project-standard validation/conflict responses, not 500.
-- `POST /api/employee-shift-swaps/{id}/accept`: 200 on successful single transfer; missing ID keeps existing NotFound mapping, unauthorized/forbidden keeps existing auth policy, no-longer-open/stale/conflicting is a controlled 4xx.
-- `POST /api/employee-shift-swaps/{id}/cancel`: 200 on successful owner-only cancellation; already-terminal is controlled 4xx.
-- Existing manager swap cancel/delete routes keep methods, paths, roles, and archival semantics; guard Open → Cancelled writes against stale state.
+- [ ] Existing persisted `IsSystem=true` is the sole entitlement source; `GF3_BOOTSTRAP_MANAGER_PASSWORD` continues to control bootstrap password only.
+- [ ] Login **and** restore-session DTOs return concrete correct `isSystemManager` booleans; any missing property defaults to deny on the client.
+- [ ] API handler derives privilege from an existing database account, not self-asserted claims, username, or client state.
+- [ ] Standard built-in policy requires authentication, manager role and trusted system claim.
+- [ ] `/api/workflow-logs`, `/api/admin/db` and `/api/admin/regulations` deny every action to ordinary managers/employees and remain available to qualifying system manager subject to existing extra admin restrictions.
+- [ ] `/information` and `/database` sidebar entries are absent for ordinary managers; no empty Settings section; direct-link/reload protection works.
+- [ ] No change to unrelated navigation, employee routes, ordinary manager abilities, manager system news, employee regulations acceptance or other APIs.
+- [ ] Previous JWTs still authenticate under normal credential/version rules; removing `IsSystem` removes authorization on next request.
+- [ ] No database migration, new env keys or credential exposure.
 
-**DB:** existing `shift_swap_request`, `schedule_slot`, `shift_swap_history`, `schedule_cell_style` only. **No schema/migration/index changes**; preserve filtered `ux_shift_swap_open_slot` and both schedule-slot unique indexes. The guarded status claim and slot/history changes must be in **one** acceptance transaction. Duplicate request creation is suppressed by the existing unique index.
+### Task B — future-video presentation reference
 
-**Logging and notifications:** only on successful committed operations. Post-commit notification failure cannot retroactively roll back an accepted swap; retain `PostCommitActions`' existing warning/reporting approach and do not falsely report a successful rollback.
+- [ ] Only existing `docs/design-system.json` serves as design catalog; source-of-truth declaration remains descriptive and pinned to full SHA.
+- [ ] Current page/control/dialog/state, shared UI, layout, responsive and actual motion/GSAP declarations are accurately reflected, especially recent changes since `b4a08ad`.
+- [ ] Every actual router route is represented in `routeBindings` and exactly one `presentationCapture.scenes` descriptor, with source, local control/dialog IDs, states, viewport targets, synthetic fixture prerequisites and real motion refs.
+- [ ] Only `/information` and `/database` are marked system-manager-only; each scene uses an existing role, page and layout.
+- [ ] `node scripts/validate-design-system.mjs` passes and fails correctly on negative fixtures.
+- [ ] No production data or credentials in snapshot. No video/capture infrastructure installed or built.
 
-**DI/config:** no new bindings, options, environment variables or dependencies. **No new services.**
+### Quality / scope
 
-**Error policy:** expected stale/unauthorized/invalid input returns controlled 4xx via existing app error pipeline; unexpected DB or programming defects must still surface through standard error logging (do not catch-all-and-return-success). Preserve cancellation-token flow.
+- [ ] Backend build/tests and frontend tests/build/lint pass (or missing environment issues are explicitly reported).
+- [ ] `git diff --check` clean; changed files confined to steps A1–A9, B1–B3, T1–T3 (plus only a **directly necessary** adjacent test fixture update).
+- [ ] No unrelated refactors, feature changes, persisted data changes or overwritten old repo `Plan.md`.
 
-## 7. Acceptance checklist
+## 9. Explicit DO NOT TOUCH list
 
-- [ ] All changes are based on immutable `842f223`; baseline and `git status` recorded.
-- [ ] Valid public, private, full-period, partial-period, and manager-created accepts still work.
-- [ ] Exactly one winner for concurrent Accept/Accept, Accept/Cancel and manager-cancel/Accept, with no double history or orphan edits.
-- [ ] DB transaction rollbacks leave original slots, status, and history unchanged on error.
-- [ ] No open request can be created twice for a slot; losing racing create returns controlled error.
-- [ ] Invalid target IDs never become public offers; malformed/partial time inputs are rejected.
-- [ ] GET availability matches POST eligibility for stale source slots, while server remains authority.
-- [ ] Unrelated-container public and non-target private requests cannot be accepted.
-- [ ] Recipient-picker response contains no employee email/phone.
-- [ ] First click on Accept only opens a clear, localized confirmation with accurate shift details; Back/Escape/backdrop has no side effects.
-- [ ] Confirm calls the existing mutation exactly once, guards pending/stale state and refreshes after success/error.
-- [ ] Previously fixed partial `SlotNo` uniqueness behavior is unchanged; previous snapshot/highlight/SignalR tests remain green.
-- [ ] Targeted backend/frontend tests, backend CI-style tests, frontend build/lint pass (or exact failures documented).
-- [ ] No unrelated refactors, new deps, migration, launcher or CI changes.
+- `BusinessLogicLayer/Services/ManagerAccountService.cs` bootstrap logic, `IManagerAccountRepository`/EF schema/migrations; existing `IsSystem` is already persisted.
+- `GF3.WebApi/Auth/JwtTokenCodec.cs`, token transport/token issuance, JWT signing configuration.
+- `GF3.WebApi/Program.cs`, runtime middleware ordering, and `GF3.WebApi/Middleware/AdminToolsGuardMiddleware.cs`.
+- `GF3.WebApi/Controllers` other than the four named controller files (`AuthController` and three privileged controllers); specifically avoid system news and employee-facing regulations endpoints.
+- `FrontEnd/src/pages/information/ui/InformationPage.tsx`, `FrontEnd/src/pages/database/ui/DataBasePage.tsx`, `FrontEnd/src/entities/regulations/ui/RegulationsAdminPanel.tsx` (no need to adjust their page logic).
+- `FrontEnd/src/app/providers/AuthProvider.tsx`, `FrontEnd/src/app/router/PageTransition.tsx`, motion CSS and unrelated page styling/runtime elements (read for reference only).
+- Existing design reference IDs unless the corresponding component has genuinely been removed/renamed in pinned code.
+- Root `Plan.md` in the repository, existing `.env` or secrets, deployment configuration, and swap/shift workflows.
 
-## 8. Explicit exclusions / implementation-agent instructions
-
-Do not rerun a full architecture analysis. Do not replace the existing Shift Swap functionality with a new request workflow or introduce two-way exchange/manager approval. Do not change business working-hour limits, company policy, employee roles, unrelated schedule generation, or source-slot ID preservation. Do not assume manager-edit locks protect multiple API instances; this plan protects swap status transitions, but **does not** solve an unrelated manager save using arbitrarily stale schedule data. Do not invent new API status enums, frontend state libraries, or database tables. If an existing manager cancellation does not perform a status transition, preserve its actual behavior and record why no CAS change was necessary.
+**End state:** focused account-level privilege gate in API and React UI, plus one reliable, verified, version-pinned JSON catalog ready for future UI video planning. No implementation is performed by this plan artifact itself.

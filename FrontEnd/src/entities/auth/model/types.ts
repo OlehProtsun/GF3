@@ -2,6 +2,7 @@ export type AuthRole = "manager" | "employee";
 
 export type AuthSession = {
   role: AuthRole;
+  isSystemManager?: boolean;
   userName: string;
   displayName: string;
   managerId?: number | null;

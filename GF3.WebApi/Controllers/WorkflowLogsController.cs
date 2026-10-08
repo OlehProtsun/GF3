@@ -10,7 +10,7 @@ namespace WebApi.Controllers;
 
 [ApiController]
 [Route("api/workflow-logs")]
-[Authorize(Roles = AuthRoles.Manager)]
+[Authorize(Policy = AuthPolicies.SystemManager)]
 public sealed class WorkflowLogsController(
     IWorkflowLogService workflowLogService,
     IRealtimeNotifier? realtimeNotifier = null) : ControllerBase
