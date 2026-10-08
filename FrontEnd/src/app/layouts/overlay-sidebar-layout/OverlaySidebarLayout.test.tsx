@@ -72,6 +72,11 @@ describe("OverlaySidebarLayout", () => {
     await user.click(screen.getByRole("button", { name: "Collapse sidebar" }));
 
     expect(container.querySelector("aside")?.getAttribute("aria-hidden")).toBe("true");
+    for (const name of ["Legal documents", "Terms", "Privacy policy"]) {
+      const link = screen.getByRole("link", { name });
+      expect(link.closest('[aria-hidden="true"]')).toBeNull();
+      expect(link).toBeVisible();
+    }
 
     const openButton = screen.getByRole("button", { name: "Open sidebar" });
     const openButtonArrow = openButton.querySelector("svg");
@@ -119,6 +124,7 @@ describe("OverlaySidebarLayout", () => {
     expect(screen.queryByText("Settings")).not.toBeInTheDocument();
     expect(screen.queryByTestId("manager-notepad")).not.toBeInTheDocument();
     expect(screen.queryByTestId("manager-system-news")).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Legal documents" })).toHaveAttribute("href", "/legal/index.html");
   });
 
   it("logs out through the shared nav-style action button", async () => {

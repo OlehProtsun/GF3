@@ -1835,5 +1835,10 @@
   "Use a valid time range like 09:00 - 15:00.": "Wpisz poprawny zakres godzin, np. 09:00 - 15:00.",
   "Select schedule": "Wybierz grafik",
   "Select schedule. Current schedule: {0}": "Wybierz grafik. Aktualny grafik: {0}",
-  "Updated {0}": "Aktualizacja: {0}"
+  "Updated {0}": "Aktualizacja: {0}",
+  "Legal documents": "Dokumenty prawne",
+  "Terms": "Regulamin",
+  "Privacy policy": "Polityka prywatności",
+  "Cookies": "Cookies",
+  "You acknowledge this document personally, not on behalf of your employer. This is not GDPR consent or a company contract.": "Potwierdzasz dokument osobiście, nie w imieniu pracodawcy. Nie jest to zgoda RODO ani umowa firmy."
 }

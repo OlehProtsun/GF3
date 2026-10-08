@@ -205,6 +205,11 @@ export function OverlaySidebarLayout({ children }: OverlaySidebarLayoutProps) {
       </aside>
       <main className={contentClassName}>
         <div className="container">{children}</div>
+        <nav className={styles.legalLinks} aria-label={t("Legal documents")}>
+            <a href="/legal/index.html">{t("Legal documents")}</a>
+            <a href="/legal/regulamin.html">{t("Terms")}</a>
+            <a href="/legal/polityka-prywatnosci.html">{t("Privacy policy")}</a>
+          </nav>
       </main>
 
       <div

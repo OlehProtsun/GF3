@@ -343,6 +343,12 @@ export function LoginPage() {
           </form>
 
           <p className={styles.supportText}>{t("contact us")} <a href="mailto:support@app-gf.com">support@app-gf.com</a></p>
+          <nav className={styles.legalLinks} aria-label={t("Legal documents")}>
+            <a href="/legal/index.html">{t("Legal documents")}</a>
+            <a href="/legal/regulamin.html">{t("Terms")}</a>
+            <a href="/legal/polityka-prywatnosci.html">{t("Privacy policy")}</a>
+            <a href="/legal/pliki-cookies.html">{t("Cookies")}</a>
+          </nav>
         </section>
       </div>
     </div>

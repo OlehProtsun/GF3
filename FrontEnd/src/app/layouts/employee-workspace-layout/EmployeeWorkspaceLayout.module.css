@@ -601,3 +601,7 @@
   .layoutSchedule .topBar { padding-bottom: 0; }
   .layoutSchedule .content { padding-top: 0; }
 }
+
+.legalLinks { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 12px; padding: 8px 4px; font-size: 11px; line-height: 1.4; flex-shrink: 0; }
+.legalLinks a { color: var(--app-text-color, #334155); text-decoration: underline; text-underline-offset: 3px; }
+.legalLinks a:focus-visible { outline: 2px solid currentColor; outline-offset: 3px; }
