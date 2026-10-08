@@ -1,659 +1,201 @@
-# Plan
+# Plan — Fix partial shift-swap acceptance (GF3, DEV2 @ f2257ba)
 
 ## 1. Objective
 
-Modernize motion on the Employee `/schedule` workflow without changing its business behavior, data contracts, or architecture.
-
-The finished page must feel gradual, dynamic, energetic, colorful, minimal, and responsive through:
-
-- coherent section entrance motion;
-- smooth Matrix ↔ Daily state changes;
-- animated schedule/day/summary state changes;
-- responsive button, tab, selector, and dialog micro-interactions;
-- smooth centering of the selected Daily day;
-- lightweight list/dialog entrance choreography;
-- immediate visual feedback for success/error states;
-- a complete `prefers-reduced-motion` fallback;
-- compositor-friendly animation that does not create continuous CPU/GPU work when the page is idle.
-
-The implementation must reuse the existing Employee motion infrastructure and existing GSAP dependency. Do not add a new animation library.
-
-## 2. Existing Components to Reuse
-
-Reuse these existing mechanisms as the implementation foundation:
-
-- `FrontEnd/src/app/layouts/employee-workspace-layout/useEmployeeMotion.ts`
-  - existing scoped Employee GSAP orchestration;
-  - existing `[data-employee-motion]` discovery;
-  - existing `data-motion-key` replay mechanism;
-  - existing `MutationObserver` cleanup and tween cancellation.
-- `FrontEnd/src/shared/ui/motion.css`
-  - global easing;
-  - global press animation;
-  - existing list-reveal convention.
-- `gsap` and `@gsap/react` already installed in `FrontEnd/package.json`.
-- `EmployeeWorkspaceLayout` motion scope. Do not create a second schedule-specific GSAP root/provider.
-- `EmployeeScheduleHero`, `ContainerGraphMatrix`, `CardSection`, `SearchableSelect`, `ViewportOverlay`, and the three existing Schedule dialogs.
-- Existing `aria-*`, focus restoration, keyboard behavior, and semantic roles.
-- Existing schedule query/calculation/PDF/export/UI-state persistence logic.
-
-Do not create a parallel motion service, context provider, event bus, animation store, or second observer.
-
-## 3. Constraints
-
-### Scope
-
-- Frontend-only change.
-- Target only Employee workflow `/schedule`, except for narrowly required shared reduced-motion safeguards.
-- No backend, API, DTO, entity, persistence, database, dependency-injection, authentication, routing, or configuration changes.
-- No changes to schedule calculations, shift-correction business rules, PDF generation, saved column-order semantics, or query/mutation contracts.
-- Do not restore the removed Salary calculator or any other old Schedule content.
-
-### Dependency constraints
-
-- Do not add Framer Motion, Motion One, React Spring, ScrollTrigger, another GSAP package, or any new npm dependency.
-- Do not change `FrontEnd/package.json`.
-- Do not import GSAP directly into individual Schedule components unless explicitly listed in this plan. The page-level state choreography must continue through `useEmployeeMotion`.
+Fix the reproducible **database uniqueness collision** when accepting a private, partial shift swap. Scenario: schedule **F35**, **2026-10-23**, Anastasia SAS offers **15:00–22:00** of her assigned **09:00–22:00** slot to Oleh Protsun; Oleh presses **Accept** and receives:
 
-### Motion/performance constraints
-
-- Structural entrance/state animations must animate only compositor-friendly `opacity` and `transform`/GSAP `x`, `y`, `scale`.
-- Color/border/background/shadow transitions are allowed only for short interaction feedback on a small number of controls.
-- Do not animate `width`, `height`, `top`, `left`, grid tracks, table dimensions, or matrix cell geometry.
-- Do not animate every `ContainerGraphMatrix` cell, every Schedule summary row, or all 28–31 Daily-day buttons independently.
-- Do not add scroll listeners, pointer-move loops, `requestAnimationFrame` loops, intersection-observer choreography, or continuous idle animation.
-- Do not animate the hero clock every second; its text may continue updating exactly as it does now, but the entrance animation must not replay on clock updates.
-- Do not apply persistent `will-change` to large groups of elements.
-- Keep list stagger bounded: only the first small set of visible dialog rows may be staggered; later rows enter together.
-- On rapid state changes, existing tweens for the affected element must be killed before the next tween begins.
+> This swap could not be accepted because the resulting schedule would conflict.
 
-### Accessibility constraints
+The intended result is to retain Anastasia's **09:00–15:00** assignment and transfer **15:00–22:00** to Oleh, while preserving other assignments, request/history state, authorization, and notifications.
 
-- Respect `prefers-reduced-motion: reduce` for JS and CSS motion.
-- Reduced-motion mode must preserve all state changes and focus behavior but use immediate/near-immediate visual updates and non-smooth scrolling.
-- Do not remove focus outlines, `aria-expanded`, `aria-pressed`, tab roles, dialog roles, or current focus restoration behavior.
+**Baseline:** `OlehProtsun/GF3`, `DEV2`, immutable commit `f2257baeeae67ec983045f6140a71b792ba47a51`. Implement against that commit; do not silently rebase onto newer DEV2 code.
 
-## 4. Implementation Steps
+## 2. Confirmed diagnosis / Analysis Context (Phase 1 handoff)
 
-### Step 1 — Extend the existing Employee GSAP motion presets and add reduced-motion handling
+### 2.1 Verified in the source code at the specified commit
 
-**Action:** EXTEND
+- `GF3.WebApi/Controllers/EmployeeShiftSwapsController.cs`: `POST /api/employee-shift-swaps/{id}/accept` calls `ShiftSwapRules.ApplyAcceptedSwapPeriod(...)` for employee-created swaps (currently around line 264), then `SaveChangesAsync`. Its `catch (DbUpdateException)` returns the exact generic conflict error (around lines 322–325). The message **does not mean the overlap / hour-limit checks rejected the request**: it is the database-update exception translation.
+- `GF3.WebApi/ShiftSwaps/ShiftSwapRules.cs`: `ApplyAcceptedSwapPeriod(ScheduleSlotModel slot, int originalEmployeeId, int acceptingEmployeeId, ShiftSwapPeriod period)` mutates the original slot to the offered interval and accepting employee. It creates remaining parts with `CreateRemainingSlot`, which **copies `sourceSlot.SlotNo` unchanged** (around lines 293–332). It has no visibility into other slots occupying the new time intervals.
+- `DataAccessLayer/Models/DataBaseContext/AppDbContext.cs`: `ConfigureScheduleSlot` enforces uniqueness of `(ScheduleId, DayOfMonth, FromTime, ToTime, SlotNo)` and separately of `(ScheduleId, DayOfMonth, FromTime, ToTime, EmployeeId)` for assigned employees. `SlotNo` must be >= 1; `FromTime < ToTime`.
+- `DataAccessLayer/Models/ScheduleSlotModel.cs`: `SlotNo` denotes a *position in the same time interval*, **not an employee ID**. Existing per-interval positions are therefore meaningful and cannot be blindly reused after splitting a different time interval.
+- `DataAccessLayer/Models/ShiftSwapRequestModel.cs`: the request already persists `OfferedFromTime`, `OfferedToTime`, `ScheduleSlotId`, `FromEmployeeId`, `TargetEmployeeId`, `Visibility`, `Status`, and acceptance metadata. No new columns are needed.
+- `ShiftSwapRules.GetAcceptanceUnavailableReason(...)` already rejects a recipient's actual time overlap (`"You already work during this time."`). Preserve it.
+- The controller already wraps acceptance + history in an EF database transaction, records snapshots, highlights cells, and notifies after commit. Reuse these mechanisms.
 
-**File:**
-- `FrontEnd/src/app/layouts/employee-workspace-layout/useEmployeeMotion.ts`
+### 2.2 Verified from attached SQL export
 
-**Changes:**
-
-1. Keep the current public hook contract unchanged:
-   - `useEmployeeMotion(scope, pathname)` remains the only exported API.
-2. Preserve the existing navigation-indicator measurement/positioning logic and `ResizeObserver`.
-3. Add a `prefers-reduced-motion` check to navigation-indicator movement:
-   - when reduced motion is not requested, retain the existing animated route-indicator movement;
-   - when reduced motion is requested, kill any active indicator tween and position the indicator immediately with `gsap.set`.
-4. Keep `data-employee-motion="from-top"` excluded from GSAP because the Schedule hero owns its CSS entrance.
-5. Refactor the `reveal(...)` branch into explicit presets selected by `element.dataset.employeeMotion`:
-   - existing/default Employee reveal: preserve the current visual behavior and duration for non-Schedule consumers;
-   - `schedule-panel`: `opacity 0.35 → 1`, `y 18 → 0`, no scale change, duration approximately `0.52s`, `power2.out`;
-   - `schedule-content`: `opacity 0.45 → 1`, `y 12 → 0`, `scale 0.99 → 1`, duration approximately `0.42s`, `power2.out`;
-   - `schedule-value`: `opacity 0.60 → 1`, `y 0`, `scale 0.96 → 1`, duration approximately `0.30s`, `power2.out`.
-6. For Schedule presets, cap sequential reveal delay at four items and use approximately `45ms` between items. Keep the current default delay behavior for non-Schedule presets.
-7. Preserve `clearProps: "opacity,transform"` after each completed tween so transformed elements do not keep unnecessary inline animation state.
-8. Preserve the existing `WeakMap` + `data-motion-key` replay semantics.
-9. Preserve the existing removed-node tween cleanup.
-10. Wrap the reveal observer branch in a reduced-motion condition:
-    - in `no-preference`, create the existing scoped `MutationObserver` and perform GSAP reveals;
-    - in `reduce`, do not create a reveal observer solely for animation and do not run entrance/state tweens; DOM nodes must render naturally in their final state.
-11. Use GSAP/context cleanup already provided by `useGSAP`; do not create a global animation registry.
-
-**Behavior after change:**
-
-- `/schedule` can request predictable motion categories without creating local GSAP code.
-- Other Employee routes retain their existing default animation.
-- Employee navigation and reveals stop moving when the OS/browser requests reduced motion.
-
-**Dependencies:**
-- Existing GSAP and `@gsap/react` only.
-
-**Do not:**
-- change the hook signature;
-- add route-specific DOM queries for individual Schedule CSS classes;
-- animate matrix/table descendants from this hook.
-
----
-
-### Step 2 — Add shared reduced-motion safeguards for existing CSS motion primitives
-
-**Action:** EXTEND
-
-**Files:**
-- `FrontEnd/src/shared/ui/motion.css`
-- `FrontEnd/src/shared/ui/ViewportOverlay.module.css`
-- `FrontEnd/src/shared/ui/components/SearchableSelect/SearchableSelect.module.css`
-
-**Changes in `motion.css`:**
-
-1. Keep all existing keyframes and default behavior unchanged for `prefers-reduced-motion: no-preference`.
-2. Add `@media (prefers-reduced-motion: reduce)` rules that:
-   - disable the global `gf3-press` active animation;
-   - disable `[data-motion-list]` child entrance animations.
-3. Do not globally disable color/focus-state changes.
-
-**Changes in `ViewportOverlay.module.css`:**
-
-1. Add a reduced-motion rule for `.surface` that disables its entrance animation.
-2. Do not change overlay sizing, scrolling, overscroll, or viewport behavior.
-
-**Changes in `SearchableSelect.module.css`:**
-
-1. Keep normal SearchableSelect animation unchanged.
-2. Under reduced motion:
-   - disable `.dropdown` entrance animation;
-   - make chevron/state transitions immediate;
-   - remove active translate movement from `.selectButton` and `.option` while preserving visual selected/focus states.
-3. Do not modify `SearchableSelect.tsx` or its public props/API.
-
-**Behavior after change:**
-
-- Existing shared controls used by `/schedule` stop spatial motion when reduced motion is requested.
-- Normal animation on other pages remains unchanged.
-
-**Do not:**
-- redesign shared component visuals;
-- change normal-duration tokens application-wide;
-- change SearchableSelect portal positioning or listbox behavior.
-
----
-
-### Step 3 — Wire deterministic motion keys into the `/schedule` state flow
-
-**Action:** MODIFY
-
-**File:**
-- `FrontEnd/src/pages/employee-schedule/ui/EmployeeSchedulePage.tsx`
-
-**Changes:**
-
-1. Keep all existing query, memoized calculation, persistence, mutation, and PDF logic unchanged.
-2. Keep `hasSwitchedScheduleView` only for the existing post-toggle focus behavior. Stop using it as the trigger for CSS entrance animation.
-3. Remove `styles.scheduleViewEnter` from both:
-   - `ContainerGraphMatrix.className`;
-   - `CardSection.className` for Daily mode.
-4. Remove `styles.scheduleViewTogglePulse` from the view-toggle class list. The button already has global press feedback and its active state; view-content motion will provide the transition feedback.
-5. Add one stable Schedule view-stage wrapper rendered whenever `selectedSchedule` exists:
-   - class: `styles.scheduleViewStage`;
-   - `data-employee-motion="schedule-content"`;
-   - `data-motion-key` exactly derived from selected schedule id and view mode, for example `${selectedSchedule.id}:${scheduleViewMode}`.
-6. Render either the existing Matrix `ContainerGraphMatrix` or existing Daily `CardSection` inside that wrapper without changing their props or business behavior.
-7. Preserve `scheduleViewToggleRef` focus restoration with `preventScroll: true`.
-8. Change the existing Daily tabpanel motion preset from `schedule-panel` to `schedule-content`; keep its existing key based on `selectedSchedule.id` + selected day so day changes replay only the Daily content transition.
-9. Add reduced-motion-aware Daily-day centering:
-   - default/no-preference: `scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" })`;
-   - reduced motion: keep `behavior: "auto"`;
-   - preserve `block` and `inline` values.
-   - use a small safe helper local to this module for the media query; do not create a new shared hook solely for this call.
-10. Do not animate every day tab while scrolling. The strip itself scrolls normally; only the selected chip changes visual state.
-11. Make the schedule-selector chevron reflect the already existing `isScheduleSelectOpen` state with a CSS modifier class, while preserving `aria-expanded`.
-12. Animate feedback states through the existing Employee motion layer:
-   - wrap each conditional `ErrorBanner` in a neutral layout wrapper with `data-employee-motion="schedule-content"` and a motion key derived from the current message/type;
-   - add `data-employee-motion="schedule-content"` and a message-derived motion key to the shift-correction success status.
-13. Animate Summary state changes without animating individual table rows:
-   - add `data-employee-motion="schedule-value"` to `.hoursSummaryTotalPill`;
-   - set its `data-motion-key` from `activeSummaryPeriod.key` plus `scheduleHoursSummary.totalHoursText`;
-   - add `data-employee-motion="schedule-content"` to the Summary grid or the Summary empty-state element;
-   - key that content by the active period key and whether it is `rows` or `empty`.
-14. Keep the outer Summary panel's existing initial `data-employee-motion="schedule-panel"` reveal.
-15. Do not add `data-motion-list` to:
-   - the 28–31 Daily date tabs;
-   - Summary rows;
-   - matrix cells/columns.
-16. Preserve stable worker keys (`worker.employeeId`). Do not force remounts just to restart CSS animations; the keyed parent Daily body is the state-transition animation boundary.
-
-**Behavior after change:**
-
-- Initial Schedule sections reveal coherently.
-- Selecting another published schedule animates the large Schedule content once.
-- Matrix ↔ Daily transitions animate through one central GSAP path rather than duplicate CSS keyframes.
-- Changing a Daily date animates only the tabpanel content and smoothly centers the selected tab.
-- Changing Summary month/year animates only the total and Summary content container.
-- Rapid changes are safe because `useEmployeeMotion` kills the previous tween before starting the next.
-
-**Dependencies:**
-- Step 1 presets.
-
-**Do not:**
-- change Schedule selection semantics;
-- change matrix props;
-- change Summary calculations;
-- remount data-heavy tables solely for animation.
-
----
-
-### Step 4 — Replace duplicate Schedule view keyframes with lightweight interaction motion
-
-**Action:** MODIFY
-
-**File:**
-- `FrontEnd/src/pages/employee-schedule/ui/EmployeeSchedulePage.module.css`
-
-**Changes:**
-
-1. Add `.scheduleViewStage` with layout-only rules required to preserve the current page geometry:
-   - `min-width: 0`;
-   - `width: 100%`;
-   - no new fixed height or overflow clipping.
-2. Add a neutral wrapper class for animated feedback/error blocks if required by Step 3; it must not alter ErrorBanner sizing or semantics.
-3. Remove the obsolete `.scheduleViewEnter` animation rule/keyframes because Matrix/Daily entrance is now owned by `useEmployeeMotion`.
-4. Remove the obsolete `.scheduleViewTogglePulse` rule/keyframes.
-5. Keep the existing blue/white Employee visual language; do not redesign the page.
-6. Refine existing interactive controls using short transitions in the approximate `140–220ms` range:
-   - `.scheduleSelectTrigger`;
-   - `.openSchedulePdfButton` / correction action;
-   - `.scheduleViewToggle`;
-   - `.dailyScheduleDay`.
-7. Transitions may use subtle translate (`1–2px`), color, border-color, background, and small shadow changes. Do not use large bounce/spring movement.
-8. Use `@media (hover: hover)` for hover-only movement so touch devices do not retain hover transforms.
-9. Add an open-state class for `.scheduleSelectChevron` with a small rotation/translation transition. The state must derive from `isScheduleSelectOpen`; no independent animation state.
-10. Improve selected Daily-day feedback with a restrained transform/outline/shadow while keeping existing work-day/off-day color semantics and `aria-selected` behavior.
-11. Keep non-interactive worker rows and Summary rows visually stable. Do not add hover movement that would imply clickability.
-12. Under `@media (prefers-reduced-motion: reduce)`:
-    - disable spatial transforms and transition motion for Schedule controls;
-    - keep instant color/border/selected-state feedback;
-    - disable any Schedule-local keyframe animation added in this file.
-
-**Behavior after change:**
-
-- Controls feel responsive and modern without competing with page-level GSAP motion.
-- Duplicate Matrix/Daily animation logic is removed.
-- Touch and reduced-motion users do not receive unnecessary transform effects.
-
-**Dependencies:**
-- Step 3 markup classes.
-
-**Do not:**
-- add animated gradients;
-- animate large shadows continuously;
-- change responsive layout breakpoints unless a motion rule requires only a selector-specific override.
-
----
-
-### Step 5 — Stage the hero entrance without reanimating its live clock
-
-**Action:** MODIFY
-
-**File:**
-- `FrontEnd/src/pages/employee-schedule/ui/EmployeeScheduleHero.module.css`
-
-**Changes:**
-
-1. Keep `EmployeeScheduleHero.tsx` unchanged unless a CSS selector cannot target an existing structural element. Prefer CSS-only work here.
-2. Keep `data-employee-motion="from-top"`; do not move the hero into the JS reveal pipeline.
-3. Refine `.hero` entrance so it remains gradual but less mechanically large:
-   - approximately `600–680ms`;
-   - opacity fade plus translate from roughly `-24px` to `0`, rather than the current larger `-44px` travel;
-   - use the existing Employee cubic-bezier style.
-4. Add one-time nested entrance choreography using existing structural elements:
-   - `.heading`: subtle opacity + `y` reveal after the hero begins;
-   - `.shifts`: subtle opacity + `y` reveal after the heading;
-   - the two `.day` columns: small stagger after `.shifts`.
-5. Keep delays bounded; the complete hero should settle in well under one second.
-6. Do not attach animation to `.clock`, `.countdown`, or text values individually. Their existing periodic re-render must not replay animation.
-7. Add `@media (prefers-reduced-motion: reduce)` that removes hero/nested entrance animations and leaves the final layout visible immediately.
-
-**Behavior after change:**
-
-- Hero arrives with layered but restrained depth.
-- Clock/countdown updates remain static and inexpensive after initial render.
-
-**Do not:**
-- add parallax;
-- add infinite shimmer/pulse/background animation;
-- change the existing timer interval or shift logic.
-
----
-
-### Step 6 — Animate the Schedule selection dialog and its list with bounded CSS choreography
-
-**Action:** MODIFY
-
-**File:**
-- `FrontEnd/src/pages/employee-schedule/ui/EmployeeScheduleSelectDialog.module.css`
-
-**Changes:**
-
-1. Preserve the existing portal, dialog semantics, focus handling, close behavior, and markup.
-2. Add a short overlay opacity entrance; do not animate `backdrop-filter` itself.
-3. Override/augment the sheet entrance with a Schedule-specific `opacity + translateY + slight scale` animation around `280–340ms`.
-4. On mobile bottom-sheet layout, use a slightly larger vertical start offset and no excessive scale.
-5. Add row entrance choreography:
-   - `.row` uses a short opacity/translate entrance;
-   - stagger only the first approximately 6 rows using `nth-child` delays of roughly `20–30ms`;
-   - all later rows share the final capped delay rather than extending the animation timeline indefinitely.
-6. Add short hover/focus/selected transitions for `.row`, `.close`, and `.indicator` using the existing blue palette.
-7. Keep selected-state contrast and focus-visible outline intact.
-8. Add reduced-motion rules that disable overlay/sheet/row spatial entrance and transform transitions while preserving immediate state styling.
-
-**Behavior after change:**
-
-- Opening the Schedule picker feels like a deliberate sheet/list reveal.
-- Large Schedule lists do not produce an unbounded stagger or long animation chain.
-
-**Do not:**
-- add JS timers or presence state for exit animation;
-- modify `EmployeeScheduleSelectDialog.tsx` unless required only to expose an already existing state class; CSS-only implementation is preferred.
-
----
-
-### Step 7 — Add restrained dialog/list micro-motion to column ordering
-
-**Action:** MODIFY
-
-**File:**
-- `FrontEnd/src/pages/employee-schedule/ui/EmployeeScheduleColumnOrderDialog.module.css`
-
-**Changes:**
-
-1. Preserve existing dialog markup, working-order state, focus behavior, save/reset behavior, and column-order persistence.
-2. Add a short overlay/surface entrance consistent with Step 6; do not animate blur.
-3. Add a bounded initial reveal for `.row` items, capped after the first approximately 6 rows.
-4. Add transitions for:
-   - `.row` / `.activeRow` border/background state;
-   - `.position` color/background state;
-   - `.controls button`, `.resetButton`, and `.closeButton` hover/press feedback.
-5. Keep actual row reorder layout updates immediate in this task. Do not add GSAP Flip or force React remounts solely to animate list reordering; preserving focus/stability and bundle/runtime simplicity has priority.
-6. Reduced-motion rules disable spatial entrance/press transitions and preserve immediate selected/disabled/focus states.
-
-**Behavior after change:**
-
-- The dialog and list appear smoothly, and every interactive control has immediate feedback.
-- Reordering remains reliable and focus-safe with no layout-animation measurement overhead.
+The provided `GF3_Graph_33_20261008_0530.sql` is a **schedule export**, not a complete live database / swap-request export. It contains 202 shift-slot rows for F35 in October 2026. The important rows on **23 October** are:
 
-**Do not:**
-- change the column order algorithm;
-- change stable React keys;
-- introduce FLIP/layout animation in this task.
-
----
+| Employee | Assigned interval | SlotNo |
+|---|---|---:|
+| Anastasia SAS | 09:00–22:00 | 1 |
+| Olena Romadanova | 09:00–15:00 | 1 |
+| Anna Minieieva | 09:00–15:00 | 2 |
+| Margarita Isachenko | 15:00–22:00 | 1 |
+| Wiktoria Bartoszek | 15:00–22:00 | 2 |
+| Iryna Barysik | 16:30–22:00 | 1 |
 
-### Step 8 — Add state motion to the Shift Correction dialog without changing its workflow
+Oleh has **no assignment on 23 October** in this export; he works **15:00–22:00** on both 21 and 22 October. The proposed split reuses `SlotNo=1` for both new periods: it collides with **Olena's 09:00–15:00 SlotNo 1** and **Margarita's 15:00–22:00 SlotNo 1**. The smallest free position is **SlotNo 3** for each interval. The export has no pre-existing duplicate of the *exact* unique key. A targeted isolated SQLite reproduction with the **same two uniqueness definitions** rejected the existing split with `UNIQUE constraint failed: schedule_slot.schedule_id, schedule_slot.day_of_month, schedule_slot.from_time, schedule_slot.to_time, schedule_slot.slot_no`; assigning SlotNo 3 to both resultant intervals passed those database constraints. This is a **SQL-level repro**, not a claim to have run the .NET application.
 
-**Action:** MODIFY
+Other schedule facts (not the cause of this exception) include Anastasia's 177.5 scheduled hours against a configured monthly minimum of 190, and a pre-existing six-day run with a configured limit of five consecutive days. **Do not modify these business settings or weaken them to solve this database-key bug.** The error is thrown by a `DbUpdateException` handler, not by a monthly-hour validation in the acceptance path.
 
-**File:**
-- `FrontEnd/src/pages/employee-schedule/ui/EmployeeShiftCorrectionDialog.module.css`
+### 2.3 Verification boundary
 
-**Changes:**
+The current GitHub source files and database model were inspected, and the SQL rows were loaded into an isolated in-memory SQLite schema to verify their values. The **application itself was not executed** here (no full working checkout/.NET SDK in this environment), and the SQL export omits live `shift_swap_request` state. The specific SQLite provider constraint code / stack trace still needs to be asserted by the implementation regression test; do not claim an end-to-end test has already passed.
 
-1. Preserve all existing Shift Correction component logic, validation, mutation inputs, pending states, and dialog semantics.
-2. Add a short overlay/dialog entrance consistent with the other Schedule dialogs.
-3. Add subtle staged entrance for the existing `.stepSection` blocks; keep the total delay bounded.
-4. Add short interaction transitions to:
-   - `.dayList button` / `.dayActive`;
-   - `.shiftCard` / pending state;
-   - `.boundaryChoices button` / `.boundarySelected`;
-   - `.timeEditor > button`;
-   - `.closeButton`.
-5. Give conditionally rendered `.adjustmentPanel`, `.validation`, and similar feedback blocks a short one-time opacity/translate reveal when they mount.
-6. Do not animate text input values or cause any movement on every keystroke.
-7. Do not automatically scroll the horizontal day list unless existing behavior already requires it; no new scroll-management logic is needed for this dialog.
-8. Add reduced-motion rules disabling spatial/keyframe motion while preserving state-color changes and focus styles.
+## 3. Technical Decision / Reasoning Context (Phase 2 handoff)
 
-**Behavior after change:**
+**One chosen fix:** make the **existing** `ShiftSwapRules.ApplyAcceptedSwapPeriod` assign an unused `SlotNo` for every newly produced `(schedule, day, from, to)` time interval when a partial shift is split. Supply the parent schedule's current slots to this existing method. Keep the original `ScheduleSlotModel` row (and its ID) as the transferred offered interval, as the current implementation does. Create zero, one, or two remaining intervals for the original employee with their own valid position numbers.
 
-- The multi-step correction workflow communicates progression and selected states clearly without changing its logic.
-- No animation runs continuously while the user edits times.
+Allocate deterministically using the **smallest positive integer not already used by another slot in that exact `(ScheduleId, DayOfMonth, FromTime, ToTime)` group**. Exclude the original slot being changed from the occupied-position lookup, and include every slot allocated earlier in the same operation. Do **not** alter slot numbers of unrelated shifts. For a whole-slot transfer with no interval splitting, preserve the original `SlotNo` to avoid an unnecessary change.
 
-**Do not:**
-- change mutation payloads or validation;
-- add new React state only for decorative animation;
-- add timers for exit transitions.
+This respects the existing EF Core schema, current request identifiers, transaction, validation, public/private flows, snapshots, notifications, and frontend API. It needs **no migration, dependency, DI, configuration, or API-contract change**.
 
----
+## 4. Scope classification
 
-### Step 9 — Update Schedule tests for motion-aware scrolling and preserve current behavior
+| Action | File / component | Precise responsibility |
+|---|---|---|
+| **MODIFY** | `GF3.WebApi/ShiftSwaps/ShiftSwapRules.cs` | Extend partial-transfer method to accept existing slots and assign unique `SlotNo` values for transferred and remainder intervals. |
+| **MODIFY** | `GF3.WebApi/Controllers/EmployeeShiftSwapsController.cs` | Pass `swap.Schedule.Slots` into the existing method at the single employee-created swap call site. Keep other Accept behavior intact. |
+| **CREATE** | `GF3.Tests/ShiftSwapSlotNoConflictTests.cs` | xUnit regression/integration tests with real EF Core SQLite unique indexes for the original F35 case and edge cases. |
+| **REUSE, no changes** | `DataAccessLayer/Models/ScheduleSlotModel.cs`, `DataAccessLayer/Models/ShiftSwapRequestModel.cs`, `DataAccessLayer/Models/DataBaseContext/AppDbContext.cs` | Existing entities, relationship and unique-key constraints. |
+| **REUSE, no changes** | Existing controller transaction, `ShiftSwapRules` period / overlap validation, `ShiftSwapHistorySnapshotBuilder`, `IWorkflowLogService`, `IRealtimeNotifier`, and test DB setup | Preserve behavior and avoid duplicated infrastructure. |
+| **DO NOT TOUCH** | Frontend, launcher, migrations, CI workflow, scheduling generator, manager-created open-shift branch, authentication, localization | Out of scope. |
 
-**Action:** MODIFY
+## 5. Deterministic implementation steps (Phase 3)
 
-**File:**
-- `FrontEnd/src/pages/employee-schedule/ui/EmployeeSchedulePage.test.tsx`
+### Step 0 — Pin baseline; targeted source check only
 
-**Changes:**
+**Action:** REUSE / VERIFY; no code modifications.
 
-1. Add a deterministic `window.matchMedia` mock/helper used by this test file.
-2. Default the helper to `prefers-reduced-motion: no-preference` in `beforeEach` and reset it between tests.
-3. Update the existing Daily-view scroll expectation:
-   - normal mode must expect `behavior: "smooth"`;
-   - keep `block: "nearest"` and `inline: "center"`.
-4. Add a focused test with reduced motion enabled and verify Daily-day centering uses `behavior: "auto"`.
-5. Keep the existing assertion that the Matrix/Daily toggle returns focus to the toggle button.
-6. Add a small DOM-wiring assertion for the state animation boundary:
-   - the rendered Matrix/Daily stage has `data-employee-motion="schedule-content"`;
-   - its `data-motion-key` changes when switching view or selecting another schedule.
-7. Add/extend a Summary test so that changing month/year changes the Summary content/total motion key without changing calculated values.
-8. Preserve all current Schedule behavior tests, including:
-   - matrix data;
-   - Daily worker ordering;
-   - empty Daily state;
-   - column ordering;
-   - PDF behavior;
-   - summary calculations;
-   - loading/empty/error states;
-   - explicit absence of the Salary calculator.
-9. Do not attempt to assert frame timing or CSS keyframe duration in Vitest/JSDOM.
-
-**Behavior after change:**
-
-- Tests protect the new JS behavior and ensure animation wiring does not alter functional behavior.
-
-**Do not:**
-- add snapshot tests for generated CSS class names;
-- make tests depend on real animation timing.
-
-## 5. Data / API / Persistence Changes
-
-### Data model
-
-None.
-
-### API
-
-None.
-
-### Persistence
-
-None.
-
-The following existing flows must remain exactly as they are:
-
-- published Schedule query;
-- Employee UI-state query/save;
-- local column-order storage;
-- shift-correction query/mutation;
-- PDF export generation.
-
-### Dependency injection
-
-None.
-
-### Configuration
-
-None.
-
-### npm dependencies
-
-None. `package.json` and lockfiles must not change for this task.
-
-## 6. Error and Edge Case Requirements
-
-1. **No schedules / loading:** existing panels remain usable and receive only their existing `schedule-panel` entrance.
-2. **Query/PDF/preference errors:** the message itself must remain readable immediately; animation must never delay or hide it after settling.
-3. **Shift-correction success:** status remains `role="status"`; animation is presentation-only.
-4. **Rapid Matrix/Daily toggles:** previous tween is killed and the newest state wins; no stacked GSAP timelines.
-5. **Rapid Daily-day changes:** only the current tabpanel finishes visible; no stale opacity/transform inline styles after GSAP cleanup.
-6. **Rapid Summary period changes:** only the current total/grid key is animated; no per-row tween accumulation.
-7. **Same state selected twice:** unchanged `data-motion-key` must not deliberately replay animation.
-8. **`prefers-reduced-motion`:** all functionality and focus changes work with no spatial entrance animation and with non-smooth day centering.
-9. **`matchMedia` unavailable in the test/runtime environment:** the local scroll helper must fail safely and treat the environment as normal/no-preference rather than throwing.
-10. **Large lists:** list stagger remains capped; do not make duration proportional to list length.
-11. **Mobile:** no entrance transform may cause horizontal page overflow; dialog/sheet animations must keep current safe-area and viewport sizing.
-12. **Keyboard:** animation must not move focus, trap focus differently, or require pointer input.
-13. **Live hero clock:** every-second updates must not recreate/restart hero animation.
+1. In the Codex workspace run `git rev-parse HEAD` and verify `f2257baeeae67ec983045f6140a71b792ba47a51` (or explicitly checkout that commit before starting). Run `git status --short` and do not overwrite unrelated changes.
+2. Open only the two MODIFY files, the three verified data-model files, and directly related swap test fixtures. Locate **all** call sites of `ApplyAcceptedSwapPeriod` and `CreateRemainingSlot` with a targeted search under `GF3.WebApi` and `GF3.Tests`; update their signatures only if affected by Step 1. Do not analyze the whole repository.
+3. Record the existing tests' construction pattern for `AppDbContext`, `EmployeeShiftSwapsController`, and an employee claims principal. Reuse their SQLite/transaction setup rather than inventing a new test framework.
+4. Confirm the duplicated `SlotNo=1` example above from the isolated fixture (do not import the user's entire SQL export into any real database).
 
-## 7. Tests
-
-### Automated tests
-
-Run from `FrontEnd`:
-
-```bash
-npm test -- EmployeeSchedulePage.test.tsx
-npm run lint
-npm run build
-npm test
-```
+### Step 1 — Correct interval-position allocation at the existing rule
 
-Required automated coverage:
+**Action:** MODIFY `GF3.WebApi/ShiftSwaps/ShiftSwapRules.cs`.
 
-- normal Daily switch uses smooth selected-day centering;
-- reduced-motion Daily switch uses automatic centering;
-- Matrix/Daily focus restoration remains intact;
-- motion key changes for view/schedule state;
-- Summary state key changes while summary values remain correct;
-- all existing Schedule behavior tests still pass.
-
-### Manual interaction verification
-
-With `npm run dev`, verify `/schedule` on desktop and a narrow mobile viewport:
-
-1. First load:
-   - hero settles first with layered internal reveal;
-   - Schedule content and Summary follow without a long blocking sequence.
-2. Matrix ↔ Daily:
-   - button press feedback is immediate;
-   - content transition is smooth and does not flash/reflow;
-   - toggle retains focus.
-3. Daily day strip:
-   - selected date centers smoothly in normal mode;
-   - only Daily body content transitions;
-   - 28–31 tabs do not independently cascade into view.
-4. Schedule picker:
-   - overlay/sheet/list entrance is clean;
-   - selected/focus/hover states remain clear;
-   - long list entrance remains bounded.
-5. Column-order dialog:
-   - open/list/control feedback is animated;
-   - moving rows still works and does not lose focus because no layout FLIP is added.
-6. Shift Correction:
-   - sections and conditional panels appear smoothly;
-   - selecting a day/boundary and editing time remains immediate.
-7. Summary:
-   - month/year dropdowns retain existing SearchableSelect behavior;
-   - total and grid transition on period change as a whole;
-   - rows are not individually animated.
-8. Error/success feedback:
-   - messages enter once and remain static/readable.
-9. Reduced motion:
-   - emulate `prefers-reduced-motion: reduce`;
-   - no hero/section/dialog/list spatial animation;
-   - no button press scaling;
-   - selected-day scroll is not smooth;
-   - all state and focus feedback remains understandable.
-
-### Performance verification
-
-Use browser Performance/Rendering tools during the manual checks:
-
-- page must become idle after entrance animations settle;
-- no newly introduced recurring timers, RAF loops, scroll listeners, or animation observers should produce work while idle;
-- structural animation should show transform/opacity compositing rather than repeated layout of the matrix/table;
-- rapidly switch views/days/summary periods and verify old tweens are cancelled rather than accumulating;
-- verify no animation is applied per matrix cell or per Summary row.
-
-## 8. Verification
-
-### Build
-
-- `npm run build` completes successfully.
-
-### Lint
-
-- `npm run lint` completes successfully.
-
-### Tests
-
-- targeted Schedule test file passes;
-- full `npm test` passes.
-
-### Integration
-
-- `EmployeeWorkspaceLayout` still owns the Employee GSAP scope;
-- `/schedule` uses `data-employee-motion` + `data-motion-key` for dynamic block transitions;
-- no second motion system/provider/observer exists.
-
-### Runtime
-
-- no animation leaves an element stuck transparent or transformed;
-- dialogs, Schedule selection, Matrix/Daily, Daily-day switching, Summary selection, PDF export, column order, and shift correction all remain functional;
-- desktop and mobile layouts remain unchanged except for motion/micro-interaction styling.
-
-### Regression
-
-- other Employee routes keep their normal existing animation when reduced motion is not requested;
-- reduced-motion users get less movement throughout the shared Employee/shared-control primitives touched by this task;
-- SearchableSelect functionality and ViewportOverlay layout remain unchanged;
-- Salary calculator remains absent from `/schedule`.
-
-### Scope
-
-- no backend files changed;
-- no package/lock files changed;
-- no unrelated refactor.
-
-## 9. Acceptance Checklist
-
-- [ ] `/schedule` has one coherent motion language instead of independent competing Matrix/Daily keyframes.
-- [ ] Existing `useEmployeeMotion` remains the only page-level JS motion orchestrator.
-- [ ] No new animation dependency was added.
-- [ ] Hero entrance is layered, restrained, and does not replay on clock updates.
-- [ ] Loading/empty panels reveal smoothly.
-- [ ] Error and success feedback enters once and remains accessible.
-- [ ] Selecting another schedule replays only the Schedule content boundary.
-- [ ] Matrix ↔ Daily content transition is smooth and focus remains on the toggle.
-- [ ] Daily selected day centers with smooth scrolling in normal mode.
-- [ ] Daily selected day centers instantly under reduced motion.
-- [ ] Daily tabpanel content reanimates on day change through `data-motion-key`.
-- [ ] Schedule picker sheet and a bounded subset of list rows reveal progressively.
-- [ ] Column-order and Shift Correction dialogs have responsive control/state motion without changing logic.
-- [ ] Summary total and grid animate on period changes as containers, not as dozens of row animations.
-- [ ] Buttons/tabs/selectors provide short press/hover/selected feedback without bounce-heavy motion.
-- [ ] `prefers-reduced-motion: reduce` suppresses JS GSAP spatial reveal, global press animation, overlay entrance, SearchableSelect dropdown entrance, Schedule hero/dialog/list motion, and smooth scrolling.
-- [ ] No matrix-cell animation was added.
-- [ ] No Summary-row animation was added.
-- [ ] No scroll listener, RAF loop, ScrollTrigger, or continuous decorative animation was added.
-- [ ] No persistent `will-change` was added to large element groups.
-- [ ] `npm run lint` passes.
-- [ ] `npm run build` passes.
-- [ ] targeted Schedule tests pass.
-- [ ] full Vitest suite passes.
-- [ ] existing functional Schedule behavior is unchanged.
-- [ ] Salary calculator remains absent.
-- [ ] No unrelated files were modified.
-
-## 10. Do Not Change
-
-Do not modify as part of this task:
-
-- backend projects, controllers, services, DTOs, persistence, migrations, or API contracts;
-- Employee Schedule domain/calculation helpers except where a test import is mechanically required;
-- `ContainerGraphMatrix` internals or its public API;
-- `CardSection` internals;
-- `SearchableSelect.tsx` public API/behavior;
-- Employee Schedule PDF-generation behavior;
-- schedule/shift-correction API calls;
-- column-order persistence format or storage keys;
-- authentication/session logic;
-- route definitions;
-- the hero timer/update interval;
-- dependencies in `package.json` or lockfiles;
-- old/removed Salary calculator functionality;
-- unrelated Employee pages or Manager workflows;
-- repository-level `Plan.md` or unrelated documentation during implementation unless the user separately requests documentation updates.
+1. Extend the existing method contract by a final argument representing the parent schedule's currently loaded slots:
+
+   `ApplyAcceptedSwapPeriod(ScheduleSlotModel slot, int originalEmployeeId, int acceptingEmployeeId, ShiftSwapPeriod period, IReadOnlyCollection<ScheduleSlotModel> scheduleSlots)`
+
+   Preserve the return type `IReadOnlyList<ScheduleSlotModel>` and the **current mutating-original-slot** behavior. This is an internal method; do not introduce a public service/interface.
+
+2. Keep the existing call to `EnsurePeriodWithinSlot` in the controller and the existing `ParseTimeMinutes` / `ShiftSwapPeriod` calculations. Compute up to two non-empty remainder periods: `[original start, offered start)` and `[offered end, original end)`.
+3. **Whole-slot case:** no remainder is generated. Reassign original slot to accepting employee as today, preserving its original `Id`, `SlotNo`, `FromTime`, `ToTime`, and `Status=ASSIGNED`.
+4. **Partial case:** for every resultant period (the original row mutated to the transferred period, plus each new original-employee remainder):
+   - Identify the occupied positive `SlotNo` values in `scheduleSlots` matching **same schedule ID, day, exact start time, and exact end time**, excluding the original source slot by persistent ID.
+   - Include earlier staged results from this same swap while calculating later positions (never allow an in-operation duplicate).
+   - Choose the **smallest free positive integer**, starting at 1; do not copy the original `SlotNo` automatically and do not invent a maximum `SlotNo` based on `PeoplePerShift`.
+   - Set the chosen position on the mutated original row and on each new remainder. Leave all other existing rows untouched.
+   - Set transferred row `EmployeeId=acceptingEmployeeId`, `Status=ASSIGNED`, `FromTime/ToTime=offered period`; remainder `EmployeeId=originalEmployeeId`, `Status=ASSIGNED`, `FromTime/ToTime=remainder period`.
+   - Keep `ScheduleId`, `DayOfMonth`, the original source row's ID, and request foreign-key relationship unchanged.
+5. Adjust `CreateRemainingSlot` only to **accept the selected `slotNo` as an argument**. It must not silently read `sourceSlot.SlotNo` for newly generated periods. Keep `CreateRemainingSlot` in the same class and preserve its existing modeling responsibility.
+6. Ensure allocation takes account of `scheduleSlots` **before** the original row is mutated, by excluding the source ID (rather than depending on the source's current interval), to make the result independent of the order of property assignments.
+7. Do not add an overlapping-time checker here: `GetAcceptanceUnavailableReason` already checks whether the **accepting employee** works during the offered interval; duplicate human assignments and duplicate exact `(time, employee)` keys remain guarded by the existing application/DB rules.
+
+**Expected F35 output (same day 2026-10-23):**
+
+- Existing Anastasia source row (same DB ID) → **Oleh**, **15:00–22:00**, **SlotNo=3**.
+- One newly inserted remainder row → **Anastasia**, **09:00–15:00**, **SlotNo=3**.
+- Olena/Anna/Margarita/Wiktoria/Iryna rows preserve their original IDs, employees, times, and `SlotNo` values.
+- No shift is lost; total shifted hours remain 13 hours across Anastasia + Oleh for the original full-day source row; ownership changes for exactly 7 hours.
+
+### Step 2 — Wire only the existing Accept call site
+
+**Action:** MODIFY `GF3.WebApi/Controllers/EmployeeShiftSwapsController.cs`.
+
+1. In `Accept(int id, CancellationToken cancellationToken)`, change only the employee-created branch invocation to supply the already eager-loaded `swap.Schedule.Slots` as the final argument of `ApplyAcceptedSwapPeriod`.
+2. Continue adding the returned `ScheduleSlotModel` remainders to `db.ScheduleSlots`; continue to let the method mutate the tracked original `slot` to the recipient.
+3. Keep `GetAcceptanceUnavailableReason`, `EnsurePeriodWithinSlot`, employee authorization, private target check, manager lock, publication check, manager-created branch, `EnsureScheduleEmployee`, cell highlights, history before/after snapshots, transaction boundary, status/accepted-by timestamp, workflow log, and SignalR notifications unchanged.
+4. Preserve the existing `DbUpdateException` → validation-error conversion for genuinely conflicting concurrent/invalid writes. The bug fix should prevent **this specific key collision** upstream; do not suppress database integrity exceptions or return success after a failed `SaveChangesAsync`.
+5. Do not add a second `SaveChangesAsync`, transaction, or status transition.
+
+### Step 3 — Add focused SQLite regression tests
+
+**Action:** CREATE `GF3.Tests/ShiftSwapSlotNoConflictTests.cs`.
+
+Use **xUnit**, **EF Core SQLite with actual schema constraints** (not EF Core InMemory), and the repository's existing integration/controller test helpers. If existing helpers are insufficient, construct only a minimal SQLite-backed `AppDbContext` test setup inside this test file and minimal fakes for controller ctor dependencies; no new NuGet packages or production DI registration. The tests must cover the real `EmployeeShiftSwapsController.Accept` and persist via `SaveChangesAsync`, not only assert an in-memory object graph.
+
+Required cases:
+
+1. **`Accept_PartialPrivateF35Swap_ReallocatesConflictingSlotNumbers`**: published swap-enabled F35 schedule in October 2026 with the six 23 October assignments from §2.2, a private `ShiftSwapRequestModel` from Anastasia to Oleh referencing Anastasia's 09:00–22:00 row, offered 15:00–22:00, and an authorized Oleh principal. Execute `Accept(id, ...)` against real SQLite. Expect HTTP success, original row owned by Oleh at **15:00–22:00 SlotNo 3**, a new Anastasia row at **09:00–15:00 SlotNo 3**, and all pre-existing unrelated rows unchanged. Re-query from a fresh EF context to verify persistence and unique-key integrity.
+2. **`Accept_PartialSwap_PersistsAcceptedRequestAndHistory`**: same fixture; request status `Accepted`, `AcceptedByEmployeeId=Oleh`, UTC acceptance timestamp set, exactly one `ShiftSwapHistoryModel` for this acceptance, snapshots show original and resultant ownership/intervals; no notification before commit. Existing post-commit side effects must retain their behavior.
+3. **`Accept_FullSlotSwap_PreservesSlotNumber`**: 15:00–22:00 entire source slot is transferred; verify no remainder row, same source ID and `SlotNo` retained, no unique-index error.
+4. **`Accept_PrefixPartialSwap_AllocatesRemainderPosition`**: offer starts at original start but ends earlier; allocate a valid position for the trailing source remainder when its exact interval already has SlotNo 1 occupied.
+5. **`Accept_MiddlePartialSwap_AllocatesBothRemainders`**: offer lies strictly inside a longer shift; both resulting original-employee remainders and the accepting employee's interval get non-conflicting positions, with hours conserved.
+6. **`Accept_RecipientAlreadyWorksOfferedTime_RejectsWithoutMutation`**: recipient already has an overlapping assignment on 23 October; expect the existing specific rejection, unchanged swap status, no new slots/history, no notification.
+7. **`Accept_NotIntendedPrivateRecipient_RejectsWithoutMutation`**: another employee tries to accept; reject using existing private-target policy.
+8. **`Accept_AlreadyAcceptedRequest_DoesNotTransferTwice`**: second sequential Accept fails with existing non-open error and creates no extra slots/history.
+9. **`Accept_StaleOrEditedSourceSlot_RejectsWithoutMutation`**: after creation, alter source assignment/times so offer is no longer inside the source or no longer owned by creator; expect existing validation and no partial persistence.
+
+For scenario 1, add test seed rows for Oleh on **21 and 22 October 15:00–22:00** if needed to exercise the existing month-load path. Do not copy the full SQL export or real employee emails into the test project; construct a minimal self-contained fixture with synthetic IDs and only required model fields. Reuse the project's authorized test account setup; do not bypass authentication by modifying production code.
+
+### Step 4 — Regression and final checks
+
+**Action:** VERIFY; do not modify unrelated code.
+
+1. Execute targeted tests first:
+
+   `dotnet test GF3.Tests/GF3.Tests.csproj --configuration Release --filter "FullyQualifiedName~ShiftSwapSlotNoConflictTests"`
+
+2. Execute the same non-local backend test command used by CI at the specified commit:
+
+   `dotnet test GF3.Tests/GF3.Tests.csproj --configuration Release --filter "Category!=LocalOnly"`
+
+3. Run the full backend build through the test project if the standard build passes: `dotnet build GF3.Tests/GF3.Tests.csproj --configuration Release`. Do not modify Windows-only launcher or CI to make this focused fix pass.
+4. Inspect `git diff --check`, `git diff --stat`, and confirm only the two stated production files plus the new test file changed (unless an **existing swap test file** requires a signature update, which is allowed but must be documented).
+5. Manually smoke-test on a **copy** of the schedule (never production): publish/allow swap, create Anastasia private offer for Oleh 2026-10-23 15:00–22:00, accept as Oleh, check UI schedule and history, and confirm the private swap leaves the open list and becomes accepted. Reload page to verify persistence.
+6. Reproduce the same test with an actual recipient overlap; confirm a legitimate conflict remains blocked. Confirm the manager-created open-shift acceptance path still works unchanged.
+7. If a test shows another constraint violation, inspect only the failing EF `SqliteException.SqliteErrorCode`, `SqliteExtendedErrorCode` and failing SQL in the test environment. Do **not** blindly remove unique indexes or catch-and-ignore writes. Report an unrelated violation as a separate blocker rather than widening this patch.
+
+## 6. Data flow and contract guarantees
+
+`POST /api/employee-shift-swaps/{id}/accept`
+→ existing authorization/publication/lock checks
+→ resolve stored offered interval
+→ existing overlap and ownership validation
+→ **`ApplyAcceptedSwapPeriod` with parent schedule slots / collision-free interval positions**
+→ tracked existing slot update + 0–2 new remainder slots
+→ existing EF transaction and `SaveChangesAsync`
+→ existing before/after snapshot history and request `Accepted` state
+→ commit
+→ existing workflow log and SignalR updates
+→ existing `ShiftSwapDto` response.
+
+**API:** No new route, HTTP verb, request field, response field, or authentication rule. Retain 200 on success and existing validation/problem-response mapping on failure.
+
+**Persistence:** Existing `schedule_slot`, `shift_swap_request`, `shift_swap_history`, and `schedule_cell_style` tables. No field/index/migration changes. The two EF unique indexes must remain enforced. Existing transaction semantics remain intact.
+
+**DI / config / dependencies:** No changes. No new packages.
+
+## 7. Error handling and edge cases
+
+- Entire vs partial swap: reallocate only if a split changes intervals; preserve original `SlotNo` for an unchanged interval.
+- Exact boundary intervals are non-overlapping; do not create zero-length remainders.
+- A strictly internal offered interval may create **two** new remainders; choose positions independently for both.
+- Allocate positions **per exact interval**, not per employee or per whole day. An overlapping shift with a different interval is not itself a duplicate of this database key.
+- The recipient's true overlapping hours remain forbidden by existing `GetAcceptanceUnavailableReason`; do not mistake this for a `SlotNo` collision.
+- Existing/open/stale request, private target, manager lock and source ownership checks retain their current behavior.
+- A failed SQLite write must roll back assignment, request status and history atomically; never retry with a random `SlotNo` after an exception or mask the failure as success.
+- Leave any unrelated pre-existing monthly-hour/consecutive-day conditions untouched. They do not explain the **specific caught `DbUpdateException`** being fixed.
+
+## 8. Acceptance checklist
+
+- [ ] Regression reproduces the original F35 failure **before** the fix using real SQLite (red test).
+- [ ] Same test passes **after** the fix (green test).
+- [ ] Anastasia retains 09:00–15:00 on 2026-10-23, SlotNo 3, after offering 15:00–22:00.
+- [ ] Oleh receives only 15:00–22:00 on 2026-10-23, SlotNo 3.
+- [ ] Olena, Anna, Margarita, Wiktoria and Iryna are unchanged.
+- [ ] No duplicate `(ScheduleId, DayOfMonth, FromTime, ToTime, SlotNo)` or `(ScheduleId, DayOfMonth, FromTime, ToTime, EmployeeId)` exists.
+- [ ] All transferred/retained hours are conserved.
+- [ ] Exactly one request acceptance and one history record persist; before/after snapshots are valid.
+- [ ] Existing recipient-overlap, private-target, stale-request, manager-lock and manager-created safeguards remain operational.
+- [ ] The backend test project builds, targeted tests pass, and the CI non-local backend suite passes.
+- [ ] No new migration, dependency, DTO, endpoint, frontend change, or unrelated refactoring.
+
+## 9. Execution guardrails / do not change
+
+Do not modify `DataAccessLayer/Models/DataBaseContext/AppDbContext.cs` or its indexes; do not migrate database or renumber existing independent assignments; do not reinterpret `SlotNo` as a user ID; do not loosen business rules; do not alter the entire shift when only a subset is offered; do not change the existing `shift_swap_request.ScheduleSlotId` identity/reference semantics; do not rewrite the swap feature, notification system, transaction, `GF3.Launcher`, or CI; do not scan/rename unrelated modules. Make the three-file scoped correction and prove it with SQLite tests.

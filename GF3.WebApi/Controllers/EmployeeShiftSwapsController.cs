@@ -283,7 +283,7 @@ public sealed class EmployeeShiftSwapsController(
         }
         else
         {
-            foreach (var remainingSlot in ApplyAcceptedSwapPeriod(slot, swap.FromEmployeeId!.Value, employeeId, offeredPeriod))
+            foreach (var remainingSlot in ApplyAcceptedSwapPeriod(slot, swap.FromEmployeeId!.Value, employeeId, offeredPeriod, swap.Schedule.Slots.ToList()))
             {
                 db.ScheduleSlots.Add(remainingSlot);
             }

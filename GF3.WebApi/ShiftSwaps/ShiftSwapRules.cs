@@ -318,7 +318,8 @@ internal static class ShiftSwapRules
         ScheduleSlotModel slot,
         int originalEmployeeId,
         int acceptingEmployeeId,
-        ShiftSwapPeriod period)
+        ShiftSwapPeriod period,
+        IReadOnlyCollection<ScheduleSlotModel> scheduleSlots)
     {
         var remainingSlots = new List<ScheduleSlotModel>();
         var originalFrom = slot.FromTime;
@@ -328,15 +329,36 @@ internal static class ShiftSwapRules
         var periodFromMinutes = ParseTimeMinutes(period.FromTime)!.Value;
         var periodToMinutes = ParseTimeMinutes(period.ToTime)!.Value;
 
+        int AllocateSlotNo(string fromTime, string toTime)
+        {
+            var occupied = scheduleSlots
+                .Where(existing => existing.Id != slot.Id)
+                .Concat(remainingSlots)
+                .Where(existing => existing.ScheduleId == slot.ScheduleId &&
+                    existing.DayOfMonth == slot.DayOfMonth &&
+                    existing.FromTime == fromTime && existing.ToTime == toTime)
+                .Select(existing => existing.SlotNo)
+                .ToHashSet();
+            var slotNo = 1;
+            while (occupied.Contains(slotNo))
+                slotNo++;
+            return slotNo;
+        }
+
         if (periodFromMinutes > originalFromMinutes)
         {
-            remainingSlots.Add(CreateRemainingSlot(slot, originalEmployeeId, originalFrom, period.FromTime));
+            remainingSlots.Add(CreateRemainingSlot(slot, originalEmployeeId, originalFrom, period.FromTime,
+                AllocateSlotNo(originalFrom, period.FromTime)));
         }
 
         if (periodToMinutes < originalToMinutes)
         {
-            remainingSlots.Add(CreateRemainingSlot(slot, originalEmployeeId, period.ToTime, originalTo));
+            remainingSlots.Add(CreateRemainingSlot(slot, originalEmployeeId, period.ToTime, originalTo,
+                AllocateSlotNo(period.ToTime, originalTo)));
         }
+
+        if (remainingSlots.Count > 0)
+            slot.SlotNo = AllocateSlotNo(period.FromTime, period.ToTime);
 
         slot.FromTime = period.FromTime;
         slot.ToTime = period.ToTime;
@@ -346,12 +368,12 @@ internal static class ShiftSwapRules
         return remainingSlots;
     }
 
-    internal static ScheduleSlotModel CreateRemainingSlot(ScheduleSlotModel sourceSlot, int employeeId, string fromTime, string toTime)
+    internal static ScheduleSlotModel CreateRemainingSlot(ScheduleSlotModel sourceSlot, int employeeId, string fromTime, string toTime, int slotNo)
         => new()
         {
             ScheduleId = sourceSlot.ScheduleId,
             DayOfMonth = sourceSlot.DayOfMonth,
-            SlotNo = sourceSlot.SlotNo,
+            SlotNo = slotNo,
             EmployeeId = employeeId,
             Status = SlotStatus.ASSIGNED,
             FromTime = fromTime,
