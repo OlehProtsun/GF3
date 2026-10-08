@@ -21,7 +21,7 @@ type AvailabilityGroupListCardProps = {
   isLoading: boolean;
   searchQuery: string;
   onClearSearch: () => void;
-  onAddGroup: () => void;
+  onAddGroup?: () => void;
   onOpenGroup: (groupId: number) => void;
 };
 
@@ -39,7 +39,7 @@ export function AvailabilityGroupListCard({
     groups
   );
 
-  const addAction = <IosButton label={t("Add New")} icon={<PlusIcon size={18} />} onClick={onAddGroup} />;
+  const addAction = onAddGroup ? <IosButton label={t("Add New")} icon={<PlusIcon size={18} />} onClick={onAddGroup} /> : undefined;
 
   return (
     <ListCardSection
@@ -50,7 +50,7 @@ export function AvailabilityGroupListCard({
       loadingMessage={t("Loading availability groups...")}
       errorMessage={t("Could not load availability groups.")}
       emptyTitle={t("No availability groups yet")}
-      emptyDescription={t("Start by creating your first availability group.")}
+      emptyDescription={onAddGroup ? t("Start by creating your first availability group.") : t("No results")}
       emptyAction={addAction}
       searchEmptyTitle={t("Nothing found")}
       searchEmptyDescription={t("No availability group matches \"{0}\".", searchQuery)}

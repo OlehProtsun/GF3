@@ -49,6 +49,7 @@ type ContainerGraphProfileWorkspaceProps = {
   isHeaderCollapsed?: boolean;
   compactSize?: boolean;
   showEditAction?: boolean;
+  showManagementActions?: boolean;
   onEdit: () => void;
   onDelete: () => void;
 };
@@ -149,6 +150,7 @@ export function ContainerGraphProfileWorkspace({
   isHeaderCollapsed = false,
   compactSize = false,
   showEditAction = true,
+  showManagementActions = true,
   onEdit,
   onDelete,
 }: ContainerGraphProfileWorkspaceProps) {
@@ -316,7 +318,7 @@ export function ContainerGraphProfileWorkspace({
       enableSelectionWhenReadOnly
       selectedCellKeys={selectedCellKeys}
       onSelectedCellKeysChange={setSelectedCellKeys}
-      helperText={t("This schedule is read-only. Open edit to update details, assigned employees, matrix values or cell styles.")}
+      helperText={showManagementActions ? t("This schedule is read-only. Open edit to update details, assigned employees, matrix values or cell styles.") : t("This schedule is read-only.")}
       onVisualHintClick={detail => setActiveRelatedHintCellKey(`${detail.employeeId}:${detail.dayOfMonth}`)}
       headerRightSlot={
         <div className={styles.badges}>
@@ -329,7 +331,7 @@ export function ContainerGraphProfileWorkspace({
 
   return (
     <>
-      <div className={joinClassNames(styles.workspace, isHeaderCollapsed && styles.workspaceHeaderCollapsed)}>
+      <div className={joinClassNames(styles.workspace, !showManagementActions && styles.workspacePhone, isHeaderCollapsed && styles.workspaceHeaderCollapsed)}>
         <div className={joinClassNames(styles.topRow, isSidebarCollapsed && styles.topRowCollapsed)}>
           <aside className={joinClassNames(styles.sidebar, isSidebarCollapsed && styles.sidebarCollapsed)}>
           <AvailabilitySidebarSection
@@ -400,7 +402,7 @@ export function ContainerGraphProfileWorkspace({
                     </strong>
                   </div>
 
-                  <div className={styles.scheduleInfoActions}>
+                  {showManagementActions ? <div className={styles.scheduleInfoActions}>
                     {showEditAction ? <IosButton label={t("Edit Schedule")} onClick={onEdit} /> : null}
                     <IosButton
                       label={isDeleting ? t("Deleting...") : t("Delete Schedule")}
@@ -410,7 +412,7 @@ export function ContainerGraphProfileWorkspace({
                       disabled={isDeleting}
                       onClick={onDelete}
                     />
-                  </div>
+                  </div> : null}
                 </div>
               </CardSection>
             </div>
@@ -430,6 +432,7 @@ export function ContainerGraphProfileWorkspace({
         <CardSection
           className={styles.summaryCardSection}
           title={t("Schedule Summary")}
+          headerClassName={!showManagementActions ? styles.phoneSectionHeader : undefined}
           icon={<InformationIcon size={18} />}
           headerRightSlot={
             <div className={styles.summaryHeaderActions}>
@@ -456,7 +459,7 @@ export function ContainerGraphProfileWorkspace({
         >
           {summaryRows.length === 0 ? (
             <div className={styles.emptyState}>
-              {t("No employee schedule rows yet. Generate a schedule or assign matrix intervals to see the summary.")}</div>
+              {showManagementActions ? t("No employee schedule rows yet. Generate a schedule or assign matrix intervals to see the summary.") : t("No results")}</div>
           ) : showSummarySearchEmpty ? (
             <div className={styles.emptyState} role="status">
               {t("No employees found for \"{0}\".", summarySearchQuery.trim())}

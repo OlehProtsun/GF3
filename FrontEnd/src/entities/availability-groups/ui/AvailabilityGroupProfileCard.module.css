@@ -91,3 +91,13 @@
     height: auto;
   }
 }
+.phoneLayout { flex-direction: column; min-width: 0; }
+.phoneLayout .sidebarColumn { flex: none; width: 100%; }
+.phoneLayout .mainColumn, .phoneLayout .mainBlock, .phoneLayout .matrixCard { width: 100%; min-width: 0; box-sizing: border-box; }
+.phoneLayout .mainBlock { padding: 0; }
+.phoneLayout .mainBlock > * { margin: 0; width: 100%; }
+
+.phoneLayout .sidebar button { min-width: 44px; min-height: 44px; }
+
+.phoneLayout .matrixCard { --availability-matrix-cell-min-height: 44px; }
+.phoneLayout .matrixCard button { min-height: 44px; }

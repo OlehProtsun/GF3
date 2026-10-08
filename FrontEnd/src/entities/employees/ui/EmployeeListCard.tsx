@@ -21,7 +21,7 @@ type EmployeeListCardProps = {
   isLoading: boolean;
   searchQuery: string;
   onClearSearch: () => void;
-  onAddEmployee: () => void;
+  onAddEmployee?: () => void;
   onEmployeeOpen: (employeeId: Employee["id"]) => void;
 };
 
@@ -39,9 +39,9 @@ export function EmployeeListCard({
     employees
   );
 
-  const addEmployeeAction = (
+  const addEmployeeAction = onAddEmployee ? (
     <IosButton label={t("Add New")} icon={<PlusIcon size={18} />} onClick={onAddEmployee} />
-  );
+  ) : undefined;
 
   return (
     <ListCardSection
@@ -52,7 +52,7 @@ export function EmployeeListCard({
       loadingMessage={t("Loading employees...")}
       errorMessage={t("Could not load employees.")}
       emptyTitle={t("No employees yet")}
-      emptyDescription={t("Start by creating your first employee record.")}
+      emptyDescription={onAddEmployee ? t("Start by creating your first employee record.") : t("No results")}
       emptyAction={addEmployeeAction}
       searchEmptyTitle={t("Nothing found")}
       searchEmptyDescription={t("No employee matches \"{0}\".", searchQuery)}

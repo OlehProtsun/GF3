@@ -1,4 +1,6 @@
 using System.Security.Claims;
+using System.Globalization;
+using BusinessLogicLayer.Contracts.Auth;
 using BusinessLogicLayer.Services.Abstractions;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -36,6 +38,7 @@ public sealed class AuthController(
             });
         }
 
+        session.WorkspaceMode = session.Role == AuthRoles.Manager ? ManagerWorkspaceModes.Choose : null;
         var token = jwtTokenService.CreateAccessToken(session);
         await workflowLogService
             .LogAsync(session.Role, session.DisplayName, session.EmployeeId, "Logged in.", cancellationToken)
@@ -62,6 +65,7 @@ public sealed class AuthController(
 
         return Ok(new SessionDto
         {
+            WorkspaceMode = User.IsInRole(AuthRoles.Manager) ? User.FindFirstValue(ManagerWorkspaceModes.ClaimType) : null,
             IsSystemManager = User.IsInRole(AuthRoles.Manager) && User.HasClaim(AuthPolicies.SystemManagerClaim, "true"),
             Role = User.FindFirstValue(ClaimTypes.Role) ?? string.Empty,
             UserName = User.Identity.Name ?? string.Empty,
@@ -75,6 +79,42 @@ public sealed class AuthController(
     [HttpPost("logout")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     public IActionResult Logout() => NoContent();
+
+    [Authorize(Roles = AuthRoles.Manager)]
+    [HttpPost("manager-mode")]
+    public ActionResult<LoginResponseDto> ChangeManagerWorkspaceMode([FromBody] ChangeManagerWorkspaceModeRequest request)
+    {
+        if (!ManagerWorkspaceModes.IsSelectable(request.Mode))
+        {
+            ModelState.AddModelError(nameof(request.Mode), "Select pc or phone.");
+            return ValidationProblem(ModelState);
+        }
+
+        var managerId = TryParseNullableInt(User.FindFirstValue("manager_id"));
+        if (managerId is not > 0 || string.IsNullOrWhiteSpace(User.Identity?.Name) ||
+            !long.TryParse(User.FindFirstValue("credential_version"), NumberStyles.None, CultureInfo.InvariantCulture, out var credentialVersion))
+        {
+            return Forbid();
+        }
+
+        var session = new AuthenticatedSessionDto
+        {
+            Role = AuthRoles.Manager,
+            UserName = User.Identity.Name,
+            DisplayName = User.FindFirstValue("display_name") ?? User.Identity.Name,
+            ManagerId = managerId,
+            CredentialVersion = credentialVersion,
+            IsSystemManager = User.HasClaim(AuthPolicies.SystemManagerClaim, "true"),
+            WorkspaceMode = request.Mode,
+        };
+        var token = jwtTokenService.CreateAccessToken(session);
+        return Ok(new LoginResponseDto
+        {
+            AccessToken = token.AccessToken,
+            ExpiresAtUtc = token.ExpiresAtUtc,
+            Session = ToSessionDto(session),
+        });
+    }
 
     [AllowAnonymous]
     [HttpPost("password/send-code")]
@@ -111,6 +151,7 @@ public sealed class AuthController(
 
     private static SessionDto ToSessionDto(BusinessLogicLayer.Contracts.Auth.AuthenticatedSessionDto session) => new()
     {
+        WorkspaceMode = session.WorkspaceMode,
         IsSystemManager = session.IsSystemManager,
         Role = session.Role,
         UserName = session.UserName,

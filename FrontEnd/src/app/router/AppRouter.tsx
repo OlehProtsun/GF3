@@ -75,6 +75,20 @@ const EmployeeListPage = lazyPage(() => import("@pages/employee-list"), (module)
 const EmployeeProfilePage = lazyPage(() => import("@pages/employee-profile"), (module) => module.EmployeeProfilePage);
 const EmployeeEditPage = lazyPage(() => import("@pages/employee-edit"), (module) => module.EmployeeEditPage);
 
+const ManagerPhoneHomePage = lazyPage(() => import("@pages/manager-phone"), module => module.ManagerPhoneHomePage);
+const ManagerPhoneContainersPage = lazyPage(() => import("@pages/manager-phone"), module => module.ManagerPhoneContainersPage);
+const ManagerPhoneContainerDetailPage = lazyPage(() => import("@pages/manager-phone"), module => module.ManagerPhoneContainerDetailPage);
+const ManagerPhoneGraphPage = lazyPage(() => import("@pages/manager-phone"), module => module.ManagerPhoneGraphPage);
+const ManagerPhoneAvailabilityPage = lazyPage(() => import("@pages/manager-phone"), module => module.ManagerPhoneAvailabilityPage);
+const ManagerPhoneAvailabilityDetailPage = lazyPage(() => import("@pages/manager-phone"), module => module.ManagerPhoneAvailabilityDetailPage);
+const ManagerPhoneEmployeesPage = lazyPage(() => import("@pages/manager-phone"), module => module.ManagerPhoneEmployeesPage);
+const ManagerPhoneEmployeeDetailPage = lazyPage(() => import("@pages/manager-phone"), module => module.ManagerPhoneEmployeeDetailPage);
+const ManagerPhoneShopsPage = lazyPage(() => import("@pages/manager-phone"), module => module.ManagerPhoneShopsPage);
+const ManagerPhoneShopDetailPage = lazyPage(() => import("@pages/manager-phone"), module => module.ManagerPhoneShopDetailPage);
+const ManagerPhoneMorePage = lazyPage(() => import("@pages/manager-phone"), module => module.ManagerPhoneMorePage);
+const ManagerPhoneLayout = lazy(() => import("@app/layouts/manager-phone-layout").then(module => ({ default: module.ManagerPhoneLayout })));
+const ManagerWorkspaceModePicker = lazyPage(() => import("@features/manager-workspace-mode/ui/ManagerWorkspaceModePicker"), module => module.ManagerWorkspaceModePicker);
+
 const managerRoutes = [
   { path: "/shop/new", element: <ShopEditPage /> },
   { path: "/shop/:shopId/edit", element: <ShopEditPage /> },
@@ -97,6 +111,20 @@ const managerRoutes = [
   { path: "/employee/:employeeId", element: <EmployeeProfilePage /> },
   { path: "/employee", element: <EmployeeListPage /> },
   { path: "/", element: <HomePage /> },
+] as const;
+
+const managerPhoneRoutes = [
+  { path: "/container/:containerId/graphs/:graphId", element: <ManagerPhoneGraphPage /> },
+  { path: "/container/:containerId", element: <ManagerPhoneContainerDetailPage /> },
+  { path: "/container", element: <ManagerPhoneContainersPage /> },
+  { path: "/availability/:availabilityId", element: <ManagerPhoneAvailabilityDetailPage /> },
+  { path: "/availability", element: <ManagerPhoneAvailabilityPage /> },
+  { path: "/employee/:employeeId", element: <ManagerPhoneEmployeeDetailPage /> },
+  { path: "/employee", element: <ManagerPhoneEmployeesPage /> },
+  { path: "/shop/:shopId", element: <ManagerPhoneShopDetailPage /> },
+  { path: "/shop", element: <ManagerPhoneShopsPage /> },
+  { path: "/more", element: <ManagerPhoneMorePage /> },
+  { path: "/", element: <ManagerPhoneHomePage /> },
 ] as const;
 
 const employeeRoutes = [
@@ -133,6 +161,12 @@ function RoutedContent() {
     return <Navigate to="/" />;
   }
 
+  if (session?.role === "manager" && session.workspaceMode === "choose") return <ManagerWorkspaceModePicker />;
+  if (session?.role === "manager" && session.workspaceMode === "phone") {
+    if (pathname.split("/").includes("new")) return <Navigate to="/" replace />;
+    return renderMatched(pathname, managerPhoneRoutes) ?? <Navigate to="/" replace />;
+  }
+
   if (session?.role === "manager" &&
       (pathname === "/information" || pathname === "/database") &&
       session.isSystemManager !== true) {
@@ -156,12 +190,16 @@ function RoutedShell() {
   );
 
   if (!shouldUseLayout) {
-    return content;
+    return <>{content}{status === "authenticated" && <RegulationAcceptanceGate />}</>;
   }
+
+  if (session?.role === "manager" && session.workspaceMode === "choose") return <>{content}<RegulationAcceptanceGate /></>;
 
   const shell = session?.role === "employee"
     ? <EmployeeWorkspaceLayout>{content}</EmployeeWorkspaceLayout>
-    : <OverlaySidebarLayout>{content}</OverlaySidebarLayout>;
+    : session?.role === "manager" && session.workspaceMode === "phone"
+      ? <Suspense fallback={<RouteFallback />}><ManagerPhoneLayout>{content}</ManagerPhoneLayout></Suspense>
+      : <OverlaySidebarLayout>{content}</OverlaySidebarLayout>;
 
   return <>{shell}<RegulationAcceptanceGate /></>;
 }

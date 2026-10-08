@@ -1,0 +1,13 @@
+.layout { min-height: 100vh; min-height: 100dvh; background: var(--app-page-background, #f3f4f6); color: var(--text-primary, #0f172a); }
+.shell { box-sizing: border-box; width: min(100%, 430px); min-width: 0; margin: 0 auto; padding: calc(10px + env(safe-area-inset-top)) 14px calc(100px + env(safe-area-inset-bottom)); }
+.topBar { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 16px; border-radius: 26px; background: var(--card-background, #fff); border: 1px solid #94a3b829; box-shadow: 0 18px 42px #0f172a14; }
+.topBar small { color: var(--text-secondary, #64748b); font-size: .7rem; letter-spacing: .08em; }
+.topBar h1 { margin: 4px 0 0; font-size: 1.15rem; }
+.badge { padding: 7px 10px; border-radius: 14px; background: #dbeafe; color: #1d4ed8; font-size: .7rem; font-weight: 700; }
+.content { min-width: 0; padding: 18px 0 0; margin: 0; overflow-wrap: anywhere; }
+.content > * { min-width: 0; max-width: 100%; }
+.nav { position: fixed; z-index: 40; bottom: calc(10px + env(safe-area-inset-bottom)); left: 50%; transform: translateX(-50%); width: min(calc(100% - 20px), 410px); box-sizing: border-box; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 2px; padding: 6px; border-radius: 26px; border: 1px solid #94a3b833; background: var(--card-background, #fff); box-shadow: 0 12px 40px #0f172a26; }
+.tab { min-height: 52px; display: grid; align-content: center; justify-items: center; gap: 5px; border-radius: 20px; text-decoration: none; color: var(--text-secondary, #64748b); font-size: .65rem; transition: background 180ms, color 180ms; }
+.active { background: #dbeafe; color: #1d4ed8; }
+.tab:focus-visible { outline: 3px solid #60a5fa; outline-offset: 1px; }
+@media (prefers-reduced-motion: reduce) { .tab { transition: none; } }

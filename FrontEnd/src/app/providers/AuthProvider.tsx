@@ -16,6 +16,7 @@ type AuthContextValue = {
   logout: () => Promise<void>;
   refreshSession: () => Promise<void>;
   replaceLoginResult: (result: AuthLoginResult) => void;
+  setManagerWorkspaceMode: (mode: "pc" | "phone") => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -57,6 +58,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
   const [passwordChanged, setPasswordChanged] = useState(false);
 
   const generation = useRef(0);
+  const modeExchangePending = useRef(false);
 
   const applyUnauthenticatedState = useCallback((nextBootstrapError: string | null = null) => {
     startTransition(() => {
@@ -157,6 +159,21 @@ export function AuthProvider({ children }: PropsWithChildren) {
     }
   };
 
+  const setManagerWorkspaceMode = async (mode: "pc" | "phone") => {
+    if (status !== "authenticated" || session?.role !== "manager" || modeExchangePending.current) {
+      throw new Error(t("Mode change failed. Please try again."));
+    }
+    modeExchangePending.current = true;
+    const requestGeneration = ++generation.current;
+    try {
+      const result = await authApi.changeManagerWorkspaceMode(mode);
+      if (requestGeneration !== generation.current) throw new Error(t("Request was canceled."));
+      replaceLoginResult(result);
+    } finally {
+      modeExchangePending.current = false;
+    }
+  };
+
   const completePasswordChange = () => {
     // The password reset has already revoked this token on the server.
     generation.current++;
@@ -179,6 +196,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
         logout,
         refreshSession,
         replaceLoginResult,
+        setManagerWorkspaceMode,
       }}
     >
       {children}

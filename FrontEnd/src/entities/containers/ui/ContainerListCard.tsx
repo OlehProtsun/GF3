@@ -15,7 +15,7 @@ type ContainerListCardProps = {
   isLoading: boolean;
   searchQuery: string;
   onClearSearch: () => void;
-  onAddContainer: () => void;
+  onAddContainer?: () => void;
   onContainerOpen: (containerId: Container["id"]) => void;
 };
 
@@ -33,9 +33,9 @@ export function ContainerListCard({
     containers,
   );
 
-  const addContainerAction = (
+  const addContainerAction = onAddContainer ? (
     <IosButton label={t("Add New")} icon={<PlusIcon size={18} />} onClick={onAddContainer} />
-  );
+  ) : undefined;
 
   return (
     <ListCardSection
@@ -46,7 +46,7 @@ export function ContainerListCard({
       loadingMessage={t("Loading containers...")}
       errorMessage={t("Could not load containers.")}
       emptyTitle={t("No containers yet")}
-      emptyDescription={t("Start by creating your first container workspace.")}
+      emptyDescription={onAddContainer ? t("Start by creating your first container workspace.") : t("No results")}
       emptyAction={addContainerAction}
       searchEmptyTitle={t("Nothing found")}
       searchEmptyDescription={t("No container matches \"{0}\".", searchQuery)}

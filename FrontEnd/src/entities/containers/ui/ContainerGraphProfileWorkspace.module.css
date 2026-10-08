@@ -673,3 +673,20 @@
     text-align: left;
   }
 }
+.workspacePhone .topRow { grid-template-columns: minmax(0, 1fr); gap: 16px; }
+.workspacePhone .sidebarCollapsed { margin-left: 0; }
+.workspacePhone .summaryHeaderActions { flex-wrap: wrap; min-width: 0; }
+.workspacePhone .summarySearchField { width: 100%; min-width: 0; }
+.workspacePhone .summarySearchInput { min-width: 0; width: 100%; }
+.workspacePhone .summaryCard, .workspacePhone .matrixCard, .workspacePhone .summaryCardSection { min-width: 0; max-width: 100%; box-sizing: border-box; }
+
+.workspacePhone .sidebar button { min-width: 44px; min-height: 44px; }
+.workspacePhone .scheduleInfoLabels { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.workspacePhone .scheduleInfoValue { overflow-wrap: anywhere; }
+
+.phoneSectionHeader { flex-direction: column; align-items: stretch; }
+.workspacePhone .stickyColumnSecondary, .workspacePhone .stickyColumnTertiary, .workspacePhone .stickyColumnQuaternary { position: static; }
+.workspacePhone .summaryTableScroll { --summary-employee-cell-width: 160px; }
+
+.workspacePhone .matrixCard { --matrix-cell-min-height: 44px; }
+.workspacePhone .matrixCard button { min-height: 44px; }

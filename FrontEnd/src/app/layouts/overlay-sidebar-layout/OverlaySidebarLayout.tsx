@@ -20,6 +20,7 @@ import {
 import { matchPath } from "@shared/lib/react-router-dom";
 import { ManagerNotepad } from "@features/manager-notepad/ui/ManagerNotepad";
 import { ManagerSystemNews } from "@features/manager-system-news/ui/ManagerSystemNews";
+import { ManagerWorkspaceModeSwitch } from "@features/manager-workspace-mode/ui/ManagerWorkspaceModeSwitch";
 
 type OverlaySidebarLayoutProps = {
   children: ReactNode;
@@ -162,6 +163,7 @@ export function OverlaySidebarLayout({ children }: OverlaySidebarLayoutProps) {
         </div>
 
         <div className={styles.sidebarFooter}>
+          {isManager ? <div className={styles.modeSwitch}><ManagerWorkspaceModeSwitch targetMode="phone" compact /></div> : null}
           <div className={styles.navItem}>
             <NavLink
               to={accountPath}

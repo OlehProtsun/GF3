@@ -1,0 +1,6 @@
+.wrap, .compact { min-width: 0; }
+.button { min-height: 44px; width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px; padding: 10px; border-radius: 16px; border: 1px solid #93c5fd; background: var(--card-background, #eff6ff); color: inherit; cursor: pointer; }
+.button small { display: block; font-size: .7rem; opacity: .7; }
+.button:focus-visible { outline: 3px solid #60a5fa; outline-offset: 2px; }
+.button:disabled { opacity: .5; cursor: wait; }
+.compact { width: 100%; font-size: .75rem; }

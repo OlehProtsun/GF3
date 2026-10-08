@@ -21,6 +21,7 @@ type PendingNavigationAttempt =
       kind: "push";
       location: RouterLocation;
       replace?: boolean;
+      onProceed?: (proceed: () => void) => void;
     }
   | {
       kind: "delta";
@@ -29,7 +30,7 @@ type PendingNavigationAttempt =
 
 type RouterContextValue = {
   location: RouterLocation;
-  navigate: (to: NavigateTo, options?: { replace?: boolean }) => void;
+  navigate: (to: NavigateTo, options?: { replace?: boolean; onProceed?: (proceed: () => void) => void }) => void;
   setNavigationBlocker: (blocker: NavigationBlocker | null) => void;
   proceedBlockedNavigation: () => void;
   cancelBlockedNavigation: () => void;
@@ -47,6 +48,7 @@ const PARAM_ROUTE_PATTERNS = [
   "/container/:containerId/graphs/new",
   "/container/:containerId/graphs/:graphId/edit",
   "/container/:containerId/graphs/:graphId",
+  "/container/:containerId",
   "/employee/new",
   "/employee/:employeeId/edit",
   "/employee/:employeeId",
@@ -138,6 +140,10 @@ export function BrowserRouter({ children }: PropsWithChildren) {
     pendingNavigationRef.current = null;
 
     if (pendingNavigation.kind === "push") {
+      if (pendingNavigation.onProceed) {
+        pendingNavigation.onProceed(() => commitPushNavigation(pendingNavigation.location, pendingNavigation.replace));
+        return;
+      }
       commitPushNavigation(pendingNavigation.location, pendingNavigation.replace);
       return;
     }
@@ -209,7 +215,7 @@ export function BrowserRouter({ children }: PropsWithChildren) {
     return () => window.removeEventListener("popstate", onPopState);
   }, [updateLocation]);
 
-  const navigate = useCallback((to: NavigateTo, options?: { replace?: boolean }) => {
+  const navigate = useCallback((to: NavigateTo, options?: { replace?: boolean; onProceed?: (proceed: () => void) => void }) => {
     if (typeof to === "number") {
       if (to === 0) {
         return;
@@ -229,18 +235,19 @@ export function BrowserRouter({ children }: PropsWithChildren) {
     const nextLocation = resolveLocation(to);
     const nextHref = toLocationHref(nextLocation);
 
-    if (nextHref === toLocationHref(locationRef.current)) {
+    if (nextHref === toLocationHref(locationRef.current) && !options?.onProceed) {
       return;
     }
 
     const blocker = navigationBlockerRef.current;
     if (blocker?.shouldBlock(nextLocation)) {
-      pendingNavigationRef.current = { kind: "push", location: nextLocation, replace: options?.replace };
+      pendingNavigationRef.current = { kind: "push", location: nextLocation, replace: options?.replace, onProceed: options?.onProceed };
       blocker.onBlocked();
       return;
     }
 
-    commitPushNavigation(nextLocation, options?.replace);
+    if (options?.onProceed) options.onProceed(() => commitPushNavigation(nextLocation, options?.replace));
+    else commitPushNavigation(nextLocation, options?.replace);
   }, [commitPushNavigation]);
 
   const value = useMemo(

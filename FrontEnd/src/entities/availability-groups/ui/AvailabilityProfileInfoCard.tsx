@@ -14,6 +14,7 @@ import { AvailabilityIcon } from "@shared/ui/icons";
 import styles from "./AvailabilityProfileInfoCard.module.css";
 
 type AvailabilityProfileInfoCardProps = {
+  showManagementActions?: boolean;
   group: AvailabilityGroup;
   employeeCount: number;
   isDeleting: boolean;
@@ -23,6 +24,7 @@ type AvailabilityProfileInfoCardProps = {
 };
 
 export function AvailabilityProfileInfoCard({
+  showManagementActions = true,
   group,
   employeeCount,
   isDeleting,
@@ -79,7 +81,7 @@ export function AvailabilityProfileInfoCard({
       subtitle={getAvailabilityGroupPeriodLabel(group)}
       statusContent={publicationOverview}
       details={detailItems}
-      actions={
+      actions={showManagementActions ? (
         <>
           <IosButton label={t("Edit")} onClick={onEdit} />
           <IosButton
@@ -91,7 +93,7 @@ export function AvailabilityProfileInfoCard({
             disabled={isDeleting}
           />
         </>
-      }
+      ) : undefined}
     />
   );
 }
