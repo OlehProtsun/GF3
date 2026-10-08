@@ -5,9 +5,26 @@ WERSJA ROBOCZA — DO WERYFIKACJI PRAWNEJ
 Wersja: 0.1.0-draft | Obowiązuje od: [DO UZUPEŁNIENIA]
 Operator: [DO UZUPEŁNIENIA]
 
+## Nawigacja i trzy odrębne ścieżki
+
+- [Instrukcja operatora po ukraińsku](OPERATOR_ONBOARDING_PLAYBOOK_UA.md).
+- [Prywatna karta wdrożenia klienta — wzór](templates/Karta_Wdrozenia_Klienta_Wzor.md) i [protokół uruchomienia/przekazania — wzór](templates/Protokol_Uruchomienia_i_Przekazania_Wzor.md).
+- [SaaS — wybór dokumentu](saas-agreement/README.md), [główny długi projekt](saas-agreement/umowa-saas-b2b-pl.md), [zakres usług](saas-agreement/zalacznik-1-zakres-uslug.md).
+- [DPA](templates/Umowa_Powierzenia_Danych_DPA.md), [TOMs/retencja](templates/Zalacznik_TOMs_i_Retencja.md), [opcjonalne SLA](templates/Zalacznik_SLA_i_Wsparcie.md).
+- [Informacja pracodawcy dla pracowników](templates/Klauzula_Informacyjna_Dla_Pracownikow_Wzor.md), [publiczny zestaw HTML](../../FrontEnd/public/legal/index.html), [robocze źródło regulaminu](electronic-services-regulations/README.md).
+- [STOP-SHIP](internal/CHECKLIST_PRZED_STARTEM.md), [dane operatora](OPERATOR_INPUTS.md), [rejestr przeglądu](LEGAL_REVIEW.md).
+
+1. **Handlowa:** operator ↔ firma: jedna finalna Umowa SaaS + zakres, DPA/TOMs i tylko uzgodnione opcjonalne SLA. Długi SaaS jest główną roboczą bazą negocjacji, nie zatwierdzoną umową. Krótkie Zamówienie może być okładką po uzgodnieniu z finalnym SaaS, bez konkurencyjnej drugiej umowy.
+2. **Publiczna:** strony `/legal/*.html` dostępne bez logowania; przed rzeczywistym użyciem wymagają prawdziwych danych operatora i zatwierdzenia. Kanoniczny adres regulaminu w domenie klienta to `/legal/regulamin.html`.
+3. **Indywidualna:** właściwy manager/employee osobiście potwierdza zatwierdzony, wersjonowany PDF zasad aplikacji; pracodawca odrębnie doręcza informację GDPR. SaaS, DPA, TOMs, faktury i wewnętrzne rejestry nie są PDF dla gate.
+
+Checkbox pracownika nie podpisuje umów firmy, nie udziela blankietowej zgody GDPR i nie zastępuje dokumentów zatrudnienia. Zapisuje złożone potwierdzenie, nie dowód przeczytania każdego słowa. HTML i PDF wymagają jawnego uzgodnienia tekstu przez człowieka.
+
+Wszystkie nowe dokumenty pozostają DRAFT. Podpisane finalne dokumenty, wypełnione karty i dowody są przechowywane w zewnętrznym chronionym archiwum, poza Git i publicznym buildem. STOP-SHIP pozostaje obowiązkowy; ten plan nie zatwierdza komercyjnego uruchomienia.
+
 Kanoniczne publiczne pliki: `FrontEnd/public/legal/*.html` i `legal.css`. Linki: logowanie, oba układy i bramka PDF. `docs/design-system.json` pozostaje zamrożonym opisem; nie zmieniamy semantyki. Prywatne wzory i TOM nie należą do dist/wwwroot.
 
-Onboarding: fakty Operatora → przegląd i STOP-SHIP → podpisane Zamówienie/DPA poza repo → izolowana instancja → zatwierdzony PDF/wersja/hash w rejestrze → upload/publish przez system managera → pending manager/pracownik → nie zaznaczony checkbox i lektura PDF → własne potwierdzenie → utrwalony dowód → dostęp API. Nowa publikacja wymaga potwierdzenia, historia pozostaje. Nie publikować roboczych PDF na produkcji.
+Onboarding: fakty Operatora → przegląd i STOP-SHIP → jeden podpisany SaaS/zakres i DPA/TOMs poza repo (Zamówienie tylko jeśli uzgodnione z SaaS) → izolowana instancja → informacja pracodawcy dla pracowników → zatwierdzony PDF/wersja/hash w rejestrze → upload/publish przez system managera → pending manager/pracownik → nie zaznaczony checkbox i lektura PDF → własne potwierdzenie → utrwalony dowód → dostęp API. Przy pending zwykłe chronione API zwraca HTTP 428; auth i dozwolone trasy regulacji mają wyjątki. Nowa publikacja wymaga potwierdzenia, historia pozostaje. Nie publikować roboczych PDF na produkcji.
 
 `node scripts/validate-legal-documents.mjs`; `--release` tylko po rzeczywistym przeglądzie. Brak gwarancji zgodności/certyfikacji lub zatwierdzenia komercyjnego startu.
 
@@ -17,7 +34,9 @@ Onboarding: fakty Operatora → przegląd i STOP-SHIP → podpisane Zamówienie/
 - https://eli.gov.pl/api/acts/DU/2024/1221/text.html
 - https://ksef.podatki.gov.pl/etapy-wdrozenia-ksef/
 
-## Weryfikacja wykonania — 2026-10-08
+## Historyczna weryfikacja wykonania — 2026-10-08
+
+Poniższe wyniki pochodzą z wcześniejszego wdrożenia mechanizmu/publicznych dokumentów, opisanego w Plan.md względem `37540cfffb9fd89bd2a22a54c00cf3f451ce58a3`. Nie są świeżymi lokalnymi testami bieżącego planu dokumentacyjnego ani dowodem konfiguracji produkcji.
 
 - Baseline HEAD `5980123995199dc4b6d40d2e3b17ff49731a6a39`, DEV2. Dostarczony Plan.md był jedyną początkową zmianą i nie został zmodyfikowany przez wykonawcę. TechStack.md nie znaleziono.
 - dotnet restore/build GF3.sln: sukces, build bez ostrzeżeń/błędów. dotnet test GF3.sln: 491/491; po dodaniu kolejnego scenariusza i rzeczywistych ścieżek biznesowych ponownie wykonano 18/18 RegulationAcceptanceGuardTests.

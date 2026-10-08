@@ -1,280 +1,325 @@
-# Plan.md — GF3: Polish B2B SaaS legal package and enforceable user acknowledgement
+# Plan.md — GF3: legal onboarding, client meeting, employee documents and launch runbook
 
-**Execution language:** English for implementation instructions; **Polish** for customer-facing legal texts.  
 **Repository:** `https://github.com/OlehProtsun/GF3`  
-**Branch:** `DEV2`  
-**PINNED BASELINE:** `5980123995199dc4b6d40d2e3b17ff49731a6a39`  
-**Research cutoff:** 2026-10-08 (Polish/EU law must be checked again before actual publication).  
-**Deliverable:** draft legal documents, non-authenticated website access to public notices, links from the application, use of the existing regulation acceptance workflow, limited API-side enforcement, and a non-code go-live checklist. **Not a production deployment or legal certification.**
+**Branch / pinned commit:** `DEV2` / `37540cfffb9fd89bd2a22a54c00cf3f451ce58a3`  
+**Prepared:** 2026-10-08 (Poland)  
+**Status:** IMPLEMENTATION PLAN ONLY. No code or project files have been modified.  
+**Audience:** CODEX (the implementation instructions in part A) and the GF3 operator (plain-language operating instructions in part B).  
+**Important:** This is not an approved contract, a legal opinion, a release authorization or proof of production security. The existing legal texts are explicitly `DRAFT`; real identities, technical controls, agreements and lawyer/accountant approvals must be supplied by humans. Never fabricate them.
 
-> **CRITICAL RELEASE RULE:** These documents are *drafts*, not lawyer-approved text. Do not claim that accepting a checkbox makes the product fully compliant, nor that an employee can automatically enter a binding B2B agreement for their employer. Do not publish placeholder-filled legal text to paying users. A Polish commercial/privacy lawyer must approve the operator-specific texts and data processing agreement before commercial launch. Codex produces drafts and application support, not legal conclusions.
+---
 
-## 1. Objective, operating model and boundaries
+# PART A — EXACT CODEX EXECUTION PLAN
 
-1. Prepare a coherent Polish-language set of documents for GF3's **existing functionality**: employee schedules, availability, shift swaps, manager/employee accounts, communications, PDF regulations, data exports and operational logs.
-2. Supply Terms (`Regulamin`) before contract conclusion, operator identity and contact details, privacy information and browser storage disclosures without login. Provide clear in-app links for every role.
-3. Ensure individual managers/employees demonstrably acknowledge the applicable published user-rule PDF via the **existing** `RegulationService` flow; reinforce the existing client-side gate with a narrowly scoped API guard. This is individual acknowledgement, **not** execution of a corporate SaaS order/DPA.
-4. For the baseline single-instance product, contract with each **customer company** separately using a signed (or otherwise legally valid and demonstrable) `Zamówienie / Umowa B2B` and `Umowa powierzenia danych (DPA)` **before** provision of production access/data. Customer signatories must be verified outside the application.
-5. Explicitly refrain from representing the current code as a safely isolated public multi-tenant SaaS. `deploy/docker-compose.yml` maps one GF3 service to one SQLite file; `EmployeeModel` has no tenant identifier. Until a separately designed and tested tenant-isolation change, support **one customer organization per independently isolated deployment** (isolated DB/volume, secrets, domain and backup), rather than mixing unrelated businesses in the same database.
-6. Leave prices, payment processor, subscription/auto-renewal, SLA uptime, retention periods, hosting jurisdictions, cloud processors, legal entity/NIP, incident-support contacts and any future plans **unasserted** until supplied as verified business facts. Mark exact gaps for manual completion; do not invent them.
+## 1. Objective and scope
 
-### Baseline facts (confirmed at SHA, do not re-discover architecture)
+Make the **already-existing legal documentation** coherent, practical and ready for *human review* rather than generating more disconnected legal drafts. Produce a single Ukrainian operator playbook and a clear document map. Eliminate contradictory instructions about which B2B document is primary and whether the current application records employee/manager PDF acceptance. Add only the two missing *draft operational templates* needed to make an onboarding handoff repeatable: an onboarding card and an activation/handover protocol. **Do not claim legal approval or implement a new onboarding feature**: the repository already has a regulation publication/acceptance mechanism.
 
-- `.NET 10` / ASP.NET Core API + React/Vite/TypeScript, EF Core/SQLite, xUnit and Vitest; production `GF3.WebApi/Program.cs` serves `FrontEnd/dist` via static files and SPA fallback.
-- `FrontEnd/src/app/router/AppRouter.tsx` currently recognizes `/login`, `/password-recovery` for anonymous users, manager paths and employee paths; anonymous legal pages should **not** require adding a new React route: public static HTML under `FrontEnd/public/legal` is served by Vite in development and by ASP.NET Core in production.
-- `FrontEnd/src/pages/login/ui/LoginPage.tsx` holds the public sign-in UI, including an existing support email (`support@app-gf.com`); this is a code string, **not verification** that the address belongs to the future legal operator.
-- `FrontEnd/src/app/layouts/overlay-sidebar-layout/OverlaySidebarLayout.tsx` and `FrontEnd/src/app/layouts/employee-workspace-layout/EmployeeWorkspaceLayout.tsx` own role-specific authenticated layouts.
-- `GF3.WebApi/Controllers/AdminRegulationsController.cs` contains the system-manager-authorized versioned PDF upload/publish workflow. `RegulationsController.cs` provides `GET /api/regulations/pending`, `GET /api/regulations/{id}/pdf`, `POST /api/regulations/{id}/accept`, `GET /api/regulations/history/me`. `BusinessLogicLayer/Services/RegulationService.cs` persists immutable published PDF SHA-256/version and per-role/account acceptance timestamp/name snapshots; `FrontEnd/src/entities/regulations/ui/RegulationAcceptanceGate.tsx` already shows a download link and **unchecked** acknowledgement checkbox after login. The gate alone does **not** stop direct API calls.
-- `docs/design-system.json` is an extensive non-runtime UI snapshot; `docs/deploy.md` describes single SQLite-volume production deployment, HTTPS, backup/update; `README.md` describes the app and stack. These documents are context, not evidence of legal compliance or a completed multi-tenant architecture. Historical `Plan.md` is about system-manager UI/design and must not be treated as this plan.
-- `AuthProvider.tsx` stores a bearer access token in browser `localStorage`; login also stores last username/password-mode preferences. `ManagerAccountService.cs` has a **development fallback manager password** if the env override is omitted, and the login UI expects six-digit numeric credentials. Production Compose requires `GF3_BOOTSTRAP_MANAGER_PASSWORD`, but that alone is not a complete authentication-hardening assessment. Flag as a go-live security risk, do not alter auth in this legal-only plan.
-- No self-service B2B onboarding, billing, organization-scoped tenant contract or tenant-isolation boundary was verified in the inspected sources. Do not describe any of these as implemented.
+**Boundary of scope:** document edits only. Do not alter .NET, React, DB, APIs, DI, auth, regulation persistence, deployment topology or UI. The actual contractual finalization, security remediation and client-specific data inputs are non-CODEX tasks and remain release blockers.
 
-**Evidence limits:** Direct inspection of important files at the pinned raw GitHub revision and the commit diff was possible; a full Git clone/tree enumeration was blocked in this environment. Codex may inspect **only explicitly listed target files and their immediate dependencies** when editing; it must not assert an unverified exhaustive repository audit. If an exact existing path from this plan is absent in its checkout, stop that step and report the mismatch; never silently create a parallel implementation.
+## 2. Pin to observed state (do not re-analyze the entire repository)
 
-## 2. Mandatory operator/business facts — manual prerequisites, not guesses
+1. `docs/legal/README.md` describes the existing commercial flow: operator facts → review/STOP-SHIP → B2B order and DPA signed *outside the repository* → single-client isolated deployment → approved regulation PDF/version/hash → publication by system manager → manager/employee sees pending PDF → individual unticked checkbox → acceptance record → API access. Each changed version requires acknowledgement.
+2. `GF3.WebApi/Controllers/RegulationsController.cs`: existing `GET /api/regulations/pending`, `GET /api/regulations/history/me`, `GET /api/regulations/history/employees/{employeeId}`, `GET /api/regulations/{documentId}/pdf`, and `POST /api/regulations/{documentId}/accept`.
+3. `GF3.WebApi/Middleware/RegulationAcceptanceGuardMiddleware.cs`: guards manager/employee API operations when published required regulations are pending, returns **HTTP 428**; auth and regulation routes have exemptions. It is not a contract signature mechanism.
+4. `FrontEnd/src/entities/regulations/ui/RegulationAcceptanceGate.tsx`: presents title/version, PDF download, unticked checkbox, acceptance action, and the explicit explanation that the acknowledgement is personal, not the employer's signature or GDPR consent.
+5. `GF3.Tests/RegulationAcceptanceGuardTests.cs` covers the guarded workflow. `docs/legal/README.md` reports previously run test successes, but those historical reports are **not a fresh local test** for this plan.
+6. `FrontEnd/public/legal/*.html` is the **public document set**. `docs/legal/templates/*` and `docs/legal/internal/*` contain private drafts/checklists and must not enter the public build or worker acceptance by accident.
+7. `docs/legal/saas-agreement/umowa-saas-b2b-pl.md` is a **long, detailed pre-existing negotiated SaaS agreement draft**, with `zalacznik-1-zakres-uslug.md`, `checklista-przed-podpisaniem.md`, `generate-html.mjs`, and rendered `umowa-saas-b2b-pl.html`. Its draft contains a negotiated/example **500 PLN/month**, seven-day payment, and other terms: none are confirmed business terms merely because written in that template.
+8. `docs/legal/templates/Zamowienie_Umowa_B2B.md` is a **second, shorter commercial draft**, not an additional contract employees must accept. Avoid two contradictory master agreements.
+9. `docs/legal/electronic-services-regulations/README.md` currently contains stale pre-implementation text saying acceptance/version is not stored; that **conflicts** with the current controller, guard, UI, and tests. Its `regulamin-swiadczenia-uslug-elektronicznych-pl.md` is another editable working source, while `FrontEnd/public/legal/regulamin.html` is currently the canonical published-path HTML draft. They are not guaranteed to have identical wording.
+10. `docs/legal/LEGAL_REVIEW.md` labels documents `DRAFT`. `docs/legal/OPERATOR_INPUTS.md` has unchecked operator identity, finance, privacy, subcontractors, retention and technical data. `docs/legal/internal/CHECKLIST_PRZED_STARTEM.md` is a real **STOP-SHIP checklist**, including PIN/token/auth, backups, TLS, isolation, browser storage and legal review.
+11. `scripts/validate-legal-documents.mjs` checks the seven public pages, links and headings. With `--release`, it checks absence of draft markers and the actual approved document **version and SHA-256** in `docs/legal/LEGAL_REVIEW.md`; failure while files remain drafts is expected and must not be hidden.
+12. Existing backend/UX allows PDF publication for the applicable roles; **no separate privacy-consent flow is established**. Do not repurpose the acknowledgement endpoint to claim workers consent to GDPR processing.
 
-**CREATE** `docs/legal/OPERATOR_INPUTS.md`. This is an internal completion form, no real personal secrets. All fields start `[DO UZUPEŁNIENIA]` until the operator supplies reliable details. Fields:
+## 3. Exact file change matrix
 
-- legal operator name, legal form (JDG/sp. z o.o./other), registered address, CEIDG/KRS number as appropriate, NIP, REGON if applicable;
-- legal contact and service/support email, privacy contact, breach/incident contact, complaints service channel;
-- exact product/trade name, public domain, effective date, applicable language(s), jurisdiction, target market (Poland-only or EU), actual intended contracting counterparty;
-- invoicing/B2B VAT and KSeF treatment verified by accountant; charging model and prices (if none yet, state `by individually signed order`, not a fictitious subscription);
-- production hosting provider, physical storage region, all processors/subprocessors (hosting, SMTP, backups, analytics, support), subprocessor notification channel, verified third-country transfers and transfer mechanism if any;
-- actual personal data categories (names, work contact, work schedules, availability, swaps, messages, auth/access logs), access roles, purposes, legal bases as controller, separate purposes as processor, security measures and verified retention schedules;
-- recovery time, backup lifecycle, export/deletion capability, exact contractual termination process and actual service/support operating hours;
-- public cookie/SDK/analytics inventory, browser storage keys, strict necessity classification, consent implications;
-- business-client order signatory proof, processor instructions and worker-privacy-notice delivery by the employer;
-- affirmative decision on whether the DSA, consumer-like sole-trader rules, EAA accessibility or special sector/employee-data obligations apply. The legal reviewer records reasons for applicability or non-applicability.
+| Action | Exact repository path | Responsibility |
+|---|---|---|
+| CREATE | `docs/legal/OPERATOR_ONBOARDING_PLAYBOOK_UA.md` | One practical human-readable guide: before meeting, negotiation, signatures, instance setup, worker notification and acknowledgement, operations, incidents, offboarding |
+| CREATE | `docs/legal/templates/Karta_Wdrozenia_Klienta_Wzor.md` | Client-by-client intake form; only placeholder fields, no real customer information |
+| CREATE | `docs/legal/templates/Protokol_Uruchomienia_i_Przekazania_Wzor.md` | Evidence of handed-over instance/access/training/testing and start date; not a replacement for signed B2B/DPA |
+| MODIFY | `docs/legal/README.md` | Canonical navigation and flow, links to the new files, distinction between app PDFs and contractual files, STOP-SHIP status |
+| MODIFY | `docs/legal/saas-agreement/README.md` | Mark the longer SaaS agreement as the primary **working basis**, not a legally approved master; explain short order template may be used only as a cover/order after legal reconciliation, not as a competing second signed agreement |
+| MODIFY | `docs/legal/electronic-services-regulations/README.md` | Correct obsolete assertion that no acceptance is saved; distinguish historical intent from 37540cf implementation; show canonical production URL and review requirement |
+| MODIFY | `docs/legal/internal/CHECKLIST_PRZED_STARTEM.md` | Add procedural gates for meeting, approved signatures, correct PDF categorization, worker information evidence, tenant isolation, dry-run and offboarding; preserve original risk list |
+| MODIFY | `docs/legal/LEGAL_REVIEW.md` | Add a *DRAFT* tracking row for each new private template/guide as appropriate; do not alter status of existing rows or invent hashes, reviewer names or signatures |
+| REUSE | `docs/legal/templates/Umowa_Powierzenia_Danych_DPA.md` | Processor agreement framework under GDPR Article 28; requires customer-specific finalization |
+| REUSE | `docs/legal/templates/Zalacznik_TOMs_i_Retencja.md` | Security measures, backups, retention, deletion and evidence |
+| REUSE | `docs/legal/templates/Zalacznik_SLA_i_Wsparcie.md` | Optional contractual support commitments; never silently promise a performance guarantee |
+| REUSE | `docs/legal/templates/Klauzula_Informacyjna_Dla_Pracownikow_Wzor.md` | Employer-customized GDPR notice for employees; informational delivery, not consent |
+| REUSE | `FrontEnd/public/legal/{index,regulamin,polityka-prywatnosci,pliki-cookies,zasady-korzystania,podwykonawcy,bezpieczenstwo}.html` | Public web documents; no change until *real operator data and lawyer approval* exist |
+| REUSE | `docs/legal/internal/{Rejestr_Czynnosci_Przetwarzania,Rejestr_Podwykonawcow_i_Transferow,Procedura_Incydentow_i_Naruszen,Procedura_DSAR_Retencji_Usuwania,Ocena_Ryzyka_i_DPIA_Screening}.md` | Private compliance records and procedures, not worker acceptance PDFs |
 
-**CREATE** `docs/legal/LEGAL_REVIEW.md`: table of every public/private document, status `DRAFT | REVIEWED | APPROVED`, reviewer, review date, document semantic version, approved SHA-256, source of operator facts, date effective, publishing checklist, approvals and unresolved questions. All documents start `DRAFT`; do not mark them approved via generated content. Require a business owner and Polish-qualified legal/privacy reviewer to sign off the final reviewed texts before commercial launch.
+Do **not** create a fake new mandatory employee `regulamin pracy` as an operator document. Such employment regulations belong to the employer, are subject to labor-law thresholds and must be written/approved by that employer. The existing electronic-services/usage rules can be the basis of a **separately approved app-usage PDF**; prepare it through human legal review, not auto-conversion of draft boilerplate.
 
-## 3. Draft package to create — exact files, language, audiences and content
+## 4. Ordered deterministic implementation steps
 
-All texts in this section MUST be professional **Polish**. Clearly label drafts `WERSJA ROBOCZA — DO WERYFIKACJI PRAWNEJ` until approval. Use neutral, understandable writing. Do not fabricate legal entity data, consent, pricing, processor arrangements, audit certifications, security levels, or refund entitlements. Use stable semantic version `0.1.0-draft` and effective-date placeholder. Each draft has a version/date header and an operator placeholder. Individual GDPR notices are information; **do not** add “I consent to GDPR” checkboxes.
+### Step 1 — CREATE operator playbook
 
-### A. Public site documents — CREATE canonical HTML files under `FrontEnd/public/legal/`
+**File:** `docs/legal/OPERATOR_ONBOARDING_PLAYBOOK_UA.md`.
 
-**A1.** `FrontEnd/public/legal/index.html` — Polish legal documents hub, operator contact card, links to all public pages, visible DRAFT warning until approval, link back to `/login`. Include version/effective date and a direct-print/save affordance via standard browser functionality (no JS required). Do not list private annexes containing sensitive security configurations.
+Create these named, numbered sections, with concrete instructions and no fabricated data:
 
-**A2.** `FrontEnd/public/legal/regulamin.html` — **Regulamin świadczenia usług drogą elektroniczną i korzystania z GF3 (B2B)**. Mandatory numbered sections, in this order:
+1. Purpose, roles, distinction between provider/operator, customer/employer, and user/employee; when provider is processor vs separate controller for own activities; mark latter for privacy-law review.
+2. Readiness traffic light: `DEMO ONLY`, `LEGAL REVIEW PENDING`, `READY TO SIGN`, `READY FOR PRODUCTION`, with **preconditions**; don't automatically infer status from passing tests.
+3. Document inventory with exact source paths and columns: document, purpose, actor completing, actor signing/accepting, where stored, whether uploaded to regulation gate. Include long agreement, short order, SaaS scope annex, DPA, TOMs, optional SLA, public terms, privacy/cookies, worker information, app usage PDF, employer HR work rules, internal records.
+4. Meeting flow: what to take/ask/demo; verify customer identity and representation; collect contacts, staff counts, locations, job/scheduling process, scope of swap approval, price, term, invoicing, service region, use of work/personal phone and e-mail, onboarding limits, permitted data categories; never collect real staff spreadsheets before DPA and secure provision.
+5. Signature flow: identify parties, negotiate a **single** commercial agreement (long SaaS draft as primary base), scope annex, DPA and TOMs; optional SLA only when promised; obtain representative authority and retain signature/e-delivery evidence *outside Git and public hosting*. Make approval by Polish lawyer and finance advisor a gate.
+6. Technical onboarding: one client → isolated instance, domain, DB/volume, secrets, backup and restoration, TLS; customer manager account; publish only approved, correctly scoped/versioned PDF; verify each role sees only applicable documents; download/history and HTTP 428; train manager to create/manage user accounts and control swaps; never claim automatic payroll/working-time legal compliance.
+7. Employee journey: employer provides GDPR notice; operator makes site usage terms accessible; **only** relevant versioned platform/app-usage regulation gets affirmative acceptance in the current gate; no DPA, SaaS, invoices, internal controller audit docs, or GDPR 'consent' checkbox to be pushed as a regulation.
+8. Operations: invoices, contract contacts, support/escalation, change/new versions, employee departure, audit trail, incident reporting, data subject access request, backup, cancellation/export/delete, record retention.
+9. Go/no-go checklist, unknowns, source references and precise operational ownership.
 
-1. Provider identity, contact, definitions (`Operator`, `Klient`, `Użytkownik`, `Konto`, `Dane Klienta`, `Usługa`), applicability and how the terms relate to an individual signed B2B order and DPA. No claim that an employee's click binds the employer; the customer is bound by its authorized order/representative.
-2. Actual scope: roster planning, schedule visualization, availability, shift-swap proposals/acceptance, messages/notifications, regulation PDF acknowledgements, exports. Specify that GF3 is a **planning tool**, not payroll, HR legal advice, medical service or legal guarantee of compliance with Kodeks pracy; employers remain responsible for legally compliant schedules/employee notices and decisions.
-3. Technical requirements: supported modern browser, network access, HTTPS, account invitation/assigned credentials; internet/security risks; no fictitious compatibility guarantee.
-4. Account opening only after customer authorization; roles manager/employee; account protection, security incident notification, authorized access, no account sharing; operator privileges only as documented.
-5. Service ordering/contract formation through verified individual B2B `Zamówienie` (not automated signup at this commit), available terms before signing, order-of-precedence: individually signed Order → DPA for data processing matters → these Terms → published usage policy, except mandatory law.
-6. Fees/duration, invoicing, renewals **only by signed order**; no invented pricing, trial period, automatic renewal or payment methods.
-7. Customer content/data ownership, permitted processing, backup/export/retention per reviewed DPA/order, authorization to input employee data; customer responsible for appropriate legal bases and information duties.
-8. Data protection roles and security overview; link `polityka-prywatnosci.html`, `podwykonawcy.html`, DPA annex. Disclose that Operator is independently controller for its own business account/support/billing data, generally processor for the employer's workforce records, subject to case-specific legal review.
-9. Prohibited conduct (unlawful content, harassment, interference, account misuse, infringing material), proportionate remediation/suspension, user notice/appeal process where legally required; link `zasady-korzystania.html`.
-10. Support/complaints procedure: submission email, information to include, investigation/response on documented terms (do **not** promise unverified number of days); operational outages/maintenance with realistic notices.
-11. Availability and limitation of liability **subject to mandatory Polish law**, causation, confidentiality, IP/licence scope and business client responsibilities. Never exclude liability for intentional harm, rights that cannot be waived or GDPR duties; ask legal reviewer to approve any cap.
-12. Termination, account deactivation, data retrieval window/deletion following signed order and DPA; user rights do not automatically erase employer-controlled employment records.
-13. Change management: versioning, user notice, material change publication before effectiveness, record of accepted versions and reasonable contract termination options reviewed against the actual sales model.
-14. Governing law/competent court clauses applicable to the actual customer; explicit reservation for mandatory protections including qualifying sole proprietors; publication date and contact.
-15. Concise risk notice that swap requests and produced schedules do not by themselves authorize overtime, employee consent where required, or lawful working-time arrangements.
+**Requirement:** The playbook must be Ukrainian in very plain language, with an exact illustrative timeline (e.g. Friday 2026-10-09 discovery meeting), an example of which party signs what, and a small FAQ about mandatory regulations and worker acceptance. Use the longer usable instructions provided in **Part B of this plan** as the content contract, but reformulate cleanly for a standalone document.
 
-**A3.** `FrontEnd/public/legal/polityka-prywatnosci.html` — **Polityka prywatności / informacja RODO**. Include distinct controller-vs-processor tables (operator contacts/billing/support/security vs customer workforce data), data categories, real purposes, lawful basis **by processing activity (not blanket consent)**, recipients/subprocessors, transfer mechanism if any, actual storage and retention categories (unresolved values visibly blocked for release), GDPR rights/how to exercise, complaint to Polish UODO, right of access/correction/erasure/objection/restriction/portability only where applicable, mandatory/provided data, source of data (typically employer), no assertion of automated decisions unless verified, incident contact, link to workforce-employer notice template, updates. Do not claim GF3 can independently delete employer workforce records on any employee request; explain controller routing.
+### Step 2 — CREATE customer intake card
 
-**A4.** `FrontEnd/public/legal/pliki-cookies.html` — **Polityka cookies i pamięci przeglądarki**. Explicitly distinguish actual cookie categories from current `localStorage` keys `gf3.auth.access-token`, `gf3.auth.last-username`, `gf3.auth.password-mode` and purposes. State storage duration only after verifying implementation; mention JWT-in-localStorage security implications internally, not as security marketing. Under PKE art. 399, strictly necessary storage may rely on the statutory exception, otherwise prior valid consent is required; never say that all storage always needs a banner or that all storage is exempt. No analytic/advertising SDK claim without evidence. Provide a mechanism/contact to withdraw optional consent *if* optional categories are deployed.
+**File:** `docs/legal/templates/Karta_Wdrozenia_Klienta_Wzor.md`.
 
-**A5.** `FrontEnd/public/legal/zasady-korzystania.html` — **Zasady akceptowalnego korzystania**; confidentiality of schedules, no credential-sharing or harassment, no unauthorized access/export, no malicious files/content, truthful swap requests, employer's final decision on working time, consequences and complaint avenue; neutral non-employment-contract wording. This text may be adapted into the published PDF acknowledgement (see Step 5) **only after legal review**.
+Polish-language private **draft** form with explicit placeholders:
 
-**A6.** `FrontEnd/public/legal/podwykonawcy.html` — **Lista podmiotów przetwarzających (subprocessors)**. Table fields: legal provider name, function, data categories, place of processing, transfer basis (if outside EEA), date of publication/notification; if operator inventory is unknown, display an explicit `DO UZUPEŁNIENIA` and block commercial release. Do **not** invent AWS/Google/Stripe or call a processor fully EU-local without evidence.
+- Client legal name, KRS/CEIDG, NIP, address, authorized representative and authority verification, emails for billing/support/privacy/incidents; owner/date/source of verification.
+- Provider legal identity/business status to be separately validated (no assumption of registered company or automatically valid nonregistered activity).
+- Contract version, order/reference, signed date, start date, subscription amount and currency, tax treatment **pending accountant**, duration/notice/first invoice, agreed optional SLA.
+- Locations, expected number of users, role mapping manager/employee, needed functions, who approves swaps, what does **not** constitute legally valid working time approval.
+- Data matrix: employee names/identifiers, contact type, schedules, availability, swap records, manager messages, account/access logs, storage region, transfer/subprocessor review, lawful basis decided by employer, retention, exports/deletion.
+- Secure delivery contact/method (do not paste personal data or credentials into the template); DPA and privacy notice delivery/approval evidence.
+- Deployment checklist: instance ID (nonsecret), domain, isolated DB/volume, TLS, backups/restore, least privilege, test accounts, regulation PDF ID/version/hash, acceptance evidence; date and tester.
+- Signatures/approval status, link to *external protected repository* containing final signed PDFs. Never store real customer data in Git.
 
-**A7.** `FrontEnd/public/legal/bezpieczenstwo.html` — **Informacja o bezpieczeństwie usługi**. Public, non-sensitive description of confirmed practices only (HTTPS in deployment path, authorization/role separation, controlled access, per-instance database/backups where configured, incident contact); explicitly do not promise SOC 2/ISO 27001/zero breaches/24×7 monitoring. Distinguish planned controls from proven runtime controls.
+### Step 3 — CREATE activation/handover record
 
-For all A1–A7, create a shared lightweight `FrontEnd/public/legal/legal.css` (no CDN, trackers, external fonts or npm packages): responsive text-first layout, clear hierarchy, navigation, readable contrast, keyboard focus, print stylesheet. Static HTML must use `lang="pl"`, UTF-8, viewport meta, semantic heading levels, version, effective date, exact document title and canonical absolute-or-root-relative links. No forms collect personal data on these pages; no JavaScript is necessary. Public legal pages remain reachable without auth and downloadable/savable by the browser before contract formation.
+**File:** `docs/legal/templates/Protokol_Uruchomienia_i_Przekazania_Wzor.md`.
 
-### B. Private B2B agreement/annex templates — CREATE under `docs/legal/templates/`
+Polish draft capturing client/provider identity, signed agreement reference, isolated instance URL, activation datetime, actual delivered features, account handover done securely, basic training provided, customer receipt, smoke test of management/employee roles and swaps, backup/restore test evidence, approved regulations, contact/support details, unresolved issues and acceptance of delivery by authorized representatives. Explicitly say: does not replace DPA, employment contracts, GDPR notices or the SaaS agreement. Never auto-certify testing.
 
-These files are Markdown source templates for operator/qualified reviewer to complete and sign with each corporate customer. They must **not** be publicly hosted automatically.
+### Step 4 — MODIFY legal navigation
 
-**B1.** `Zamowienie_Umowa_B2B.md` — parties/IDs/authority evidence, provisioned company-specific instance/domain, scope/seats/features, exact price/currency/VAT or commercial offer reference, commencement/contract duration, support/SLA if any, payment/invoice terms, order-of-precedence, suspension/termination, export/deletion procedure, contact/notice addresses, written/e-signature acceptance, electronic copy exchange. Only include automatic renewal if explicitly negotiated; no one-sided irrevocable terms.
+**File:** `docs/legal/README.md`.
 
-**B2.** `Umowa_Powierzenia_Danych_DPA.md` — GDPR **Article 28(3)** contract with annexes. Cover subject/duration/nature/purpose, categories of data subjects (employees/managers), actual data categories, employer's instructions/controller responsibilities, confidentiality of personnel, security/TOMs, authorized subprocessors and notice/object mechanism, third-country transfers, rights/DSAR assistance, breach assistance, DPIA/cooperation, return or deletion at termination (legal retention exceptions), audit/information duties without unlawfully barring audits, notifications/contact, signed order linkage and Annexes I–III. Include a clear data-processing locations/suppliers register placeholder. Explicitly include no use of customer data for training models or provider advertising without another valid basis and separate contractual authorization.
+Keep currently documented 37540cf behavior and test history. Add a top-of-file mini-directory linking to the new playbook, the two new templates, existing SaaS and DPA, employee notice and internal STOP-SHIP. Define **three separate tracks**:
 
-**B3.** `Zalacznik_TOMs_i_Retencja.md` — detailed technical/organizational measures and retention matrix for account data, shifts/swaps, uploads, logs, backups, expired credentials, acceptance evidence; measure owner, implemented/planned, tested-on date, deletion method and exception. Do not state controls not verified. Mark as confidential where it describes operational details.
+- **Commercial:** provider ↔ company: one SaaS agreement + scope, DPA/TOMs, optional negotiated SLA.
+- **Public site:** legal pages accessible without login, after real operator identity and approval.
+- **Individual user:** approved app regulation PDF acknowledged by each relevant manager/employee, while employer delivers GDPR information separately.
 
-**B4.** `Zalacznik_SLA_i_Wsparcie.md` — response process, maintenance window, severity definitions, backup and recovery commitments **as business-approved placeholders**. Explicitly state no binding SLA figure exists until completed and agreed. Match deployment reality; never claim 99.9% SLA by default.
+Add a note: a worker's checkbox never signs company agreements, grants generalized GDPR consent or replaces employment documents.
 
-**B5.** `Klauzula_Informacyjna_Dla_Pracownikow_Wzor.md` — sample **for customer/employer to personalize**, not a definitive notice automatically sent by Operator. Employer/controller identity, workforce scheduling purposes/legal bases, system visibility/recipients, how to exercise rights, employment-law record retention, transparency about swaps; link to Operator's processor role as applicable. Distinguish employee acknowledgement of app rules from GDPR consent/waiver of employee rights.
+### Step 5 — MODIFY SaaS source selection
 
-### C. Internal compliance procedures — CREATE under `docs/legal/internal/`
+**File:** `docs/legal/saas-agreement/README.md`.
 
-**C1.** `Rejestr_Czynnosci_Przetwarzania.md`: GDPR article 30 processing records template, split controller processing (lead/contact/support/billing/security) and processor categories (work schedules/workers). Include actual fields for legal basis/purpose/subjects/data/recipients/third-country transfers/retention/security and owner. No automatic assertion of the small-company exemption.
+Add a section `Which document to give the client?` which states:
 
-**C2.** `Procedura_Incydentow_i_Naruszen.md`: incident owner and detection/reporting, classification, containment/evidence and customer processor notification **without undue delay** as agreed in DPA; GDPR supervisory notification within 72 hours **when required for the controller** (Art. 33) and data-subject notification when high-risk (Art. 34), documentation of non-reportable events, communications/restore tests; distinguish operator controller role from employer controller role. Include contact and drill placeholders.
+- use `docs/legal/saas-agreement/umowa-saas-b2b-pl.md` (generated `.html` for print-to-PDF) as **primary longer negotiation draft**;
+- `docs/legal/templates/Zamowienie_Umowa_B2B.md` is an alternative short order/cover concept **not an independently approved second contract**. If a finalized SaaS agreement already includes the full order terms, do not hand over a contradictory second master agreement; an order cover must explicitly incorporate the finalized master and be vetted;
+- `zalacznik-1-zakres-uslug.md` specifies delivered functions;
+- attach negotiated DPA plus its security and subprocessors instructions; optional SLA only where agreed;
+- 500 PLN, billing direction and termination provisions are **draft default/example terms, not fixed by verified sales agreement**;
+- export the edited HTML to PDF (Chrome/Edge Ctrl+P A4) and keep the human-signed output privately; never imply Node generation signs or approves it.
 
-**C3.** `Procedura_DSAR_Retencji_Usuwania.md`: receive/verify request, decide data controller, forward employee data request to employer, export mechanics, retention schedule, deletion across live DB/backups and lawful retention exceptions; accountable operator roles, response SLAs anchored in GDPR where applicable, evidence log and audit trail handling.
+Do not rewrite the underlying commercial clauses, tax status or worker privacy bases.
 
-**C4.** `Ocena_Ryzyka_i_DPIA_Screening.md`: risks around shift/attendance data, access to worker contacts, swap messages, unauthorized exports, default PINs, backups and single shared DB. Screening of whether Art. 35 DPIA is necessary; decision and sign-off by competent controller, no prefilled claim that DPIA is not needed.
+### Step 6 — MODIFY stale acceptance description
 
-**C5.** `Rejestr_Podwykonawcow_i_Transferow.md`: supplier due diligence, Article 28 agreements, region, onward transfers/SCC/TIA if necessary, processor monitoring, reassessment and notices.
+**File:** `docs/legal/electronic-services-regulations/README.md`.
 
-**C6.** `CHECKLIST_PRZED_STARTEM.md`: **stop-ship** checklist (see Section 9) with owner, evidence URL/path, due date, status and legal/accounting sign-off.
+Replace the stale language in the `Rejestrowanie akceptacji` and `Funkcje wyłączone` sections that wrongly claims the current code does not store acceptance with a precise dated statement:
 
-## 4. Site integration — minimal, no SPA/routing redesign
+- As of pinned commit, manager and employee regulation acceptances already have published-PDF pending/list/history/accept endpoints and a 428 guard.
+- `FrontEnd/src/entities/regulations/ui/RegulationAcceptanceGate.tsx` requires a deliberately checked box; it offers PDF download; this proves a submitted acknowledgement, **not** that the person read every word and not consent to personal-data processing.
+- An approved and uploaded PDF is separate from the web `regulamin.html` URL; keep textual versions aligned by an explicit human review/checklist, rather than assume one is generated automatically from another.
+- Keep other historical sections if they are still relevant, but label historical audit findings `as of before 37540cf` if superseded; don't imply changes to unrelated account features.
 
-**MODIFY** `FrontEnd/src/pages/login/ui/LoginPage.tsx`: underneath the existing login/support section add a small, keyboard-accessible group of normal `<a href>` links: `Regulamin` (`/legal/regulamin.html`), `Polityka prywatności` (`/legal/polityka-prywatnosci.html`), `Cookies` (`/legal/pliki-cookies.html`) and `Dokumenty prawne` (`/legal/index.html`). Keep login form, six-digit input modes and current navigation unchanged. Reuse `LoginPage.module.css` for local layout/style; do not create a new global provider.
+### Step 7 — MODIFY pre-launch checklist and legal review register
 
-**MODIFY** `FrontEnd/src/app/layouts/overlay-sidebar-layout/OverlaySidebarLayout.tsx` and `FrontEnd/src/app/layouts/employee-workspace-layout/EmployeeWorkspaceLayout.tsx`: add small unobtrusive footer access to `/legal/index.html`, `/legal/regulamin.html`, `/legal/polityka-prywatnosci.html`. Add to existing visible layout area, accessible in desktop/mobile/collapsed states; no new sidebar nav privilege. Do not display hidden system-manager areas to ordinary users.
+**Files:** `docs/legal/internal/CHECKLIST_PRZED_STARTEM.md` and `docs/legal/LEGAL_REVIEW.md`.
 
-**REUSE AS-IS:** `FrontEnd/src/app/router/AppRouter.tsx`, `GF3.WebApi/Program.cs` static asset serving, existing Vite setup. Because each legal page is a real static `.html`, no new React route or API is required. Verify the production server actually returns HTML rather than the SPA fallback for these exact files; only alter static hosting if a test proves a failure.
+Append independently testable, human-owned gates: `operator verified`, `client representative verified`, `single executed SaaS contract`, `executed DPA/TOMs`, `support and finance ready`, `subprocessors accounted for`, `employee notice approved by employer and delivered`, `separate production instance verified`, `published PDF approved/scope and history checked`, `test user acceptance/428/manager employee history`, `exit/export/delete process validated`, `incident contact tested`. Each gate needs `owner / evidence location / test date / status` placeholders. Preserve all present STOP-SHIP items and historical draft rows. Add DRAFT rows for new private documents only; **do not set `APPROVED`**, create false SHA hashes, or silently turn release validator green.
 
-**REUSE/REFRESH** `docs/design-system.json` only for the narrow addition of a cross-link/reference to the legal document footer/login links *if* its validator supports such entries. Do not re-catalog the entire UI; do not change unrelated scene/route IDs. If the snapshot is not structured to describe these static documents without new semantics, leave it intact and record the legal pages in `docs/legal/README.md` instead. (No separate architecture decision: the canonical runtime references are the static HTML files.)
+### Step 8 — Documentation consistency and static validation
 
-## 5. Explicit acknowledgement and enforced access — extend the existing regulations mechanism
+1. In repo root, `git diff --check` — no whitespace defects in changes made by Codex.
+2. `node scripts/validate-legal-documents.mjs` — expected to pass existing **draft mode**, assuming untouched public HTML.
+3. `node scripts/validate-legal-documents.mjs --release` — **expected to fail until a real reviewer has approved the final public texts**; a failure is a valid STOP-SHIP, do not bypass or fake its inputs.
+4. Search *only changed legal docs* for unqualified statements `no acceptance exists` and `500 PLN is obligatory for employees`: there must be none.
+5. Validate every new relative markdown link resolves to a real path in the pinned repo.
+6. Verify no generated documents with actual customer information, secrets or signed contracts are added to Git.
+7. No need for `dotnet build`/`dotnet test` or `npm build` to validate documentation-only changes; no runtime artifacts touched. Existing tests should be run before actual release after any other implementation/security changes.
 
-### 5.1 Correct distinction between legal instruments
+## 5. API, data, dependency and configuration contract
 
-- A **B2B company** contracts via signed `Zamowienie_Umowa_B2B.md` and DPA; the existing database acceptance by an employee or manager **cannot substitute** for proof of their employer's consent/authorized signature.
-- Each individual login user acknowledges the **published platform-use rules** (e.g. a lawyer-approved version of `zasady-korzystania.html`, exported as immutable PDF) in the existing `RegulationAcceptanceGate`. If the operator separately wants to obtain explicit user acknowledgement of the entire `Regulamin`, use a separate approved PDF/version; never call this B2B contract formation automatically.
-- Privacy notices and cookies disclosures are **made accessible**, not "consented to" as a condition of using necessary processing. Optional marketing or nonessential cookies need independently revocable opt-in if later added.
+**API:** NONE. Preserve `GET /api/regulations/pending`, `GET /api/regulations/history/me`, `GET /api/regulations/history/employees/{employeeId}`, `GET /api/regulations/{documentId}/pdf`, `POST /api/regulations/{documentId}/accept` and existing publication/upload flows without modification.  
+**Persistence / migration:** NONE. Preserve existing version/history/acceptance persistence.  
+**Dependency injection:** NONE.  
+**Configuration / `.env`:** NONE. Do not make up production secrets or client identities.  
+**UI:** NONE. Do not build a new checkbox, duplicate gate or a new signup funnel.  
+**Operational release:** Outside Codex; requires signed contracts, verified controls and legal approvals.  
+**Error behavior:** Do not mask existing `428`, errors, unpublished PDF checks or validator failures. A document link missing or inconsistent is a documentation verification failure; don't publish it.
 
-### 5.2 REUSE without new persistence or endpoints
+## 6. Acceptance checklist for CODEX
 
-- `BusinessLogicLayer/Services/RegulationService.cs` (existing version/hash/publish/accept handling).
-- `GF3.WebApi/Controllers/AdminRegulationsController.cs` (`POST /api/admin/regulations`, `POST /api/admin/regulations/{documentId}/publish`, privileged as system manager).
-- `GF3.WebApi/Controllers/RegulationsController.cs` (`GET pending`, `GET PDF`, `POST accept`, `GET personal history`); `FrontEnd/src/entities/regulations/ui/RegulationAcceptanceGate.tsx` (individual affirmative checkbox, download, error handling).
-- Existing `RegulationDocumentModel` and `RegulationAcceptanceModel`, repository uniqueness/idempotency logic, existing xUnit tests. **No migration**, new table, extra legal-consent database, payment workflow or new DI service solely to hold acknowledgements.
+- [ ] One coherent Ukrainian operator playbook exists at exact path, describing every phase from client discovery to data deletion.
+- [ ] Polish intake card + activation protocol are marked **templates/drafts** and contain no real client information.
+- [ ] Navigation points to all relevant existing and new files.
+- [ ] The long SaaS agreement is clearly identified as primary *working draft*, not an approved agreement; shorter document is explicitly non-competing.
+- [ ] The historical "no acceptance stored" assertion is corrected using the pinned version's code evidence.
+- [ ] Clear distinction among operator site regulation, employer labor regulations and employer GDPR notice.
+- [ ] No employee is described as signing B2B/DPA or "consenting to RODO" via the regulation checkbox.
+- [ ] STOP-SHIP is retained; none of the DRAFT statuses, missing operator facts, unresolved security warnings or release checks are falsified.
+- [ ] Validator draft mode passes (where tool runtime is available); release mode remains blocked if still genuinely unapproved.
+- [ ] No production code, packages, schema, infrastructure or unrelated files changed.
 
-**Operational onboarding:** (1) obtain legal approval for the specific PDF, (2) record its exact version and SHA-256 in `docs/legal/LEGAL_REVIEW.md`, (3) upload/publish through already-existing system-manager UI on each isolated customer instance, (4) verify `GET /api/regulations/pending` lists it for a newly provisioned manager and employee, (5) user sees checkbox unchecked and downloads/read the exact PDF, (6) POST acceptance persists their account ID/role, timestamp and PDF hash, (7) re-publishing a new version forces a new acknowledgement according to the current repository semantics. Preserve all existing acceptance history and immutable published PDFs.
+## 7. DO NOT TOUCH
 
-### 5.3 CREATE a narrowly scoped API acknowledgement guard
+`GF3.WebApi/**`, `GF3.Tests/**`, `FrontEnd/src/**`, `FrontEnd/public/**`, `BusinessLogicLayer/**`, `DataAccessLayer/**`, `scripts/**`, deployment/CI files, account/swap/schedule services and existing real DB. Preserve the originally pinned commit as the analysis baseline and implement only the documentation changes above.
 
-**CREATE** `GF3.WebApi/Middleware/RegulationAcceptanceGuardMiddleware.cs` in namespace `WebApi.Middleware`.
+---
 
-**Constructor dependencies:** `RequestDelegate next`; resolve `IRegulationService` via `HttpContext.RequestServices` per request (request-scoped; do not inject a scoped service into a singleton middleware constructor). No new service abstraction.
+# PART B — ПРАКТИЧНА ІНСТРУКЦІЯ ДЛЯ ВЛАСНИКА GF3 (користуватися вже зараз)
 
-**Exact behavior:**
+> **Статус на 8 жовтня 2026 року:** у репозиторії є хороші чернетки, але НЕ готовий юридично затверджений пакет. Нижче — робочий сценарій і карта документів. Це не замінює перевірку польського юриста, бухгалтера чи аудит конкретного сервера. Не підписуй незаповнену версію з `[DO UZUPEŁNIENIA]`.
 
-1. Apply only to authenticated requests with a valid `manager` or `employee` role plus positive `manager_id`/`employee_id` claim. Let existing authentication/authorization decide 401/403 for anonymous/invalid tokens; never infer account ID from request input.
-2. Exempt, case-insensitively on exact route segments: `GET /api/regulations/pending`, `GET /api/regulations/history/me`, `GET /api/regulations/{positiveInt}/pdf`, `POST /api/regulations/{positiveInt}/accept`, all `/api/auth/*`, `GET /api/health`; also exempt `/api/admin/regulations/*` **only for an authenticated system manager already carrying the trusted `gf3.system_manager=true` claim and manager role**, so the operator can publish the initial PDF. Let pre-existing ASP.NET policy and admin guard enforce actual privileged endpoints. No wildcard exempt for arbitrary `/api/regulations/` actions.
-3. Construct the existing `RegulationSubject` with the same trusted role/account ID, username and display-name claims as `RegulationsController.GetSubject()`; never create a second business-level pending calculation. To avoid duplicating claim parsing, **EXTEND** `GF3.WebApi/Controllers/RegulationsController.cs` only if needed to extract its exact subject-construction logic into a small `GF3.WebApi/Services/RegulationSubjectResolver.cs` helper used by controller + middleware; helper must not access DB or accept user IDs from clients. No change to DTO routes/status of existing endpoints.
-4. Call `IRegulationService.ListPendingAsync(subject, cancellationToken)`. If none pending, call `next(context)`. If one/more pending, return HTTP **428 Precondition Required**, `application/problem+json`, stable error code `regulations_acceptance_required` and safe message `Accept the currently published required documents to continue.` Include no PDF content or PII in response; request client to fetch `/api/regulations/pending`.
-5. Database/pending-read errors: preserve existing API exception middleware handling; **fail closed** (never call next when status cannot be determined). Do not log PIN, JWT, PDF, names or customer schedule data. Use cancellation token.
-6. Place guard after authentication/authorization within the API pipeline, before protected controller execution and under the existing `ApiExceptionMiddleware`; do not guard public static `/legal/*.html`, login or the download/acceptance endpoints. Scope to `/api` using current `UseWhen` infrastructure, not a new global router filter.
+## Б1. Хто є ким і чому це важливо
 
-**MODIFY** `GF3.WebApi/Program.cs`: in existing API branch immediately after `ApiExceptionMiddleware` and before `EmployeePresenceMiddleware`/`AdminToolsGuardMiddleware`, add `UseMiddleware<RegulationAcceptanceGuardMiddleware>()`. Verify this position still preserves admin guard semantics; for an account with no pending documents behavior must be byte-for-byte unchanged.
+**Ти / оператор GF3:** надаєш компанії доступ до вебзастосунку для графіків, доступності, замін, сповіщень. Для даних персоналу, які обробляєш за дорученням роботодавця, зазвичай ти — `podmiot przetwarzający` (процесор). За власні дані щодо рахунків, продажів і ділового зв'язку можеш мати окрему роль адміністратора; це потрібно визначити за фактичними цілями обробки.
 
-**MODIFY (limited)** `FrontEnd/src/entities/regulations/ui/RegulationAcceptanceGate.tsx`: retain exact download + user-checked confirmation + mutation flow. Add a link to the public `/legal/index.html` and Polish-readable explanation (`accepted by user, not on behalf of employer`) without making privacy policy consent mandatory. Reuse existing i18n and CSS patterns; do not add a second checkbox or separate acceptance cache.
+**Клієнт / компанія-роботодавець:** купує сервіс, призначає менеджерів, вводить працівників, визначає, навіщо обробляються їхні дані. Для кадрових даних зазвичай є `administrator danych` — відповідає за законну підставу, інформування працівників і законність трудових графіків.
 
-**Edge rules:** duplicate acceptance POST must follow repository's existing no-duplicate behavior; stale or unpublished PDF must not be accepted; user acceptance for one version must not cover another; old acceptance remains auditable. If a new published regulation arrives while an account is active, next protected API call must return 428 until acknowledgement. Admin can create first PDF even when existing pending PDFs exist because only trusted system manager publishing endpoints are exempt. Outage must not turn into a bypass.
+**Менеджер клієнта:** користувач з рольовим доступом, керує графіками, працівниками і swap. Зазвичай не підписує від імені компанії B2B, якщо немає окремих повноважень.
 
-## 6. Browser storage and marketing — strictly evidence-driven
+**Працівник клієнта:** звичайний користувач GF3. Не платить тобі за підписку; не укладає B2B і DPA; може персонально підтвердити правила користування застосунком. Його особистий checkbox **не є** юридичною згодою на всі операції з персональними даними і не замінює трудові документи.
 
-**CREATE** `docs/legal/COOKIE_AUDIT.md` with the real current `document.cookie`, sessionStorage/localStorage, analytics, CDN/beacons, third-party scripts and marketing contact use discovered by **bounded scan of frontend entry/scripts and deployment HTTP headers**. Record each item as strictly necessary or optional, purpose, duration, third party, lawful route, effective blocking behavior.
+## Б2. Які бувають документи: точно кому і куди
 
-At pinned baseline there is known localStorage of JWT/access token and username/password-mode; do not represent that as a nonessential advertising cookie. **Do not add a cookie consent banner** to the legal-only change while verified runtime has only necessary storage. If optional tracking is found, prevent it from running in production until a **separate** proper prior opt-in/withdrawal mechanism is implemented and tested; cookie policy alone is insufficient. Do not add analytics or tracking during this task.
+| Документ | Де вже є заготовка | Що заповнити | Хто підписує / отримує | В `RegulationAcceptanceGate`? |
+|---|---|---|---|---|
+| Основний платний **договір SaaS B2B** | `docs/legal/saas-agreement/umowa-saas-b2b-pl.md` та `.html` | Твої правдиві реквізити/статус; юридичні дані клієнта; ціну; VAT; оплату; строк; припинення; підтримку | Уповноважений оператор та уповноважений представник компанії | **НІ** |
+| Додаток із конкретними функціями | `docs/legal/saas-agreement/zalacznik-1-zakres-uslug.md` | Кількість акаунтів, об'єкти, включені функції, запуск, межі послуги | Компанія + оператор разом із договором | **НІ** |
+| Коротке `Zamówienie / Umowa B2B` | `docs/legal/templates/Zamowienie_Umowa_B2B.md` | Комерційні параметри за однією узгодженою схемою | Лише якщо юрист узгодить із основним договором; **не підписуй два суперечливі договори** | **НІ** |
+| **DPA / umowa powierzenia** (ст. 28 GDPR/RODO) | `docs/legal/templates/Umowa_Powierzenia_Danych_DPA.md` | Сторони, дані/категорії людей, мета, строки, інструкції, субпроцесори, ризики, допомога, видалення | Компанія-адміністратор і оператор-процесор | **НІ** |
+| **TOMs/retencja** — засоби захисту, строки зберігання | `docs/legal/templates/Zalacznik_TOMs_i_Retencja.md` | РЕАЛЬНІ HTTPS, backup, відновлення, доступи, зберігання, експорт, видалення | Як погоджений додаток до DPA | **НІ** |
+| **SLA / підтримка** | `docs/legal/templates/Zalacznik_SLA_i_Wsparcie.md` | Контакт, дні/години, час реагування, обмеження, backup, RPO/RTO лише підтверджені | Тільки якщо сторони справді погодили | **НІ** |
+| **Regulamin świadczenia usług drogą elektroniczną / правила платформи** | `docs/legal/electronic-services-regulations/regulamin-swiadczenia-uslug-elektronicznych-pl.md` + **публічний** `FrontEnd/public/legal/regulamin.html` | Дані оператора, функції, техвимоги, обмеження, скарги, припинення, дата й версія; узгодити обидва тексти | Оператор публікує ДО користування/контракту; користувачам забезпечити доступ | **Може бути** погоджена, релевантна версія PDF для персонального підтвердження; не публікувати чернетку |
+| **Zasady korzystania** / практичні правила користувачів | `FrontEnd/public/legal/zasady-korzystania.html` | Особисті акаунти, безпека, заборонені дії, графіки/swap; після review може бути єдиний узгоджений PDF | Користувачі бачать / за потреби підтверджують | **ТАК**, якщо людино- та рольово-доречний затверджений PDF |
+| **Політика приватності / cookies** | `FrontEnd/public/legal/polityka-prywatnosci.html`, `pliki-cookies.html` | Реальні ролі й цілі, дані, основи, строки, cookies, контакти, провайдери | Оператор публікує, користувачі читають; додаткові cookie-згоди лише якщо застосовні | **НІ як універсальна GDPR-згода** |
+| **Інформаційне повідомлення для працівника (GDPR art. 13/14)** | `docs/legal/templates/Klauzula_Informacyjna_Dla_Pracownikow_Wzor.md` | Реальні дані **роботодавця**, мета/основи, види даних, GF3 як процесор, строк/права/контакт/одержувачі | Роботодавець надає працівникам та фіксує факт інформування | **Не через кнопку «zgadzam się na RODO»**. Передати окремо, можливе підтвердження отримання |
+| **Regulamin pracy / правила роботи компанії** | У GF3 немає універсального затвердженого регламенту роботодавця | Створює сам роботодавець за польським трудовим правом, якщо застосовно | Роботодавець ознайомлює працівників | **Не замінювати правилом оператора**. Не завантажувати автоматично |
+| **Внутрішні RODO-реєстри, DPIA, інциденти** | `docs/legal/internal/*.md` | Фактичні процеси, відповідальні, докази | Оператор/клієнт всередині своїх структур | **НІ**, внутрішні документи |
 
-Commercial emails/SMS to prospects require independently checked legal permission under applicable PKE art. 398 and GDPR; password reset/security notices are not marketing subscriptions. Do not invent an unsolicited outreach consent form or send campaigns.
+**Принцип:** якщо ти не можеш пояснити, *чому кожен працівник має саме це підтверджувати*, не публікуй цей файл як обов'язкову регуляцію через gate. Комерційні й кадрові папери — інша юридична взаємодія.
 
-## 7. Tests to CREATE/MODIFY
+## Б3. Завтра, п'ятниця 9 жовтня 2026: зустріч із потенційним клієнтом
 
-### Frontend
+### Що підготувати ДО зустрічі
 
-- **MODIFY** existing login page test at `FrontEnd/src/pages/login/ui/LoginPage.test.tsx` **only if the path exists**; otherwise **CREATE** it using existing Vitest/Testing Library patterns. Assert legal links exist/point to actual static files, link activation does not submit login, login flow and numeric keypad still operate.
-- **MODIFY** layout tests `FrontEnd/src/app/layouts/overlay-sidebar-layout/OverlaySidebarLayout.test.tsx` and existing employee layout tests (if present) to verify links for manager/employee and accessibility at collapsed/mobile states; preserve existing admin visibility assertions.
-- **MODIFY/CREATE** `FrontEnd/src/entities/regulations/ui/RegulationAcceptanceGate.test.tsx` as appropriate to verify checkbox starts unchecked, cannot accept until checked, PDF link, duplicate spinner behavior, failed download/POST feedback, legal hub link; do not test the B2B contract via the employee checkbox.
+1. **Демо на синтетичних даних**, без справжніх прізвищ/номерів телефону співробітників. Показати manager → створення графіка → публікацію → працівник бачить графік → доступність → swap та підтвердження → історію; визнати, що це не кадрова система, не зарплатний калькулятор і не юридична перевірка графіка.
+2. **Односторінкову комерційну пропозицію**: що саме отримує компанія, приблизна кількість співробітників/локацій, ціна й умови як *пропозиція*, не неперевірений рахунок чи підписаний договір. 500 PLN/місяць — лише число, закладене в чинному **чернетковому** SaaS договорі; його треба підтвердити/узгодити.
+3. **Чернетку основного договору**: `docs/legal/saas-agreement/umowa-saas-b2b-pl.html`. Можна показати як матеріал для переговорів. HTML → Chrome/Edge → `Ctrl+P` → Save as PDF, A4; не прибирати юридичні caveats до погодження з юристом.
+4. **Чорнові DPA/TOMs** (для розмови про дані), **scope annex**, окремо **список запитань** з `docs/legal/saas-agreement/checklista-przed-podpisaniem.md`.
+5. **Свою перевірену особу й комерційний статус**. Якщо ти ще не маєш зареєстрованої діяльності, НЕ заявляй автоматично, що можеш підписати як компанія без CEIDG або що немає ZUS/VAT. Чинний шаблон прямо передбачає можливу `działalność nierejestrowana`; для безперервного SaaS і контрактної класифікації потрібна перевірка бухгалтером/юристом (див. також нормативні джерела в Б9).
+6. **Картку питань клієнту**: повна назва/NIP/KRS або CEIDG, хто має право підписати, юридична адреса, контакт ІТ/HR/RODO, адреса для рахунків, кількість робітників і локацій, чи потрібні окремі ролі, як схвалюється swap, строки договору, види даних, чи будуть особисті номери/пошти, вимоги до експорту/видалення, бажана дата запуску.
 
-### Backend
+### Як провести зустріч — репліки простими словами
 
-- **CREATE** `GF3.Tests/RegulationAcceptanceGuardTests.cs` using existing Web API test-host/xUnit conventions. Scenarios: anonymous not blocked by guard (auth status preserved), authenticated manager/employee without pending proceeds, each role with pending receives HTTP 428 and safe ProblemDetails error code; unauthenticated/public auth and allowed regulation paths remain reachable; acceptance then proceeds; publishing a newer document re-blocks; non-system manager cannot use admin exception; system manager exception still goes through admin policy/middleware; DB failure blocks access/uses normal error; duplicate requests don't create double records.
-- Reuse existing acceptance tests for immutability/hash/persistence and run all relevant regression suites. Do not modify the repository's existing acceptance schema or bypass authorization.
+«GF3 — вебсервіс для створення та публікації графіків, доступності й замін змін. Ви як роботодавець залишаєтеся відповідальними за своїх працівників і законність графіків. Ми надаємо інструмент, а не беремо на себе payroll, трудове право чи кадрову документацію. Якщо домовимося, фіксуємо точний обсяг і ціну в договорі SaaS, окремо підписуємо угоду про обробку персональних даних DPA, готуємо вашу ізольовану інстанцію і тільки після перевірки вносимо дані співробітників. Працівники не підписують з нами ваш корпоративний договір: вони отримують інформацію від роботодавця і бачать затверджені правила користування системою».
 
-### Static legal document validation — CREATE `scripts/validate-legal-documents.mjs`
+**Не роби завтра:** не вимагай підписів під `DRAFT`; не проси Excel із реальними працівниками на незахищену пошту; не обіцяй 24/7, SOC2, ISO, 99,9%, автоматичну відповідність трудовому праву, юридичну сертифікацію; не вписуй вигадані строки видалення; не підписуй від імені компанії без повноважень.
 
-Node.js built-ins only; no new dependencies. Validate all seven public `.html` files and `legal.css` exist, link targets exist, UTF-8/lang/title/meta and version markers exist, and each has a link to legal index and the login page. Check `docs/legal/LEGAL_REVIEW.md` exists. `--release` additionally rejects any `DO UZUPEŁNIENIA`, `[PLACEHOLDER]`, `0.1.0-draft` or `WERSJA ROBOCZA` markers in public files and requires all public docs approved in `LEGAL_REVIEW.md` (including matching approved version/hash); fail with nonzero exit and names of offending documents, never print private data. Without `--release`, drafts pass syntax/coverage checks to keep developer builds functional. Do not give `--release` the power to approve documents automatically.
+### ПІСЛЯ зустрічі
 
-## 8. Exact API, persistence, DI and deployment deltas
+Занеси результати у приватну картку клієнта. Уточни оферту/ціну, звір повноваження підписанта, передай юридичні питання адвокату/radca prawny, облік/VAT/ZUS — бухгалтеру. Тільки після погодження сторони підписують фінальну комерційну угоду + scope + DPA/узгоджені додатки і отримують копії. Підписані PDF зберігай у захищеному сховищі з контрольованим доступом, **не в GitHub і не в публічному `public/legal`**.
 
-- **Public routes:** `GET /legal/index.html`, `/legal/regulamin.html`, `/legal/polityka-prywatnosci.html`, `/legal/pliki-cookies.html`, `/legal/zasady-korzystania.html`, `/legal/podwykonawcy.html`, `/legal/bezpieczenstwo.html`, `/legal/legal.css` (static). Existing auth/session API contracts unchanged.
-- **New API endpoints:** NONE.
-- **Existing protected API behavior:** when a valid manager/employee has pending published regulations, most business API endpoints return HTTP 428 ProblemDetails instead of executing, with exempt paths defined in §5.3. All existing 401/403 and admin guard rules stay authoritative.
-- **Persistence:** NONE. Reuse existing regulation documents, SHA-256 and acceptance timestamps. No EF migration, table, index or separate tenant ID. Corporate contracts/approval records are external signed artifacts retained outside source control.
-- **DI:** NONE; request-scoped service resolution uses existing `IRegulationService`. If a shared `RegulationSubjectResolver` helper is introduced, implement as stateless static helper; no registration.
-- **Environment configuration:** NONE added. Existing `GF3_BOOTSTRAP_MANAGER_PASSWORD`, `Jwt__SigningKey`, DB, SMTP, HTTPS and admin flags remain as-is. Operator-specific public legal facts are deliberately not sourced from secrets or customer data in `.env`; approved public text must match the deployed domain/operator per instance.
-- **Privacy/security:** do not expose runtime secrets, real employee schedules or signed customer DPA in Git or static assets. Signed agreements and sensitive TOMs stay outside the public build artifact.
-- **Storage/data flow:** signed B2B order + DPA (external) → approved public Terms before contract → operator provisions isolated instance → approved per-user PDF published by trusted system manager → manager/employee logs in → existing `RegulationAcceptanceGate` shows pending version/PDF → user checks acknowledgement → existing `POST /api/regulations/{id}/accept` stores immutable evidence → protected APIs become available. Newly published version → further acknowledgement before protected API access.
+## Б4. Як заповнити найважливіші поля договору
 
-## 9. Non-code STOP-SHIP checklist — operator and lawyer/accountant must complete
+**У SaaS договорі:**
 
-Create the checklist from §3 C6 with checkboxes and named verification evidence. Do not let a green `dotnet test` alone mark these business steps complete.
+- `Usługodawca` — **справжня юридична особа/фізична особа у законній формі**; ПІБ/назва, адреса та відповідні ідентифікатори. Якщо форма діяльності неясна — STOP, фінансово-правова перевірка.
+- `Klient` — точна назва й організаційна форма, KRS/CEIDG, NIP, адреса, хто представляє та за яким правом (не просто менеджер із графіків).
+- `Platforma` — домен конкретного клієнта/інстанції, реальні доступні функції, число користувачів, дата старту.
+- `Opłata` — узгоджена сума/валюта та спосіб податкового опису, перший період, оплата наперед/після, термін платежу, форма бухгалтерського документа.
+- `Okres / wypowiedzenie` — строк дії, повідомлення про припинення, коли зупиняється доступ, як клієнт експортує дані й коли вони видаляються.
+- `Odpowiedzialność / SLA` — тільки умови, на які погодився юрист і які реально можеш виконати. Межі відповідальності не встановлювати навмання.
 
-1. **Legal identity:** CEIDG/KRS registration as appropriate, legal name/address, NIP, public contact, correct PKD and formal business tax status confirmed; contracts identify the actual registered operator rather than project brand.
-2. **Legal review:** all public statements fit actual practices; company signs Order and DPA with verified authorized signatory, and provider has documented agreements with processors. Review mandatory protections for sole traders whose contracts are non-professional and any B2C sales; do not blindly assert all rights are excluded merely because the label says B2B.
-3. **GDPR records:** categorize employer-vs-provider controllers/processors; Art. 13 notices, Art. 28 DPA and supplier agreements, Art. 30 records as applicable, security risks and DPIA screening, actual retention rules and employee subject request channel. Confirm EU/EEA hosting or lawful transfers with evidence. Employees' rights must not be waived by a checkbox.
-4. **Security readiness:** strong production system account password (no fallback), no publicly guessable PINs, rate limiting/account lockout and monitoring assessed, JWT and backups protected, TLS-only internet endpoint, least-privilege admin, restore drill, patch/update ownership, tested isolation (one client/deployment), incident runbook, access/export logs. **The current six-digit login and localStorage bearer token are explicit security-review items and may require a separate hardening plan before workforce-data launch.**
-5. **Browser privacy:** audit storage and trackers; if any optional trackers exist, disable them until prior consent mechanism; publish accurate PKE art. 399 notice. Do not use marketing email/SMS without valid separate permission under art. 398.
-6. **Commercial/accounting:** signed prices/invoicing/termination terms, VAT/OSS/VAT-UE assessment if cross-border, KSeF 2026 obligations and any transitional threshold assessed with accountant; do not advertise automated billing unless implemented.
-7. **Operational:** production hostname/SSL, support privacy contact, backups retention/restore/deletion capability verified, actual export window agreed, production availability promises no greater than achievable, risk allocation reviewed, incident communications contact tested.
-8. **Regulatory applicability review:** DSA hosting/user-content classification (cloud storage/messaging might qualify depending on functionality), EAA/Polish accessibility e-commerce coverage (B2B-only vs consumer sales), NIS2/KSC relevance, Polish employment-record constraints and GDPR high-risk worker monitoring. Do not automatically claim all apply or none apply.
-9. **Final publication:** fill placeholders, obtain legal approval/hash, publish pages and approved PDF (plus signed corporate agreement), run release validator, manually inspect mobile/desktop/readability/keyboard and public no-login access; store signed documents/version/hash/acceptance evidence. Keep the exact previously used legal versions archived outside the source repo when replacing terms.
-10. **Tenant boundary:** separate company deployment per contract until a distinct complete tenancy architecture/security test plan is approved. Never place multiple unrelated employers' actual workforce data into this one SQLite data store under the assumption of data isolation.
+**У DPA:** компанія = адміністратор даних; оператор GF3 = процесор на стороні обслуговування персоналу. Зазначити категорії співробітників, які поля обробляються, задачі (графіки, swaps, повідомлення, права доступу), дозволених менеджерів, місця хостингу, субпроцесорів, процедури інциденту, строки, видалення та допомогу із запитами людей. Додаток TOMs повинен описувати **дійсно наявний** захист, не плани.
 
-## 10. Verification commands (run from pinned checkout)
+**У повідомленні працівнику:** роботодавець вказує себе як адміністратора, зв'язок/відповідального, цілі та підстави для кожної категорії обробки, одержувачів, строки, права та шлях звернення. Зазвичай правова підстава у кадровому процесі **не** зводиться до «натиснув кнопку — дав згоду». Не збирай добровільну GDPR-згоду там, де обробка об'єктивно потрібна для виконання трудових обов'язків/правових зобов'язань.
 
-Before any code change: `git rev-parse HEAD`, `git branch --show-current`, `git status --short`. Stop/report a baseline mismatch or conflicting local edits; do not reset or discard changes. Read only the target files and immediate dependencies referenced here.
+## Б5. Працівник зайшов на сайт: що він реально побачить у нинішньому GF3
 
-```bash
-# backend
- dotnet restore GF3.sln
- dotnet build GF3.sln
- dotnet test GF3.sln
+1. Компанія **попередньо законно** включила потрібні дані, забезпечила GDPR-повідомлення і створила обліковий запис через менеджера. Самореєстрація кожної незалежної фірми в цій версії не підтверджена.
+2. Застосунок перевіряє автентифікацію, роль, опубліковані обов'язкові документи **для цього користувача** і вже підтверджені версії.
+3. За наявності pending PDF користувач бачить назву і версію, може **завантажити PDF**, ставить **порожній за замовчуванням checkbox** «ознайомився і приймаю версію…», тисне «Accept and continue».
+4. Сервер записує прийняття за користувачем/роллю/документом/версією в наявному механізмі; у разі незавершеного прийняття звичайні захищені API відповідають **HTTP 428**. Після прийняття доступ поновлюється.
+5. Коли опублікована **нова обов'язкова версія**, потрібно підтвердити її окремо; старі записи й історію зберегти. Менеджер має endpoint перегляду історії конкретного працівника, у межах поточних дозволів.
+6. **Важливе обмеження:** чекбокс доводить факт заявленого підтвердження, **не доводить фактичного уважного читання** й не є підписом роботодавця. Не можна змушувати працівника підтверджувати DPA/рахунок або видавати це за згоду на будь-яку RODO-обробку.
 
-# frontend
- cd FrontEnd
- npm ci
- npm run lint
- npm run build
- # use the project's existing test script for Vitest (inspect package.json script once)
- cd ..
+### Який саме PDF ставити на acceptance?
 
-# legal/static checks
- node scripts/validate-legal-documents.mjs
- # ONLY after real operator facts and lawyer approval are supplied:
- node scripts/validate-legal-documents.mjs --release
-```
+**Перший кандидат:** один перевірений юристом, датований, версійний **Regulamin korzystania z platformy GF3 dla upoważnionych użytkowników**, погоджений з опублікованими операторськими `Regulamin`/`Zasady korzystania`. Зміст: призначення GF3; хто створює акаунти; особисте користування; захист пароля/PIN; кому звертатись щодо доступу; що графіки і swaps потребують організаційного/юридичного підтвердження роботодавцем; заборона стороннього використання, контакт підтримки і процедура скарг; дата/номер версії. Не писати в ньому «працівник дає добровільну згоду на всю обробку RODO».
 
-Manually smoke-test anonymous access to every `/legal/*.html` through Vite and the compiled ASP.NET production host. Validate no redirect to `/login`, 200/`text/html`, printable text, mobile layout, and working cross-links. Test manager and employee login plus existing schedules/swaps/exports before and after acknowledgement. Test admin publish with existing guard. Verify `curl` against private API fails with HTTP 428 when document pending; a normal authenticated account resumes immediately after accepted version is saved. Test that no B2B private contract/TOM document leaks into `FrontEnd/dist` / `wwwroot`.
+**Що НЕ прикріплювати як acceptance:** SaaS/B2B; DPA; конфіденційні TOMs; SLA; рахунок; внутрішній реєстр RODO; інформаційну клаузулу роботодавця у вигляді «zgadzam się na przetwarzanie»; трудовий контракт; неузгоджений «regulamin pracy» іншої компанії.
 
-## 11. Acceptance criteria
+**Якщо компанія хоче підтвердження власних HR-правил:** спочатку обговорити зі своїм HR/польським трудовим юристом, чи саме цей документ належить працівникам і чи належним способом він доводиться до відома. Поточний загальний gate не слід автоматично вважати повноцінним кадровим документообігом; для цього потрібне окреме погоджене призначення й аудит.
 
-- [ ] All seven Polish public legal pages are readable anonymously, responsive, printable, linked from sign-in and relevant authenticated layouts, with actual operator identity or explicitly still flagged `DRAFT`.
-- [ ] Public Terms cover service scope, technology, contracting, prohibited content, complaints, termination, IP, risk, worker schedule/swap limitations, and mandatory-law safeguards.
-- [ ] Privacy notice explicitly distinguishes operator/controller vs employer/controller, GF3 processor functions and actual data/retention/suppliers; cookies notice includes exact verified browser storage.
-- [ ] Private B2B order/DPA templates contain role/authorization and all Article 28 elements; employer worker notice template and internal compliance procedures exist.
-- [ ] No fictitious payment system, SLA, SOC 2 certificate, cloud vendor, company identity, GDPR consent or tenant boundary appears in any draft.
-- [ ] Existing published `Regulations` PDF/version/SHA-256/checkbox/acceptance persistence is reused, existing account roles and history unaffected.
-- [ ] Direct protected API requests by a user with pending published regulation are blocked with 428; only narrow recovery/publishing/auth paths remain reachable; after acceptance normal behavior resumes. Existing authentication/authorization/admin flags unchanged.
-- [ ] Backend and frontend tests pass; production static paths serve HTML, not the app shell; no unrelated modules are changed.
-- [ ] Draft validator passes locally. `--release` MUST fail until real operator-specific facts + genuine legal approvals are supplied; do not defeat it by fake approval/checksums.
-- [ ] The operator has a concrete STOP-SHIP list covering business registration, taxes/KSeF, DPA, employee privacy, incident response, backups, security/PIN review, individual contracts, and per-company isolation.
+## Б6. Чи взагалі потрібен «regulamin»? Не плутай три різні речі
 
-## 12. DO NOT TOUCH
+**1) `Regulamin świadczenia usług drogą elektroniczną` оператора GF3:** загалом потрібен для дистанційної електронної послуги; польський закон вимагає визначити та **безоплатно надати його до укладання договору**, щоб можна було зберегти/відтворити; описати функції, технічні умови, заборони, укладення/розірвання, рекламації (art. 8 UŚUDE). Це НЕ «regulamin pracy». Наявні draft HTML ще треба завершити.
 
-- Do not rewrite scheduling, shift swap, roster algorithms, shop/employee entities, exported workbooks, SignalR business behavior, permission policies, JWT token format or password system.
-- Do not turn `docs/design-system.json` into runtime config or change its existing snapshot semantics.
-- Do not modify old repository `Plan.md` during execution unless the operator explicitly chooses this external new plan as the replacement. Do not commit legal customer contracts with genuine personal details or sensitive security annexes.
-- Do not implement multi-tenancy, checkout/Stripe, automatic billing, consent-management platforms, marketing integrations or analytics in this plan.
-- Do not assume worker acknowledgement constitutes an employment contract, GDPR consent, DPA acceptance, or an employer's legally effective B2B signature.
+**2) `Zasady korzystania z aplikacji` працівника/менеджера:** зрозуміла інструкція та правила користування сервісом. Її доцільно показувати й документувати персональне ознайомлення/прийняття, якщо текст коректний і його застосування узгоджене з юридичною моделлю договору. Не кожна політика за законом вимагає окремого checkbox; документ має бути наданий належним чином.
 
-## 13. Primary research/legal references — check current law again before signing
+**3) `Regulamin pracy` роботодавця:** це кадровий акт **клієнта, не власника GF3**. За польським Кодексом праці загалом обов'язковий від **50 працівників**, за **20–49** — якщо за умовами закону звернулася профспілкова організація; для менших компаній можливий добровільний; є винятки для колективних договорів. Роботодавець повинен ознайомити працівника з чинними правилами перед початком роботи. Це не означає, що ти маєш генерувати його клієнтам або додавати до кожного GF3-логіну.
 
-1. Polish Act on services by electronic means (UŚUDE), Art. 5–8: https://eli.gov.pl/api/acts/DU/2024/1513/text.html
-2. GDPR EU 2016/679, Arts. 12–14, 28, 30, 32–35: https://eur-lex.europa.eu/legal-content/EN-PL/TXT/?uri=CELEX%3A32016R0679
-3. UODO controller/processor relationship and Art. 28: https://uodo.gov.pl/pl/675/4229 ; UODO processor obligations: https://uodo.gov.pl/pl/676/4258
-4. Polish Electronic Communications Law (PKE), Art. 398–400, especially necessary browser storage exception Art. 399(3): https://eli.gov.pl/api/acts/DU/2024/1221/text.html
-5. KSeF official 2026/2027 timetable and threshold: https://ksef.podatki.gov.pl/etapy-wdrozenia-ksef/ ; https://ksef.podatki.gov.pl/informacje-ogolne-ksef-20/zakres-obowiazkowego-ksef/
-6. Business establishment/review of registration: https://biznes.gov.pl/pl/portal/00120
-7. EU DSA, intermediary/hosting status decided case by case: https://eur-lex.europa.eu/eli/reg/2022/2065/oj/eng ; EC hosting explanation https://digital-strategy.ec.europa.eu/en/faqs/dsa-transparency-database-questions-and-answers
-8. UOKiK consumer rights / digital service background (application to sole traders/B2B requires legal assessment): https://prawakonsumenta.uokik.gov.pl/
-9. Pinned source references (verified, not a complete code archive):
-   - https://raw.githubusercontent.com/OlehProtsun/GF3/5980123995199dc4b6d40d2e3b17ff49731a6a39/README.md
-   - https://raw.githubusercontent.com/OlehProtsun/GF3/5980123995199dc4b6d40d2e3b17ff49731a6a39/docs/deploy.md
-   - https://raw.githubusercontent.com/OlehProtsun/GF3/5980123995199dc4b6d40d2e3b17ff49731a6a39/GF3.WebApi/Controllers/RegulationsController.cs
-   - https://raw.githubusercontent.com/OlehProtsun/GF3/5980123995199dc4b6d40d2e3b17ff49731a6a39/BusinessLogicLayer/Services/RegulationService.cs
-   - https://raw.githubusercontent.com/OlehProtsun/GF3/5980123995199dc4b6d40d2e3b17ff49731a6a39/FrontEnd/src/entities/regulations/ui/RegulationAcceptanceGate.tsx
+## Б7. Як запускати реального клієнта без хаосу
 
-**Final execution report:** give changed-file list, tests/run results, drafts remaining for legal review, STOP-SHIP blockers not resolvable by code, and explicit statement that no legal compliance/certification is guaranteed. Do not claim commercial launch is approved while any critical operator-specific field remains unresolved.
+**Фаза 0 — Legal & security gate:** підтверджена законна форма продажу послуги, рахунки, VAT/ZUS/KSeF за конкретними обставинами; юрист затвердив публічний regulamin, політики, SaaS, DPA; перевірені безпечні PIN/auth/token, HTTPS, доступи, ізоляція, копії і restore, субпроцесори, cookie/storage, персональна інформація. Поточний `CHECKLIST_PRZED_STARTEM.md` окремо позначає ризики 6-значних паролів, localStorage JWT тощо — не вважати проєкт готовим тільки через успішні unit tests.
+
+**Фаза 1 — Угода:** фінальні, узгоджені й підписані SaaS + scope та DPA/TOMs; погоджене SLA лише коли справді є. Контакти юридичні/фінансові/інцидентні з обох сторін і зовнішній захищений архів підписів.
+
+**Фаза 2 — Ізольована інстанція:** окрема організація → свій домен, база/volume, конфігурація і секрети, резервні копії; окремо перевірити реальне серверне оточення. **Не** розміщати двох незалежних роботодавців у спільній інстанції, бо поточний пакунок не підтверджує відповідну ізоляцію.
+
+**Фаза 3 — Налаштування:** створити уповноваженого менеджера, налаштувати локації/акаунти, перевірити безпечний канал початкових доступів, не завантажувати більше персональних даних, ніж потрібно, і переконатися у можливості відкликати доступ.
+
+**Фаза 4 — Документи для людей:** опублікований та затверджений публічний `regulamin.html` доступний до підпису, інформаційні повідомлення від роботодавця доставлені; **окремий придатний PDF** — через існуючий системний інтерфейс upload/publish відповідальним системним менеджером, в правильній інстанції. Не заливати PDF із написом DRAFT.
+
+**Фаза 5 — Контрольний тест:** свіжий тестовий manager/employee, pending → PDF → checkbox → accept → API працює; без підтвердження — HTTP 428; нова версія знову просить підтвердження; відновлюються графік, swaps і відображається історія. Перевірити доступність старого PDF/історії в погодженому архіві.
+
+**Фаза 6 — Акт введення:** заповнити протокол запуску/передачі, хто отримав доступ, проведено навчання, що протестовано та які проблеми залишилися. Він не замінює підписаний договір.
+
+## Б8. Що робити після запуску — повсякденний цикл
+
+**Кожного місяця / розрахунковий період:** перевірка вартості договору, виставлення правильного документа й отримання оплати, запис платежів, підтримка й обробка звернень, перевірка резервних копій. GF3 не має підтвердженого автоматичного білінгу — не покладайся на відсутню функцію.
+
+**Коли додають працівника:** компанія забезпечує інформацію та підставу обробки, менеджер створює акаунт, працівник має доступ до правильних правил; лише за необхідності окремо підтверджує approved PDF.
+
+**Коли змінюється правило:** юрист/відповідальна особа затверджує нову редакцію, зазначається версія і дата, публікується новий PDF, зберігаються попередні версії і підтвердження. Не змінюй існуючий файл 'тихо' без версіонування й доказу.
+
+**Коли працівник звільняється:** клієнт відкликає доступ; за погодженими політиками зберігає/видаляє відповідні кадрові дані, графіки й слід аудиту. Не знищувати все відразу без перевірки трудових строків і DPA; не залишати активний доступ.
+
+**Якщо витік чи підозра на витік:** зареєструвати інцидент, локалізувати, зберегти докази, без зволікання повідомити клієнта-адміністратора через контакт DPA. **72 години** стосуються оцінки повідомлення наглядового органу адміністратором за відповідних умов GDPR, а не універсального права процесора чекати 72 години, перш ніж повідомити клієнта.
+
+**Коли працівник просить видалити дані / доступ:** не видаляй самовільно дані роботодавця; верифікуй запит, передай адміністратору-роботодавцю за DPA, допоможи виконати його рішення, збережи журнал дій.
+
+**Коли клієнт припиняє підписку:** за підписаними SaaS/DPA надай погоджений експорт у доступному форматі, закрий доступ, поверни/видали дані згідно з інструкцією і обов'язковими винятками, перевір бекапи/ретенцію, збережи протокол. Не обіцяй PDF-експорт із поточного UI або спеціальну міграцію, якщо це не наявна функція.
+
+## Б9. Що не можна вважати вирішеним (реальні блокери)
+
+- У `docs/legal/LEGAL_REVIEW.md` документи все ще **DRAFT**, без реальних затверджень і SHA-256. Публічні HTML містять `[DO UZUPEŁNIENIA]`.
+- Треба підтвердити, чи маєш **законну форму надання постійного SaaS**, які ZUS/VAT/податки та потрібні рахунки. Польська `działalność nierejestrowana` має специфічні вимоги та навіть за такого статусу договори послуг можуть створювати обов'язки платника внесків у клієнта. Не вважати, що просто слово "B2B" обходить ці правила.
+- Не визначені фактичні субпроцесори/хостинг, терміни зберігання, тест restore і політика cookie/storage на реальній доменній конфігурації.
+- У STOP-SHIP є окремі питання реальної безпеки акаунтів; їх треба вирішити **до** реальних даних персоналу, незалежно від цього документаційного плану.
+- Розрізнення старих `docs/legal/electronic-services-regulations/*` та нового `FrontEnd/public/legal/*` потребує узгодження остаточного затвердженого тексту; не вважати будь-який markdown автоматично опублікованим.
+- Докази підписання/повноважень та передачі GDPR-повідомлень не з'являються від того, що тест чекбокса зелений.
+
+## Б10. Джерела для юриста та фінансової перевірки (станом на 2026-10-08)
+
+- GF3 pinned legal README: https://github.com/OlehProtsun/GF3/blob/37540cfffb9fd89bd2a22a54c00cf3f451ce58a3/docs/legal/README.md
+- GF3 launch blocker list: https://github.com/OlehProtsun/GF3/blob/37540cfffb9fd89bd2a22a54c00cf3f451ce58a3/docs/legal/internal/CHECKLIST_PRZED_STARTEM.md
+- EU GDPR/RODO arts. 13, 28, 30, 32–34: https://eur-lex.europa.eu/legal-content/PL/TXT/?uri=CELEX:32016R0679
+- Polish electronic services law, art. 8: https://eli.gov.pl/api/acts/DU/2024/1513/text.html
+- Polish UODO — controllers vs processors: https://www.uodo.gov.pl/pl/675/4234
+- Polish PIP — employer duties and workplace regulations: https://www.pip.gov.pl/dla-pracodawcow/niezbednik-pracodawcy/jak-zatrudnic-pracownika-w-ramach-umowy-o-prace
+- Polish government — nonregistered activity 2026, conditions and services/ZUS: https://biznes.gov.pl/pl/firma/zakladanie-firmy/chce-wiedziec-jak-zalozyc-wlasna-firme/dzialalnosc-nierejestrowa-oraz-inne-sytuacje-w-ktorych-nie-trzeba-rejestrowac-firmy
+
+**Final operational rule:** For the meeting you may bring *drafts* and present the product. For **paid production with real employees**, first close the legal, contractual, fiscal, security and GDPR release gates. CODEX can improve documentation, but cannot certify those gates or sign anything for the parties.

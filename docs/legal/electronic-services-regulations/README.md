@@ -7,7 +7,7 @@ Pakiet jest polskim projektem do przeglądu prawnego, technicznego i operacyjneg
 ## Utworzone pliki
 
 - `regulamin-swiadczenia-uslug-elektronicznych-pl.md` – edytowalne źródło Regulaminu.
-- `regulamin-swiadczenia-uslug-elektronicznych-pl.html` – samodzielna wersja do publikacji, przeglądania i druku.
+- `regulamin-swiadczenia-uslug-elektronicznych-pl.html` – samodzielna robocza wersja do przeglądania i druku; nie kanoniczny plik publicznego builda.
 - `informacja-o-zagrozeniach-pl.md` – zrozumiała informacja o ryzykach i środkach ostrożności.
 - `checklista-wdrozenia-regulaminu.md` – lista prac publikacyjnych, prawnych i technicznych wraz z właścicielami placeholderów.
 - `README.md` – instrukcja obsługi pakietu.
@@ -44,17 +44,26 @@ Użytkownik będący pracownikiem lub menedżerem Klienta nie nabywa samodzielni
 
 ## Publikacja na Platformie
 
-1. Dodać publiczną trasę `/regulamin` oraz stabilny publiczny adres pliku HTML lub PDF.
-2. Umieścić link „Regulamin” na ekranie logowania – jest to najważniejsze miejsce, ponieważ Regulamin ma być dostępny przed rozpoczęciem korzystania.
-3. Powtórzyć link w stałej stopce lub menu pomocy po zalogowaniu.
-4. Obok udostępnić „Informację o szczególnych zagrożeniach”, Politykę prywatności i – jeżeli dotyczy – Politykę cookies.
-5. Zachować każdą opublikowaną wersję pod niezmiennym adresem archiwalnym; nie podmieniać po cichu wcześniej zaakceptowanej treści.
+Stan dokumentacji na 2026-10-08, punkt odniesienia DEV2 `37540cfffb9fd89bd2a22a54c00cf3f451ce58a3`: publiczny zestaw i linki logowania/układów/gate istnieją. Wcześniejsza instrukcja dodania `/regulamin` była ustaleniem sprzed `37540cf`; nie jest brakującą funkcją tego planu.
 
-Nie wykonano zmian aplikacji, wdrożenia ani publikacji.
+1. Kanoniczny plik to `FrontEnd/public/legal/regulamin.html` — [źródło publiczne](../../../FrontEnd/public/legal/regulamin.html). Adres w rzeczywistej domenie klienta: **`/legal/regulamin.html`**, hub `/legal/index.html`; konkretna domena wymaga potwierdzenia operatora.
+2. Przed umową/użyciem uzupełnić dane i uzyskać przegląd prawny. Sprawdzić dostęp anonimowy z ekranu logowania oraz linki w obu układach i gate; nie zakładać stanu zewnętrznego serwera na podstawie kodu.
+3. Sprawdzić powiązane publiczne zasady, politykę prywatności, cookies, podwykonawców i bezpieczeństwo; robocza informacja o zagrożeniach nadal wymaga uzgodnienia z finalnym zestawem.
+4. Ten katalog zawiera odrębne robocze Markdown i generowany HTML. Generator nie aktualizuje `FrontEnd/public/legal/regulamin.html` ani nie uploaduje PDF. Człowiek porównuje treść, wersję i datę roboczego źródła, publicznych regulaminu/zasad oraz osobnego PDF, zapisuje różnice i zatwierdzenie dokładnych wersji/hash w [rejestrze review](../LEGAL_REVIEW.md).
+5. Dopiero zatwierdzony, właściwy dla ról PDF zasad aplikacji system manager publikuje w istniejącym mechanizmie. Zachować wcześniejsze PDF, treści i historię w uzgodnionym archiwum; nie podmieniać po cichu zaakceptowanej wersji.
+
+Bieżący plan zmienia wyłącznie dokumentację, nie wykonuje produkcyjnego wdrożenia, uploadu ani zatwierdzenia. [Playbook UA](../OPERATOR_ONBOARDING_PLAYBOOK_UA.md) i [STOP-SHIP](../internal/CHECKLIST_PRZED_STARTEM.md) określają odpowiedzialności i warunki.
 
 ## Rejestrowanie akceptacji
 
-Aktualny kod nie zapisuje akceptacji Regulaminu, numeru zaakceptowanej wersji ani daty akceptacji. Po przeglądzie prawnym rekomendowane wdrożenie obejmuje nieoznaczone z góry pole przy pierwszym logowaniu lub aktywacji, bezpośredni link do pełnej treści oraz zapis Użytkownika, Klienta, wersji i czasu akceptacji. Historyczne treści muszą pozostać odtwarzalne.
+**2026-10-08, stan względem pinned `37540cf`: zapis akceptacji i wersji już istnieje dla managera i pracownika.** Historyczne ustalenie o braku zapisu dotyczyło stanu przed `37540cf` i jest zastąpione poniższym opisem.
+
+- [RegulationsController.cs](../../../GF3.WebApi/Controllers/RegulationsController.cs): `GET /api/regulations/pending`, `GET /api/regulations/history/me`, manager-only `GET /api/regulations/history/employees/{employeeId}`, `GET /api/regulations/{documentId}/pdf`, `POST /api/regulations/{documentId}/accept`. Mechanizm utrwala użytkownika/rolę, dokument, wersję i datę; istnieją też upload/publication. Historia pracownika jest dostępna w granicach aktualnych uprawnień.
+- [RegulationAcceptanceGuardMiddleware.cs](../../../GF3.WebApi/Middleware/RegulationAcceptanceGuardMiddleware.cs) zwraca **HTTP 428** dla zwykłych chronionych operacji API manager/employee przy pending wymaganych opublikowanych PDF. Auth i dozwolone trasy regulacji mają wyjątki; to nie mechanizm podpisu firmy. Po wszystkich wymaganych potwierdzeniach dostęp wraca; nowa wymagana wersja potrzebuje własnego potwierdzenia, dotychczasowa historia pozostaje.
+- [RegulationAcceptanceGate.tsx](../../../FrontEnd/src/entities/regulations/ui/RegulationAcceptanceGate.tsx) pokazuje tytuł/wersję, pobranie PDF, checkbox pusty domyślnie i działanie dopiero po świadomym zaznaczeniu. Zapis dowodzi złożonego osobistego potwierdzenia, nie przeczytania każdego słowa, podpisu pracodawcy ani zgody na przetwarzanie danych.
+- Zatwierdzony/uploadowany PDF jest osobny od `/legal/regulamin.html`. Wersje tekstowe wymagają jawnego uzgodnienia człowieka; nie są automatycznie identyczne. Do gate nie wysyłać SaaS/DPA, TOMs, SLA, faktur, wewnętrznych rejestrów ani informacji GDPR jako blankietowej zgody. Pracodawca doręcza informację odrębnie.
+
+[RegulationAcceptanceGuardTests.cs](../../../GF3.Tests/RegulationAcceptanceGuardTests.cs) obejmuje ten przepływ. Historyczne wyniki z [legal README](../README.md) nie są świeżą lokalną walidacją bieżącego planu dokumentacyjnego.
 
 ## Funkcjonalność potwierdzona w repozytorium
 
@@ -82,7 +91,6 @@ Administrator Klienta jest pojęciem organizacyjnym. Aktualna Platforma nie ma o
 - wymuszona zmiana Hasła przy pierwszym logowaniu;
 - odrębny stan dezaktywacji Konta pracownika niezależny od jego usunięcia;
 - samodzielne usunięcie Konta przez pracownika;
-- zapis akceptacji Regulaminu i jego wersji;
 - ogólny czat, komentarze pracownicze i przesyłanie plików;
 - zgłaszanie ogólnej korekty grafiku inne niż potwierdzone zamiany zmian i dostępność;
 - e-mail, SMS lub powiadomienia push jako ogólny kanał zdarzeń Platformy;
@@ -113,7 +121,7 @@ Administrator Klienta jest pojęciem organizacyjnym. Aktualna Platforma nie ma o
 - produkcyjne adresy wsparcia, reklamacji i Incydentów;
 - proces klasyfikacji, eskalacji i monitorowania Incydentów;
 - eksport, retencja, usuwanie danych, kopie zapasowe i separacja środowisk;
-- wdrożenie publicznego Regulaminu i rejestru akceptacji.
+- produkcyjna publikacja zatwierdzonych publicznych tekstów i właściwego PDF oraz runtime weryfikacja istniejącego rejestru akceptacji; implementacja mechanizmu jest potwierdzona od `37540cf`.
 
 ## Odrębne dokumenty nadal wymagane
 
@@ -177,4 +185,3 @@ Projekt oparto między innymi na wymaganiach ustawy z dnia 18 lipca 2002 r. o ś
 - [RODO – EUR-Lex](https://eur-lex.europa.eu/legal-content/PL/TXT/?uri=CELEX:32016R0679)
 
 Przed publikacją należy sprawdzić aktualny stan prawny i dopasowanie dokumentów do faktycznego modelu Usługodawcy, Klienta oraz produkcyjnego sposobu działania Platformy.
-

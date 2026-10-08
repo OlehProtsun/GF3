@@ -4,7 +4,18 @@
 
 Pakiet jest roboczym projektem negocjacyjnym w języku polskim. Nie stanowi finalnej porady prawnej, podatkowej, księgowej, ubezpieczeniowej ani RODO. Nie potwierdza automatycznie prawa do działalności nierejestrowanej, braku ZUS, zwolnienia z VAT ani określonej klasyfikacji współpracy.
 
-## Utworzone pliki
+## Which document to give the client?
+
+- Główną, dłuższą **roboczą bazą negocjacji** jest `docs/legal/saas-agreement/umowa-saas-b2b-pl.md` — [źródło](umowa-saas-b2b-pl.md), [generowany HTML do druku/PDF](umowa-saas-b2b-pl.html). Nie jest zatwierdzoną umową; wymaga uzupełnienia prawdziwych faktów i przeglądu polskiego prawnika oraz doradcy finansowego.
+- `docs/legal/templates/Zamowienie_Umowa_B2B.md` — [krótki projekt](../templates/Zamowienie_Umowa_B2B.md) — jest alternatywną koncepcją krótkiego zamówienia/okładki, nie niezależnie zatwierdzonym drugim kontraktem. Jeżeli finalny SaaS zawiera pełne warunki zamówienia, nie przekazywać sprzecznej drugiej umowy głównej. Ewentualna okładka musi wyraźnie włączać finalny SaaS przez referencję i przejść kontrolę zgodności u prawnika.
+- [Załącznik zakresu](zalacznik-1-zakres-uslug.md) określa rzeczywiście dostarczane funkcje, konfigurację i limity, nie niepotwierdzone obietnice.
+- Dołączyć uzgodnione [DPA](../templates/Umowa_Powierzenia_Danych_DPA.md) wraz z [TOMs/retencją](../templates/Zalacznik_TOMs_i_Retencja.md), instrukcjami dotyczącymi bezpieczeństwa i podprocesorów. [SLA/wsparcie](../templates/Zalacznik_SLA_i_Wsparcie.md) tylko jeśli strony rzeczywiście je uzgodniły i operator może je wykonać.
+- **500 PLN miesięcznie, siedmiodniowy termin, płatność z góry/z dołu i postanowienia wypowiedzenia to domyślne/przykładowe warunki projektu, nie potwierdzona umowa sprzedaży.** Cenę, podatki, pierwszy okres, dokument księgowy i zakończenie należy uzgodnić indywidualnie. Pracownik nie płaci abonamentu operatorowi.
+- Po edycji Markdown wygenerować HTML istniejącym `node generate-html.mjs`, porównać wersje, następnie Chrome/Edge → Ctrl+P → A4 → Zapisz jako PDF i sprawdzić wszystkie strony. Generowanie Node ani druk nie podpisują i nie zatwierdzają dokumentu. Finalne podpisy, umocowanie i dowody doręczenia zachować wyłącznie w zewnętrznym chronionym archiwum poza Git/public.
+
+Kolejność i odpowiedzialności: [playbook UA](../OPERATOR_ONBOARDING_PLAYBOOK_UA.md), [karta wdrożenia](../templates/Karta_Wdrozenia_Klienta_Wzor.md), [protokół przekazania](../templates/Protokol_Uruchomienia_i_Przekazania_Wzor.md), [STOP-SHIP](../internal/CHECKLIST_PRZED_STARTEM.md). Osobisty checkbox managera/pracownika nie podpisuje SaaS ani DPA i nie jest zgodą GDPR.
+
+## Pliki pakietu
 
 - `umowa-saas-b2b-pl.md` – edytowalne źródło Umowy.
 - `umowa-saas-b2b-pl.html` – wersja do przeglądania, drukowania i eksportu do PDF.
