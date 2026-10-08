@@ -12,6 +12,8 @@ using DataAccessLayer.Models.Enums;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
+using Microsoft.Data.Sqlite;
 using WebApi.Auth;
 using WebApi.Contracts.ShiftSwaps;
 using WebApi.Realtime;
@@ -45,8 +47,6 @@ public sealed class EmployeeShiftSwapsController(
                 FirstName = employee.FirstName,
                 LastName = employee.LastName,
                 DisplayName = employee.FirstName + " " + employee.LastName,
-                Email = employee.Email,
-                Phone = employee.Phone,
             })
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
@@ -93,6 +93,8 @@ public sealed class EmployeeShiftSwapsController(
                 .ToListAsync(cancellationToken)
                 .ConfigureAwait(false);
         var orderedRequests = requests
+            .Where(request => request.Status != ShiftSwapStatus.Open || request.ArchivedViewsJson != null ||
+                request.Schedule.Slots.Any(slot => slot.Id == request.ScheduleSlotId))
             .OrderBy(request => request.Status == ShiftSwapStatus.Open ? 0 : 1)
             .ThenByDescending(request => request.CreatedAtUtc)
             .ToList();
@@ -124,7 +126,9 @@ public sealed class EmployeeShiftSwapsController(
         }
 
         var offeredPeriod = ResolveRequestedPeriod(request, slot);
-        var targetEmployeeId = request.TargetEmployeeId is > 0 ? request.TargetEmployeeId.Value : (int?)null;
+        if (request.TargetEmployeeId is <= 0)
+            throw ValidationException.ForField(nameof(request.TargetEmployeeId), "The selected employee was not found.");
+        var targetEmployeeId = request.TargetEmployeeId;
         if (targetEmployeeId == employeeId)
         {
             throw ValidationException.ForField(nameof(request.TargetEmployeeId), "Choose another employee or publish this swap for everyone.");
@@ -163,7 +167,18 @@ public sealed class EmployeeShiftSwapsController(
         };
 
         db.ShiftSwapRequests.Add(model);
-        await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch (DbUpdateException exception) when (exception.InnerException is SqliteException { SqliteExtendedErrorCode: 2067 })
+        {
+            if (!await db.ShiftSwapRequests.AsNoTracking()
+                .AnyAsync(swap => swap.ScheduleSlotId == slot.Id && swap.Status == ShiftSwapStatus.Open, cancellationToken)
+                .ConfigureAwait(false))
+                throw;
+            throw ValidationException.ForField(nameof(request.ScheduleSlotId), "This shift already has an open swap offer.");
+        }
 
         var created = await BuildSwapRequestQuery()
             .FirstAsync(swap => swap.Id == model.Id, cancellationToken)
@@ -194,7 +209,16 @@ public sealed class EmployeeShiftSwapsController(
     public async Task<ActionResult<ShiftSwapDto>> Accept(int id, CancellationToken cancellationToken)
     {
         var employeeId = GetRequiredEmployeeId();
-        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
+        IDbContextTransaction transaction;
+        try
+        {
+            transaction = await db.Database.BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception exception) when (IsSqliteWriterConflict(exception))
+        {
+            throw new ValidationException("This swap changed during another request. Refresh and try again.");
+        }
+        await using var transactionLifetime = transaction;
         var swap = await BuildSwapRequestQuery()
             .FirstOrDefaultAsync(request => request.Id == id, cancellationToken)
             .ConfigureAwait(false)
@@ -223,7 +247,8 @@ public sealed class EmployeeShiftSwapsController(
         }
 
         EnsureScheduleIsNotLocked(swap.Schedule);
-        var slot = swap.Schedule.Slots.First(slot => slot.Id == swap.ScheduleSlotId);
+        var slot = swap.Schedule.Slots.FirstOrDefault(slot => slot.Id == swap.ScheduleSlotId)
+            ?? throw new ValidationException("This shift is no longer available.");
         var offeredPeriod = GetSwapPeriod(swap, slot);
         EnsurePeriodWithinSlot(slot, offeredPeriod);
         var employeeMonthSlots = await LoadPublishedEmployeeMonthSlotsAsync(
@@ -257,47 +282,45 @@ public sealed class EmployeeShiftSwapsController(
             employeeId,
             acceptingEmployeeName);
 
-        if (swap.IsManagerCreated)
-        {
-            if (slot.EmployeeId.HasValue)
-            {
-                throw new ValidationException("This open shift is no longer available.");
-            }
-        }
-        else if (slot.EmployeeId != swap.FromEmployeeId)
-        {
-            throw new ValidationException("This shift is no longer assigned to the employee who opened the swap.");
-        }
-
-        if (swap.IsManagerCreated)
-        {
-            slot.EmployeeId = employeeId;
-            slot.Status = SlotStatus.ASSIGNED;
-            if (swap.ManualColumnId.HasValue)
-            {
-                swap.Schedule.Note = RemoveManualColumnCellFromNote(
-                    swap.Schedule.Note,
-                    swap.ManualColumnId.Value,
-                    slot.DayOfMonth);
-            }
-        }
-        else
-        {
-            foreach (var remainingSlot in ApplyAcceptedSwapPeriod(slot, swap.FromEmployeeId!.Value, employeeId, offeredPeriod, swap.Schedule.Slots.ToList()))
-            {
-                db.ScheduleSlots.Add(remainingSlot);
-            }
-        }
-
-        EnsureScheduleEmployee(swap.Schedule, employeeId);
-        await HighlightAcceptedSwapCellsAsync(swap, employeeId, cancellationToken).ConfigureAwait(false);
-        swap.Status = ShiftSwapStatus.Accepted;
-        swap.AcceptedByEmployeeId = employeeId;
         var acceptedAtUtc = DateTimeOffset.UtcNow;
-        swap.AcceptedAtUtc = acceptedAtUtc;
-
         try
         {
+            var affectedRows = await db.ShiftSwapRequests
+                .Where(request => request.Id == id && request.Status == ShiftSwapStatus.Open)
+                .ExecuteUpdateAsync(update => update
+                    .SetProperty(request => request.Status, ShiftSwapStatus.Accepted)
+                    .SetProperty(request => request.AcceptedByEmployeeId, employeeId)
+                    .SetProperty(request => request.AcceptedAtUtc, acceptedAtUtc), cancellationToken)
+                .ConfigureAwait(false);
+            if (affectedRows != 1)
+                throw new ValidationException("This swap offer is no longer open.");
+
+            swap.Status = ShiftSwapStatus.Accepted;
+            swap.AcceptedByEmployeeId = employeeId;
+            swap.AcceptedAtUtc = acceptedAtUtc;
+
+            if (swap.IsManagerCreated)
+            {
+                slot.EmployeeId = employeeId;
+                slot.Status = SlotStatus.ASSIGNED;
+                if (swap.ManualColumnId.HasValue)
+                {
+                    swap.Schedule.Note = RemoveManualColumnCellFromNote(
+                        swap.Schedule.Note,
+                        swap.ManualColumnId.Value,
+                        slot.DayOfMonth);
+                }
+            }
+            else
+            {
+                foreach (var remainingSlot in ApplyAcceptedSwapPeriod(slot, swap.FromEmployeeId!.Value, employeeId, offeredPeriod, swap.Schedule.Slots.ToList()))
+                {
+                    db.ScheduleSlots.Add(remainingSlot);
+                }
+            }
+
+            EnsureScheduleEmployee(swap.Schedule, employeeId);
+            await HighlightAcceptedSwapCellsAsync(swap, employeeId, cancellationToken).ConfigureAwait(false);
             await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
 
             var afterSlots = await db.ScheduleSlots
@@ -344,9 +367,15 @@ public sealed class EmployeeShiftSwapsController(
             await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
             await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
         }
-        catch (DbUpdateException)
+        catch (DbUpdateException exception) when (exception.InnerException is SqliteException { SqliteErrorCode: 19 })
         {
+            await transaction.RollbackAsync(cancellationToken).ConfigureAwait(false);
             throw new ValidationException("This swap could not be accepted because the resulting schedule would conflict.");
+        }
+        catch (Exception exception) when (IsSqliteWriterConflict(exception))
+        {
+            await transaction.RollbackAsync(cancellationToken).ConfigureAwait(false);
+            throw new ValidationException("This swap changed during another request. Refresh and try again.");
         }
 
         var accepted = await BuildSwapRequestQuery()
@@ -392,9 +421,24 @@ public sealed class EmployeeShiftSwapsController(
             throw new ValidationException("Only open swap offers can be cancelled.");
         }
 
+        var cancelledAtUtc = DateTimeOffset.UtcNow;
+        try
+        {
+            var affectedRows = await db.ShiftSwapRequests
+                .Where(request => request.Id == id && request.FromEmployeeId == employeeId && request.Status == ShiftSwapStatus.Open)
+                .ExecuteUpdateAsync(update => update
+                    .SetProperty(request => request.Status, ShiftSwapStatus.Cancelled)
+                    .SetProperty(request => request.CancelledAtUtc, cancelledAtUtc), cancellationToken)
+                .ConfigureAwait(false);
+            if (affectedRows != 1)
+                throw new ValidationException("Only open swap offers can be cancelled.");
+        }
+        catch (Exception exception) when (IsSqliteWriterConflict(exception))
+        {
+            throw new ValidationException("This swap changed during another request. Refresh and try again.");
+        }
         swap.Status = ShiftSwapStatus.Cancelled;
-        swap.CancelledAtUtc = DateTimeOffset.UtcNow;
-        await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        swap.CancelledAtUtc = cancelledAtUtc;
 
         await PostCommitActions.RunAsync(HttpContext, () => workflowLogService
             .LogAsync(
