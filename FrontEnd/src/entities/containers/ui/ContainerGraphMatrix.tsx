@@ -53,6 +53,7 @@ type ContainerGraphMatrixProps = {
   style?: CSSProperties;
   icon?: ReactNode;
   compactSize?: boolean;
+  mobileReadOnlyViewport?: boolean;
   neutralStyle?: boolean;
   regularCellText?: boolean;
   showColumnTotals?: boolean;
@@ -650,6 +651,7 @@ export function ContainerGraphMatrix({
   style,
   icon = <ScheduleIcon size={18} />,
   compactSize = false,
+  mobileReadOnlyViewport = false,
   neutralStyle = false,
   regularCellText = false,
   showColumnTotals = true,
@@ -732,6 +734,7 @@ export function ContainerGraphMatrix({
   const cellInteractionEnabled = !readOnly || selectionEnabled;
   const cardClassName = [
     styles.card,
+    mobileReadOnlyViewport ? styles.cardPhoneViewport : "",
     showShiftStaffingCounts ? styles.cardWithStaffing : "",
     useCompactShell ? styles.cardCompact : "",
     className ?? "",
@@ -747,6 +750,7 @@ export function ContainerGraphMatrix({
   const isEmpty = columns.length === 0;
   const layoutClassName = joinClassNames(
     styles.layout,
+    mobileReadOnlyViewport && styles.layoutPhoneViewport,
     hasToolbar && styles.layoutWithToolbar,
     isEmpty && styles.layoutEmpty,
     useCompactShell && styles.layoutCompact,
@@ -1586,11 +1590,16 @@ export function ContainerGraphMatrix({
         {isEmpty ? (
           <div className={styles.emptyState}>{resolvedEmptyMessage}</div>
         ) : (
-          <div className={joinClassNames(styles.tableShell, useCompactShell && styles.tableShellCompact)}>
-            <div className={joinClassNames(styles.tableScroll, useCompactShell && styles.tableScrollCompact)}>
+          <div className={joinClassNames(styles.tableShell, useCompactShell && styles.tableShellCompact, mobileReadOnlyViewport && styles.tableShellPhoneViewport)}>
+            <div className={joinClassNames(styles.tableScroll, useCompactShell && styles.tableScrollCompact, mobileReadOnlyViewport && styles.tableScrollPhoneViewport)}
+              data-phone-matrix-scroll={mobileReadOnlyViewport ? "" : undefined}
+              role={mobileReadOnlyViewport ? "region" : undefined}
+              tabIndex={mobileReadOnlyViewport ? 0 : undefined}
+              aria-label={mobileReadOnlyViewport ? (typeof title === "string" ? title : t("Schedule Matrix")) : undefined}>
               <table
                 className={joinClassNames(
                   styles.table,
+                  mobileReadOnlyViewport && styles.tablePhoneViewport,
                   neutralStyle && styles.tableNeutral,
                   regularCellText && styles.regularCellText,
                   !stretchColumns && styles.tableFixedColumns,

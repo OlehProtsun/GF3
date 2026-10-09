@@ -690,3 +690,12 @@
 
 .workspacePhone .matrixCard { --matrix-cell-min-height: 44px; }
 .workspacePhone .matrixCard button { min-height: 44px; }
+
+.workspacePhone, .workspacePhone .topRow, .workspacePhone .mainColumn, .workspacePhone .summaryCardMeasure, .workspacePhone .summaryTableScroll {
+  width: 100%; min-width: 0; max-width: 100%; box-sizing: border-box;
+}
+.workspacePhone .topRowCollapsed { grid-template-columns: minmax(0, 1fr); }
+.workspacePhone .summaryTableScroll { overscroll-behavior-x: contain; }
+.workspacePhone .summaryCard { padding: 16px; border-radius: 26px; }
+.workspacePhone .badge, .workspacePhone .metaBadge { box-sizing: border-box; max-width: 100%; overflow-wrap: anywhere; }
+.workspacePhone .lastUpdateField { flex-wrap: wrap; }

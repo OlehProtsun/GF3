@@ -11,6 +11,9 @@ import { EmployeeProfileCard } from "@entities/employees/ui/EmployeeProfileCard"
 import { ShopProfileCard } from "@entities/shops/ui/ShopProfileCard";
 import { ContainerGraphProfileWorkspace } from "@entities/containers";
 import { AvailabilityGroupProfileCard } from "@entities/availability-groups/ui";
+import { ManagerPhonePage } from "./ManagerPhonePage";
+import { ManagerPhoneEmployeeDetailPage } from "./ManagerPhoneEmployeeDetailPage";
+import { ManagerPhoneShopDetailPage } from "./ManagerPhoneShopDetailPage";
 import { parsePhoneId } from "./parsePhoneId";
 const container = { id: 1, name: "All manager container", note: "Manager records" };
 const employee = { id: 2, firstName: "Other", lastName: "Worker", hasLoginAccount: true, isOnline: true, username: "other", email: "other@example.com", phone: "123" };
@@ -32,6 +35,8 @@ beforeEach(() => {
   else if (path === "/api/containers/1/graphs/3") data = graph;
   else if (path.endsWith("/employees") && path.includes("graphs")) data = [{ id: 7, scheduleId: 3, employeeId: 2, displayOrder: 1 }];
   else if (path.endsWith("/slots") && path.includes("graphs")) data = [{ id: 8, scheduleId: 3, employeeId: 2, dayOfMonth: 1, slotNo: 1, fromTime: "08:00", toTime: "16:00", status: "Working" }];
+  else if (path === "/api/employees/2") data = employee;
+  else if (path === "/api/shops/4") data = shop;
   else if (path === "/api/employees") data = [employee];
   else if (path === "/api/shops") data = [shop];
   else if (path === "/api/availability-groups") data = [group];
@@ -87,4 +92,26 @@ test("loading stays non-interactive and 404 is a not-found state", async () => {
  finish(Response.json([])); await screen.findByText("No containers yet"); view.unmount();
  vi.mocked(globalThis.fetch).mockImplementation(async input => String(input).includes("/containers/") ? Response.json({ detail: "Not found" }, { status: 404 }) : Response.json([]));
  mount(<ManagerPhoneContainerDetailPage />, "/container/999"); await screen.findByText("Record not found."); expect(screen.getByRole("link", { name: /Back/ })).toHaveAttribute("href", "/container");
+});
+
+
+test("root wrapper and manager lists omit Back by default", async () => {
+ const view = mount(<ManagerPhonePage>Home</ManagerPhonePage>);
+ expect(screen.queryByRole("link", { name: /Back/ })).not.toBeInTheDocument();
+ view.unmount();
+ mount(<ManagerPhoneContainersPage />, "/container"); await screen.findByText(container.name);
+ expect(screen.queryByRole("link", { name: /Back/ })).not.toBeInTheDocument();
+});
+
+test.each([
+ ["graph", <ManagerPhoneGraphPage />, "/container/1/graphs/3", "/container/1"],
+ ["availability", <ManagerPhoneAvailabilityDetailPage />, "/availability/5", "/availability"],
+ ["employee", <ManagerPhoneEmployeeDetailPage />, "/employee/2", "/employee"],
+ ["shop", <ManagerPhoneShopDetailPage />, "/shop/4", "/shop"],
+] as const)("%s detail preserves parent Back and GET-only access", async (_name, element, path, parent) => {
+ mount(element, path);
+ expect(screen.getByRole("link", { name: /Back/ })).toHaveAttribute("href", parent);
+ await waitFor(() => expect(screen.queryByText("Loading...")).not.toBeInTheDocument());
+ expect(calls.every(call => call.method === "GET")).toBe(true);
+ expect(screen.queryByRole("button", { name: /Edit|Delete|Publish|Export|Kick/ })).not.toBeInTheDocument();
 });

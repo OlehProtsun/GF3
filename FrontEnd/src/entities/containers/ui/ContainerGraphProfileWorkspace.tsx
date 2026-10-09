@@ -257,6 +257,7 @@ export function ContainerGraphProfileWorkspace({
     isHeaderCollapsed ? 1000 : 980,
     Math.round(topRowBaseMinHeight * 1.15),
   );
+  const phoneMatrixViewport = compactSize && !showManagementActions;
   const shouldPreserveMatrixHeight = !compactSize;
   const activeRelatedHint =
     activeRelatedHintCellKey
@@ -307,6 +308,9 @@ export function ContainerGraphProfileWorkspace({
       graph={graph}
       showShiftStaffingCounts
       compactSize={compactSize}
+      mobileReadOnlyViewport={phoneMatrixViewport}
+      stretchColumns={!phoneMatrixViewport}
+      allowColumnResize={!phoneMatrixViewport}
       columns={columns}
       cellMap={cellMap}
       visualHintMap={visualHintMap}

@@ -811,3 +811,12 @@
     flex-direction: column;
   }
 }
+
+.cardPhoneViewport, .layoutPhoneViewport, .tableShellPhoneViewport, .tableScrollPhoneViewport {
+  box-sizing: border-box; width: 100%; min-width: 0; max-width: 100%;
+}
+.layoutPhoneViewport { grid-template-columns: minmax(0, 1fr); }
+.cardPhoneViewport.cardWithStaffing { --matrix-day-column-width: 96px; }
+.tableScrollPhoneViewport { overflow-x: auto; overflow-y: auto; touch-action: pan-x pan-y pinch-zoom; overscroll-behavior-x: contain; scrollbar-gutter: auto; }
+.tablePhoneViewport { width: max-content; min-width: var(--matrix-table-min-width); max-width: none; table-layout: fixed; }
+@media (max-width: 350px) { .cardPhoneViewport.cardWithStaffing { --matrix-day-column-width: 88px; } }

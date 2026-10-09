@@ -6,7 +6,7 @@ import { t } from "@shared/i18n";
 import { ErrorBanner } from "@shared/ui/components/ErrorBanner";
 import styles from "./ManagerPhonePage.module.css";
 
-export function ManagerPhonePage({ children, backTo = "/", query, onQueryChange, valid = true, missing = false, queries = [], queryKeys = [] }: PropsWithChildren<{
+export function ManagerPhonePage({ children, backTo, query, onQueryChange, valid = true, missing = false, queries = [], queryKeys = [] }: PropsWithChildren<{
   backTo?: string;
   query?: string;
   onQueryChange?: (value: string) => void;
@@ -20,7 +20,7 @@ export function ManagerPhonePage({ children, backTo = "/", query, onQueryChange,
   const failed = queries.some(item => item.isError || item.error);
   const notFound = missing && queries.some(item => item.error instanceof ApiError && item.error.status === 404);
   return <div className={styles.page}>
-    <NavLink className={styles.back} to={backTo}>← {t("Back")}</NavLink>
+    {backTo && <NavLink className={styles.back} to={backTo}>← {t("Back")}</NavLink>}
     {onQueryChange && <label className={styles.search}>{t("Search")}<input type="search" value={query ?? ""} onChange={event => onQueryChange(event.target.value)} /></label>}
     {!valid ? <ErrorBanner dismissible={false}>{t("Invalid record ID.")}</ErrorBanner>
       : notFound ? <p role="status">{t("Record not found.")}</p>

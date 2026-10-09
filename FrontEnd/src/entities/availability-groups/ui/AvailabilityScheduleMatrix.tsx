@@ -27,6 +27,7 @@ type AvailabilityScheduleMatrixProps = {
   className?: string;
   style?: CSSProperties;
   compactSize?: boolean;
+  mobileReadOnlyViewport?: boolean;
   headerCenterSlot?: ReactNode;
   headerRightSlot?: ReactNode;
   bindValueByKey?: ReadonlyMap<string, string>;
@@ -52,6 +53,7 @@ export function AvailabilityScheduleMatrix({
   className,
   style,
   compactSize = false,
+  mobileReadOnlyViewport = false,
   headerCenterSlot,
   headerRightSlot,
   bindValueByKey,
@@ -109,7 +111,10 @@ export function AvailabilityScheduleMatrix({
           : t("Add at least one employee to start filling the schedule."))
       }
       compactSize={compactSize}
-      preserveShellHeightOnCompact
+      mobileReadOnlyViewport={mobileReadOnlyViewport}
+      stretchColumns={!mobileReadOnlyViewport}
+      allowColumnResize={!mobileReadOnlyViewport}
+      preserveShellHeightOnCompact={!mobileReadOnlyViewport}
       editMode="inline"
       emptyCellVariant="danger"
       cellErrors={cellErrors}

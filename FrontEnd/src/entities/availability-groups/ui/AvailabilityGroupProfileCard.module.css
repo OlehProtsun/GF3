@@ -101,3 +101,10 @@
 
 .phoneLayout .matrixCard { --availability-matrix-cell-min-height: 44px; }
 .phoneLayout .matrixCard button { min-height: 44px; }
+
+.phoneLayout, .phoneLayout .sidebarColumn, .phoneLayout .mainColumn, .phoneLayout .mainBlock, .phoneLayout .matrixCard {
+  width: 100%; min-width: 0; max-width: 100%; box-sizing: border-box;
+}
+.phoneLayout.layoutCollapsed { flex-direction: column; gap: 16px; }
+.phoneLayout .sidebarColumnCollapsed, .phoneLayout .mainColumnCollapsed { flex: none; }
+.phoneLayout .sidebar > * { width: 100%; margin: 0; box-sizing: border-box; }
