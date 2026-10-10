@@ -7,6 +7,7 @@ import {
   useMemo,
   useRef,
   useState,
+  useSyncExternalStore,
 } from "react";
 import type { PropsWithChildren } from "react";
 import { isRequestCanceledError } from "@shared/api/httpClient";
@@ -104,6 +105,17 @@ async function runWithRetry<TData>(queryFn: () => Promise<TData>, retry: number)
 }
 
 export class QueryClient {
+  private mutationCount = 0;
+  private mutationListeners = new Set<() => void>();
+  getMutationCount = () => this.mutationCount;
+  subscribeMutations = (listener: () => void) => {
+    this.mutationListeners.add(listener);
+    return () => { this.mutationListeners.delete(listener); };
+  };
+  changeMutationCount(delta: number) {
+    this.mutationCount += delta;
+    this.mutationListeners.forEach(listener => listener());
+  }
   private listeners: Set<(event: QueryEvent) => void> = new Set();
   private bumps: Map<string, number> = new Map();
   private records: Map<string, CacheRecord> = new Map();
@@ -440,10 +452,16 @@ export function useMutation<TData, TVariables>(options: MutationOptions<TData, T
   const mutate = useCallback(
     (variables: TVariables, callbacks?: { onSuccess?: (data: TData) => void; onError?: (error: unknown) => void }) => {
       setIsPending(true);
+      client.changeMutationCount(1);
       setError(null);
 
-      options
-        .mutationFn(variables)
+      let mutation: Promise<TData>;
+      try {
+        mutation = options.mutationFn(variables);
+      } catch (reason) {
+        mutation = Promise.reject(reason);
+      }
+      mutation
         .then((data) => {
           options.onSuccess?.(data, variables);
           callbacks?.onSuccess?.(data);
@@ -454,10 +472,15 @@ export function useMutation<TData, TVariables>(options: MutationOptions<TData, T
           callbacks?.onError?.(reason);
           client.mutationCache?.config.onError?.(reason, variables, null, { options: { mutationKey: options.mutationKey } });
         })
-        .finally(() => setIsPending(false));
+        .finally(() => { client.changeMutationCount(-1); setIsPending(false); });
     },
     [client, options],
   );
 
   return { mutate, isPending, error };
+}
+
+export function useIsMutating() {
+  const client = useQueryClient();
+  return useSyncExternalStore(client.subscribeMutations, client.getMutationCount, client.getMutationCount);
 }

@@ -146,8 +146,17 @@ internal static class JwtTokenCodec
                 return false;
             }
 
+            var hasMode = payloadRoot.RootElement.TryGetProperty(ManagerWorkspaceModes.ClaimType, out var modeProperty);
+            var mode = hasMode && modeProperty.ValueKind == JsonValueKind.String ? modeProperty.GetString() : null;
+            if (hasMode && (role != AuthRoles.Manager || mode is not (ManagerWorkspaceModes.Choose or ManagerWorkspaceModes.Pc or ManagerWorkspaceModes.Phone)))
+            {
+                error = "Token manager workspace mode is invalid.";
+                return false;
+            }
+
             session = new AuthenticatedSessionDto
             {
+                WorkspaceMode = role == AuthRoles.Manager ? ManagerWorkspaceModes.ResolveForManager(mode) : null,
                 UserName = userName,
                 Role = role,
                 DisplayName = ReadString(payloadRoot.RootElement, "display_name") ?? userName,
@@ -193,6 +202,11 @@ internal static class JwtTokenCodec
             {
                 payload["credential_version"] = session.CredentialVersion.Value;
             }
+        }
+
+        if (session.Role == AuthRoles.Manager && session.WorkspaceMode is not null)
+        {
+            payload[ManagerWorkspaceModes.ClaimType] = ManagerWorkspaceModes.ResolveForManager(session.WorkspaceMode);
         }
 
         return payload;

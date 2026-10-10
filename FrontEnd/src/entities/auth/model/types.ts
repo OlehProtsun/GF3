@@ -1,6 +1,8 @@
 export type AuthRole = "manager" | "employee";
+export type ManagerWorkspaceMode = "choose" | "pc" | "phone";
 
 export type AuthSession = {
+  workspaceMode?: ManagerWorkspaceMode | null;
   role: AuthRole;
   isSystemManager?: boolean;
   userName: string;

@@ -25,8 +25,10 @@ type AvailabilityScheduleMatrixProps = {
   emptyMessage?: string;
   cellErrors?: Record<string, string>;
   className?: string;
+  titleClassName?: string;
   style?: CSSProperties;
   compactSize?: boolean;
+  mobileReadOnlyViewport?: boolean;
   headerCenterSlot?: ReactNode;
   headerRightSlot?: ReactNode;
   bindValueByKey?: ReadonlyMap<string, string>;
@@ -50,8 +52,10 @@ export function AvailabilityScheduleMatrix({
   emptyMessage,
   cellErrors = {},
   className,
+  titleClassName,
   style,
   compactSize = false,
+  mobileReadOnlyViewport = false,
   headerCenterSlot,
   headerRightSlot,
   bindValueByKey,
@@ -94,6 +98,7 @@ export function AvailabilityScheduleMatrix({
       className={className}
       style={style}
       title={title}
+      titleClassName={titleClassName}
       icon={<AvailabilityIcon size={18} />}
       helperText={helperText}
       graph={{ year, month }}
@@ -109,7 +114,11 @@ export function AvailabilityScheduleMatrix({
           : t("Add at least one employee to start filling the schedule."))
       }
       compactSize={compactSize}
-      preserveShellHeightOnCompact
+      mobileReadOnlyViewport={mobileReadOnlyViewport}
+      maxAutoColumnWidth={mobileReadOnlyViewport ? 156 : undefined}
+      stretchColumns={!mobileReadOnlyViewport}
+      allowColumnResize={!mobileReadOnlyViewport}
+      preserveShellHeightOnCompact={!mobileReadOnlyViewport}
       editMode="inline"
       emptyCellVariant="danger"
       cellErrors={cellErrors}

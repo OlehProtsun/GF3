@@ -10,6 +10,7 @@ import { AvailabilityWorkspaceLayout } from "./AvailabilityWorkspaceLayout";
 import styles from "./AvailabilityGroupProfileCard.module.css";
 
 type AvailabilityGroupProfileCardProps = {
+  showManagementActions?: boolean;
   group?: AvailabilityGroup | null;
   columns: AvailabilityMatrixColumn[];
   cellMap: AvailabilityMatrixCellMap;
@@ -27,6 +28,7 @@ function joinClassNames(...values: Array<string | undefined | false>) {
 }
 
 export function AvailabilityGroupProfileCard({
+  showManagementActions = true,
   group,
   columns,
   cellMap,
@@ -38,6 +40,7 @@ export function AvailabilityGroupProfileCard({
   onDelete,
   onVisualHintClick,
 }: AvailabilityGroupProfileCardProps) {
+  const phoneReadOnly = !showManagementActions;
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
   if (isLoading) {
@@ -48,9 +51,21 @@ export function AvailabilityGroupProfileCard({
     return <ErrorBanner className={styles.banner}>{t("Could not load this availability group.")}</ErrorBanner>;
   }
 
+  if (phoneReadOnly) {
+    return <div className={styles.phoneLayout}>
+      <div className={styles.phoneInfo} data-phone-availability-information>
+        <AvailabilityProfileInfoCard showManagementActions={false} group={group} employeeCount={columns.length}
+          isDeleting={isDeleting} onEdit={onEdit} onDelete={onDelete} />
+      </div>
+      <AvailabilityScheduleMatrix className={styles.matrixCard} titleClassName={styles.phoneMatrixTitle} year={group.year} month={group.month}
+        columns={columns} cellMap={cellMap} visualHintMap={visualHintMap} readOnly compactSize mobileReadOnlyViewport
+        title={t("Availability Schedule")} helperText={t("This schedule is read-only.")} onVisualHintClick={onVisualHintClick} />
+    </div>;
+  }
+
   return (
     <AvailabilityWorkspaceLayout
-      className={isSidebarCollapsed ? styles.layoutCollapsed : undefined}
+      className={joinClassNames(isSidebarCollapsed && styles.layoutCollapsed, phoneReadOnly && styles.phoneLayout)}
       sidebarColumnClassName={joinClassNames(styles.sidebarColumn, isSidebarCollapsed && styles.sidebarColumnCollapsed)}
       sidebarContentClassName={joinClassNames(styles.sidebar, isSidebarCollapsed && styles.sidebarCollapsed)}
       mainColumnClassName={joinClassNames(styles.mainColumn, isSidebarCollapsed && styles.mainColumnCollapsed)}
@@ -63,6 +78,7 @@ export function AvailabilityGroupProfileCard({
           onExpand={() => setIsSidebarCollapsed(false)}
         >
           <AvailabilityProfileInfoCard
+            showManagementActions={showManagementActions}
             group={group}
             employeeCount={columns.length}
             isDeleting={isDeleting}
@@ -86,8 +102,10 @@ export function AvailabilityGroupProfileCard({
           cellMap={cellMap}
           visualHintMap={visualHintMap}
           readOnly
+          compactSize={phoneReadOnly}
+          mobileReadOnlyViewport={phoneReadOnly}
           title={t("Availability Schedule")}
-          helperText={t("This schedule is read-only. Open edit if you want to update assigned employees or day codes.")}
+          helperText={showManagementActions ? t("This schedule is read-only. Open edit if you want to update assigned employees or day codes.") : t("This schedule is read-only.")}
           onVisualHintClick={onVisualHintClick}
         />
       }

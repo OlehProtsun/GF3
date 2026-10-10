@@ -26,6 +26,9 @@ export async function loginWithCredentials(page: Page, username: string, passwor
     await signInButton.click();
   }
 
+  const picker = page.getByRole("heading", { name: "Choose workspace" });
+  const next = await Promise.race([picker.waitFor({ state: "visible", timeout: 10000 }).then(() => "choose"), appShell.waitFor({ state: "visible", timeout: 10000 }).then(() => "app")]);
+  if (next === "choose") await page.getByRole("button", { name: "PC Full access", exact: true }).click();
   await expect(appShell).toBeVisible({ timeout: 10000 });
 }
 
@@ -51,7 +54,10 @@ export async function createEmployeeAccount(api: APIRequestContext, prefix = "e2
   });
   expect(loginResponse.ok()).toBe(true);
 
-  const loginResult = await loginResponse.json() as LoginResponse;
+  const initialLogin = await loginResponse.json() as LoginResponse;
+  const exchange = await api.post("/api/auth/manager-mode", { headers: { Authorization: `Bearer ${initialLogin.accessToken}` }, data: { mode: "pc" } });
+  expect(exchange.ok()).toBe(true);
+  const loginResult = await exchange.json() as LoginResponse;
   const createResponse = await api.post("/api/employees", {
     headers: {
       Authorization: `Bearer ${loginResult.accessToken}`,

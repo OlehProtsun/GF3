@@ -310,12 +310,21 @@ function patchEmployeePresence<T extends Pick<Employee, "id" | "isOnline" | "las
 export function PresenceProvider({ children }: PropsWithChildren) {
   const queryClient = useQueryClient();
   const { status, session, logout } = useAuth();
+  const managerPcMode = session?.role === "manager" && (session.workspaceMode ?? "pc") === "pc";
   const connectionRef = useRef<HubConnection | null>(null);
   const [connectionTick, setConnectionTick] = useState(0);
   const [desiredManagerEditLocks, setDesiredManagerEditLocks] = useState<ManagerEditLockTarget[]>([]);
   const desiredManagerEditLocksRef = useRef<ManagerEditLockTarget[]>([]);
   const [managerEditLocks, setManagerEditLocksState] = useState<Record<string, ManagerEditLockState>>({});
   const [notifications, setNotifications] = useState<EmployeeRealtimeNotification[]>([]);
+
+  useEffect(() => {
+    if (session?.role === "manager" && !managerPcMode) {
+      desiredManagerEditLocksRef.current = [];
+      setDesiredManagerEditLocks([]);
+      setManagerEditLocksState({});
+    }
+  }, [managerPcMode, session?.role]);
 
   useEffect(() => {
     setNotifications([]);
@@ -536,7 +545,7 @@ export function PresenceProvider({ children }: PropsWithChildren) {
 
   const publishManagerEditLocks = useCallback(async (locks: ManagerEditLockTarget[]) => {
     const connection = connectionRef.current;
-    if (!connection || connection.state !== HubConnectionState.Connected || session?.role !== "manager") {
+    if (!connection || connection.state !== HubConnectionState.Connected || !managerPcMode) {
       return [];
     }
 
@@ -550,7 +559,7 @@ export function PresenceProvider({ children }: PropsWithChildren) {
       }
       return [];
     }
-  }, [applyManagerEditLockStates, session?.role]);
+  }, [applyManagerEditLockStates, managerPcMode]);
 
   const applyManagerEditLockChanged = useEffectEvent((update: ManagerEditLockState) => {
     applyManagerEditLockStates([update]);
@@ -585,6 +594,7 @@ export function PresenceProvider({ children }: PropsWithChildren) {
   });
 
   const setManagerEditLocks = useCallback((locks: ManagerEditLockTarget[]) => {
+    if (!managerPcMode) return Promise.resolve([]);
     desiredManagerEditLocksRef.current = locks;
     setDesiredManagerEditLocks(locks);
     if (locks.length > 0) {
@@ -602,7 +612,7 @@ export function PresenceProvider({ children }: PropsWithChildren) {
       });
     }
     return publishManagerEditLocks(locks);
-  }, [publishManagerEditLocks]);
+  }, [publishManagerEditLocks, managerPcMode]);
 
   const setScheduleEditLocks = useCallback((locks: ScheduleEditLockTarget[]) => {
     return setManagerEditLocks(locks.map(scheduleToManagerEditLockTarget));
@@ -621,7 +631,7 @@ export function PresenceProvider({ children }: PropsWithChildren) {
   }), [clearNotifications, managerEditLocks, notifications, setManagerEditLocks, setScheduleEditLocks]);
 
   useEffect(() => {
-    if (status !== "authenticated" || !session || !getAuthAccessToken()) {
+    if (status !== "authenticated" || !session || !getAuthAccessToken() || (session.role === "manager" && !managerPcMode)) {
       return;
     }
 
@@ -717,6 +727,7 @@ export function PresenceProvider({ children }: PropsWithChildren) {
     };
   }, [
     queryClient,
+    managerPcMode,
     status,
     session,
   ]);

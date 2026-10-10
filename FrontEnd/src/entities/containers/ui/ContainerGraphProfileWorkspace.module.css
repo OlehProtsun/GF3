@@ -673,3 +673,76 @@
     text-align: left;
   }
 }
+.workspacePhone { width: 100%; max-width: 100%; min-width: 0; gap: 14px; }
+.workspacePhone .mainColumn, .phoneInformationWrap, .workspacePhone .summaryCard, .workspacePhone .matrixCard, .workspacePhone .summaryCardSection { width: 100%; min-width: 0; max-width: 100%; box-sizing: border-box; }
+.workspacePhone .summaryCard, .workspacePhone .summaryCardSection { padding: 14px; border-radius: 26px; background: var(--card-background, #fff); }
+.workspacePhone .summaryCardSection { margin-top: 0; }
+.workspacePhone .phoneSectionHeader { flex-direction: column; align-items: stretch; gap: 12px; }
+.workspacePhone .phoneSectionTitle { min-width: 0; color: var(--text-primary, #0f172a); font-size: 1rem; gap: 8px; }
+.workspacePhone .phoneSectionTitle > svg { flex-shrink: 0; padding: 7px; width: 32px; height: 32px; box-sizing: border-box; border-radius: 10px; background: #eff6ff; color: #2563eb; }
+.workspacePhone .phoneSummaryHeaderRight { width: 100%; min-width: 0; }
+.workspacePhone .summaryHeaderActions { width: 100%; min-width: 0; }
+.workspacePhone .summarySearchField { flex-basis: 100%; width: 100%; min-width: 0; max-width: none; }
+.workspacePhone .summarySearchInput { width: 100%; min-width: 0; color: var(--text-primary, #0f172a); background: var(--card-background, #f8fafc); }
+.workspacePhone .phoneMatrixHeader { flex-wrap: wrap; gap: 10px; }
+.workspacePhone .phoneMatrixHeaderRight { min-width: 0; max-width: 100%; margin-left: auto; }
+.workspacePhone .badges { gap: 6px; }
+.workspacePhone .badge { width: auto; padding: 6px 8px; max-width: 100%; font-size: .72rem; font-weight: 650; overflow-wrap: anywhere; background: #eff6ff; color: #1e40af; }
+.workspacePhone .matrixCard {
+  --matrix-cell-min-width: 104px;
+  --matrix-cell-min-height: 30px;
+  --matrix-cell-font-size: 0.76rem;
+  --matrix-shell-radius: 18px;
+  --matrix-header-padding: 7px 5px;
+  --matrix-day-header-padding: 7px 3px;
+  --matrix-header-font-size: 0.78rem;
+  --matrix-day-header-font-size: 0.68rem;
+  --matrix-value-header-padding-right: 5px;
+  --matrix-header-cell-gap: 2px;
+  --matrix-cell-padding: 2px 6px;
+  --matrix-scroll-max-height: min(560px, calc(100dvh - 190px));
+  padding: 12px 10px; border-radius: 24px;
+}
+.workspacePhone .phoneSummary { display: grid; gap: 10px; min-width: 0; }
+.workspacePhone .phoneSummaryEmployee { min-width: 0; border: 1px solid #94a3b829; border-radius: 20px; box-shadow: 0 3px 10px #0f172a05; background: var(--card-background, #f8fafc); overflow-wrap: anywhere; }
+.workspacePhone .phoneSummaryToggle { display: grid; grid-template-columns: 40px minmax(0, 1fr) 28px; gap: 8px; padding: 12px; min-height: 44px; list-style: none; cursor: pointer; align-items: center; }
+.workspacePhone .phoneSummaryToggle::-webkit-details-marker { display: none; }
+.workspacePhone :focus-visible { outline: 3px solid #60a5fa; outline-offset: 2px; border-radius: 12px; }
+.workspacePhone .phoneEmployeeAvatar { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; font-weight: 800; font-size: .9rem; }
+.workspacePhone .phoneAvatar0 { background: #dbeafe; color: #1d4ed8; }
+.workspacePhone .phoneAvatar1 { background: #ede9fe; color: #7c3aed; }
+.workspacePhone .phoneAvatar2 { background: #d1fae5; color: #047857; }
+.workspacePhone .phoneAvatar3 { background: #fef3c7; color: #92400e; }
+.workspacePhone .phoneAvatar4 { background: #fce7f3; color: #be185d; }
+.workspacePhone .phoneAvatar5 { background: #e0f2fe; color: #0369a1; }
+.workspacePhone .phoneEmployeeName { margin: 0; min-width: 0; color: var(--text-primary, #0f172a); font-size: .95rem; font-weight: 750; line-height: 1.3; }
+.workspacePhone .phoneEmployeeChevron { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; background: #eff6ff; color: #64748b; grid-column: 3; grid-row: 1 / 3; }
+.workspacePhone .phoneSummaryEmployee[open] .phoneEmployeeChevron svg { transform: rotate(90deg); }
+.workspacePhone .phoneSummaryMetrics { grid-column: 1 / 3; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin: 2px 0 0; min-width: 0; }
+.workspacePhone .phoneSummaryMetrics > div + div { border-left: 1px solid #94a3b829; padding-left: 6px; }
+.workspacePhone .phoneSummaryMetrics dt { color: var(--text-secondary, #64748b); font-size: .72rem; }
+.workspacePhone .phoneSummaryMetrics dd { margin: 4px 0 0; font-size: .95rem; font-weight: 750; color: var(--text-primary, #0f172a); }
+.workspacePhone .phoneSummaryDays { margin: 0; padding: 0 12px 12px; }
+.workspacePhone .phoneSummaryDays > div { padding: 8px 0; border-top: 1px solid #94a3b829; }
+.workspacePhone .phoneSummaryDays dt { font-size: .75rem; font-weight: 700; }
+.workspacePhone .phoneSummaryDays dd { margin: 4px 0 0; }
+.workspacePhone .phoneSummaryShift { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; padding: 3px 0; font-size: .78rem; }
+.workspacePhone .phoneSummaryShift small { display: block; color: var(--text-secondary, #64748b); font-size: .72rem; }
+.workspacePhone .scheduleIdentity { padding: 12px; border-radius: 18px; background: #eff6ff; }
+.workspacePhone .scheduleName { font-size: 1rem; }
+.workspacePhone .scheduleNote, .workspacePhone .scheduleNoteEmpty { min-height: 0; background: var(--card-background, #f8fafc); }
+.workspacePhone .scheduleNoteValue { min-height: 0; color: var(--text-primary, #0f172a); }
+.workspacePhone .scheduleNote .scheduleInfoLabel { display: flex; align-items: center; gap: 6px; }
+.workspacePhone .scheduleInfoLabels { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.workspacePhone .scheduleInfoItem { grid-template-columns: 24px minmax(0, 1fr); column-gap: 7px; padding: 10px 8px; background: var(--card-background, #f8fafc); }
+.workspacePhone .phoneDetailIcon { grid-row: 1 / 3; align-self: start; display: grid; place-items: center; width: 24px; height: 28px; border-radius: 8px; color: #2563eb; background: #eff6ff; }
+.workspacePhone .scheduleInfoLabel { min-width: 0; overflow-wrap: anywhere; color: var(--text-secondary, #64748b); }
+.workspacePhone .scheduleInfoValue { min-width: 0; color: var(--text-primary, #0f172a); }
+.workspacePhone .phoneAvailabilityTile { grid-column: 1 / -1; }
+.workspacePhone .scheduleStatusPublic, .workspacePhone .scheduleStatusPrivate { justify-self: start; border-radius: 999px; padding: 3px 7px; }
+.workspacePhone .scheduleStatusPublic { background: #dcfce7; color: #166534; }
+.workspacePhone .scheduleStatusPrivate { background: #fee2e2; color: #991b1b; }
+.workspacePhone .lastUpdateField { flex-wrap: wrap; margin-top: 0; }
+.workspacePhone .lastUpdateValue { min-width: 0; overflow-wrap: anywhere; }
+.workspacePhone .emptyState { min-height: 100px; color: var(--text-secondary, #64748b); }
+@media (max-width: 350px) { .workspacePhone .scheduleInfoLabels { grid-template-columns: minmax(0, 1fr); } }

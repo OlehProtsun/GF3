@@ -5,6 +5,8 @@ namespace WebApi.Contracts.Auth;
 /// </summary>
 public sealed class SessionDto
 {
+    public string? WorkspaceMode { get; set; }
+
     public bool IsSystemManager { get; set; }
 
     public string Role { get; set; } = string.Empty;

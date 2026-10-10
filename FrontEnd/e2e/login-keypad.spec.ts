@@ -7,6 +7,7 @@ test("phone keypad accepts presses along all four edges", async ({ page, isMobil
     localStorage.setItem("gf3.auth.password-mode", "phone");
   });
   await page.goto("/login");
+  await page.getByRole("button", { name: "Enter password", exact: true }).click();
   const key = page.getByRole("button", { name: "1", exact: true });
   await expect(key).toBeEnabled();
   const box = await key.boundingBox();

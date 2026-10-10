@@ -9,6 +9,7 @@ import type {
 } from "@entities/auth/model/types";
 
 type SessionDto = {
+  workspaceMode?: string | null;
   role: AuthSession["role"];
   isSystemManager?: boolean;
   userName: string;
@@ -24,7 +25,12 @@ type LoginResponseDto = {
 };
 
 function toSessionModel(dto: SessionDto): AuthSession {
+  const mode = dto.workspaceMode ?? "pc";
+  if (dto.role === "manager" && mode !== "choose" && mode !== "pc" && mode !== "phone") {
+    throw new Error("Invalid manager workspace mode.");
+  }
   return {
+    workspaceMode: dto.role === "manager" ? mode as AuthSession["workspaceMode"] : null,
     role: dto.role,
     isSystemManager: dto.isSystemManager === true,
     userName: dto.userName,
@@ -50,6 +56,8 @@ function toLoginDto(input: LoginInput) {
 }
 
 export const authApi = {
+  changeManagerWorkspaceMode: async (mode: "pc" | "phone") =>
+    toLoginResultModel(await request<LoginResponseDto>("auth/manager-mode", { method: "POST", body: { mode } })),
   login: async (input: LoginInput) =>
     toLoginResultModel(await request<LoginResponseDto>("auth/login", { method: "POST", body: toLoginDto(input), anonymous: true })),
   session: async () => toSessionModel(await request<SessionDto>("auth/session")),

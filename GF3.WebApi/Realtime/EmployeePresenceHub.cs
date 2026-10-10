@@ -161,6 +161,7 @@ public sealed class EmployeePresenceHub : Hub<IEmployeePresenceClient>
         }
 
         var lockedBy = Context.User?.FindFirstValue("display_name") ?? Context.User?.Identity?.Name ?? "Manager";
+        RequirePcMode();
         var managerId = TryGetManagerId(Context.User);
         var result = _managerEditLockService.SetLocks(Context.ConnectionId, managerId, lockedBy, locks);
         foreach (var change in result.ChangedStates)
@@ -173,6 +174,7 @@ public sealed class EmployeePresenceHub : Hub<IEmployeePresenceClient>
 
     public async Task<IReadOnlyList<ScheduleEditLockState>> SetScheduleEditLocks(IReadOnlyList<ScheduleEditLockTarget> locks)
     {
+        RequirePcMode();
         var states = await SetManagerEditLocks(locks
             .Select(target => ManagerEditLockTargets.Schedule(target.ContainerId, target.GraphId))
             .ToList()).ConfigureAwait(false);
@@ -201,6 +203,11 @@ public sealed class EmployeePresenceHub : Hub<IEmployeePresenceClient>
 
         if (string.Equals(Context.User.FindFirstValue(ClaimTypes.Role), AuthRoles.Manager, StringComparison.Ordinal))
         {
+            if (!IsPcMode())
+            {
+                Context.Abort();
+                return;
+            }
             await Groups.AddToGroupAsync(Context.ConnectionId, ManagersGroupName).ConfigureAwait(false);
 
             var managerId = TryGetManagerId(Context.User);
@@ -276,6 +283,13 @@ public sealed class EmployeePresenceHub : Hub<IEmployeePresenceClient>
         }
 
         await base.OnDisconnectedAsync(exception).ConfigureAwait(false);
+    }
+
+    private bool IsPcMode() => (Context.User?.FindFirstValue(ManagerWorkspaceModes.ClaimType) ?? ManagerWorkspaceModes.Pc) == ManagerWorkspaceModes.Pc;
+
+    private void RequirePcMode()
+    {
+        if (!IsPcMode()) throw new HubException("Manager PC mode is required to edit locks.");
     }
 
     private Task BroadcastPresenceChangedAsync(EmployeePresenceChange change, DateTimeOffset? lastLoginAtUtc = null)

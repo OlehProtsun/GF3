@@ -82,6 +82,12 @@ public sealed class JwtAuthenticationHandler : AuthenticationHandler<Authenticat
             claims.Add(new Claim(AuthPolicies.SystemManagerClaim, "true"));
         }
 
+        if (session.Role == AuthRoles.Manager)
+        {
+            claims.Add(new Claim(ManagerWorkspaceModes.ClaimType, session.WorkspaceMode!));
+            claims.Add(new Claim("credential_version", session.CredentialVersion!.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)));
+        }
+
         if (session.EmployeeId.HasValue)
         {
             claims.Add(new Claim("employee_id", session.EmployeeId.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)));

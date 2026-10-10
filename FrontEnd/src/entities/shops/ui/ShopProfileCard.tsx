@@ -12,6 +12,7 @@ import { type ProfileSummaryDetail } from "@shared/ui/components/ProfileSummaryC
 import { ShopIcon } from "@shared/ui/icons";
 
 type ShopProfileCardProps = {
+  showManagementActions?: boolean;
   shop?: Shop;
   isLoading: boolean;
   hasLoadError: boolean;
@@ -21,6 +22,7 @@ type ShopProfileCardProps = {
 };
 
 export function ShopProfileCard({
+  showManagementActions = true,
   shop,
   isLoading,
   hasLoadError,
@@ -53,7 +55,7 @@ export function ShopProfileCard({
       subtitle={shop ? detailsState : undefined}
       details={details}
       actions={
-        shop ? (
+        shop && showManagementActions ? (
           <>
             <IosButton label={t("Edit Shop")} onClick={() => onEditShop(shop.id)} />
             <IosButton

@@ -11,6 +11,7 @@ export function LanguageProvider({ children }: PropsWithChildren) {
   const language = useSyncExternalStore(subscribeLanguage, getLanguage);
   const accountKey = session ? `${session.role}:${session.managerId ?? session.employeeId}` : "guest";
   const isAuthenticated = Boolean(session);
+  const choosingWorkspace = session?.role === "manager" && session.workspaceMode === "choose";
   const [loadedAccount, setLoadedAccount] = useState<string | null>(null);
   const [loadError, setLoadError] = useState(false);
   const [retry, setRetry] = useState(0);
@@ -21,7 +22,7 @@ export function LanguageProvider({ children }: PropsWithChildren) {
     activeRequest.current = controller;
     setLanguage("en");
     setLoadError(false);
-    if (!isAuthenticated) {
+    if (!isAuthenticated || choosingWorkspace) {
       setLoadedAccount(accountKey);
       return () => controller.abort();
     }
@@ -39,7 +40,7 @@ export function LanguageProvider({ children }: PropsWithChildren) {
         }
       });
     return () => controller.abort();
-  }, [accountKey, isAuthenticated, retry]);
+  }, [accountKey, isAuthenticated, choosingWorkspace, retry]);
 
   const save = async (next: Language) => {
     const controller = activeRequest.current;

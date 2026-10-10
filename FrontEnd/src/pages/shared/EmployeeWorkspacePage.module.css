@@ -72,7 +72,7 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   margin: 0;
-  font-size: clamp(1.45rem, 5vw, 2.45rem);
+  font-size: clamp(1.45rem, 5cqw, 2.45rem);
   line-height: 1.02;
   font-weight: 900;
   letter-spacing: -0.05em;
@@ -380,7 +380,7 @@
   line-height: 1.55;
 }
 
-@media (min-width: 720px) {
+@container employee-workspace (min-width: 720px) {
   .panelGridTwo {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -390,7 +390,7 @@
   }
 }
 
-@media (min-width: 960px) {
+@container employee-workspace (min-width: 960px) {
   .page {
     gap: 18px;
   }

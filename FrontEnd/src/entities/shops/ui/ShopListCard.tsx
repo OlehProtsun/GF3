@@ -15,7 +15,7 @@ type ShopListCardProps = {
   isLoading: boolean;
   searchQuery: string;
   onClearSearch: () => void;
-  onAddShop: () => void;
+  onAddShop?: () => void;
   onShopOpen: (shopId: Shop["id"]) => void;
 };
 
@@ -33,9 +33,9 @@ export function ShopListCard({
     shops
   );
 
-  const addShopAction = (
+  const addShopAction = onAddShop ? (
     <IosButton label={t("Add New")} icon={<PlusIcon size={18} />} onClick={onAddShop} />
-  );
+  ) : undefined;
 
   return (
     <ListCardSection
@@ -46,7 +46,7 @@ export function ShopListCard({
       loadingMessage={t("Loading shops...")}
       errorMessage={t("Could not load shops.")}
       emptyTitle={t("No shops yet")}
-      emptyDescription={t("Start by creating your first shop record.")}
+      emptyDescription={onAddShop ? t("Start by creating your first shop record.") : t("No results")}
       emptyAction={addShopAction}
       searchEmptyTitle={t("Nothing found")}
       searchEmptyDescription={t("No shop matches \"{0}\".", searchQuery)}

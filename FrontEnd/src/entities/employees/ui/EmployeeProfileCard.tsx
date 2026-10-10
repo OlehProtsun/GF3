@@ -17,6 +17,7 @@ import { type ProfileSummaryDetail } from "@shared/ui/components/ProfileSummaryC
 import { EmployeeIcon } from "@shared/ui/icons";
 
 type EmployeeProfileCardProps = {
+  showManagementActions?: boolean;
   employee?: Employee;
   isLoading: boolean;
   hasLoadError: boolean;
@@ -28,6 +29,7 @@ type EmployeeProfileCardProps = {
 };
 
 export function EmployeeProfileCard({
+  showManagementActions = true,
   employee,
   isLoading,
   hasLoadError,
@@ -63,7 +65,7 @@ export function EmployeeProfileCard({
       subtitle={employee ? <PresenceBadge label={presenceLabel} tone={presenceTone} /> : undefined}
       details={details}
       actions={
-        employee ? (
+        employee && showManagementActions ? (
           <>
             <IosButton label={t("Edit Employee")} onClick={() => onEditEmployee(employee.id)} />
             {employee.hasLoginAccount ? (
