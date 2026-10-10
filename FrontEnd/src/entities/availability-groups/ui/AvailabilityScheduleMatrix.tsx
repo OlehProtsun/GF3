@@ -25,6 +25,7 @@ type AvailabilityScheduleMatrixProps = {
   emptyMessage?: string;
   cellErrors?: Record<string, string>;
   className?: string;
+  titleClassName?: string;
   style?: CSSProperties;
   compactSize?: boolean;
   mobileReadOnlyViewport?: boolean;
@@ -51,6 +52,7 @@ export function AvailabilityScheduleMatrix({
   emptyMessage,
   cellErrors = {},
   className,
+  titleClassName,
   style,
   compactSize = false,
   mobileReadOnlyViewport = false,
@@ -96,6 +98,7 @@ export function AvailabilityScheduleMatrix({
       className={className}
       style={style}
       title={title}
+      titleClassName={titleClassName}
       icon={<AvailabilityIcon size={18} />}
       helperText={helperText}
       graph={{ year, month }}
@@ -112,6 +115,7 @@ export function AvailabilityScheduleMatrix({
       }
       compactSize={compactSize}
       mobileReadOnlyViewport={mobileReadOnlyViewport}
+      maxAutoColumnWidth={mobileReadOnlyViewport ? 156 : undefined}
       stretchColumns={!mobileReadOnlyViewport}
       allowColumnResize={!mobileReadOnlyViewport}
       preserveShellHeightOnCompact={!mobileReadOnlyViewport}

@@ -163,7 +163,7 @@ export function OverlaySidebarLayout({ children }: OverlaySidebarLayoutProps) {
         </div>
 
         <div className={styles.sidebarFooter}>
-          {isManager ? <div className={styles.modeSwitch}><ManagerWorkspaceModeSwitch targetMode="phone" compact /></div> : null}
+          {isManager ? <div className={styles.modeSwitch}><ManagerWorkspaceModeSwitch targetMode="phone" compact itemClassName={styles.navItem} buttonClassName={styles.navButton} labelClassName={styles.navLabel} /></div> : null}
           <div className={styles.navItem}>
             <NavLink
               to={accountPath}

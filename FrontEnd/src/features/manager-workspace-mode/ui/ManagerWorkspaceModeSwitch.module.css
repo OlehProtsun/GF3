@@ -9,3 +9,5 @@
 .pcButton:hover { background: #dbeafe; }
 .homeIcon { transform: scaleY(-1); transform-origin: center; flex-shrink: 0; }
 @media (prefers-reduced-motion: reduce) { .pcButton { transition: none; } }
+
+.compact button:disabled { opacity: .5; cursor: wait; }

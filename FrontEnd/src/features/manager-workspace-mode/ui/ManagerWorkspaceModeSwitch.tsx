@@ -7,7 +7,13 @@ import { ErrorBanner } from "@shared/ui/components/ErrorBanner";
 import { EyeIcon, HomeIcon } from "@shared/ui/icons";
 import styles from "./ManagerWorkspaceModeSwitch.module.css";
 
-export function ManagerWorkspaceModeSwitch({ targetMode, compact = false }: { targetMode: "pc" | "phone"; compact?: boolean }) {
+export function ManagerWorkspaceModeSwitch({ targetMode, compact = false, itemClassName, buttonClassName, labelClassName }: {
+  targetMode: "pc" | "phone";
+  compact?: boolean;
+  itemClassName?: string;
+  buttonClassName?: string;
+  labelClassName?: string;
+}) {
   const { setManagerWorkspaceMode } = useAuth();
   const navigate = useNavigate();
   const mutations = useIsMutating();
@@ -25,11 +31,13 @@ export function ManagerWorkspaceModeSwitch({ targetMode, compact = false }: { ta
     } catch { setError(true); }
     finally { busy.current = false; setPending(false); }
   };
-  return <div className={compact ? styles.compact : styles.wrap}>
-    <button className={`${styles.button} ${targetMode === "pc" ? styles.pcButton : ""}`} disabled={pending || mutations > 0} onClick={() => navigate("/", { replace: true, onProceed: proceed => void exchange(proceed) })}>
+  const label = t(targetMode === "phone" ? "Switch to Phone" : "Switch to Desktop");
+  return <div className={[compact ? styles.compact : styles.wrap, itemClassName].filter(Boolean).join(" ")}>
+    <button className={compact && buttonClassName ? buttonClassName : `${styles.button} ${targetMode === "pc" ? styles.pcButton : ""}`} aria-label={label} aria-busy={pending} disabled={pending || mutations > 0} onClick={() => navigate("/", { replace: true, onProceed: proceed => void exchange(proceed) })}>
       {targetMode === "phone" ? <EyeIcon size={20} /> : <HomeIcon className={styles.homeIcon} size={20} />}
-      <span>{t(targetMode === "phone" ? "Switch to Phone" : "Switch to PC")}<small>{t(targetMode === "phone" ? "Read only" : "Full access")}</small></span>
+      {!compact && <span>{label}<small>{t(targetMode === "phone" ? "Read only" : "Full access")}</small></span>}
     </button>
+    {compact && <div className={labelClassName} aria-hidden="true">{label}</div>}
     {mutations > 0 && <small role="status">{t("Wait for the current save to finish.")}</small>}
     {error && <ErrorBanner dismissible={false}>{t("Mode change failed. Please try again.")}</ErrorBanner>}
   </div>;

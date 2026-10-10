@@ -91,11 +91,11 @@
     height: auto;
   }
 }
-.phoneLayout { display: grid; gap: 12px; width: 100%; min-width: 0; max-width: 100%; box-sizing: border-box; }
-.phoneInfo { min-width: 0; padding: 0 12px; border-radius: 22px; border: 1px solid #94a3b829; background: var(--card-background, #fff); }
-.phoneInfo > summary { min-height: 44px; align-content: center; cursor: pointer; font-weight: 700; font-size: .85rem; }
-.phoneInfo > summary:focus-visible { outline: 3px solid #60a5fa; outline-offset: 2px; }
-.phoneInfo[open] { padding-bottom: 12px; }
-.phoneInfo > * { max-width: 100%; box-sizing: border-box; overflow-wrap: anywhere; }
+.phoneLayout { display: grid; gap: 14px; width: 100%; min-width: 0; max-width: 100%; box-sizing: border-box; }
+.phoneInfo { width: 100%; min-width: 0; max-width: 100%; box-sizing: border-box; }
 .phoneLayout .matrixCard { width: 100%; min-width: 0; max-width: 100%; min-height: 0; height: auto; box-sizing: border-box; --availability-matrix-cell-min-height: 44px; }
 .phoneLayout .matrixCard button { min-height: 44px; }
+
+.phoneLayout .matrixCard { --matrix-scroll-max-height: min(560px, calc(100dvh - 190px)); --matrix-cell-font-size: .76rem; --matrix-header-font-size: .78rem; --matrix-header-padding: 7px 5px; padding: 12px 10px; border-radius: 24px; background: var(--card-background, #fff); }
+.phoneLayout .phoneMatrixTitle { color: var(--text-primary, #0f172a); font-size: 1rem; gap: 8px; }
+.phoneLayout .phoneMatrixTitle > svg { width: 32px; height: 32px; padding: 7px; flex-shrink: 0; box-sizing: border-box; border-radius: 10px; background: #eff6ff; color: #2563eb; }

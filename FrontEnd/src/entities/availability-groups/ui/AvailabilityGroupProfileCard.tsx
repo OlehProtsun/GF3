@@ -53,12 +53,11 @@ export function AvailabilityGroupProfileCard({
 
   if (phoneReadOnly) {
     return <div className={styles.phoneLayout}>
-      <details className={styles.phoneInfo}>
-        <summary>{t("Availability Information")}</summary>
+      <div className={styles.phoneInfo} data-phone-availability-information>
         <AvailabilityProfileInfoCard showManagementActions={false} group={group} employeeCount={columns.length}
           isDeleting={isDeleting} onEdit={onEdit} onDelete={onDelete} />
-      </details>
-      <AvailabilityScheduleMatrix className={styles.matrixCard} year={group.year} month={group.month}
+      </div>
+      <AvailabilityScheduleMatrix className={styles.matrixCard} titleClassName={styles.phoneMatrixTitle} year={group.year} month={group.month}
         columns={columns} cellMap={cellMap} visualHintMap={visualHintMap} readOnly compactSize mobileReadOnlyViewport
         title={t("Availability Schedule")} helperText={t("This schedule is read-only.")} onVisualHintClick={onVisualHintClick} />
     </div>;

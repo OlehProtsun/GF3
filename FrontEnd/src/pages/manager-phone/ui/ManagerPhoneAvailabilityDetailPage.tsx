@@ -211,7 +211,7 @@ export function ManagerPhoneAvailabilityDetailPage() {
     (!isLoading && !groupQuery.data) ||
     (!isLoading && Boolean(groupQuery.data) && !hasResolvedMatrix);
 
-  return <ManagerPhonePage backTo="/availability" valid={hasValidId} missing={!groupQuery.data}
+  return <ManagerPhonePage title={t("Availability Profile")} backTo="/availability" valid={hasValidId} missing={!groupQuery.data}
     queries={[{ isLoading, isError: hasLoadError, error: hasLoadError ? groupQuery.error ?? itemsQuery.error ?? membersQuery.error ?? slotsQuery.error : undefined }, employeesQuery]}
     queryKeys={[queryKeys.availabilityGroups.all, queryKeys.employees.all]}>
     <AvailabilityGroupProfileCard group={groupQuery.data} columns={columns} cellMap={cellMap} visualHintMap={visualHintMap}

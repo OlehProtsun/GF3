@@ -1,12 +1,12 @@
 import { parsePhoneId } from "./parsePhoneId";
-import { NavLink, useLocation, useParams } from "react-router-dom";
+import { useLocation, useParams } from "react-router-dom";
 import { useAvailabilityGroupsListQuery } from "@entities/availability-groups";
 import { ContainerGraphProfileWorkspace, useContainerByIdQuery, useContainerGraphsQuery, useGraphByIdQuery, useGraphCellStylesQuery, useGraphEmployeesQuery, useGraphSlotsBatchQuery, useGraphSlotsQuery } from "@entities/containers";
 import { useEmployeesListQuery } from "@entities/employees/api/queries";
 import { useShopsListQuery } from "@entities/shops/api/queries";
 import { queryKeys } from "@shared/api/queryKeys";
 import { ManagerPhonePage } from "./ManagerPhonePage";
-import styles from "./ManagerPhonePage.module.css";
+import { t } from "@shared/i18n";
 
 export function ManagerPhoneGraphPage() {
   const location = useLocation();
@@ -25,10 +25,9 @@ export function ManagerPhoneGraphPage() {
   const groups = useAvailabilityGroupsListQuery(location.key);
   const relatedGraphs = (graphs.data ?? []).filter(item => item.id !== graphId && item.year === graph.data?.year && item.month === graph.data?.month);
   const relatedSlots = useGraphSlotsBatchQuery(containerId, relatedGraphs.map(item => item.id), valid);
-  return <ManagerPhonePage backTo={containerId ? `/container/${containerId}` : "/container"} valid={valid} missing={!graph.data || !container.data}
+  return <ManagerPhonePage title={t("Schedule Profile")} backTo={containerId ? `/container/${containerId}` : "/container"} valid={valid} missing={!graph.data || !container.data}
     queries={[container, graphs, graph, graphEmployees, slots, cellStyles, employees, shops, groups, relatedSlots]}
     queryKeys={[queryKeys.containers.all, queryKeys.employees.all, queryKeys.shops.all, queryKeys.availabilityGroups.all]}>
-    {relatedGraphs.length > 0 && <nav className={styles.tiles}>{relatedGraphs.map(item => <NavLink className={styles.tile} to={`/container/${containerId}/graphs/${item.id}`} key={item.id}>{item.name}</NavLink>)}</nav>}
     <ContainerGraphProfileWorkspace container={container.data} graph={graph.data} shop={(shops.data ?? []).find(item => item.id === graph.data?.shopId)}
       availabilityGroup={(groups.data ?? []).find(item => item.id === graph.data?.availabilityGroupId)} graphEmployees={graphEmployees.data ?? []}
       slots={slots.data ?? []} cellStyles={cellStyles.data ?? []} relatedGraphs={relatedGraphs} relatedGraphSlotsById={relatedSlots.data ?? {}}

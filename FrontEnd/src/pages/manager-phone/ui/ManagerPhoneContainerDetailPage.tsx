@@ -8,7 +8,7 @@ import { useShopsListQuery } from "@entities/shops/api/queries";
 import { queryKeys } from "@shared/api/queryKeys";
 import { t } from "@shared/i18n";
 import { ManagerPhonePage } from "./ManagerPhonePage";
-import { StatisticsIcon } from "@shared/ui/icons";
+import { EmployeeIcon, StatisticsIcon } from "@shared/ui/icons";
 import styles from "./ManagerPhonePage.module.css";
 
 export function ManagerPhoneContainerDetailPage() {
@@ -41,10 +41,10 @@ export function ManagerPhoneContainerDetailPage() {
       <span>{t("Employees: {0}", item.employeeCount)} · {t("Hours: {0}", item.assignedHoursText)}</span>
     </NavLink>)}</div>
     {summaries.length === 0 && <p>{t("No results")}</p>}
-    {statistics.pivotRows.length > 0 && <section className={styles.card}>
+    {statistics.pivotRows.length > 0 && <section className={`${styles.card} ${styles.statisticsCard}`} data-phone-container-statistics>
       <h2 className={styles.statisticsHeading}><StatisticsIcon size={18} />{t("Statistics")}</h2>
       <div className={styles.metrics}>{statistics.pivotRows.map((row, index) => <article className={`${styles.metricCard} ${row.isTotal ? styles.metricTotal : ""}`} key={index}>
-        <h3>{row.employee}</h3>
+        <h3><span className={styles.metricIcon} aria-hidden="true">{row.isTotal ? <StatisticsIcon size={16} /> : <EmployeeIcon size={16} />}</span><span>{row.employee}</span></h3>
         <dl className={styles.metricValues}>
           <div><dt>{t("Work Days")}</dt><dd>{row.workDays}</dd></div>
           <div><dt>{t("Free Days")}</dt><dd>{row.freeDays}</dd></div>

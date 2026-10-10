@@ -3,6 +3,7 @@ import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import userEvent from "@testing-library/user-event";
 import { BrowserRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { HomePage } from "@pages/home";
 import { ManagerPhoneHomePage } from "./ManagerPhoneHomePage";
 import { ManagerPhoneAvailabilityPage } from "./ManagerPhoneAvailabilityPage";
 import { ManagerPhoneMorePage } from "./ManagerPhoneMorePage";
@@ -123,9 +124,11 @@ test.each([
 });
 
 
-test("phone Home stays empty and sends no dashboard requests", () => {
+test("phone Home shows Coming Soon and sends no dashboard requests", () => {
  const view = mount(<ManagerPhoneHomePage />);
- expect(view.container.textContent).toBe(""); expect(calls).toEqual([]);
+ expect(screen.getByRole("heading", { name: "Coming Soon" })).toBeInTheDocument(); expect(view.container.querySelector("a")).toBeNull(); expect(calls).toEqual([]);
+ view.unmount(); mount(<HomePage />);
+ expect(screen.getByRole("heading", { name: "Coming Soon" })).toBeInTheDocument(); expect(calls).toEqual([]);
 });
 
 test("Back and controlled search share one toolbar with exact destination and clear", () => {
@@ -196,8 +199,10 @@ test.each(["items", "nested"])("availability uses %s base data despite optional 
  });
  const view = mount(<ManagerPhoneAvailabilityDetailPage />, "/availability/5");
  await screen.findByText("Availability Schedule"); expect(screen.getByText("Other Worker")).toBeInTheDocument();
- const disclosure = view.container.querySelector("details")!; expect(disclosure.open).toBe(false);
- await userEvent.click(disclosure.querySelector("summary")!); expect(disclosure.open).toBe(true);
+ expect(screen.getByText("Availability Profile")).toBeInTheDocument();
+ expect(view.container.querySelector("[data-phone-availability-information]")).toBeVisible();
+ expect(view.container.querySelector("details")).toBeNull();
+ expect(screen.queryByRole("button", { name: /Collapse Availability Information|Expand Availability Information/ })).not.toBeInTheDocument();
  expect(screen.getByText("Private dispo")).toBeInTheDocument(); expect(view.container.querySelector("[data-phone-matrix-scroll]")).toBeInTheDocument();
  expect(view.container.querySelector("tbody tr td:nth-child(2)")).toHaveTextContent("+");
  expect(screen.queryByRole("button", { name: /Edit|Delete/ })).not.toBeInTheDocument();
@@ -223,7 +228,7 @@ test.each([ManagerPhoneAvailabilityPage, ManagerPhoneEmployeesPage])("lists reta
 
 test("More shows account, PC switch and functional logout without Shops shortcut", () => {
  mount(<ManagerPhoneMorePage />, "/more"); expect(screen.getByText("Real Manager")).toBeInTheDocument();
- expect(screen.queryByRole("link", { name: /Shops/ })).not.toBeInTheDocument(); expect(screen.getByRole("button", { name: /Switch to PC/ })).toBeInTheDocument();
+ expect(screen.queryByRole("link", { name: /Shops/ })).not.toBeInTheDocument(); expect(screen.getByRole("button", { name: /Switch to Desktop/ })).toBeInTheDocument();
  fireEvent.click(screen.getByRole("button", { name: "Log out" })); expect(auth.logout).toHaveBeenCalledOnce();
 });
 
@@ -243,8 +248,29 @@ test("phone schedule summary keeps metrics and every split shift in compact sear
  expect(summary.querySelectorAll("dl > div > dt")).toHaveLength(33);
  const search = screen.getByRole("searchbox", { name: "Search schedule summary by employee name or surname" });
  fireEvent.change(search, { target: { value: "missing" } }); expect(screen.getByRole("status")).toHaveTextContent('No employees found');
- fireEvent.change(search, { target: { value: "worker" } }); expect(view.container.querySelector("[data-phone-schedule-summary] article")).toBeInTheDocument();
+ fireEvent.change(search, { target: { value: "worker" } }); expect(view.container.querySelector("[data-phone-schedule-summary] > details")).toBeInTheDocument();
  view.unmount();
  const pc = mount(<ContainerGraphProfileWorkspace {...props} />);
  expect(pc.container.querySelector("[data-phone-schedule-summary]")).not.toBeInTheDocument(); expect(pc.container.querySelectorAll("table")[1].querySelectorAll("thead th").length).toBeGreaterThan(30);
+});
+
+
+test.each(["public", "private"] as const)("phone availability keeps %s status, visibility dates and every detail", status => {
+ const datedGroup = { ...group, publicationStatus: status, visibleFromUtc: "2026-04-01T08:00:00Z", visibleToUtc: "2026-04-30T18:00:00Z" };
+ const view = mount(<AvailabilityGroupProfileCard group={datedGroup} columns={[{ employeeId: 2, memberId: 7, label: "Other Worker" }]} cellMap={{ "2:1": "+" }} showManagementActions={false} isLoading={false} hasLoadError={false} isDeleting={false} onEdit={() => {}} onDelete={() => {}} />);
+ const information = view.container.querySelector<HTMLElement>("[data-phone-availability-information]")!;
+ expect(information).toBeVisible();
+ for (const label of ["Month", "Year", "Employees", "Status", "Visible", "From", "To", "ID 5", "2026"]) expect(within(information).getByText(label)).toBeInTheDocument();
+ expect(within(information).getByText(status === "public" ? "Public" : "Private")).toBeInTheDocument();
+ expect(within(information).getByText("1")).toBeInTheDocument();
+ expect(within(information).getByText(/Apr 1/)).toBeInTheDocument();
+ expect(within(information).getByText(/Apr 30/)).toBeInTheDocument();
+ expect(view.container.querySelector("details")).toBeNull();
+ expect(screen.queryByRole("button", { name: /Edit|Delete/ })).not.toBeInTheDocument();
+});
+
+test("phone availability retains missing visibility fallback", () => {
+ const view = mount(<AvailabilityGroupProfileCard group={group} columns={[]} cellMap={{}} showManagementActions={false} isLoading={false} hasLoadError={false} isDeleting={false} onEdit={() => {}} onDelete={() => {}} />);
+ expect(screen.getByText("Not configured")).toBeInTheDocument();
+ expect(view.container.querySelector("[data-phone-availability-information]")).toHaveTextContent("Employees0");
 });

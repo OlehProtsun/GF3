@@ -25,7 +25,7 @@ import type { Employee } from "@entities/employees/model/types";
 import type { Shop } from "@entities/shops/model/types";
 import { ErrorBanner } from "@shared/ui/components/ErrorBanner";
 import { IosButton } from "@shared/ui/components/IosButton";
-import { InformationIcon, ScheduleDetailsIcon, SearchIcon } from "@shared/ui/icons";
+import { InformationIcon, ScheduleDetailsIcon, SearchIcon, StatisticsIcon, NoteIcon, ScheduleIcon, ShopIcon, CheckIcon, EmployeeIcon, ContainerIcon, ChevronRightIcon } from "@shared/ui/icons";
 import { formatScheduleLastUpdate } from "@shared/lib/scheduleLastUpdate";
 import { CardSection } from "@shared/ui/sections/CardSection";
 import { ContainerGraphMatrix } from "./ContainerGraphMatrix";
@@ -64,6 +64,18 @@ function matchesEmployeeSearch(employeeName: string, searchQuery: string) {
 
   return searchTerms.every(term => normalizedEmployeeName.includes(term));
 }
+
+function getEmployeeInitials(name: string) {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  return parts.length ? `${parts[0][0]}${parts[1]?.[0] ?? parts[0][1] ?? ""}`.toUpperCase() : "?";
+}
+
+const detailIcons = {
+  month: ScheduleIcon, year: ScheduleIcon, shop: ShopIcon, status: CheckIcon,
+  people: EmployeeIcon, shift1: ScheduleIcon, shift2: ScheduleIcon,
+  "max-days": ScheduleDetailsIcon, "max-consecutive-full": ScheduleDetailsIcon,
+  "max-full": ContainerIcon, availability: ContainerIcon,
+};
 
 function getGraphInitials(graph?: Graph | null) {
   const parts = (graph?.name ?? "")
@@ -305,6 +317,9 @@ export function ContainerGraphProfileWorkspace({
     <ContainerGraphMatrix
       className={joinClassNames(styles.matrixCard, compactSize && styles.matrixCardCompact)}
       style={matrixCardStyle}
+      headerClassName={phoneMatrixViewport ? styles.phoneMatrixHeader : undefined}
+      titleClassName={phoneMatrixViewport ? styles.phoneSectionTitle : undefined}
+      headerRightClassName={phoneMatrixViewport ? styles.phoneMatrixHeaderRight : undefined}
       graph={graph}
       showShiftStaffingCounts
       compactSize={compactSize}
@@ -334,9 +349,209 @@ export function ContainerGraphProfileWorkspace({
     />
   );
 
+  const informationCard = (
+    <CardSection
+      className={styles.summaryCard}
+      title={t("Schedule Information")}
+      icon={<ScheduleDetailsIcon size={18} />}
+      titleClassName={phoneMatrixViewport ? styles.phoneSectionTitle : undefined}
+      headerRightSlot={phoneMatrixViewport ? undefined :
+        <AvailabilitySidebarCollapseButton
+          label={t("Schedule Information")}
+          onCollapse={() => setIsSidebarCollapsed(true)}
+        />
+      }
+    >
+      <div className={styles.summaryContent}>
+        <div className={styles.scheduleIdentity}>
+          <div className={styles.scheduleAvatar} aria-hidden="true">
+            {getGraphInitials(graph)}
+          </div>
+          <div className={styles.scheduleIdentityText}>
+            <h2 className={styles.scheduleName}>{graph.name}</h2>
+            <p className={styles.scheduleId}>{`ID ${graph.id}`}</p>
+          </div>
+        </div>
+
+        <div className={joinClassNames(styles.scheduleNote, !hasNote && styles.scheduleNoteEmpty)}>
+          <span className={styles.scheduleInfoLabel}>{phoneMatrixViewport && <NoteIcon size={16} aria-hidden="true" />}{t("Note")}</span>
+          <div className={styles.scheduleNoteValue} tabIndex={phoneMatrixViewport && hasNote ? 0 : undefined}>
+            {note || <span className={styles.mutedValue}>{t("No notes yet.")}</span>}
+          </div>
+        </div>
+
+        <div className={styles.scheduleInfoLabels} role="group" aria-label={t("Schedule details")}>
+          {scheduleDetails.map(item => {
+            const Icon = detailIcons[item.key];
+            return (
+              <div key={item.key} className={joinClassNames(styles.scheduleInfoItem, phoneMatrixViewport && item.key === "availability" && styles.phoneAvailabilityTile)}>
+                {phoneMatrixViewport && <span className={styles.phoneDetailIcon} aria-hidden="true"><Icon size={16} /></span>}
+                <span className={styles.scheduleInfoLabel}>{item.label}</span>
+                <strong
+                  className={joinClassNames(
+                    styles.scheduleInfoValue,
+                    item.key === "status" && (
+                      graph.publicationStatus === "public"
+                        ? styles.scheduleStatusPublic
+                        : styles.scheduleStatusPrivate
+                    ),
+                  )}
+                >
+                  {item.value}
+                </strong>
+              </div>
+            );
+          })}
+        </div>
+
+        <div className={styles.lastUpdateField} aria-label={t("Last Update: {0}", lastUpdateLabel)}>
+          <span className={styles.lastUpdateLabel}>
+            <span className={styles.lastUpdateDot} aria-hidden="true" />
+            {t("Last Update")}</span>
+          <strong className={styles.lastUpdateValue}>
+            {graph.lastUpdatedAtUtc ? (
+              <time dateTime={graph.lastUpdatedAtUtc}>{lastUpdateLabel}</time>
+            ) : lastUpdateLabel}
+          </strong>
+        </div>
+
+        {showManagementActions ? <div className={styles.scheduleInfoActions}>
+          {showEditAction ? <IosButton label={t("Edit Schedule")} onClick={onEdit} /> : null}
+          <IosButton
+            label={isDeleting ? t("Deleting...") : t("Delete Schedule")}
+            variant="secondary"
+            customColor="#ef4444"
+            customBorderColor="#ef4444"
+            disabled={isDeleting}
+            onClick={onDelete}
+          />
+        </div> : null}
+      </div>
+    </CardSection>
+  );
+  const summaryCard = (
+    <CardSection
+      className={styles.summaryCardSection}
+      title={t("Schedule Summary")}
+      headerClassName={phoneMatrixViewport ? styles.phoneSectionHeader : undefined}
+      icon={phoneMatrixViewport ? <StatisticsIcon size={18} /> : <InformationIcon size={18} />}
+      titleClassName={phoneMatrixViewport ? styles.phoneSectionTitle : undefined}
+      headerRightClassName={phoneMatrixViewport ? styles.phoneSummaryHeaderRight : undefined}
+      headerRightSlot={
+        <div className={styles.summaryHeaderActions}>
+          {summaryRows.length > 0 ? (
+            <label className={styles.summarySearchField} htmlFor="schedule-summary-search">
+              <SearchIcon className={styles.summarySearchIcon} />
+              <input
+                id="schedule-summary-search"
+                className={styles.summarySearchInput}
+                type="search"
+                value={summarySearchQuery}
+                onChange={event => setSummarySearchQuery(event.target.value)}
+                placeholder={t("Search by name or surname")}
+                aria-label={t("Search schedule summary by employee name or surname")}
+              />
+            </label>
+          ) : null}
+          {!phoneMatrixViewport && <div className={styles.summaryMeta}>
+            <span className={styles.metaBadge}>{t("Employees: {0}", totals.totalEmployees)}</span>
+            <span className={styles.metaBadge}>{t("Hours: {0}", totals.totalHoursText)}</span>
+          </div>}
+        </div>
+      }
+    >
+      {summaryRows.length === 0 ? (
+        <div className={styles.emptyState}>
+          {showManagementActions ? t("No employee schedule rows yet. Generate a schedule or assign matrix intervals to see the summary.") : t("No results")}</div>
+      ) : showSummarySearchEmpty ? (
+        <div className={styles.emptyState} role="status">
+          {t("No employees found for \"{0}\".", summarySearchQuery.trim())}
+        </div>
+      ) : phoneMatrixViewport ? (
+        <div className={styles.phoneSummary} data-phone-schedule-summary>
+          {filteredSummaryRows.map(row => <details className={styles.phoneSummaryEmployee} key={row.employeeId}>
+            <summary className={styles.phoneSummaryToggle}>
+              <span className={joinClassNames(styles.phoneEmployeeAvatar, styles[`phoneAvatar${Math.abs(row.employeeId) % 6}`])} aria-hidden="true">{getEmployeeInitials(row.employee)}</span>
+              <h3 className={styles.phoneEmployeeName}>{row.employee}</h3>
+              <span className={styles.phoneEmployeeChevron} aria-hidden="true"><ChevronRightIcon size={18} /></span>
+              <dl className={styles.phoneSummaryMetrics}>
+                <div><dt>{t("Work Days")}</dt><dd>{row.workDays}</dd></div>
+                <div><dt>{t("Free Days")}</dt><dd>{row.freeDays}</dd></div>
+                <div><dt>{t("Hours")}</dt><dd>{row.sum || "0"}</dd></div>
+              </dl>
+            </summary>
+            <dl className={styles.phoneSummaryDays}>{summaryHeaders.map((header, dayIndex) => <div key={header.dayOfMonth}>
+                <dt>{header.label}</dt>
+                <dd>{row.dayRows.map((days, rowIndex) => <div className={styles.phoneSummaryShift} key={rowIndex}>
+                  <span><small>{t("From")}</small>{days[dayIndex].from || "-"}</span>
+                  <span><small>{t("To")}</small>{days[dayIndex].to || "-"}</span>
+                  <span><small>{t("Hours")}</small>{days[dayIndex].hours || "-"}</span>
+                </div>)}</dd>
+              </div>)}</dl>
+          </details>)}
+        </div>
+      ) : (
+        <div className={styles.summaryTableScroll}>
+          <table className={styles.summaryTable}>
+            <thead>
+              <tr>
+                <th rowSpan={2} className={joinClassNames(styles.stickyColumn, styles.employeeColumn)}>{t("Employee")}</th>
+                <th rowSpan={2} className={joinClassNames(styles.stickyColumnSecondary, styles.statColumn)}>{t("Work Days")}</th>
+                <th rowSpan={2} className={joinClassNames(styles.stickyColumnTertiary, styles.statColumn)}>{t("Free Days")}</th>
+                <th rowSpan={2} className={joinClassNames(styles.stickyColumnQuaternary, styles.statColumn)}>{t("Sum")}</th>
+                {summaryHeaders.map(header => (
+                  <th key={header.dayOfMonth} colSpan={3}>{header.label}</th>
+                ))}
+              </tr>
+              <tr>
+                {summaryHeaders.map(header => (
+                  <Fragment key={`${header.dayOfMonth}-subcolumns`}>
+                    <th className={styles.subColumn}>{t("From")}</th>
+                    <th className={styles.subColumn}>{t("To")}</th>
+                    <th className={styles.subColumn}>{t("Hours")}</th>
+                  </Fragment>
+                ))}
+              </tr>
+            </thead>
+
+            <tbody>
+              {filteredSummaryRows.map(row => (
+                <Fragment key={row.employeeId}>
+                  {row.dayRows.map((days, rowIndex) => (
+                    <tr key={`${row.employeeId}-${rowIndex}`}>
+                      {rowIndex === 0 ? (
+                        <>
+                          <td rowSpan={row.dayRows.length} className={joinClassNames(styles.stickyColumn, styles.employeeValue)}>{row.employee}</td>
+                          <td rowSpan={row.dayRows.length} className={joinClassNames(styles.stickyColumnSecondary, styles.statValue)}>{row.workDays}</td>
+                          <td rowSpan={row.dayRows.length} className={joinClassNames(styles.stickyColumnTertiary, styles.statValue)}>{row.freeDays}</td>
+                          <td rowSpan={row.dayRows.length} className={joinClassNames(styles.stickyColumnQuaternary, styles.statValue)}>{row.sum || "0"}</td>
+                        </>
+                      ) : null}
+                      {days.map((day, index) => (
+                        <Fragment key={`${row.employeeId}-${rowIndex}-${index}`}>
+                          <td>{day.from || "-"}</td>
+                          <td>{day.to || "-"}</td>
+                          <td>{day.hours || "-"}</td>
+                        </Fragment>
+                      ))}
+                    </tr>
+                  ))}
+                </Fragment>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </CardSection>
+  );
+
   return (
     <>
-      <div className={joinClassNames(styles.workspace, !showManagementActions && styles.workspacePhone, isHeaderCollapsed && styles.workspaceHeaderCollapsed)}>
+      {phoneMatrixViewport ? <div className={joinClassNames(styles.workspace, styles.workspacePhone)}>
+        <div className={styles.phoneInformationWrap} data-phone-schedule-information>{informationCard}</div>
+        <div className={joinClassNames(styles.mainColumn, styles.mainColumnCompact)}>{matrix}</div>
+        {summaryCard}
+      </div> : <div className={joinClassNames(styles.workspace, isHeaderCollapsed && styles.workspaceHeaderCollapsed)}>
         <div className={joinClassNames(styles.topRow, isSidebarCollapsed && styles.topRowCollapsed)}>
           <aside className={joinClassNames(styles.sidebar, isSidebarCollapsed && styles.sidebarCollapsed)}>
           <AvailabilitySidebarSection
@@ -347,79 +562,7 @@ export function ContainerGraphProfileWorkspace({
             onExpand={() => setIsSidebarCollapsed(false)}
           >
             <div className={styles.summaryCardMeasure}>
-              <CardSection
-                className={styles.summaryCard}
-                title={t("Schedule Information")}
-                icon={<ScheduleDetailsIcon size={18} />}
-                headerRightSlot={
-                  <AvailabilitySidebarCollapseButton
-                    label={t("Schedule Information")}
-                    onCollapse={() => setIsSidebarCollapsed(true)}
-                  />
-                }
-              >
-                <div className={styles.summaryContent}>
-                  <div className={styles.scheduleIdentity}>
-                    <div className={styles.scheduleAvatar} aria-hidden="true">
-                      {getGraphInitials(graph)}
-                    </div>
-                    <div className={styles.scheduleIdentityText}>
-                      <h2 className={styles.scheduleName}>{graph.name}</h2>
-                      <p className={styles.scheduleId}>{`ID ${graph.id}`}</p>
-                    </div>
-                  </div>
-
-                  <div className={joinClassNames(styles.scheduleNote, !hasNote && styles.scheduleNoteEmpty)}>
-                    <span className={styles.scheduleInfoLabel}>{t("Note")}</span>
-                    <div className={styles.scheduleNoteValue}>
-                      {note || <span className={styles.mutedValue}>{t("No notes yet.")}</span>}
-                    </div>
-                  </div>
-
-                  <div className={styles.scheduleInfoLabels} role="group" aria-label={t("Schedule details")}>
-                    {scheduleDetails.map(item => (
-                      <div key={item.key} className={styles.scheduleInfoItem}>
-                        <span className={styles.scheduleInfoLabel}>{item.label}</span>
-                        <strong
-                          className={joinClassNames(
-                            styles.scheduleInfoValue,
-                            item.key === "status" && (
-                              graph.publicationStatus === "public"
-                                ? styles.scheduleStatusPublic
-                                : styles.scheduleStatusPrivate
-                            ),
-                          )}
-                        >
-                          {item.value}
-                        </strong>
-                      </div>
-                    ))}
-                  </div>
-
-                  <div className={styles.lastUpdateField} aria-label={t("Last Update: {0}", lastUpdateLabel)}>
-                    <span className={styles.lastUpdateLabel}>
-                      <span className={styles.lastUpdateDot} aria-hidden="true" />
-                      {t("Last Update")}</span>
-                    <strong className={styles.lastUpdateValue}>
-                      {graph.lastUpdatedAtUtc ? (
-                        <time dateTime={graph.lastUpdatedAtUtc}>{lastUpdateLabel}</time>
-                      ) : lastUpdateLabel}
-                    </strong>
-                  </div>
-
-                  {showManagementActions ? <div className={styles.scheduleInfoActions}>
-                    {showEditAction ? <IosButton label={t("Edit Schedule")} onClick={onEdit} /> : null}
-                    <IosButton
-                      label={isDeleting ? t("Deleting...") : t("Delete Schedule")}
-                      variant="secondary"
-                      customColor="#ef4444"
-                      customBorderColor="#ef4444"
-                      disabled={isDeleting}
-                      onClick={onDelete}
-                    />
-                  </div> : null}
-                </div>
-              </CardSection>
+              {informationCard}
             </div>
           </AvailabilitySidebarSection>
           </aside>
@@ -434,117 +577,8 @@ export function ContainerGraphProfileWorkspace({
             )}
           </div>
         </div>
-        <CardSection
-          className={styles.summaryCardSection}
-          title={t("Schedule Summary")}
-          headerClassName={!showManagementActions ? styles.phoneSectionHeader : undefined}
-          icon={<InformationIcon size={18} />}
-          headerRightSlot={
-            <div className={styles.summaryHeaderActions}>
-              {summaryRows.length > 0 ? (
-                <label className={styles.summarySearchField} htmlFor="schedule-summary-search">
-                  <SearchIcon className={styles.summarySearchIcon} />
-                  <input
-                    id="schedule-summary-search"
-                    className={styles.summarySearchInput}
-                    type="search"
-                    value={summarySearchQuery}
-                    onChange={event => setSummarySearchQuery(event.target.value)}
-                    placeholder={t("Search by name or surname")}
-                    aria-label={t("Search schedule summary by employee name or surname")}
-                  />
-                </label>
-              ) : null}
-              <div className={styles.summaryMeta}>
-                <span className={styles.metaBadge}>{t("Employees: {0}", totals.totalEmployees)}</span>
-                <span className={styles.metaBadge}>{t("Hours: {0}", totals.totalHoursText)}</span>
-              </div>
-            </div>
-          }
-        >
-          {summaryRows.length === 0 ? (
-            <div className={styles.emptyState}>
-              {showManagementActions ? t("No employee schedule rows yet. Generate a schedule or assign matrix intervals to see the summary.") : t("No results")}</div>
-          ) : showSummarySearchEmpty ? (
-            <div className={styles.emptyState} role="status">
-              {t("No employees found for \"{0}\".", summarySearchQuery.trim())}
-            </div>
-          ) : phoneMatrixViewport ? (
-            <div className={styles.phoneSummary} data-phone-schedule-summary>
-              {filteredSummaryRows.map(row => <article className={styles.phoneSummaryEmployee} key={row.employeeId}>
-                <h3>{row.employee}</h3>
-                <dl className={styles.phoneSummaryMetrics}>
-                  <div><dt>{t("Work Days")}</dt><dd>{row.workDays}</dd></div>
-                  <div><dt>{t("Free Days")}</dt><dd>{row.freeDays}</dd></div>
-                  <div><dt>{t("Hours")}</dt><dd>{row.sum || "0"}</dd></div>
-                </dl>
-                <details className={styles.phoneSummaryDetails}>
-                  <summary>{t("Schedule details")}</summary>
-                  <dl className={styles.phoneSummaryDays}>{summaryHeaders.map((header, dayIndex) => <div key={header.dayOfMonth}>
-                    <dt>{header.label}</dt>
-                    <dd>{row.dayRows.map((days, rowIndex) => <div className={styles.phoneSummaryShift} key={rowIndex}>
-                      <span><small>{t("From")}</small>{days[dayIndex].from || "-"}</span>
-                      <span><small>{t("To")}</small>{days[dayIndex].to || "-"}</span>
-                      <span><small>{t("Hours")}</small>{days[dayIndex].hours || "-"}</span>
-                    </div>)}</dd>
-                  </div>)}</dl>
-                </details>
-              </article>)}
-            </div>
-          ) : (
-            <div className={styles.summaryTableScroll}>
-              <table className={styles.summaryTable}>
-                <thead>
-                  <tr>
-                    <th rowSpan={2} className={joinClassNames(styles.stickyColumn, styles.employeeColumn)}>{t("Employee")}</th>
-                    <th rowSpan={2} className={joinClassNames(styles.stickyColumnSecondary, styles.statColumn)}>{t("Work Days")}</th>
-                    <th rowSpan={2} className={joinClassNames(styles.stickyColumnTertiary, styles.statColumn)}>{t("Free Days")}</th>
-                    <th rowSpan={2} className={joinClassNames(styles.stickyColumnQuaternary, styles.statColumn)}>{t("Sum")}</th>
-                    {summaryHeaders.map(header => (
-                      <th key={header.dayOfMonth} colSpan={3}>{header.label}</th>
-                    ))}
-                  </tr>
-                  <tr>
-                    {summaryHeaders.map(header => (
-                      <Fragment key={`${header.dayOfMonth}-subcolumns`}>
-                        <th className={styles.subColumn}>{t("From")}</th>
-                        <th className={styles.subColumn}>{t("To")}</th>
-                        <th className={styles.subColumn}>{t("Hours")}</th>
-                      </Fragment>
-                    ))}
-                  </tr>
-                </thead>
-
-                <tbody>
-                  {filteredSummaryRows.map(row => (
-                    <Fragment key={row.employeeId}>
-                      {row.dayRows.map((days, rowIndex) => (
-                        <tr key={`${row.employeeId}-${rowIndex}`}>
-                          {rowIndex === 0 ? (
-                            <>
-                              <td rowSpan={row.dayRows.length} className={joinClassNames(styles.stickyColumn, styles.employeeValue)}>{row.employee}</td>
-                              <td rowSpan={row.dayRows.length} className={joinClassNames(styles.stickyColumnSecondary, styles.statValue)}>{row.workDays}</td>
-                              <td rowSpan={row.dayRows.length} className={joinClassNames(styles.stickyColumnTertiary, styles.statValue)}>{row.freeDays}</td>
-                              <td rowSpan={row.dayRows.length} className={joinClassNames(styles.stickyColumnQuaternary, styles.statValue)}>{row.sum || "0"}</td>
-                            </>
-                          ) : null}
-                          {days.map((day, index) => (
-                            <Fragment key={`${row.employeeId}-${rowIndex}-${index}`}>
-                              <td>{day.from || "-"}</td>
-                              <td>{day.to || "-"}</td>
-                              <td>{day.hours || "-"}</td>
-                            </Fragment>
-                          ))}
-                        </tr>
-                      ))}
-                    </Fragment>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </CardSection>
-      </div>
+        {summaryCard}
+      </div>}
 
       <ContainerGraphRelatedHintDialog
         open={activeRelatedHint !== null}

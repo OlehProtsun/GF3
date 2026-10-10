@@ -27,3 +27,18 @@ test("pending saves block switching through shared mutation count", async () => 
  fireEvent.click(screen.getByText("save")); await waitFor(() => expect(finish).toBeDefined()); expect(screen.getByRole("button", { name: /Switch to Phone/ })).toBeDisabled();
  await act(async () => finish()); expect(screen.getByRole("button", { name: /Switch to Phone/ })).toBeEnabled(); expect(auth.setManagerWorkspaceMode).not.toHaveBeenCalled();
 });
+
+
+test.each(["phone", "pc"] as const)("compact %s switch retains pending state and mode exchange with an external label", async targetMode => {
+ let finish!: () => void;
+ auth.setManagerWorkspaceMode.mockImplementation(() => new Promise<void>(resolve => { finish = resolve; }));
+ window.history.replaceState({}, "", "/container");
+ render(<QueryClientProvider client={new QueryClient()}><BrowserRouter><ManagerWorkspaceModeSwitch targetMode={targetMode} compact itemClassName="navItem" buttonClassName="navButton" labelClassName="navLabel" /></BrowserRouter></QueryClientProvider>);
+ const label = targetMode === "phone" ? "Switch to Phone" : "Switch to Desktop";
+ const button = screen.getByRole("button", { name: label, exact: true });
+ expect(button).toHaveClass("navButton"); expect(button.textContent).toBe("");
+ expect(screen.getByText(label).previousElementSibling).toBe(button);
+ fireEvent.click(button); await waitFor(() => expect(auth.setManagerWorkspaceMode).toHaveBeenCalledWith(targetMode));
+ expect(button).toBeDisabled(); expect(button).toHaveAttribute("aria-busy", "true");
+ await act(async () => finish()); await waitFor(() => expect(window.location.pathname).toBe("/")); expect(button).toBeEnabled();
+});

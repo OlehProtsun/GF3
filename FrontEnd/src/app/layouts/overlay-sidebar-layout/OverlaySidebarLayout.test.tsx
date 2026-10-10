@@ -7,12 +7,14 @@ import { OverlaySidebarLayout } from "./OverlaySidebarLayout";
 
 const authMock = vi.hoisted(() => ({
   session: { role: "manager" as "manager" | "employee", displayName: "Synthetic manager", userName: "manager", isSystemManager: undefined as boolean | undefined },
+  setManagerWorkspaceMode: vi.fn(() => Promise.resolve()),
   logout: vi.fn<() => Promise<void>>(() => Promise.resolve()),
 }));
 
 vi.mock("@app/providers/AuthProvider", () => ({
   useAuth: () => ({
     logout: authMock.logout,
+    setManagerWorkspaceMode: authMock.setManagerWorkspaceMode,
     session: authMock.session,
   }),
 }));
@@ -40,6 +42,7 @@ function renderManagerLayout(pathname = "/") {
 describe("OverlaySidebarLayout", () => {
   beforeEach(() => {
     authMock.logout.mockClear();
+    authMock.setManagerWorkspaceMode.mockClear();
     authMock.session.role = "manager";
     authMock.session.isSystemManager = undefined;
     window.history.replaceState({}, "", "/");
@@ -54,6 +57,12 @@ describe("OverlaySidebarLayout", () => {
     const logoutButton = screen.getByRole("button", { name: "Log out" });
 
     expect(homeLink.className).toContain("navButton");
+    const modeButton = screen.getByRole("button", { name: "Switch to Phone", exact: true });
+    expect(modeButton.className).toBe(homeLink.className.split(" ")[0]);
+    expect(modeButton.textContent).toBe("");
+    expect(modeButton.querySelector("svg")).toBeInTheDocument();
+    expect(screen.getByText("Switch to Phone").className).toContain("navLabel");
+    expect(screen.getByText("Switch to Phone").previousElementSibling).toBe(modeButton);
     expect(managerLink.className).toContain("navButton");
     expect(logoutButton.className).toContain("navButton");
     expect(container.querySelector("main")?.className).toContain("contentManager");

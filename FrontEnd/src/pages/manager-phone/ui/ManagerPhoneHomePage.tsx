@@ -1,5 +1,6 @@
+import { HomePage } from "@pages/home";
 import { ManagerPhonePage } from "./ManagerPhonePage";
 
 export function ManagerPhoneHomePage() {
-  return <ManagerPhonePage />;
+  return <ManagerPhonePage><HomePage phoneMode /></ManagerPhonePage>;
 }
