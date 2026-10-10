@@ -371,7 +371,7 @@ for (const language of ["en", "pl"] as const) for (const width of [320, 375, 390
  test(`Phone profile refinements ${language} at ${width}px`, async ({ page }, testInfo) => {
   await page.setViewportSize({ width, height: 850 });
   const f = await fixture(page, "phone", "manager", { workerCount: 6, longNames: true, manualColumn: true, language });
-  await page.route("**/api/availability-groups/5", route => route.fulfill({ contentType: "application/json", body: JSON.stringify({ id: 5, name: "Dyspozycyjność BardzoDługiePolskieNazwisko Zespołu", year: 2026, month: 10, publicationStatus: "public", visibleFromUtc: "2026-10-01T08:00:00Z", visibleToUtc: "2026-10-31T18:00:00Z" }) }));
+  await page.route("**/api/availability-groups/5", route => route.fulfill({ contentType: "application/json", body: JSON.stringify({ id: 5, name: "DyspozycyjnoÃ…â€ºÃ„â€¡ BardzoDÃ…â€šugiePolskieNazwisko ZespoÃ…â€šu", year: 2026, month: 10, publicationStatus: "public", visibleFromUtc: "2026-10-01T08:00:00Z", visibleToUtc: "2026-10-31T18:00:00Z" }) }));
   await page.goto("/container/1/graphs/3");
   const information = page.locator("[data-phone-schedule-information]"); await expect(information).toBeVisible();
   const summary = page.locator("[data-phone-schedule-summary]"); await expect(summary.locator(":scope > details")).toHaveCount(6);
@@ -385,7 +385,7 @@ for (const language of ["en", "pl"] as const) for (const width of [320, 375, 390
   const region = (await matrix.boundingBox())!; const corner = (await matrix.locator("thead th").first().boundingBox())!;
   expect(Math.abs(corner.x - region.x)).toBeLessThanOrEqual(2); expect(Math.abs(corner.y - region.y)).toBeLessThanOrEqual(2);
   await matrix.evaluate(element => { element.scrollLeft = 0; element.scrollTop = 0; }); await matrix.locator("tbody button").first().click(); await expect(page.getByRole("dialog")).toBeVisible();
-  await page.getByRole("button", { name: /Close related schedule|Zamknij powiązany grafik/ }).click();
+  await page.getByRole("button", { name: /Close related schedule|Zamknij powiÃ„â€¦zany grafik/ }).click();
   await noOverflow(page); await noManagement(page);
   await page.goto("/container/1"); const statistics = page.locator("[data-phone-container-statistics]"); await expect(statistics.locator("article")).toHaveCount(7);
   const firstCard = statistics.locator("article").first(); expect(await firstCard.locator("dl").first().locator("dd").allTextContents()).toEqual(["1", "30", "16"]);
@@ -399,9 +399,9 @@ for (const language of ["en", "pl"] as const) for (const width of [320, 375, 390
   if (width === 390) await page.screenshot({ path: testInfo.outputPath(`statistics-${language}.png`), fullPage: true });
   await page.getByRole("link", { name: /Back|Wstecz/, exact: true }).click(); await expect(page).toHaveURL(/\/container$/);
   await page.goto("/availability/5"); const availability = page.locator("[data-phone-availability-information]"); await expect(availability).toBeVisible();
-  await expect(page.getByText(language === "en" ? "Availability Profile" : "Profil dyspozycyjności", { exact: true })).toBeVisible();
-  await expect(page.locator("main details, main nav")).toHaveCount(0); await expect(availability).toContainText("Dyspozycyjność BardzoDługiePolskieNazwisko Zespołu");
-  await expect(availability).toContainText(language === "en" ? "Public" : "Udostępnione"); await expect(availability).toContainText("2026");
+  await expect(page.getByText(language === "en" ? "Availability Profile" : "Profil dyspozycyjnoÃ…â€ºci", { exact: true })).toBeVisible();
+  await expect(page.locator("main details, main nav")).toHaveCount(0); await expect(availability).toContainText("DyspozycyjnoÃ…â€ºÃ„â€¡ BardzoDÃ…â€šugiePolskieNazwisko ZespoÃ…â€šu");
+  await expect(availability).toContainText(language === "en" ? "Public" : "UdostÃ„â„¢pnione"); await expect(availability).toContainText("2026");
   await expect(availability).toContainText("6"); await expect(availability.locator('[class*="_visibilityEndpoint_"]')).toHaveCount(2);
   const availabilityMatrix = page.locator("[data-phone-matrix-scroll]"); await availabilityMatrix.scrollIntoViewIfNeeded(); await availabilityMatrix.evaluate(element => { element.scrollLeft = element.scrollWidth; });
   await expect.poll(() => availabilityMatrix.evaluate(element => element.scrollLeft)).toBeGreaterThan(0); await reachesViewport(availabilityMatrix, availabilityMatrix.locator("thead th").last());
@@ -433,10 +433,7 @@ for (const width of [320, 375, 390, 430]) test(`Home Coming Soon centered in Pho
 });
 for (const height of [720, 1000]) test(`Desktop sidebar switch matches navigation and reaches phone Home at ${height}px`, async ({ page }) => {
  await page.setViewportSize({ width: 1440, height }); const f = await fixture(page, "pc"); await page.goto("/");
- const title = page.getByRole("heading", { name: "Coming Soon", exact: true }); await expect(title).toBeVisible();
- const titleBox = (await title.boundingBox())!; const content = (await title.locator("..").boundingBox())!;
- expect(Math.abs(titleBox.x + titleBox.width / 2 - content.x - content.width / 2)).toBeLessThanOrEqual(2);
- expect(Math.abs(titleBox.y + titleBox.height / 2 - content.y - content.height / 2)).toBeLessThanOrEqual(2);
+ const title = page.getByRole("heading", { name: "Home", exact: true }); await expect(title).toBeVisible();
  const mode = page.getByRole("button", { name: "Switch to Phone", exact: true }); const employee = page.getByRole("link", { name: "Employee", exact: true });
  const design = (element: Element) => { const style = getComputedStyle(element); return [style.width, style.height, style.borderRadius, style.backgroundColor, style.border, style.padding, style.display]; };
  const baseline = await employee.evaluate(design); expect(await mode.evaluate(design)).toEqual(baseline);
@@ -447,7 +444,59 @@ for (const height of [720, 1000]) test(`Desktop sidebar switch matches navigatio
  await employee.hover(); await expect.poll(() => employee.evaluate(element => element.getAnimations().length)).toBe(0); const hoverBackground = await employee.evaluate(element => getComputedStyle(element).backgroundColor);
  await mode.hover(); await expect.poll(() => mode.evaluate(element => getComputedStyle(element).backgroundColor)).toBe(hoverBackground);
  await page.keyboard.press("Tab"); await mode.focus(); await expect(mode).toBeFocused(); expect(await mode.evaluate(element => element.matches(":focus-visible"))).toBe(true);
- await mode.click(); await expect(page.locator("[data-manager-phone]")).toBeVisible(); await expect(title).toBeVisible();
+ await mode.click(); await expect(page.locator("[data-manager-phone]")).toBeVisible(); await expect(page.getByRole("heading", { name: "Coming Soon", exact: true })).toBeVisible();
  await page.getByRole("link", { name: "More", exact: true }).click(); await page.getByRole("button", { name: "Switch to Desktop", exact: true }).click();
  await expect(page.locator("[data-manager-phone]")).toHaveCount(0); await expect(title).toBeVisible(); expect(f.errors).toEqual([]);
+});
+
+
+test("PC Home restores data and interactions through PC Phone PC without login", async ({ page }) => {
+ await page.setViewportSize({ width: 1440, height: 1000 });
+ await page.clock.setFixedTime(new Date("2026-10-01T10:00:00Z"));
+ const f = await fixture(page, "pc");
+ const requests: string[] = [];
+ page.on("request", request => requests.push(new URL(request.url()).pathname));
+ await page.goto("/");
+ await expect(page.getByRole("heading", { name: "Home", exact: true })).toBeVisible();
+ await expect(page.getByRole("heading", { name: "Coming Soon" })).toHaveCount(0);
+ await page.getByRole("button", { name: "Collapse sidebar", exact: true }).click();
+ const today = page.locator("section").filter({ has: page.getByText("Who Works Today?", { exact: true }) });
+ await expect(today.getByRole("table")).toBeVisible();
+ await expect(today.getByRole("button", { name: "Show Worker 1's schedule" }).first()).toBeVisible();
+ await page.getByRole("button", { name: "Expand this month details" }).click();
+ await expect(page.locator("#home-month-details")).toHaveAttribute("aria-hidden", "false");
+ await expect(page.locator("#home-month-details").getByText("Private schedule", { exact: true })).toBeVisible();
+ await expect(page.locator("#home-month-details").getByText("Central", { exact: true })).toBeVisible();
+ await page.getByRole("button", { name: "Expand all", exact: true }).click();
+ for (const id of [3, 6]) await expect(page.locator(`#home-schedule-${id}-content`).getByRole("table")).toBeVisible();
+ await page.getByRole("button", { name: "Collapse all", exact: true }).click();
+ for (const id of [3, 6]) await expect(page.locator(`#home-schedule-${id}-content`)).toHaveAttribute("aria-hidden", "true");
+ await today.getByRole("button", { name: "Show Worker 1's schedule" }).first().click();
+ await expect(page.locator("#home-schedule-3-content").getByRole("table")).toBeVisible();
+ await page.getByRole("button", { name: "Open schedule", exact: true }).first().click();
+ await expect(page).toHaveURL(/\/container\/1\/graphs\/3$/);
+ await page.goto("/");
+ await page.getByRole("button", { name: "Collapse sidebar", exact: true }).click();
+ await page.getByRole("button", { name: "Open container", exact: true }).first().click();
+ await expect(page).toHaveURL(/\/container\?openContainerId=1$/);
+ await page.goto("/");
+ await expect(page.getByText("Who Works Today?", { exact: true })).toBeVisible();
+ await page.waitForLoadState("networkidle");
+ await page.getByRole("button", { name: "Switch to Phone", exact: true }).click();
+ await expect(page.getByRole("heading", { name: "Coming Soon", exact: true })).toBeVisible();
+ await expect(page.getByText("Who Works Today?", { exact: true })).toHaveCount(0);
+ await page.waitForLoadState("networkidle");
+ const phoneStart = requests.length;
+ await page.reload();
+ await expect(page.getByRole("heading", { name: "Coming Soon", exact: true })).toBeVisible();
+ await page.waitForLoadState("networkidle");
+ expect(requests.slice(phoneStart).filter(path => /^\/api\/(containers|employees|shops)(\/|$)/.test(path))).toEqual([]);
+ await page.getByRole("link", { name: "More", exact: true }).click();
+ await page.getByRole("button", { name: "Switch to Desktop", exact: true }).click();
+ await expect(page.getByRole("heading", { name: "Home", exact: true })).toBeVisible();
+ await expect(today.getByRole("table")).toBeVisible();
+ await expect(page.getByRole("heading", { name: "Coming Soon" })).toHaveCount(0);
+ expect(requests.filter(path => path === "/api/auth/login")).toEqual([]);
+ expect(f.errors).toEqual([]);
+ expect(f.unsafe).toEqual([]);
 });
