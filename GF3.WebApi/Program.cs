@@ -4,28 +4,25 @@ using Microsoft.AspNetCore.SpaServices.Extensions;
 using Microsoft.EntityFrameworkCore;
 using WebApi.Infrastructure;
 using WebApi.Middleware;
+using WebApi.Realtime;
 
 var builder = WebApplication.CreateBuilder(args);
-builder.Services.AddWebApiCore(builder.Configuration);
+if (builder.Environment.IsProduction())
+{
+    builder.Logging.ClearProviders();
+    builder.Logging.AddConsole();
+}
+builder.Services.AddWebApiCore(
+    builder.Configuration,
+    requireExplicitJwtSigningKey: builder.Environment.IsProduction());
 
 var app = builder.Build();
 
-ApplyDatabaseMigrations(app);
+await DatabaseMigrationStartup.ApplyAsync(app);
 ConfigureCommonMiddleware(app);
 ConfigureFrontendHosting(app);
 
 app.Run();
-
-/// <summary>
-/// Applies pending EF Core migrations during startup.
-/// We do this once on boot so the API always operates against the expected schema.
-/// </summary>
-static void ApplyDatabaseMigrations(WebApplication app)
-{
-    using var scope = app.Services.CreateScope();
-    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    db.Database.Migrate();
-}
 
 /// <summary>
 /// Configures middleware shared by all environments.
@@ -33,23 +30,34 @@ static void ApplyDatabaseMigrations(WebApplication app)
 /// </summary>
 static void ConfigureCommonMiddleware(WebApplication app)
 {
-    app.UseSwagger();
-    app.UseSwaggerUI();
+    app.UseResponseCompression();
 
     if (app.Environment.IsDevelopment())
     {
+        app.UseSwagger();
+        app.UseSwaggerUI();
         app.UseCors("FrontendDev");
     }
+
+    app.UseAuthentication();
+    app.UseAuthorization();
 
     app.UseWhen(
         context => StartupConfiguration.IsApiRequest(context.Request.Path),
         apiBranch =>
         {
             apiBranch.UseMiddleware<ApiExceptionMiddleware>();
+            apiBranch.UseMiddleware<RegulationAcceptanceGuardMiddleware>();
+            apiBranch.UseMiddleware<ManagerWorkspaceModeGuardMiddleware>();
+            apiBranch.UseMiddleware<EmployeePresenceMiddleware>();
             apiBranch.UseMiddleware<AdminToolsGuardMiddleware>();
         });
 
     app.MapControllers();
+    app.MapHub<EmployeePresenceHub>(EmployeePresenceHub.RoutePattern, options =>
+    {
+        options.CloseOnAuthenticationExpiration = true;
+    });
 }
 
 /// <summary>
@@ -76,6 +84,15 @@ static void ConfigureFrontendHosting(WebApplication app)
     }
 
     app.UseDefaultFiles();
-    app.UseStaticFiles();
+    app.UseStaticFiles(new StaticFileOptions
+    {
+        OnPrepareResponse = context =>
+        {
+            if (context.Context.Request.Path.StartsWithSegments("/assets"))
+            {
+                context.Context.Response.Headers.CacheControl = "public,max-age=31536000,immutable";
+            }
+        }
+    });
     app.MapFallbackToFile("index.html");
 }

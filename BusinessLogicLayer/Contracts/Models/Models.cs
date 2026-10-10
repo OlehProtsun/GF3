@@ -12,6 +12,8 @@ public class BindModel
     /// </summary>
     public int Id { get; set; }
 
+    public int? ManagerAccountId { get; set; }
+
     /// <summary>
     /// Availability code that will be inserted by the bind, for example <c>+</c>, <c>-</c>, or a normalized interval.
     /// </summary>
@@ -132,6 +134,21 @@ public class AvailabilityGroupModel
     public int Month { get; set; }
 
     /// <summary>
+    /// Publication state that controls employee visibility.
+    /// </summary>
+    public AvailabilityPublicationStatus PublicationStatus { get; set; } = AvailabilityPublicationStatus.Private;
+
+    /// <summary>
+    /// UTC moment when employees can start seeing the availability group.
+    /// </summary>
+    public DateTimeOffset? VisibleFromUtc { get; set; }
+
+    /// <summary>
+    /// UTC moment after which employees no longer see the availability group.
+    /// </summary>
+    public DateTimeOffset? VisibleToUtc { get; set; }
+
+    /// <summary>
     /// Members that participate in this availability group.
     /// </summary>
     public ICollection<AvailabilityGroupMemberModel> Members { get; set; } = new List<AvailabilityGroupMemberModel>();
@@ -161,6 +178,11 @@ public class AvailabilityGroupMemberModel
     /// Stable visual order used by the planner UI.
     /// </summary>
     public int DisplayOrder { get; set; }
+
+    /// <summary>
+    /// Last UTC moment this member was modified from the employee self-service workflow.
+    /// </summary>
+    public DateTimeOffset? EmployeeLastModifiedAtUtc { get; set; }
 
     /// <summary>
     /// Optional expanded employee payload used by richer read models.
@@ -248,6 +270,15 @@ public class ScheduleModel
     /// Calendar month that the schedule applies to.
     /// </summary>
     public int Month { get; set; }
+
+    /// <summary>
+    /// Publication state that controls employee visibility.
+    /// </summary>
+    public SchedulePublicationStatus PublicationStatus { get; set; } = SchedulePublicationStatus.Private;
+    public DateTimeOffset? PublishedAtUtc { get; set; }
+
+    /// <summary>Controls whether shift swaps are allowed for this schedule.</summary>
+    public bool AllowSwap { get; set; } = true;
 
     /// <summary>
     /// Number of employees required in each shift interval.

@@ -1,3 +1,4 @@
+using BusinessLogicLayer.Contracts.Enums;
 using BusinessLogicLayer.Contracts.Models;
 using WebApi.Contracts.Containers.Graphs;
 
@@ -8,7 +9,7 @@ namespace WebApi.Mappers;
 /// </summary>
 public static class GraphMapper
 {
-    public static GraphDto ToGraphDto(this ScheduleModel model) => new()
+    public static GraphDto ToGraphDto(this ScheduleModel model, DateTimeOffset? lastUpdatedAtUtc = null) => new()
     {
         Id = model.Id,
         ContainerId = model.ContainerId,
@@ -16,6 +17,8 @@ public static class GraphMapper
         Name = model.Name,
         Year = model.Year,
         Month = model.Month,
+        PublicationStatus = ToApiPublicationStatus(model.PublicationStatus),
+        AllowSwap = model.AllowSwap,
         PeoplePerShift = model.PeoplePerShift,
         Shift1Time = model.Shift1Time,
         Shift2Time = model.Shift2Time,
@@ -25,6 +28,7 @@ public static class GraphMapper
         MaxFullPerMonth = model.MaxFullPerMonth,
         Note = model.Note,
         AvailabilityGroupId = model.AvailabilityGroupId,
+        LastUpdatedAtUtc = lastUpdatedAtUtc,
     };
 
     public static ScheduleModel ToCreateModel(this CreateGraphRequest request, int containerId)
@@ -34,6 +38,8 @@ public static class GraphMapper
             request.Name,
             request.Year,
             request.Month,
+            request.PublicationStatus,
+            request.AllowSwap,
             request.PeoplePerShift,
             request.Shift1Time,
             request.Shift2Time,
@@ -51,6 +57,8 @@ public static class GraphMapper
             request.Name,
             request.Year,
             request.Month,
+            request.PublicationStatus,
+            request.AllowSwap,
             request.PeoplePerShift,
             request.Shift1Time,
             request.Shift2Time,
@@ -69,6 +77,8 @@ public static class GraphMapper
             request.Graph.Name,
             request.Graph.Year,
             request.Graph.Month,
+            request.Graph.PublicationStatus,
+            request.Graph.AllowSwap,
             request.Graph.PeoplePerShift,
             request.Graph.Shift1Time,
             request.Graph.Shift2Time,
@@ -86,6 +96,8 @@ public static class GraphMapper
         string name,
         int year,
         int month,
+        string? publicationStatus,
+        bool allowSwap,
         int peoplePerShift,
         string shift1Time,
         string shift2Time,
@@ -104,6 +116,8 @@ public static class GraphMapper
             Name = name,
             Year = year,
             Month = month,
+            PublicationStatus = ToDomainPublicationStatus(publicationStatus),
+            AllowSwap = allowSwap,
             PeoplePerShift = peoplePerShift,
             Shift1Time = shift1Time,
             Shift2Time = shift2Time,
@@ -114,4 +128,12 @@ public static class GraphMapper
             Note = note,
             AvailabilityGroupId = availabilityGroupId,
         };
+
+    private static string ToApiPublicationStatus(SchedulePublicationStatus status)
+        => status == SchedulePublicationStatus.Public ? "public" : "private";
+
+    private static SchedulePublicationStatus ToDomainPublicationStatus(string? status)
+        => string.Equals(status, "public", StringComparison.OrdinalIgnoreCase)
+            ? SchedulePublicationStatus.Public
+            : SchedulePublicationStatus.Private;
 }

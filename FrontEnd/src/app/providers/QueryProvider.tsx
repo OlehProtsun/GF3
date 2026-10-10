@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { t } from "@shared/i18n";
+import { useEffect, useState } from "react";
 import type { PropsWithChildren } from "react";
 import {
   MutationCache,
@@ -10,6 +11,7 @@ import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 import { isRequestCanceledError } from "@shared/api/httpClient";
 import { isDev } from "@shared/lib/isDev";
 import { pushErrorAlertFromError } from "@shared/ui/feedback/error-alerts/errorAlerts";
+import { useAuth } from "./AuthProvider";
 
 function createQueryClient() {
   return new QueryClient({
@@ -29,7 +31,7 @@ function createQueryClient() {
           return;
         }
 
-        pushErrorAlertFromError(error, "Could not load data from the server.");
+        pushErrorAlertFromError(error, t("Could not load data from the server."));
 
         if (isDev) {
           console.error("[Query error]", query.queryKey, error);
@@ -42,7 +44,7 @@ function createQueryClient() {
           return;
         }
 
-        pushErrorAlertFromError(error, "Could not complete the requested action.");
+        pushErrorAlertFromError(error, t("Could not complete the requested action."));
 
         if (isDev) {
           console.error("[Mutation error]", mutation.options.mutationKey, error);
@@ -53,7 +55,15 @@ function createQueryClient() {
 }
 
 export function QueryProvider({ children }: PropsWithChildren) {
+  const { session } = useAuth();
+  const accountKey = session ? `${session.role}:${session.managerId ?? session.employeeId}` : "guest";
+
+  return <AccountQueryProvider key={accountKey}>{children}</AccountQueryProvider>;
+}
+
+function AccountQueryProvider({ children }: PropsWithChildren) {
   const [queryClient] = useState(createQueryClient);
+  useEffect(() => () => queryClient.clear(), [queryClient]);
 
   return (
     <QueryClientProvider client={queryClient}>

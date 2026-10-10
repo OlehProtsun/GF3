@@ -18,7 +18,7 @@ internal static class LauncherPaths
     {
         var configuredPath = Environment.GetEnvironmentVariable(DatabasePathEnvironmentVariable);
         var databasePath = string.IsNullOrWhiteSpace(configuredPath)
-            ? Path.Combine(GetApplicationDataRoot(), DefaultDatabaseFileName)
+            ? LauncherDatabaseSelectionStore.ResolveDatabasePath(Path.Combine(GetApplicationDataRoot(), DefaultDatabaseFileName))
             : configuredPath;
 
         databasePath = Path.GetFullPath(databasePath);

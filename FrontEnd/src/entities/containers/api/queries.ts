@@ -1,3 +1,4 @@
+import { t } from "@shared/i18n";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { GraphEmployee, GraphSlot } from "@entities/containers/model/types";
 import {
@@ -5,7 +6,7 @@ import {
   type GraphMatrixCellMap,
 } from "@entities/containers/model/graphWorkspace";
 import { queryKeys } from "@shared/api/queryKeys";
-import { containersApi } from "./containersApi";
+import { containersApi, managerGraphFillColorBindsApi, managerGraphTextColorBindsApi } from "./containersApi";
 import type {
   GenerateGraphRequestDto,
   GenerateGraphPreviewRequestDto,
@@ -14,8 +15,59 @@ import type {
   SaveGraphEmployeeDto,
   SaveGraphSlotDto,
   SaveSchedulePresetDto,
+  SaveManagerGraphFillColorBindDto,
+  SaveManagerGraphTextColorBindDto,
   UpsertGraphCellStyleDto,
+  UpdateGraphsPublicationDto,
 } from "./dto";
+
+export const useManagerGraphFillColorBindsQuery = () =>
+  useQuery({
+    queryKey: queryKeys.managerGraphFillColorBinds.current(),
+    queryFn: ({ signal }) => managerGraphFillColorBindsApi.list(signal),
+  });
+
+export function useUpsertManagerGraphFillColorBindMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload: SaveManagerGraphFillColorBindDto) => managerGraphFillColorBindsApi.upsert(payload),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.managerGraphFillColorBinds.current() }),
+  });
+}
+
+export function useDeleteManagerGraphFillColorBindMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id: number) => managerGraphFillColorBindsApi.remove(id),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.managerGraphFillColorBinds.current() }),
+  });
+}
+
+export const useManagerGraphTextColorBindsQuery = () =>
+  useQuery({
+    queryKey: queryKeys.managerGraphTextColorBinds.current(),
+    queryFn: ({ signal }) => managerGraphTextColorBindsApi.list(signal),
+  });
+
+export function useUpsertManagerGraphTextColorBindMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload: SaveManagerGraphTextColorBindDto) => managerGraphTextColorBindsApi.upsert(payload),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.managerGraphTextColorBinds.current() }),
+  });
+}
+
+export function useDeleteManagerGraphTextColorBindMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id: number) => managerGraphTextColorBindsApi.remove(id),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.managerGraphTextColorBinds.current() }),
+  });
+}
 
 export type SaveGraphWorkspaceEmployeeAssignment = {
   id: number | null;
@@ -134,7 +186,7 @@ async function syncGraphWorkspace({
   });
 
   if (Object.keys(draft.errors).length > 0) {
-    throw new Error(Object.values(draft.errors)[0] ?? "The schedule matrix contains invalid time ranges.");
+    throw new Error(Object.values(draft.errors)[0] ?? t("The schedule matrix contains invalid time ranges."));
   }
 
   await containersApi.replaceGraphSlots(containerId, resolvedGraphId as number, {
@@ -289,10 +341,28 @@ export function useSaveGraphWorkspaceMutation() {
   return useMutation({
     mutationFn: syncGraphWorkspace,
     onSuccess: (result, variables) => {
+      qc.invalidateQueries({ queryKey: queryKeys.containers.all });
       qc.invalidateQueries({ queryKey: queryKeys.containers.graphs(variables.containerId) });
       qc.invalidateQueries({ queryKey: queryKeys.containers.graphById(variables.containerId, result.graphId) });
       qc.invalidateQueries({ queryKey: queryKeys.containers.graphEmployees(variables.containerId, result.graphId) });
       qc.invalidateQueries({ queryKey: queryKeys.containers.graphSlots(variables.containerId, result.graphId) });
+      qc.invalidateQueries({ queryKey: queryKeys.containers.graphCellStyles(variables.containerId, result.graphId) });
+      qc.invalidateQueries({ queryKey: queryKeys.employeeSchedules.all });
+      qc.invalidateQueries({ queryKey: queryKeys.shiftSwaps.all });
+    },
+  });
+}
+
+export function useUpdateGraphsPublicationMutation() {
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ containerId, payload }: { containerId: number; payload: UpdateGraphsPublicationDto }) =>
+      containersApi.updateGraphsPublication(containerId, payload),
+    onSuccess: (_, variables) => {
+      qc.invalidateQueries({ queryKey: queryKeys.containers.graphs(variables.containerId) });
+      qc.invalidateQueries({ queryKey: queryKeys.employeeSchedules.all });
+      qc.invalidateQueries({ queryKey: queryKeys.shiftSwaps.all });
     },
   });
 }
@@ -316,6 +386,47 @@ export const useGraphSlotsQuery = (containerId: number | null, graphId: number |
     cancelOnUnmount: true,
     queryFn: ({ signal }) => containersApi.listGraphSlots(containerId as number, graphId as number, signal),
   });
+
+export const useGraphVersionsQuery = (
+  containerId: number | null,
+  graphId: number | null,
+  enabled = true,
+) => useQuery({
+  queryKey: queryKeys.containers.graphVersions(containerId ?? 0, graphId ?? 0),
+  enabled: enabled && containerId !== null && graphId !== null,
+  queryFn: ({ signal }) => containersApi.listGraphVersions(containerId as number, graphId as number, signal),
+});
+
+export function useCheckoutGraphVersionMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ containerId, graphId, versionId }: { containerId: number; graphId: number; versionId: number }) =>
+      containersApi.checkoutGraphVersion(containerId, graphId, versionId),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.containers.graphVersions(variables.containerId, variables.graphId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.containers.graphs(variables.containerId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.containers.graphById(variables.containerId, variables.graphId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.containers.graphEmployees(variables.containerId, variables.graphId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.containers.graphSlots(variables.containerId, variables.graphId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.containers.graphCellStyles(variables.containerId, variables.graphId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.employeeSchedules.all });
+      queryClient.invalidateQueries({ queryKey: queryKeys.shiftSwaps.all });
+    },
+  });
+}
+
+export function useDeleteGraphVersionMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ containerId, graphId, versionId }: { containerId: number; graphId: number; versionId: number }) =>
+      containersApi.removeGraphVersion(containerId, graphId, versionId),
+    onSuccess: (_, variables) => queryClient.invalidateQueries({
+      queryKey: queryKeys.containers.graphVersions(variables.containerId, variables.graphId),
+    }),
+  });
+}
 
 export const useGraphSlotsBatchQuery = (containerId: number | null, graphIds: number[], enabled = true) => {
   const normalizedGraphIds = [...new Set(

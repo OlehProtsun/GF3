@@ -1,4 +1,5 @@
-import { getErrorMessage } from "@shared/api/httpClient";
+import { t } from "@shared/i18n";
+import { getErrorMessage, isRequestCanceledError } from "@shared/api/httpClient";
 
 export type ErrorAlert = {
   id: number;
@@ -59,7 +60,7 @@ export function pushErrorAlert(input: { title?: string; message: string }) {
 
   const alert: ErrorAlert = {
     id: nextAlertId++,
-    title: input.title?.trim() || "Request Error",
+    title: input.title?.trim() || t("Request Error"),
     message,
   };
 
@@ -71,7 +72,8 @@ export function pushErrorAlert(input: { title?: string; message: string }) {
   }, 6500);
 }
 
-export function pushErrorAlertFromError(error: unknown, fallbackMessage = "Something went wrong while processing the request.") {
+export function pushErrorAlertFromError(error: unknown, fallbackMessage = t("Something went wrong while processing the request.")) {
+  if (isRequestCanceledError(error)) return;
   pushErrorAlert({
     message: getErrorMessage(error, fallbackMessage),
   });

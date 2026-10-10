@@ -1,7 +1,9 @@
+import { t } from "@shared/i18n";
 import {
   buildGraphCellMap,
   buildGraphConflictDayMap,
   buildGraphMatrixColumns,
+  buildGraphRelatedScheduleHintData,
   buildGraphStyleMap,
   buildGraphTotals,
   containersApi,
@@ -19,6 +21,7 @@ import {
   type GraphMatrixCellMap,
   type GraphMatrixColumn,
   type GraphMatrixStyleMap,
+  type GraphRelatedScheduleHintDetailMap,
   type GraphSlot,
   type GraphTotals,
 } from "@entities/containers";
@@ -30,11 +33,12 @@ import type { Shop } from "@entities/shops/model/types";
 
 export type HomeWhoWorksTodayRow = {
   id: string;
+  employeeId: number;
+  graphId: number;
   dateLabel: string;
   employee: string;
   shift: string;
   shop: string;
-  route: string;
 };
 
 export type HomeSchedulePreview = {
@@ -45,6 +49,8 @@ export type HomeSchedulePreview = {
   route: string;
   columns: GraphMatrixColumn[];
   cellMap: GraphMatrixCellMap;
+  visualHintMap: GraphMatrixCellMap;
+  visualHintDetailMap: GraphRelatedScheduleHintDetailMap;
   styleMap: GraphMatrixStyleMap;
   dayConflictMap: Record<number, boolean>;
   totals: GraphTotals;
@@ -64,9 +70,7 @@ export type HomeDashboardData = {
   currentMonthTotalSchedules: number;
   currentMonthTotalHoursText: string;
   currentMonthTotalShops: number;
-  overallTotalEmployees: number;
-  overallTotalContainers: number;
-  overallTotalShops: number;
+  todayActiveEmployeesCount: number;
   statusText: string;
   todayRows: HomeWhoWorksTodayRow[];
   activeSchedules: HomeSchedulePreview[];
@@ -82,7 +86,7 @@ type LoadedMonthGraph = {
 };
 
 function createAbortError() {
-  const error = new Error("Request was canceled.");
+  const error = new Error(t("Request was canceled."));
   error.name = "AbortError";
   return error;
 }
@@ -141,9 +145,10 @@ function buildHomeSchedulePreview(
     cellStyles: GraphCellStyle[];
     shop: Shop | null;
     employeesById: Map<number, Employee>;
+    relatedGraphs: LoadedMonthGraph[];
   },
 ) {
-  const { container, graph, graphEmployees, slots, cellStyles, shop, employeesById } = params;
+  const { container, graph, graphEmployees, slots, cellStyles, shop, employeesById, relatedGraphs } = params;
   const parsedGraphNote = parseGraphNoteContent(graph.note);
   const baseColumns = buildGraphMatrixColumns(graphEmployees, employeesById, slots);
   const manualColumns = parsedGraphNote.manualColumns.map(column => ({
@@ -151,7 +156,7 @@ function buildHomeSchedulePreview(
     kind: "manual" as const,
     manualColumnId: column.id,
     graphEmployeeId: null,
-    label: column.label || `Custom ${column.id}`,
+    label: column.label || t("Custom {0}", column.id),
     minHoursMonth: null,
     totalMinutes: 0,
     totalText: "",
@@ -168,6 +173,20 @@ function buildHomeSchedulePreview(
 
     return accumulator;
   }, {});
+  const cellMap = {
+    ...buildGraphCellMap(slots),
+    ...rehydrateGraphNoteTextCells(parsedGraphNote.textCells),
+    ...manualCellMap,
+  };
+  const relatedScheduleHintData = buildGraphRelatedScheduleHintData({
+    currentGraph: graph,
+    columns,
+    cellMap,
+    relatedGraphs: relatedGraphs.map(relatedGraph => ({
+      graph: relatedGraph.graph,
+      slots: relatedGraph.slots,
+    })),
+  });
 
   return {
     graph,
@@ -176,11 +195,9 @@ function buildHomeSchedulePreview(
     monthLabel: formatGraphMonthYear(graph.year, graph.month),
     route: `/container/${container.id}/graphs/${graph.id}`,
     columns,
-    cellMap: {
-      ...buildGraphCellMap(slots),
-      ...rehydrateGraphNoteTextCells(parsedGraphNote.textCells),
-      ...manualCellMap,
-    },
+    cellMap,
+    visualHintMap: relatedScheduleHintData.visualHintMap,
+    visualHintDetailMap: relatedScheduleHintData.detailMap,
     styleMap: buildGraphStyleMap([
       ...cellStyles,
       ...rehydrateGraphNoteCellStyles(parsedGraphNote.cellStyles, graph.id),
@@ -191,8 +208,8 @@ function buildHomeSchedulePreview(
 }
 
 function compareGraphs(left: LoadedMonthGraph, right: LoadedMonthGraph) {
-  const leftShop = left.shop?.name?.trim() || `Shop ${left.graph.shopId}`;
-  const rightShop = right.shop?.name?.trim() || `Shop ${right.graph.shopId}`;
+  const leftShop = left.shop?.name?.trim() || t("Shop {0}", left.graph.shopId);
+  const rightShop = right.shop?.name?.trim() || t("Shop {0}", right.graph.shopId);
   const shopComparison = leftShop.localeCompare(rightShop);
 
   if (shopComparison !== 0) {
@@ -282,6 +299,7 @@ export async function loadHomeDashboard(signal?: AbortSignal): Promise<HomeDashb
   const monthEmployeeIds = new Set<number>();
   const monthShopIds = new Set<number>();
   const activeContainerIds = new Set<number>();
+  const todayEmployeeIds = new Set<number>();
   const todayRowsByKey = new Map<string, HomeWhoWorksTodayRow>();
   let monthTotalMinutes = 0;
 
@@ -290,7 +308,7 @@ export async function loadHomeDashboard(signal?: AbortSignal): Promise<HomeDashb
     monthShopIds.add(record.graph.shopId);
     activeContainerIds.add(record.container.id);
 
-    const shopName = record.shop?.name?.trim() || `Shop ${record.graph.shopId}`;
+    const shopName = record.shop?.name?.trim() || t("Shop {0}", record.graph.shopId);
     monthShopNames.add(shopName);
 
     record.graphEmployees.forEach(graphEmployee => {
@@ -300,7 +318,7 @@ export async function loadHomeDashboard(signal?: AbortSignal): Promise<HomeDashb
 
       monthEmployeeIds.add(graphEmployee.employeeId);
       monthEmployeeNames.add(
-        getEmployeeFullName(employeesById.get(graphEmployee.employeeId), `Employee ${graphEmployee.employeeId}`),
+        getEmployeeFullName(employeesById.get(graphEmployee.employeeId), t("Employee {0}", graphEmployee.employeeId)),
       );
     });
 
@@ -311,7 +329,7 @@ export async function loadHomeDashboard(signal?: AbortSignal): Promise<HomeDashb
 
       monthEmployeeIds.add(slot.employeeId);
       monthEmployeeNames.add(
-        getEmployeeFullName(employeesById.get(slot.employeeId), `Employee ${slot.employeeId}`),
+        getEmployeeFullName(employeesById.get(slot.employeeId), t("Employee {0}", slot.employeeId)),
       );
       monthTotalMinutes += getSlotDurationMinutes(slot);
 
@@ -319,20 +337,22 @@ export async function loadHomeDashboard(signal?: AbortSignal): Promise<HomeDashb
         return;
       }
 
-      const employeeName = getEmployeeFullName(employeesById.get(slot.employeeId), `Employee ${slot.employeeId}`);
+      const employeeName = getEmployeeFullName(employeesById.get(slot.employeeId), t("Employee {0}", slot.employeeId));
       const shift = `${slot.fromTime} - ${slot.toTime}`;
-      const rowKey = `${slot.dayOfMonth}:${employeeName}:${shift}:${shopName}`;
+      const rowKey = `${record.graph.id}:${slot.id}`;
       if (todayRowsByKey.has(rowKey)) {
         return;
       }
 
+      todayEmployeeIds.add(slot.employeeId);
       todayRowsByKey.set(rowKey, {
         id: rowKey,
+        employeeId: slot.employeeId,
+        graphId: record.graph.id,
         dateLabel: formatShortDate(currentYear, currentMonth, slot.dayOfMonth),
         employee: employeeName,
         shift,
         shop: shopName,
-        route: `/container/${record.container.id}/graphs/${record.graph.id}`,
       });
     });
 
@@ -344,6 +364,7 @@ export async function loadHomeDashboard(signal?: AbortSignal): Promise<HomeDashb
       cellStyles: record.cellStyles,
       shop: record.shop,
       employeesById,
+      relatedGraphs: loadedMonthGraphs,
     });
   });
 
@@ -353,10 +374,10 @@ export async function loadHomeDashboard(signal?: AbortSignal): Promise<HomeDashb
 
   const currentMonthContainerName =
     activeContainerNames.length === 0
-      ? "No active containers"
+      ? t("No active containers")
       : activeContainerNames.length === 1
         ? activeContainerNames[0]
-        : `${activeContainerNames.length} active containers`;
+        : t("{0} active containers", activeContainerNames.length);
 
   const todayRows = [...todayRowsByKey.values()].sort((left, right) => {
     const shiftComparison = left.shift.localeCompare(right.shift);
@@ -387,12 +408,10 @@ export async function loadHomeDashboard(signal?: AbortSignal): Promise<HomeDashb
     currentMonthTotalSchedules: monthGraphs.length,
     currentMonthTotalHoursText: formatHoursMinutes(monthTotalMinutes),
     currentMonthTotalShops: monthShopIds.size,
-    overallTotalEmployees: employees.length,
-    overallTotalContainers: containers.length,
-    overallTotalShops: shops.length,
+    todayActiveEmployeesCount: todayEmployeeIds.size,
     statusText: hasPartialData
-      ? "Home data loaded with a few missing schedule previews."
-      : "Home data is up to date.",
+      ? t("Home data loaded with a few missing schedule previews.")
+      : t("Home data is up to date."),
     todayRows,
     activeSchedules,
   };

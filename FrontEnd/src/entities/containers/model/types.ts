@@ -1,4 +1,5 @@
 export type SlotStatus = "Free" | "Working" | "Blocked" | number;
+export type GraphPublicationStatus = "private" | "public";
 
 export type Container = {
   id: number;
@@ -13,6 +14,8 @@ export type Graph = {
   name: string;
   year: number;
   month: number;
+  publicationStatus: GraphPublicationStatus;
+  allowSwap?: boolean;
   peoplePerShift: number;
   shift1Time: string;
   shift2Time: string;
@@ -22,6 +25,7 @@ export type Graph = {
   maxFullPerMonth: number;
   note?: string | null;
   availabilityGroupId?: number | null;
+  lastUpdatedAtUtc?: string | null;
 };
 
 export type SchedulePresetEmployee = {

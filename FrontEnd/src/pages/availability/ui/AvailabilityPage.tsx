@@ -1,3 +1,4 @@
+import { t } from "@shared/i18n";
 import { useCallback, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAvailabilityGroupsQuery } from "@entities/availability-groups";
@@ -31,16 +32,16 @@ export function AvailabilityPage() {
   return (
     <div className={styles.page}>
       <PageHeader
-        title="Availability List"
-        subtitle="Browse and search availability schedules"
+        title={t("Availability List")}
+        subtitle={t("Browse and search availability schedules")}
         backTo="/"
-        rightSlot={<IosButton label="Add New" icon={<PlusIcon size={18} />} onClick={handleAddGroup} />}
-        searchMeta={`Total: ${groups.length}`}
+        rightSlot={<IosButton label={t("Add New")} icon={<PlusIcon size={18} />} onClick={handleAddGroup} />}
+        searchMeta={t("Total: {0}", groups.length)}
         search={{
           value: query,
           onChange: setQuery,
-          placeholder: "Search availability",
-          ariaLabel: "Search availability",
+          placeholder: t("Search availability"),
+          ariaLabel: t("Search availability"),
         }}
       />
 

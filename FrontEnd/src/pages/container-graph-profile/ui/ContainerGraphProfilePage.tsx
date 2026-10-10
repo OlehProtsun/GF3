@@ -1,3 +1,4 @@
+import { t } from "@shared/i18n";
 import { useMemo, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useAvailabilityGroupsListQuery } from "@entities/availability-groups";
@@ -51,7 +52,7 @@ function CompactSizeHeaderToggle({ checked, onToggle }: CompactSizeHeaderToggleP
       aria-pressed={checked}
       onClick={onToggle}
     >
-      <span className={styles.compactToggleTitle}>Compact Size</span>
+      <span className={styles.compactToggleTitle}>{t("Compact Size")}</span>
 
       <span className={styles.compactToggleTrack} aria-hidden="true">
         <span className={styles.compactToggleThumb} />
@@ -222,7 +223,7 @@ export function ContainerGraphProfilePage() {
       const file = await runMutation(exportExcelMutation.mutate, { containerId, graphId: graph.id });
       downloadExportFile(file, buildGraphExportFallbackFilename("excel", graph.name, graph.year, graph.month));
     } catch (error) {
-      setExportError(getExportErrorMessage(error, "Could not export this schedule to Excel."));
+      setExportError(getExportErrorMessage(error, t("Could not export this schedule to Excel.")));
     }
   };
 
@@ -237,15 +238,15 @@ export function ContainerGraphProfilePage() {
       const file = await runMutation(exportSqlMutation.mutate, { containerId, graphId: graph.id });
       downloadExportFile(file, buildGraphExportFallbackFilename("sql", graph.name, graph.year, graph.month));
     } catch (error) {
-      setExportError(getExportErrorMessage(error, "Could not export this schedule to code."));
+      setExportError(getExportErrorMessage(error, t("Could not export this schedule to code.")));
     }
   };
 
   return (
     <div className={styles.page}>
       <PageHeader
-        title="Schedule Profile"
-        subtitle="View schedule details, matrix layout, conflicts and employee summary"
+        title={t("Schedule Profile")}
+        subtitle={t("View schedule details, matrix layout, conflicts and employee summary")}
         onBack={() => navigate(`/container?openContainerId=${containerId ?? ""}`)}
         onCollapseChange={setIsHeaderCollapsed}
         maxWidth={pageHeaderMaxWidth}
@@ -279,7 +280,7 @@ export function ContainerGraphProfilePage() {
 
                     navigate(`/container/${containerId}/graphs/${nextGraphId}${sessionSearch}`);
                   }}
-                  actionSlot={<IosButton label="Edit all" onClick={() => setIsEditConfirmOpen(true)} />}
+                  actionSlot={<IosButton label={t("Edit all")} onClick={() => setIsEditConfirmOpen(true)} />}
                 />
               </div>
             ) : (
@@ -328,28 +329,28 @@ export function ContainerGraphProfilePage() {
 
       <ConfirmDialog
         open={isDeleteOpen}
-        title="Delete schedule"
-        message="Are you sure you want to delete this schedule? This action cannot be undone."
+        title={t("Delete schedule")}
+        message={t("Are you sure you want to delete this schedule? This action cannot be undone.")}
         onCancel={() => setIsDeleteOpen(false)}
         onConfirm={handleDeleteConfirm}
-        confirmText={deleteGraphMutation.isPending ? "Deleting..." : "Delete"}
+        confirmText={deleteGraphMutation.isPending ? t("Deleting...") : t("Delete")}
         confirmDisabled={deleteGraphMutation.isPending}
         cancelDisabled={deleteGraphMutation.isPending}
       />
 
       <ConfirmDialog
         open={isEditConfirmOpen}
-        title={sessionGraphNames.length > 1 ? "Edit selected schedules" : "Edit schedule"}
+        title={sessionGraphNames.length > 1 ? t("Edit selected schedules") : t("Edit schedule")}
         message={
           sessionGraphNames.length > 1
-            ? "Open the editor for these schedules?"
-            : `Open the editor for '${sessionGraphNames[0] ?? graph?.name ?? "this schedule"}'?`
+            ? t("Open the editor for these schedules?")
+            : t("Open the editor for '{0}'?", sessionGraphNames[0] ?? graph?.name ?? "this schedule")
         }
         footerSlot={
           sessionGraphNames.length > 0 ? (
             <div className={styles.dialogList}>
               <span className={styles.dialogListTitle}>
-                {sessionGraphNames.length > 1 ? "Schedules in this session" : "Selected schedule"}
+                {sessionGraphNames.length > 1 ? t("Schedules in this session") : t("Selected schedule")}
               </span>
               <span className={styles.dialogListValue}>{sessionGraphNames.join(", ")}</span>
             </div>
@@ -357,7 +358,7 @@ export function ContainerGraphProfilePage() {
         }
         onCancel={() => setIsEditConfirmOpen(false)}
         onConfirm={handleOpenEdit}
-        confirmText="Edit"
+        confirmText={t("Edit")}
         variant="confirm"
       />
     </div>

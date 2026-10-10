@@ -1,3 +1,4 @@
+import { getLanguage, dateTimeFormat, t } from "@shared/i18n";
 import type { Employee } from "@entities/employees/model/types";
 import { getEmployeeFullName } from "@entities/employees/model/presentation";
 import { parseFlexibleTimeSegment } from "@shared/lib/timeRange";
@@ -5,6 +6,7 @@ import { buildPreviewList, formatHoursMinutes, getSlotDurationMinutes } from "./
 import type { Graph, GraphCellStyle, GraphEmployee, GraphSlot, SlotStatus } from "./types";
 
 export const GRAPH_EMPTY_MARK = "-";
+export const GRAPH_MAX_INTERVALS_PER_CELL = 4;
 
 export type GraphMatrixColumn = {
   employeeId: number;
@@ -73,6 +75,7 @@ export type GraphSummaryRow = {
   freeDays: number;
   sum: string;
   days: GraphSummaryDayCell[];
+  dayRows: GraphSummaryDayCell[][];
 };
 
 export type GraphTotals = {
@@ -138,7 +141,7 @@ function getGraphDate(year: number, month: number, dayOfMonth: number) {
 
 export function getGraphWeekdayLabel(year: number, month: number, dayOfMonth: number) {
   const weekdayIndex = getGraphDate(year, month, dayOfMonth).getDay();
-  const weekdayLabels = ["su", "mo", "tu", "we", "th", "fr", "sa"];
+  const weekdayLabels = getLanguage() === "pl" ? ["nd", "pn", "wt", "śr", "cz", "pt", "so"] : ["su", "mo", "tu", "we", "th", "fr", "sa"];
   return `${weekdayLabels[weekdayIndex]}.`;
 }
 
@@ -149,7 +152,7 @@ export function isGraphWeekend(year: number, month: number, dayOfMonth: number) 
 
 export function formatGraphMonthYear(year: number, month: number) {
   const date = new Date(Date.UTC(clampGraphYear(year), clampGraphMonth(month) - 1, 1));
-  return new Intl.DateTimeFormat("en-US", {
+  return dateTimeFormat("en-US", {
     month: "long",
     year: "numeric",
     timeZone: "UTC",
@@ -232,10 +235,58 @@ export function buildGraphCellMap(slots: GraphSlot[]) {
 
   const cellMap: GraphMatrixCellMap = {};
   slotsByEmployeeByDay.forEach((daySlots, key) => {
-    cellMap[key] = formatGraphIntervals(mergeGraphIntervalsForDisplay(daySlots));
+    cellMap[key] = formatGraphIntervals(mergeGraphIntervalsForDisplay(daySlots, { mergeTouching: true }));
   });
 
   return cellMap;
+}
+
+export function buildGraphDayShiftStaffingCounts(params: {
+  graph: Pick<Graph, "year" | "month"> & Partial<Pick<Graph, "shift1Time" | "shift2Time">>;
+  columns: Array<Pick<GraphMatrixColumn, "employeeId" | "kind">>;
+  cellMap: GraphMatrixCellMap;
+}) {
+  const { graph, columns, cellMap } = params;
+  const shifts = [tryParseGraphShiftRange(graph.shift1Time), tryParseGraphShiftRange(graph.shift2Time)]
+    .filter((shift): shift is { fromMinutes: number; toMinutes: number } => shift !== null);
+  if (shifts.length === 0) {
+    return {} as Record<number, number[]>;
+  }
+
+  const employeeIds = [...new Set(
+    columns
+      .filter(column => column.kind === "employee" && column.employeeId > 0)
+      .map(column => column.employeeId),
+  )];
+  const daysInMonth = getGraphDaysInMonth(graph.year, graph.month);
+
+  return Array.from({ length: daysInMonth }, (_, index) => index + 1)
+    .reduce<Record<number, number[]>>((result, dayOfMonth) => {
+      result[dayOfMonth] = shifts.map(shift => employeeIds.reduce((count, employeeId) => {
+        const parsed = parseGraphCellContent(cellMap[getGraphCellKey(employeeId, dayOfMonth)] ?? GRAPH_EMPTY_MARK);
+        if (parsed.kind !== "intervals") {
+          return count;
+        }
+
+        const worksThisShift = parsed.value.some(interval => {
+          const fromMinutes = parseGraphTimeMinutes(interval.from);
+          let toMinutes = parseGraphTimeMinutes(interval.to);
+          if (fromMinutes === null || toMinutes === null) {
+            return false;
+          }
+
+          if (toMinutes < fromMinutes) {
+            toMinutes += 24 * 60;
+          }
+
+          return fromMinutes < shift.toMinutes && toMinutes > shift.fromMinutes;
+        });
+
+        return count + (worksThisShift ? 1 : 0);
+      }, 0));
+
+      return result;
+    }, {});
 }
 
 export function buildGraphRelatedScheduleHintData(params: {
@@ -247,7 +298,7 @@ export function buildGraphRelatedScheduleHintData(params: {
     slots: GraphSlot[];
   }>;
 }) {
-  const { currentGraph, columns, cellMap, relatedGraphs } = params;
+  const { currentGraph, columns, relatedGraphs } = params;
   const employeeIdSet = new Set(
     columns
       .filter(column => column.kind === "employee" && column.employeeId > 0)
@@ -287,10 +338,6 @@ export function buildGraphRelatedScheduleHintData(params: {
       }
 
       const cellKey = getGraphCellKey(slot.employeeId, slot.dayOfMonth);
-      if (!isGraphCellEmptyValue(cellMap[cellKey])) {
-        return;
-      }
-
       const cellSlots = slotsByCellKey.get(cellKey) ?? [];
       cellSlots.push(slot);
       slotsByCellKey.set(cellKey, cellSlots);
@@ -305,7 +352,7 @@ export function buildGraphRelatedScheduleHintData(params: {
         return;
       }
 
-      const mergedIntervals = mergeGraphIntervalsForDisplay(cellSlots);
+      const mergedIntervals = mergeGraphIntervalsForDisplay(cellSlots, { mergeTouching: true });
       const dayValues = dayValuesByEmployeeId.get(employeeId) ?? buildGraphRelatedScheduleHintDayValues({
         year: graph.year,
         month: graph.month,
@@ -421,7 +468,10 @@ export function rgbHexToArgb(value: string) {
   return (255 << 24) | (red << 16) | (green << 8) | blue;
 }
 
-export function mergeGraphIntervalsForDisplay(slots: Pick<GraphSlot, "fromTime" | "toTime">[]) {
+export function mergeGraphIntervalsForDisplay(
+  slots: Pick<GraphSlot, "fromTime" | "toTime">[],
+  options: { mergeTouching?: boolean } = {},
+) {
   const uniqueIntervals = new Set<string>();
   const intervals: Array<{ fromMinutes: number; toMinutes: number }> = [];
 
@@ -461,7 +511,10 @@ export function mergeGraphIntervalsForDisplay(slots: Pick<GraphSlot, "fromTime" 
 
   for (let index = 1; index < intervals.length; index += 1) {
     const nextInterval = intervals[index];
-    if (nextInterval.fromMinutes <= current.toMinutes) {
+    if (
+      nextInterval.fromMinutes < current.toMinutes ||
+      (options.mergeTouching && nextInterval.fromMinutes === current.toMinutes)
+    ) {
       current.toMinutes = Math.max(current.toMinutes, nextInterval.toMinutes);
       continue;
     }
@@ -486,6 +539,18 @@ export function formatGraphIntervals(intervals: Array<{ from: string; to: string
   return intervals.map(interval => `${interval.from} - ${interval.to}`).join(", ");
 }
 
+export function formatGraphCellValueForDisplay(value: string) {
+  const parsed = tryParseGraphIntervals(value);
+  if (!parsed.ok || parsed.value.length === 0) {
+    return value;
+  }
+
+  return formatGraphIntervals(mergeGraphIntervalsForDisplay(
+    parsed.value.map(interval => ({ fromTime: interval.from, toTime: interval.to })),
+    { mergeTouching: true },
+  ));
+}
+
 export function tryParseGraphIntervals(input: string):
   | { ok: true; value: Array<{ from: string; to: string }> }
   | { ok: false; error: string } {
@@ -497,8 +562,15 @@ export function tryParseGraphIntervals(input: string):
 
   const parts = trimmed
     .split(",")
-    .map(part => part.trim())
-    .filter(Boolean);
+    .map(part => part.trim());
+
+  if (parts.some(part => !part)) {
+    return { ok: false, error: t("Enter a complete time range after each comma.") };
+  }
+
+  if (parts.length > GRAPH_MAX_INTERVALS_PER_CELL) {
+    return { ok: false, error: t("A cell can contain no more than {0} time ranges.", GRAPH_MAX_INTERVALS_PER_CELL) };
+  }
 
   const uniqueIntervals = new Set<string>();
   const intervals: Array<{ from: string; to: string }> = [];
@@ -511,23 +583,23 @@ export function tryParseGraphIntervals(input: string):
       .filter(Boolean);
 
     if (segments.length !== 2) {
-      return { ok: false, error: "Use time ranges like 09:00 - 15:00. Comma-separated ranges are allowed." };
+      return { ok: false, error: t("Use time ranges like 09:00 - 15:00. Comma-separated ranges are allowed.") };
     }
 
     const from = normalizeGraphTime(segments[0]);
     const to = normalizeGraphTime(segments[1]);
 
     if (!from || !to) {
-      return { ok: false, error: "Use time ranges like 09:00 - 15:00." };
+      return { ok: false, error: t("Use time ranges like 09:00 - 15:00.") };
     }
 
     if ((parseGraphTimeMinutes(to) ?? 0) <= (parseGraphTimeMinutes(from) ?? 0)) {
-      return { ok: false, error: "From must be earlier than To." };
+      return { ok: false, error: t("From must be earlier than To.") };
     }
 
     const key = `${from}:${to}`;
     if (uniqueIntervals.has(key)) {
-      continue;
+      return { ok: false, error: t("The same time range cannot be entered more than once.") };
     }
 
     uniqueIntervals.add(key);
@@ -543,6 +615,14 @@ export function tryParseGraphIntervals(input: string):
 
     return (parseGraphTimeMinutes(left.to) ?? 0) - (parseGraphTimeMinutes(right.to) ?? 0);
   });
+
+  for (let index = 1; index < intervals.length; index += 1) {
+    const previousTo = parseGraphTimeMinutes(intervals[index - 1].to) ?? 0;
+    const currentFrom = parseGraphTimeMinutes(intervals[index].from) ?? 0;
+    if (currentFrom < previousTo) {
+      return { ok: false, error: t("Time ranges in one cell cannot overlap.") };
+    }
+  }
 
   return { ok: true, value: intervals };
 }
@@ -683,7 +763,7 @@ export function buildGraphSummaryHeaders(year: number, month: number) {
   return Array.from({ length: daysInMonth }, (_, index) => {
     const dayOfMonth = index + 1;
     const date = getGraphDate(year, month, dayOfMonth);
-    const weekday = new Intl.DateTimeFormat("en-US", {
+    const weekday = dateTimeFormat("en-US", {
       weekday: "short",
       timeZone: "UTC",
     }).format(date);
@@ -702,17 +782,30 @@ export function buildGraphSummaryRows(
   slots: GraphSlot[] = [],
 ) {
   const columns = buildGraphMatrixColumns(graphEmployees, employeesById, slots);
-  const cellMap = buildGraphCellMap(slots);
   const daysInMonth = getGraphDaysInMonth(graph.year, graph.month);
+  const slotsByCellKey = new Map<string, GraphSlot[]>();
+
+  slots.forEach(slot => {
+    if (!slot.employeeId || slot.employeeId <= 0) {
+      return;
+    }
+
+    const cellKey = getGraphCellKey(slot.employeeId, slot.dayOfMonth);
+    const cellSlots = slotsByCellKey.get(cellKey) ?? [];
+    cellSlots.push(slot);
+    slotsByCellKey.set(cellKey, cellSlots);
+  });
 
   return columns.map(column => {
-    const days = Array.from({ length: daysInMonth }, (_, index) => {
+    const dayCells = Array.from({ length: daysInMonth }, (_, index) => {
       const dayOfMonth = index + 1;
-      const cellValue = cellMap[getGraphCellKey(column.employeeId, dayOfMonth)] ?? GRAPH_EMPTY_MARK;
-      return buildGraphSummaryDayCell(cellValue);
+      return buildGraphSummaryDayCells(slotsByCellKey.get(getGraphCellKey(column.employeeId, dayOfMonth)) ?? []);
     });
-
-    const workDays = days.filter(day => day.hours !== "" || day.from !== "" || day.to !== "").length;
+    const dayRowCount = Math.max(1, ...dayCells.map(cells => cells.length));
+    const dayRows = Array.from({ length: dayRowCount }, (_, rowIndex) =>
+      dayCells.map(cells => cells[rowIndex] ?? createEmptyGraphSummaryDayCell()),
+    );
+    const workDays = dayCells.filter(cells => cells.length > 0).length;
     const freeDays = Math.max(0, daysInMonth - workDays);
 
     return {
@@ -721,7 +814,8 @@ export function buildGraphSummaryRows(
       workDays,
       freeDays,
       sum: formatSummaryMinutes(column.totalMinutes),
-      days,
+      days: dayRows[0],
+      dayRows,
     } satisfies GraphSummaryRow;
   });
 }
@@ -1080,38 +1174,19 @@ function hasGraphIntervalOverlap(intervals: Array<{ fromMinutes: number; toMinut
   return false;
 }
 
-function buildGraphSummaryDayCell(value: string): GraphSummaryDayCell {
-  const trimmed = value.trim();
+function createEmptyGraphSummaryDayCell(): GraphSummaryDayCell {
+  return { from: "", to: "", hours: "" };
+}
 
-  if (!trimmed || trimmed === GRAPH_EMPTY_MARK) {
-    return { from: "", to: "", hours: "" };
-  }
-
-  const matches = [...trimmed.matchAll(/\b([01]?\d|2[0-3]):[0-5]\d\b/g)].map(match => match[0]);
-  if (matches.length < 2) {
-    return { from: trimmed, to: "", hours: "" };
-  }
-
-  const totalMinutes = matches.reduce((sum, _, index) => {
-    if (index % 2 !== 0) {
-      return sum;
-    }
-
-    const fromMinutes = parseGraphTimeMinutes(matches[index]);
-    const toMinutes = parseGraphTimeMinutes(matches[index + 1] ?? "");
-
-    if (fromMinutes === null || toMinutes === null || toMinutes <= fromMinutes) {
-      return sum;
-    }
-
-    return sum + (toMinutes - fromMinutes);
-  }, 0);
-
-  return {
-    from: matches[0],
-    to: matches[matches.length - 1],
-    hours: formatSummaryMinutes(totalMinutes),
-  };
+function buildGraphSummaryDayCells(daySlots: GraphSlot[]): GraphSummaryDayCell[] {
+  return mergeGraphIntervalsForDisplay(daySlots, { mergeTouching: true }).map(interval => ({
+    from: interval.from,
+    to: interval.to,
+    hours: formatSummaryMinutes(getSlotDurationMinutes({
+      fromTime: interval.from,
+      toTime: interval.to,
+    })),
+  }));
 }
 
 function formatSummaryMinutes(totalMinutes: number) {
@@ -1126,7 +1201,7 @@ function formatSummaryMinutes(totalMinutes: number) {
 }
 
 function getEmployeeLabel(employeeId: number, employeesById?: Map<number, Employee>) {
-  return getEmployeeFullName(employeesById?.get(employeeId), `Employee ${employeeId}`);
+  return getEmployeeFullName(employeesById?.get(employeeId), t("Employee {0}", employeeId));
 }
 
 function containsAlphabeticCharacter(value: string) {
@@ -1168,11 +1243,6 @@ function parseGraphTimeMinutes(value: string) {
 
   const [hours, minutes] = normalized.split(":").map(Number);
   return hours * 60 + minutes;
-}
-
-function isGraphCellEmptyValue(value: string | undefined) {
-  const trimmed = value?.trim() ?? "";
-  return trimmed.length === 0 || trimmed === GRAPH_EMPTY_MARK;
 }
 
 function buildGraphRelatedScheduleHintDayValues(params: {

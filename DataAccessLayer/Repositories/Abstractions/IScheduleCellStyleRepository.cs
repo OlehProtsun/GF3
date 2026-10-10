@@ -11,4 +11,14 @@ public interface IScheduleCellStyleRepository : IBaseRepository<ScheduleCellStyl
     /// Returns all style overrides for one schedule.
     /// </summary>
     Task<List<ScheduleCellStyleModel>> GetByScheduleAsync(int scheduleId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Returns a style override for one schedule cell.
+    /// </summary>
+    Task<ScheduleCellStyleModel?> GetByScheduleCellAsync(int scheduleId, int dayOfMonth, int employeeId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Replaces all style overrides for one schedule in one database batch.
+    /// </summary>
+    Task ReplaceForScheduleAsync(int scheduleId, IEnumerable<ScheduleCellStyleModel> styles, CancellationToken ct = default);
 }

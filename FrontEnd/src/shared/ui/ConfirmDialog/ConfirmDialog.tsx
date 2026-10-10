@@ -1,3 +1,4 @@
+import { t } from "@shared/i18n";
 import { useEffect, useId, type MouseEvent, type ReactNode } from "react";
 import { IosButton } from "@shared/ui/components/IosButton";
 import { CheckIcon, CloseIcon, WarnIcon } from "@shared/ui/icons";
@@ -24,8 +25,8 @@ export function ConfirmDialog({
   variant = "warning",
   onConfirm,
   onCancel,
-  confirmText = "Confirm",
-  cancelText = "Cancel",
+  confirmText = t("Confirm"),
+  cancelText = t("Cancel"),
   footerSlot,
   confirmDisabled = false,
   cancelDisabled = false,
@@ -63,6 +64,7 @@ export function ConfirmDialog({
       role={open ? "dialog" : undefined}
       aria-modal={open ? true : undefined}
       aria-hidden={open ? undefined : true}
+      inert={!open}
       aria-labelledby={open ? titleId : undefined}
       aria-describedby={open ? messageId : undefined}
       onMouseDown={handleOverlayMouseDown}

@@ -16,12 +16,36 @@ export type GraphCellStyleDto = GraphCellStyle;
 export type SchedulePresetDto = SchedulePreset;
 export type SchedulePresetEmployeeDto = SchedulePresetEmployee;
 
+export type GraphVersionDto = {
+  id: number;
+  parentVersionId?: number | null;
+  versionNumber: number;
+  branchName: string;
+  createdAtUtc: string;
+  authorName: string;
+  employeeCount: number;
+  slotCount: number;
+  cellStyleCount: number;
+  isCurrent: boolean;
+};
+
+export type GraphVersionTreeDto = {
+  currentVersionId?: number | null;
+  versions: GraphVersionDto[];
+};
+
 export type SaveContainerDto = { name: string; note?: string };
+export type UpdateGraphsPublicationDto = {
+  publicationStatus: Graph["publicationStatus"];
+  allowSwap?: boolean | null;
+};
 export type SaveGraphDto = {
   shopId: number;
   name: string;
   year: number;
   month: number;
+  publicationStatus?: Graph["publicationStatus"];
+  allowSwap?: boolean;
   peoplePerShift: number;
   shift1Time: string;
   shift2Time: string;
@@ -98,4 +122,26 @@ export type UpsertGraphCellStyleDto = {
   employeeId: number;
   backgroundColorArgb?: number | null;
   textColorArgb?: number | null;
+};
+
+export type ManagerGraphFillColorBindDto = {
+  id: number;
+  key: string;
+  fillColor: string;
+};
+
+export type SaveManagerGraphFillColorBindDto = {
+  key: string;
+  fillColor: string;
+};
+
+export type ManagerGraphTextColorBindDto = {
+  id: number;
+  key: string;
+  textColor: string;
+};
+
+export type SaveManagerGraphTextColorBindDto = {
+  key: string;
+  textColor: string;
 };

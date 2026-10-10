@@ -1,0 +1,359 @@
+<!doctype html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="source-sha256" content="933b84d6d51f6c41d89218c45cdba6fa8ae5d05cf8d7250ba99a4b5a86a3c7a5" />
+  <title>Umowa o świadczenie usług SaaS – GF</title>
+  <style>
+    @page {
+      size: A4;
+      margin: 20mm 18mm 20mm 18mm;
+      @bottom-center {
+        content: "Strona " counter(page) " z " counter(pages);
+        color: #667085;
+        font: 8.5pt Arial, sans-serif;
+      }
+    }
+    :root {
+      color: #182230;
+      background: #edf1f5;
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: 11pt;
+      line-height: 1.48;
+      font-synthesis: none;
+    }
+    *, *::before, *::after { box-sizing: border-box; }
+    html, body { margin: 0; min-height: 100%; }
+    body { padding: 20px; }
+    .document {
+      width: 210mm;
+      margin: 0 auto;
+      padding: 20mm 18mm;
+      background: #fff;
+      box-shadow: 0 18px 55px rgba(24, 34, 48, 0.16);
+    }
+    h1, h2, h3 { color: #101828; break-after: avoid; page-break-after: avoid; }
+    h1 {
+      margin: 0 0 8mm;
+      padding-bottom: 5mm;
+      border-bottom: 1.5px solid #98a2b3;
+      font-family: Arial, sans-serif;
+      font-size: 21pt;
+      line-height: 1.15;
+      letter-spacing: 0.03em;
+      text-align: center;
+    }
+    h2 {
+      margin: 9mm 0 4mm;
+      padding-bottom: 1.8mm;
+      border-bottom: 1px solid #d0d5dd;
+      font-family: Arial, sans-serif;
+      font-size: 14pt;
+      line-height: 1.25;
+    }
+    h3 {
+      margin: 5mm 0 2.5mm;
+      font-family: Arial, sans-serif;
+      font-size: 11.5pt;
+    }
+    p, li { orphans: 3; widows: 3; }
+    .paragraph { margin: 0 0 3.2mm; text-align: justify; }
+    .paragraph.indented { margin-left: 9mm; }
+    .legal-notice {
+      margin: 0 0 7mm;
+      padding: 4mm 5mm;
+      border: 1px solid #f2c94c;
+      border-left: 4px solid #d69e00;
+      background: #fffae8;
+      font-family: Arial, sans-serif;
+      font-size: 9.2pt;
+      line-height: 1.45;
+      break-inside: avoid;
+    }
+    .clause, .bullet {
+      display: grid;
+      grid-template-columns: 8mm 1fr;
+      gap: 1.5mm;
+      margin: 0 0 2.7mm;
+      text-align: justify;
+      orphans: 3;
+      widows: 3;
+    }
+    .clause-1, .bullet-1 { margin-left: 9.5mm; }
+    .clause-2, .bullet-2 { margin-left: 19mm; }
+    .clause-3, .bullet-3 { margin-left: 28.5mm; }
+    .clause-number { font-weight: 700; }
+    strong { color: #101828; }
+    code {
+      padding: 0.2mm 1mm;
+      border-radius: 1mm;
+      background: #f2f4f7;
+      font: 9pt Consolas, monospace;
+    }
+    table {
+      width: 100%;
+      margin: 4mm 0 7mm;
+      border-collapse: collapse;
+      font-family: Arial, sans-serif;
+      font-size: 9pt;
+      line-height: 1.35;
+      break-inside: avoid;
+    }
+    thead { display: table-header-group; }
+    tr { break-inside: avoid; page-break-inside: avoid; }
+    th, td { padding: 2.5mm 2.8mm; border: 1px solid #d0d5dd; vertical-align: top; }
+    th { background: #f2f4f7; text-align: left; }
+    h2 + .clause, h2 + .paragraph, h3 + .clause, h3 + .paragraph { margin-top: 0; }
+    @media screen and (max-width: 850px) {
+      body { padding: 0; background: #fff; }
+      .document { width: 100%; padding: 28px 22px; box-shadow: none; }
+      h1 { font-size: 18pt; }
+      table { display: block; overflow-x: auto; }
+    }
+    @media print {
+      html, body { min-height: 0; background: #fff; }
+      body {
+        padding: 0;
+        print-color-adjust: exact;
+        -webkit-print-color-adjust: exact;
+      }
+      .document { width: auto; margin: 0; padding: 0; box-shadow: none; }
+      h1, h2, h3 { break-after: avoid; page-break-after: avoid; }
+      p, li { orphans: 3; widows: 3; }
+      table, .legal-notice { break-inside: avoid; page-break-inside: avoid; }
+    }
+  </style>
+</head>
+<body>
+  <main class="document">
+<h1>UMOWA O ŚWIADCZENIE USŁUG SaaS</h1>
+<p class="paragraph">zawarta w <strong>[DO WYPEŁNIENIA: MIEJSCOWOŚĆ]</strong> w dniu <strong>[DO WYPEŁNIENIA: DATA]</strong> („Umowa”).</p>
+<aside class="legal-notice"><strong>Ważne:</strong> niniejszy dokument jest projektem do negocjacji i nie stanowi porady prawnej, podatkowej, księgowej, ubezpieczeniowej ani dotyczącej ochrony danych osobowych. Przed podpisaniem wymaga sprawdzenia przez polskiego prawnika oraz księgowego z uwzględnieniem aktualnego statusu Stron.</aside>
+<h2>Strony</h2>
+<p class="clause clause-0"><span class="clause-number">1.</span><span><strong>[DO WYPEŁNIENIA: IMIĘ I NAZWISKO]</strong>, zamieszkały/a pod adresem <strong>[DO WYPEŁNIENIA: ADRES ZAMIESZKANIA]</strong>, zamierzający/a świadczyć usługi w ramach działalności nierejestrowanej, o ile spełnia aktualne przesłanki z art. 5 ustawy z dnia 6 marca 2018 r. – Prawo przedsiębiorców, NIP: <strong>[DO WYPEŁNIENIA: NIP – JEŻELI NADANY]</strong>, PESEL: <strong>[DO WYPEŁNIENIA: PESEL – TYLKO JEŻELI KONIECZNY]</strong>, adres e-mail: <strong>[DO WYPEŁNIENIA: ADRES E-MAIL]</strong>, numer telefonu: <strong>[DO WYPEŁNIENIA: NUMER TELEFONU]</strong>, zwany/a dalej „<strong>Usługodawcą</strong>”.</span></p>
+<p class="paragraph indented"><strong>[DO WERYFIKACJI PRAWNEJ: STATUS I SPOSÓB IDENTYFIKACJI USŁUGODAWCY]</strong></p>
+<p class="paragraph indented"><strong>[DO WERYFIKACJI Z KSIĘGOWYM LUB PRAWNIKIEM]</strong></p>
+<p class="clause clause-0"><span class="clause-number">2.</span><span><strong>[DO WYPEŁNIENIA: PEŁNA NAZWA SPÓŁKI]</strong>, <strong>[DO WYPEŁNIENIA: FORMA PRAWNA]</strong>, z siedzibą pod adresem <strong>[DO WYPEŁNIENIA: ADRES SIEDZIBY]</strong>, wpisana do rejestru przedsiębiorców Krajowego Rejestru Sądowego pod numerem KRS <strong>[DO WYPEŁNIENIA: KRS]</strong>, NIP <strong>[DO WYPEŁNIENIA: NIP]</strong>, REGON <strong>[DO WYPEŁNIENIA: REGON]</strong>, reprezentowana przez <strong>[DO WYPEŁNIENIA: OSOBA REPREZENTUJĄCA]</strong> na podstawie <strong>[DO WYPEŁNIENIA: PODSTAWA REPREZENTACJI]</strong>, adres e-mail do kontaktu: <strong>[DO WYPEŁNIENIA: ADRES E-MAIL DO KONTAKTU]</strong>, adres e-mail do dokumentów rozliczeniowych: <strong>[DO WYPEŁNIENIA: ADRES E-MAIL DO FAKTUR]</strong>, zwana dalej „<strong>Klientem</strong>”.</span></p>
+<p class="paragraph">Usługodawca i Klient są dalej łącznie zwani „<strong>Stronami</strong>”, a każdy z osobna „<strong>Stroną</strong>”.</p>
+<h2>§ 1. Definicje</h2>
+<p class="clause clause-0"><span class="clause-number">1.</span><span><strong>Platforma</strong> – platforma internetowa pod nazwą „GF”, dostępna pod adresem <strong>[DO WYPEŁNIENIA: ADRES PLATFORMY]</strong>, służąca do organizacji pracy, tworzenia i udostępniania grafików pracowniczych, zarządzania dostępnością oraz komunikacji w zakresie opisanym w Załączniku nr 1.</span></p>
+<p class="clause clause-0"><span class="clause-number">2.</span><span><strong>Usługa SaaS</strong> – świadczona na odległość usługa zapewnienia Klientowi dostępu do Platformy przez przeglądarkę internetową, bez przeniesienia własności Platformy, kodu źródłowego ani autorskich praw majątkowych.</span></p>
+<p class="clause clause-0"><span class="clause-number">3.</span><span><strong>Konto</strong> – indywidualny, zabezpieczony zbiór uprawnień umożliwiający Użytkownikowi korzystanie z Platformy.</span></p>
+<p class="clause clause-0"><span class="clause-number">4.</span><span><strong>Użytkownik</strong> – osoba upoważniona przez Klienta do korzystania z Platformy jako menedżer albo pracownik.</span></p>
+<p class="clause clause-0"><span class="clause-number">5.</span><span><strong>Administrator Klienta</strong> – wskazana przez Klienta osoba uprawniona do kontaktu z Usługodawcą, zarządzania organizacją Kont i koordynowania korzystania z Platformy po stronie Klienta.</span></p>
+<p class="clause clause-0"><span class="clause-number">6.</span><span><strong>Dane Klienta</strong> – dane, treści i informacje wprowadzone do Platformy przez Klienta lub Użytkowników albo przekazane Usługodawcy w celu wykonania Umowy, w tym dane pracowników, grafiki, dostępności i informacje organizacyjne.</span></p>
+<p class="clause clause-0"><span class="clause-number">7.</span><span><strong>Okres Rozliczeniowy</strong> – jeden miesiąc kalendarzowy, chyba że Strony wyraźnie uzgodnią inaczej w formie dokumentowej.</span></p>
+<p class="clause clause-0"><span class="clause-number">8.</span><span><strong>Incydent</strong> – zdarzenie dotyczące działania, bezpieczeństwa lub dostępności Platformy wymagające analizy Usługodawcy.</span></p>
+<p class="clause clause-0"><span class="clause-number">9.</span><span><strong>Awaria</strong> – potwierdzona, powtarzalna niezgodność działania Platformy z uzgodnionym zakresem, która nie wynika z Błędu Użytkownika, urządzenia lub łącza Klienta ani systemu zewnętrznego pozostającego poza rozsądną kontrolą Usługodawcy.</span></p>
+<p class="clause clause-0"><span class="clause-number">10.</span><span><strong>Awaria Krytyczna</strong> – Awaria uniemożliwiająca wszystkim upoważnionym Użytkownikom Klienta zalogowanie się lub korzystanie z podstawowych funkcji publikowanego grafiku, bez dostępnego rozsądnego obejścia.</span></p>
+<p class="clause clause-0"><span class="clause-number">11.</span><span><strong>Przerwa Techniczna</strong> – czasowe ograniczenie lub wyłączenie Platformy związane z utrzymaniem, aktualizacją, bezpieczeństwem albo usuwaniem Awarii.</span></p>
+<p class="clause clause-0"><span class="clause-number">12.</span><span><strong>Wniosek Rozwojowy</strong> – propozycja nowej funkcji albo zmiany wykraczającej poza usunięcie Awarii i bieżący zakres z Załącznika nr 1.</span></p>
+<p class="clause clause-0"><span class="clause-number">13.</span><span><strong>Błąd Użytkownika</strong> – nieprawidłowe działanie lub rezultat wynikające z wprowadzenia błędnych danych, użycia niezgodnego z Dokumentacją albo działania bez wymaganych uprawnień.</span></p>
+<p class="clause clause-0"><span class="clause-number">14.</span><span><strong>Dokumentacja</strong> – aktualne instrukcje użytkowe i informacje o obsłudze udostępnione Klientowi przez Usługodawcę w Platformie, wiadomości e-mail albo innym uzgodnionym kanale.</span></p>
+<p class="clause clause-0"><span class="clause-number">15.</span><span><strong>Dzień Roboczy</strong> – dzień od poniedziałku do piątku, z wyłączeniem dni ustawowo wolnych od pracy w Polsce.</span></p>
+<h2>§ 2. Przedmiot Umowy</h2>
+<p class="clause clause-0"><span class="clause-number">1.</span><span>Usługodawca zobowiązuje się zapewniać Klientowi zdalny dostęp do Usługi SaaS, a Klient zobowiązuje się korzystać z niej zgodnie z Umową i terminowo płacić wynagrodzenie.</span></p>
+<p class="clause clause-0"><span class="clause-number">2.</span><span>Platforma jest utrzymywana przez Usługodawcę lub na jego rzecz. Korzystanie odbywa się przez obsługiwaną przeglądarkę internetową pod adresem <strong>[DO WYPEŁNIENIA: ADRES PLATFORMY]</strong>.</span></p>
+<p class="clause clause-0"><span class="clause-number">3.</span><span>Klient otrzymuje na czas obowiązywania Umowy ograniczone prawo korzystania z Platformy na zasadach określonych w § 9.</span></p>
+<p class="clause clause-0"><span class="clause-number">4.</span><span>Szczegółowy zakres funkcji i świadczeń wliczonych w abonament określa Załącznik nr 1 – Zakres usług i funkcjonalności Platformy.</span></p>
+<p class="clause clause-0"><span class="clause-number">5.</span><span>Umowa nie jest umową sprzedaży Platformy. Nie przenosi na Klienta własności aplikacji, serwera ani infrastruktury, kodu źródłowego, dokumentacji technicznej ani jakichkolwiek autorskich praw majątkowych lub praw wyłącznych.</span></p>
+<h2>§ 3. Zakres usług</h2>
+<p class="clause clause-0"><span class="clause-number">1.</span><span>W zakresie potwierdzonym w Załączniku nr 1 Usługa SaaS obejmuje w szczególności kategorie: zarządzanie pracownikami i lokalizacjami, tworzenie i publikowanie grafików, zarządzanie dostępnością, widok pracownika, komunikację i powiadomienia, obsługę zamian zmian, kontrolę godzin, historię wybranych działań oraz eksport danych w dostępnych formatach.</span></p>
+<p class="clause clause-0"><span class="clause-number">2.</span><span>Funkcje aktualnie wliczone w abonament, funkcje wyłączone oraz znane ograniczenia określa wyłącznie Załącznik nr 1. Opis marketingowy, prezentacja albo rozmowa handlowa nie rozszerzają zakresu Umowy bez udokumentowanego uzgodnienia Stron.</span></p>
+<p class="clause clause-0"><span class="clause-number">3.</span><span>Wnioski Rozwojowe, integracje, migracje danych, niestandardowe raporty, modyfikacje na wyłączność i inne prace indywidualne nie są objęte miesięcznym abonamentem, chyba że Strony wyraźnie uzgodnią ich zakres, cenę i termin w formie pisemnej albo dokumentowej.</span></p>
+<p class="clause clause-0"><span class="clause-number">4.</span><span>Usługodawca nie ma obowiązku wdrożenia Wniosku Rozwojowego. Może przedstawić odrębną wycenę i harmonogram.</span></p>
+<h2>§ 4. Uruchomienie Platformy</h2>
+<p class="clause clause-0"><span class="clause-number">1.</span><span>Planowana data uruchomienia: <strong>[DO WYPEŁNIENIA: PLANOWANA DATA URUCHOMIENIA]</strong>.</span></p>
+<p class="clause clause-0"><span class="clause-number">2.</span><span>Osoba odpowiedzialna po stronie Usługodawcy: <strong>[DO WYPEŁNIENIA: OSOBA KONTAKTOWA USŁUGODAWCY]</strong>. Osoba odpowiedzialna po stronie Klienta: <strong>[DO WYPEŁNIENIA: OSOBA KONTAKTOWA KLIENTA]</strong>.</span></p>
+<p class="clause clause-0"><span class="clause-number">3.</span><span>Uruchomienie obejmuje kolejno:</span></p>
+<p class="clause clause-1"><span class="clause-number">1.</span><span>podstawową konfigurację Platformy w zakresie <strong>[DO WYPEŁNIENIA: ZAKRES KONFIGURACJI POCZĄTKOWEJ]</strong>;</span></p>
+<p class="clause clause-1"><span class="clause-number">2.</span><span>utworzenie lub ręczne dodanie podstawowych danych organizacyjnych uzgodnionych przez Strony;</span></p>
+<p class="clause clause-1"><span class="clause-number">3.</span><span>utworzenie dostępu Administratora Klienta;</span></p>
+<p class="clause clause-1"><span class="clause-number">4.</span><span>podstawowe wprowadzenie do obsługi;</span></p>
+<p class="clause clause-1"><span class="clause-number">5.</span><span>udostępnienie Platformy do bieżącej pracy.</span></p>
+<p class="clause clause-0"><span class="clause-number">4.</span><span>Początkowa liczba Użytkowników objętych konfiguracją wynosi maksymalnie <strong>[DO WYPEŁNIENIA: MAKSYMALNA LICZBA POCZĄTKOWYCH UŻYTKOWNIKÓW]</strong>.</span></p>
+<p class="clause clause-0"><span class="clause-number">5.</span><span>Import lub migracja danych z innych systemów nie są objęte uruchomieniem, chyba że zostaną wyraźnie wpisane do zakresu konfiguracji początkowej.</span></p>
+<p class="clause clause-0"><span class="clause-number">6.</span><span>Klient dostarczy kompletne i prawidłowe dane oraz zapewni dostępność osób decyzyjnych w terminach uzgodnionych przez Strony. Opóźnienie po stronie Klienta odpowiednio przesuwa termin uruchomienia.</span></p>
+<p class="clause clause-0"><span class="clause-number">7.</span><span>Uruchomienie może zostać potwierdzone dokumentem „Protokół uruchomienia Platformy”. Protokół nie jest tworzony w ramach niniejszego projektu Umowy.</span></p>
+<h2>§ 5. Konta i Użytkownicy</h2>
+<p class="clause clause-0"><span class="clause-number">1.</span><span>Klient wyznacza Administratora Klienta i przekazuje Usługodawcy jego aktualne dane kontaktowe.</span></p>
+<p class="clause clause-0"><span class="clause-number">2.</span><span>Klient odpowiada za prawidłowość danych Użytkowników, przydzielenie im właściwych ról i uprawnień oraz niezwłoczne zgłaszanie potrzeby utworzenia, zmiany, zablokowania lub usunięcia dostępu.</span></p>
+<p class="clause clause-0"><span class="clause-number">3.</span><span>Każdy Użytkownik korzysta z własnego Konta. Danych logowania nie wolno udostępniać innym osobom ani używać wspólnego Konta, chyba że Usługodawca wyraźnie udostępni odrębny mechanizm konta wspólnego.</span></p>
+<p class="clause clause-0"><span class="clause-number">4.</span><span>Klient zapewni, aby Użytkownicy chronili dane logowania i niezwłocznie zgłaszali podejrzenie ich ujawnienia lub przejęcia.</span></p>
+<p class="clause clause-0"><span class="clause-number">5.</span><span>Klient odpowiada za działania wykonane przez Konta pozostające pod jego kontrolą, z wyjątkiem zdarzeń wynikających z okoliczności, za które odpowiada Usługodawca.</span></p>
+<p class="clause clause-0"><span class="clause-number">6.</span><span>Zabronione jest obchodzenie zabezpieczeń, uzyskiwanie dostępu do cudzych Kont lub danych, testowanie podatności bez uprzedniej zgody, zakłócanie działania Platformy albo automatyczne pobieranie danych w sposób nieuzgodniony z Usługodawcą.</span></p>
+<h2>§ 6. Obowiązki Usługodawcy</h2>
+<p class="clause clause-0"><span class="clause-number">1.</span><span>Usługodawca zobowiązuje się:</span></p>
+<p class="clause clause-1"><span class="clause-number">1.</span><span>zapewniać dostęp do Platformy zgodnie z Umową;</span></p>
+<p class="clause clause-1"><span class="clause-number">2.</span><span>utrzymywać Usługę SaaS z należytą starannością właściwą dla profesjonalnego świadczenia usług informatycznych;</span></p>
+<p class="clause clause-1"><span class="clause-number">3.</span><span>wykonywać rozsądne czynności utrzymaniowe i aktualizacje;</span></p>
+<p class="clause clause-1"><span class="clause-number">4.</span><span>analizować zgłoszone i potwierdzone Awarie oraz podejmować działania naprawcze odpowiednie do ich wpływu;</span></p>
+<p class="clause clause-1"><span class="clause-number">5.</span><span>stosować odpowiednie do ryzyka środki ochrony dostępu do Platformy;</span></p>
+<p class="clause clause-1"><span class="clause-number">6.</span><span>utrzymywać mechanizm kopii zapasowych w zakresie określonym w § 14, po potwierdzeniu warunków produkcyjnych;</span></p>
+<p class="clause clause-1"><span class="clause-number">7.</span><span>w miarę możliwości uprzedzać o istotnych planowanych Przerwach Technicznych;</span></p>
+<p class="clause clause-1"><span class="clause-number">8.</span><span>świadczyć podstawowe wsparcie na zasadach z § 13;</span></p>
+<p class="clause clause-1"><span class="clause-number">9.</span><span>informować Klienta o istotnych Incydentach bezpieczeństwa lub ochrony danych osobowych, gdy wymagają tego przepisy lub odrębna umowa powierzenia.</span></p>
+<p class="clause clause-0"><span class="clause-number">2.</span><span>Usługodawca nie gwarantuje nieprzerwanego dostępu, dostępności na poziomie 100%, obsługi całodobowej, natychmiastowego usunięcia każdej Awarii, odtworzenia każdej usuniętej pozycji, zgodności z każdym urządzeniem lub przeglądarką ani pełnej ochrony przed wszystkimi cyberatakami.</span></p>
+<h2>§ 7. Obowiązki Klienta</h2>
+<p class="clause clause-0"><span class="clause-number">1.</span><span>Klient zobowiązuje się:</span></p>
+<p class="clause clause-1"><span class="clause-number">1.</span><span>korzystać z Platformy zgodnie z Umową, Dokumentacją i obowiązującym prawem;</span></p>
+<p class="clause clause-1"><span class="clause-number">2.</span><span>przekazywać prawidłowe, aktualne i zgodne z prawem dane;</span></p>
+<p class="clause clause-1"><span class="clause-number">3.</span><span>wskazać osoby kontaktowe oraz Administratora Klienta;</span></p>
+<p class="clause clause-1"><span class="clause-number">4.</span><span>zarządzać uprawnieniami Użytkowników i chronić dane logowania;</span></p>
+<p class="clause clause-1"><span class="clause-number">5.</span><span>korzystać z obsługiwanych przeglądarek, urządzeń i stabilnego połączenia z internetem;</span></p>
+<p class="clause clause-1"><span class="clause-number">6.</span><span>zgłaszać Awarie z opisem, czasem wystąpienia, zakresem wpływu i – o ile to możliwe – materiałem pozwalającym odtworzyć problem;</span></p>
+<p class="clause clause-1"><span class="clause-number">7.</span><span>terminowo płacić opłatę abonamentową;</span></p>
+<p class="clause clause-1"><span class="clause-number">8.</span><span>przestrzegać przepisów prawa pracy, ochrony danych osobowych oraz wewnętrznych zasad organizacji pracy;</span></p>
+<p class="clause clause-1"><span class="clause-number">9.</span><span>posiadać właściwą podstawę prawną do wprowadzania do Platformy danych pracowników i innych osób;</span></p>
+<p class="clause clause-1"><span class="clause-number">10.</span><span>nie wprowadzać treści bezprawnych, naruszających prawa osób trzecich albo bezpieczeństwo Platformy.</span></p>
+<p class="clause clause-0"><span class="clause-number">2.</span><span>Platforma wspiera układanie grafików i organizację pracy, ale nie zastępuje decyzji pracodawcy, działu kadr, prawnika ani specjalisty BHP. O ile Załącznik nr 1 nie stanowi wyraźnie inaczej, Platforma nie weryfikuje samodzielnie pełnej zgodności grafiku ze wszystkimi przepisami prawa pracy, układami zbiorowymi, umowami ani regulacjami wewnętrznymi Klienta.</span></p>
+<h2>§ 8. Wynagrodzenie i płatności</h2>
+<p class="clause clause-0"><span class="clause-number">1.</span><span>Miesięczna opłata abonamentowa za dostęp do Platformy wynosi <strong>500,00 zł</strong>.</span></p>
+<p class="clause clause-0"><span class="clause-number">2.</span><span>Sposób ujęcia podatku VAT, składek, zaliczek podatkowych oraz innych publicznoprawnych obciążeń zostanie ustalony zgodnie z aktualnym statusem Usługodawcy i obowiązującymi przepisami.</span></p>
+<p class="paragraph indented"><strong>[DO WERYFIKACJI KSIĘGOWEJ: SPOSÓB ROZLICZENIA, VAT, PODATEK, ZUS I EWENTUALNE OBOWIĄZKI PŁATNIKA]</strong></p>
+<p class="paragraph indented"><strong>[DO WERYFIKACJI Z KSIĘGOWYM LUB PRAWNIKIEM]</strong></p>
+<p class="clause clause-0"><span class="clause-number">3.</span><span>W wersji głównej projektu opłata jest płatna <strong>z góry</strong> za każdy Okres Rozliczeniowy, na podstawie faktury albo innego prawnie dopuszczalnego dokumentu księgowego: <strong>[DO WERYFIKACJI KSIĘGOWEJ: RODZAJ DOKUMENTU KSIĘGOWEGO]</strong>.</span></p>
+<p class="clause clause-0"><span class="clause-number">4.</span><span>Pierwszy Okres Rozliczeniowy rozpoczyna się <strong>[DO WYPEŁNIENIA: PIERWSZY DZIEŃ PIERWSZEGO OKRESU ROZLICZENIOWEGO]</strong>. Zasada rozliczenia niepełnego miesiąca: <strong>[DO WYPEŁNIENIA: PEŁNA OPŁATA / PROPORCJONALNIE / INNA ZASADA]</strong>.</span></p>
+<p class="clause clause-0"><span class="clause-number">5.</span><span>Termin płatności wynosi 7 dni od dnia wystawienia i prawidłowego doręczenia dokumentu rozliczeniowego na adres <strong>[DO WYPEŁNIENIA: ADRES E-MAIL DO FAKTUR]</strong>.</span></p>
+<p class="clause clause-0"><span class="clause-number">6.</span><span>Płatność następuje przelewem na rachunek <strong>[DO WYPEŁNIENIA: NUMER RACHUNKU BANKOWEGO]</strong>. Za dzień zapłaty uważa się dzień uznania rachunku wskazanego przez Usługodawcę.</span></p>
+<p class="clause clause-0"><span class="clause-number">7.</span><span>W razie opóźnienia Usługodawca może żądać odsetek ustawowych właściwych dla danej relacji i transakcji, jeżeli znajdują zastosowanie.</span></p>
+<p class="clause clause-0"><span class="clause-number">8.</span><span>Jeżeli opóźnienie jest istotne, Usługodawca może wezwać Klienta do zapłaty, wyznaczając dodatkowy termin co najmniej 7 dni. Po bezskutecznym upływie tego terminu może zawiesić dostęp, o ile uprzednio poinformuje Klienta o planowanym zawieszeniu i jego skutkach.</span></p>
+<p class="clause clause-0"><span class="clause-number">9.</span><span>Dostęp zostanie przywrócony bez zbędnej zwłoki po zaksięgowaniu pełnej zaległej należności, chyba że Umowa została wcześniej skutecznie rozwiązana.</span></p>
+<h2>§ 9. Prawa własności intelektualnej</h2>
+<p class="clause clause-0"><span class="clause-number">1.</span><span>Wszystkie prawa własności intelektualnej do Platformy, jej kodu, interfejsu, rozwiązań, oznaczeń i Dokumentacji pozostają przy Usługodawcy albo właściwych licencjodawcach. Umowa nie przenosi na Klienta autorskich praw majątkowych.</span></p>
+<p class="clause clause-0"><span class="clause-number">2.</span><span>Kod źródłowy nie jest przekazywany ani udostępniany Klientowi.</span></p>
+<p class="clause clause-0"><span class="clause-number">3.</span><span>Usługodawca udziela Klientowi ograniczonego, niewyłącznego, nieprzenoszalnego i niepodlegającego sublicencjonowaniu prawa do korzystania z Platformy przez czas obowiązywania Umowy i pod warunkiem regulowania wymaganych opłat.</span></p>
+<p class="clause clause-0"><span class="clause-number">4.</span><span>Dozwolone korzystanie obejmuje wyłącznie:</span></p>
+<p class="clause clause-1"><span class="clause-number">1.</span><span>dostęp do Platformy przez obsługiwaną przeglądarkę;</span></p>
+<p class="clause clause-1"><span class="clause-number">2.</span><span>używanie dostępnych funkcji na wewnętrzne potrzeby organizacyjne Klienta;</span></p>
+<p class="clause clause-1"><span class="clause-number">3.</span><span>wyświetlanie wyników upoważnionym Użytkownikom;</span></p>
+<p class="clause clause-1"><span class="clause-number">4.</span><span>pobieranie albo drukowanie Danych Klienta w zakresie, w jakim Platforma udostępnia taką funkcję.</span></p>
+<p class="clause clause-0"><span class="clause-number">5.</span><span>Klient nie może odsprzedawać, sublicencjonować, rozpowszechniać, kopiować poza dozwolonym zakresem, wynajmować ani udostępniać Platformy osobom trzecim. Nie może prowadzić inżynierii wstecznej, dekompilacji ani prób uzyskania kodu źródłowego, z wyjątkiem zakresu, w którym zakazu takiego nie dopuszczają bezwzględnie obowiązujące przepisy.</span></p>
+<p class="clause clause-0"><span class="clause-number">6.</span><span>Klient nie usunie oznaczeń prawnych ani informacji o pochodzeniu Platformy i nie wykorzysta jej do stworzenia produktu konkurencyjnego przez nieuprawnione kopiowanie.</span></p>
+<p class="clause clause-0"><span class="clause-number">7.</span><span>Klient zachowuje prawa do Danych Klienta. Usługodawca nie nabywa własności danych pracowników, grafików ani informacji operacyjnych Klienta.</span></p>
+<p class="clause clause-0"><span class="clause-number">8.</span><span>Usługodawca może wykorzystać dobrowolne opinie i sugestie do rozwoju Platformy, pod warunkiem że nie ujawni poufnych informacji Klienta ani nie przypisze mu wypowiedzi bez zgody.</span></p>
+<h2>§ 10. Dane Klienta</h2>
+<p class="clause clause-0"><span class="clause-number">1.</span><span>Klient zachowuje prawa do Danych Klienta oraz odpowiada za legalność ich pozyskania, prawidłowość, kompletność i zakres wprowadzania.</span></p>
+<p class="clause clause-0"><span class="clause-number">2.</span><span>Usługodawca wykorzystuje Dane Klienta wyłącznie w celu świadczenia Usługi SaaS, realizacji Umowy, zapewnienia bezpieczeństwa i wykonania obowiązków prawnych.</span></p>
+<p class="clause clause-0"><span class="clause-number">3.</span><span>Klient może pobierać dane za pomocą funkcji eksportu dostępnych w Platformie. Dodatkowy eksport może zostać przygotowany, o ile jest technicznie możliwy i został uzgodniony co do zakresu, formatu, terminu oraz ewentualnej ceny.</span></p>
+<p class="clause clause-0"><span class="clause-number">4.</span><span>Dostępny format eksportu: <strong>[DO WERYFIKACJI TECHNICZNEJ: DOSTĘPNY FORMAT EKSPORTU – OBECNIE POTWIERDZONO ARKUSZ XLSX DLA WYBRANYCH DANYCH GRAFIKU]</strong>.</span></p>
+<p class="clause clause-0"><span class="clause-number">5.</span><span>Klient powinien pobrać lub zażądać eksportu przed zakończeniem Umowy. Po jej zakończeniu może to zrobić w terminie <strong>[DO WERYFIKACJI TECHNICZNEJ: OKRES NA POBRANIE DANYCH PO ZAKOŃCZENIU UMOWY – PROPOZYCJA 14 DNI]</strong>.</span></p>
+<p class="clause clause-0"><span class="clause-number">6.</span><span>Po upływie tego okresu Dane Klienta zostaną usunięte albo zanonimizowane w terminie <strong>[DO WERYFIKACJI TECHNICZNEJ I PRAWNEJ: TERMIN USUNIĘCIA DANYCH – PROPOZYCJA 45 DNI]</strong>, z uwzględnieniem cyklu kopii zapasowych i prawnych obowiązków przechowywania.</span></p>
+<p class="clause clause-0"><span class="clause-number">7.</span><span>Usunięcie danych z aktywnego środowiska nie oznacza natychmiastowego usunięcia każdej kopii zapasowej. Dane w kopiach podlegają ograniczonemu dostępowi i są usuwane wraz z właściwym cyklem retencji, chyba że prawo wymaga dłuższego przechowania.</span></p>
+<h2>§ 11. Ochrona danych osobowych</h2>
+<p class="clause clause-0"><span class="clause-number">1.</span><span>W typowym modelu Klient jest administratorem danych osobowych pracowników i innych osób wprowadzanych do Platformy, a Usługodawca może działać jako podmiot przetwarzający. Ostateczne role Stron należy ustalić na podstawie faktycznych celów i sposobów przetwarzania.</span></p>
+<p class="clause clause-0"><span class="clause-number">2.</span><span><strong>Umowa powierzenia przetwarzania danych osobowych stanowi odrębny dokument lub załącznik do Umowy.</strong> Dokument ten powinien regulować przetwarzanie zgodnie z art. 28 RODO przed przekazaniem Usługodawcy danych osobowych w imieniu Klienta.</span></p>
+<p class="clause clause-0"><span class="clause-number">3.</span><span>Data zawarcia umowy powierzenia: <strong>[DO WYPEŁNIENIA: DATA DPA]</strong>.</span></p>
+<p class="clause clause-0"><span class="clause-number">4.</span><span>Zatwierdzona lista dalszych podmiotów przetwarzających: <strong>[DO WYPEŁNIENIA: LISTA SUBPROCESORÓW LUB MIEJSCE JEJ UDOSTĘPNIENIA]</strong>.</span></p>
+<p class="clause clause-0"><span class="clause-number">5.</span><span>Miejsce przetwarzania danych: <strong>[DO WERYFIKACJI TECHNICZNEJ I PRAWNEJ: LOKALIZACJA PRZETWARZANIA DANYCH]</strong>.</span></p>
+<p class="clause clause-0"><span class="clause-number">6.</span><span>Kontakt do zgłoszeń dotyczących danych osobowych: <strong>[DO WYPEŁNIENIA: ADRES E-MAIL DO INCYDENTÓW DANYCH OSOBOWYCH]</strong>.</span></p>
+<p class="clause clause-0"><span class="clause-number">7.</span><span>Usługodawca może korzystać z zatwierdzonych podwykonawców w zakresie uregulowanym umową powierzenia. Aktualna lista zostanie przekazana odrębnie bez ujawniania informacji zagrażających bezpieczeństwu.</span></p>
+<p class="clause clause-0"><span class="clause-number">8.</span><span>Umowa nie stanowi zapewnienia, że Platforma jest w pełni zgodna z RODO w każdym modelu użycia. Ocena wymaga odrębnego audytu prawnego i technicznego.</span></p>
+<h2>§ 12. Poufność</h2>
+<p class="clause clause-0"><span class="clause-number">1.</span><span>Każda Strona zachowa w poufności informacje drugiej Strony, których poufny charakter wynika z ich treści, oznaczenia albo okoliczności ujawnienia.</span></p>
+<p class="clause clause-0"><span class="clause-number">2.</span><span>Informacje poufne obejmują w szczególności kod źródłowy, architekturę, Dokumentację techniczną, informacje o zabezpieczeniach, niepubliczne ceny, Dane Klienta, dane pracowników, wewnętrzne grafiki, informacje organizacyjne, procesy biznesowe i dane logowania.</span></p>
+<p class="clause clause-0"><span class="clause-number">3.</span><span>Strona otrzymująca wykorzysta informacje poufne wyłącznie do wykonania Umowy, ograniczy dostęp do osób, które muszą je znać, i zapewni im obowiązek poufności.</span></p>
+<p class="clause clause-0"><span class="clause-number">4.</span><span>Obowiązek nie dotyczy informacji, które Strona otrzymująca wykaże jako:</span></p>
+<p class="clause clause-1"><span class="clause-number">1.</span><span>publicznie dostępne bez naruszenia Umowy;</span></p>
+<p class="clause clause-1"><span class="clause-number">2.</span><span>zgodnie z prawem znane jej przed ujawnieniem;</span></p>
+<p class="clause clause-1"><span class="clause-number">3.</span><span>zgodnie z prawem otrzymane od osoby trzeciej bez obowiązku poufności;</span></p>
+<p class="clause clause-1"><span class="clause-number">4.</span><span>samodzielnie opracowane bez wykorzystania informacji poufnych;</span></p>
+<p class="clause clause-1"><span class="clause-number">5.</span><span>wymagające ujawnienia na podstawie prawa albo wiążącego żądania uprawnionego organu.</span></p>
+<p class="clause clause-0"><span class="clause-number">5.</span><span>Przed wymaganym ujawnieniem Strona, o ile prawo na to pozwala, poinformuje drugą Stronę i ograniczy zakres ujawnienia do niezbędnego minimum.</span></p>
+<p class="clause clause-0"><span class="clause-number">6.</span><span>Obowiązek poufności trwa przez 5 lat od zakończenia Umowy, a w odniesieniu do tajemnicy przedsiębiorstwa – tak długo, jak informacja zachowuje taki charakter.</span></p>
+<h2>§ 13. Wsparcie, utrzymanie i przerwy</h2>
+<p class="clause clause-0"><span class="clause-number">1.</span><span>Podstawowe wsparcie jest świadczone w Dni Robocze przez adres <strong>[DO WYPEŁNIENIA: ADRES E-MAIL WSPARCIA]</strong>.</span></p>
+<p class="clause clause-0"><span class="clause-number">2.</span><span>Usługodawca dąży do pierwszej odpowiedzi na standardowe zgłoszenie w ciągu 2 Dni Roboczych. Jest to czas podjęcia kontaktu lub analizy, a nie gwarantowany czas rozwiązania.</span></p>
+<p class="clause clause-0"><span class="clause-number">3.</span><span>Awarie Krytyczne są podejmowane z rozsądnym priorytetem adekwatnym do ich wpływu. Strony mogą zawrzeć odrębne SLA, jeżeli potrzebne są inne godziny wsparcia, klasy priorytetów albo mierzalne parametry.</span></p>
+<p class="clause clause-0"><span class="clause-number">4.</span><span>Wniosek Rozwojowy nie jest Awarią. Błąd Użytkownika może wymagać wyjaśnienia, instruktażu albo odrębnie płatnej pomocy, jeżeli wykracza poza podstawowe wsparcie.</span></p>
+<p class="clause clause-0"><span class="clause-number">5.</span><span>Usługodawca w miarę możliwości poinformuje o istotnej planowanej Przerwie Technicznej. Pilne prace bezpieczeństwa lub awaryjne mogą zostać wykonane bez uprzedzenia, z późniejszą informacją, jeżeli jest to zasadne.</span></p>
+<p class="clause clause-0"><span class="clause-number">6.</span><span>Aktualizacje mogą zmieniać drobne elementy interfejsu lub sposób obsługi, o ile nie ograniczają istotnie podstawowych funkcji uzgodnionych w Załączniku nr 1.</span></p>
+<h2>§ 14. Kopie zapasowe i bezpieczeństwo</h2>
+<p class="clause clause-0"><span class="clause-number">1.</span><span>Kod Platformy zawiera mechanizm automatycznego wykonywania kopii danych co godzinę podczas działania usługi oraz zachowania 10 najnowszych kopii. Rzeczywiste działanie tego mechanizmu w środowisku Klienta, monitoring, odseparowanie kopii i procedura odtworzenia muszą zostać potwierdzone przed podpisaniem.</span></p>
+<p class="clause clause-0"><span class="clause-number">2.</span><span><strong>[DO WERYFIKACJI TECHNICZNEJ: CZĘSTOTLIWOŚĆ KOPII ZAPASOWYCH – W KODZIE CO GODZINĘ PODCZAS DZIAŁANIA USŁUGI]</strong></span></p>
+<p class="clause clause-0"><span class="clause-number">3.</span><span><strong>[DO WERYFIKACJI TECHNICZNEJ: OKRES RETENCJI KOPII – W KODZIE LIMIT 10 NAJNOWSZYCH KOPII]</strong></span></p>
+<p class="clause clause-0"><span class="clause-number">4.</span><span><strong>[DO WERYFIKACJI TECHNICZNEJ: SPOSÓB ODTWARZANIA, TESTY ODTWORZENIOWE I ODPOWIEDZIALNA OSOBA]</strong></span></p>
+<p class="clause clause-0"><span class="clause-number">5.</span><span>Kopie zapasowe są środkiem odporności usługi, a nie gwarancją odwrócenia każdej czynności Użytkownika. Nie zastępują pobierania przez Klienta ważnych zestawień, gdy jest to uzasadnione jego obowiązkami.</span></p>
+<p class="clause clause-0"><span class="clause-number">6.</span><span>Strony nie będą ujawniać w Umowie ani publicznie danych dostępowych, adresów infrastruktury ani innych szczegółów mogących osłabić bezpieczeństwo.</span></p>
+<h2>§ 15. Odpowiedzialność</h2>
+<p class="clause clause-0"><span class="clause-number">1.</span><span>Każda Strona odpowiada za niewykonanie lub nienależyte wykonanie Umowy na zasadach ogólnie obowiązującego prawa polskiego, z uwzględnieniem poniższych postanowień.</span></p>
+<p class="clause clause-0"><span class="clause-number">2.</span><span>Usługodawca nie odpowiada w zakresie, w jakim szkoda wynika z:</span></p>
+<p class="clause clause-1"><span class="clause-number">1.</span><span>błędnych, niepełnych lub bezprawnie wprowadzonych Danych Klienta;</span></p>
+<p class="clause clause-1"><span class="clause-number">2.</span><span>decyzji Klienta lub jego menedżerów podjętych na podstawie nieprawidłowych danych;</span></p>
+<p class="clause clause-1"><span class="clause-number">3.</span><span>użycia sprzecznego z Umową albo Dokumentacją;</span></p>
+<p class="clause clause-1"><span class="clause-number">4.</span><span>udostępnienia danych logowania przez Użytkownika;</span></p>
+<p class="clause clause-1"><span class="clause-number">5.</span><span>nieobsługiwanego urządzenia albo przeglądarki;</span></p>
+<p class="clause clause-1"><span class="clause-number">6.</span><span>awarii połączenia internetowego lub systemu Klienta;</span></p>
+<p class="clause clause-1"><span class="clause-number">7.</span><span>działania zewnętrznego systemu poza rozsądną kontrolą Usługodawcy;</span></p>
+<p class="clause clause-1"><span class="clause-number">8.</span><span>decyzji Klienta naruszającej prawo pracy lub inne przepisy;</span></p>
+<p class="clause clause-1"><span class="clause-number">9.</span><span>siły wyższej;</span></p>
+<p class="clause clause-1"><span class="clause-number">10.</span><span>prawidłowo zakomunikowanej Przerwy Technicznej albo pilnych prac bezpieczeństwa wykonywanych zgodnie z Umową.</span></p>
+<p class="clause clause-0"><span class="clause-number">3.</span><span>Wyłączenia stosuje się tylko w zakresie, w jakim dana przyczyna rzeczywiście wpłynęła na szkodę, i nie zwalniają Usługodawcy z odpowiedzialności za okoliczności mu przypisane.</span></p>
+<p class="clause clause-0"><span class="clause-number">4.</span><span>Z zastrzeżeniem bezwzględnie obowiązujących przepisów prawa, łączna odpowiedzialność Usługodawcy związana z Umową jest ograniczona do sumy opłat abonamentowych zapłaconych przez Klienta za ostatnie <strong>6 miesięcy</strong> poprzedzających zdarzenie powodujące szkodę.</span></p>
+<p class="paragraph indented"><strong>[DO WERYFIKACJI PRAWNEJ: LIMIT ODPOWIEDZIALNOŚCI – WERSJA GŁÓWNA 6 MIESIĘCY; ROZWAŻYĆ 3, 6 LUB 12 MIESIĘCY]</strong></p>
+<p class="clause clause-0"><span class="clause-number">5.</span><span>Ograniczeń odpowiedzialności nie stosuje się do szkody wyrządzonej umyślnie ani w innych przypadkach, w których ograniczenie byłoby niedopuszczalne na podstawie bezwzględnie obowiązującego prawa.</span></p>
+<h2>§ 16. Siła wyższa</h2>
+<p class="clause clause-0"><span class="clause-number">1.</span><span>Strona nie odpowiada za opóźnienie lub niewykonanie obowiązku w zakresie spowodowanym zdarzeniem pozostającym poza jej rozsądną kontrolą, którego nie mogła rozsądnie przewidzieć ani mu zapobiec.</span></p>
+<p class="clause clause-0"><span class="clause-number">2.</span><span>Zdarzeniami takimi mogą być w szczególności rozległe awarie infrastruktury lub telekomunikacji, działania władz publicznych, klęski żywiołowe, wojna, poważne cyberataki pomimo zastosowania rozsądnych zabezpieczeń oraz nieuniknione awarie zewnętrznych dostawców.</span></p>
+<p class="clause clause-0"><span class="clause-number">3.</span><span>Strona dotknięta zdarzeniem, o ile jest to praktycznie możliwe, poinformuje drugą Stronę o jego wpływie i podejmie rozsądne działania ograniczające skutki.</span></p>
+<p class="clause clause-0"><span class="clause-number">4.</span><span>Siła wyższa nie zwalnia z obowiązku zapłaty należności, które stały się wymagalne przed jej wystąpieniem.</span></p>
+<h2>§ 17. Czas trwania i rozwiązanie Umowy</h2>
+<p class="clause clause-0"><span class="clause-number">1.</span><span>Umowa zostaje zawarta na czas nieokreślony od dnia <strong>[DO WYPEŁNIENIA: DATA ROZPOCZĘCIA OBOWIĄZYWANIA]</strong>.</span></p>
+<p class="clause clause-0"><span class="clause-number">2.</span><span>Każda Strona może wypowiedzieć Umowę z jednomiesięcznym okresem wypowiedzenia ze skutkiem na koniec miesiąca kalendarzowego.</span></p>
+<p class="clause clause-0"><span class="clause-number">3.</span><span>Wypowiedzenie wymaga formy dokumentowej umożliwiającej ustalenie nadawcy i treści, w szczególności wiadomości e-mail wysłanej na adresy wskazane w § 20, chyba że Strony zastrzegą formę pisemną.</span></p>
+<p class="clause clause-0"><span class="clause-number">4.</span><span>Strona może rozwiązać Umowę ze skutkiem natychmiastowym w razie istotnego naruszenia przez drugą Stronę, jeżeli naruszenie nie zostanie usunięte w dodatkowym terminie 14 dni od udokumentowanego wezwania.</span></p>
+<p class="clause clause-0"><span class="clause-number">5.</span><span>Usługodawca może zawiesić dostęp albo rozwiązać Umowę ze skutkiem natychmiastowym bez okresu naprawczego, jeżeli Klient świadomie używa Platformy bezprawnie, atakuje jej bezpieczeństwo, próbuje uzyskać cudze dane albo dopuszcza się poważnego naruszenia poufności, a dalsze świadczenie stwarza istotne ryzyko.</span></p>
+<p class="clause clause-0"><span class="clause-number">6.</span><span>Uprawnienie do zawieszenia z powodu zaległości płatniczych podlega zasadom z § 8 ust. 8.</span></p>
+<h2>§ 18. Skutki zakończenia Umowy</h2>
+<p class="clause clause-0"><span class="clause-number">1.</span><span>Po zakończeniu Umowy:</span></p>
+<p class="clause clause-1"><span class="clause-number">1.</span><span>dostęp Użytkowników zostanie wyłączony;</span></p>
+<p class="clause clause-1"><span class="clause-number">2.</span><span>wymagalne i niezapłacone opłaty pozostają należne;</span></p>
+<p class="clause clause-1"><span class="clause-number">3.</span><span>Klient może zażądać eksportu w okresie wskazanym w § 10;</span></p>
+<p class="clause clause-1"><span class="clause-number">4.</span><span>Dane Klienta zostaną następnie usunięte albo zanonimizowane zgodnie z § 10, obowiązkami prawnymi i cyklem kopii zapasowych;</span></p>
+<p class="clause clause-1"><span class="clause-number">5.</span><span>Klient zaprzestanie korzystania z Platformy;</span></p>
+<p class="clause clause-1"><span class="clause-number">6.</span><span>prawo korzystania określone w § 9 wygasa.</span></p>
+<p class="clause clause-0"><span class="clause-number">2.</span><span>Postanowienia dotyczące należnych płatności, własności intelektualnej, poufności, odpowiedzialności, danych i rozstrzygania sporów pozostają skuteczne w zakresie wynikającym z ich celu.</span></p>
+<p class="clause clause-0"><span class="clause-number">3.</span><span>Usługodawca nie zobowiązuje się do natychmiastowego usunięcia danych z każdej kopii zapasowej, jeżeli nie jest to technicznie możliwe lub naruszałoby obowiązek prawny.</span></p>
+<h2>§ 19. Zmiany Usługi i Umowy</h2>
+<p class="clause clause-0"><span class="clause-number">1.</span><span>Usługodawca może wprowadzać aktualizacje bezpieczeństwa, poprawki, usprawnienia oraz drobne zmiany techniczne lub interfejsu bez aneksu, jeżeli nie zmniejszają istotnie podstawowego zakresu z Załącznika nr 1.</span></p>
+<p class="clause clause-0"><span class="clause-number">2.</span><span>Istotne ograniczenie funkcjonalności wymaga uprzedniego poinformowania Klienta i uzgodnienia dalszego sposobu świadczenia albo umożliwienia wypowiedzenia przed wejściem ograniczenia w życie.</span></p>
+<p class="clause clause-0"><span class="clause-number">3.</span><span>Zmiana ceny, istotnych warunków odpowiedzialności, czasu trwania lub zakresu zobowiązań wymaga aneksu albo jednoznacznej, udokumentowanej akceptacji Klienta. Milczenie Klienta nie oznacza zgody.</span></p>
+<p class="clause clause-0"><span class="clause-number">4.</span><span>Usługodawca nie ma nieograniczonego prawa do jednostronnej zmiany Umowy.</span></p>
+<h2>§ 20. Komunikacja i zawiadomienia</h2>
+<p class="clause clause-0"><span class="clause-number">1.</span><span>Zwykła komunikacja operacyjna może odbywać się pocztą elektroniczną:</span></p>
+<p class="clause clause-1"><span class="clause-number">1.</span><span>Usługodawca: <strong>[DO WYPEŁNIENIA: ADRES E-MAIL USŁUGODAWCY]</strong>;</span></p>
+<p class="clause clause-1"><span class="clause-number">2.</span><span>kontakt operacyjny Klienta: <strong>[DO WYPEŁNIENIA: ADRES E-MAIL KONTAKTU OPERACYJNEGO KLIENTA]</strong>;</span></p>
+<p class="clause clause-1"><span class="clause-number">3.</span><span>kontakt rozliczeniowy Klienta: <strong>[DO WYPEŁNIENIA: ADRES E-MAIL DO FAKTUR]</strong>;</span></p>
+<p class="clause clause-1"><span class="clause-number">4.</span><span>kontakt prawny Klienta: <strong>[DO WYPEŁNIENIA: ADRES E-MAIL KONTAKTU PRAWNEGO KLIENTA]</strong>.</span></p>
+<p class="clause clause-0"><span class="clause-number">2.</span><span>Zgłoszenia wsparcia są kierowane na adres z § 13.</span></p>
+<p class="clause clause-0"><span class="clause-number">3.</span><span>Wypowiedzenie, wezwanie do usunięcia istotnego naruszenia, informacja o zawieszeniu oraz inne istotne zawiadomienie wymagają co najmniej formy dokumentowej pozwalającej ustalić nadawcę, adresata, datę i treść.</span></p>
+<p class="clause clause-0"><span class="clause-number">4.</span><span>Strona poinformuje drugą Stronę o zmianie adresu kontaktowego. Do czasu skutecznego zawiadomienia korespondencja wysłana na dotychczasowy adres jest uznawana za skierowaną prawidłowo, z zastrzeżeniem bezwzględnie obowiązujących przepisów.</span></p>
+<h2>§ 21. Prawo właściwe i spory</h2>
+<p class="clause clause-0"><span class="clause-number">1.</span><span>Do Umowy stosuje się prawo polskie.</span></p>
+<p class="clause clause-0"><span class="clause-number">2.</span><span>Przed skierowaniem sprawy do sądu Strony podejmą próbę polubownego rozwiązania sporu przez co najmniej 14 dni od udokumentowanego wezwania do negocjacji, chyba że zwłoka grozi szkodą lub utratą uprawnienia.</span></p>
+<p class="clause clause-0"><span class="clause-number">3.</span><span>Spory rozstrzyga właściwy polski sąd powszechny ustalony zgodnie z przepisami albo ważnym uzgodnieniem Stron.</span></p>
+<p class="paragraph indented"><strong>[DO WERYFIKACJI PRAWNEJ: WŁAŚCIWOŚĆ SĄDU]</strong></p>
+<h2>§ 22. Postanowienia końcowe</h2>
+<p class="clause clause-0"><span class="clause-number">1.</span><span>Umowa wraz z wyraźnie wskazanymi załącznikami stanowi pełne uzgodnienie Stron dotyczące jej przedmiotu.</span></p>
+<p class="clause clause-0"><span class="clause-number">2.</span><span>Zmiany Umowy wymagają formy pisemnej albo dokumentowej, jeżeli Umowa wyraźnie ją dopuszcza, pod rygorem skutków uzgodnionych przez Strony.</span></p>
+<p class="paragraph indented"><strong>[DO WERYFIKACJI PRAWNEJ: CZY DLA ANEKSÓW WYMAGAĆ FORMY PISEMNEJ, ELEKTRONICZNEJ Z PODPISEM KWALIFIKOWANYM CZY DOKUMENTOWEJ]</strong></p>
+<p class="clause clause-0"><span class="clause-number">3.</span><span>Nieważność albo bezskuteczność pojedynczego postanowienia nie narusza pozostałej części Umowy. Strony zastąpią je zgodnym z prawem postanowieniem możliwie najbliższym celowi gospodarczemu.</span></p>
+<p class="clause clause-0"><span class="clause-number">4.</span><span>Integralną część Umowy stanowi Załącznik nr 1 – Zakres usług i funkcjonalności Platformy. Umowa powierzenia danych, Regulamin i inne dokumenty stają się integralne tylko po ich wskazaniu i przyjęciu przez Strony.</span></p>
+<p class="clause clause-0"><span class="clause-number">5.</span><span>W razie sprzeczności dokumentów pierwszeństwo mają:</span></p>
+<p class="clause clause-1"><span class="clause-number">1.</span><span>indywidualnie podpisany aneks;</span></p>
+<p class="clause clause-1"><span class="clause-number">2.</span><span>Umowa;</span></p>
+<p class="clause clause-1"><span class="clause-number">3.</span><span>umowa powierzenia przetwarzania danych – wyłącznie w sprawach ochrony danych osobowych;</span></p>
+<p class="clause clause-1"><span class="clause-number">4.</span><span>Załącznik nr 1;</span></p>
+<p class="clause clause-1"><span class="clause-number">5.</span><span>Regulamin świadczenia usług drogą elektroniczną;</span></p>
+<p class="clause clause-1"><span class="clause-number">6.</span><span>pozostałe przyjęte załączniki.</span></p>
+<p class="clause clause-0"><span class="clause-number">6.</span><span>Umowę sporządzono w <strong>[DO WYPEŁNIENIA: LICZBA EGZEMPLARZY]</strong> jednobrzmiących egzemplarzach, po jednym dla każdej Strony, albo zawarto elektronicznie w sposób uzgodniony przez Strony.</span></p>
+<h2>Podpisy</h2>
+<table><thead><tr><th>Usługodawca</th><th>Klient</th></tr></thead><tbody><tr><td>Imię i nazwisko: <strong>[DO WYPEŁNIENIA]</strong></td><td>Imię i nazwisko: <strong>[DO WYPEŁNIENIA]</strong></td></tr><tr><td>Rola: Usługodawca</td><td>Rola / funkcja: <strong>[DO WYPEŁNIENIA]</strong></td></tr><tr><td>Data: <strong>[DO WYPEŁNIENIA]</strong></td><td>Data: <strong>[DO WYPEŁNIENIA]</strong></td></tr><tr><td>Podpis: __________________________</td><td>Podpis: __________________________</td></tr></tbody></table>
+<h2>Załączniki</h2>
+<p class="clause clause-0"><span class="clause-number">1.</span><span>Załącznik nr 1 – Zakres usług i funkcjonalności Platformy – <strong>dołączony</strong>.</span></p>
+<p class="clause clause-0"><span class="clause-number">2.</span><span>Umowa powierzenia przetwarzania danych osobowych – <strong>odrębny dokument do przygotowania przed przetwarzaniem danych w imieniu Klienta</strong>.</span></p>
+<p class="clause clause-0"><span class="clause-number">3.</span><span>Regulamin świadczenia usług drogą elektroniczną – <strong>odrębny dokument do przygotowania</strong>.</span></p>
+  </main>
+</body>
+</html>

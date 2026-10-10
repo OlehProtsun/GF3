@@ -1,7 +1,10 @@
+import { t } from "@shared/i18n";
 import type { AvailabilityGroup } from "@entities/availability-groups/model/types";
 import {
   getAvailabilityGroupPeriodLabel,
   getAvailabilityMonthLabel,
+  getAvailabilityPublicationStatusLabel,
+  getAvailabilityWindowStatusLabel,
 } from "@entities/availability-groups/model/presentation";
 import { usePinnedRecords } from "@shared/lib/records/usePinnedRecords";
 import { IosButton } from "@shared/ui/components/IosButton";
@@ -10,6 +13,7 @@ import { RecordGrid } from "@shared/ui/components/RecordGrid";
 import type { RecordTileMetaItem } from "@shared/ui/components/RecordTile";
 import { RecordTile } from "@shared/ui/components/RecordTile";
 import { PlusIcon } from "@shared/ui/icons";
+import styles from "./AvailabilityGroupListCard.module.css";
 
 type AvailabilityGroupListCardProps = {
   groups: AvailabilityGroup[];
@@ -17,7 +21,7 @@ type AvailabilityGroupListCardProps = {
   isLoading: boolean;
   searchQuery: string;
   onClearSearch: () => void;
-  onAddGroup: () => void;
+  onAddGroup?: () => void;
   onOpenGroup: (groupId: number) => void;
 };
 
@@ -35,7 +39,7 @@ export function AvailabilityGroupListCard({
     groups
   );
 
-  const addAction = <IosButton label="Add New" icon={<PlusIcon size={18} />} onClick={onAddGroup} />;
+  const addAction = onAddGroup ? <IosButton label={t("Add New")} icon={<PlusIcon size={18} />} onClick={onAddGroup} /> : undefined;
 
   return (
     <ListCardSection
@@ -43,36 +47,64 @@ export function AvailabilityGroupListCard({
       isFetching={isLoading}
       hasData={groups.length > 0}
       searchQuery={searchQuery}
-      loadingMessage="Loading availability groups..."
-      errorMessage="Could not load availability groups."
-      emptyTitle="No availability groups yet"
-      emptyDescription="Start by creating your first availability group."
+      loadingMessage={t("Loading availability groups...")}
+      errorMessage={t("Could not load availability groups.")}
+      emptyTitle={t("No availability groups yet")}
+      emptyDescription={onAddGroup ? t("Start by creating your first availability group.") : t("No results")}
       emptyAction={addAction}
-      searchEmptyTitle="Nothing found"
-      searchEmptyDescription={`No availability group matches "${searchQuery}".`}
-      searchEmptyAction={<IosButton label="Clear Search" variant="secondary" onClick={onClearSearch} />}
+      searchEmptyTitle={t("Nothing found")}
+      searchEmptyDescription={t("No availability group matches \"{0}\".", searchQuery)}
+      searchEmptyAction={<IosButton label={t("Clear Search")} variant="secondary" onClick={onClearSearch} />}
     >
       <RecordGrid>
         {sortedGroups.map(group => {
           const isPinned = pinnedIdSet.has(String(group.id));
           const periodLabel = getAvailabilityGroupPeriodLabel(group);
+          const windowStatusLabel = getAvailabilityWindowStatusLabel(group);
+          const publicationStatusLabel = getAvailabilityPublicationStatusLabel(group.publicationStatus);
           const metaItems: RecordTileMetaItem[] = [
-            { key: "month", label: "Month", value: getAvailabilityMonthLabel(group.month, "short") },
-            { key: "year", label: "Year", value: String(group.year) },
+            { key: "month", label: t("Month"), value: getAvailabilityMonthLabel(group.month, "short") },
+            { key: "year", label: t("Year"), value: String(group.year) },
+            {
+              key: "window-status",
+              label: t("Status"),
+              value: (
+                <span className={[
+                  styles.statusPill,
+                  windowStatusLabel === "Open" ? styles.statusPillOpen : styles.statusPillClosed,
+                ].filter(Boolean).join(" ")}
+                >
+                  {windowStatusLabel}
+                </span>
+              ),
+            },
+            {
+              key: "publication-status",
+              label: t("Public"),
+              value: (
+                <span className={[
+                  styles.statusPill,
+                  publicationStatusLabel === "Public" ? styles.publicationPillPublic : styles.publicationPillPrivate,
+                ].filter(Boolean).join(" ")}
+                >
+                  {publicationStatusLabel}
+                </span>
+              ),
+            },
           ];
 
           return (
             <RecordTile
               key={group.id}
               title={group.name}
-              description={`Availability schedule for ${periodLabel}`}
+              description={t("Availability schedule for {0}", periodLabel)}
               badge={`ID ${group.id}`}
               metaItems={metaItems}
               isPinned={isPinned}
               onTogglePin={() => togglePin(group.id)}
-              pinLabel={isPinned ? `Unpin ${group.name}` : `Pin ${group.name}`}
+              pinLabel={isPinned ? t("Unpin {0}", group.name) : t("Pin {0}", group.name)}
               onClick={() => onOpenGroup(group.id)}
-              ariaLabel={`Open availability group ${group.name}`}
+              ariaLabel={t("Open availability group {0}", group.name)}
             />
           );
         })}

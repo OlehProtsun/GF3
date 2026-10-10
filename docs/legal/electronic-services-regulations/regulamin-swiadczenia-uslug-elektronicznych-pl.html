@@ -1,0 +1,423 @@
+<!doctype html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="source-sha256" content="d3cc5a79bffe81f5c22048f88a9b50b9e62174228918a699714306bc5a1fb2eb" />
+  <title>Regulamin świadczenia usług drogą elektroniczną – GF</title>
+  <style>
+    @page {
+      size: A4;
+      margin: 18mm;
+      @bottom-left {
+        content: "Regulamin GF • wersja [DO WYPEŁNIENIA: NUMER WERSJI]";
+        color: #667085;
+        font: 8pt Arial, sans-serif;
+      }
+      @bottom-right {
+        content: "Strona " counter(page) " z " counter(pages);
+        color: #667085;
+        font: 8pt Arial, sans-serif;
+      }
+    }
+    :root {
+      color: #182230;
+      background: #eef2f6;
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: 11pt;
+      line-height: 1.52;
+      font-synthesis: none;
+    }
+    *, *::before, *::after { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    html, body { margin: 0; min-height: 100%; }
+    body { padding: 20px; }
+    .document {
+      width: min(210mm, 100%);
+      margin: 0 auto;
+      padding: 18mm;
+      background: #fff;
+      box-shadow: 0 18px 55px rgba(24, 34, 48, 0.15);
+    }
+    h1, h2, h3 { color: #101828; break-after: avoid; page-break-after: avoid; scroll-margin-top: 18px; }
+    h1 {
+      margin: 0 0 7mm;
+      padding-bottom: 5mm;
+      border-bottom: 2px solid #344054;
+      font: 700 20pt/1.18 Arial, sans-serif;
+      letter-spacing: 0.025em;
+      text-align: center;
+    }
+    h2 {
+      position: relative;
+      margin: 9mm 0 4mm;
+      padding-bottom: 1.8mm;
+      border-bottom: 1px solid #d0d5dd;
+      font: 700 14pt/1.28 Arial, sans-serif;
+    }
+    h3 { margin: 5mm 0 2.5mm; font: 700 11.5pt/1.3 Arial, sans-serif; }
+    .heading-link { float: right; color: #98a2b3; text-decoration: none; font-weight: 400; }
+    .heading-link:hover, .heading-link:focus { color: #344054; }
+    .toc {
+      margin: 0 0 9mm;
+      padding: 5mm 6mm;
+      border: 1px solid #d0d5dd;
+      border-radius: 3mm;
+      background: #f8fafc;
+      font-family: Arial, sans-serif;
+      break-inside: avoid;
+    }
+    .toc h2 { margin: 0 0 3mm; padding: 0; border: 0; font-size: 12pt; }
+    .toc ol { columns: 2; column-gap: 8mm; margin: 0; padding-left: 6mm; }
+    .toc li { margin: 0 0 1.3mm; break-inside: avoid; font-size: 8.7pt; }
+    .toc a { color: #344054; text-decoration: none; }
+    .toc a:hover, .toc a:focus { text-decoration: underline; }
+    p, li { orphans: 3; widows: 3; }
+    .paragraph { margin: 0 0 3.2mm; text-align: justify; }
+    .legal-notice {
+      margin: 0 0 7mm;
+      padding: 4mm 5mm;
+      border: 1px solid #f2c94c;
+      border-left: 4px solid #d69e00;
+      background: #fffae8;
+      font: 9.2pt/1.45 Arial, sans-serif;
+      break-inside: avoid;
+    }
+    .clause, .bullet {
+      display: grid;
+      grid-template-columns: 8mm minmax(0, 1fr);
+      gap: 1.5mm;
+      margin: 0 0 2.7mm;
+      text-align: justify;
+      orphans: 3;
+      widows: 3;
+    }
+    .clause-1, .bullet-1 { margin-left: 9.5mm; }
+    .clause-2, .bullet-2 { margin-left: 19mm; }
+    .clause-3, .bullet-3 { margin-left: 28.5mm; }
+    .clause-number { font-weight: 700; }
+    strong { color: #101828; }
+    code { padding: 0.2mm 1mm; border-radius: 1mm; background: #f2f4f7; font: 9pt Consolas, monospace; }
+    .table-scroll { width: 100%; overflow-x: auto; }
+    table {
+      width: 100%;
+      margin: 4mm 0 7mm;
+      border-collapse: collapse;
+      font: 9pt/1.35 Arial, sans-serif;
+    }
+    thead { display: table-header-group; }
+    tr { break-inside: avoid; page-break-inside: avoid; }
+    th, td { padding: 2.5mm 2.8mm; border: 1px solid #d0d5dd; vertical-align: top; }
+    th { background: #f2f4f7; text-align: left; }
+    .doc-footer {
+      margin: 10mm auto 0;
+      padding-top: 4mm;
+      border-top: 1px solid #d0d5dd;
+      color: #667085;
+      font: 8.5pt/1.4 Arial, sans-serif;
+      text-align: center;
+    }
+    @media screen and (max-width: 850px) {
+      body { padding: 0; background: #fff; }
+      .document { width: 100%; padding: 26px 20px; box-shadow: none; }
+      h1 { font-size: 17pt; }
+      h2 { font-size: 13pt; }
+      .toc ol { columns: 1; }
+      .clause-1, .bullet-1 { margin-left: 5mm; }
+      .clause-2, .bullet-2 { margin-left: 10mm; }
+      .clause-3, .bullet-3 { margin-left: 15mm; }
+    }
+    @media print {
+      html, body { min-height: 0; background: #fff; }
+      body { padding: 0; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+      .document { width: auto; margin: 0; padding: 0; box-shadow: none; }
+      nav { display: none; }
+      .heading-link { display: none; }
+      h1, h2, h3 { break-after: avoid; page-break-after: avoid; }
+      p, li { orphans: 3; widows: 3; }
+      table, .legal-notice { break-inside: avoid; page-break-inside: avoid; }
+      .table-scroll { overflow: visible; }
+    }
+  </style>
+</head>
+<body>
+  <main class="document">
+    <article>
+<h1>REGULAMIN ŚWIADCZENIA USŁUG DROGĄ ELEKTRONICZNĄ PLATFORMY [DO WYPEŁNIENIA: NAZWA PLATFORMY – ROBOCZO „GF”]</h1>
+<p class="paragraph"><strong>Wersja:</strong> [DO WYPEŁNIENIA: NUMER WERSJI] <strong>Data obowiązywania:</strong> [DO WYPEŁNIENIA: DATA OBOWIĄZYWANIA] <strong>Data ostatniej aktualizacji:</strong> [DO WYPEŁNIENIA: DATA OSTATNIEJ AKTUALIZACJI]</p>
+<aside class="legal-notice"><strong>Ważne:</strong> niniejszy dokument jest projektem Regulaminu przeznaczonym do przeglądu prawnego i technicznego. Nie stanowi porady prawnej ani potwierdzenia pełnej zgodności Platformy lub sposobu jej wdrożenia z przepisami.</aside>
+<nav class="toc" aria-label="Spis treści">
+      <h2>Spis treści</h2>
+      <ol>
+<li><a href="#paragraf-1-postanowienia-ogolne">§ 1. Postanowienia ogólne</a></li>
+<li><a href="#paragraf-2-dane-uslugodawcy">§ 2. Dane Usługodawcy</a></li>
+<li><a href="#paragraf-3-definicje">§ 3. Definicje</a></li>
+<li><a href="#paragraf-4-rodzaje-i-zakres-uslug">§ 4. Rodzaje i zakres Usług</a></li>
+<li><a href="#paragraf-5-warunki-rozpoczecia-korzystania-z-platformy">§ 5. Warunki rozpoczęcia korzystania z Platformy</a></li>
+<li><a href="#paragraf-6-wymagania-techniczne">§ 6. Wymagania techniczne</a></li>
+<li><a href="#paragraf-7-konto-i-dane-dostepowe">§ 7. Konto i dane dostępowe</a></li>
+<li><a href="#paragraf-8-zasady-korzystania-z-platformy">§ 8. Zasady korzystania z Platformy</a></li>
+<li><a href="#paragraf-9-zakaz-dostarczania-tresci-bezprawnych">§ 9. Zakaz dostarczania treści bezprawnych</a></li>
+<li><a href="#paragraf-10-tresci-i-dane-wprowadzane-przez-uzytkownikow">§ 10. Treści i dane wprowadzane przez Użytkowników</a></li>
+<li><a href="#paragraf-11-prawa-i-obowiazki-klienta">§ 11. Prawa i obowiązki Klienta</a></li>
+<li><a href="#paragraf-12-prawa-i-obowiazki-uslugodawcy">§ 12. Prawa i obowiązki Usługodawcy</a></li>
+<li><a href="#paragraf-13-przerwy-techniczne-awarie-i-aktualizacje">§ 13. Przerwy techniczne, Awarie i aktualizacje</a></li>
+<li><a href="#paragraf-14-bezpieczenstwo">§ 14. Bezpieczeństwo</a></li>
+<li><a href="#paragraf-15-zglaszanie-bledow-i-wsparcie-techniczne">§ 15. Zgłaszanie błędów i wsparcie techniczne</a></li>
+<li><a href="#paragraf-16-reklamacje">§ 16. Reklamacje</a></li>
+<li><a href="#paragraf-17-zawieranie-umowy-o-swiadczenie-uslug-elektronicznych">§ 17. Zawieranie umowy o świadczenie Usług elektronicznych</a></li>
+<li><a href="#paragraf-18-zakonczenie-korzystania-i-usuniecie-konta">§ 18. Zakończenie korzystania i usunięcie Konta</a></li>
+<li><a href="#paragraf-19-zawieszenie-lub-ograniczenie-dostepu">§ 19. Zawieszenie lub ograniczenie dostępu</a></li>
+<li><a href="#paragraf-20-odpowiedzialnosc">§ 20. Odpowiedzialność</a></li>
+<li><a href="#paragraf-21-wlasnosc-intelektualna">§ 21. Własność intelektualna</a></li>
+<li><a href="#paragraf-22-ochrona-danych-osobowych">§ 22. Ochrona danych osobowych</a></li>
+<li><a href="#paragraf-23-zmiany-regulaminu">§ 23. Zmiany Regulaminu</a></li>
+<li><a href="#paragraf-24-postanowienia-koncowe">§ 24. Postanowienia końcowe</a></li>
+      </ol>
+    </nav>
+<h2 id="paragraf-1-postanowienia-ogolne">§ 1. Postanowienia ogólne<a class="heading-link" href="#paragraf-1-postanowienia-ogolne" aria-label="Odnośnik do tej sekcji">§</a></h2>
+<p class="clause clause-0"><span class="clause-number">1.</span><span>Regulamin określa zasady świadczenia drogą elektroniczną Usług dostępnych przez Platformę, wymagania techniczne, reguły korzystania z Kont, zasady bezpieczeństwa, tryb reklamacyjny oraz przesłanki ograniczenia lub zakończenia dostępu.</span></p>
+<p class="clause clause-0"><span class="clause-number">2.</span><span>Platforma jest przeznaczona dla Klientów będących przedsiębiorcami lub innymi podmiotami organizacyjnymi oraz dla Użytkowników upoważnionych przez Klienta. Użytkownik nie nabywa samodzielnie abonamentu od Usługodawcy.</span></p>
+<p class="clause clause-0"><span class="clause-number">3.</span><span>Korzystanie z Usług wymaga uprzedniego bezpłatnego udostępnienia Regulaminu w sposób pozwalający go pozyskać, odtworzyć i utrwalić oraz przestrzegania jego postanowień.</span></p>
+<p class="clause clause-0"><span class="clause-number">4.</span><span>Samo odwiedzenie publicznej strony informacyjnej lub strony logowania nie oznacza przyjęcia wszystkich warunków umownych.</span></p>
+<p class="clause clause-0"><span class="clause-number">5.</span><span>Stosunek handlowy między Usługodawcą a Klientem reguluje odrębna Umowa o świadczenie usług SaaS wraz z załącznikami. W indywidualnie uzgodnionych sprawach handlowych, w szczególności dotyczących ceny, okresu świadczenia, zakresu płatnych funkcji i limitu odpowiedzialności, pierwszeństwo ma ta Umowa.</span></p>
+<p class="clause clause-0"><span class="clause-number">6.</span><span>W sprawach powierzonego przez Klienta przetwarzania danych osobowych pierwszeństwo ma odrębna Umowa powierzenia przetwarzania danych osobowych.</span></p>
+<p class="clause clause-0"><span class="clause-number">7.</span><span>Regulamin nie wprowadza modelu konsumenckiego ani prawa Użytkownika do samodzielnego zakupu Usług.</span></p>
+<h2 id="paragraf-2-dane-uslugodawcy">§ 2. Dane Usługodawcy<a class="heading-link" href="#paragraf-2-dane-uslugodawcy" aria-label="Odnośnik do tej sekcji">§</a></h2>
+<p class="clause clause-0"><span class="clause-number">1.</span><span>Usługodawcą jest:</span></p>
+<p class="clause clause-1"><span class="clause-number">1.</span><span>imię i nazwisko: <strong>[DO WYPEŁNIENIA: IMIĘ I NAZWISKO USŁUGODAWCY]</strong>;</span></p>
+<p class="clause clause-1"><span class="clause-number">2.</span><span>adres: <strong>[DO WYPEŁNIENIA: ADRES]</strong>;</span></p>
+<p class="clause clause-1"><span class="clause-number">3.</span><span>adres do korespondencji: <strong>[DO WYPEŁNIENIA: ADRES DO KORESPONDENCJI]</strong>;</span></p>
+<p class="clause clause-1"><span class="clause-number">4.</span><span>adres e-mail: <strong>[DO WYPEŁNIENIA: ADRES E-MAIL]</strong>;</span></p>
+<p class="clause clause-1"><span class="clause-number">5.</span><span>numer telefonu, jeżeli udostępniany: <strong>[DO WYPEŁNIENIA: NUMER TELEFONU – OPCJONALNIE]</strong>;</span></p>
+<p class="clause clause-1"><span class="clause-number">6.</span><span>NIP, jeżeli nadany i wymagany: <strong>[DO WYPEŁNIENIA: NIP – JEŻELI NADANY I WYMAGANY]</strong>;</span></p>
+<p class="clause clause-1"><span class="clause-number">7.</span><span>adres e-mail do reklamacji: <strong>[DO WYPEŁNIENIA: ADRES E-MAIL DO REKLAMACJI]</strong>;</span></p>
+<p class="clause clause-1"><span class="clause-number">8.</span><span>adres e-mail wsparcia technicznego: <strong>[DO WYPEŁNIENIA: ADRES E-MAIL WSPARCIA TECHNICZNEGO]</strong>.</span></p>
+<p class="clause clause-0"><span class="clause-number">2.</span><span>Projekt zakłada, że Usługodawca zamierza wykonywać Usługi w ramach działalności nierejestrowanej w rozumieniu art. 5 ustawy – Prawo przedsiębiorców, o ile spełnia aktualne warunki ustawowe.</span></p>
+<p class="clause clause-0"><span class="clause-number">3.</span><span><strong>[DO WERYFIKACJI PRAWNEJ: SPOSÓB OZNACZENIA USŁUGODAWCY ORAZ DOPUSZCZALNOŚĆ WSKAZANIA DZIAŁALNOŚCI NIEREJESTROWANEJ]</strong></span></p>
+<h2 id="paragraf-3-definicje">§ 3. Definicje<a class="heading-link" href="#paragraf-3-definicje" aria-label="Odnośnik do tej sekcji">§</a></h2>
+<p class="clause clause-0"><span class="clause-number">1.</span><span><strong>Administrator Klienta</strong> – osoba wskazana przez Klienta do organizowania dostępu do Platformy, kontaktu z Usługodawcą i zarządzania Kontami w zakresie przyznanych jej uprawnień; nie jest to obecnie odrębna techniczna rola w Platformie.</span></p>
+<p class="clause clause-0"><span class="clause-number">2.</span><span><strong>Awaria</strong> – potwierdzona i powtarzalna niezgodność działania Platformy z uzgodnionym zakresem, niewynikająca z Błędu Użytkownika, urządzenia lub łącza Klienta ani systemu zewnętrznego pozostającego poza rozsądną kontrolą Usługodawcy.</span></p>
+<p class="clause clause-0"><span class="clause-number">3.</span><span><strong>Awaria Krytyczna</strong> – Awaria uniemożliwiająca wszystkim upoważnionym Użytkownikom Klienta zalogowanie się albo korzystanie z podstawowych funkcji opublikowanego grafiku, bez rozsądnego obejścia.</span></p>
+<p class="clause clause-0"><span class="clause-number">4.</span><span><strong>Błąd Użytkownika</strong> – nieprawidłowe działanie lub wynik spowodowane błędnymi danymi, użyciem niezgodnym z Regulaminem lub instrukcjami albo działaniem bez wymaganych uprawnień.</span></p>
+<p class="clause clause-0"><span class="clause-number">5.</span><span><strong>Dane Klienta</strong> – dane, treści i informacje wprowadzone do Platformy przez Klienta lub Użytkowników, w tym dane pracowników, grafiki, dostępności i dane organizacyjne.</span></p>
+<p class="clause clause-0"><span class="clause-number">6.</span><span><strong>Dzień Roboczy</strong> – dzień od poniedziałku do piątku, z wyłączeniem dni ustawowo wolnych od pracy w Polsce.</span></p>
+<p class="clause clause-0"><span class="clause-number">7.</span><span><strong>Hasło</strong> – poufny ciąg znaków służący wraz z nazwą Użytkownika do uwierzytelnienia w Platformie.</span></p>
+<p class="clause clause-0"><span class="clause-number">8.</span><span><strong>Incydent</strong> – zdarzenie dotyczące działania, bezpieczeństwa, poufności lub dostępności Platformy wymagające analizy albo reakcji.</span></p>
+<p class="clause clause-0"><span class="clause-number">9.</span><span><strong>Klient</strong> – przedsiębiorca lub inny podmiot organizacyjny, który zawarł z Usługodawcą Umowę o świadczenie usług SaaS i upoważnia Użytkowników.</span></p>
+<p class="clause clause-0"><span class="clause-number">10.</span><span><strong>Konto</strong> – indywidualny zestaw danych i uprawnień umożliwiający Użytkownikowi korzystanie z Platformy.</span></p>
+<p class="clause clause-0"><span class="clause-number">11.</span><span><strong>Platforma</strong> – aplikacja internetowa pod nazwą roboczą „GF”, dostępna pod adresem <strong>[DO WYPEŁNIENIA: ADRES PLATFORMY]</strong>.</span></p>
+<p class="clause clause-0"><span class="clause-number">12.</span><span><strong>Przerwa Techniczna</strong> – czasowe ograniczenie lub wyłączenie Platformy związane z utrzymaniem, aktualizacją, bezpieczeństwem albo usuwaniem Awarii.</span></p>
+<p class="clause clause-0"><span class="clause-number">13.</span><span><strong>Regulamin</strong> – niniejszy Regulamin świadczenia usług drogą elektroniczną.</span></p>
+<p class="clause clause-0"><span class="clause-number">14.</span><span><strong>Treści Użytkownika</strong> – informacje wprowadzone lub przekazane przez Użytkownika za pomocą funkcji Platformy, w tym dostępność, propozycje zamian zmian i inne dane organizacyjne.</span></p>
+<p class="clause clause-0"><span class="clause-number">15.</span><span><strong>Usługa SaaS</strong> – zapewnienie Klientowi zdalnego dostępu do Platformy na zasadach Umowy o świadczenie usług SaaS.</span></p>
+<p class="clause clause-0"><span class="clause-number">16.</span><span><strong>Usługi</strong> – funkcje świadczone drogą elektroniczną za pośrednictwem Platformy, opisane w § 4.</span></p>
+<p class="clause clause-0"><span class="clause-number">17.</span><span><strong>Usługodawca</strong> – osoba wskazana w § 2.</span></p>
+<p class="clause clause-0"><span class="clause-number">18.</span><span><strong>Użytkownik</strong> – menedżer, pracownik albo inna osoba związana z Klientem i upoważniona przez niego do korzystania z Platformy w przydzielonym zakresie.</span></p>
+<p class="clause clause-0"><span class="clause-number">19.</span><span><strong>Wniosek Rozwojowy</strong> – propozycja nowej funkcji albo zmiany wykraczającej poza usunięcie Awarii i aktualny zakres Usług.</span></p>
+<h2 id="paragraf-4-rodzaje-i-zakres-uslug">§ 4. Rodzaje i zakres Usług<a class="heading-link" href="#paragraf-4-rodzaje-i-zakres-uslug" aria-label="Odnośnik do tej sekcji">§</a></h2>
+<p class="clause clause-0"><span class="clause-number">1.</span><span>Platforma udostępnia potwierdzone w aktualnej wersji Usługi obejmujące:</span></p>
+<p class="clause clause-1"><span class="clause-number">1.</span><span>logowanie i obsługę sesji Użytkownika;</span></p>
+<p class="clause clause-1"><span class="clause-number">2.</span><span>zarządzanie Kontami menedżerów i pracowników przez uprawnionych menedżerów;</span></p>
+<p class="clause clause-1"><span class="clause-number">3.</span><span>zarządzanie pracownikami i lokalizacjami;</span></p>
+<p class="clause clause-1"><span class="clause-number">4.</span><span>tworzenie grup dostępności i przekazywanie dostępności przez pracowników;</span></p>
+<p class="clause clause-1"><span class="clause-number">5.</span><span>tworzenie, wspomagane generowanie, edycję, publikowanie i wycofywanie grafików;</span></p>
+<p class="clause clause-1"><span class="clause-number">6.</span><span>przegląd opublikowanych grafików, zmian, godzin i obsady;</span></p>
+<p class="clause clause-1"><span class="clause-number">7.</span><span>zgłaszanie, przyjmowanie i anulowanie zamian zmian w grafikach, dla których Klient dopuścił tę funkcję;</span></p>
+<p class="clause clause-1"><span class="clause-number">8.</span><span>komunikaty menedżera i ich potwierdzanie przez pracowników;</span></p>
+<p class="clause clause-1"><span class="clause-number">9.</span><span>powiadomienia w interfejsie Platformy dotyczące grafików, dostępności, zamian i komunikatów;</span></p>
+<p class="clause clause-1"><span class="clause-number">10.</span><span>historię zaakceptowanych zamian i wybrane rejestry działań;</span></p>
+<p class="clause clause-1"><span class="clause-number">11.</span><span>eksport przez menedżera wybranych danych grafików w formacie XLSX oraz techniczny eksport SQL w zakresie dostępnym w Platformie;</span></p>
+<p class="clause clause-1"><span class="clause-number">12.</span><span>edycję przez pracownika własnych danych kontaktowych służących odzyskiwaniu dostępu oraz zmianę Hasła z użyciem kodu.</span></p>
+<p class="clause clause-0"><span class="clause-number">2.</span><span>Platforma rozróżnia dwie techniczne role: <strong>menedżera</strong> i <strong>pracownika</strong>. Administrator Klienta jest funkcją organizacyjną, wykonywaną przez osobę posiadającą właściwe uprawnienia menedżera.</span></p>
+<p class="clause clause-0"><span class="clause-number">3.</span><span>Menedżer może w szczególności zarządzać strukturą organizacyjną, Kontami, pracownikami, dostępnością, grafikami, publikacją, zamianami, komunikatami, wybranymi logami i eksportami – wyłącznie w granicach przyznanych uprawnień.</span></p>
+<p class="clause clause-0"><span class="clause-number">4.</span><span>Pracownik może w szczególności przeglądać opublikowany grafik i powiadomienia, przekazywać dostępność, korzystać z dopuszczonych zamian, odczytywać komunikaty oraz zarządzać własnymi danymi kontaktowymi i Hasłem.</span></p>
+<p class="clause clause-0"><span class="clause-number">5.</span><span>Platforma nie zapewnia samodzielnej rejestracji, przesyłania plików, ogólnego czatu pracowniczego, samodzielnego usunięcia Konta przez pracownika, naliczania płac ani pełnej automatycznej kontroli zgodności grafiku z prawem pracy.</span></p>
+<p class="clause clause-0"><span class="clause-number">6.</span><span>Szczegółowy, odpłatny zakres funkcjonalny określają Umowa o świadczenie usług SaaS i jej Załącznik nr 1. Wnioski Rozwojowe wymagają odrębnego uzgodnienia i nie stanowią Awarii.</span></p>
+<p class="clause clause-0"><span class="clause-number">7.</span><span><strong>[DO WERYFIKACJI TECHNICZNEJ: CZY KAŻDY MENEDŻER MA MIEĆ UPRAWNIENIA ADMINISTRATORA KLIENTA DO TWORZENIA I USUWANIA KONT MENEDŻERÓW]</strong></span></p>
+<h2 id="paragraf-5-warunki-rozpoczecia-korzystania-z-platformy">§ 5. Warunki rozpoczęcia korzystania z Platformy<a class="heading-link" href="#paragraf-5-warunki-rozpoczecia-korzystania-z-platformy" aria-label="Odnośnik do tej sekcji">§</a></h2>
+<p class="clause clause-0"><span class="clause-number">1.</span><span>Platforma nie przewiduje samodzielnej rejestracji. Konto pracownika tworzy uprawniony menedżer wraz z profilem pracownika, wskazując nazwę Użytkownika i początkowe Hasło. Konto kolejnego menedżera tworzy uprawniony menedżer w interfejsie profilu menedżera.</span></p>
+<p class="clause clause-0"><span class="clause-number">2.</span><span>Użytkownik może rozpocząć korzystanie po utworzeniu Konta, nadaniu mu roli i upoważnieniu go przez Klienta.</span></p>
+<p class="clause clause-0"><span class="clause-number">3.</span><span>W aktualnej wersji nie potwierdzono zaproszeń, obowiązkowej weryfikacji e-mail lub telefonu ani wymuszonej zmiany Hasła przy pierwszym logowaniu.</span></p>
+<p class="clause clause-0"><span class="clause-number">4.</span><span>Użytkownik podaje i utrzymuje prawidłowe dane oraz nie tworzy ani nie używa Konta innej osoby bez upoważnienia.</span></p>
+<p class="clause clause-0"><span class="clause-number">5.</span><span>Przed rozpoczęciem korzystania Użytkownikowi należy bezpłatnie udostępnić Regulamin w pełnej treści, przez bezpośredni link pozwalający go pobrać, zapisać i wydrukować.</span></p>
+<p class="clause clause-0"><span class="clause-number">6.</span><span>Do czasu wdrożenia mechanizmu akceptacji Klient powinien udokumentować przekazanie Regulaminu Użytkownikom w uzgodniony sposób. Docelowy mechanizm powinien używać nieoznaczonego z góry pola akceptacji, zapisywać identyfikator Użytkownika i Klienta, wersję Regulaminu oraz datę i czas akceptacji.</span></p>
+<p class="clause clause-0"><span class="clause-number">7.</span><span>Aktualna wersja Platformy nie zapisuje akceptacji Regulaminu ani jego wersji. Wdrożenie tego mechanizmu opisuje checklista i nie jest objęte niniejszym zadaniem.</span></p>
+<p class="clause clause-0"><span class="clause-number">8.</span><span><strong>[DO WERYFIKACJI PRAWNEJ: MOMENT ZAWARCIA UMOWY O ŚWIADCZENIE USŁUG ELEKTRONICZNYCH Z UŻYTKOWNIKIEM I SPOSÓB DOKUMENTOWANIA AKCEPTACJI]</strong></span></p>
+<h2 id="paragraf-6-wymagania-techniczne">§ 6. Wymagania techniczne<a class="heading-link" href="#paragraf-6-wymagania-techniczne" aria-label="Odnośnik do tej sekcji">§</a></h2>
+<p class="clause clause-0"><span class="clause-number">1.</span><span>Korzystanie z Platformy wymaga:</span></p>
+<p class="clause clause-1"><span class="clause-number">1.</span><span>urządzenia z bezpiecznym dostępem do internetu;</span></p>
+<p class="clause clause-1"><span class="clause-number">2.</span><span>aktualnej przeglądarki internetowej obsługującej standardy wykorzystywane przez Platformę;</span></p>
+<p class="clause clause-1"><span class="clause-number">3.</span><span>włączonej obsługi JavaScript;</span></p>
+<p class="clause clause-1"><span class="clause-number">4.</span><span>dostępnej pamięci lokalnej przeglądarki niezbędnej między innymi do utrzymania sesji i wybranych ustawień interfejsu;</span></p>
+<p class="clause clause-1"><span class="clause-number">5.</span><span>aktywnego adresu e-mail przypisanego do Konta, jeżeli Użytkownik ma korzystać z odzyskiwania Hasła.</span></p>
+<p class="clause clause-0"><span class="clause-number">2.</span><span>Roboczo rekomenduje się aktualne stabilne wersje Chrome, Edge, Firefox lub Safari. Zakres oficjalnie wspieranych wersji wymaga testów.</span></p>
+<p class="clause clause-0"><span class="clause-number">3.</span><span><strong>[DO WERYFIKACJI TECHNICZNEJ: LISTA WSPIERANYCH PRZEGLĄDAREK, WERSJI, SYSTEMÓW I URZĄDZEŃ]</strong></span></p>
+<p class="clause clause-0"><span class="clause-number">4.</span><span><strong>[DO WERYFIKACJI TECHNICZNEJ: CZY W ŚRODOWISKU PRODUKCYJNYM SĄ WYMAGANE NIEZBĘDNE PLIKI COOKIE OPRÓCZ PAMIĘCI LOKALNEJ PRZEGLĄDARKI]</strong></span></p>
+<p class="clause clause-0"><span class="clause-number">5.</span><span>Rozszerzenia przeglądarki, mechanizmy blokujące skrypty, przestarzały system, nieprawidłowy czas urządzenia albo ograniczenia sieciowe mogą wpływać na działanie Platformy.</span></p>
+<p class="clause clause-0"><span class="clause-number">6.</span><span>Użytkownik odpowiada za aktualizację i podstawowe zabezpieczenie swojego urządzenia. Nie powinien korzystać z poufnych danych pracowniczych na publicznych lub niezabezpieczonych urządzeniach, a po użyciu urządzenia współdzielonego musi się wylogować.</span></p>
+<p class="clause clause-0"><span class="clause-number">7.</span><span>Usługodawca nie gwarantuje zgodności z każdą przeglądarką, konfiguracją, wtyczką, urządzeniem ani niewspieranym systemem operacyjnym.</span></p>
+<h2 id="paragraf-7-konto-i-dane-dostepowe">§ 7. Konto i dane dostępowe<a class="heading-link" href="#paragraf-7-konto-i-dane-dostepowe" aria-label="Odnośnik do tej sekcji">§</a></h2>
+<p class="clause clause-0"><span class="clause-number">1.</span><span>Każdy Użytkownik korzysta z indywidualnego Konta. Konto i uprawnienia nie mogą być przekazywane innej osobie.</span></p>
+<p class="clause clause-0"><span class="clause-number">2.</span><span>Użytkownik nie udostępnia nazwy Użytkownika, Hasła ani kodu uwierzytelniającego oraz nie zapisuje Hasła w przeglądarce na urządzeniu publicznym lub współdzielonym.</span></p>
+<p class="clause clause-0"><span class="clause-number">3.</span><span>Aktualna Platforma wymaga Hasła złożonego dokładnie z sześciu cyfr. Użytkownik powinien stosować unikalne Hasło, nieużywane w innych usługach, i chronić je jak kod dostępu.</span></p>
+<p class="clause clause-0"><span class="clause-number">4.</span><span><strong>[DO WERYFIKACJI TECHNICZNEJ: ADEKWATNOŚĆ SZEŚCIOCYFROWEGO HASŁA DO RYZYKA I POTRZEBA DODATKOWYCH ZABEZPIECZEŃ]</strong></span></p>
+<p class="clause clause-0"><span class="clause-number">5.</span><span><strong>[DO WERYFIKACJI PRAWNEJ: CZY WYMAGANIA UWIERZYTELNIANIA SĄ ADEKWATNE DO KATEGORII PRZETWARZANYCH DANYCH]</strong></span></p>
+<p class="clause clause-0"><span class="clause-number">6.</span><span>Użytkownik niezwłocznie zgłasza podejrzenie przejęcia Konta. Usługodawca lub uprawniony menedżer może unieważnić aktywne sesje i wymagać zmiany Hasła.</span></p>
+<p class="clause clause-0"><span class="clause-number">7.</span><span>Klient niezwłocznie usuwa lub ogranicza dostęp osoby, której upoważnienie wygasło. Aktualna Platforma pozwala menedżerowi usunąć pracownika, gdy nie blokują tego zależności danych, oraz unieważnić jego aktywne sesje; odrębnego stanu „Konto wyłączone” nie potwierdzono.</span></p>
+<p class="clause clause-0"><span class="clause-number">8.</span><span>Odpowiedzialność za zdarzenie na Koncie zależy od przyczyny. Użytkownik lub Klient odpowiada w zakresie swojego zawinionego zaniedbania, a nie za zdarzenia wynikające wyłącznie z wady Platformy lub okoliczności przypisanych Usługodawcy.</span></p>
+<h2 id="paragraf-8-zasady-korzystania-z-platformy">§ 8. Zasady korzystania z Platformy<a class="heading-link" href="#paragraf-8-zasady-korzystania-z-platformy" aria-label="Odnośnik do tej sekcji">§</a></h2>
+<p class="clause clause-0"><span class="clause-number">1.</span><span>Użytkownik korzysta z Platformy wyłącznie na potrzeby wewnętrznej organizacji Klienta, zgodnie z rolą, uprawnieniami, Regulaminem, Umową o świadczenie usług SaaS i udostępnionymi instrukcjami.</span></p>
+<p class="clause clause-0"><span class="clause-number">2.</span><span>Dozwolone jest zarządzanie grafikami, dostępnością i danymi organizacyjnymi, komunikowanie informacji służbowych oraz przeglądanie i aktualizowanie danych dostępnych dla danej roli.</span></p>
+<p class="clause clause-0"><span class="clause-number">3.</span><span>Zabronione jest:</span></p>
+<p class="clause clause-1"><span class="clause-number">1.</span><span>uzyskiwanie nieuprawnionego dostępu albo obchodzenie uprawnień;</span></p>
+<p class="clause clause-1"><span class="clause-number">2.</span><span>udostępnianie danych dostępowych lub podszywanie się pod inną osobę;</span></p>
+<p class="clause clause-1"><span class="clause-number">3.</span><span>próba dostępu do danych innego Klienta lub organizacji;</span></p>
+<p class="clause clause-1"><span class="clause-number">4.</span><span>wprowadzanie złośliwego oprogramowania albo odnośników służących atakowi;</span></p>
+<p class="clause clause-1"><span class="clause-number">5.</span><span>automatyczne skanowanie, testowanie zabezpieczeń lub nadmierne wywołania bez zgody Usługodawcy;</span></p>
+<p class="clause clause-1"><span class="clause-number">6.</span><span>zakłócanie działania Platformy lub utrudnianie korzystania innym osobom;</span></p>
+<p class="clause clause-1"><span class="clause-number">7.</span><span>używanie Danych Klienta do bezprawnych celów lub naruszanie prywatności pracowników;</span></p>
+<p class="clause clause-1"><span class="clause-number">8.</span><span>umyślne wprowadzanie fałszywych lub wprowadzających w błąd danych mogących wyrządzić szkodę;</span></p>
+<p class="clause clause-1"><span class="clause-number">9.</span><span>kopiowanie, odsprzedaż, sublicencjonowanie lub redystrybucja Platformy;</span></p>
+<p class="clause clause-1"><span class="clause-number">10.</span><span>odtwarzanie kodu, dekompilacja lub inżynieria wsteczna, z wyjątkiem zakresu, którego zakaz wyłącza bezwzględnie obowiązujące prawo;</span></p>
+<p class="clause clause-1"><span class="clause-number">11.</span><span>tworzenie konkurencyjnej kopii Platformy przez nieuprawnione powielanie jej elementów;</span></p>
+<p class="clause clause-1"><span class="clause-number">12.</span><span>usuwanie oznaczeń praw autorskich lub własności.</span></p>
+<h2 id="paragraf-9-zakaz-dostarczania-tresci-bezprawnych">§ 9. Zakaz dostarczania treści bezprawnych<a class="heading-link" href="#paragraf-9-zakaz-dostarczania-tresci-bezprawnych" aria-label="Odnośnik do tej sekcji">§</a></h2>
+<p class="clause clause-0"><span class="clause-number">1.</span><span>Użytkownik nie może dostarczać ani rozpowszechniać przez Platformę Treści Użytkownika, które:</span></p>
+<p class="clause clause-1"><span class="clause-number">1.</span><span>naruszają prawo polskie lub prawo Unii Europejskiej;</span></p>
+<p class="clause clause-1"><span class="clause-number">2.</span><span>naruszają prawa autorskie, dobra osobiste, tajemnicę przedsiębiorstwa lub inne prawa osoby trzeciej;</span></p>
+<p class="clause clause-1"><span class="clause-number">3.</span><span>zawierają bezprawne groźby, dyskryminację, nękanie lub nawoływanie do czynu zabronionego;</span></p>
+<p class="clause clause-1"><span class="clause-number">4.</span><span>zawierają złośliwe oprogramowanie albo treści służące przejęciu danych;</span></p>
+<p class="clause clause-1"><span class="clause-number">5.</span><span>bezprawnie ujawniają dane osobowe lub informacje poufne;</span></p>
+<p class="clause clause-1"><span class="clause-number">6.</span><span>są umyślnie fałszywe w sposób mogący wyrządzić szkodę innej osobie.</span></p>
+<p class="clause clause-0"><span class="clause-number">2.</span><span>Usługodawca nie uzyskuje ogólnego prawa do dowolnego przeglądania prywatnych treści pracowniczych. Może jednak podjąć proporcjonalne działania po wiarygodnym zgłoszeniu, wykryciu zagrożenia lub otrzymaniu wiążącego polecenia uprawnionego organu.</span></p>
+<p class="clause clause-0"><span class="clause-number">3.</span><span>Zależnie od sytuacji Usługodawca może czasowo zablokować dostęp do treści, zabezpieczyć niezbędne dowody, zażądać wyjaśnień od Klienta, usunąć treść, ograniczyć Konto albo wykonać obowiązek nałożony przez organ. O ile ryzyko na to pozwala, działania powinny być ograniczone do niezbędnego zakresu.</span></p>
+<h2 id="paragraf-10-tresci-i-dane-wprowadzane-przez-uzytkownikow">§ 10. Treści i dane wprowadzane przez Użytkowników<a class="heading-link" href="#paragraf-10-tresci-i-dane-wprowadzane-przez-uzytkownikow" aria-label="Odnośnik do tej sekcji">§</a></h2>
+<p class="clause clause-0"><span class="clause-number">1.</span><span>Klient zachowuje prawa do Danych Klienta oraz odpowiada za ich legalność, prawidłowość, adekwatność i podstawę przetwarzania.</span></p>
+<p class="clause clause-0"><span class="clause-number">2.</span><span>Użytkownik może wprowadzać tylko informacje potrzebne do obowiązków służbowych i objęte jego upoważnieniem. Nie powinien wprowadzać zbędnych danych szczególnych kategorii ani informacji niezwiązanych z organizacją pracy.</span></p>
+<p class="clause clause-0"><span class="clause-number">3.</span><span>Użytkownik nie wykorzystuje danych dostępnych w Platformie poza zakresem przydzielonych obowiązków.</span></p>
+<p class="clause clause-0"><span class="clause-number">4.</span><span>Klient określa wewnętrzne uprawnienia i zasady dostępu. Usługodawca nie nabywa własności Danych Klienta i przetwarza je technicznie wyłącznie w celu świadczenia, zabezpieczenia i rozliczenia Usług oraz wykonania obowiązków prawnych.</span></p>
+<p class="clause clause-0"><span class="clause-number">5.</span><span>Szczegółowe zasady przetwarzania określają Polityka prywatności oraz Umowa powierzenia przetwarzania danych osobowych.</span></p>
+<h2 id="paragraf-11-prawa-i-obowiazki-klienta">§ 11. Prawa i obowiązki Klienta<a class="heading-link" href="#paragraf-11-prawa-i-obowiazki-klienta" aria-label="Odnośnik do tej sekcji">§</a></h2>
+<p class="clause clause-0"><span class="clause-number">1.</span><span>Klient:</span></p>
+<p class="clause clause-1"><span class="clause-number">1.</span><span>wyznacza Administratora Klienta i osoby kontaktowe;</span></p>
+<p class="clause clause-1"><span class="clause-number">2.</span><span>upoważnia Użytkowników oraz nadaje im uprawnienia odpowiadające obowiązkom;</span></p>
+<p class="clause clause-1"><span class="clause-number">3.</span><span>udostępnia Użytkownikom Regulamin przed rozpoczęciem korzystania;</span></p>
+<p class="clause clause-1"><span class="clause-number">4.</span><span>zapewnia podstawę prawną przetwarzania danych pracowników i realizuje obowiązki informacyjne;</span></p>
+<p class="clause clause-1"><span class="clause-number">5.</span><span>niezwłocznie odbiera dostęp po ustaniu upoważnienia;</span></p>
+<p class="clause clause-1"><span class="clause-number">6.</span><span>przekazuje prawidłowe dane organizacyjne;</span></p>
+<p class="clause clause-1"><span class="clause-number">7.</span><span>zgłasza Awarie z informacjami potrzebnymi do diagnozy;</span></p>
+<p class="clause clause-1"><span class="clause-number">8.</span><span>płaci opłaty na zasadach odrębnej Umowy o świadczenie usług SaaS;</span></p>
+<p class="clause clause-1"><span class="clause-number">9.</span><span>korzysta z Platformy zgodnie z prawem pracy, ochroną danych i własnymi procedurami.</span></p>
+<p class="clause clause-0"><span class="clause-number">2.</span><span>Platforma wspiera organizację grafików, ale nie zastępuje decyzji pracodawcy, działu kadr lub prawnika i nie gwarantuje automatycznie zgodności każdego grafiku z prawem pracy, umowami ani regulacjami wewnętrznymi.</span></p>
+<h2 id="paragraf-12-prawa-i-obowiazki-uslugodawcy">§ 12. Prawa i obowiązki Usługodawcy<a class="heading-link" href="#paragraf-12-prawa-i-obowiazki-uslugodawcy" aria-label="Odnośnik do tej sekcji">§</a></h2>
+<p class="clause clause-0"><span class="clause-number">1.</span><span>Usługodawca zapewnia dostęp do Platformy w uzgodnionym zakresie, utrzymuje ją z należytą starannością, stosuje rozsądne środki ochrony dostępu, wykonuje prace utrzymaniowe, analizuje potwierdzone Incydenty i Awarie oraz obsługuje reklamacje.</span></p>
+<p class="clause clause-0"><span class="clause-number">2.</span><span>Usługodawca może niezwłocznie instalować aktualizacje bezpieczeństwa i wprowadzać drobne zmiany interfejsu, które nie ograniczają istotnie uzgodnionego zakresu.</span></p>
+<p class="clause clause-0"><span class="clause-number">3.</span><span>O istotnych planowanych Przerwach Technicznych Usługodawca informuje z wyprzedzeniem, gdy jest to rozsądnie możliwe.</span></p>
+<p class="clause clause-0"><span class="clause-number">4.</span><span>Usługodawca może proporcjonalnie zawiesić lub ograniczyć dostęp z uzasadnionej przyczyny bezpieczeństwa, prawnej lub umownej, na zasadach § 19.</span></p>
+<p class="clause clause-0"><span class="clause-number">5.</span><span>Usługodawca nie gwarantuje dostępności 100%, nieprzerwanego działania, wsparcia całodobowego, natychmiastowego rozwiązania każdego zgłoszenia, ochrony przed każdym cyberatakiem, zgodności z każdym urządzeniem ani odtworzenia każdej czynności Użytkownika.</span></p>
+<h2 id="paragraf-13-przerwy-techniczne-awarie-i-aktualizacje">§ 13. Przerwy techniczne, Awarie i aktualizacje<a class="heading-link" href="#paragraf-13-przerwy-techniczne-awarie-i-aktualizacje" aria-label="Odnośnik do tej sekcji">§</a></h2>
+<p class="clause clause-0"><span class="clause-number">1.</span><span>Planowane prace utrzymaniowe są komunikowane Klientowi z wyprzedzeniem, gdy jest to rozsądnie możliwe.</span></p>
+<p class="clause clause-0"><span class="clause-number">2.</span><span>Pilne prace awaryjne lub bezpieczeństwa mogą rozpocząć się bez uprzedzenia. Usługodawca przekazuje informację po rozpoczęciu prac, jeżeli jest to zasadne i bezpieczne.</span></p>
+<p class="clause clause-0"><span class="clause-number">3.</span><span>Awaria Krytyczna otrzymuje rozsądny priorytet adekwatny do wpływu. Zwykła Awaria jest analizowana w normalnym toku wsparcia.</span></p>
+<p class="clause clause-0"><span class="clause-number">4.</span><span>Wniosek Rozwojowy nie jest Awarią. Błąd Użytkownika może wymagać instruktażu albo odrębnie płatnej pomocy, gdy wykracza poza podstawowe wsparcie.</span></p>
+<p class="clause clause-0"><span class="clause-number">5.</span><span>Niedostępność wynikająca z awarii internetu Klienta, urządzenia Użytkownika lub zewnętrznej infrastruktury poza rozsądną kontrolą Usługodawcy nie jest sama w sobie Awarią Platformy.</span></p>
+<p class="clause clause-0"><span class="clause-number">6.</span><span>Standardowy cel pierwszej odpowiedzi wynosi 2 Dni Robocze, zgodnie z projektem Umowy o świadczenie usług SaaS. Nie jest to gwarantowany termin rozwiązania.</span></p>
+<p class="clause clause-0"><span class="clause-number">7.</span><span>Aktualizacje bezpieczeństwa mogą być stosowane natychmiast, a drobne zmiany interfejsu – bez zmiany Regulaminu, jeżeli nie ograniczają istotnie Usług.</span></p>
+<p class="clause clause-0"><span class="clause-number">8.</span><span>Istotne ograniczenie płatnej funkcjonalności jest rozliczane zgodnie z Umową o świadczenie usług SaaS.</span></p>
+<h2 id="paragraf-14-bezpieczenstwo">§ 14. Bezpieczeństwo<a class="heading-link" href="#paragraf-14-bezpieczenstwo" aria-label="Odnośnik do tej sekcji">§</a></h2>
+<p class="clause clause-0"><span class="clause-number">1.</span><span>Użytkownik:</span></p>
+<p class="clause clause-1"><span class="clause-number">1.</span><span>chroni Hasło i kody uwierzytelniające oraz nie przekazuje ich pocztą elektroniczną ani komunikatorem;</span></p>
+<p class="clause clause-1"><span class="clause-number">2.</span><span>sprawdza adres Platformy przed logowaniem;</span></p>
+<p class="clause clause-1"><span class="clause-number">3.</span><span>nie otwiera podejrzanych odnośników i zgłasza próby phishingu;</span></p>
+<p class="clause clause-1"><span class="clause-number">4.</span><span>aktualizuje system i przeglądarkę oraz chroni urządzenie;</span></p>
+<p class="clause clause-1"><span class="clause-number">5.</span><span>wylogowuje się po pracy, szczególnie na urządzeniu współdzielonym;</span></p>
+<p class="clause clause-1"><span class="clause-number">6.</span><span>niezwłocznie zgłasza utratę urządzenia lub podejrzenie nieuprawnionego dostępu.</span></p>
+<p class="clause clause-0"><span class="clause-number">2.</span><span>Korzystanie z internetu wiąże się między innymi z ryzykiem phishingu, złośliwego oprogramowania, kradzieży danych dostępowych, przejęcia Konta, podsłuchu w niezabezpieczonej sieci, złośliwych rozszerzeń, socjotechniki, utraty urządzenia oraz czasowych awarii sieci lub Usług.</span></p>
+<p class="clause clause-0"><span class="clause-number">3.</span><span>Rozwinięcie zagrożeń i zalecane środki ostrożności zawiera odrębny dokument „Informacja o szczególnych zagrożeniach związanych z korzystaniem z usług świadczonych drogą elektroniczną”.</span></p>
+<p class="clause clause-0"><span class="clause-number">4.</span><span>Żaden zestaw zabezpieczeń nie eliminuje wszystkich ryzyk. Użytkownik powinien stosować środki adekwatne do poufności danych, do których ma dostęp.</span></p>
+<h2 id="paragraf-15-zglaszanie-bledow-i-wsparcie-techniczne">§ 15. Zgłaszanie błędów i wsparcie techniczne<a class="heading-link" href="#paragraf-15-zglaszanie-bledow-i-wsparcie-techniczne" aria-label="Odnośnik do tej sekcji">§</a></h2>
+<p class="clause clause-0"><span class="clause-number">1.</span><span>Zgłoszenia techniczne należy wysyłać na <strong>[DO WYPEŁNIENIA: ADRES E-MAIL WSPARCIA]</strong>.</span></p>
+<p class="clause clause-0"><span class="clause-number">2.</span><span>Przydatne zgłoszenie powinno zawierać nazwę Klienta, nazwę Użytkownika lub identyfikator Konta, datę i czas, moduł, opis problemu, kroki prowadzące do błędu, pilność, dane kontaktowe oraz – jeżeli potrzebne – zrzut ekranu i informacje o przeglądarce lub urządzeniu.</span></p>
+<p class="clause clause-0"><span class="clause-number">3.</span><span>Zrzut ekranu nie powinien zawierać zbędnych danych osobowych. W zgłoszeniu nie wolno przesyłać Hasła, kodu uwierzytelniającego ani innych sekretów.</span></p>
+<p class="clause clause-0"><span class="clause-number">4.</span><span>Zgłoszenie techniczne dotyczy działania Platformy. Reklamacja dotyczy zarzutu niewykonania lub nienależytego wykonania Usługi. Wniosek Rozwojowy dotyczy nowej funkcji. Incydent ochrony danych lub bezpieczeństwa wymaga pilnego oznaczenia i użycia odpowiedniego kanału.</span></p>
+<p class="clause clause-0"><span class="clause-number">5.</span><span>Adres do Incydentów bezpieczeństwa: <strong>[DO WYPEŁNIENIA: ADRES E-MAIL DO INCYDENTÓW BEZPIECZEŃSTWA]</strong>.</span></p>
+<p class="clause clause-0"><span class="clause-number">6.</span><span>Adres do Incydentów danych osobowych: <strong>[DO WYPEŁNIENIA: ADRES E-MAIL DO SPRAW DANYCH OSOBOWYCH]</strong>.</span></p>
+<h2 id="paragraf-16-reklamacje">§ 16. Reklamacje<a class="heading-link" href="#paragraf-16-reklamacje" aria-label="Odnośnik do tej sekcji">§</a></h2>
+<p class="clause clause-0"><span class="clause-number">1.</span><span>Reklamację należy wysłać na <strong>[DO WYPEŁNIENIA: ADRES E-MAIL DO REKLAMACJI]</strong>.</span></p>
+<p class="clause clause-0"><span class="clause-number">2.</span><span>Reklamacja powinna wskazywać Klienta, osobę zgłaszającą i jej dane kontaktowe, Konto, którego dotyczy, opis zdarzenia, datę i czas, żądanie oraz informacje umożliwiające analizę.</span></p>
+<p class="clause clause-0"><span class="clause-number">3.</span><span>Usługodawca potwierdza otrzymanie reklamacji na adres nadawcy. Jeżeli informacje są niepełne, może zwrócić się o ich uzupełnienie; czas potrzebny na uzupełnienie może odpowiednio opóźnić analizę.</span></p>
+<p class="clause clause-0"><span class="clause-number">4.</span><span>Wersja robocza przewiduje rozpatrzenie kompletnej reklamacji w terminie 14 dni od jej otrzymania i przekazanie odpowiedzi pocztą elektroniczną.</span></p>
+<p class="clause clause-0"><span class="clause-number">5.</span><span><strong>[DO WERYFIKACJI PRAWNEJ I OPERACYJNEJ: TERMIN ROZPATRZENIA KOMPLETNEJ REKLAMACJI – PROPOZYCJA 14 DNI]</strong></span></p>
+<p class="clause clause-0"><span class="clause-number">6.</span><span>Brak odpowiedzi w terminie nie oznacza automatycznego uznania reklamacji, chyba że taki skutek wynika z bezwzględnie obowiązującego prawa w konkretnej relacji.</span></p>
+<p class="clause clause-0"><span class="clause-number">7.</span><span>Jeżeli reklamacja dotyczy rozliczeń, zakresu płatnej Usługi albo odpowiedzialności między Stronami, stosuje się również procedurę i postanowienia Umowy o świadczenie usług SaaS.</span></p>
+<h2 id="paragraf-17-zawieranie-umowy-o-swiadczenie-uslug-elektronicznych">§ 17. Zawieranie umowy o świadczenie Usług elektronicznych<a class="heading-link" href="#paragraf-17-zawieranie-umowy-o-swiadczenie-uslug-elektronicznych" aria-label="Odnośnik do tej sekcji">§</a></h2>
+<p class="clause clause-0"><span class="clause-number">1.</span><span>Umowę o świadczenie usług SaaS zawierają Usługodawca i Klient. Użytkownik nie zawiera samodzielnie umowy abonamentowej i nie jest zobowiązany do zapłaty miesięcznej opłaty.</span></p>
+<p class="clause clause-0"><span class="clause-number">2.</span><span>Indywidualny dostęp Użytkownika rozpoczyna się po jego upoważnieniu przez Klienta, utworzeniu i aktywowaniu Konta, udostępnieniu Regulaminu oraz rozpoczęciu korzystania zgodnie z nadanymi uprawnieniami.</span></p>
+<p class="clause clause-0"><span class="clause-number">3.</span><span>Dostęp Użytkownika jest ograniczony czasem obowiązywania Umowy o świadczenie usług SaaS, zakresem Usług zamówionych przez Klienta i okresem upoważnienia Użytkownika.</span></p>
+<p class="clause clause-0"><span class="clause-number">4.</span><span>Klient zapewnia przekazanie Regulaminu upoważnionym osobom, a Usługodawca powinien udostępniać bezpośredni, publicznie dostępny link do aktualnej i możliwej do pobrania wersji.</span></p>
+<p class="clause clause-0"><span class="clause-number">5.</span><span><strong>[DO WERYFIKACJI PRAWNEJ: CHARAKTER RELACJI USŁUGODAWCY Z UŻYTKOWNIKIEM UPOWAŻNIONYM PRZEZ KLIENTA]</strong></span></p>
+<h2 id="paragraf-18-zakonczenie-korzystania-i-usuniecie-konta">§ 18. Zakończenie korzystania i usunięcie Konta<a class="heading-link" href="#paragraf-18-zakonczenie-korzystania-i-usuniecie-konta" aria-label="Odnośnik do tej sekcji">§</a></h2>
+<p class="clause clause-0"><span class="clause-number">1.</span><span>Dostęp Użytkownika może zakończyć się w szczególności wskutek:</span></p>
+<p class="clause clause-1"><span class="clause-number">1.</span><span>rozwiązania lub wygaśnięcia Umowy o świadczenie usług SaaS;</span></p>
+<p class="clause clause-1"><span class="clause-number">2.</span><span>żądania Klienta;</span></p>
+<p class="clause clause-1"><span class="clause-number">3.</span><span>zakończenia upoważnienia lub współpracy Użytkownika z Klientem;</span></p>
+<p class="clause clause-1"><span class="clause-number">4.</span><span>usunięcia profilu pracownika lub Konta menedżera przez uprawnionego menedżera;</span></p>
+<p class="clause clause-1"><span class="clause-number">5.</span><span>poważnego naruszenia Regulaminu;</span></p>
+<p class="clause clause-1"><span class="clause-number">6.</span><span>zagrożenia bezpieczeństwa wymagającego zawieszenia albo unieważnienia sesji.</span></p>
+<p class="clause clause-0"><span class="clause-number">2.</span><span>Użytkownik nie ma obecnie funkcji samodzielnego usunięcia Konta. Powinien zgłosić taką potrzebę Klientowi, który podejmuje decyzję jako podmiot upoważniający i – co do zasady – administrator danych pracowniczych.</span></p>
+<p class="clause clause-0"><span class="clause-number">3.</span><span>Dezaktywacja lub usunięcie Konta nie oznacza automatycznego usunięcia wszystkich danych organizacyjnych. Dane mogą pozostać w dokumentacji Klienta, historii operacyjnej, kopiach zapasowych albo zbiorach przechowywanych z uwagi na obowiązek prawny.</span></p>
+<p class="clause clause-0"><span class="clause-number">4.</span><span>Okresy eksportu, retencji, usunięcia i anonimizacji określają Umowa o świadczenie usług SaaS, Umowa powierzenia przetwarzania danych osobowych, instrukcje Klienta oraz obowiązujące prawo.</span></p>
+<p class="clause clause-0"><span class="clause-number">5.</span><span>Użytkownik kieruje żądania dotyczące danych przede wszystkim do Klienta, jeżeli Klient jest ich administratorem; Usługodawca wspiera Klienta jako podmiot przetwarzający w uzgodnionym zakresie.</span></p>
+<p class="clause clause-0"><span class="clause-number">6.</span><span><strong>[DO WERYFIKACJI PRAWNEJ: RELACJA ADMINISTRATOR–PODMIOT PRZETWARZAJĄCY PRZY DEZAKTYWACJI KONTA I ŻĄDANIACH UŻYTKOWNIKA]</strong></span></p>
+<p class="clause clause-0"><span class="clause-number">7.</span><span><strong>[DO WERYFIKACJI TECHNICZNEJ: DOCELOWY PROCES DEZAKTYWACJI KONTA BEZ USUWANIA POWIĄZANYCH DANYCH]</strong></span></p>
+<h2 id="paragraf-19-zawieszenie-lub-ograniczenie-dostepu">§ 19. Zawieszenie lub ograniczenie dostępu<a class="heading-link" href="#paragraf-19-zawieszenie-lub-ograniczenie-dostepu" aria-label="Odnośnik do tej sekcji">§</a></h2>
+<p class="clause clause-0"><span class="clause-number">1.</span><span>Usługodawca może proporcjonalnie zawiesić Konto, sesję, funkcję lub dostęp Klienta, gdy:</span></p>
+<p class="clause clause-1"><span class="clause-number">1.</span><span>wystąpi Incydent bezpieczeństwa albo wiarygodne podejrzenie przejęcia danych dostępowych;</span></p>
+<p class="clause clause-1"><span class="clause-number">2.</span><span>istnieje podejrzenie bezprawnego działania lub ataku na Platformę;</span></p>
+<p class="clause clause-1"><span class="clause-number">3.</span><span>Użytkownik poważnie albo uporczywie narusza Regulamin;</span></p>
+<p class="clause clause-1"><span class="clause-number">4.</span><span>dalszy dostęp zagraża innym Użytkownikom, danym lub infrastrukturze;</span></p>
+<p class="clause clause-1"><span class="clause-number">5.</span><span>Klient zażąda zawieszenia;</span></p>
+<p class="clause clause-1"><span class="clause-number">6.</span><span>opóźnienie w płatności uprawnia do zawieszenia na zasadach Umowy o świadczenie usług SaaS.</span></p>
+<p class="clause clause-0"><span class="clause-number">2.</span><span>Jeżeli ryzyko na to pozwala, Usługodawca informuje Klienta o przyczynie, umożliwia usunięcie naruszenia i ogranicza działanie do niezbędnego zakresu.</span></p>
+<p class="clause clause-0"><span class="clause-number">3.</span><span>Przy poważnym ryzyku bezpieczeństwa lub obowiązku prawnym zawieszenie może nastąpić natychmiast. Usługodawca przekazuje informację, gdy będzie to prawnie i technicznie dopuszczalne.</span></p>
+<p class="clause clause-0"><span class="clause-number">4.</span><span>Dostęp jest przywracany po ustaniu przyczyny, o ile Umowa nie została skutecznie rozwiązana lub dalszy dostęp nie pozostaje bezprawny.</span></p>
+<h2 id="paragraf-20-odpowiedzialnosc">§ 20. Odpowiedzialność<a class="heading-link" href="#paragraf-20-odpowiedzialnosc" aria-label="Odnośnik do tej sekcji">§</a></h2>
+<p class="clause clause-0"><span class="clause-number">1.</span><span>Klient i Użytkownik odpowiadają na zasadach ogólnie obowiązującego prawa, w zakresie im przypisanym, za wprowadzane dane, nadane uprawnienia, zawinione udostępnienie danych dostępowych, bezprawne Treści Użytkownika oraz korzystanie sprzeczne z Regulaminem.</span></p>
+<p class="clause clause-0"><span class="clause-number">2.</span><span>Usługodawca nie odpowiada w zakresie, w jakim szkoda wynika z awarii internetu Klienta, niewspieranego urządzenia, Błędu Użytkownika, nieprawidłowych danych grafikowych, działania poza Platformą, systemu zewnętrznego poza rozsądną kontrolą, siły wyższej albo użycia sprzecznego z instrukcjami.</span></p>
+<p class="clause clause-0"><span class="clause-number">3.</span><span>Wyłączenia stosuje się tylko w zakresie rzeczywistego wpływu danej przyczyny i nie zwalniają Usługodawcy z odpowiedzialności za okoliczności mu przypisane.</span></p>
+<p class="clause clause-0"><span class="clause-number">4.</span><span>Regulamin nie wyłącza odpowiedzialności za szkodę wyrządzoną umyślnie ani odpowiedzialności, której nie można ograniczyć na podstawie bezwzględnie obowiązującego prawa.</span></p>
+<p class="clause clause-0"><span class="clause-number">5.</span><span>Zasady i limit odpowiedzialności w relacji Usługodawca–Klient określa § 15 Umowy o świadczenie usług SaaS. Regulamin nie ustanawia odrębnego limitu.</span></p>
+<h2 id="paragraf-21-wlasnosc-intelektualna">§ 21. Własność intelektualna<a class="heading-link" href="#paragraf-21-wlasnosc-intelektualna" aria-label="Odnośnik do tej sekcji">§</a></h2>
+<p class="clause clause-0"><span class="clause-number">1.</span><span>Prawa własności intelektualnej do Platformy pozostają przy Usługodawcy lub właściwych licencjodawcach.</span></p>
+<p class="clause clause-0"><span class="clause-number">2.</span><span>Użytkownik uzyskuje wyłącznie ograniczone prawo korzystania z dostępnych funkcji w okresie ważnego upoważnienia i w zakresie wewnętrznych potrzeb Klienta.</span></p>
+<p class="clause clause-0"><span class="clause-number">3.</span><span>Nie dochodzi do przeniesienia własności Platformy, kodu źródłowego ani autorskich praw majątkowych. Kopiowanie, odsprzedaż i redystrybucja Platformy są zabronione.</span></p>
+<p class="clause clause-0"><span class="clause-number">4.</span><span>Dane Klienta pozostają danymi Klienta; Usługodawca nie nabywa do nich prawa własności.</span></p>
+<h2 id="paragraf-22-ochrona-danych-osobowych">§ 22. Ochrona danych osobowych<a class="heading-link" href="#paragraf-22-ochrona-danych-osobowych" aria-label="Odnośnik do tej sekcji">§</a></h2>
+<p class="clause clause-0"><span class="clause-number">1.</span><span>Informacje o przetwarzaniu przez Usługodawcę danych kontaktowych i danych Kont, dla których sam określa cele i sposoby przetwarzania, zawiera Polityka prywatności: <strong>[DO WYPEŁNIENIA: LINK DO POLITYKI PRYWATNOŚCI]</strong>.</span></p>
+<p class="clause clause-0"><span class="clause-number">2.</span><span>W odniesieniu do danych pracowników i danych organizacyjnych Klient jest co do zasady administratorem, a Usługodawca może działać jako podmiot przetwarzający na podstawie odrębnej Umowy powierzenia przetwarzania danych osobowych.</span></p>
+<p class="clause clause-0"><span class="clause-number">3.</span><span>Użytkownik kieruje żądanie wykonania praw dotyczących danych przede wszystkim do Klienta, gdy Klient jest administratorem. Usługodawca nie rozstrzyga samodzielnie o usunięciu danych, które przetwarza na udokumentowane polecenie Klienta.</span></p>
+<p class="clause clause-0"><span class="clause-number">4.</span><span>Incydenty dotyczące danych osobowych należy zgłaszać niezwłocznie na <strong>[DO WYPEŁNIENIA: ADRES E-MAIL DO SPRAW DANYCH OSOBOWYCH]</strong>.</span></p>
+<p class="clause clause-0"><span class="clause-number">5.</span><span><strong>[DO WERYFIKACJI PRAWNEJ: PODZIAŁ RÓL, OBOWIĄZKI INFORMACYJNE I OBSŁUGA PRAW OSÓB, KTÓRYCH DANE DOTYCZĄ]</strong></span></p>
+<h2 id="paragraf-23-zmiany-regulaminu">§ 23. Zmiany Regulaminu<a class="heading-link" href="#paragraf-23-zmiany-regulaminu" aria-label="Odnośnik do tej sekcji">§</a></h2>
+<p class="clause clause-0"><span class="clause-number">1.</span><span>Regulamin może zostać zmieniony z powodu zmiany prawa, wymagań bezpieczeństwa, technologii, zakresu funkcji, organizacji Usług albo potrzeby doprecyzowania postanowień.</span></p>
+<p class="clause clause-0"><span class="clause-number">2.</span><span>Nowa wersja wskazuje numer, datę publikacji i datę obowiązywania. Nie stosuje się jej wstecz.</span></p>
+<p class="clause clause-0"><span class="clause-number">3.</span><span>Usługodawca publikuje pełną treść nowej wersji i zachowuje możliwość pobrania oraz utrwalenia dokumentu. Historyczne wersje powinny pozostać dostępne do celów dowodowych.</span></p>
+<p class="clause clause-0"><span class="clause-number">4.</span><span>O istotnej zmianie Usługodawca informuje Klienta z wyprzedzeniem, gdy jest to możliwe. Potrzebę ponownej akceptacji przez Użytkowników należy ocenić według charakteru zmiany.</span></p>
+<p class="clause clause-0"><span class="clause-number">5.</span><span>Milczenie Klienta lub Użytkownika nie oznacza automatycznie akceptacji, chyba że taki skutek został zgodnie z prawem i jednoznacznie uzgodniony w danej relacji.</span></p>
+<p class="clause clause-0"><span class="clause-number">6.</span><span>Zmiana ceny lub innych warunków handlowych następuje wyłącznie na zasadach Umowy o świadczenie usług SaaS.</span></p>
+<p class="clause clause-0"><span class="clause-number">7.</span><span><strong>[DO WERYFIKACJI PRAWNEJ: TERMIN POWIADOMIENIA I PRZESŁANKI PONOWNEJ AKCEPTACJI REGULAMINU]</strong></span></p>
+<h2 id="paragraf-24-postanowienia-koncowe">§ 24. Postanowienia końcowe<a class="heading-link" href="#paragraf-24-postanowienia-koncowe" aria-label="Odnośnik do tej sekcji">§</a></h2>
+<p class="clause clause-0"><span class="clause-number">1.</span><span>Do Regulaminu stosuje się prawo polskie. W sprawach nieuregulowanych stosuje się obowiązujące przepisy oraz Umowę o świadczenie usług SaaS.</span></p>
+<p class="clause clause-0"><span class="clause-number">2.</span><span>Regulamin jest udostępniany nieodpłatnie pod adresem <strong>[DO WYPEŁNIENIA: LINK DO REGULAMINU]</strong> w sposób umożliwiający jego pobranie, zapisanie, odtworzenie i wydrukowanie przed rozpoczęciem korzystania z Usług.</span></p>
+<p class="clause clause-0"><span class="clause-number">3.</span><span>Nieważność albo bezskuteczność pojedynczego postanowienia nie narusza pozostałych postanowień, o ile obowiązujące prawo nie wymaga inaczej.</span></p>
+<p class="clause clause-0"><span class="clause-number">4.</span><span>Wiążąca jest wersja polska, chyba że Usługodawca i Klient wyraźnie uzgodnią inną wersję językową.</span></p>
+<p class="clause clause-0"><span class="clause-number">5.</span><span>Regulamin obowiązuje od <strong>[DO WYPEŁNIENIA: DATA OBOWIĄZYWANIA]</strong> jako wersja <strong>[DO WYPEŁNIENIA: NUMER WERSJI]</strong>.</span></p>
+<p class="clause clause-0"><span class="clause-number">6.</span><span>Oficjalne kanały kontaktu wskazano w § 2.</span></p>
+    </article>
+    <footer class="doc-footer">
+      Regulamin świadczenia usług drogą elektroniczną Platformy GF • wersja [DO WYPEŁNIENIA: NUMER WERSJI] • obowiązuje od [DO WYPEŁNIENIA: DATA OBOWIĄZYWANIA]
+    </footer>
+  </main>
+</body>
+</html>

@@ -130,9 +130,8 @@ public static class ScheduleMatrixEngine
     }
 
     /// <summary>
-    /// Merges overlapping time ranges for one employee/day into user-friendly display intervals.
-    /// We deduplicate identical intervals first, then merge touching/overlapping windows so the
-    /// exported matrix shows the cleanest possible textual representation.
+    /// Merges overlapping or touching time ranges for one employee/day into display intervals,
+    /// preserving separate intervals only when there is a break.
     /// </summary>
     public static List<(string from, string to)> MergeIntervalsForDisplay(IEnumerable<ScheduleSlotModel> slots)
     {

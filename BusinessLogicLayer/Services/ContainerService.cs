@@ -4,6 +4,7 @@ using BusinessLogicLayer.Contracts.Enums;
 using BusinessLogicLayer.Contracts.Models;
 using BusinessLogicLayer.Generators;
 using BusinessLogicLayer.Mappers;
+using BusinessLogicLayer.Schedule;
 using BusinessLogicLayer.Services.Abstractions;
 using DataAccessLayer.Repositories.Abstractions;
 using Microsoft.EntityFrameworkCore;
@@ -22,6 +23,7 @@ public class ContainerService : IContainerService
     private const string DeleteBlockedMessage = "To delete this container, first delete all graphs that belong to it.";
     private const string DuplicateSlotMessage = "Duplicate slot for the same time/day";
     private const string ReplaceSlotsRejectedMessage = "Could not save schedule slots because the database rejected the slot set.";
+    private const int MaxAssignedIntervalsPerEmployeeDay = 4;
 
     private readonly IContainerRepository _repo;
     private readonly IScheduleRepository _scheduleRepo;
@@ -62,7 +64,7 @@ public class ContainerService : IContainerService
         => await ServiceMappingHelper.GetMappedAsync(token => _repo.GetByIdAsync(id, token), x => x.ToContract(), ct).ConfigureAwait(false);
 
     public async Task<List<ContainerModel>> GetAllAsync(CancellationToken ct = default)
-        => await ServiceMappingHelper.GetMappedListAsync(_repo.GetAllAsync, x => x.ToContract(), ct).ConfigureAwait(false);
+        => await ServiceMappingHelper.GetMappedListAsync(_repo.GetSummariesAsync, x => x.ToContract(), ct).ConfigureAwait(false);
 
     public async Task<ContainerModel> CreateAsync(ContainerModel entity, CancellationToken ct = default)
     {
@@ -97,7 +99,7 @@ public class ContainerService : IContainerService
     }
 
     public async Task<List<ContainerModel>> GetByValueAsync(string value, CancellationToken ct = default)
-        => await ServiceMappingHelper.GetMappedListAsync(token => _repo.GetByValueAsync(value, token), x => x.ToContract(), ct).ConfigureAwait(false);
+        => await ServiceMappingHelper.GetMappedListAsync(token => _repo.GetSummariesByValueAsync(value, token), x => x.ToContract(), ct).ConfigureAwait(false);
 
     public async Task<List<ScheduleModel>?> GetGraphsAsync(int containerId, CancellationToken ct = default)
     {
@@ -119,6 +121,20 @@ public class ContainerService : IContainerService
         return graph?.ToContract();
     }
 
+    public async Task<List<ScheduleModel>> GetPublishedGraphsForEmployeeAsync(int employeeId, CancellationToken ct = default)
+    {
+        if (employeeId <= 0)
+        {
+            throw ValidationException.ForField(nameof(employeeId), "Employee is required.");
+        }
+
+        return (await _scheduleRepo
+                .GetPublishedForEmployeeAsync(employeeId, ServiceMappingHelper.NormalizeReadCancellationToken(ct))
+                .ConfigureAwait(false))
+            .Select(x => x.ToContract())
+            .ToList();
+    }
+
     public async Task<ScheduleModel> CreateGraphAsync(int containerId, ScheduleModel model, CancellationToken ct = default)
     {
         await EnsureContainerExistsAsync(containerId, ct).ConfigureAwait(false);
@@ -135,6 +151,18 @@ public class ContainerService : IContainerService
         model.Id = graphId;
         model.ContainerId = containerId;
         await _scheduleRepo.UpdateAsync(model.ToDal(), ct).ConfigureAwait(false);
+    }
+
+    public async Task<int> UpdateGraphPublicationAsync(
+        int containerId,
+        SchedulePublicationStatus publicationStatus,
+        bool? allowSwap,
+        CancellationToken ct = default)
+    {
+        await EnsureContainerExistsAsync(containerId, ct).ConfigureAwait(false);
+        return await _scheduleRepo
+            .UpdatePublicationByContainerAsync(containerId, publicationStatus.ToDal(), allowSwap, ct)
+            .ConfigureAwait(false);
     }
 
     public async Task DeleteGraphAsync(int containerId, int graphId, CancellationToken ct = default)
@@ -336,8 +364,9 @@ public class ContainerService : IContainerService
     {
         await EnsureGraphOwnershipAsync(containerId, graphId, ct).ConfigureAwait(false);
 
-        var existing = (await _cellStyleRepo.GetByScheduleAsync(graphId, ct).ConfigureAwait(false))
-            .FirstOrDefault(x => x.DayOfMonth == model.DayOfMonth && x.EmployeeId == model.EmployeeId);
+        var existing = await _cellStyleRepo
+            .GetByScheduleCellAsync(graphId, model.DayOfMonth, model.EmployeeId, ct)
+            .ConfigureAwait(false);
 
         if (existing is null)
         {
@@ -439,19 +468,38 @@ public class ContainerService : IContainerService
             .ToList();
     }
 
-    private async Task<List<AvailabilityGroupModel>> LoadAvailabilityGroupsAsync(ScheduleModel schedule, CancellationToken ct)
+    private async Task<List<AvailabilityGroupModel>> LoadAvailabilityGroupsAsync(
+        ScheduleModel schedule,
+        IEnumerable<ScheduleEmployeeModel> employees,
+        CancellationToken ct)
     {
         var availabilities = new List<AvailabilityGroupModel>();
 
-        if (schedule.AvailabilityGroupId is not int availabilityGroupId || availabilityGroupId <= 0)
+        if (schedule.AvailabilityGroupId is int availabilityGroupId && availabilityGroupId > 0)
         {
-            return availabilities;
+            var group = await _availabilityGroupRepo.GetFullByIdAsync(availabilityGroupId, ct).ConfigureAwait(false)
+                ?? throw new KeyNotFoundException($"Availability group with id {availabilityGroupId} was not found.");
+
+            availabilities.Add(group.ToContract());
         }
 
-        var group = await _availabilityGroupRepo.GetFullByIdAsync(availabilityGroupId, ct).ConfigureAwait(false)
-            ?? throw new KeyNotFoundException($"Availability group with id {availabilityGroupId} was not found.");
+        var otherSchedules = await _scheduleRepo
+            .GetByMonthWithSlotsAsync(
+                schedule.Year,
+                schedule.Month,
+                schedule.Id > 0 ? schedule.Id : null,
+                ct)
+            .ConfigureAwait(false);
+        var savedScheduleConstraint = ExternalScheduleAvailabilityBuilder.Build(
+            schedule,
+            otherSchedules.SelectMany(otherSchedule => otherSchedule.Slots).Select(slot => slot.ToContract()),
+            employees.Select(employee => employee.EmployeeId));
 
-        availabilities.Add(group.ToContract());
+        if (savedScheduleConstraint is not null)
+        {
+            availabilities.Add(savedScheduleConstraint);
+        }
+
         return availabilities;
     }
 
@@ -461,10 +509,11 @@ public class ContainerService : IContainerService
         IProgress<int>? progress,
         CancellationToken ct)
     {
-        var availabilities = await LoadAvailabilityGroupsAsync(schedule, ct).ConfigureAwait(false);
+        var employeeList = employees.ToList();
+        var availabilities = await LoadAvailabilityGroupsAsync(schedule, employeeList, ct).ConfigureAwait(false);
 
         return (await _scheduleGenerator
-            .GenerateAsync(schedule, availabilities, employees, progress, ct)
+            .GenerateAsync(schedule, availabilities, employeeList, progress, ct)
             .ConfigureAwait(false))
             .Select(slot =>
             {
@@ -516,7 +565,7 @@ public class ContainerService : IContainerService
     /// Before persisting we:
     /// 1. normalize schedule ownership and time strings,
     /// 2. group logically identical slots,
-    /// 3. drop duplicate employees inside the same time bucket,
+    /// 3. validate split shifts per employee/day,
     /// 4. rebuild slot numbers so storage stays dense and deterministic.
     /// </summary>
     private static List<ScheduleSlotModel> NormalizeReplacementSlots(IEnumerable<ScheduleSlotModel> slots, int graphId)
@@ -540,6 +589,8 @@ public class ContainerService : IContainerService
                 };
             })
             .ToList();
+
+        ValidateAssignedEmployeeIntervals(normalizedInput);
 
         var normalizedSlots = new List<ScheduleSlotModel>(normalizedInput.Count);
 
@@ -569,6 +620,69 @@ public class ContainerService : IContainerService
         return normalizedSlots;
     }
 
+    private static void ValidateAssignedEmployeeIntervals(IReadOnlyCollection<ScheduleSlotModel> slots)
+    {
+        foreach (var employeeDay in slots
+            .Where(slot => slot.EmployeeId is > 0)
+            .GroupBy(slot => new { EmployeeId = slot.EmployeeId!.Value, slot.DayOfMonth }))
+        {
+            if (employeeDay.Count() > MaxAssignedIntervalsPerEmployeeDay)
+            {
+                throw new ValidationException(
+                    $"An employee can have no more than {MaxAssignedIntervalsPerEmployeeDay} time ranges in one day.");
+            }
+
+            var uniqueIntervals = new HashSet<(int FromMinutes, int ToMinutes)>();
+            var intervals = new List<(int FromMinutes, int ToMinutes)>();
+
+            foreach (var slot in employeeDay)
+            {
+                if (!ScheduleMatrixEngine.TryParseTime(slot.FromTime, out var fromTime) ||
+                    !ScheduleMatrixEngine.TryParseTime(slot.ToTime, out var toTime))
+                {
+                    throw new ValidationException("Schedule slot times must use a valid HH:mm format.");
+                }
+
+                var fromMinutes = (int)fromTime.TotalMinutes;
+                var toMinutes = (int)toTime.TotalMinutes;
+                if (fromMinutes < 0 || fromMinutes >= 24 * 60 || toMinutes < 0 || toMinutes >= 24 * 60)
+                {
+                    throw new ValidationException("Schedule slot times must be within one 24-hour day.");
+                }
+
+                if (toMinutes < fromMinutes)
+                {
+                    toMinutes += 24 * 60;
+                }
+
+                if (toMinutes == fromMinutes)
+                {
+                    throw new ValidationException("Schedule slot end time must differ from its start time.");
+                }
+
+                if (!uniqueIntervals.Add((fromMinutes, toMinutes)))
+                {
+                    throw new ValidationException(
+                        "The same time range cannot be entered more than once for one employee and day.");
+                }
+
+                intervals.Add((fromMinutes, toMinutes));
+            }
+
+            intervals.Sort((left, right) => left.FromMinutes != right.FromMinutes
+                ? left.FromMinutes.CompareTo(right.FromMinutes)
+                : left.ToMinutes.CompareTo(right.ToMinutes));
+
+            for (var index = 1; index < intervals.Count; index++)
+            {
+                if (intervals[index].FromMinutes < intervals[index - 1].ToMinutes)
+                {
+                    throw new ValidationException("Time ranges for one employee and day cannot overlap.");
+                }
+            }
+        }
+    }
+
     private async Task EnsureGraphEmployeeIsUniqueAsync(int graphId, int employeeId, int? excludeGraphEmployeeId, CancellationToken ct)
     {
         if (employeeId <= 0)
@@ -576,9 +690,9 @@ public class ContainerService : IContainerService
             throw ValidationException.ForField(nameof(ScheduleEmployeeModel.EmployeeId), "Employee is required.");
         }
 
-        var existing = await _employeeRepo.GetByScheduleAsync(graphId, ct).ConfigureAwait(false);
-        var duplicateExists = existing.Any(x => x.EmployeeId == employeeId && (!excludeGraphEmployeeId.HasValue || x.Id != excludeGraphEmployeeId.Value));
-        if (duplicateExists)
+        if (await _employeeRepo
+                .ExistsForScheduleAsync(graphId, employeeId, excludeGraphEmployeeId, ct)
+                .ConfigureAwait(false))
         {
             throw ValidationException.ForField(nameof(ScheduleEmployeeModel.EmployeeId), "This employee is already added to the graph.");
         }

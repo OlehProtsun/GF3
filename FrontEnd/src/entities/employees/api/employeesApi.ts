@@ -10,6 +10,8 @@ function toSaveDto(input: SaveEmployeeInput): SaveEmployeeDto {
     lastName: input.lastName.trim(),
     phone: input.phone?.trim() || undefined,
     email: input.email?.trim() || undefined,
+    username: input.username?.trim() || undefined,
+    password: input.password || undefined,
   };
 }
 
@@ -20,4 +22,5 @@ export const employeesApi = {
   update: (id: number, payload: SaveEmployeeInput) =>
     request<void>(`${endpoint}/${id}`, { method: "PUT", body: toSaveDto(payload) }),
   remove: (id: number) => request<void>(`${endpoint}/${id}`, { method: "DELETE" }),
+  kick: (id: number) => request<void>(`${endpoint}/${id}/kick`, { method: "POST" }),
 };

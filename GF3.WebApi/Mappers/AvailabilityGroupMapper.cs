@@ -1,4 +1,6 @@
 using BusinessLogicLayer.Contracts.Models;
+using BusinessLogicLayer.Contracts.Enums;
+using BusinessLogicLayer.Common;
 using WebApi.Contracts.AvailabilityGroups;
 
 namespace WebApi.Mappers;
@@ -14,13 +16,29 @@ public static class AvailabilityGroupMapper
         Name = model.Name,
         Year = model.Year,
         Month = model.Month,
+        PublicationStatus = ToApiPublicationStatus(model.PublicationStatus),
+        VisibleFromUtc = model.VisibleFromUtc,
+        VisibleToUtc = model.VisibleToUtc,
     };
 
     public static AvailabilityGroupModel ToCreateModel(this CreateAvailabilityGroupRequest request)
-        => MapAvailabilityGroupModel(request.Name, request.Year, request.Month);
+        => MapAvailabilityGroupModel(
+            request.Name,
+            request.Year,
+            request.Month,
+            request.PublicationStatus,
+            request.VisibleFromUtc,
+            request.VisibleToUtc);
 
     public static AvailabilityGroupModel ToUpdateModel(this UpdateAvailabilityGroupRequest request, int id)
-        => MapAvailabilityGroupModel(request.Name, request.Year, request.Month, id);
+        => MapAvailabilityGroupModel(
+            request.Name,
+            request.Year,
+            request.Month,
+            request.PublicationStatus,
+            request.VisibleFromUtc,
+            request.VisibleToUtc,
+            id);
 
     /// <summary>
     /// Flattens group members and their day entries into the compact list shape used by the API.
@@ -49,12 +67,42 @@ public static class AvailabilityGroupMapper
             });
     }
 
-    private static AvailabilityGroupModel MapAvailabilityGroupModel(string name, int year, int month, int id = 0)
+    private static AvailabilityGroupModel MapAvailabilityGroupModel(
+        string name,
+        int year,
+        int month,
+        string? publicationStatus,
+        DateTimeOffset? visibleFromUtc,
+        DateTimeOffset? visibleToUtc,
+        int id = 0)
         => new()
         {
             Id = id,
             Name = name,
             Year = year,
             Month = month,
+            PublicationStatus = ParsePublicationStatus(publicationStatus),
+            VisibleFromUtc = visibleFromUtc,
+            VisibleToUtc = visibleToUtc,
         };
+
+    private static string ToApiPublicationStatus(AvailabilityPublicationStatus status)
+        => status.ToString().ToLowerInvariant();
+
+    private static AvailabilityPublicationStatus ParsePublicationStatus(string? value)
+    {
+        var normalized = (value ?? "private").Trim();
+
+        if (string.Equals(normalized, "private", StringComparison.OrdinalIgnoreCase))
+        {
+            return AvailabilityPublicationStatus.Private;
+        }
+
+        if (string.Equals(normalized, "public", StringComparison.OrdinalIgnoreCase))
+        {
+            return AvailabilityPublicationStatus.Public;
+        }
+
+        throw ValidationException.ForField(nameof(CreateAvailabilityGroupRequest.PublicationStatus), "Publication status must be private or public.");
+    }
 }

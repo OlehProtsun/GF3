@@ -1,10 +1,20 @@
 using BusinessLogicLayer;
+using BusinessLogicLayer.Options;
+using BusinessLogicLayer.Services.Abstractions;
 using DataAccessLayer.Administration;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Cors.Infrastructure;
+using Microsoft.AspNetCore.Mvc.Authorization;
+using Microsoft.AspNetCore.ResponseCompression;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using Microsoft.OpenApi;
+using WebApi.Auth;
 using WebApi.Options;
+using WebApi.Realtime;
+using WebApi.Services;
 
 namespace WebApi.Infrastructure;
 
@@ -23,12 +33,34 @@ public static class WebApiServiceCollectionExtensions
         IConfiguration configuration,
         Func<string, string?>? readEnvironmentVariable = null,
         string? localApplicationDataRoot = null,
-        Action<string>? ensureDirectory = null)
+        Action<string>? ensureDirectory = null,
+        bool requireExplicitJwtSigningKey = false)
     {
-        services.AddApiMvc();
+        var jwtOptions = JwtAuthOptions.FromConfiguration(configuration, requireExplicitJwtSigningKey);
+
+        services.AddSingleton(TimeProvider.System);
+        services.AddSingleton<AuthAttemptLimiter>();
+        services.AddApiMvc(jwtOptions);
         services.AddApiDocumentation();
         services.AddFrontendDevelopmentCors();
+        services.AddHttpResponseCompression();
+        services.AddSignalR(options =>
+        {
+            options.KeepAliveInterval = TimeSpan.FromSeconds(15);
+            options.ClientTimeoutInterval = TimeSpan.FromSeconds(35);
+        });
+        services.AddSingleton<ManagerEditLockService>();
+        services.AddSingleton<IManagerEditLockService>(services => services.GetRequiredService<ManagerEditLockService>());
+        services.AddSingleton<IScheduleEditLockService>(services => services.GetRequiredService<ManagerEditLockService>());
+        services.AddScoped<IRealtimeNotifier, RealtimeNotifier>();
+        services.AddScoped<IWorkflowLogService, WorkflowLogService>();
+        services.AddScoped<IScheduleLastUpdateService, ScheduleLastUpdateService>();
+        services.Configure<SmtpEmailOptions>(configuration.GetSection("Smtp"));
+        services.Configure<ExportTemplatesOptions>(configuration.GetSection("ExportTemplates"));
         services.ConfigureAdminTools(configuration, readEnvironmentVariable);
+        services.AddSingleton(Microsoft.Extensions.Options.Options.Create(jwtOptions));
+        services.AddSingleton<IJwtTokenService, JwtTokenService>();
+        services.AddTransient<IEmailSender, SmtpEmailSender>();
 
         var connectionString = StartupConfiguration.ResolveConnectionString(
             configuration.GetConnectionString("Default"),
@@ -36,6 +68,8 @@ public static class WebApiServiceCollectionExtensions
             ensureDirectory);
 
         services.AddBusinessLogicStack(connectionString);
+        services.AddHostedService<DatabaseAutoBackupHostedService>();
+        services.AddHostedService<EmployeeNotificationCleanupHostedService>();
         return services;
     }
 
@@ -48,13 +82,25 @@ public static class WebApiServiceCollectionExtensions
     public static string ResolveRegisteredDatabasePath(IServiceProvider services)
         => services.GetRequiredService<ISqliteAdminService>().DatabasePath;
 
-    private static IServiceCollection AddApiMvc(this IServiceCollection services)
+    private static IServiceCollection AddApiMvc(this IServiceCollection services, JwtAuthOptions jwtOptions)
     {
         services.AddLogging();
         services.AddScoped<ApiExceptionFilter>();
+        services.AddAuthentication(JwtAuthenticationDefaults.SchemeName)
+            .AddScheme<AuthenticationSchemeOptions, JwtAuthenticationHandler>(
+                JwtAuthenticationDefaults.SchemeName,
+                _ => { });
+        services.AddAuthorization(options =>
+            options.AddPolicy(AuthPolicies.SystemManager, policy => policy
+                .RequireAuthenticatedUser()
+                .RequireRole(AuthRoles.Manager)
+                .RequireClaim(AuthPolicies.SystemManagerClaim, "true")));
         services.AddControllers(options =>
         {
             options.Filters.AddService<ApiExceptionFilter>();
+            options.Filters.Add(new AuthorizeFilter(new AuthorizationPolicyBuilder()
+                .RequireAuthenticatedUser()
+                .Build()));
         });
         services.AddProblemDetails();
         return services;
@@ -63,7 +109,36 @@ public static class WebApiServiceCollectionExtensions
     private static IServiceCollection AddApiDocumentation(this IServiceCollection services)
     {
         services.AddEndpointsApiExplorer();
-        services.AddSwaggerGen();
+        services.AddSwaggerGen(options =>
+        {
+            var bearerScheme = new OpenApiSecurityScheme
+            {
+                Name = "Authorization",
+                Type = SecuritySchemeType.Http,
+                Scheme = "bearer",
+                BearerFormat = "JWT",
+                In = ParameterLocation.Header,
+                Description = "JWT access token in the format: Bearer {token}",
+            };
+
+            options.AddSecurityDefinition("Bearer", bearerScheme);
+        });
+        return services;
+    }
+
+    private static IServiceCollection AddHttpResponseCompression(this IServiceCollection services)
+    {
+        services.AddResponseCompression(options =>
+        {
+            options.EnableForHttps = true;
+            options.MimeTypes = ResponseCompressionDefaults.MimeTypes.Concat(
+            [
+                "application/json",
+                "application/problem+json",
+                "application/vnd.api+json",
+            ]);
+        });
+
         return services;
     }
 
@@ -75,7 +150,8 @@ public static class WebApiServiceCollectionExtensions
             {
                 policy.WithOrigins(FrontendDevOrigins)
                     .AllowAnyHeader()
-                    .AllowAnyMethod();
+                    .AllowAnyMethod()
+                    .AllowCredentials();
             });
         });
 

@@ -1,5 +1,9 @@
 using BusinessLogicLayer.Services.Abstractions;
+using BusinessLogicLayer.Contracts.Enums;
+using BusinessLogicLayer.Contracts.Models;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using WebApi.Auth;
 using WebApi.Infrastructure;
 using WebApi.Contracts.Containers;
 using WebApi.Contracts.Containers.Graphs;
@@ -8,17 +12,25 @@ using WebApi.Contracts.Containers.Graphs.Employees;
 using WebApi.Contracts.Containers.Graphs.Slots;
 using WebApi.Contracts.Containers.SchedulePresets;
 using WebApi.Mappers;
+using WebApi.Realtime;
+using WebApi.Services;
 
 namespace WebApi.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
+[Authorize(Roles = AuthRoles.Manager)]
 /// <summary>
 /// Main HTTP API for containers and all nested graph resources.
 /// This controller intentionally mirrors the aggregate structure from the business layer,
 /// which makes the route tree predictable for frontend code and keeps ownership boundaries explicit.
 /// </summary>
-public class ContainersController(IContainerService containerService) : ControllerBase
+public class ContainersController(
+    IContainerService containerService,
+    IWorkflowLogService workflowLogService,
+    IRealtimeNotifier realtimeNotifier,
+    IManagerEditLockService? editLockService = null,
+    IScheduleLastUpdateService? scheduleLastUpdateService = null) : ControllerBase
 {
     [HttpGet]
     [ProducesResponseType(typeof(IEnumerable<ContainerDto>), StatusCodes.Status200OK)]
@@ -56,7 +68,74 @@ public class ContainersController(IContainerService containerService) : Controll
             return NotFound(CreateNotFoundProblem($"Container with id {containerId} was not found."));
         }
 
-        return Ok(graphs.Select(x => x.ToGraphDto()));
+        var lastUpdates = await GetLastUpdatesAsync(graphs.Select(graph => graph.Id), cancellationToken)
+            .ConfigureAwait(false);
+        return Ok(graphs.Select(graph => graph.ToGraphDto(lastUpdates.GetValueOrDefault(graph.Id))));
+    }
+
+    [HttpPut("{containerId:int}/graphs/publication")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> UpdateGraphsPublication(
+        int containerId,
+        [FromBody] UpdateGraphsPublicationRequest request,
+        CancellationToken cancellationToken)
+    {
+        var isPublic = string.Equals(request.PublicationStatus, "public", StringComparison.OrdinalIgnoreCase);
+        var isPrivate = string.Equals(request.PublicationStatus, "private", StringComparison.OrdinalIgnoreCase);
+        if (!isPublic && !isPrivate)
+        {
+            return BadRequest(ApiProblemDetailsFactory.CreateValidationProblem(
+                HttpContext,
+                new Dictionary<string, string[]> { [nameof(request.PublicationStatus)] = ["Publication status must be private or public."] }));
+        }
+
+        if (isPublic && !request.AllowSwap.HasValue)
+        {
+            return BadRequest(ApiProblemDetailsFactory.CreateValidationProblem(
+                HttpContext,
+                new Dictionary<string, string[]> { [nameof(request.AllowSwap)] = ["Can swap must be selected when publishing schedules."] }));
+        }
+
+        var graphs = await containerService.GetGraphsAsync(containerId, cancellationToken).ConfigureAwait(false);
+        if (graphs is null)
+        {
+            return NotFound(CreateNotFoundProblem($"Container with id {containerId} was not found."));
+        }
+
+        foreach (var graph in graphs)
+        {
+            if (CreateEditLockConflictResult(
+                    ManagerEditLockTargets.Schedule(containerId, graph.Id),
+                    $"Schedule \"{graph.Name}\"") is { } conflict)
+            {
+                return conflict;
+            }
+        }
+
+        var publicationStatus = isPublic
+            ? SchedulePublicationStatus.Public
+            : SchedulePublicationStatus.Private;
+        await containerService
+            .UpdateGraphPublicationAsync(containerId, publicationStatus, isPublic ? request.AllowSwap : null, cancellationToken)
+            .ConfigureAwait(false);
+
+        var action = isPublic
+            ? $"Published all {graphs.Count} schedules in container {containerId} with swaps {(request.AllowSwap == true ? "enabled" : "disabled")}."
+            : $"Made all {graphs.Count} schedules private in container {containerId}.";
+        await LogManagerActionAsync(action, cancellationToken).ConfigureAwait(false);
+
+        foreach (var graph in graphs)
+        {
+            await NotifyGraphChangedAsync(
+                containerId,
+                graph.Id,
+                isPublic ? "manager-schedules-published" : "manager-schedules-made-private").ConfigureAwait(false);
+        }
+
+        return NoContent();
     }
 
     [HttpGet("{containerId:int}/schedule-presets")]
@@ -83,6 +162,10 @@ public class ContainersController(IContainerService containerService) : Controll
     {
         var created = await containerService.CreateSchedulePresetAsync(containerId, request.ToCreateModel(containerId), cancellationToken).ConfigureAwait(false);
         var dto = created.ToSchedulePresetDto();
+        await LogManagerActionAsync($"Created schedule preset {dto.Name}.", cancellationToken).ConfigureAwait(false);
+        await realtimeNotifier
+            .NotifyManagerDataChangedAsync(ManagerEditResourceTypes.Container, containerId.ToString(), "manager-schedule-preset-created", containerId)
+            .ConfigureAwait(false);
         return CreatedAtAction(nameof(GetSchedulePresets), new { containerId }, dto);
     }
 
@@ -98,7 +181,8 @@ public class ContainersController(IContainerService containerService) : Controll
             return NotFound(CreateNotFoundProblem($"Graph with id {graphId} was not found."));
         }
 
-        return Ok(graph.ToGraphDto());
+        var lastUpdates = await GetLastUpdatesAsync([graph.Id], cancellationToken).ConfigureAwait(false);
+        return Ok(graph.ToGraphDto(lastUpdates.GetValueOrDefault(graph.Id)));
     }
 
     [HttpPost("{containerId:int}/graphs")]
@@ -110,6 +194,14 @@ public class ContainersController(IContainerService containerService) : Controll
     {
         var created = await containerService.CreateGraphAsync(containerId, request.ToCreateModel(containerId), cancellationToken).ConfigureAwait(false);
         var dto = created.ToGraphDto();
+        var isPublished = created.PublicationStatus == SchedulePublicationStatus.Public;
+        await LogManagerActionAsync(
+            $"{(isPublished ? "Published" : "Created")} {DescribeSchedule(created)}.",
+            cancellationToken).ConfigureAwait(false);
+        await NotifyGraphChangedAsync(
+            containerId,
+            dto.Id,
+            isPublished ? "manager-schedule-published" : "manager-schedule-created").ConfigureAwait(false);
         return CreatedAtAction(nameof(GetGraphById), new { containerId, graphId = dto.Id }, dto);
     }
 
@@ -120,7 +212,27 @@ public class ContainersController(IContainerService containerService) : Controll
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> UpdateGraph(int containerId, int graphId, [FromBody] UpdateGraphRequest request, CancellationToken cancellationToken)
     {
-        await containerService.UpdateGraphAsync(containerId, graphId, request.ToUpdateModel(containerId, graphId), cancellationToken).ConfigureAwait(false);
+        if (CreateEditLockConflictResult(ManagerEditLockTargets.Schedule(containerId, graphId), "This schedule") is { } conflict)
+        {
+            return conflict;
+        }
+
+        var existing = await containerService.GetGraphByIdAsync(containerId, graphId, cancellationToken).ConfigureAwait(false);
+        var updatedModel = request.ToUpdateModel(containerId, graphId);
+        var becamePublic =
+            existing?.PublicationStatus != SchedulePublicationStatus.Public &&
+            updatedModel.PublicationStatus == SchedulePublicationStatus.Public;
+
+        await containerService.UpdateGraphAsync(containerId, graphId, updatedModel, cancellationToken).ConfigureAwait(false);
+        var logModel = await containerService.GetGraphByIdAsync(containerId, graphId, cancellationToken).ConfigureAwait(false)
+            ?? updatedModel;
+        await LogManagerActionAsync(
+            $"{(becamePublic ? "Published" : "Updated")} {DescribeSchedule(logModel)}.",
+            cancellationToken).ConfigureAwait(false);
+        await NotifyGraphChangedAsync(
+            containerId,
+            graphId,
+            becamePublic ? "manager-schedule-published" : "manager-schedule-updated").ConfigureAwait(false);
         return NoContent();
     }
 
@@ -130,7 +242,17 @@ public class ContainersController(IContainerService containerService) : Controll
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> DeleteGraph(int containerId, int graphId, CancellationToken cancellationToken)
     {
+        if (CreateEditLockConflictResult(ManagerEditLockTargets.Schedule(containerId, graphId), "This schedule") is { } conflict)
+        {
+            return conflict;
+        }
+
+        var existing = await containerService.GetGraphByIdAsync(containerId, graphId, cancellationToken).ConfigureAwait(false);
         await containerService.DeleteGraphAsync(containerId, graphId, cancellationToken).ConfigureAwait(false);
+        await LogManagerActionAsync(
+            $"Deleted {(existing is null ? "schedule" : DescribeSchedule(existing))}.",
+            cancellationToken).ConfigureAwait(false);
+        await NotifyGraphChangedAsync(containerId, graphId, "manager-schedule-deleted").ConfigureAwait(false);
         return NoContent();
     }
 
@@ -172,6 +294,12 @@ public class ContainersController(IContainerService containerService) : Controll
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult<GenerateGraphResponse>> GenerateGraph(int containerId, int graphId, [FromBody] GenerateGraphRequest request, CancellationToken cancellationToken)
     {
+        if (!request.DryRun &&
+            CreateEditLockConflictResult(ManagerEditLockTargets.Schedule(containerId, graphId), "This schedule") is { } conflict)
+        {
+            return conflict;
+        }
+
         var result = await containerService
             .GenerateGraphAsync(containerId, graphId, request.Overwrite, request.DryRun, progress: null, cancellationToken)
             .ConfigureAwait(false);
@@ -179,6 +307,14 @@ public class ContainersController(IContainerService containerService) : Controll
         // Returning slots is optional for persisted generation because some callers only care
         // about counts. Dry-run always returns slots because there is no database write to inspect later.
         var includeSlots = request.DryRun || request.ReturnSlots;
+        if (!request.DryRun && result.WrittenSlotsCount > 0)
+        {
+            var graph = await containerService.GetGraphByIdAsync(containerId, graphId, cancellationToken).ConfigureAwait(false);
+            await LogManagerActionAsync(
+                $"Generated {result.WrittenSlotsCount} shifts for {DescribeScheduleOrFallback(graph)}.",
+                cancellationToken).ConfigureAwait(false);
+            await NotifyGraphChangedAsync(containerId, graphId, "manager-schedule-generated").ConfigureAwait(false);
+        }
 
         return Ok(new GenerateGraphResponse
         {
@@ -209,7 +345,17 @@ public class ContainersController(IContainerService containerService) : Controll
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> ReplaceGraphSlots(int containerId, int graphId, [FromBody] ReplaceGraphSlotsRequest request, CancellationToken cancellationToken)
     {
+        if (CreateEditLockConflictResult(ManagerEditLockTargets.Schedule(containerId, graphId), "This schedule") is { } conflict)
+        {
+            return conflict;
+        }
+
         await containerService.ReplaceGraphSlotsAsync(containerId, graphId, request.ToReplaceModels(graphId), cancellationToken).ConfigureAwait(false);
+        var graph = await containerService.GetGraphByIdAsync(containerId, graphId, cancellationToken).ConfigureAwait(false);
+        await LogManagerActionAsync(
+            $"Saved the schedule matrix for {DescribeScheduleOrFallback(graph)} with {request.Slots.Count} shifts.",
+            cancellationToken).ConfigureAwait(false);
+        await NotifyGraphChangedAsync(containerId, graphId, "manager-schedule-slots-replaced").ConfigureAwait(false);
         return NoContent();
     }
 
@@ -218,7 +364,17 @@ public class ContainersController(IContainerService containerService) : Controll
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
     public async Task<ActionResult<GraphSlotDto>> CreateGraphSlot(int containerId, int graphId, [FromBody] CreateGraphSlotRequest request, CancellationToken cancellationToken)
     {
+        if (CreateEditLockConflictResult(ManagerEditLockTargets.Schedule(containerId, graphId), "This schedule") is { } conflict)
+        {
+            return conflict;
+        }
+
         var created = await containerService.CreateGraphSlotAsync(containerId, graphId, request.ToCreateModel(graphId), cancellationToken).ConfigureAwait(false);
+        var graph = await containerService.GetGraphByIdAsync(containerId, graphId, cancellationToken).ConfigureAwait(false);
+        await LogManagerActionAsync(
+            $"Added {DescribeShift(created, graph)} to {DescribeScheduleOrFallback(graph)}.",
+            cancellationToken).ConfigureAwait(false);
+        await NotifyGraphChangedAsync(containerId, graphId, "manager-schedule-slot-created").ConfigureAwait(false);
         return CreatedAtAction(nameof(GetGraphSlots), new { containerId, graphId }, created.ToGraphSlotDto());
     }
 
@@ -227,7 +383,18 @@ public class ContainersController(IContainerService containerService) : Controll
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> UpdateGraphSlot(int containerId, int graphId, int slotId, [FromBody] UpdateGraphSlotRequest request, CancellationToken cancellationToken)
     {
+        if (CreateEditLockConflictResult(ManagerEditLockTargets.Schedule(containerId, graphId), "This schedule") is { } conflict)
+        {
+            return conflict;
+        }
+
         await containerService.UpdateGraphSlotAsync(containerId, graphId, slotId, request.ToUpdateModel(graphId, slotId), cancellationToken).ConfigureAwait(false);
+        var graph = await containerService.GetGraphByIdAsync(containerId, graphId, cancellationToken).ConfigureAwait(false);
+        var updatedSlot = graph?.Slots.FirstOrDefault(slot => slot.Id == slotId) ?? request.ToUpdateModel(graphId, slotId);
+        await LogManagerActionAsync(
+            $"Updated {DescribeShift(updatedSlot, graph)} in {DescribeScheduleOrFallback(graph)}.",
+            cancellationToken).ConfigureAwait(false);
+        await NotifyGraphChangedAsync(containerId, graphId, "manager-schedule-slot-updated").ConfigureAwait(false);
         return NoContent();
     }
 
@@ -235,7 +402,18 @@ public class ContainersController(IContainerService containerService) : Controll
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     public async Task<IActionResult> DeleteGraphSlot(int containerId, int graphId, int slotId, CancellationToken cancellationToken)
     {
+        if (CreateEditLockConflictResult(ManagerEditLockTargets.Schedule(containerId, graphId), "This schedule") is { } conflict)
+        {
+            return conflict;
+        }
+
+        var graph = await containerService.GetGraphByIdAsync(containerId, graphId, cancellationToken).ConfigureAwait(false);
+        var deletedSlot = graph?.Slots.FirstOrDefault(slot => slot.Id == slotId);
         await containerService.DeleteGraphSlotAsync(containerId, graphId, slotId, cancellationToken).ConfigureAwait(false);
+        await LogManagerActionAsync(
+            $"Deleted {(deletedSlot is null ? "a shift" : DescribeShift(deletedSlot, graph))} from {DescribeScheduleOrFallback(graph)}.",
+            cancellationToken).ConfigureAwait(false);
+        await NotifyGraphChangedAsync(containerId, graphId, "manager-schedule-slot-deleted").ConfigureAwait(false);
         return NoContent();
     }
 
@@ -257,7 +435,18 @@ public class ContainersController(IContainerService containerService) : Controll
     [ProducesResponseType(typeof(GraphEmployeeDto), StatusCodes.Status201Created)]
     public async Task<ActionResult<GraphEmployeeDto>> AddGraphEmployee(int containerId, int graphId, [FromBody] AddGraphEmployeeRequest request, CancellationToken cancellationToken)
     {
+        if (CreateEditLockConflictResult(ManagerEditLockTargets.Schedule(containerId, graphId), "This schedule") is { } conflict)
+        {
+            return conflict;
+        }
+
         var created = await containerService.AddGraphEmployeeAsync(containerId, graphId, request.ToAddModel(graphId), cancellationToken).ConfigureAwait(false);
+        var graph = await containerService.GetGraphByIdAsync(containerId, graphId, cancellationToken).ConfigureAwait(false);
+        var assignment = graph?.Employees.FirstOrDefault(employee => employee.EmployeeId == created.EmployeeId) ?? created;
+        await LogManagerActionAsync(
+            $"Added {DescribeEmployee(assignment)} to {DescribeScheduleOrFallback(graph)}.",
+            cancellationToken).ConfigureAwait(false);
+        await NotifyGraphChangedAsync(containerId, graphId, "manager-schedule-employee-added").ConfigureAwait(false);
         return CreatedAtAction(nameof(GetGraphEmployees), new { containerId, graphId }, created.ToGraphEmployeeDto());
     }
 
@@ -265,7 +454,18 @@ public class ContainersController(IContainerService containerService) : Controll
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     public async Task<IActionResult> UpdateGraphEmployee(int containerId, int graphId, int graphEmployeeId, [FromBody] UpdateGraphEmployeeRequest request, CancellationToken cancellationToken)
     {
+        if (CreateEditLockConflictResult(ManagerEditLockTargets.Schedule(containerId, graphId), "This schedule") is { } conflict)
+        {
+            return conflict;
+        }
+
         await containerService.UpdateGraphEmployeeAsync(containerId, graphId, graphEmployeeId, request.ToUpdateModel(graphId, graphEmployeeId), cancellationToken).ConfigureAwait(false);
+        var graph = await containerService.GetGraphByIdAsync(containerId, graphId, cancellationToken).ConfigureAwait(false);
+        var assignment = graph?.Employees.FirstOrDefault(employee => employee.Id == graphEmployeeId);
+        await LogManagerActionAsync(
+            $"Updated {(assignment is null ? "an employee assignment" : DescribeEmployee(assignment))} in {DescribeScheduleOrFallback(graph)}.",
+            cancellationToken).ConfigureAwait(false);
+        await NotifyGraphChangedAsync(containerId, graphId, "manager-schedule-employee-updated").ConfigureAwait(false);
         return NoContent();
     }
 
@@ -273,7 +473,18 @@ public class ContainersController(IContainerService containerService) : Controll
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     public async Task<IActionResult> RemoveGraphEmployee(int containerId, int graphId, int graphEmployeeId, CancellationToken cancellationToken)
     {
+        if (CreateEditLockConflictResult(ManagerEditLockTargets.Schedule(containerId, graphId), "This schedule") is { } conflict)
+        {
+            return conflict;
+        }
+
+        var graph = await containerService.GetGraphByIdAsync(containerId, graphId, cancellationToken).ConfigureAwait(false);
+        var assignment = graph?.Employees.FirstOrDefault(employee => employee.Id == graphEmployeeId);
         await containerService.RemoveGraphEmployeeAsync(containerId, graphId, graphEmployeeId, cancellationToken).ConfigureAwait(false);
+        await LogManagerActionAsync(
+            $"Removed {(assignment is null ? "an employee" : DescribeEmployee(assignment))} from {DescribeScheduleOrFallback(graph)}.",
+            cancellationToken).ConfigureAwait(false);
+        await NotifyGraphChangedAsync(containerId, graphId, "manager-schedule-employee-removed").ConfigureAwait(false);
         return NoContent();
     }
 
@@ -295,7 +506,17 @@ public class ContainersController(IContainerService containerService) : Controll
     [ProducesResponseType(typeof(GraphCellStyleDto), StatusCodes.Status200OK)]
     public async Task<ActionResult<GraphCellStyleDto>> UpsertGraphCellStyle(int containerId, int graphId, [FromBody] UpsertGraphCellStyleRequest request, CancellationToken cancellationToken)
     {
+        if (CreateEditLockConflictResult(ManagerEditLockTargets.Schedule(containerId, graphId), "This schedule") is { } conflict)
+        {
+            return conflict;
+        }
+
         var style = await containerService.UpsertGraphCellStyleAsync(containerId, graphId, request.ToUpsertModel(graphId), cancellationToken).ConfigureAwait(false);
+        var graph = await containerService.GetGraphByIdAsync(containerId, graphId, cancellationToken).ConfigureAwait(false);
+        await LogManagerActionAsync(
+            $"Updated a cell style in {DescribeScheduleOrFallback(graph)}.",
+            cancellationToken).ConfigureAwait(false);
+        await NotifyGraphChangedAsync(containerId, graphId, "manager-schedule-style-updated").ConfigureAwait(false);
         return Ok(style.ToGraphCellStyleDto());
     }
 
@@ -303,7 +524,17 @@ public class ContainersController(IContainerService containerService) : Controll
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     public async Task<IActionResult> DeleteGraphCellStyle(int containerId, int graphId, int styleId, CancellationToken cancellationToken)
     {
+        if (CreateEditLockConflictResult(ManagerEditLockTargets.Schedule(containerId, graphId), "This schedule") is { } conflict)
+        {
+            return conflict;
+        }
+
         await containerService.DeleteGraphCellStyleAsync(containerId, graphId, styleId, cancellationToken).ConfigureAwait(false);
+        var graph = await containerService.GetGraphByIdAsync(containerId, graphId, cancellationToken).ConfigureAwait(false);
+        await LogManagerActionAsync(
+            $"Deleted a cell style from {DescribeScheduleOrFallback(graph)}.",
+            cancellationToken).ConfigureAwait(false);
+        await NotifyGraphChangedAsync(containerId, graphId, "manager-schedule-style-deleted").ConfigureAwait(false);
         return NoContent();
     }
 
@@ -315,6 +546,10 @@ public class ContainersController(IContainerService containerService) : Controll
     {
         var created = await containerService.CreateAsync(request.ToCreateModel(), cancellationToken).ConfigureAwait(false);
         var dto = created.ToApiDto();
+        await LogManagerActionAsync($"Created container {dto.Name}.", cancellationToken).ConfigureAwait(false);
+        await realtimeNotifier
+            .NotifyManagerDataChangedAsync(ManagerEditResourceTypes.Container, dto.Id.ToString(), "manager-container-created", dto.Id)
+            .ConfigureAwait(false);
         return CreatedAtAction(nameof(GetById), new { id = dto.Id }, dto);
     }
 
@@ -325,6 +560,11 @@ public class ContainersController(IContainerService containerService) : Controll
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> Update(int id, [FromBody] UpdateContainerRequest request, CancellationToken cancellationToken)
     {
+        if (CreateEditLockConflictResult(ManagerEditLockTargets.Container(id), "This container") is { } conflict)
+        {
+            return conflict;
+        }
+
         var existing = await containerService.GetAsync(id, cancellationToken).ConfigureAwait(false);
         if (existing is null)
         {
@@ -332,6 +572,10 @@ public class ContainersController(IContainerService containerService) : Controll
         }
 
         await containerService.UpdateAsync(request.ToUpdateModel(id), cancellationToken).ConfigureAwait(false);
+        await LogManagerActionAsync($"Updated container {request.Name}.", cancellationToken).ConfigureAwait(false);
+        await realtimeNotifier
+            .NotifyManagerDataChangedAsync(ManagerEditResourceTypes.Container, id.ToString(), "manager-container-updated", id)
+            .ConfigureAwait(false);
         return NoContent();
     }
 
@@ -342,6 +586,11 @@ public class ContainersController(IContainerService containerService) : Controll
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> Delete(int id, CancellationToken cancellationToken)
     {
+        if (CreateEditLockConflictResult(ManagerEditLockTargets.Container(id), "This container") is { } conflict)
+        {
+            return conflict;
+        }
+
         var existing = await containerService.GetAsync(id, cancellationToken).ConfigureAwait(false);
         if (existing is null)
         {
@@ -357,8 +606,85 @@ public class ContainersController(IContainerService containerService) : Controll
                 result.Message));
         }
 
+        await LogManagerActionAsync($"Deleted container {existing.Name}.", cancellationToken).ConfigureAwait(false);
+        await realtimeNotifier
+            .NotifyManagerDataChangedAsync(ManagerEditResourceTypes.Container, id.ToString(), "manager-container-deleted", id)
+            .ConfigureAwait(false);
         return NoContent();
     }
+
+    private Task LogManagerActionAsync(string action, CancellationToken cancellationToken)
+        => workflowLogService.LogAsync(User, action, cancellationToken);
+
+    private async Task<IReadOnlyDictionary<int, DateTimeOffset>> GetLastUpdatesAsync(
+        IEnumerable<int> scheduleIds,
+        CancellationToken cancellationToken)
+    {
+        if (scheduleLastUpdateService is null)
+        {
+            return new Dictionary<int, DateTimeOffset>();
+        }
+
+        return await scheduleLastUpdateService
+            .GetLastUpdatesAsync(scheduleIds, cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    private static string DescribeSchedule(ScheduleModel schedule)
+    {
+        var period = new DateTime(schedule.Year, schedule.Month, 1)
+            .ToString("MMMM yyyy", System.Globalization.CultureInfo.InvariantCulture);
+        var shop = string.IsNullOrWhiteSpace(schedule.Shop?.Name) ? "the assigned shop" : $"shop \"{schedule.Shop.Name}\"";
+        var container = string.IsNullOrWhiteSpace(schedule.Container?.Name) ? "the container" : $"container \"{schedule.Container.Name}\"";
+        return $"schedule \"{schedule.Name}\" for {period} at {shop} in {container}";
+    }
+
+    private static string DescribeScheduleOrFallback(ScheduleModel? schedule)
+        => schedule is null ? "the schedule" : DescribeSchedule(schedule);
+
+    private static string DescribeShift(ScheduleSlotModel slot, ScheduleModel? schedule)
+    {
+        var date = schedule is not null &&
+                   schedule.Month is >= 1 and <= 12 &&
+                   slot.DayOfMonth >= 1 &&
+                   slot.DayOfMonth <= DateTime.DaysInMonth(schedule.Year, schedule.Month)
+            ? new DateTime(schedule.Year, schedule.Month, slot.DayOfMonth)
+                .ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture)
+            : $"day {slot.DayOfMonth}";
+        var employee = slot.Employee is null
+            ? "unassigned"
+            : $"assigned to {GetEmployeeDisplayName(slot.Employee)}";
+        return $"shift on {date}, {slot.FromTime}-{slot.ToTime}, {employee}";
+    }
+
+    private static string DescribeEmployee(ScheduleEmployeeModel assignment)
+    {
+        var name = assignment.Employee is null
+            ? "the employee"
+            : GetEmployeeDisplayName(assignment.Employee);
+        var minimumHours = assignment.MinHoursMonth.HasValue
+            ? $" with a {assignment.MinHoursMonth.Value}-hour monthly minimum"
+            : string.Empty;
+        return $"employee {name}{minimumHours}";
+    }
+
+    private static string GetEmployeeDisplayName(EmployeeModel employee)
+    {
+        var fullName = $"{employee.FirstName} {employee.LastName}".Trim();
+        return string.IsNullOrWhiteSpace(fullName) ? "the employee" : $"\"{fullName}\"";
+    }
+
+    private async Task NotifyGraphChangedAsync(int containerId, int graphId, string reason)
+    {
+        await realtimeNotifier
+            .NotifyManagerDataChangedAsync(ManagerEditResourceTypes.Schedule, $"{containerId}:{graphId}", reason, containerId, graphId)
+            .ConfigureAwait(false);
+        await realtimeNotifier.NotifyScheduleChangedAsync(containerId, graphId, reason).ConfigureAwait(false);
+        await realtimeNotifier.NotifyShiftSwapsChangedAsync(containerId, graphId, graphId, reason).ConfigureAwait(false);
+    }
+
+    private ActionResult? CreateEditLockConflictResult(ManagerEditLockTarget target, string resourceLabel)
+        => ManagerEditLockHttp.CreateConflictResult(this, editLockService, target, resourceLabel);
 
     private ProblemDetails CreateNotFoundProblem(string detail)
         => new()

@@ -1,3 +1,4 @@
+import { t } from "@shared/i18n";
 import { useCallback, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useShopsQuery } from "@entities/shops/model/queries";
@@ -31,18 +32,18 @@ export function ShopListPage() {
   return (
     <div className={styles.page}>
       <PageHeader
-        title="Shop List"
-        subtitle="Browse and search shop records"
+        title={t("Shop List")}
+        subtitle={t("Browse and search shop records")}
         backTo="/"
         rightSlot={
-          <IosButton label="Add New" icon={<PlusIcon size={18} />} onClick={handleAddShop} />
+          <IosButton label={t("Add New")} icon={<PlusIcon size={18} />} onClick={handleAddShop} />
         }
-        searchMeta={`Total: ${shops.length}`}
+        searchMeta={t("Total: {0}", shops.length)}
         search={{
           value: query,
           onChange: setQuery,
-          placeholder: "Search shop",
-          ariaLabel: "Search shop",
+          placeholder: t("Search shop"),
+          ariaLabel: t("Search shop"),
         }}
       />
 

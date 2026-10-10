@@ -1,11 +1,15 @@
+import { t } from "@shared/i18n";
 import { memo, useEffect, useMemo, useRef, useState } from "react";
-import type { CSSProperties, DragEvent, KeyboardEvent, MouseEvent, ReactNode } from "react";
+import type { CSSProperties, ClipboardEvent, DragEvent, FocusEvent, KeyboardEvent, MouseEvent, ReactNode } from "react";
 import {
   GRAPH_EMPTY_MARK,
+  buildGraphDayShiftStaffingCounts,
+  formatGraphCellValueForDisplay,
   getGraphCellKey,
   getGraphDaysInMonth,
   getGraphWeekdayLabel,
   isGraphWeekend,
+  parseGraphCellContent,
   type GraphMatrixCellMap,
   type GraphMatrixColumn,
   type GraphRelatedScheduleHintDetail,
@@ -18,6 +22,10 @@ import {
   isCommonEditorShortcut,
 } from "@entities/availability-binds";
 import type { Graph } from "@entities/containers/model/types";
+import {
+  buildMatrixAutoColumnWidths,
+  MATRIX_COLUMN_MIN_WIDTH_PX,
+} from "@entities/containers/model/matrixLayout";
 import { ScheduleIcon } from "@shared/ui/icons";
 import { CardSection } from "@shared/ui/sections/CardSection";
 import styles from "./ContainerGraphMatrix.module.css";
@@ -27,14 +35,16 @@ export type ContainerGraphMatrixEditMode = "deferred" | "inline";
 export type ContainerGraphMatrixEmptyCellVariant = "neutral" | "danger";
 
 type ContainerGraphMatrixProps = {
-  graph: Pick<Graph, "year" | "month">;
+  graph: Pick<Graph, "year" | "month"> & Partial<Pick<Graph, "shift1Time" | "shift2Time">>;
   columns: GraphMatrixColumn[];
   cellMap: GraphMatrixCellMap;
   visualHintMap?: GraphMatrixCellMap;
+  mutedSuffixMap?: GraphMatrixCellMap;
   visualHintDetailMap?: GraphRelatedScheduleHintDetailMap;
+  lockVisualHintCells?: boolean;
   styleMap?: GraphMatrixStyleMap;
   dayConflictMap?: Record<number, boolean>;
-  title?: string;
+  title?: ReactNode;
   helperText?: string;
   readOnly?: boolean;
   highlightReadOnlyEmpty?: boolean;
@@ -43,22 +53,41 @@ type ContainerGraphMatrixProps = {
   style?: CSSProperties;
   icon?: ReactNode;
   compactSize?: boolean;
+  mobileReadOnlyViewport?: boolean;
+  maxAutoColumnWidth?: number;
+  neutralStyle?: boolean;
+  regularCellText?: boolean;
+  showColumnTotals?: boolean;
+  showShiftStaffingCounts?: boolean;
+  allowColumnResize?: boolean;
+  stretchColumns?: boolean;
+  compactHeader?: boolean;
   preserveShellHeightOnCompact?: boolean;
   editMode?: ContainerGraphMatrixEditMode;
   emptyCellVariant?: ContainerGraphMatrixEmptyCellVariant;
   cellErrors?: Record<string, string>;
+  validationSignal?: number;
   toolbar?: ReactNode;
+  headerClassName?: string;
+  titleClassName?: string;
+  headerRightClassName?: string;
   headerCenterSlot?: ReactNode;
   headerRightSlot?: ReactNode;
   bindValueByKey?: ReadonlyMap<string, string>;
+  fillColorByKey?: ReadonlyMap<string, string>;
+  textColorByKey?: ReadonlyMap<string, string>;
   selectedCellKeys?: string[];
   enableSelectionWhenReadOnly?: boolean;
   normalizeCellValue?: (employeeId: number, value: string) => string;
   onSelectedCellKeysChange?: (keys: string[]) => void;
+  onColumnHeaderClick?: (column: GraphMatrixColumn) => void;
   onColumnMove?: (employeeId: number, targetEmployeeId: number) => void;
   onColumnLabelChange?: (columnId: number, value: string) => void;
   onCellChange?: (employeeId: number, dayOfMonth: number, value: string) => void;
+  onFillColorShortcut?: (fillColor: string, cellKeys: string[]) => void;
+  onTextColorShortcut?: (textColor: string, cellKeys: string[]) => void;
   onVisualHintClick?: (detail: GraphRelatedScheduleHintDetail) => void;
+  onVisualHintCellClick?: (employeeId: number, dayOfMonth: number) => void;
 };
 
 type MatrixDay = {
@@ -86,6 +115,14 @@ type MatrixDayStyleMeta = {
   inlineStyle: CSSProperties;
 };
 
+type MatrixColumnResizeSession = {
+  employeeId: number;
+  startClientX: number;
+  startWidth: number;
+};
+
+type MatrixEditorSelectionBehavior = "select-all" | "caret-end";
+
 type MatrixValueCellProps = {
   cellKey: string;
   employeeId: number;
@@ -93,9 +130,12 @@ type MatrixValueCellProps = {
   columnLabel: string;
   value: string;
   visualHint?: string;
+  mutedSuffix?: string;
+  lockVisualHint?: boolean;
   error?: string;
   isEmpty: boolean;
   isSelected: boolean;
+  hasRowGuide: boolean;
   isEditing: boolean;
   readOnly: boolean;
   isWeekend: boolean;
@@ -107,6 +147,7 @@ type MatrixValueCellProps = {
   backgroundColor?: string | null;
   textColor?: string | null;
   editorValue?: string;
+  editorSelectionBehavior?: MatrixEditorSelectionBehavior;
   onFocusTargetRef?: (element: HTMLButtonElement | HTMLInputElement | null) => void;
   onEditorValueChange: (value: string) => void;
   onEditorBlur: () => void;
@@ -117,14 +158,15 @@ type MatrixValueCellProps = {
 
 type MatrixDayCellProps = {
   day: MatrixDay;
+  shiftStaffingCounts?: number[];
   selectionEnabled: boolean;
   isSelected: boolean;
+  hasRowGuide: boolean;
   inlineStyle: CSSProperties;
 };
 
 const EMPTY_STYLE = {} as CSSProperties;
 const NOOP = () => {};
-
 function joinClassNames(...values: Array<string | undefined | false>) {
   return values.filter(Boolean).join(" ");
 }
@@ -182,6 +224,39 @@ function buildDayRangeSelectionKeys(anchorKey: string, targetDayOfMonth: number,
   }
 
   return cellKeys;
+}
+
+function getNextColumnCellKey(employeeId: number, dayOfMonth: number, lastDayOfMonth: number) {
+  const nextDayOfMonth = dayOfMonth < lastDayOfMonth ? dayOfMonth + 1 : dayOfMonth;
+  return getGraphCellKey(employeeId, nextDayOfMonth);
+}
+
+function isDirectCellInputKey(event: KeyboardEvent<HTMLTableElement>) {
+  return !event.ctrlKey && !event.metaKey && !event.altKey && event.key.length === 1 && event.key !== " ";
+}
+
+function normalizePastedCellValue(value: string) {
+  return value.replace(/\r\n|\r|\n/g, " ");
+}
+
+function resolveCellNavigationDirection(key: string) {
+  if (key === "ArrowUp") {
+    return "up" as const;
+  }
+
+  if (key === "ArrowDown") {
+    return "down" as const;
+  }
+
+  if (key === "ArrowLeft") {
+    return "left" as const;
+  }
+
+  if (key === "ArrowRight") {
+    return "right" as const;
+  }
+
+  return null;
 }
 
 function toggleSelection(currentSelection: string[], keys: string[]) {
@@ -258,15 +333,23 @@ function getSelectionTarget(target: EventTarget | null) {
 
 const MatrixDayCell = memo(function MatrixDayCell({
   day,
+  shiftStaffingCounts,
   selectionEnabled,
   isSelected,
+  hasRowGuide,
   inlineStyle,
 }: MatrixDayCellProps) {
+  const staffingLabel = shiftStaffingCounts?.join(",") ?? "";
+  const staffingDescription = shiftStaffingCounts
+    ?.map((count, index) => t("Shift {0}: {1} {2}", index + 1, count, count === 1 ? "employee" : "employees"))
+    .join("; ");
+
   return (
     <th
       className={joinClassNames(
         styles.dayCell,
         day.hasConflict && styles.dayCellConflict,
+        hasRowGuide && styles.dayCellRowGuide,
         isSelected && styles.dayCellSelected,
       )}
       style={inlineStyle}
@@ -276,10 +359,16 @@ const MatrixDayCell = memo(function MatrixDayCell({
       <span
         className={joinClassNames(
           styles.dayButton,
+          shiftStaffingCounts && styles.dayButtonWithStaffing,
           isSelected && styles.dayButtonSelected,
         )}
       >
-        {day.label}
+        {shiftStaffingCounts ? (
+          <span className={styles.shiftStaffingBadge} aria-label={staffingDescription} title={staffingDescription}>
+            {staffingLabel}
+          </span>
+        ) : null}
+        <span className={styles.dayLabel}>{day.label}</span>
       </span>
     </th>
   );
@@ -292,9 +381,12 @@ const MatrixValueCell = memo(function MatrixValueCell({
   columnLabel,
   value,
   visualHint,
+  mutedSuffix,
+  lockVisualHint,
   error,
   isEmpty,
   isSelected,
+  hasRowGuide,
   isEditing,
   readOnly,
   isWeekend,
@@ -306,6 +398,7 @@ const MatrixValueCell = memo(function MatrixValueCell({
   backgroundColor,
   textColor,
   editorValue,
+  editorSelectionBehavior = "select-all",
   onFocusTargetRef,
   onEditorValueChange,
   onEditorBlur,
@@ -318,12 +411,26 @@ const MatrixValueCell = memo(function MatrixValueCell({
     ...(backgroundColor ? { backgroundColor } : {}),
     ...(textColor ? { color: textColor } : {}),
   } satisfies CSSProperties;
-  const hasVisualHint = isEmpty && Boolean(visualHint?.trim());
-  const renderedValue = hasVisualHint ? visualHint?.trim() ?? value : value;
-  const cellTitle = error ?? (hasVisualHint ? `Also works in: ${renderedValue}` : value);
+  const trimmedVisualHint = visualHint?.trim() ?? "";
+  const hasVisualHint = Boolean(trimmedVisualHint);
+  const isLockedVisualHint = Boolean(lockVisualHint && isEmpty && hasVisualHint);
+  const trimmedMutedSuffix = mutedSuffix?.trim() ?? "";
+  const renderedValue = isEmpty && hasVisualHint ? trimmedVisualHint : value;
+  const rawRenderedPrefix = trimmedMutedSuffix && renderedValue.endsWith(trimmedMutedSuffix)
+    ? renderedValue.slice(0, -trimmedMutedSuffix.length).replace(/,\s*$/, "")
+    : renderedValue;
+  const isTextValue = parseGraphCellContent(rawRenderedPrefix).kind === "text";
+  const renderedPrefix = formatGraphCellValueForDisplay(rawRenderedPrefix);
+  const renderedContent = trimmedMutedSuffix ? (
+    <>
+      {renderedPrefix ? renderedPrefix + ",\u00a0" : null}
+      <span className={styles.mutedSuffix}>{trimmedMutedSuffix}</span>
+    </>
+  ) : renderedPrefix;
+  const cellTitle = error ?? (hasVisualHint ? t("Also works in: {0}", trimmedVisualHint) : value);
   const interactiveCellTitle =
     hasVisualHint && onVisualHintClick
-      ? `${cellTitle}. Click for details.`
+      ? t("{0}. Click for details.", cellTitle)
       : cellTitle;
   const isInlineEditing = !readOnly && editMode === "inline";
   const isSelectionOnlyReadOnlyCell = readOnly && selectionEnabled;
@@ -367,6 +474,41 @@ const MatrixValueCell = memo(function MatrixValueCell({
     clearVisualHintClickTimeout();
   };
 
+  const renderVisualHintContent = () => (
+    <>
+      {!isEmpty ? (
+        <span className={joinClassNames(styles.visualHintCurrentValue, isTextValue && styles.textValue)}>
+          {renderedContent},{"\u00a0"}
+        </span>
+      ) : null}
+      <button
+        type="button"
+        ref={onFocusTargetRef}
+        className={joinClassNames(
+          styles.visualHintButton,
+          !isEmpty && styles.visualHintValue,
+        )}
+        aria-label={t("{0} day {1}", columnLabel, dayOfMonth)}
+        aria-invalid={Boolean(error)}
+        title={interactiveCellTitle}
+        onClick={handleVisualHintButtonClick}
+        onDoubleClick={handleVisualHintButtonDoubleClick}
+      >
+        {isEmpty ? renderedContent : trimmedVisualHint}
+      </button>
+    </>
+  );
+
+  const handleEditorFocus = (event: FocusEvent<HTMLInputElement>) => {
+    if (editorSelectionBehavior === "caret-end") {
+      const { value: currentValue } = event.currentTarget;
+      event.currentTarget.setSelectionRange(currentValue.length, currentValue.length);
+      return;
+    }
+
+    event.currentTarget.select();
+  };
+
   return (
     <td
       className={joinClassNames(
@@ -378,6 +520,7 @@ const MatrixValueCell = memo(function MatrixValueCell({
         readOnly && isDangerEmpty && styles.readonlyEmptyCellDanger,
         readOnly && isDangerEmpty && isWeekend && styles.readonlyEmptyCellDangerWeekend,
         error && styles.errorCell,
+        hasRowGuide && styles.rowGuideCell,
         isSelected && styles.selectedCell,
         isEditing && styles.editingCell,
       )}
@@ -394,66 +537,62 @@ const MatrixValueCell = memo(function MatrixValueCell({
               className={joinClassNames(
                 styles.visualHintShell,
                 styles.readonlyValue,
+                isTextValue && styles.textValue,
                 isEmpty && styles.cellValueEmpty,
                 isDangerEmpty && styles.dangerEmptyValue,
-                hasVisualHint && styles.visualHintValue,
+                isEmpty && hasVisualHint && styles.visualHintValue,
               )}
               title={interactiveCellTitle}
             >
-              <button
-                type="button"
-                ref={onFocusTargetRef}
-                className={styles.visualHintButton}
-                aria-label={`${columnLabel} day ${dayOfMonth}`}
-                title={interactiveCellTitle}
-                onClick={handleVisualHintButtonClick}
-                onDoubleClick={handleVisualHintButtonDoubleClick}
-              >
-                {renderedValue}
-              </button>
+              {renderVisualHintContent()}
             </div>
           ) : (
             <span
               className={joinClassNames(
                 styles.readonlyValue,
+                isTextValue && styles.textValue,
                 isEmpty && styles.cellValueEmpty,
                 isDangerEmpty && styles.dangerEmptyValue,
-                hasVisualHint && styles.visualHintValue,
+                isEmpty && hasVisualHint && styles.visualHintValue,
               )}
               title={interactiveCellTitle}
             >
-              {renderedValue}
+              {renderedContent}
             </span>
           )
-        ) : isInlineEditing ? (
+        ) : isInlineEditing && !isLockedVisualHint ? (
           <input
             ref={onFocusTargetRef}
             className={joinClassNames(
               styles.cellEditor,
+              isTextValue && styles.textValue,
               isEmpty && styles.cellValueEmpty,
               isDangerEmpty && styles.dangerEmptyValue,
             )}
             value={value}
             onChange={event => onInlineValueChange?.(event.target.value)}
             onBlur={event => onInlineValueCommit?.(event.target.value)}
-            aria-label={`${columnLabel} day ${dayOfMonth}`}
+            onFocus={handleEditorFocus}
+            aria-label={t("{0} day {1}", columnLabel, dayOfMonth)}
             aria-invalid={Boolean(error)}
             title={interactiveCellTitle}
             data-matrix-editor="true"
           />
-        ) : isEditing ? (
+        ) : isEditing && !isLockedVisualHint ? (
           <input
             autoFocus
             ref={onFocusTargetRef}
             className={joinClassNames(
               styles.cellEditor,
+              isTextValue && styles.textValue,
               isEmpty && styles.cellValueEmpty,
               isDangerEmpty && styles.dangerEmptyValue,
             )}
             value={editorValue ?? value}
             onChange={event => onEditorValueChange(event.target.value)}
             onBlur={onEditorBlur}
-            aria-label={`${columnLabel} day ${dayOfMonth}`}
+            onFocus={handleEditorFocus}
+            aria-label={t("{0} day {1}", columnLabel, dayOfMonth)}
             aria-invalid={Boolean(error)}
             title={interactiveCellTitle}
             data-matrix-editor="true"
@@ -464,22 +603,11 @@ const MatrixValueCell = memo(function MatrixValueCell({
               styles.visualHintShell,
               isEmpty && styles.cellValueEmpty,
               isDangerEmpty && styles.dangerEmptyValue,
-              hasVisualHint && styles.visualHintValue,
+              isEmpty && hasVisualHint && styles.visualHintValue,
             )}
             title={interactiveCellTitle}
           >
-            <button
-              type="button"
-              ref={onFocusTargetRef}
-              className={styles.visualHintButton}
-              aria-label={`${columnLabel} day ${dayOfMonth}`}
-              aria-invalid={Boolean(error)}
-              title={interactiveCellTitle}
-              onClick={handleVisualHintButtonClick}
-              onDoubleClick={handleVisualHintButtonDoubleClick}
-            >
-              {renderedValue}
-            </button>
+            {renderVisualHintContent()}
           </div>
         ) : (
           <button
@@ -488,15 +616,16 @@ const MatrixValueCell = memo(function MatrixValueCell({
             className={joinClassNames(
               styles.cellButton,
               readOnly && styles.readonlyValue,
+              isTextValue && styles.textValue,
               isEmpty && styles.cellValueEmpty,
               isDangerEmpty && styles.dangerEmptyValue,
-              hasVisualHint && styles.visualHintValue,
+              isEmpty && hasVisualHint && styles.visualHintValue,
             )}
-            aria-label={`${columnLabel} day ${dayOfMonth}`}
+            aria-label={t("{0} day {1}", columnLabel, dayOfMonth)}
             aria-invalid={Boolean(error)}
             title={interactiveCellTitle}
           >
-            {renderedValue}
+            {renderedContent}
           </button>
         )}
       </div>
@@ -509,10 +638,12 @@ export function ContainerGraphMatrix({
   columns,
   cellMap,
   visualHintMap = {},
+  mutedSuffixMap = {},
   visualHintDetailMap = {},
+  lockVisualHintCells = false,
   styleMap = {},
   dayConflictMap = {},
-  title = "Schedule Matrix",
+  title = t("Schedule Matrix"),
   helperText,
   readOnly = false,
   highlightReadOnlyEmpty = false,
@@ -521,28 +652,50 @@ export function ContainerGraphMatrix({
   style,
   icon = <ScheduleIcon size={18} />,
   compactSize = false,
+  mobileReadOnlyViewport = false,
+  maxAutoColumnWidth,
+  neutralStyle = false,
+  regularCellText = false,
+  showColumnTotals = true,
+  showShiftStaffingCounts = false,
+  allowColumnResize = true,
+  stretchColumns = true,
+  compactHeader = false,
   preserveShellHeightOnCompact = false,
   editMode = "deferred",
   emptyCellVariant = "neutral",
   cellErrors = {},
+  validationSignal = 0,
   toolbar,
+  headerClassName,
+  titleClassName,
+  headerRightClassName,
   headerCenterSlot,
   headerRightSlot,
   bindValueByKey,
+  fillColorByKey,
+  textColorByKey,
   selectedCellKeys = [],
   enableSelectionWhenReadOnly = false,
   normalizeCellValue,
   onSelectedCellKeysChange,
+  onColumnHeaderClick,
   onColumnMove,
   onColumnLabelChange,
   onCellChange,
+  onFillColorShortcut,
+  onTextColorShortcut,
   onVisualHintClick,
+  onVisualHintCellClick,
 }: ContainerGraphMatrixProps) {
   const [editingCellKey, setEditingCellKey] = useState<string | null>(null);
   const [editingValue, setEditingValue] = useState(GRAPH_EMPTY_MARK);
+  const [editingSelectionBehavior, setEditingSelectionBehavior] = useState<MatrixEditorSelectionBehavior>("select-all");
   const [draftSelectedCellKeys, setDraftSelectedCellKeys] = useState<string[] | null>(null);
   const [draggedEmployeeId, setDraggedEmployeeId] = useState<number | null>(null);
   const [dropTargetEmployeeId, setDropTargetEmployeeId] = useState<number | null>(null);
+  const [columnWidthOverrides, setColumnWidthOverrides] = useState<Record<number, number>>({});
+  const [resizingEmployeeId, setResizingEmployeeId] = useState<number | null>(null);
   const isPointerSelectingRef = useRef(false);
   const lastDraggedSelectionKeyRef = useRef<string | null>(null);
   const selectionAnchorKeyRef = useRef<string | null>(selectedCellKeys[0] ?? null);
@@ -556,6 +709,7 @@ export function ContainerGraphMatrix({
   const cellFocusTargetRefs = useRef<Record<string, HTMLButtonElement | HTMLInputElement | null>>({});
   const editingCellKeyRef = useRef<string | null>(null);
   const editingValueRef = useRef(editingValue);
+  const activeResizeSessionRef = useRef<MatrixColumnResizeSession | null>(null);
 
   const days = useMemo<MatrixDay[]>(
     () =>
@@ -563,30 +717,42 @@ export function ContainerGraphMatrix({
         const dayOfMonth = index + 1;
         return {
           dayOfMonth,
-          label: `${getGraphWeekdayLabel(graph.year, graph.month, dayOfMonth)}/${String(dayOfMonth).padStart(2, "0")}`,
+          label: `${getGraphWeekdayLabel(graph.year, graph.month, dayOfMonth)}/${String(dayOfMonth).padStart(2, "0")}.${String(graph.month).padStart(2, "0")}`,
           isWeekend: isGraphWeekend(graph.year, graph.month, dayOfMonth),
           hasConflict: Boolean(dayConflictMap[dayOfMonth]),
         };
       }),
     [dayConflictMap, graph.month, graph.year],
   );
+  const shiftStaffingCountsByDay = useMemo(
+    () => showShiftStaffingCounts
+      ? buildGraphDayShiftStaffingCounts({ graph, columns, cellMap })
+      : {},
+    [cellMap, columns, graph, showShiftStaffingCounts],
+  );
   const useCompactShell = compactSize && !preserveShellHeightOnCompact;
   const effectiveEditMode: ContainerGraphMatrixEditMode = readOnly ? "deferred" : editMode;
   const selectionEnabled = Boolean(onSelectedCellKeysChange) && (!readOnly || enableSelectionWhenReadOnly);
   const cellInteractionEnabled = !readOnly || selectionEnabled;
-  const cardClassName = [styles.card, useCompactShell ? styles.cardCompact : "", className ?? ""].filter(Boolean).join(" ");
+  const cardClassName = [
+    styles.card,
+    mobileReadOnlyViewport ? styles.cardPhoneViewport : "",
+    showShiftStaffingCounts ? styles.cardWithStaffing : "",
+    useCompactShell ? styles.cardCompact : "",
+    className ?? "",
+  ].filter(Boolean).join(" ");
   const cardStyle = useMemo(
     () =>
       ({
         ...(style ?? {}),
-        "--matrix-cell-min-height": compactSize ? "10px" : "30px",
       }) as CSSProperties,
-    [compactSize, style],
+    [style],
   );
   const hasToolbar = Boolean(toolbar);
   const isEmpty = columns.length === 0;
   const layoutClassName = joinClassNames(
     styles.layout,
+    mobileReadOnlyViewport && styles.layoutPhoneViewport,
     hasToolbar && styles.layoutWithToolbar,
     isEmpty && styles.layoutEmpty,
     useCompactShell && styles.layoutCompact,
@@ -596,13 +762,44 @@ export function ContainerGraphMatrix({
     () => new Set(columns.map(column => column.employeeId)),
     [columns],
   );
+  const automaticColumnWidths = useMemo(
+    () => {
+      const widths = buildMatrixAutoColumnWidths({ columns, cellMap, visualHintMap });
+      if (maxAutoColumnWidth === undefined) return widths;
+      return Object.fromEntries(Object.entries(widths).map(([id, width]) => [
+        id,
+        Math.min(width, Math.max(MATRIX_COLUMN_MIN_WIDTH_PX, maxAutoColumnWidth)),
+      ]));
+    },
+    [cellMap, columns, maxAutoColumnWidth, visualHintMap],
+  );
+  const fixedWidthSum = useMemo(
+    () => columns.reduce((totalWidth, column) => totalWidth + (columnWidthOverrides[column.employeeId] ?? 0), 0),
+    [columnWidthOverrides, columns],
+  );
+  const automaticWidthSum = useMemo(
+    () => columns.reduce((totalWidth, column) => (
+      columnWidthOverrides[column.employeeId] === undefined
+        ? totalWidth + (automaticColumnWidths[column.employeeId] ?? MATRIX_COLUMN_MIN_WIDTH_PX)
+        : totalWidth
+    ), 0),
+    [automaticColumnWidths, columnWidthOverrides, columns],
+  );
+  const autoWidthColumnCount = useMemo(
+    () => columns.reduce((count, column) => count + (columnWidthOverrides[column.employeeId] === undefined ? 1 : 0), 0),
+    [columnWidthOverrides, columns],
+  );
   const tableStyle = useMemo(
     () =>
       ({
         "--matrix-column-count": String(columns.length),
-        "--matrix-value-column-width": `calc((100% - var(--matrix-day-column-width)) / ${Math.max(columns.length, 1)})`,
+        "--matrix-auto-extra-width":
+          stretchColumns && autoWidthColumnCount > 0
+            ? `max(0px, calc((100% - var(--matrix-day-column-width) - ${fixedWidthSum}px - ${automaticWidthSum}px) / ${autoWidthColumnCount}))`
+            : "0px",
+        "--matrix-table-min-width": `calc(var(--matrix-day-column-width) + ${fixedWidthSum + automaticWidthSum}px)`,
       }) as CSSProperties,
-    [columns.length],
+    [autoWidthColumnCount, automaticWidthSum, columns.length, fixedWidthSum, stretchColumns],
   );
   const effectiveSelectedCellKeys = draftSelectedCellKeys ?? selectedCellKeys;
   const selectedCellKeySet = useMemo(() => new Set(effectiveSelectedCellKeys), [effectiveSelectedCellKeys]);
@@ -638,11 +835,27 @@ export function ContainerGraphMatrix({
 
     return nextSet;
   }, [columns, days, selectedCellKeySet]);
+  const partiallySelectedDaySet = useMemo(() => {
+    const nextSet = new Set<number>();
+
+    days.forEach(day => {
+      const selectedCellCount = columns.reduce(
+        (count, column) => count + Number(selectedCellKeySet.has(getGraphCellKey(column.employeeId, day.dayOfMonth))),
+        0,
+      );
+
+      if (selectedCellCount > 0 && selectedCellCount < columns.length) {
+        nextSet.add(day.dayOfMonth);
+      }
+    });
+
+    return nextSet;
+  }, [columns, days, selectedCellKeySet]);
   const resolvedEmptyMessage =
     emptyMessage ??
     (readOnly
-      ? "No employees are assigned to this schedule yet."
-      : "Add employees to the schedule to start filling the matrix.");
+      ? t("No employees are assigned to this schedule yet.")
+      : t("Add employees to the schedule to start filling the matrix."));
   const canReorderColumns = !readOnly && typeof onColumnMove === "function";
 
   useEffect(() => {
@@ -700,6 +913,81 @@ export function ContainerGraphMatrix({
     }
   }, [draggedEmployeeId, dropTargetEmployeeId, reorderableColumnIds]);
 
+  useEffect(() => {
+    const activeEmployeeIdSet = new Set(columns.map(column => column.employeeId));
+
+    setColumnWidthOverrides(currentOverrides => {
+      let changed = false;
+      const nextOverrides = Object.entries(currentOverrides).reduce<Record<number, number>>((accumulator, [employeeIdKey, width]) => {
+        const employeeId = Number(employeeIdKey);
+        if (!activeEmployeeIdSet.has(employeeId)) {
+          changed = true;
+          return accumulator;
+        }
+
+        accumulator[employeeId] = width;
+        return accumulator;
+      }, {});
+
+      return changed ? nextOverrides : currentOverrides;
+    });
+
+    if (resizingEmployeeId !== null && !activeEmployeeIdSet.has(resizingEmployeeId)) {
+      activeResizeSessionRef.current = null;
+      setResizingEmployeeId(null);
+    }
+  }, [columns, resizingEmployeeId]);
+
+  useEffect(() => {
+    if (!allowColumnResize || resizingEmployeeId === null) {
+      return;
+    }
+
+    const handleResizeMove = (event: globalThis.MouseEvent) => {
+      const activeResizeSession = activeResizeSessionRef.current;
+      if (!activeResizeSession) {
+        return;
+      }
+
+      const nextWidth = Math.max(
+        MATRIX_COLUMN_MIN_WIDTH_PX,
+        Math.round(activeResizeSession.startWidth + (event.clientX - activeResizeSession.startClientX)),
+      );
+
+      setColumnWidthOverrides(currentOverrides => (
+        currentOverrides[activeResizeSession.employeeId] === nextWidth
+          ? currentOverrides
+          : {
+            ...currentOverrides,
+            [activeResizeSession.employeeId]: nextWidth,
+          }
+      ));
+    };
+
+    const stopResize = () => {
+      activeResizeSessionRef.current = null;
+      setResizingEmployeeId(null);
+    };
+
+    const previousCursor = document.body.style.cursor;
+    const previousUserSelect = document.body.style.userSelect;
+
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+
+    window.addEventListener("mousemove", handleResizeMove);
+    window.addEventListener("mouseup", stopResize);
+    window.addEventListener("blur", stopResize);
+
+    return () => {
+      document.body.style.cursor = previousCursor;
+      document.body.style.userSelect = previousUserSelect;
+      window.removeEventListener("mousemove", handleResizeMove);
+      window.removeEventListener("mouseup", stopResize);
+      window.removeEventListener("blur", stopResize);
+    };
+  }, [allowColumnResize, resizingEmployeeId]);
+
   const resolveSelectionMode = (event: { shiftKey: boolean; ctrlKey: boolean; metaKey: boolean }): GraphMatrixSelectionMode => {
     if (event.shiftKey) {
       return "range";
@@ -749,6 +1037,58 @@ export function ContainerGraphMatrix({
     });
   };
 
+  const moveFocusToCellBelow = (employeeId: number, dayOfMonth: number) => {
+    const nextCellKey = getNextColumnCellKey(employeeId, dayOfMonth, days.length);
+    commitSelection([nextCellKey], nextCellKey);
+    focusCell(nextCellKey);
+  };
+
+  const moveFocusToCell = (employeeId: number, dayOfMonth: number) => {
+    const nextCellKey = getGraphCellKey(employeeId, dayOfMonth);
+    commitSelection([nextCellKey], nextCellKey);
+    focusCell(nextCellKey);
+  };
+
+  const moveFocusByDirection = (
+    employeeId: number,
+    dayOfMonth: number,
+    direction: "up" | "down" | "left" | "right",
+  ) => {
+    if (orderedEmployeeIds.length === 0) {
+      return;
+    }
+
+    const employeeIndex = orderedEmployeeIds.indexOf(employeeId);
+    if (employeeIndex < 0) {
+      return;
+    }
+
+    if (direction === "up") {
+      moveFocusToCell(employeeId, Math.max(1, dayOfMonth - 1));
+      return;
+    }
+
+    if (direction === "down") {
+      moveFocusToCell(employeeId, Math.min(days.length, dayOfMonth + 1));
+      return;
+    }
+
+    if (direction === "left") {
+      moveFocusToCell(orderedEmployeeIds[Math.max(0, employeeIndex - 1)], dayOfMonth);
+      return;
+    }
+
+    moveFocusToCell(orderedEmployeeIds[Math.min(orderedEmployeeIds.length - 1, employeeIndex + 1)], dayOfMonth);
+  };
+
+  const startDirectCellEditing = (cellKey: string, initialValue: string) => {
+    commitSelection([cellKey], cellKey);
+    beginEditingCell(cellKey, {
+      initialValue,
+      selectionBehavior: "caret-end",
+    });
+  };
+
   const commitCellValue = (employeeId: number, dayOfMonth: number, value: string) => {
     const nextValue = normalizeCellValueRef.current?.(employeeId, value) ?? value;
     const cellKey = getGraphCellKey(employeeId, dayOfMonth);
@@ -757,6 +1097,14 @@ export function ContainerGraphMatrix({
     if (nextValue !== currentValue) {
       onCellChangeRef.current?.(employeeId, dayOfMonth, nextValue);
     }
+  };
+
+  const clearCellValues = (cellKeys: string[]) => {
+    const uniqueCellKeys = [...new Set(cellKeys)];
+    uniqueCellKeys.forEach(cellKey => {
+      const { employeeId, dayOfMonth } = parseSelectedCellKey(cellKey);
+      commitCellValue(employeeId, dayOfMonth, "");
+    });
   };
 
   const flushEditingCell = () => {
@@ -769,21 +1117,30 @@ export function ContainerGraphMatrix({
 
     editingCellKeyRef.current = null;
     setEditingCellKey(null);
+    setEditingSelectionBehavior("select-all");
     commitCellValue(employeeId, dayOfMonth, editingValueRef.current);
   };
 
   const cancelEditingCell = () => {
     editingCellKeyRef.current = null;
     setEditingCellKey(null);
+    setEditingSelectionBehavior("select-all");
     setEditingValue(GRAPH_EMPTY_MARK);
   };
 
-  const beginEditingCell = (cellKey: string) => {
+  const beginEditingCell = (
+    cellKey: string,
+    options?: {
+      initialValue?: string;
+      selectionBehavior?: MatrixEditorSelectionBehavior;
+    },
+  ) => {
     flushEditingCell();
     editingCellKeyRef.current = cellKey;
     const currentValue = cellMapRef.current[cellKey] ?? GRAPH_EMPTY_MARK;
     setEditingCellKey(cellKey);
-    setEditingValue(currentValue);
+    setEditingSelectionBehavior(options?.selectionBehavior ?? "select-all");
+    setEditingValue(options?.initialValue ?? currentValue);
   };
 
   const applyBindShortcut = (
@@ -819,13 +1176,36 @@ export function ContainerGraphMatrix({
 
     commitCellValue(target.employeeId, target.dayOfMonth, bindValue);
 
-    const nextCellKey =
-      target.dayOfMonth < days.length
-        ? getGraphCellKey(target.employeeId, target.dayOfMonth + 1)
-        : target.cellKey;
+    moveFocusToCellBelow(target.employeeId, target.dayOfMonth);
+    return true;
+  };
 
-    commitSelection([nextCellKey], nextCellKey);
-    focusCell(nextCellKey);
+  const applyColorShortcut = (
+    event: KeyboardEvent<HTMLTableElement>,
+    target: Extract<MatrixSelectionTarget, { type: "cell" }>,
+  ) => {
+    if (readOnly) {
+      return false;
+    }
+
+    if (isBindNavigationKey(event.key) || isCommonEditorShortcut(event)) {
+      return false;
+    }
+
+    const bindToken = formatBindKeyFromKeyboardEvent(event);
+    const boundFillColor = bindToken && onFillColorShortcut ? fillColorByKey?.get(bindToken) : undefined;
+    const boundTextColor = bindToken && onTextColorShortcut ? textColorByKey?.get(bindToken) : undefined;
+    const boundColor = boundFillColor ?? boundTextColor;
+    const applyBoundColor = boundFillColor ? onFillColorShortcut : onTextColorShortcut;
+    if (!boundColor || !applyBoundColor) {
+      return false;
+    }
+
+    event.preventDefault();
+    const activeCellKeys = selectedCellKeysRef.current.includes(target.cellKey)
+      ? selectedCellKeysRef.current
+      : [target.cellKey];
+    applyBoundColor(boundColor, activeCellKeys);
     return true;
   };
 
@@ -942,6 +1322,10 @@ export function ContainerGraphMatrix({
     }
 
     startSelection(target, resolveSelectionMode(event));
+
+    if (!isInlineEditorTarget && target.type === "cell") {
+      focusCell(target.cellKey);
+    }
   };
 
   const handleTableMouseMove = (event: MouseEvent<HTMLTableElement>) => {
@@ -987,16 +1371,23 @@ export function ContainerGraphMatrix({
 
     const isEditorTarget = event.target instanceof HTMLInputElement && event.target.dataset.matrixEditor === "true";
 
-    if (applyBindShortcut(event, target, isEditorTarget)) {
+    if (applyColorShortcut(event, target) || applyBindShortcut(event, target, isEditorTarget)) {
       return;
     }
 
     if (isEditorTarget) {
-      if (effectiveEditMode === "inline") {
+      const navigationDirection = resolveCellNavigationDirection(event.key);
+      if (effectiveEditMode === "inline" && navigationDirection) {
+        event.preventDefault();
+        moveFocusByDirection(target.employeeId, target.dayOfMonth, navigationDirection);
         return;
       }
 
       if (event.key === "Escape") {
+        if (effectiveEditMode === "inline") {
+          return;
+        }
+
         event.preventDefault();
         cancelEditingCell();
         return;
@@ -1004,16 +1395,48 @@ export function ContainerGraphMatrix({
 
       if (event.key === "Enter") {
         event.preventDefault();
-        flushEditingCell();
-        commitSelection([target.cellKey], target.cellKey);
+        if (effectiveEditMode !== "inline") {
+          flushEditingCell();
+        }
+
+        moveFocusToCellBelow(target.employeeId, target.dayOfMonth);
       }
 
       return;
     }
 
-    if (!readOnly && (event.key === "Enter" || event.key === "F2")) {
+    const navigationDirection = resolveCellNavigationDirection(event.key);
+    if (navigationDirection) {
+      event.preventDefault();
+      moveFocusByDirection(target.employeeId, target.dayOfMonth, navigationDirection);
+      return;
+    }
+
+    if (!readOnly && (event.key === "Delete" || event.key === "Backspace")) {
+      event.preventDefault();
+      const cellKeysToClear =
+        selectedCellKeysRef.current.length > 0 && selectedCellKeysRef.current.includes(target.cellKey)
+          ? selectedCellKeysRef.current
+          : [target.cellKey];
+      clearCellValues(cellKeysToClear);
+      return;
+    }
+
+    if (event.key === "Enter") {
+      event.preventDefault();
+      moveFocusToCellBelow(target.employeeId, target.dayOfMonth);
+      return;
+    }
+
+    if (!readOnly && event.key === "F2") {
       event.preventDefault();
       beginEditingCell(target.cellKey);
+      return;
+    }
+
+    if (!readOnly && effectiveEditMode !== "inline" && isDirectCellInputKey(event)) {
+      event.preventDefault();
+      startDirectCellEditing(target.cellKey, event.key);
       return;
     }
 
@@ -1038,8 +1461,31 @@ export function ContainerGraphMatrix({
     }
   };
 
+  const handleTablePaste = (event: ClipboardEvent<HTMLTableElement>) => {
+    if (readOnly || effectiveEditMode === "inline") {
+      return;
+    }
+
+    if (event.target instanceof HTMLInputElement && event.target.dataset.matrixEditor === "true") {
+      return;
+    }
+
+    const target = getSelectionTarget(event.target);
+    if (!target || target.type !== "cell") {
+      return;
+    }
+
+    const pastedValue = normalizePastedCellValue(event.clipboardData.getData("text"));
+    if (!pastedValue) {
+      return;
+    }
+
+    event.preventDefault();
+    startDirectCellEditing(target.cellKey, pastedValue);
+  };
+
   const handleHeaderDragStart = (event: DragEvent<HTMLTableCellElement>, employeeId: number) => {
-    if (!canReorderColumns || !reorderableColumnIds.has(employeeId)) {
+    if (!canReorderColumns || activeResizeSessionRef.current !== null || !reorderableColumnIds.has(employeeId)) {
       return;
     }
 
@@ -1100,12 +1546,48 @@ export function ContainerGraphMatrix({
     setDropTargetEmployeeId(null);
   };
 
+  const handleColumnResizeStart = (event: MouseEvent<HTMLSpanElement>, employeeId: number) => {
+    if (!allowColumnResize) {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+
+    const currentWidth = columnWidthOverrides[employeeId];
+    const fallbackWidth = Math.max(
+      MATRIX_COLUMN_MIN_WIDTH_PX,
+      Math.round((event.currentTarget.closest("th")?.getBoundingClientRect().width ?? MATRIX_COLUMN_MIN_WIDTH_PX)),
+    );
+
+    activeResizeSessionRef.current = {
+      employeeId,
+      startClientX: event.clientX,
+      startWidth: currentWidth ?? fallbackWidth,
+    };
+    setResizingEmployeeId(employeeId);
+  };
+
+  const getColumnStyle = (employeeId: number) => {
+    const manualWidth = columnWidthOverrides[employeeId];
+    const automaticWidth = automaticColumnWidths[employeeId] ?? MATRIX_COLUMN_MIN_WIDTH_PX;
+
+    return ({
+      "--matrix-column-width": manualWidth !== undefined
+        ? `${manualWidth}px`
+        : `calc(${automaticWidth}px + var(--matrix-auto-extra-width))`,
+    }) as CSSProperties;
+  };
+
   return (
     <CardSection
       className={cardClassName}
       style={cardStyle}
       title={title}
       icon={icon}
+      headerClassName={[compactHeader ? styles.compactHeader : "", headerClassName].filter(Boolean).join(" ")}
+      titleClassName={[compactHeader ? styles.compactTitle : "", titleClassName].filter(Boolean).join(" ")}
+      headerRightClassName={[compactHeader ? styles.compactHeaderRight : "", headerRightClassName].filter(Boolean).join(" ")}
       headerCenterSlot={headerCenterSlot}
       headerRightSlot={headerRightSlot}
     >
@@ -1117,25 +1599,40 @@ export function ContainerGraphMatrix({
         {isEmpty ? (
           <div className={styles.emptyState}>{resolvedEmptyMessage}</div>
         ) : (
-          <div className={joinClassNames(styles.tableShell, useCompactShell && styles.tableShellCompact)}>
-            <div className={joinClassNames(styles.tableScroll, useCompactShell && styles.tableScrollCompact)}>
+          <div className={joinClassNames(styles.tableShell, useCompactShell && styles.tableShellCompact, mobileReadOnlyViewport && styles.tableShellPhoneViewport)}>
+            <div className={joinClassNames(styles.tableScroll, useCompactShell && styles.tableScrollCompact, mobileReadOnlyViewport && styles.tableScrollPhoneViewport)}
+              data-phone-matrix-scroll={mobileReadOnlyViewport ? "" : undefined}
+              role={mobileReadOnlyViewport ? "region" : undefined}
+              tabIndex={mobileReadOnlyViewport ? 0 : undefined}
+              aria-label={mobileReadOnlyViewport ? (typeof title === "string" ? title : t("Schedule Matrix")) : undefined}>
               <table
-                className={styles.table}
+                className={joinClassNames(
+                  styles.table,
+                  mobileReadOnlyViewport && styles.tablePhoneViewport,
+                  neutralStyle && styles.tableNeutral,
+                  regularCellText && styles.regularCellText,
+                  !stretchColumns && styles.tableFixedColumns,
+                )}
                 style={tableStyle}
                 onMouseDown={handleTableMouseDown}
                 onMouseMove={handleTableMouseMove}
                 onDoubleClick={handleTableDoubleClick}
                 onKeyDown={handleTableKeyDown}
+                onPaste={handleTablePaste}
               >
                 <colgroup>
                   <col className={styles.dayColumn} />
                   {columns.map(column => (
-                    <col key={`col-${column.employeeId}`} className={styles.valueColumn} />
+                    <col
+                      key={`col-${column.employeeId}`}
+                      className={styles.valueColumn}
+                      style={getColumnStyle(column.employeeId)}
+                    />
                   ))}
                 </colgroup>
                 <thead>
                   <tr>
-                    <th className={styles.dayHeader}>Day</th>
+                    <th className={styles.dayHeader}>{t("Day")}</th>
                     {columns.map(column => {
                       const isEditableManualColumn =
                         !readOnly &&
@@ -1153,10 +1650,13 @@ export function ContainerGraphMatrix({
                         <th
                           key={column.employeeId}
                           className={joinClassNames(
+                            styles.valueHeader,
                             isReorderableColumn && styles.draggableHeader,
                             isDragSource && styles.draggingHeader,
                             isDropTarget && styles.dropTargetHeader,
+                            resizingEmployeeId === column.employeeId && styles.resizingHeader,
                           )}
+                          style={getColumnStyle(column.employeeId)}
                           draggable={isReorderableColumn}
                           onDragStart={isReorderableColumn ? event => handleHeaderDragStart(event, column.employeeId) : undefined}
                           onDragEnter={isReorderableColumn ? () => handleHeaderDragEnter(column.employeeId) : undefined}
@@ -1170,18 +1670,41 @@ export function ContainerGraphMatrix({
                               <input
                                 className={styles.manualHeaderInput}
                                 value={column.label}
-                                placeholder="Manual column"
-                                aria-label={`Manual column ${column.manualColumnId} header`}
+                                placeholder={t("Manual column")}
+                                aria-label={t("Manual column {0} header", column.manualColumnId)}
                                 draggable={false}
                                 onChange={event => onColumnLabelChange(column.manualColumnId as number, event.target.value)}
                               />
                             </div>
                           ) : (
                             <div className={styles.headerCell}>
-                              <span className={styles.headerLabel}>{column.label}</span>
-                              {column.totalText ? <span className={styles.headerMeta}>{column.totalText}</span> : null}
+                              {onColumnHeaderClick && column.kind === "employee" ? (
+                                <button
+                                  type="button"
+                                  className={styles.headerLabelButton}
+                                  aria-label={t("Customize columns from {0}", column.label)}
+                                  onClick={() => onColumnHeaderClick(column)}
+                                >
+                                  {column.label}
+                                </button>
+                              ) : (
+                                <span className={styles.headerLabel}>{column.label}</span>
+                              )}
+                              {showColumnTotals && column.totalText ? <span className={styles.headerMeta}>{column.totalText}</span> : null}
                             </div>
                           )}
+
+                          {allowColumnResize ? (
+                            <span
+                              className={joinClassNames(
+                                styles.columnResizeHandle,
+                                resizingEmployeeId === column.employeeId && styles.columnResizeHandleActive,
+                              )}
+                              role="presentation"
+                              draggable={false}
+                              onMouseDown={event => handleColumnResizeStart(event, column.employeeId)}
+                            />
+                          ) : null}
                         </th>
                       );
                     })}
@@ -1199,8 +1722,10 @@ export function ContainerGraphMatrix({
                     >
                       <MatrixDayCell
                         day={day}
+                        shiftStaffingCounts={shiftStaffingCountsByDay[day.dayOfMonth]}
                         selectionEnabled={selectionEnabled}
                         isSelected={selectedDaySet.has(day.dayOfMonth)}
+                        hasRowGuide={partiallySelectedDaySet.has(day.dayOfMonth)}
                         inlineStyle={dayStyleMetaByDay[day.dayOfMonth]?.inlineStyle ?? EMPTY_STYLE}
                       />
 
@@ -1217,16 +1742,19 @@ export function ContainerGraphMatrix({
 
                         return (
                           <MatrixValueCell
-                            key={cellKey}
+                            key={`${cellKey}:${error && !isEditing ? validationSignal : 0}`}
                             cellKey={cellKey}
                             employeeId={column.employeeId}
                             dayOfMonth={day.dayOfMonth}
                             columnLabel={column.label}
                             value={cellValue}
                             visualHint={visualHint}
+                            mutedSuffix={mutedSuffixMap[cellKey]}
+                            lockVisualHint={lockVisualHintCells}
                             error={error}
                             isEmpty={isEmpty}
                             isSelected={isSelected}
+                            hasRowGuide={partiallySelectedDaySet.has(day.dayOfMonth)}
                             isEditing={isEditing}
                             readOnly={readOnly}
                             isWeekend={day.isWeekend}
@@ -1238,6 +1766,7 @@ export function ContainerGraphMatrix({
                             backgroundColor={cellStyle?.backgroundColor}
                             textColor={cellStyle?.textColor}
                             editorValue={isEditing ? editingValue : undefined}
+                            editorSelectionBehavior={isEditing ? editingSelectionBehavior : undefined}
                             onFocusTargetRef={element => {
                               cellFocusTargetRefs.current[cellKey] = element;
                             }}
@@ -1245,9 +1774,11 @@ export function ContainerGraphMatrix({
                             onEditorBlur={isEditing ? flushEditingCell : NOOP}
                             onInlineValueChange={nextValue => onCellChange?.(column.employeeId, day.dayOfMonth, nextValue)}
                             onInlineValueCommit={nextValue => commitCellValue(column.employeeId, day.dayOfMonth, nextValue)}
-                            onVisualHintClick={visualHintDetail && onVisualHintClick
-                              ? () => onVisualHintClick(visualHintDetail)
-                              : undefined}
+                            onVisualHintClick={onVisualHintCellClick
+                              ? () => onVisualHintCellClick(column.employeeId, day.dayOfMonth)
+                              : visualHintDetail && onVisualHintClick
+                                ? () => onVisualHintClick(visualHintDetail)
+                                : undefined}
                           />
                         );
                       })}

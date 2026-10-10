@@ -91,3 +91,11 @@
     height: auto;
   }
 }
+.phoneLayout { display: grid; gap: 14px; width: 100%; min-width: 0; max-width: 100%; box-sizing: border-box; }
+.phoneInfo { width: 100%; min-width: 0; max-width: 100%; box-sizing: border-box; }
+.phoneLayout .matrixCard { width: 100%; min-width: 0; max-width: 100%; min-height: 0; height: auto; box-sizing: border-box; --availability-matrix-cell-min-height: 44px; }
+.phoneLayout .matrixCard button { min-height: 44px; }
+
+.phoneLayout .matrixCard { --matrix-scroll-max-height: min(560px, calc(100dvh - 190px)); --matrix-cell-font-size: .76rem; --matrix-header-font-size: .78rem; --matrix-header-padding: 7px 5px; padding: 12px 10px; border-radius: 24px; background: var(--card-background, #fff); }
+.phoneLayout .phoneMatrixTitle { color: var(--text-primary, #0f172a); font-size: 1rem; gap: 8px; }
+.phoneLayout .phoneMatrixTitle > svg { width: 32px; height: 32px; padding: 7px; flex-shrink: 0; box-sizing: border-box; border-radius: 10px; background: #eff6ff; color: #2563eb; }

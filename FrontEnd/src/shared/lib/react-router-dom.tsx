@@ -1,5 +1,5 @@
 /* eslint-disable react-refresh/only-export-components */
-import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { AnchorHTMLAttributes, PropsWithChildren, ReactNode } from "react";
 
 type NavigateTo = string | number;
@@ -11,14 +11,35 @@ type RouterLocation = {
   key: string;
 };
 
+type NavigationBlocker = {
+  shouldBlock: (nextLocation: RouterLocation) => boolean;
+  onBlocked: () => void;
+};
+
+type PendingNavigationAttempt =
+  | {
+      kind: "push";
+      location: RouterLocation;
+      replace?: boolean;
+      onProceed?: (proceed: () => void) => void;
+    }
+  | {
+      kind: "delta";
+      delta: number;
+    };
+
 type RouterContextValue = {
   location: RouterLocation;
-  navigate: (to: NavigateTo) => void;
+  navigate: (to: NavigateTo, options?: { replace?: boolean; onProceed?: (proceed: () => void) => void }) => void;
+  setNavigationBlocker: (blocker: NavigationBlocker | null) => void;
+  proceedBlockedNavigation: () => void;
+  cancelBlockedNavigation: () => void;
 };
 
 const RouterContext = createContext<RouterContextValue | null>(null);
 
 let locationSequence = 0;
+const ROUTER_HISTORY_INDEX_KEY = "__gf3RouterIndex";
 
 const PARAM_ROUTE_PATTERNS = [
   "/availability/new",
@@ -27,6 +48,7 @@ const PARAM_ROUTE_PATTERNS = [
   "/container/:containerId/graphs/new",
   "/container/:containerId/graphs/:graphId/edit",
   "/container/:containerId/graphs/:graphId",
+  "/container/:containerId",
   "/employee/new",
   "/employee/:employeeId/edit",
   "/employee/:employeeId",
@@ -62,17 +84,150 @@ function toLocationHref(location: RouterLocation) {
   return `${location.pathname}${location.search}${location.hash}`;
 }
 
+function getRouterHistoryIndex(state: unknown) {
+  if (!state || typeof state !== "object") {
+    return null;
+  }
+
+  const rawValue = (state as Record<string, unknown>)[ROUTER_HISTORY_INDEX_KEY];
+  return typeof rawValue === "number" && Number.isInteger(rawValue) ? rawValue : null;
+}
+
+function createRouterHistoryState(index: number) {
+  return {
+    [ROUTER_HISTORY_INDEX_KEY]: index,
+  };
+}
+
+function getCurrentHref() {
+  return `${window.location.pathname}${window.location.search}${window.location.hash}`;
+}
+
 export function BrowserRouter({ children }: PropsWithChildren) {
   const [location, setLocation] = useState<RouterLocation>(() => readLocation());
+  const locationRef = useRef(location);
+  const historyIndexRef = useRef(getRouterHistoryIndex(window.history.state) ?? 0);
+  const navigationBlockerRef = useRef<NavigationBlocker | null>(null);
+  const pendingNavigationRef = useRef<PendingNavigationAttempt | null>(null);
+  const bypassNextPopStateRef = useRef(false);
 
-  useEffect(() => {
-    const onPopState = () => setLocation(readLocation());
-    window.addEventListener("popstate", onPopState);
-    return () => window.removeEventListener("popstate", onPopState);
+  const updateLocation = useCallback((nextLocation: RouterLocation) => {
+    locationRef.current = nextLocation;
+    setLocation(nextLocation);
   }, []);
 
-  const navigate = (to: NavigateTo) => {
+  const commitPushNavigation = useCallback((nextLocation: RouterLocation, replace = false) => {
+    const nextHistoryIndex = historyIndexRef.current + (replace ? 0 : 1);
+    historyIndexRef.current = nextHistoryIndex;
+    if (replace) {
+      window.history.replaceState(createRouterHistoryState(nextHistoryIndex), "", toLocationHref(nextLocation));
+    } else {
+      window.history.pushState(createRouterHistoryState(nextHistoryIndex), "", toLocationHref(nextLocation));
+    }
+    updateLocation(nextLocation);
+  }, [updateLocation]);
+
+  const cancelBlockedNavigation = useCallback(() => {
+    pendingNavigationRef.current = null;
+  }, []);
+
+  const proceedBlockedNavigation = useCallback(() => {
+    const pendingNavigation = pendingNavigationRef.current;
+    if (!pendingNavigation) {
+      return;
+    }
+
+    pendingNavigationRef.current = null;
+
+    if (pendingNavigation.kind === "push") {
+      if (pendingNavigation.onProceed) {
+        pendingNavigation.onProceed(() => commitPushNavigation(pendingNavigation.location, pendingNavigation.replace));
+        return;
+      }
+      commitPushNavigation(pendingNavigation.location, pendingNavigation.replace);
+      return;
+    }
+
+    if (pendingNavigation.delta === 0) {
+      return;
+    }
+
+    bypassNextPopStateRef.current = true;
+    window.history.go(pendingNavigation.delta);
+  }, [commitPushNavigation]);
+
+  const setNavigationBlocker = useCallback((blocker: NavigationBlocker | null) => {
+    navigationBlockerRef.current = blocker;
+  }, []);
+
+  useEffect(() => {
+    const existingHistoryIndex = getRouterHistoryIndex(window.history.state);
+    if (existingHistoryIndex === null) {
+      window.history.replaceState(createRouterHistoryState(historyIndexRef.current), "", getCurrentHref());
+    } else {
+      historyIndexRef.current = existingHistoryIndex;
+    }
+  }, []);
+
+  useEffect(() => {
+    locationRef.current = location;
+  }, [location]);
+
+  useEffect(() => {
+    const onPopState = (event: PopStateEvent) => {
+      const nextLocation = readLocation();
+      const nextHistoryIndex = getRouterHistoryIndex(event.state);
+
+      if (bypassNextPopStateRef.current) {
+        bypassNextPopStateRef.current = false;
+        if (nextHistoryIndex !== null) {
+          historyIndexRef.current = nextHistoryIndex;
+        }
+
+        updateLocation(nextLocation);
+        return;
+      }
+
+      const blocker = navigationBlockerRef.current;
+      if (blocker?.shouldBlock(nextLocation)) {
+        const delta = nextHistoryIndex !== null ? nextHistoryIndex - historyIndexRef.current : 0;
+        pendingNavigationRef.current = { kind: "delta", delta };
+        blocker.onBlocked();
+
+        if (delta !== 0) {
+          bypassNextPopStateRef.current = true;
+          window.history.go(-delta);
+        } else {
+          window.history.replaceState(createRouterHistoryState(historyIndexRef.current), "", toLocationHref(locationRef.current));
+        }
+
+        return;
+      }
+
+      if (nextHistoryIndex !== null) {
+        historyIndexRef.current = nextHistoryIndex;
+      }
+
+      updateLocation(nextLocation);
+    };
+
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, [updateLocation]);
+
+  const navigate = useCallback((to: NavigateTo, options?: { replace?: boolean; onProceed?: (proceed: () => void) => void }) => {
     if (typeof to === "number") {
+      if (to === 0) {
+        return;
+      }
+
+      const blocker = navigationBlockerRef.current;
+      if (blocker?.shouldBlock(locationRef.current)) {
+        pendingNavigationRef.current = { kind: "delta", delta: to };
+        blocker.onBlocked();
+        return;
+      }
+
       window.history.go(to);
       return;
     }
@@ -80,15 +235,31 @@ export function BrowserRouter({ children }: PropsWithChildren) {
     const nextLocation = resolveLocation(to);
     const nextHref = toLocationHref(nextLocation);
 
-    if (nextHref === toLocationHref(readLocation())) {
+    if (nextHref === toLocationHref(locationRef.current) && !options?.onProceed) {
       return;
     }
 
-    window.history.pushState({}, "", nextHref);
-    setLocation(nextLocation);
-  };
+    const blocker = navigationBlockerRef.current;
+    if (blocker?.shouldBlock(nextLocation)) {
+      pendingNavigationRef.current = { kind: "push", location: nextLocation, replace: options?.replace, onProceed: options?.onProceed };
+      blocker.onBlocked();
+      return;
+    }
 
-  const value = useMemo(() => ({ location, navigate }), [location]);
+    if (options?.onProceed) options.onProceed(() => commitPushNavigation(nextLocation, options?.replace));
+    else commitPushNavigation(nextLocation, options?.replace);
+  }, [commitPushNavigation]);
+
+  const value = useMemo(
+    () => ({
+      location,
+      navigate,
+      setNavigationBlocker,
+      proceedBlockedNavigation,
+      cancelBlockedNavigation,
+    }),
+    [cancelBlockedNavigation, location, navigate, proceedBlockedNavigation, setNavigationBlocker],
+  );
 
   return <RouterContext.Provider value={value}>{children}</RouterContext.Provider>;
 }
@@ -108,6 +279,36 @@ export function useNavigate() {
 
 export function useLocation() {
   return useRouterContext().location;
+}
+
+export function useNavigationBlocker(
+  enabled: boolean,
+  shouldBlock: (nextLocation: RouterLocation) => boolean,
+  onBlocked: () => void,
+) {
+  const { setNavigationBlocker, proceedBlockedNavigation, cancelBlockedNavigation } = useRouterContext();
+
+  useEffect(() => {
+    if (!enabled) {
+      cancelBlockedNavigation();
+      setNavigationBlocker(null);
+      return;
+    }
+
+    setNavigationBlocker({
+      shouldBlock,
+      onBlocked,
+    });
+
+    return () => {
+      setNavigationBlocker(null);
+    };
+  }, [cancelBlockedNavigation, enabled, onBlocked, setNavigationBlocker, shouldBlock]);
+
+  return {
+    proceedBlockedNavigation,
+    cancelBlockedNavigation,
+  };
 }
 
 function extractRouteParams(pathname: string, path: string) {
@@ -183,14 +384,15 @@ export function NavLink({ to, className, children, ...rest }: NavLinkProps) {
 
 type NavigateProps = {
   to: string;
+  replace?: boolean;
 };
 
-export function Navigate({ to }: NavigateProps) {
+export function Navigate({ to, replace = false }: NavigateProps) {
   const navigate = useNavigate();
 
   useEffect(() => {
-    navigate(to);
-  }, [navigate, to]);
+    navigate(to, { replace });
+  }, [navigate, to, replace]);
 
   return null;
 }

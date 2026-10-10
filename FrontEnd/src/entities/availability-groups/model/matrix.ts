@@ -1,3 +1,4 @@
+import { getLanguage, t } from "@shared/i18n";
 import type { AvailabilityGroupItem, AvailabilityGroupMember, AvailabilityKind, AvailabilitySlot } from "./types";
 import { parseFlexibleTimeRange } from "@shared/lib/timeRange";
 
@@ -12,6 +13,7 @@ export type AvailabilityMatrixColumn = {
   memberId?: number | null;
   label: string;
   displayOrder?: number | null;
+  employeeLastModifiedAtUtc?: string | null;
 };
 
 export type AvailabilityMatrixCellMap = Record<string, string>;
@@ -85,7 +87,7 @@ function getAvailabilityDate(year: number, month: number, dayOfMonth: number) {
 
 export function getAvailabilityWeekdayLabel(year: number, month: number, dayOfMonth: number) {
   const weekdayIndex = getAvailabilityDate(year, month, dayOfMonth).getDay();
-  const weekdayLabels = ["su", "mo", "tu", "we", "th", "fr", "sa"];
+  const weekdayLabels = getLanguage() === "pl" ? ["nd", "pn", "wt", "śr", "cz", "pt", "so"] : ["su", "mo", "tu", "we", "th", "fr", "sa"];
 
   return `${weekdayLabels[weekdayIndex]}.`;
 }
@@ -201,7 +203,7 @@ export function parseAvailabilityCode(input: string):
 
   return {
     ok: false,
-    error: "Use +, -, text, or a valid time range like 09:00 - 15:00.",
+    error: t("Use +, -, text, or a valid time range like 09:00 - 15:00."),
   };
 }
 
@@ -220,7 +222,8 @@ export function buildAvailabilityColumns(
       employeeId: member.employeeId,
       memberId: member.id,
       displayOrder: member.displayOrder,
-      label: employeeNameById.get(member.employeeId) ?? `Employee #${member.employeeId}`,
+      employeeLastModifiedAtUtc: member.employeeLastModifiedAtUtc ?? null,
+      label: employeeNameById.get(member.employeeId) ?? t("Employee #{0}", member.employeeId),
     }))
   );
 }
@@ -250,7 +253,10 @@ export function buildAvailabilityColumnsFromItems(
   items: AvailabilityGroupItem[],
   employeeNameById: Map<number, string>
 ): AvailabilityMatrixColumn[] {
-  const memberById = new Map<number, { employeeId: number; memberId: number; displayOrder: number }>();
+  const memberById = new Map<
+    number,
+    { employeeId: number; memberId: number; displayOrder: number; employeeLastModifiedAtUtc: string | null }
+  >();
 
   items.forEach(item => {
     if (!memberById.has(item.memberId)) {
@@ -258,6 +264,7 @@ export function buildAvailabilityColumnsFromItems(
         employeeId: item.employeeId,
         memberId: item.memberId,
         displayOrder: item.displayOrder,
+        employeeLastModifiedAtUtc: null,
       });
     }
   });
@@ -268,7 +275,8 @@ export function buildAvailabilityColumnsFromItems(
       employeeId: member.employeeId,
       memberId: member.memberId,
       displayOrder: member.displayOrder,
-      label: employeeNameById.get(member.employeeId) ?? `Employee #${member.employeeId}`,
+      employeeLastModifiedAtUtc: member.employeeLastModifiedAtUtc,
+      label: employeeNameById.get(member.employeeId) ?? t("Employee #{0}", member.employeeId),
     }))
   );
 }

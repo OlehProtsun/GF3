@@ -1,4 +1,6 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { useDropdownPosition } from "@shared/lib/useDropdownPosition";
+import { t } from "@shared/i18n";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { ArrowIcon, CheckIcon, SearchIcon } from "@shared/ui/icons";
 import styles from "./SearchableSelect.module.css";
@@ -16,7 +18,7 @@ type SearchableSelectProps = {
   options: SearchableSelectOption[];
   placeholder: string;
   dropdownTitle: string;
-  size?: "default" | "compact" | "field";
+  size?: "default" | "compact" | "field" | "summary";
   searchPlaceholder?: string;
   emptyMessage?: string;
   fallbackHint?: string;
@@ -29,6 +31,7 @@ type SearchableSelectProps = {
   ariaDescribedBy?: string;
   ariaLabel?: string;
   className?: string;
+  leadingIcon?: ReactNode;
   onChange: (value: string) => void;
 };
 
@@ -43,8 +46,8 @@ export function SearchableSelect({
   placeholder,
   dropdownTitle,
   size = "default",
-  searchPlaceholder = "Search...",
-  emptyMessage = "No matching options found.",
+  searchPlaceholder = t("Search..."),
+  emptyMessage = t("No matching options found."),
   fallbackHint,
   showSelectedHint = true,
   searchEnabled = true,
@@ -55,6 +58,7 @@ export function SearchableSelect({
   ariaDescribedBy,
   ariaLabel,
   className,
+  leadingIcon,
   onChange,
 }: SearchableSelectProps) {
   const triggerRef = useRef<HTMLDivElement | null>(null);
@@ -62,7 +66,7 @@ export function SearchableSelect({
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   const [isOpen, setIsOpen] = useState(false);
   const [searchText, setSearchText] = useState("");
-  const [dropdownStyle, setDropdownStyle] = useState<CSSProperties>({});
+  const dropdownStyle = useDropdownPosition(isOpen, triggerRef, dropdownRef, dropdownPlacement);
 
   const selectedOption = options.find(option => option.value === value) ?? null;
   const filteredOptions = useMemo(() => {
@@ -90,44 +94,6 @@ export function SearchableSelect({
     setSearchText("");
     setIsOpen(true);
   }, []);
-
-  useLayoutEffect(() => {
-    if (!isOpen || !triggerRef.current || !dropdownRef.current) {
-      return;
-    }
-
-    const viewportPadding = 12;
-    const dropdownOffset = 10;
-    const updateDropdownPosition = () => {
-      const triggerRect = triggerRef.current?.getBoundingClientRect();
-      const dropdownRect = dropdownRef.current?.getBoundingClientRect();
-      if (!triggerRect || !dropdownRect) {
-        return;
-      }
-
-      const maxLeft = Math.max(viewportPadding, window.innerWidth - triggerRect.width - viewportPadding);
-      const left = Math.min(Math.max(triggerRect.left, viewportPadding), maxLeft);
-      const preferredTop =
-        dropdownPlacement === "up"
-          ? triggerRect.top - dropdownRect.height - dropdownOffset
-          : triggerRect.bottom + dropdownOffset;
-      const maxTop = Math.max(viewportPadding, window.innerHeight - dropdownRect.height - viewportPadding);
-
-      setDropdownStyle({
-        left,
-        top: Math.min(Math.max(preferredTop, viewportPadding), maxTop),
-        width: triggerRect.width,
-      });
-    };
-
-    updateDropdownPosition();
-    window.addEventListener("resize", updateDropdownPosition);
-    window.addEventListener("scroll", updateDropdownPosition, true);
-    return () => {
-      window.removeEventListener("resize", updateDropdownPosition);
-      window.removeEventListener("scroll", updateDropdownPosition, true);
-    };
-  }, [dropdownPlacement, isOpen]);
 
   useEffect(() => {
     if (!isOpen) {
@@ -170,7 +136,7 @@ export function SearchableSelect({
   };
 
   const resolvedHint = showSelectedHint
-    ? (selectedOption?.hint ?? fallbackHint ?? `${options.length} options available`)
+    ? (selectedOption?.hint ?? fallbackHint ?? t("{0} options available", options.length))
     : "";
   const rootClassName = joinClassNames(styles.root, className);
   const dropdown = isOpen ? createPortal(
@@ -235,8 +201,10 @@ export function SearchableSelect({
           type="button"
           className={joinClassNames(
             styles.selectButton,
+            leadingIcon != null && styles.selectButtonWithIcon,
             size === "compact" && styles.selectButtonCompact,
             size === "field" && styles.selectButtonField,
+            size === "summary" && styles.selectButtonSummary,
             shadow === "soft" && styles.selectButtonShadowSoft,
             invalid && styles.selectButtonInvalid,
           )}
@@ -259,6 +227,7 @@ export function SearchableSelect({
           aria-label={ariaLabel ?? dropdownTitle}
           disabled={disabled}
         >
+          {leadingIcon != null ? <span className={styles.leadingIcon} aria-hidden="true">{leadingIcon}</span> : null}
           <div className={styles.selectButtonText}>
             <span className={styles.selectButtonLabel}>{selectedOption?.label ?? placeholder}</span>
             {resolvedHint ? <span className={styles.selectButtonHint}>{resolvedHint}</span> : null}

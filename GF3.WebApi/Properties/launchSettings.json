@@ -7,7 +7,9 @@
       "applicationUrl": "https://localhost:54294;http://localhost:54295",
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development",
-        "ASPNETCORE_HOSTINGSTARTUPASSEMBLIES": "Microsoft.AspNetCore.SpaProxy"
+        "ASPNETCORE_HOSTINGSTARTUPASSEMBLIES": "Microsoft.AspNetCore.SpaProxy",
+        "GF3_ADMIN_DEVELOPER_PASSWORD": "123456",
+        "GF3_BOOTSTRAP_MANAGER_PASSWORD": "123456"
       }
     }
   }

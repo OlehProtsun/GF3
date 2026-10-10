@@ -25,11 +25,32 @@ public class BindRepository : GenericRepository<BindModel>, IBindRepository
             .ToListAsync(ct)
             .ConfigureAwait(false);
 
+    public Task<BindModel?> GetByIdAsync(int id, int managerAccountId, CancellationToken ct = default)
+        => _set.AsNoTracking().FirstOrDefaultAsync(
+            bind => bind.Id == id && bind.ManagerAccountId == managerAccountId,
+            ct);
+
+    public Task<List<BindModel>> GetAllAsync(int managerAccountId, CancellationToken ct = default)
+        => _set.AsNoTracking()
+            .Where(bind => bind.ManagerAccountId == managerAccountId)
+            .OrderBy(bind => bind.Key)
+            .ToListAsync(ct);
+
     /// <inheritdoc />
     public Task<BindModel?> GetByKeyAsync(string key, CancellationToken ct = default)
     {
         var normalizedKey = NormalizeRequiredText(key);
-        return _set.AsNoTracking().FirstOrDefaultAsync(bind => bind.Key == normalizedKey, ct);
+        return _set.AsNoTracking().FirstOrDefaultAsync(
+            bind => bind.ManagerAccountId == null && EF.Functions.Collate(bind.Key, "NOCASE") == normalizedKey,
+            ct);
+    }
+
+    public Task<BindModel?> GetByKeyAsync(string key, int managerAccountId, CancellationToken ct = default)
+    {
+        var normalizedKey = NormalizeRequiredText(key);
+        return _set.AsNoTracking().FirstOrDefaultAsync(
+            bind => bind.ManagerAccountId == managerAccountId && EF.Functions.Collate(bind.Key, "NOCASE") == normalizedKey,
+            ct);
     }
 
     /// <inheritdoc />
@@ -39,6 +60,28 @@ public class BindRepository : GenericRepository<BindModel>, IBindRepository
             .Where(bind => bind.IsActive)
             .OrderBy(bind => bind.Key)
             .ToListAsync(ct);
+
+    public Task<List<BindModel>> GetActiveAsync(int managerAccountId, CancellationToken ct = default)
+        => _set.AsNoTracking()
+            .Where(bind => bind.ManagerAccountId == managerAccountId && bind.IsActive)
+            .OrderBy(bind => bind.Key)
+            .ToListAsync(ct);
+
+    public Task DeleteAsync(int id, int managerAccountId, CancellationToken ct = default)
+        => _set.Where(bind => bind.Id == id && bind.ManagerAccountId == managerAccountId)
+            .ExecuteDeleteAsync(ct);
+
+    public async Task<bool> IsColorKeyInUseAsync(int managerAccountId, string key, CancellationToken ct = default)
+    {
+        var normalizedKey = NormalizeRequiredText(key);
+        var fillKeyInUse = await _db.ManagerGraphFillColorBinds.AsNoTracking().AnyAsync(
+            bind => bind.ManagerAccountId == managerAccountId && EF.Functions.Collate(bind.Key, "NOCASE") == normalizedKey,
+            ct).ConfigureAwait(false);
+
+        return fillKeyInUse || await _db.ManagerGraphTextColorBinds.AsNoTracking().AnyAsync(
+            bind => bind.ManagerAccountId == managerAccountId && EF.Functions.Collate(bind.Key, "NOCASE") == normalizedKey,
+            ct).ConfigureAwait(false);
+    }
 
     /// <inheritdoc />
     public async Task<BindModel> UpsertByKeyAsync(BindModel model, CancellationToken ct = default)
@@ -56,7 +99,7 @@ public class BindRepository : GenericRepository<BindModel>, IBindRepository
 
         var existing = await _set
             .AsNoTracking()
-            .FirstOrDefaultAsync(bind => bind.Key == model.Key, ct)
+            .FirstOrDefaultAsync(bind => bind.ManagerAccountId == model.ManagerAccountId && EF.Functions.Collate(bind.Key, "NOCASE") == model.Key, ct)
             .ConfigureAwait(false);
 
         if (existing is null)
@@ -73,7 +116,7 @@ public class BindRepository : GenericRepository<BindModel>, IBindRepository
     {
         var keyTaken = await _set
             .AsNoTracking()
-            .AnyAsync(bind => bind.Key == model.Key && bind.Id != model.Id, ct)
+            .AnyAsync(bind => bind.ManagerAccountId == model.ManagerAccountId && EF.Functions.Collate(bind.Key, "NOCASE") == model.Key && bind.Id != model.Id, ct)
             .ConfigureAwait(false);
 
         if (keyTaken)

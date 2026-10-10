@@ -1,4 +1,63 @@
-﻿export const queryKeys = {
+export const queryKeys = {
+  home: {
+    dashboard: () => ["home", "dashboard"] as const,
+  },
+  employeeUiState: {
+    current: () => ["employeeUiState", "current"] as const,
+  },
+  employeeProfile: {
+    me: () => ["employeeProfile", "me"] as const,
+  },
+  managerProfile: {
+    updating: () => ["managerProfile", "updating"] as const,
+    me: () => ["managerProfile", "me"] as const,
+    list: () => ["managerProfile", "list"] as const,
+  },
+  managerNotepad: {
+    current: () => ["managerNotepad", "current"] as const,
+  },
+  managerGraphFillColorBinds: {
+    current: () => ["managerGraphFillColorBinds", "current"] as const,
+  },
+  managerGraphTextColorBinds: {
+    current: () => ["managerGraphTextColorBinds", "current"] as const,
+  },
+  systemNews: {
+    all: ["systemNews"] as const,
+    visible: () => ["systemNews", "visible"] as const,
+    admin: () => ["systemNews", "admin"] as const,
+  },
+  employeeAvailability: {
+    all: ["employeeAvailability"] as const,
+    list: () => ["employeeAvailability", "list"] as const,
+    byId: (id: number) => ["employeeAvailability", "byId", id] as const,
+  },
+  employeeSchedules: {
+    all: ["employeeSchedules"] as const,
+    list: () => ["employeeSchedules", "list"] as const,
+  },
+  shiftSwaps: {
+    all: ["shiftSwaps"] as const,
+    employee: () => ["shiftSwaps", "employee"] as const,
+    employees: () => ["shiftSwaps", "employees"] as const,
+    employeeCorrections: () => ["shiftSwaps", "employeeCorrections"] as const,
+    graphCorrections: (containerId: number, graphId: number) => ["shiftSwaps", "graphCorrections", containerId, graphId] as const,
+    correctionSettings: () => ["shiftSwaps", "correctionSettings"] as const,
+    graphLog: (containerId: number, graphId: number) => ["shiftSwaps", "graphLog", containerId, graphId] as const,
+    graphHighlightSetting: (containerId: number, graphId: number) => ["shiftSwaps", "graphHighlightSetting", containerId, graphId] as const,
+    container: (containerId: number) => ["shiftSwaps", "container", containerId] as const,
+  },
+  workflowLogs: {
+    all: ["workflowLogs"] as const,
+    list: () => ["workflowLogs", "list"] as const,
+    settings: () => ["workflowLogs", "settings"] as const,
+  },
+  communications: {
+    all: ["communications"] as const,
+    managerList: () => ["communications", "managerList"] as const,
+    employeePendingAll: ["communications", "employeePending"] as const,
+    employeePending: (employeeId: number) => ["communications", "employeePending", employeeId] as const,
+  },
   employees: {
     all: ["employees"] as const,
     list: () => ["employees", "list"] as const,
@@ -16,6 +75,14 @@
     metadata: () => ["adminDb", "metadata"] as const,
     hash: () => ["adminDb", "hash"] as const,
   },
+  regulations: {
+    all: ["regulations"] as const,
+    pending: (accountKey: string) => ["regulations", "pending", accountKey] as const,
+    myHistory: (accountKey: string) => ["regulations", "history", "me", accountKey] as const,
+    employeeHistory: (employeeId: number) => ["regulations", "history", "employee", employeeId] as const,
+    admin: () => ["regulations", "admin"] as const,
+    adminAcceptances: () => ["regulations", "admin", "acceptances"] as const,
+  },
   containers: {
     all: ["containers"] as const,
     list: () => ["containers", "list"] as const,
@@ -24,10 +91,14 @@
     schedulePresets: (containerId: number) => ["containers", containerId, "schedulePresets"] as const,
     graphById: (containerId: number, graphId: number) => ["containers", containerId, "graphs", graphId] as const,
     graphSlots: (containerId: number, graphId: number) => ["containers", containerId, "graphs", graphId, "slots"] as const,
+    graphSlotsBatches: (containerId: number) => ["containers", containerId, "graphs", "slotsBatch"] as const,
     graphSlotsBatch: (containerId: number, graphIds: readonly number[]) =>
       ["containers", containerId, "graphs", "slotsBatch", ...graphIds] as const,
     graphEmployees: (containerId: number, graphId: number) => ["containers", containerId, "graphs", graphId, "employees"] as const,
     graphCellStyles: (containerId: number, graphId: number) => ["containers", containerId, "graphs", graphId, "cellStyles"] as const,
+    graphVersions: (containerId: number, graphId: number) => ["containers", containerId, "graphs", graphId, "versions"] as const,
+    graphRecordsPrefix: (containerId: number) => ["containers", containerId, "graphRecords"] as const,
+    graphRecords: (containerId: number, graphIdsKey: string) => ["containers", containerId, "graphRecords", graphIdsKey] as const,
   },
   availabilityBinds: {
     all: ["availabilityBinds"] as const,
@@ -42,5 +113,9 @@
     items: (id: number) => ["availabilityGroups", "items", id] as const,
     members: (id: number) => ["availabilityGroups", id, "members"] as const,
     slots: (id: number) => ["availabilityGroups", id, "slots"] as const,
+    transferSources: (id: number, memberId: number) => ["availabilityGroups", id, "members", memberId, "transferSources"] as const,
+    transferPreview: (employeeIdsKey: string, year: number, month: number, targetGroupId: number | null) =>
+      ["availabilityGroups", "transferPreview", employeeIdsKey, year, month, targetGroupId ?? "new"] as const,
+    transferHints: (id: number) => ["availabilityGroups", id, "transferHints"] as const,
   },
 };

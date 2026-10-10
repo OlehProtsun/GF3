@@ -1,0 +1,1 @@
+export { ManagerPhoneLayout } from "./ManagerPhoneLayout";

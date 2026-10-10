@@ -3,6 +3,7 @@ using BusinessLogicLayer.Contracts.Models;
 using BusinessLogicLayer.Mappers;
 using BusinessLogicLayer.Services.Abstractions;
 using DataAccessLayer.Repositories.Abstractions;
+using System.Net.Mail;
 
 namespace BusinessLogicLayer.Services;
 
@@ -71,10 +72,61 @@ public class EmployeeService : IEmployeeService
     public async Task<List<EmployeeModel>> GetByValueAsync(string value, CancellationToken ct = default)
         => await ServiceMappingHelper.GetMappedListAsync(token => _repo.GetByValueAsync(value, token), x => x.ToContract(), ct).ConfigureAwait(false);
 
+    public async Task<EmployeeModel> UpdateContactAsync(int employeeId, string? email, string? phone, CancellationToken ct = default)
+    {
+        var existing = await _repo.GetByIdAsync(employeeId, ct).ConfigureAwait(false)
+            ?? throw new ValidationException("The employee profile could not be found.");
+
+        existing.Email = NormalizeEmail(email);
+        existing.Phone = NormalizePhone(phone);
+
+        await _repo.UpdateAsync(existing, ct).ConfigureAwait(false);
+        return existing.ToContract();
+    }
+
     private static void NormalizeNameFields(EmployeeModel entity)
     {
         entity.FirstName = (entity.FirstName ?? string.Empty).Trim();
         entity.LastName = (entity.LastName ?? string.Empty).Trim();
+    }
+
+    private static string? NormalizeEmail(string? email)
+    {
+        if (string.IsNullOrWhiteSpace(email))
+        {
+            return null;
+        }
+
+        var trimmedEmail = email.Trim();
+        if (trimmedEmail.Length > 254)
+        {
+            throw ValidationException.ForField("recoveryEmail", "Recovery email is too long.");
+        }
+
+        try
+        {
+            return new MailAddress(trimmedEmail).Address;
+        }
+        catch (FormatException)
+        {
+            throw ValidationException.ForField("recoveryEmail", "Enter a valid recovery email address.");
+        }
+    }
+
+    private static string? NormalizePhone(string? phone)
+    {
+        if (string.IsNullOrWhiteSpace(phone))
+        {
+            return null;
+        }
+
+        var trimmedPhone = phone.Trim();
+        if (trimmedPhone.Length > 50)
+        {
+            throw ValidationException.ForField("phone", "Phone number is too long.");
+        }
+
+        return trimmedPhone;
     }
 
     /// <summary>

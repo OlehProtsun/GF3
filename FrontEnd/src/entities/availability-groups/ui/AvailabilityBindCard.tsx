@@ -1,4 +1,5 @@
-﻿import type { FocusEvent, KeyboardEvent, ReactNode } from "react";
+import { t } from "@shared/i18n";
+import type { FocusEvent, KeyboardEvent, ReactNode } from "react";
 import {
   formatBindKeyFromKeyboardEvent,
   isCommonEditorShortcut,
@@ -45,6 +46,30 @@ export function AvailabilityBindCard({
   onAddBind,
   onDeleteBind,
 }: AvailabilityBindCardProps) {
+  const shouldCaptureKeyStroke = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.ctrlKey || event.altKey || event.metaKey) {
+      return true;
+    }
+
+    if (/^F\d{1,2}$/i.test(event.key)) {
+      return true;
+    }
+
+    return [
+      " ",
+      "Spacebar",
+      "ArrowUp",
+      "ArrowDown",
+      "ArrowLeft",
+      "ArrowRight",
+      "Home",
+      "End",
+      "PageUp",
+      "PageDown",
+      "Insert",
+    ].includes(event.key);
+  };
+
   const handleRowBlur = (event: FocusEvent<HTMLDivElement>, clientId: string) => {
     if (event.relatedTarget instanceof Node && event.currentTarget.contains(event.relatedTarget)) {
       return;
@@ -64,13 +89,11 @@ export function AvailabilityBindCard({
       return;
     }
 
-    if (event.key === "Backspace" || event.key === "Delete") {
-      event.preventDefault();
-      onBindFieldChange(clientId, { key: "" });
+    if (isCommonEditorShortcut(event) || isModifierOnlyKey(event.key)) {
       return;
     }
 
-    if (isCommonEditorShortcut(event) || isModifierOnlyKey(event.key)) {
+    if (!shouldCaptureKeyStroke(event)) {
       return;
     }
 
@@ -83,14 +106,14 @@ export function AvailabilityBindCard({
     onBindFieldChange(clientId, { key: nextKey });
   };
 
-  const bindCountLabel = `${binds.length} bind${binds.length === 1 ? "" : "s"}`;
+  const bindCountLabel = t("{0} bind{1}", binds.length, binds.length === 1 ? "" : "s");
 
   return (
     <CardSection
       className={styles.card}
       title={
         <span className={styles.titleWrap}>
-          <span>Bind Information</span>
+          <span>{t("Bind Information")}</span>
           <span className={styles.titleMeta}>{bindCountLabel}</span>
         </span>
       }
@@ -110,13 +133,13 @@ export function AvailabilityBindCard({
 
         <div className={styles.placeholderTable}>
           <div className={styles.headerRow}>
-            <span>Key</span>
-            <span>Value</span>
-            <span>Active</span>
+            <span>{t("Key")}</span>
+            <span>{t("Value")}</span>
+            <span>{t("Active")}</span>
           </div>
 
           {isLoading ? (
-            <div className={styles.emptyRow}>Loading bind information...</div>
+            <div className={styles.emptyRow}>{t("Loading bind information...")}</div>
           ) : binds.length > 0 ? (
             <div className={styles.body}>
               {binds.map(bind => {
@@ -133,9 +156,11 @@ export function AvailabilityBindCard({
                     <input
                       className={styles.keyInput}
                       value={bind.key}
-                      readOnly
-                      placeholder="Press shortcut..."
+                      placeholder={t("Press shortcut or type manually...")}
+                      spellCheck={false}
+                      autoComplete="off"
                       onFocus={() => onSelectedBindChange(bind.clientId)}
+                      onChange={event => onBindFieldChange(bind.clientId, { key: event.target.value })}
                       onKeyDown={event => handleKeyCapture(event, bind.clientId)}
                     />
 
@@ -172,13 +197,13 @@ export function AvailabilityBindCard({
               })}
             </div>
           ) : (
-            <div className={styles.emptyRow}>No binds yet. Add as many rows as you need.</div>
+            <div className={styles.emptyRow}>{t("No binds yet. Add as many rows as you need.")}</div>
           )}
         </div>
 
         <div className={styles.actions}>
-          <IosButton label="Delete" icon={<CloseIcon size={16} />} variant="secondary" customColor="#dc2626" customBorderColor="#dc2626" onClick={onDeleteBind} disabled={isBusy || !selectedBindClientId} />
-          <IosButton label="Add" icon={<PlusIcon size={16} />} onClick={onAddBind} disabled={isBusy} />
+          <IosButton label={t("Delete")} icon={<CloseIcon size={16} />} variant="secondary" customColor="#dc2626" customBorderColor="#dc2626" onClick={onDeleteBind} disabled={isBusy || !selectedBindClientId} />
+          <IosButton label={t("Add")} icon={<PlusIcon size={16} />} onClick={onAddBind} disabled={isBusy} />
         </div>
       </div>
     </CardSection>

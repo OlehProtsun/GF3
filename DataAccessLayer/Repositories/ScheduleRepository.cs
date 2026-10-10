@@ -1,5 +1,6 @@
 using DataAccessLayer.Models;
 using DataAccessLayer.Models.DataBaseContext;
+using DataAccessLayer.Models.Enums;
 using DataAccessLayer.Repositories.Abstractions;
 using Microsoft.EntityFrameworkCore;
 
@@ -38,6 +39,34 @@ public class ScheduleRepository : GenericRepository<ScheduleModel>, IScheduleRep
     }
 
     /// <inheritdoc />
+    public async Task<int> UpdatePublicationByContainerAsync(
+        int containerId,
+        SchedulePublicationStatus publicationStatus,
+        bool? allowSwap,
+        CancellationToken ct = default)
+    {
+        var query = _set.Where(schedule => schedule.ContainerId == containerId);
+        var now = DateTimeOffset.UtcNow;
+
+        return allowSwap.HasValue
+            ? await query.ExecuteUpdateAsync(
+                setters => setters
+                    .SetProperty(schedule => schedule.PublishedAtUtc, schedule =>
+                        publicationStatus == SchedulePublicationStatus.Public && schedule.PublicationStatus != SchedulePublicationStatus.Public
+                            ? now : schedule.PublishedAtUtc)
+                    .SetProperty(schedule => schedule.PublicationStatus, publicationStatus)
+                    .SetProperty(schedule => schedule.AllowSwap, allowSwap.Value),
+                ct).ConfigureAwait(false)
+            : await query.ExecuteUpdateAsync(
+                setters => setters
+                    .SetProperty(schedule => schedule.PublishedAtUtc, schedule =>
+                        publicationStatus == SchedulePublicationStatus.Public && schedule.PublicationStatus != SchedulePublicationStatus.Public
+                            ? now : schedule.PublishedAtUtc)
+                    .SetProperty(schedule => schedule.PublicationStatus, publicationStatus),
+                ct).ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
     public async Task<List<ScheduleModel>> GetByValueAsync(string value, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(value))
@@ -51,22 +80,59 @@ public class ScheduleRepository : GenericRepository<ScheduleModel>, IScheduleRep
     }
 
     /// <inheritdoc />
+    public async Task<List<ScheduleModel>> GetPublishedForEmployeeAsync(int employeeId, CancellationToken ct = default)
+        => await _set
+            .AsNoTracking()
+            .AsSplitQuery()
+            .Include(schedule => schedule.Container)
+            .Include(schedule => schedule.Shop)
+            .Include(schedule => schedule.Employees)
+                .ThenInclude(scheduleEmployee => scheduleEmployee.Employee)
+            .Include(schedule => schedule.Slots)
+            .Where(schedule =>
+                schedule.PublicationStatus == SchedulePublicationStatus.Public &&
+                schedule.Employees.Any(scheduleEmployee => scheduleEmployee.EmployeeId == employeeId))
+            .OrderByDescending(schedule => schedule.Year)
+            .ThenByDescending(schedule => schedule.Month)
+            .ThenBy(schedule => schedule.Name)
+            .ToListAsync(ct)
+            .ConfigureAwait(false);
+
+    /// <inheritdoc />
+    public async Task<List<ScheduleModel>> GetByMonthWithSlotsAsync(
+        int year,
+        int month,
+        int? excludeScheduleId = null,
+        CancellationToken ct = default)
+        => await _set
+            .AsNoTracking()
+            .AsSplitQuery()
+            .Include(schedule => schedule.Slots)
+            .Where(schedule =>
+                schedule.Year == year &&
+                schedule.Month == month &&
+                (!excludeScheduleId.HasValue || schedule.Id != excludeScheduleId.Value))
+            .ToListAsync(ct)
+            .ConfigureAwait(false);
+
+    /// <inheritdoc />
     public async Task<ScheduleModel?> GetDetailedAsync(int id, CancellationToken ct = default)
         => await _set
             .AsNoTracking()
+            .AsSplitQuery()
             .Include(schedule => schedule.Container)
             .Include(schedule => schedule.Shop)
             .Include(schedule => schedule.Slots)
+                .ThenInclude(slot => slot.Employee)
             .Include(schedule => schedule.Employees)
                 .ThenInclude(scheduleEmployee => scheduleEmployee.Employee)
+            .Include(schedule => schedule.CellStyles)
             .FirstOrDefaultAsync(schedule => schedule.Id == id, ct)
             .ConfigureAwait(false);
 
     private IQueryable<ScheduleModel> CreateListQuery()
         => _set
-            .AsNoTracking()
-            .Include(schedule => schedule.Container)
-            .Include(schedule => schedule.Shop);
+            .AsNoTracking();
 
     /// <summary>
     /// Applies the shared schedule search logic used by both global lists and container-scoped lists.

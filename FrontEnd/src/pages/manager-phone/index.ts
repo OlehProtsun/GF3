@@ -1,0 +1,11 @@
+export { ManagerPhoneHomePage } from "./ui/ManagerPhoneHomePage";
+export { ManagerPhoneContainersPage } from "./ui/ManagerPhoneContainersPage";
+export { ManagerPhoneContainerDetailPage } from "./ui/ManagerPhoneContainerDetailPage";
+export { ManagerPhoneGraphPage } from "./ui/ManagerPhoneGraphPage";
+export { ManagerPhoneAvailabilityPage } from "./ui/ManagerPhoneAvailabilityPage";
+export { ManagerPhoneAvailabilityDetailPage } from "./ui/ManagerPhoneAvailabilityDetailPage";
+export { ManagerPhoneEmployeesPage } from "./ui/ManagerPhoneEmployeesPage";
+export { ManagerPhoneEmployeeDetailPage } from "./ui/ManagerPhoneEmployeeDetailPage";
+export { ManagerPhoneShopsPage } from "./ui/ManagerPhoneShopsPage";
+export { ManagerPhoneShopDetailPage } from "./ui/ManagerPhoneShopDetailPage";
+export { ManagerPhoneMorePage } from "./ui/ManagerPhoneMorePage";

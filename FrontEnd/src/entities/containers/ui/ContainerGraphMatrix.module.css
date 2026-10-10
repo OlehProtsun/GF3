@@ -1,5 +1,5 @@
 .card {
-  --matrix-day-column-width: 65px;
+  --matrix-day-column-width: 76px;
   --matrix-cell-min-width: 135px;
   --matrix-cell-min-height: 30px;
   width: 100%;
@@ -13,6 +13,11 @@
 
 .cardCompact {
   flex: 0 0 auto;
+  --matrix-cell-min-height: 10px;
+}
+
+.cardWithStaffing {
+  --matrix-day-column-width: 108px;
 }
 
 .layout {
@@ -66,7 +71,7 @@
   min-height: 260px;
   padding: 20px;
   box-sizing: border-box;
-  border-radius: 26px;
+  border-radius: var(--matrix-shell-radius, 26px);
   border: 1px dashed rgba(113, 113, 122, 0.16);
   background: rgba(244, 244, 245, 0.52);
   color: rgba(17, 24, 39, 0.62);
@@ -80,7 +85,7 @@
   display: flex;
   align-items: stretch;
   flex-direction: column;
-  border-radius: 26px;
+  border-radius: var(--matrix-shell-radius, 26px);
   border: 1px solid rgba(113, 113, 122, 0.12);
   background: rgba(255, 255, 255, 0.76);
   overflow: hidden;
@@ -94,6 +99,7 @@
 .tableScroll {
   width: 100%;
   max-width: 100%;
+  max-height: var(--matrix-scroll-max-height, none);
   overflow: auto;
   flex: 1 1 auto;
   min-height: 0;
@@ -104,7 +110,7 @@
   -webkit-overflow-scrolling: touch;
   scrollbar-gutter: stable both-edges;
   will-change: scroll-position;
-  touch-action: pan-x pan-y;
+  touch-action: pan-x pan-y pinch-zoom;
 }
 
 .tableScrollCompact {
@@ -131,11 +137,15 @@
 
 .table {
   width: 100%;
-  min-width: calc(var(--matrix-day-column-width) + (var(--matrix-cell-min-width) * var(--matrix-column-count, 1)));
+  min-width: var(--matrix-table-min-width, calc(var(--matrix-day-column-width) + (var(--matrix-cell-min-width) * var(--matrix-column-count, 1))));
   max-width: none;
   table-layout: fixed;
   border-collapse: separate;
   border-spacing: 0;
+}
+
+.tableFixedColumns {
+  width: max-content;
 }
 
 .dayColumn {
@@ -145,9 +155,9 @@
 }
 
 .valueColumn {
-  width: var(--matrix-value-column-width);
-  min-width: var(--matrix-value-column-width);
-  max-width: var(--matrix-value-column-width);
+  width: var(--matrix-column-width, var(--matrix-auto-column-width));
+  min-width: var(--matrix-column-width, var(--matrix-auto-column-width));
+  max-width: var(--matrix-column-width, var(--matrix-auto-column-width));
 }
 
 .table th,
@@ -161,15 +171,19 @@
   position: sticky;
   top: 0;
   z-index: 5;
-  width: var(--matrix-value-column-width);
-  min-width: var(--matrix-value-column-width);
-  max-width: var(--matrix-value-column-width);
-  padding: 12px 10px;
+  padding: var(--matrix-header-padding, 12px 10px);
   background: #f5f5f5;
   color: #111827;
-  font-size: 0.92rem;
+  font-size: var(--matrix-header-font-size, 0.92rem);
   font-weight: 800;
   text-align: center;
+}
+
+.valueHeader {
+  width: var(--matrix-column-width, var(--matrix-auto-column-width));
+  min-width: var(--matrix-column-width, var(--matrix-auto-column-width));
+  max-width: var(--matrix-column-width, var(--matrix-auto-column-width));
+  padding-right: var(--matrix-value-header-padding-right, 16px);
 }
 
 .table thead th.draggableHeader {
@@ -196,11 +210,38 @@
 
 .headerCell {
   display: grid;
-  gap: 4px;
+  gap: var(--matrix-header-cell-gap, 4px);
 }
 
 .headerLabel {
   display: block;
+}
+
+.headerLabelButton {
+  width: 100%;
+  min-width: 0;
+  padding: 2px 4px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: inherit;
+  text-align: center;
+  cursor: pointer;
+  transition:
+    background 140ms ease,
+    color 140ms ease;
+}
+
+.headerLabelButton:hover {
+  background: rgba(219, 234, 254, 0.86);
+  color: #1d4ed8;
+}
+
+.headerLabelButton:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 2px rgba(37, 99, 235, 0.34);
 }
 
 .manualHeaderCell {
@@ -247,6 +288,39 @@
   font-weight: 700;
 }
 
+.columnResizeHandle {
+  position: absolute;
+  top: 0;
+  right: -4px;
+  width: 12px;
+  height: 100%;
+  cursor: col-resize;
+  z-index: 3;
+}
+
+.columnResizeHandle::before {
+  content: "";
+  position: absolute;
+  top: 9px;
+  bottom: 9px;
+  left: 50%;
+  width: 2px;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.26);
+  transform: translateX(-50%);
+  transition: background 120ms ease, box-shadow 120ms ease;
+}
+
+.valueHeader:hover .columnResizeHandle::before,
+.columnResizeHandleActive::before {
+  background: rgba(59, 130, 246, 0.6);
+  box-shadow: 0 0 0 1px rgba(191, 219, 254, 0.85);
+}
+
+.resizingHeader {
+  background: #eff6ff;
+}
+
 .table thead th.dayHeader,
 .table tbody th.dayCell {
   position: sticky;
@@ -259,9 +333,9 @@
 
 .table thead th.dayHeader {
   z-index: 7;
-  padding: 12px 4px;
+  padding: var(--matrix-day-header-padding, 12px 4px);
   background: #f0f0f0;
-  font-size: 0.76rem;
+  font-size: var(--matrix-day-header-font-size, 0.76rem);
   white-space: normal;
 }
 
@@ -297,6 +371,39 @@
   pointer-events: none;
 }
 
+.dayButtonWithStaffing {
+  justify-content: center;
+  gap: 4px;
+  padding-inline: 3px;
+}
+
+.dayLabel {
+  flex: 0 0 auto;
+  min-width: max-content;
+}
+
+.shiftStaffingBadge {
+  flex: 0 0 auto;
+  min-width: 21px;
+  padding: 1px 2px;
+  box-sizing: border-box;
+  border: 1px solid rgba(148, 163, 184, 0.34);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.72);
+  color: #64748b;
+  font-size: 0.62rem;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  text-align: center;
+}
+
+.cardCompact .shiftStaffingBadge {
+  min-width: 18px;
+  padding: 1px 2px;
+  font-size: 0.575rem;
+}
+
 .dayButton:hover {
   background: rgba(219, 234, 254, 0.72);
 }
@@ -315,11 +422,24 @@
   box-shadow: inset 0 0 0 2px rgba(37, 99, 235, 0.42);
 }
 
+.dayCellRowGuide::after,
+.rowGuideCell::before {
+  content: "";
+  position: absolute;
+  inset: 1px;
+  z-index: 1;
+  border: 1px dashed rgba(37, 99, 235, 0.52);
+  pointer-events: none;
+}
+
+.dayCellRowGuide::after {
+  inset: 0;
+  border-width: 2px;
+  border-color: rgba(37, 99, 235, 0.76);
+}
+
 .table tbody td {
   padding: 0;
-  width: var(--matrix-value-column-width);
-  min-width: var(--matrix-value-column-width);
-  max-width: var(--matrix-value-column-width);
   height: var(--matrix-cell-min-height);
   position: relative;
   overflow: hidden;
@@ -328,9 +448,6 @@
 
 .matrixCell {
   padding: 0;
-  width: var(--matrix-value-column-width);
-  min-width: var(--matrix-value-column-width);
-  max-width: var(--matrix-value-column-width);
   height: var(--matrix-cell-min-height);
   position: relative;
   overflow: hidden;
@@ -340,8 +457,6 @@
 .cellSurface {
   position: relative;
   width: 100%;
-  min-width: 100%;
-  max-width: 100%;
   min-height: var(--matrix-cell-min-height);
   height: 100%;
   overflow: hidden;
@@ -415,15 +530,39 @@
   background: rgba(252, 140, 140, 0.9);
 }
 
-.errorCell {
-  background: rgba(254, 179, 179, 0.96);
+.errorCell::before {
+  content: "";
+  position: absolute;
+  inset: 3px;
+  z-index: 4;
+  pointer-events: none;
+  border: 1px solid rgba(255, 255, 255, 0.96);
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.12);
+  opacity: 0;
+  box-shadow:
+    0 0 0 2px rgba(220, 38, 38, 0.92),
+    0 0 0 5px rgba(220, 38, 38, 0.2);
+  will-change: opacity, transform;
+  animation: matrix-error-pulse 850ms ease-in-out infinite;
 }
 
-.errorCell .cellSurface,
-.errorCell .cellButton,
-.errorCell .cellEditor,
-.errorCell .readonlyValue {
-  background: rgba(254, 179, 179, 0.96);
+.errorCell.editingCell::before {
+  display: none;
+}
+
+@keyframes matrix-error-pulse {
+  0%,
+  100% {
+    opacity: 0;
+    transform: scale(0.995);
+  }
+
+  38%,
+  62% {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
 .selectedCell,
@@ -440,6 +579,7 @@
 }
 
 .selectedCell::after {
+  z-index: 2;
   box-shadow: inset 0 0 0 2px rgba(37, 99, 235, 0.42);
 }
 
@@ -462,6 +602,7 @@
   background: transparent;
   color: inherit;
   font: inherit;
+  font-size: var(--matrix-cell-font-size, inherit);
   box-sizing: border-box;
   white-space: nowrap;
   overflow: hidden;
@@ -473,7 +614,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 2px 6px;
+  padding: var(--matrix-cell-padding, 2px 6px);
   text-align: center;
   cursor: default;
   user-select: none;
@@ -515,6 +656,14 @@
   box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.24);
 }
 
+.visualHintCurrentValue {
+  min-width: 0;
+  overflow: hidden;
+  color: inherit;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
 .cellButton:focus-visible {
   outline: none;
   box-shadow: inset 0 0 0 2px rgba(37, 99, 235, 0.32);
@@ -548,9 +697,25 @@
   letter-spacing: 0.01em;
 }
 
+.mutedSuffix {
+  color: rgba(107, 114, 128, 0.92);
+}
+
+.textValue {
+  color: rgba(100, 116, 139, 0.9);
+  font-weight: 400;
+}
+
 .readonlyValue {
   font-weight: 700;
   cursor: default;
+}
+
+.regularCellText .readonlyValue,
+.regularCellText .visualHintValue,
+.regularCellText .visualHintButton,
+.regularCellText .visualHintCurrentValue {
+  font-weight: 400;
 }
 
 .table tr:last-child td,
@@ -561,6 +726,68 @@
 .table th:last-child,
 .table td:last-child {
   border-right: none;
+}
+
+.tableNeutral thead th,
+.tableNeutral thead th.dayHeader,
+.tableNeutral tbody th.dayCell,
+.tableNeutral tbody td,
+.tableNeutral .weekendRow th.dayCell,
+.tableNeutral .weekendRow td,
+.tableNeutral .conflictRow th.dayCell,
+.tableNeutral .conflictRow td,
+.tableNeutral .emptyCell,
+.tableNeutral .readonlyEmptyCell,
+.tableNeutral .emptyCellDanger,
+.tableNeutral .emptyCellDangerWeekend,
+.tableNeutral .readonlyEmptyCellDanger,
+.tableNeutral .readonlyEmptyCellDangerWeekend,
+.tableNeutral .errorCell {
+  background: #ffffff;
+}
+
+.tableNeutral .weekendRow th.dayCell,
+.tableNeutral .weekendRow td {
+  background: var(--matrix-neutral-weekend-background, #f1f5f9);
+}
+
+.tableNeutral .dayCellConflict {
+  box-shadow: none;
+}
+
+.tableNeutral .cellSurface,
+.tableNeutral .cellButton,
+.tableNeutral .cellEditor,
+.tableNeutral .readonlyValue {
+  background: transparent;
+}
+
+.tableNeutral .cellValueEmpty,
+.tableNeutral .dangerEmptyValue,
+.tableNeutral .visualHintValue {
+  color: rgba(107, 114, 128, 0.92);
+}
+
+.compactHeader {
+  gap: 8px;
+  margin-bottom: 6px;
+  padding: 0;
+}
+
+.compactTitle {
+  gap: 6px;
+  font-size: 0.92rem;
+  line-height: 1.1;
+  flex: 0 0 auto;
+}
+
+.compactTitle > span {
+  min-width: 0;
+  white-space: nowrap;
+}
+
+.compactHeaderRight {
+  flex: 0 1 auto;
 }
 
 @media (max-width: 960px) {
@@ -584,3 +811,18 @@
     flex-direction: column;
   }
 }
+
+.cardPhoneViewport, .layoutPhoneViewport, .tableShellPhoneViewport, .tableScrollPhoneViewport {
+  box-sizing: border-box; width: 100%; min-width: 0; max-width: 100%;
+}
+.layoutPhoneViewport { grid-template-columns: minmax(0, 1fr); }
+.cardPhoneViewport.cardWithStaffing { --matrix-day-column-width: 96px; }
+.tableScrollPhoneViewport { overflow-x: auto; overflow-y: auto; touch-action: pan-x pan-y pinch-zoom; overscroll-behavior-x: contain; scrollbar-gutter: auto; }
+.tablePhoneViewport { width: max-content; min-width: var(--matrix-table-min-width); max-width: none; table-layout: fixed; }
+.tablePhoneViewport th, .tablePhoneViewport td { box-sizing: border-box; }
+.tablePhoneViewport .headerLabel { white-space: normal; overflow-wrap: anywhere; line-height: 1.3; }
+.tablePhoneViewport .cellSurface { height: auto; contain: none; }
+.tablePhoneViewport .readonlyValue, .tablePhoneViewport .cellButton { position: relative; height: auto; min-height: var(--matrix-cell-min-height); white-space: normal; overflow-wrap: anywhere; }
+.tablePhoneViewport .visualHintShell { position: relative; min-height: var(--matrix-cell-min-height); flex-wrap: wrap; gap: 2px; }
+.tablePhoneViewport .visualHintButton, .tablePhoneViewport .visualHintCurrentValue { white-space: normal; overflow-wrap: anywhere; overflow: visible; }
+@media (max-width: 350px) { .cardPhoneViewport.cardWithStaffing { --matrix-day-column-width: 88px; } }

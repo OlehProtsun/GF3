@@ -15,19 +15,25 @@ public static class EmployeeMapper
         LastName = dto.LastName,
         Phone = dto.Phone,
         Email = dto.Email,
+        Username = dto.Username,
+        HasLoginAccount = dto.HasLoginAccount,
+        IsOnline = dto.IsOnline,
+        LastLoginAtUtc = dto.LastLoginAtUtc,
     };
 
     public static SaveEmployeeRequest ToSaveRequest(this CreateEmployeeRequest request)
-        => MapSaveRequest(request.FirstName, request.LastName, request.Phone, request.Email);
+        => MapSaveRequest(request.FirstName, request.LastName, request.Phone, request.Email, request.Username, request.Password);
 
     public static SaveEmployeeRequest ToSaveRequest(this UpdateEmployeeRequest request, int id)
-        => MapSaveRequest(request.FirstName, request.LastName, request.Phone, request.Email, id);
+        => MapSaveRequest(request.FirstName, request.LastName, request.Phone, request.Email, request.Username, request.Password, id);
 
     private static SaveEmployeeRequest MapSaveRequest(
         string firstName,
         string lastName,
         string? phone,
         string? email,
+        string? username,
+        string? password,
         int id = 0)
         => new()
         {
@@ -36,5 +42,7 @@ public static class EmployeeMapper
             LastName = lastName,
             Phone = phone,
             Email = email,
+            Username = username,
+            Password = password,
         };
 }

@@ -1,13 +1,16 @@
+import { t } from "@shared/i18n";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import type { Employee } from "@entities/employees/model/types";
 import type { AvailabilityMatrixCellMap, AvailabilityMatrixColumn } from "@entities/availability-groups/model/editor";
+import type { AvailabilityPublicationStatus } from "@entities/availability-groups/model/types";
 import { ErrorBanner } from "@shared/ui/components/ErrorBanner";
 import { IosButton } from "@shared/ui/components/IosButton";
-import { SaveIcon } from "@shared/ui/icons";
+import { BindIcon, EmployeeIcon, EyeIcon, InformationIcon, SaveIcon } from "@shared/ui/icons";
 import { AvailabilityBindCard } from "./AvailabilityBindCard";
 import { AvailabilityEmployeeCard } from "./AvailabilityEmployeeCard";
 import { AvailabilityInformationCard, type AvailabilityInformationErrors } from "./AvailabilityInformationCard";
+import { AvailabilityPublicationCard, type AvailabilityPublicationErrors } from "./AvailabilityPublicationCard";
 import { AvailabilityScheduleMatrix } from "./AvailabilityScheduleMatrix";
 import { AvailabilitySidebarCollapseButton, AvailabilitySidebarSection } from "./AvailabilitySidebarSection";
 import { AvailabilityWorkspaceLayout } from "./AvailabilityWorkspaceLayout";
@@ -30,12 +33,17 @@ type AvailabilityGroupEditorProps = {
   isHeaderCollapsed?: boolean;
   compactSize?: boolean;
   informationErrors?: AvailabilityInformationErrors;
+  publicationStatus: AvailabilityPublicationStatus;
+  visibleFrom: string;
+  visibleTo: string;
+  publicationErrors?: AvailabilityPublicationErrors;
   employeeError?: string;
   employees: Employee[];
   selectedEmployeeId: number | null;
-  assignedEmployees: { id: number; label: string }[];
+  assignedEmployees: { id: number; label: string; canChooseFromAnother: boolean }[];
   columns: AvailabilityMatrixColumn[];
   cellMap: AvailabilityMatrixCellMap;
+  visualHintMap?: AvailabilityMatrixCellMap;
   cellErrors?: Record<string, string>;
   binds: AvailabilityGroupEditorBindRow[];
   selectedBindClientId: string | null;
@@ -50,20 +58,25 @@ type AvailabilityGroupEditorProps = {
   onNameChange: (value: string) => void;
   onMonthChange: (value: number) => void;
   onYearChange: (value: number) => void;
+  onPublicationStatusChange: (value: AvailabilityPublicationStatus) => void;
+  onVisibleFromChange: (value: string) => void;
+  onVisibleToChange: (value: string) => void;
   onSelectedEmployeeIdChange: (value: number | null) => void;
   onSelectedBindChange: (clientId: string | null) => void;
   onBindFieldChange: (clientId: string, patch: Partial<Pick<AvailabilityGroupEditorBindRow, "key" | "value" | "isActive">>) => void;
   onBindCommit: (clientId: string) => void;
   onAddEmployee: () => void;
-  onRemoveEmployee: () => void;
+  onRemoveEmployee: (employeeId: number) => void;
+  onChooseFromAnother: (employeeId: number) => void;
   onAddBind: () => void;
   onDeleteBind: () => void;
   onColumnMove: (employeeId: number, targetEmployeeId: number) => void;
   onCellChange: (employeeId: number, dayOfMonth: number, value: string) => void;
+  onVisualHintClick: (employeeId: number, dayOfMonth: number) => void;
   onSave: () => void;
 };
 
-type SidebarSectionKey = "information" | "employee" | "bind";
+type SidebarSectionKey = "information" | "publication" | "employee" | "bind";
 
 function joinClassNames(...values: Array<string | undefined>) {
   return values.filter(Boolean).join(" ");
@@ -99,12 +112,17 @@ export function AvailabilityGroupEditor({
   isHeaderCollapsed = false,
   compactSize = false,
   informationErrors,
+  publicationStatus,
+  visibleFrom,
+  visibleTo,
+  publicationErrors,
   employeeError,
   employees,
   selectedEmployeeId,
   assignedEmployees,
   columns,
   cellMap,
+  visualHintMap,
   cellErrors = {},
   binds,
   selectedBindClientId,
@@ -119,22 +137,28 @@ export function AvailabilityGroupEditor({
   onNameChange,
   onMonthChange,
   onYearChange,
+  onPublicationStatusChange,
+  onVisibleFromChange,
+  onVisibleToChange,
   onSelectedEmployeeIdChange,
   onSelectedBindChange,
   onBindFieldChange,
   onBindCommit,
   onAddEmployee,
   onRemoveEmployee,
+  onChooseFromAnother,
   onAddBind,
   onDeleteBind,
   onColumnMove,
   onCellChange,
+  onVisualHintClick,
   onSave,
 }: AvailabilityGroupEditorProps) {
   const [collapsedSections, setCollapsedSections] = useState<Record<SidebarSectionKey, boolean>>({
-    information: false,
-    employee: false,
-    bind: false,
+    information: true,
+    publication: true,
+    employee: true,
+    bind: true,
   });
   const [isDesktopLayout, setIsDesktopLayout] = useState(false);
   const [viewportHeight, setViewportHeight] = useState(0);
@@ -226,11 +250,11 @@ export function AvailabilityGroupEditor({
   );
 
   if (isLoading) {
-    return <div className={styles.state}>Loading availability editor...</div>;
+    return <div className={styles.state}>{t("Loading availability editor...")}</div>;
   }
 
   if (hasLoadError) {
-    return <ErrorBanner className={styles.banner}>Could not load this availability group.</ErrorBanner>;
+    return <ErrorBanner className={styles.banner}>{t("Could not load this availability group.")}</ErrorBanner>;
   }
 
   const scheduleMatrixBaseMinHeight =
@@ -306,8 +330,9 @@ export function AvailabilityGroupEditor({
       sidebar={
         <>
           <AvailabilitySidebarSection
-            label="Information"
+            label={t("Information")}
             collapsed={collapsedSections.information}
+            collapsedIcon={<InformationIcon size={18} />}
             collapsedOffset={allSectionsCollapsed ? "flush" : "default"}
             onExpand={() => setSectionCollapsed("information", false)}
           >
@@ -316,7 +341,7 @@ export function AvailabilityGroupEditor({
               month={month}
               year={year}
               errors={informationErrors}
-              headerRightSlot={renderCollapseButton("Information", "information")}
+              headerRightSlot={renderCollapseButton(t("Information"), "information")}
               onNameChange={onNameChange}
               onMonthChange={onMonthChange}
               onYearChange={onYearChange}
@@ -324,8 +349,28 @@ export function AvailabilityGroupEditor({
           </AvailabilitySidebarSection>
 
           <AvailabilitySidebarSection
-            label="Employee"
+            label={t("Publication")}
+            collapsed={collapsedSections.publication}
+            collapsedIcon={<EyeIcon size={18} />}
+            collapsedOffset={allSectionsCollapsed ? "flush" : "default"}
+            onExpand={() => setSectionCollapsed("publication", false)}
+          >
+            <AvailabilityPublicationCard
+              publicationStatus={publicationStatus}
+              visibleFrom={visibleFrom}
+              visibleTo={visibleTo}
+              errors={publicationErrors}
+              headerRightSlot={renderCollapseButton(t("Publication"), "publication")}
+              onPublicationStatusChange={onPublicationStatusChange}
+              onVisibleFromChange={onVisibleFromChange}
+              onVisibleToChange={onVisibleToChange}
+            />
+          </AvailabilitySidebarSection>
+
+          <AvailabilitySidebarSection
+            label={t("Employee")}
             collapsed={collapsedSections.employee}
+            collapsedIcon={<EmployeeIcon size={18} />}
             collapsedOffset={allSectionsCollapsed ? "flush" : "default"}
             onExpand={() => setSectionCollapsed("employee", false)}
           >
@@ -334,16 +379,18 @@ export function AvailabilityGroupEditor({
               selectedEmployeeId={selectedEmployeeId}
               assignedEmployees={assignedEmployees}
               groupError={employeeError}
-              headerRightSlot={renderCollapseButton("Employee", "employee")}
+              headerRightSlot={renderCollapseButton(t("Employee"), "employee")}
               onSelectedEmployeeIdChange={onSelectedEmployeeIdChange}
               onAddEmployee={onAddEmployee}
               onRemoveEmployee={onRemoveEmployee}
+              onChooseFromAnother={onChooseFromAnother}
             />
           </AvailabilitySidebarSection>
 
           <AvailabilitySidebarSection
-            label="Bind Information"
+            label={t("Bind Information")}
             collapsed={collapsedSections.bind}
+            collapsedIcon={<BindIcon size={18} />}
             collapsedOffset={allSectionsCollapsed ? "flush" : "default"}
             onExpand={() => setSectionCollapsed("bind", false)}
           >
@@ -353,7 +400,7 @@ export function AvailabilityGroupEditor({
               isLoading={isBindsLoading}
               isBusy={isBindBusy}
               errorMessage={bindErrorMessage}
-              headerRightSlot={renderCollapseButton("Bind Information", "bind")}
+              headerRightSlot={renderCollapseButton(t("Bind Information"), "bind")}
               onSelectedBindChange={onSelectedBindChange}
               onBindFieldChange={onBindFieldChange}
               onBindCommit={onBindCommit}
@@ -384,6 +431,7 @@ export function AvailabilityGroupEditor({
             month={month}
             columns={columns}
             cellMap={cellMap}
+            visualHintMap={visualHintMap}
             cellErrors={cellErrors}
             headerCenterSlot={
               errorMessage ? (
@@ -398,7 +446,7 @@ export function AvailabilityGroupEditor({
             headerRightSlot={
               <IosButton
                 className={styles.scheduleSaveButton}
-                label={isSaving ? "Saving..." : "Save Changes"}
+                label={isSaving ? t("Saving...") : t("Save Changes")}
                 icon={<SaveIcon size={18} />}
                 onClick={onSave}
                 disabled={isSaving}
@@ -411,10 +459,10 @@ export function AvailabilityGroupEditor({
               setSelectedCellKeys(sanitizeSelectedCellKeys(nextSelectedCellKeys, columns, year, month));
             }}
             onCellChange={onCellChange}
+            onVisualHintClick={onVisualHintClick}
           />
         </div>
       }
     />
   );
 }
-

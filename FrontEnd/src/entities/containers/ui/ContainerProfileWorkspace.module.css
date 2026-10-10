@@ -13,6 +13,11 @@
   align-items: stretch;
 }
 
+.topRowAllCollapsed {
+  grid-template-columns: 46px minmax(0, 1fr);
+  gap: 4px;
+}
+
 .sidebar,
 .scheduleColumn,
 .statisticsCard {
@@ -22,53 +27,318 @@
 .sidebar {
   position: static;
   min-height: 0;
+  display: grid;
+  align-content: start;
+  gap: 18px;
+}
+
+.sidebarAllCollapsed {
+  gap: 8px;
+}
+
+.sidebar > * button[aria-label^="Expand "] {
+  margin-left: -8px;
 }
 
 .summaryCard {
   width: 100%;
   max-width: none;
-  height: 100%;
   margin-inline: 0;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(248, 250, 252, 0.96));
+  padding: 20px 20px 18px;
+  border-radius: 32px;
+  border-color: rgba(148, 163, 184, 0.16);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(248, 250, 252, 0.82));
+  box-shadow: 0 18px 50px rgba(15, 23, 42, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.82);
 }
 
-.summaryDetails {
+.containerInfoContent {
   display: grid;
+  gap: 14px;
+}
+
+.containerIdentity {
+  display: flex;
+  align-items: center;
   gap: 12px;
+  min-width: 0;
+  padding: 2px;
 }
 
-.noteList,
-.metricsList {
-  margin-top: 0;
+.containerAvatar {
+  display: grid;
+  place-items: center;
+  width: 60px;
+  height: 60px;
+  flex: 0 0 auto;
+  border-radius: 20px;
+  background: linear-gradient(180deg, #3b82f6, #2563eb);
+  border: 1px solid rgba(37, 99, 235, 0.32);
+  color: #ffffff;
+  font-size: 1.1rem;
+  font-weight: 900;
+  box-shadow: 0 12px 24px rgba(37, 99, 235, 0.18);
 }
 
-.profileNoteItem,
-.profileMetricItem {
-  min-height: 0;
+.containerIdentityText {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
 }
 
-.profileNoteItemEmpty {
-  min-height: 13rem;
+.containerName {
+  margin: 0;
+  color: #0f172a;
+  font-size: 1.2rem;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
 }
 
-.profileNoteValue {
+.containerSubtitle {
+  margin: 0;
+  color: #64748b;
+  font-size: 0.84rem;
+  line-height: 1.45;
+}
+
+.containerInfoLabels {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+}
+
+.containerInfoLabels .statisticsSummaryItem {
+  flex: 1 1 calc(50% - 4px);
+  justify-content: space-between;
+  min-width: 0;
+}
+
+.containerNote {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  min-height: 130px;
+  padding: 14px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 20px;
+  background: rgba(248, 250, 252, 0.86);
+  box-sizing: border-box;
+}
+
+.containerNoteEmpty {
+  min-height: 150px;
+}
+
+.containerNoteLabel {
+  color: #64748b;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.containerNoteValue {
   max-height: 10rem;
   overflow: auto;
   padding-right: 4px;
-  font-size: 0.95rem;
+  color: #0f172a;
+  font-size: 0.92rem;
   font-weight: 600;
   line-height: 1.55;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
 
-.profileNoteValueEmpty {
-  min-height: 10rem;
+.containerInfoActions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 2px;
 }
 
-.profileMetricValue {
-  font-size: 0.95rem;
-  line-height: 1.35;
+.containerInfoActions :global(button) {
+  flex: 1 1 140px;
+  justify-content: center;
+}
+
+.swapsCard {
+  padding: 18px;
+  border-radius: 32px;
+  border-color: rgba(148, 163, 184, 0.16);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(248, 250, 252, 0.82));
+  box-shadow: 0 18px 50px rgba(15, 23, 42, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.82);
+}
+
+.swapHeaderActions,
+.swapActions,
+.swapPeople,
+.swapItemHeader {
+  display: flex;
+  align-items: center;
+}
+
+.swapHeaderActions {
+  gap: 8px;
+}
+
+.swapsContent {
+  min-width: 0;
+  display: grid;
+  gap: 12px;
+}
+
+.swapMonthLabel {
+  color: #64748b;
+  font-size: 0.78rem;
+  font-weight: 850;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.swapSearchField {
+  width: 100%;
+  min-width: 0;
+}
+
+.swapError {
+  margin: 0;
+}
+
+.swapState {
+  padding: 18px 12px;
+  border: 1px dashed rgba(148, 163, 184, 0.34);
+  border-radius: 18px;
+  color: #64748b;
+  font-size: 0.86rem;
+  font-weight: 700;
+  text-align: center;
+}
+
+.swapList {
+  max-height: 470px;
+  display: grid;
+  gap: 10px;
+  margin-right: -10px;
+  padding-right: 12px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.swapItem {
+  min-width: 0;
+  display: grid;
+  gap: 10px;
+  padding: 13px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.78);
+}
+
+.swapItemHeader {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) max-content;
+  gap: 10px;
+}
+
+.swapPeople {
+  min-width: 0;
+  gap: 5px;
+  color: #64748b;
+  font-size: 0.82rem;
+  overflow: hidden;
+}
+
+.swapPeople strong {
+  min-width: 0;
+  color: #0f172a;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.swapStatus {
+  flex: 0 0 auto;
+  padding: 4px 8px;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 900;
+  text-transform: capitalize;
+}
+
+.swapStatusopen {
+  background: rgba(37, 99, 235, 0.1);
+  color: #1d4ed8;
+}
+
+.swapStatusaccepted {
+  background: rgba(22, 163, 74, 0.1);
+  color: #15803d;
+}
+
+.swapStatuscancelled {
+  background: rgba(100, 116, 139, 0.12);
+  color: #475569;
+}
+
+.swapMeta {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+  color: #64748b;
+  font-size: 0.78rem;
+}
+
+.swapMeta strong {
+  color: #334155;
+  overflow-wrap: anywhere;
+}
+
+.swapActions {
+  display: grid;
+  grid-template-columns: max-content max-content minmax(0, 1fr) max-content;
+  gap: 7px;
+}
+
+.swapActions button {
+  min-height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 6px 10px;
+  border: 1px solid rgba(37, 99, 235, 0.16);
+  border-radius: 999px;
+  background: rgba(239, 246, 255, 0.82);
+  color: #1d4ed8;
+  font: inherit;
+  font-size: 0.76rem;
+  font-weight: 850;
+  cursor: pointer;
+}
+
+.swapActions button:hover:not(:disabled) {
+  background: #dbeafe;
+}
+
+.swapActions button:focus-visible {
+  outline: 3px solid rgba(37, 99, 235, 0.16);
+}
+
+.swapActions button:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.swapActions .swapDeleteButton {
+  grid-column: 4;
+  margin-left: 0;
+  border-color: rgba(220, 38, 38, 0.16);
+  background: rgba(254, 242, 242, 0.86);
+  color: #dc2626;
+}
+
+.swapActions .swapDeleteButton:hover:not(:disabled) {
+  background: #fee2e2;
 }
 
 .scheduleColumn {
@@ -112,11 +382,36 @@
 }
 
 .scheduleGrid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   width: 100%;
   padding: 12px 26px 24px;
   box-sizing: border-box;
   row-gap: 22px;
   align-items: start;
+}
+
+.scheduleStatusValue,
+.scheduleLastUpdateValue {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 7px;
+  border-radius: 999px;
+  font-weight: 800;
+}
+
+.scheduleStatusPublic {
+  color: #15803d;
+  background: rgba(34, 197, 94, 0.12);
+}
+
+.scheduleStatusPrivate {
+  color: #dc2626;
+  background: rgba(239, 68, 68, 0.12);
+}
+
+.scheduleLastUpdateValue {
+  color: #1d4ed8;
+  background: rgba(59, 130, 246, 0.12);
 }
 
 .scheduleHeaderActions {
@@ -125,6 +420,54 @@
   justify-content: flex-end;
   gap: 12px;
   flex-wrap: wrap;
+}
+
+.scheduleBulkActions {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.scheduleBulkButton {
+  min-height: 32px;
+  padding: 6px 10px;
+  border: 1px solid rgba(100, 116, 139, 0.2);
+  border-radius: 999px;
+  background: rgba(248, 250, 252, 0.92);
+  color: #475569;
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 850;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease;
+}
+
+.scheduleBulkPublishButton {
+  border-color: rgba(22, 163, 74, 0.2);
+  background: rgba(240, 253, 244, 0.92);
+  color: #15803d;
+}
+
+.scheduleBulkButton:hover:not(:disabled) {
+  border-color: rgba(71, 85, 105, 0.34);
+  background: #f1f5f9;
+}
+
+.scheduleBulkPublishButton:hover:not(:disabled) {
+  border-color: rgba(22, 163, 74, 0.34);
+  background: #dcfce7;
+}
+
+.scheduleBulkButton:focus-visible {
+  outline: 3px solid rgba(59, 130, 246, 0.14);
+  outline-offset: 1px;
+}
+
+.scheduleBulkButton:disabled {
+  opacity: 0.48;
+  cursor: default;
 }
 
 .multiOpenToggle {
@@ -241,6 +584,28 @@
   display: flex;
   flex-direction: column;
   min-height: 0;
+  border-radius: 32px;
+  padding: 20px 20px 0;
+  border-color: rgba(148, 163, 184, 0.16);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(248, 250, 252, 0.82));
+  box-shadow: 0 18px 50px rgba(15, 23, 42, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.82);
+}
+
+.statisticsHeader {
+  margin-bottom: 12px;
+  padding: 0 2px;
+}
+
+.statisticsSearchField {
+  flex: 1 1 280px;
+  width: auto;
+  min-width: min(100%, 260px);
+}
+
+.statisticsSearchField .searchInput {
+  min-height: 44px;
+  border-radius: 999px;
+  background: rgba(248, 250, 252, 0.9);
 }
 
 .headerBadge {
@@ -319,46 +684,89 @@
   box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.12);
 }
 
-
-
-.metricRow {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 12px;
-}
-
-.metricCard {
-  display: grid;
-  gap: 4px;
-  padding: 16px;
-  border: 1px solid rgba(148, 163, 184, 0.18);
-  border-radius: 20px;
-  background: linear-gradient(180deg, rgba(248, 250, 252, 0.96), rgba(241, 245, 249, 0.9));
-}
-
-.metricLabel {
-  color: #64748b;
-  font-size: 0.82rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-
-.metricValue {
-  color: #0f172a;
-  font-size: 1.2rem;
+.swapPermissionChoice {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #475569;
+  font-size: 0.78rem;
   font-weight: 800;
 }
 
+.swapPermissionOptions {
+  display: inline-flex;
+  padding: 2px;
+  border-radius: 999px;
+  background: rgba(226, 232, 240, 0.78);
+}
+
+.swapPermissionOptions button {
+  min-width: 38px !important;
+  min-height: 28px;
+  padding: 4px 9px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: #64748b;
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 850;
+  cursor: pointer;
+}
+
+.swapPermissionOptions .swapPermissionOptionActive {
+  background: #ffffff;
+  color: #1d4ed8;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.1);
+}
+
+
+
+.statisticsSummary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 2px 0 0;
+  padding: 0;
+}
+
+.statisticsSummaryItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+  padding: 5px 12px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 999px;
+  background: rgba(248, 250, 252, 0.9);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+.statisticsSummaryLabel {
+  color: #64748b;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.statisticsSummaryValue {
+  margin: 0;
+  color: #0f172a;
+  font-size: 0.84rem;
+  font-weight: 850;
+  font-variant-numeric: tabular-nums;
+}
+
 .tableWrap {
-  margin-top: 16px;
+  margin-top: 12px;
   margin-bottom: 18px;
   overflow: auto;
   flex: 1 1 auto;
   min-height: 0;
   max-height: clamp(240px, calc(100dvh - 320px), 460px);
-  border: 1px solid rgba(148, 163, 184, 0.18);
-  border-radius: 20px;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 24px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
   scrollbar-gutter: stable both-edges;
 }
 
@@ -436,6 +844,10 @@
   margin-bottom: 24px;
 }
 
+.statisticsSearchEmptyState {
+  margin: 16px 0 24px;
+}
+
 .banner,
 .inlineBanner {
   width: 100%;
@@ -446,9 +858,15 @@
   color: #94a3b8;
 }
 
-@media (max-width: 1200px) {
-  .metricRow {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+@media (max-width: 1280px) {
+  .scheduleGrid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 1100px) and (min-width: 961px) {
+  .sidebar > * button[aria-label^="Expand "] {
+    margin-left: -12px;
   }
 }
 
@@ -457,8 +875,16 @@
     grid-template-columns: 1fr;
   }
 
+  .scheduleGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .scheduleCardShell {
     height: auto;
+  }
+
+  .sidebar {
+    gap: 14px;
   }
 
   .scheduleCard {
@@ -475,25 +901,46 @@
 }
 
 @media (max-width: 680px) {
+  .scheduleGrid {
+    grid-template-columns: 1fr;
+  }
+
   .scheduleHeaderRow {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .statisticsSearchField {
+    width: 100%;
+    min-width: 100%;
+    flex-basis: 100%;
   }
 
   .scheduleHeaderActions {
     justify-content: flex-start;
   }
 
-  .profileNoteValue {
+  .scheduleBulkActions {
+    align-self: flex-start;
+  }
+
+  .containerAvatar {
+    width: 52px;
+    height: 52px;
+    border-radius: 17px;
+  }
+
+  .containerNoteValue {
     max-height: 8.5rem;
   }
 
-  .profileNoteItemEmpty {
-    min-height: 11.5rem;
+  .containerInfoActions {
+    flex-direction: column;
   }
 
-  .profileNoteValueEmpty {
-    min-height: 8.5rem;
+  .containerInfoActions :global(button) {
+    width: 100%;
+    flex-basis: auto;
   }
 
   .scheduleEmptyState {
@@ -501,8 +948,14 @@
     min-height: 200px;
   }
 
-  .metricRow {
-    grid-template-columns: 1fr;
+  .statisticsSummary {
+    gap: 6px;
+  }
+
+  .statisticsSummaryItem {
+    flex: 1 1 calc(50% - 3px);
+    justify-content: space-between;
+    min-width: 0;
   }
 
   .table th,

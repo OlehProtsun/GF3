@@ -1,3 +1,4 @@
+import { t, translateServerMessage } from "@shared/i18n";
 export type ValidationErrors = Record<string, string[]>;
 type ValidationErrorPayload = ValidationErrors | string[];
 
@@ -24,7 +25,7 @@ export class ApiError extends Error {
 }
 
 export class RequestCanceledError extends Error {
-  constructor(message = "Request was canceled.") {
+  constructor(message = t("Request was canceled.")) {
     super(message);
     this.name = "RequestCanceledError";
   }
@@ -41,6 +42,7 @@ export type DownloadedFile = {
 };
 
 type RequestOptions = {
+  anonymous?: boolean;
   method?: RequestMethod;
   body?: unknown;
   headers?: HeadersInit;
@@ -115,6 +117,24 @@ export function isRequestCanceledError(error: unknown): boolean {
 }
 
 const defaultBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim() || "/api";
+let authAccessToken: string | null = null;
+let authGeneration = 0;
+const unauthorizedListeners = new Set<() => void>();
+
+export function subscribeUnauthorized(listener: () => void) {
+  unauthorizedListeners.add(listener);
+  return () => { unauthorizedListeners.delete(listener); };
+}
+
+export function setAuthAccessToken(token: string | null) {
+  const nextToken = token && token.trim().length > 0 ? token.trim() : null;
+  if (nextToken !== authAccessToken) authGeneration++;
+  authAccessToken = nextToken;
+}
+
+export function getAuthAccessToken() {
+  return authAccessToken;
+}
 
 function withQueryString(url: string, query?: Record<string, QueryValue>) {
   if (!query) {
@@ -147,6 +167,10 @@ function buildUrl(path: string, query?: Record<string, QueryValue>): string {
   const base = defaultBaseUrl.replace(/\/$/, "");
   const relativePath = path.replace(/^\//, "");
   return withQueryString(`${base}/${relativePath}`, query);
+}
+
+export function buildApiUrl(path: string, query?: Record<string, QueryValue>) {
+  return buildUrl(path, query);
 }
 
 function parseContentDispositionFileName(contentDisposition: string | null): string | null {
@@ -197,13 +221,13 @@ function normalizeValidationErrors(errors: ValidationErrorPayload | undefined): 
 
   if (Array.isArray(errors)) {
     const messages = errors.filter((message): message is string => typeof message === "string" && message.trim().length > 0);
-    return messages.length > 0 ? { general: messages } : undefined;
+    return messages.length > 0 ? { general: messages.map(translateServerMessage) } : undefined;
   }
 
   const entries = Object.entries(errors)
     .map(([field, messages]) => [
       field,
-      messages.filter((message): message is string => typeof message === "string" && message.trim().length > 0),
+      messages.filter((message): message is string => typeof message === "string" && message.trim().length > 0).map(translateServerMessage),
     ] as const)
     .filter(([, messages]) => messages.length > 0);
 
@@ -224,7 +248,7 @@ function toApiError(status: number, payload: unknown): ApiError {
   const problem = (payload ?? {}) as ProblemDetailsResponse;
   const validationErrors = normalizeValidationErrors(problem.errors);
   const textPayload = typeof payload === "string" ? payload.trim() : "";
-  const fallbackMessage = `Request failed with status ${status}`;
+  const fallbackMessage = t("Request failed with status {0}", status);
   const message =
     problem.detail?.trim() ||
     getFirstValidationErrorMessage(validationErrors) ||
@@ -234,14 +258,14 @@ function toApiError(status: number, payload: unknown): ApiError {
 
   return new ApiError({
     status,
-    message,
+    message: translateServerMessage(message),
     details: payload,
     traceId: problem.traceId,
     validationErrors,
   });
 }
 
-export function getErrorMessage(error: unknown, fallbackMessage = "Something went wrong."): string {
+export function getErrorMessage(error: unknown, fallbackMessage = t("Something went wrong.")): string {
   if (error instanceof ApiError) {
     return getFirstValidationErrorMessage(error.validationErrors) ?? error.message ?? fallbackMessage;
   }
@@ -253,13 +277,23 @@ export function getErrorMessage(error: unknown, fallbackMessage = "Something wen
   return fallbackMessage;
 }
 
-async function executeRequest(path: string, options: RequestOptions = {}): Promise<Response> {
+async function executeRequest(path: string, options: RequestOptions = {}) {
+  const requestToken = authAccessToken;
+  const requestGeneration = authGeneration;
+  const ensureCurrent = () => {
+    if (requestGeneration !== authGeneration || options.signal?.aborted) throw new RequestCanceledError();
+  };
   const method = options.method ?? "GET";
   const hasBody = options.body !== undefined;
   const responseType = options.responseType ?? "json";
 
   const headers = new Headers(options.headers);
   headers.set("Accept", responseType === "blob" ? "*/*" : "application/json");
+
+  if (!options.anonymous && authAccessToken && !headers.has("Authorization")) {
+    headers.set("Authorization", `Bearer ${authAccessToken}`);
+  }
+
   const requestBody = hasBody ? buildRequestBody(options.body, headers) : undefined;
 
   let response: Response;
@@ -272,35 +306,53 @@ async function executeRequest(path: string, options: RequestOptions = {}): Promi
       body: requestBody,
     });
   } catch (error) {
-    if (options.signal?.aborted || isRequestCanceledError(error)) {
+    if (requestGeneration !== authGeneration || options.signal?.aborted || isRequestCanceledError(error)) {
       throw new RequestCanceledError();
     }
 
     throw error;
   }
 
-  return response;
+  ensureCurrent();
+  const readBody = async (type: ResponseType) => {
+    try {
+      return await parseBody(response, type);
+    } finally {
+      ensureCurrent();
+    }
+  };
+  const notifyUnauthorized = () => {
+    ensureCurrent();
+    if (response.status === 401 && requestToken && !options.anonymous &&
+        headers.get("Authorization") === `Bearer ${requestToken}`) {
+      unauthorizedListeners.forEach(listener => listener());
+    }
+  };
+  return { response, readBody, notifyUnauthorized, ensureCurrent };
 }
 
 export async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
-  const response = await executeRequest(path, options);
+  const { response, readBody, notifyUnauthorized, ensureCurrent } = await executeRequest(path, options);
+  ensureCurrent();
 
   if (response.status === 204) {
     return undefined as T;
   }
 
   if (!response.ok) {
-    const errorPayload = await parseBody(response, "json");
+    const errorPayload = await readBody("json");
+    notifyUnauthorized();
     throw toApiError(response.status, errorPayload);
   }
 
   const responseType = options.responseType ?? "json";
-  const payload = await parseBody(response, responseType);
+  const payload = await readBody(responseType);
   return payload as T;
 }
 
 export async function requestFile(path: string, options: Omit<RequestOptions, "responseType"> = {}): Promise<DownloadedFile> {
-  const response = await executeRequest(path, { ...options, responseType: "blob" });
+  const { response, readBody, notifyUnauthorized, ensureCurrent } = await executeRequest(path, { ...options, responseType: "blob" });
+  ensureCurrent();
 
   if (response.status === 204) {
     return {
@@ -311,12 +363,13 @@ export async function requestFile(path: string, options: Omit<RequestOptions, "r
   }
 
   if (!response.ok) {
-    const errorPayload = await parseBody(response, "json");
+    const errorPayload = await readBody("json");
+    notifyUnauthorized();
     throw toApiError(response.status, errorPayload);
   }
 
   return {
-    blob: await response.blob(),
+    blob: await readBody("blob") as Blob,
     fileName: parseContentDispositionFileName(response.headers.get("content-disposition")),
     contentType: response.headers.get("content-type"),
   };

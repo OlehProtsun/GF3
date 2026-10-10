@@ -1,3 +1,4 @@
+import { t } from "@shared/i18n";
 import { useMemo, type ReactNode } from "react";
 import type { Employee } from "@entities/employees/model/types";
 import { getEmployeeFullName } from "@entities/employees/model/presentation";
@@ -13,18 +14,18 @@ import { LabeledField, TextInput } from "@shared/ui/forms/Field";
 import styles from "./ContainerGraphEditor.module.css";
 
 const MONTH_OPTIONS = [
-  { value: "1", label: "January" },
-  { value: "2", label: "February" },
-  { value: "3", label: "March" },
-  { value: "4", label: "April" },
-  { value: "5", label: "May" },
-  { value: "6", label: "June" },
-  { value: "7", label: "July" },
-  { value: "8", label: "August" },
-  { value: "9", label: "September" },
-  { value: "10", label: "October" },
-  { value: "11", label: "November" },
-  { value: "12", label: "December" },
+  { value: "1", get label() { return t("January"); } },
+  { value: "2", get label() { return t("February"); } },
+  { value: "3", get label() { return t("March"); } },
+  { value: "4", get label() { return t("April"); } },
+  { value: "5", get label() { return t("May"); } },
+  { value: "6", get label() { return t("June"); } },
+  { value: "7", get label() { return t("July"); } },
+  { value: "8", get label() { return t("August"); } },
+  { value: "9", get label() { return t("September"); } },
+  { value: "10", get label() { return t("October"); } },
+  { value: "11", get label() { return t("November"); } },
+  { value: "12", get label() { return t("December"); } },
 ] as const;
 
 type ScheduleDetailsEmployeeRow = {
@@ -60,7 +61,7 @@ function getStepperValue(rawValue: string, fallbackValue: number) {
 }
 
 function getMonthOptionLabel(month: number) {
-  return MONTH_OPTIONS.find(option => Number(option.value) === month)?.label ?? `Month ${month}`;
+  return MONTH_OPTIONS.find(option => Number(option.value) === month)?.label ?? t("Month {0}", month);
 }
 
 export function ContainerGraphDetailsFields({
@@ -108,8 +109,8 @@ export function ContainerGraphDetailsFields({
     () => [
       {
         value: "",
-        label: "No availability group",
-        hint: "Leave this schedule unlinked",
+        label: t("No availability group"),
+        hint: t("Leave this schedule unlinked"),
         keywords: "none no availability unlinked",
       },
       ...availabilityGroups.map(group => ({
@@ -128,12 +129,12 @@ export function ContainerGraphDetailsFields({
 
       <div className={joinClassNames(styles.detailsRow, styles.detailsRowBalanced)}>
         {showNameField ? (
-          <LabeledField id={`${idPrefix}-name`} label="Name*" error={formErrors.name} className={styles.detailsFieldCompact}>
+          <LabeledField id={`${idPrefix}-name`} label={t("Name*")} error={formErrors.name} className={styles.detailsFieldCompact}>
             <TextInput
               id={`${idPrefix}-name`}
               className={styles.controlCompact}
               value={form.name}
-              placeholder="Example: March 2026 Main Shop"
+              placeholder={t("Example: March 2026 Main Shop")}
               aria-invalid={Boolean(formErrors.name)}
               aria-describedby={formErrors.name ? `${idPrefix}-name-error` : undefined}
               onChange={event => onFieldChange("name")(event.target.value)}
@@ -143,7 +144,7 @@ export function ContainerGraphDetailsFields({
 
         <LabeledField
           id={`${idPrefix}-people`}
-          label="People / shift*"
+          label={t("People / shift*")}
           error={formErrors.peoplePerShift}
           className={joinClassNames(
             styles.detailsFieldCompact,
@@ -160,32 +161,32 @@ export function ContainerGraphDetailsFields({
             value={getStepperValue(form.peoplePerShift, 1)}
             min={1}
             onChange={value => onFieldChange("peoplePerShift")(String(value))}
-            ariaLabel="people per shift"
+            ariaLabel={t("people per shift")}
           />
         </LabeledField>
       </div>
 
       <div className={joinClassNames(styles.detailsRow, styles.detailsRowBalanced)}>
-        <LabeledField id={`${idPrefix}-month`} label="Month*" error={formErrors.month} className={styles.detailsFieldCompact}>
+        <LabeledField id={`${idPrefix}-month`} label={t("Month*")} error={formErrors.month} className={styles.detailsFieldCompact}>
           <SearchableSelect
             id={`${idPrefix}-month`}
             className={styles.controlMedium}
             size="field"
             value={form.month}
             options={monthOptions}
-            placeholder="Select month..."
-            dropdownTitle="Schedule months"
+            placeholder={t("Select month...")}
+            dropdownTitle={t("Schedule months")}
             fallbackHint=""
             searchEnabled={false}
             invalid={Boolean(formErrors.month)}
             dropdownPlacement={selectDropdownPlacement}
             ariaDescribedBy={formErrors.month ? `${idPrefix}-month-error` : undefined}
-            ariaLabel="schedule months"
+            ariaLabel={t("schedule months")}
             onChange={value => onFieldChange("month")(value)}
           />
         </LabeledField>
 
-        <LabeledField id={`${idPrefix}-year`} label="Year*" error={formErrors.year} className={styles.detailsFieldCompact}>
+        <LabeledField id={`${idPrefix}-year`} label={t("Year*")} error={formErrors.year} className={styles.detailsFieldCompact}>
           <NumberStepperInput
             id={`${idPrefix}-year`}
             className={joinClassNames(
@@ -197,13 +198,13 @@ export function ContainerGraphDetailsFields({
             min={2000}
             max={2100}
             onChange={value => onFieldChange("year")(String(value))}
-            ariaLabel="schedule year"
+            ariaLabel={t("schedule year")}
           />
         </LabeledField>
       </div>
 
       <div className={joinClassNames(styles.detailsRow, styles.detailsRowBalanced)}>
-        <LabeledField id={`${idPrefix}-shift1`} label="Shift 1*" error={formErrors.shift1Time} className={styles.detailsFieldCompact}>
+        <LabeledField id={`${idPrefix}-shift1`} label={t("Shift 1*")} error={formErrors.shift1Time} className={styles.detailsFieldCompact}>
           <TextInput
             id={`${idPrefix}-shift1`}
             className={styles.controlCompact}
@@ -214,7 +215,7 @@ export function ContainerGraphDetailsFields({
           />
         </LabeledField>
 
-        <LabeledField id={`${idPrefix}-shift2`} label="Shift 2*" error={formErrors.shift2Time} className={styles.detailsFieldCompact}>
+        <LabeledField id={`${idPrefix}-shift2`} label={t("Shift 2*")} error={formErrors.shift2Time} className={styles.detailsFieldCompact}>
           <TextInput
             id={`${idPrefix}-shift2`}
             className={styles.controlCompact}
@@ -227,7 +228,7 @@ export function ContainerGraphDetailsFields({
       </div>
 
       <div className={joinClassNames(styles.detailsRow, styles.detailsRowBalanced)}>
-        <LabeledField id={`${idPrefix}-max-hours`} label="Max hours / employee" error={formErrors.maxHoursPerEmpMonth} className={styles.detailsFieldCompact}>
+        <LabeledField id={`${idPrefix}-max-hours`} label={t("Max hours / employee")} error={formErrors.maxHoursPerEmpMonth} className={styles.detailsFieldCompact}>
           <NumberStepperInput
             id={`${idPrefix}-max-hours`}
             className={joinClassNames(
@@ -238,11 +239,11 @@ export function ContainerGraphDetailsFields({
             value={getStepperValue(form.maxHoursPerEmpMonth, 160)}
             min={1}
             onChange={value => onFieldChange("maxHoursPerEmpMonth")(String(value))}
-            ariaLabel="max hours per employee"
+            ariaLabel={t("max hours per employee")}
           />
         </LabeledField>
 
-        <LabeledField id={`${idPrefix}-max-days`} label="Max consecutive days" error={formErrors.maxConsecutiveDays} className={styles.detailsFieldCompact}>
+        <LabeledField id={`${idPrefix}-max-days`} label={t("Max consecutive days")} error={formErrors.maxConsecutiveDays} className={styles.detailsFieldCompact}>
           <NumberStepperInput
             id={`${idPrefix}-max-days`}
             className={joinClassNames(
@@ -253,11 +254,11 @@ export function ContainerGraphDetailsFields({
             value={getStepperValue(form.maxConsecutiveDays, 0)}
             min={0}
             onChange={value => onFieldChange("maxConsecutiveDays")(String(value))}
-            ariaLabel="max consecutive days"
+            ariaLabel={t("max consecutive days")}
           />
         </LabeledField>
 
-        <LabeledField id={`${idPrefix}-max-full`} label="Max consecutive full" error={formErrors.maxConsecutiveFull} className={styles.detailsFieldCompact}>
+        <LabeledField id={`${idPrefix}-max-full`} label={t("Max consecutive full")} error={formErrors.maxConsecutiveFull} className={styles.detailsFieldCompact}>
           <NumberStepperInput
             id={`${idPrefix}-max-full`}
             className={joinClassNames(
@@ -268,11 +269,11 @@ export function ContainerGraphDetailsFields({
             value={getStepperValue(form.maxConsecutiveFull, 0)}
             min={0}
             onChange={value => onFieldChange("maxConsecutiveFull")(String(value))}
-            ariaLabel="max consecutive full"
+            ariaLabel={t("max consecutive full")}
           />
         </LabeledField>
 
-        <LabeledField id={`${idPrefix}-max-full-month`} label="Max full / month" error={formErrors.maxFullPerMonth} className={styles.detailsFieldCompact}>
+        <LabeledField id={`${idPrefix}-max-full-month`} label={t("Max full / month")} error={formErrors.maxFullPerMonth} className={styles.detailsFieldCompact}>
           <NumberStepperInput
             id={`${idPrefix}-max-full-month`}
             className={joinClassNames(
@@ -283,7 +284,7 @@ export function ContainerGraphDetailsFields({
             value={getStepperValue(form.maxFullPerMonth, 0)}
             min={0}
             onChange={value => onFieldChange("maxFullPerMonth")(String(value))}
-            ariaLabel="max full per month"
+            ariaLabel={t("max full per month")}
           />
         </LabeledField>
       </div>
@@ -291,7 +292,7 @@ export function ContainerGraphDetailsFields({
       <div className={joinClassNames(styles.detailsRow, styles.detailsRowBalanced)}>
         <LabeledField
           id={`${idPrefix}-shop`}
-          label="Shop*"
+          label={t("Shop*")}
           error={formErrors.shopId}
           className={joinClassNames(
             styles.detailsFieldFull,
@@ -303,34 +304,34 @@ export function ContainerGraphDetailsFields({
             className={styles.controlFull}
             value={form.shopId}
             options={shopOptions}
-            placeholder={shops.length > 0 ? "Select shop..." : "No shops available"}
-            dropdownTitle="Shop list"
-            searchPlaceholder="Search shop..."
-            emptyMessage="No shops match your search."
+            placeholder={shops.length > 0 ? t("Select shop...") : t("No shops available")}
+            dropdownTitle={t("Shop list")}
+            searchPlaceholder={t("Search shop...")}
+            emptyMessage={t("No shops match your search.")}
             invalid={Boolean(formErrors.shopId)}
             dropdownPlacement={selectDropdownPlacement}
             shadow={shopSelectShadow}
             ariaDescribedBy={formErrors.shopId ? `${idPrefix}-shop-error` : undefined}
-            ariaLabel="shop list"
+            ariaLabel={t("shop list")}
             onChange={value => onFieldChange("shopId")(value)}
           />
         </LabeledField>
 
         {showAvailabilityField ? (
-          <LabeledField id={`${idPrefix}-availability`} label="Availability" error={formErrors.availabilityGroupId} className={styles.detailsFieldFull}>
+          <LabeledField id={`${idPrefix}-availability`} label={t("Availability")} error={formErrors.availabilityGroupId} className={styles.detailsFieldFull}>
             <SearchableSelect
               id={`${idPrefix}-availability`}
               className={styles.controlFull}
               value={form.availabilityGroupId}
               options={availabilityOptions}
-              placeholder="Select availability..."
-              dropdownTitle="Availability groups"
-              searchPlaceholder="Search availability..."
-              emptyMessage="No availability groups match your search."
+              placeholder={t("Select availability...")}
+              dropdownTitle={t("Availability groups")}
+              searchPlaceholder={t("Search availability...")}
+              emptyMessage={t("No availability groups match your search.")}
               invalid={Boolean(formErrors.availabilityGroupId)}
               dropdownPlacement={selectDropdownPlacement}
               ariaDescribedBy={formErrors.availabilityGroupId ? `${idPrefix}-availability-error` : undefined}
-              ariaLabel="availability groups"
+              ariaLabel={t("availability groups")}
               onChange={value => onFieldChange("availabilityGroupId")(value)}
             />
           </LabeledField>
@@ -340,12 +341,12 @@ export function ContainerGraphDetailsFields({
       {showEmployeeMinHoursField ? (
         <div className={styles.detailsMinHoursBlock}>
           <div className={styles.detailsMinHoursHeader}>
-            <span className={styles.detailsMinHoursTitle}>Min hours per employee</span>
-            <span className={styles.detailsMinHoursMeta}>{`${graphEmployeeRows.length} assigned`}</span>
+            <span className={styles.detailsMinHoursTitle}>{t("Min hours per employee")}</span>
+            <span className={styles.detailsMinHoursMeta}>{t("{0} assigned", graphEmployeeRows.length)}</span>
           </div>
 
           {graphEmployeeRows.length === 0 ? (
-            <div className={styles.detailsMinHoursEmpty}>Add employees first to set monthly minimum hours.</div>
+            <div className={styles.detailsMinHoursEmpty}>{t("Add employees first to set monthly minimum hours.")}</div>
           ) : (
             <div
               className={joinClassNames(
@@ -355,7 +356,7 @@ export function ContainerGraphDetailsFields({
             >
               {graphEmployeeRows.map(row => {
                 const employee = employeeById.get(row.employeeId);
-                const employeeName = getEmployeeFullName(employee, `Employee ${row.employeeId}`);
+                const employeeName = getEmployeeFullName(employee, t("Employee {0}", row.employeeId));
 
                 return (
                   <label key={`${idPrefix}-details-min-hours-${row.employeeId}`} className={styles.detailsMinHoursItem}>
@@ -365,7 +366,7 @@ export function ContainerGraphDetailsFields({
                       value={getStepperValue(row.minHoursMonth, 0)}
                       min={0}
                       onChange={value => onEmployeeMinHoursChange(row.employeeId, String(value))}
-                      ariaLabel={`${employeeName} min hours per month`}
+                      ariaLabel={t("{0} min hours per month", employeeName)}
                     />
                   </label>
                 );

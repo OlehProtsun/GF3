@@ -41,8 +41,52 @@ public class BindService : IBindService
     public Task DeleteAsync(int id, CancellationToken ct = default)
         => _bindRepo.DeleteAsync(id, ct);
 
+    public async Task<BindModel?> GetAsync(int id, int managerAccountId, CancellationToken ct = default)
+        => await ServiceMappingHelper.GetMappedAsync(
+            token => _bindRepo.GetByIdAsync(id, managerAccountId, token),
+            x => x.ToContract(),
+            ct).ConfigureAwait(false);
+
+    public async Task<List<BindModel>> GetAllAsync(int managerAccountId, CancellationToken ct = default)
+        => await ServiceMappingHelper.GetMappedListAsync(
+            token => _bindRepo.GetAllAsync(managerAccountId, token),
+            x => x.ToContract(),
+            ct).ConfigureAwait(false);
+
+    public async Task<BindModel> CreateAsync(BindModel entity, int managerAccountId, CancellationToken ct = default)
+    {
+        entity.ManagerAccountId = managerAccountId;
+        await ValidateAsync(entity, excludeId: null, managerAccountId, ct).ConfigureAwait(false);
+        return await ServiceMappingHelper.CreateMappedAsync(
+            entity.ToDal(),
+            _bindRepo.AddAsync,
+            x => x.ToContract(),
+            ct).ConfigureAwait(false);
+    }
+
+    public async Task UpdateAsync(BindModel entity, int managerAccountId, CancellationToken ct = default)
+    {
+        if (await _bindRepo.GetByIdAsync(entity.Id, managerAccountId, ct).ConfigureAwait(false) is null)
+        {
+            throw new KeyNotFoundException($"Availability bind with id {entity.Id} was not found.");
+        }
+
+        entity.ManagerAccountId = managerAccountId;
+        await ValidateAsync(entity, entity.Id, managerAccountId, ct).ConfigureAwait(false);
+        await _bindRepo.UpdateAsync(entity.ToDal(), ct).ConfigureAwait(false);
+    }
+
+    public Task DeleteAsync(int id, int managerAccountId, CancellationToken ct = default)
+        => _bindRepo.DeleteAsync(id, managerAccountId, ct);
+
     public async Task<List<BindModel>> GetActiveAsync(CancellationToken ct = default)
         => await ServiceMappingHelper.GetMappedListAsync(_bindRepo.GetActiveAsync, x => x.ToContract(), ct).ConfigureAwait(false);
+
+    public async Task<List<BindModel>> GetActiveAsync(int managerAccountId, CancellationToken ct = default)
+        => await ServiceMappingHelper.GetMappedListAsync(
+            token => _bindRepo.GetActiveAsync(managerAccountId, token),
+            x => x.ToContract(),
+            ct).ConfigureAwait(false);
 
     public async Task<BindModel?> GetByKeyAsync(string key, CancellationToken ct = default)
         => await ServiceMappingHelper.GetMappedAsync(token => _bindRepo.GetByKeyAsync(key, token), x => x.ToContract(), ct).ConfigureAwait(false);
@@ -67,6 +111,23 @@ public class BindService : IBindService
         if (existing is not null && (!excludeId.HasValue || existing.Id != excludeId.Value))
         {
             throw ValidationException.ForField(nameof(BindModel.Key), $"A bind with key '{entity.Key}' already exists.");
+        }
+    }
+
+    private async Task ValidateAsync(BindModel entity, int? excludeId, int managerAccountId, CancellationToken ct)
+    {
+        Normalize(entity);
+        ValidateRequiredFields(entity);
+
+        var existing = await _bindRepo.GetByKeyAsync(entity.Key, managerAccountId, ct).ConfigureAwait(false);
+        if (existing is not null && (!excludeId.HasValue || existing.Id != excludeId.Value))
+        {
+            throw ValidationException.ForField(nameof(BindModel.Key), $"A bind with key '{entity.Key}' already exists.");
+        }
+
+        if (await _bindRepo.IsColorKeyInUseAsync(managerAccountId, entity.Key, ct).ConfigureAwait(false))
+        {
+            throw ValidationException.ForField(nameof(BindModel.Key), $"Key '{entity.Key}' is already used by a color bind.");
         }
     }
 
