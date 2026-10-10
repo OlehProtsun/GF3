@@ -209,10 +209,10 @@ export function ManagerPhoneAvailabilityDetailPage() {
   const hasLoadError =
     !hasValidId ||
     (!isLoading && !groupQuery.data) ||
-    (!isLoading && Boolean(groupQuery.data) && !hasResolvedMatrix && hasItemsError && (hasMembersError || hasSlotsError));
+    (!isLoading && Boolean(groupQuery.data) && !hasResolvedMatrix);
 
   return <ManagerPhonePage backTo="/availability" valid={hasValidId} missing={!groupQuery.data}
-    queries={[{ isLoading, isError: hasLoadError, error: hasLoadError ? groupQuery.error ?? itemsQuery.error ?? membersQuery.error ?? slotsQuery.error : undefined }, employeesQuery, transferHintsQuery, transferPreviewQuery]}
+    queries={[{ isLoading, isError: hasLoadError, error: hasLoadError ? groupQuery.error ?? itemsQuery.error ?? membersQuery.error ?? slotsQuery.error : undefined }, employeesQuery]}
     queryKeys={[queryKeys.availabilityGroups.all, queryKeys.employees.all]}>
     <AvailabilityGroupProfileCard group={groupQuery.data} columns={columns} cellMap={cellMap} visualHintMap={visualHintMap}
       showManagementActions={false} isLoading={false} hasLoadError={false} isDeleting={false} onEdit={() => {}} onDelete={() => {}}

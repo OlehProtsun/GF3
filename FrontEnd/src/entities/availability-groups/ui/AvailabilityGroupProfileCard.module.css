@@ -91,20 +91,11 @@
     height: auto;
   }
 }
-.phoneLayout { flex-direction: column; min-width: 0; }
-.phoneLayout .sidebarColumn { flex: none; width: 100%; }
-.phoneLayout .mainColumn, .phoneLayout .mainBlock, .phoneLayout .matrixCard { width: 100%; min-width: 0; box-sizing: border-box; }
-.phoneLayout .mainBlock { padding: 0; }
-.phoneLayout .mainBlock > * { margin: 0; width: 100%; }
-
-.phoneLayout .sidebar button { min-width: 44px; min-height: 44px; }
-
-.phoneLayout .matrixCard { --availability-matrix-cell-min-height: 44px; }
+.phoneLayout { display: grid; gap: 12px; width: 100%; min-width: 0; max-width: 100%; box-sizing: border-box; }
+.phoneInfo { min-width: 0; padding: 0 12px; border-radius: 22px; border: 1px solid #94a3b829; background: var(--card-background, #fff); }
+.phoneInfo > summary { min-height: 44px; align-content: center; cursor: pointer; font-weight: 700; font-size: .85rem; }
+.phoneInfo > summary:focus-visible { outline: 3px solid #60a5fa; outline-offset: 2px; }
+.phoneInfo[open] { padding-bottom: 12px; }
+.phoneInfo > * { max-width: 100%; box-sizing: border-box; overflow-wrap: anywhere; }
+.phoneLayout .matrixCard { width: 100%; min-width: 0; max-width: 100%; min-height: 0; height: auto; box-sizing: border-box; --availability-matrix-cell-min-height: 44px; }
 .phoneLayout .matrixCard button { min-height: 44px; }
-
-.phoneLayout, .phoneLayout .sidebarColumn, .phoneLayout .mainColumn, .phoneLayout .mainBlock, .phoneLayout .matrixCard {
-  width: 100%; min-width: 0; max-width: 100%; box-sizing: border-box;
-}
-.phoneLayout.layoutCollapsed { flex-direction: column; gap: 16px; }
-.phoneLayout .sidebarColumnCollapsed, .phoneLayout .mainColumnCollapsed { flex: none; }
-.phoneLayout .sidebar > * { width: 100%; margin: 0; box-sizing: border-box; }

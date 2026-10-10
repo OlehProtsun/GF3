@@ -9,7 +9,7 @@ export function ManagerPhoneContainersPage() {
   const navigate = useNavigate();
   const [query, setQuery] = useState("");
   const containers = useContainersListQuery(location.key);
-  const data = (containers.data ?? []).filter(item => matchesContainerSearch(item, query));
+  const data = (containers.data ?? []).filter(item => matchesContainerSearch(item, query)).sort((a, b) => b.id - a.id);
   return <ManagerPhonePage query={query} onQueryChange={setQuery} queries={[containers]} queryKeys={[queryKeys.containers.list()]}>
     <ContainerListCard containers={data} isLoading={false} searchQuery={query} onClearSearch={() => setQuery("")} onContainerOpen={id => navigate(`/container/${id}`)} />
   </ManagerPhonePage>;

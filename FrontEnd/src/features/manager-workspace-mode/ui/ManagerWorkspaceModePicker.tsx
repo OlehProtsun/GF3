@@ -34,7 +34,7 @@ export function ManagerWorkspaceModePicker() {
       <h1 id="workspace-title">{t("Choose workspace")}</h1>
       <p>{t("How would you like to continue?")}</p>
       <div className={styles.choices}>
-        <button disabled={pending} onClick={() => void choose("pc")}><HomeIcon size={28} /><strong>{t("PC")}</strong><span>{t("Full access")}</span></button>
+        <button disabled={pending} onClick={() => void choose("pc")}><HomeIcon className={styles.homeIcon} size={28} /><strong>{t("PC")}</strong><span>{t("Full access")}</span></button>
         <button disabled={pending} onClick={() => void choose("phone")}><EyeIcon size={28} /><strong>{t("Phone")}</strong><span>{t("Read only")}</span></button>
       </div>
       <p>{t("You can view all manager records but cannot edit.")}</p>

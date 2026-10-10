@@ -8,6 +8,7 @@ import { useShopsListQuery } from "@entities/shops/api/queries";
 import { queryKeys } from "@shared/api/queryKeys";
 import { t } from "@shared/i18n";
 import { ManagerPhonePage } from "./ManagerPhonePage";
+import { StatisticsIcon } from "@shared/ui/icons";
 import styles from "./ManagerPhonePage.module.css";
 
 export function ManagerPhoneContainerDetailPage() {
@@ -40,9 +41,19 @@ export function ManagerPhoneContainerDetailPage() {
       <span>{t("Employees: {0}", item.employeeCount)} · {t("Hours: {0}", item.assignedHoursText)}</span>
     </NavLink>)}</div>
     {summaries.length === 0 && <p>{t("No results")}</p>}
-    {statistics.pivotRows.length > 0 && <section className={styles.card}><h2>{t("Statistics")}</h2><div className={styles.scroll} tabIndex={0} aria-label={t("Statistics")}>
-      <table><thead><tr><th>{t("Employee")}</th><th>{t("Work Days")}</th><th>{t("Free Days")}</th><th>{t("Hours")}</th>{statistics.shopHeaders.map(item => <th key={item.key}>{item.name}</th>)}</tr></thead>
-      <tbody>{statistics.pivotRows.map((row, index) => <tr key={index}><td>{row.employee}</td><td>{row.workDays}</td><td>{row.freeDays}</td><td>{row.hoursSum}</td>{statistics.shopHeaders.map(shop => <td key={shop.key}>{row.hoursByShop[shop.key]}</td>)}</tr>)}</tbody></table>
-    </div></section>}
+    {statistics.pivotRows.length > 0 && <section className={styles.card}>
+      <h2 className={styles.statisticsHeading}><StatisticsIcon size={18} />{t("Statistics")}</h2>
+      <div className={styles.metrics}>{statistics.pivotRows.map((row, index) => <article className={`${styles.metricCard} ${row.isTotal ? styles.metricTotal : ""}`} key={index}>
+        <h3>{row.employee}</h3>
+        <dl className={styles.metricValues}>
+          <div><dt>{t("Work Days")}</dt><dd>{row.workDays}</dd></div>
+          <div><dt>{t("Free Days")}</dt><dd>{row.freeDays}</dd></div>
+          <div><dt>{t("Hours")}</dt><dd>{row.hoursSum}</dd></div>
+        </dl>
+        {statistics.shopHeaders.length > 0 && <details><summary>{t("Shops")}</summary>
+          <dl className={styles.shopValues}>{statistics.shopHeaders.map(shop => <div key={shop.key}><dt>{shop.name}</dt><dd>{row.hoursByShop[shop.key]}</dd></div>)}</dl>
+        </details>}
+      </article>)}</div>
+    </section>}
   </ManagerPhonePage>;
 }

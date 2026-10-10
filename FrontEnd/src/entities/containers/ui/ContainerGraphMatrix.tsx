@@ -54,6 +54,7 @@ type ContainerGraphMatrixProps = {
   icon?: ReactNode;
   compactSize?: boolean;
   mobileReadOnlyViewport?: boolean;
+  maxAutoColumnWidth?: number;
   neutralStyle?: boolean;
   regularCellText?: boolean;
   showColumnTotals?: boolean;
@@ -652,6 +653,7 @@ export function ContainerGraphMatrix({
   icon = <ScheduleIcon size={18} />,
   compactSize = false,
   mobileReadOnlyViewport = false,
+  maxAutoColumnWidth,
   neutralStyle = false,
   regularCellText = false,
   showColumnTotals = true,
@@ -761,8 +763,15 @@ export function ContainerGraphMatrix({
     [columns],
   );
   const automaticColumnWidths = useMemo(
-    () => buildMatrixAutoColumnWidths({ columns, cellMap, visualHintMap }),
-    [cellMap, columns, visualHintMap],
+    () => {
+      const widths = buildMatrixAutoColumnWidths({ columns, cellMap, visualHintMap });
+      if (maxAutoColumnWidth === undefined) return widths;
+      return Object.fromEntries(Object.entries(widths).map(([id, width]) => [
+        id,
+        Math.min(width, Math.max(MATRIX_COLUMN_MIN_WIDTH_PX, maxAutoColumnWidth)),
+      ]));
+    },
+    [cellMap, columns, maxAutoColumnWidth, visualHintMap],
   );
   const fixedWidthSum = useMemo(
     () => columns.reduce((totalWidth, column) => totalWidth + (columnWidthOverrides[column.employeeId] ?? 0), 0),

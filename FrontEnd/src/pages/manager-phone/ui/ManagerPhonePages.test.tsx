@@ -1,7 +1,11 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { within, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
+import userEvent from "@testing-library/user-event";
 import { BrowserRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { ManagerPhoneHomePage } from "./ManagerPhoneHomePage";
+import { ManagerPhoneAvailabilityPage } from "./ManagerPhoneAvailabilityPage";
+import { ManagerPhoneMorePage } from "./ManagerPhoneMorePage";
 import { ManagerPhoneContainersPage } from "./ManagerPhoneContainersPage";
 import { ManagerPhoneContainerDetailPage } from "./ManagerPhoneContainerDetailPage";
 import { ManagerPhoneGraphPage } from "./ManagerPhoneGraphPage";
@@ -20,10 +24,12 @@ const employee = { id: 2, firstName: "Other", lastName: "Worker", hasLoginAccoun
 const graph = { id: 3, containerId: 1, shopId: 4, name: "Private schedule", year: 2026, month: 4, publicationStatus: "private" as const, peoplePerShift: 1, shift1Time: "08:00 - 16:00", shift2Time: "16:00 - 20:00", maxHoursPerEmpMonth: 160, maxConsecutiveDays: 5, maxConsecutiveFull: 3, maxFullPerMonth: 10 };
 const group = { id: 5, name: "Private dispo", year: 2026, month: 4, publicationStatus: "private" as const };
 const shop = { id: 4, name: "Central", address: "Main Street" };
+const auth = vi.hoisted(() => ({ logout: vi.fn(), setManagerWorkspaceMode: vi.fn() }));
+vi.mock("@app/providers/AuthProvider", () => ({ useAuth: () => ({ ...auth, session: { displayName: "Real Manager", userName: "manager" } }) }));
 let mode: "data" | "empty" | "error" = "data";
 let calls: Array<{ path: string; method: string }> = [];
 beforeEach(() => {
- mode = "data"; calls = [];
+ mode = "data"; calls = []; localStorage.clear(); auth.logout.mockReset(); auth.setManagerWorkspaceMode.mockReset();
  vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
   const path = new URL(String(input), "http://localhost").pathname; calls.push({ path, method: init?.method ?? "GET" });
   if (mode === "error") return Response.json({ detail: "offline" }, { status: 503 });
@@ -46,7 +52,7 @@ beforeEach(() => {
  });
 });
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
-function mount(element: React.ReactNode, path = "/") { window.history.replaceState({}, "", path); return render(<QueryClientProvider client={new QueryClient()}><BrowserRouter>{element}</BrowserRouter></QueryClientProvider>); }
+function mount(element: React.ReactNode, path = "/", client = new QueryClient()) { window.history.replaceState({}, "", path); return render(<QueryClientProvider client={client}><BrowserRouter>{element}</BrowserRouter></QueryClientProvider>); }
 test("container lists manager data, supports search and empty state without Add", async () => {
  mount(<ManagerPhoneContainersPage />); await screen.findByText(container.name); expect(screen.queryByRole("button", { name: "Add New" })).not.toBeInTheDocument();
  fireEvent.change(screen.getByRole("searchbox"), { target: { value: "missing" } }); await screen.findByText("Nothing found");
@@ -114,4 +120,131 @@ test.each([
  await waitFor(() => expect(screen.queryByText("Loading...")).not.toBeInTheDocument());
  expect(calls.every(call => call.method === "GET")).toBe(true);
  expect(screen.queryByRole("button", { name: /Edit|Delete|Publish|Export|Kick/ })).not.toBeInTheDocument();
+});
+
+
+test("phone Home stays empty and sends no dashboard requests", () => {
+ const view = mount(<ManagerPhoneHomePage />);
+ expect(view.container.textContent).toBe(""); expect(calls).toEqual([]);
+});
+
+test("Back and controlled search share one toolbar with exact destination and clear", () => {
+ const change = vi.fn();
+ const view = mount(<ManagerPhonePage backTo="/container/17" query="worker" onQueryChange={change} />);
+ const back = screen.getByRole("link", { name: "Back" });
+ expect(back).toHaveAttribute("href", "/container/17");
+ expect(back.parentElement).toContainElement(screen.getByRole("searchbox", { name: "Search" }));
+ fireEvent.change(screen.getByRole("searchbox"), { target: { value: "new" } }); expect(change).toHaveBeenCalledWith("new");
+ fireEvent.click(screen.getByRole("button", { name: "Clear Search" })); expect(change).toHaveBeenCalledWith("");
+ view.rerender(<QueryClientProvider client={new QueryClient()}><BrowserRouter><ManagerPhonePage query="" onQueryChange={change} /></BrowserRouter></QueryClientProvider>);
+ expect(screen.queryByRole("button", { name: "Clear Search" })).not.toBeInTheDocument();
+});
+
+test("containers descend within pinned and unpinned groups without mutating cached data", async () => {
+ const data = Object.freeze([container, { ...container, id: 9, name: "Container nine" }, { ...container, id: 4, name: "Container four" }, { ...container, id: 7, name: "Container seven" }]);
+ localStorage.setItem("containers:list:pinned", JSON.stringify(["1", "4"]));
+ const client = new QueryClient();
+ const setData = client.setQueryData.bind(client);
+ const cacheWrites = vi.spyOn(client, "setQueryData").mockImplementation((key, value) => {
+  if (Array.isArray(value)) Object.freeze(value);
+  setData(key, value);
+ });
+ const original = vi.mocked(fetch).getMockImplementation()!;
+ vi.mocked(fetch).mockImplementation(async (input, init) => new URL(String(input), "http://localhost").pathname === "/api/containers" ? Response.json(data) : original(input, init));
+ mount(<ManagerPhoneContainersPage />, "/container", client); await screen.findByText("Container nine");
+ const names = () => screen.getAllByText(/^(All manager container|Container nine|Container four|Container seven)$/).map(node => node.textContent);
+ expect(names()).toEqual(["Container four", "All manager container", "Container nine", "Container seven"]);
+ fireEvent.change(screen.getByRole("searchbox"), { target: { value: "Container" } }); expect(names()).toEqual(["Container four", "All manager container", "Container nine", "Container seven"]);
+ expect(data.map(item => item.id)).toEqual([1, 9, 4, 7]);
+ const key = cacheWrites.mock.calls.find(([key]) => key[0] === "containers" && key[1] === "list")![0];
+ expect(client.getQueryState<typeof data>(key).data!.map(item => item.id)).toEqual([1, 9, 4, 7]);
+});
+
+test("statistics retain all employee, total and per-shop values in cards", async () => {
+ const original = vi.mocked(fetch).getMockImplementation()!;
+ vi.mocked(fetch).mockImplementation(async (input, init) => {
+  const path = new URL(String(input), "http://localhost").pathname;
+  if (path === "/api/shops") return Response.json([shop, { ...shop, id: 10, name: "Second shop" }]);
+  if (path === "/api/containers/1/graphs") return Response.json([graph, { ...graph, id: 6, shopId: 10 }]);
+  return original(input, init);
+ });
+ const view = mount(<ManagerPhoneContainerDetailPage />, "/container/1"); await screen.findByText("Other Worker");
+ const heading = screen.getByRole("heading", { name: "Statistics" }); const stats = heading.closest("section")!;
+ expect(within(stats).queryByRole("table")).not.toBeInTheDocument();
+ const cards = within(stats).getAllByRole("article"); expect(cards).toHaveLength(2);
+ expect(within(cards[0]).getByRole("heading")).toHaveTextContent("Other Worker"); expect(within(cards[1]).getByRole("heading")).toHaveTextContent("TOTAL");
+ for (const card of cards) {
+  expect(within(card).getByText("Work Days")).toBeInTheDocument(); expect(within(card).getByText("Free Days")).toBeInTheDocument(); expect(within(card).getByText("Hours")).toBeInTheDocument();
+  expect(Array.from(card.querySelectorAll("dl:first-of-type dd")).slice(0, 3).map(node => node.textContent)).toEqual(["1", "29", "16"]);
+  const details = card.querySelector("details")!; expect(details.open).toBe(false); await userEvent.click(details.querySelector("summary")!); expect(details.open).toBe(true);
+  expect(within(details).getByText("Central")).toBeInTheDocument(); expect(within(details).getByText("Second shop")).toBeInTheDocument(); expect(within(details).getAllByText("8")).toHaveLength(2);
+ }
+ expect(view.container.querySelectorAll("article")).toHaveLength(2);
+});
+
+test.each(["items", "nested"])("availability uses %s base data despite optional hint failures", async source => {
+ const original = vi.mocked(fetch).getMockImplementation()!;
+ vi.mocked(fetch).mockImplementation(async (input, init) => {
+  const path = new URL(String(input), "http://localhost").pathname;
+  if (path.includes("transfer")) return Response.json({}, { status: 503 });
+  if (source === "nested") {
+   if (path.endsWith("/items")) return Response.json({}, { status: 503 });
+   if (path.endsWith("/members")) return Response.json([{ id: 7, employeeId: 2, displayOrder: 1 }]);
+   if (path.endsWith("/slots")) return Response.json([{ id: 8, availabilityGroupMemberId: 7, dayOfMonth: 1, kind: "Available", intervalStr: null }]);
+  }
+  return original(input, init);
+ });
+ const view = mount(<ManagerPhoneAvailabilityDetailPage />, "/availability/5");
+ await screen.findByText("Availability Schedule"); expect(screen.getByText("Other Worker")).toBeInTheDocument();
+ const disclosure = view.container.querySelector("details")!; expect(disclosure.open).toBe(false);
+ await userEvent.click(disclosure.querySelector("summary")!); expect(disclosure.open).toBe(true);
+ expect(screen.getByText("Private dispo")).toBeInTheDocument(); expect(view.container.querySelector("[data-phone-matrix-scroll]")).toBeInTheDocument();
+ expect(view.container.querySelector("tbody tr td:nth-child(2)")).toHaveTextContent("+");
+ expect(screen.queryByRole("button", { name: /Edit|Delete/ })).not.toBeInTheDocument();
+});
+
+test("unresolved mandatory availability data shows retry instead of fabricated grid", async () => {
+ const original = vi.mocked(fetch).getMockImplementation()!;
+ vi.mocked(fetch).mockImplementation(async (input, init) => /\/(items|members|slots)$/.test(new URL(String(input), "http://localhost").pathname) ? Response.json(null) : original(input, init));
+ const view = mount(<ManagerPhoneAvailabilityDetailPage />, "/availability/5"); await screen.findByRole("button", { name: "Retry" });
+ expect(view.container.querySelector("[data-phone-matrix-scroll]")).not.toBeInTheDocument();
+});
+
+test("PC availability retains expanded desktop info and management controls", () => {
+ const view = mount(<AvailabilityGroupProfileCard group={group} columns={[]} cellMap={{}} isLoading={false} hasLoadError={false} isDeleting={false} onEdit={() => {}} onDelete={() => {}} />);
+ expect(view.container.querySelector("details")).not.toBeInTheDocument(); expect(screen.getByText("Private dispo")).toBeInTheDocument(); expect(screen.getByRole("button", { name: /Edit/ })).toBeInTheDocument();
+});
+
+test.each([ManagerPhoneAvailabilityPage, ManagerPhoneEmployeesPage])("lists retain search and clear", async Component => {
+ mount(<Component />); await screen.findByText(Component === ManagerPhoneAvailabilityPage ? "Private dispo" : "Other Worker");
+ const input = screen.getByRole("searchbox"); fireEvent.change(input, { target: { value: "missing" } });
+ expect(input).toHaveValue("missing"); await screen.findByText("Nothing found"); fireEvent.click(screen.getAllByRole("button", { name: "Clear Search" })[0]); expect(input).toHaveValue("");
+});
+
+test("More shows account, PC switch and functional logout without Shops shortcut", () => {
+ mount(<ManagerPhoneMorePage />, "/more"); expect(screen.getByText("Real Manager")).toBeInTheDocument();
+ expect(screen.queryByRole("link", { name: /Shops/ })).not.toBeInTheDocument(); expect(screen.getByRole("button", { name: /Switch to PC/ })).toBeInTheDocument();
+ fireEvent.click(screen.getByRole("button", { name: "Log out" })); expect(auth.logout).toHaveBeenCalledOnce();
+});
+
+
+test("phone schedule summary keeps metrics and every split shift in compact searchable cards", async () => {
+ const props = { graph, graphEmployees: [{ id: 7, scheduleId: 3, employeeId: 2, displayOrder: 1 }],
+  slots: [{ id: 8, scheduleId: 3, employeeId: 2, dayOfMonth: 1, slotNo: 1, fromTime: "08:00", toTime: "12:00", status: "Working" },
+   { id: 9, scheduleId: 3, employeeId: 2, dayOfMonth: 1, slotNo: 2, fromTime: "13:00", toTime: "16:00", status: "Working" }],
+  employeesById: new Map([[2, employee]]), cellStyles: [], isLoading: false, hasLoadError: false, isDeleting: false, onEdit: () => {}, onDelete: () => {} };
+ const view = mount(<ContainerGraphProfileWorkspace {...props} compactSize showManagementActions={false} />);
+ const summary = view.container.querySelector("[data-phone-schedule-summary]")!;
+ expect(within(summary as HTMLElement).queryByRole("table")).not.toBeInTheDocument();
+ expect(within(summary as HTMLElement).getByRole("heading", { name: "Other Worker" })).toBeInTheDocument();
+ const metrics = summary.querySelector("dl")!; expect(Array.from(metrics.querySelectorAll("dd")).map(node => node.textContent)).toEqual(["1", "29", "7"]);
+ await userEvent.click(summary.querySelector("summary")!);
+ for (const value of ["08:00", "12:00", "13:00", "16:00", "4", "3"]) expect(within(summary as HTMLElement).getByText(value)).toBeInTheDocument();
+ expect(summary.querySelectorAll("dl > div > dt")).toHaveLength(33);
+ const search = screen.getByRole("searchbox", { name: "Search schedule summary by employee name or surname" });
+ fireEvent.change(search, { target: { value: "missing" } }); expect(screen.getByRole("status")).toHaveTextContent('No employees found');
+ fireEvent.change(search, { target: { value: "worker" } }); expect(view.container.querySelector("[data-phone-schedule-summary] article")).toBeInTheDocument();
+ view.unmount();
+ const pc = mount(<ContainerGraphProfileWorkspace {...props} />);
+ expect(pc.container.querySelector("[data-phone-schedule-summary]")).not.toBeInTheDocument(); expect(pc.container.querySelectorAll("table")[1].querySelectorAll("thead th").length).toBeGreaterThan(30);
 });

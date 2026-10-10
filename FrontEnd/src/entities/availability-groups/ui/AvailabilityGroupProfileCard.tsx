@@ -51,6 +51,19 @@ export function AvailabilityGroupProfileCard({
     return <ErrorBanner className={styles.banner}>{t("Could not load this availability group.")}</ErrorBanner>;
   }
 
+  if (phoneReadOnly) {
+    return <div className={styles.phoneLayout}>
+      <details className={styles.phoneInfo}>
+        <summary>{t("Availability Information")}</summary>
+        <AvailabilityProfileInfoCard showManagementActions={false} group={group} employeeCount={columns.length}
+          isDeleting={isDeleting} onEdit={onEdit} onDelete={onDelete} />
+      </details>
+      <AvailabilityScheduleMatrix className={styles.matrixCard} year={group.year} month={group.month}
+        columns={columns} cellMap={cellMap} visualHintMap={visualHintMap} readOnly compactSize mobileReadOnlyViewport
+        title={t("Availability Schedule")} helperText={t("This schedule is read-only.")} onVisualHintClick={onVisualHintClick} />
+    </div>;
+  }
+
   return (
     <AvailabilityWorkspaceLayout
       className={joinClassNames(isSidebarCollapsed && styles.layoutCollapsed, phoneReadOnly && styles.phoneLayout)}

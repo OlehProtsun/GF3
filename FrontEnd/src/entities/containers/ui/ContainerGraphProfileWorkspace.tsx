@@ -309,6 +309,7 @@ export function ContainerGraphProfileWorkspace({
       showShiftStaffingCounts
       compactSize={compactSize}
       mobileReadOnlyViewport={phoneMatrixViewport}
+      maxAutoColumnWidth={phoneMatrixViewport ? 156 : undefined}
       stretchColumns={!phoneMatrixViewport}
       allowColumnResize={!phoneMatrixViewport}
       columns={columns}
@@ -467,6 +468,28 @@ export function ContainerGraphProfileWorkspace({
           ) : showSummarySearchEmpty ? (
             <div className={styles.emptyState} role="status">
               {t("No employees found for \"{0}\".", summarySearchQuery.trim())}
+            </div>
+          ) : phoneMatrixViewport ? (
+            <div className={styles.phoneSummary} data-phone-schedule-summary>
+              {filteredSummaryRows.map(row => <article className={styles.phoneSummaryEmployee} key={row.employeeId}>
+                <h3>{row.employee}</h3>
+                <dl className={styles.phoneSummaryMetrics}>
+                  <div><dt>{t("Work Days")}</dt><dd>{row.workDays}</dd></div>
+                  <div><dt>{t("Free Days")}</dt><dd>{row.freeDays}</dd></div>
+                  <div><dt>{t("Hours")}</dt><dd>{row.sum || "0"}</dd></div>
+                </dl>
+                <details className={styles.phoneSummaryDetails}>
+                  <summary>{t("Schedule details")}</summary>
+                  <dl className={styles.phoneSummaryDays}>{summaryHeaders.map((header, dayIndex) => <div key={header.dayOfMonth}>
+                    <dt>{header.label}</dt>
+                    <dd>{row.dayRows.map((days, rowIndex) => <div className={styles.phoneSummaryShift} key={rowIndex}>
+                      <span><small>{t("From")}</small>{days[dayIndex].from || "-"}</span>
+                      <span><small>{t("To")}</small>{days[dayIndex].to || "-"}</span>
+                      <span><small>{t("Hours")}</small>{days[dayIndex].hours || "-"}</span>
+                    </div>)}</dd>
+                  </div>)}</dl>
+                </details>
+              </article>)}
             </div>
           ) : (
             <div className={styles.summaryTableScroll}>

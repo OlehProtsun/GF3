@@ -25,13 +25,11 @@ export function ManagerPhoneLayout({ children }: PropsWithChildren) {
     else navigationRef.current?.querySelector<HTMLAnchorElement>('[aria-current="page"]')?.focus({ preventScroll: true });
   }, [isTabsCollapsed]);
   const { pathname } = useLocation();
-  const title = pathname.startsWith("/shop") ? "Shops" : tabs.find(tab => tab.to !== "/" && pathname.startsWith(tab.to))?.label ?? "Home";
   return <div className={styles.layout} data-manager-phone>
     <button ref={openButtonRef} type="button" aria-label={t("Open navigation")}
       className={`${styles.openButton} ${isTabsCollapsed ? "" : styles.openHidden}`}
       inert={!isTabsCollapsed} onClick={() => setIsTabsCollapsed(false)}><BackIcon size={14} /></button>
     <div className={`${styles.shell} ${isTabsCollapsed ? styles.shellCollapsed : ""}`}>
-      <header className={styles.topBar}><div><small>GF3 · {t("Manager")}</small><h1>{t(title)}</h1></div><span className={styles.badge}>{t("Read only")}</span></header>
       <main className={styles.content}>{children}</main>
       <nav ref={navigationRef} inert={isTabsCollapsed} className={`${styles.nav} ${isTabsCollapsed ? styles.navCollapsed : ""}`} aria-label={t("Manager navigation")}>
         {tabs.map(({ label, to, icon: Icon }) => {
@@ -39,7 +37,7 @@ export function ManagerPhoneLayout({ children }: PropsWithChildren) {
             : pathname === to || pathname.startsWith(`${to}/`) || (to === "/more" && pathname.startsWith("/shop"));
           return <NavLink key={to} to={to} tabIndex={0} aria-label={t(label)} aria-current={active ? "page" : undefined}
             className={`${styles.tab} ${active ? styles.active : ""}`}>
-            <Icon size={18} /><span className={styles.tabLabel} aria-hidden="true">{t(label)}</span>
+            <Icon size={20} className={to === "/" ? styles.homeIcon : undefined} /><span className={styles.tabLabel} aria-hidden="true">{t(label)}</span>
           </NavLink>;
         })}
         <button type="button" className={styles.collapseButton} aria-label={t("Collapse navigation")}

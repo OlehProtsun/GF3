@@ -688,8 +688,22 @@
 .workspacePhone .stickyColumnSecondary, .workspacePhone .stickyColumnTertiary, .workspacePhone .stickyColumnQuaternary { position: static; }
 .workspacePhone .summaryTableScroll { --summary-employee-cell-width: 160px; }
 
-.workspacePhone .matrixCard { --matrix-cell-min-height: 44px; }
-.workspacePhone .matrixCard button { min-height: 44px; }
+.workspacePhone .matrixCard {
+  --matrix-cell-min-width: 104px;
+  --matrix-cell-min-height: 30px;
+  --matrix-cell-font-size: 0.76rem;
+  --matrix-shell-radius: 18px;
+  --matrix-header-padding: 7px 5px;
+  --matrix-day-header-padding: 7px 3px;
+  --matrix-header-font-size: 0.78rem;
+  --matrix-day-header-font-size: 0.68rem;
+  --matrix-value-header-padding-right: 5px;
+  --matrix-header-cell-gap: 2px;
+  --matrix-cell-padding: 2px 6px;
+  --matrix-scroll-max-height: min(560px, calc(100dvh - 190px));
+  padding: 12px 10px;
+  border-radius: 24px;
+}
 
 .workspacePhone, .workspacePhone .topRow, .workspacePhone .mainColumn, .workspacePhone .summaryCardMeasure, .workspacePhone .summaryTableScroll {
   width: 100%; min-width: 0; max-width: 100%; box-sizing: border-box;
@@ -699,3 +713,20 @@
 .workspacePhone .summaryCard { padding: 16px; border-radius: 26px; }
 .workspacePhone .badge, .workspacePhone .metaBadge { box-sizing: border-box; max-width: 100%; overflow-wrap: anywhere; }
 .workspacePhone .lastUpdateField { flex-wrap: wrap; }
+.workspacePhone .summaryCardSection { padding: 14px; border-radius: 24px; }
+.workspacePhone .summaryMeta { flex-wrap: nowrap; }
+.workspacePhone .summaryMeta .metaBadge { width: auto; flex: 1; padding: 6px 8px; font-size: .75rem; }
+.phoneSummary { display: grid; gap: 10px; min-width: 0; }
+.phoneSummaryEmployee { min-width: 0; padding: 12px; border: 1px solid #e2e8f0; border-radius: 18px; background: #f8fafc; overflow-wrap: anywhere; }
+.phoneSummaryEmployee h3 { margin: 0 0 10px; font-size: .9rem; line-height: 1.3; }
+.phoneSummaryMetrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 0; }
+.phoneSummaryMetrics dt { color: #64748b; font-size: .72rem; }
+.phoneSummaryMetrics dd { margin: 4px 0 0; font-size: .9rem; font-weight: 700; }
+.phoneSummaryDetails summary { min-height: 44px; align-content: center; color: #2563eb; font-size: .8rem; cursor: pointer; }
+.phoneSummaryDetails summary:focus-visible { outline: 3px solid #60a5fa; outline-offset: 2px; border-radius: 8px; }
+.phoneSummaryDays { margin: 0; }
+.phoneSummaryDays > div { padding: 8px 0; border-top: 1px solid #e2e8f0; }
+.phoneSummaryDays dt { font-size: .75rem; font-weight: 700; }
+.phoneSummaryDays dd { margin: 4px 0 0; }
+.phoneSummaryShift { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; padding: 3px 0; font-size: .78rem; }
+.phoneSummaryShift small { display: block; color: #64748b; font-size: .68rem; }

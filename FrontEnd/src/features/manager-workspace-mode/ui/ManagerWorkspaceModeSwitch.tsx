@@ -26,8 +26,8 @@ export function ManagerWorkspaceModeSwitch({ targetMode, compact = false }: { ta
     finally { busy.current = false; setPending(false); }
   };
   return <div className={compact ? styles.compact : styles.wrap}>
-    <button className={styles.button} disabled={pending || mutations > 0} onClick={() => navigate("/", { replace: true, onProceed: proceed => void exchange(proceed) })}>
-      {targetMode === "phone" ? <EyeIcon size={20} /> : <HomeIcon size={20} />}
+    <button className={`${styles.button} ${targetMode === "pc" ? styles.pcButton : ""}`} disabled={pending || mutations > 0} onClick={() => navigate("/", { replace: true, onProceed: proceed => void exchange(proceed) })}>
+      {targetMode === "phone" ? <EyeIcon size={20} /> : <HomeIcon className={styles.homeIcon} size={20} />}
       <span>{t(targetMode === "phone" ? "Switch to Phone" : "Switch to PC")}<small>{t(targetMode === "phone" ? "Read only" : "Full access")}</small></span>
     </button>
     {mutations > 0 && <small role="status">{t("Wait for the current save to finish.")}</small>}

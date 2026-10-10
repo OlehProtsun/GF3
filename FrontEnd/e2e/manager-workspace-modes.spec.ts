@@ -64,6 +64,7 @@ async function login(page: Page) {
   await expect(page.getByRole("heading", { name: "Choose workspace" })).toBeVisible();
 }
 async function noOverflow(page: Page) {
+  await expect(page.locator("[data-manager-phone] header").filter({ hasText: "GF3" })).toHaveCount(0);
   await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);
   await expect.poll(() => page.locator("[data-manager-phone] > div").evaluate(element => element.getBoundingClientRect().width)).toBeLessThanOrEqual(430);
 }
@@ -89,10 +90,11 @@ async function scrollMatrix(page: Page, headerCount = 7) {
   await expect(headers.first()).toHaveText("Day");
   const before = await scroll.evaluate(element => ({ clientWidth: element.clientWidth, scrollWidth: element.scrollWidth, scrollLeft: element.scrollLeft, overflowX: getComputedStyle(element).overflowX }));
   expect(before.clientWidth).toBeGreaterThan(150);
-  expect(before.scrollWidth).toBeGreaterThan(before.clientWidth);
+  if (headerCount > 2) expect(before.scrollWidth).toBeGreaterThan(before.clientWidth);
   expect(["auto", "scroll"]).toContain(before.overflowX);
   await scroll.evaluate(element => { element.scrollLeft = element.scrollWidth; });
-  await expect.poll(() => scroll.evaluate(element => element.scrollLeft)).toBeGreaterThan(0);
+  if (before.scrollWidth > before.clientWidth) await expect.poll(() => scroll.evaluate(element => element.scrollLeft)).toBeGreaterThan(0);
+  else await expect.poll(() => scroll.evaluate(element => element.scrollLeft)).toBe(0);
   await reachesViewport(scroll, headers.last());
   await reachesViewport(scroll, scroll.locator("tbody tr").first().locator("td").last());
   const after = await scroll.evaluate(element => element.scrollLeft);
@@ -104,10 +106,13 @@ async function navigation(page: Page, width: number) {
   await expect(nav.getByRole("link")).toHaveCount(5);
   const current = nav.locator('[aria-current="page"]');
   await expect(current).toHaveCount(1);
-  await expect(current.locator("span")).toHaveCSS("opacity", "1");
+  await expect(current.locator("span")).toHaveCSS("opacity", width < 375 ? "0" : "1");
+  const glass = await nav.evaluate(element => ({ background: getComputedStyle(element).backgroundColor, filter: getComputedStyle(element).backdropFilter }));
+  expect(glass.background).toBe("rgba(255, 255, 255, 0.16)");
+  expect(glass.filter).toContain("blur(20px)");
   for (const link of await nav.getByRole("link").all()) {
     const box = await link.boundingBox(); expect(box!.height).toBeGreaterThanOrEqual(44);
-    expect(box!.width).toBeGreaterThanOrEqual(width === 320 ? 40 : 44);
+    expect(box!.width).toBeGreaterThanOrEqual(44);
     await expect(link.locator("svg")).toBeVisible();
   }
   await page.getByRole("button", { name: "Collapse navigation", exact: true }).click();
@@ -120,7 +125,14 @@ async function navigation(page: Page, width: number) {
 }
 
 test("login chooser selects original PC shell and edit controls", async ({ page }) => {
-  const f = await fixture(page); await login(page); await page.getByRole("button", { name: "PC Full access", exact: true }).click();
+  const f = await fixture(page); await login(page);
+  for (const name of ["PC Full access", "Phone Read only"]) {
+    const choice = page.getByRole("button", { name, exact: true });
+    await expect(choice).toHaveCSS("box-shadow", "none");
+    await expect(choice).toHaveCSS("border-top-color", "rgb(226, 232, 240)");
+  }
+  await expect(page.getByRole("button", { name: "PC Full access", exact: true }).locator("svg")).toHaveCSS("transform", "matrix(1, 0, 0, -1, 0, 0)");
+  await page.getByRole("button", { name: "PC Full access", exact: true }).click();
   await page.waitForLoadState("networkidle"); await page.goto("/employee"); await expect(page.getByRole("button", { name: "Add New" })).toBeVisible(); await expect(page.locator("aside").first()).toBeVisible(); expect(f.errors).toEqual([]);
 });
 test("Phone switches both ways, refresh persists and back never exposes an editor", async ({ page }) => {
@@ -134,7 +146,7 @@ for (const width of [320, 375, 390, 430, 768, 1440]) {
   test(`Phone all manager data, matrix scrolling and shell at ${width}px`, async ({ page }, testInfo) => {
     test.setTimeout(60_000);
     await page.setViewportSize({ width, height: 850 }); const f = await fixture(page, "phone");
-    await page.waitForLoadState("networkidle"); await page.goto("/"); await expect(page.getByRole("link", { name: "Containers →", exact: true })).toBeVisible();
+    await page.waitForLoadState("networkidle"); await page.goto("/"); await expect(page.getByRole("navigation", { name: "Manager navigation" })).toBeVisible(); await expect(page.locator("main")).toHaveText("");
     await expect(page.getByRole("link", { name: /Back/ })).toHaveCount(0); await noOverflow(page); await navigation(page, width);
     await page.waitForLoadState("networkidle"); await page.goto("/container"); await expect(page.getByText("All manager container", { exact: true })).toBeVisible(); await noOverflow(page); await noManagement(page);
     await page.getByText("All manager container", { exact: true }).click(); await expect(page.getByText("Private schedule", { exact: true })).toBeVisible(); await expect(page.getByText("Public schedule", { exact: true })).toBeVisible(); await noOverflow(page);
@@ -166,12 +178,19 @@ for (const width of [320, 375, 390, 430, 768, 1440]) {
     expect((await scroll.boundingBox())!.width).toBeGreaterThanOrEqual(innerWidth * .75); await noOverflow(page);
     await page.getByRole("button", { name: "Collapse Schedule Information", exact: true }).click();
     expect((await scroll.boundingBox())!.width).toBeGreaterThanOrEqual(innerWidth * .75);
-    const summary = page.locator('[class*="summaryTableScroll"]');
-    await summary.evaluate(element => { element.scrollLeft = element.scrollWidth; });
-    await expect.poll(() => summary.evaluate(element => element.scrollLeft)).toBeGreaterThan(0);
-    await reachesViewport(summary, summary.locator("thead tr").first().locator("th").last());
-    await reachesViewport(summary, summary.locator("thead th").first()); await noOverflow(page);
-    await page.waitForLoadState("networkidle"); await page.goto("/availability/5"); await expect(page.getByText("Private dispo", { exact: true })).toBeVisible(); await noOverflow(page); await noManagement(page);
+    const summary = page.locator('[data-phone-schedule-summary]');
+    await expect(summary.locator("article")).toHaveCount(6);
+    await expect(summary.locator("table")).toHaveCount(0);
+    await summary.locator("summary").first().click();
+    await expect(summary.locator("article").first()).toContainText("08:00");
+    await noOverflow(page);
+    await page.waitForLoadState("networkidle"); await page.goto("/availability/5"); await expect(page.getByText("Availability Schedule", { exact: true })).toBeVisible();
+    const info = page.locator("details").first(); await expect(info).not.toHaveAttribute("open");
+    const matrix = page.locator("[data-phone-matrix-scroll]"); await expect(matrix).toBeVisible();
+    await matrix.locator("thead").scrollIntoViewIfNeeded();
+    expect((await matrix.locator("thead").boundingBox())!.y).toBeLessThan(700);
+    await info.locator("summary").click(); await expect(page.getByText("Private dispo", { exact: true })).toBeVisible(); await noOverflow(page); await noManagement(page);
+    await info.locator("summary").click();
     await recordGeometry(testInfo, "availability-scroll-geometry", await scrollMatrix(page));
     await page.waitForLoadState("networkidle"); await page.goto("/availability"); await expect(page.getByRole("link", { name: /Back/ })).toHaveCount(0); await noOverflow(page);
     await page.waitForLoadState("networkidle"); await page.goto("/employee"); await expect(page.getByText("Worker 1", { exact: true })).toBeVisible(); await expect(page.getByText("Worker 6", { exact: true })).toBeVisible(); await noOverflow(page);
@@ -179,7 +198,7 @@ for (const width of [320, 375, 390, 430, 768, 1440]) {
     await page.waitForLoadState("networkidle"); await page.goto("/shop/4"); await expect(page.getByText("Central", { exact: true })).toBeVisible(); await noOverflow(page); await noManagement(page);
     await expect(page.locator('nav[aria-label="Manager navigation"] [aria-current="page"]')).toHaveAttribute("href", "/more");
     await page.waitForLoadState("networkidle"); await page.goto("/shop"); await expect(page.getByText("Central", { exact: true })).toBeVisible(); await noOverflow(page);
-    await page.waitForLoadState("networkidle"); await page.goto("/more"); await expect(page.getByRole("button", { name: /Switch to PC/ })).toBeVisible(); await noOverflow(page);
+    await page.waitForLoadState("networkidle"); await page.goto("/more"); await expect(page.getByRole("button", { name: /Switch to PC/ })).toBeVisible(); await expect(page.getByRole("link", { name: /Shops/ })).toHaveCount(0); await noOverflow(page);
     await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
     const logout = page.getByRole("button", { name: /Logout|Log out|Sign out/ }); await expect(logout).toBeVisible();
     const logoutBox = await logout.boundingBox(); const navBox = await page.getByRole("navigation", { name: "Manager navigation" }).boundingBox();
@@ -245,3 +264,107 @@ for (const workerCount of [0, 1, 6]) {
     await noOverflow(page); await noManagement(page); expect(f.unsafe).toEqual([]); expect(f.errors).toEqual([]);
   });
 }
+
+
+test("rounded chooser logout ends the session", async ({ page }) => {
+ await fixture(page, "choose"); await page.goto("/");
+ const logout = page.getByRole("button", { name: "Log out", exact: true }); await expect(logout).toBeVisible();
+ expect((await logout.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+ await expect(logout).toHaveCSS("border-radius", "999px"); await logout.click(); await expect(page).toHaveURL(/\/login$/);
+});
+
+for (const width of [320, 375, 390, 430]) {
+ for (const workerCount of [0, 1, 6]) {
+  test(`Availability ${workerCount} workers visible at ${width}px with collapsed information`, async ({ page }, testInfo) => {
+   await page.setViewportSize({ width, height: 850 }); const f = await fixture(page, "phone", "manager", { workerCount, longNames: true });
+   await page.goto("/availability/5"); await expect(page.getByText("Availability Schedule", { exact: true })).toBeVisible();
+   const disclosure = page.locator("details").first(); await expect(disclosure).not.toHaveAttribute("open");
+   if (workerCount === 0) {
+    await expect(page.getByText("No employees are assigned to this availability group yet.")).toBeVisible();
+    await expect(page.locator("[data-phone-matrix-scroll]")).toHaveCount(0);
+   } else {
+    const scroll = page.locator("[data-phone-matrix-scroll]");
+    await scroll.locator("thead").scrollIntoViewIfNeeded();
+    expect((await scroll.locator("thead").boundingBox())!.y).toBeLessThan(700);
+    await recordGeometry(testInfo, "availability-first-screen", await scrollMatrix(page, workerCount + 1));
+    await scroll.locator("tbody tr").last().scrollIntoViewIfNeeded(); await expect(scroll.locator("tbody tr").last()).toContainText("31");
+    await disclosure.locator("summary").click(); await noOverflow(page); await disclosure.locator("summary").click();
+   }
+   if (width === 390) await page.screenshot({ path: testInfo.outputPath("phone-availability.png"), fullPage: true });
+   await noOverflow(page); await noManagement(page); expect(f.errors).toEqual([]); expect(f.unsafe).toEqual([]);
+  });
+ }
+}
+
+test("phone search, descending containers, pin priority, metrics and long employee fields", async ({ page }, testInfo) => {
+ await page.setViewportSize({ width: 390, height: 850 }); const f = await fixture(page, "phone", "manager", { longNames: true });
+ await page.route("**/api/containers", route => route.fulfill({ contentType: "application/json", body: JSON.stringify([{ id: 1, name: "All manager container" }, { id: 9, name: "Container nine" }, { id: 4, name: "Container four" }]) }));
+ await page.goto("/container"); await expect(page.getByText("Container nine", { exact: true })).toBeVisible();
+ const titles = page.locator('main article[role="button"] [class*="_title_"]'); await expect(titles).toHaveText(["Container nine", "Container four", "All manager container"]);
+ await page.getByRole("button", { name: /Pin All manager container/ }).click(); await expect(titles).toHaveText(["All manager container", "Container nine", "Container four"]);
+ const search = page.getByRole("searchbox", { name: "Search", exact: true }); await search.fill("nine"); await expect(titles).toHaveText(["Container nine"]);
+ await page.getByRole("button", { name: "Clear Search", exact: true }).click(); await expect(titles).toHaveCount(3);
+ await page.getByText("All manager container", { exact: true }).click(); await expect(page.getByRole("heading", { name: "Statistics" })).toBeVisible();
+ const stats = page.getByRole("heading", { name: "Statistics" }).locator(".."); await expect(stats.locator("table")).toHaveCount(0);
+ await expect(stats.locator("article")).toHaveCount(7); await stats.locator("article details summary").first().click(); await expect(stats.locator("article").first()).toContainText("Central"); await noOverflow(page);
+ await page.getByRole("link", { name: "Back", exact: true }).click(); await expect(page).toHaveURL(/\/container$/);
+ await page.goto("/employee/2"); await expect(page.getByText("Worker A very long employee surname 1", { exact: true })).toBeVisible(); await noOverflow(page); await noManagement(page);
+ await page.goto("/more"); await expect(page.getByRole("button", { name: /Switch to PC/ }).locator("svg")).toHaveCSS("transform", "matrix(1, 0, 0, -1, 0, 0)");
+ await page.screenshot({ path: testInfo.outputPath("phone-more.png"), fullPage: true }); await page.getByRole("button", { name: "Log out", exact: true }).click(); await expect(page).toHaveURL(/\/login$/); expect(f.unsafe).toEqual([]);
+});
+
+
+for (const width of [320, 375, 390, 430]) {
+ for (const workerCount of [0, 1, 8]) {
+  test(`Manager schedule sticky axes and mobile summary at ${width}px with ${workerCount} long names`, async ({ page }, testInfo) => {
+   await page.setViewportSize({ width, height: 740 });
+   const f = await fixture(page, "phone", "manager", { workerCount, longNames: true, manualColumn: workerCount === 8 });
+   await page.goto("/container/1/graphs/3"); await expect(page.getByText("Schedule Summary", { exact: true })).toBeVisible(); await page.waitForLoadState("networkidle");
+   if (workerCount > 0) {
+    const scroll = page.locator("[data-phone-matrix-scroll]");
+    await scroll.scrollIntoViewIfNeeded();
+    const before = await scroll.evaluate(element => ({ height: element.clientHeight, scrollHeight: element.scrollHeight, width: element.clientWidth, scrollWidth: element.scrollWidth }));
+    expect(before.height).toBeLessThanOrEqual(560); expect(before.scrollHeight).toBeGreaterThan(before.height);
+    const nameHeader = scroll.locator("thead th").nth(1); expect((await nameHeader.boundingBox())!.width).toBeLessThanOrEqual(157);
+    expect(await nameHeader.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true);
+    await scroll.evaluate(element => { element.scrollLeft = element.scrollWidth; element.scrollTop = element.scrollHeight; });
+    const day = scroll.locator("tbody th").last(); const corner = scroll.locator("thead th").first(); const header = scroll.locator("thead th").last();
+    const geometry = await scroll.evaluate(element => ({ left: element.scrollLeft, top: element.scrollTop, box: element.getBoundingClientRect().toJSON() }));
+    if (before.scrollWidth > before.width) expect(geometry.left).toBeGreaterThan(0);
+    else expect(geometry.left).toBe(0);
+    expect(geometry.top).toBeGreaterThan(0);
+    const cornerBox = (await corner.boundingBox())!; const headerBox = (await header.boundingBox())!; const dayBox = (await day.boundingBox())!;
+    expect(Math.abs(cornerBox.x - geometry.box.x)).toBeLessThanOrEqual(2); expect(Math.abs(dayBox.x - cornerBox.x)).toBeLessThanOrEqual(2);
+    expect(Math.abs(headerBox.y - geometry.box.y)).toBeLessThanOrEqual(2); expect(Math.abs(cornerBox.y - headerBox.y)).toBeLessThanOrEqual(2);
+    expect(await corner.evaluate(element => Number(getComputedStyle(element).zIndex))).toBeGreaterThan(await header.evaluate(element => Number(getComputedStyle(element).zIndex)));
+    await reachesViewport(scroll, scroll.locator("tbody tr").last().locator("td").last());
+    await recordGeometry(testInfo, "sticky-matrix-axes", { before, geometry, cornerBox, headerBox, dayBox });
+    const summary = page.locator("[data-phone-schedule-summary]"); await expect(summary.locator("article")).toHaveCount(workerCount);
+    expect(await summary.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true); await expect(summary.locator("table")).toHaveCount(0);
+    const search = page.getByRole("searchbox", { name: "Search schedule summary by employee name or surname" });
+    await search.fill("surname 1"); await expect(summary.locator("article")).toHaveCount(1); await expect(summary).toContainText("Worker A very long employee surname 1");
+    await summary.locator("summary").click(); await expect(summary).toContainText("08:00"); await expect(summary).toContainText("16:00"); await expect(summary.locator("article > dl dd").nth(2)).toHaveText("8");
+    await search.fill("missing employee"); await expect(page.getByRole("status")).toContainText('No employees found');
+    await search.fill(""); await expect(summary.locator("article")).toHaveCount(workerCount);
+    await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+    const last = (await summary.locator("article").last().boundingBox())!; const nav = (await page.getByRole("navigation", { name: "Manager navigation" }).boundingBox())!;
+    expect(last.y + last.height).toBeLessThanOrEqual(nav.y);
+    if (width === 390 && workerCount === 8) await page.screenshot({ path: testInfo.outputPath("manager-phone-summary.png"), fullPage: true });
+   } else {
+    await expect(page.locator("[data-phone-matrix-scroll]")).toHaveCount(0); await expect(page.getByText("No employees are assigned to this schedule yet.")).toBeVisible();
+   }
+   await noOverflow(page); await noManagement(page); expect(f.unsafe).toEqual([]); expect(f.errors).toEqual([]);
+  });
+ }
+}
+
+
+test("PC schedule retains its desktop matrix dimensions and full summary table", async ({ page }) => {
+ await fixture(page, "pc", "manager", { longNames: true }); await page.goto("/container/1/graphs/3");
+ await expect(page.getByText("Schedule Summary", { exact: true })).toBeVisible(); await page.waitForLoadState("networkidle");
+ await expect(page.locator("[data-manager-phone], [data-phone-matrix-scroll], [data-phone-schedule-summary]")).toHaveCount(0);
+ const table = page.locator('[class*="summaryTableScroll"] table'); await expect(table).toBeVisible();
+ await expect(table.locator("thead th")).toHaveCount(128); await expect(table.locator("tbody")).toContainText("08:00");
+ const matrixHeader = page.locator('table').first().locator("thead th").nth(1);
+ expect((await matrixHeader.boundingBox())!.width).toBeGreaterThan(156);
+});
