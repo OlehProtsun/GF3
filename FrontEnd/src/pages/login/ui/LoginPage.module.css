@@ -215,13 +215,6 @@
   text-align: center;
 }
 
-.pinPanel {
-  display: grid;
-  justify-items: center;
-  gap: 0.72rem;
-  padding-top: 0.15rem;
-}
-
 .pinDots {
   display: flex;
   justify-content: center;
@@ -430,8 +423,6 @@
     --ios-button-radius: 20px;
   }
 
-  .pinKeypad { grid-template-columns: repeat(3, 3.4rem); gap: 0.5rem 0.75rem; }
-  .pinKey { width: 3.4rem; height: 3.4rem; font-size: 1.32rem; }
   .pagePhone .card :global(input) { font-size: 1rem; }
 }
 
@@ -447,10 +438,6 @@
   .cardSubtitle { line-height: 1.4; }
   .form { gap: 0.68rem; padding: 0.72rem; }
   .card :global(input) { min-height: 46px; }
-  .pinPanel { gap: 0.5rem; }
-  .pinKeypad { grid-template-columns: repeat(3, 3.15rem); gap: 0.38rem 0.7rem; }
-  .pinKey { width: 3.15rem; height: 3.15rem; font-size: 1.25rem; }
-  .pinHint { margin-top: 0.1rem; }
   .inlineRecoveryAction { margin-top: -0.25rem; }
 }
 
@@ -463,3 +450,83 @@
   overflow-y: auto;
   overscroll-behavior: contain;
 }
+
+.pinLaunchButton { width: 100%; }
+.pinHint { min-height: 1.2em; }
+.pinDialog:not([open]) { display: none; }
+.pinDialog[open] {
+  position: fixed;
+  inset: 0;
+  margin: 0;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: none;
+  height: 100vh;
+  height: 100dvh;
+  max-height: none;
+  border: 0;
+  border-radius: 0;
+  padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  background: #f3f4f6;
+  color: #0f172a;
+  touch-action: manipulation;
+}
+.pinDialog::backdrop { background: rgba(15, 23, 42, 0.25); }
+.pinDialogContent {
+  width: min(100%, 400px);
+  flex: 0 0 auto;
+  margin: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+.pinClose {
+  align-self: flex-end;
+  min-height: 44px;
+  padding: 10px 20px;
+  border: 1px solid #cbd5e1;
+  border-radius: 999px;
+  background: #fff;
+  color: #334155;
+  font: inherit;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.pinClose:focus-visible { outline: 3px solid #2563eb; outline-offset: 2px; }
+.pinClose:disabled { opacity: 0.42; cursor: default; }
+.pinTitle { margin: 0; font-size: 1.25rem; text-align: center; overflow-wrap: anywhere; }
+.pinDialog .pinKeypad {
+  width: 100%;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  justify-items: center;
+}
+.pinDialog .pinKey,
+.pinDialog .pinDelete {
+  box-sizing: border-box;
+  width: min(100%, 104px);
+  height: auto;
+  aspect-ratio: 1;
+  min-width: 44px;
+  min-height: 44px;
+  border-radius: 50%;
+}
+.pinDialog .pinKey { font-size: 1.85rem; }
+.pinDialog .pinDelete { padding: 8px; background: #e2e8f0; color: #334155; overflow-wrap: anywhere; }
+.pinFeedback {
+  box-sizing: border-box;
+  width: 100%;
+  height: 72px;
+  flex: 0 0 72px;
+  overflow-y: auto;
+  overflow-wrap: anywhere;
+  text-align: center;
+  color: #475569;
+  line-height: 1.4;
+}
+.pinError { color: #b91c1c; }

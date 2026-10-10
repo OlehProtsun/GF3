@@ -46,6 +46,9 @@ export function LoginPage() {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [failedPinAttempts, setFailedPinAttempts] = useState(0);
+  const [isPinDialogOpen, setIsPinDialogOpen] = useState(false);
+  const pinDialogRef = useRef<HTMLDialogElement | null>(null);
+  const submitInFlightRef = useRef(false);
   const passwordRef = useRef("");
   const lastPinPointerActionRef = useRef<{ key: string; at: number } | null>(null);
 
@@ -118,6 +121,35 @@ export function LoginPage() {
     setPassword(value);
   };
 
+  const openPinDialog = () => {
+    if (passwordMode !== "phone" || isSubmitting || !username.trim()) return;
+    updatePassword("");
+    setSubmitError(null);
+    lastPinPointerActionRef.current = null;
+    // WebKit does not focus tapped buttons; give native close() a return target.
+    pinDialogRef.current?.parentElement?.querySelector<HTMLButtonElement>(`.${styles.pinLaunchButton}`)?.focus();
+    setIsPinDialogOpen(true);
+  };
+
+  const closePinDialog = () => {
+    if (submitInFlightRef.current) return;
+    setIsPinDialogOpen(false);
+    updatePassword("");
+    setSubmitError(null);
+    lastPinPointerActionRef.current = null;
+  };
+
+  useEffect(() => {
+    const dialog = pinDialogRef.current;
+    if (!dialog) return;
+    if (isPinDialogOpen && passwordMode === "phone") {
+      if (!dialog.open) dialog.showModal();
+    } else if (dialog.open) dialog.close();
+    return () => {
+      if (dialog.open) dialog.close();
+    };
+  }, [isPinDialogOpen, passwordMode]);
+
   const submitCredentials = async (candidatePassword: string) => {
     if (isSubmitting) return;
     if (!username.trim()) {
@@ -129,6 +161,8 @@ export function LoginPage() {
       return;
     }
 
+    if (submitInFlightRef.current) return;
+    submitInFlightRef.current = true;
     setSubmitError(null);
     setIsSubmitting(true);
     try {
@@ -140,6 +174,7 @@ export function LoginPage() {
         setFailedPinAttempts((current) => current + 1);
       }
     } finally {
+      submitInFlightRef.current = false;
       setIsSubmitting(false);
     }
   };
@@ -157,6 +192,8 @@ export function LoginPage() {
 
   const handlePasswordModeChange = (mode: PasswordMode) => {
     setPasswordMode(mode);
+    setIsPinDialogOpen(false);
+    lastPinPointerActionRef.current = null;
     updatePassword("");
     setSubmitError(null);
     persistValue(PASSWORD_MODE_STORAGE_KEY, mode);
@@ -165,7 +202,7 @@ export function LoginPage() {
 
   const handlePinDigit = (digit: string) => {
     const currentPassword = passwordRef.current;
-    if (isSubmitting || !username.trim() || currentPassword.length >= PASSWORD_LENGTH) return;
+    if (submitInFlightRef.current || isSubmitting || !username.trim() || currentPassword.length >= PASSWORD_LENGTH) return;
     const nextPassword = `${currentPassword}${digit}`;
     updatePassword(nextPassword);
     setSubmitError(null);
@@ -173,7 +210,7 @@ export function LoginPage() {
   };
 
   const handlePinDelete = () => {
-    if (isSubmitting) return;
+    if (submitInFlightRef.current || isSubmitting) return;
     updatePassword(passwordRef.current.slice(0, -1));
     setSubmitError(null);
   };
@@ -237,7 +274,7 @@ export function LoginPage() {
             </div>
           ) : null}
           {bootstrapError ? <ErrorBanner className={styles.banner}>{bootstrapError}</ErrorBanner> : null}
-          {submitError ? <ErrorBanner className={styles.banner}>{submitError}</ErrorBanner> : null}
+          {passwordMode === "pc" && submitError ? <ErrorBanner className={styles.banner}>{submitError}</ErrorBanner> : null}
 
           <form className={styles.form} onSubmit={handleSubmit}>
             <LabeledField id="login-username" label={t("Username")}>
@@ -272,57 +309,13 @@ export function LoginPage() {
                   <span className={styles.passwordHint}>{t("Exactly 6 digits")}</span>
                 </>
               ) : (
-                <div className={styles.pinPanel} aria-label={t("Password PIN entry")}>
-                  <div
-                    key={failedPinAttempts}
-                    className={`${styles.pinDots} ${failedPinAttempts ? styles.pinDotsError : ""}`}
-                    role="status"
-                    aria-label={t("{0} of {1} digits entered", password.length, PASSWORD_LENGTH)}
-                  >
-                    {Array.from({ length: PASSWORD_LENGTH }, (_, index) => (
-                      <span key={index} className={`${styles.pinDot} ${index < password.length ? styles.pinDotFilled : ""}`} aria-hidden="true" />
-                    ))}
-                  </div>
-
-                  <div className={styles.pinKeypad} aria-label={t("Numeric keypad")}>
-                    {KEYPAD_DIGITS.map((digit) => (
-                      <button
-                        key={digit}
-                        type="button"
-                        className={styles.pinKey}
-                        aria-label={digit}
-                        disabled={isSubmitting || !username.trim()}
-                        onPointerDown={(event) => handlePinPointerDown(event, digit, () => handlePinDigit(digit))}
-                        onClick={() => handlePinClick(digit, () => handlePinDigit(digit))}
-                      >
-                        {digit}
-                      </button>
-                    ))}
-                    <span aria-hidden="true" />
-                    <button
-                      type="button"
-                      className={styles.pinKey}
-                      aria-label="0"
-                      disabled={isSubmitting || !username.trim()}
-                      onPointerDown={(event) => handlePinPointerDown(event, "0", () => handlePinDigit("0"))}
-                      onClick={() => handlePinClick("0", () => handlePinDigit("0"))}
-                    >
-                      0
-                    </button>
-                    <button
-                      type="button"
-                      className={styles.pinDelete}
-                      aria-label={t("Delete last digit")}
-                      disabled={isSubmitting || password.length === 0}
-                      onPointerDown={(event) => handlePinPointerDown(event, "delete", handlePinDelete)}
-                      onClick={() => handlePinClick("delete", handlePinDelete)}
-                    >
-                      {t("Delete")}</button>
-                  </div>
+                <>
+                  <IosButton label={t("Enter password")} type="button" onClick={openPinDialog}
+                    disabled={isSubmitting || !username.trim()} className={`${styles.submitButton} ${styles.pinLaunchButton}`} />
                   <span className={styles.pinHint}>
-                    {isSubmitting ? t("Checking…") : username.trim() ? t("Enter your 6-digit PIN") : t("Enter username to unlock keypad")}
+                    {username.trim() ? t("Exactly 6 digits") : t("Enter username to unlock keypad")}
                   </span>
-                </div>
+                </>
               )}
             </LabeledField>
 
@@ -351,6 +344,77 @@ export function LoginPage() {
           </nav>
         </section>
       </div>
+      {passwordMode === "phone" ? (
+        <dialog ref={pinDialogRef} className={styles.pinDialog} aria-labelledby="login-pin-dialog-title"
+          onClose={closePinDialog}
+          onCancel={(event) => { if (submitInFlightRef.current) event.preventDefault(); }}
+          onKeyDown={(event) => {
+            if (!isPinDialogOpen || submitInFlightRef.current) return;
+            if (/^[0-9]$/.test(event.key)) {
+              event.preventDefault();
+              handlePinDigit(event.key);
+            } else if (event.key === "Backspace") {
+              event.preventDefault();
+              handlePinDelete();
+            }
+          }}>
+          <div className={styles.pinDialogContent} aria-label={t("Password PIN entry")}>
+            <button type="button" autoFocus className={styles.pinClose} aria-label={t("Close")}
+              disabled={isSubmitting} onClick={closePinDialog}>{t("Close")}</button>
+            <h2 id="login-pin-dialog-title" className={styles.pinTitle}>{t("Enter your 6-digit PIN")}</h2>
+            <div
+              key={failedPinAttempts}
+              className={`${styles.pinDots} ${failedPinAttempts ? styles.pinDotsError : ""}`}
+              role="status"
+              aria-label={t("{0} of {1} digits entered", password.length, PASSWORD_LENGTH)}
+            >
+              {Array.from({ length: PASSWORD_LENGTH }, (_, index) => (
+                <span key={index} className={`${styles.pinDot} ${index < password.length ? styles.pinDotFilled : ""}`} aria-hidden="true" />
+              ))}
+            </div>
+
+            <div className={styles.pinKeypad} aria-label={t("Numeric keypad")}>
+              {KEYPAD_DIGITS.map((digit) => (
+                <button
+                  key={digit}
+                  type="button"
+                  className={styles.pinKey}
+                  aria-label={digit}
+                  disabled={isSubmitting || !username.trim()}
+                  onPointerDown={(event) => handlePinPointerDown(event, digit, () => handlePinDigit(digit))}
+                  onClick={() => handlePinClick(digit, () => handlePinDigit(digit))}
+                >
+                  {digit}
+                </button>
+              ))}
+              <span aria-hidden="true" />
+              <button
+                type="button"
+                className={styles.pinKey}
+                aria-label="0"
+                disabled={isSubmitting || !username.trim()}
+                onPointerDown={(event) => handlePinPointerDown(event, "0", () => handlePinDigit("0"))}
+                onClick={() => handlePinClick("0", () => handlePinDigit("0"))}
+              >
+                0
+              </button>
+              <button
+                type="button"
+                className={styles.pinDelete}
+                aria-label={t("Delete last digit")}
+                disabled={isSubmitting || password.length === 0}
+                onPointerDown={(event) => handlePinPointerDown(event, "delete", handlePinDelete)}
+                onClick={() => handlePinClick("delete", handlePinDelete)}
+              >
+                {t("Delete")}</button>
+            </div>
+            <div className={styles.pinFeedback} aria-live="polite">
+              {isSubmitting ? <span role="status">{t("Checking…")}</span> : submitError ?
+                <span role="alert" className={styles.pinError}>{submitError}</span> : <span>{t("Exactly 6 digits")}</span>}
+            </div>
+          </div>
+        </dialog>
+      ) : null}
     </div>
   );
 }
