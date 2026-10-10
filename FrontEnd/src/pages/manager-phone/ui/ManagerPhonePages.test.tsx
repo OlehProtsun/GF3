@@ -127,7 +127,7 @@ test.each([
 test("phone Home shows Coming Soon and sends no dashboard requests", () => {
  const view = mount(<ManagerPhoneHomePage />);
  expect(screen.getByRole("heading", { name: "Coming Soon" })).toBeInTheDocument(); expect(view.container.querySelector("a")).toBeNull(); expect(calls).toEqual([]);
- view.unmount(); mount(<HomePage />);
+ view.unmount(); mount(<HomePage phoneMode />);
  expect(screen.getByRole("heading", { name: "Coming Soon" })).toBeInTheDocument(); expect(calls).toEqual([]);
 });
 
