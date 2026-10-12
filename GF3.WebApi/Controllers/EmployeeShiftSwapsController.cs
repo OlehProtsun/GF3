@@ -29,7 +29,8 @@ public sealed class EmployeeShiftSwapsController(
     AppDbContext db,
     IScheduleEditLockService scheduleEditLockService,
     IWorkflowLogService workflowLogService,
-    IRealtimeNotifier realtimeNotifier) : ControllerBase
+    IRealtimeNotifier realtimeNotifier,
+    ScheduleVersionCommitService versionCommitService) : ControllerBase
 {
     [HttpGet("employees")]
     [ProducesResponseType(typeof(IEnumerable<ShiftSwapEmployeeDto>), StatusCodes.Status200OK)]
@@ -283,8 +284,12 @@ public sealed class EmployeeShiftSwapsController(
             acceptingEmployeeName);
 
         var acceptedAtUtc = DateTimeOffset.UtcNow;
+        var writingVersion = false;
         try
         {
+            writingVersion = true;
+            await versionCommitService.CommitAsync(swap.ScheduleId, null, "System (before accepted swap)", cancellationToken).ConfigureAwait(false);
+            writingVersion = false;
             var affectedRows = await db.ShiftSwapRequests
                 .Where(request => request.Id == id && request.Status == ShiftSwapStatus.Open)
                 .ExecuteUpdateAsync(update => update
@@ -365,9 +370,19 @@ public sealed class EmployeeShiftSwapsController(
                 AfterSnapshotJson = afterSnapshotJson,
             });
             await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+            writingVersion = true;
+            var acceptedVersion = await versionCommitService.CommitAsync(swap.ScheduleId, null, $"Swap accepted: {acceptingEmployeeName}", cancellationToken).ConfigureAwait(false);
+            if (acceptedVersion is null)
+                throw new InvalidOperationException("The accepted swap did not create a schedule version.");
+            writingVersion = false;
             await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
         }
-        catch (DbUpdateException exception) when (exception.InnerException is SqliteException { SqliteErrorCode: 19 })
+        catch (DbUpdateException exception) when (writingVersion && exception.InnerException is SqliteException { SqliteExtendedErrorCode: 2067 })
+        {
+            await transaction.RollbackAsync(cancellationToken).ConfigureAwait(false);
+            throw new ValidationException("This schedule's version history changed during another request. Refresh and try again.");
+        }
+        catch (DbUpdateException exception) when (!writingVersion && exception.InnerException is SqliteException { SqliteErrorCode: 19 })
         {
             await transaction.RollbackAsync(cancellationToken).ConfigureAwait(false);
             throw new ValidationException("This swap could not be accepted because the resulting schedule would conflict.");

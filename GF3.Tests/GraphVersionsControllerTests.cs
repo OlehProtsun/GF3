@@ -144,7 +144,7 @@ public sealed class GraphVersionsControllerTests
     {
         var controller = new GraphVersionsController(db,
             failPostCommit ? System.Reflection.DispatchProxy.Create<WebApi.Services.IWorkflowLogService, ShiftCorrectionControllerTests.FailingPostCommitProxy>() : new NoopWorkflowLogService(),
-            failPostCommit ? System.Reflection.DispatchProxy.Create<WebApi.Realtime.IRealtimeNotifier, ShiftCorrectionControllerTests.FailingPostCommitProxy>() : new NoopRealtimeNotifier());
+            failPostCommit ? System.Reflection.DispatchProxy.Create<WebApi.Realtime.IRealtimeNotifier, ShiftCorrectionControllerTests.FailingPostCommitProxy>() : new NoopRealtimeNotifier(), new WebApi.Services.ScheduleVersionCommitService(db));
         controller.ControllerContext = new ControllerContext
         {
             HttpContext = new DefaultHttpContext

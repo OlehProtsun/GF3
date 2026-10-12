@@ -18,6 +18,7 @@ vi.mock("./useEmployeeMotion", () => ({ useEmployeeMotion: () => {} }));
 
 beforeEach(() => { localStorage.clear(); window.history.replaceState({}, "", "/schedule"); });
 it("keeps legal links accessible when mobile navigation is collapsed", () => {
+  window.history.replaceState({}, "", "/profile");
   render(<BrowserRouter><EmployeeWorkspaceLayout><div>Schedule</div></EmployeeWorkspaceLayout></BrowserRouter>);
   fireEvent.click(screen.getByRole("button", { name: "Collapse navigation" }));
   for (const [name, href] of [["Legal documents", "/legal/index.html"], ["Terms", "/legal/regulamin.html"], ["Privacy policy", "/legal/polityka-prywatnosci.html"]]) {

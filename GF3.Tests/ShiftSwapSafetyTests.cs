@@ -451,6 +451,7 @@ public sealed class ShiftSwapSafetyTests
         builder.WebHost.UseUrls("http://127.0.0.1:0");
         builder.Services.AddDbContext<AppDbContext>(configuration => configuration.UseSqlite(database.ConnectionString));
         builder.Services.AddSingleton<IScheduleEditLockService, ManagerEditLockService>();
+        builder.Services.AddScoped<WebApi.Services.ScheduleVersionCommitService>();
         builder.Services.AddSingleton<IWorkflowLogService, NoopWorkflowLogService>();
         builder.Services.AddSingleton<IRealtimeNotifier, NoopRealtimeNotifier>();
         builder.Services.AddSingleton(Options.Create(options));
@@ -544,7 +545,7 @@ public sealed class ShiftSwapSafetyTests
 
     private static EmployeeShiftSwapsController Employee(AppDbContext db, int employeeId, RecordingNotifier? notifier = null, IScheduleEditLockService? locks = null)
     {
-        var controller = new EmployeeShiftSwapsController(db, locks ?? new ManagerEditLockService(), new NoopWorkflowLogService(), notifier ?? new RecordingNotifier());
+        var controller = new EmployeeShiftSwapsController(db, locks ?? new ManagerEditLockService(), new NoopWorkflowLogService(), notifier ?? new RecordingNotifier(), new WebApi.Services.ScheduleVersionCommitService(db));
         SetUser(controller, AuthRoles.Employee, employeeId);
         return controller;
     }
