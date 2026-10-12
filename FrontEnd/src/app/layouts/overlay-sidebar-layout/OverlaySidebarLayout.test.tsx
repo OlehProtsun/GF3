@@ -77,7 +77,7 @@ describe("OverlaySidebarLayout", () => {
 
   it("collapses and reopens the sidebar while keeping the collapsed arrow pointed down", async () => {
     const user = userEvent.setup();
-    const { container } = renderManagerLayout();
+    const { container } = renderManagerLayout("/manager-profile");
 
     await user.click(screen.getByRole("button", { name: "Collapse sidebar" }));
 
@@ -127,7 +127,7 @@ describe("OverlaySidebarLayout", () => {
   it.each([true, false, undefined])("does not grant employee system links with flag %s", privilege => {
     authMock.session.role = "employee";
     authMock.session.isSystemManager = privilege;
-    renderManagerLayout();
+    renderManagerLayout("/profile");
     expect(screen.getByRole("link", { name: "Open profile" })).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Information" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "DataBase" })).not.toBeInTheDocument();

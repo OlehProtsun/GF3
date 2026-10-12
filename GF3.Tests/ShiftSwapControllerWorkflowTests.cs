@@ -32,7 +32,7 @@ public sealed class ShiftSwapControllerWorkflowTests
             context,
             new ManagerEditLockService(),
             new NoopWorkflowLogService(),
-            new NoopRealtimeNotifier());
+            new NoopRealtimeNotifier(), new WebApi.Services.ScheduleVersionCommitService(context));
         SetEmployeeUser(controller, fixture.OwnerEmployeeId);
 
         var result = await controller.GetEmployees(CancellationToken.None);
@@ -66,7 +66,7 @@ public sealed class ShiftSwapControllerWorkflowTests
             context,
             lockService,
             new NoopWorkflowLogService(),
-            new NoopRealtimeNotifier());
+            new NoopRealtimeNotifier(), new WebApi.Services.ScheduleVersionCommitService(context));
         SetEmployeeUser(ownerController, fixture.OwnerEmployeeId);
 
         var createResult = await ownerController.Create(new CreateEmployeeShiftSwapRequest
@@ -90,7 +90,7 @@ public sealed class ShiftSwapControllerWorkflowTests
             context,
             lockService,
             new NoopWorkflowLogService(),
-            new NoopRealtimeNotifier());
+            new NoopRealtimeNotifier(), new WebApi.Services.ScheduleVersionCommitService(context));
         SetEmployeeUser(targetController, fixture.TargetEmployeeId);
 
         var visibleResult = await targetController.GetVisible(CancellationToken.None);
@@ -240,7 +240,7 @@ public sealed class ShiftSwapControllerWorkflowTests
             context,
             lockService,
             new NoopWorkflowLogService(),
-            new NoopRealtimeNotifier());
+            new NoopRealtimeNotifier(), new WebApi.Services.ScheduleVersionCommitService(context));
         SetEmployeeUser(ownerController, fixture.OwnerEmployeeId);
         var createResult = await ownerController.Create(new CreateEmployeeShiftSwapRequest
         {
@@ -254,7 +254,7 @@ public sealed class ShiftSwapControllerWorkflowTests
             context,
             lockService,
             new NoopWorkflowLogService(),
-            new NoopRealtimeNotifier());
+            new NoopRealtimeNotifier(), new WebApi.Services.ScheduleVersionCommitService(context));
         SetEmployeeUser(targetController, fixture.TargetEmployeeId);
 
         await targetController.Accept(created.Id, CancellationToken.None);
@@ -297,7 +297,7 @@ public sealed class ShiftSwapControllerWorkflowTests
             context,
             lockService,
             new NoopWorkflowLogService(),
-            new NoopRealtimeNotifier());
+            new NoopRealtimeNotifier(), new WebApi.Services.ScheduleVersionCommitService(context));
         SetEmployeeUser(ownerController, fixture.OwnerEmployeeId);
         var createResult = await ownerController.Create(new CreateEmployeeShiftSwapRequest
         {
@@ -311,7 +311,7 @@ public sealed class ShiftSwapControllerWorkflowTests
             context,
             lockService,
             new NoopWorkflowLogService(),
-            new NoopRealtimeNotifier());
+            new NoopRealtimeNotifier(), new WebApi.Services.ScheduleVersionCommitService(context));
         SetEmployeeUser(targetController, fixture.TargetEmployeeId);
 
         var visibleResult = await targetController.GetVisible(CancellationToken.None);
@@ -346,7 +346,7 @@ public sealed class ShiftSwapControllerWorkflowTests
             context,
             lockService,
             new NoopWorkflowLogService(),
-            new NoopRealtimeNotifier());
+            new NoopRealtimeNotifier(), new WebApi.Services.ScheduleVersionCommitService(context));
         SetEmployeeUser(ownerController, fixture.OwnerEmployeeId);
         var createResult = await ownerController.Create(new CreateEmployeeShiftSwapRequest
         {
@@ -358,7 +358,7 @@ public sealed class ShiftSwapControllerWorkflowTests
             context,
             lockService,
             new NoopWorkflowLogService(),
-            new NoopRealtimeNotifier());
+            new NoopRealtimeNotifier(), new WebApi.Services.ScheduleVersionCommitService(context));
         SetEmployeeUser(targetController, fixture.TargetEmployeeId);
 
         await targetController.Accept(created.Id, CancellationToken.None);
@@ -381,7 +381,7 @@ public sealed class ShiftSwapControllerWorkflowTests
             context,
             lockService,
             new NoopWorkflowLogService(),
-            new NoopRealtimeNotifier());
+            new NoopRealtimeNotifier(), new WebApi.Services.ScheduleVersionCommitService(context));
         SetEmployeeUser(ownerController, fixture.OwnerEmployeeId);
         var createResult = await ownerController.Create(new CreateEmployeeShiftSwapRequest
         {
@@ -398,7 +398,7 @@ public sealed class ShiftSwapControllerWorkflowTests
             context,
             lockService,
             new NoopWorkflowLogService(),
-            new NoopRealtimeNotifier());
+            new NoopRealtimeNotifier(), new WebApi.Services.ScheduleVersionCommitService(context));
         SetEmployeeUser(targetController, fixture.TargetEmployeeId);
 
         var staleOffer = await Assert.ThrowsAsync<ValidationException>(() =>
@@ -420,13 +420,13 @@ public sealed class ShiftSwapControllerWorkflowTests
             context,
             lockService,
             new NoopWorkflowLogService(),
-            new NoopRealtimeNotifier());
+            new NoopRealtimeNotifier(), new WebApi.Services.ScheduleVersionCommitService(context));
         SetEmployeeUser(ownerController, fixture.OwnerEmployeeId);
         var targetController = new EmployeeShiftSwapsController(
             context,
             lockService,
             new NoopWorkflowLogService(),
-            new NoopRealtimeNotifier());
+            new NoopRealtimeNotifier(), new WebApi.Services.ScheduleVersionCommitService(context));
         SetEmployeeUser(targetController, fixture.TargetEmployeeId);
 
         for (var index = 0; index < 12; index++)
@@ -488,7 +488,7 @@ public sealed class ShiftSwapControllerWorkflowTests
             context,
             lockService,
             new NoopWorkflowLogService(),
-            new NoopRealtimeNotifier());
+            new NoopRealtimeNotifier(), new WebApi.Services.ScheduleVersionCommitService(context));
         SetEmployeeUser(ownerController, fixture.OwnerEmployeeId);
         var createResult = await ownerController.Create(new CreateEmployeeShiftSwapRequest
         {
@@ -501,7 +501,7 @@ public sealed class ShiftSwapControllerWorkflowTests
             context,
             lockService,
             new NoopWorkflowLogService(),
-            new NoopRealtimeNotifier());
+            new NoopRealtimeNotifier(), new WebApi.Services.ScheduleVersionCommitService(context));
         SetEmployeeUser(targetController, fixture.TargetEmployeeId);
         await targetController.Accept(created.Id, CancellationToken.None);
 
@@ -534,7 +534,7 @@ public sealed class ShiftSwapControllerWorkflowTests
             context,
             lockService,
             new NoopWorkflowLogService(),
-            new NoopRealtimeNotifier());
+            new NoopRealtimeNotifier(), new WebApi.Services.ScheduleVersionCommitService(context));
         SetEmployeeUser(ownerController, fixture.OwnerEmployeeId);
 
         var createResult = await ownerController.Create(new CreateEmployeeShiftSwapRequest
@@ -553,7 +553,7 @@ public sealed class ShiftSwapControllerWorkflowTests
             context,
             lockService,
             new NoopWorkflowLogService(),
-            new NoopRealtimeNotifier());
+            new NoopRealtimeNotifier(), new WebApi.Services.ScheduleVersionCommitService(context));
         SetEmployeeUser(unrelatedController, fixture.TargetEmployeeId);
         var unrelatedVisibleResult = await unrelatedController.GetVisible(CancellationToken.None);
         Assert.Empty(Assert.IsAssignableFrom<IEnumerable<ShiftSwapDto>>(
@@ -563,7 +563,7 @@ public sealed class ShiftSwapControllerWorkflowTests
             context,
             lockService,
             new NoopWorkflowLogService(),
-            new NoopRealtimeNotifier());
+            new NoopRealtimeNotifier(), new WebApi.Services.ScheduleVersionCommitService(context));
         SetEmployeeUser(outsiderController, outsider.Id);
         var visibleResult = await outsiderController.GetVisible(CancellationToken.None);
         var visibleDto = Assert.Single(Assert.IsAssignableFrom<IEnumerable<ShiftSwapDto>>(
@@ -605,13 +605,13 @@ public sealed class ShiftSwapControllerWorkflowTests
             context,
             new ManagerEditLockService(),
             new NoopWorkflowLogService(),
-            new NoopRealtimeNotifier());
+            new NoopRealtimeNotifier(), new WebApi.Services.ScheduleVersionCommitService(context));
         SetEmployeeUser(controller, fixture.OwnerEmployeeId);
         var invalidSessionController = new EmployeeShiftSwapsController(
             context,
             new ManagerEditLockService(),
             new NoopWorkflowLogService(),
-            new NoopRealtimeNotifier());
+            new NoopRealtimeNotifier(), new WebApi.Services.ScheduleVersionCommitService(context));
         SetUser(invalidSessionController, new ClaimsPrincipal(new ClaimsIdentity(
         [
             new Claim(ClaimTypes.Name, "employee")
@@ -670,7 +670,7 @@ public sealed class ShiftSwapControllerWorkflowTests
             context,
             new ManagerEditLockService(),
             new NoopWorkflowLogService(),
-            new NoopRealtimeNotifier());
+            new NoopRealtimeNotifier(), new WebApi.Services.ScheduleVersionCommitService(context));
         SetEmployeeUser(controller, fixture.OwnerEmployeeId);
 
         var badTime = await Assert.ThrowsAsync<ValidationException>(() =>
@@ -705,7 +705,7 @@ public sealed class ShiftSwapControllerWorkflowTests
             context,
             lockService,
             new NoopWorkflowLogService(),
-            new NoopRealtimeNotifier());
+            new NoopRealtimeNotifier(), new WebApi.Services.ScheduleVersionCommitService(context));
         SetEmployeeUser(ownerController, fixture.OwnerEmployeeId);
         var createResult = await ownerController.Create(new CreateEmployeeShiftSwapRequest
         {
@@ -718,7 +718,7 @@ public sealed class ShiftSwapControllerWorkflowTests
             context,
             lockService,
             new NoopWorkflowLogService(),
-            new NoopRealtimeNotifier());
+            new NoopRealtimeNotifier(), new WebApi.Services.ScheduleVersionCommitService(context));
         SetEmployeeUser(targetController, fixture.TargetEmployeeId);
         var notOwnerException = await Assert.ThrowsAsync<ValidationException>(() =>
             targetController.Cancel(createdDto.Id, CancellationToken.None));
@@ -751,7 +751,7 @@ public sealed class ShiftSwapControllerWorkflowTests
             context,
             lockService,
             new NoopWorkflowLogService(),
-            new NoopRealtimeNotifier());
+            new NoopRealtimeNotifier(), new WebApi.Services.ScheduleVersionCommitService(context));
         SetEmployeeUser(ownerController, fixture.OwnerEmployeeId);
 
         var createResult = await ownerController.Create(new CreateEmployeeShiftSwapRequest
@@ -774,7 +774,7 @@ public sealed class ShiftSwapControllerWorkflowTests
             context,
             lockService,
             new NoopWorkflowLogService(),
-            new NoopRealtimeNotifier());
+            new NoopRealtimeNotifier(), new WebApi.Services.ScheduleVersionCommitService(context));
         SetEmployeeUser(targetController, fixture.TargetEmployeeId);
         var visibleResult = await targetController.GetVisible(CancellationToken.None);
         var visibleDto = Assert.Single(Assert.IsAssignableFrom<IEnumerable<ShiftSwapDto>>(
@@ -824,7 +824,7 @@ public sealed class ShiftSwapControllerWorkflowTests
             context,
             lockService,
             new NoopWorkflowLogService(),
-            new NoopRealtimeNotifier());
+            new NoopRealtimeNotifier(), new WebApi.Services.ScheduleVersionCommitService(context));
         SetEmployeeUser(ownerController, fixture.OwnerEmployeeId);
         var createResult = await ownerController.Create(new CreateEmployeeShiftSwapRequest
         {
@@ -839,7 +839,7 @@ public sealed class ShiftSwapControllerWorkflowTests
             context,
             lockService,
             new NoopWorkflowLogService(),
-            new NoopRealtimeNotifier());
+            new NoopRealtimeNotifier(), new WebApi.Services.ScheduleVersionCommitService(context));
         SetEmployeeUser(targetController, fixture.TargetEmployeeId);
         var visibleResult = await targetController.GetVisible(CancellationToken.None);
         var visibleDto = Assert.Single(Assert.IsAssignableFrom<IEnumerable<ShiftSwapDto>>(
@@ -868,7 +868,7 @@ public sealed class ShiftSwapControllerWorkflowTests
             context,
             lockService,
             new NoopWorkflowLogService(),
-            new NoopRealtimeNotifier());
+            new NoopRealtimeNotifier(), new WebApi.Services.ScheduleVersionCommitService(context));
         SetEmployeeUser(ownerController, fixture.OwnerEmployeeId);
         var createResult = await ownerController.Create(new CreateEmployeeShiftSwapRequest
         {
@@ -885,7 +885,7 @@ public sealed class ShiftSwapControllerWorkflowTests
             context,
             lockService,
             new NoopWorkflowLogService(),
-            new NoopRealtimeNotifier());
+            new NoopRealtimeNotifier(), new WebApi.Services.ScheduleVersionCommitService(context));
         SetEmployeeUser(targetController, fixture.TargetEmployeeId);
 
         var visibleResult = await targetController.GetVisible(CancellationToken.None);
@@ -905,7 +905,7 @@ public sealed class ShiftSwapControllerWorkflowTests
         await using var context = database.CreateContext();
         var fixture = await SeedPublishedScheduleAsync(context);
         var lockService = new ManagerEditLockService();
-        var ownerController = new EmployeeShiftSwapsController(context, lockService, new NoopWorkflowLogService(), new NoopRealtimeNotifier());
+        var ownerController = new EmployeeShiftSwapsController(context, lockService, new NoopWorkflowLogService(), new NoopRealtimeNotifier(), new WebApi.Services.ScheduleVersionCommitService(context));
         SetEmployeeUser(ownerController, fixture.OwnerEmployeeId);
 
         var createResult = await ownerController.Create(new CreateEmployeeShiftSwapRequest
@@ -925,7 +925,7 @@ public sealed class ShiftSwapControllerWorkflowTests
             ScheduleSlotId = fixture.OwnerSlotId,
         }, CancellationToken.None));
 
-        var targetController = new EmployeeShiftSwapsController(context, lockService, new NoopWorkflowLogService(), new NoopRealtimeNotifier());
+        var targetController = new EmployeeShiftSwapsController(context, lockService, new NoopWorkflowLogService(), new NoopRealtimeNotifier(), new WebApi.Services.ScheduleVersionCommitService(context));
         SetEmployeeUser(targetController, fixture.TargetEmployeeId);
         var acceptBlocked = await Assert.ThrowsAsync<ValidationException>(() => targetController.Accept(created.Id, CancellationToken.None));
 
@@ -997,7 +997,7 @@ public sealed class ShiftSwapControllerWorkflowTests
             context,
             lockService,
             new NoopWorkflowLogService(),
-            new NoopRealtimeNotifier());
+            new NoopRealtimeNotifier(), new WebApi.Services.ScheduleVersionCommitService(context));
         SetEmployeeUser(ownerController, fixture.OwnerEmployeeId);
         var sharedCreateResult = await ownerController.Create(new CreateEmployeeShiftSwapRequest
         {
@@ -1010,7 +1010,7 @@ public sealed class ShiftSwapControllerWorkflowTests
             context,
             lockService,
             new NoopWorkflowLogService(),
-            new NoopRealtimeNotifier());
+            new NoopRealtimeNotifier(), new WebApi.Services.ScheduleVersionCommitService(context));
         SetEmployeeUser(otherController, otherEmployee.Id);
         var otherCreateResult = await otherController.Create(new CreateEmployeeShiftSwapRequest
         {
@@ -1023,7 +1023,7 @@ public sealed class ShiftSwapControllerWorkflowTests
             context,
             lockService,
             new NoopWorkflowLogService(),
-            new NoopRealtimeNotifier());
+            new NoopRealtimeNotifier(), new WebApi.Services.ScheduleVersionCommitService(context));
         SetEmployeeUser(targetController, fixture.TargetEmployeeId);
         var visibleResult = await targetController.GetVisible(CancellationToken.None);
         var visibleSwap = Assert.Single(Assert.IsAssignableFrom<IEnumerable<ShiftSwapDto>>(
@@ -1062,7 +1062,7 @@ public sealed class ShiftSwapControllerWorkflowTests
             context,
             lockService,
             new NoopWorkflowLogService(),
-            new NoopRealtimeNotifier());
+            new NoopRealtimeNotifier(), new WebApi.Services.ScheduleVersionCommitService(context));
         SetEmployeeUser(controller, fixture.OwnerEmployeeId);
 
         var lockedException = await Assert.ThrowsAsync<ValidationException>(() =>
@@ -1222,7 +1222,7 @@ public sealed class ShiftSwapControllerWorkflowTests
             context,
             new ManagerEditLockService(),
             new NoopWorkflowLogService(),
-            new NoopRealtimeNotifier());
+            new NoopRealtimeNotifier(), new WebApi.Services.ScheduleVersionCommitService(context));
         SetEmployeeUser(employeeController, fixture.TargetEmployeeId);
         var acceptResult = await employeeController.Accept(createdDto.Id, CancellationToken.None);
 
@@ -1298,7 +1298,7 @@ public sealed class ShiftSwapControllerWorkflowTests
             context,
             new ManagerEditLockService(),
             new NoopWorkflowLogService(),
-            new NoopRealtimeNotifier());
+            new NoopRealtimeNotifier(), new WebApi.Services.ScheduleVersionCommitService(context));
         SetEmployeeUser(employeeController, fixture.OwnerEmployeeId);
         var createResult = await employeeController.Create(new CreateEmployeeShiftSwapRequest
         {

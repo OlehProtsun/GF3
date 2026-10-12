@@ -323,7 +323,7 @@ public sealed class ShiftSwapSlotNoConflictTests
         AppDbContext context, int employeeId, IRealtimeNotifier? notifier = null, IScheduleEditLockService? locks = null)
     {
         var controller = new EmployeeShiftSwapsController(context, locks ?? new ManagerEditLockService(),
-            new NoopWorkflowLogService(), notifier ?? new NoopRealtimeNotifier());
+            new NoopWorkflowLogService(), notifier ?? new NoopRealtimeNotifier(), new WebApi.Services.ScheduleVersionCommitService(context));
         controller.ControllerContext = new ControllerContext
         {
             HttpContext = new DefaultHttpContext

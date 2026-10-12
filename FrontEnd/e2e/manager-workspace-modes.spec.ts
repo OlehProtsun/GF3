@@ -63,6 +63,66 @@ async function login(page: Page) {
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Choose workspace" })).toBeVisible();
 }
+
+const legalDestinations = ["/legal/index.html", "/legal/regulamin.html", "/legal/polityka-prywatnosci.html"];
+async function legalFooter(page: Page, destinations: string[]) {
+  const nav = page.getByRole("navigation", { name: "Legal documents", exact: true });
+  await expect(nav).toHaveCount(1);
+  await expect(nav.getByRole("link")).toHaveCount(destinations.length);
+  for (const href of destinations) await expect(nav.locator(`a[href="${href}"]`)).toHaveCount(1);
+}
+
+test("legal footer remains on login in both password input modes", async ({ page }) => {
+  await fixture(page);
+  await page.goto("/login");
+  for (const mode of ["PC", "Phone", "PC"]) {
+    await page.getByRole("group", { name: "Password input mode" }).getByRole("button", { name: mode, exact: true }).click();
+    await legalFooter(page, [...legalDestinations, "/legal/pliki-cookies.html"]);
+  }
+});
+
+test("legal footer exists only on manager PC account profile", async ({ page }) => {
+  test.setTimeout(60_000);
+  await fixture(page, "pc", "manager");
+  await page.goto("/manager-profile");
+  await legalFooter(page, legalDestinations);
+  for (const path of ["/", "/employee", "/shop", "/availability", "/container", "/container/1/graphs/3", "/communications"]) {
+    await page.waitForLoadState("networkidle");
+    await page.goto(path);
+    await expect(page.locator("aside").first()).toBeVisible();
+    await expect(page.getByRole("navigation", { name: "Legal documents", exact: true })).toHaveCount(0);
+    await page.getByRole("link", { name: "Open manager profile", exact: true }).click();
+    await expect(page).toHaveURL(/\/manager-profile$/);
+    await legalFooter(page, legalDestinations);
+  }
+});
+
+test("legal footer exists only on employee account profile", async ({ page }) => {
+  test.setTimeout(60_000);
+  await fixture(page, "pc", "employee");
+  await page.goto("/profile");
+  await legalFooter(page, legalDestinations);
+  for (const path of ["/", "/availability", "/schedule", "/swap"]) {
+    await page.waitForLoadState("networkidle");
+    await page.goto(path);
+    await expect(page.locator("[data-employee-nav]:visible")).toHaveCount(1);
+    await expect(page.getByRole("navigation", { name: "Legal documents", exact: true })).toHaveCount(0);
+  }
+  await page.locator("[data-employee-nav]:visible").getByRole("link", { name: "Profile", exact: true }).click();
+  await expect(page).toHaveURL(/\/profile$/);
+  await legalFooter(page, legalDestinations);
+});
+
+test("legal footer is absent from manager phone shell including More", async ({ page }) => {
+  test.setTimeout(60_000);
+  await fixture(page, "phone", "manager");
+  for (const path of ["/", "/employee", "/shop", "/availability", "/container", "/more"]) {
+    await page.waitForLoadState("networkidle");
+    await page.goto(path);
+    await expect(page.locator("[data-manager-phone]")).toBeVisible();
+    await expect(page.getByRole("navigation", { name: "Legal documents", exact: true })).toHaveCount(0);
+  }
+});
 async function noOverflow(page: Page) {
   await expect(page.locator("[data-manager-phone] header").filter({ hasText: "GF3" })).toHaveCount(0);
   await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);

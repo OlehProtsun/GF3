@@ -54,6 +54,7 @@ public static class WebApiServiceCollectionExtensions
         services.AddSingleton<IScheduleEditLockService>(services => services.GetRequiredService<ManagerEditLockService>());
         services.AddScoped<IRealtimeNotifier, RealtimeNotifier>();
         services.AddScoped<IWorkflowLogService, WorkflowLogService>();
+        services.AddScoped<ScheduleVersionCommitService>();
         services.AddScoped<IScheduleLastUpdateService, ScheduleLastUpdateService>();
         services.Configure<SmtpEmailOptions>(configuration.GetSection("Smtp"));
         services.Configure<ExportTemplatesOptions>(configuration.GetSection("ExportTemplates"));
