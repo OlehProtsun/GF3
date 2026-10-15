@@ -30,7 +30,7 @@ public sealed class BusinessCrudServiceTests
     }
 
     [Fact]
-    public async Task EmployeeService_Delete_GuardsAgainstReferencedEmployee()
+    public async Task EmployeeService_Delete_ArchivesReferencedEmployee()
     {
         await using var database = await SqliteTestDatabase.CreateAsync();
         await using var context = database.CreateContext();
@@ -51,12 +51,10 @@ public sealed class BusinessCrudServiceTests
         var service = new EmployeeService(new DataAccessLayer.Repositories.EmployeeRepository(context));
         var result = await service.TryDeleteAsync(employee.Id);
 
-        Assert.False(result.Succeeded);
-        Assert.Equal(
-            "To delete this employee, first delete all Availability and Schedule entries where this employee is used.",
-            result.Message);
-
-        await Assert.ThrowsAsync<ValidationException>(() => service.DeleteAsync(employee.Id));
+        Assert.True(result.Succeeded);
+        Assert.True((await service.GetAsync(employee.Id))!.IsDeleted);
+        Assert.Equal(employee.Id, (await context.ScheduleSlots.SingleAsync()).EmployeeId);
+        await service.DeleteAsync(employee.Id);
     }
 
     [Fact]
@@ -136,8 +134,8 @@ public sealed class BusinessCrudServiceTests
         var deleteResult = await service.TryDeleteAsync(deleteCandidate.Id);
 
         Assert.True(deleteResult.Succeeded);
-        Assert.Null(await service.GetAsync(deleteCandidate.Id));
-        Assert.Equal(2, await context.Employees.AsNoTracking().CountAsync());
+        Assert.True((await service.GetAsync(deleteCandidate.Id))!.IsDeleted);
+        Assert.Equal(3, await context.Employees.AsNoTracking().CountAsync());
     }
 
     [Fact]

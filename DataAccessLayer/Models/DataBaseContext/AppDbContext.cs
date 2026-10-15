@@ -137,9 +137,11 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             entity.Property(property => property.FirstName).IsRequired();
             entity.Property(property => property.LastName).IsRequired();
             entity.Property(property => property.Email).IsRequired(false);
+            entity.Property(property => property.IsDeleted).IsRequired().HasDefaultValue(false);
             entity.HasIndex(property => new { property.FirstName, property.LastName })
                 .IsUnique()
-                .HasDatabaseName("ux_employee_full_name");
+                .HasDatabaseName("ux_employee_full_name")
+                .HasFilter("\"is_deleted\" = 0");
 
             entity.HasOne(property => property.Account)
                 .WithOne(account => account.Employee)

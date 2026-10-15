@@ -28,6 +28,9 @@ public class EmployeeModel
     [Column("last_name")]
     public string LastName { get; set; } = null!;
 
+    [Column("is_deleted")]
+    public bool IsDeleted { get; set; }
+
     [Column("phone")]
     public string? Phone { get; set; }
 

@@ -435,6 +435,12 @@ namespace DataAccessLayer.Migrations
                         .HasColumnType("TEXT")
                         .HasColumnName("first_name");
 
+                    b.Property<bool>("IsDeleted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER")
+                        .HasDefaultValue(false)
+                        .HasColumnName("is_deleted");
+
                     b.Property<string>("LastName")
                         .IsRequired()
                         .HasColumnType("TEXT")
@@ -448,7 +454,8 @@ namespace DataAccessLayer.Migrations
 
                     b.HasIndex("FirstName", "LastName")
                         .IsUnique()
-                        .HasDatabaseName("ux_employee_full_name");
+                        .HasDatabaseName("ux_employee_full_name")
+                        .HasFilter("\"is_deleted\" = 0");
 
                     b.ToTable("employee");
                 });

@@ -56,6 +56,8 @@ public class ContainerModel
 /// </summary>
 public class EmployeeModel
 {
+    public bool IsDeleted { get; set; }
+
     /// <summary>
     /// Persistent employee identifier.
     /// </summary>

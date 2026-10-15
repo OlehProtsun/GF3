@@ -178,7 +178,7 @@ public sealed class WebApiControllerAndMiddlewareTests
     }
 
     [Fact]
-    public async Task EmployeesController_Delete_ReturnsBadRequest_WhenDeleteGuardFails()
+    public async Task EmployeesController_Delete_SucceedsForReferencedEmployee()
     {
         await using var database = await SqliteTestDatabase.CreateAsync();
         await using var context = database.CreateContext();
@@ -200,10 +200,9 @@ public sealed class WebApiControllerAndMiddlewareTests
         SetHttpContext(controller);
 
         var result = await controller.Delete(employee.Id, CancellationToken.None);
-        var badRequest = Assert.IsType<BadRequestObjectResult>(result);
-        var problem = Assert.IsType<ValidationProblemDetails>(badRequest.Value);
-
-        Assert.Equal(["To delete this employee, first delete all Availability and Schedule entries where this employee is used."], problem.Errors["general"]);
+        Assert.IsType<NoContentResult>(result);
+        Assert.True((await context.Employees.AsNoTracking().SingleAsync()).IsDeleted);
+        Assert.Equal(employee.Id, (await context.ScheduleSlots.SingleAsync()).EmployeeId);
     }
 
     [Fact]
