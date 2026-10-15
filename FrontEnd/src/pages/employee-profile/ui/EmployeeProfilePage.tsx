@@ -1,5 +1,5 @@
 import { t } from "@shared/i18n";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   useDeleteEmployeeMutation,
@@ -18,6 +18,7 @@ export function EmployeeProfilePage() {
   const { employeeId } = useParams<{ employeeId: string }>();
   const id = employeeId ? Number(employeeId) : null;
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+  const deleteInFlight = useRef(false);
   const [isKickOpen, setIsKickOpen] = useState(false);
 
   const employeeQuery = useEmployeeByIdQuery(Number.isFinite(id) ? id : null);
@@ -31,10 +32,15 @@ export function EmployeeProfilePage() {
   const hasLoadError = !employee && (!hasValidId || (!isEmployeeLoading && (employeeQuery.isError || Boolean(employeeQuery.error))));
 
   const handleDeleteConfirm = () => {
-    if (!id) return;
+    if (!id || !isDeleteOpen || deleteInFlight.current || deleteMutation.isPending) return;
 
+    deleteInFlight.current = true;
     deleteMutation.mutate(id, {
-      onSuccess: () => navigate("/employee"),
+      onSuccess: () => {
+        deleteInFlight.current = false;
+        navigate("/employee");
+      },
+      onError: () => { deleteInFlight.current = false; },
     });
   };
 
@@ -73,11 +79,14 @@ export function EmployeeProfilePage() {
 
       <ConfirmDialog
         open={isDeleteOpen}
-        title={t("Delete employee")}
-        message={t("Are you sure you want to delete this employee? This action cannot be undone.")}
+        title="Usunąć pracownika?"
+        message="Czy na pewno chcesz usunąć tego pracownika? Ta operacja jest nieodwracalna."
         onCancel={() => setIsDeleteOpen(false)}
         onConfirm={handleDeleteConfirm}
-        confirmText={deleteMutation.isPending ? t("Deleting...") : t("Delete")}
+        confirmText="Usuń"
+        cancelText="Anuluj"
+        confirmDisabled={deleteMutation.isPending}
+        cancelDisabled={deleteMutation.isPending}
       />
 
       <ConfirmDialog
