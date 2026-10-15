@@ -78,6 +78,13 @@ public sealed class DatabaseMigrationStartupTests
 
             await using var verificationContext = CreateContext(workspace.ConnectionString);
             Assert.Equal(2, await verificationContext.Employees.CountAsync());
+            var employees = await verificationContext.Employees.OrderBy(employee => employee.FirstName).ToListAsync();
+            Assert.Equal(new[] { "Alice", "Bob" }, employees.Select(employee => employee.FirstName));
+            Assert.All(employees, employee =>
+            {
+                Assert.Equal("Existing", employee.LastName);
+                Assert.False(employee.IsDeleted);
+            });
             var migratedSchedule = Assert.Single(await verificationContext.Schedules.ToListAsync());
             Assert.True(migratedSchedule.AllowSwap);
             Assert.Single(await verificationContext.ScheduleSlots.ToListAsync());
@@ -121,11 +128,19 @@ public sealed class DatabaseMigrationStartupTests
     {
         var container = new ContainerModel { Name = "Release container" };
         var shop = new ShopModel { Name = "Release shop", Address = "Production address" };
-        var alice = new EmployeeModel { FirstName = "Alice", LastName = "Existing" };
-        var bob = new EmployeeModel { FirstName = "Bob", LastName = "Existing" };
-
-        context.AddRange(container, shop, alice, bob);
+        context.AddRange(container, shop);
         await context.SaveChangesAsync();
+
+        await context.Database.ExecuteSqlInterpolatedAsync($"""
+            INSERT INTO employee (first_name, last_name) VALUES ({"Alice"}, {"Existing"});
+            INSERT INTO employee (first_name, last_name) VALUES ({"Bob"}, {"Existing"});
+            """);
+        var aliceId = await context.Database
+            .SqlQueryRaw<int>("SELECT id AS Value FROM employee WHERE first_name = 'Alice' AND last_name = 'Existing'")
+            .SingleAsync();
+        var bobId = await context.Database
+            .SqlQueryRaw<int>("SELECT id AS Value FROM employee WHERE first_name = 'Bob' AND last_name = 'Existing'")
+            .SingleAsync();
 
         await context.Database.ExecuteSqlInterpolatedAsync($"""
             INSERT INTO schedule
@@ -145,7 +160,7 @@ public sealed class DatabaseMigrationStartupTests
             ScheduleId = scheduleId,
             DayOfMonth = 5,
             SlotNo = 1,
-            EmployeeId = alice.Id,
+            EmployeeId = aliceId,
             Status = SlotStatus.ASSIGNED,
             FromTime = "09:00",
             ToTime = "17:00",
@@ -158,7 +173,7 @@ public sealed class DatabaseMigrationStartupTests
             INSERT INTO shift_swap_request
                 (schedule_id, schedule_slot_id, from_employee_id, accepted_by_employee_id,
                  visibility, status, created_at_utc, accepted_at_utc)
-            VALUES ({scheduleId}, {slot.Id}, {alice.Id}, {bob.Id}, {"Public"}, {"Accepted"},
+            VALUES ({scheduleId}, {slot.Id}, {aliceId}, {bobId}, {"Public"}, {"Accepted"},
                 {new DateTimeOffset(2026, 6, 25, 8, 0, 0, TimeSpan.Zero)},
                 {new DateTimeOffset(2026, 6, 25, 9, 0, 0, TimeSpan.Zero)});
             """);

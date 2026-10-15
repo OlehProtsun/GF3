@@ -14,6 +14,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using WebApi.Auth;
@@ -38,11 +39,17 @@ public sealed class RealtimeAuthenticationExpiryTests
         await db.SaveChangesAsync();
         var jwtOptions = new JwtAuthOptions { Issuer = "tests", Audience = "tests", SigningKey = "realtime-expiry-test-signing-key-2026" };
         var builder = WebApplication.CreateBuilder();
+        builder.Host.UseDefaultServiceProvider(options =>
+        {
+            options.ValidateOnBuild = true;
+            options.ValidateScopes = true;
+        });
         builder.Logging.ClearProviders();
         builder.WebHost.UseUrls("http://127.0.0.1:0");
         builder.Services.AddDbContext<AppDbContext>(options => options.UseSqlite(database.ConnectionString));
         builder.Services.AddScoped<IManagerAccountRepository, ManagerAccountRepository>();
         builder.Services.AddScoped<IEmployeeAccountRepository, EmployeeAccountRepository>();
+        builder.Services.AddScoped<IEmployeeRepository, EmployeeRepository>();
         builder.Services.AddScoped<IEmployeeAccountService, EmployeeAccountService>();
         builder.Services.AddSingleton<IPasswordHasher, PasswordHasher>();
         builder.Services.AddSingleton<IEmployeePresenceService, EmployeePresenceService>();
