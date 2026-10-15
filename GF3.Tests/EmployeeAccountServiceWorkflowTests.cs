@@ -126,7 +126,7 @@ public sealed class EmployeeAccountServiceWorkflowTests
 
         Assert.Null(noAccount);
         Assert.Empty(await context.EmployeeAccounts.AsNoTracking().ToListAsync());
-        Assert.Equal("A valid employee id is required before creating an account.", invalidEmployeeId.Message);
+        Assert.Equal("The employee profile is deleted or could not be found.", invalidEmployeeId.Message);
         Assert.Equal("Username is required when creating a login account.", missingUsername.Message);
         Assert.Equal("Password is required when creating a login account.", missingPassword.Message);
     }
@@ -341,7 +341,8 @@ public sealed class EmployeeAccountServiceWorkflowTests
         => new(
             new EmployeeAccountRepository(context),
             new ManagerAccountRepository(context),
-            passwordHasher ?? new PasswordHasher());
+            passwordHasher ?? new PasswordHasher(),
+            new EmployeeRepository(context));
 
     private static async Task<EmployeeModel> AddEmployeeAsync(
         DataAccessLayer.Models.DataBaseContext.AppDbContext context,

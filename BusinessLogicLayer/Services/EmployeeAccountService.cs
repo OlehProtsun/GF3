@@ -20,15 +20,18 @@ public sealed class EmployeeAccountService : IEmployeeAccountService
     private readonly IEmployeeAccountRepository _accountRepository;
     private readonly IManagerAccountRepository _managerAccountRepository;
     private readonly IPasswordHasher _passwordHasher;
+    private readonly IEmployeeRepository _employeeRepository;
 
     public EmployeeAccountService(
         IEmployeeAccountRepository accountRepository,
         IManagerAccountRepository managerAccountRepository,
-        IPasswordHasher passwordHasher)
+        IPasswordHasher passwordHasher,
+        IEmployeeRepository employeeRepository)
     {
         _accountRepository = accountRepository;
         _managerAccountRepository = managerAccountRepository;
         _passwordHasher = passwordHasher;
+        _employeeRepository = employeeRepository;
     }
 
     public async Task<EmployeeAccountModel?> GetByEmployeeIdAsync(int employeeId, CancellationToken ct = default)
@@ -53,6 +56,10 @@ public sealed class EmployeeAccountService : IEmployeeAccountService
 
     public async Task<EmployeeAccountModel?> UpsertForEmployeeAsync(int employeeId, string? username, string? password, CancellationToken ct = default)
     {
+        var employee = await _employeeRepository.GetByIdAsync(employeeId, ct).ConfigureAwait(false);
+        if (employee is null || employee.IsDeleted)
+            throw new ValidationException("The employee profile is deleted or could not be found.");
+
         var existingAccount = await _accountRepository.GetByEmployeeIdAsync(employeeId, ct).ConfigureAwait(false);
         var normalizedUsername = NormalizeUsername(username);
         var normalizedPassword = NormalizePassword(password);

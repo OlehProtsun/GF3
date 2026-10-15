@@ -28,7 +28,8 @@ public sealed class EmployeeFacade : IEmployeeFacade
 
     public async Task<IReadOnlyList<EmployeeDto>> GetAllAsync(CancellationToken ct = default)
     {
-        var employees = await _employeeService.GetAllAsync(ct).ConfigureAwait(false);
+        var employees = (await _employeeService.GetAllAsync(ct).ConfigureAwait(false))
+            .Where(employee => !employee.IsDeleted).ToList();
         var accountMap = await _employeeAccountService
             .GetByEmployeeIdsAsync(employees.Select(employee => employee.Id), ct)
             .ConfigureAwait(false);
@@ -39,7 +40,8 @@ public sealed class EmployeeFacade : IEmployeeFacade
 
     public async Task<IReadOnlyList<EmployeeDto>> GetByValueAsync(string value, CancellationToken ct = default)
     {
-        var employees = await _employeeService.GetByValueAsync(value, ct).ConfigureAwait(false);
+        var employees = (await _employeeService.GetByValueAsync(value, ct).ConfigureAwait(false))
+            .Where(employee => !employee.IsDeleted).ToList();
         var accountMap = await _employeeAccountService
             .GetByEmployeeIdsAsync(employees.Select(employee => employee.Id), ct)
             .ConfigureAwait(false);
@@ -51,7 +53,7 @@ public sealed class EmployeeFacade : IEmployeeFacade
     public async Task<EmployeeDto?> GetAsync(int id, CancellationToken ct = default)
     {
         var model = await _employeeService.GetAsync(id, ct).ConfigureAwait(false);
-        if (model is null)
+        if (model is null || model.IsDeleted)
         {
             return null;
         }

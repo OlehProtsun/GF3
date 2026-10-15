@@ -183,7 +183,7 @@ public sealed class ReviewSecurityTests
     }
 
     private static EmployeeAccountService CreateEmployeeService(AppDbContext db)
-        => new(new EmployeeAccountRepository(db), new ManagerAccountRepository(db), new PasswordHasher());
+        => new(new EmployeeAccountRepository(db), new ManagerAccountRepository(db), new PasswordHasher(), new EmployeeRepository(db));
 
     private static async Task<AuthenticateResult> Authenticate(AppDbContext db, string token, string? queryPath = null)
     {
