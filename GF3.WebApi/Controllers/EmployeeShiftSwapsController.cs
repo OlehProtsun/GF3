@@ -512,12 +512,8 @@ public sealed class EmployeeShiftSwapsController(
                 candidate, new(candidate.FromTime, candidate.ToTime), assignments, offers);
             var windows = ShiftSwapExchangeRules.FindEligibleReturnWindows(input, candidate);
             var dto = CandidateSummary(candidate, new(candidate.FromTime, candidate.ToTime));
-            var firstEnd = ParseTimeMinutes(candidate.FromTime)!.Value + ShiftSwapExchangeRules.DurationMinutes(source.Period);
-            var reasonInput = input with { ReturnPeriod = new(candidate.FromTime,
-                firstEnd <= ParseTimeMinutes(candidate.ToTime) ? $"{firstEnd / 60:00}:{firstEnd % 60:00}" : candidate.ToTime) };
             dto.CanSelect = windows.Count > 0;
-            dto.UnavailableReason = dto.CanSelect ? null : dto.DurationMinutes < ShiftSwapExchangeRules.DurationMinutes(source.Period)
-                ? "Not enough hours." : ShiftSwapExchangeRules.GetExchangeConflictReason(reasonInput) ?? "No compatible return period.";
+            dto.UnavailableReason = dto.CanSelect ? null : ShiftSwapExchangeRules.GetExchangeConflictReason(input) ?? "No compatible return period.";
             dto.SuggestedFromTime = windows.FirstOrDefault().FromTime;
             dto.SuggestedToTime = windows.FirstOrDefault().ToTime;
             dto.EligibleWindows = windows.Select(window => new ShiftSwapEligibleWindowDto(window.FromTime, window.ToTime)).ToList();

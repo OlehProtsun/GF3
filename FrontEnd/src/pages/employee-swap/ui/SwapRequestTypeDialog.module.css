@@ -1,42 +1,28 @@
-.content { display: grid; gap: 20px; min-width: 0; }
+.content { flex: 1; display: flex; flex-direction: column; gap: 12px; min-width: 0; min-height: 0; padding: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
 .content h2, .content p { margin: 0; }
-.content button { min-height: 48px; border: 1px solid #e5eaf1; border-radius: 20px; padding: 12px 18px; background: white; color: #23344e; cursor: pointer; font: inherit; }
-.person { display: flex; align-items: center; gap: 12px; }
-.person > span { display: grid; place-items: center; width: 48px; height: 48px; background: #edf3ff; color: #2f6df5; border-radius: 50%; }
-.options { display: grid; gap: 12px; }
-.options [aria-checked="true"] { border-color: #2f6df5; background: #f1f6ff; }
-.selection { display: grid; gap: 12px; padding: 18px; border: 1px solid #e5eaf1; border-radius: 22px; background: #f7f9fc; }
-.selection p { line-height: 1.7; overflow-wrap: anywhere; }
-.footer { position: sticky; bottom: -20px; background: white; padding: 14px 0 max(12px, env(safe-area-inset-bottom, 0px)); }
-.content .footer button { width: 100%; min-height: 50px; background: #2f6df5; color: white; }
-.content button:disabled { opacity: .5; cursor: default; }
-
-.content { position: relative; display: flex; flex-direction: column; min-height: 0; padding-top: 54px; gap: 12px; }
+.content > h2, .description, .footer { flex-shrink: 0; }
 .handle { position: absolute; top: 16px; left: calc(50% - 22px); width: 44px; height: 5px; background: #cbd0da; border-radius: 5px; }
-.description { flex: none; font-size: 14px; line-height: 1.5; color: #66758c; }
-.scroll { min-height: 0; overflow-y: auto; display: grid; gap: 14px; padding: 2px; overscroll-behavior: contain; }
-.person { padding: 12px; border: 1px solid #e5eaf1; border-radius: 16px; background: #f7f9fc; }
-.person > span { flex: none; width: 40px; height: 40px; }
-.person strong { font-size: 15px; font-weight: 700; overflow-wrap: anywhere; color: #101a30; }
-.options { gap: 10px; }
-.options button { display: flex; align-items: flex-start; gap: 12px; padding: 14px; text-align: left; border-radius: 18px; }
-.options button > span:last-child { display: grid; gap: 6px; min-width: 0; }
-.options strong { font-size: 16px; font-weight: 700; color: #101a30; }
+.description { font-size: 14px; line-height: 1.45; color: #66758c; overflow-wrap: anywhere; }
+.scroll { display: grid; align-content: start; gap: 14px; padding: 2px; }
+.person { display: flex; align-items: center; gap: 12px; padding: 10px; border: 1px solid #e5eaf1; border-radius: 14px; background: #f7f9fc; }
+.person > span { flex: none; display: grid; place-items: center; width: 36px; height: 36px; background: #edf3ff; color: #2f6df5; border-radius: 50%; font-size: 13px; }
+.person strong { min-width: 0; font-size: 15px; overflow-wrap: anywhere; color: #101a30; }
+.options { display: grid; gap: 12px; }
+.options button { display: flex; align-items: flex-start; gap: 12px; padding: 12px; text-align: left; }
+.options button > span:last-child { display: grid; gap: 5px; min-width: 0; overflow-wrap: anywhere; }
+.options strong { font-size: 16px; color: #101a30; }
 .options small { font-size: 13px; line-height: 1.45; color: #66758c; }
-.radio { flex: none; width: 24px; height: 24px; border: 1.5px solid #9aa6b8; border-radius: 50%; box-sizing: border-box; margin-top: 1px; }
+.options [aria-checked="true"] { border-color: #2f6df5; background: #f1f6ff; }
+.radio { flex: none; width: 24px; height: 24px; border: 1.5px solid #9aa6b8; border-radius: 50%; box-sizing: border-box; }
 [aria-checked="true"] > .radio { border: 7px solid #246bff; background: white; }
-.selection { border: 0; border-radius: 0; background: transparent; padding: 0; gap: 10px; }
-.selection h3 { color: #101a30; font-size: 17px; font-weight: 700; }
-.shiftCard { display: flex; gap: 10px; align-items: center; border: 1px solid #e5eaf1; border-radius: 16px; padding: 12px; }
+.selection { display: grid; gap: 10px; }
+.selection h3 { color: #101a30; font-size: 16px; }
+.shiftCard { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; border: 1px solid #e5eaf1; border-radius: 14px; padding: 10px; }
 .shiftCard svg { width: 28px; height: 28px; flex: none; color: #66758c; }
-.shiftCard > div { display: grid; gap: 5px; flex: 1; min-width: 0; font-size: 13px; }
-.shiftCard strong { color: #101a30; font-size: 14px; font-weight: 700; }
+.shiftCard > div { display: grid; gap: 5px; flex: 1; min-width: 0; font-size: 13px; overflow-wrap: anywhere; }
+.shiftCard strong { color: #101a30; font-size: 14px; }
 .shiftCard span { color: #66758c; }
-.shiftCard button { padding: 8px 12px; min-height: 44px; border: 0; border-radius: 12px; color: #246bff; background: #e8f1ff; font-size: 13px; font-weight: 600; }
-.selection p { color: #7b879b; font-size: 12px; }
-.footer { flex: none; position: static; padding: 4px 0 max(18px, env(safe-area-inset-bottom, 0px)); }
-.content .footer button { min-height: 52px; border-radius: 18px; font-size: 17px; font-weight: 600; }
-@media (max-width: 360px) { .content { gap: 10px; } .scroll { gap: 10px; } .options button { padding: 12px; } .shiftCard { padding: 10px; gap: 8px; } }
-
-.content .shiftCard button { color: #246bff; background: #e8f1ff; border: 0; }
-.content .selection h3 { font-size: 17px; font-weight: 700; }
+.content .shiftCard button { padding: 8px 10px; color: #246bff; background: #e8f1ff; border: 0; font-size: 13px; }
+.selection p { font-size: 12px; color: #66758c; line-height: 1.45; }
+.footer { padding: 12px 0 max(12px, env(safe-area-inset-bottom, 0px)); border-top: 1px solid #edf0f5; background: #fffffff5; }
+.content .footer button { width: 100%; height: 48px; background: #2f6df5; color: white; border-color: #2f6df5; font-size: 16px; font-weight: 600; }

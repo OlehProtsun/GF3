@@ -11,12 +11,12 @@ export const useShiftSwapReturnCandidatesQuery = (params: ShiftSwapCandidatePara
   queryFn: async ({ signal }) => {
     const items = [];
     let result;
-    for (let page = 1; page <= (params?.page ?? 1); page++) {
+    for (let page = 1; !result || result.hasMore; page++) {
       result = await shiftSwapsApi.listReturnCandidates({ ...params!, page }, signal);
       items.push(...result.items);
       if (!result.hasMore) break;
     }
-    return { ...result!, items };
+    return { ...result!, items, hasMore: false };
   },
 });
 

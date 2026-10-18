@@ -369,11 +369,12 @@ public sealed class ShiftSwapExchangeTests
         for (var iteration = 0; iteration < 1000; iteration++)
         {
             var duration = random.Next(1, 240);
+            var returnDuration = random.Next(1, 240);
             var sourceFrom = random.Next(60, 800); var returnFrom = random.Next(60, 800);
             var sourceSchedule = new ScheduleModel { Id = 1, ContainerId = 1, Year = 2026, Month = 10, PublicationStatus = SchedulePublicationStatus.Public, AllowSwap = true };
             var returnSchedule = new ScheduleModel { Id = 2, ContainerId = 1, Year = 2026, Month = 10, PublicationStatus = SchedulePublicationStatus.Public, AllowSwap = true };
             var source = new ScheduleSlotModel { Id = 1, ScheduleId = 1, Schedule = sourceSchedule, DayOfMonth = 1, SlotNo = 1, EmployeeId = 1, Status = SlotStatus.ASSIGNED, FromTime = Time(sourceFrom - 10), ToTime = Time(sourceFrom + duration + 10) };
-            var back = new ScheduleSlotModel { Id = 2, ScheduleId = 2, Schedule = returnSchedule, DayOfMonth = random.Next(1, 3), SlotNo = 1, EmployeeId = 2, Status = SlotStatus.ASSIGNED, FromTime = Time(returnFrom - 10), ToTime = Time(returnFrom + duration + 10) };
+            var back = new ScheduleSlotModel { Id = 2, ScheduleId = 2, Schedule = returnSchedule, DayOfMonth = random.Next(1, 3), SlotNo = 1, EmployeeId = 2, Status = SlotStatus.ASSIGNED, FromTime = Time(returnFrom - 10), ToTime = Time(returnFrom + returnDuration + 10) };
             var assignments = new List<ScheduleSlotModel> { source, back };
             for (var other = 0; other < 5; other++)
             {
@@ -381,16 +382,16 @@ public sealed class ShiftSwapExchangeTests
                 assignments.Add(new() { Id = other + 3, ScheduleId = 2, Schedule = returnSchedule, DayOfMonth = random.Next(1, 3), EmployeeId = random.Next(1, 3), Status = SlotStatus.ASSIGNED, FromTime = Time(from), ToTime = Time(from + 30) });
             }
             var give = new ShiftSwapRules.ShiftSwapPeriod(Time(sourceFrom), Time(sourceFrom + duration));
-            var receive = new ShiftSwapRules.ShiftSwapPeriod(Time(returnFrom), Time(returnFrom + duration));
-            bool ReferenceCollision(int employee, ScheduleSlotModel outgoing, int from, ScheduleSlotModel incoming, int incomingFrom)
+            var receive = new ShiftSwapRules.ShiftSwapPeriod(Time(returnFrom), Time(returnFrom + returnDuration));
+            bool ReferenceCollision(int employee, ScheduleSlotModel outgoing, int from, int outgoingDuration, ScheduleSlotModel incoming, int incomingFrom, int incomingDuration)
             {
                 var occupied = new HashSet<(int Day, int Minute)>();
                 foreach (var slot in assignments.Where(s => s.EmployeeId == employee))
                     for (var minute = ShiftSwapRules.ParseTimeMinutes(slot.FromTime)!.Value; minute < ShiftSwapRules.ParseTimeMinutes(slot.ToTime); minute++)
-                        if (slot.Id != outgoing.Id || minute < from || minute >= from + duration) occupied.Add((slot.DayOfMonth, minute));
-                return Enumerable.Range(incomingFrom, duration).Any(minute => occupied.Contains((incoming.DayOfMonth, minute)));
+                        if (slot.Id != outgoing.Id || minute < from || minute >= from + outgoingDuration) occupied.Add((slot.DayOfMonth, minute));
+                return Enumerable.Range(incomingFrom, incomingDuration).Any(minute => occupied.Contains((incoming.DayOfMonth, minute)));
             }
-            var expected = ReferenceCollision(1, source, sourceFrom, back, returnFrom) || ReferenceCollision(2, back, returnFrom, source, sourceFrom);
+            var expected = ReferenceCollision(1, source, sourceFrom, duration, back, returnFrom, returnDuration) || ReferenceCollision(2, back, returnFrom, returnDuration, source, sourceFrom, duration);
             Assert.Equal(expected, ShiftSwapExchangeRules.GetExchangeConflictReason(new(1, 2, source, give, back, receive, assignments.OrderBy(_ => random.Next()).ToList(), [])) is not null);
             var fragments = ShiftSwapExchangeRules.ApplyExchangeTransferToSlot(source, 1, 2, give, [source]);
             Assert.Equal(2, fragments.Count);
@@ -439,13 +440,48 @@ public sealed class ShiftSwapExchangeTests
     }
 
     [Theory]
+    [InlineData("09:00", "17:00", "15:00", "21:00", false)]
+    [InlineData("09:00", "14:00", "10:00", "18:00", false)]
+    [InlineData("09:15", "14:00", "10:00", "17:45", true)]
+    public async Task UnequalPeriods_PreviewCreateAndAcceptUseActualHours(string from, string to, string backFrom, string backTo, bool partial)
+    {
+        await using var database = await SqliteTestDatabase.CreateAsync();
+        await using var db = database.CreateContext();
+        var f = await Seed(db);
+        f.Source.FromTime = partial ? "09:00" : from; f.Source.ToTime = partial ? "17:00" : to;
+        f.Back.FromTime = partial ? "09:00" : backFrom; f.Back.ToTime = partial ? "18:00" : backTo;
+        f.Request.FromTime = from; f.Request.ToTime = to;
+        f.Request.ReturnFromTime = backFrom; f.Request.ReturnToTime = backTo;
+        await db.SaveChangesAsync();
+        var candidates = Assert.IsType<ShiftSwapReturnCandidatePageDto>(Assert.IsType<OkObjectResult>((await Employee(db, f.Owner)
+            .GetReturnCandidates(f.Source.ScheduleId, f.Source.Id, from, to, f.Target, default)).Result).Value);
+        var candidate = Assert.Single(candidates.Items);
+        Assert.True(candidate.CanSelect);
+        Assert.Equal(f.Back.FromTime, candidate.SuggestedFromTime); Assert.Equal(f.Back.ToTime, candidate.SuggestedToTime);
+        var before = ShiftSwapRules.GetSlotDurationHours(f.Source);
+        var giveHours = ShiftSwapExchangeRules.DurationMinutes(new(from, to)) / 60d;
+        var receiveHours = ShiftSwapExchangeRules.DurationMinutes(new(backFrom, backTo)) / 60d;
+        var preview = Assert.IsType<ShiftSwapOfferPreviewDto>(Assert.IsType<OkObjectResult>((await Employee(db, f.Owner).Preview(f.Request, default)).Result).Value);
+        Assert.Equal(before - giveHours + receiveHours, preview.ProjectedMonths.Single().HoursAfter, 6);
+        var created = await Create(db, f);
+        await Employee(db, f.Target).Accept(created.Id, default);
+        await using var persisted = database.CreateContext();
+        var slots = await persisted.ScheduleSlots.Include(s => s.Schedule).ToListAsync();
+        Assert.Contains(slots, s => s.EmployeeId == f.Target && s.ScheduleId == f.Source.ScheduleId && s.FromTime == from && s.ToTime == to);
+        Assert.Contains(slots, s => s.EmployeeId == f.Owner && s.ScheduleId == f.Back.ScheduleId && s.FromTime == backFrom && s.ToTime == backTo);
+        Assert.Equal(preview.ProjectedMonths.Single().HoursAfter, slots.Where(s => s.EmployeeId == f.Owner).Sum(ShiftSwapRules.GetSlotDurationHours), 6);
+        Assert.Equal(partial ? 6 : 2, slots.Count);
+        Assert.Single(await persisted.ShiftSwapHistories.ToListAsync());
+        Assert.Equal(4, await persisted.ScheduleVersions.CountAsync());
+    }
+
+    [Theory]
     [InlineData("kind")]
     [InlineData("public")]
     [InlineData("self")]
     [InlineData("unknown")]
     [InlineData("deleted")]
     [InlineData("missing")]
-    [InlineData("unequal")]
     [InlineData("malformed")]
     [InlineData("outside")]
     [InlineData("container")]
@@ -471,7 +507,6 @@ public sealed class ShiftSwapExchangeTests
             case "unknown": f.Request.TargetEmployeeId = 99999; break;
             case "deleted": (await db.Employees.SingleAsync(e => e.Id == f.Target)).IsDeleted = true; break;
             case "missing": f.Request.ReturnToTime = null; break;
-            case "unequal": f.Request.ReturnToTime = "15:59"; break;
             case "malformed": f.Request.ReturnFromTime = "9:00"; break;
             case "outside": f.Request.ReturnFromTime = "08:00"; f.Request.ReturnToTime = "15:00"; break;
             case "container": var other = TestDataFactory.CreateDalContainer("Other"); db.Add(other); await db.SaveChangesAsync(); f.Back.Schedule.ContainerId = other.Id; break;
@@ -539,6 +574,25 @@ public sealed class ShiftSwapExchangeTests
         Assert.DoesNotContain("email", json, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("phone", json, StringComparison.OrdinalIgnoreCase);
         await Assert.ThrowsAsync<ValidationException>(() => Employee(db, f.Target).GetReturnCandidates(f.Source.ScheduleId, f.Source.Id, "09:00", "16:00", f.Owner, default));
+    }
+
+    [Fact]
+    public async Task Candidates_ExposeShortSafeIntervalsWithoutIgnoringConflicts()
+    {
+        await using var database = await SqliteTestDatabase.CreateAsync();
+        await using var db = database.CreateContext();
+        var f = await Seed(db);
+        db.Add(TestDataFactory.CreateDalSlot(f.Source.ScheduleId, f.Back.DayOfMonth, 2, f.Owner, "10:00", "15:00"));
+        await db.SaveChangesAsync();
+        var page = Assert.IsType<ShiftSwapReturnCandidatePageDto>(Assert.IsType<OkObjectResult>((await Employee(db, f.Owner)
+            .GetReturnCandidates(f.Source.ScheduleId, f.Source.Id, "09:00", "16:00", f.Target, default)).Result).Value);
+        var candidate = Assert.Single(page.Items);
+        Assert.True(candidate.CanSelect);
+        Assert.Equal(new[] { new ShiftSwapEligibleWindowDto("09:00", "10:00"), new ShiftSwapEligibleWindowDto("15:00", "16:00") }, candidate.EligibleWindows);
+        f.Request.ReturnToTime = "10:00";
+        await Employee(db, f.Owner).Preview(f.Request, default);
+        f.Request.ReturnToTime = "10:01";
+        await Assert.ThrowsAsync<ValidationException>(() => Employee(db, f.Owner).Preview(f.Request, default));
     }
 
     private static async Task<ShiftSwapDto> Create(AppDbContext db, Fixture f)

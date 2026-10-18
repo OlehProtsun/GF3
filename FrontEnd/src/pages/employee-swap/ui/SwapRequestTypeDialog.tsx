@@ -1,6 +1,7 @@
 import type { ShiftSwapEmployee } from "@entities/shift-swaps/model/types";
 import { t } from "@shared/i18n";
 import { swapShiftDate, type SwapShiftSelection } from "./SwapShiftPickerDialog";
+import { SwapScrollRegion } from "./SwapScrollRegion";
 import styles from "./SwapRequestTypeDialog.module.css";
 
 export function SwapRequestTypeDialog({ employee, kind, selection, onKindChange, onChooseShift, onSave }: {
@@ -11,7 +12,7 @@ export function SwapRequestTypeDialog({ employee, kind, selection, onKindChange,
     <span className={styles.handle} aria-hidden="true" />
     <h2 tabIndex={-1} data-subview-heading>{t("Request type")}</h2>
     <p className={styles.description}>{t("Choose how you want to arrange the shift with {0}.", employee.displayName)}</p>
-    <div className={styles.scroll}>
+    <SwapScrollRegion className={styles.scroll}>
     <div className={styles.person}><span aria-hidden="true">{employee.firstName[0]}{employee.lastName[0]}</span><strong>{employee.displayName}</strong></div>
     <div role="radiogroup" aria-label={t("Request type")} className={styles.options} onKeyDown={event => {
       if (!["ArrowDown", "ArrowUp", "ArrowLeft", "ArrowRight"].includes(event.key)) return;
@@ -31,7 +32,7 @@ export function SwapRequestTypeDialog({ employee, kind, selection, onKindChange,
       </div>
       <p>{t("You can change this later if needed.")}</p>
     </div>}
-    </div>
+    </SwapScrollRegion>
     <footer className={styles.footer}><button type="button" disabled={kind === "exchange" && !selection} onClick={onSave}>{t("Save selection")}</button></footer>
   </section>;
 }

@@ -724,7 +724,7 @@ export function EmployeeSwapPage() {
       </dialog>
       {isGiveAwayExpanded && employeeId && <SwapCreateWizard
         returnFocusRef={createOfferTriggerRef}
-        schedules={schedules} employees={targetEmployees} employeeId={employeeId} swaps={swaps}
+        schedules={schedules} employees={targetEmployees} employeeId={employeeId} employeeName={session?.displayName ?? ""} swaps={swaps}
         busy={createSwapMutation.isPending} error={actionError || (loadError ? getErrorMessage(loadError, t("Could not load swap data.")) : null)}
         onClose={() => { setIsGiveAwayExpanded(false); createOfferTriggerRef.current?.focus({ preventScroll: true }); }}
         onSubmit={payload => { setActionError(null); createSwapMutation.mutate(payload, {

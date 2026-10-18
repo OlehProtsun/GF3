@@ -50,7 +50,6 @@ internal static class ShiftSwapExchangeRules
         }
         catch (ValidationException exception) { return exception.Message; }
         catch (ArgumentOutOfRangeException) { return "The selected shift has an invalid date."; }
-        if (DurationMinutes(give) != DurationMinutes(receive)) return "Exchange periods must have exactly equal duration.";
         if (source.ScheduleId == back.ScheduleId && Date(source) == Date(back) && give == receive)
             return "Choose a different shift period for the exchange.";
         if (offers.Any(offer => offer.Id != requestId && offer.Status == ShiftSwapStatus.Open &&
@@ -66,17 +65,27 @@ internal static class ShiftSwapExchangeRules
 
     internal static IReadOnlyList<ShiftSwapPeriod> FindEligibleReturnWindows(ExchangeInput input, ScheduleSlotModel candidate)
     {
-        var duration = DurationMinutes(input.SourcePeriod);
         var start = ParseTimeMinutes(candidate.FromTime);
         var end = ParseTimeMinutes(candidate.ToTime);
-        if (start is null || end is null || duration <= 0 || end - start < duration) return [];
+        if (start is null || end is null || end <= start) return [];
+        DateOnly candidateDate;
+        try { candidateDate = Date(candidate); }
+        catch (ArgumentOutOfRangeException) { return []; }
+        var remainingOwner = Project(input.Assignments, input.OwnerId, input.Source, input.SourcePeriod, null, null);
         var windows = new List<ShiftSwapPeriod>();
-        // Minute precision also supports legacy shifts that are not aligned to the UI's 15-minute steps.
-        for (var minute = start.Value; minute + duration <= end; minute++)
+        int? runStart = null;
+        // Maximal free intervals allow each side to choose its own duration, including legacy minute boundaries.
+        for (var minute = start.Value; minute <= end.Value; minute++)
         {
-            var period = new ShiftSwapPeriod(Time(minute), Time(minute + duration));
-            if (GetExchangeConflictReason(input with { Return = candidate, ReturnPeriod = period }) is null)
-                windows.Add(period);
+            var free = minute < end.Value && !remainingOwner.Any(item => item.Date == candidateDate && item.Start <= minute && minute < item.End);
+            if (free) runStart ??= minute;
+            else if (runStart is { } from)
+            {
+                var period = new ShiftSwapPeriod(Time(from), Time(minute));
+                if (GetExchangeConflictReason(input with { Return = candidate, ReturnPeriod = period }) is null)
+                    windows.Add(period);
+                runStart = null;
+            }
         }
         return windows;
     }
