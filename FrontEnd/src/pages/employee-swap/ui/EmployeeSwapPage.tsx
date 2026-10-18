@@ -1,7 +1,7 @@
 import { createPortal } from "react-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { queryKeys } from "@shared/api/queryKeys";
-import { dateTimeFormat, t } from "@shared/i18n";
+import { t } from "@shared/i18n";
 import {
   useCallback,
   useDeferredValue,
@@ -15,8 +15,6 @@ import {
 import { useAuth } from "@app/providers/AuthProvider";
 import {
   useEmployeeScheduleListQuery,
-  type EmployeeSchedule,
-  type EmployeeScheduleSlot,
 } from "@entities/employee-schedule";
 import {
   useEmployeeUiStateQuery,
@@ -30,27 +28,14 @@ import {
   useEmployeeShiftSwapEmployeesQuery,
   useEmployeeShiftSwapsQuery,
   type ShiftSwap,
-  type ShiftSwapEmployee,
 } from "@entities/shift-swaps";
 import { getErrorMessage } from "@shared/api/httpClient";
 import { ErrorBanner } from "@shared/ui/components/ErrorBanner";
-import { EmployeeTargetCombobox } from "@shared/ui/components/EmployeeTargetCombobox";
+import { SwapCreateWizard } from "./SwapCreateWizard";
 import { ConfirmDialog } from "@shared/ui/ConfirmDialog";
 import { ArrowIcon, CloseIcon, PinIcon, PlusIcon, SearchIcon, SwapHistoryIcon } from "@shared/ui/icons";
 import workspaceStyles from "@pages/shared/EmployeeWorkspacePage.module.css";
 import styles from "./EmployeeSwapPage.module.css";
-
-const scheduleMonthOnlyFormatter = dateTimeFormat("en-GB", {
-  month: "long",
-  timeZone: "UTC",
-});
-
-const swapDateFormatter = dateTimeFormat("en-GB", {
-  weekday: "short",
-  day: "2-digit",
-  month: "short",
-  timeZone: "UTC",
-});
 
 const swapOfferDateFormatter = new Intl.DateTimeFormat("en-GB", {
   day: "2-digit",
@@ -59,19 +44,6 @@ const swapOfferDateFormatter = new Intl.DateTimeFormat("en-GB", {
   timeZone: "UTC",
 });
 
-const slotWeekdayFormatter = new Intl.DateTimeFormat("en-GB", {
-  weekday: "short",
-  timeZone: "UTC",
-});
-
-const TIME_STEP_MINUTES = 15;
-
-type ShiftSelectionPeriod = {
-  fromTime: string;
-  toTime: string;
-};
-
-type ShiftPeriodMode = "full" | "custom";
 type SwapFilter = "all" | "mine" | "available" | "pinned";
 
 type SwapPreviewStats = {
@@ -82,14 +54,6 @@ type SwapPreviewStats = {
   freeDaysBefore: number;
   freeDaysAfter: number;
 };
-
-function formatScheduleMonth(schedule: Pick<EmployeeSchedule, "year" | "month">) {
-  return `${String(schedule.month).padStart(2, "0")}.${schedule.year}`;
-}
-
-function formatScheduleMonthOnly(schedule: Pick<EmployeeSchedule, "year" | "month">) {
-  return scheduleMonthOnlyFormatter.format(new Date(Date.UTC(schedule.year, schedule.month - 1, 1)));
-}
 
 function formatSwapDate(value: Pick<ShiftSwap, "year" | "month" | "dayOfMonth">) {
   return swapOfferDateFormatter
@@ -115,18 +79,6 @@ function getSwapCode(swap: ShiftSwap) {
   return initials || "SWP";
 }
 
-function formatSlotDate(schedule: Pick<EmployeeSchedule, "year" | "month">, slot: Pick<EmployeeScheduleSlot, "dayOfMonth">) {
-  return swapDateFormatter.format(new Date(Date.UTC(schedule.year, schedule.month - 1, slot.dayOfMonth)));
-}
-
-function formatSlotWeekday(schedule: Pick<EmployeeSchedule, "year" | "month">, dayOfMonth: number) {
-  return slotWeekdayFormatter.format(new Date(Date.UTC(schedule.year, schedule.month - 1, dayOfMonth)));
-}
-
-function getDaysInMonth(year: number, month: number) {
-  return new Date(Date.UTC(year, month, 0)).getUTCDate();
-}
-
 function formatHours(value: number) {
   const roundedValue = Math.round(value * 10) / 10;
   return Number.isInteger(roundedValue) ? `${roundedValue}h` : `${roundedValue.toFixed(1)}h`;
@@ -140,157 +92,6 @@ function formatDelta(value: number) {
 
 function formatIntegerDelta(value: number) {
   return value > 0 ? `+${value}` : String(value);
-}
-
-function getTargetEmployeeLabel(employee: ShiftSwapEmployee) {
-  const fullName = `${employee.firstName} ${employee.lastName}`.trim();
-  return employee.displayName?.trim() || fullName || t("Employee #{0}", employee.id);
-}
-
-function padTimePart(value: number) {
-  return String(value).padStart(2, "0");
-}
-
-function parseTimeMinutes(value: string) {
-  const [rawHour, rawMinute] = value.split(":");
-  const hour = Number(rawHour);
-  const minute = Number(rawMinute);
-
-  if (!Number.isInteger(hour) || !Number.isInteger(minute) || hour < 0 || hour > 23 || minute < 0 || minute > 59) {
-    return null;
-  }
-
-  return hour * 60 + minute;
-}
-
-function formatTimeMinutes(totalMinutes: number) {
-  const normalizedMinutes = Math.min(Math.max(totalMinutes, 0), 23 * 60 + 59);
-  const hour = Math.floor(normalizedMinutes / 60);
-  const minute = normalizedMinutes % 60;
-
-  return `${padTimePart(hour)}:${padTimePart(minute)}`;
-}
-
-function clampMinutes(value: number, min: number, max: number) {
-  return Math.min(Math.max(value, min), max);
-}
-
-function getSlotTimeBounds(slot: Pick<EmployeeScheduleSlot, "fromTime" | "toTime">) {
-  const fromMinutes = parseTimeMinutes(slot.fromTime);
-  const toMinutes = parseTimeMinutes(slot.toTime);
-
-  if (fromMinutes === null || toMinutes === null || toMinutes <= fromMinutes) {
-    return null;
-  }
-
-  return { fromMinutes, toMinutes };
-}
-
-function getSafeCustomPeriod(slot: EmployeeScheduleSlot, fromTime: string, toTime: string): ShiftSelectionPeriod {
-  const bounds = getSlotTimeBounds(slot);
-  if (!bounds) {
-    return { fromTime: slot.fromTime, toTime: slot.toTime };
-  }
-
-  if (bounds.toMinutes - bounds.fromMinutes <= TIME_STEP_MINUTES) {
-    return { fromTime: slot.fromTime, toTime: slot.toTime };
-  }
-
-  const currentFrom = parseTimeMinutes(fromTime) ?? bounds.fromMinutes;
-  const currentTo = parseTimeMinutes(toTime) ?? bounds.toMinutes;
-  const safeFrom = clampMinutes(currentFrom, bounds.fromMinutes, bounds.toMinutes - TIME_STEP_MINUTES);
-  const safeTo = clampMinutes(currentTo, safeFrom + TIME_STEP_MINUTES, bounds.toMinutes);
-
-  return {
-    fromTime: formatTimeMinutes(safeFrom),
-    toTime: formatTimeMinutes(safeTo),
-  };
-}
-
-function getTimeRangeDurationHours(fromTime: string, toTime: string) {
-  const fromMinutes = parseTimeMinutes(fromTime);
-  const toMinutes = parseTimeMinutes(toTime);
-
-  if (fromMinutes === null || toMinutes === null || toMinutes <= fromMinutes) {
-    return 0;
-  }
-
-  return (toMinutes - fromMinutes) / 60;
-}
-
-function getSlotDurationHours(slot: Pick<EmployeeScheduleSlot, "fromTime" | "toTime">) {
-  return getTimeRangeDurationHours(slot.fromTime, slot.toTime);
-}
-
-function buildOwnShiftLabel(schedule: EmployeeSchedule, slot: EmployeeScheduleSlot, period?: ShiftSelectionPeriod | null) {
-  const date = formatSlotDate(schedule, slot);
-  const fromTime = period?.fromTime ?? slot.fromTime;
-  const toTime = period?.toTime ?? slot.toTime;
-
-  return `${date} - ${fromTime} - ${toTime}`;
-}
-
-function getSelectedSchedule(schedules: EmployeeSchedule[], selectedScheduleId: number | null) {
-  return schedules.find(schedule => schedule.id === selectedScheduleId) ?? null;
-}
-
-function getOwnShiftOptions(schedule: EmployeeSchedule | null, employeeId: number | null) {
-  if (!schedule || !employeeId) {
-    return [];
-  }
-
-  return schedule.slots
-    .filter(slot => slot.employeeId === employeeId)
-    .sort((left, right) =>
-      left.dayOfMonth - right.dayOfMonth ||
-      left.fromTime.localeCompare(right.fromTime) ||
-      left.toTime.localeCompare(right.toTime));
-}
-
-function getEmployeeMonthStats(
-  schedules: EmployeeSchedule[],
-  selectedSchedule: EmployeeSchedule | null,
-  employeeId: number | null,
-  selectedSlot: EmployeeScheduleSlot | null,
-  selectedPeriod: ShiftSelectionPeriod | null,
-): SwapPreviewStats | null {
-  if (!selectedSchedule || !employeeId) {
-    return null;
-  }
-
-  const monthSchedules = schedules.filter(
-    schedule => schedule.year === selectedSchedule.year && schedule.month === selectedSchedule.month,
-  );
-  const employeeSlots = monthSchedules.flatMap(schedule =>
-    schedule.slots.filter(slot => slot.employeeId === employeeId),
-  );
-  const daysInMonth = getDaysInMonth(selectedSchedule.year, selectedSchedule.month);
-  const workDaysBeforeSet = new Set(employeeSlots.map(slot => slot.dayOfMonth));
-  const hoursBefore = employeeSlots.reduce((sum, slot) => sum + getSlotDurationHours(slot), 0);
-  const giveAwayHours = selectedSlot
-    ? getTimeRangeDurationHours(selectedPeriod?.fromTime ?? selectedSlot.fromTime, selectedPeriod?.toTime ?? selectedSlot.toTime)
-    : 0;
-  const workDaysAfterSet = new Set<number>();
-
-  employeeSlots.forEach(slot => {
-    if (!selectedSlot || slot.id !== selectedSlot.id) {
-      workDaysAfterSet.add(slot.dayOfMonth);
-      return;
-    }
-
-    if (getSlotDurationHours(slot) - giveAwayHours > 0) {
-      workDaysAfterSet.add(slot.dayOfMonth);
-    }
-  });
-
-  return {
-    hoursBefore,
-    hoursAfter: Math.max(0, hoursBefore - giveAwayHours),
-    workDaysBefore: workDaysBeforeSet.size,
-    workDaysAfter: workDaysAfterSet.size,
-    freeDaysBefore: Math.max(0, daysInMonth - workDaysBeforeSet.size),
-    freeDaysAfter: Math.max(0, daysInMonth - workDaysAfterSet.size),
-  };
 }
 
 function getSwapOfferStats(swap: ShiftSwap): SwapPreviewStats {
@@ -427,219 +228,6 @@ function PinToggleButton({
   );
 }
 
-function ShiftPickerDialog({
-  schedule,
-  slots,
-  selectedSlotId,
-  confirmSlotId,
-  onConfirmSlotChange,
-  onChoose,
-  onClose,
-}: {
-  schedule: EmployeeSchedule | null;
-  slots: EmployeeScheduleSlot[];
-  selectedSlotId: number | null;
-  confirmSlotId: number | null;
-  onConfirmSlotChange: (slotId: number | null) => void;
-  onChoose: (slot: EmployeeScheduleSlot, period: ShiftSelectionPeriod) => void;
-  onClose: () => void;
-}) {
-  const [periodMode, setPeriodMode] = useState<ShiftPeriodMode>("full");
-  const [periodFromTime, setPeriodFromTime] = useState("09:00");
-  const [periodToTime, setPeriodToTime] = useState("15:00");
-
-  const dialogRef = useRef<HTMLDialogElement>(null);
-  const isOpen = schedule !== null;
-  useEffect(() => {
-    const dialog = dialogRef.current;
-    if (!isOpen || !dialog) return;
-    dialog.showModal();
-    return () => dialog.close();
-  }, [isOpen]);
-  useEffect(() => {
-    const confirmSlot = slots.find(slot => slot.id === confirmSlotId) ?? null;
-    if (!confirmSlot) {
-      return;
-    }
-
-    setPeriodMode("full");
-    setPeriodFromTime(confirmSlot.fromTime);
-    setPeriodToTime(confirmSlot.toTime);
-  }, [confirmSlotId, slots]);
-
-  if (!schedule) {
-    return null;
-  }
-
-  const dayNumbers = Array.from({ length: getDaysInMonth(schedule.year, schedule.month) }, (_, index) => index + 1);
-  const pickerEntries = dayNumbers.flatMap<{ dayOfMonth: number; slot: EmployeeScheduleSlot | null }>(dayOfMonth => {
-    const daySlots = slots.filter(slot => slot.dayOfMonth === dayOfMonth);
-    return daySlots.length > 0
-      ? daySlots.map(slot => ({ dayOfMonth, slot }))
-      : [{ dayOfMonth, slot: null }];
-  });
-  const confirmSlot = slots.find(slot => slot.id === confirmSlotId) ?? null;
-  const selectedPeriod = confirmSlot && periodMode === "custom"
-    ? getSafeCustomPeriod(confirmSlot, periodFromTime, periodToTime)
-    : confirmSlot
-      ? { fromTime: confirmSlot.fromTime, toTime: confirmSlot.toTime }
-      : null;
-  const handleOverlayMouseDown = (event: MouseEvent<HTMLDialogElement>) => {
-    if (event.target === event.currentTarget) {
-      onClose();
-    }
-  };
-  const adjustCustomPeriod = (edge: "from" | "to", deltaMinutes: number) => {
-    if (!confirmSlot) {
-      return;
-    }
-
-    const bounds = getSlotTimeBounds(confirmSlot);
-    if (!bounds) {
-      return;
-    }
-
-    if (bounds.toMinutes - bounds.fromMinutes <= TIME_STEP_MINUTES) {
-      return;
-    }
-
-    const currentPeriod = getSafeCustomPeriod(confirmSlot, periodFromTime, periodToTime);
-    const currentFrom = parseTimeMinutes(currentPeriod.fromTime) ?? bounds.fromMinutes;
-    const currentTo = parseTimeMinutes(currentPeriod.toTime) ?? bounds.toMinutes;
-
-    setPeriodMode("custom");
-    if (edge === "from") {
-      const maxFrom = Math.min(bounds.toMinutes - TIME_STEP_MINUTES, currentTo - TIME_STEP_MINUTES);
-      setPeriodFromTime(formatTimeMinutes(clampMinutes(currentFrom + deltaMinutes, bounds.fromMinutes, maxFrom)));
-      return;
-    }
-
-    const minTo = Math.max(bounds.fromMinutes + TIME_STEP_MINUTES, currentFrom + TIME_STEP_MINUTES);
-    setPeriodToTime(formatTimeMinutes(clampMinutes(currentTo + deltaMinutes, minTo, bounds.toMinutes)));
-  };
-
-  return (
-    <dialog ref={dialogRef} className={styles.dialogOverlay} aria-label={t("Choose shift")} onCancel={event => { event.preventDefault(); onClose(); }} onMouseDown={handleOverlayMouseDown}>
-      <div className={styles.shiftDialog}>
-        <div className={styles.dialogHeader}>
-          <div>
-            <span className={styles.dialogEyebrow}>{formatScheduleMonth(schedule)}</span>
-            <h3>{t("Schedule name: {0}", schedule.name)}</h3>
-          </div>
-
-          <button type="button" className={styles.iconButton} aria-label={t("Close")} onClick={onClose}>
-            <CloseIcon size={16} />
-          </button>
-        </div>
-
-        <div className={styles.shiftScroll}>
-          <div className={styles.shiftGrid}>
-            {pickerEntries.map(({ dayOfMonth, slot }) => {
-              const isSelected = Boolean(slot && slot.id === selectedSlotId);
-              const isConfirming = Boolean(slot && slot.id === confirmSlotId);
-
-              return (
-                <button
-                  key={slot ? `slot-${slot.id}` : `day-${dayOfMonth}`}
-                  type="button"
-                  className={[
-                    styles.shiftButton,
-                    !slot ? styles.shiftButtonEmpty : "",
-                    isSelected ? styles.shiftButtonSelected : "",
-                    isConfirming ? styles.shiftButtonConfirming : "",
-                  ].filter(Boolean).join(" ")}
-                  aria-pressed={isSelected || isConfirming}
-                  disabled={!slot}
-                  onClick={() => {
-                    if (slot) {
-                      onConfirmSlotChange(slot.id);
-                    }
-                  }}
-                >
-                  <span className={styles.shiftDay}>{dayOfMonth}</span>
-                  <span className={styles.shiftWeekday}>{formatSlotWeekday(schedule, dayOfMonth)}</span>
-                  <span className={styles.shiftTime}>{slot ? `${slot.fromTime} - ${slot.toTime}` : "-"}</span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        {confirmSlot ? (
-          <div className={styles.confirmOverlay}>
-            <div className={styles.confirmBox}>
-              <div>
-                <span>{t("Confirm shift")}</span>
-                <strong>{buildOwnShiftLabel(schedule, confirmSlot, selectedPeriod)}</strong>
-              </div>
-              <p>{t("Choose the whole shift or only the time period you want to give away.")}</p>
-              <div className={styles.periodModeRow}>
-                <button
-                  type="button"
-                  className={[styles.segmentButton, periodMode === "full" ? styles.segmentButtonActive : ""].filter(Boolean).join(" ")}
-                  onClick={() => setPeriodMode("full")}
-                >
-                  {t("Full shift")}</button>
-                <button
-                  type="button"
-                  className={[styles.segmentButton, periodMode === "custom" ? styles.segmentButtonActive : ""].filter(Boolean).join(" ")}
-                  onClick={() => setPeriodMode("custom")}
-                >
-                  {t("Custom period")}</button>
-              </div>
-              {periodMode === "custom" && selectedPeriod ? (
-                <div className={styles.timePanel}>
-                  <div className={styles.timeStepper}>
-                    <button type="button" aria-label={t("Decrease start time")} onClick={() => adjustCustomPeriod("from", -TIME_STEP_MINUTES)}>
-                      -
-                    </button>
-                    <span>
-                      <strong>{selectedPeriod.fromTime}</strong>
-                      <small>{t("From")}</small>
-                    </span>
-                    <button type="button" aria-label={t("Increase start time")} onClick={() => adjustCustomPeriod("from", TIME_STEP_MINUTES)}>
-                      +
-                    </button>
-                  </div>
-
-                  <span className={styles.timeDash}>-</span>
-
-                  <div className={styles.timeStepper}>
-                    <button type="button" aria-label={t("Decrease end time")} onClick={() => adjustCustomPeriod("to", -TIME_STEP_MINUTES)}>
-                      -
-                    </button>
-                    <span>
-                      <strong>{selectedPeriod.toTime}</strong>
-                      <small>{t("To")}</small>
-                    </span>
-                    <button type="button" aria-label={t("Increase end time")} onClick={() => adjustCustomPeriod("to", TIME_STEP_MINUTES)}>
-                      +
-                    </button>
-                  </div>
-                </div>
-              ) : null}
-              <div className={styles.confirmActions}>
-                <button type="button" className={styles.secondaryButton} onClick={() => onConfirmSlotChange(null)}>
-                  {t("Back")}</button>
-                <button
-                  type="button"
-                  className={styles.primaryButton}
-                  onClick={() => {
-                    if (selectedPeriod) {
-                      onChoose(confirmSlot, selectedPeriod);
-                    }
-                  }}
-                >
-                  {t("Choose shift")}</button>
-              </div>
-            </div>
-          </div>
-        ) : null}
-      </div>
-    </dialog>
-  );
-}
-
 function SwapOfferCard({
   swap,
   stats,
@@ -660,7 +248,8 @@ function SwapOfferCard({
   const [isExpanded, setIsExpanded] = useState(false);
   const isOpen = swap.status === "open";
   const isScheduleLocked = isOpen && swap.isScheduleLocked;
-  const unavailableReason = isOpen && !swap.canAccept && !swap.isCreatedByCurrentEmployee
+  const unavailableReason = isOpen && !swap.canAccept && (!swap.isCreatedByCurrentEmployee ||
+    (swap.requestKind === "exchange" && swap.acceptanceUnavailableReason !== "This is your own swap offer."))
     ? swap.acceptanceUnavailableReason
       ?? (isScheduleLocked
         ? t("Schedule is locked while a manager is editing it.")
@@ -738,6 +327,10 @@ function SwapOfferCard({
         <div className={styles.offerMeta}>
           <span>{`${formatSwapDate(swap)} → ${swap.fromTime} – ${swap.toTime}`}</span>
           <small>{t("From: {0}", swap.fromEmployeeName)}</small>
+          {swap.requestKind === "exchange" && <>
+            <small>{t("Swap shifts")} · {swap.targetEmployeeName}</small>
+            <small>{t("In return")}: {swap.returnScheduleName} · {String(swap.returnDayOfMonth).padStart(2, "0")}.{String(swap.returnMonth).padStart(2, "0")}.{swap.returnYear} · {swap.returnFromTime}–{swap.returnToTime}</small>
+          </>}
         </div>
       </div>
 
@@ -804,8 +397,8 @@ function SwapOfferCard({
         <span className={styles.cardChevron} aria-hidden="true"><ArrowIcon size={13} /></span>
       </div>
       {unavailableReason ? (
-        <div className={styles.offerUnavailableReason} title={unavailableReason}>
-          <span className={styles.unavailableText}>{unavailableReason}</span>
+        <div className={styles.offerUnavailableReason} title={t(unavailableReason)}>
+          <span className={styles.unavailableText}>{t(unavailableReason)}</span>
         </div>
       ) : null}
     </article>
@@ -814,7 +407,6 @@ function SwapOfferCard({
 
 export function EmployeeSwapPage() {
   const stageRef = useRef<HTMLDivElement>(null);
-  const creationDialogRef = useRef<HTMLDialogElement>(null);
   const createOfferTriggerRef = useRef<HTMLButtonElement>(null);
   const historyDialogRef = useRef<HTMLDialogElement>(null);
   const [historyDialogElement, setHistoryDialogElement] = useState<HTMLDialogElement | null>(null);
@@ -850,27 +442,8 @@ export function EmployeeSwapPage() {
   const schedules = schedulesQuery.data ?? [];
   const swaps = swapsQuery.data ?? [];
   const targetEmployees = targetEmployeesQuery.data ?? [];
-  const [selectedScheduleId, setSelectedScheduleId] = useState<number | null>(null);
-  const [selectedSlotId, setSelectedSlotId] = useState<number | null>(null);
-  const [selectedPeriod, setSelectedPeriod] = useState<ShiftSelectionPeriod | null>(null);
-  const [shiftDialogScheduleId, setShiftDialogScheduleId] = useState<number | null>(null);
-  const [confirmSlotId, setConfirmSlotId] = useState<number | null>(null);
-  const [targetMode, setTargetMode] = useState<"public" | "private">("public");
-  const [targetEmployeeId, setTargetEmployeeId] = useState<number | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [isGiveAwayExpanded, setIsGiveAwayExpanded] = useState(false);
-  useEffect(() => {
-    const dialog = creationDialogRef.current;
-    if (!isGiveAwayExpanded || !dialog) return;
-    const previousOverflow = document.body.style.overflow;
-    dialog.showModal();
-    document.body.style.overflow = "hidden";
-    return () => {
-      dialog.close();
-      createOfferTriggerRef.current?.focus({ preventScroll: true });
-      document.body.style.overflow = previousOverflow;
-    };
-  }, [isGiveAwayExpanded]);
   const [isHistoryExpanded, setIsHistoryExpanded] = useState(false);
   useEffect(() => {
     const dialog = historyDialogRef.current;
@@ -891,29 +464,6 @@ export function EmployeeSwapPage() {
   const acceptInFlightRef = useRef(false);
   const queryClient = useQueryClient();
   const deferredSwapSearchQuery = useDeferredValue(swapSearchQuery);
-  const selectedSchedule = useMemo(
-    () => getSelectedSchedule(schedules, selectedScheduleId),
-    [schedules, selectedScheduleId],
-  );
-  const dialogSchedule = useMemo(
-    () => getSelectedSchedule(schedules, shiftDialogScheduleId),
-    [schedules, shiftDialogScheduleId],
-  );
-  const selectedScheduleShiftOptions = useMemo(
-    () => getOwnShiftOptions(selectedSchedule, employeeId),
-    [employeeId, selectedSchedule],
-  );
-  const dialogShiftOptions = useMemo(
-    () => getOwnShiftOptions(dialogSchedule, employeeId),
-    [dialogSchedule, employeeId],
-  );
-  const selectedSlot = selectedScheduleShiftOptions.find(slot => slot.id === selectedSlotId) ?? null;
-  const sortedTargetEmployees = useMemo(
-    () => targetEmployees
-      .filter(employee => employee.id !== employeeId)
-      .sort((left, right) => getTargetEmployeeLabel(left).localeCompare(getTargetEmployeeLabel(right))),
-    [employeeId, targetEmployees],
-  );
   const pinnedSwapIdSet = useMemo(
     () => new Set((uiStateQuery.data?.pinnedSwapIds ?? []).map(String)),
     [uiStateQuery.data?.pinnedSwapIds],
@@ -949,13 +499,7 @@ export function EmployeeSwapPage() {
     : swaps.find(swap => swap.id === pendingUnpinSwapId) ?? null;
   const isActionBusy = createSwapMutation.isPending || acceptSwapMutation.isPending || cancelSwapMutation.isPending || isAcceptSubmitting;
   const loadError = schedulesQuery.error ?? swapsQuery.error ?? targetEmployeesQuery.error ?? uiStateQuery.error;
-  const resolvedTargetEmployeeId = targetMode === "private" ? targetEmployeeId ?? sortedTargetEmployees[0]?.id ?? null : null;
   const hasSwapSearch = swapSearchQuery.trim().length > 0;
-  const swapPreviewStats = useMemo(
-    () => getEmployeeMonthStats(schedules, selectedSchedule, employeeId, selectedSlot, selectedPeriod),
-    [employeeId, schedules, selectedPeriod, selectedSchedule, selectedSlot],
-  );
-
   const handleToggleSwapPin = (swapId: number) => {
     if (pinnedSwapIdSet.has(String(swapId))) {
       setPendingUnpinSwapId(swapId);
@@ -976,68 +520,6 @@ export function EmployeeSwapPage() {
       );
     }
     setPendingUnpinSwapId(null);
-  };
-
-  const handleOpenSchedule = (schedule: EmployeeSchedule) => {
-    if (schedule.allowSwap === false) {
-      setActionError(t("Swaps are not allowed for “{0}”.", schedule.name));
-      return;
-    }
-
-    setSelectedScheduleId(schedule.id);
-    setShiftDialogScheduleId(schedule.id);
-    setConfirmSlotId(null);
-    setActionError(null);
-  };
-
-  const handleChooseShift = (slot: EmployeeScheduleSlot, period: ShiftSelectionPeriod) => {
-    if (!dialogSchedule) {
-      return;
-    }
-
-    setSelectedScheduleId(dialogSchedule.id);
-    setSelectedSlotId(slot.id);
-    setSelectedPeriod(period);
-    setShiftDialogScheduleId(null);
-    setConfirmSlotId(null);
-    setActionError(null);
-  };
-
-  const handleCreateOffer = () => {
-    setActionError(null);
-
-    if (!selectedSchedule || !selectedSlot) {
-      setActionError(t("Choose a published schedule and one of your shifts."));
-      return;
-    }
-
-    if (selectedSchedule.allowSwap === false) {
-      setActionError(t("Swaps are not allowed for this schedule."));
-      return;
-    }
-
-    if (targetMode === "private" && !resolvedTargetEmployeeId) {
-      setActionError(t("Choose who should receive this private swap."));
-      return;
-    }
-
-    createSwapMutation.mutate(
-      {
-        scheduleId: selectedSchedule.id,
-        scheduleSlotId: selectedSlot.id,
-        fromTime: selectedPeriod?.fromTime ?? selectedSlot.fromTime,
-        toTime: selectedPeriod?.toTime ?? selectedSlot.toTime,
-        targetEmployeeId: resolvedTargetEmployeeId,
-      },
-      {
-        onSuccess: () => {
-          setIsGiveAwayExpanded(false);
-          setSelectedSlotId(null);
-          setSelectedPeriod(null);
-        },
-        onError: error => setActionError(getErrorMessage(error, t("Could not create this swap offer."))),
-      },
-    );
   };
 
   const handleAccept = (swap: ShiftSwap) => {
@@ -1175,7 +657,7 @@ export function EmployeeSwapPage() {
               filteredOpenSwaps.length >= 5 ? styles.offerListScrollable : "",
             ].filter(Boolean).join(" ")}>
               {openSwaps.length === 0 ? (
-                <p className={styles.emptyText}>{t("No open swap offers right now.")}</p>
+                <p className={`${styles.emptyText} ${styles.emptyState}`}><span aria-hidden="true">↔</span>{t("Your next shift swap starts here.")}</p>
               ) : filteredOpenSwaps.length === 0 ? (
                 <p className={styles.emptyText}>{hasSwapSearch ? t("No open swap offers match \"{0}\".", swapSearchQuery.trim()) : t("No swap offers match this filter.")}</p>
               ) : filteredOpenSwaps.map(swap => (
@@ -1240,130 +722,31 @@ export function EmployeeSwapPage() {
       ) : null}
 
       </dialog>
-      <ShiftPickerDialog
-        schedule={dialogSchedule}
-        slots={dialogShiftOptions}
-        selectedSlotId={selectedSlotId}
-        confirmSlotId={confirmSlotId}
-        onConfirmSlotChange={setConfirmSlotId}
-        onChoose={handleChooseShift}
-        onClose={() => {
-          setShiftDialogScheduleId(null);
-          setConfirmSlotId(null);
-        }}
-      />
-
-      <dialog ref={creationDialogRef} className={styles.creationDialog} aria-labelledby="create-swap-title" onCancel={() => setIsGiveAwayExpanded(false)} onClick={event => { if (event.target === event.currentTarget) setIsGiveAwayExpanded(false); }}>
-          {isGiveAwayExpanded ? (
-            <section id="create-swap-panel" className={styles.creationPanel} aria-label={t("Create a swap offer")}>
-              <div className={styles.panelHeaderRow}>
-                <div>
-                  <span className={workspaceStyles.panelEyebrow}>{t("Give away a shift")}</span>
-                  <h2 id="create-swap-title" className={workspaceStyles.panelTitle}>{t("Create a swap offer")}</h2>
-                </div>
-                <button type="button" className={styles.dialogCloseButton} aria-label={t("Close")} onClick={() => setIsGiveAwayExpanded(false)}><CloseIcon size={20} /></button>
-              </div>
-
-            {loadError ? <ErrorBanner dismissible={false}>{getErrorMessage(loadError, t("Could not load swap data."))}</ErrorBanner> : null}
-            {actionError ? <ErrorBanner dismissible={false}>{actionError}</ErrorBanner> : null}
-            {schedules.length === 0 ? (
-              <p className={styles.emptyText}>{t("No published schedules are available for swap.")}</p>
-            ) : (
-              <div className={styles.scheduleSwitcher}>
-                {schedules.map(schedule => {
-                  const isSelected = schedule.id === selectedSchedule?.id;
-
-                  return (
-                    <button
-                      key={schedule.id}
-                      type="button"
-                      className={[styles.scheduleButton, isSelected ? styles.scheduleButtonActive : ""].filter(Boolean).join(" ")}
-                      aria-pressed={isSelected}
-                      onClick={() => handleOpenSchedule(schedule)}
-                    >
-                      <span className={styles.scheduleDateBadge}>
-                        <span>{formatScheduleMonthOnly(schedule).slice(0, 3)}</span>
-                        <strong>{schedule.year}</strong>
-                      </span>
-
-                      <span className={styles.scheduleButtonContent}>
-                        <span className={styles.scheduleButtonName}>{schedule.name}</span>
-                        <span className={styles.scheduleButtonMeta}>
-                          {`${schedule.shopName || t("Shop {0}", schedule.shopId)} / ${schedule.containerName || t("Container {0}", schedule.containerId)}${schedule.allowSwap === false ? t(" · Swaps disabled") : ""}`}
-                        </span>
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-
-            {selectedSchedule && selectedSlot ? (
-              <div className={styles.selectedShiftCard}>
-                <span>{t("Selected shift")}</span>
-                <strong>{buildOwnShiftLabel(selectedSchedule, selectedSlot, selectedPeriod)}</strong>
-              </div>
-            ) : (
-              <p className={styles.helperText}>{t("Choose a schedule, then select one of your shifts from the dialog.")}</p>
-            )}
-
-            <SwapStatisticsCard stats={swapPreviewStats} summary={t("Give away impact")} collapsible defaultExpanded={false} />
-
-            <div className={styles.formGrid}>
-              <div className={`${styles.field} ${styles.fieldWide}`}>
-                <span className={styles.fieldLabel}>{t("Receiver")}</span>
-                <div className={styles.segmentRow}>
-                  <button
-                    type="button"
-                    className={[styles.segmentButton, targetMode === "public" ? styles.segmentButtonActive : ""].filter(Boolean).join(" ")}
-                    onClick={() => setTargetMode("public")}
-                  >
-                    {t("Everyone")}</button>
-                  <button
-                    type="button"
-                    className={[styles.segmentButton, targetMode === "private" ? styles.segmentButtonActive : ""].filter(Boolean).join(" ")}
-                    onClick={() => setTargetMode("private")}
-                  >
-                    {t("Specific employee")}</button>
-                </div>
-              </div>
-
-              {targetMode === "private" ? (
-                <div className={styles.field}>
-                  <span className={styles.fieldLabel}>{t("Employee")}</span>
-                  <EmployeeTargetCombobox
-                    employees={sortedTargetEmployees}
-                    selectedEmployeeId={resolvedTargetEmployeeId}
-                    loading={targetEmployeesQuery.isLoading}
-                    onChange={setTargetEmployeeId}
-                  />
-                </div>
-              ) : null}
-
-              <button
-                type="button"
-                className={styles.primaryButton}
-                disabled={
-                  isActionBusy ||
-                  !selectedSchedule ||
-                  selectedSchedule.allowSwap === false ||
-                  !selectedSlot ||
-                  (targetMode === "private" && !resolvedTargetEmployeeId)
-                }
-                onClick={handleCreateOffer}
-              >
-                {createSwapMutation.isPending ? t("Creating...") : t("Offer shift")}
-              </button>
-            </div>
-            </section>
-          ) : null}
-
-      </dialog>
+      {isGiveAwayExpanded && employeeId && <SwapCreateWizard
+        returnFocusRef={createOfferTriggerRef}
+        schedules={schedules} employees={targetEmployees} employeeId={employeeId} swaps={swaps}
+        busy={createSwapMutation.isPending} error={actionError || (loadError ? getErrorMessage(loadError, t("Could not load swap data.")) : null)}
+        onClose={() => { setIsGiveAwayExpanded(false); createOfferTriggerRef.current?.focus({ preventScroll: true }); }}
+        onSubmit={payload => { setActionError(null); createSwapMutation.mutate(payload, {
+          onSuccess: () => { setIsGiveAwayExpanded(false); createOfferTriggerRef.current?.focus({ preventScroll: true }); },
+          onError: error => {
+            setActionError(getErrorMessage(error, t("Could not create this swap offer.")));
+            void queryClient.invalidateQueries({ queryKey: ["shiftSwaps", "preview"] });
+            void queryClient.invalidateQueries({ queryKey: ["shiftSwaps", "returnCandidates"] });
+            void queryClient.invalidateQueries({ queryKey: queryKeys.employeeSchedules.all });
+          },
+        }); }}
+      />}
       {createPortal(<ConfirmDialog
         open={pendingAcceptSwap !== null}
         variant="confirm"
         title={t("Accept this shift?")}
-        message={pendingAcceptSwap ? t(
+        message={pendingAcceptSwap?.requestKind === "exchange" ? t(
+          "Accept exchange: you receive {0} on {1}, {2}–{3}, and give {4} on {5}, {6}–{7}, to {8}? Both schedules update together.",
+          pendingAcceptSwap.scheduleName, formatSwapDate(pendingAcceptSwap), pendingAcceptSwap.fromTime, pendingAcceptSwap.toTime,
+          pendingAcceptSwap.returnScheduleName ?? "", `${String(pendingAcceptSwap.returnDayOfMonth).padStart(2, "0")}.${String(pendingAcceptSwap.returnMonth).padStart(2, "0")}.${pendingAcceptSwap.returnYear}`,
+          pendingAcceptSwap.returnFromTime ?? "", pendingAcceptSwap.returnToTime ?? "", pendingAcceptSwap.fromEmployeeName,
+        ) : pendingAcceptSwap ? t(
           "Take the shift from {0} in {1}{2} on {3}, {4}–{5} ({6})? Acceptance updates your schedule.",
           pendingAcceptSwap.isManagerCreated ? pendingAcceptSwap.manualColumnName || t("Open shift") : pendingAcceptSwap.fromEmployeeName,
           pendingAcceptSwap.scheduleName,

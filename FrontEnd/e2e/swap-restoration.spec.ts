@@ -12,7 +12,7 @@ for (const language of ['en', 'pl']) {
       if (path === '/api/auth/session') body = { role: 'employee', employeeId: 1, managerId: null, userName: 'worker', displayName: 'Worker' };
       else if (path === '/api/account-language') body = { language };
       else if (path === '/api/employee-shift-swaps') body = Array.from({ length: 8 }, (_, index) => ({
-        id: index + 1, scheduleId: 10, scheduleSlotId: 100, scheduleName: `Offer ${index + 1}`,
+        id: index + 1, scheduleId: 10, scheduleSlotId: index + 1000, scheduleName: `Offer ${index + 1}`,
         containerName: 'Container', shopName: 'Shop', year: 2026, month: 9, dayOfMonth: index + 1,
         fromTime: '08:00', toTime: '16:00', fromEmployeeId: 2, fromEmployeeName: 'Test Worker',
         visibility: 'public', status: 'open', createdAtUtc: '2026-09-01T00:00:00Z', shiftHours: 8,
@@ -29,25 +29,25 @@ for (const language of ['en', 'pl']) {
     });
     await page.goto('/swap');
     await page.getByRole('button', { name: language === 'en' ? 'Create offer' : 'Utwórz ofertę', exact: true }).click();
-    await expect(page.locator('#create-swap-panel')).toBeVisible();
+    await expect(page.getByRole('dialog')).toBeVisible();
     const dialog = page.getByRole('dialog');
     await expect(dialog).toBeVisible();
     expect(await dialog.evaluate(element => element.matches(':modal'))).toBeTruthy();
-    expect(await dialog.evaluate(element => getComputedStyle(element, '::backdrop').backdropFilter)).toBe('blur(10px)');
+    await expect(page.locator('dialog:modal')).toHaveCount(1);
     if (language === 'en') {
       await dialog.getByRole('button', { name: /Test schedule/ }).click();
-      const picker = page.getByRole('dialog', { name: 'Choose shift', exact: true });
+      const picker = page.getByRole('region', { name: 'Select a shift', exact: true });
       await expect(picker).toBeVisible();
-      expect(await picker.evaluate(element => element.matches(':modal'))).toBeTruthy();
+      await expect(page.locator('dialog:modal')).toHaveCount(1);
       await page.keyboard.press('Escape');
       await expect(picker).not.toBeVisible();
       await expect(dialog).toBeVisible();
       await dialog.getByRole('button', { name: /Test schedule/ }).click();
-      await picker.getByRole('button', { name: /08:00.*16:00/ }).click();
-      await picker.getByRole('button', { name: 'Choose shift', exact: true }).click();
+      await picker.getByRole('radio', { name: /08:00.*16:00/ }).click();
+      await picker.getByRole('button', { name: 'Confirm shift', exact: true }).click();
       await expect(picker).not.toBeVisible();
       await expect(dialog.getByText('Selected shift', { exact: true })).toBeVisible();
-      await expect(dialog.getByRole('button', { name: 'Offer shift', exact: true })).toBeEnabled();
+      await expect(dialog.getByRole('button', { name: 'Continue', exact: true })).toBeEnabled();
     }
     await page.keyboard.press('Escape');
     await expect(dialog).not.toBeVisible();

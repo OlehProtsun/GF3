@@ -3,12 +3,15 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { queryKeys } from "@shared/api/queryKeys";
+import { useState } from "react";
 import {
   useAcceptEmployeeShiftSwapMutation,
   useCancelEmployeeShiftSwapMutation,
   useCancelManagerManualShiftSwapMutation,
   useCreateEmployeeShiftSwapMutation,
   useCreateManagerManualShiftSwapMutation,
+  useShiftSwapReturnCandidatesQuery,
+  useShiftSwapPreviewQuery,
 } from "./queries";
 
 const apiMocks = vi.hoisted(() => ({
@@ -17,6 +20,8 @@ const apiMocks = vi.hoisted(() => ({
   cancelEmployee: vi.fn(),
   createManagerManual: vi.fn(),
   cancelManagerManual: vi.fn(),
+  listReturnCandidates: vi.fn(),
+  previewEmployee: vi.fn(),
 }));
 
 vi.mock("./shiftSwapsApi", () => ({
@@ -95,6 +100,23 @@ beforeEach(() => {
 });
 
 describe("shift swap query mutations", () => {
+  test("keeps candidate reads disabled without a draft and follows candidate pagination", async () => {
+    apiMocks.listReturnCandidates.mockImplementation(async ({ page }: { page: number }) => ({ items: [{ slotId: page }], page, pageSize: 1, hasMore: page < 2 }));
+    apiMocks.previewEmployee.mockResolvedValue({ isValid: true });
+    function Reads() {
+      const [enabled, setEnabled] = useState(false);
+      const candidates = useShiftSwapReturnCandidatesQuery(enabled ? { sourceScheduleId: 10, sourceSlotId: 20, fromTime: "09:00", toTime: "13:00", targetEmployeeId: 7, page: 2, pageSize: 1 } : null);
+      const preview = useShiftSwapPreviewQuery(enabled ? { requestKind: "give", scheduleId: 10, scheduleSlotId: 20, fromTime: "09:00", toTime: "13:00" } : null);
+      return <><button onClick={() => setEnabled(true)}>load draft</button><output>{candidates.data?.items.length ?? 0}:{String(preview.data?.isValid ?? false)}</output></>;
+    }
+    render(<QueryClientProvider client={new QueryClient()}><Reads /></QueryClientProvider>);
+    expect(apiMocks.listReturnCandidates).not.toHaveBeenCalled();
+    expect(apiMocks.previewEmployee).not.toHaveBeenCalled();
+    await userEvent.setup().click(screen.getByRole("button", { name: "load draft" }));
+    await waitFor(() => expect(screen.getByText("2:true")).toBeInTheDocument());
+    expect(apiMocks.listReturnCandidates).toHaveBeenCalledTimes(2);
+    expect(apiMocks.listReturnCandidates).toHaveBeenLastCalledWith(expect.objectContaining({ targetEmployeeId: 7, page: 2 }), expect.any(AbortSignal));
+  });
   test("invalidates employee swap and schedule caches after employee actions", async () => {
     const user = userEvent.setup();
     const client = new QueryClient();

@@ -2,6 +2,30 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { queryKeys } from "@shared/api/queryKeys";
 import type { CreateManagerShiftSwapInput, CreateShiftSwapInput } from "../model/types";
 import { shiftSwapsApi } from "./shiftSwapsApi";
+import type { ShiftSwapCandidateParams, SwapWizardRequest } from "../model/types";
+
+export const useShiftSwapReturnCandidatesQuery = (params: ShiftSwapCandidateParams | null) => useQuery({
+  queryKey: queryKeys.shiftSwaps.candidates(params),
+  enabled: params !== null,
+  staleTime: 0,
+  queryFn: async ({ signal }) => {
+    const items = [];
+    let result;
+    for (let page = 1; page <= (params?.page ?? 1); page++) {
+      result = await shiftSwapsApi.listReturnCandidates({ ...params!, page }, signal);
+      items.push(...result.items);
+      if (!result.hasMore) break;
+    }
+    return { ...result!, items };
+  },
+});
+
+export const useShiftSwapPreviewQuery = (payload: SwapWizardRequest | null) => useQuery({
+  queryKey: queryKeys.shiftSwaps.preview(payload),
+  enabled: payload !== null,
+  staleTime: 0,
+  queryFn: ({ signal }) => shiftSwapsApi.previewEmployee(payload!, signal),
+});
 
 export const useEmployeeShiftSwapsQuery = () =>
   useQuery({
@@ -61,6 +85,9 @@ export function useCreateEmployeeShiftSwapMutation() {
     mutationFn: (payload: CreateShiftSwapInput) => shiftSwapsApi.createEmployee(payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.shiftSwaps.employee() });
+      queryClient.invalidateQueries({ queryKey: ["shiftSwaps", "returnCandidates"] });
+      queryClient.invalidateQueries({ queryKey: ["shiftSwaps", "preview"] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.employeeSchedules.all });
     },
   });
 }
@@ -122,6 +149,8 @@ export function useAcceptEmployeeShiftSwapMutation() {
     mutationFn: (id: number) => shiftSwapsApi.acceptEmployee(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.shiftSwaps.employee() });
+      queryClient.invalidateQueries({ queryKey: ["shiftSwaps", "returnCandidates"] });
+      queryClient.invalidateQueries({ queryKey: ["shiftSwaps", "preview"] });
       queryClient.invalidateQueries({ queryKey: queryKeys.employeeSchedules.all });
     },
   });
