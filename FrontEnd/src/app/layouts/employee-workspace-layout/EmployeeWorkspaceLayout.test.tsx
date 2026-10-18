@@ -30,3 +30,22 @@ it("keeps legal links accessible when mobile navigation is collapsed", () => {
     expect(link).toHaveFocus();
   }
 });
+
+
+it("Swap follows the visual viewport and releases its listeners on exit", () => {
+  window.history.replaceState({}, "", "/swap");
+  const viewport = new EventTarget(); Object.assign(viewport, { height: 640, offsetTop: 0 });
+  const remove = vi.spyOn(viewport, "removeEventListener"); vi.stubGlobal("visualViewport", viewport);
+  try {
+    const page = render(<BrowserRouter><EmployeeWorkspaceLayout><div>Swap content</div></EmployeeWorkspaceLayout></BrowserRouter>);
+    const layout = screen.getByText("Swap content").closest("main")!.parentElement!.parentElement!;
+    expect(layout.style.getPropertyValue("--employee-visual-height")).toBe("640px");
+    Object.assign(viewport, { height: 480, offsetTop: 25 }); viewport.dispatchEvent(new Event("resize"));
+    expect(layout.style.getPropertyValue("--employee-visual-height")).toBe("480px");
+    expect(layout.style.getPropertyValue("--employee-visual-top")).toBe("25px");
+    page.unmount();
+    expect(remove).toHaveBeenCalledWith("resize", expect.any(Function));
+    expect(remove).toHaveBeenCalledWith("scroll", expect.any(Function));
+    expect(layout.style.getPropertyValue("--employee-visual-height")).toBe("");
+  } finally { vi.unstubAllGlobals(); }
+});

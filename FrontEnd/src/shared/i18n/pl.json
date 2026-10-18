@@ -1951,5 +1951,13 @@
   "After sending, {0} will receive a request and must confirm it.": "Po wysłaniu {0} otrzyma prośbę i musi ją potwierdzić.",
   "After sending, eligible employees will be able to view and accept your offer.": "Po wysłaniu uprawnieni pracownicy będą mogli zobaczyć i przyjąć Twoją ofertę.",
   "Give": "Oddajesz",
-  "Receive": "Otrzymujesz"
+  "Receive": "Otrzymujesz",
+  "Offer details": "Szczegóły oferty",
+  "View offer details for {0}": "Zobacz szczegóły oferty {0}",
+  "Shift you receive": "Zmiana, którą otrzymujesz",
+  "Offered shift": "Oferowana zmiana",
+  "Return shift": "Zmiana w zamian",
+  "Visibility": "Widoczność",
+  "Not available": "Niedostępne",
+  "Open offer": "Otwarta"
 }

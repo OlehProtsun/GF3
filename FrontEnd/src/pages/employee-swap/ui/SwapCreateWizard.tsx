@@ -12,6 +12,7 @@ import { ErrorBanner } from "@shared/ui/components/ErrorBanner";
 import { SwapShiftPickerDialog, swapMinutes, swapShiftDate, type SwapShiftSelection } from "./SwapShiftPickerDialog";
 import { SwapRequestTypeDialog } from "./SwapRequestTypeDialog";
 import { SwapScrollRegion } from "./SwapScrollRegion";
+import { useSwapModalEnvironment } from "./useSwapModalEnvironment";
 import styles from "./SwapCreateWizard.module.css";
 type Recipient = { mode: "everyone" } | { mode: "specific"; employee: ShiftSwapEmployee; kind: "give" }
   | { mode: "specific"; employee: ShiftSwapEmployee; kind: "exchange"; selection: SwapShiftSelection };
@@ -45,54 +46,7 @@ export function SwapCreateWizard({ schedules, employees, employeeId, employeeNam
     else if (step > 1) setStep((step - 1) as 1 | 2);
     else onClose();
   };
-  useEffect(() => {
-    const dialog = dialogRef.current;
-    const previousFocus = returnFocusRef?.current ?? document.activeElement as HTMLElement | null;
-    const pagePosition = { left: window.scrollX, top: window.scrollY };
-    const restoreStyles: (() => void)[] = [];
-    const setStyles = (element: HTMLElement, values: Record<string, string>) => {
-      const previous = Object.keys(values).map(name => ({ name, value: element.style.getPropertyValue(name), priority: element.style.getPropertyPriority(name) }));
-      for (const [name, value] of Object.entries(values)) element.style.setProperty(name, value);
-      restoreStyles.push(() => { for (const { name, value, priority } of previous) {
-        if (value) element.style.setProperty(name, value, priority);
-        else element.style.removeProperty(name);
-      } });
-    };
-    const root = document.getElementById("root");
-    const backgroundScrollers = root ? [root, ...root.querySelectorAll<HTMLElement>("*")]
-      .filter(element => /auto|scroll/.test(`${getComputedStyle(element).overflowX} ${getComputedStyle(element).overflowY}`))
-      .map(element => ({ element, left: element.scrollLeft, top: element.scrollTop })) : [];
-    for (const { element } of backgroundScrollers) setStyles(element, { "overflow-x": "hidden", "overflow-y": "hidden", "overscroll-behavior": "none", "scrollbar-gutter": "stable" });
-    if (root) setStyles(root, { "touch-action": "none" });
-    const scrollbarGap = window.innerWidth - document.documentElement.clientWidth;
-    const bodyPadding = getComputedStyle(document.body).paddingRight;
-    setStyles(document.documentElement, { "overflow-x": "hidden", "overflow-y": "hidden", "overscroll-behavior": "none" });
-    // Fix the viewport on iOS as well as locking the app's independent scrollers.
-    setStyles(document.body, { "overflow-x": "hidden", "overflow-y": "hidden", position: "fixed", top: `${-pagePosition.top}px`, left: `${-pagePosition.left}px`,
-      width: "100%", "box-sizing": "border-box", "padding-right": `calc(${bodyPadding} + ${scrollbarGap}px)` });
-    const viewport = window.visualViewport;
-    const updateViewport = () => {
-      const height = viewport?.height ?? window.innerHeight;
-      dialog?.style.setProperty("--swap-visual-height", `${height}px`);
-      dialog?.style.setProperty("--swap-visual-top", `${viewport?.offsetTop ?? 0}px`);
-      if (dialog) dialog.dataset.compactViewport = String(height < 600);
-    };
-    updateViewport();
-    viewport?.addEventListener("resize", updateViewport);
-    viewport?.addEventListener("scroll", updateViewport);
-    window.addEventListener("resize", updateViewport);
-    dialog?.showModal();
-    return () => {
-      viewport?.removeEventListener("resize", updateViewport);
-      viewport?.removeEventListener("scroll", updateViewport);
-      window.removeEventListener("resize", updateViewport);
-      dialog?.close();
-      for (const restore of restoreStyles.reverse()) restore();
-      for (const { element, left, top } of backgroundScrollers) { element.scrollLeft = left; element.scrollTop = top; }
-      window.scrollTo({ ...pagePosition, behavior: "instant" });
-      previousFocus?.focus({ preventScroll: true });
-    };
-  }, [returnFocusRef]);
+  useSwapModalEnvironment(dialogRef, returnFocusRef);
   useEffect(() => {
     if (bodyRef.current) bodyRef.current.scrollTop = 0;
     dialogRef.current?.querySelector<HTMLElement>("[data-subview-heading]")?.focus({ preventScroll: true });
@@ -164,7 +118,7 @@ export function SwapCreateWizard({ schedules, employees, employeeId, employeeNam
     onClick={event => { if (event.target === event.currentTarget && !busy) onClose(); }}>
     <div className={styles.shell}>
       <header className={styles.header}>
-        {view === "wizard" && step === 2 && <button type="button" className={styles.previousStep} onClick={back} aria-label={t("Back")}>‹</button>}
+        {view === "wizard" && step > 1 && <button type="button" className={styles.previousStep} disabled={busy} onClick={back} aria-label={t("Back")}>‹</button>}
         {view === "wizard" && <ol className={styles.steps} aria-label={t("Request progress")}>{(["Schedule", "Recipient", "Review"] as const).map((label, index) =>
             <li key={label} aria-current={step === index + 1 ? "step" : undefined} data-complete={step > index + 1}>{step === 3 && index < 2 ? <button type="button" disabled={busy} aria-label={index === 0 ? t("Edit schedule") : t("Edit recipient")} onClick={() => setStep(index === 0 ? 1 : 2)}><span>✓</span>{t(label)}</button> : <><span>{step > index + 1 ? "✓" : index + 1}</span>{t(label)}</>}</li>)}</ol>}
         <button type="button" aria-label={t(view === "wizard" ? "Close" : "Back")} disabled={busy} onClick={() => view !== "wizard" ? back() : onClose()}>{view === "wizard" ? "×" : <ChevronLeftIcon size={22} />}</button></header>

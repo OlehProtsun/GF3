@@ -31,9 +31,22 @@
 
 @container employee-workspace (max-width: 859px) {
   .hero {
+    position: relative;
     border-top-left-radius: 0;
     border-top-right-radius: 0;
     padding-top: calc(clamp(22px, 5cqw, 34px) + env(safe-area-inset-top));
+  }
+
+  .hero::before {
+    content: "";
+    position: absolute;
+    bottom: 100%;
+    left: 0;
+    right: 0;
+    height: 100%;
+    background: inherit;
+    transform: scaleY(-1);
+    pointer-events: none;
   }
 }
 

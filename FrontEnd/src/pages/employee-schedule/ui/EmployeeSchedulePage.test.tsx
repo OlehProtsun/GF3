@@ -174,6 +174,10 @@ function mockReducedMotion(reduced = false) {
 afterEach(() => vi.unstubAllGlobals());
 
 beforeEach(() => {
+  Object.defineProperties(HTMLDialogElement.prototype, {
+    showModal: { configurable: true, value(this: HTMLDialogElement) { this.open = true; } },
+    close: { configurable: true, value(this: HTMLDialogElement) { this.open = false; } },
+  });
   mockReducedMotion();
   window.localStorage.clear();
   mocks.scheduleQuery.mockReset();

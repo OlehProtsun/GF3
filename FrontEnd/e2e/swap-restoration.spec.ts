@@ -69,7 +69,7 @@ for (const language of ['en', 'pl']) {
         await page.getByRole('button', { name: 'Open navigation', exact: true }).click();
       }
       const history = page.locator('button[aria-controls="swap-history-panel"]');
-      const scrollArea = page.locator('main[class*="swapBody"]');
+      const scrollArea = page.locator('[data-swap-offers-scroll]');
       await scrollArea.evaluate(element => { element.scrollTop = element.scrollHeight; });
       const lastOffer = scrollArea.locator('article').last();
       await expect(lastOffer).toBeVisible();
@@ -86,7 +86,7 @@ for (const language of ['en', 'pl']) {
       })).toBeTruthy();
       if (size.width === 408) await page.screenshot({ path: test.info().outputPath('swap-408.png'), fullPage: true });
     }
-    await page.locator('main[class*="swapBody"]').evaluate(element => { element.scrollTop = 0; });
+    await page.locator('[data-swap-offers-scroll]').evaluate(element => { element.scrollTop = 0; });
     await expect(page.getByRole('button', { name: language === 'en' ? 'My offers' : 'Moje oferty', exact: true })).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBeTruthy();
     expect(errors).toEqual([]);

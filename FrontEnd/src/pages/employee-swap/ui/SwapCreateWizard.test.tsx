@@ -223,6 +223,11 @@ test("public Give has three steps, authoritative review and submits once", async
   expect(screen.queryByText("Your statistics")).not.toBeInTheDocument();
   expect(screen.queryByLabelText("Reciprocal exchange")).not.toBeInTheDocument();
   expect(screen.queryByRole("region", { name: "Employee shift (they give)" })).not.toBeInTheDocument();
+  const back = screen.getByRole("button", { name: "Back", exact: true });
+  expect(back.nextElementSibling).toHaveAttribute("aria-label", "Request progress");
+  await user.click(back);
+  expect(screen.getByRole("heading", { name: "Give to whom?" })).toHaveFocus();
+  await user.click(screen.getByRole("button", { name: "Continue" }));
   await user.dblClick(screen.getByRole("button", { name: "Send request" }));
   expect(result.onSubmit).toHaveBeenCalledTimes(1);
   expect(result.onSubmit).toHaveBeenCalledWith({ requestKind: "give", scheduleId: 10, scheduleSlotId: 100, fromTime: "09:00", toTime: "16:30", targetEmployeeId: null });
@@ -255,6 +260,10 @@ test("specific Exchange edits return bounds independently in a single modal", as
   expect(screen.queryByText("Your statistics")).not.toBeInTheDocument();
   expect(screen.getAllByRole("dialog")).toEqual([modal]);
   expect(result.onSubmit).not.toHaveBeenCalled();
+  await user.click(screen.getByRole("button", { name: "Back", exact: true }));
+  expect(screen.getByRole("button", { name: /Target Worker/ })).toHaveTextContent("Swap shifts");
+  await user.click(screen.getByRole("button", { name: "Continue" }));
+  expect(screen.getByLabelText("Reciprocal exchange")).toBeInTheDocument();
   await user.click(screen.getByRole("button", { name: "Send request" }));
   expect(result.onSubmit).toHaveBeenCalledWith(expect.objectContaining({ requestKind: "exchange", targetEmployeeId: 2, returnScheduleId: 20, returnScheduleSlotId: 200, returnFromTime: "09:15", returnToTime: "16:30" }));
 });
@@ -273,6 +282,7 @@ test("pending and failed submission preserve the draft and allow an explicit ret
   await user.click(screen.getByRole("button", { name: "Send request" }));
   result.rerender(<QueryClientProvider client={result.client}><SwapCreateWizard {...result.props} busy /></QueryClientProvider>);
   expect(screen.getByRole("button", { name: "Sending..." })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "Back", exact: true })).toBeDisabled();
   expect(screen.getByRole("button", { name: "Close" })).toBeDisabled();
   result.rerender(<QueryClientProvider client={result.client}><SwapCreateWizard {...result.props} error="Temporary failure" /></QueryClientProvider>);
   expect(screen.getByText("Temporary failure")).toBeInTheDocument();

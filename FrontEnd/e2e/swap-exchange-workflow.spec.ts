@@ -21,7 +21,7 @@ function offer(payload: Record<string, unknown>) {
     fromTime: "09:00", toTime: "16:30", fromEmployeeId: 1, fromEmployeeName: "Owner Worker", targetEmployeeName: "Target Worker", visibility: payload.targetEmployeeId ? "private" : "public",
     status: "open", createdAtUtc: "2026-10-01T00:00:00Z", shiftHours: 7.5, currentEmployeeHoursBefore: 7.5, currentEmployeeHoursAfter: 7.5,
     currentEmployeeWorkDaysBefore: 1, currentEmployeeWorkDaysAfter: 1, currentEmployeeFreeDaysBefore: 30, currentEmployeeFreeDaysAfter: 30,
-    fromEmployeeHoursBefore: 7.5, fromEmployeeHoursAfter: 7.5, canAccept: false, canCancel: true, isCreatedByCurrentEmployee: true, isManagerCreated: false,
+    fromEmployeeHoursBefore: 7.5, fromEmployeeHoursAfter: 7.5, canAccept: false, canCancel: true, isCreatedByCurrentEmployee: true, isManagerCreated: false, isScheduleLocked: false, acceptanceUnavailableReason: "",
     ...(payload.requestKind === "exchange" ? { returnScheduleName: "F35", returnShopName: "Central", returnYear: 2026, returnMonth: 10, returnDayOfMonth: 3, returnShiftHours: 7.5 } : {}), ...payload };
 }
 async function mockApi(page: Page, actor: number, state: { offers: Offer[]; stale?: boolean; scheduleCount?: number; shiftCount?: number; employeeCount?: number; multipleReturnSchedules?: boolean; previewState?: "loading" | "error" | "invalid" | "stale"; ownerName?: string; targetName?: string; language?: "en" | "pl" }) {
@@ -54,7 +54,7 @@ async function mockApi(page: Page, actor: number, state: { offers: Offer[]; stal
     } else if (path === "/api/employee-shift-swaps") {
       if (route.request().method() === "POST") state.offers = [offer(route.request().postDataJSON())];
       body = route.request().method() === "POST" ? state.offers[0] : state.offers.map(item => ({ ...item,
-        canAccept: actor === 2 && item.status === "open", canCancel: actor === 1 && item.status === "open", isCreatedByCurrentEmployee: actor === 1 }));
+        canAccept: actor === 2 && item.status === "open" && !item.isScheduleLocked && !item.acceptanceUnavailableReason, canCancel: actor === 1 && item.status === "open", isCreatedByCurrentEmployee: actor === 1 }));
     } else if (path.includes("negotiate")) return route.fulfill({ status: 503 });
     await route.fulfill({ contentType: "application/json", body: JSON.stringify(body) });
   });
@@ -121,7 +121,7 @@ for (const viewport of [{ width: 320, height: 640 }, { width: 375, height: 667 }
     await page.setViewportSize(viewport);
     await mockApi(page, 1, { offers: Array.from({ length: 15 }, (_, i) => ({ ...offer({}), id: i + 1, scheduleSlotId: 900 + i })), shiftCount: 20 });
     await page.goto("/swap");
-    const background = page.locator('main[class*="swapBody_"]');
+    const background = page.locator('[data-swap-offers-scroll]');
     await expect(background.locator("article")).toHaveCount(15);
     await background.evaluate(el => { el.scrollTop = 80; });
     const saved = await background.evaluate(el => ({ top: el.scrollTop, overflow: el.style.overflow, y: window.scrollY }));
@@ -246,7 +246,9 @@ for (const viewport of [{ width: 320, height: 640 }, { width: 375, height: 667 }
     await modal.getByRole("button", { name: "Close", exact: true }).click();
     expect(await background.evaluate(el => ({ top: el.scrollTop, overflow: el.style.overflow, y: window.scrollY }))).toEqual(saved);
     if (!(test.info().project.use.isMobile && browserName === "webkit")) {
-      await background.hover(); await page.mouse.wheel(0, 100);
+      const scrollBox = (await background.boundingBox())!;
+      await background.hover({ position: { x: scrollBox.width - 12, y: Math.min(10, scrollBox.height / 2) } });
+      await page.mouse.wheel(0, 100);
       await expect.poll(() => background.evaluate(el => el.scrollTop)).toBeGreaterThan(saved.top);
     } else {
       await background.evaluate(el => { el.scrollTop += 100; });
@@ -427,7 +429,11 @@ for (const viewport of [{ width: 320, height: 568 }, { width: 375, height: 667 }
       expect(state.offers[0].status).toBe("open");
       await expect(page.locator('[class*="swapBackdrop"] path')).toHaveAttribute("d", silhouette!);
       await page.reload();
-      if (mode === "exchange") await expect(page.getByText(/In return.*F35/)).toBeVisible();
+      if (mode === "exchange") {
+        await page.getByRole("button", { name: "View offer details for F27" }).click();
+        await expect(page.getByRole("dialog", { name: "Offer details" }).getByRole("region", { name: "Shift you receive" })).toContainText("F35");
+        await page.getByRole("dialog", { name: "Offer details" }).getByRole("button", { name: "Close", exact: true }).click();
+      }
       await expect(page.getByRole("button", { name: "Swap history", exact: true })).toBeVisible();
     });
   }
@@ -439,12 +445,13 @@ for (const stale of [false, true]) {
     await mockApi(page, 1, state); await page.goto("/swap");
     const recipientContext = await browser.newContext(); const recipient = await recipientContext.newPage();
     await mockApi(recipient, 2, state); await recipient.goto(new URL("/swap", page.url()).href);
-    await recipient.getByRole("button", { name: "Accept", exact: true }).click();
+    await recipient.getByRole("button", { name: /^View offer details for/ }).click();
+    await recipient.getByRole("dialog", { name: "Offer details" }).getByRole("button", { name: "Accept shift", exact: true }).click();
     const confirmation = recipient.getByRole("dialog", { name: "Accept this shift?" });
     await expect(confirmation).toContainText("F27"); await expect(confirmation).toContainText("F35");
     await confirmation.getByRole("button", { name: "Accept shift", exact: true }).click();
     if (stale) await expect(recipient.getByText("Return shift unavailable.", { exact: true }).first()).toBeVisible();
-    else { await page.reload(); await page.getByRole("button", { name: "Swap history", exact: true }).click(); await expect(page.getByText(/In return.*F35/)).toBeVisible(); }
+    else { await page.reload(); await page.getByRole("button", { name: "Swap history", exact: true }).click(); await page.getByRole("dialog", { name: "Recent swap activity" }).getByRole("button", { name: "View offer details for F27" }).click(); await expect(page.getByRole("dialog", { name: "Offer details" }).getByRole("region", { name: "Shift you receive" })).toContainText("F35"); }
     expect(state.offers[0].status).toBe(stale ? "open" : "accepted");
     await recipientContext.close();
   });
@@ -499,7 +506,7 @@ for (const width of [320, 375, 390, 430]) {
     await page.getByRole("button", { name: "Create offer", exact: true }).click();
     await page.locator("dialog:modal").getByRole("button", { name: /F27/ }).click();
     const dialog = page.locator("dialog:modal");
-    await expect(dialog.getByRole("button", { name: "Back", exact: true })).toHaveCount(0);
+    await expect(dialog.getByRole("button", { name: "Back", exact: true })).toHaveCount(1);
     const rows = dialog.getByRole("radio");
     await expect(rows).toHaveCount(20);
     await expect(rows.nth(1)).toBeDisabled();
@@ -510,14 +517,14 @@ for (const width of [320, 375, 390, 430]) {
     await page.screenshot({ path: test.info().outputPath("picker-full.png") });
     await dialog.getByRole("button", { name: "Custom period" }).click();
     await dialog.getByRole("button", { name: "Increase From" }).click();
-    await expect(dialog.locator('input[type="time"]').first()).toHaveValue("08:15");
+    await expect(dialog.locator('input[type="time"]').first()).toHaveValue("09:15");
     await expect(dialog.getByRole("button", { name: "Confirm shift" })).toBeInViewport({ ratio: 1 });
     expect(await dialog.evaluate(el => el.scrollWidth <= el.clientWidth && el.scrollHeight <= el.clientHeight + 1)).toBeTruthy();
     await page.screenshot({ path: test.info().outputPath("picker-custom.png") });
     await dialog.getByRole("button", { name: "Confirm shift" }).click();
     await expect(dialog.getByText(/Thu 01 Oct.*09:15/)).toBeVisible();
     await dialog.getByRole("button", { name: "Change shift" }).click();
-    await expect(dialog.locator('input[type="time"]').first()).toHaveValue("08:15");
+    await expect(dialog.locator('input[type="time"]').first()).toHaveValue("09:15");
     await dialog.getByRole("button", { name: "Back", exact: true }).click();
     await expect(dialog.getByRole("heading", { name: "Choose a schedule" })).toBeVisible();
   });
@@ -583,9 +590,9 @@ for (const width of [320, 375, 390, 430]) {
   });
 }
 
-for (const width of [320, 375, 390, 430]) {
+for (const width of [320, 375, 390, 430, 1280]) {
   test(`custom Review design ${width}px`, async ({ page }) => {
-    await page.setViewportSize({ width, height: width === 320 ? 640 : 844 });
+    await page.setViewportSize({ width, height: width === 320 ? 568 : width === 375 ? 667 : width === 430 ? 932 : width === 1280 ? 800 : 844 });
     const state = { offers: [] as Offer[] }; await mockApi(page, 1, state); await page.goto("/swap");
     await page.getByRole("button", { name: "Create offer", exact: true }).click();
     const dialog = page.locator("dialog:modal");
@@ -595,6 +602,14 @@ for (const width of [320, 375, 390, 430]) {
     await dialog.getByRole("button", { name: "Increase From" }).click();
     await dialog.getByRole("button", { name: "Confirm shift" }).click();
     await dialog.getByRole("button", { name: "Continue", exact: true }).click();
+    await dialog.getByRole("button", { name: "Continue", exact: true }).click();
+    const back = dialog.getByRole("button", { name: "Back", exact: true });
+    await expect(back).toHaveCount(1);
+    const backBox = (await back.boundingBox())!;
+    const progressBox = (await dialog.getByRole("list", { name: "Request progress" }).boundingBox())!;
+    expect(backBox.x + backBox.width).toBeLessThanOrEqual(progressBox.x);
+    await back.click();
+    await expect(dialog.getByRole("heading", { name: "Give to whom?" })).toBeFocused();
     await dialog.getByRole("button", { name: "Continue", exact: true }).click();
     const card = dialog.getByRole("region", { name: "Your shift (you give)", exact: true });
     await expect(card).toContainText("09:15"); await expect(card).toContainText("7.25h");
@@ -750,5 +765,341 @@ for (const width of [320, 375, 390, 430]) for (const language of ["en", "pl"] as
     await expect(modal.getByRole("button", { name: close, exact: true })).toHaveText("×");
     await modal.getByRole("button", { name: close, exact: true }).click();
     await expect(modal).toHaveCount(0); await expect(launcher).toBeFocused();
+  });
+}
+
+
+for (const viewport of [{ width: 320, height: 568 }, { width: 375, height: 667 }, { width: 390, height: 844 },
+  { width: 430, height: 932 }, { width: 1280, height: 800 }, { width: 667, height: 375 }]) {
+  test(`compact offers and review details ${viewport.width}x${viewport.height}`, async ({ page }) => {
+    await page.setViewportSize(viewport);
+    const state = { offers: [offer({ id: 1, requestKind: "give", targetEmployeeName: null }),
+      offer({ id: 2, requestKind: "exchange", targetEmployeeId: 2, returnFromTime: "10:00", returnToTime: "14:15", returnShiftHours: 4.25, returnShopName: "North Store" }),
+      offer({ id: 3, requestKind: "give", targetEmployeeId: 2 })] };
+    await mockApi(page, 2, state); await page.goto("/swap");
+    const cards = page.locator('article[class*="offerCard_"]'); await expect(cards).toHaveCount(3);
+    await expect(cards.first()).toHaveCSS("opacity", "1");
+    const initialHeight = await cards.first().evaluate(el => el.offsetHeight);
+    await page.screenshot({ path: test.info().outputPath("compact-give.png") });
+    await expect(cards.nth(1).getByText("Swap shifts", { exact: true })).toBeVisible();
+    await expect(cards.nth(1).getByText("F35", { exact: true })).toHaveCount(0);
+    await cards.nth(1).scrollIntoViewIfNeeded();
+    await page.locator('[data-swap-offers-scroll]').evaluate(el => { el.scrollTop += 120; });
+    await page.screenshot({ path: test.info().outputPath("compact-exchange.png") });
+    const area = page.locator('[data-swap-offers-scroll]');
+    const launcher = cards.first().getByRole("button", { name: "View offer details for F27" });
+    await launcher.focus();
+    const scrollTop = await area.evaluate(el => el.scrollTop);
+    await page.keyboard.press("Enter");
+    const details = page.getByRole("dialog", { name: "Offer details", exact: true });
+    await expect(details).toBeVisible(); await expect(page.locator("dialog:modal")).toHaveCount(1);
+    await expect(details.getByRole("region", { name: "Shift you receive" })).toContainText("09:00–16:30");
+    await expect(details.getByText("Public", { exact: true })).toBeVisible();
+    await expect(details.getByRole("button", { name: "Accept shift" })).toBeInViewport({ ratio: 1 });
+    await expect(area).toHaveCSS("overflow-y", "hidden");
+    await page.screenshot({ path: test.info().outputPath("give-details.png") });
+    await details.getByText("Status", { exact: true }).scrollIntoViewIfNeeded();
+    await expect(details.getByRole("button", { name: "Accept shift" })).toBeInViewport({ ratio: 1 });
+    await page.screenshot({ path: test.info().outputPath("give-details-bottom.png") });
+    await page.keyboard.press("Tab");
+    expect(await details.evaluate(el => el.contains(document.activeElement))).toBeTruthy();
+    await page.keyboard.press("Escape"); await expect(details).toHaveCount(0); await expect(launcher).toBeFocused();
+    expect(await area.evaluate(el => el.scrollTop)).toBe(scrollTop);
+    expect(await cards.first().evaluate(el => el.offsetHeight)).toBe(initialHeight);
+    await expect(cards.first()).not.toHaveAttribute("data-expanded");
+    await cards.nth(1).getByRole("button", { name: "View offer details for F27" }).click();
+    const sourceCard = details.getByRole("region", { name: "Shift you receive" });
+    const returnCard = details.getByRole("region", { name: "Your shift (you give)" });
+    await expect(sourceCard).toContainText("7.5h"); await expect(sourceCard.getByText("Receive", { exact: true })).toHaveCSS("color", "rgb(19, 128, 90)");
+    await expect(returnCard).toContainText("F35"); await expect(returnCard).toContainText("North Store");
+    await expect(returnCard).toContainText("4.25h"); await expect(returnCard.getByText("Give", { exact: true })).toHaveCSS("color", "rgb(36, 107, 255)");
+    await expect(details.getByRole("button", { name: "Accept shift" })).toBeInViewport({ ratio: 1 });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBeTruthy();
+    await page.screenshot({ path: test.info().outputPath("exchange-details.png") });
+    await returnCard.getByText("Shift hours: 4.25h", { exact: true }).scrollIntoViewIfNeeded();
+    await expect(details.getByRole("button", { name: "Accept shift" })).toBeInViewport({ ratio: 1 });
+    await page.screenshot({ path: test.info().outputPath("exchange-details-bottom.png") });
+    await details.getByRole("button", { name: "Close", exact: true }).click();
+    await cards.nth(2).getByRole("button", { name: "View offer details for F27" }).click();
+    await expect(details.getByText("Private", { exact: true })).toBeVisible();
+    await details.getByRole("button", { name: "Accept shift", exact: true }).click();
+    await expect(page.locator("dialog:modal")).toHaveCount(0);
+    await expect(page.getByRole("dialog", { name: "Accept this shift?" })).toBeVisible();
+    await page.getByRole("button", { name: "Back", exact: true }).click();
+  });
+}
+
+test("details lock eligibility, restore History and show creator transfer direction", async ({ page }) => {
+  const state = { offers: [offer({ requestKind: "exchange", targetEmployeeId: 2, returnFromTime: "10:00", returnToTime: "14:15", returnShiftHours: 4.25 }),
+    offer({ id: 2, status: "accepted", requestKind: "give" })] };
+  await mockApi(page, 1, state); await page.goto("/swap");
+  await page.getByRole("button", { name: "View offer details for F27" }).click();
+  const details = page.getByRole("dialog", { name: "Offer details" });
+  await expect(details.getByRole("region", { name: "Your shift (you give)" })).toContainText("F27");
+  await expect(details.getByRole("region", { name: "Shift you receive" })).toContainText("F35");
+  await expect(details.getByRole("button", { name: "Accept shift" })).toBeDisabled();
+  await expect(details.getByRole("button", { name: "Cancel offer" })).toBeEnabled();
+  await details.getByRole("button", { name: "Close", exact: true }).click();
+  await page.getByRole("button", { name: "Swap history", exact: true }).click();
+  const history = page.getByRole("dialog", { name: "Recent swap activity" });
+  const historyLauncher = history.getByRole("button", { name: "View offer details for F27" });
+  await historyLauncher.click(); await expect(page.locator("dialog:modal")).toHaveCount(2);
+  await expect(details.getByRole("button", { name: "Accept shift" })).toHaveCount(0);
+  await expect(details.getByRole("button", { name: "Cancel offer" })).toHaveCount(0);
+  await page.keyboard.press("Escape"); await expect(details).toHaveCount(0);
+  await expect(historyLauncher).toBeFocused(); await expect(history).toBeVisible();
+  expect(await page.evaluate(() => document.body.style.overflow)).toBe("hidden");
+  await page.keyboard.press("Escape"); await expect(history).not.toBeVisible();
+});
+
+test("locked offer details stay disabled and backdrop dismisses", async ({ page }) => {
+  await mockApi(page, 2, { offers: [offer({ isScheduleLocked: true, acceptanceUnavailableReason: "Schedule is locked while a manager is editing it." })] });
+  await page.goto("/swap"); await page.getByRole("button", { name: "View offer details for F27" }).click();
+  const details = page.getByRole("dialog", { name: "Offer details" });
+  await expect(details.getByRole("button", { name: "Accept shift" })).toBeDisabled();
+  await expect(details.getByText("Schedule is locked while a manager is editing it.", { exact: true })).toBeVisible();
+  await page.mouse.click(1, 1); await expect(details).toHaveCount(0);
+});
+
+
+test("Polish offer details wrap long names at doubled text size", async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 568 });
+  await mockApi(page, 2, { language: "pl", offers: [offer({ requestKind: "exchange", targetEmployeeId: 2,
+    scheduleName: "Grafik Aleksandry Marii Kowalskiej-Wiśniewskiej", fromEmployeeName: "Aleksandra Maria Kowalska-Wiśniewska",
+    targetEmployeeName: "Anna Aleksandrowicz-Kowalska", returnScheduleName: "Listopadowy grafik oddziału północnego",
+    returnFromTime: "10:00", returnToTime: "14:15", returnShiftHours: 4.25 })] });
+  await page.goto("/swap"); await page.getByRole("button", { name: /^Zobacz szczegóły oferty/ }).click();
+  const details = page.getByRole("dialog", { name: "Szczegóły oferty" });
+  await details.evaluate(dialog => {
+    const nodes = [dialog, ...dialog.querySelectorAll<HTMLElement>("*")].filter((node): node is HTMLElement => node instanceof HTMLElement);
+    const sizes = nodes.map(node => Number.parseFloat(getComputedStyle(node).fontSize));
+    nodes.forEach((node, index) => { node.style.fontSize = `${sizes[index] * 2}px`; });
+  });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBeTruthy();
+  expect(await details.evaluate(dialog => dialog.scrollWidth <= dialog.clientWidth)).toBeTruthy();
+  await details.getByText("Widoczność", { exact: true }).scrollIntoViewIfNeeded();
+  await expect(details.getByRole("button", { name: "Przejmij zmianę", exact: true })).toBeInViewport({ ratio: 1 });
+  await expect(details.getByRole("button", { name: "Zamknij", exact: true })).toBeInViewport({ ratio: 1 });
+  await page.screenshot({ path: test.info().outputPath("polish-details-double-text.png") });
+  await details.getByRole("button", { name: "Zamknij", exact: true }).click();
+  await expect(details).toHaveCount(0);
+});
+
+
+for (const width of [320, 375, 390, 430]) {
+  test(`premium offer list preserves History at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 844 });
+    const state = { offers: [offer({ id: 1, scheduleName: "Demo", requestKind: "exchange",
+      fromEmployeeName: "Oleh Protsun", fromEmployeeId: 2, targetEmployeeId: 1, isCreatedByCurrentEmployee: false, canAccept: true, canCancel: false, returnFromTime: "10:00", returnToTime: "14:15", returnShiftHours: 4.25 }),
+      ...Array.from({ length: 6 }, (_, index) => offer({ id: index + 2, scheduleName: "8989", requestKind: "give",
+        dayOfMonth: index + 2, fromEmployeeName: "Anna Minieieva", acceptanceUnavailableReason: "This is your own swap offer." }))] };
+    await mockApi(page, 1, state);
+    await page.route("**/api/employee-shift-swaps", route => route.fulfill({ contentType: "application/json", body: JSON.stringify(state.offers) }));
+    await page.goto("/swap");
+    const cards = page.locator('[data-swap-offers-scroll] article'); await expect(cards).toHaveCount(7);
+    await expect(cards.first()).toHaveCSS("opacity", "1");
+    await expect(page.getByText("7 offers", { exact: true })).toBeVisible();
+    const date = cards.first().locator('[class*="offerDateLine"]');
+    await expect(date).toHaveCSS("display", "flex");
+    const icon = (await date.locator("svg").boundingBox())!;
+    const text = (await date.locator("span").boundingBox())!;
+    expect(Math.abs(icon.y + icon.height / 2 - text.y - text.height / 2)).toBeLessThanOrEqual(1);
+    const warning = cards.nth(1).locator('[class*="offerUnavailableReason"]');
+    await expect(warning).toHaveCSS("background-color", "rgb(255, 240, 242)");
+    await expect(warning.locator("svg")).toHaveCount(1);
+    await expect(cards.first().getByText("Can", { exact: true })).toBeVisible();
+    const history = page.getByRole("button", { name: "Swap history", exact: true });
+    const historyGeometry = await history.evaluate(button => {
+      const rect = button.getBoundingClientRect(); const style = getComputedStyle(button);
+      const stage = button.parentElement!; const backdrop = stage.querySelector("svg path");
+      return { x: rect.x, y: rect.y, width: rect.width, height: rect.height, bottom: style.bottom,
+        borderRadius: style.borderRadius, background: style.background, boxShadow: style.boxShadow, zIndex: style.zIndex,
+        backdrop: backdrop?.getAttribute("d") };
+    });
+    await writeFile(test.info().outputPath("history-geometry.json"), JSON.stringify(historyGeometry, null, 2));
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBeTruthy();
+    await expect(history).toBeInViewport({ ratio: 1 });
+    await page.screenshot({ path: test.info().outputPath("premium-offers.png") });
+    await cards.first().getByRole("button", { name: "Pin Demo swap" }).click();
+    await expect(page.getByRole("dialog", { name: "Offer details" })).toHaveCount(0);
+    await cards.first().getByRole("button", { name: "View offer details for Demo" }).click();
+    await expect(page.getByRole("dialog", { name: "Offer details" })).toBeVisible();
+    await page.getByRole("dialog", { name: "Offer details" }).getByRole("button", { name: "Close", exact: true }).click();
+    const area = page.locator('[data-swap-offers-scroll]');
+    await area.evaluate(el => { el.scrollTop = el.scrollHeight; });
+    await expect(cards.last()).toBeInViewport(); await expect(history).toBeInViewport({ ratio: 1 });
+    await expect.poll(() => area.evaluate(el => el.scrollTop)).toBeGreaterThan(0);
+    const last = (await cards.last().boundingBox())!; const historyBox = (await history.boundingBox())!;
+    expect(last.y + last.height).toBeLessThanOrEqual(historyBox.y);
+    await page.screenshot({ path: test.info().outputPath("premium-offers-scrolled.png") });
+    await area.evaluate(el => { el.scrollTop = 0; });
+    await page.getByRole("searchbox").fill("Demo"); await expect(cards).toHaveCount(1);
+    await page.getByRole("button", { name: "Clear swap search" }).click(); await expect(cards).toHaveCount(7);
+  });
+}
+
+
+for (const viewport of [{ width: 320, height: 640 }, { width: 375, height: 812 }, { width: 390, height: 844 }, { width: 430, height: 932 }]) {
+  test(`History viewport and independent scrolling ${viewport.width}x${viewport.height}`, async ({ page, browserName }) => {
+    await page.setViewportSize(viewport);
+    const state = { offers: [
+      ...Array.from({ length: 12 }, (_, i) => offer({ id: i + 1, scheduleName: `Open ${i}`, scheduleSlotId: i + 800 })),
+      ...Array.from({ length: 15 }, (_, i) => offer({ id: i + 100, scheduleName: i === 0 ? "Aleksandra Maria Kowalska-Wiśniewska — harmonogram listopadowy" : `History ${i}`,
+        fromEmployeeName: "Aleksandra Maria Kowalska-Wiśniewska", targetEmployeeName: "Anna Aleksandrowicz-Kowalska",
+        requestKind: i % 2 ? "give" : "exchange", status: i % 2 ? "cancelled" : "accepted", visibility: i % 3 ? "public" : "private",
+        returnFromTime: "10:00", returnToTime: "14:15", returnShiftHours: 4.25 }))] };
+    await mockApi(page, 1, state); await page.goto("/swap");
+    const background = page.locator('[data-swap-offers-scroll]');
+    await expect(background.locator("article")).toHaveCount(12);
+    await background.evaluate(el => { el.scrollTop = 180; });
+    const saved = await background.evaluate(el => ({ scroll: el.scrollTop, overflow: el.style.overflowY, x: el.getBoundingClientRect().x, width: el.getBoundingClientRect().width }));
+    const launcher = page.getByRole("button", { name: "Swap history", exact: true }); await launcher.click();
+    const history = page.getByRole("dialog", { name: "Recent swap activity" });
+    const list = history.getByRole("region", { name: "Swap history", exact: true });
+    await expect(history).toBeVisible(); await expect(history).toHaveCSS("overflow-y", "hidden");
+    await expect(list).toHaveCSS("overflow-y", "auto");
+    if (await page.evaluate(() => CSS.supports("overscroll-behavior-y", "none"))) await expect(list).toHaveCSS("overscroll-behavior-y", "none");
+    else test.info().annotations.push({ type: "runtime", description: "Installed WebKit lacks overscroll-behavior support; fixed-body/root locks and scroll restoration are verified separately." });
+    await expect(background).toHaveCSS("overflow-y", "hidden"); await expect(page.locator("body")).toHaveCSS("position", "fixed");
+    const box = (await history.boundingBox())!;
+    expect(box.y).toBeGreaterThanOrEqual(0); expect(box.y + box.height).toBeLessThanOrEqual(viewport.height);
+    expect(box.height).toBeGreaterThanOrEqual(viewport.height - 80);
+    const close = history.getByRole("button", { name: "Close", exact: true });
+    await close.click({ trial: true });
+    const closeBefore = (await close.boundingBox())!;
+    const cards = list.locator("article"); await expect(cards).toHaveCount(15);
+    expect(await cards.evaluateAll(nodes => nodes.every(node => {
+      const badges = node.querySelector<HTMLElement>('[class*="offerBadges_"]')!;
+      const title = node.querySelector<HTMLElement>('[class*="offerTitle_"]')!;
+      return getComputedStyle(badges).justifyContent === "flex-start" && getComputedStyle(badges).flexWrap === "wrap" &&
+        Math.abs(badges.getBoundingClientRect().left - title.getBoundingClientRect().left) < 1 &&
+        [...badges.children].every(badge => badge.getBoundingClientRect().right <= node.getBoundingClientRect().right);
+    }))).toBeTruthy();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBeTruthy();
+    expect(await list.evaluate(el => el.scrollWidth <= el.clientWidth)).toBeTruthy();
+    await page.screenshot({ path: test.info().outputPath("history-top.png") });
+    const first = cards.first().getByRole("button", { name: /^View offer details for/ }); await first.click();
+    const details = page.getByRole("dialog", { name: "Offer details" }); await expect(details).toBeVisible();
+    await expect(page.locator("dialog:modal")).toHaveCount(2); await page.keyboard.press("Escape");
+    await expect(details).toHaveCount(0); await expect(first).toBeFocused();
+    await expect(background).toHaveCSS("overflow-y", "hidden");
+    await list.evaluate(el => { el.scrollTop = el.scrollHeight; });
+    await expect(cards.last()).toBeInViewport(); await expect(close).toBeInViewport({ ratio: 1 });
+    expect((await close.boundingBox())!.y).toBeCloseTo(closeBefore.y, 0);
+    if (!(browserName === "webkit" && test.info().project.use.isMobile)) {
+      await list.hover(); await page.mouse.wheel(0, 800);
+      await page.mouse.move(1, 1); await page.mouse.wheel(0, 800);
+    }
+    expect(await background.evaluate(el => el.scrollTop)).toBe(saved.scroll);
+    await page.screenshot({ path: test.info().outputPath("history-bottom.png") });
+    await close.click(); await expect(history).not.toBeVisible(); await expect(launcher).toBeFocused();
+    expect(await background.evaluate(el => ({ scroll: el.scrollTop, overflow: el.style.overflowY, x: el.getBoundingClientRect().x, width: el.getBoundingClientRect().width }))).toEqual(saved);
+    await launcher.click(); await expect(list).toBeVisible(); await page.keyboard.press("Escape"); await expect(history).not.toBeVisible();
+    await expect(background).toHaveCSS("overflow-y", "auto");
+  });
+}
+
+
+for (const count of [0, 1, 4]) {
+  test(`short History uses natural card height with ${count} entries`, async ({ page }) => {
+    await page.setViewportSize({ width: 320, height: 640 });
+    await mockApi(page, 1, { offers: Array.from({ length: count }, (_, i) => offer({ id: i + 1, status: "accepted", scheduleName: "Long employee name — Aleksandra Maria Kowalska-Wiśniewska", canAccept: false, canCancel: false })) });
+    await page.goto("/swap"); await page.getByRole("button", { name: "Swap history", exact: true }).click();
+    const history = page.getByRole("dialog", { name: "Recent swap activity" });
+    const list = history.getByRole("region", { name: "Swap history", exact: true });
+    const close = history.getByRole("button", { name: "Close", exact: true });
+    await close.click({ trial: true });
+    const box = (await history.boundingBox())!;
+    expect(box.y + box.height).toBeLessThanOrEqual(640);
+    expect(await list.evaluate(el => el.scrollWidth <= el.clientWidth)).toBeTruthy();
+    if (count === 0) expect(box.height).toBeLessThan(300);
+    if (count === 1) expect(box.height).toBeLessThan(400);
+    if (count > 0) {
+      const card = list.locator("article").first();
+      await expect(card).toHaveCSS("flex-grow", "0");
+      expect((await card.boundingBox())!.height).toBeLessThanOrEqual((await card.locator('button[class*="offerOpenButton_"]').boundingBox())!.height + 2);
+    }
+    await list.evaluate(el => { el.scrollTop = el.scrollHeight; }); await expect(close).toBeInViewport({ ratio: 1 });
+    await page.screenshot({ path: test.info().outputPath("short-history.png") });
+    await close.click(); await expect(history).not.toBeVisible();
+  });
+}
+
+
+for (const viewport of [{ width: 320, height: 640 }, { width: 375, height: 812 }, { width: 390, height: 844 }, { width: 430, height: 932 }, { width: 1280, height: 800 }]) {
+  test(`stationary Swap and list-only gestures ${viewport.width}x${viewport.height}`, async ({ page, browserName }) => {
+    await page.setViewportSize(viewport);
+    await mockApi(page, 2, { offers: Array.from({ length: 16 }, (_, i) => offer({ id: i + 1, scheduleName: `Offer ${i + 1}`, scheduleSlotId: 800 + i })) });
+    await page.goto("/swap");
+    const list = page.locator("[data-swap-offers-scroll]"); await expect(list.locator("article")).toHaveCount(16);
+    const header = page.locator('header[class*="swapHeader_"]');
+    const toolbar = page.locator('[class*="offerToolbar_"]');
+    const history = page.getByRole("button", { name: "Swap history", exact: true });
+    const nav = page.locator('[data-employee-nav]').last();
+    await expect(header).toHaveCSS("opacity", "1"); await expect(toolbar).toHaveCSS("opacity", "1");
+    await expect(nav).toHaveCSS("opacity", "1");
+    await page.getByRole("button", { name: "Create offer", exact: true }).click({ trial: true });
+    const rect = async (locator: typeof list) => locator.evaluate(el => {
+      const box = el.getBoundingClientRect(); return { x: Math.round(box.x), y: Math.round(box.y), width: Math.round(box.width), height: Math.round(box.height) };
+    });
+    const stationary = async () => ({ header: await rect(header), toolbar: await rect(toolbar), history: await rect(history), nav: await rect(nav) });
+    const before = await stationary();
+    const outer = () => page.evaluate(() => ({ window: scrollY, html: document.documentElement.scrollTop, body: document.body.scrollTop, root: document.getElementById("root")!.scrollTop }));
+    const originalOuter = await outer();
+    await expect(list).toHaveCSS("overflow-y", "auto");
+    await expect(page.locator('main[class*="swapBody_"]')).toHaveCSS("overflow-y", "hidden");
+    await expect(page.locator("body")).toHaveCSS("position", "fixed");
+    const listBox = (await list.boundingBox())!;
+    const x = listBox.x + listBox.width / 2;
+    const gesture = async (x: number, y: number, distance: number) => {
+      if (browserName === "chromium") {
+        const cdp = await page.context().newCDPSession(page);
+        await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x, y }] });
+        for (let step = 1; step <= 8; step++) {
+          await cdp.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: [{ x, y: y - distance * step / 8 }] });
+          await page.waitForTimeout(16);
+        }
+        await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] }); await cdp.detach();
+      } else if (test.info().project.use.isMobile) {
+        test.info().annotations.push({ type: "runtime", description: "Mobile WebKit exposes no wheel/swipe input; keyboard scroll is exercised here, Chromium verifies native touch and desktop WebKit verifies wheel input." });
+        if (x >= listBox.x && x <= listBox.x + listBox.width && y >= listBox.y && y <= listBox.y + listBox.height) await list.focus();
+        else await history.focus();
+        await page.keyboard.press(distance > 0 ? "PageDown" : "PageUp");
+      } else { await page.mouse.move(x, y); await page.mouse.wheel(0, distance); }
+    };
+    await gesture(x, listBox.y + Math.min(listBox.height - 10, 230), 160);
+    await expect.poll(() => list.evaluate(el => el.scrollTop)).toBeGreaterThan(0);
+    expect(await stationary()).toEqual(before); expect(await outer()).toEqual(originalOuter);
+    const search = (await toolbar.boundingBox())!;
+    await gesture(search.x + search.width / 2, search.y + search.height / 2, 80);
+    expect(await stationary()).toEqual(before); expect(await outer()).toEqual(originalOuter);
+    await list.evaluate(el => { el.scrollTop = el.scrollHeight; });
+    await gesture(x, listBox.y + Math.min(listBox.height - 10, 180), 120);
+    expect(await stationary()).toEqual(before); expect(await outer()).toEqual(originalOuter);
+    await list.evaluate(el => { el.scrollTop = 0; });
+    await gesture(x, listBox.y + 10, -120);
+    expect(await stationary()).toEqual(before); expect(await outer()).toEqual(originalOuter);
+    await list.evaluate(el => { el.scrollTop = 160; });
+    const saved = await list.evaluate(el => el.scrollTop);
+    for (const kind of ["history", "details", "wizard"]) {
+      if (kind === "history") await history.click();
+      if (kind === "details") await list.locator("article").nth(2).getByRole("button", { name: /^View offer details for/ }).click();
+      if (kind === "wizard") await page.getByRole("button", { name: "Create offer", exact: true }).click();
+      await expect(page.locator("dialog:modal")).toHaveCount(1);
+      await page.locator("dialog:modal").getByRole("button", { name: "Close", exact: true }).click();
+      await expect(page.locator("dialog:modal")).toHaveCount(0);
+      expect(await list.evaluate(el => el.scrollTop)).toBe(saved);
+      expect(await outer()).toEqual(originalOuter);
+    }
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth && document.documentElement.scrollHeight <= innerHeight)).toBeTruthy();
+    const svg = page.locator('svg[class*="swapBackdrop_"]');
+    expect(await svg.evaluate(el => Math.abs((el as SVGSVGElement).viewBox.baseVal.height - el.getBoundingClientRect().height) < 1)).toBeTruthy();
+    await page.screenshot({ path: test.info().outputPath("stationary-swap.png") });
+    await page.setViewportSize({ width: viewport.width, height: viewport.height - 100 });
+    await expect.poll(() => page.evaluate(() => document.documentElement.scrollHeight <= innerHeight)).toBeTruthy();
+    await expect(history).toBeInViewport({ ratio: 1 });
+    await nav.getByRole("link", { name: "Profile", exact: true }).click();
+    await expect(page.locator("body")).not.toHaveCSS("position", "fixed");
+    await expect(page.locator("html")).toHaveCSS("overflow-y", "auto");
   });
 }
