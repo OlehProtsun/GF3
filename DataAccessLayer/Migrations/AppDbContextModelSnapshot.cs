@@ -1608,6 +1608,57 @@ namespace DataAccessLayer.Migrations
                         .HasColumnType("INTEGER")
                         .HasColumnName("month");
 
+                    b.Property<string>("RequestKind")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT")
+                        .HasDefaultValue("Give")
+                        .HasColumnName("request_kind");
+
+                    b.Property<string>("ReturnAfterSnapshotJson")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("return_after_snapshot_json");
+
+                    b.Property<string>("ReturnBeforeSnapshotJson")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("return_before_snapshot_json");
+
+                    b.Property<int?>("ReturnDayOfMonth")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("return_day_of_month");
+
+                    b.Property<string>("ReturnFromTime")
+                        .HasMaxLength(5)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("return_from_time");
+
+                    b.Property<int?>("ReturnMonth")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("return_month");
+
+                    b.Property<int?>("ReturnScheduleId")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("return_schedule_id");
+
+                    b.Property<string>("ReturnScheduleName")
+                        .HasMaxLength(200)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("return_schedule_name");
+
+                    b.Property<string>("ReturnShopName")
+                        .HasMaxLength(200)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("return_shop_name");
+
+                    b.Property<string>("ReturnToTime")
+                        .HasMaxLength(5)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("return_to_time");
+
+                    b.Property<int?>("ReturnYear")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("return_year");
+
                     b.Property<int>("ScheduleId")
                         .HasColumnType("INTEGER")
                         .HasColumnName("schedule_id");
@@ -1715,6 +1766,31 @@ namespace DataAccessLayer.Migrations
                         .HasColumnType("TEXT")
                         .HasColumnName("offered_to_time");
 
+                    b.Property<string>("RequestKind")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT")
+                        .HasDefaultValue("Give")
+                        .HasColumnName("request_kind");
+
+                    b.Property<string>("ReturnFromTime")
+                        .HasMaxLength(5)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("return_from_time");
+
+                    b.Property<int?>("ReturnScheduleId")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("return_schedule_id");
+
+                    b.Property<int?>("ReturnScheduleSlotId")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("return_schedule_slot_id");
+
+                    b.Property<string>("ReturnToTime")
+                        .HasMaxLength(5)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("return_to_time");
+
                     b.Property<int>("ScheduleId")
                         .HasColumnType("INTEGER")
                         .HasColumnName("schedule_id");
@@ -1744,6 +1820,14 @@ namespace DataAccessLayer.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("AcceptedByEmployeeId");
+
+                    b.HasIndex("ReturnScheduleId", "Status")
+                        .HasDatabaseName("ix_shift_swap_return_schedule_status");
+
+                    b.HasIndex("ReturnScheduleSlotId", "Status")
+                        .IsUnique()
+                        .HasDatabaseName("ux_shift_swap_open_return_slot")
+                        .HasFilter("status = 'Open' AND request_kind = 'Exchange' AND return_schedule_slot_id IS NOT NULL");
 
                     b.HasIndex("ScheduleSlotId", "Status")
                         .IsUnique()

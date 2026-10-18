@@ -14,6 +14,7 @@ const mocks = vi.hoisted(() => ({
   swapsQuery: vi.fn(),
   employeesQuery: vi.fn(),
   createMutate: vi.fn(),
+  preview: vi.fn(),
   acceptMutate: vi.fn(),
   cancelMutate: vi.fn(),
   setPinMutate: vi.fn(),
@@ -66,6 +67,8 @@ vi.mock("@entities/employee-ui-state", async () => {
 
 vi.mock("@entities/shift-swaps", async importOriginal => ({
   ...(await importOriginal<typeof import("@entities/shift-swaps")>()),
+  useShiftSwapPreviewQuery: (payload: unknown) => mocks.preview(payload),
+  useShiftSwapReturnCandidatesQuery: () => ({ data: { items: [], hasMore: false }, isFetching: false }),
   useEmployeeShiftSwapsQuery: () => mocks.swapsQuery(),
   useEmployeeShiftSwapEmployeesQuery: () => mocks.employeesQuery(),
   useCreateEmployeeShiftSwapMutation: () => ({
@@ -199,6 +202,12 @@ beforeEach(() => {
   mocks.swapsQuery.mockReset();
   mocks.employeesQuery.mockReset();
   mocks.createMutate.mockReset();
+  mocks.preview.mockImplementation((payload: { fromTime: string; toTime: string; targetEmployeeId?: number; scheduleSlotId: number } | null) => ({
+    data: payload ? { requestKind: "give", targetEmployeeId: payload.targetEmployeeId, targetEmployeeName: payload.targetEmployeeId ? "Target Worker" : "Everyone",
+      source: { slotId: payload.scheduleSlotId, scheduleId: 10, scheduleName: "May Schedule", shopName: "Central Shop", year: 2026, month: 5, dayOfMonth: 1,
+        fromTime: payload.fromTime, toTime: payload.toTime, durationMinutes: 450 }, projectedMonths: [], isValid: true } : undefined,
+    isFetching: false, error: null,
+  }));
   mocks.acceptMutate.mockReset();
   mocks.cancelMutate.mockReset();
   mocks.setPinMutate.mockReset();
@@ -220,19 +229,25 @@ describe("EmployeeSwapPage", () => {
     await user.click(screen.getByRole("button", { name: "Create offer" }));
     await user.click(screen.getByRole("button", { name: /May Schedule/i }));
 
-    const dialog = screen.getByRole("dialog", { name: "Choose shift" });
-    await user.click(within(dialog).getByRole("button", { name: /08:00 - 16:00/i }));
+    const dialog = screen.getByRole("dialog", { name: "Create a swap offer" });
+    await user.click(within(dialog).getByRole("radio", { name: /08:00.*16:00/i }));
     await user.click(within(dialog).getByRole("button", { name: "Custom period" }));
-    await user.click(within(dialog).getByRole("button", { name: "Increase start time" }));
-    await user.click(within(dialog).getByRole("button", { name: "Decrease end time" }));
-    await user.click(within(dialog).getByRole("button", { name: "Choose shift" }));
+    await user.click(within(dialog).getByRole("button", { name: "Increase From" }));
+    await user.click(within(dialog).getByRole("button", { name: "Decrease To" }));
+    await user.click(within(dialog).getByRole("button", { name: "Confirm shift" }));
 
+    await user.click(screen.getByRole("button", { name: "Continue" }));
     await user.click(screen.getByRole("button", { name: "Specific employee" }));
     expect(screen.getByRole("button", { name: /Target Worker/i })).toBeEnabled();
-    await user.click(screen.getByRole("button", { name: "Offer shift" }));
+    expect(screen.getByRole("button", { name: "Continue" })).toBeDisabled();
+    await user.click(screen.getByRole("button", { name: /Target Worker/i }));
+    await user.click(screen.getByRole("button", { name: "Save selection" }));
+    await user.click(screen.getByRole("button", { name: "Continue" }));
+    await user.click(screen.getByRole("button", { name: "Send request" }));
 
     expect(mocks.createMutate).toHaveBeenCalledWith(
       {
+        requestKind: "give",
         scheduleId: 10,
         scheduleSlotId: 100,
         fromTime: "08:15",
@@ -263,16 +278,19 @@ describe("EmployeeSwapPage", () => {
 
     await user.click(screen.getByRole("button", { name: "Create offer" }));
     await user.click(screen.getByRole("button", { name: /May Schedule/i }));
-    const dialog = screen.getByRole("dialog", { name: "Choose shift" });
-    await user.click(within(dialog).getByRole("button", { name: /11:00 - 15:00/i }));
+    const dialog = screen.getByRole("dialog", { name: "Create a swap offer" });
+    await user.click(within(dialog).getByRole("radio", { name: /11:00.*15:00/i }));
     await user.click(within(dialog).getByRole("button", { name: "Custom period" }));
-    await user.click(within(dialog).getByRole("button", { name: "Increase start time" }));
-    await user.click(within(dialog).getByRole("button", { name: "Decrease end time" }));
-    await user.click(within(dialog).getByRole("button", { name: "Choose shift" }));
-    await user.click(screen.getByRole("button", { name: "Offer shift" }));
+    await user.click(within(dialog).getByRole("button", { name: "Increase From" }));
+    await user.click(within(dialog).getByRole("button", { name: "Decrease To" }));
+    await user.click(within(dialog).getByRole("button", { name: "Confirm shift" }));
+    await user.click(screen.getByRole("button", { name: "Continue" }));
+    await user.click(screen.getByRole("button", { name: "Continue" }));
+    await user.click(screen.getByRole("button", { name: "Send request" }));
 
     expect(mocks.createMutate).toHaveBeenCalledWith(
       {
+        requestKind: "give",
         scheduleId: 10,
         scheduleSlotId: 111,
         fromTime: "11:15",
@@ -292,8 +310,8 @@ describe("EmployeeSwapPage", () => {
 
     await user.click(screen.getByRole("button", { name: "Create offer" }));
 
-    expect(screen.getByText("Choose a schedule, then select one of your shifts from the dialog.")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Offer shift" })).toBeDisabled();
+    expect(screen.getByRole("heading", { name: "Choose a schedule" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Continue" })).toBeDisabled();
     expect(mocks.createMutate).not.toHaveBeenCalled();
   });
 

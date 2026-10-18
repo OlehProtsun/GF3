@@ -239,7 +239,7 @@ public sealed class EmployeeUiStateController(AppDbContext db) : ControllerBase
             .AsNoTracking()
             .AnyAsync(request =>
                 request.Id == swapId &&
-                (request.ArchivedViewsJson != null || request.Schedule.PublicationStatus == SchedulePublicationStatus.Public) &&
+                ((request.Status != ShiftSwapStatus.Open && request.ScheduleSlotId == null && request.ArchivedViewsJson != null) || request.Schedule.PublicationStatus == SchedulePublicationStatus.Public) &&
                 (request.FromEmployeeId == employeeId ||
                  request.TargetEmployeeId == employeeId ||
                  request.AcceptedByEmployeeId == employeeId ||

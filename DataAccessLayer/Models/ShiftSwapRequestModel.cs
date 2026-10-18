@@ -11,6 +11,21 @@ namespace DataAccessLayer.Models;
 [Index(nameof(FromEmployeeId), nameof(Status), Name = "ix_shift_swap_from_status")]
 public class ShiftSwapRequestModel
 {
+    [Column("request_kind")]
+    public ShiftSwapRequestKind RequestKind { get; set; } = ShiftSwapRequestKind.Give;
+
+    [Column("return_schedule_id")]
+    public int? ReturnScheduleId { get; set; }
+
+    [Column("return_schedule_slot_id")]
+    public int? ReturnScheduleSlotId { get; set; }
+
+    [MaxLength(5), Column("return_from_time")]
+    public string? ReturnFromTime { get; set; }
+
+    [MaxLength(5), Column("return_to_time")]
+    public string? ReturnToTime { get; set; }
+
     [Key]
     [Column("id")]
     public int Id { get; set; }
@@ -27,6 +42,7 @@ public class ShiftSwapRequestModel
     public ScheduleSlotModel? ScheduleSlot { get; set; }
 
     [Column("archived_views_json")]
+    // Pending exchanges retain original shift identities; completion replaces these with participant views.
     public string? ArchivedViewsJson { get; set; }
 
     [Column("offered_from_time")]

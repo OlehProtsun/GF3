@@ -13,6 +13,20 @@ export type ShiftSwapScheduleSnapshot = {
 };
 
 export type ShiftSwap = {
+  requestKind?: "give" | "exchange";
+  returnScheduleId?: number | null;
+  returnScheduleSlotId?: number | null;
+  returnScheduleName?: string | null;
+  returnShopName?: string | null;
+  returnYear?: number | null;
+  returnMonth?: number | null;
+  returnDayOfMonth?: number | null;
+  returnFromTime?: string | null;
+  returnToTime?: string | null;
+  returnShiftHours?: number | null;
+  returnBeforeSnapshot?: ShiftSwapScheduleSnapshot | null;
+  returnAfterSnapshot?: ShiftSwapScheduleSnapshot | null;
+  currentEmployeeProjectedMonths?: ShiftSwapPreviewMonthStats[] | null;
   id: number;
   scheduleId: number;
   scheduleSlotId: number;
@@ -63,11 +77,46 @@ export type ShiftSwapEmployee = {
 };
 
 export type CreateShiftSwapInput = {
+  requestKind?: "give" | "exchange";
+  returnScheduleId?: number;
+  returnScheduleSlotId?: number;
+  returnFromTime?: string;
+  returnToTime?: string;
   scheduleId: number;
   scheduleSlotId: number;
   fromTime: string;
   toTime: string;
   targetEmployeeId?: number | null;
+};
+
+export type SwapWizardRequest = CreateShiftSwapInput & (
+  | { requestKind: "give"; returnScheduleId?: never; returnScheduleSlotId?: never; returnFromTime?: never; returnToTime?: never }
+  | { requestKind: "exchange"; targetEmployeeId: number; returnScheduleId: number; returnScheduleSlotId: number; returnFromTime: string; returnToTime: string }
+);
+
+export type ShiftSwapReturnCandidate = {
+  scheduleId: number; scheduleName: string; shopName: string;
+  year: number; month: number; dayOfMonth: number; slotId: number;
+  fromTime: string; toTime: string; durationMinutes: number;
+  canSelect: boolean; unavailableReason?: string | null;
+  suggestedFromTime?: string | null; suggestedToTime?: string | null;
+  eligibleWindows?: { fromTime: string; toTime: string }[];
+};
+export type ShiftSwapReturnCandidatePage = {
+  items: ShiftSwapReturnCandidate[]; page: number; pageSize: number; hasMore: boolean;
+};
+export type ShiftSwapCandidateParams = {
+  sourceScheduleId: number; sourceSlotId: number; fromTime: string; toTime: string;
+  targetEmployeeId: number; page?: number; pageSize?: number;
+};
+export type ShiftSwapPreviewMonthStats = {
+  year: number; month: number; hoursBefore: number; hoursAfter: number;
+  workDaysBefore: number; workDaysAfter: number; freeDaysBefore: number; freeDaysAfter: number;
+};
+export type ShiftSwapOfferPreview = {
+  requestKind: "give" | "exchange"; targetEmployeeId?: number | null; targetEmployeeName: string;
+  source: ShiftSwapReturnCandidate; return?: ShiftSwapReturnCandidate | null;
+  projectedMonths: ShiftSwapPreviewMonthStats[]; isValid: boolean; unavailableReason?: string | null;
 };
 
 export type CreateManagerShiftSwapInput = {

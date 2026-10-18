@@ -1,7 +1,4 @@
-.formGrid {
-  display: grid;
-  gap: 12px;
-}
+
 
 .panelHeaderRow {
   min-width: 0;
@@ -85,147 +82,6 @@
   background: rgba(219, 234, 254, 0.94);
   color: #1d4ed8;
   box-shadow: 0 5px 14px rgba(37, 99, 235, 0.14);
-}
-
-.scheduleSwitcher {
-  display: grid;
-  gap: 10px;
-}
-
-.scheduleButton {
-  width: 100%;
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  gap: 10px;
-  align-items: center;
-  box-sizing: border-box;
-  padding: 14px;
-  border-radius: 24px;
-  border: 1px solid rgba(148, 163, 184, 0.14);
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(248, 250, 252, 0.9));
-  color: inherit;
-  text-align: left;
-  cursor: pointer;
-  box-shadow:
-    0 10px 24px rgba(15, 23, 42, 0.045),
-    inset 0 1px 0 rgba(255, 255, 255, 0.8);
-  transition:
-    transform 0.16s ease,
-    border-color 0.18s ease,
-    background 0.18s ease,
-    box-shadow 0.18s ease;
-}
-
-.scheduleButton:hover {
-  transform: translateY(-1px);
-  background: rgba(255, 255, 255, 0.98);
-  box-shadow: 0 12px 26px rgba(15, 23, 42, 0.06);
-}
-
-.scheduleButtonActive {
-  border-color: rgba(37, 99, 235, 0.34);
-  background:
-    linear-gradient(180deg, rgba(239, 246, 255, 0.98), rgba(219, 234, 254, 0.74));
-  box-shadow: 0 14px 30px rgba(37, 99, 235, 0.1);
-}
-
-.scheduleDateBadge {
-  width: 52px;
-  min-height: 52px;
-  display: grid;
-  place-items: center;
-  gap: 1px;
-  border-radius: 18px;
-  border: 1px solid rgba(148, 163, 184, 0.12);
-  background: rgba(255, 255, 255, 0.86);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.78);
-}
-
-.scheduleDateBadge span {
-  color: #64748b;
-  font-size: 0.68rem;
-  font-weight: 900;
-  text-transform: uppercase;
-}
-
-.scheduleDateBadge strong {
-  color: #0f172a;
-  font-size: 0.86rem;
-  line-height: 1;
-  font-weight: 900;
-}
-
-.scheduleButtonContent {
-  min-width: 0;
-  display: grid;
-  gap: 5px;
-}
-
-.scheduleButtonName {
-  min-width: 0;
-  color: #0f172a;
-  font-size: 0.95rem;
-  line-height: 1.2;
-  font-weight: 900;
-  letter-spacing: 0;
-  overflow-wrap: anywhere;
-}
-
-.scheduleButtonMeta {
-  color: #64748b;
-  font-size: 0.76rem;
-  line-height: 1.25;
-  font-weight: 800;
-  overflow-wrap: anywhere;
-}
-
-.selectedShiftCard {
-  display: grid;
-  gap: 5px;
-  padding: 12px 14px;
-  border-radius: 18px;
-  border: 1px solid rgba(37, 99, 235, 0.14);
-  background: rgba(239, 246, 255, 0.82);
-}
-
-.selectedShiftCard span,
-.helperText {
-  color: #64748b;
-  font-size: 0.8rem;
-  line-height: 1.4;
-  font-weight: 800;
-}
-
-.selectedShiftCard span {
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-
-.selectedShiftCard strong {
-  color: #1d4ed8;
-  font-size: 0.94rem;
-  line-height: 1.25;
-  font-weight: 900;
-  overflow-wrap: anywhere;
-}
-
-.helperText {
-  margin: 0;
-}
-
-.field {
-  display: grid;
-  gap: 7px;
-}
-
-.field label,
-.fieldLabel {
-  color: #64748b;
-  font-size: 0.76rem;
-  font-weight: 850;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
 }
 
 .select,
@@ -399,30 +255,6 @@
 }
 
 .comboCheck {
-  color: #1d4ed8;
-}
-
-.segmentRow {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-}
-
-.segmentButton {
-  min-height: 38px;
-  border-radius: 14px;
-  border: 1px solid rgba(148, 163, 184, 0.18);
-  background: rgba(248, 250, 252, 0.9);
-  color: #475569;
-  font: inherit;
-  font-size: 0.84rem;
-  font-weight: 900;
-  cursor: pointer;
-}
-
-.segmentButtonActive {
-  border-color: rgba(37, 99, 235, 0.28);
-  background: rgba(219, 234, 254, 0.9);
   color: #1d4ed8;
 }
 
@@ -754,6 +586,28 @@
   line-height: 1.55;
 }
 
+.emptyState {
+  min-height: 180px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  text-align: center;
+  font-size: 14px;
+}
+
+.emptyState > span {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  color: #2f6df5;
+  background: #edf3ff;
+  font-size: 26px;
+}
+
 .statsPanel {
   display: grid;
   gap: 11px;
@@ -903,335 +757,7 @@
   color: #475569;
 }
 
-.dialogOverlay {
-  composes: overlay from "../../../shared/ui/ViewportOverlay.module.css";
-  position: fixed;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  max-width: none;
-  max-height: none;
-  margin: 0;
-  border: 0;
-  color: inherit;
-  z-index: 80;
-  display: grid;
-  place-items: center;
-  box-sizing: border-box;
-  padding: max(16px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom));
-  background: rgba(15, 23, 42, 0.16);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-}
-
-.shiftDialog {
-  composes: surface from "../../../shared/ui/ViewportOverlay.module.css";
-  width: min(100%, 430px);
-  max-height: min(760px, calc(100dvh - 32px));
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
-  gap: 14px;
-  box-sizing: border-box;
-  position: relative;
-  padding: 16px;
-  border-radius: 30px;
-  border: 1px solid rgba(148, 163, 184, 0.18);
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(248, 250, 252, 0.95));
-  box-shadow:
-    0 24px 64px rgba(15, 23, 42, 0.2),
-    inset 0 1px 0 rgba(255, 255, 255, 0.88);
-  overflow: hidden;
-}
-
-.dialogHeader {
-  position: sticky;
-  top: 0;
-  z-index: 2;
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-  padding-bottom: 2px;
-  background: transparent;
-}
-
-.dialogHeader > div {
-  min-width: 0;
-  display: grid;
-  gap: 4px;
-}
-
-.dialogEyebrow {
-  color: #64748b;
-  font-size: 0.72rem;
-  font-weight: 900;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-}
-
-.dialogHeader h3 {
-  margin: 0;
-  color: #0f172a;
-  font-size: 1.18rem;
-  line-height: 1.1;
-  font-weight: 950;
-  letter-spacing: 0;
-  overflow-wrap: anywhere;
-}
-
-.iconButton {
-  width: 38px;
-  height: 38px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  padding: 0;
-  border-radius: 15px;
-  border: 1px solid rgba(148, 163, 184, 0.14);
-  background: rgba(255, 255, 255, 0.86);
-  color: #475569;
-  cursor: pointer;
-  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.05);
-}
-
-.iconButton:hover {
-  color: #0f172a;
-  background: #ffffff;
-}
-
-.shiftScroll {
-  min-height: 0;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  padding-right: 2px;
-  scrollbar-width: thin;
-  scrollbar-color: rgba(148, 163, 184, 0.5) transparent;
-}
-
-.shiftScroll::-webkit-scrollbar {
-  width: 8px;
-}
-
-.shiftScroll::-webkit-scrollbar-thumb {
-  border-radius: 999px;
-  border: 2px solid transparent;
-  background: #cbd5e1;
-  background-clip: content-box;
-}
-
-.shiftGrid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 8px;
-}
-
-.shiftButton {
-  min-width: 0;
-  min-height: 78px;
-  display: grid;
-  grid-template-rows: auto auto 1fr;
-  align-content: center;
-  gap: 3px;
-  padding: 10px 7px;
-  border-radius: 18px;
-  border: 1px solid rgba(148, 163, 184, 0.14);
-  background: rgba(248, 250, 252, 0.94);
-  color: #334155;
-  font: inherit;
-  text-align: center;
-  cursor: pointer;
-  transition:
-    transform 140ms ease,
-    border-color 140ms ease,
-    background 140ms ease,
-    box-shadow 140ms ease;
-}
-
-.shiftButton:not(:disabled):hover {
-  transform: translateY(-1px);
-  border-color: rgba(37, 99, 235, 0.18);
-  background: #ffffff;
-  box-shadow: 0 10px 20px rgba(15, 23, 42, 0.06);
-}
-
-.shiftButton:disabled {
-  cursor: default;
-}
-
-.shiftButtonEmpty {
-  background: rgba(248, 250, 252, 0.78);
-  color: #334155;
-}
-
-.shiftButtonSelected,
-.shiftButtonConfirming {
-  border-color: rgba(37, 99, 235, 0.28);
-  background: rgba(219, 234, 254, 0.9);
-  color: #1d4ed8;
-}
-
-.shiftDay {
-  color: inherit;
-  font-size: 1.02rem;
-  line-height: 1;
-  font-weight: 950;
-}
-
-.shiftWeekday {
-  color: rgba(71, 85, 105, 0.72);
-  font-size: 0.66rem;
-  line-height: 1;
-  font-weight: 900;
-  text-transform: uppercase;
-}
-
-.shiftTime {
-  align-self: end;
-  color: inherit;
-  font-size: 0.78rem;
-  line-height: 1.2;
-  font-weight: 900;
-  overflow-wrap: anywhere;
-}
-
-.confirmOverlay {
-  position: absolute;
-  inset: 0;
-  z-index: 5;
-  display: grid;
-  place-items: center;
-  box-sizing: border-box;
-  padding: 18px;
-  border-radius: inherit;
-  background: rgba(15, 23, 42, 0.16);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-}
-
-.confirmBox {
-  width: min(100%, 390px);
-  max-height: calc(100% - 24px);
-  display: grid;
-  gap: 10px;
-  padding: 14px;
-  border-radius: 22px;
-  border: 1px solid rgba(37, 99, 235, 0.18);
-  background: rgba(255, 255, 255, 0.96);
-  box-shadow: 0 18px 42px rgba(15, 23, 42, 0.18);
-  overflow-y: auto;
-}
-
-.confirmBox > div:first-child {
-  display: grid;
-  gap: 4px;
-}
-
-.confirmBox span {
-  color: #64748b;
-  font-size: 0.72rem;
-  font-weight: 900;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.confirmBox strong {
-  color: #0f172a;
-  font-size: 0.92rem;
-  line-height: 1.25;
-  font-weight: 900;
-}
-
-.confirmBox p {
-  margin: 0;
-  color: #475569;
-  font-size: 0.84rem;
-  line-height: 1.45;
-  font-weight: 800;
-}
-
-.periodModeRow {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-}
-
-.timePanel {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
-  align-items: center;
-  gap: 8px;
-  padding: 10px;
-  border-radius: 18px;
-  border: 1px solid rgba(148, 163, 184, 0.14);
-  background: rgba(244, 244, 245, 0.74);
-}
-
-.timeStepper {
-  display: grid;
-  grid-template-columns: 32px minmax(0, 1fr) 32px;
-  align-items: center;
-  gap: 6px;
-}
-
-.timeStepper button {
-  width: 32px;
-  height: 32px;
-  border: 1px solid rgba(148, 163, 184, 0.14);
-  border-radius: 13px;
-  background: rgba(255, 255, 255, 0.9);
-  color: #0f172a;
-  font: inherit;
-  font-size: 1rem;
-  font-weight: 900;
-  line-height: 1;
-  cursor: pointer;
-}
-
-.timeStepper span {
-  min-width: 0;
-  display: grid;
-  gap: 3px;
-  justify-items: center;
-}
-
-.timeStepper strong {
-  color: #0f172a;
-  font-size: 0.98rem;
-  line-height: 1;
-  font-weight: 950;
-}
-
-.timeStepper small {
-  color: rgba(71, 85, 105, 0.64);
-  font-size: 0.62rem;
-  font-weight: 900;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.timeDash {
-  color: rgba(71, 85, 105, 0.5);
-  font-size: 1rem;
-  font-weight: 900;
-}
-
-.confirmActions {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-}
-
 @container employee-workspace (min-width: 760px) {
-  .formGrid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    align-items: end;
-  }
-
-  .formGrid .fieldWide {
-    grid-column: 1 / -1;
-  }
 
   .statsCompareGrid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -1259,24 +785,9 @@
   .offerHeaderActions {
     gap: 6px;
   }
-
-  .confirmActions {
-    grid-template-columns: 1fr;
-  }
-
-  .timePanel {
-    grid-template-columns: 1fr;
-  }
-
-  .timeDash {
-    display: none;
-  }
 }
 
 @container employee-workspace (max-width: 360px) {
-  .shiftGrid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
 }
 
 /* Employee swap concept */
@@ -1347,7 +858,7 @@
   color: #111827;
   font-size: 1.3rem;
   line-height: 1.05;
-  font-weight: 900;
+  font-weight: 600;
   letter-spacing: -0.035em;
 }
 
@@ -1461,8 +972,6 @@
   border-radius: 999px;
   background: rgba(148, 163, 184, 0.42);
 }
-
-.creationPanel,
 .historyPanel {
   box-sizing: border-box;
   display: grid;

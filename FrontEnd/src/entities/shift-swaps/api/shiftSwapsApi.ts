@@ -1,10 +1,17 @@
 import { request } from "@shared/api/httpClient";
+import type { ShiftSwapCandidateParams, ShiftSwapReturnCandidatePage, ShiftSwapOfferPreview } from "../model/types";
 import type { CreateManagerShiftSwapInput, CreateShiftSwapInput, ShiftSwap, ShiftSwapEmployee, ShiftSwapHighlightSetting } from "../model/types";
 
 const employeeEndpoint = "employee-shift-swaps";
 const containerEndpoint = "containers";
 
 export const shiftSwapsApi = {
+  listReturnCandidates: (params: ShiftSwapCandidateParams, signal?: AbortSignal) => {
+    const query = new URLSearchParams(Object.entries(params).filter(([, value]) => value !== undefined).map(([key, value]) => [key, String(value)]));
+    return request<ShiftSwapReturnCandidatePage>(`${employeeEndpoint}/return-candidates?${query}`, { signal });
+  },
+  previewEmployee: (payload: CreateShiftSwapInput, signal?: AbortSignal) =>
+    request<ShiftSwapOfferPreview>(`${employeeEndpoint}/preview`, { method: "POST", body: payload, signal }),
   listEmployee: (signal?: AbortSignal) => request<ShiftSwap[]>(employeeEndpoint, { signal }),
   listEmployees: (signal?: AbortSignal) => request<ShiftSwapEmployee[]>(`${employeeEndpoint}/employees`, { signal }),
   createEmployee: (payload: CreateShiftSwapInput) =>

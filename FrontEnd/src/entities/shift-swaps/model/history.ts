@@ -48,6 +48,12 @@ export function filterShiftSwaps(items: ShiftSwap[], query: string) {
       item.scheduleName,
       item.containerName,
       item.shopName,
+      item.returnScheduleName ?? "",
+      item.returnShopName ?? "",
+      item.returnFromTime ?? "",
+      item.returnToTime ?? "",
+      item.returnYear && item.returnMonth && item.returnDayOfMonth
+        ? formatDateSearchValues(new Date(Date.UTC(item.returnYear, item.returnMonth - 1, item.returnDayOfMonth))).join(" ") : "",
       item.acceptedAtUtc ?? "",
       ...buildDateSearchValues(item),
     ].join(" "));

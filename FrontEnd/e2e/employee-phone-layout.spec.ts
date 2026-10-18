@@ -183,9 +183,9 @@ test("Swap search, filters, independent scroll and dialogs", async ({ page }) =>
   await expect(creation).toBeVisible();
   expect((await creation.boundingBox())!.width).toBeLessThanOrEqual(430);
   await creation.getByRole("button", { name: /September/ }).click();
-  const picker = page.getByRole("dialog", { name: "Choose shift", exact: true });
+  const picker = page.getByRole("region", { name: "Select a shift", exact: true });
   await expect(picker).toBeVisible();
-  expect(await picker.evaluate(element => element.matches(":modal"))).toBe(true);
+  await expect(page.locator("dialog:modal")).toHaveCount(1);
   expect(await picker.locator(':scope > div').evaluate(element => element.getBoundingClientRect().width)).toBeLessThanOrEqual(430);
   await page.keyboard.press("Escape");
   await expect(picker).toBeHidden();

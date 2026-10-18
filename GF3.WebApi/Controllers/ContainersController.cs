@@ -14,6 +14,9 @@ using WebApi.Contracts.Containers.SchedulePresets;
 using WebApi.Mappers;
 using WebApi.Realtime;
 using WebApi.Services;
+using DataAccessLayer.Models.DataBaseContext;
+using Microsoft.EntityFrameworkCore;
+using WebApi.ShiftSwaps;
 
 namespace WebApi.Controllers;
 
@@ -30,7 +33,8 @@ public class ContainersController(
     IWorkflowLogService workflowLogService,
     IRealtimeNotifier realtimeNotifier,
     IManagerEditLockService? editLockService = null,
-    IScheduleLastUpdateService? scheduleLastUpdateService = null) : ControllerBase
+    IScheduleLastUpdateService? scheduleLastUpdateService = null,
+    AppDbContext? db = null) : ControllerBase
 {
     [HttpGet]
     [ProducesResponseType(typeof(IEnumerable<ContainerDto>), StatusCodes.Status200OK)]
@@ -242,13 +246,21 @@ public class ContainersController(
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> DeleteGraph(int containerId, int graphId, CancellationToken cancellationToken)
     {
+        await using var transaction = db is null ? null : await db.Database.BeginTransactionAsync(cancellationToken);
         if (CreateEditLockConflictResult(ManagerEditLockTargets.Schedule(containerId, graphId), "This schedule") is { } conflict)
         {
             return conflict;
         }
 
         var existing = await containerService.GetGraphByIdAsync(containerId, graphId, cancellationToken).ConfigureAwait(false);
+        if (db is not null && await db.ShiftSwapRequests.AnyAsync(request => request.RequestKind == DataAccessLayer.Models.Enums.ShiftSwapRequestKind.Exchange &&
+            (request.ScheduleId == graphId || request.ReturnScheduleId == graphId) &&
+            request.Status == DataAccessLayer.Models.Enums.ShiftSwapStatus.Open, cancellationToken))
+            return Conflict(new ProblemDetails { Status = 409, Title = "Deletion is blocked",
+                Detail = "Resolve open exchanges referencing this schedule before deleting it." });
+        if (db is not null) await ShiftSwapArchive.PreserveCompletedAsync(db, graphId, cancellationToken);
         await containerService.DeleteGraphAsync(containerId, graphId, cancellationToken).ConfigureAwait(false);
+        if (transaction is not null) await transaction.CommitAsync(cancellationToken);
         await LogManagerActionAsync(
             $"Deleted {(existing is null ? "schedule" : DescribeSchedule(existing))}.",
             cancellationToken).ConfigureAwait(false);
