@@ -445,12 +445,18 @@ public sealed class ShiftSwapSafetyTests
     {
         await using var database = await SqliteTestDatabase.CreateAsync();
         var fixture = await SeedAsync(database);
+        var managerAccount = new ManagerAccountModel { Username = "matrix-manager", DisplayName = "Manager", PasswordHash = "synthetic-test-hash", PasswordUpdatedAtUtc = DateTimeOffset.UtcNow };
+        await using (var setup = database.CreateContext())
+        {
+            setup.Add(managerAccount); await setup.SaveChangesAsync();
+        }
         var options = new JwtAuthOptions { Issuer = "tests", Audience = "tests", SigningKey = "shift-safety-tests-signing-key-with-enough-entropy" };
         var builder = WebApplication.CreateBuilder();
         builder.Logging.ClearProviders();
         builder.WebHost.UseUrls("http://127.0.0.1:0");
         builder.Services.AddDbContext<AppDbContext>(configuration => configuration.UseSqlite(database.ConnectionString));
         builder.Services.AddSingleton<IScheduleEditLockService, ManagerEditLockService>();
+        builder.Services.AddScoped<DataAccessLayer.Repositories.Abstractions.IManagerAccountRepository, DataAccessLayer.Repositories.ManagerAccountRepository>();
         builder.Services.AddScoped<WebApi.Services.ScheduleVersionCommitService>();
         builder.Services.AddSingleton<IWorkflowLogService, NoopWorkflowLogService>();
         builder.Services.AddSingleton<IRealtimeNotifier, NoopRealtimeNotifier>();
@@ -467,6 +473,10 @@ public sealed class ShiftSwapSafetyTests
         using var client = new HttpClient { BaseAddress = new Uri(app.Urls.Single()) };
         Assert.Equal(HttpStatusCode.Unauthorized, (await client.GetAsync("/api/employee-shift-swaps/employees")).StatusCode);
         Assert.Equal(HttpStatusCode.Unauthorized, (await client.PostAsync($"/api/employee-shift-swaps/{fixture.Swap}/accept", null)).StatusCode);
+        var managerListPath = $"/api/containers/{fixture.Container}/shift-swaps";
+        var managerCreatePath = $"/api/containers/{fixture.Container}/graphs/{fixture.Schedule}/shift-swaps/manual";
+        Assert.Equal(HttpStatusCode.Unauthorized, (await client.GetAsync(managerListPath)).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await client.PostAsync(managerCreatePath, null)).StatusCode);
         var tokenService = new JwtTokenService(Options.Create(options));
         var wrongRole = tokenService.CreateAccessToken(new AuthenticatedSessionDto { Role = "Other", UserName = "wrong-role", EmployeeId = fixture.Target });
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", wrongRole.AccessToken);
@@ -475,6 +485,8 @@ public sealed class ShiftSwapSafetyTests
         var employeeToken = tokenService.CreateAccessToken(new AuthenticatedSessionDto { Role = AuthRoles.Employee, UserName = "test", EmployeeId = fixture.Owner });
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", employeeToken.AccessToken);
         var response = await client.GetAsync("/api/employee-shift-swaps/employees");
+        Assert.Equal(HttpStatusCode.Forbidden, (await client.GetAsync(managerListPath)).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await client.PostAsync(managerCreatePath, null)).StatusCode);
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
         Assert.Equal(2, json.RootElement.GetArrayLength());
@@ -484,6 +496,11 @@ public sealed class ShiftSwapSafetyTests
             Assert.False(employee.TryGetProperty("email", out _));
             Assert.False(employee.TryGetProperty("phone", out _));
         }
+        var managerToken = tokenService.CreateAccessToken(new AuthenticatedSessionDto { Role = AuthRoles.Manager, UserName = managerAccount.Username,
+            ManagerId = managerAccount.Id, CredentialVersion = managerAccount.PasswordUpdatedAtUtc.UtcTicks });
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", managerToken.AccessToken);
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync(managerListPath)).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await client.PostAsync($"/api/employee-shift-swaps/{fixture.Swap}/accept", null)).StatusCode);
         await app.StopAsync();
     }
 
@@ -618,7 +635,7 @@ public sealed class ShiftSwapSafetyTests
     }
 
     // SQLite begins writer transactions immediately; rendezvous before BEGIN, never while holding the writer lock.
-    private sealed class TransactionGate : DbTransactionInterceptor
+    internal sealed class TransactionGate : DbTransactionInterceptor
     {
         private int arrivals;
         private readonly TaskCompletionSource ready = new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -631,7 +648,7 @@ public sealed class ShiftSwapSafetyTests
         }
     }
 
-    private sealed class WriteGate(string sqlPrefix) : DbCommandInterceptor
+    internal sealed class WriteGate(string sqlPrefix) : DbCommandInterceptor
     {
         private int arrivals;
         private readonly TaskCompletionSource ready = new(TaskCreationOptions.RunContinuationsAsynchronously);

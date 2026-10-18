@@ -223,6 +223,25 @@ beforeEach(() => {
 });
 
 describe("EmployeeSwapPage", () => {
+  test("unequal Exchange confirmation preserves both participants, graphs and exact times", async () => {
+    const user = userEvent.setup();
+    mocks.swapsQuery.mockReturnValue({ data: [createSwap({ requestKind: "exchange", visibility: "private", targetEmployeeId: 12,
+      targetEmployeeName: "Target Worker", fromTime: "09:17", toTime: "13:43", shiftHours: 4.43,
+      returnScheduleId: 20, returnScheduleSlotId: 200, returnScheduleName: "June Return", returnShopName: "Second Shop",
+      returnYear: 2026, returnMonth: 6, returnDayOfMonth: 3, returnFromTime: "10:00", returnToTime: "16:00", returnShiftHours: 6 })], error: null });
+    renderPage();
+    await user.click(screen.getByRole("button", { name: "View offer details for May Schedule" }));
+    const details = screen.getByRole("dialog", { name: "Offer details" });
+    expect(details).toHaveTextContent("Owner Worker");
+    expect(details).toHaveTextContent("09:17–13:43"); expect(details).toHaveTextContent("10:00–16:00");
+    await user.click(within(details).getByRole("button", { name: "Accept shift" }));
+    const confirmation = screen.getByRole("dialog", { name: "Accept this shift?" });
+    for (const text of ["May Schedule", "June Return", "09:17–13:43", "10:00–16:00", "Owner Worker"]) expect(confirmation).toHaveTextContent(text);
+    expect(mocks.acceptMutate).not.toHaveBeenCalled();
+    await user.dblClick(within(confirmation).getByRole("button", { name: "Accept shift" }));
+    expect(mocks.acceptMutate).toHaveBeenCalledTimes(1);
+  });
+
   test("creates a private custom-period offer from one of the current employee shifts", async () => {
     const user = userEvent.setup();
     renderPage();

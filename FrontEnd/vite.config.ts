@@ -4,10 +4,17 @@ import path from "node:path";
 import svgr from "vite-plugin-svgr";
 
 const projectRoot = process.cwd();
+const buildId = process.env.GF3_BUILD_ID?.trim() || new Date().toISOString();
 
 export default defineConfig({
   root: projectRoot,
-  plugins: [react(), svgr()],
+  define: { __GF3_BUILD_ID__: JSON.stringify(buildId) },
+  plugins: [react(), svgr(), {
+    name: "gf3-release",
+    generateBundle() {
+      this.emitFile({ type: "asset", fileName: "version.json", source: JSON.stringify({ buildId }) });
+    },
+  }],
   build: {
     rollupOptions: {
       input: {

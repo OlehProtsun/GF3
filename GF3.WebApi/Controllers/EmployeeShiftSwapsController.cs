@@ -244,6 +244,7 @@ public sealed class EmployeeShiftSwapsController(
         EnsureScheduleIsNotLocked(swap.Schedule);
         var slot = swap.Schedule.Slots.FirstOrDefault(slot => slot.Id == swap.ScheduleSlotId)
             ?? throw new ValidationException("This shift is no longer available.");
+        EnsureValidSwapDate(slot);
         var offeredPeriod = GetSwapPeriod(swap, slot);
         EnsurePeriodWithinSlot(slot, offeredPeriod);
         var employeeMonthSlots = await LoadPublishedEmployeeMonthSlotsAsync(
@@ -569,6 +570,7 @@ public sealed class EmployeeShiftSwapsController(
             ?? throw ValidationException.ForField(nameof(request.ScheduleSlotId), "Shift was not found in this schedule.");
         if (slot.EmployeeId != employeeId || slot.Status != SlotStatus.ASSIGNED)
             throw ValidationException.ForField(nameof(request.ScheduleSlotId), "You can only offer your own assigned shift.");
+        EnsureValidSwapDate(slot);
         var period = ResolveRequestedPeriod(request, slot);
         if (request.TargetEmployeeId == employeeId)
             throw ValidationException.ForField(nameof(request.TargetEmployeeId), "Choose another employee or publish this swap for everyone.");
@@ -910,6 +912,13 @@ public sealed class EmployeeShiftSwapsController(
             EmployeeId = employeeId,
             DisplayOrder = nextDisplayOrder,
         });
+    }
+
+    private static void EnsureValidSwapDate(ScheduleSlotModel slot)
+    {
+        if (slot.Schedule.Year is < 1 or > 9999 || slot.Schedule.Month is < 1 or > 12 ||
+            slot.DayOfMonth < 1 || slot.DayOfMonth > DateTime.DaysInMonth(slot.Schedule.Year, slot.Schedule.Month))
+            throw new ValidationException("This shift has an invalid calendar date.");
     }
 
     private void EnsureScheduleIsNotLocked(ScheduleModel schedule)

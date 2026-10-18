@@ -213,6 +213,31 @@ async function chooseSource(user: ReturnType<typeof userEvent.setup>) {
   await user.click(screen.getByRole("button", { name: "Continue" }));
 }
 
+test.each([
+  ["early-half", "09:00", "12:45", null],
+  ["late-half", "12:45", "16:30", 2],
+  ["custom-minute", "12:01", "12:02", 2],
+] as const)("%s Give submits exact periods and targeting once", async (_name, fromTime, toTime, targetEmployeeId) => {
+  const user = userEvent.setup(); const result = setup();
+  await user.click(screen.getByRole("button", { name: /F27/ }));
+  await user.click(screen.getByRole("radio"));
+  await user.click(screen.getByRole("button", { name: "Custom period" }));
+  fireEvent.change(screen.getByDisplayValue("09:00"), { target: { value: fromTime } });
+  fireEvent.change(screen.getByDisplayValue("16:30"), { target: { value: toTime } });
+  await user.click(screen.getByRole("button", { name: "Confirm shift" }));
+  await user.click(screen.getByRole("button", { name: "Continue" }));
+  if (targetEmployeeId) {
+    await user.click(screen.getByRole("button", { name: "Specific employee" }));
+    await user.click(screen.getByRole("button", { name: "Target Worker" }));
+    await user.click(screen.getByRole("button", { name: "Save selection" }));
+  }
+  await user.click(screen.getByRole("button", { name: "Continue" }));
+  expect(screen.getByRole("region", { name: "Your shift (you give)" })).toHaveTextContent(`${fromTime} – ${toTime}`);
+  await user.dblClick(screen.getByRole("button", { name: "Send request" }));
+  expect(result.onSubmit).toHaveBeenCalledTimes(1);
+  expect(result.onSubmit).toHaveBeenCalledWith({ requestKind: "give", scheduleId: 10, scheduleSlotId: 100, fromTime, toTime, targetEmployeeId });
+});
+
 test("public Give has three steps, authoritative review and submits once", async () => {
   const user = userEvent.setup(); const result = setup();
   expect(screen.getByRole("button", { name: "Continue" })).toBeDisabled();

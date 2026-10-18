@@ -51,6 +51,9 @@ async function mockApi(page: Page, actor: number, state: { offers: Offer[]; stal
       if (state.stale) return route.fulfill({ status: 409, contentType: "application/problem+json", body: JSON.stringify({ title: "Return shift unavailable.", detail: "Return shift unavailable." }) });
       state.offers[0] = { ...state.offers[0], status: "accepted", canAccept: false, canCancel: false };
       body = state.offers[0];
+    } else if (path === "/api/employee-shift-swaps/1/cancel") {
+      state.offers[0] = { ...state.offers[0], status: "cancelled", canAccept: false, canCancel: false };
+      body = state.offers[0];
     } else if (path === "/api/employee-shift-swaps") {
       if (route.request().method() === "POST") state.offers = [offer(route.request().postDataJSON())];
       body = route.request().method() === "POST" ? state.offers[0] : state.offers.map(item => ({ ...item,
@@ -69,6 +72,63 @@ async function sourceSteps(page: Page) {
   await expect(page.getByText("Thu 01 Oct · 09:00–16:30")).toBeVisible();
   await page.getByRole("button", { name: "Continue", exact: true }).click();
 }
+
+test("custom private Give sends exact payload and cancellation appears in History", async ({ page }) => {
+  const state: { offers: Offer[] } = { offers: [] };
+  await mockApi(page, 1, state); await page.goto("/swap");
+  await page.getByRole("button", { name: "Create offer", exact: true }).click();
+  await page.getByRole("button", { name: /F27/ }).click();
+  await page.getByRole("radio").click();
+  await page.getByRole("button", { name: "Custom period" }).click();
+  await page.getByRole("button", { name: "Increase From" }).click();
+  await page.getByRole("button", { name: "Decrease To" }).click();
+  await page.getByRole("button", { name: "Confirm shift" }).click();
+  await page.getByRole("button", { name: "Continue", exact: true }).click();
+  await page.getByRole("button", { name: "Specific employee" }).click();
+  await page.getByRole("searchbox", { name: "Search employee...", exact: true }).fill("Target");
+  await page.getByRole("button", { name: "Target Worker", exact: true }).click();
+  await page.getByRole("button", { name: "Save selection" }).click();
+  await page.getByRole("button", { name: "Continue", exact: true }).click();
+  const sent = page.waitForRequest(r => new URL(r.url()).pathname === "/api/employee-shift-swaps" && r.method() === "POST");
+  await page.getByRole("button", { name: "Send request" }).click();
+  expect((await sent).postDataJSON()).toEqual({ requestKind: "give", scheduleId: 10, scheduleSlotId: 100, fromTime: "09:15", toTime: "16:15", targetEmployeeId: 2 });
+  await page.getByRole("button", { name: "View offer details for F27" }).click();
+  await page.getByRole("button", { name: "Cancel offer", exact: true }).click();
+  await expect(page.getByRole("dialog", { name: "Offer details" })).toHaveCount(0);
+  expect(state.offers[0].status).toBe("cancelled");
+  await page.getByRole("button", { name: "Swap history", exact: true }).click();
+  await expect(page.getByRole("dialog", { name: "Recent swap activity" })).toContainText("Cancelled");
+});
+
+test("eligible recipient accepts a manager manual opening", async ({ page }) => {
+  const state = { offers: [offer({ isManagerCreated: true, fromEmployeeId: null, fromEmployeeName: "Manual counter", manualColumnName: "Manual counter", requestKind: "give" })] };
+  await mockApi(page, 2, state); await page.goto("/swap");
+  await page.getByRole("button", { name: "View offer details for F27" }).click();
+  await page.getByRole("button", { name: "Accept shift", exact: true }).click();
+  const confirmation = page.getByRole("dialog", { name: "Accept this shift?" });
+  await expect(confirmation).toContainText("Manual counter");
+  await confirmation.getByRole("button", { name: "Accept shift", exact: true }).click();
+  await expect(confirmation).toHaveCount(0); expect(state.offers[0].status).toBe("accepted");
+});
+
+test("release notice preserves an active wizard until explicit update", async ({ page, request }) => {
+  const metadata = await request.get("/version.json");
+  test.skip(!metadata.headers()["content-type"]?.includes("application/json"), "Release polling requires a production preview.");
+  const original = await metadata.json();
+  let buildId = original.buildId;
+  await mockApi(page, 1, { offers: [] });
+  await page.route("**/version.json", route => route.fulfill({ contentType: "application/json", body: JSON.stringify({ buildId }) }));
+  await page.goto("/swap");
+  await sourceSteps(page);
+  buildId = "wizard-new-release";
+  await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+  await expect(page.locator("aside button").filter({ hasText: "Update now" })).toBeVisible();
+  await expect(page.locator("dialog:modal")).toHaveCount(1);
+  expect(await page.evaluate(() => localStorage.getItem("gf3.auth.access-token"))).toBe("swap-test");
+  await page.locator("dialog:modal header > button").last().click();
+  await Promise.all([page.waitForEvent("domcontentloaded"), page.getByRole("button", { name: "Update now" }).click()]);
+  expect(await page.evaluate(() => localStorage.getItem("gf3.auth.access-token"))).toBe("swap-test");
+});
 
 async function geometry(page: Page, width: number, action: string | RegExp) {
   const dialog = page.locator("dialog:modal");
