@@ -1,4 +1,6 @@
 export type { IconProps } from "./createIcon";
+export { CopyLinkIcon } from "./CopyLinkIcon";
+export { ShareIcon } from "./ShareIcon";
 export { InfoIcon } from "./InfoIcon";
 export { WarnIcon } from "./WarnIcon";
 export { ErrorIcon } from "./ErrorIcon";

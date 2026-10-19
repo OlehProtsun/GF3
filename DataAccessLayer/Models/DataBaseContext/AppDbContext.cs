@@ -26,6 +26,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<EmployeeCommunicationDismissalModel> EmployeeCommunicationDismissals => Set<EmployeeCommunicationDismissalModel>();
     public DbSet<EmployeeScheduleColumnPreferenceModel> EmployeeScheduleColumnPreferences => Set<EmployeeScheduleColumnPreferenceModel>();
     public DbSet<EmployeeNotificationReadModel> EmployeeNotificationReads => Set<EmployeeNotificationReadModel>();
+    public DbSet<EmployeePushSubscriptionModel> EmployeePushSubscriptions => Set<EmployeePushSubscriptionModel>();
+    public DbSet<EmployeePushDeliveryModel> EmployeePushDeliveries => Set<EmployeePushDeliveryModel>();
     public DbSet<EmployeePinnedSwapModel> EmployeePinnedSwaps => Set<EmployeePinnedSwapModel>();
     public DbSet<ShopModel> Shops => Set<ShopModel>();
     public DbSet<ScheduleModel> Schedules => Set<ScheduleModel>();
@@ -83,6 +85,40 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        modelBuilder.Entity<EmployeePushSubscriptionModel>(entity =>
+        {
+            entity.ToTable("employee_push_subscription");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).HasColumnName("id");
+            entity.Property(x => x.EmployeeId).HasColumnName("employee_id");
+            entity.Property(x => x.Endpoint).HasColumnName("endpoint").HasMaxLength(2048).IsRequired();
+            entity.Property(x => x.P256dh).HasColumnName("p256dh").HasMaxLength(512).IsRequired();
+            entity.Property(x => x.Auth).HasColumnName("auth").HasMaxLength(256).IsRequired();
+            entity.Property(x => x.CreatedAtUtc).HasColumnName("created_at_utc").HasConversion(x => x.UtcTicks, x => new DateTimeOffset(x, TimeSpan.Zero));
+            entity.Property(x => x.UpdatedAtUtc).HasColumnName("updated_at_utc").HasConversion(x => x.UtcTicks, x => new DateTimeOffset(x, TimeSpan.Zero));
+            entity.HasIndex(x => x.Endpoint).IsUnique();
+            entity.HasIndex(x => new { x.EmployeeId, x.Id });
+            entity.HasOne(x => x.Employee).WithMany().HasForeignKey(x => x.EmployeeId).OnDelete(DeleteBehavior.Cascade);
+        });
+        modelBuilder.Entity<EmployeePushDeliveryModel>(entity =>
+        {
+            entity.ToTable("employee_push_delivery");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).HasColumnName("id");
+            entity.Property(x => x.SubscriptionId).HasColumnName("subscription_id");
+            entity.Property(x => x.NotificationId).HasColumnName("notification_id").HasMaxLength(256).IsRequired();
+            entity.Property(x => x.CreatedAtUtc).HasColumnName("created_at_utc").HasConversion(x => x.UtcTicks, x => new DateTimeOffset(x, TimeSpan.Zero));
+            entity.Property(x => x.NextAttemptAtUtc).HasColumnName("next_attempt_at_utc").HasConversion(x => x.UtcTicks, x => new DateTimeOffset(x, TimeSpan.Zero));
+            entity.Property(x => x.AttemptCount).HasColumnName("attempt_count");
+            entity.Property(x => x.LeaseUntilUtc).HasColumnName("lease_until_utc").HasConversion(x => x.HasValue ? x.Value.UtcTicks : (long?)null, x => x.HasValue ? new DateTimeOffset(x.Value, TimeSpan.Zero) : null);
+            entity.Property(x => x.LeaseToken).HasColumnName("lease_token").HasMaxLength(36);
+            entity.Property(x => x.FinalizedAtUtc).HasColumnName("finalized_at_utc").HasConversion(x => x.HasValue ? x.Value.UtcTicks : (long?)null, x => x.HasValue ? new DateTimeOffset(x.Value, TimeSpan.Zero) : null);
+            entity.Property(x => x.Outcome).HasColumnName("outcome").HasMaxLength(32);
+            entity.HasIndex(x => new { x.SubscriptionId, x.NotificationId }).IsUnique();
+            entity.HasIndex(x => new { x.NextAttemptAtUtc, x.LeaseUntilUtc });
+            entity.HasIndex(x => x.FinalizedAtUtc);
+            entity.HasOne(x => x.Subscription).WithMany().HasForeignKey(x => x.SubscriptionId).OnDelete(DeleteBehavior.Cascade);
+        });
         ConfigureContainer(modelBuilder);
         ConfigureEmployee(modelBuilder);
         ConfigureEmployeeAccount(modelBuilder);

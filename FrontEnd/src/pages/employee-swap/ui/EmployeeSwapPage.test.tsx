@@ -8,6 +8,7 @@ import type { EmployeeSchedule } from "@entities/employee-schedule";
 import type { ShiftSwap, ShiftSwapEmployee } from "@entities/shift-swaps";
 import { EmployeeSwapPage } from "./EmployeeSwapPage";
 import styles from "./EmployeeSwapPage.module.css";
+import { BrowserRouter } from "react-router-dom";
 
 const mocks = vi.hoisted(() => ({
   schedulesQuery: vi.fn(),
@@ -186,10 +187,11 @@ function createSwap(overrides: Partial<ShiftSwap> = {}): ShiftSwap {
 
 let queryClient: QueryClient;
 function renderPage() {
-  return render(<QueryClientProvider client={queryClient}><EmployeeSwapPage /></QueryClientProvider>);
+  return render(<QueryClientProvider client={queryClient}><BrowserRouter><EmployeeSwapPage /></BrowserRouter></QueryClientProvider>);
 }
 
 beforeEach(() => {
+  window.history.replaceState({}, "", "/swap");
   setLanguage("en");
   queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   // jsdom does not implement the browser's modal dialog methods.
@@ -223,6 +225,96 @@ beforeEach(() => {
 });
 
 describe("EmployeeSwapPage", () => {
+  test("query navigation clears obstructing filters, scrolls the app list and cancels old highlights", async () => {
+    const user = userEvent.setup();
+    mocks.swapsQuery.mockReturnValue({ data: [createSwap({ id: 5 }), createSwap({ id: 6, scheduleName: "Other schedule" })], error: null });
+    renderPage();
+    await user.type(screen.getByRole("searchbox"), "no match");
+    expect(screen.queryByRole("button", { name: "View offer details for Other schedule" })).not.toBeInTheDocument();
+    const list = screen.getByRole("region", { name: "Swap offers" });
+    list.style.overflowY = "auto";
+    Object.defineProperties(list, { scrollHeight: { configurable: true, value: 1000 }, clientHeight: { configurable: true, value: 100 } });
+    act(() => { window.history.pushState({}, "", "/swap?swapId=6"); window.dispatchEvent(new PopStateEvent("popstate")); });
+    const target = await screen.findByRole("button", { name: "View offer details for Other schedule" });
+    await waitFor(() => expect(target).toHaveFocus());
+    expect(screen.getByRole("searchbox")).toHaveValue("");
+    expect(list.scrollTop).toBeGreaterThanOrEqual(0);
+    expect(window.scrollTo).not.toHaveBeenCalled();
+    act(() => { window.history.pushState({}, "", "/swap?swapId=5"); window.dispatchEvent(new PopStateEvent("popstate")); });
+    await waitFor(() => expect(screen.getByRole("button", { name: "View offer details for May Schedule" })).toHaveFocus());
+    expect(target.closest("article")).not.toHaveClass(styles.deepLinkedOffer);
+  });
+
+  test.each(["open", "accepted"] as const)("deep link focuses the authorized %s card", async status => {
+    window.history.replaceState({}, "", "/swap?swapId=5");
+    mocks.swapsQuery.mockReturnValue({ data: [createSwap({ status })], error: null });
+    renderPage();
+    const button = await screen.findByRole("button", { name: "View offer details for May Schedule" });
+    await waitFor(() => expect(button).toHaveFocus());
+    expect(button.closest("article")).toHaveClass(styles.deepLinkedOffer);
+    expect(screen.queryByRole("dialog", { name: "Offer details" })).not.toBeInTheDocument();
+    if (status === "accepted") expect(screen.getByRole("dialog", { name: "Recent swap activity" })).toBeVisible();
+  });
+
+  test.each(["?swapId=999", "?swapId=-1"])("deep link safely reports %s", async query => {
+    window.history.replaceState({}, "", `/swap${query}`);
+    mocks.swapsQuery.mockReturnValue({ data: [], isLoading: false, error: null });
+    renderPage();
+    expect(screen.getByText(query.includes("999") ? "This swap is unavailable or you do not have access." : "This swap link is invalid.")).toBeVisible();
+  });
+
+  test("does not report missing data while loading or on API error", () => {
+    window.history.replaceState({}, "", "/swap?swapId=5");
+    mocks.swapsQuery.mockReturnValue({ isLoading: true, error: null });
+    const page = renderPage();
+    expect(screen.queryByText("This swap is unavailable or you do not have access.")).not.toBeInTheDocument();
+    mocks.swapsQuery.mockReturnValue({ isLoading: false, error: new Error("API unavailable") });
+    page.rerender(<QueryClientProvider client={queryClient}><BrowserRouter><EmployeeSwapPage /></BrowserRouter></QueryClientProvider>);
+    expect(screen.queryByText("This swap is unavailable or you do not have access.")).not.toBeInTheDocument();
+    expect(screen.getByText("API unavailable")).toBeVisible();
+  });
+
+  test.each([false, true])("copies the canonical link independently; clipboard failure: %s", async fails => {
+    const user = userEvent.setup();
+    const clipboard = vi.spyOn(navigator.clipboard, "writeText");
+    clipboard.mockClear();
+    if (fails) clipboard.mockRejectedValue(new Error("Unavailable"));
+    else clipboard.mockResolvedValue(undefined);
+    const share = vi.fn();
+    Object.defineProperty(navigator, "share", { configurable: true, value: share });
+    mocks.swapsQuery.mockReturnValue({ data: [createSwap()], error: null });
+    renderPage();
+    await user.click(screen.getByRole("button", { name: "Copy swap link for May Schedule" }));
+    expect(clipboard).toHaveBeenCalledExactlyOnceWith(`${window.location.origin}/swap?swapId=5`);
+    expect(share).not.toHaveBeenCalled();
+    expect(screen.queryByRole("dialog", { name: "Offer details" })).not.toBeInTheDocument();
+    expect(mocks.setPinMutate).not.toHaveBeenCalled();
+    expect(screen.getByRole("status")).toHaveTextContent(fails ? "Could not copy this link" : "Link copied");
+  });
+  test.each(["open", "accepted"] as const)("marks only manager manual offers in %s cards", async status => {
+    const user = userEvent.setup();
+    mocks.initialPinnedSwapIds = [4];
+    mocks.swapsQuery.mockReturnValue({ data: [
+      createSwap({ id: 1, status, isManagerCreated: true, manualColumnId: 3 }),
+      createSwap({ id: 2, status, isManagerCreated: true }),
+      createSwap({ id: 3, status }),
+      createSwap({ id: 4, status }),
+      createSwap({ id: 5, status, isManagerCreated: true, manualColumnId: 0 }),
+    ], error: null });
+    renderPage();
+    if (status !== "open") await user.click(screen.getByRole("button", { name: "Swap history" }));
+    expect(screen.getAllByRole("img", { name: "Manager-posted shift" })).toHaveLength(1);
+    const indicator = screen.getByRole("img", { name: "Manager-posted shift" });
+    expect(indicator).toHaveTextContent("🔥");
+    const card = indicator.closest("article")!;
+    await user.click(within(card).getByRole("button", { name: "Pin May Schedule swap" }));
+    expect(mocks.setPinMutate).toHaveBeenCalledWith({ swapId: 1, pinned: true });
+    await user.click(within(card).getByRole("button", { name: "View offer details for May Schedule" }));
+    expect(screen.getByRole("dialog", { name: "Offer details" })).toBeVisible();
+    await user.click(within(screen.getByRole("dialog", { name: "Offer details" })).getByRole("button", { name: "Close" }));
+    if (status !== "open") await user.click(within(screen.getByRole("dialog", { name: "Recent swap activity" })).getByRole("button", { name: "Close" }));
+  });
+
   test("unequal Exchange confirmation preserves both participants, graphs and exact times", async () => {
     const user = userEvent.setup();
     mocks.swapsQuery.mockReturnValue({ data: [createSwap({ requestKind: "exchange", visibility: "private", targetEmployeeId: 12,
@@ -624,7 +716,7 @@ describe("EmployeeSwapPage", () => {
     await user.click(screen.getByRole("button", { name: "Accept shift" }));
     mocks.swapsQuery.mockReturnValue({ data: kind === "missing" ? [] :
       [createSwap(kind === "ineligible" ? { canAccept: false } : { status: "accepted" })], error: null });
-    page.rerender(<QueryClientProvider client={queryClient}><EmployeeSwapPage /></QueryClientProvider>);
+    page.rerender(<QueryClientProvider client={queryClient}><BrowserRouter><EmployeeSwapPage /></BrowserRouter></QueryClientProvider>);
     await user.click(screen.getByRole("button", { name: "Accept shift" }));
     expect(mocks.acceptMutate).not.toHaveBeenCalled();
     expect(screen.getByText("This offer is no longer available. The swap list has been refreshed.")).toBeInTheDocument();
@@ -712,7 +804,7 @@ describe("EmployeeSwapPage", () => {
     const user = userEvent.setup(); mocks.swapsQuery.mockReturnValue({ data: [createSwap()], error: null }); const page = renderPage();
     await user.click(screen.getByRole("button", { name: "View offer details for May Schedule" }));
     mocks.swapsQuery.mockReturnValue({ data: change === "missing" ? [] : [createSwap(change === "locked" ? { canAccept: false, isScheduleLocked: true } : { status: "accepted" })], error: null });
-    page.rerender(<QueryClientProvider client={queryClient}><EmployeeSwapPage /></QueryClientProvider>);
+    page.rerender(<QueryClientProvider client={queryClient}><BrowserRouter><EmployeeSwapPage /></BrowserRouter></QueryClientProvider>);
     if (change === "missing") {
       expect(screen.queryByRole("dialog", { name: "Offer details" })).not.toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Create offer" })).toHaveFocus();
@@ -741,7 +833,7 @@ describe("EmployeeSwapPage", () => {
     const root = document.createElement("div"); root.id = "root"; root.style.overflowY = "auto"; root.scrollTop = 123;
     const container = document.createElement("div"); root.append(container); document.body.append(root);
     const previousBody = document.body.style.cssText;
-    const page = render(<QueryClientProvider client={queryClient}><EmployeeSwapPage /></QueryClientProvider>, { container });
+    const page = render(<QueryClientProvider client={queryClient}><BrowserRouter><EmployeeSwapPage /></BrowserRouter></QueryClientProvider>, { container });
     try {
       const launcher = screen.getByRole("button", { name: "Swap history" }); await user.click(launcher);
       const history = screen.getByRole("dialog", { name: "Recent swap activity" });

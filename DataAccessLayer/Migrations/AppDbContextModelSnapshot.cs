@@ -526,6 +526,112 @@ namespace DataAccessLayer.Migrations
                     b.ToTable("employee_pinned_swap");
                 });
 
+            modelBuilder.Entity("DataAccessLayer.Models.EmployeePushDeliveryModel", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("id");
+
+                    b.Property<int>("AttemptCount")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("attempt_count");
+
+                    b.Property<long>("CreatedAtUtc")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<long?>("FinalizedAtUtc")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("finalized_at_utc");
+
+                    b.Property<string>("LeaseToken")
+                        .HasMaxLength(36)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("lease_token");
+
+                    b.Property<long?>("LeaseUntilUtc")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("lease_until_utc");
+
+                    b.Property<long>("NextAttemptAtUtc")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("next_attempt_at_utc");
+
+                    b.Property<string>("NotificationId")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("notification_id");
+
+                    b.Property<string>("Outcome")
+                        .HasMaxLength(32)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("outcome");
+
+                    b.Property<int>("SubscriptionId")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("subscription_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("FinalizedAtUtc");
+
+                    b.HasIndex("NextAttemptAtUtc", "LeaseUntilUtc");
+
+                    b.HasIndex("SubscriptionId", "NotificationId")
+                        .IsUnique();
+
+                    b.ToTable("employee_push_delivery", (string)null);
+                });
+
+            modelBuilder.Entity("DataAccessLayer.Models.EmployeePushSubscriptionModel", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Auth")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("auth");
+
+                    b.Property<long>("CreatedAtUtc")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<int>("EmployeeId")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("employee_id");
+
+                    b.Property<string>("Endpoint")
+                        .IsRequired()
+                        .HasMaxLength(2048)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("endpoint");
+
+                    b.Property<string>("P256dh")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("p256dh");
+
+                    b.Property<long>("UpdatedAtUtc")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("updated_at_utc");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Endpoint")
+                        .IsUnique();
+
+                    b.HasIndex("EmployeeId", "Id");
+
+                    b.ToTable("employee_push_subscription", (string)null);
+                });
+
             modelBuilder.Entity("DataAccessLayer.Models.EmployeeScheduleColumnPreferenceModel", b =>
                 {
                     b.Property<int>("Id")
@@ -2175,6 +2281,28 @@ namespace DataAccessLayer.Migrations
                     b.Navigation("Employee");
 
                     b.Navigation("ShiftSwap");
+                });
+
+            modelBuilder.Entity("DataAccessLayer.Models.EmployeePushDeliveryModel", b =>
+                {
+                    b.HasOne("DataAccessLayer.Models.EmployeePushSubscriptionModel", "Subscription")
+                        .WithMany()
+                        .HasForeignKey("SubscriptionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Subscription");
+                });
+
+            modelBuilder.Entity("DataAccessLayer.Models.EmployeePushSubscriptionModel", b =>
+                {
+                    b.HasOne("DataAccessLayer.Models.EmployeeModel", "Employee")
+                        .WithMany()
+                        .HasForeignKey("EmployeeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Employee");
                 });
 
             modelBuilder.Entity("DataAccessLayer.Models.EmployeeScheduleColumnPreferenceModel", b =>

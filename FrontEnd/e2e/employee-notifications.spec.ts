@@ -15,6 +15,12 @@ for (const language of ['en', 'pl']) {
       if (path === '/api/auth/session') body = { role: 'employee', employeeId: 1, userName: 'worker', displayName: 'Worker' };
       else if (path === '/api/account-language') body = { language };
       else if (path === '/api/employee-ui-state') body = { scheduleColumnOrders: {}, pinnedSwapIds: [], readNotificationIds: [...readIds] };
+      else if (path === '/api/employee-shift-swaps') body = [{
+        id: 31, scheduleId: 2, scheduleName: 'LINKED-SWAP', containerName: 'Container', shopName: 'Shop',
+        year: 2026, month: 9, dayOfMonth: 19, fromTime: '08:00', toTime: '16:00', fromEmployeeName: 'Coworker',
+        status: 'open', visibility: 'public', createdAtUtc: new Date(now).toISOString(), isCreatedByCurrentEmployee: false,
+        isManagerCreated: true, manualColumnId: 1,
+      }];
       else if (path === '/api/employee-ui-state/notifications/read') {
         route.request().postDataJSON().notificationIds.forEach((id: string) => readIds.add(id));
         return route.fulfill({status: 204});
@@ -28,6 +34,7 @@ for (const language of ['en', 'pl']) {
       return route.fulfill({contentType: 'application/json', body: JSON.stringify(body)});
     });
     await page.goto('/');
+    await expect(page.locator('a[href="/swap?swapId=31"]')).toBeVisible();
     const recent = page.locator('article').filter({hasText: 'RECENT-SCHEDULE'});
     const expiring = page.locator('article').filter({hasText: 'EXPIRING-SCHEDULE'});
     await expect(recent).toBeVisible();

@@ -39,6 +39,8 @@ public static class WebApiServiceCollectionExtensions
         var jwtOptions = JwtAuthOptions.FromConfiguration(configuration, requireExplicitJwtSigningKey);
 
         services.AddSingleton(TimeProvider.System);
+        services.AddOptions<PushOptions>().Bind(configuration.GetSection("Push"))
+            .Validate(options => options.IsValid(), "Push configuration is invalid; check VAPID settings.").ValidateOnStart();
         services.AddSingleton<AuthAttemptLimiter>();
         services.AddApiMvc(jwtOptions);
         services.AddApiDocumentation();
@@ -55,6 +57,10 @@ public static class WebApiServiceCollectionExtensions
         services.AddScoped<IRealtimeNotifier, RealtimeNotifier>();
         services.AddScoped<IWorkflowLogService, WorkflowLogService>();
         services.AddScoped<ScheduleVersionCommitService>();
+        services.AddScoped<IEmployeePushNotificationSource, EmployeePushNotificationSource>();
+        services.AddHttpClient<IEmployeeWebPushSender, EmployeeWebPushSender>(client => client.Timeout = TimeSpan.FromSeconds(30))
+            .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
+        services.AddHostedService<EmployeeWebPushHostedService>();
         services.AddScoped<IScheduleLastUpdateService, ScheduleLastUpdateService>();
         services.Configure<SmtpEmailOptions>(configuration.GetSection("Smtp"));
         services.Configure<ExportTemplatesOptions>(configuration.GetSection("ExportTemplates"));
