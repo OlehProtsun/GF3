@@ -13,6 +13,18 @@ beforeEach(() => {
 });
 
 describe("shift swaps api", () => {
+  test("encodes candidate query times and posts the complete exchange preview unchanged", () => {
+    const controller = new AbortController();
+    shiftSwapsApi.listReturnCandidates({ sourceScheduleId: 1, sourceSlotId: 2, fromTime: "09:00", toTime: "16:30", targetEmployeeId: 3, page: 2 }, controller.signal);
+    const [url, options] = requestMock.mock.calls[0];
+    expect(new URLSearchParams(url.split("?")[1]).get("fromTime")).toBe("09:00");
+    expect(new URLSearchParams(url.split("?")[1]).get("page")).toBe("2");
+    expect(options.signal).toBe(controller.signal);
+    const payload = { requestKind: "exchange" as const, scheduleId: 1, scheduleSlotId: 2, fromTime: "09:00", toTime: "16:30", targetEmployeeId: 3,
+      returnScheduleId: 4, returnScheduleSlotId: 5, returnFromTime: "10:00", returnToTime: "17:30" };
+    shiftSwapsApi.previewEmployee(payload, controller.signal);
+    expect(requestMock).toHaveBeenLastCalledWith("employee-shift-swaps/preview", { method: "POST", body: payload, signal: controller.signal });
+  });
   test("loads employee swap lists and available target employees with read signals", () => {
     const controller = new AbortController();
 

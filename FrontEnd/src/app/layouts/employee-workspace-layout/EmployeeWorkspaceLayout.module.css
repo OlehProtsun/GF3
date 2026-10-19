@@ -21,6 +21,33 @@
   background: var(--app-page-background, #f3f4f6);
 }
 
+@media (max-width: 430px) {
+  :global(html):has(.layoutSchedule) { isolation: isolate; }
+  :global(html):has(.layoutSchedule)::before {
+    content: "";
+    position: fixed;
+    top: 0;
+    left: 50%;
+    translate: -50% 0;
+    width: var(--schedule-hero-width, 100%);
+    height: 50svh;
+    background-image: var(--schedule-hero-background);
+    pointer-events: none;
+    z-index: -1;
+  }
+  :global(body):has(.layoutSchedule) {
+    position: relative;
+    z-index: 0;
+    /* Clip horizontally without creating a vertical scrollport that clips the hero extension. */
+    overflow-x: clip;
+  }
+
+  :global(html):has(.layoutSchedule) {
+    background-image: linear-gradient(#2b91ec, var(--app-page-background, #f3f4f6) 50svh);
+    background-repeat: no-repeat;
+  }
+}
+
 .shell {
   container-name: employee-workspace;
   container-type: inline-size;
@@ -189,7 +216,7 @@
   position: fixed;
   left: max(12px, env(safe-area-inset-left));
   right: max(12px, env(safe-area-inset-right));
-  bottom: calc(18px + env(safe-area-inset-bottom, 0px));
+  bottom: calc(9px + env(safe-area-inset-bottom, 0px) / 2);
   z-index: 40;
   isolation: isolate;
   display: flex;
@@ -356,7 +383,7 @@
 .mobileOpenTab {
   position: fixed;
   left: max(12px, env(safe-area-inset-left));
-  bottom: calc(18px + env(safe-area-inset-bottom, 0px));
+  bottom: calc(9px + env(safe-area-inset-bottom, 0px) / 2);
   z-index: 41;
   width: 44px;
   height: 44px;
@@ -535,3 +562,24 @@
     left: max(12px, env(safe-area-inset-left), calc(50% - 203px));
   }
 }
+
+:global(html):has(.layoutSwap),
+:global(body):has(.layoutSwap),
+:global(#root):has(.layoutSwap) {
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+:global(body):has(.layoutSwap) { position: fixed; inset: 0; width: 100%; }
+.layoutSwap {
+  position: fixed;
+  inset: var(--employee-visual-top, 0px) 0 auto;
+  height: var(--employee-visual-height, 100dvh);
+  width: 100%;
+  overscroll-behavior: none;
+}
+.layoutSwap .shell, .layoutSwap .content { min-height: 0; overflow: hidden; }
+
+.layoutSwap .shell:not(.shellTabsCollapsed) { padding-bottom: calc(74px + env(safe-area-inset-bottom, 0px) / 2); }
+.layoutSwap .content { padding-bottom: 0; }

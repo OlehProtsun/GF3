@@ -13,6 +13,44 @@ namespace WebApi.ShiftSwaps;
 
 internal static class ShiftSwapRules
 {
+    internal static void PopulateReturnSummary(ShiftSwapDto dto, ShiftSwapRequestModel swap,
+        ScheduleSlotModel? returnSlot, ShiftSwapHistoryModel? history = null)
+    {
+        var reservation = ShiftSwapArchive.ReadReservation(swap);
+        dto.RequestKind = swap.RequestKind == ShiftSwapRequestKind.Exchange ? "exchange" : "give";
+        dto.ReturnScheduleId = swap.ReturnScheduleId;
+        dto.ReturnScheduleSlotId = swap.ReturnScheduleSlotId;
+        dto.ReturnScheduleName = history?.ReturnScheduleName ?? reservation?.Return.ScheduleName ?? returnSlot?.Schedule.Name;
+        dto.ReturnShopName = history?.ReturnShopName ?? reservation?.Return.ShopName ?? returnSlot?.Schedule.Shop?.Name;
+        dto.ReturnYear = history?.ReturnYear ?? reservation?.Return.Year ?? returnSlot?.Schedule.Year;
+        dto.ReturnMonth = history?.ReturnMonth ?? reservation?.Return.Month ?? returnSlot?.Schedule.Month;
+        dto.ReturnDayOfMonth = history?.ReturnDayOfMonth ?? reservation?.Return.DayOfMonth ?? returnSlot?.DayOfMonth;
+        dto.ReturnFromTime = history?.ReturnFromTime ?? swap.ReturnFromTime;
+        dto.ReturnToTime = history?.ReturnToTime ?? swap.ReturnToTime;
+        dto.ReturnShiftHours = dto.ReturnFromTime is null || dto.ReturnToTime is null ? null : GetTimeRangeDurationHours(dto.ReturnFromTime, dto.ReturnToTime);
+        if (reservation is not null)
+        {
+            dto.ScheduleName = reservation.Source.ScheduleName;
+            dto.ShopName = reservation.Source.ShopName;
+            dto.Year = reservation.Source.Year;
+            dto.Month = reservation.Source.Month;
+            dto.DayOfMonth = reservation.Source.DayOfMonth;
+        }
+        if (history is not null)
+        {
+            dto.ScheduleName = history.ScheduleName;
+            dto.ShopName = history.ShopName;
+            dto.Year = history.Year;
+            dto.Month = history.Month;
+            dto.DayOfMonth = history.DayOfMonth;
+            dto.FromTime = history.FromTime;
+            dto.ToTime = history.ToTime;
+            dto.BeforeSnapshot = ShiftSwapHistorySnapshotBuilder.Deserialize(history.BeforeSnapshotJson);
+            dto.AfterSnapshot = ShiftSwapHistorySnapshotBuilder.Deserialize(history.AfterSnapshotJson);
+            dto.ReturnBeforeSnapshot = ShiftSwapHistorySnapshotBuilder.Deserialize(history.ReturnBeforeSnapshotJson);
+            dto.ReturnAfterSnapshot = ShiftSwapHistorySnapshotBuilder.Deserialize(history.ReturnAfterSnapshotJson);
+        }
+    }
     internal static bool IsSqliteWriterConflict(Exception exception)
         => exception is SqliteException { SqliteErrorCode: 5 or 6 } ||
             exception.InnerException is SqliteException { SqliteErrorCode: 5 or 6 };
@@ -26,8 +64,8 @@ internal static class ShiftSwapRules
         bool isScheduleLocked,
         IReadOnlyList<ScheduleSlotModel> currentEmployeeMonthSlots)
     {
-        if (model.ArchivedViewsJson is not null)
-            return ShiftSwapArchive.ReadView(model.ArchivedViewsJson, currentEmployeeId);
+        if (ShiftSwapArchive.IsArchived(model))
+            return ShiftSwapArchive.ReadView(model.ArchivedViewsJson!, currentEmployeeId);
         var slot = model.Schedule.Slots.FirstOrDefault(slot => slot.Id == model.ScheduleSlotId) ?? model.ScheduleSlot
             ?? throw new InvalidOperationException("The swap has no shift or archived snapshot.");
         ShiftSwapPeriod offeredPeriod;
@@ -78,6 +116,11 @@ internal static class ShiftSwapRules
 
         return new ShiftSwapDto
         {
+            RequestKind = model.RequestKind == ShiftSwapRequestKind.Exchange ? "exchange" : "give",
+            ReturnScheduleId = model.ReturnScheduleId,
+            ReturnScheduleSlotId = model.ReturnScheduleSlotId,
+            ReturnFromTime = model.ReturnFromTime,
+            ReturnToTime = model.ReturnToTime,
             Id = model.Id,
             ScheduleId = model.ScheduleId,
             ScheduleSlotId = model.ScheduleSlotId ?? 0,

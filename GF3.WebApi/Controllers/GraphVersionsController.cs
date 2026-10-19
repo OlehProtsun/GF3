@@ -98,7 +98,7 @@ public sealed class GraphVersionsController(
             .SingleOrDefaultAsync(item => item.ScheduleId == graphId, cancellationToken)
             .ConfigureAwait(false);
         var hasOpenSwaps = await db.ShiftSwapRequests
-            .AnyAsync(request => request.ScheduleId == graphId && request.Status == ShiftSwapStatus.Open, cancellationToken)
+            .AnyAsync(request => (request.ScheduleId == graphId || request.ReturnScheduleId == graphId) && request.Status == ShiftSwapStatus.Open, cancellationToken)
             .ConfigureAwait(false);
         var hasPendingCorrections = await db.ShiftCorrectionRequests
             .AnyAsync(request => request.ScheduleId == graphId && request.Status == ShiftCorrectionStatus.Pending, cancellationToken)

@@ -8,6 +8,14 @@ internal static class ShiftSwapHistorySnapshotBuilder
 {
     private static readonly JsonSerializerOptions SerializerOptions = new(JsonSerializerDefaults.Web);
 
+    public static Dictionary<int, string> BuildExchangeJson(IEnumerable<ScheduleModel> schedules,
+        IEnumerable<ScheduleSlotModel> slots, ShiftSwapRequestModel swap, int recipientId, string recipientName)
+    {
+        var bySchedule = slots.ToLookup(slot => slot.ScheduleId);
+        return schedules.DistinctBy(schedule => schedule.Id).ToDictionary(schedule => schedule.Id,
+            schedule => BuildJson(schedule, bySchedule[schedule.Id], swap, recipientId, recipientName));
+    }
+
     public static string BuildJson(
         ScheduleModel schedule,
         IEnumerable<ScheduleSlotModel> slots,

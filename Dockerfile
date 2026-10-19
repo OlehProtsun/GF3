@@ -7,7 +7,8 @@ COPY FrontEnd/package*.json ./
 RUN npm ci
 
 COPY FrontEnd/ ./
-RUN npm run build
+ARG GF3_BUILD_ID
+RUN GF3_BUILD_ID="$GF3_BUILD_ID" npm run build
 
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS dotnet-build
 WORKDIR /src

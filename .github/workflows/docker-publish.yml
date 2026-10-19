@@ -38,6 +38,8 @@ jobs:
         with:
           context: .
           push: true
+          build-args: |
+            GF3_BUILD_ID=${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
           tags: |
             ${{ steps.image.outputs.name }}:${{ inputs.image_tag }}
             ${{ steps.image.outputs.name }}:latest

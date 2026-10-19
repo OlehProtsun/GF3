@@ -16,7 +16,7 @@ describe("application icons", () => {
   it("declares the exact application identity and standard icons", () => {
     expect(manifest).toEqual({
       id: "/", name: "GF", short_name: "GF", start_url: "/", scope: "/",
-      display: "standalone", background_color: "#FFFFFF", theme_color: "#FFFFFF",
+      display: "standalone", background_color: "#f3f4f6", theme_color: "#f3f4f6",
       icons: [
         { src: "/icons/gf-icon-192.png", sizes: "192x192", type: "image/png", purpose: "any" },
         { src: "/icons/gf-icon-512.png", sizes: "512x512", type: "image/png", purpose: "any" },
@@ -38,7 +38,7 @@ describe("application icons", () => {
     for (const [name, content] of [
       ["apple-mobile-web-app-title", "GF"],
       ["apple-mobile-web-app-capable", "yes"],
-      ["theme-color", "#FFFFFF"],
+      ["theme-color", "#f3f4f6"],
     ]) {
       const tags = html.head.querySelectorAll(`meta[name="${name}"]`);
       expect(tags).toHaveLength(1);

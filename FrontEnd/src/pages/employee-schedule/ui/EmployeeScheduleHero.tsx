@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { EmployeeSchedule } from "@entities/employee-schedule";
 import { dateTimeFormat, t } from "@shared/i18n";
 import { getHeroShifts } from "./scheduleHeroShifts";
@@ -13,6 +13,25 @@ type Props = {
 };
 
 export function EmployeeScheduleHero({ schedules, employeeId, displayName, isLoading, hasError }: Props) {
+  const heroRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const hero = heroRef.current;
+    if (!hero) return;
+    const root = document.documentElement;
+    const update = () => {
+      const bounds = hero.getBoundingClientRect();
+      root.style.setProperty("--schedule-hero-width", `${bounds.width}px`);
+      root.style.setProperty("--schedule-hero-background", getComputedStyle(hero).backgroundImage);
+    };
+    const observer = new ResizeObserver(update);
+    observer.observe(hero);
+    update();
+    return () => {
+      observer.disconnect();
+      root.style.removeProperty("--schedule-hero-width");
+      root.style.removeProperty("--schedule-hero-background");
+    };
+  }, []);
   const [now, setNow] = useState(() => new Date());
   useEffect(() => {
     const refresh = () => setNow(new Date());
@@ -34,7 +53,7 @@ export function EmployeeScheduleHero({ schedules, employeeId, displayName, isLoa
     return tomorrow ? t("Starts in {0}", duration) : t("Ends in {0}", duration);
   };
   return (
-    <section className={styles.hero} data-employee-motion="from-top" aria-label={t("Your upcoming shifts")}>
+    <section ref={heroRef} className={styles.hero} data-employee-motion="from-top" aria-label={t("Your upcoming shifts")}>
       <div className={styles.heading}>
         <div className={styles.greeting}>
           <time dateTime={now.toISOString()}>{dateTimeFormat("en-GB", { weekday: "long", month: "long", day: "numeric" }).format(now)}</time>

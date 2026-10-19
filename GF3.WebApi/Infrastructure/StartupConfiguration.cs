@@ -11,6 +11,15 @@ namespace WebApi.Infrastructure;
 /// </summary>
 public static class StartupConfiguration
 {
+    public static void ApplyFrontendCacheHeaders(HttpContext httpContext, string servedFileName)
+    {
+        httpContext.Response.Headers.CacheControl = servedFileName is "index.html" or "version.json"
+            ? "no-store, max-age=0"
+            : httpContext.Request.Path.StartsWithSegments("/assets")
+                ? "public, max-age=31536000, immutable"
+                : "no-cache, must-revalidate";
+    }
+
     private const string AdminEnabledVariable = "GF3_ADMIN_ENABLED";
     private const string AdminAllowRemoteVariable = "GF3_ADMIN_ALLOW_REMOTE";
     private const string AdminAllowWriteVariable = "GF3_ADMIN_ALLOW_WRITE";

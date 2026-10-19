@@ -1,5 +1,7 @@
 import { dateTimeFormat, t } from "@shared/i18n";
-import { useEffect, useId, useMemo, useState, type MouseEvent } from "react";
+import { useEffect, useId, useMemo, useRef, useState, type MouseEvent } from "react";
+import { createPortal } from "react-dom";
+import { useSwapModalEnvironment } from "@pages/employee-swap/ui/useSwapModalEnvironment";
 import type { EmployeeSchedule, EmployeeScheduleSlot } from "@entities/employee-schedule";
 import type { CreateShiftCorrectionInput, ShiftCorrectionRequest } from "@entities/shift-corrections";
 import { IosButton } from "@shared/ui/components/IosButton";
@@ -61,6 +63,8 @@ export function EmployeeShiftCorrectionDialog({
   onSubmit,
 }: EmployeeShiftCorrectionDialogProps) {
   const titleId = useId();
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  useSwapModalEnvironment(dialogRef, undefined, open && Boolean(schedule));
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
   const [boundary, setBoundary] = useState<Boundary | null>(null);
   const [adjustmentMinutes, setAdjustmentMinutes] = useState(0);
@@ -137,12 +141,12 @@ export function EmployeeShiftCorrectionDialog({
     setAdjustmentMinutes(nextMinutes - toMinutes(originalTime));
   };
 
-  const handleOverlayMouseDown = (event: MouseEvent<HTMLDivElement>) => {
+  const handleOverlayMouseDown = (event: MouseEvent<HTMLDialogElement>) => {
     if (event.target === event.currentTarget) onCancel();
   };
 
-  return (
-    <div className={styles.overlay} role="dialog" aria-modal="true" aria-labelledby={titleId} onMouseDown={handleOverlayMouseDown}>
+  return createPortal(
+    <dialog ref={dialogRef} className={styles.overlay} aria-modal="true" aria-labelledby={titleId} onCancel={event => { event.preventDefault(); onCancel(); }} onMouseDown={handleOverlayMouseDown}>
       <div className={styles.dialog}>
         <header className={styles.header}>
           <div className={styles.titleBlock}>
@@ -155,6 +159,7 @@ export function EmployeeShiftCorrectionDialog({
           </button>
         </header>
 
+        <div className={styles.body}>
         <section className={styles.stepSection}>
           <div className={styles.stepHeader}>
             <span className={styles.stepNumber}>1</span>
@@ -240,6 +245,7 @@ export function EmployeeShiftCorrectionDialog({
           {errorMessage ? <p className={styles.validation}>{errorMessage}</p> : null}
         </section>
 
+        </div>
         <footer className={styles.footer}>
           <IosButton label={t("Cancel")} variant="secondary" size="compact" onClick={onCancel} />
           <IosButton label={isSending ? t("Sending...") : t("Send request")} size="compact" icon={<CheckIcon size={15} />}
@@ -247,6 +253,6 @@ export function EmployeeShiftCorrectionDialog({
             onClick={() => selectedSlot && onSubmit({ scheduleId: schedule.id, scheduleSlotId: selectedSlot.id, requestedFromTime: requestedFrom, requestedToTime: requestedTo })} />
         </footer>
       </div>
-    </div>
+    </dialog>, document.body
   );
 }

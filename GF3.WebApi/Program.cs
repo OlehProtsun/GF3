@@ -86,13 +86,10 @@ static void ConfigureFrontendHosting(WebApplication app)
     app.UseDefaultFiles();
     app.UseStaticFiles(new StaticFileOptions
     {
-        OnPrepareResponse = context =>
-        {
-            if (context.Context.Request.Path.StartsWithSegments("/assets"))
-            {
-                context.Context.Response.Headers.CacheControl = "public,max-age=31536000,immutable";
-            }
-        }
+        OnPrepareResponse = context => StartupConfiguration.ApplyFrontendCacheHeaders(context.Context, context.File.Name)
     });
-    app.MapFallbackToFile("index.html");
+    app.MapFallbackToFile("index.html", new StaticFileOptions
+    {
+        OnPrepareResponse = context => StartupConfiguration.ApplyFrontendCacheHeaders(context.Context, context.File.Name)
+    });
 }

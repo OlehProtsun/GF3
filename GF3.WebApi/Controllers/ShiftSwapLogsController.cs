@@ -105,9 +105,18 @@ public sealed class ShiftSwapLogsController(
         var historicalRequestIds = history
             .Select(entry => entry.SourceShiftSwapRequestId)
             .ToHashSet();
+        var returnSlotIds = requests.Where(r => r.ReturnScheduleSlotId.HasValue).Select(r => r.ReturnScheduleSlotId!.Value).ToArray();
+        var returnSlots = await db.ScheduleSlots.AsNoTracking().Include(s => s.Schedule).ThenInclude(s => s.Shop)
+            .Where(s => returnSlotIds.Contains(s.Id)).ToListAsync(cancellationToken);
         var result = requests
             .Where(request => !historicalRequestIds.Contains(request.Id))
-            .Select(request => ToLogDto(request, managerCanCancel: true))
+            .Select(request =>
+            {
+                var dto = ToLogDto(request, managerCanCancel: true);
+                if (request.RequestKind == ShiftSwapRequestKind.Exchange && !ShiftSwapArchive.IsArchived(request))
+                    ShiftSwapRules.PopulateReturnSummary(dto, request, returnSlots.FirstOrDefault(s => s.Id == request.ReturnScheduleSlotId));
+                return dto;
+            })
             .Concat(history.Select(ToLogDto))
             .OrderByDescending(item => item.AcceptedAtUtc ?? item.CreatedAtUtc)
             .ToList();
@@ -157,6 +166,7 @@ public sealed class ShiftSwapLogsController(
             throw new ValidationException("Only open shift swaps can be cancelled.");
         }
 
+        var cancelledSlot = swap.ScheduleSlot;
         var cancelledAtUtc = DateTimeOffset.UtcNow;
         try
         {
@@ -178,6 +188,8 @@ public sealed class ShiftSwapLogsController(
             }
 
             await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+            if (swap.RequestKind == ShiftSwapRequestKind.Exchange)
+                await ShiftSwapArchive.PreserveCompletedAsync(db, swap.ScheduleId, cancellationToken, swap.Id);
             await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
         }
         catch (Exception exception) when (ShiftSwapRules.IsSqliteWriterConflict(exception))
@@ -188,7 +200,7 @@ public sealed class ShiftSwapLogsController(
         await workflowLogService
             .LogAsync(
                 User,
-                $"Cancelled the shift swap in schedule \"{swap.Schedule.Name}\" for {swap.Schedule.Year}-{swap.Schedule.Month:00}-{swap.ScheduleSlot!.DayOfMonth:00}, {swap.OfferedFromTime ?? swap.ScheduleSlot!.FromTime}-{swap.OfferedToTime ?? swap.ScheduleSlot!.ToTime}.",
+                $"Cancelled the shift swap in schedule \"{swap.Schedule.Name}\" for {swap.Schedule.Year}-{swap.Schedule.Month:00}-{cancelledSlot!.DayOfMonth:00}, {swap.OfferedFromTime ?? cancelledSlot.FromTime}-{swap.OfferedToTime ?? cancelledSlot.ToTime}.",
                 cancellationToken)
             .ConfigureAwait(false);
         if (swap.IsManagerCreated)
@@ -441,21 +453,29 @@ public sealed class ShiftSwapLogsController(
             .Include(request => request.TargetEmployee)
             .Include(request => request.AcceptedByEmployee)
             .Where(request =>
-                request.ScheduleId == graphId &&
-                request.IsManagerCreated &&
+                (request.ScheduleId == graphId || request.ReturnScheduleId == graphId) &&
                 request.Status == ShiftSwapStatus.Open)
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
 
         var history = await db.ShiftSwapHistories
             .AsNoTracking()
-            .Where(entry => entry.ScheduleId == graphId)
+            .Where(entry => entry.ScheduleId == graphId || entry.ReturnScheduleId == graphId)
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
 
+        var returnSlotIds = openRequests.Where(r => r.ReturnScheduleSlotId.HasValue).Select(r => r.ReturnScheduleSlotId!.Value).ToArray();
+        var returnSlots = await db.ScheduleSlots.AsNoTracking().Include(s => s.Schedule).ThenInclude(s => s.Shop)
+            .Where(s => returnSlotIds.Contains(s.Id)).ToListAsync(cancellationToken);
         var result = openRequests
             .OrderByDescending(request => request.CreatedAtUtc)
-            .Select(request => ToLogDto(request))
+            .Select(request =>
+            {
+                var dto = ToLogDto(request);
+                if (request.RequestKind == ShiftSwapRequestKind.Exchange)
+                    ShiftSwapRules.PopulateReturnSummary(dto, request, returnSlots.FirstOrDefault(s => s.Id == request.ReturnScheduleSlotId));
+                return dto;
+            })
             .Concat(history.OrderByDescending(entry => entry.AcceptedAtUtc).Select(ToLogDto))
             .ToList();
 
@@ -566,8 +586,8 @@ public sealed class ShiftSwapLogsController(
 
     private static ShiftSwapDto ToLogDto(ShiftSwapRequestModel model, bool managerCanCancel = false)
     {
-        if (model.ArchivedViewsJson is not null)
-            return ShiftSwapArchive.ReadView(model.ArchivedViewsJson, 0);
+        if (ShiftSwapArchive.IsArchived(model))
+            return ShiftSwapArchive.ReadView(model.ArchivedViewsJson!, 0);
         var slot = model.ScheduleSlot ?? throw new InvalidOperationException("The swap has no shift or archived snapshot.");
         var fromTime = string.IsNullOrWhiteSpace(model.OfferedFromTime) ? slot.FromTime : model.OfferedFromTime;
         var toTime = string.IsNullOrWhiteSpace(model.OfferedToTime) ? slot.ToTime : model.OfferedToTime;
@@ -580,6 +600,11 @@ public sealed class ShiftSwapLogsController(
         return new ShiftSwapDto
         {
             Id = model.Id,
+            RequestKind = model.RequestKind == ShiftSwapRequestKind.Exchange ? "exchange" : "give",
+            ReturnScheduleId = model.ReturnScheduleId,
+            ReturnScheduleSlotId = model.ReturnScheduleSlotId,
+            ReturnFromTime = model.ReturnFromTime,
+            ReturnToTime = model.ReturnToTime,
             ScheduleId = model.ScheduleId,
             ScheduleSlotId = model.ScheduleSlotId ?? 0,
             ScheduleName = model.Schedule.Name,
@@ -628,6 +653,18 @@ public sealed class ShiftSwapLogsController(
         return new ShiftSwapDto
         {
             Id = history.SourceShiftSwapRequestId,
+            RequestKind = history.RequestKind == ShiftSwapRequestKind.Exchange ? "exchange" : "give",
+            ReturnScheduleId = history.ReturnScheduleId,
+            ReturnScheduleName = history.ReturnScheduleName,
+            ReturnShopName = history.ReturnShopName,
+            ReturnYear = history.ReturnYear,
+            ReturnMonth = history.ReturnMonth,
+            ReturnDayOfMonth = history.ReturnDayOfMonth,
+            ReturnFromTime = history.ReturnFromTime,
+            ReturnToTime = history.ReturnToTime,
+            ReturnShiftHours = history.ReturnFromTime is null || history.ReturnToTime is null ? null : GetTimeRangeDurationHours(history.ReturnFromTime, history.ReturnToTime),
+            ReturnBeforeSnapshot = history.ReturnBeforeSnapshotJson is null ? null : ShiftSwapHistorySnapshotBuilder.Deserialize(history.ReturnBeforeSnapshotJson),
+            ReturnAfterSnapshot = history.ReturnAfterSnapshotJson is null ? null : ShiftSwapHistorySnapshotBuilder.Deserialize(history.ReturnAfterSnapshotJson),
             ScheduleId = history.ScheduleId,
             ScheduleSlotId = history.ScheduleSlotId,
             ScheduleName = history.ScheduleName,

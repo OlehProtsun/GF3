@@ -2,6 +2,20 @@ namespace WebApi.Contracts.ShiftSwaps;
 
 public sealed class ShiftSwapDto
 {
+    public string RequestKind { get; set; } = "give";
+    public int? ReturnScheduleId { get; set; }
+    public int? ReturnScheduleSlotId { get; set; }
+    public string? ReturnScheduleName { get; set; }
+    public string? ReturnShopName { get; set; }
+    public int? ReturnYear { get; set; }
+    public int? ReturnMonth { get; set; }
+    public int? ReturnDayOfMonth { get; set; }
+    public string? ReturnFromTime { get; set; }
+    public string? ReturnToTime { get; set; }
+    public double? ReturnShiftHours { get; set; }
+    public ShiftSwapScheduleSnapshotDto? ReturnBeforeSnapshot { get; set; }
+    public ShiftSwapScheduleSnapshotDto? ReturnAfterSnapshot { get; set; }
+    public List<ShiftSwapPreviewMonthStatsDto>? CurrentEmployeeProjectedMonths { get; set; }
     public int Id { get; set; }
     public int ScheduleId { get; set; }
     public int ScheduleSlotId { get; set; }

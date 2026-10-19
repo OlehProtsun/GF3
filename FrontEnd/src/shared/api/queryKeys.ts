@@ -37,6 +37,8 @@ export const queryKeys = {
     list: () => ["employeeSchedules", "list"] as const,
   },
   shiftSwaps: {
+    candidates: (params: object | null) => ["shiftSwaps", "returnCandidates", params] as const,
+    preview: (payload: object | null) => ["shiftSwaps", "preview", payload] as const,
     all: ["shiftSwaps"] as const,
     employee: () => ["shiftSwaps", "employee"] as const,
     employees: () => ["shiftSwaps", "employees"] as const,

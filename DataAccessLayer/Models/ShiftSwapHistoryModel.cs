@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using DataAccessLayer.Models.Enums;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
@@ -9,6 +10,39 @@ namespace DataAccessLayer.Models;
 [Index(nameof(ScheduleId), nameof(AcceptedAtUtc), Name = "ix_shift_swap_history_schedule_accepted")]
 public class ShiftSwapHistoryModel
 {
+    [Column("request_kind")]
+    public ShiftSwapRequestKind RequestKind { get; set; } = ShiftSwapRequestKind.Give;
+
+    [Column("return_schedule_id")]
+    public int? ReturnScheduleId { get; set; }
+
+    [MaxLength(200), Column("return_schedule_name")]
+    public string? ReturnScheduleName { get; set; }
+
+    [MaxLength(200), Column("return_shop_name")]
+    public string? ReturnShopName { get; set; }
+
+    [Column("return_year")]
+    public int? ReturnYear { get; set; }
+
+    [Column("return_month")]
+    public int? ReturnMonth { get; set; }
+
+    [Column("return_day_of_month")]
+    public int? ReturnDayOfMonth { get; set; }
+
+    [MaxLength(5), Column("return_from_time")]
+    public string? ReturnFromTime { get; set; }
+
+    [MaxLength(5), Column("return_to_time")]
+    public string? ReturnToTime { get; set; }
+
+    [Column("return_before_snapshot_json")]
+    public string? ReturnBeforeSnapshotJson { get; set; }
+
+    [Column("return_after_snapshot_json")]
+    public string? ReturnAfterSnapshotJson { get; set; }
+
     [Key]
     [Column("id")]
     public int Id { get; set; }

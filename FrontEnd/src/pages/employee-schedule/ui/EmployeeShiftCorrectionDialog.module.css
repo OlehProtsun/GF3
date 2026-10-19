@@ -34,6 +34,14 @@
   gap: 14px;
 }
 
+.body {
+  display: grid;
+  gap: 14px;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
 .titleBlock {
   min-width: 0;
   display: grid;
@@ -450,3 +458,19 @@
   .overlay, .dialog, .dayList button, .shiftCard, .boundaryChoices button, .timeEditor > button, .closeButton, .stepSection, .adjustmentPanel, .validation, .empty, .hint { animation: none; transition: none; }
   :is(.dayList button, .boundaryChoices button, .timeEditor > button, .closeButton):active:not(:disabled) { transform: none; }
 }
+
+/* The native top layer escapes animated page containing blocks and navigation. */
+.overlay {
+  inset: var(--swap-visual-top, 0px) 0 auto;
+  height: var(--swap-visual-height, 100dvh);
+  max-height: none;
+  max-width: none;
+  margin: 0;
+  border: 0;
+  padding: max(14px, env(safe-area-inset-top)) max(14px, env(safe-area-inset-right)) max(14px, env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-left));
+  overflow: hidden;
+  background: transparent;
+  backdrop-filter: none;
+}
+.overlay::backdrop { background: rgba(10, 15, 28, .4); backdrop-filter: blur(12px); }
+.overlay .dialog { grid-template-rows: auto minmax(0, 1fr) auto; max-height: 100%; overflow: hidden; }

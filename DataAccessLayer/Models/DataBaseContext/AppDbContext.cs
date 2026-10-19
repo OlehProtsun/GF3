@@ -739,6 +739,12 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     {
         modelBuilder.Entity<ShiftSwapRequestModel>(entity =>
         {
+            entity.Property(request => request.RequestKind).HasConversion<string>().HasDefaultValue(ShiftSwapRequestKind.Give);
+            entity.HasIndex(request => new { request.ReturnScheduleId, request.Status })
+                .HasDatabaseName("ix_shift_swap_return_schedule_status");
+            entity.HasIndex(request => new { request.ReturnScheduleSlotId, request.Status }).IsUnique()
+                .HasDatabaseName("ux_shift_swap_open_return_slot")
+                .HasFilter("status = 'Open' AND request_kind = 'Exchange' AND return_schedule_slot_id IS NOT NULL");
             entity.HasOne(request => request.Schedule)
                 .WithMany()
                 .HasForeignKey(request => request.ScheduleId)
@@ -792,6 +798,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     {
         modelBuilder.Entity<ShiftSwapHistoryModel>(entity =>
         {
+            entity.Property(history => history.RequestKind).HasConversion<string>().HasDefaultValue(ShiftSwapRequestKind.Give);
             entity.HasOne(history => history.Schedule)
                 .WithMany()
                 .HasForeignKey(history => history.ScheduleId)

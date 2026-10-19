@@ -33,6 +33,86 @@ const routes = ["/", "/notifications", "/availability", "/schedule", "/swap", "/
 const shell = (page: Page) => page.locator("header:has(> [data-employee-nav])").locator("..");
 const mobileNav = (page: Page) => page.locator('[data-employee-nav]').last();
 
+for (const [width, height] of [[320, 640], [375, 812], [390, 844], [430, 932]]) {
+  test(`mobile overscroll background ${width}`, async ({ page }) => {
+    await page.setViewportSize({ width, height });
+    await fixture(page);
+    await page.goto("/schedule");
+    const hero = page.locator('[class*="hero_"]').first();
+    await expect(hero).toBeVisible();
+    await expect.poll(() => page.evaluate(() => getComputedStyle(document.documentElement, "::before").position)).toBe("fixed");
+    await expect.poll(() => hero.evaluate(element => getComputedStyle(element, "::before").content)).toBe('""');
+    const continuation = await hero.evaluate(element => {
+      const style = getComputedStyle(element);
+      const extension = getComputedStyle(element, "::before");
+      return {
+        background: style.backgroundImage,
+        extensionBackground: extension.backgroundImage,
+        height: element.getBoundingClientRect().height,
+        extensionHeight: extension.height,
+        transform: extension.transform,
+        overflowX: getComputedStyle(document.body).overflowX,
+        overflowY: getComputedStyle(document.body).overflowY,
+        scrollHeight: document.documentElement.scrollHeight,
+      };
+    });
+    expect(continuation.extensionBackground).toBe(continuation.background);
+    expect(Math.abs(parseFloat(continuation.extensionHeight) - continuation.height)).toBeLessThan(1);
+    expect(continuation.transform).toBe("matrix(1, 0, 0, -1, 0, 0)");
+    expect(continuation.overflowX).toBe("clip");
+    expect(continuation.overflowY).toBe("visible");
+    const hideExtension = await page.addStyleTag({ content: '[class*="hero_"]::before { content: none !important; }' });
+    expect(await page.evaluate(() => document.documentElement.scrollHeight)).toBe(continuation.scrollHeight);
+    await hideExtension.evaluate(element => element.remove());
+    await page.screenshot({ path: test.info().outputPath(`schedule-top-${width}.png`) });
+    const backgrounds = await page.evaluate(() => ({
+      canvas: getComputedStyle(document.documentElement).backgroundImage,
+      bottom: getComputedStyle(document.documentElement).backgroundColor,
+      body: getComputedStyle(document.body).backgroundColor,
+      overflow: document.documentElement.scrollWidth - innerWidth,
+    }));
+    expect(backgrounds.canvas).toContain("43, 145, 236");
+    expect(backgrounds.bottom).toBe("rgb(243, 244, 246)");
+    expect(backgrounds.body).toBe(backgrounds.bottom);
+    expect(backgrounds.overflow).toBeLessThanOrEqual(1);
+    await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+    await expect.poll(() => page.evaluate(() => scrollY)).toBeGreaterThan(0);
+    await page.screenshot({ path: test.info().outputPath(`schedule-${width}.png`) });
+    await page.goto("/profile");
+    await expect.poll(() => page.evaluate(() => getComputedStyle(document.documentElement).backgroundImage)).toBe("none");
+    expect(await page.locator('meta[name="theme-color"]').getAttribute("content")).toBe("#f3f4f6");
+  });
+}
+
+for (const [width, height] of [[320, 640], [375, 812], [390, 844], [430, 932], [390, 480]]) {
+  test(`adjust visible viewport ${width}x${height}`, async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await page.setViewportSize({ width, height });
+    await fixture(page);
+    await page.goto("/schedule");
+    const adjust = page.getByRole("button", { name: "Request a shift correction", exact: true });
+    await expect(adjust).toBeVisible();
+    for (const fraction of [0, .5, 1, .25, .25]) {
+      await page.evaluate(value => window.scrollTo(0, value * (document.documentElement.scrollHeight - innerHeight)), fraction);
+      const scroll = await page.evaluate(() => scrollY);
+      await adjust.evaluate(element => (element as HTMLButtonElement).click());
+      const modal = page.getByRole("dialog", { name: "Request a shift change" });
+      await expect(modal).toBeVisible();
+      expect(await modal.evaluate(element => element.parentElement === document.body && element.matches(":modal"))).toBe(true);
+      const bounds = await modal.locator(":scope > div").boundingBox();
+      const viewport = await page.evaluate(() => ({ top: visualViewport?.offsetTop ?? 0, height: visualViewport?.height ?? innerHeight }));
+      expect(bounds!.y).toBeGreaterThanOrEqual(viewport.top);
+      expect(bounds!.y + bounds!.height).toBeLessThanOrEqual(viewport.top + viewport.height + 1);
+      expect(Math.abs(bounds!.y + bounds!.height / 2 - viewport.top - viewport.height / 2)).toBeLessThan(2);
+      await expect(modal.getByRole("button", { name: "Close shift correction dialog" })).toBeInViewport();
+      expect(await page.evaluate(() => document.body.style.position)).toBe("fixed");
+      await modal.getByRole("button", { name: "Close shift correction dialog" }).click();
+      await expect(modal).toHaveCount(0);
+      expect(await page.evaluate(() => scrollY)).toBeCloseTo(scroll, 0);
+    }
+  });
+}
+
 async function geometry(page: Page, width: number) {
   await expect(shell(page)).toBeVisible();
   await expect.poll(() => shell(page).evaluate(element => getComputedStyle(element).containerName)).toBe("employee-workspace");
@@ -166,13 +246,14 @@ test("Swap search, filters, independent scroll and dialogs", async ({ page }) =>
   await filters.getByRole("button", { name: "My offers", exact: true }).click();
   await expect(page.locator('[class*="offerCard_"]')).toHaveCount(0);
   await filters.getByRole("button", { name: "All", exact: true }).click();
-  const area = page.locator('main[class*="swapBody_"]');
+  const area = page.locator('[data-swap-offers-scroll]');
   await area.evaluate(element => { element.scrollTop = element.scrollHeight; });
   await expect.poll(() => area.evaluate(element => element.scrollTop)).toBeGreaterThan(0);
   await expect(page.locator('[class*="offerCard_"]').last()).toBeInViewport();
   expect(await page.evaluate(() => window.scrollY)).toBe(0);
   await area.evaluate(element => { element.scrollTop = 0; });
-  await page.getByRole("button", { name: "Accept", exact: true }).first().click();
+  await page.getByRole("button", { name: /^View offer details for/ }).first().click();
+  await page.getByRole("dialog", { name: "Offer details" }).getByRole("button", { name: "Accept shift", exact: true }).click();
   const confirmation = page.getByRole("dialog");
   await expect(confirmation).toBeVisible();
   await expect(confirmation.getByText("Accept this shift?", { exact: true })).toBeVisible();
@@ -183,9 +264,9 @@ test("Swap search, filters, independent scroll and dialogs", async ({ page }) =>
   await expect(creation).toBeVisible();
   expect((await creation.boundingBox())!.width).toBeLessThanOrEqual(430);
   await creation.getByRole("button", { name: /September/ }).click();
-  const picker = page.getByRole("dialog", { name: "Choose shift", exact: true });
+  const picker = page.getByRole("region", { name: "Select your shift", exact: true });
   await expect(picker).toBeVisible();
-  expect(await picker.evaluate(element => element.matches(":modal"))).toBe(true);
+  await expect(page.locator("dialog:modal")).toHaveCount(1);
   expect(await picker.locator(':scope > div').evaluate(element => element.getBoundingClientRect().width)).toBeLessThanOrEqual(430);
   await page.keyboard.press("Escape");
   await expect(picker).toBeHidden();

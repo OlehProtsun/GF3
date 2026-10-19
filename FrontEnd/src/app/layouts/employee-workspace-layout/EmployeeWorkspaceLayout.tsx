@@ -121,6 +121,26 @@ export function EmployeeWorkspaceLayout({ children }: PropsWithChildren) {
   const isAvailabilityRoute = pathname === "/availability";
   const isScheduleRoute = pathname === "/schedule";
   const isSwapRoute = pathname === "/swap";
+  useEffect(() => {
+    const layout = motionScope.current;
+    if (!isSwapRoute || !layout) return;
+    const viewport = window.visualViewport;
+    const updateViewport = () => {
+      layout.style.setProperty("--employee-visual-height", `${viewport?.height ?? window.innerHeight}px`);
+      layout.style.setProperty("--employee-visual-top", `${viewport?.offsetTop ?? 0}px`);
+    };
+    updateViewport();
+    viewport?.addEventListener("resize", updateViewport);
+    viewport?.addEventListener("scroll", updateViewport);
+    window.addEventListener("resize", updateViewport);
+    return () => {
+      viewport?.removeEventListener("resize", updateViewport);
+      viewport?.removeEventListener("scroll", updateViewport);
+      window.removeEventListener("resize", updateViewport);
+      layout.style.removeProperty("--employee-visual-height");
+      layout.style.removeProperty("--employee-visual-top");
+    };
+  }, [isSwapRoute]);
   const layoutClassName = [
     styles.layout,
     isProfileRoute ? styles.layoutProfile : "",
