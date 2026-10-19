@@ -19,6 +19,10 @@ public sealed class EmployeeAvailabilityGroupDto
 
     public DateTimeOffset? VisibleToUtc { get; set; }
 
+    public DateTimeOffset? PublishedAtUtc { get; set; }
+    public string? NotificationId { get; set; }
+    public DateTimeOffset? NotificationOccurredAtUtc { get; set; }
+
     public bool CanSubmit { get; set; }
 
     public bool IsEditLocked { get; set; }

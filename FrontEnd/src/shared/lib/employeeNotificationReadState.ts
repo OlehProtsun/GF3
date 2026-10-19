@@ -37,7 +37,9 @@ export function getEmployeeScheduleNotificationId(scheduleId: number | string | 
 export function getEmployeeAvailabilityNotificationId(
   availabilityId: number | string | null | undefined,
   visibleFromUtc?: string | null,
+  publishedAtUtc?: string | null,
 ) {
+  if (publishedAtUtc) return `availability-public:${availabilityId ?? "current"}:published:${publishedAtUtc}`;
   return `availability-public:${availabilityId ?? "current"}:${visibleFromUtc ?? "current"}`;
 }
 

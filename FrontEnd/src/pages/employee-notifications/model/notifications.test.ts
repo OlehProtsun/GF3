@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import contract from "./notificationContract.fixture.json";
 import type { ShiftSwap } from "@entities/shift-swaps";
 import type { EmployeeSchedule } from "@entities/employee-schedule";
 import type { EmployeeAvailabilityGroup } from "@entities/employee-availability";
@@ -72,11 +73,41 @@ function createNotification(overrides: Partial<EmployeeRealtimeNotificationLike>
 }
 
 describe("employee notification model", () => {
+  it("uses publication identity and real eligibility time, retains closed forms, and preserves legacy reads", () => {
+    const group: EmployeeAvailabilityGroup = { id: 31, name: "My name", year: 2026, month: 11,
+      visibleFromUtc: "2026-10-19T09:00:00+00:00", visibleToUtc: "2026-10-19T12:00:05+00:00",
+      publishedAtUtc: contract.nowUtc, notificationOccurredAtUtc: contract.nowUtc, canSubmit: false, isEditLocked: false, slots: [] };
+    const now = Date.parse(contract.nowUtc) + 30_000;
+    const item = buildEmployeeNotificationItems([], [], [], [group], now)[0];
+    expect(item.id).toBe("availability-public:31:published:" + contract.nowUtc);
+    expect(item.occurredAtUtc).toBe(contract.nowUtc);
+    expect(item.body).toContain("submissions have closed");
+    expect(item.body).toContain("My name");
+    expect(item.actionPath).toBe("/availability");
+    expect(isEmployeeNotificationRead(item, new Set([item.id]))).toBe(true);
+    expect(buildEmployeeNotificationItems([], [], [], [group], Date.parse(contract.nowUtc) + employeeNotificationRetentionMs)).toEqual([]);
+    expect(buildEmployeeNotificationItems([], [], [], [{ ...group, visibleFromUtc: "2026-10-20T09:00:00+00:00" }], now)).toEqual([]);
+    const legacy = buildEmployeeNotificationItems([], [], [], [{ ...group, publishedAtUtc: null, notificationOccurredAtUtc: null }], now)[0];
+    expect(legacy.id).toBe("availability-public:31:2026-10-19T09:00:00+00:00");
+    expect(isEmployeeNotificationRead(legacy, new Set([legacy.id]))).toBe(true);
+    const edited = buildEmployeeNotificationItems([], [], [], [{ ...group, publishedAtUtc: null,
+      notificationId: legacy.id, visibleFromUtc: "2026-10-19T10:00:00+00:00" }], now)[0];
+    expect(edited.id).toBe(legacy.id);
+  });
+
+  it("applies the shared cap with deterministic ordinal identity ordering on tied event times", () => {
+    const items = buildEmployeeNotificationItems([], Array.from({ length: 85 }, (_, index) =>
+      createSwap({ id: index + 1, createdAtUtc: contract.nowUtc })), [], [], Date.parse(contract.nowUtc));
+    expect(items).toHaveLength(contract.limit);
+    expect(items.map(x => x.id)).toEqual(Array.from({ length: 85 }, (_, index) => `open-shift:${index + 1}`).sort().slice(0, contract.limit));
+  });
+
   it("preserves canonical System.Text.Json timestamps and all backend push IDs byte for byte", () => {
     expect([
-      getEmployeeAvailabilityNotificationId(1, "2026-10-19T11:58:00+00:00"), getEmployeeOpenShiftNotificationId(2),
+      getEmployeeAvailabilityNotificationId(1, "2026-10-19T11:58:00+00:00", contract.nowUtc), getEmployeeOpenShiftNotificationId(2),
       getEmployeeScheduleNotificationId(1, "2026-10-19T11:00:00+00:00"), getEmployeeSwapAcceptedNotificationId(3), getEmployeeSwapNotificationId(1),
-    ]).toEqual(["availability-public:1:2026-10-19T11:58:00+00:00", "open-shift:2", "schedule-public:1:2026-10-19T11:00:00+00:00", "swap-accepted:3", "swap-public:1"]);
+    ]).toEqual(contract.ids);
+    expect(employeeNotificationRetentionMs).toBe(contract.retentionDays * 86_400_000);
   });
 
   it("uses canonical deep links for open, manual and accepted own swaps", () => {

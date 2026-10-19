@@ -48,16 +48,24 @@ public sealed class EmployeeWebPushHostedService(
                 var readIds = (await db.EmployeeNotificationReads.AsNoTracking().Where(x => x.EmployeeId == group.Key).Select(x => x.NotificationId).ToListAsync(ct)).ToHashSet();
                 foreach (var subscription in group)
                 {
-                    if (!options.Value.AllowsEndpoint(subscription.Endpoint)) continue;
+                    if (!options.Value.AllowsEndpoint(subscription.Endpoint))
+                    {
+                        logger.LogDebug("Employee push subscription {SubscriptionId} skipped: invalid endpoint.", subscription.Id);
+                        continue;
+                    }
+                    logger.LogDebug("Employee push subscription {SubscriptionId}: {Eligible} candidates, {Old} predate opt-in, {Read} read.",
+                        subscription.Id, candidates.Count, candidates.Count(x => x.OccurredAtUtc < subscription.CreatedAtUtc),
+                        candidates.Count(x => readIds.Contains(x.NotificationId)));
                     foreach (var candidate in candidates.Where(x => x.OccurredAtUtc >= subscription.CreatedAtUtc && !readIds.Contains(x.NotificationId)))
                     {
                         // The endpoint may have transferred accounts since the page was loaded.
-                        await db.Database.ExecuteSqlInterpolatedAsync($"""
+                        var inserted = await db.Database.ExecuteSqlInterpolatedAsync($"""
                             INSERT INTO employee_push_delivery (subscription_id, notification_id, created_at_utc, next_attempt_at_utc, attempt_count)
                             SELECT {subscription.Id}, {candidate.NotificationId}, {now.UtcTicks}, {now.UtcTicks}, 0
                             WHERE EXISTS (SELECT 1 FROM employee_push_subscription WHERE id = {subscription.Id} AND employee_id = {subscription.EmployeeId} AND created_at_utc = {subscription.CreatedAtUtc.UtcTicks})
                             ON CONFLICT(subscription_id, notification_id) DO NOTHING
                             """, ct);
+                        if (inserted == 0) logger.LogDebug("Employee push subscription {SubscriptionId}: existing delivery or changed recipient; duplicate suppressed.", subscription.Id);
                     }
                     var jobs = await db.EmployeePushDeliveries.AsNoTracking().Where(x => x.SubscriptionId == subscription.Id && x.Outcome == null && x.NextAttemptAtUtc <= now && (x.LeaseUntilUtc == null || x.LeaseUntilUtc <= now))
                         .OrderBy(x => x.NextAttemptAtUtc).ThenBy(x => x.Id).Take(100 - attempted).ToListAsync(ct);
@@ -74,6 +82,8 @@ public sealed class EmployeeWebPushHostedService(
                             var isRead = current is not null && await db.EmployeeNotificationReads.AnyAsync(x => x.EmployeeId == current.EmployeeId && x.NotificationId == job.NotificationId, ct);
                             if (isRead || eligible is null || current is null || !options.Value.AllowsEndpoint(current.Endpoint))
                             {
+                                logger.LogDebug("Employee push job {JobId} skipped: {Reason}.", job.Id,
+                                    isRead ? "read" : current is null ? "recipient changed" : eligible is null ? "withdrawn, expired, or predates opt-in" : "invalid endpoint");
                                 await FinishAsync(db, job.Id, token, isRead ? "read" : "expired", ct);
                                 continue;
                             }

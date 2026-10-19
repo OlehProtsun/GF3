@@ -21,6 +21,7 @@
 
   <ItemGroup>
     <Using Include="Xunit" />
+    <None Include="..\FrontEnd\src\pages\employee-notifications\model\notificationContract.fixture.json" Link="notificationContract.fixture.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>

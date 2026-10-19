@@ -264,18 +264,23 @@ function buildScheduleNotification(
 function buildAvailabilityNotification(
   availability: EmployeeAvailabilityGroup,
   event?: EmployeeRealtimeNotificationLike,
+  nowMs = Date.now(),
 ): EmployeeNotificationItem {
-  const id = getEmployeeAvailabilityNotificationId(availability.id, availability.visibleFromUtc);
+  const id = availability.notificationId ?? getEmployeeAvailabilityNotificationId(availability.id, availability.visibleFromUtc, availability.publishedAtUtc);
+  const closed = Boolean(availability.visibleToUtc && new Date(availability.visibleToUtc).getTime() < nowMs);
   return {
     id,
     readIds: [id],
     title: t("New availability published"),
-    body: t("\"{0}\" for {1} is open for your availability.", availability.name, formatMonth(availability.year, availability.month)),
-    meta: availability.visibleToUtc
+    body: closed
+      ? t("\"{0}\" for {1}: submissions have closed.", availability.name, formatMonth(availability.year, availability.month))
+      : t("\"{0}\" for {1} is open for your availability.", availability.name, formatMonth(availability.year, availability.month)),
+    meta: closed ? t("Submissions closed") : availability.visibleToUtc
       ? t("Submit by {0}", formatNotificationTime(availability.visibleToUtc))
       : t("Open now"),
     tone: "availability",
-    occurredAtUtc: availability.visibleFromUtc ?? event?.occurredAtUtc ?? null,
+    occurredAtUtc: availability.notificationId ? availability.notificationOccurredAtUtc
+      : availability.notificationOccurredAtUtc ?? availability.visibleFromUtc ?? event?.occurredAtUtc ?? null,
     actionPath: "/availability",
     actionLabel: t("Open availability"),
   };
@@ -352,9 +357,11 @@ export function buildEmployeeNotificationItems(
   });
 
   availabilityGroups.forEach(availability => {
+    if (availability.visibleFromUtc && new Date(availability.visibleFromUtc).getTime() > nowMs) return;
     items.push(buildAvailabilityNotification(
       availability,
       findAvailabilityPublicationEvent(realtimeNotifications, availability.id),
+      nowMs,
     ));
   });
 
@@ -388,8 +395,8 @@ export function buildEmployeeNotificationItems(
   });
 
   return [...new Map(items.map(item => [item.id, item])).values()]
-    .filter(item => isWithinEmployeeNotificationRetention(item.occurredAtUtc, nowMs))
-    .sort((left, right) => getNotificationSortValue(right) - getNotificationSortValue(left))
+    .filter(item => isWithinEmployeeNotificationRetention(item.occurredAtUtc, nowMs) && getNotificationSortValue(item) <= nowMs)
+    .sort((left, right) => getNotificationSortValue(right) - getNotificationSortValue(left) || (left.id < right.id ? -1 : left.id > right.id ? 1 : 0))
     .slice(0, 80);
 }
 

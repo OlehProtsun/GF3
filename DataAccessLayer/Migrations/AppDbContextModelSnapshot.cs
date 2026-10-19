@@ -130,6 +130,10 @@ namespace DataAccessLayer.Migrations
                         .HasColumnType("TEXT")
                         .HasColumnName("employee_last_modified_at_utc");
 
+                    b.Property<DateTimeOffset?>("JoinedAtUtc")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("joined_at_utc");
+
                     b.HasKey("Id");
 
                     b.HasIndex("EmployeeId");
@@ -160,12 +164,24 @@ namespace DataAccessLayer.Migrations
                         .HasColumnType("TEXT")
                         .HasColumnName("name");
 
+                    b.Property<DateTimeOffset?>("NotificationAvailableAtUtc")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("notification_available_at_utc");
+
+                    b.Property<DateTimeOffset?>("NotificationLegacyVisibleFromUtc")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("notification_legacy_visible_from_utc");
+
                     b.Property<string>("PublicationStatus")
                         .IsRequired()
                         .ValueGeneratedOnAdd()
                         .HasColumnType("TEXT")
                         .HasDefaultValue("Private")
                         .HasColumnName("publication_status");
+
+                    b.Property<DateTimeOffset?>("PublishedAtUtc")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("published_at_utc");
 
                     b.Property<DateTimeOffset?>("VisibleFromUtc")
                         .HasColumnType("TEXT")

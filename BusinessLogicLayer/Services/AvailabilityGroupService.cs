@@ -478,6 +478,9 @@ public class AvailabilityGroupService : IAvailabilityGroupService
         return new EmployeeAvailabilityModel
         {
             Group = contractGroup,
+            PublishedAtUtc = group.PublishedAtUtc,
+            NotificationId = DataAccessLayer.Models.AvailabilityNotificationTiming.Id(group),
+            NotificationOccurredAtUtc = DataAccessLayer.Models.AvailabilityNotificationTiming.OccurredAt(group, member),
             Member = contractMember,
             Days = days,
             CanSubmit = (!contractGroup.VisibleFromUtc.HasValue || contractGroup.VisibleFromUtc.Value <= normalizedNowUtc) &&
