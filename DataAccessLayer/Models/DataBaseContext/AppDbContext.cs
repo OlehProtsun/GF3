@@ -9,7 +9,7 @@ namespace DataAccessLayer.Models.DataBaseContext;
 /// 1. exposes aggregate roots as <see cref="DbSet{TEntity}"/>,
 /// 2. defines relational invariants that must stay true regardless of which API/service writes data.
 /// </summary>
-public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(options)
+public class AppDbContext(DbContextOptions<AppDbContext> options, TimeProvider? timeProvider = null) : DbContext(options)
 {
     public DbSet<ContainerModel> Containers => Set<ContainerModel>();
     public DbSet<EmployeeModel> Employees => Set<EmployeeModel>();
@@ -54,12 +54,14 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public override int SaveChanges(bool acceptAllChangesOnSuccess)
     {
         UpdateSchedulePublicationTimestamps();
+        UpdateAvailabilityNotificationTimestamps();
         return base.SaveChanges(acceptAllChangesOnSuccess);
     }
 
     public override Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
     {
         UpdateSchedulePublicationTimestamps();
+        UpdateAvailabilityNotificationTimestamps();
         return base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
     }
 
@@ -80,6 +82,35 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
                     publication.OriginalValue != SchedulePublicationStatus.Public
                     ? DateTimeOffset.UtcNow : timestamp.OriginalValue;
             }
+        }
+    }
+
+    private void UpdateAvailabilityNotificationTimestamps()
+    {
+        var now = (timeProvider ?? TimeProvider.System).GetUtcNow();
+        foreach (var entry in ChangeTracker.Entries<AvailabilityGroupModel>())
+        {
+            if (entry.State is not (EntityState.Added or EntityState.Modified)) continue;
+            var publication = entry.Property(x => x.PublicationStatus);
+            var published = entry.Property(x => x.PublishedAtUtc);
+            var newPublication = publication.CurrentValue == AvailabilityPublicationStatus.Public &&
+                (entry.State == EntityState.Added || publication.OriginalValue != AvailabilityPublicationStatus.Public);
+            published.CurrentValue = newPublication ? now : entry.State == EntityState.Added ? null : published.OriginalValue;
+            var available = entry.Property(x => x.NotificationAvailableAtUtc);
+            var rescheduled = entry.State == EntityState.Modified && available.OriginalValue > now &&
+                entry.Property(x => x.VisibleFromUtc).IsModified;
+            available.CurrentValue = newPublication || rescheduled
+                ? entry.Entity.VisibleFromUtc is { } start && start > now ? start : now
+                : entry.State == EntityState.Added ? null : available.OriginalValue;
+            var legacyIdentity = entry.Property(x => x.NotificationLegacyVisibleFromUtc);
+            legacyIdentity.CurrentValue = entry.State == EntityState.Added ? null : legacyIdentity.OriginalValue;
+        }
+        foreach (var entry in ChangeTracker.Entries<AvailabilityGroupMemberModel>())
+        {
+            if (entry.State is not (EntityState.Added or EntityState.Modified)) continue;
+            var joined = entry.Property(x => x.JoinedAtUtc);
+            joined.CurrentValue = entry.State == EntityState.Added || entry.Property(x => x.EmployeeId).IsModified
+                ? now : joined.OriginalValue;
         }
     }
 

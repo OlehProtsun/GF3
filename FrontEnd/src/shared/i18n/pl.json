@@ -1245,6 +1245,8 @@
   "Su": "Nd",
   "Submit availability when a manager opens a window.": "Podaj dyspozycyjność, gdy menedżer otworzy okres zgłoszeń.",
   "Submit by {0}": "Prześlij do {0}",
+  "Submissions closed": "Termin zgłaszania minął",
+  "\"{0}\" for {1}: submissions have closed.": "„{0}” na {1}: termin zgłaszania dostępności już minął.",
   "Sum": "Suma",
   "Summary month": "Miesiąc podsumowania",
   "Summary period": "Okres podsumowania",

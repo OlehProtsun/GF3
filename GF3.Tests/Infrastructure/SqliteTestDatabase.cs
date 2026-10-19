@@ -30,13 +30,13 @@ internal sealed class SqliteTestDatabase : IAsyncDisposable
         return database;
     }
 
-    public AppDbContext CreateContext()
+    public AppDbContext CreateContext(TimeProvider? timeProvider = null)
     {
         var options = new DbContextOptionsBuilder<AppDbContext>()
             .UseSqlite(ConnectionString)
             .Options;
 
-        return new AppDbContext(options);
+        return new AppDbContext(options, timeProvider);
     }
 
     public ServiceProvider BuildServiceProvider(Action<IServiceCollection>? configureServices = null)

@@ -7,6 +7,9 @@ export type EmployeeAvailabilityGroup = {
   month: number;
   visibleFromUtc?: string | null;
   visibleToUtc?: string | null;
+  publishedAtUtc?: string | null;
+  notificationId?: string | null;
+  notificationOccurredAtUtc?: string | null;
   canSubmit: boolean;
   isEditLocked: boolean;
   editLockedBy?: string | null;

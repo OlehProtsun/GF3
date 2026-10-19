@@ -50,9 +50,10 @@ public sealed class EmployeeWebPushDispatchTests
     private sealed class Sender : IEmployeeWebPushSender
     {
         public int Calls;
+        public List<(int EmployeeId, EmployeePushCandidate Candidate)> Messages = [];
         public Func<CancellationToken, Task>? Send;
         public Task SendAsync(EmployeePushSubscriptionModel subscription, EmployeePushCandidate candidate, CancellationToken ct)
-        { Calls++; return Send?.Invoke(ct) ?? Task.CompletedTask; }
+        { Calls++; Messages.Add((subscription.EmployeeId, candidate)); return Send?.Invoke(ct) ?? Task.CompletedTask; }
     }
     private sealed class Source : IEmployeePushNotificationSource
     {
@@ -79,6 +80,128 @@ public sealed class EmployeeWebPushDispatchTests
     });
     private static EmployeeWebPushHostedService Worker(ServiceProvider provider, Clock clock, bool enabled = true) =>
         new(provider.GetRequiredService<IServiceScopeFactory>(), clock, Options.Create(new PushOptions { Enabled = enabled }), NullLogger<EmployeeWebPushHostedService>.Instance);
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task RealAvailability_PublishedAfterOptIn_WithPastOrFutureStart_SurvivesLateScanAndRestart(bool scheduled)
+    {
+        await using var database = await SqliteTestDatabase.CreateAsync();
+        var employee = await Seed(database, 2);
+        var clock = new Clock();
+        await using var db = database.CreateContext(clock);
+        var start = scheduled ? clock.Now.AddHours(1) : clock.Now.AddHours(-3);
+        var group = new AvailabilityGroupModel { Name = "November", Year = 2026, Month = 11,
+            PublicationStatus = DataAccessLayer.Models.Enums.AvailabilityPublicationStatus.Public,
+            VisibleFromUtc = start, VisibleToUtc = clock.Now.AddHours(scheduled ? 1 : 0).AddSeconds(5),
+            Members = [new() { EmployeeId = employee }] };
+        db.Add(group); await db.SaveChangesAsync();
+        // A genuinely later opt-in must not receive the historic event.
+        var occurrence = scheduled ? start : clock.Now;
+        db.Add(new EmployeePushSubscriptionModel { EmployeeId = employee, Endpoint = "https://fcm.googleapis.com/send/later",
+            P256dh = "test", Auth = "test", CreatedAtUtc = occurrence.AddSeconds(1), UpdatedAtUtc = occurrence.AddSeconds(1) });
+        await db.SaveChangesAsync();
+        var sender = new Sender();
+        await using var provider = database.BuildServiceProvider(services =>
+        {
+            services.AddSingleton<IEmployeeWebPushSender>(sender);
+            services.AddSingleton<IOptions<Microsoft.AspNetCore.Mvc.JsonOptions>>(Options.Create(new Microsoft.AspNetCore.Mvc.JsonOptions()));
+            services.AddScoped<IEmployeePushNotificationSource, EmployeePushNotificationSource>();
+        });
+        using (var worker = Worker(provider, clock))
+        {
+            if (scheduled) { await worker.ScanAsync(default); Assert.Empty(sender.Messages); }
+            clock.Now = occurrence.AddSeconds(30); // The form closed between polls; it remains in Inbox.
+            await worker.ScanAsync(default);
+        }
+        Assert.Equal(2, sender.Calls);
+        Assert.All(sender.Messages, x =>
+        {
+            Assert.Equal(occurrence, x.Candidate.OccurredAtUtc);
+            Assert.Contains("Submissions have closed", x.Candidate.Body);
+        });
+        using var restarted = Worker(provider, clock); await restarted.ScanAsync(default);
+        Assert.Equal(2, sender.Calls);
+        Assert.Equal(2, await db.EmployeePushDeliveries.CountAsync());
+    }
+
+    [Fact]
+    public async Task RealSource_LanguagesAreEmployeeSpecific_AndRetryUsesCurrentAccountLanguageWithoutResubscription()
+    {
+        await using var database = await SqliteTestDatabase.CreateAsync();
+        var first = await Seed(database, 2); var clock = new Clock();
+        await using var db = database.CreateContext(clock);
+        var second = TestDataFactory.CreateDalEmployee("English", "Employee"); db.Add(second); await db.SaveChangesAsync();
+        db.AddRange(new EmployeeAccountModel { EmployeeId = first, Username = "polish", PasswordHash = "hash", Language = "pl" },
+            new EmployeeAccountModel { EmployeeId = second.Id, Username = "english", PasswordHash = "hash", Language = "en" },
+            new EmployeePushSubscriptionModel { EmployeeId = second.Id, Endpoint = "https://fcm.googleapis.com/send/english", P256dh = "test", Auth = "test",
+                CreatedAtUtc = clock.Now.AddMinutes(-1), UpdatedAtUtc = clock.Now },
+            new AvailabilityGroupModel { Name = "User name stays unchanged", Year = 2026, Month = 11,
+                PublicationStatus = DataAccessLayer.Models.Enums.AvailabilityPublicationStatus.Public,
+                VisibleFromUtc = clock.Now.AddHours(-3), VisibleToUtc = clock.Now.AddHours(1),
+                Members = [new() { EmployeeId = first }, new() { EmployeeId = second.Id }] });
+        await db.SaveChangesAsync();
+        var sender = new Sender { Send = _ => throw new HttpRequestException("temporary") };
+        await using var provider = database.BuildServiceProvider(services =>
+        {
+            services.AddSingleton<IEmployeeWebPushSender>(sender);
+            services.AddSingleton<IOptions<Microsoft.AspNetCore.Mvc.JsonOptions>>(Options.Create(new Microsoft.AspNetCore.Mvc.JsonOptions()));
+            services.AddScoped<IEmployeePushNotificationSource, EmployeePushNotificationSource>();
+        });
+        using var worker = Worker(provider, clock); await worker.ScanAsync(default);
+        Assert.Equal(3, sender.Calls);
+        Assert.All(sender.Messages.Where(x => x.EmployeeId == first), x =>
+        {
+            Assert.Equal("Udostępniono nową dostępność", x.Candidate.Title);
+            Assert.Contains("listopad", x.Candidate.Body);
+            Assert.Contains("15:00 +02:00", x.Candidate.Body); // Warsaw, independently of server/browser locale.
+            Assert.Contains("User name stays unchanged", x.Candidate.Body);
+        });
+        Assert.Equal("New availability published", Assert.Single(sender.Messages, x => x.EmployeeId == second.Id).Candidate.Title);
+        await db.EmployeeAccounts.Where(x => x.EmployeeId == first).ExecuteUpdateAsync(x => x.SetProperty(a => a.Language, "en"));
+        sender.Send = null; sender.Messages.Clear(); clock.Now = clock.Now.AddMinutes(2);
+        await worker.ScanAsync(default); await worker.ScanAsync(default);
+        Assert.Equal(3, sender.Messages.Count);
+        Assert.All(sender.Messages, x => { Assert.Equal("New availability published", x.Candidate.Title); Assert.Contains("November", x.Candidate.Body); });
+        Assert.Equal(3, await db.EmployeePushSubscriptions.CountAsync());
+        Assert.All(await db.EmployeePushDeliveries.ToListAsync(), x => Assert.Equal("sent", x.Outcome));
+    }
+
+    [Fact]
+    public async Task RealSource_AllInboxCategoriesReachTheSenderWithCanonicalIds_AndReadStateStopsDelivery()
+    {
+        await using var database = await SqliteTestDatabase.CreateAsync(); var clock = new Clock();
+        await using var db = database.CreateContext(clock);
+        var (owner, recipient, schedule, slot) = await EmployeePushNotificationSourceTests.Seed(db);
+        var ordinary = EmployeePushNotificationSourceTests.Offer(owner, schedule, slot);
+        var manualSlot = TestDataFactory.CreateDalSlot(schedule.Id, 2, 1, null, "08:00", "16:00"); db.Add(manualSlot); await db.SaveChangesAsync();
+        var manual = EmployeePushNotificationSourceTests.Offer(owner, schedule, manualSlot);
+        manual.FromEmployeeId = null; manual.IsManagerCreated = true; manual.ManualColumnId = 1;
+        var accepted = EmployeePushNotificationSourceTests.Offer(recipient, schedule, slot);
+        accepted.Status = DataAccessLayer.Models.Enums.ShiftSwapStatus.Accepted; accepted.AcceptedAtUtc = clock.Now;
+        db.AddRange(ordinary, manual, accepted,
+            new AvailabilityGroupModel { Name = "November", Year = 2026, Month = 11,
+                PublicationStatus = DataAccessLayer.Models.Enums.AvailabilityPublicationStatus.Public,
+                VisibleFromUtc = clock.Now.AddHours(-3), Members = [new() { EmployeeId = recipient }] },
+            new EmployeePushSubscriptionModel { EmployeeId = recipient, Endpoint = "https://fcm.googleapis.com/send/all",
+                P256dh = "test", Auth = "test", CreatedAtUtc = clock.Now.AddHours(-2), UpdatedAtUtc = clock.Now });
+        await db.SaveChangesAsync();
+        var sender = new Sender();
+        await using var provider = database.BuildServiceProvider(services =>
+        {
+            services.AddSingleton<IEmployeeWebPushSender>(sender);
+            services.AddSingleton<IOptions<Microsoft.AspNetCore.Mvc.JsonOptions>>(Options.Create(new Microsoft.AspNetCore.Mvc.JsonOptions()));
+            services.AddScoped<IEmployeePushNotificationSource, EmployeePushNotificationSource>();
+        });
+        using var worker = Worker(provider, clock); await worker.ScanAsync(default); await worker.ScanAsync(default);
+        var candidates = await EmployeePushNotificationSourceTests.Source(db).GetCurrentAsync(recipient, clock.Now, default);
+        Assert.Equal(5, sender.Calls);
+        Assert.Equal(candidates.Select(x => x.NotificationId).Order(), sender.Messages.Select(x => x.Candidate.NotificationId).Order());
+        var readSlot = TestDataFactory.CreateDalSlot(schedule.Id, 3, 1, owner, "08:00", "16:00"); db.Add(readSlot); await db.SaveChangesAsync();
+        var readOffer = EmployeePushNotificationSourceTests.Offer(owner, schedule, readSlot); db.Add(readOffer); await db.SaveChangesAsync();
+        db.Add(new EmployeeNotificationReadModel { EmployeeId = recipient, NotificationId = $"swap-public:{readOffer.Id}", ReadAtUtc = clock.Now });
+        await db.SaveChangesAsync(); await worker.ScanAsync(default); Assert.Equal(5, sender.Calls);
+    }
 
     [Fact]
     public async Task CancellationBetweenInitialScanAndSend_CannotSendStaleCandidate()

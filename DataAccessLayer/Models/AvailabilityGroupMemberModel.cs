@@ -47,6 +47,9 @@ public class AvailabilityGroupMemberModel
     [Column("employee_last_modified_at_utc")]
     public DateTimeOffset? EmployeeLastModifiedAtUtc { get; set; }
 
+    [Column("joined_at_utc")]
+    public DateTimeOffset? JoinedAtUtc { get; set; }
+
     /// <summary>
     /// Day-level availability entries for the member.
     /// </summary>
