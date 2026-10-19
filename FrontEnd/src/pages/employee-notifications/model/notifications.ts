@@ -177,7 +177,7 @@ export function buildOpenShiftLiveNotification(
     meta: formatNotificationTime(event.occurredAtUtc),
     tone: "swap",
     occurredAtUtc: event.occurredAtUtc,
-    actionPath: "/swap",
+    actionPath: (swap?.id ?? event.shiftSwapId) != null ? `/swap?swapId=${swap?.id ?? event.shiftSwapId}` : "/swap",
     actionLabel: t("Open swap"),
   };
 }
@@ -191,7 +191,7 @@ export function buildOpenShiftSnapshotNotification(swap: ShiftSwap): EmployeeNot
     meta: `${swap.shopName || t("Shop")} / ${swap.containerName || t("Container")}`,
     tone: "swap",
     occurredAtUtc: swap.createdAtUtc,
-    actionPath: "/swap",
+    actionPath: `/swap?swapId=${swap.id}`,
     actionLabel: t("Open swap"),
   };
 }
@@ -303,7 +303,7 @@ function buildSwapAvailableNotification(
     meta: `${swap.shopName || t("Shop")} / ${swap.containerName || t("Container")}`,
     tone: "swap",
     occurredAtUtc: swap.createdAtUtc,
-    actionPath: "/swap",
+    actionPath: `/swap?swapId=${swap.id}`,
     actionLabel: t("Open swap"),
   };
 }
@@ -321,7 +321,7 @@ function buildAcceptedOwnSwapNotification(
     meta: `${swap.shopName || t("Shop")} / ${swap.containerName || t("Container")}`,
     tone: "swap",
     occurredAtUtc: swap.acceptedAtUtc ?? swap.createdAtUtc,
-    actionPath: "/swap",
+    actionPath: `/swap?swapId=${swap.id}`,
     actionLabel: t("View swap"),
   };
 }

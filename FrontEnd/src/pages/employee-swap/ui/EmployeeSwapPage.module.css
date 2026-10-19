@@ -1542,3 +1542,24 @@
 }
 .offersSection > .offerList > * { flex: none; }
 .offersSection > .offerList:focus-visible { outline: 2px solid #729dff; outline-offset: -2px; }
+
+.offerTitle.managerManualTitle { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.managerManualTitle strong { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.managerManualIndicator {
+  flex: 0 0 6px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #dc263d;
+  border: 1px solid #b91c32;
+  box-shadow: 0 0 4px #dc263d55;
+}
+.offerCard > .shareButton {
+  position: absolute; right: 11px; top: 50px;
+  display: grid; place-items: center; width: 32px; height: 32px;
+  border: 1px solid #e5ecf5; border-radius: 10px; background: #f8faff; color: #325a85; cursor: pointer;
+}
+.offerCard > .shareButton:focus-visible { outline: 2px solid #246bff; outline-offset: 2px; }
+.shareStatus { display: block; padding: 4px 12px; font-size: .75rem; }
+.offerCard.deepLinkedOffer { outline: 3px solid #246bff; outline-offset: -3px; background: #edf4ff; }
+.offersSection .offerMeta, .historyPanel .offerMeta { padding-right: 32px; }

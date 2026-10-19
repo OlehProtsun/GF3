@@ -21,6 +21,17 @@ const schedule: EmployeeSchedule = {
 };
 
 describe("EmployeeShiftCorrectionDialog", () => {
+  test("opens the native modal and closes it on teardown", () => {
+    const { unmount } = render(
+      <EmployeeShiftCorrectionDialog open schedule={schedule} employeeId={7} existingRequests={[]}
+        isSending={false} onCancel={() => undefined} onSubmit={() => undefined} />,
+    );
+    const dialog = screen.getByRole("dialog") as HTMLDialogElement;
+    expect(dialog.open).toBe(true);
+    unmount();
+    expect(dialog.open).toBe(false);
+  });
+
   test("shows split shifts and sends the selected boundary adjustment", async () => {
     const user = userEvent.setup();
     const onSubmit = vi.fn();

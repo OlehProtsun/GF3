@@ -77,6 +77,8 @@ public sealed class DatabaseMigrationStartupTests
             }
 
             await using var verificationContext = CreateContext(workspace.ConnectionString);
+            Assert.Empty(await verificationContext.EmployeePushSubscriptions.ToListAsync());
+            Assert.Empty(await verificationContext.EmployeePushDeliveries.ToListAsync());
             Assert.Equal(2, await verificationContext.Employees.CountAsync());
             var employees = await verificationContext.Employees.OrderBy(employee => employee.FirstName).ToListAsync();
             Assert.Equal(new[] { "Alice", "Bob" }, employees.Select(employee => employee.FirstName));

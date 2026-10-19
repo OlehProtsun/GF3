@@ -36,6 +36,9 @@ import { ConfirmDialog } from "@shared/ui/ConfirmDialog";
 import { CheckIcon, CloseIcon, EmployeeIcon, PinIcon, PlusIcon, ScheduleIcon, SearchIcon, SwapHistoryIcon, SwapOffersIcon, WarnIcon } from "@shared/ui/icons";
 import workspaceStyles from "@pages/shared/EmployeeWorkspacePage.module.css";
 import styles from "./EmployeeSwapPage.module.css";
+import { ShareIcon } from "@shared/ui/icons";
+import { createSwapLink, parseSwapLinkId } from "../model/swapLink";
+import { useLocation } from "react-router-dom";
 
 const swapOfferDateFormatter = new Intl.DateTimeFormat("en-GB", {
   day: "2-digit",
@@ -103,21 +106,47 @@ function PinToggleButton({
   );
 }
 
-function SwapOfferCard({ swap, isPinned, onTogglePin, onViewDetails }: {
+function SwapOfferCard({ swap, isPinned, highlighted, onTogglePin, onViewDetails }: {
   swap: ShiftSwap; isPinned: boolean; onTogglePin: (swapId: number) => void;
+  highlighted?: boolean;
   onViewDetails: (swapId: number, trigger: HTMLElement) => void;
 }) {
   const isOpen = swap.status === "open";
+  const [shareStatus, setShareStatus] = useState<string | null>(null);
+  useEffect(() => {
+    if (!shareStatus) return;
+    const timer = window.setTimeout(() => setShareStatus(null), 4000);
+    return () => window.clearTimeout(timer);
+  }, [shareStatus]);
+  const share = async () => {
+    setShareStatus(null);
+    const url = createSwapLink(swap.id, window.location.origin);
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: t("{0} swap", swap.scheduleName), url });
+        return;
+      } catch (error) {
+        if (error && typeof error === "object" && "name" in error && error.name === "AbortError") return;
+      }
+    }
+    try {
+      await navigator.clipboard.writeText(url);
+      setShareStatus(t("Link copied"));
+    } catch {
+      setShareStatus(t("Could not share this link. Please try again."));
+    }
+  };
+  const isManagerManual = swap.isManagerCreated === true && typeof swap.manualColumnId === "number" && swap.manualColumnId > 0;
   const availabilityLabel = !isOpen ? swap.status === "accepted" ? t("Accepted") : t("Cancelled")
     : swap.isCreatedByCurrentEmployee ? t("My offer") : swap.canAccept ? t("Can") : t("Can’t");
   const unavailableReason = isOpen && !swap.canAccept ? swap.acceptanceUnavailableReason ||
     (swap.isScheduleLocked ? "Schedule is locked while a manager is editing it." : null) : null;
-  return <article className={[styles.offerCard, isPinned ? styles.offerCardPinned : ""].join(" ")} data-pinned={String(isPinned)} data-own={swap.isCreatedByCurrentEmployee}>
+  return <article className={[styles.offerCard, isPinned ? styles.offerCardPinned : "", highlighted ? styles.deepLinkedOffer : ""].join(" ")} data-swap-id={swap.id} data-pinned={String(isPinned)} data-own={swap.isCreatedByCurrentEmployee}>
     <button type="button" className={styles.offerOpenButton} aria-label={t("View offer details for {0}", swap.scheduleName)}
       onClick={event => onViewDetails(swap.id, event.currentTarget)}>
       <span className={styles.offerAvatar} aria-hidden="true">{getSwapCode(swap)}</span>
       <span className={styles.offerSummary}>
-        <span className={styles.offerTitle}><strong>{swap.scheduleName}</strong></span>
+        <span className={`${styles.offerTitle} ${styles.managerManualTitle}`}><strong>{swap.scheduleName}</strong>{isManagerManual && <span className={styles.managerManualIndicator} role="img" aria-label={t("Manager-posted shift")} />}</span>
         <span className={styles.offerMeta}>
           <span className={styles.offerDateLine}><ScheduleIcon size={12} /><span>{`${formatSwapDate(swap)} · ${swap.fromTime} – ${swap.toTime}`}</span></span>
           <small className={styles.offerFromLine}><EmployeeIcon size={12} /><span>{t("From: {0}", swap.isManagerCreated ? swap.manualColumnName || t("Open shift") : swap.fromEmployeeName)}</span></small>
@@ -139,10 +168,17 @@ function SwapOfferCard({ swap, isPinned, onTogglePin, onViewDetails }: {
       </span>
     </button>
     <PinToggleButton isPinned={isPinned} label={t("{0} swap", swap.scheduleName)} onToggle={() => onTogglePin(swap.id)} />
+    <button type="button" className={styles.shareButton} aria-label={t("Share {0} swap", swap.scheduleName)} onClick={() => void share()}><ShareIcon size={16} /></button>
+    {shareStatus && <span className={styles.shareStatus} role="status">{shareStatus}</span>}
   </article>;
 }
 
 export function EmployeeSwapPage() {
+  const { search } = useLocation();
+  const linkedId = parseSwapLinkId(search);
+  const offerListRef = useRef<HTMLDivElement>(null);
+  const historyListRef = useRef<HTMLDivElement>(null);
+  const [highlightedId, setHighlightedId] = useState<number | null>(null);
   const stageRef = useRef<HTMLDivElement>(null);
   const detailsLauncherRef = useRef<HTMLElement | null>(null);
   const [selectedDetailsSwapId, setSelectedDetailsSwapId] = useState<number | null>(null);
@@ -188,7 +224,13 @@ export function EmployeeSwapPage() {
   const [actionError, setActionError] = useState<string | null>(null);
   const [isGiveAwayExpanded, setIsGiveAwayExpanded] = useState(false);
   const [isHistoryExpanded, setIsHistoryExpanded] = useState(false);
-  useSwapModalEnvironment(historyDialogRef, historyTriggerRef, isHistoryExpanded);
+  const [historySuspended, setHistorySuspended] = useState(false);
+  useSwapModalEnvironment(historyDialogRef, historyTriggerRef, isHistoryExpanded && !historySuspended);
+  useEffect(() => {
+    if (isHistoryExpanded && !historySuspended && selectedDetailsSwapId === null && historyDialogRef.current?.contains(detailsLauncherRef.current)) {
+      detailsLauncherRef.current?.focus({ preventScroll: true });
+    }
+  }, [isHistoryExpanded, historySuspended, selectedDetailsSwapId]);
   const [swapSearchQuery, setSwapSearchQuery] = useState("");
   const [swapFilter, setSwapFilter] = useState<SwapFilter>("all");
   const [pendingUnpinSwapId, setPendingUnpinSwapId] = useState<number | null>(null);
@@ -233,6 +275,43 @@ export function EmployeeSwapPage() {
     return filterShiftSwaps(swapsForFilter, deferredSwapSearchQuery);
   }, [deferredSwapSearchQuery, openSwaps, pinnedSwapIdSet, swapFilter]);
   const swapHistory = useMemo(() => sortedSwaps.filter(swap => swap.status !== "open"), [sortedSwaps]);
+  const linkedSwap = linkedId === null ? undefined : swaps.find(swap => swap.id === linkedId);
+  const linkedStatus = linkedSwap?.status;
+  const swapsReady = !swapsQuery.isLoading && !swapsQuery.error && swapsQuery.data !== undefined;
+  useEffect(() => {
+    setHighlightedId(null);
+    if (!linkedId || !employeeId || !swapsReady || !linkedStatus) return;
+    setSelectedDetailsSwapId(null);
+    setHistorySuspended(false);
+    setSwapSearchQuery("");
+    setSwapFilter("all");
+    setIsHistoryExpanded(linkedStatus !== "open");
+    let frame = 0;
+    let timer = 0;
+    const locate = () => {
+      const list = linkedStatus === "open" ? offerListRef.current : historyListRef.current;
+      const card = list?.querySelector<HTMLElement>(`[data-swap-id="${linkedId}"]`);
+      if (!card) { frame = requestAnimationFrame(locate); return; }
+      let scroller = card.parentElement;
+      while (scroller && scroller !== document.body) {
+        const overflow = getComputedStyle(scroller).overflowY;
+        if (/auto|scroll/.test(overflow) && scroller.scrollHeight > scroller.clientHeight) {
+          const top = card.getBoundingClientRect().top - scroller.getBoundingClientRect().top + scroller.scrollTop - 8;
+          scroller.scrollTop = Math.max(0, Math.min(top, scroller.scrollHeight - scroller.clientHeight));
+          break;
+        }
+        scroller = scroller.parentElement;
+      }
+      card.querySelector<HTMLButtonElement>("button")?.focus({ preventScroll: true });
+      setHighlightedId(linkedId);
+      timer = window.setTimeout(() => setHighlightedId(null), 3500);
+    };
+    frame = requestAnimationFrame(locate);
+    return () => { cancelAnimationFrame(frame); window.clearTimeout(timer); };
+  }, [linkedId, linkedStatus, swapsReady, employeeId]);
+  const linkError = new URLSearchParams(search).has("swapId") && linkedId === null
+    ? t("This swap link is invalid.")
+    : linkedId && swapsReady && !linkedSwap ? t("This swap is unavailable or you do not have access.") : null;
   const pendingUnpinSwap = pendingUnpinSwapId === null
     ? null
     : swaps.find(swap => swap.id === pendingUnpinSwapId) ?? null;
@@ -262,12 +341,14 @@ export function EmployeeSwapPage() {
   };
 
   const handleViewDetails = (swapId: number, trigger: HTMLElement) => {
+    if (isHistoryExpanded) flushSync(() => setHistorySuspended(true));
     detailsLauncherRef.current = trigger;
     setDetailsError(null);
     setSelectedDetailsSwapId(swapId);
   };
   const closeDetails = () => {
-    setSelectedDetailsSwapId(null);
+    flushSync(() => setSelectedDetailsSwapId(null));
+    setHistorySuspended(false);
     if (!detailsLauncherRef.current?.isConnected) detailsLauncherRef.current = createOfferTriggerRef.current;
   };
 
@@ -361,6 +442,7 @@ export function EmployeeSwapPage() {
         <main className={styles.swapBody}>
           {loadError ? <ErrorBanner dismissible={false}>{getErrorMessage(loadError, t("Could not load swap data."))}</ErrorBanner> : null}
           {actionError ? <ErrorBanner dismissible={false}>{actionError}</ErrorBanner> : null}
+          {linkError ? <ErrorBanner dismissible={false}>{linkError}</ErrorBanner> : null}
 
           <section className={styles.offersSection} aria-labelledby="open-swaps-heading">
             <h2 id="open-swaps-heading" className={styles.visuallyHidden}>{t("Open swaps")}</h2>
@@ -412,7 +494,7 @@ export function EmployeeSwapPage() {
               </div>
             </div>
 
-            <div data-swap-offers-scroll role="region" aria-label={t("Swap offers")} tabIndex={0} data-motion-list className={[
+            <div ref={offerListRef} data-swap-offers-scroll role="region" aria-label={t("Swap offers")} tabIndex={0} data-motion-list className={[
               styles.offerList,
               filteredOpenSwaps.length >= 5 ? styles.offerListScrollable : "",
             ].filter(Boolean).join(" ")}>
@@ -424,6 +506,7 @@ export function EmployeeSwapPage() {
                 <SwapOfferCard
                   key={swap.id}
                   swap={swap}
+                  highlighted={highlightedId === swap.id}
                   isPinned={pinnedSwapIdSet.has(String(swap.id))}
                   onTogglePin={handleToggleSwapPin}
                   onViewDetails={handleViewDetails}
@@ -460,13 +543,14 @@ export function EmployeeSwapPage() {
             </div>
             <button type="button" className={styles.dialogCloseButton} aria-label={t("Close")} onClick={() => setIsHistoryExpanded(false)}><CloseIcon size={20} /></button>
           </div>
-          <div role="region" aria-label={t("Swap history")} tabIndex={0} data-motion-list className={[styles.offerList, swapHistory.length >= 5 ? styles.offerListScrollable : ""].filter(Boolean).join(" ")}>
+          <div ref={historyListRef} data-swap-history-scroll role="region" aria-label={t("Swap history")} tabIndex={0} data-motion-list className={[styles.offerList, swapHistory.length >= 5 ? styles.offerListScrollable : ""].filter(Boolean).join(" ")}>
             {swapHistory.length === 0 ? (
               <p className={styles.emptyText}>{t("Accepted and cancelled swaps will appear here.")}</p>
             ) : swapHistory.map(swap => (
               <SwapOfferCard
                 key={swap.id}
                 swap={swap}
+                highlighted={highlightedId === swap.id}
                 isPinned={pinnedSwapIdSet.has(String(swap.id))}
                 onTogglePin={handleToggleSwapPin}
                 onViewDetails={handleViewDetails}

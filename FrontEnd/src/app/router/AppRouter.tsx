@@ -136,8 +136,10 @@ const employeeRoutes = [
   { path: "/", element: <EmployeeNotificationsPage /> },
 ] as const;
 
+import { parseSwapLinkId } from "@pages/employee-swap/model/swapLink";
+
 function RoutedContent() {
-  const { pathname } = useLocation();
+  const { pathname, search } = useLocation();
   const { session, status } = useAuth();
   const isPublicAuthRoute = pathname === "/login" || pathname === "/password-recovery";
 
@@ -154,10 +156,16 @@ function RoutedContent() {
       return <PasswordRecoveryPage />;
     }
 
-    return <Navigate to="/login" />;
+    const swapId = pathname === "/swap" ? parseSwapLinkId(search) : null;
+    return <Navigate to={swapId ? `/login?returnTo=${encodeURIComponent(`/swap?swapId=${swapId}`)}` : "/login"} replace />;
   }
 
   if (isPublicAuthRoute) {
+    const targets = new URLSearchParams(search).getAll("returnTo");
+    const target = targets.length === 1 ? targets[0] : "";
+    if (pathname === "/login" && session?.role === "employee" && /^\/swap\?swapId=[0-9]+$/.test(target) && parseSwapLinkId(target.slice(5))) {
+      return <Navigate to={target} replace />;
+    }
     return <Navigate to="/" />;
   }
 

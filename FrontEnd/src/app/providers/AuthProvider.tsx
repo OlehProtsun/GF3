@@ -3,6 +3,7 @@ import { createContext, startTransition, useCallback, useContext, useEffect, use
 import { ApiError, getAuthAccessToken, getErrorMessage, setAuthAccessToken, subscribeUnauthorized } from "@shared/api/httpClient";
 import { authApi } from "@entities/auth";
 import type { AuthLoginResult, AuthSession, LoginInput } from "@entities/auth";
+import { disableForDevice, syncPushSubscription } from "@entities/employee-push/lib/pushSubscription";
 
 type AuthStatus = "loading" | "authenticated" | "unauthenticated";
 
@@ -59,6 +60,16 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
   const generation = useRef(0);
   const modeExchangePending = useRef(false);
+  const pushSyncController = useRef<AbortController | null>(null);
+  const pushEmployeeId = status === "authenticated" && session?.role === "employee" ? session.employeeId : null;
+  useEffect(() => {
+    if (!pushEmployeeId) return;
+    const controller = new AbortController();
+    const pushGeneration = generation.current;
+    pushSyncController.current = controller;
+    void syncPushSubscription(pushEmployeeId, controller.signal, () => generation.current === pushGeneration).catch(() => { /* Profile provides explicit retry. */ });
+    return () => controller.abort();
+  }, [pushEmployeeId]);
 
   const applyUnauthenticatedState = useCallback((nextBootstrapError: string | null = null) => {
     startTransition(() => {
@@ -149,7 +160,12 @@ export function AuthProvider({ children }: PropsWithChildren) {
   };
 
   const logout = async () => {
-    generation.current++;
+    const logoutGeneration = ++generation.current;
+    pushSyncController.current?.abort();
+    if (session?.role === "employee") {
+      try { await disableForDevice(() => generation.current === logoutGeneration); } catch { /* Local logout must finish when push is unavailable. */ }
+    }
+    if (logoutGeneration !== generation.current) return;
     storeAccessToken(null);
     applyUnauthenticatedState(null);
     try {

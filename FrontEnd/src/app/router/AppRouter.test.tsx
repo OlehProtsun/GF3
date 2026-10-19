@@ -49,6 +49,40 @@ function mount(path: string) {
 }
 
 describe("AppRouter system access", () => {
+  it("preserves a swap link through login", async () => {
+    auth.status = "unauthenticated";
+    auth.session = null;
+    const page = mount("/swap?swapId=42");
+    expect(await screen.findByText("LoginPage")).toBeInTheDocument();
+    expect(window.location.search).toBe("?returnTo=%2Fswap%3FswapId%3D42");
+    auth.status = "authenticated";
+    auth.session = employee;
+    page.rerender(<AppRouter />);
+    expect(await screen.findByText("EmployeeSwapPage")).toBeInTheDocument();
+    expect(window.location.search).toBe("?swapId=42");
+  });
+
+  it("opens an authenticated employee swap link directly", async () => {
+    auth.session = employee;
+    mount("/swap?swapId=42");
+    expect(await screen.findByText("EmployeeSwapPage")).toBeInTheDocument();
+    expect(window.location.search).toBe("?swapId=42");
+  });
+
+  it.each(["https://evil.example", "//evil.example", "/swap?swapId=1&returnTo=//evil.example", "/swap?swapId=-1"])("rejects return target %s", async target => {
+    auth.session = employee;
+    mount(`/login?returnTo=${encodeURIComponent(target)}`);
+    expect(await screen.findByText("EmployeeNotificationsPage")).toBeInTheDocument();
+    expect(window.location.pathname).toBe("/");
+  });
+
+  it("ignores employee return targets for managers", async () => {
+    auth.session = manager();
+    mount("/login?returnTo=%2Fswap%3FswapId%3D42");
+    expect(await screen.findByText("HomePage")).toBeInTheDocument();
+    expect(window.location.pathname).toBe("/");
+  });
+
   beforeEach(() => {
     auth.status = "authenticated";
     auth.session = manager(false);

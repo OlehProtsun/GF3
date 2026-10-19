@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { ShiftSwap } from "@entities/shift-swaps";
 import type { EmployeeSchedule } from "@entities/employee-schedule";
 import type { EmployeeAvailabilityGroup } from "@entities/employee-availability";
+import { getEmployeeAvailabilityNotificationId, getEmployeeOpenShiftNotificationId, getEmployeeScheduleNotificationId, getEmployeeSwapAcceptedNotificationId, getEmployeeSwapNotificationId } from "@shared/lib/employeeNotificationReadState";
 import {
   buildEmployeeNotificationItems,
   employeeNotificationRetentionMs,
@@ -71,6 +72,23 @@ function createNotification(overrides: Partial<EmployeeRealtimeNotificationLike>
 }
 
 describe("employee notification model", () => {
+  it("preserves canonical System.Text.Json timestamps and all backend push IDs byte for byte", () => {
+    expect([
+      getEmployeeAvailabilityNotificationId(1, "2026-10-19T11:58:00+00:00"), getEmployeeOpenShiftNotificationId(2),
+      getEmployeeScheduleNotificationId(1, "2026-10-19T11:00:00+00:00"), getEmployeeSwapAcceptedNotificationId(3), getEmployeeSwapNotificationId(1),
+    ]).toEqual(["availability-public:1:2026-10-19T11:58:00+00:00", "open-shift:2", "schedule-public:1:2026-10-19T11:00:00+00:00", "swap-accepted:3", "swap-public:1"]);
+  });
+
+  it("uses canonical deep links for open, manual and accepted own swaps", () => {
+    const items = buildEmployeeNotificationItems([], [
+      createSwap({ id: 1 }), createSwap({ id: 2, isManagerCreated: false, manualColumnId: null }),
+      createSwap({ id: 3, status: "accepted", isCreatedByCurrentEmployee: true, acceptedAtUtc: "2026-05-10T10:00:00+00:00" }),
+    ], [], [], TEST_NOW_MS);
+    expect(items.map(item => [item.id, item.actionPath]).sort()).toEqual([
+      ["open-shift:1", "/swap?swapId=1"], ["swap-accepted:3", "/swap?swapId=3"], ["swap-public:2", "/swap?swapId=2"],
+    ]);
+  });
+
   it("keeps only manager-created open shifts and ignores schedule-change noise", () => {
     const items = buildEmployeeNotificationItems(
       [
@@ -96,7 +114,7 @@ describe("employee notification model", () => {
     expect(items[0]).toMatchObject({
       id: "open-shift:1",
       title: "Open shift posted",
-      actionPath: "/swap",
+      actionPath: "/swap?swapId=1",
     });
     expect(items[0]?.body).toContain("Morning schedule");
   });
