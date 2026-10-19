@@ -1,6 +1,7 @@
 import { employeePushApi, type BrowserPushSubscription } from "../api/employeePushApi";
 
 const accountKey = "gf3.push.employeeId";
+export const employeePushStateChanged = "gf3:employee-push-state-changed";
 let workerPromise: Promise<ServiceWorkerRegistration> | undefined;
 
 export function pushSupport(): "supported" | "install-ios" | "unsupported" {
@@ -16,9 +17,11 @@ export function pushAccount(): number | null {
 }
 export function rememberPushAccount(employeeId: number) {
   try { localStorage.setItem(accountKey, String(employeeId)); } catch { /* Storage is optional. */ }
+  window.dispatchEvent(new Event(employeePushStateChanged));
 }
 function forgetPushAccount() {
   try { localStorage.removeItem(accountKey); } catch { /* Storage is optional. */ }
+  window.dispatchEvent(new Event(employeePushStateChanged));
 }
 
 export function registerWorker() {

@@ -5,6 +5,7 @@ import { EmployeePushSettings } from "./EmployeePushSettings";
 const mocks = vi.hoisted(() => ({ getConfig: vi.fn(), upsertSubscription: vi.fn(), support: vi.fn(), getSubscription: vi.fn(), account: vi.fn(), ensure: vi.fn(), remember: vi.fn(), disable: vi.fn() }));
 vi.mock("../api/employeePushApi", () => ({ employeePushApi: { getConfig: mocks.getConfig, upsertSubscription: mocks.upsertSubscription } }));
 vi.mock("../lib/pushSubscription", () => ({ pushSupport: mocks.support, getBrowserSubscription: mocks.getSubscription, pushAccount: mocks.account,
+  employeePushStateChanged: "gf3:employee-push-state-changed",
   registerWorker: () => Promise.resolve({}), ensureSubscription: mocks.ensure, rememberPushAccount: mocks.remember,
   serializeSubscription: (value: unknown) => value, disableForDevice: mocks.disable }));
 beforeEach(() => {
@@ -51,5 +52,19 @@ describe("push Profile settings", () => {
   test("shows server-disabled state", async () => {
     mocks.getConfig.mockResolvedValue({ enabled: false, publicKey: null }); render(<EmployeePushSettings employeeId={7} />);
     expect(await screen.findByText("Push is not configured on the server")).toBeVisible();
+  });
+  test("still allows current-device cleanup when server push is disabled", async () => {
+    mocks.getConfig.mockResolvedValue({ enabled: false, publicKey: null }); mocks.getSubscription.mockResolvedValue({}); mocks.account.mockReturnValue(7);
+    render(<EmployeePushSettings employeeId={7} />);
+    fireEvent.click(await screen.findByRole("button", { name: "Disable notifications" }));
+    await waitFor(() => expect(mocks.disable).toHaveBeenCalledOnce());
+  });
+  test("refreshes Profile after push is enabled in the welcome dialog", async () => {
+    render(<EmployeePushSettings employeeId={7} />);
+    await screen.findByRole("button", { name: "Enable notifications" });
+    mocks.getSubscription.mockResolvedValue({}); mocks.account.mockReturnValue(7);
+    fireEvent(window, new Event("gf3:employee-push-state-changed"));
+    expect(await screen.findByRole("button", { name: "Disable notifications" })).toBeEnabled();
+    expect(screen.getByText("Enabled on this device")).toBeVisible();
   });
 });

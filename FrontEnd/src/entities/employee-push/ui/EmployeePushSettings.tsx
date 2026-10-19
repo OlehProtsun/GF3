@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { t } from "@shared/i18n";
 import { employeePushApi, type PushConfig } from "../api/employeePushApi";
-import { disableForDevice, ensureSubscription, getBrowserSubscription, pushAccount, pushSupport, registerWorker, rememberPushAccount, serializeSubscription } from "../lib/pushSubscription";
+import { disableForDevice, employeePushStateChanged, getBrowserSubscription, pushAccount, pushSupport, registerWorker } from "../lib/pushSubscription";
+import { enableEmployeePush } from "../lib/enablePush";
 import styles from "./EmployeePushSettings.module.css";
 
 export function EmployeePushSettings({ employeeId }: { employeeId: number }) {
@@ -14,18 +15,24 @@ export function EmployeePushSettings({ employeeId }: { employeeId: number }) {
   const [permission, setPermission] = useState<NotificationPermission>(typeof Notification === "undefined" ? "default" : Notification.permission);
   const support = pushSupport();
   useEffect(() => {
+    const refresh = () => setRevision(value => value + 1);
+    window.addEventListener(employeePushStateChanged, refresh);
+    return () => window.removeEventListener(employeePushStateChanged, refresh);
+  }, []);
+  useEffect(() => {
     const controller = new AbortController();
     operations.current = controller;
-    setEnabled(false); setBusy(true); setError(false);
+    setEnabled(false); setConfig(null); setBusy(true); setError(false);
+    setPermission(typeof Notification === "undefined" ? "default" : Notification.permission);
     void (async () => {
       try {
         const settings = await employeePushApi.getConfig(controller.signal);
         if (controller.signal.aborted) return;
         setConfig(settings);
-        if (support === "supported" && settings.enabled) {
-          await registerWorker();
+        if (support === "supported") {
+          if (settings.enabled) await registerWorker();
           const subscription = await getBrowserSubscription();
-          if (!controller.signal.aborted) setEnabled(Boolean(subscription && pushAccount() === employeeId && Notification.permission === "granted"));
+          if (!controller.signal.aborted) setEnabled(Boolean(subscription && pushAccount() === employeeId));
         }
       } catch { if (!controller.signal.aborted) setError(true); }
       finally { if (!controller.signal.aborted) setBusy(false); }
@@ -35,23 +42,17 @@ export function EmployeePushSettings({ employeeId }: { employeeId: number }) {
 
   const enable = () => {
     const signal = operations.current.signal;
-    // Start the permission request directly in the click's user gesture.
-    const permissionRequest = Notification.permission === "granted" ? Promise.resolve("granted" as const) : Notification.requestPermission();
+    if (!config?.publicKey || busy) return;
+    const permissionRequest = enableEmployeePush(employeeId, config.publicKey, signal);
     setBusy(true); setError(false);
     void (async () => {
       try {
         const result = await permissionRequest;
         if (signal.aborted) return;
         setPermission(result);
-        if (result !== "granted" || !config?.publicKey) return;
-        const subscription = await ensureSubscription(config.publicKey);
-        if (signal.aborted) return;
-        await employeePushApi.upsertSubscription(serializeSubscription(subscription), signal);
-        if (signal.aborted) return;
-        rememberPushAccount(employeeId);
-        setEnabled(true);
-      } catch { setError(true); setEnabled(false); }
-      finally { setBusy(false); }
+        setEnabled(result === "granted");
+      } catch { if (!signal.aborted) { setError(true); setEnabled(false); } }
+      finally { if (!signal.aborted) setBusy(false); }
     })();
   };
   const disable = async () => {
@@ -69,6 +70,6 @@ export function EmployeePushSettings({ employeeId }: { employeeId: number }) {
     <div><strong>{t("Push notifications")}</strong><p>{message}</p><small>{t("iPhone and iPad require iOS 16.4 or later, Add to Home Screen, HTTPS and system permission. Delivery may be delayed by the system.")}</small></div>
     {error && <p role="alert">{t("Could not update notifications. Please try again.")}</p>}
     {error && !config && <button type="button" disabled={busy} onClick={() => setRevision(value => value + 1)}>{t("Retry")}</button>}
-    {support === "supported" && config?.enabled && permission !== "denied" && <button type="button" disabled={busy} onClick={enabled ? () => void disable() : enable}>{t(enabled ? "Disable notifications" : "Enable notifications")}</button>}
+    {(enabled || support === "supported" && config?.enabled && permission !== "denied") && <button type="button" disabled={busy} onClick={enabled ? () => void disable() : enable}>{t(enabled ? "Disable notifications" : "Enable notifications")}</button>}
   </section>;
 }

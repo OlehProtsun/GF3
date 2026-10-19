@@ -36,7 +36,7 @@ import { ConfirmDialog } from "@shared/ui/ConfirmDialog";
 import { CheckIcon, CloseIcon, EmployeeIcon, PinIcon, PlusIcon, ScheduleIcon, SearchIcon, SwapHistoryIcon, SwapOffersIcon, WarnIcon } from "@shared/ui/icons";
 import workspaceStyles from "@pages/shared/EmployeeWorkspacePage.module.css";
 import styles from "./EmployeeSwapPage.module.css";
-import { ShareIcon } from "@shared/ui/icons";
+import { CopyLinkIcon } from "@shared/ui/icons";
 import { createSwapLink, parseSwapLinkId } from "../model/swapLink";
 import { useLocation } from "react-router-dom";
 
@@ -94,6 +94,7 @@ function PinToggleButton({
       className={[
         styles.collapseButton,
         styles.pinButton,
+        styles.cardActionButton,
         isPinned ? styles.pinButtonActive : "",
       ].filter(Boolean).join(" ")}
       aria-label={actionLabel}
@@ -121,19 +122,11 @@ function SwapOfferCard({ swap, isPinned, highlighted, onTogglePin, onViewDetails
   const share = async () => {
     setShareStatus(null);
     const url = createSwapLink(swap.id, window.location.origin);
-    if (navigator.share) {
-      try {
-        await navigator.share({ title: t("{0} swap", swap.scheduleName), url });
-        return;
-      } catch (error) {
-        if (error && typeof error === "object" && "name" in error && error.name === "AbortError") return;
-      }
-    }
     try {
       await navigator.clipboard.writeText(url);
       setShareStatus(t("Link copied"));
     } catch {
-      setShareStatus(t("Could not share this link. Please try again."));
+      setShareStatus(t("Could not copy this link. Please try again."));
     }
   };
   const isManagerManual = swap.isManagerCreated === true && typeof swap.manualColumnId === "number" && swap.manualColumnId > 0;
@@ -146,7 +139,7 @@ function SwapOfferCard({ swap, isPinned, highlighted, onTogglePin, onViewDetails
       onClick={event => onViewDetails(swap.id, event.currentTarget)}>
       <span className={styles.offerAvatar} aria-hidden="true">{getSwapCode(swap)}</span>
       <span className={styles.offerSummary}>
-        <span className={`${styles.offerTitle} ${styles.managerManualTitle}`}><strong>{swap.scheduleName}</strong>{isManagerManual && <span className={styles.managerManualIndicator} role="img" aria-label={t("Manager-posted shift")} />}</span>
+        <span className={`${styles.offerTitle} ${styles.managerManualTitle}`}><strong>{swap.scheduleName}</strong>{isManagerManual && <span className={styles.managerManualIndicator} role="img" aria-label={t("Manager-posted shift")}><span aria-hidden="true">🔥</span></span>}</span>
         <span className={styles.offerMeta}>
           <span className={styles.offerDateLine}><ScheduleIcon size={12} /><span>{`${formatSwapDate(swap)} · ${swap.fromTime} – ${swap.toTime}`}</span></span>
           <small className={styles.offerFromLine}><EmployeeIcon size={12} /><span>{t("From: {0}", swap.isManagerCreated ? swap.manualColumnName || t("Open shift") : swap.fromEmployeeName)}</span></small>
@@ -168,7 +161,7 @@ function SwapOfferCard({ swap, isPinned, highlighted, onTogglePin, onViewDetails
       </span>
     </button>
     <PinToggleButton isPinned={isPinned} label={t("{0} swap", swap.scheduleName)} onToggle={() => onTogglePin(swap.id)} />
-    <button type="button" className={styles.shareButton} aria-label={t("Share {0} swap", swap.scheduleName)} onClick={() => void share()}><ShareIcon size={16} /></button>
+    <button type="button" className={`${styles.collapseButton} ${styles.cardActionButton} ${styles.copyLinkButton}`} aria-label={t("Copy swap link for {0}", swap.scheduleName)} onClick={() => void share()}><CopyLinkIcon size={15} /></button>
     {shareStatus && <span className={styles.shareStatus} role="status">{shareStatus}</span>}
   </article>;
 }

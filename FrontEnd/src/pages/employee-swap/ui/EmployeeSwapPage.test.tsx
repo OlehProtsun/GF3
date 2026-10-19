@@ -274,32 +274,23 @@ describe("EmployeeSwapPage", () => {
     expect(screen.getByText("API unavailable")).toBeVisible();
   });
 
-  test.each(["native", "unsupported", "cancel", "clipboard-error"])("shares independently using %s", async mode => {
+  test.each([false, true])("copies the canonical link independently; clipboard failure: %s", async fails => {
     const user = userEvent.setup();
     const clipboard = vi.spyOn(navigator.clipboard, "writeText");
     clipboard.mockClear();
-    clipboard.mockResolvedValue(undefined);
-    if (mode === "clipboard-error") clipboard.mockRejectedValue(new Error("Unavailable"));
-    const share = vi.fn().mockResolvedValue(undefined);
-    if (mode === "cancel") share.mockRejectedValue(new DOMException("Cancelled", "AbortError"));
-    if (mode === "unsupported") share.mockRejectedValue(new TypeError("Unsupported"));
-    Object.defineProperty(navigator, "share", { configurable: true, value: mode === "clipboard-error" ? undefined : share });
+    if (fails) clipboard.mockRejectedValue(new Error("Unavailable"));
+    else clipboard.mockResolvedValue(undefined);
+    const share = vi.fn();
+    Object.defineProperty(navigator, "share", { configurable: true, value: share });
     mocks.swapsQuery.mockReturnValue({ data: [createSwap()], error: null });
     renderPage();
-    await user.click(screen.getByRole("button", { name: "Share May Schedule swap" }));
+    await user.click(screen.getByRole("button", { name: "Copy swap link for May Schedule" }));
+    expect(clipboard).toHaveBeenCalledExactlyOnceWith(`${window.location.origin}/swap?swapId=5`);
+    expect(share).not.toHaveBeenCalled();
     expect(screen.queryByRole("dialog", { name: "Offer details" })).not.toBeInTheDocument();
     expect(mocks.setPinMutate).not.toHaveBeenCalled();
-    if (mode === "unsupported") {
-      expect(clipboard).toHaveBeenCalledWith(`${window.location.origin}/swap?swapId=5`);
-      expect(screen.getByRole("status")).toHaveTextContent("Link copied");
-    } else if (mode === "clipboard-error") {
-      expect(screen.getByRole("status")).toHaveTextContent("Could not share this link");
-    } else {
-      expect(clipboard).not.toHaveBeenCalled();
-      expect(share).toHaveBeenCalledWith({ title: "May Schedule swap", url: `${window.location.origin}/swap?swapId=5` });
-    }
+    expect(screen.getByRole("status")).toHaveTextContent(fails ? "Could not copy this link" : "Link copied");
   });
-
   test.each(["open", "accepted"] as const)("marks only manager manual offers in %s cards", async status => {
     const user = userEvent.setup();
     mocks.initialPinnedSwapIds = [4];
@@ -314,6 +305,7 @@ describe("EmployeeSwapPage", () => {
     if (status !== "open") await user.click(screen.getByRole("button", { name: "Swap history" }));
     expect(screen.getAllByRole("img", { name: "Manager-posted shift" })).toHaveLength(1);
     const indicator = screen.getByRole("img", { name: "Manager-posted shift" });
+    expect(indicator).toHaveTextContent("🔥");
     const card = indicator.closest("article")!;
     await user.click(within(card).getByRole("button", { name: "Pin May Schedule swap" }));
     expect(mocks.setPinMutate).toHaveBeenCalledWith({ swapId: 1, pinned: true });
