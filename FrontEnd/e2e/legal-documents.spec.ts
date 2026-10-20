@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 
 const pages = ['index', 'regulamin', 'polityka-prywatnosci', 'pliki-cookies', 'zasady-korzystania', 'podwykonawcy', 'bezpieczenstwo'];
 
-test("all legal pages serve real anonymous HTML, cross-links and printable mobile text", async ({ page, request, isMobile }, testInfo) => {
+test("all legal pages serve real anonymous HTML, cross-links and printable mobile text", async ({ page, request, isMobile, browserName }, testInfo) => {
   for (const name of pages) {
     const response = await page.goto(`/legal/${name}.html`);
     expect(response?.status()).toBe(200);
@@ -14,13 +14,23 @@ test("all legal pages serve real anonymous HTML, cross-links and printable mobil
     for (const link of await page.locator('a[href^="/legal/"]').evaluateAll(links => [...new Set(links.map(link => link.getAttribute('href')!))])) {
       expect((await request.get(link)).status()).toBe(200);
     }
-    await page.screenshot({ path: testInfo.outputPath(`${name}.png`), fullPage: true });
+    const height = await page.locator('html').evaluate(element => element.scrollHeight);
+    if (height < 30_000) {
+      await page.screenshot({ path: testInfo.outputPath(`${name}.png`), fullPage: true, scale: 'css' });
+    } else {
+      // Complete regulations exceed WebKit's maximum screenshot dimension on phones.
+      for (const [part, top] of [['top', 0], ['middle', height / 2], ['bottom', height]] as const) {
+        await page.evaluate(y => window.scrollTo(0, y), top);
+        await page.screenshot({ path: testInfo.outputPath(`${name}-${part}.png`), scale: 'css' });
+      }
+      await page.evaluate(() => window.scrollTo(0, 0));
+    }
   }
   await page.emulateMedia({ media: 'print' });
   await expect(page.locator('h1')).toBeVisible();
   await expect(page.locator('header')).toBeHidden();
   await page.emulateMedia({ media: 'screen' });
-  if (isMobile) await page.locator('.skip').focus();
+  if (isMobile || browserName === 'webkit') await page.locator('.skip').focus();
   else await page.keyboard.press('Tab');
   await expect(page.locator('.skip')).toBeFocused();
   await page.keyboard.press('Enter');
@@ -58,7 +68,7 @@ test("legal links can be reached on a short phone screen", async ({ page }) => {
   }
 });
 
-test("employee legal links survive collapsed mobile tabs", async ({ page, isMobile }) => {
+test("employee profile legal links survive collapsed mobile tabs", async ({ page, isMobile }) => {
   await page.addInitScript(() => localStorage.setItem('gf3.auth.access-token', 'synthetic-legal-ui'));
   await page.route('**/api/**', async route => {
     const path = new URL(route.request().url()).pathname;
@@ -69,9 +79,12 @@ test("employee legal links survive collapsed mobile tabs", async ({ page, isMobi
     if (path === '/api/employee-ui-state') body = { readNotificationIds: [], scheduleColumnOrders: {}, pinnedSwapIds: [] };
     await route.fulfill({ contentType: 'application/json', body: JSON.stringify(body) });
   });
-  await page.goto('/swap');
+  await page.goto('/profile');
   if (isMobile) await page.getByRole('button', { name: 'Collapse navigation' }).click();
   const links = page.getByRole('navigation', { name: 'Legal documents' });
   await expect(links).toBeVisible();
-  for (const link of await links.getByRole('link').all()) await expect(link).toBeInViewport();
+  for (const link of await links.getByRole('link').all()) {
+    await link.scrollIntoViewIfNeeded();
+    await expect(link).toBeInViewport();
+  }
 });

@@ -15,3 +15,5 @@ th, td { border: 1px solid #9aa8b8; padding: .5rem; text-align: left; vertical-a
 .skip { position: absolute; left: -10000px; }
 .skip:focus { position: static; }
 @media print { body, main { color: black; background: white; } header, footer nav, .skip { display: none; } main { max-width: none; padding: 0; } h2 { break-after: avoid; } table { font-size: 8pt; } a { color: black; } .table-scroll { overflow: visible; } }
+
+main table{display:block;max-width:100%;overflow-x:auto}main th,main td{min-width:9rem;overflow-wrap:anywhere}main p,main li,main code{overflow-wrap:anywhere}@media print{main table{display:table;overflow:visible;font-size:9pt}main th,main td{min-width:0}main thead{display:table-header-group}main tr{break-inside:avoid}h2,h3{break-after:avoid}}

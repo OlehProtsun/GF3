@@ -1,14 +1,16 @@
 # Zamówienie / Umowa B2B
 
+> **STATUS: HISTORYCZNY WZÓR POMOCNICZY — NIE JEST RÓWNOLEGŁYM WZORCEM UMOWNYM.** Od przeglądu 2026-10-19 obowiązującym źródłem projektu jest [dokument kanoniczny](../saas-agreement/umowa-saas-b2b-pl.md). Poniższe historyczne pola i postanowienia zachowano do śledzenia zmian; nie przyjmować ich oddzielnie ani nie nadawać im pierwszeństwa. Zamówienie może być jedynie okładką parametrów jawnie włączającą jeden uzgodniony SaaS/DPA.
+
 WERSJA ROBOCZA — DO WERYFIKACJI PRAWNEJ
 
-Wersja: 0.1.0-draft | Obowiązuje od: [DO UZUPEŁNIENIA]
+Wersja: 0.2.0-draft | Obowiązuje od: [DO UZUPEŁNIENIA]
 Operator: [DO UZUPEŁNIENIA]
 
 ## Strony i umocowanie
 Operator i Klient: nazwa, forma, adres, rejestr, NIP, reprezentant, dowód umocowania i jego weryfikacja: [DO UZUPEŁNIENIA]. Rzeczywiste podpisane dokumenty przechowywać poza repo.
 ## Instancja i zakres
-Organizacja, domena, oddzielna baza/wolumen, sekrety i backup: [DO UZUPEŁNIENIA]. Jedna organizacja na wdrożenie. Funkcje, konta, start i okres umowy: [DO UZUPEŁNIENIA]. GF3 planuje grafiki; pracodawca odpowiada za legalność czasu pracy.
+Organizacja, domena, oddzielna baza/wolumen, sekrety i backup: [DO UZUPEŁNIENIA]. Jedna organizacja na wdrożenie. Funkcje, konta, start i okres umowy: [DO UZUPEŁNIENIA]. GF planuje grafiki; pracodawca odpowiada za legalność czasu pracy.
 ## Warunki handlowe
 Cena lub oferta, waluta, VAT, faktury/KSeF, płatność i terminy: [DO UZUPEŁNIENIA po konsultacji księgowej]. Odnowienie tylko wyraźnie negocjowane. Wsparcie i SLA wyłącznie z podpisanego załącznika; brak domyślnej gwarancji.
 ## Dokumenty i odpowiedzialność

@@ -1,6 +1,6 @@
-# REGULAMIN ŚWIADCZENIA USŁUG DROGĄ ELEKTRONICZNĄ PLATFORMY [DO WYPEŁNIENIA: NAZWA PLATFORMY – ROBOCZO „GF”]
+# REGULAMIN ŚWIADCZENIA USŁUG DROGĄ ELEKTRONICZNĄ PLATFORMY GF
 
-**Wersja:** [DO WYPEŁNIENIA: NUMER WERSJI]  
+**Wersja:** 0.2.0-draft
 **Data obowiązywania:** [DO WYPEŁNIENIA: DATA OBOWIĄZYWANIA]  
 **Data ostatniej aktualizacji:** [DO WYPEŁNIENIA: DATA OSTATNIEJ AKTUALIZACJI]
 
@@ -27,7 +27,7 @@
    6. NIP, jeżeli nadany i wymagany: **[DO WYPEŁNIENIA: NIP – JEŻELI NADANY I WYMAGANY]**;
    7. adres e-mail do reklamacji: **[DO WYPEŁNIENIA: ADRES E-MAIL DO REKLAMACJI]**;
    8. adres e-mail wsparcia technicznego: **[DO WYPEŁNIENIA: ADRES E-MAIL WSPARCIA TECHNICZNEGO]**.
-2. Projekt zakłada, że Usługodawca zamierza wykonywać Usługi w ramach działalności nierejestrowanej w rozumieniu art. 5 ustawy – Prawo przedsiębiorców, o ile spełnia aktualne warunki ustawowe.
+2. Forma prawna Usługodawcy wymaga potwierdzenia przez właściciela. Działalność nierejestrowana jest wyłącznie rozważanym wariantem, zależnym od wszystkich przesłanek art. 5 Prawa przedsiębiorców, nie ustalonym statusem.
 3. **[DO WERYFIKACJI PRAWNEJ: SPOSÓB OZNACZENIA USŁUGODAWCY ORAZ DOPUSZCZALNOŚĆ WSKAZANIA DZIAŁALNOŚCI NIEREJESTROWANEJ]**
 
 ## § 3. Definicje
@@ -70,9 +70,9 @@
 2. Platforma rozróżnia dwie techniczne role: **menedżera** i **pracownika**. Administrator Klienta jest funkcją organizacyjną, wykonywaną przez osobę posiadającą właściwe uprawnienia menedżera.
 3. Menedżer może w szczególności zarządzać strukturą organizacyjną, Kontami, pracownikami, dostępnością, grafikami, publikacją, zamianami, komunikatami, wybranymi logami i eksportami – wyłącznie w granicach przyznanych uprawnień.
 4. Pracownik może w szczególności przeglądać opublikowany grafik i powiadomienia, przekazywać dostępność, korzystać z dopuszczonych zamian, odczytywać komunikaty oraz zarządzać własnymi danymi kontaktowymi i Hasłem.
-5. Platforma nie zapewnia samodzielnej rejestracji, przesyłania plików, ogólnego czatu pracowniczego, samodzielnego usunięcia Konta przez pracownika, naliczania płac ani pełnej automatycznej kontroli zgodności grafiku z prawem pracy.
+5. Platforma nie zapewnia samodzielnej rejestracji, ogólnego repozytorium plików i czatu pracowniczego, samodzielnego pełnego usunięcia Konta i wszystkich danych przez pracownika, naliczania płac ani pełnej automatycznej kontroli zgodności grafiku z prawem pracy. Przesyłanie PDF regulaminu i obrazów aktualności przez uprawnioną osobę jest odrębną dostępną funkcją.
 6. Szczegółowy, odpłatny zakres funkcjonalny określają Umowa o świadczenie usług SaaS i jej Załącznik nr 1. Wnioski Rozwojowe wymagają odrębnego uzgodnienia i nie stanowią Awarii.
-7. **[DO WERYFIKACJI TECHNICZNEJ: CZY KAŻDY MENEDŻER MA MIEĆ UPRAWNIENIA ADMINISTRATORA KLIENTA DO TWORZENIA I USUWANIA KONT MENEDŻERÓW]**
+7. Uprawnienia do zarządzania kontami menedżerów wynikają z kontroli dostępu Platformy. Klient przed uruchomieniem przypisuje funkcję Administratora Klienta i zatwierdza macierz upoważnień; nie należy utożsamiać funkcji organizacyjnej z nową rolą techniczną.
 
 ## § 5. Warunki rozpoczęcia korzystania z Platformy
 
@@ -81,8 +81,8 @@
 3. W aktualnej wersji nie potwierdzono zaproszeń, obowiązkowej weryfikacji e-mail lub telefonu ani wymuszonej zmiany Hasła przy pierwszym logowaniu.
 4. Użytkownik podaje i utrzymuje prawidłowe dane oraz nie tworzy ani nie używa Konta innej osoby bez upoważnienia.
 5. Przed rozpoczęciem korzystania Użytkownikowi należy bezpłatnie udostępnić Regulamin w pełnej treści, przez bezpośredni link pozwalający go pobrać, zapisać i wydrukować.
-6. Do czasu wdrożenia mechanizmu akceptacji Klient powinien udokumentować przekazanie Regulaminu Użytkownikom w uzgodniony sposób. Docelowy mechanizm powinien używać nieoznaczonego z góry pola akceptacji, zapisywać identyfikator Użytkownika i Klienta, wersję Regulaminu oraz datę i czas akceptacji.
-7. Aktualna wersja Platformy nie zapisuje akceptacji Regulaminu ani jego wersji. Wdrożenie tego mechanizmu opisuje checklista i nie jest objęte niniejszym zadaniem.
+6. Platforma zapisuje osobiste potwierdzenie opublikowanej wersji PDF przez konto menedżera lub pracownika, wraz z rolą, identyfikatorem konta, migawką loginu i nazwy oraz czasem UTC. Dokument ma numer wersji, skrót SHA-256 i czas publikacji. Opublikowanej treści nie zmienia się; zachowuje się historię potwierdzeń i dostęp do własnego zapisu, a menedżer ma dostęp do historii pracownika w granicach uprawnień. Przed potwierdzeniem użytkownik ma dostęp do PDF i pola, które nie jest zaznaczone z góry. Oczekujące wymagane dokumenty ograniczają zwykłe funkcje do czasu ich potwierdzenia, z zachowaniem dostępu do czynności potrzebnych do logowania, pobrania, potwierdzenia i własnej historii. Zapis nie dowodzi przeczytania każdej strony, nie jest kwalifikowanym podpisem elektronicznym, nie zawiera Umowy SaaS lub DPA w imieniu Klienta i nie stanowi ogólnej zgody RODO. Produkcyjnej publikacji podlega wyłącznie prawnie zweryfikowany PDF.
+7. Informacja pracodawcy o przetwarzaniu danych oraz zawarcie Umowy SaaS i DPA mają odrębne podstawy i dowody; nie zastępuje ich zapis potwierdzenia PDF.
 8. **[DO WERYFIKACJI PRAWNEJ: MOMENT ZAWARCIA UMOWY O ŚWIADCZENIE USŁUG ELEKTRONICZNYCH Z UŻYTKOWNIKIEM I SPOSÓB DOKUMENTOWANIA AKCEPTACJI]**
 
 ## § 6. Wymagania techniczne
@@ -108,7 +108,7 @@
 4. **[DO WERYFIKACJI TECHNICZNEJ: ADEKWATNOŚĆ SZEŚCIOCYFROWEGO HASŁA DO RYZYKA I POTRZEBA DODATKOWYCH ZABEZPIECZEŃ]**
 5. **[DO WERYFIKACJI PRAWNEJ: CZY WYMAGANIA UWIERZYTELNIANIA SĄ ADEKWATNE DO KATEGORII PRZETWARZANYCH DANYCH]**
 6. Użytkownik niezwłocznie zgłasza podejrzenie przejęcia Konta. Usługodawca lub uprawniony menedżer może unieważnić aktywne sesje i wymagać zmiany Hasła.
-7. Klient niezwłocznie usuwa lub ogranicza dostęp osoby, której upoważnienie wygasło. Aktualna Platforma pozwala menedżerowi usunąć pracownika, gdy nie blokują tego zależności danych, oraz unieważnić jego aktywne sesje; odrębnego stanu „Konto wyłączone” nie potwierdzono.
+7. Klient niezwłocznie usuwa lub ogranicza dostęp osoby, której upoważnienie wygasło. Aktualna Platforma archiwizuje profil pracownika przez IsDeleted i usuwa konto, zachowując dane historyczne. Nie jest to pełne wymazanie danych; zakres dodatkowego usunięcia ustala Administrator.
 8. Odpowiedzialność za zdarzenie na Koncie zależy od przyczyny. Użytkownik lub Klient odpowiada w zakresie swojego zawinionego zaniedbania, a nie za zdarzenia wynikające wyłącznie z wady Platformy lub okoliczności przypisanych Usługodawcy.
 
 ## § 8. Zasady korzystania z Platformy
@@ -268,7 +268,7 @@
 
 ## § 22. Ochrona danych osobowych
 
-1. Informacje o przetwarzaniu przez Usługodawcę danych kontaktowych i danych Kont, dla których sam określa cele i sposoby przetwarzania, zawiera Polityka prywatności: **[DO WYPEŁNIENIA: LINK DO POLITYKI PRYWATNOŚCI]**.
+1. Informacje o przetwarzaniu przez Usługodawcę danych kontaktowych i danych Kont, dla których sam określa cele i sposoby przetwarzania, zawiera Polityka prywatności: /legal/polityka-prywatnosci.html.
 2. W odniesieniu do danych pracowników i danych organizacyjnych Klient jest co do zasady administratorem, a Usługodawca może działać jako podmiot przetwarzający na podstawie odrębnej Umowy powierzenia przetwarzania danych osobowych.
 3. Użytkownik kieruje żądanie wykonania praw dotyczących danych przede wszystkim do Klienta, gdy Klient jest administratorem. Usługodawca nie rozstrzyga samodzielnie o usunięciu danych, które przetwarza na udokumentowane polecenie Klienta.
 4. Incydenty dotyczące danych osobowych należy zgłaszać niezwłocznie na **[DO WYPEŁNIENIA: ADRES E-MAIL DO SPRAW DANYCH OSOBOWYCH]**.
@@ -287,8 +287,24 @@
 ## § 24. Postanowienia końcowe
 
 1. Do Regulaminu stosuje się prawo polskie. W sprawach nieuregulowanych stosuje się obowiązujące przepisy oraz Umowę o świadczenie usług SaaS.
-2. Regulamin jest udostępniany nieodpłatnie pod adresem **[DO WYPEŁNIENIA: LINK DO REGULAMINU]** w sposób umożliwiający jego pobranie, zapisanie, odtworzenie i wydrukowanie przed rozpoczęciem korzystania z Usług.
+2. Regulamin jest udostępniany nieodpłatnie pod adresem /legal/regulamin.html w sposób umożliwiający jego pobranie, zapisanie, odtworzenie i wydrukowanie przed rozpoczęciem korzystania z Usług.
 3. Nieważność albo bezskuteczność pojedynczego postanowienia nie narusza pozostałych postanowień, o ile obowiązujące prawo nie wymaga inaczej.
 4. Wiążąca jest wersja polska, chyba że Usługodawca i Klient wyraźnie uzgodnią inną wersję językową.
-5. Regulamin obowiązuje od **[DO WYPEŁNIENIA: DATA OBOWIĄZYWANIA]** jako wersja **[DO WYPEŁNIENIA: NUMER WERSJI]**.
+5. Regulamin obowiązuje od **[DO WYPEŁNIENIA: DATA OBOWIĄZYWANIA]** jako wersja **0.2.0-draft**.
 6. Oficjalne kanały kontaktu wskazano w § 2.
+
+## § 25. Powiadomienia urządzenia, pamięć i historia
+
+Web Push jest opcjonalnym kanałem uruchamianym przez pracownika dla konkretnego urządzenia/profilu przeglądarki. Wymaga obsługi technologii i uprawnienia systemowego; na niektórych urządzeniach także instalacji PWA. Odmowa nie odbiera dostępu do grafiku w GF. Wyłączenie jest dostępne dla urządzenia w GF oraz przez zmianę uprawnień przeglądarki. Nie jest gwarantowany termin dostarczenia lub odczyt; pracodawca określa skuteczny kanał organizacyjny.
+
+Powiadomienie może zawierać nazwę i okres grafiku lub dostępności, termin, datę i godziny zmiany, informację o zamianie lub wolnej zmianie. Użytkownik chroni ekran blokady i profil na urządzeniu wspólnym. Permission przeglądarki jest odrębne od podstawy RODO oraz od zgody na opcjonalną pamięć lub media. Szczegóły retencji i odbiorców wskazują polityki prywatności i pamięci pod /legal/.
+
+Korekty, zamiany i zmiany grafików mogą pozostawiać historie i migawki. Usunięcie profilu z bieżącej listy nie usuwa tych danych ani dowodów potwierdzenia regulaminu i kopii. Żądanie usunięcia podlega ocenie Administratora i przepisom RODO.
+
+## § 26. Status warunków i ochrona bezwzględnie obowiązująca
+
+Wszystkie warunki tego projektu, w tym cel pierwszej odpowiedzi 2 Dni Robocze i rozpatrzenia reklamacji 14 dni, są proponowane do zatwierdzenia przez Operatora i prawnika; nie stanowią dowodu działającej obsady. Po zawarciu wiążącej umowy obowiązują uzgodnione kanały, godziny i właściwe przepisy. Zgłoszenie brakujących informacji nie zawiesza terminu ustawowego, gdy ustawa nie przewiduje takiego skutku. Incydenty i prawa osób obsługuje się według właściwych terminów ustawowych, niezależnie od celu wsparcia.
+
+Jeżeli Klient jest osobą fizyczną prowadzącą działalność, a umowa nie ma dla niego charakteru zawodowego, należy zastosować przysługujące mu bezwzględnie obowiązujące uprawnienia. Nazwa B2B, numer NIP lub postanowienie o sądzie nie wyłączają tych praw. Przed przyjęciem warunków wymaga to indywidualnej oceny prawnej.
+
+W sprawach ochrony danych pierwszeństwo ma uzgodnione DPA; w handlowych indywidualnie uzgodniona Umowa SaaS i jej zakres. Publiczne zasady są uzupełniające i nie zmieniają samodzielnie ceny, odpowiedzialności lub DPA. Istotną zmianę regulaminu proponuje się doręczać co najmniej 14 dni przed wejściem w życie, chyba że krótszy termin jest konieczny z mocy prawa lub bezpieczeństwa; taki tryb nie daje prawa dowolnej zmiany umowy. Ponowny checkbox PDF jest osobistym potwierdzeniem użytkownika, a nie aneksem firmy.

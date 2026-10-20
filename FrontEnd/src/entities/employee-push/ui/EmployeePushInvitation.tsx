@@ -5,7 +5,7 @@ import { t } from "@shared/i18n";
 import { useLanguageRevision } from "@shared/i18n/useLanguageRevision";
 import { employeePushApi } from "../api/employeePushApi";
 import { enableEmployeePush } from "../lib/enablePush";
-import { employeePushStateChanged, getBrowserSubscription, pushAccount, pushSupport, registerWorker } from "../lib/pushSubscription";
+import { employeePushStateChanged, pushSupport } from "../lib/pushSubscription";
 import styles from "./EmployeePushInvitation.module.css";
 
 const cooldownMs = 7 * 24 * 60 * 60 * 1000;
@@ -43,15 +43,11 @@ function EmployeeInvitation({ employeeId }: { employeeId: number }) {
   useEffect(() => {
     const controller = new AbortController();
     operations.current = controller;
-    if (isDismissed(employeeId) || pushSupport() !== "supported" || Notification.permission === "denied") return () => controller.abort();
+    if (isDismissed(employeeId) || pushSupport() !== "supported" || Notification.permission !== "default") return () => controller.abort();
     void (async () => {
       try {
         const config = await employeePushApi.getConfig(controller.signal);
-        if (controller.signal.aborted || !config.enabled || !config.publicKey) return;
-        await registerWorker();
-        const subscription = await getBrowserSubscription();
-        if (controller.signal.aborted || Notification.permission === "denied" ||
-            subscription && pushAccount() === employeeId && Notification.permission === "granted") return;
+        if (controller.signal.aborted || !config.enabled || !config.publicKey || Notification.permission !== "default") return;
         setPublicKey(config.publicKey);
       } catch { /* Optional invitation must never block the employee workspace. */ }
     })();
@@ -72,7 +68,7 @@ function EmployeeInvitation({ employeeId }: { employeeId: number }) {
       const content = document.querySelector("[data-employee-content]");
       const loading = content && [...content.querySelectorAll('[role="status"]')].some(element => element.getAttribute("aria-label") === t("Loading page"));
       if (!content?.childElementCount || loading || document.querySelector('dialog[open], [role="dialog"][aria-modal="true"]') ||
-          Notification.permission === "denied" || operations.current?.signal.aborted || isDismissed(employeeId)) return;
+          Notification.permission !== "default" || operations.current?.signal.aborted || isDismissed(employeeId)) return;
       previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
       previousOverflow = document.documentElement.style.overflow;
       document.documentElement.style.overflow = "hidden";

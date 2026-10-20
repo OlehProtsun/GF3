@@ -44,9 +44,9 @@ Użytkownik będący pracownikiem lub menedżerem Klienta nie nabywa samodzielni
 
 ## Publikacja na Platformie
 
-Stan dokumentacji na 2026-10-08, punkt odniesienia DEV2 `37540cfffb9fd89bd2a22a54c00cf3f451ce58a3`: publiczny zestaw i linki logowania/układów/gate istnieją. Wcześniejsza instrukcja dodania `/regulamin` była ustaleniem sprzed `37540cf`; nie jest brakującą funkcją tego planu.
+Historyczny stan dokumentacji na 2026-10-08, punkt odniesienia DEV2 `37540cfffb9fd89bd2a22a54c00cf3f451ce58a3`: publiczny zestaw i linki logowania/układów/gate istnieją. Wcześniejsza instrukcja dodania `/regulamin` była ustaleniem sprzed `37540cf`; nie jest brakującą funkcją tego planu.
 
-1. Kanoniczny plik to `FrontEnd/public/legal/regulamin.html` — [źródło publiczne](../../../FrontEnd/public/legal/regulamin.html). Adres w rzeczywistej domenie klienta: **`/legal/regulamin.html`**, hub `/legal/index.html`; konkretna domena wymaga potwierdzenia operatora.
+1. Kanoniczną treść pełnego regulaminu zawiera `regulamin-swiadczenia-uslug-elektronicznych-pl.md`; publiczną reprezentacją jest `FrontEnd/public/legal/regulamin.html` — [źródło publiczne](../../../FrontEnd/public/legal/regulamin.html). Adres w rzeczywistej domenie klienta: **`/legal/regulamin.html`**, hub `/legal/index.html`; konkretna domena wymaga potwierdzenia operatora.
 2. Przed umową/użyciem uzupełnić dane i uzyskać przegląd prawny. Sprawdzić dostęp anonimowy z ekranu logowania oraz linki w obu układach i gate; nie zakładać stanu zewnętrznego serwera na podstawie kodu.
 3. Sprawdzić powiązane publiczne zasady, politykę prywatności, cookies, podwykonawców i bezpieczeństwo; robocza informacja o zagrożeniach nadal wymaga uzgodnienia z finalnym zestawem.
 4. Ten katalog zawiera odrębne robocze Markdown i generowany HTML. Generator nie aktualizuje `FrontEnd/public/legal/regulamin.html` ani nie uploaduje PDF. Człowiek porównuje treść, wersję i datę roboczego źródła, publicznych regulaminu/zasad oraz osobnego PDF, zapisuje różnice i zatwierdzenie dokładnych wersji/hash w [rejestrze review](../LEGAL_REVIEW.md).
@@ -89,11 +89,11 @@ Administrator Klienta jest pojęciem organizacyjnym. Aktualna Platforma nie ma o
 - samodzielna rejestracja Użytkownika;
 - zaproszenia i obowiązkowa weryfikacja e-mail lub telefonu przed aktywacją;
 - wymuszona zmiana Hasła przy pierwszym logowaniu;
-- odrębny stan dezaktywacji Konta pracownika niezależny od jego usunięcia;
+- odrębny przełącznik samego Konta; profil jest archiwizowany przez IsDeleted i konto usuwane, z zachowaniem historii;
 - samodzielne usunięcie Konta przez pracownika;
 - ogólny czat, komentarze pracownicze i przesyłanie plików;
-- zgłaszanie ogólnej korekty grafiku inne niż potwierdzone zamiany zmian i dostępność;
-- e-mail, SMS lub powiadomienia push jako ogólny kanał zdarzeń Platformy;
+- dowolne korekty poza wdrożonym obiegiem wniosków korekty zmian, zamian i dostępności; istniejący obieg ShiftCorrectionsController jest objęty aktualizacją zakresu;
+- ogólny kanał wszystkich zdarzeń przez e-mail/SMS; wdrożono SMTP odzyskiwania oraz opcjonalny push wybranych zdarzeń grafiku, dostępności i zamian;
 - oficjalna lista wspieranych wersji przeglądarek;
 - automatyczna pełna kontrola zgodności grafiku z prawem pracy;
 - obsługa konsumentów oraz indywidualna sprzedaż abonamentu pracownikom.

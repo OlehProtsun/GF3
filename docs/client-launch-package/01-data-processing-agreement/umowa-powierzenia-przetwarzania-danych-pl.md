@@ -3,12 +3,12 @@
 | Metadane | Wartość |
 | --- | --- |
 | Produkt | GF |
-| Wersja | [DO WYPEŁNIENIA: NUMER WERSJI] |
+| Wersja | 0.2.0-draft |
 | Status | DRAFT – WYMAGA WERYFIKACJI |
 | Właściciel | [DO WYPEŁNIENIA: WŁAŚCICIEL DOKUMENTU] |
 | Recenzent | [DO WYPEŁNIENIA: RECENZENT] |
 | Data obowiązywania | [DO WYPEŁNIENIA: DATA OBOWIĄZYWANIA] |
-| Data przeglądu | [DO WYPEŁNIENIA: DATA PRZEGLĄDU] |
+| Data przeglądu | 2026-10-19 — przegląd redakcyjny i kodu; bez zatwierdzenia prawnego |
 | Dokumenty powiązane | Umowa SaaS; Załączniki A–E |
 | Klasyfikacja | UMOWNY / POUFNY |
 
@@ -38,7 +38,7 @@ zawarta pomiędzy **[DO WYPEŁNIENIA: PEŁNA NAZWA, ADRES, KRS I NIP KLIENTA]**,
 
 1. Operacje obejmują zapis, organizowanie, odczyt, zmianę, publikowanie uprawnionym Użytkownikom, transmisję, eksport, tworzenie kopii, ograniczanie i usuwanie.
 2. Potwierdzone cele obejmują profile i Konta, uwierzytelnianie, grafiki, dostępność, zamiany zmian, komunikaty i powiadomienia, logi operacyjne, wsparcie, bezpieczeństwo, kopie i eksport.
-3. Ogólne korekty inne niż dostępność i zamiany, pliki oraz czat nie są objęte, jeżeli nie zostaną wdrożone i udokumentowane.
+3. Zakres obejmuje także wdrożone korekty zmian, historie i wersje grafików, publikację oraz potwierdzenia wersji regulaminu PDF i Web Push. Nie obejmuje domniemanego czatu lub dowolnych plików niewynikających z uzgodnionych funkcji.
 
 ## § 4. Osoby i dane
 
@@ -63,9 +63,9 @@ zawarta pomiędzy **[DO WYPEŁNIENIA: PEŁNA NAZWA, ADRES, KRS I NIP KLIENTA]**,
 
 ## § 8. Podprzetwarzanie
 
-1. Wersja robocza stosuje ogólne pisemne upoważnienie z uprzednim powiadomieniem **[DO WERYFIKACJI PRAWNEJ: TERMIN POWIADOMIENIA O NOWYM PODPRZETWARZAJĄCYM]** i prawem uzasadnionego sprzeciwu.
+1. Proponuje się ogólne pisemne upoważnienie wyłącznie dla podmiotów ujętych w uzgodnionym Załączniku D. Podmiot przetwarzający aktywnie doręcza informację o planowanym dodaniu lub zastąpieniu podmiotu na uzgodniony adres Administratora co najmniej 14 dni przed rozpoczęciem przetwarzania. Powiadomienie obejmuje nazwę, funkcję, zakres danych, lokalizacje i planowane transfery; sama aktualizacja witryny nie zastępuje powiadomienia. Termin 14 dni jest proponowanym postanowieniem umownym do zatwierdzenia przez Strony.
 2. Lista stanowi Załącznik D. Podmiot przetwarzający zawiera z Podmiotem podprzetwarzającym obowiązki nie mniej chroniące niż niniejsza Umowa.
-3. Awaryjna zmiana dla bezpieczeństwa lub ciągłości jest dopuszczalna z powiadomieniem bez zbędnej zwłoki. **[DO WERYFIKACJI RODO: MODEL AUTORYZACJI PODPRZETWARZAJĄCYCH]**
+3. Administrator może przed rozpoczęciem przetwarzania wnieść uzasadniony sprzeciw dotyczący ochrony danych. Strony uzgodnią rozwiązanie, alternatywnego dostawcę lub ograniczenie danego zakresu; do rozwiązania sprzeciwu nowy podmiot nie przetwarza objętych nim danych. Jeżeli brak zgodnej alternatywy uniemożliwia świadczenie, Administrator może zakończyć dotknięty zakres bez kary za sprzeciw. Pilna zmiana nie znosi obowiązku uprzedniego upoważnienia; w razie potrzeby Strony uzyskują szczegółową zgodę przed dostępem. Podmiot przetwarzający ponosi wobec Administratora pełną odpowiedzialność za wykonanie obowiązków ochrony danych przez podprzetwarzającego zgodnie z art. 28 ust. 4 RODO.
 
 ## § 9. Transfery międzynarodowe
 
@@ -90,25 +90,25 @@ zawarta pomiędzy **[DO WYPEŁNIENIA: PEŁNA NAZWA, ADRES, KRS I NIP KLIENTA]**,
 
 ## § 13. Audyt
 
-1. Najpierw stosuje się dokumentację, kwestionariusz i dowody, następnie audyt zdalny, a audyt na miejscu tylko przy uzasadnionej potrzebie i rozsądnym wyprzedzeniu.
+1. Podmiot przetwarzający udostępnia wszelkie informacje niezbędne do wykazania wykonania art. 28 RODO oraz umożliwia i wspiera audyty, w tym inspekcje Administratora lub jego upoważnionego audytora. Strony mogą uzgodnić najpierw analizę dokumentacji lub audyt zdalny, o ile nie wyklucza to skutecznej inspekcji. Przy naruszeniu, uzasadnionym podejrzeniu lub żądaniu organu stosuje się pilny tryb bez zwykłego wyprzedzenia.
 2. Audyt chroni poufność i dane innych klientów; testy destrukcyjne wymagają odrębnego uzgodnienia.
-3. Koszty ponosi Administrator, chyba że potwierdzono istotne naruszenie obowiązków Podmiotu przetwarzającego. **[DO WERYFIKACJI PRAWNEJ: ZASADY I KOSZTY AUDYTU]**
+3. Uzgodnienia kosztów nie mogą blokować ustawowego prawa do informacji i audytu. Zwykłe informacje wykazujące obowiązki udostępnia się bez dodatkowej opłaty; dodatkowe uzasadnione koszty organizacyjne wymagają uprzedniego uzgodnienia, z wyłączeniem kontroli wywołanej naruszeniem Podmiotu przetwarzającego.
 
 ## § 14. Zwrot lub usunięcie
 
-1. Administrator żąda eksportu w okresie **[DO WERYFIKACJI TECHNICZNEJ: OKRES EKSPORTU – PROPOZYCJA 14 DNI]** w technicznie dostępnym formacie; aktualnie potwierdzono wybrane eksporty XLSX i SQL, nie pełny eksport wszystkich danych.
+1. Po zakończeniu usług Administrator wybiera zwrot danych i następnie usunięcie pozostających kopii albo ich usunięcie bez zwrotu, chyba że prawo Unii lub państwa członkowskiego nakazuje przechowanie. Proponowane okno żądania eksportu wynosi **[DO WERYFIKACJI TECHNICZNEJ: OKRES EKSPORTU – PROPOZYCJA 14 DNI]** w technicznie dostępnym formacie; aktualnie potwierdzono wybrane eksporty XLSX i SQL, nie pełny eksport wszystkich danych.
 2. Usunięcie z systemu aktywnego następuje w okresie **[DO WERYFIKACJI TECHNICZNEJ: OKRES USUNIĘCIA Z SYSTEMU AKTYWNEGO – PROPOZYCJA 45 DNI]**.
 3. Kopie są usuwane przez rotację: **[DO WERYFIKACJI TECHNICZNEJ: RETENCJA KOPII – KOD UTRZYMUJE 10 NAJNOWSZYCH KOPII]**. Nie gwarantuje się natychmiastowego fizycznego usunięcia z każdej kopii.
 4. Procedurę i potwierdzenie określa Załącznik E; wyjątki prawne muszą być udokumentowane.
 
 ## § 15. Odpowiedzialność i pierwszeństwo
 
-1. Umowa nie ustanawia odrębnego limitu odpowiedzialności; stosuje się zgodny z prawem limit Umowy SaaS, bez wyłączenia szkody umyślnej.
+1. Ewentualny limit Umowy SaaS dotyczy wyłącznie dopuszczalnych rozliczeń między Stronami. Nie ogranicza praw osób z art. 82 RODO, kompetencji organu, obowiązków z art. 28 ani odpowiedzialności, której nie można ograniczyć prawem; nie wyłącza szkody umyślnej.
 2. W sprawach ochrony danych pierwszeństwo ma niniejsza Umowa, a w pozostałych – Umowa SaaS.
 
 ## § 16. Końcowe
 
-1. Umowa trwa jak powierzenie. Zmiany wymagają formy **[DO WERYFIKACJI PRAWNEJ: PISEMNEJ LUB DOKUMENTOWEJ]**.
+1. Umowa trwa przez czas powierzenia, a obowiązki poufności, pomocy, zabezpieczenia i usuwania przez czas konieczny do ich wykonania. Instrukcje i zmiany utrwala się w formie pisemnej, w tym elektronicznej zgodnie z art. 28 ust. 9 RODO, umożliwiającej wykazanie treści i umocowania. Sposób zawarcia zatwierdza prawnik Stron.
 2. Stosuje się prawo polskie i sąd zgodny z Umową SaaS. Załączniki A–E są integralne.
 3. Podpisy: Administrator **[DO WYPEŁNIENIA: PODPIS]**; Podmiot przetwarzający **[DO WYPEŁNIENIA: PODPIS]**.
 
@@ -117,3 +117,17 @@ zawarta pomiędzy **[DO WYPEŁNIENIA: PEŁNA NAZWA, ADRES, KRS I NIP KLIENTA]**,
 - [RODO – art. 28, 29, 32–36](https://eur-lex.europa.eu/legal-content/PL/TXT/?uri=CELEX:32016R0679)
 - [Wytyczne EROD 07/2020 – administrator i podmiot przetwarzający](https://www.edpb.europa.eu/documents/guideline/guidelines-072020-on-the-concepts-of-controller-and-processor-in-the-gdpr_en)
 - [UODO – materiały o naruszeniach](https://uodo.gov.pl/pl/598/3563)
+
+## Uzupełnienie zakresu załączników A–E
+
+Przetwarzanie obejmuje service worker /sw.js i subskrypcję danego urządzenia, endpoint, p256dh/auth, ID pracownika/subskrypcji, daty utworzenia i aktualizacji oraz rekordy doręczeń: ID powiadomienia, liczbę prób, termin kolejnej próby, dzierżawę zadania, wynik i datę finalizacji. Kody i endpointy traktuje się jako poufne identyfikatory i nie publikuje w dowodach audytu. Powiadomienia obejmują grafiki, dostępność, zamiany, wolne zmiany i przyjęcie zamiany; treść może ujawniać nazwę, okres, termin lub godziny pracy na ekranie blokady. Język PL/EN wynika z konta.
+
+Włączenie jest działaniem pracownika i wymaga permission przeglądarki; jest ono odrębne od podstawy RODO i od oceny art. 399 PKE. Wyłączenie dla urządzenia podejmuje usunięcie subskrypcji serwera i unsubscribe w przeglądarce; błąd sieci może pozostawić rekord serwera. Cofnięcie samego permission nie gwarantuje usunięcia. Odpowiedź bramy 404/410 powoduje usunięcie subskrypcji; usunięcie rekordu subskrypcji usuwa zależne doręczenia. Brak potwierdzonego TTL nieaktywnej subskrypcji wymaga decyzji retencyjnej.
+
+Skaner działa co około 30 sekund przy włączonej usłudze; pomija zdarzenia sprzed opt-in i odczytane. Przejściowe błędy są ponawiane do 8 prób; ostateczny wynik „sent” oznacza przyjęcie wysyłki przez usługę, nie odczyt na urządzeniu. Zakończone doręczenia są usuwane po 5 dniach od finalizacji podczas skanów; zadań nieukończonych i subskrypcji nie obejmuje ten warunek. TTL wysyłki jest ograniczony do godziny dla ofert zamian/wolnych zmian i do 5 dni dla pozostałych zdarzeń, zależnie od wieku zdarzenia.
+
+Web Push szyfruje treść i używa HTTPS, ale dostawcy bram przeglądarki/systemu mogą otrzymywać metadane transmisji. Konfiguracja dopuszcza hosty FCM, Mozilla, Apple i Windows; nie jest to dowód zawartej umowy, konkretnego operatora prawnego, regionu lub transferu. Należy ustalić rolę każdego rzeczywistego dostawcy i podstawę rozdziału V przed produkcją. Brak gwarancji dostarczenia; nie używać jako jedynego kanału skutecznego zawiadomienia pracownika.
+
+Usunięcie pracownika oznacza archiwizację profilu przez IsDeleted oraz usunięcie konta pracownika. Nie oznacza pełnego wymazania profilu, kontaktów, historycznych grafików, dostępności, zamian, korekt, dowodów akceptacji, eksportów lub kopii. Wykonanie prawa do usunięcia wymaga ustalenia podstaw retencji, instrukcji Klienta i odrębnej kontroli powiązań; nie należy zastępować archiwizacji deklaracją anonimizacji.
+
+Platforma rejestruje osobiste potwierdzenie opublikowanej wersji PDF przez konto menedżera lub pracownika: identyfikator konta, rolę, migawkę loginu i nazwy oraz czas UTC. Dokument ma wersję, SHA-256 i czas publikacji; opublikowany dokument jest niezmienny, a przyjęte lub opublikowane dokumenty nie podlegają zwykłemu usunięciu. Dostępna jest historia własna i historia pracownika dla menedżera. Middleware zwraca HTTP 428 dla chronionych operacji API przy oczekujących dokumentach, z wyjątkami uwierzytelnienia, pobrania i potwierdzenia dokumentów oraz wskazanych tras. Gate prezentuje PDF i pole domyślnie niezaznaczone. Nie dowodzi to przeczytania każdej strony ani kwalifikowanego podpisu; nie podpisuje Umowy SaaS lub DPA w imieniu Klienta i nie jest ogólną zgodą RODO. Tylko prawnie zweryfikowany PDF może trafić do publikacji produkcyjnej; ten przegląd niczego nie publikuje.

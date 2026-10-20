@@ -3,12 +3,12 @@
 | Metadane | Wartość |
 | --- | --- |
 | Produkt | GF |
-| Wersja | [DO WYPEŁNIENIA: NUMER WERSJI] |
+| Wersja | 0.2.0-draft |
 | Status | DRAFT – WYMAGA WERYFIKACJI |
 | Właściciel | [DO WYPEŁNIENIA: WŁAŚCICIEL DOKUMENTU] |
 | Recenzent | [DO WYPEŁNIENIA: RECENZENT] |
 | Data obowiązywania | [DO WYPEŁNIENIA: DATA OBOWIĄZYWANIA] |
-| Data przeglądu | [DO WYPEŁNIENIA: DATA PRZEGLĄDU] |
+| Data przeglądu | 2026-10-19 — przegląd redakcyjny i kodu; bez zatwierdzenia prawnego |
 | Dokumenty powiązane | Umowa SaaS; incydenty; klasyfikacja |
 | Klasyfikacja | POUFNY UMOWNY |
 
@@ -34,3 +34,7 @@ Pierwsza odpowiedź nie jest czasem naprawy. Bieg może zostać wstrzymany, gdy 
 ## 3. Bezpieczeństwo i eskalacja
 
 Nie przesyłać haseł, tokenów ani całych baz. Incydenty danych przechodzą do procedury naruszeń. Eskalacja biznesowa **[DO WYPEŁNIENIA]**, techniczna **[DO WYPEŁNIENIA]**, RODO 24/7 **[DO WYPEŁNIENIA]**. Zamknięcie po potwierdzeniu albo po **[DO WYPEŁNIENIA]** bez odpowiedzi, z możliwością ponownego otwarcia.
+
+## Status propozycji handlowych
+
+500 PLN miesięcznie, płatność z góry w terminie 7 dni, jednomiesięczne wypowiedzenie, kontakt w 2 Dni Robocze i reklamacja 14 dni są wyłącznie propozycjami projektu SaaS do potwierdzenia przez właściciela i Strony. Nie ustalają VAT ani terminu naprawy. Dodatkowe SLA, godziny i rekompensaty obowiązują tylko po odrębnym uzgodnieniu; pola pustego wariantu nie stają się obietnicą. Incydenty RODO i żądania osób mają właściwe terminy ustawowe, których zwykła kolejka wsparcia nie zawiesza.

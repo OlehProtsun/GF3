@@ -1,7 +1,7 @@
 # GF3 — практична інструкція для оператора
 
 **DRAFT — робоча інструкція для людської юридичної, фінансової та технічної перевірки.**
-Версія: 0.1.0-draft. Підготовлено: 2026-10-08, Польща.
+Версія: 0.2.0-draft. Підготовлено: 2026-10-08, Польща.
 Основа опису застосунку: DEV2, `37540cfffb9fd89bd2a22a54c00cf3f451ce58a3`.
 Цей файл не затверджує договори, безпеку сервера чи комерційний запуск.
 Заповнені картки, персональні дані, секрети, підписані PDF і докази зберігаються поза Git та публічним хостингом у захищеному сховищі.
@@ -151,3 +151,7 @@
 - [Biznes.gov.pl — działalność nierejestrowana](https://biznes.gov.pl/pl/firma/zakladanie-firmy/chce-wiedziec-jak-zalozyc-wlasna-firme/dzialalnosc-nierejestrowa-oraz-inne-sytuacje-w-ktorych-nie-trzeba-rejestrowac-firmy): перевірити актуальні умови та можливі обов'язки клієнта як платника внесків за договором послуг.
 
 На зустріч можна принести чернетки. Оплачуваний production з реальними працівниками потребує закритих юридичних, договірних, фінансових, security та GDPR gates з доказами.
+
+## Aktualizacja zakresu 2026-10-19
+
+Historyczne testy z 2026-10-08 i bazowych commitów pozostają dowodami wyłącznie wskazanego czasu i środowiska. Bieżący stan kodu 171aec08 obejmuje service worker, Web Push, dodatkowe klucze gf3.push.employeeId i gf3.push.invitation.*, korekty, historię PDF i archiwizację pracownika. Pełny aktualny inwentarz: docs/client-launch-package/03-cookies-and-storage/wykaz-cookies-i-storage.md; źródła i ograniczenia: LEGAL_SOURCES_2026-10-19.md; wynik bieżącego przeglądu: LEGAL_COMPLETION_REPORT_2026-10-19.md. Nie traktować poprzedniego lokalnego testu jako aktualnego audytu domeny produkcyjnej.

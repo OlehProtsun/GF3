@@ -3,12 +3,12 @@
 | Metadane | Wartość |
 | --- | --- |
 | Produkt | GF |
-| Wersja | [DO WYPEŁNIENIA: NUMER WERSJI] |
+| Wersja | 0.2.0-draft |
 | Status | DRAFT – WYMAGA WERYFIKACJI |
 | Właściciel | [DO WYPEŁNIENIA: WŁAŚCICIEL DOKUMENTU] |
 | Recenzent | [DO WYPEŁNIENIA: RECENZENT] |
 | Data obowiązywania | [DO WYPEŁNIENIA: DATA OBOWIĄZYWANIA] |
-| Data przeglądu | [DO WYPEŁNIENIA: DATA PRZEGLĄDU] |
+| Data przeglądu | 2026-10-19 — przegląd redakcyjny i kodu; bez zatwierdzenia prawnego |
 | Dokumenty powiązane | DPA; polityka prywatności |
 | Klasyfikacja | WEWNĘTRZNY / RODO |
 
@@ -29,3 +29,13 @@ Nie należy przyjmować jednej roli dla wszystkich operacji. Dane pracownicze po
 - [RODO – art. 5, 6, 12–14, 24, 28, 30 i 32](https://eur-lex.europa.eu/legal-content/PL/TXT/?uri=CELEX:32016R0679)
 - [Wytyczne EROD 07/2020](https://www.edpb.europa.eu/documents/guideline/guidelines-072020-on-the-concepts-of-controller-and-processor-in-the-gdpr_en)
 - [UODO](https://uodo.gov.pl)
+
+## Kwalifikacja operacji i kryteria
+
+Podstawy administratora, źródła, odbiorcy, prawa i kryteria retencji są opisane per cel w § 2–8 polityki prywatności; nie są podstawą samodzielnego wykorzystywania danych przez procesora. Czynności techniczne kont, push, historii i dowodów regulaminu na polecenie Klienta mieszczą się w DPA. Dowód potwierdzenia zasad nie zamienia relacji powierzenia w niezależne administrowanie.
+
+Log organizacji pracy służący Klientowi jest powierzeniem. Zabezpieczenie infrastruktury dla samodzielnie określonego celu Operatora może stanowić odrębną czynność administratora po ocenie celu, niezbędności i równowagi. Ten sam zapis użyty w obu celach wymaga rozdzielenia dostępu, retencji i informacji. Zgłoszenie wsparcia zawiera kontakt obsługiwany we własnym celu oraz możliwe dane pracowników dostępne tylko na instrukcję; nie kwalifikuje się całej skrzynki jedną rolą.
+
+Art. 9 wymaga odrębnej przesłanki, jeżeli wolny tekst zawiera dane szczególne; nie zastępuje jej zakaz w regulaminie. Podstawy dla pracowników, zleceniobiorców i menedżerów mogą się różnić. Klient potwierdza podstawy i realną kontrolę generatora. Push jest wyborem kanału na urządzeniu, a nie zgodą na wszystkie cele. Wytyczne EROD 07/2020 wymagają oceny rzeczywistych celów i zasadniczych sposobów, niezależnie od nazwy strony w umowie.
+
+Status kwalifikacji: REQUIRES LEGAL REVIEW; konfiguracja dostawców: UNVERIFIED EXTERNAL FACT. Brak dowodów VERIFIED IN DEPLOYMENT w tym przeglądzie.

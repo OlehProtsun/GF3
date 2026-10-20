@@ -3,12 +3,12 @@
 | Metadane | Wartość |
 | --- | --- |
 | Produkt | GF |
-| Wersja | [DO WYPEŁNIENIA: NUMER WERSJI] |
+| Wersja | 0.2.0-draft |
 | Status | DRAFT – WYMAGA WERYFIKACJI |
 | Właściciel | [DO WYPEŁNIENIA: WŁAŚCICIEL DOKUMENTU] |
 | Recenzent | [DO WYPEŁNIENIA: RECENZENT] |
 | Data obowiązywania | [DO WYPEŁNIENIA: DATA OBOWIĄZYWANIA] |
-| Data przeglądu | [DO WYPEŁNIENIA: DATA PRZEGLĄDU] |
+| Data przeglądu | 2026-10-19 — przegląd redakcyjny i kodu; bez zatwierdzenia prawnego |
 | Dokumenty powiązane | audyt i polityka cookies |
 | Klasyfikacja | WEWNĘTRZNY / DECYZYJNY |
 
@@ -27,3 +27,7 @@ Kryteria: brak żądania do domeny zewnętrznej przed wyborem; odmowa nie blokuj
 - [RODO](https://eur-lex.europa.eu/legal-content/PL/TXT/?uri=CELEX:32016R0679)
 - [Ustawa o świadczeniu usług drogą elektroniczną – ELI](https://eli.gov.pl/eli/DU/2024/1513/ogl)
 - [biznes.gov.pl – działalność nierejestrowana](https://biznes.gov.pl/pl/firma/zakladanie-firmy/chce-wiedziec-jak-zalozyc-wlasna-firme/dzialalnosc-nierejestrowa-oraz-inne-sytuacje-w-ktorych-nie-trzeba-rejestrowac-firmy)
+
+## Wszystkie kategorie pamięci, nie tylko media
+
+Ta rekomendacja obejmuje również trwały login, tryb hasła, piny, układ kolumn, presety, odczyty i zapamiętanie odłożenia zaproszenia. Wykaz storage zawiera indywidualną ocenę art. 399 PKE. Dla każdej operacji trzeba wykazać konieczność dla wyraźnie żądanej usługi albo blokować ją przed opt-in. Deklaracja „funkcjonalne” nie stanowi wyjątku. Dla push rozdzielić wybór usługi i permission urządzenia od podstawy RODO i dodatkowej pamięci. Wariant bez bannera dopuszczalny tylko po wykazaniu wyjątków i braku pozostałych operacji wymagających zgody.

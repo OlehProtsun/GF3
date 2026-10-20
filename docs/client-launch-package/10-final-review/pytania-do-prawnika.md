@@ -3,12 +3,12 @@
 | Metadane | Wartość |
 | --- | --- |
 | Produkt | GF |
-| Wersja | [DO WYPEŁNIENIA: NUMER WERSJI] |
+| Wersja | 0.2.0-draft |
 | Status | DRAFT – WYMAGA WERYFIKACJI |
 | Właściciel | [DO WYPEŁNIENIA: WŁAŚCICIEL DOKUMENTU] |
 | Recenzent | [DO WYPEŁNIENIA: RECENZENT] |
 | Data obowiązywania | [DO WYPEŁNIENIA: DATA OBOWIĄZYWANIA] |
-| Data przeglądu | [DO WYPEŁNIENIA: DATA PRZEGLĄDU] |
+| Data przeglądu | 2026-10-19 — przegląd redakcyjny i kodu; bez zatwierdzenia prawnego |
 | Dokumenty powiązane | Umowa; Regulamin; DPA; exit |
 | Klasyfikacja | POUFNY |
 
@@ -37,3 +37,7 @@ Odpowiedzi, rekomendowane brzmienie i data stanu prawnego: **[DO WERYFIKACJI PRA
 - Jak wpływa utrata statusu studenta na ZUS/rozliczenia i treść Umowy?
 - Czy podpis dokumentowy/elektroniczny jest wystarczający dla Umowy, DPA i instrukcji?
 - Jak opisać relację z Użytkownikami-pracownikami Klienta i podstawy prywatności własnej GF?
+
+## Zakres uzupełniony 2026-10-19
+
+Aktualne fakty, źródła, klasy pytań, blokery i wyniki: [raport zakończenia](../../legal/LEGAL_COMPLETION_REPORT_2026-10-19.md). Do decyzji włączono Web Push/PWA i ekran blokady, retencję nieaktywnych subskrypcji, art. 399 dla każdej preferencji, erasure historii po IsDeleted, art. 22/DPIA oraz zmiany AI Act/KSC i KSeF 2026/2027. Podpisy i faktyczne decyzje pozostają poza Git.

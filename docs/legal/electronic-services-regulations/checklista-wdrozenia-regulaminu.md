@@ -4,10 +4,10 @@
 
 ## 1. Publikacja
 
-- [ ] Dodać publiczną trasę `/regulamin`, dostępną bez logowania.
+- [ ] Zweryfikować istniejącą publiczną stronę `/legal/regulamin.html`, dostępną bez logowania; nie tworzyć konkurencyjnej trasy.
 - [ ] Udostępnić pełną wersję HTML oraz plik możliwy do pobrania; opcjonalnie przygotować równoważny PDF.
-- [ ] Dodać widoczny link „Regulamin” na ekranie logowania.
-- [ ] Dodać link w stopce aplikacji albo innym stałym miejscu dostępnym po zalogowaniu.
+- [ ] Sprawdzić istniejący widoczny link „Regulamin” na ekranie logowania.
+- [ ] Sprawdzić istniejące linki na profilach managera/pracownika i w gate; nie rozszerzać stopki na wszystkie strony.
 - [ ] Dodać obok link do „Informacji o szczególnych zagrożeniach”.
 - [ ] Zapewnić możliwość pobrania, zapisania, odtworzenia i wydrukowania Regulaminu przed rozpoczęciem korzystania.
 - [ ] Zweryfikować czytelność na telefonie, tablecie i komputerze.
@@ -18,11 +18,11 @@
 ## 2. Rejestrowanie akceptacji
 
 - [ ] Ustalić z prawnikiem, czy i dla których Użytkowników wymagane jest wyraźne oświadczenie o akceptacji.
-- [ ] Dodać, tam gdzie będzie to właściwe, nieoznaczone z góry pole akceptacji przy pierwszym logowaniu lub aktywacji Konta.
+- [ ] Sprawdzić istniejący RegulationAcceptanceGate: pole początkowo niezaznaczone, PDF, potwierdzenie i obsługę błędu.
 - [ ] Wyświetlić bezpośredni link do pełnej treści przed oznaczeniem pola.
-- [ ] Zapisać numer wersji Regulaminu.
-- [ ] Zapisać datę i czas akceptacji w UTC.
-- [ ] Zapisać identyfikator Użytkownika i techniczną rolę.
+- [ ] Sprawdzić zapis: numer wersji Regulaminu.
+- [ ] Sprawdzić zapis: datę i czas akceptacji w UTC.
+- [ ] Sprawdzić zapis: identyfikator Użytkownika i techniczną rolę.
 - [ ] Zapisać identyfikator organizacji Klienta, gdy model danych go zapewnia.
 - [ ] Zachować dowód treści odpowiadającej zaakceptowanej wersji.
 - [ ] Zachowywać historyczne wersje i nie podmieniać ich po akceptacji.
@@ -124,3 +124,6 @@
 - [ ] Nadanie wersji i dat oraz zamrożenie plików tej wersji.
 - [ ] Test publicznego udostępnienia przed aktywacją akceptacji.
 
+## Stan kodu i granica dowodu
+
+Platforma rejestruje osobiste potwierdzenie opublikowanej wersji PDF przez konto menedżera lub pracownika: identyfikator konta, rolę, migawkę loginu i nazwy oraz czas UTC. Dokument ma wersję, SHA-256 i czas publikacji; opublikowany dokument jest niezmienny, a przyjęte lub opublikowane dokumenty nie podlegają zwykłemu usunięciu. Dostępna jest historia własna i historia pracownika dla menedżera. Middleware zwraca HTTP 428 dla chronionych operacji API przy oczekujących dokumentach, z wyjątkami uwierzytelnienia, pobrania i potwierdzenia dokumentów oraz wskazanych tras. Gate prezentuje PDF i pole domyślnie niezaznaczone. Nie dowodzi to przeczytania każdej strony ani kwalifikowanego podpisu; nie podpisuje Umowy SaaS lub DPA w imieniu Klienta i nie jest ogólną zgodą RODO. Tylko prawnie zweryfikowany PDF może trafić do publikacji produkcyjnej; ten przegląd niczego nie publikuje.

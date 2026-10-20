@@ -1,7 +1,7 @@
 # Karta wdrożenia klienta — WZÓR PRYWATNY
 
 **DRAFT — WERSJA ROBOCZA — DO WERYFIKACJI PRAWNEJ, KSIĘGOWEJ I TECHNICZNEJ**
-Wersja: 0.1.0-draft | Data wypełnienia: [DO UZUPEŁNIENIA]
+Wersja: 0.2.0-draft | Data wypełnienia: [DO UZUPEŁNIENIA]
 
 W repozytorium pozostaje wyłącznie pusty wzór. Wypełniać kopię poza Git i publicznym hostingiem, w chronionym repozytorium dokumentów. Nie wklejać list pracowników, haseł, PIN, tokenów ani kluczy. Karta nie zawiera zatwierdzenia startu ani nie zastępuje umów.
 

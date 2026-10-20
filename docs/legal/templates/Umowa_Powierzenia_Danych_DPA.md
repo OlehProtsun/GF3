@@ -1,8 +1,10 @@
 # Umowa powierzenia danych — art. 28 RODO
 
+> **STATUS: HISTORYCZNY WZÓR POMOCNICZY — NIE JEST RÓWNOLEGŁYM WZORCEM UMOWNYM.** Od przeglądu 2026-10-19 obowiązującym źródłem projektu jest [dokument kanoniczny](../../client-launch-package/01-data-processing-agreement/umowa-powierzenia-przetwarzania-danych-pl.md). Poniższe historyczne pola i postanowienia zachowano do śledzenia zmian; nie przyjmować ich oddzielnie ani nie nadawać im pierwszeństwa. Zamówienie może być jedynie okładką parametrów jawnie włączającą jeden uzgodniony SaaS/DPA.
+
 WERSJA ROBOCZA — DO WERYFIKACJI PRAWNEJ
 
-Wersja: 0.1.0-draft | Obowiązuje od: [DO UZUPEŁNIENIA]
+Wersja: 0.2.0-draft | Obowiązuje od: [DO UZUPEŁNIENIA]
 Operator: [DO UZUPEŁNIENIA]
 
 ## Strony, przedmiot i czas
