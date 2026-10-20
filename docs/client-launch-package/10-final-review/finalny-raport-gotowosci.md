@@ -1,14 +1,16 @@
 # Finalny raport gotowości
 
+> Aktualny raport przeglądu 2026-10-19: [LEGAL_COMPLETION_REPORT_2026-10-19.md](../../legal/LEGAL_COMPLETION_REPORT_2026-10-19.md). Poniższy inwentarz zachowano i zaktualizowano jako dokument wspierający. Bieżące wyniki walidacji i blokery pochodzą z raportu kanonicznego; historyczne wyniki nie są ponownym testem produkcji.
+
 | Metadane | Wartość |
 | --- | --- |
 | Produkt | GF |
-| Wersja | [DO WYPEŁNIENIA: NUMER WERSJI] |
+| Wersja | 0.2.0-draft |
 | Status | DRAFT – WYMAGA WERYFIKACJI |
 | Właściciel | [DO WYPEŁNIENIA: WŁAŚCICIEL DOKUMENTU] |
 | Recenzent | [DO WYPEŁNIENIA: RECENZENT] |
 | Data obowiązywania | [DO WYPEŁNIENIA: DATA OBOWIĄZYWANIA] |
-| Data przeglądu | [DO WYPEŁNIENIA: DATA PRZEGLĄDU] |
+| Data przeglądu | 2026-10-19 — przegląd redakcyjny i kodu; bez zatwierdzenia prawnego |
 | Dokumenty powiązane | indeks; rejestr placeholderów; raport braków |
 | Klasyfikacja | POUFNY |
 
@@ -113,7 +115,7 @@ Utworzono 81 wymaganych artefaktów (generator techniczny nie jest dokumentem):
 
 ## 4. Confirmed system functionality
 
-Role manager/pracownik; manager tworzy konta; odzyskiwanie przez e-mail; profile pracowników; placówki/organizacja; dostępności; tworzenie, publikacja i odczyt grafików; zamiany; powiadomienia/komunikaty i notatki managera; logi operacyjne; wybrane eksporty; administracyjne operacje backup/restore. Brak potwierdzonego self-registration, samodzielnego usuwania konta i logu akceptacji dokumentów.
+Role manager/pracownik; manager tworzy konta; odzyskiwanie przez e-mail; profile i archiwizacja IsDeleted; placówki/organizacja; dostępność; tworzenie, publikacja, korekty i wersje grafików; zamiany i historia; komunikaty, odczyty i notatki; opcjonalny push oraz service worker; logi operacyjne; wybrane XLSX/SQL i pobranie PDF regulaminu; administracyjne backup/restore. Wersje/hash PDF, osobiste potwierdzenia, historia i gate API 428 są wdrożone. Nie potwierdzono self-registration lub samodzielnego pełnego wymazania danych przez użytkownika.
 
 ## 5. Confirmed infrastructure
 

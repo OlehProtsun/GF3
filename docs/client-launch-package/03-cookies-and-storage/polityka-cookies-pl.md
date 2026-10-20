@@ -3,43 +3,45 @@
 | Metadane | Wartość |
 | --- | --- |
 | Produkt | GF |
-| Wersja | [DO WYPEŁNIENIA: NUMER WERSJI] |
+| Wersja | 0.2.0-draft |
 | Status | DRAFT – WYMAGA WERYFIKACJI |
 | Właściciel | [DO WYPEŁNIENIA: WŁAŚCICIEL DOKUMENTU] |
 | Recenzent | [DO WYPEŁNIENIA: RECENZENT] |
 | Data obowiązywania | [DO WYPEŁNIENIA: DATA OBOWIĄZYWANIA] |
-| Data przeglądu | [DO WYPEŁNIENIA: DATA PRZEGLĄDU] |
+| Data przeglądu | 2026-10-19 — przegląd redakcyjny i kodu; bez zatwierdzenia prawnego |
 | Dokumenty powiązane | polityka prywatności; wykaz storage |
 | Klasyfikacja | PUBLICZNY |
 
 > Projekt do weryfikacji prawnej, RODO, księgowej, podatkowej, biznesowej i technicznej w odpowiednim zakresie. Nie stanowi finalnej porady ani gwarancji zgodności lub bezpieczeństwa.
 
-## 1. Zakres
+## 1. Zakres i kontakt
 
-Polityka opisuje cookies, localStorage i zewnętrzne zasoby Platformy. Cookies są danymi zapisywanymi przez serwer/przeglądarkę; localStorage jest odrębną pamięcią i nie jest cookie.
+Za technologie GF odpowiada **[OWNER_REQUIRED: tożsamość Operatora i kontakt prywatności]**. Polityka dotyczy cookies, localStorage, pamięci przeglądarki, service worker, Web Push i zewnętrznych mediów. Art. 399 PKE dotyczy także informacji innych niż dane osobowe oraz pamięci innej niż cookies HTTP.
 
-## 2. Technologie GF
+## 2. Własna pamięć aplikacji
 
-Obecny kod nie ustawia własnych HTTP cookies. W localStorage zapisuje token sesji, nazwę Użytkownika i tryb logowania, identyfikatory odczytanych powiadomień, układ kolumn i przypięte rekordy. Pełna tabela: **[DO WYPEŁNIENIA: LINK DO WYKAZU]**.
+Token gf3.auth.access-token służy do sesji, a gf3.auth.last-username i gf3.auth.password-mode zapamiętują login i tryb wpisywania hasła. Pierwszy wpis jest usuwany przez wylogowanie lub unieważnienie sesji; wpis nie ma własnego TTL przeglądarki. Login i tryb pozostają do zmiany lub usunięcia.
 
-## 3. Zewnętrzne treści
+gf3.employee-notifications.read.* przechowuje identyfikatory odczytów powiązane z loginem/ID pracownika. Datowane wpisy są filtrowane po 5 dniach; starszy format może pozostać. gf3:employee-availability:time-presets:* zapisuje presety godzin, gf3:employee-schedule-column-order:* kolejność kolumn, a employees:list:pinned, shops:list:pinned, containers:list:pinned i availability-groups:list:pinned identyfikatory przypiętych rekordów. Ustawienia te nie mają automatycznego czasu usunięcia.
 
-Aktualności mogą zawierać obraz z zewnętrznego hosta lub wideo YouTube w domenie youtube-nocookie.com. Załadowanie może ujawnić dostawcy IP i nagłówki oraz uruchomić jego technologie. Do czasu wdrożenia decyzji zgody treści powinny być wyłączone albo ładowane dopiero po świadomym wyborze.
+gf3.push.employeeId łączy urządzenie z kontem przy włączonym push; funkcja wyłączenia usuwa ten klucz. gf3.push.invitation.{employeeId} przechowuje czas odłożenia zaproszenia do powiadomień o 7 dni. Upływ tego czasu nie usuwa fizycznie klucza. Własne zapisy nie służą reklamie. Sam cel wygody nie oznacza jednak ustawowej niezbędności.
 
-## 4. Analityka i marketing
+## 3. PWA i Web Push
 
-Nie potwierdzono analityki, reklamy ani pikseli. Nie wolno ich uruchamiać bez aktualizacji polityki i odpowiedniej podstawy/zgody.
+GF ma manifest instalacji i service worker /sw.js z zakresem /. Skrypt obsługuje odbiór powiadomień i kliknięcie; nie potwierdzono własnej pamięci Cache API ani trybu pracy całej aplikacji offline. Przeglądarka stosuje własny cache zasobów zgodnie z odpowiedziami HTTP i ustawieniami.
 
-## 5. Zarządzanie
+Web Push wymaga świadomego włączenia przez pracownika, obsługiwanej przeglądarki i jej uprawnienia do powiadomień. Przeglądarka przechowuje subskrypcję, endpoint i klucze szyfrujące; serwer zapisuje ich kopię z identyfikatorem pracownika oraz metadane doręczeń. Uprawnienie przeglądarki nie jest ogólną zgodą RODO ani zgodą cookies. Włączenie dotyczy konkretnego urządzenia/profilu. Wyłączenie w GF podejmuje próbę usunięcia po stronie serwera i unsubscribe w przeglądarce; błąd sieci może opóźnić usunięcie rekordu serwerowego. Osobno można cofnąć permission w ustawieniach witryny. Szczegóły treści, bram push i retencji opisuje [polityka prywatności](/legal/polityka-prywatnosci.html).
 
-Użytkownik może usuwać dane strony w ustawieniach przeglądarki. Usunięcie tokenu wyloguje, a blokada localStorage może uniemożliwić obecne uwierzytelnienie lub zapamiętywanie ustawień. Opcjonalne media powinny mieć równoważne „Akceptuję” i „Odrzucam” oraz możliwość zmiany decyzji.
+## 4. Media, cookies i odbiorcy
 
-## 6. Kontakt i wersja
+Aktualności mogą ładować iframe youtube-nocookie.com oraz obrazy z hostów wskazanych w treści. Powoduje to połączenie z dostawcą, ujawniające co najmniej adres IP i dane żądania. Nazwa domeny „nocookie” nie dowodzi braku technologii urządzenia ani transferu. Faktyczne zapisy i odbiorcy wymagają testu.
 
-Kontakt: **[DO WYPEŁNIENIA: E-MAIL RODO]**. Polityka prywatności: **[DO WYPEŁNIENIA: LINK]**. Produkcyjny wykaz wymaga **[DO WERYFIKACJI TECHNICZNEJ: TESTU PRZEGLĄDARKOWEGO]**.
+Nie znaleziono w kodzie produktu własnego ustawiania HTTP cookies, sessionStorage, IndexedDB ani narzędzi reklamowych/analitycznych. Nie przesądza to o cookies hostingu, proxy, przeglądarki lub zewnętrznych mediów. **[PRODUCTION_TEST_REQUIRED: wykaz cookies i technologii rzeczywistej domeny, dostawców i terminów]**.
 
-## Podstawy i materiały do weryfikacji
+## 5. Niezbędność, wybór i usuwanie
 
-- [UŚUDE – obowiązki informacyjne](https://eli.gov.pl/eli/DU/2024/1513/ogl)
-- [RODO](https://eur-lex.europa.eu/legal-content/PL/TXT/?uri=CELEX:32016R0679)
-- [Polityka prywatności YouTube/Google – do weryfikacji](https://policies.google.com/privacy?hl=pl)
+Zapis lub odczyt ściśle niezbędny do transmisji albo usługi wyraźnie żądanej przez użytkownika może podlegać wyjątkowi art. 399 ust. 3 PKE. Dotyczy to odpowiednio niezbędnej sesji i mechanizmów obsługi świadomie żądanego push. Nie kwalifikuje automatycznie trwałego loginu, pinów lub układu kolumn. Pozostałe operacje wymagają uprzedniej informacji i ważnej zgody, o ile nie ma innego właściwego wyjątku. Zgoda musi być dobrowolna, konkretna, możliwa do odrzucenia i wycofania równie łatwo jak udzielenie.
+
+**Stan projektu:** obecna aplikacja nie ma potwierdzonego kompletnego mechanizmu blokowania opcjonalnej pamięci i mediów przed wyborem. Przed wydaniem należy go wdrożyć albo usunąć te operacje z wydawanego zakresu oraz potwierdzić wyjątki dla pozostałych. Niniejszy tekst ani zamknięcie komunikatu nie stanowią zgody.
+
+Użytkownik może usunąć dane witryny, cache i rejestracje service worker w ustawieniach przeglądarki. Może to wylogować i skasować lokalne ustawienia, lecz nie usuwa automatycznie danych serwera ani uprawnień systemowych we wszystkich przeglądarkach. Po pracy na urządzeniu wspólnym należy wylogować się, wyłączyć push i sprawdzić podgląd powiadomień na ekranie blokady. Blokowanie pamięci może ograniczyć zapamiętywanie sesji; zakres rzeczywistego wpływu zależy od przeglądarki.

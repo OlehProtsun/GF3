@@ -1,7 +1,7 @@
-# Protokół uruchomienia i przekazania GF3 — WZÓR PRYWATNY
+# Protokół uruchomienia i przekazania GF — WZÓR PRYWATNY
 
 **DRAFT — WERSJA ROBOCZA — DO WERYFIKACJI PRAWNEJ I OPERACYJNEJ**
-Wersja: 0.1.0-draft | Data sporządzenia: [DO UZUPEŁNIENIA]
+Wersja: 0.2.0-draft | Data sporządzenia: [DO UZUPEŁNIENIA]
 
 Wypełniać kopię w zewnętrznym chronionym archiwum, nigdy w Git lub publicznym buildzie. Nie wpisywać danych pracowników, haseł, PIN, tokenów ani kluczy. Protokół dokumentuje rzeczywiste przekazanie; **nie zastępuje Umowy SaaS, DPA, umów o pracę ani informacji GDPR pracodawcy**. Nie certyfikuje zgodności prawnej ani bezpieczeństwa. Wyniki testów muszą mieć dowody; niewykonany test oznaczyć NOT VERIFIED.
 

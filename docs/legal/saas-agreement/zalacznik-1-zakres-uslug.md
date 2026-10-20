@@ -103,3 +103,11 @@ Stawka lub sposób wyceny: **[DO WYPEŁNIENIA: CENNIK USŁUG DODATKOWYCH / WYCEN
 | **[DO WYPEŁNIENIA: IMIĘ I NAZWISKO]** | **[DO WYPEŁNIENIA: OSOBA REPREZENTUJĄCA KLIENTA]** |
 | Data: **[DO WYPEŁNIENIA]** | Data: **[DO WYPEŁNIENIA]** |
 | Podpis: __________________________ | Podpis: __________________________ |
+
+## Aktualizacja zakresu 2026-10-19
+
+Potwierdzono w kodzie: korekty zmian i historie, wersje grafików, zamiany Give/Exchange oraz migawki przyjętych zamian, archiwizację pracownika przez IsDeleted, publikację niezmiennego PDF i zapis osobistego potwierdzenia oraz historię, gate HTTP 428 i opcjonalny Web Push. Push obejmuje publikację grafiku/dostępności, terminy, zamiany i wolne zmiany; wymaga konfiguracji serwera, obsługi przeglądarki i świadomego włączenia na urządzeniu. Nie gwarantuje doręczenia. Język PL/EN wynika z konta.
+
+Potwierdzono wybrane eksporty XLSX/SQL i pobieranie wgranego PDF regulaminu. Nie jest to ogólny eksport grafików do PDF ani pełny eksport wszystkich danych Klienta. Generator uwzględnia dostępność i parametry, lecz menedżer musi zweryfikować wynik przed publikacją; nie gwarantuje zgodności czasu pracy.
+
+Zakres faktycznie przekazanej instancji, dostępność funkcji, wsparcie i terminy potwierdza protokół, nie sam kod. Żadna funkcja nie oznacza zatwierdzenia prawnego, a zmiana zakresu danych wymaga oceny DPA i polityk.

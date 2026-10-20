@@ -58,3 +58,7 @@ Nie potwierdzono wystarczających podstaw, aby obiecywać poniższe możliwości
 - gwarantowane SLA, dostępność 24/7 lub nielimitowane wsparcie;
 - konkretne procentowe oszczędności czasu lub kosztów;
 - formalne warunki podatkowe, księgowe albo prawne abonamentu.
+
+## Status 2026-10-19
+
+Oferta jest materiałem pochodnym, bez samodzielnego pierwszeństwa przed uzgodnioną [Umową SaaS](../legal/saas-agreement/umowa-saas-b2b-pl.md). Warianty cen/podatków i terminów są propozycjami. Zakres korekt, historii, PDF i push potwierdza załącznik usług, a konfigurację produkcji protokół. Oznaczenie DRAFT nie jest zgodą na publikację jako zatwierdzonej oferty.

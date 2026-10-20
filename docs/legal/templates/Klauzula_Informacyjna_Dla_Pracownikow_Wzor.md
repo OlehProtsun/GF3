@@ -1,8 +1,10 @@
 # Wzór informacji pracodawcy dla pracowników
 
+> **STATUS: HISTORYCZNY WZÓR POMOCNICZY — NIE JEST RÓWNOLEGŁYM WZORCEM UMOWNYM.** Od przeglądu 2026-10-19 obowiązującym źródłem projektu jest [dokument kanoniczny](../../client-launch-package/02-privacy/klauzula-informacyjna-uzytkownicy-platformy-pl.md). Poniższe historyczne pola i postanowienia zachowano do śledzenia zmian; nie przyjmować ich oddzielnie ani nie nadawać im pierwszeństwa. Zamówienie może być jedynie okładką parametrów jawnie włączającą jeden uzgodniony SaaS/DPA.
+
 WERSJA ROBOCZA — DO WERYFIKACJI PRAWNEJ
 
-Wersja: 0.1.0-draft | Obowiązuje od: [DO UZUPEŁNIENIA]
+Wersja: 0.2.0-draft | Obowiązuje od: [DO UZUPEŁNIENIA]
 Operator: [DO UZUPEŁNIENIA]
 
 To wzór do personalizacji i doręczenia przez pracodawcę, nie automatyczna informacja Operatora.

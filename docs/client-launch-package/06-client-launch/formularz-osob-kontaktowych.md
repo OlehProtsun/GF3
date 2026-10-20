@@ -3,12 +3,12 @@
 | Metadane | Wartość |
 | --- | --- |
 | Produkt | GF |
-| Wersja | [DO WYPEŁNIENIA: NUMER WERSJI] |
+| Wersja | 0.2.0-draft |
 | Status | DRAFT – WYMAGA WERYFIKACJI |
 | Właściciel | [DO WYPEŁNIENIA: WŁAŚCICIEL DOKUMENTU] |
 | Recenzent | [DO WYPEŁNIENIA: RECENZENT] |
 | Data obowiązywania | [DO WYPEŁNIENIA: DATA OBOWIĄZYWANIA] |
-| Data przeglądu | [DO WYPEŁNIENIA: DATA PRZEGLĄDU] |
+| Data przeglądu | 2026-10-19 — przegląd redakcyjny i kodu; bez zatwierdzenia prawnego |
 | Dokumenty powiązane | wsparcie; incydenty; klauzula B2B |
 | Klasyfikacja | POUFNY |
 
@@ -18,7 +18,7 @@
 |---|---|---|---|---|---|---|
 | Umowa i rozliczenia | **[DO WYPEŁNIENIA]** | **[DO WYPEŁNIENIA]** | **[DO WYPEŁNIENIA]** | **[DO WYPEŁNIENIA]** | **[DO WYPEŁNIENIA]** | **[DO WYPEŁNIENIA]** |
 | Wdrożenie / manager | **[DO WYPEŁNIENIA]** | **[DO WYPEŁNIENIA]** | **[DO WYPEŁNIENIA]** | **[DO WYPEŁNIENIA]** | **[DO WYPEŁNIENIA]** | **[DO WYPEŁNIENIA]** |
-| Incydenty/RODO 24/7 | **[DO WYPEŁNIENIA]** | **[DO WYPEŁNIENIA]** | **[DO WYPEŁNIENIA]** | **[DO WYPEŁNIENIA]** | **[DO WYPEŁNIENIA]** | **[DO WYPEŁNIENIA]** |
+| Incydenty/RODO — obsada do potwierdzenia | **[DO WYPEŁNIENIA]** | **[DO WYPEŁNIENIA]** | **[DO WYPEŁNIENIA]** | **[DO WYPEŁNIENIA]** | **[DO WYPEŁNIENIA]** | **[DO WYPEŁNIENIA]** |
 | Wsparcie techniczne | **[DO WYPEŁNIENIA]** | **[DO WYPEŁNIENIA]** | **[DO WYPEŁNIENIA]** | **[DO WYPEŁNIENIA]** | **[DO WYPEŁNIENIA]** | **[DO WYPEŁNIENIA]** |
 
 Kontakty wykorzystywać tylko do wskazanych celów; aktualizację zgłaszać w **[DO WYPEŁNIENIA: TERMIN]**.

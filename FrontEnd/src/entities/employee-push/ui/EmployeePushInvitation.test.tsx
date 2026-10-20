@@ -40,7 +40,7 @@ describe("employee push welcome", () => {
     mocks.auth.status = "authenticated"; page.rerender(workspace(true));
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     await act(async () => resolveConfig({ enabled: true, publicKey: "key" }));
-    await waitFor(() => expect(mocks.subscription).toHaveBeenCalled());
+    expect(mocks.config).toHaveBeenCalledOnce();
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     page.rerender(workspace());
     expect(await screen.findByRole("dialog", { name: "Enable notifications" })).toBeVisible();
@@ -74,7 +74,7 @@ describe("employee push welcome", () => {
     expect(Notification.requestPermission).not.toHaveBeenCalled();
   });
 
-  test.each(["manager", "unauthenticated", "denied", "unsupported", "install-ios", "server-disabled", "already-enabled"])("never invites in %s state", async state => {
+  test.each(["manager", "unauthenticated", "denied", "unsupported", "install-ios", "server-disabled", "already-enabled", "granted-without-subscription", "granted-other-account"])("never invites in %s state", async state => {
     if (state === "manager") mocks.auth.session.role = "manager";
     if (state === "unauthenticated") mocks.auth.status = "unauthenticated";
     if (state === "denied") vi.stubGlobal("Notification", { permission: "denied", requestPermission: vi.fn() });
@@ -84,9 +84,42 @@ describe("employee push welcome", () => {
       vi.stubGlobal("Notification", { permission: "granted", requestPermission: vi.fn() });
       mocks.subscription.mockResolvedValue({}); mocks.account.mockReturnValue(mocks.auth.session.employeeId);
     }
+    if (state.startsWith("granted-")) {
+      vi.stubGlobal("Notification", { permission: "granted", requestPermission: vi.fn() });
+      if (state === "granted-other-account") { mocks.subscription.mockResolvedValue({}); mocks.account.mockReturnValue(mocks.auth.session.employeeId + 1); }
+    }
     render(workspace()); await act(async () => {});
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument(); expect(Notification.requestPermission).not.toHaveBeenCalled();
-    if (["manager", "unauthenticated", "denied", "unsupported", "install-ios"].includes(state)) expect(mocks.config).not.toHaveBeenCalled();
+    if (state !== "server-disabled") expect(mocks.config).not.toHaveBeenCalled();
+  });
+
+  test("does not invite after logout and login when browser permission remains granted", async () => {
+    vi.stubGlobal("Notification", { permission: "granted", requestPermission: vi.fn() });
+    const page = render(workspace());
+    mocks.auth.status = "unauthenticated"; page.rerender(workspace());
+    mocks.auth.status = "authenticated"; page.rerender(workspace());
+    await act(async () => {});
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(mocks.config).not.toHaveBeenCalled();
+    expect(Notification.requestPermission).not.toHaveBeenCalled();
+  });
+
+  test("rechecks permission after configuration loads", async () => {
+    let resolveConfig!: (value: object) => void;
+    mocks.config.mockReturnValue(new Promise(resolve => { resolveConfig = resolve; }));
+    render(workspace());
+    vi.stubGlobal("Notification", { permission: "granted", requestPermission: vi.fn() });
+    await act(async () => resolveConfig({ enabled: true, publicKey: "key" }));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  test("rechecks permission while waiting for the page to be ready", async () => {
+    const page = render(workspace(true));
+    await act(async () => {});
+    vi.stubGlobal("Notification", { permission: "granted", requestPermission: vi.fn() });
+    page.rerender(workspace());
+    await act(async () => {});
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
   test("ignores stale configuration after switching accounts", async () => {
@@ -111,7 +144,7 @@ describe("employee push welcome", () => {
     const viewport = new EventTarget(); Object.assign(viewport, { height: 500, offsetTop: 30 });
     const remove = vi.spyOn(viewport, "removeEventListener"); vi.stubGlobal("visualViewport", viewport);
     const originalOverflow = document.documentElement.style.overflow;
-    const page = render(workspace(false, true)); await waitFor(() => expect(mocks.subscription).toHaveBeenCalled());
+    const page = render(workspace(false, true)); await act(async () => {});
     expect(screen.queryByRole("dialog", { name: "Enable notifications" })).not.toBeInTheDocument();
     page.rerender(workspace()); const dialog = await screen.findByRole("dialog", { name: "Enable notifications" });
     expect(dialog.parentElement).toBe(document.body); expect(dialog.style.getPropertyValue("--push-visual-height")).toBe("500px");

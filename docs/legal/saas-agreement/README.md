@@ -64,10 +64,10 @@ Na podstawie aktualnych tras, interfejsów i usług projektu potwierdzono:
 
 - naliczanie płac, obsługa kadr, fakturowanie i rozliczenia podatkowe;
 - automatyczna, kompletna kontrola zgodności grafiku z prawem pracy;
-- integracje z systemami zewnętrznymi;
+- integracje biznesowe niewdrożone w uzgodnionym zakresie; SMTP odzyskiwania i opcjonalny Web Push są wdrożonymi interfejsami zewnętrznymi;
 - standardowa migracja danych;
 - natywne aplikacje mobilne i tryb offline;
-- eksport PDF z aktualnego interfejsu;
+- ogólny eksport grafików do PDF; istnieje pobieranie wgranego PDF regulaminu;
 - publiczny interfejs integracyjny dla Klienta;
 - gwarantowane SLA, 24/7, czas naprawy lub 100% dostępności;
 - samodzielna rejestracja i rozliczanie wielu niezależnych firm;
@@ -163,10 +163,8 @@ Aktualny, pełny inwentarz pozostałych placeholderów znajduje się w sekcji �
 - `[DO WYPEŁNIENIA: ADRES E-MAIL KONTAKTU PRAWNEGO KLIENTA]`
 - `[DO WYPEŁNIENIA: ADRES E-MAIL USŁUGODAWCY]`
 - `[DO WYPEŁNIENIA: ADRES E-MAIL WSPARCIA]`
-- `[DO WYPEŁNIENIA: ADRES E-MAIL]`
 - `[DO WYPEŁNIENIA: ADRES PLATFORMY]`
 - `[DO WYPEŁNIENIA: ADRES SIEDZIBY]`
-- `[DO WYPEŁNIENIA: ADRES ZAMIESZKANIA]`
 - `[DO WYPEŁNIENIA: CENNIK USŁUG DODATKOWYCH / WYCENA INDYWIDUALNA]`
 - `[DO WYPEŁNIENIA: DATA DPA]`
 - `[DO WYPEŁNIENIA: DATA ROZPOCZĘCIA OBOWIĄZYWANIA]`
@@ -182,17 +180,14 @@ Aktualny, pełny inwentarz pozostałych placeholderów znajduje się w sekcji �
 - `[DO WYPEŁNIENIA: LISTA SUBPROCESORÓW LUB MIEJSCE JEJ UDOSTĘPNIENIA]`
 - `[DO WYPEŁNIENIA: MAKSYMALNA LICZBA POCZĄTKOWYCH UŻYTKOWNIKÓW]`
 - `[DO WYPEŁNIENIA: MIEJSCOWOŚĆ]`
-- `[DO WYPEŁNIENIA: NIP – JEŻELI NADANY]`
 - `[DO WYPEŁNIENIA: NIP]`
 - `[DO WYPEŁNIENIA: NUMER RACHUNKU BANKOWEGO]`
-- `[DO WYPEŁNIENIA: NUMER TELEFONU]`
 - `[DO WYPEŁNIENIA: OSOBA KONTAKTOWA KLIENTA]`
 - `[DO WYPEŁNIENIA: OSOBA KONTAKTOWA USŁUGODAWCY]`
 - `[DO WYPEŁNIENIA: OSOBA REPREZENTUJĄCA KLIENTA]`
 - `[DO WYPEŁNIENIA: OSOBA REPREZENTUJĄCA]`
 - `[DO WYPEŁNIENIA: PEŁNA NAZWA SPÓŁKI]`
 - `[DO WYPEŁNIENIA: PEŁNA OPŁATA / PROPORCJONALNIE / INNA ZASADA]`
-- `[DO WYPEŁNIENIA: PESEL – TYLKO JEŻELI KONIECZNY]`
 - `[DO WYPEŁNIENIA: PIERWSZY DZIEŃ PIERWSZEGO OKRESU ROZLICZENIOWEGO]`
 - `[DO WYPEŁNIENIA: PLANOWANA DATA URUCHOMIENIA]`
 - `[DO WYPEŁNIENIA: PODSTAWA REPREZENTACJI]`

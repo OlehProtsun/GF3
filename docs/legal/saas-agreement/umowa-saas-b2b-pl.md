@@ -6,7 +6,7 @@ zawarta w **[DO WYPEŁNIENIA: MIEJSCOWOŚĆ]** w dniu **[DO WYPEŁNIENIA: DATA]*
 
 ## Strony
 
-1. **[DO WYPEŁNIENIA: IMIĘ I NAZWISKO]**, zamieszkały/a pod adresem **[DO WYPEŁNIENIA: ADRES ZAMIESZKANIA]**, zamierzający/a świadczyć usługi w ramach działalności nierejestrowanej, o ile spełnia aktualne przesłanki z art. 5 ustawy z dnia 6 marca 2018 r. – Prawo przedsiębiorców, NIP: **[DO WYPEŁNIENIA: NIP – JEŻELI NADANY]**, PESEL: **[DO WYPEŁNIENIA: PESEL – TYLKO JEŻELI KONIECZNY]**, adres e-mail: **[DO WYPEŁNIENIA: ADRES E-MAIL]**, numer telefonu: **[DO WYPEŁNIENIA: NUMER TELEFONU]**, zwany/a dalej „**Usługodawcą**”.
+1. **[OWNER_REQUIRED: pełna nazwa lub imię i nazwisko Usługodawcy, właściwy adres, potwierdzona forma prawna, odpowiednie identyfikatory rejestrowe/NIP, reprezentacja i kontakt]**, zwany dalej „**Usługodawcą**”. Działalność nierejestrowana jest wyłącznie wariantem wymagającym osobnego potwierdzenia przesłanek, nie ustalonym faktem.
 
    **[DO WERYFIKACJI PRAWNEJ: STATUS I SPOSÓB IDENTYFIKACJI USŁUGODAWCY]**
 
@@ -272,9 +272,9 @@ Usługodawca i Klient są dalej łącznie zwani „**Stronami**”, a każdy z o
 3. Nieważność albo bezskuteczność pojedynczego postanowienia nie narusza pozostałej części Umowy. Strony zastąpią je zgodnym z prawem postanowieniem możliwie najbliższym celowi gospodarczemu.
 4. Integralną część Umowy stanowi Załącznik nr 1 – Zakres usług i funkcjonalności Platformy. Umowa powierzenia danych, Regulamin i inne dokumenty stają się integralne tylko po ich wskazaniu i przyjęciu przez Strony.
 5. W razie sprzeczności dokumentów pierwszeństwo mają:
-   1. indywidualnie podpisany aneks;
-   2. Umowa;
-   3. umowa powierzenia przetwarzania danych – wyłącznie w sprawach ochrony danych osobowych;
+   1. umowa powierzenia przetwarzania danych — w sprawach ochrony danych, z zachowaniem bezwzględnie obowiązującego prawa;
+   2. indywidualnie uzgodniony aneks w pozostałych sprawach;
+   3. Umowa;
    4. Załącznik nr 1;
    5. Regulamin świadczenia usług drogą elektroniczną;
    6. pozostałe przyjęte załączniki.
@@ -294,3 +294,12 @@ Usługodawca i Klient są dalej łącznie zwani „**Stronami**”, a każdy z o
 1. Załącznik nr 1 – Zakres usług i funkcjonalności Platformy – **dołączony**.
 2. Umowa powierzenia przetwarzania danych osobowych – **odrębny dokument do przygotowania przed przetwarzaniem danych w imieniu Klienta**.
 3. Regulamin świadczenia usług drogą elektroniczną – **odrębny dokument do przygotowania**.
+
+## § 23. Uzgodnienia projektu i zgodność dokumentów
+
+1. Wszystkie postanowienia niniejszej wersji są proponowanymi warunkami umownymi do negocjacji i zatwierdzenia. W szczególności 500 PLN miesięcznie, płatność z góry, 7 dni od prawidłowego dokumentu, jednomiesięczne wypowiedzenie na koniec miesiąca, cel kontaktu 2 Dni Robocze, reklamacja 14 dni, limit odpowiedzialności 6 miesięcy opłat i okna eksportu/usunięcia 14/45 dni wymagają rzeczywistej akceptacji Stron i kontroli prawnej. Kwota nie przesądza netto/brutto, zwolnienia lub stawki VAT. Wariant płatności z dołu albo pilotażu z checklisty nie obowiązuje bez wyraźnego uzgodnienia.
+2. Usługa obejmuje wyłącznie zakres Załącznika nr 1, z uwzględnieniem korekt, historii, wersji grafików, potwierdzeń PDF i opcjonalnego push, jeśli zostały zamówione. Generator wspiera planowanie; Klient odpowiada za kontrolę i prawidłową organizację czasu pracy. Publikacja i korekta nie są poświadczeniem zgodności prawa pracy.
+3. Osobiste potwierdzenie PDF przez pracownika lub menedżera nie stanowi podpisu tej Umowy ani DPA, chyba że odrębny prawnie skuteczny proces z umocowaniem Stron wyraźnie ustanowiono. Sam techniczny gate tego nie ustanawia. Nie jest też zgodą na wszystkie cele przetwarzania.
+4. W zakresie danych powierzonych DPA ma pierwszeństwo przed sprzecznym warunkiem handlowym i reguluje wybór zwrotu/usunięcia. Sporna płatność nie uprawnia do zatrzymania całego zbioru pracowników. Dopuszczalny limit odpowiedzialności między Stronami nie ogranicza praw osób z RODO, uprawnień organu ani odpowiedzialności, której ograniczyć nie wolno.
+5. Umowa nie wyłącza ochrony osoby fizycznej prowadzącej działalność przy niezawodowym charakterze umowy, jeżeli właściwe przepisy tak stanowią. Kwalifikację, prawa odstąpienia/reklamacji i skuteczność postanowień ocenia się przed podpisaniem; sam NIP lub oznaczenie B2B nie rozstrzygają.
+6. Wypowiedzenie i zawiadomienia wysyła się uzgodnionym kanałem pozwalającym wykazać nadawcę, treść i doręczenie. Przed podpisaniem Strony potwierdzają działanie kontaktów, zdolność realizacji terminów i załączniki. Projekt nie zapewnia automatycznego odnowienia nowego okresu oznaczonego bez wyraźnego uzgodnienia ani gwarantowanego SLA, dyżuru 24/7, certyfikacji lub odtworzenia każdej operacji.

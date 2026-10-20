@@ -2,7 +2,7 @@
 
 WERSJA ROBOCZA — DO WERYFIKACJI PRAWNEJ
 
-Wersja: 0.1.0-draft | Obowiązuje od: [DO UZUPEŁNIENIA]
+Wersja: 0.2.0-draft | Obowiązuje od: [DO UZUPEŁNIENIA]
 Operator: [DO UZUPEŁNIENIA]
 
 ## Zakres i dowody — 2026-10-08
@@ -34,3 +34,7 @@ Rzeczywista domena, reverse proxy, dostawcy i produkcyjne nagłówki: [DO UZUPE�
 Nie dodano bannera: nie stwierdzono opcjonalnego śledzenia w ograniczonym zakresie. Preferencje nie są reklamowymi cookies, ale ich niezbędność i faktyczna domena wymagają oceny. Jeśli wyjątek nie przysługuje lub pojawi się tracking, wstrzymać odpowiednie zapisy/skrypty przed produkcją aż do odrębnego przetestowanego mechanizmu zgody i cofnięcia. Sama polityka nie daje zgody.
 
 Wewnętrzne ryzyko: token w localStorage jest dostępny dla skryptów tej samej origin; XSS i sześciocyfrowe dane logowania wymagają przeglądu bezpieczeństwa przed danymi pracowników. Nie zmieniono auth, TTL ani storage. Stan języka jest zarządzany istniejącym providerem/API, bez wykrytego własnego localStorage w tym providerze.
+
+## Aktualizacja zakresu 2026-10-19
+
+Historyczne testy z 2026-10-08 i bazowych commitów pozostają dowodami wyłącznie wskazanego czasu i środowiska. Bieżący stan kodu 171aec08 obejmuje service worker, Web Push, dodatkowe klucze gf3.push.employeeId i gf3.push.invitation.*, korekty, historię PDF i archiwizację pracownika. Pełny aktualny inwentarz: docs/client-launch-package/03-cookies-and-storage/wykaz-cookies-i-storage.md; źródła i ograniczenia: LEGAL_SOURCES_2026-10-19.md; wynik bieżącego przeglądu: LEGAL_COMPLETION_REPORT_2026-10-19.md. Nie traktować poprzedniego lokalnego testu jako aktualnego audytu domeny produkcyjnej.

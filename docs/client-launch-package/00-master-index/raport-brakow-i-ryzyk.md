@@ -3,12 +3,12 @@
 | Metadane | Wartość |
 | --- | --- |
 | Produkt | GF |
-| Wersja | [DO WYPEŁNIENIA: NUMER WERSJI] |
+| Wersja | 0.2.0-draft |
 | Status | DRAFT – WYMAGA WERYFIKACJI |
 | Właściciel | [DO WYPEŁNIENIA: WŁAŚCICIEL DOKUMENTU] |
 | Recenzent | [DO WYPEŁNIENIA: RECENZENT] |
 | Data obowiązywania | [DO WYPEŁNIENIA: DATA OBOWIĄZYWANIA] |
-| Data przeglądu | [DO WYPEŁNIENIA: DATA PRZEGLĄDU] |
+| Data przeglądu | 2026-10-19 — przegląd redakcyjny i kodu; bez zatwierdzenia prawnego |
 | Dokumenty powiązane | final review; security; backup; cookies |
 | Klasyfikacja | POUFNY |
 
@@ -26,9 +26,9 @@ Pakiet jest kompletnym szkieletem do profesjonalnego przeglądu, ale nie potwier
 | Wysoki | dostawcy/regiony nieustalone | hosting i SMTP niepotwierdzone | DPA/produkcję | inwentaryzacja i umowy podprocesorów |
 | Wysoki | zewnętrzne media | dowolny image URL i youtube-nocookie iframe | produkcję/polityki | wyłączyć/proxy/click-to-load |
 | Wysoki | TLS niepotwierdzony produkcyjnie | repo ma osobny overlay HTTPS | produkcję | test publicznego HTTPS i proxy |
-| Wysoki | brak logowania akceptacji prawa | brak wersji/dat akceptacji i publicznych tras polityk | start | proces poza systemem lub wdrożenie |
+| Wysoki | brak produkcyjnego dowodu właściwej publikacji i potwierdzenia | Kod ma publiczne strony, wersje/hash PDF, acceptedAt i gate 428 | start | prawnik/operator: właściwy PDF i test obu ról, nie nowa implementacja |
 | Średni | pola swobodne | notatki/komunikaty mogą przyjąć dane szczególne | onboarding | zakaz, szkolenie, minimalizacja |
-| Średni | brak pełnego self-service delete/export | częściowe eksporty i manager deletion zależne od relacji | DPA/exit | zakres/formats/runbook i test |
+| Średni | brak pełnego self-service delete/export | wybrane eksporty; IsDeleted zachowuje profil i historię, usuwa konto | DPA/exit | zakres, formaty, kontrolowane usunięcie i test |
 | Średni | monitoring i metadane | logi aktora; brak potwierdzonego IP/UA/alertingu | produkcję | minimalny monitoring i retencja |
 | Blokujący biznesowo | status działalności/VAT/KSeF/PIT/ZUS | brak możliwości rozstrzygnięcia z kodu | podpis/fakturę | prawnik + księgowy + doradca podatkowy |
 
@@ -51,3 +51,16 @@ Zamknąć decyzje z final-review, wykonać przeglądy specjalistyczne, wdrożyć
 | Akceptacja wersji dokumentów | brak dowodu w aplikacji | Regulamin/privacy/cookies | onboarding lub moduł legal | wersja, czas, użytkownik, typ akcji i eksport dowodu albo zatwierdzony proces zewnętrzny | Wysoki | brak rozliczalności | Tak lub proces kompensujący |
 | Kontrolowany export/delete | częściowe funkcje i zależności encji | DPA E, exit | eksporty, konta, retencja | test kompletności, autoryzacji, formatów, aktywnego usunięcia i backup expiry | Wysoki | nadmiarowa retencja/niepełny zwrot | Tak |
 | Monitoring i incident readiness | brak potwierdzonych alertów | DPA, polityka incydentów | health/logging/alerting | alert testowy, dyżur, retencja logów bez sekretów, ćwiczenie tabletop | Średni | późna detekcja | Tak |
+
+## Otwarte warunki przeglądu 2026-10-19
+
+- OWNER_REQUIRED: rzeczywista tożsamość, forma działalności, kontakty, terminy/cena/VAT i zdolność wsparcia; weryfikacja dokumentem i testem kontaktu.
+- CLIENT_REQUIRED: tożsamość/umocowanie, podstawy i informacja pracowników, retencja, rzeczywista kontrola generatora, instrukcje i podpisy.
+- ACCOUNTANT_REQUIRED: kwartalny limit działalności nierejestrowanej 2026, VAT/NIP/PIT/ZUS, dokumenty i przejściowe KSeF do 2027; decyzja na danych całej działalności.
+- LAWYER_REQUIRED: pełna aktualność prawa (w tym ograniczony dostęp EUR-Lex), kontrakty i art. 28, prawa JDG, art. 22/DPIA, AI Act i jego zmiany 2026, DSA/EAA/KSC, prawo pracy, terminy i granice odpowiedzialności.
+- INFRASTRUCTURE_REQUIRED: rzeczywiści hosting/SMTP/backup/wsparcie/bramy push, role, regiony, umowy, transfery, TLS, izolacja, szyfrowanie i retencja endpointów.
+- PRODUCTION_TEST_REQUIRED: hardening 6-cyfrowych haseł i tokenu localStorage, skuteczność uprawnień/izolacji, restore, exit/usunięcie historii, runtime cookies/storage/media i push offline/zmiana konta/ekran blokady.
+
+Brak mechanizmu prior opt-in dla opcjonalnych zapisów i mediów pozostaje STOP-SHIP dla ich wydania, do wdrożenia albo uzasadnionego wyłączenia operacji. Zakończone delivery push >5 dni nie wyznaczają TTL wszystkich danych. Soft-delete nie wykonuje pełnego erasure. Kod potwierdzeń PDF istnieje; brakującym dowodem jest poprawny zatwierdzony PDF i test produkcji, nie implementacja od zera.
+
+Dokładne pliki, sekcje, pola, powód niemożności ustalenia z kodu, odpowiedzialność, metoda i wpływ znajdują się w rejestrze placeholderów. Nie zmieniono żadnego statusu na APPROVED. Otwarte warunki blokują zatwierdzenie/publikację i produkcję, mimo przygotowania treści do przeglądu.

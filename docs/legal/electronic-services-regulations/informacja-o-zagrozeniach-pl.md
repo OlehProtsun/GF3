@@ -75,4 +75,3 @@ Awaria łącza, urządzenia, zewnętrznego dostawcy albo Przerwa Techniczna mog�
 5. W razie podejrzenia przejęcia Konta należy przerwać korzystanie z podejrzanego urządzenia, zgłosić zdarzenie i wykonać instrukcje dotyczące unieważnienia sesji lub zmiany Hasła.
 
 **[DO WERYFIKACJI TECHNICZNEJ: PRODUKCYJNY PROCES OBSŁUGI INCYDENTÓW, GODZINY MONITOROWANIA I OSOBY ODPOWIEDZIALNE]**
-
