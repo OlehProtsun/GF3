@@ -70,6 +70,13 @@ export function ContainerGraphPresetSelect({
     () => new Map(shops.map(shop => [shop.id, shop.name])),
     [shops],
   );
+  const nameCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const preset of presets) counts.set(preset.name, (counts.get(preset.name) ?? 0) + 1);
+    return counts;
+  }, [presets]);
+  const displayName = (preset: SchedulePreset) =>
+    (nameCounts.get(preset.name) ?? 0) > 1 ? `${preset.name} #${preset.id}` : preset.name;
   const selectedPreset = useMemo(
     () => presets.find(preset => preset.id === selectedPresetId) ?? null,
     [presets, selectedPresetId],
@@ -138,7 +145,7 @@ export function ContainerGraphPresetSelect({
     closeDropdown();
   };
 
-  const triggerLabel = selectedPreset?.name ?? t("Apply preset");
+  const triggerLabel = selectedPreset ? displayName(selectedPreset) : t("Apply preset");
   const triggerHint = selectedPreset
     ? getPresetHint(selectedPreset, shopNameById)
     : isLoading
@@ -188,7 +195,7 @@ export function ContainerGraphPresetSelect({
                     onClick={() => handleSelect(preset.id)}
                   >
                     <div className={styles.optionBody}>
-                      <span className={styles.optionName}>{preset.name}</span>
+                      <span className={styles.optionName}>{displayName(preset)}</span>
                       <span className={styles.optionHint}>{getPresetHint(preset, shopNameById)}</span>
                       <span className={styles.optionMeta}>{getPresetMeta(preset)}</span>
                     </div>

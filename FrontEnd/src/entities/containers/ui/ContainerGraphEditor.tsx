@@ -494,8 +494,8 @@ export function ContainerGraphEditor({
     return window.matchMedia(DESKTOP_MEDIA_QUERY).matches;
   });
   const graphContainerId = graph?.containerId ?? null;
-  const graphId = graph?.id ?? null;
-  const swapHighlightSettingQuery = useGraphShiftSwapHighlightSettingQuery(graphContainerId, graphId);
+  const persistedGraphId = graph && Number.isInteger(graph.id) && graph.id > 0 ? graph.id : null;
+  const swapHighlightSettingQuery = useGraphShiftSwapHighlightSettingQuery(graphContainerId, persistedGraphId);
   const saveSwapHighlightSettingMutation = useSaveGraphShiftSwapHighlightSettingMutation();
 
   const allSectionsCollapsed = Object.values(collapsedSections).every(Boolean);
@@ -507,11 +507,11 @@ export function ContainerGraphEditor({
   }, [swapHighlightSettingQuery.data?.highlightColor]);
 
   const handleSwapHighlightColorChange = (highlightColor: string) => {
-    if (graphContainerId === null || graphId === null) return;
+    if (graphContainerId === null || persistedGraphId === null) return;
     setSwapHighlightColor(highlightColor);
     setIsSwapColorDialogOpen(false);
     setSwapColorError(null);
-    saveSwapHighlightSettingMutation.mutate({ containerId: graphContainerId, graphId, highlightColor }, {
+    saveSwapHighlightSettingMutation.mutate({ containerId: graphContainerId, graphId: persistedGraphId, highlightColor }, {
       onError: error => setSwapColorError(getErrorMessage(error, t("Could not save the accepted swap highlight color."))),
     });
   };
@@ -790,7 +790,7 @@ export function ContainerGraphEditor({
                 <div className={styles.publicationHeaderTools}>
                   <button type="button" className={styles.publicationColorControl}
                     title={t("Accepted swap highlight color")} aria-label={t("Accepted swap highlight color")}
-                    disabled={graphId === null || saveSwapHighlightSettingMutation.isPending}
+                    disabled={persistedGraphId === null || saveSwapHighlightSettingMutation.isPending}
                     onClick={() => setIsSwapColorDialogOpen(true)}>
                     <span className={styles.publicationColorSwatch}
                       style={{ backgroundColor: swapHighlightColor }} aria-hidden="true" />
@@ -924,7 +924,7 @@ export function ContainerGraphEditor({
               >
                 <ContainerGraphShiftCorrectionsCard
                   containerId={graph?.containerId ?? null}
-                  graphId={graph?.id ?? null}
+                  graphId={persistedGraphId}
                   hasUnsavedChanges={Boolean(hasUnsavedChanges)}
                   disabled={isSaving || isGenerating}
                   onApproved={onVersionCheckoutComplete}
@@ -1195,7 +1195,7 @@ export function ContainerGraphEditor({
                       <ToolbarActionButton
                         label={t("Versions")}
                         icon={<SwapHistoryIcon size={15} />}
-                        disabled={!graph || isSaving || isGenerating || isStylingBusy}
+                        disabled={persistedGraphId === null || isSaving || isGenerating || isStylingBusy}
                         onClick={() => setIsVersionsDialogOpen(true)}
                       />
 
@@ -1301,7 +1301,7 @@ export function ContainerGraphEditor({
       <ContainerGraphVersionsDialog
         open={isVersionsDialogOpen}
         containerId={graph?.containerId ?? null}
-        graphId={graph?.id ?? null}
+        graphId={persistedGraphId}
         hasUnsavedChanges={hasUnsavedChanges}
         onCancel={() => setIsVersionsDialogOpen(false)}
         onCheckoutComplete={onVersionCheckoutComplete}

@@ -179,7 +179,7 @@ public class ContainerService : IContainerService
             return null;
         }
 
-        return (await _schedulePresetRepo.GetByContainerAsync(containerId, readCt).ConfigureAwait(false))
+        return (await _schedulePresetRepo.GetAllAsync(readCt).ConfigureAwait(false))
             .Select(x => x.ToContract())
             .ToList();
     }

@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, renderHook, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -7,6 +7,8 @@ import { getGraphCellKey } from "../model/graphWorkspace";
 import type { GraphEmployee, GraphSlot } from "../model/types";
 import {
   useCreateContainerMutation,
+  useCreateSchedulePresetMutation,
+  useSchedulePresetsQuery,
   useCreateGraphMutation,
   useDeleteContainerMutation,
   useDeleteGraphMutation,
@@ -242,7 +244,7 @@ describe("container graph workspace query mutation", () => {
       { queryKey: queryKeys.containers.all },
       { queryKey: queryKeys.containers.byId(2) },
       { queryKey: queryKeys.containers.graphs(2) },
-      { queryKey: queryKeys.containers.schedulePresets(2) },
+      { queryKey: queryKeys.containers.schedulePresets() },
       { queryKey: queryKeys.containers.graphs(2) },
       { queryKey: queryKeys.containers.graphs(2) },
       { queryKey: queryKeys.containers.graphById(2, 66) },
@@ -340,5 +342,37 @@ describe("container graph workspace query mutation", () => {
       { queryKey: queryKeys.employeeSchedules.all },
       { queryKey: queryKeys.shiftSwaps.all },
     ]);
+  });
+});
+
+
+describe("global schedule presets", () => {
+  test("shares one cache across containers and refreshes B when A creates a preset", async () => {
+    const client = new QueryClient();
+    const invalidate = vi.spyOn(client, "invalidateQueries");
+    const initial = [{ id: 8, containerId: null, name: "Retained" }];
+    const added = { id: 9, containerId: 1, name: "New" };
+    apiMocks.listSchedulePresets.mockResolvedValue(initial);
+    apiMocks.createSchedulePreset.mockResolvedValue(added);
+    const wrapper = ({ children }: { children: React.ReactNode }) =>
+      <QueryClientProvider client={client}>{children}</QueryClientProvider>;
+    const b = renderHook(() => useSchedulePresetsQuery(2), { wrapper });
+    await waitFor(() => expect(b.result.current.data).toEqual(initial));
+    const a = renderHook(() => useSchedulePresetsQuery(1), { wrapper });
+    await waitFor(() => expect(a.result.current.data).toEqual(initial));
+    expect(a.result.current.data).toEqual(b.result.current.data);
+    apiMocks.listSchedulePresets.mockResolvedValue([...initial, added]);
+    const create = renderHook(() => useCreateSchedulePresetMutation(), { wrapper });
+    act(() => create.result.current.mutate({ containerId: 1, payload: { ...graphPayload, name: "New", scheduleName: "Schedule", employees: [] } }));
+    await waitFor(() => expect(b.result.current.data).toEqual([...initial, added]));
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: queryKeys.containers.schedulePresets() });
+    expect(apiMocks.listSchedulePresets).toHaveBeenCalledWith(2, expect.any(AbortSignal));
+  });
+
+  test.each([null, 0, -1, 1.5])("does not fetch for invalid container %s", containerId => {
+    const client = new QueryClient();
+    renderHook(() => useSchedulePresetsQuery(containerId), { wrapper: ({ children }) =>
+      <QueryClientProvider client={client}>{children}</QueryClientProvider> });
+    expect(apiMocks.listSchedulePresets).not.toHaveBeenCalled();
   });
 });

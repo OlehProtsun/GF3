@@ -389,10 +389,10 @@ export function PresenceProvider({ children }: PropsWithChildren) {
 
       case managerEditResourceTypes.container:
         invalidateRealtimeQuery(queryClient, queryKeys.containers.all);
+        invalidateRealtimeQuery(queryClient, queryKeys.containers.schedulePresets());
         if (resourceId !== null) {
           invalidateRealtimeQuery(queryClient, queryKeys.containers.byId(resourceId));
           invalidateRealtimeQuery(queryClient, queryKeys.containers.graphs(resourceId));
-          invalidateRealtimeQuery(queryClient, queryKeys.containers.schedulePresets(resourceId));
           invalidateRealtimeQuery(queryClient, queryKeys.containers.graphRecordsPrefix(resourceId));
         }
         break;

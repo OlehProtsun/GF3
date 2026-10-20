@@ -404,7 +404,7 @@ public sealed class FacadeAndControllerRouteTests
         var preset = new SchedulePresetModel
         {
             Id = 8,
-            ContainerId = container.Id,
+            ContainerId = null,
             Name = "April Preset",
             ScheduleName = "Preset Graph",
             ShopId = 2,
@@ -602,8 +602,13 @@ public sealed class FacadeAndControllerRouteTests
         }, CancellationToken.None);
 
         Assert.IsType<OkObjectResult>(allResult.Result);
-        Assert.IsType<OkObjectResult>(presetResult.Result);
-        Assert.IsType<CreatedAtActionResult>(createPresetResult.Result);
+        var presetOk = Assert.IsType<OkObjectResult>(presetResult.Result);
+        var presetDtos = Assert.IsAssignableFrom<IEnumerable<SchedulePresetDto>>(presetOk.Value);
+        Assert.Null(Assert.Single(presetDtos).ContainerId);
+        Assert.Contains("\"containerId\":null", System.Text.Json.JsonSerializer.Serialize(presetDtos,
+            new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web)));
+        var presetCreated = Assert.IsType<CreatedAtActionResult>(createPresetResult.Result);
+        Assert.Equal(container.Id, Assert.IsType<SchedulePresetDto>(presetCreated.Value).ContainerId);
         Assert.IsType<OkObjectResult>(graphByIdResult.Result);
         Assert.IsType<CreatedAtActionResult>(createGraphResult.Result);
         Assert.IsType<NoContentResult>(updateGraphResult);
