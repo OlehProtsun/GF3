@@ -148,6 +148,51 @@ public sealed class ContainerServiceTests
     }
 
     [Fact]
+    public async Task SchedulePresets_AreGlobal_AndSurviveOriginDeletion()
+    {
+        await using var database = await SqliteTestDatabase.CreateAsync();
+        await using var context = database.CreateContext();
+        var service = CreateService(context, new FakeScheduleGenerator());
+        var a = TestDataFactory.CreateDalContainer("A");
+        var b = TestDataFactory.CreateDalContainer("B");
+        var c = TestDataFactory.CreateDalContainer("C");
+        var shop = TestDataFactory.CreateDalShop();
+        var employee = TestDataFactory.CreateDalEmployee();
+        context.AddRange(a, b, c, shop, employee);
+        await context.SaveChangesAsync();
+        SchedulePresetModel Input() => new()
+        {
+            Name = "Same name", ScheduleName = "Schedule", ShopId = shop.Id, Year = 2026, Month = 4,
+            PeoplePerShift = 1, Shift1Time = "08:00 - 16:00", Shift2Time = "16:00 - 20:00",
+            MaxHoursPerEmpMonth = 160, MaxConsecutiveDays = 5, MaxConsecutiveFull = 2, MaxFullPerMonth = 4,
+            Employees = [new() { EmployeeId = employee.Id, MinHoursMonth = 80 }],
+        };
+        var first = await service.CreateSchedulePresetAsync(a.Id, Input());
+        var second = await service.CreateSchedulePresetAsync(b.Id, Input());
+        Assert.NotEqual(first.Id, second.Id);
+        foreach (var origin in new[] { a.Id, b.Id })
+        {
+            var presets = (await service.GetSchedulePresetsAsync(origin))!;
+            Assert.Equal(new[] { first.Id, second.Id }.Order(), presets.Select(p => p.Id).Order());
+            Assert.Equal(a.Id, presets.Single(p => p.Id == first.Id).ContainerId);
+            Assert.Equal(b.Id, presets.Single(p => p.Id == second.Id).ContainerId);
+            Assert.All(presets, p => { Assert.Equal(employee.Id, Assert.Single(p.Employees).EmployeeId); Assert.Equal(80, p.Employees.Single().MinHoursMonth); });
+        }
+        await Assert.ThrowsAsync<ValidationException>(() => service.CreateSchedulePresetAsync(a.Id, Input()));
+        Assert.Null(await service.GetSchedulePresetsAsync(int.MaxValue));
+        await Assert.ThrowsAsync<KeyNotFoundException>(() => service.CreateSchedulePresetAsync(int.MaxValue, Input()));
+        Assert.True((await service.TryDeleteAsync(a.Id)).Succeeded);
+        var retained = (await service.GetSchedulePresetsAsync(b.Id))!.Single(p => p.Id == first.Id);
+        Assert.Null(retained.ContainerId);
+        Assert.Equal(first.Employees.Single().Id, Assert.Single(retained.Employees).Id);
+        Assert.Equal(80, retained.Employees.Single().MinHoursMonth);
+        Assert.True((await service.TryDeleteAsync(b.Id)).Succeeded);
+        var orphans = (await service.GetSchedulePresetsAsync(c.Id))!;
+        Assert.Equal(2, orphans.Count);
+        Assert.All(orphans, p => Assert.Null(p.ContainerId));
+    }
+
+    [Fact]
     public async Task GenerateGraphPreviewAsync_UsesNormalizedEmployeesAndAvailability()
     {
         await using var database = await SqliteTestDatabase.CreateAsync();

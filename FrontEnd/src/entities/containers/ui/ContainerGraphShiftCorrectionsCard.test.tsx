@@ -3,10 +3,12 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 import { ContainerGraphShiftCorrectionsCard } from "./ContainerGraphShiftCorrectionsCard";
 
-const mocks = vi.hoisted(() => ({ saveSetting: vi.fn() }));
+const mocks = vi.hoisted(() => ({ saveSetting: vi.fn(), approve: vi.fn(), reject: vi.fn(), graphQuery: vi.fn(), settingQuery: vi.fn() }));
 
 vi.mock("@entities/shift-corrections", () => ({
-  useGraphShiftCorrectionsQuery: () => ({
+  useGraphShiftCorrectionsQuery: (containerId: number | null, graphId: number | null) => {
+    mocks.graphQuery(containerId, graphId);
+    return ({
     data: [{
       id: 4, containerId: 2, scheduleId: 9, scheduleSlotId: 21, scheduleName: "August", shopName: "Central",
       year: 2026, month: 8, dayOfMonth: 12, employeeId: 7, employeeName: "Oleh Protsun",
@@ -15,15 +17,15 @@ vi.mock("@entities/shift-corrections", () => ({
     }],
     isLoading: false,
     isError: false,
-  }),
-  useShiftCorrectionSettingQuery: () => ({ data: { highlightColor: "#FDE68A" } }),
+  }); },
+  useShiftCorrectionSettingQuery: (enabled: boolean) => { mocks.settingQuery(enabled); return { data: { highlightColor: "#FDE68A" } }; },
   useSaveShiftCorrectionSettingMutation: () => ({ mutate: mocks.saveSetting, isPending: false }),
-  useApproveShiftCorrectionMutation: () => ({ mutate: vi.fn(), isPending: false }),
-  useRejectShiftCorrectionMutation: () => ({ mutate: vi.fn(), isPending: false }),
+  useApproveShiftCorrectionMutation: () => ({ mutate: mocks.approve, isPending: false }),
+  useRejectShiftCorrectionMutation: () => ({ mutate: mocks.reject, isPending: false }),
 }));
 
 describe("ContainerGraphShiftCorrectionsCard", () => {
-  beforeEach(() => mocks.saveSetting.mockReset());
+  beforeEach(() => Object.values(mocks).forEach(mock => mock.mockClear()));
 
   test("expands request details in place", async () => {
     const user = userEvent.setup();
@@ -67,4 +69,35 @@ describe("ContainerGraphShiftCorrectionsCard", () => {
     expect(mocks.saveSetting).toHaveBeenCalledWith("#DBEAFE", expect.objectContaining({ onError: expect.any(Function) }));
     expect(screen.queryByRole("dialog", { name: "Choose approval color" })).not.toBeInTheDocument();
   });
+});
+
+
+test.each([0, null, -1])("disables correction actions and settings for unsaved graph %s", async graphId => {
+  const user = userEvent.setup();
+  render(<ContainerGraphShiftCorrectionsCard containerId={2} graphId={graphId}
+    hasUnsavedChanges={false} disabled={false} onApproved={() => undefined} />);
+  expect(mocks.settingQuery).toHaveBeenLastCalledWith(false);
+  expect(mocks.graphQuery).toHaveBeenLastCalledWith(2, graphId);
+  expect(screen.getByRole("button", { name: "Approved correction highlight color" })).toBeDisabled();
+  await user.click(screen.getByRole("listitem"));
+  const approve = screen.getByRole("button", { name: "Approve" });
+  const reject = screen.getByRole("button", { name: "Reject" });
+  expect(approve).toBeDisabled();
+  expect(reject).toBeDisabled();
+  await user.click(approve);
+  await user.click(reject);
+  expect(mocks.approve).not.toHaveBeenCalled();
+  expect(mocks.reject).not.toHaveBeenCalled();
+});
+
+test("allows approval and rejection for persisted graphs", async () => {
+  const user = userEvent.setup();
+  render(<ContainerGraphShiftCorrectionsCard containerId={2} graphId={9}
+    hasUnsavedChanges={false} disabled={false} onApproved={() => undefined} />);
+  expect(mocks.settingQuery).toHaveBeenLastCalledWith(true);
+  await user.click(screen.getByRole("listitem"));
+  await user.click(screen.getByRole("button", { name: "Approve" }));
+  await user.click(screen.getByRole("button", { name: "Reject" }));
+  expect(mocks.approve).toHaveBeenCalledWith(expect.objectContaining({ containerId: 2, graphId: 9, id: 4 }), expect.any(Object));
+  expect(mocks.reject).toHaveBeenCalledWith({ containerId: 2, graphId: 9, id: 4 }, expect.any(Object));
 });

@@ -2089,9 +2089,6 @@ export function ContainerGraphEditPage() {
       payload,
     });
 
-    void queryClient.invalidateQueries({
-      queryKey: queryKeys.containers.schedulePresets(containerId),
-    });
     setSelectedSchedulePresetId(createdPreset.id);
   };
 

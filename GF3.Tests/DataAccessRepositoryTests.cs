@@ -513,7 +513,7 @@ public sealed class DataAccessRepositoryTests
     }
 
     [Fact]
-    public async Task SchedulePresetRepository_GetAllAndByContainer_OrderByNameAndIncludeEmployees()
+    public async Task SchedulePresetRepository_GetAll_OrdersGloballyAndIncludesEmployees()
     {
         await using var database = await SqliteTestDatabase.CreateAsync();
         await using var context = database.CreateContext();
@@ -549,18 +549,16 @@ public sealed class DataAccessRepositoryTests
         var repository = new SchedulePresetRepository(context);
 
         var all = await repository.GetAllAsync();
-        var byContainer = await repository.GetByContainerAsync(firstContainer.Id);
         var duplicateInFirst = await repository.ExistsByNameAsync(firstContainer.Id, "Alpha");
         var duplicateExcluded = await repository.ExistsByNameAsync(firstContainer.Id, "Alpha", alpha.Id);
         var sameNameOtherContainer = await repository.ExistsByNameAsync(secondContainer.Id, "Alpha");
 
         Assert.Equal(["Alpha", "Beta", "Gamma"], all.Select(preset => preset.Name));
-        Assert.Equal(["Alpha", "Beta"], byContainer.Select(preset => preset.Name));
-        Assert.Equal(80, Assert.Single(byContainer[0].Employees).MinHoursMonth);
+        Assert.Equal(80, Assert.Single(all[0].Employees).MinHoursMonth);
         Assert.True(duplicateInFirst);
         Assert.False(duplicateExcluded);
         Assert.False(sameNameOtherContainer);
-        Assert.Equal(EntityState.Detached, context.Entry(byContainer[0]).State);
+        Assert.Equal(EntityState.Detached, context.Entry(all[0]).State);
     }
 
     [Fact]

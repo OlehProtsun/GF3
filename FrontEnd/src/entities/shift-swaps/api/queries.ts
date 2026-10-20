@@ -52,7 +52,7 @@ export const useGraphShiftSwapLogQuery = (containerId: number | null, graphId: n
 export const useGraphShiftSwapHighlightSettingQuery = (containerId: number | null, graphId: number | null) =>
   useQuery({
     queryKey: queryKeys.shiftSwaps.graphHighlightSetting(containerId ?? 0, graphId ?? 0),
-    enabled: containerId !== null && graphId !== null,
+    enabled: Number.isInteger(containerId) && containerId !== null && containerId > 0 && Number.isInteger(graphId) && graphId !== null && graphId > 0,
     staleTime: 300_000,
     queryFn: ({ signal }) => shiftSwapsApi.getHighlightSetting(containerId as number, graphId as number, signal),
   });

@@ -1,10 +1,11 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, renderHook, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { queryKeys } from "@shared/api/queryKeys";
 import { useState } from "react";
 import {
+  useGraphShiftSwapHighlightSettingQuery,
   useAcceptEmployeeShiftSwapMutation,
   useCancelEmployeeShiftSwapMutation,
   useCancelManagerManualShiftSwapMutation,
@@ -15,6 +16,7 @@ import {
 } from "./queries";
 
 const apiMocks = vi.hoisted(() => ({
+  getHighlightSetting: vi.fn(),
   createEmployee: vi.fn(),
   acceptEmployee: vi.fn(),
   cancelEmployee: vi.fn(),
@@ -92,6 +94,7 @@ function renderHarness(client: QueryClient) {
 
 beforeEach(() => {
   Object.values(apiMocks).forEach(mock => mock.mockReset());
+  apiMocks.getHighlightSetting.mockResolvedValue({ highlightColor: "#BBF7D0" });
   apiMocks.createEmployee.mockResolvedValue({});
   apiMocks.acceptEmployee.mockResolvedValue({});
   apiMocks.cancelEmployee.mockResolvedValue({});
@@ -183,5 +186,24 @@ describe("shift swap query mutations", () => {
       { queryKey: queryKeys.containers.graphSlots(2, 10) },
     ]);
     expect(events).toContain(`invalidate:${JSON.stringify(queryKeys.containers.graphSlots(2, 10))}`);
+  });
+});
+
+const highlightWrapper = ({ children }: { children: React.ReactNode }) =>
+  <QueryClientProvider client={new QueryClient()}>{children}</QueryClientProvider>;
+
+describe("useGraphShiftSwapHighlightSettingQuery", () => {
+  test.each([null, 0, -1, 1.5])("does not fetch unsaved/invalid graph %s", graphId => {
+    renderHook(() => useGraphShiftSwapHighlightSettingQuery(2, graphId), { wrapper: highlightWrapper });
+    expect(apiMocks.getHighlightSetting).not.toHaveBeenCalled();
+  });
+  test.each([null, 0, -1, 1.5])("does not fetch invalid container %s", containerId => {
+    renderHook(() => useGraphShiftSwapHighlightSettingQuery(containerId, 9), { wrapper: highlightWrapper });
+    expect(apiMocks.getHighlightSetting).not.toHaveBeenCalled();
+  });
+  test("fetches persisted graphs", async () => {
+    const { result } = renderHook(() => useGraphShiftSwapHighlightSettingQuery(2, 9), { wrapper: highlightWrapper });
+    await waitFor(() => expect(result.current.data).toEqual({ highlightColor: "#BBF7D0" }));
+    expect(apiMocks.getHighlightSetting).toHaveBeenCalledExactlyOnceWith(2, 9, expect.any(AbortSignal));
   });
 });

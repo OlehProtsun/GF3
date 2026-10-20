@@ -257,7 +257,7 @@ export function useDeleteContainerMutation() {
       qc.invalidateQueries({ queryKey: queryKeys.containers.all });
       qc.invalidateQueries({ queryKey: queryKeys.containers.byId(id) });
       qc.invalidateQueries({ queryKey: queryKeys.containers.graphs(id) });
-      qc.invalidateQueries({ queryKey: queryKeys.containers.schedulePresets(id) });
+      qc.invalidateQueries({ queryKey: queryKeys.containers.schedulePresets() });
     },
   });
 }
@@ -272,8 +272,8 @@ export const useContainerGraphsQuery = (containerId: number | null, enabled = tr
 
 export const useSchedulePresetsQuery = (containerId: number | null, enabled = true) =>
   useQuery({
-    queryKey: queryKeys.containers.schedulePresets(containerId ?? 0),
-    enabled: enabled && containerId !== null,
+    queryKey: queryKeys.containers.schedulePresets(),
+    enabled: enabled && Number.isInteger(containerId) && containerId !== null && containerId > 0,
     cancelOnUnmount: true,
     queryFn: ({ signal }) => containersApi.listSchedulePresets(containerId as number, signal),
   });
@@ -284,8 +284,8 @@ export function useCreateSchedulePresetMutation() {
   return useMutation({
     mutationFn: ({ containerId, payload }: { containerId: number; payload: SaveSchedulePresetDto }) =>
       containersApi.createSchedulePreset(containerId, payload),
-    onSuccess: (_, variables) => {
-      qc.invalidateQueries({ queryKey: queryKeys.containers.schedulePresets(variables.containerId) });
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.containers.schedulePresets() });
     },
   });
 }

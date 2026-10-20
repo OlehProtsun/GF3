@@ -55,8 +55,10 @@ export function ContainerGraphShiftCorrectionsCard({
   onApproved,
   onPendingCountChange,
 }: ContainerGraphShiftCorrectionsCardProps) {
+  const hasPersistedGraph = Number.isInteger(containerId) && containerId !== null && containerId > 0
+    && Number.isInteger(graphId) && graphId !== null && graphId > 0;
   const requestsQuery = useGraphShiftCorrectionsQuery(containerId, graphId);
-  const settingQuery = useShiftCorrectionSettingQuery(containerId !== null && graphId !== null);
+  const settingQuery = useShiftCorrectionSettingQuery(hasPersistedGraph);
   const saveSettingMutation = useSaveShiftCorrectionSettingMutation();
   const approveMutation = useApproveShiftCorrectionMutation();
   const rejectMutation = useRejectShiftCorrectionMutation();
@@ -86,6 +88,7 @@ export function ContainerGraphShiftCorrectionsCard({
   }, [onPendingCountChange, pendingCount]);
 
   const handleColorChange = (value: string) => {
+    if (!hasPersistedGraph) return;
     setHighlightColor(value);
     setIsColorDialogOpen(false);
     setActionError(null);
@@ -95,7 +98,7 @@ export function ContainerGraphShiftCorrectionsCard({
   };
 
   const handleApprove = () => {
-    if (!selected || containerId === null || graphId === null) return;
+    if (!selected || !hasPersistedGraph || containerId === null || graphId === null) return;
     setActionError(null);
     approveMutation.mutate({ containerId, graphId, id: selected.id, highlightColor }, {
       onSuccess: () => {
@@ -108,14 +111,14 @@ export function ContainerGraphShiftCorrectionsCard({
   };
 
   const handleReject = () => {
-    if (!selected || containerId === null || graphId === null) return;
+    if (!selected || !hasPersistedGraph || containerId === null || graphId === null) return;
     setActionError(null);
     rejectMutation.mutate({ containerId, graphId, id: selected.id }, {
       onError: error => setActionError(getErrorMessage(error, t("Could not reject this correction."))),
     });
   };
 
-  const isBusy = disabled || approveMutation.isPending || rejectMutation.isPending;
+  const isBusy = !hasPersistedGraph || disabled || approveMutation.isPending || rejectMutation.isPending;
   const originalDuration = selected ? toMinutes(selected.originalToTime) - toMinutes(selected.originalFromTime) : 0;
   const requestedDuration = selected ? toMinutes(selected.requestedToTime) - toMinutes(selected.requestedFromTime) : 0;
   const selectedDetails = selected ? (
@@ -162,7 +165,7 @@ export function ContainerGraphShiftCorrectionsCard({
     <>
       <div className={styles.headerTools}>
         <button type="button" className={styles.colorControl} title={t("Approved correction highlight color")}
-          aria-label={t("Approved correction highlight color")} disabled={saveSettingMutation.isPending}
+          aria-label={t("Approved correction highlight color")} disabled={!hasPersistedGraph || saveSettingMutation.isPending}
           onClick={() => setIsColorDialogOpen(true)}>
           <span className={styles.colorSwatch} style={{ backgroundColor: highlightColor }} aria-hidden="true" />
         </button>

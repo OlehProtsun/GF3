@@ -36,7 +36,7 @@ export type SchedulePresetEmployee = {
 
 export type SchedulePreset = {
   id: number;
-  containerId: number;
+  containerId: number | null;
   name: string;
   scheduleName: string;
   shopId: number;

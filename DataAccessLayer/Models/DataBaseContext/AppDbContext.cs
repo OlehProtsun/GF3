@@ -608,7 +608,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, TimeProvider? 
             entity.HasOne<ContainerModel>()
                 .WithMany()
                 .HasForeignKey(preset => preset.ContainerId)
-                .OnDelete(DeleteBehavior.Cascade);
+                .OnDelete(DeleteBehavior.SetNull);
 
             entity.HasOne<ShopModel>()
                 .WithMany()

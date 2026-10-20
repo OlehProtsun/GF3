@@ -14,7 +14,7 @@ export const useEmployeeShiftCorrectionsQuery = (enabled = true) =>
 export const useGraphShiftCorrectionsQuery = (containerId: number | null, graphId: number | null) =>
   useQuery({
     queryKey: queryKeys.shiftSwaps.graphCorrections(containerId ?? 0, graphId ?? 0),
-    enabled: containerId !== null && graphId !== null,
+    enabled: Number.isInteger(containerId) && containerId !== null && containerId > 0 && Number.isInteger(graphId) && graphId !== null && graphId > 0,
     staleTime: 15_000,
     queryFn: ({ signal }) => shiftCorrectionsApi.listGraph(containerId as number, graphId as number, signal),
   });

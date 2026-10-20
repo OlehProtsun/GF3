@@ -1316,7 +1316,7 @@ namespace DataAccessLayer.Migrations
                         .HasColumnType("INTEGER")
                         .HasColumnName("availability_group_id");
 
-                    b.Property<int>("ContainerId")
+                    b.Property<int?>("ContainerId")
                         .HasColumnType("INTEGER")
                         .HasColumnName("container_id");
 
@@ -2497,8 +2497,7 @@ namespace DataAccessLayer.Migrations
                     b.HasOne("DataAccessLayer.Models.ContainerModel", null)
                         .WithMany()
                         .HasForeignKey("ContainerId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.SetNull);
 
                     b.HasOne("DataAccessLayer.Models.ShopModel", null)
                         .WithMany()
