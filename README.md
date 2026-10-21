@@ -61,3 +61,12 @@ npm run build
 ## Deployment
 
 Production deployment is prepared for Docker + nginx. See `docs/deploy.md` for the full local smoke-test, server setup, HTTPS, update, rollback, and backup workflow.
+
+## Dokumentacja akademicka (IDEIS UDSW)
+
+Instrukcje użytkownika PL/EN oraz polska dokumentacja techniczna i procedury odbioru/wdrożenia:
+
+- [Dokumentacja użytkownika (PL)](docs/university/01-Dokumentacja-uzytkownika-PL.md)
+- [User documentation (EN)](docs/university/01-User-documentation-EN.md)
+- [Dokumentacja techniczna](docs/university/02-Dokumentacja-techniczna.md)
+- [Procedury odbioru, wdrożenia i odtworzenia](docs/university/03-Procedury-odbioru-wdrozenia.md)
