@@ -1,3 +1,4 @@
+import { useLanguageRevision } from "@shared/i18n/useLanguageRevision";
 import { t } from "@shared/i18n";
 import { startTransition, useDeferredValue, useEffect, useMemo, useState, type FormEvent } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -119,6 +120,7 @@ function useContainerGraphRecords(containerId: number | null, graphs: Graph[], e
 }
 
 export function ContainerPage() {
+  const language = useLanguageRevision();
   const navigate = useNavigate();
   const location = useLocation();
   const [mode, setMode] = useState<ContainerPageMode>("list");
@@ -205,7 +207,8 @@ export function ContainerPage() {
 
   const graphSummaries = useMemo(
     () => buildContainerGraphSummaries(graphs, graphRecordsState.recordsByGraphId, shopsById),
-    [graphRecordsState.recordsByGraphId, graphs, shopsById],
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- Translation helpers read the current language internally.
+    [graphRecordsState.recordsByGraphId, graphs, shopsById, language],
   );
   const filteredGraphSummaries = useMemo(
     () => filterGraphSummaries(graphSummaries, deferredGraphSearchQuery),
@@ -219,7 +222,8 @@ export function ContainerPage() {
         employeesById,
         shopsById,
       }),
-    [employeesById, graphRecordsState.recordsByGraphId, graphs, shopsById],
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- Translation helpers read the current language internally.
+    [employeesById, graphRecordsState.recordsByGraphId, graphs, shopsById, language],
   );
 
   const isSaving = createMutation.isPending || updateMutation.isPending;

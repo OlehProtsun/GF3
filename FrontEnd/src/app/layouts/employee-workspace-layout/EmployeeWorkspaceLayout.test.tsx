@@ -1,7 +1,11 @@
+import { beforeEach as beforeEnglishTest } from "vitest";
+import { setLanguage as setTestLanguage } from "@shared/i18n";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { BrowserRouter } from "react-router-dom";
 import { beforeEach, expect, it, vi } from "vitest";
 import { EmployeeWorkspaceLayout } from "./EmployeeWorkspaceLayout";
+
+beforeEnglishTest(() => setTestLanguage("en"));
 
 const state = vi.hoisted(() => ({
   empty: { data: [] }, ui: { data: { readNotificationIds: [] }, refetch: vi.fn() },

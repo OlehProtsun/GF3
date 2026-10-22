@@ -6,7 +6,8 @@ import { LanguageSelector } from "@shared/i18n/LanguageSelector";
 import { useLanguageRevision } from "@shared/i18n/useLanguageRevision";
 import { getLanguage, setLanguage, t } from "@shared/i18n";
 
-const mocks = vi.hoisted(() => ({ request: vi.fn(), session: { role: "manager", managerId: 1, employeeId: undefined as number | undefined } }));
+type TestSession = { role: string; managerId?: number; employeeId?: number; workspaceMode?: "choose" | "pc" | "phone" } | null;
+const mocks = vi.hoisted(() => ({ request: vi.fn(), session: { role: "manager", managerId: 1 } as TestSession }));
 vi.mock("./AuthProvider", () => ({ useAuth: () => ({ session: mocks.session }) }));
 vi.mock("@shared/api/httpClient", () => ({ request: (...args: unknown[]) => mocks.request(...args) }));
 
@@ -20,9 +21,9 @@ const view = () => <LanguageProvider><Profile /></LanguageProvider>;
 beforeEach(() => {
   mocks.request.mockReset();
   mocks.session = { role: "manager", managerId: 1, employeeId: undefined };
-  setLanguage("en");
+  setLanguage("pl");
 });
-afterEach(() => { cleanup(); setLanguage("en"); });
+afterEach(() => { cleanup(); setLanguage("pl"); });
 
 describe("language preference lifecycle", () => {
   it("loads and saves the preference without losing an unsaved profile draft", async () => {
@@ -55,7 +56,7 @@ describe("language preference lifecycle", () => {
     let resolveFirst!: (value: { language: string }) => void;
     mocks.request.mockImplementationOnce(() => new Promise(resolve => { resolveFirst = resolve; })).mockResolvedValueOnce({ language: "en" });
     const screenView = render(view());
-    mocks.session = { role: "employee", managerId: undefined as unknown as number, employeeId: 1 };
+    mocks.session = { role: "employee", managerId: undefined, employeeId: 1 };
     screenView.rerender(view());
     await screen.findByText("Profile access");
     await act(async () => resolveFirst({ language: "pl" }));
@@ -67,9 +68,33 @@ describe("language preference lifecycle", () => {
     const first = render(view());
     await screen.findByText("Dostęp do profilu");
     first.unmount();
-    setLanguage("en");
+    setLanguage("pl");
     render(view());
     await waitFor(() => expect(getLanguage()).toBe("pl"));
     expect(screen.getByLabelText("Język aplikacji")).toHaveValue("pl");
   });
+});
+
+it.each([null, { role: "manager", managerId: 1, workspaceMode: "choose" as const }])("uses Polish without a protected request for %j", async session => {
+  mocks.session = session;
+  setLanguage("en");
+  render(view());
+  await screen.findByText("Dost\u0119p do profilu");
+  expect(getLanguage()).toBe("pl");
+  expect(mocks.request).not.toHaveBeenCalled();
+});
+it.each([{}, null, { language: null }, { language: "de" }, { language: "pl" }])("uses Polish for a fresh or malformed preference %j without saving it", async result => {
+  mocks.request.mockResolvedValue(result);
+  render(view());
+  await screen.findByText("Dost\u0119p do profilu");
+  expect(getLanguage()).toBe("pl");
+  expect(mocks.request).toHaveBeenCalledTimes(1);
+});
+it("shows a Polish load error and retries the saved English preference", async () => {
+  mocks.request.mockRejectedValueOnce(new Error("offline")).mockResolvedValueOnce({ language: "en" });
+  render(view());
+  expect(await screen.findByRole("alert")).toHaveTextContent(t("Could not load your language preference."));
+  fireEvent.click(screen.getByRole("button", { name: t("Retry") }));
+  await screen.findByText("Profile access");
+  expect(getLanguage()).toBe("en");
 });

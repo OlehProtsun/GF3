@@ -302,7 +302,7 @@ export function formatHoursMinutes(totalMinutes: number) {
   const hours = Math.floor(safeMinutes / 60);
   const minutes = safeMinutes % 60;
 
-  return `${hours}h ${minutes}m`;
+  return t("{0}h {1}m", hours, minutes);
 }
 
 export function formatHoursCell(totalMinutes: number) {
@@ -314,7 +314,7 @@ export function formatHoursCell(totalMinutes: number) {
   const hours = Math.floor(safeMinutes / 60);
   const minutes = safeMinutes % 60;
 
-  return minutes === 0 ? `${hours}` : `${hours}h ${minutes}m`;
+  return minutes === 0 ? `${hours}` : t("{0}h {1}m", hours, minutes);
 }
 
 export function buildPreviewList(items: string[], previewCount = 8) {

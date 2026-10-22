@@ -1,3 +1,5 @@
+import { beforeEach as beforeEnglishTest } from "vitest";
+import { setLanguage as setTestLanguage } from "@shared/i18n";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, expect, test, vi } from "vitest";
 import { useState } from "react";
@@ -5,6 +7,8 @@ import { BrowserRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider, useMutation } from "@tanstack/react-query";
 import { ManagerWorkspaceModeSwitch } from "./ManagerWorkspaceModeSwitch";
 import { useUnsavedChangesPrompt } from "@shared/lib/useUnsavedChangesPrompt";
+
+beforeEnglishTest(() => setTestLanguage("en"));
 const auth = vi.hoisted(() => ({ setManagerWorkspaceMode: vi.fn() }));
 vi.mock("@app/providers/AuthProvider", () => ({ useAuth: () => auth }));
 afterEach(() => { cleanup(); vi.clearAllMocks(); });

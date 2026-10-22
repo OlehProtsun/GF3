@@ -1,5 +1,6 @@
 import { useDropdownPosition } from "@shared/lib/useDropdownPosition";
 import { t } from "@shared/i18n";
+import { useLanguageRevision } from "@shared/i18n/useLanguageRevision";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { SchedulePreset } from "@entities/containers/model/types";
@@ -59,6 +60,7 @@ export function ContainerGraphPresetSelect({
   onSelect,
   onAddPreset,
 }: ContainerGraphPresetSelectProps) {
+  const language = useLanguageRevision();
   const triggerRef = useRef<HTMLDivElement | null>(null);
   const dropdownRef = useRef<HTMLDivElement | null>(null);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
@@ -97,7 +99,8 @@ export function ContainerGraphPresetSelect({
       .join(" ")
       .toLowerCase()
       .includes(normalizedSearchText));
-  }, [presets, searchText, shopNameById]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- Translation helpers read the current language internally.
+  }, [presets, searchText, shopNameById, language]);
   const closeDropdown = useCallback(() => {
     setIsOpen(false);
     setSearchText("");

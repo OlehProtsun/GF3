@@ -1,3 +1,4 @@
+import { useLanguageRevision } from "@shared/i18n/useLanguageRevision";
 import { dateTimeFormat, t } from "@shared/i18n";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
@@ -878,6 +879,7 @@ const PRESET_MANAGED_FIELDS = new Set<keyof ContainerGraphFormState>([
 const GENERATE_AVAILABILITY_GROUP_REQUIRED_MESSAGE = "Select an availability group before generating a schedule.";
 
 export function ContainerGraphEditPage() {
+  const language = useLanguageRevision();
   usePageScrollbarHidden();
 
   const location = useLocation();
@@ -1615,7 +1617,8 @@ export function ContainerGraphEditPage() {
 
     const fallbackName = effectiveGraph.name.trim();
     return fallbackName ? [fallbackName] : [t("New schedule")];
-  }, [effectiveGraph.name, sessionGraphs]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- Translation helpers read the current language internally.
+  }, [effectiveGraph.name, sessionGraphs, language]);
   const showSessionTabs = !isCreate && (openGraphIds.length > 1 || hasExplicitSession);
   const visibleSessionTabCount = Math.min(Math.max(sessionGraphs.length, 1), 3);
   const pageHeaderMaxWidth = showSessionTabs
@@ -1646,7 +1649,8 @@ export function ContainerGraphEditPage() {
   );
   const totals = useMemo(
     () => buildGraphTotals(draftGraphEmployees, effectiveSlots, employeesById),
-    [draftGraphEmployees, effectiveSlots, employeesById],
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- Translation helpers read the current language internally.
+    [draftGraphEmployees, effectiveSlots, employeesById, language],
   );
 
   const scheduleAvailabilityGroupId = form.availabilityGroupId ? Number(form.availabilityGroupId) : null;
@@ -1691,7 +1695,8 @@ export function ContainerGraphEditPage() {
         keywords: `${group.id} ${group.name} ${group.month} ${group.year} ${formatAvailabilityGroupPeriod(group.year, group.month)}`,
       })),
     ];
-  }, [matchingAvailabilityGroups, scheduleAvailabilityGroupId, selectedScheduleAvailabilityGroup]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- Translation helpers read the current language internally.
+  }, [matchingAvailabilityGroups, scheduleAvailabilityGroupId, selectedScheduleAvailabilityGroup, language]);
   const previewColumns = useMemo<AvailabilityMatrixColumn[]>(
     () => buildAvailabilityColumns(previewMembersQuery.data ?? [], employeeNameById),
     [employeeNameById, previewMembersQuery.data],

@@ -1,8 +1,12 @@
+import { beforeEach as beforeEnglishTest } from "vitest";
+import { setLanguage as setTestLanguage } from "@shared/i18n";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { expect, test, vi } from "vitest";
 import type { SchedulePreset } from "../model/types";
 import { ContainerGraphPresetSelect } from "./ContainerGraphPresetSelect";
+
+beforeEnglishTest(() => setTestLanguage("en"));
 
 const preset: SchedulePreset = {
   id: 8, containerId: null, name: "Same name", scheduleName: "Schedule", shopId: 3,

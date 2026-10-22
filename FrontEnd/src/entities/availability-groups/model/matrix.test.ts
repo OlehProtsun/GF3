@@ -1,3 +1,5 @@
+import { beforeEach as beforeEnglishTest } from "vitest";
+import { setLanguage as setTestLanguage } from "@shared/i18n";
 import { describe, expect, test } from "vitest";
 import {
   AVAILABILITY_ANY_MARK,
@@ -22,6 +24,8 @@ import {
   summarizeAvailabilityCellMap,
 } from "./matrix";
 import type { AvailabilityGroupItem, AvailabilityGroupMember, AvailabilitySlot } from "./types";
+
+beforeEnglishTest(() => setTestLanguage("en"));
 
 describe("availability matrix model", () => {
   test("clamps dates and calculates month metadata", () => {

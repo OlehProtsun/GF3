@@ -1,3 +1,4 @@
+import { useLanguageRevision } from "@shared/i18n/useLanguageRevision";
 import { t } from "@shared/i18n";
 import { useMemo, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
@@ -419,6 +420,7 @@ function CompactSizeHeaderToggle({ checked, onToggle }: CompactSizeHeaderToggleP
 }
 
 export function AvailabilityEditPage() {
+  const language = useLanguageRevision();
   const location = useLocation();
   const navigate = useNavigate();
   const { availabilityId } = useParams<{ availabilityId: string }>();
@@ -602,7 +604,8 @@ export function AvailabilityEditPage() {
         label: employeeNameById.get(employeeId) ?? t("Employee #{0}", employeeId),
       };
     });
-  }, [employeeNameById, existingMemberByEmployeeId, selectedEmployeeIds]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- Translation helpers read the current language internally.
+  }, [employeeNameById, existingMemberByEmployeeId, selectedEmployeeIds, language]);
 
   const assignedEmployees = useMemo(() => {
     return columns.map(column => ({

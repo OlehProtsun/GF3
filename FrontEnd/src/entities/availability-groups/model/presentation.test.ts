@@ -1,3 +1,5 @@
+import { beforeEach as beforeEnglishTest } from "vitest";
+import { setLanguage as setTestLanguage } from "@shared/i18n";
 import { describe, expect, test } from "vitest";
 import {
   filterAvailabilityGroups,
@@ -16,6 +18,8 @@ import {
   summarizeAvailabilitySlots,
 } from "./presentation";
 import type { AvailabilityGroup } from "./types";
+
+beforeEnglishTest(() => setTestLanguage("en"));
 
 describe("availability presentation model", () => {
   test("formats period, publication status, windows, and kinds", () => {

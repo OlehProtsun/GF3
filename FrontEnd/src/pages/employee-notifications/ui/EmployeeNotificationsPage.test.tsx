@@ -1,9 +1,13 @@
+import { beforeEach as beforeEnglishTest } from "vitest";
+import { setLanguage as setTestLanguage } from "@shared/i18n";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { BrowserRouter } from "react-router-dom";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { EmployeeNotificationsPage } from "./EmployeeNotificationsPage";
 import { EmployeeWorkspaceLayout } from "@app/layouts/employee-workspace-layout/EmployeeWorkspaceLayout";
 import { writeEmployeeNotificationIdsForAccount } from "@shared/lib/employeeNotificationReadState";
+
+beforeEnglishTest(() => setTestLanguage("en"));
 
 const mocks = vi.hoisted(() => ({
   schedules: [] as unknown[],

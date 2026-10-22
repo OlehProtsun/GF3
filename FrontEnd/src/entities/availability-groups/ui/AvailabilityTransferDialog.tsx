@@ -1,3 +1,4 @@
+import { useLanguageRevision } from "@shared/i18n/useLanguageRevision";
 import { t } from "@shared/i18n";
 import { useEffect, useId, useMemo, useState, type MouseEvent } from "react";
 import type { AvailabilityTransferSource } from "@entities/availability-groups/model/transfer";
@@ -40,6 +41,7 @@ export function AvailabilityTransferDialog({
   onCancel,
   onConfirm,
 }: AvailabilityTransferDialogProps) {
+  const language = useLanguageRevision();
   const titleId = useId();
   const descriptionId = useId();
   const [selectedSourceId, setSelectedSourceId] = useState<number | null>(null);
@@ -75,7 +77,8 @@ export function AvailabilityTransferDialog({
     label: source.groupName,
     hint: t("{0} days available", source.days.filter(day => day.canTransfer).length),
     keywords: `${source.groupName} ${source.groupId}`,
-  })), [sources]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- Translation helpers read the current language internally.
+  })), [sources, language]);
   const cellMap = useMemo<AvailabilityMatrixCellMap>(() => (selectedSource?.days ?? []).reduce<AvailabilityMatrixCellMap>(
     (result, day) => {
       result[getAvailabilityCellKey(employeeId, day.dayOfMonth)] = getAvailabilityCodeFromKind(day.kind, day.intervalStr);
@@ -176,7 +179,7 @@ export function AvailabilityTransferDialog({
         <footer className={styles.footer}>
           <IosButton label={t("Cancel")} variant="secondary" onClick={onCancel} disabled={isPending} />
           <IosButton
-            label={isPending ? t("Applying...") : t("Add {0} day{1} to draft", dayOfMonths.length || "", dayOfMonths.length === 1 ? "" : "s").trim()}
+            label={isPending ? t("Applying...") : t("Add days to draft: {0}", dayOfMonths.length || "").trim()}
             onClick={() => selectedSource && onConfirm(selectedSource.groupId, dayOfMonths)}
             disabled={!selectedSource || dayOfMonths.length === 0 || isPending}
           />

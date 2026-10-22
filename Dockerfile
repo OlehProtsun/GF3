@@ -38,7 +38,7 @@ ENV ASPNETCORE_ENVIRONMENT=Production \
     DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=false
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends curl \
+    && apt-get install -y --no-install-recommends curl fonts-crosextra-carlito \
     && rm -rf /var/lib/apt/lists/* \
     && mkdir -p /data \
     && chown -R app:app /data /app

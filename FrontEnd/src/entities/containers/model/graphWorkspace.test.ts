@@ -1,3 +1,5 @@
+import { beforeEach as beforeEnglishTest } from "vitest";
+import { setLanguage as setTestLanguage } from "@shared/i18n";
 import { describe, expect, test } from "vitest";
 import {
   GRAPH_EMPTY_MARK,
@@ -31,6 +33,8 @@ import {
 } from "./graphWorkspace";
 import type { Employee } from "@entities/employees/model/types";
 import type { Graph, GraphCellStyle, GraphEmployee, GraphSlot } from "./types";
+
+beforeEnglishTest(() => setTestLanguage("en"));
 
 const graph: Graph = {
   id: 1,

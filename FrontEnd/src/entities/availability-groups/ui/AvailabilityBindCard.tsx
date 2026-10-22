@@ -106,7 +106,7 @@ export function AvailabilityBindCard({
     onBindFieldChange(clientId, { key: nextKey });
   };
 
-  const bindCountLabel = t("{0} bind{1}", binds.length, binds.length === 1 ? "" : "s");
+  const bindCountLabel = t("Bindings: {0}", binds.length);
 
   return (
     <CardSection

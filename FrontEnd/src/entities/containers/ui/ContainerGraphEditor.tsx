@@ -1,4 +1,4 @@
-import { dateTimeFormat, t } from "@shared/i18n";
+import { dateTimeFormat, numberFormat, t } from "@shared/i18n";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import type { Employee } from "@entities/employees/model/types";
 import { getEmployeeFullName } from "@entities/employees/model/presentation";
@@ -244,7 +244,7 @@ function formatShiftSwapLogTime(value: string) {
 
 function formatShiftSwapLogHours(value: number) {
   const normalized = Math.abs(value) < 0.05 ? 0 : value;
-  return `${Number.isInteger(normalized) ? normalized.toFixed(0) : normalized.toFixed(1)}h`;
+  return t("{0}h", numberFormat("en-GB", { maximumFractionDigits: 1 }).format(normalized));
 }
 
 function formatShiftSwapAcceptedAt(value?: string | null) {

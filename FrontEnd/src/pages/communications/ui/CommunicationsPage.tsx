@@ -100,7 +100,7 @@ function getMessageStatusClassName(message: CommunicationMessageDto) {
     return styles.statusExpired;
   }
 
-  return getDeadlineTone(message) === "Due soon" ? styles.statusSoon : styles.statusActive;
+  return getDeadlineTone(message) === t("Due soon") ? styles.statusSoon : styles.statusActive;
 }
 
 export function CommunicationsPage() {

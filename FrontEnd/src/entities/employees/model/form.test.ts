@@ -1,5 +1,9 @@
+import { beforeEach as beforeEnglishTest } from "vitest";
+import { setLanguage as setTestLanguage } from "@shared/i18n";
 import { describe, expect, test } from "vitest";
 import { createEmployeeFormState, validateEmployeeForm } from "./form";
+
+beforeEnglishTest(() => setTestLanguage("en"));
 
 describe("employee form model", () => {
   test("creates empty and populated form state", () => {

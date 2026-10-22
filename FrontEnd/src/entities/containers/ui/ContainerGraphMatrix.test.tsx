@@ -1,8 +1,12 @@
+import { beforeEach as beforeEnglishTest } from "vitest";
+import { setLanguage as setTestLanguage, t } from "@shared/i18n";
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, test, vi } from "vitest";
 import type { GraphRelatedScheduleHintDetail } from "@entities/containers/model/graphWorkspace";
 import { ContainerGraphMatrix } from "./ContainerGraphMatrix";
 import styles from "./ContainerGraphMatrix.module.css";
+
+beforeEnglishTest(() => setTestLanguage("en"));
 
 describe("ContainerGraphMatrix related schedule hints", () => {
   test("marks an invalid styled cell for the visible error pulse", () => {
@@ -300,4 +304,19 @@ describe("ContainerGraphMatrix related schedule hints", () => {
       vi.useRealTimers();
     }
   });
+});
+
+test("updates memoized matrix cells and weekdays without remounting user content", () => {
+  const columns = [{ employeeId: 7, kind: "employee" as const, manualColumnId: null, graphEmployeeId: 70, label: "Ada", minHoursMonth: null, totalMinutes: 0, totalText: "" }];
+  const cells = { "7:1": "09:00 - 12:00" };
+  render(<ContainerGraphMatrix graph={{ year: 2026, month: 1 }} columns={columns} cellMap={cells} />);
+  const cell = screen.getByRole("button", { name: "Ada day 1", exact: true });
+  expect(screen.getByText("th./01.01")).toBeInTheDocument();
+  act(() => setTestLanguage("pl"));
+  expect(screen.getByRole("button", { name: t("{0} day {1}", "Ada", 1), exact: true })).toBe(cell);
+  expect(screen.queryByText("th./01.01")).not.toBeInTheDocument();
+  expect(cell).toHaveTextContent("09:00");
+  act(() => setTestLanguage("en"));
+  expect(screen.getByRole("button", { name: "Ada day 1", exact: true })).toBe(cell);
+  expect(screen.getByText("th./01.01")).toBeInTheDocument();
 });

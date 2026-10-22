@@ -267,11 +267,11 @@ function toApiError(status: number, payload: unknown): ApiError {
 
 export function getErrorMessage(error: unknown, fallbackMessage = t("Something went wrong.")): string {
   if (error instanceof ApiError) {
-    return getFirstValidationErrorMessage(error.validationErrors) ?? error.message ?? fallbackMessage;
+    return translateServerMessage(getFirstValidationErrorMessage(error.validationErrors) ?? error.message ?? fallbackMessage);
   }
 
   if (error instanceof Error && error.message.trim().length > 0) {
-    return error.message;
+    return translateServerMessage(error.message);
   }
 
   return fallbackMessage;

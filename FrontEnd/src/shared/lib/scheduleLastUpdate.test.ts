@@ -1,5 +1,9 @@
+import { beforeEach as beforeEnglishTest } from "vitest";
+import { setLanguage as setTestLanguage } from "@shared/i18n";
 import { describe, expect, test } from "vitest";
 import { formatScheduleLastUpdate } from "./scheduleLastUpdate";
+
+beforeEnglishTest(() => setTestLanguage("en"));
 
 describe("formatScheduleLastUpdate", () => {
   test("formats a valid UTC timestamp for the user's local time zone", () => {

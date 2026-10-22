@@ -14,7 +14,7 @@ public class EmployeeAccountModel
     [Required]
     [MaxLength(2)]
     [Column("language")]
-    public string Language { get; set; } = "en";
+    public string Language { get; set; } = "pl";
 
     [Key]
     [Column("id")]

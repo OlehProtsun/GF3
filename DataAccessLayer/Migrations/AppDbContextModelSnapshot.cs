@@ -347,8 +347,10 @@ namespace DataAccessLayer.Migrations
 
                     b.Property<string>("Language")
                         .IsRequired()
+                        .ValueGeneratedOnAdd()
                         .HasMaxLength(2)
                         .HasColumnType("TEXT")
+                        .HasDefaultValue("pl")
                         .HasColumnName("language");
 
                     b.Property<DateTimeOffset?>("LastLoginAtUtc")
@@ -706,8 +708,10 @@ namespace DataAccessLayer.Migrations
 
                     b.Property<string>("Language")
                         .IsRequired()
+                        .ValueGeneratedOnAdd()
                         .HasMaxLength(2)
                         .HasColumnType("TEXT")
+                        .HasDefaultValue("pl")
                         .HasColumnName("language");
 
                     b.Property<DateTimeOffset?>("LastLoginAtUtc")

@@ -1,6 +1,10 @@
+import { beforeEach as beforeEnglishTest } from "vitest";
+import { setLanguage as setTestLanguage } from "@shared/i18n";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, test, vi } from "vitest";
 import { ContainerGraphColorDialog } from "./ContainerGraphColorDialog";
+
+beforeEnglishTest(() => setTestLanguage("en"));
 
 function renderDialog(
   onBindFillColor: (key: string, fillColor: string) => Promise<void>,

@@ -13,7 +13,7 @@ using GF3.Tests.Infrastructure;
 
 namespace GF3.Tests;
 
-public sealed class ExportLayerDeepTests
+public sealed partial class ExportLayerDeepTests
 {
     [Fact]
     public void ScheduleExcelContextBuilder_BuildScheduleContext_AppliesManualColumnsAndIgnoresTextOverridesInSummary()
@@ -945,7 +945,8 @@ public sealed class ExportLayerDeepTests
             => Task.FromResult(Graphs.FirstOrDefault(graph => graph.Id == graphId && graph.ContainerId == containerId));
 
         public Task<List<ScheduleModel>> GetPublishedGraphsForEmployeeAsync(int employeeId, CancellationToken ct = default)
-            => Task.FromResult(Graphs);
+            => Task.FromResult(Graphs.Where(graph => graph.PublicationStatus == SchedulePublicationStatus.Public
+                && GraphEmployees.GetValueOrDefault(graph.Id, []).Any(employee => employee.EmployeeId == employeeId)).ToList());
 
         public Task<ScheduleModel> CreateGraphAsync(int containerId, ScheduleModel model, CancellationToken ct = default)
             => Task.FromResult(model);

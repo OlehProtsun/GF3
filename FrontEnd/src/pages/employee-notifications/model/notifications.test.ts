@@ -1,3 +1,5 @@
+import { beforeEach as beforeEnglishTest } from "vitest";
+import { setLanguage as setTestLanguage } from "@shared/i18n";
 import { describe, expect, it } from "vitest";
 import contract from "./notificationContract.fixture.json";
 import type { ShiftSwap } from "@entities/shift-swaps";
@@ -13,6 +15,8 @@ import {
   isOpenShiftPostedNotification,
   type EmployeeRealtimeNotificationLike,
 } from "./notifications";
+
+beforeEnglishTest(() => setTestLanguage("en"));
 
 const TEST_NOW_MS = Date.parse("2026-05-10T12:00:00.000Z");
 

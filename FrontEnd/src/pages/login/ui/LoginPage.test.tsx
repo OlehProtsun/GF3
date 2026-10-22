@@ -1,9 +1,13 @@
+import { beforeEach as beforeEnglishTest } from "vitest";
+import { setLanguage as setTestLanguage } from "@shared/i18n";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { StrictMode } from "react";
 import userEvent from "@testing-library/user-event";
 import { BrowserRouter } from "react-router-dom";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 import { LoginPage } from "./LoginPage";
+
+beforeEnglishTest(() => setTestLanguage("en"));
 
 const mocks = vi.hoisted(() => ({
   login: vi.fn(),

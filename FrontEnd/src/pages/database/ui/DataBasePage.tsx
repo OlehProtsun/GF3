@@ -349,16 +349,14 @@ function DataBaseWorkspace() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const overviewCardRef = useRef<HTMLElement | null>(null);
   const [executorSql, setExecutorSql] = useState(DEFAULT_EXECUTOR_SQL);
-  const [executorMessage, setExecutorMessage] = useState(t("Ready."));
+  const [executorMessage, setExecutorMessage] = useState<() => string>(() => () => t("Ready."));
   const [executorTone, setExecutorTone] = useState<ResultTone>("neutral");
   const [queryResult, setQueryResult] = useState<AdminDbQueryResponse | null>(null);
   const [importFile, setImportFile] = useState<ImportFileState | null>(null);
   const [importScript, setImportScript] = useState("");
-  const [importMessage, setImportMessage] = useState(t("Ready. Load a file or paste a SQL script to begin."));
+  const [importMessage, setImportMessage] = useState<() => string>(() => () => t("Ready. Load a file or paste a SQL script to begin."));
   const [importTone, setImportTone] = useState<ResultTone>("neutral");
-  const [databaseActionMessage, setDatabaseActionMessage] = useState(
-    t("AutoBackup creates a fresh SQLite snapshot every hour while the application stays open. The last selected database is restored on the next launch."),
-  );
+  const [databaseActionMessage, setDatabaseActionMessage] = useState<() => string>(() => () => t("AutoBackup creates a fresh SQLite snapshot every hour while the application stays open. The last selected database is restored on the next launch."));
   const [databaseActionTone, setDatabaseActionTone] = useState<ResultTone>("neutral");
   const [schemaSearch, setSchemaSearch] = useState("");
   const deferredSchemaSearch = useDeferredValue(schemaSearch);
@@ -468,7 +466,7 @@ function DataBaseWorkspace() {
         ? t("Loading preview for {0}...", selectedObject.name)
         : viewerPreviewQuery.isError
           ? describeApiError(viewerPreviewQuery.error, t("Could not load preview rows for {0}.", selectedObject.name))
-          : t("Showing {0} row{1} from {2}.", viewerResult?.rowCount ?? 0, viewerResult?.rowCount === 1 ? "" : "s", selectedObject.name);
+          : t("Showing rows from {1}: {0}.", viewerResult?.rowCount ?? 0, selectedObject.name);
   const recentAutomaticBackups = automaticBackups.slice(0, 6);
   const recentManualCopies = manualCopies.slice(0, 6);
   const autoBackupsOverflowCount = Math.max(automaticBackups.length - recentAutomaticBackups.length, 0);
@@ -487,19 +485,19 @@ function DataBaseWorkspace() {
   const handleClearExecutorOutput = () => {
     setQueryResult(null);
     setExecutorTone("neutral");
-    setExecutorMessage(t("Output cleared."));
+    setExecutorMessage(() => () => t("Output cleared."));
   };
 
   const handleCreateManualCopy = () => {
     manualCopyMutation.mutate(undefined, {
       onSuccess: createdCopy => {
         setDatabaseActionTone("success");
-        setDatabaseActionMessage(t("Manual copy created: {0}.", createdCopy.name));
+        setDatabaseActionMessage(() => () => t("Manual copy created: {0}.", createdCopy.name));
         invalidateAdminQueries();
       },
       onError: error => {
         setDatabaseActionTone("error");
-        setDatabaseActionMessage(describeApiError(error, t("Could not create a manual database copy.")));
+        setDatabaseActionMessage(() => () => describeApiError(error, t("Could not create a manual database copy.")));
       },
     });
   };
@@ -509,13 +507,13 @@ function DataBaseWorkspace() {
 
     if (!databasePath) {
       setDatabaseActionTone("error");
-      setDatabaseActionMessage(t("Choose a database file before switching."));
+      setDatabaseActionMessage(() => () => t("Choose a database file before switching."));
       return;
     }
 
     if (databasePath === metadata?.databasePath) {
       setDatabaseActionTone("neutral");
-      setDatabaseActionMessage(t("This database is already active."));
+      setDatabaseActionMessage(() => () => t("This database is already active."));
       return;
     }
 
@@ -528,12 +526,12 @@ function DataBaseWorkspace() {
           setQueryResult(null);
           setSchemaSearch("");
           setDatabaseActionTone("success");
-          setDatabaseActionMessage(t("Active database switched to {0}. This choice will be restored after restart.", selectedDatabase.name));
+          setDatabaseActionMessage(() => () => t("Active database switched to {0}. This choice will be restored after restart.", selectedDatabase.name));
           invalidateAllDatabaseQueries();
         },
         onError: error => {
           setDatabaseActionTone("error");
-          setDatabaseActionMessage(describeApiError(error, t("Could not switch the active database.")));
+          setDatabaseActionMessage(() => () => describeApiError(error, t("Could not switch the active database.")));
         },
       },
     );
@@ -544,25 +542,25 @@ function DataBaseWorkspace() {
 
     if (!sql) {
       setExecutorTone("error");
-      setExecutorMessage(t("SQL command is required."));
+      setExecutorMessage(() => () => t("SQL command is required."));
       return;
     }
 
     if (sqlOverLimit) {
       setExecutorTone("error");
-      setExecutorMessage(t("SQL exceeds the current limit of {0} characters.", metadata?.maxSqlLength ?? 0));
+      setExecutorMessage(() => () => t("SQL exceeds the current limit of {0} characters.", metadata?.maxSqlLength ?? 0));
       return;
     }
 
     if (sqlMode === "unknown") {
       setExecutorTone("error");
-      setExecutorMessage(t("Start the command with SELECT, PRAGMA, WITH, INSERT, UPDATE, or DELETE."));
+      setExecutorMessage(() => () => t("Start the command with SELECT, PRAGMA, WITH, INSERT, UPDATE, or DELETE."));
       return;
     }
 
     if (sqlMode === "write" && metadata && !metadata.allowWriteSql) {
       setExecutorTone("error");
-      setExecutorMessage(t("Write SQL operations are disabled by the backend configuration."));
+      setExecutorMessage(() => () => t("Write SQL operations are disabled by the backend configuration."));
       return;
     }
 
@@ -573,12 +571,12 @@ function DataBaseWorkspace() {
           onSuccess: result => {
             setQueryResult(result);
             setExecutorTone("success");
-            setExecutorMessage(buildQueryMessage(result));
+            setExecutorMessage(() => () => buildQueryMessage(result));
           },
           onError: error => {
             setQueryResult(null);
             setExecutorTone("error");
-            setExecutorMessage(describeApiError(error, t("Query execution failed.")));
+            setExecutorMessage(() => () => describeApiError(error, t("Query execution failed.")));
           },
         },
       );
@@ -591,13 +589,13 @@ function DataBaseWorkspace() {
         onSuccess: result => {
           setQueryResult(null);
           setExecutorTone("success");
-          setExecutorMessage(t("Command executed. Affected rows: {0}.", result.affectedRows));
+          setExecutorMessage(() => () => t("Command executed. Affected rows: {0}.", result.affectedRows));
           invalidateAdminQueries();
         },
         onError: error => {
           setQueryResult(null);
           setExecutorTone("error");
-          setExecutorMessage(describeApiError(error, t("Write execution failed.")));
+          setExecutorMessage(() => () => describeApiError(error, t("Write execution failed.")));
         },
       },
     );
@@ -626,10 +624,10 @@ function DataBaseWorkspace() {
       });
       setImportScript(text);
       setImportTone("success");
-      setImportMessage(t("File loaded. Review or adjust the script, then run the import."));
+      setImportMessage(() => () => t("File loaded. Review or adjust the script, then run the import."));
     } catch (error) {
       setImportTone("error");
-      setImportMessage(describeApiError(error, t("Could not read the selected SQL file.")));
+      setImportMessage(() => () => describeApiError(error, t("Could not read the selected SQL file.")));
     }
   };
 
@@ -638,13 +636,13 @@ function DataBaseWorkspace() {
 
     if (!normalizedScript) {
       setImportTone("error");
-      setImportMessage(t("Import script is empty."));
+      setImportMessage(() => () => t("Import script is empty."));
       return;
     }
 
     if (importOverLimit) {
       setImportTone("error");
-      setImportMessage(t("Import payload exceeds the current limit of {0}.", formatBytes(metadata?.maxImportBytes ?? 0)));
+      setImportMessage(() => () => t("Import payload exceeds the current limit of {0}.", formatBytes(metadata?.maxImportBytes ?? 0)));
       return;
     }
 
@@ -657,7 +655,7 @@ function DataBaseWorkspace() {
       onSuccess: result => {
         const hasFailure = result.failedStatementIndex != null;
         setImportTone(hasFailure ? "error" : "success");
-        setImportMessage(buildImportResultMessage(result));
+        setImportMessage(() => () => buildImportResultMessage(result));
 
         if (!hasFailure) {
           invalidateAdminQueries();
@@ -665,7 +663,7 @@ function DataBaseWorkspace() {
       },
       onError: error => {
         setImportTone("error");
-        setImportMessage(describeApiError(error, t("Import execution failed.")));
+        setImportMessage(() => () => describeApiError(error, t("Import execution failed.")));
       },
     });
   };
@@ -883,7 +881,7 @@ function DataBaseWorkspace() {
                       />
                     </div>
 
-                    <div className={`${databaseActionResultClassName} ${styles.controlMessage}`}>{databaseActionMessage}</div>
+                    <div className={`${databaseActionResultClassName} ${styles.controlMessage}`}>{databaseActionMessage()}</div>
                   </div>
 
                   <div className={`${styles.overviewMiniGrid} ${styles.controlMetricsGrid}`}>
@@ -1195,7 +1193,7 @@ function DataBaseWorkspace() {
         >
           <div className={styles.cardBody}>
             <div className={styles.inlineMeta}>
-              <span className={styles.metaBadge}>{t("Mode:")} {sqlMode === "unknown" ? "unknown" : sqlMode}</span>
+              <span className={styles.metaBadge}>{t("Mode:")} {sqlMode === "unknown" ? t("Unknown") : sqlMode === "read" ? t("Read SQL") : t("Write SQL")}</span>
               <span className={`${styles.metaBadge} ${sqlOverLimit ? styles.metaBadgeError : ""}`}>
                 {sqlLength}/{metadata?.maxSqlLength ?? "?"}  {t("chars")}</span>
             </div>
@@ -1224,7 +1222,7 @@ function DataBaseWorkspace() {
               spellCheck={false}
             />
 
-            <div className={executorResultClassName}>{executorMessage}</div>
+            <div className={executorResultClassName}>{executorMessage()}</div>
 
             <div className={styles.tableShell}>
               {queryResult ? (
@@ -1327,7 +1325,7 @@ function DataBaseWorkspace() {
               spellCheck={false}
             />
 
-            <div className={importResultClassName}>{importMessage}</div>
+            <div className={importResultClassName}>{importMessage()}</div>
           </div>
         </CardSection>
       </div>

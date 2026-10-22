@@ -5,8 +5,10 @@ using Microsoft.EntityFrameworkCore;
 using WebApi.Infrastructure;
 using WebApi.Middleware;
 using WebApi.Realtime;
+using WebApi.Services;
 
 var builder = WebApplication.CreateBuilder(args);
+SchedulePdfFontResolver.ConfigureOnce(builder.Configuration["PdfExport:FontFilePath"]);
 if (builder.Environment.IsProduction())
 {
     builder.Logging.ClearProviders();

@@ -165,22 +165,16 @@ function getEmployeeVisibilityWindowLabel(group: Pick<EmployeeAvailabilityGroup,
   const from = formatEmployeeDateTimeLabel(group.visibleFromUtc);
   const to = formatEmployeeDateTimeLabel(group.visibleToUtc);
 
-  if (from === "Not set" && to === "Not set") {
+  if (from === t("Not set") && to === t("Not set")) {
     return t("Not configured");
   }
 
   return `${from} - ${to}`;
 }
 
-const availabilityEditLockedMessagePrefix = "This availability is currently being edited by ";
-
 function getAvailabilityEditLockedMessage(group: Pick<EmployeeAvailabilityGroup, "editLockedBy">) {
   const lockedBy = group.editLockedBy?.trim() || t("a manager");
-  return t("{0}{1}. You cannot edit it right now.", availabilityEditLockedMessagePrefix, lockedBy);
-}
-
-function isAvailabilityEditLockedMessage(value: string | null) {
-  return value?.startsWith(availabilityEditLockedMessagePrefix) ?? false;
+  return t("This availability is currently being edited by {0}. You cannot edit it right now.", lockedBy);
 }
 
 function isAvailabilityOpen(group?: EmployeeAvailabilityGroup | null) {
@@ -532,12 +526,12 @@ export function EmployeeAvailabilityPage() {
   useEffect(() => {
     if (selectedEditLockedMessage) {
       setEditingDayOfMonth(null);
-      setClosedMessage(selectedEditLockedMessage);
+      setClosedMessage("availability-locked");
       return;
     }
 
     setClosedMessage(currentMessage =>
-      isAvailabilityEditLockedMessage(currentMessage) ? null : currentMessage,
+      currentMessage === "availability-locked" ? null : currentMessage,
     );
   }, [selectedEditLockedMessage]);
 
@@ -601,7 +595,7 @@ export function EmployeeAvailabilityPage() {
 
   const handleOpenDayDialog = (dayOfMonth: number) => {
     if (selectedAvailability?.isEditLocked) {
-      setClosedMessage(getAvailabilityEditLockedMessage(selectedAvailability));
+      setClosedMessage("availability-locked");
       return;
     }
 
@@ -795,7 +789,7 @@ export function EmployeeAvailabilityPage() {
 
             {closedMessage ? (
               <div className={styles.closedMessage} role="status">
-                {closedMessage}
+                {closedMessage === "availability-locked" ? selectedEditLockedMessage : closedMessage}
               </div>
             ) : null}
 

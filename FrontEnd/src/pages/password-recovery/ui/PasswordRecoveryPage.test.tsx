@@ -1,8 +1,12 @@
+import { beforeEach as beforeEnglishTest } from "vitest";
+import { setLanguage as setTestLanguage } from "@shared/i18n";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { BrowserRouter } from "react-router-dom";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 import { PasswordRecoveryPage } from "./PasswordRecoveryPage";
+
+beforeEnglishTest(() => setTestLanguage("en"));
 
 const mocks = vi.hoisted(() => ({
   sendPasswordResetCode: vi.fn(),

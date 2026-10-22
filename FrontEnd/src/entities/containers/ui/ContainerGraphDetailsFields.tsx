@@ -1,3 +1,4 @@
+import { useLanguageRevision } from "@shared/i18n/useLanguageRevision";
 import { t } from "@shared/i18n";
 import { useMemo, type ReactNode } from "react";
 import type { Employee } from "@entities/employees/model/types";
@@ -81,6 +82,7 @@ export function ContainerGraphDetailsFields({
   onFieldChange,
   onEmployeeMinHoursChange,
 }: ContainerGraphDetailsFieldsProps) {
+  const language = useLanguageRevision();
   const hasScrollableMinHoursList = graphEmployeeRows.length > 5;
   const employeeById = useMemo(
     () => new Map(employees.map(employee => [employee.id, employee])),
@@ -93,7 +95,8 @@ export function ContainerGraphDetailsFields({
         label: option.label,
         keywords: `${option.value} ${option.label}`,
       })),
-    [],
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- Translation helpers read the current language internally.
+    [language],
   );
   const shopOptions = useMemo<SearchableSelectOption[]>(
     () =>
@@ -120,7 +123,8 @@ export function ContainerGraphDetailsFields({
         keywords: `${group.id} ${group.name} ${group.month} ${group.year} ${getMonthOptionLabel(group.month)}`,
       })),
     ],
-    [availabilityGroups],
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- Translation helpers read the current language internally.
+    [availabilityGroups, language],
   );
 
   return (

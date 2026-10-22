@@ -1,3 +1,5 @@
+import { beforeEach as beforeEnglishTest } from "vitest";
+import { setLanguage as setTestLanguage } from "@shared/i18n";
 import { describe, expect, test } from "vitest";
 import {
   getContainerDisplayName,
@@ -8,6 +10,8 @@ import {
   matchesContainerSearch,
 } from "./presentation";
 import type { Container } from "./types";
+
+beforeEnglishTest(() => setTestLanguage("en"));
 
 describe("container presentation model", () => {
   test("formats display names, initials, states, and details with fallbacks", () => {
