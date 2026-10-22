@@ -40,7 +40,7 @@ function formatDelta(minutes: number) {
   const absolute = Math.abs(minutes);
   const hours = Math.floor(absolute / 60);
   const remainder = absolute % 60;
-  return `${sign}${hours ? `${hours}h` : ""}${hours && remainder ? " " : ""}${remainder ? `${remainder}m` : ""}`;
+  return `${sign}${hours ? t("{0}h", hours) : ""}${hours && remainder ? " " : ""}${remainder ? t("{0}m", remainder) : ""}`;
 }
 
 function statusLabel(status: ShiftCorrectionRequest["status"]) {

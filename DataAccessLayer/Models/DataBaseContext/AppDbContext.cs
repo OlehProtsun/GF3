@@ -221,6 +221,11 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, TimeProvider? 
     {
         modelBuilder.Entity<EmployeeAccountModel>(entity =>
         {
+            entity.Property(property => property.Language)
+                .IsRequired()
+                .HasMaxLength(2)
+                .HasDefaultValue("pl");
+
             entity.Property(property => property.Username)
                 .IsRequired()
                 .HasMaxLength(100)
@@ -248,6 +253,11 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, TimeProvider? 
     {
         modelBuilder.Entity<ManagerAccountModel>(entity =>
         {
+            entity.Property(property => property.Language)
+                .IsRequired()
+                .HasMaxLength(2)
+                .HasDefaultValue("pl");
+
             entity.Property(property => property.Username)
                 .IsRequired()
                 .HasMaxLength(100)

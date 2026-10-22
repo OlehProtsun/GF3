@@ -1,3 +1,5 @@
+import { beforeEach as beforeEnglishTest } from "vitest";
+import { setLanguage as setTestLanguage } from "@shared/i18n";
 import { describe, expect, test } from "vitest";
 import {
   formatEmployeeLastLogin,
@@ -8,6 +10,8 @@ import {
   getEmployeePresenceTone,
 } from "./presentation";
 import type { Employee } from "./types";
+
+beforeEnglishTest(() => setTestLanguage("en"));
 
 const employee: Employee = {
   id: 1,

@@ -20,7 +20,7 @@ export function LanguageProvider({ children }: PropsWithChildren) {
   useEffect(() => {
     const controller = new AbortController();
     activeRequest.current = controller;
-    setLanguage("en");
+    setLanguage("pl");
     setLoadError(false);
     if (!isAuthenticated || choosingWorkspace) {
       setLoadedAccount(accountKey);
@@ -29,7 +29,7 @@ export function LanguageProvider({ children }: PropsWithChildren) {
     void request<{ language: Language }>("account-language", { signal: controller.signal })
       .then(result => {
         if (!controller.signal.aborted) {
-          setLanguage(result.language === "pl" ? "pl" : "en");
+          setLanguage(result?.language === "en" ? "en" : "pl");
           setLoadedAccount(accountKey);
         }
       })
@@ -48,7 +48,7 @@ export function LanguageProvider({ children }: PropsWithChildren) {
       method: "PUT", body: { language: next }, signal: controller?.signal,
     });
     if (!controller?.signal.aborted) {
-      setLanguage(result.language === "pl" ? "pl" : "en");
+      setLanguage(result?.language === "en" ? "en" : "pl");
       setLoadError(false);
     }
   };

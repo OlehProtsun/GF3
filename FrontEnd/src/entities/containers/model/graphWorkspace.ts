@@ -1197,7 +1197,7 @@ function formatSummaryMinutes(totalMinutes: number) {
   const hours = Math.floor(totalMinutes / 60);
   const minutes = totalMinutes % 60;
 
-  return minutes === 0 ? `${hours}` : `${hours}h ${minutes}m`;
+  return minutes === 0 ? `${hours}` : t("{0}h {1}m", hours, minutes);
 }
 
 function getEmployeeLabel(employeeId: number, employeesById?: Map<number, Employee>) {

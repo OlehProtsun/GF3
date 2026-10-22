@@ -1,3 +1,5 @@
+import { beforeEach as beforeEnglishTest } from "vitest";
+import { setLanguage as setTestLanguage } from "@shared/i18n";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { BrowserRouter } from "react-router-dom";
@@ -6,6 +8,8 @@ import { QueryProvider } from "@app/providers/QueryProvider";
 import { getAuthAccessToken, setAuthAccessToken } from "@shared/api/httpClient";
 import { EmployeeAccountPage } from "./EmployeeAccountPage";
 import { LoginPage } from "@pages/login/ui/LoginPage";
+
+beforeEnglishTest(() => setTestLanguage("en"));
 
 vi.mock("@entities/regulations", () => ({ useMyRegulationHistoryQuery: () => ({ data: [] }) }));
 vi.mock("@entities/regulations/ui/RegulationHistoryCard", () => ({ RegulationHistoryCard: () => null }));

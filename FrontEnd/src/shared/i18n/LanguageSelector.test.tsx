@@ -1,3 +1,4 @@
+import { setLanguage, getLanguage } from "./index";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { LanguageSelector } from "./LanguageSelector";
@@ -6,6 +7,8 @@ const context = vi.hoisted(() => ({ language: "en", ready: true, save: vi.fn() }
 vi.mock("@app/providers/LanguageProvider", () => ({ useLanguage: () => context }));
 
 beforeEach(() => {
+  setLanguage("en");
+  context.language = "en";
   context.save.mockReset();
   vi.useFakeTimers();
   vi.stubGlobal("ResizeObserver", class {
@@ -13,7 +16,7 @@ beforeEach(() => {
     disconnect() {}
   });
 });
-afterEach(() => { cleanup(); vi.useRealTimers(); vi.unstubAllGlobals(); });
+afterEach(() => { cleanup(); setLanguage("pl"); vi.useRealTimers(); vi.unstubAllGlobals(); });
 
 function choosePolish() {
   fireEvent.click(screen.getByRole("button", { name: "Application language" }));
@@ -56,4 +59,24 @@ it("does not save the already selected language and cancels feedback timers on u
   expect(screen.getByRole("status")).toHaveTextContent("Saved");
   view.unmount();
   expect(vi.getTimerCount()).toBe(0);
+});
+
+it("localizes successful feedback in Polish and English with the existing choices", async () => {
+  context.save.mockImplementation(async (language: "pl" | "en") => {
+    context.language = language;
+    setLanguage(language);
+  });
+  const view = render(<LanguageSelector appearance="rounded" />);
+  choosePolish();
+  await act(async () => {});
+  view.rerender(<LanguageSelector appearance="rounded" />);
+  expect(getLanguage()).toBe("pl");
+  expect(screen.getByRole("status")).toHaveTextContent("Zapisano");
+  fireEvent.click(screen.getByRole("button", { name: "J\u0119zyk aplikacji" }));
+  expect(screen.getByRole("option", { name: "Polski" })).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("option", { name: "English" }));
+  await act(async () => {});
+  view.rerender(<LanguageSelector appearance="rounded" />);
+  expect(getLanguage()).toBe("en");
+  expect(screen.getByRole("status")).toHaveTextContent("Saved");
 });

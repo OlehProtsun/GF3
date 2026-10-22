@@ -1,7 +1,11 @@
+import { beforeEach as beforeEnglishTest } from "vitest";
+import { setLanguage as setTestLanguage } from "@shared/i18n";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, test, vi } from "vitest";
 import { ContainerGraphVersionsDialog } from "./ContainerGraphVersionsDialog";
+
+beforeEnglishTest(() => setTestLanguage("en"));
 
 const queryMocks = vi.hoisted(() => ({
   checkout: vi.fn(),

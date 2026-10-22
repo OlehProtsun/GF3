@@ -1,4 +1,5 @@
-import { t, dateTimeFormat } from "@shared/i18n";
+import { useLanguageRevision } from "@shared/i18n/useLanguageRevision";
+import { t, numberFormat, dateTimeFormat } from "@shared/i18n";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { NavLink } from "react-router-dom";
 import { useAuth } from "@app/providers/AuthProvider";
@@ -112,7 +113,7 @@ function getSlotDurationHours(slot: EmployeeScheduleSlot) {
 
 function formatHours(value: number) {
   const roundedValue = Math.round(value * 10) / 10;
-  return Number.isInteger(roundedValue) ? `${roundedValue}h` : `${roundedValue.toFixed(1)}h`;
+  return t("{0}h", numberFormat("en-GB", { maximumFractionDigits: 1 }).format(roundedValue));
 }
 
 function isCurrentEmployeeSlot(slot: EmployeeScheduleSlot, employeeId: number | null) {
@@ -596,6 +597,7 @@ function writeEmployeeScheduleColumnOrders(storageKey: string, scheduleOrders: R
   }
 }
 export function EmployeeSchedulePage() {
+  const language = useLanguageRevision();
   const { session } = useAuth();
   const scheduleQuery = useEmployeeScheduleListQuery();
   const shiftCorrectionsQuery = useEmployeeShiftCorrectionsQuery(Boolean(session?.employeeId));
@@ -717,7 +719,8 @@ export function EmployeeSchedulePage() {
       value: String(period.month),
       label: formatScheduleMonthOnly(period),
     })),
-    [summaryMonths],
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- Translation helpers read the current language internally.
+    [summaryMonths, language],
   );
   const summaryYearOptions = useMemo<SearchableSelectOption[]>(
     () => summaryYears.map(year => ({ value: String(year), label: String(year) })),
@@ -747,7 +750,8 @@ export function EmployeeSchedulePage() {
         isWorkingDay,
       };
     });
-  }, [currentEmployeeId, selectedSchedule]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- Translation helpers read the current language internally.
+  }, [currentEmployeeId, selectedSchedule, language]);
   const defaultDailyScheduleDay = useMemo(() => {
     if (!selectedSchedule || dailyScheduleDays.length === 0) {
       return 1;
@@ -781,15 +785,18 @@ export function EmployeeSchedulePage() {
     () => selectedSchedule
       ? buildDailyScheduleWorkers(selectedSchedule, activeDailyScheduleDay, fallbackMatrixEmployeeId, displayName)
       : [],
-    [activeDailyScheduleDay, displayName, fallbackMatrixEmployeeId, selectedSchedule],
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- Translation helpers read the current language internally.
+    [activeDailyScheduleDay, displayName, fallbackMatrixEmployeeId, selectedSchedule, language],
   );
   const scheduleHoursSummary = useMemo(
     () => buildScheduleHoursSummary(schedules, activeSummaryPeriod, currentEmployeeId),
-    [activeSummaryPeriod, currentEmployeeId, schedules],
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- Translation helpers read the current language internally.
+    [activeSummaryPeriod, currentEmployeeId, schedules, language],
   );
   const defaultScheduleMatrixColumns = useMemo(
     () => buildScheduleMatrixColumns(selectedSchedule, fallbackMatrixEmployeeId, displayName),
-    [displayName, fallbackMatrixEmployeeId, selectedSchedule],
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- Translation helpers read the current language internally.
+    [displayName, fallbackMatrixEmployeeId, selectedSchedule, language],
   );
   const scheduleMatrixColumns = useMemo(() => {
     if (!selectedSchedule) {

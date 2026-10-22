@@ -1,7 +1,7 @@
 import { createPortal, flushSync } from "react-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { queryKeys } from "@shared/api/queryKeys";
-import { t } from "@shared/i18n";
+import { dateTimeFormat, numberFormat, translateServerMessage, t } from "@shared/i18n";
 import {
   useCallback,
   useDeferredValue,
@@ -40,7 +40,7 @@ import { CopyLinkIcon } from "@shared/ui/icons";
 import { createSwapLink, parseSwapLinkId } from "../model/swapLink";
 import { useLocation } from "react-router-dom";
 
-const swapOfferDateFormatter = new Intl.DateTimeFormat("en-GB", {
+const swapOfferDateFormatter = dateTimeFormat("en-GB", {
   day: "2-digit",
   month: "2-digit",
   year: "numeric",
@@ -75,7 +75,7 @@ function getSwapCode(swap: ShiftSwap) {
 
 function formatHours(value: number) {
   const roundedValue = Math.round(value * 10) / 10;
-  return Number.isInteger(roundedValue) ? `${roundedValue}h` : `${roundedValue.toFixed(1)}h`;
+  return t("{0}h", numberFormat("en-GB", { maximumFractionDigits: 1 }).format(roundedValue));
 }
 
 function PinToggleButton({
@@ -87,7 +87,7 @@ function PinToggleButton({
   label: string;
   onToggle: () => void;
 }) {
-  const actionLabel = `${isPinned ? t("Unpin") : t("Pin")} ${t(label)}`;
+  const actionLabel = `${isPinned ? t("Unpin") : t("Pin")} ${label}`;
   return (
     <button
       type="button"
@@ -124,9 +124,9 @@ function SwapOfferCard({ swap, isPinned, highlighted, onTogglePin, onViewDetails
     const url = createSwapLink(swap.id, window.location.origin);
     try {
       await navigator.clipboard.writeText(url);
-      setShareStatus(t("Link copied"));
+      setShareStatus("copied");
     } catch {
-      setShareStatus(t("Could not copy this link. Please try again."));
+      setShareStatus("failed");
     }
   };
   const isManagerManual = swap.isManagerCreated === true && typeof swap.manualColumnId === "number" && swap.manualColumnId > 0;
@@ -157,12 +157,12 @@ function SwapOfferCard({ swap, isPinned, highlighted, onTogglePin, onViewDetails
           </span>
           {isOpen && swap.isScheduleLocked && <span className={`${styles.badge} ${styles.badgeLocked}`}><WarnIcon size={13} /><span>{t("Locked")}</span></span>}
         </span>
-        {unavailableReason && <span className={styles.offerUnavailableReason}><WarnIcon size={13} /><span className={styles.unavailableText}>{t(unavailableReason)}</span></span>}
+        {unavailableReason && <span className={styles.offerUnavailableReason}><WarnIcon size={13} /><span className={styles.unavailableText}>{translateServerMessage(unavailableReason)}</span></span>}
       </span>
     </button>
     <PinToggleButton isPinned={isPinned} label={t("{0} swap", swap.scheduleName)} onToggle={() => onTogglePin(swap.id)} />
     <button type="button" className={`${styles.collapseButton} ${styles.cardActionButton} ${styles.copyLinkButton}`} aria-label={t("Copy swap link for {0}", swap.scheduleName)} onClick={() => void share()}><CopyLinkIcon size={15} /></button>
-    {shareStatus && <span className={styles.shareStatus} role="status">{shareStatus}</span>}
+    {shareStatus && <span className={styles.shareStatus} role="status">{shareStatus === "copied" ? t("Link copied") : t("Could not copy this link. Please try again.")}</span>}
   </article>;
 }
 
@@ -600,7 +600,7 @@ export function EmployeeSwapPage() {
         open={pendingUnpinSwapId !== null}
         variant="confirm"
         title={t("Unpin swap?")}
-        message={t("Remove {0} from your pinned swaps?", pendingUnpinSwap?.scheduleName ?? "this swap")}
+        message={t("Remove {0} from your pinned swaps?", pendingUnpinSwap?.scheduleName ?? t("this swap"))}
         confirmText={t("Unpin")}
         onCancel={() => setPendingUnpinSwapId(null)}
         onConfirm={handleConfirmUnpin}

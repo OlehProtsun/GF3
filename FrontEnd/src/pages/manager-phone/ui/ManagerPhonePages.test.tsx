@@ -1,3 +1,5 @@
+import { beforeEach as beforeEnglishTest } from "vitest";
+import { setLanguage as setTestLanguage } from "@shared/i18n";
 import { within, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import userEvent from "@testing-library/user-event";
@@ -20,6 +22,8 @@ import { ManagerPhonePage } from "./ManagerPhonePage";
 import { ManagerPhoneEmployeeDetailPage } from "./ManagerPhoneEmployeeDetailPage";
 import { ManagerPhoneShopDetailPage } from "./ManagerPhoneShopDetailPage";
 import { parsePhoneId } from "./parsePhoneId";
+
+beforeEnglishTest(() => setTestLanguage("en"));
 const container = { id: 1, name: "All manager container", note: "Manager records" };
 const employee = { id: 2, firstName: "Other", lastName: "Worker", hasLoginAccount: true, isOnline: true, username: "other", email: "other@example.com", phone: "123" };
 const graph = { id: 3, containerId: 1, shopId: 4, name: "Private schedule", year: 2026, month: 4, publicationStatus: "private" as const, peoplePerShift: 1, shift1Time: "08:00 - 16:00", shift2Time: "16:00 - 20:00", maxHoursPerEmpMonth: 160, maxConsecutiveDays: 5, maxConsecutiveFull: 3, maxFullPerMonth: 10 };

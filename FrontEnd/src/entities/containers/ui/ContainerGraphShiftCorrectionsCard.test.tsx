@@ -1,7 +1,11 @@
+import { beforeEach as beforeEnglishTest } from "vitest";
+import { setLanguage as setTestLanguage } from "@shared/i18n";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 import { ContainerGraphShiftCorrectionsCard } from "./ContainerGraphShiftCorrectionsCard";
+
+beforeEnglishTest(() => setTestLanguage("en"));
 
 const mocks = vi.hoisted(() => ({ saveSetting: vi.fn(), approve: vi.fn(), reject: vi.fn(), graphQuery: vi.fn(), settingQuery: vi.fn() }));
 

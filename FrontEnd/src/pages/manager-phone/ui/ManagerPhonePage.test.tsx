@@ -1,3 +1,5 @@
+import { beforeEach as beforeEnglishTest } from "vitest";
+import { setLanguage as setTestLanguage } from "@shared/i18n";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { expect, test, vi } from "vitest";
 import { BrowserRouter } from "react-router-dom";
@@ -5,6 +7,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ComponentProps } from "react";
 import { ApiError } from "@shared/api/httpClient";
 import { ManagerPhonePage } from "./ManagerPhonePage";
+
+beforeEnglishTest(() => setTestLanguage("en"));
 function mount(props: ComponentProps<typeof ManagerPhonePage> = {}) {
   const client = new QueryClient();
   const invalidate = vi.spyOn(client, "invalidateQueries");

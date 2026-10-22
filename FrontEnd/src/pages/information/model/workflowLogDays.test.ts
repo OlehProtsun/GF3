@@ -1,3 +1,5 @@
+import { beforeEach as beforeEnglishTest } from "vitest";
+import { setLanguage as setTestLanguage } from "@shared/i18n";
 import { describe, expect, it } from "vitest";
 import type { WorkflowLog } from "@entities/workflow-logs";
 import {
@@ -9,6 +11,8 @@ import {
   groupWorkflowLogsByDay,
   parseWorkflowLogDate,
 } from "./workflowLogDays";
+
+beforeEnglishTest(() => setTestLanguage("en"));
 
 function createLog(id: number, occurredAtUtc: string, action = `Action ${id}`): WorkflowLog {
   return {

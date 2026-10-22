@@ -537,7 +537,7 @@ export function ManagerAccountPage() {
       <ConfirmDialog
         open={deleteTarget !== null}
         title={t("Delete manager")}
-        message={t("Delete {0}? This removes their access to the manager workflow.", deleteTarget?.displayName ?? "this manager")}
+        message={t("Delete {0}? This removes their access to the manager workflow.", deleteTarget?.displayName ?? t("this manager"))}
         onCancel={() => {
           if (!deleteManagerMutation.isPending) {
             setDeleteTarget(null);

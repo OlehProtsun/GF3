@@ -1,14 +1,36 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { formatHoursMinutes } from "@entities/containers/model/statistics";
+import { afterEach, vi, describe, expect, it } from "vitest";
 import { dateTimeFormat, getLanguage, numberFormat, setLanguage, t, translateServerMessage } from "./index";
 import pl from "./pl.json";
 import { normalizeBindKey } from "@entities/availability-binds/model/hotkeys";
 import { getGraphWeekdayLabel, parseGraphCellContent } from "@entities/containers/model/graphWorkspace";
 import { availabilityMonthOptions, getAvailabilityKindLabel } from "@entities/availability-groups/model/presentation";
 
-afterEach(() => setLanguage("en"));
+afterEach(() => setLanguage("pl"));
 
 describe("account language", () => {
+  it("starts a fresh module in Polish and synchronizes HTML even for the same language", async () => {
+    vi.resetModules();
+    const fresh = await import("./index");
+    expect(fresh.getLanguage()).toBe("pl");
+    document.documentElement.lang = "en";
+    fresh.setLanguage("pl");
+    expect(document.documentElement.lang).toBe("pl");
+  });
+  it("translates shift selection, notification fallbacks and duration interpolation", () => {
+    setLanguage("pl");
+    expect(t("Choose a shift")).toBe("Wybierz zmian\u0119");
+    expect(t("your shop")).toBe("Twoim sklepie");
+    expect(t("A coworker")).toBe("Wsp\u00f3\u0142pracownik");
+    expect(t("{0}h", "7,5")).toBe("7,5 godz.");
+    expect(formatHoursMinutes(450)).toBe("7 godz. 30 min");
+    setLanguage("en");
+    expect(t("Choose a shift")).toBe("Choose a shift");
+    expect(formatHoursMinutes(450)).toBe("7h 30m");
+    setLanguage("pl");
+  });
   it("switches translations, document language, preloaded month labels and formatters in both directions", () => {
+    setLanguage("en");
     const formatter = dateTimeFormat("en-GB", { month: "long", timeZone: "UTC" });
     const date = new Date("2026-09-01T00:00:00Z");
     expect(formatter.format(date)).toBe("September");

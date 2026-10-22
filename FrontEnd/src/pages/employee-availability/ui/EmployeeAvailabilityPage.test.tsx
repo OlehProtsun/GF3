@@ -1,3 +1,5 @@
+import { beforeEach as beforeEnglishTest } from "vitest";
+import { setLanguage as setTestLanguage } from "@shared/i18n";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { BrowserRouter } from "react-router-dom";
@@ -5,6 +7,8 @@ import { beforeEach, describe, expect, test, vi } from "vitest";
 import type { EmployeeAvailabilityGroup } from "@entities/employee-availability";
 import { AVAILABILITY_KIND_ANY, AVAILABILITY_KIND_INTERVAL, AVAILABILITY_KIND_NONE } from "@entities/availability-groups/model/editor";
 import { EmployeeAvailabilityPage } from "./EmployeeAvailabilityPage";
+
+beforeEnglishTest(() => setTestLanguage("en"));
 
 const mocks = vi.hoisted(() => ({
   availabilityQuery: vi.fn(),

@@ -1,3 +1,4 @@
+import { useLanguageRevision } from "@shared/i18n/useLanguageRevision";
 import { t } from "@shared/i18n";
 import { useMemo, type CSSProperties, type ReactNode } from "react";
 import type { GraphMatrixColumn } from "@entities/containers";
@@ -66,6 +67,7 @@ export function AvailabilityScheduleMatrix({
   onCellChange,
   onVisualHintClick,
 }: AvailabilityScheduleMatrixProps) {
+  const language = useLanguageRevision();
   const graphColumns = useMemo<GraphMatrixColumn[]>(
     () =>
       columns.map(column => ({
@@ -78,7 +80,8 @@ export function AvailabilityScheduleMatrix({
         totalMinutes: 0,
         totalText: getAvailabilityMemberLastModifiedLabel(column.employeeLastModifiedAtUtc),
       })),
-    [columns],
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- Translation helpers read the current language internally.
+    [columns, language],
   );
   const normalizedBindValueByKey = useMemo(() => {
     if (!bindValueByKey || bindValueByKey.size === 0) {

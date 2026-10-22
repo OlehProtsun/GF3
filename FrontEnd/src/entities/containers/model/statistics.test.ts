@@ -1,3 +1,5 @@
+import { beforeEach as beforeEnglishTest } from "vitest";
+import { setLanguage as setTestLanguage } from "@shared/i18n";
 import { describe, expect, test } from "vitest";
 import {
   buildContainerGraphSummaries,
@@ -11,6 +13,8 @@ import {
 import type { Graph, GraphEmployee, GraphSlot } from "./types";
 import type { Employee } from "@entities/employees/model/types";
 import type { Shop } from "@entities/shops/model/types";
+
+beforeEnglishTest(() => setTestLanguage("en"));
 
 const graph: Graph = {
   id: 10,

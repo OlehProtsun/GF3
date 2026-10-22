@@ -1,6 +1,10 @@
+import { beforeEach as beforeEnglishTest } from "vitest";
+import { setLanguage as setTestLanguage } from "@shared/i18n";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { RegulationAcceptanceGate } from "./RegulationAcceptanceGate";
+
+beforeEnglishTest(() => setTestLanguage("en"));
 
 const mocks = vi.hoisted(() => ({
   document: { id: 1, title: "Rules", version: "1.0", message: "Read the PDF", pdfFileName: "rules.pdf" },

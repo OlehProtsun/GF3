@@ -1,7 +1,7 @@
 import { useId, useRef, type RefObject } from "react";
 import { createPortal } from "react-dom";
 import type { ShiftSwap } from "@entities/shift-swaps";
-import { getLocale, t } from "@shared/i18n";
+import { getLocale, translateServerMessage, t } from "@shared/i18n";
 import { ErrorBanner } from "@shared/ui/components/ErrorBanner";
 import { CloseIcon } from "@shared/ui/icons";
 import { useSwapModalEnvironment } from "./useSwapModalEnvironment";
@@ -55,7 +55,7 @@ export function SwapOfferDetailsDialog({ swap, currentEmployeeId, busy, error, o
                 <div className={review.transferMeta}><strong>{panel.schedule || t("Not available")}</strong>
                   {panel.location && <span>{panel.location}</span>}
                   <strong>{panel.from && panel.to ? `${panel.from}–${panel.to}` : t("Not available")}</strong>
-                  {typeof panel.hours === "number" && Number.isFinite(panel.hours) && <span>{t("Shift hours")}: {new Intl.NumberFormat(getLocale(), { maximumFractionDigits: 2 }).format(panel.hours)}h</span>}
+                  {typeof panel.hours === "number" && Number.isFinite(panel.hours) && <span>{t("Shift hours")}: {t("{0}h", new Intl.NumberFormat(getLocale(), { maximumFractionDigits: 2 }).format(panel.hours))}</span>}
                 </div>
               </div>
             </section>
@@ -68,7 +68,7 @@ export function SwapOfferDetailsDialog({ swap, currentEmployeeId, busy, error, o
             ...(swap.acceptedByEmployeeName ? [[t("Accepted by"), swap.acceptedByEmployeeName]] : [])].map(([label, value]) =>
             <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}
         </dl>
-        {swap.status === "open" && !swap.canAccept && <p className={review.reviewInfo}>{t(unavailable)}</p>}
+        {swap.status === "open" && !swap.canAccept && <p className={review.reviewInfo}>{translateServerMessage(unavailable)}</p>}
       </div>
       <footer className={styles.footer}>
         {swap.status === "open" ? <>

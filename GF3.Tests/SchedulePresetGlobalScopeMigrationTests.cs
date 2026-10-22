@@ -81,6 +81,8 @@ public sealed class SchedulePresetGlobalScopeMigrationTests
             await Assert.ThrowsAsync<SqliteException>(() => context.GetService<IMigrator>().MigrateAsync(Baseline));
             Assert.Equal(orphanSnapshot, await Snapshot(context));
             Assert.Equal(childBefore, await ChildSnapshot(context));
+            // Later migrations may already have rolled back before the guarded downgrade fails.
+            await context.Database.MigrateAsync();
             Assert.Empty(await context.Database.GetPendingMigrationsAsync());
             await context.Database.OpenConnectionAsync();
             await using var command = context.Database.GetDbConnection().CreateCommand();

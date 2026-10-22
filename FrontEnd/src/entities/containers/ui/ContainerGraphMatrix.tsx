@@ -1,3 +1,4 @@
+import { useLanguageRevision } from "@shared/i18n/useLanguageRevision";
 import { t } from "@shared/i18n";
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties, ClipboardEvent, DragEvent, FocusEvent, KeyboardEvent, MouseEvent, ReactNode } from "react";
@@ -339,9 +340,10 @@ const MatrixDayCell = memo(function MatrixDayCell({
   hasRowGuide,
   inlineStyle,
 }: MatrixDayCellProps) {
+  useLanguageRevision();
   const staffingLabel = shiftStaffingCounts?.join(",") ?? "";
   const staffingDescription = shiftStaffingCounts
-    ?.map((count, index) => t("Shift {0}: {1} {2}", index + 1, count, count === 1 ? "employee" : "employees"))
+    ?.map((count, index) => t("Shift {0}: {1} {2}", index + 1, count, count === 1 ? t("employee") : t("employees")))
     .join("; ");
 
   return (
@@ -406,6 +408,7 @@ const MatrixValueCell = memo(function MatrixValueCell({
   onInlineValueCommit,
   onVisualHintClick,
 }: MatrixValueCellProps) {
+  useLanguageRevision();
   const visualHintClickTimeoutRef = useRef<number | null>(null);
   const inlineStyle = {
     ...(backgroundColor ? { backgroundColor } : {}),
@@ -688,6 +691,7 @@ export function ContainerGraphMatrix({
   onVisualHintClick,
   onVisualHintCellClick,
 }: ContainerGraphMatrixProps) {
+  const language = useLanguageRevision();
   const [editingCellKey, setEditingCellKey] = useState<string | null>(null);
   const [editingValue, setEditingValue] = useState(GRAPH_EMPTY_MARK);
   const [editingSelectionBehavior, setEditingSelectionBehavior] = useState<MatrixEditorSelectionBehavior>("select-all");
@@ -722,7 +726,8 @@ export function ContainerGraphMatrix({
           hasConflict: Boolean(dayConflictMap[dayOfMonth]),
         };
       }),
-    [dayConflictMap, graph.month, graph.year],
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- Translation helpers read the current language internally.
+    [dayConflictMap, graph.month, graph.year, language],
   );
   const shiftStaffingCountsByDay = useMemo(
     () => showShiftStaffingCounts

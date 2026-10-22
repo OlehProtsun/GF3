@@ -1,3 +1,5 @@
+import { beforeEach as beforeEnglishTest } from "vitest";
+import { setLanguage as setTestLanguage } from "@shared/i18n";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import type { Container, Graph, GraphCellStyle, GraphEmployee, GraphSlot } from "@entities/containers";
 import type { Employee } from "@entities/employees/model/types";
@@ -36,6 +38,8 @@ vi.mock("@entities/shops/api/shopsApi", () => ({
 }));
 
 import { loadHomeDashboard } from "./homeDashboard";
+
+beforeEnglishTest(() => setTestLanguage("en"));
 
 const currentDate = new Date("2026-05-10T12:00:00");
 

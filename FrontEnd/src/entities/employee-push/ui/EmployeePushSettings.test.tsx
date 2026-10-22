@@ -1,6 +1,10 @@
+import { beforeEach as beforeEnglishTest } from "vitest";
+import { setLanguage as setTestLanguage } from "@shared/i18n";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { EmployeePushSettings } from "./EmployeePushSettings";
+
+beforeEnglishTest(() => setTestLanguage("en"));
 
 const mocks = vi.hoisted(() => ({ getConfig: vi.fn(), upsertSubscription: vi.fn(), support: vi.fn(), getSubscription: vi.fn(), account: vi.fn(), ensure: vi.fn(), remember: vi.fn(), disable: vi.fn() }));
 vi.mock("../api/employeePushApi", () => ({ employeePushApi: { getConfig: mocks.getConfig, upsertSubscription: mocks.upsertSubscription } }));

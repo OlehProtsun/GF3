@@ -1,9 +1,13 @@
+import { beforeEach as beforeEnglishTest } from "vitest";
+import { setLanguage as setTestLanguage } from "@shared/i18n";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter } from "react-router-dom";
 import { OverlaySidebarLayout } from "./OverlaySidebarLayout";
+
+beforeEnglishTest(() => setTestLanguage("en"));
 
 const authMock = vi.hoisted(() => ({
   session: { role: "manager" as "manager" | "employee", displayName: "Synthetic manager", userName: "manager", isSystemManager: undefined as boolean | undefined },

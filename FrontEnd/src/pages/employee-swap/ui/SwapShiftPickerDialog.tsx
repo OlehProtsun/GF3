@@ -1,6 +1,6 @@
 import { useId, useState } from "react";
 import type { ShiftSwapReturnCandidate } from "@entities/shift-swaps/model/types";
-import { t } from "@shared/i18n";
+import { numberFormat, translateServerMessage, t } from "@shared/i18n";
 import { SwapSelectionContext } from "./SwapSelectionContext";
 import { SwapScrollRegion } from "./SwapScrollRegion";
 import styles from "./SwapShiftPickerDialog.module.css";
@@ -79,7 +79,7 @@ export function SwapShiftPickerDialog({ shifts, selection, outgoing, returnMode 
         <span>{swapShiftDate(item)}</span>
         <strong>{item.fromTime} – {item.toTime}</strong>
         <span className={styles.radio} aria-hidden="true" />
-        {!item.canSelect && <small>{t(item.unavailableReason ?? "Shift unavailable.")}</small>}
+        {!item.canSelect && <small>{translateServerMessage(item.unavailableReason ?? t("Shift unavailable."))}</small>}
       </button>)}
       {!loading && shifts.length === 0 && <p>{t("No shifts available.")}</p>}
       {loading && <p role="status">{t("Loading...")}</p>}
@@ -104,7 +104,7 @@ export function SwapShiftPickerDialog({ shifts, selection, outgoing, returnMode 
       </div>}
       {!custom && shift && period && <div className={styles.summary}>
         <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">{returnMode ? <><rect x="4" y="5" width="16" height="16" rx="2" /><path d="M8 3v5m8-5v5M4 11h16" /></> : <><circle cx="12" cy="12" r="9" /><path d="M12 6v6h5" /></>}</svg>
-        <div>{returnMode && <span>{swapShiftDate(shift)}</span>}<strong>{period.fromTime} – {period.toTime} ({Number(((swapMinutes(period.toTime) - swapMinutes(period.fromTime)) / 60).toFixed(2))}h)</strong>{!returnMode && <span>{t("Full shift")}</span>}</div>
+        <div>{returnMode && <span>{swapShiftDate(shift)}</span>}<strong>{period.fromTime} – {period.toTime} ({t("{0}h", numberFormat("en-GB", { maximumFractionDigits: 2 }).format((swapMinutes(period.toTime) - swapMinutes(period.fromTime)) / 60))})</strong>{!returnMode && <span>{t("Full shift")}</span>}</div>
       </div>}
     </div>}
     <footer className={styles.footer}><button type="button" className={styles.confirm} disabled={!valid || loading} onClick={() => valid && shift && period && onConfirm({ shift, period })}>{returnMode ? t("Confirm selection") : t("Confirm shift")}</button></footer>

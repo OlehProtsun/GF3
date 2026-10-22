@@ -251,7 +251,7 @@ function ReviewShiftCard({ shift, selection, receive = false, employeeName, init
       <span className={receive ? styles.receiveBadge : styles.giveBadge}>{receive ? t("Receive") : t("Give")}</span>
     </header>
     <div className={styles.transferPeriod}><div className={styles.dateBadge}><strong>{String(shift.dayOfMonth).padStart(2, "0")}</strong><span>{new Intl.DateTimeFormat(getLocale(), { month: "short" }).format(date)}</span><small>{shift.year}</small></div>
-      <div><strong>{shift.fromTime} – {shift.toTime}</strong><span>{new Intl.NumberFormat(getLocale(), { maximumFractionDigits: 2 }).format(shift.durationMinutes / 60)}h</span></div>
+      <div><strong>{shift.fromTime} – {shift.toTime}</strong><span>{t("{0}h", new Intl.NumberFormat(getLocale(), { maximumFractionDigits: 2 }).format(shift.durationMinutes / 60))}</span></div>
     </div>
     <div className={styles.transferMeta}><span>{new Intl.DateTimeFormat(getLocale(), { weekday: "long" }).format(date)}, {swapShiftDate(shift)}</span><span>{shift.scheduleName}</span></div>
     <span className={styles.periodBadge}>{custom ? t("Custom period") : t("Full shift")}</span>

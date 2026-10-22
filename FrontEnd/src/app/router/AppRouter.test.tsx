@@ -1,8 +1,12 @@
+import { beforeEach as beforeEnglishTest } from "vitest";
+import { setLanguage as setTestLanguage } from "@shared/i18n";
 import { render, screen, waitFor } from "@testing-library/react";
 import type { PropsWithChildren } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { AuthSession } from "@entities/auth/model/types";
 import { AppRouter } from "./AppRouter";
+
+beforeEnglishTest(() => setTestLanguage("en"));
 
 const auth = vi.hoisted(() => ({
   status: "authenticated" as "authenticated" | "unauthenticated" | "loading",

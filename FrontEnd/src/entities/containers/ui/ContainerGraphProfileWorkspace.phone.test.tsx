@@ -1,9 +1,13 @@
+import { beforeEach as beforeEnglishTest } from "vitest";
+import { setLanguage as setTestLanguage } from "@shared/i18n";
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { expect, test, vi } from "vitest";
 import userEvent from "@testing-library/user-event";
 import type { Graph, GraphEmployee, GraphSlot } from "../model/types";
 import type { Employee } from "@entities/employees/model/types";
 import { ContainerGraphProfileWorkspace } from "./ContainerGraphProfileWorkspace";
+
+beforeEnglishTest(() => setTestLanguage("en"));
 
 const graph: Graph = { id: 3, containerId: 1, shopId: 4, name: "July Schedule", year: 2026, month: 7, publicationStatus: "public", peoplePerShift: 1, shift1Time: "08:00 - 12:00", shift2Time: "14:00 - 18:00", maxHoursPerEmpMonth: 160, maxConsecutiveDays: 5, maxConsecutiveFull: 3, maxFullPerMonth: 10, lastUpdatedAtUtc: "2026-07-01T10:00:00Z" };
 const employees: Employee[] = [

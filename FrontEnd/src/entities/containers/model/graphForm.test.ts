@@ -1,3 +1,5 @@
+import { beforeEach as beforeEnglishTest } from "vitest";
+import { setLanguage as setTestLanguage } from "@shared/i18n";
 import { describe, expect, test } from "vitest";
 import {
   applyGraphApiErrors,
@@ -6,6 +8,8 @@ import {
   isValidGraphShiftTime,
   parseIntegerField,
 } from "./graphForm";
+
+beforeEnglishTest(() => setTestLanguage("en"));
 
 describe("container graph form model", () => {
   test("creates initial form with current year, default month, and optional shop", () => {

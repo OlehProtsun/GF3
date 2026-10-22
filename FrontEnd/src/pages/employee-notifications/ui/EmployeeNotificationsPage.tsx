@@ -1,3 +1,4 @@
+import { useLanguageRevision } from "@shared/i18n/useLanguageRevision";
 import { getLocale, t } from "@shared/i18n";
 import { useEffect, useMemo, useState } from "react";
 import { NavLink } from "react-router-dom";
@@ -32,6 +33,7 @@ const EMPTY_SCHEDULES: EmployeeSchedule[] = [];
 const EMPTY_AVAILABILITY_GROUPS: EmployeeAvailabilityGroup[] = [];
 
 export function EmployeeNotificationsPage() {
+  const language = useLanguageRevision();
   const { session } = useAuth();
   const { notifications: realtimeNotifications } = useRealtime();
   const swapsQuery = useEmployeeShiftSwapsQuery();
@@ -88,7 +90,8 @@ export function EmployeeNotificationsPage() {
 
   const notificationItems = useMemo(
     () => buildEmployeeNotificationItems(realtimeNotifications, swaps, schedules, availabilityGroups, nowMs),
-    [availabilityGroups, nowMs, realtimeNotifications, schedules, swaps],
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- Translation helpers read the current language internally.
+    [availabilityGroups, nowMs, realtimeNotifications, schedules, swaps, language],
   );
 
   const unreadCount = notificationItems.reduce(

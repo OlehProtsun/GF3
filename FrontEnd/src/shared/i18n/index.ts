@@ -1,7 +1,7 @@
 import pl from "./pl.json";
 
 export type Language = "en" | "pl";
-let language: Language = "en";
+let language: Language = "pl";
 const listeners = new Set<() => void>();
 
 export function getLanguage(): Language { return language; }

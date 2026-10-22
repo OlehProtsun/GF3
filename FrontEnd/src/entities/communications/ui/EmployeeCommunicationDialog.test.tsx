@@ -1,7 +1,11 @@
+import { beforeEach as beforeEnglishTest } from "vitest";
+import { setLanguage as setTestLanguage } from "@shared/i18n";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 import { EmployeeCommunicationDialog } from "./EmployeeCommunicationDialog";
+
+beforeEnglishTest(() => setTestLanguage("en"));
 
 const hookMocks = vi.hoisted(() => ({
   useEmployeePendingCommunicationsQuery: vi.fn(),

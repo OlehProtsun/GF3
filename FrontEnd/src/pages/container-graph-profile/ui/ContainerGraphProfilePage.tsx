@@ -344,7 +344,7 @@ export function ContainerGraphProfilePage() {
         message={
           sessionGraphNames.length > 1
             ? t("Open the editor for these schedules?")
-            : t("Open the editor for '{0}'?", sessionGraphNames[0] ?? graph?.name ?? "this schedule")
+            : t("Open the editor for '{0}'?", sessionGraphNames[0] ?? graph?.name ?? t("this schedule"))
         }
         footerSlot={
           sessionGraphNames.length > 0 ? (

@@ -67,11 +67,11 @@ export function formatEmployeeNotificationExpiry(value?: string | null, nowMs = 
   const minutes = totalMinutes % 60;
 
   if (days > 0) {
-    return t("This notification will be deleted in {0}d{1}.", days, hours > 0 ? ` ${hours}h` : "");
+    return t("This notification will be deleted in {0}d{1}.", days, hours > 0 ? ` ${t("{0}h", hours)}` : "");
   }
 
   if (hours > 0) {
-    return t("This notification will be deleted in {0}h{1}.", hours, minutes > 0 ? ` ${minutes}m` : "");
+    return t("This notification will be deleted in {0}h{1}.", hours, minutes > 0 ? ` ${t("{0}m", minutes)}` : "");
   }
 
   return t("This notification will be deleted in {0}m.", minutes);
@@ -252,7 +252,7 @@ function buildScheduleNotification(
     id,
     readIds: [id],
     title: t("New schedule published"),
-    body: t("\"{0}\" for {1} is now available at {2}.", schedule.name, formatMonth(schedule.year, schedule.month), schedule.shopName || "your shop"),
+    body: t("\"{0}\" for {1} is now available at {2}.", schedule.name, formatMonth(schedule.year, schedule.month), schedule.shopName || t("your shop")),
     meta: `${schedule.shopName || t("Shop")} / ${schedule.containerName || t("Container")}`,
     tone: "schedule",
     occurredAtUtc: schedule.publishedAtUtc ?? event?.occurredAtUtc ?? null,
@@ -304,7 +304,7 @@ function buildSwapAvailableNotification(
     id,
     readIds: uniqueIds([id, event?.id]),
     title: t("Shift swap available"),
-    body: t("{0} offered {1} {2} - {3} from \"{4}\".", swap.fromEmployeeName || "A coworker", formatSwapDay(swap), swap.fromTime, swap.toTime, swap.scheduleName),
+    body: t("{0} offered {1} {2} - {3} from \"{4}\".", swap.fromEmployeeName || t("A coworker"), formatSwapDay(swap), swap.fromTime, swap.toTime, swap.scheduleName),
     meta: `${swap.shopName || t("Shop")} / ${swap.containerName || t("Container")}`,
     tone: "swap",
     occurredAtUtc: swap.createdAtUtc,
@@ -322,7 +322,7 @@ function buildAcceptedOwnSwapNotification(
     id,
     readIds: uniqueIds([id, event?.id]),
     title: t("Your shift was accepted"),
-    body: t("{0} accepted your {1} {2} - {3} shift from \"{4}\".", swap.acceptedByEmployeeName || "A coworker", formatSwapDay(swap), swap.fromTime, swap.toTime, swap.scheduleName),
+    body: t("{0} accepted your {1} {2} - {3} shift from \"{4}\".", swap.acceptedByEmployeeName || t("A coworker"), formatSwapDay(swap), swap.fromTime, swap.toTime, swap.scheduleName),
     meta: `${swap.shopName || t("Shop")} / ${swap.containerName || t("Container")}`,
     tone: "swap",
     occurredAtUtc: swap.acceptedAtUtc ?? swap.createdAtUtc,

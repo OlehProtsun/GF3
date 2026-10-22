@@ -1,3 +1,5 @@
+import { beforeEach as beforeEnglishTest } from "vitest";
+import { setLanguage as setTestLanguage } from "@shared/i18n";
 import { describe, expect, test } from "vitest";
 import {
   getShopDetailsState,
@@ -6,6 +8,8 @@ import {
   getShopProfileDetails,
 } from "./presentation";
 import type { Shop } from "./types";
+
+beforeEnglishTest(() => setTestLanguage("en"));
 
 const shop: Shop = {
   id: 1,

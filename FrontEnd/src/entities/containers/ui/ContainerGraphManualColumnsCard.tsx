@@ -1,4 +1,5 @@
-import { dateTimeFormat, t } from "@shared/i18n";
+import { useLanguageRevision } from "@shared/i18n/useLanguageRevision";
+import { dateTimeFormat, numberFormat, t } from "@shared/i18n";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import type { Employee } from "@entities/employees";
@@ -130,7 +131,7 @@ function formatPublishedShiftTime(value: string) {
 
 function formatPublishedShiftHours(value: number) {
   const normalized = Math.abs(value) < 0.05 ? 0 : value;
-  return `${Number.isInteger(normalized) ? normalized.toFixed(0) : normalized.toFixed(1)}h`;
+  return t("{0}h", numberFormat("en-GB", { maximumFractionDigits: 1 }).format(normalized));
 }
 
 function getTimeRangeDurationHours(fromTime: string, toTime: string) {
@@ -333,11 +334,14 @@ export function ContainerGraphManualColumnsCard({
   onCancelPublishedShift,
   onCancelPendingPublishedShift,
 }: ContainerGraphManualColumnsCardProps) {
-  const columnsCountLabel = t("{0} column{1}", columns.length, columns.length === 1 ? "" : "s");
-  const shiftGroups = useMemo(() => buildManualShiftGroups(columns, year, month), [columns, month, year]);
+  const language = useLanguageRevision();
+  const columnsCountLabel = t("Columns: {0}", columns.length);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- Translation helpers read the current language internally.
+  const shiftGroups = useMemo(() => buildManualShiftGroups(columns, year, month), [columns, month, year, language]);
   const sortedEmployees = useMemo(
     () => [...employees].sort((left, right) => getEmployeeLabel(left).localeCompare(getEmployeeLabel(right))),
-    [employees],
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- Translation helpers read the current language internally.
+    [employees, language],
   );
   const employeeOptions = useMemo<SearchableSelectOption[]>(
     () => sortedEmployees.map(employee => {
@@ -357,7 +361,8 @@ export function ContainerGraphManualColumnsCard({
         ].join(" "),
       };
     }),
-    [sortedEmployees],
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- Translation helpers read the current language internally.
+    [sortedEmployees, language],
   );
   const shiftOptions = useMemo(() => shiftGroups.flatMap(group =>
     group.cells.flatMap(cell => (cell.option ? [cell.option] : [])),
@@ -373,7 +378,8 @@ export function ContainerGraphManualColumnsCard({
   const selectedEmployeeId = targetEmployeeId ?? sortedEmployees[0]?.id ?? null;
   const employeeNameById = useMemo(
     () => new Map(employees.map(employee => [employee.id, getEmployeeLabel(employee)] as const)),
-    [employees],
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- Translation helpers read the current language internally.
+    [employees, language],
   );
   const offerCount = publishedShifts.length + pendingPublishedShifts.length;
 

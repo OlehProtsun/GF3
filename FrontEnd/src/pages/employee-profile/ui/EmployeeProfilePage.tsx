@@ -79,12 +79,12 @@ export function EmployeeProfilePage() {
 
       <ConfirmDialog
         open={isDeleteOpen}
-        title="Usunąć pracownika?"
-        message="Czy na pewno chcesz usunąć tego pracownika? Ta operacja jest nieodwracalna."
+        title={t("Delete employee?")}
+        message={t("Are you sure you want to delete this employee? This action cannot be undone.")}
         onCancel={() => setIsDeleteOpen(false)}
         onConfirm={handleDeleteConfirm}
-        confirmText="Usuń"
-        cancelText="Anuluj"
+        confirmText={t("Delete")}
+        cancelText={t("Cancel")}
         confirmDisabled={deleteMutation.isPending}
         cancelDisabled={deleteMutation.isPending}
       />
