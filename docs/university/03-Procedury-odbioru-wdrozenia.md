@@ -2,14 +2,12 @@
 
 Projekt techniczny: GF3. Podstawa: `DEV2 @ 06cb43083939fecab4c95bb27bfa094fec13055f`.
 
-[README](../../README.md) · [Instrukcja PL](01-Dokumentacja-uzytkownika-PL.md) · [Dokumentacja techniczna](02-Dokumentacja-techniczna.md)
-
 Dokument jest instrukcją i wzorem operacyjnym. Nie potwierdza umowy, odbioru, wykonania backupu, próby odtworzenia ani zgodności prawnej konkretnego wdrożenia. Parametry środowiska, odpowiedzialni, terminy i zgody: **Do uzgodnienia z właścicielem / administratorem**. Wymagania techniczne wynikają ze źródeł; decyzje klienta nie są przedstawione jako istniejące ustalenia.
 
-- [Odbiór i formularze](#1-procedura-odbioru-produktu)
-- [Wdrożenie](#2-procedura-wdrozenia-i-uruchomienia)
-- [Kopie zapasowe](#3-kopie-zapasowe)
-- [Odtworzenie i checklista](#4-dokumentacja-odtworzenia-systemu)
+- Odbiór i formularze
+- Wdrożenie
+- Kopie zapasowe
+- Odtworzenie i checklista
 
 ## 1. Procedura odbioru produktu
 
@@ -81,7 +79,7 @@ Terminy, priorytet i odpowiedzialność uzgadniają strony; brak ustalonego SLA 
 
 ### Warunki techniczne
 
-Wariant produkcyjny to web/PWA przez Docker + nginx, bez publikacji do App Store/Google Play. Wymagane: Docker Engine i Compose plugin, miejsce na obraz/dane/kopie, trwały zapisywalny wolumin wybrany przez `GF3_DATA_VOLUME`, poprawne uprawnienia `/data/SQLite.db`, konfiguracja z [deploy/.env.example](../../deploy/.env.example). Dla publicznego hosta: DNS domeny, dostępne porty HTTP/HTTPS, poprawny certyfikat i klucz dla wariantu HTTPS. Konkretne CPU/RAM/IOPS: niezdefiniowane / do zweryfikowania dla docelowego obciążenia. Ubuntu 24.04 jest przykładem [runbooka](../deploy.md), nie jedynym potwierdzonym OS.
+Wariant produkcyjny to web/PWA przez Docker + nginx, bez publikacji do App Store/Google Play. Wymagane: Docker Engine i Compose plugin, miejsce na obraz/dane/kopie, trwały zapisywalny wolumin wybrany przez `GF3_DATA_VOLUME`, poprawne uprawnienia `/data/SQLite.db`, konfiguracja z deploy/.env.example. Dla publicznego hosta: DNS domeny, dostępne porty HTTP/HTTPS, poprawny certyfikat i klucz dla wariantu HTTPS. Konkretne CPU/RAM/IOPS: niezdefiniowane / do zweryfikowania dla docelowego obciążenia. Ubuntu 24.04 jest przykładowym środowiskiem, nie jedynym potwierdzonym OS.
 
 Administrator tworzy prywatny `deploy/.env`, ustawia `GF3_IMAGE`, nazwę hosta/porty i **weryfikuje dokładną nazwę istniejącego woluminu**. Konfiguruje silny losowy `Jwt__SigningKey`, własne `GF3_ADMIN_DEVELOPER_PASSWORD` i `GF3_BOOTSTRAP_MANAGER_PASSWORD`, bez pozostawiania wartości przykładowych. Admin tools/remote/write pozostają wyłączone poza świadomie zatwierdzoną czynnością. Sekretów nie należy wypisywać w logach/protokole.
 
@@ -156,7 +154,7 @@ Serwerowa SQLite jest źródłem danych kont/pracy. Stan PWA/przeglądarki (sesj
 
 ### Bezpieczne archiwum operatora
 
-Instrukcja dla administratora po zatwierdzeniu okna prac: sprawdź `GF3_DATA_VOLUME` w prywatnej konfiguracji i potwierdź przez `docker volume inspect <WOLUMIN>`. Zatrzymaj nginx i aplikację, aby nie było zapisów w trakcie archiwizacji. Zachowaj bieżącą konfigurację/identyfikator obrazu osobno od jawnych dowodów; sekrety przechowuj bezpiecznie. Przykład runbooka, Bash, wartości zastępcze trzeba uzupełnić:
+Instrukcja dla administratora po zatwierdzeniu okna prac: sprawdź `GF3_DATA_VOLUME` w prywatnej konfiguracji i potwierdź przez `docker volume inspect <WOLUMIN>`. Zatrzymaj nginx i aplikację, aby nie było zapisów w trakcie archiwizacji. Zachowaj bieżącą konfigurację/identyfikator obrazu osobno od jawnych dowodów; sekrety przechowuj bezpiecznie. Przykład dla Bash; wartości zastępcze trzeba uzupełnić:
 
 ```bash
 mkdir -p backups
@@ -183,7 +181,7 @@ Wybierz (A) snapshot SQLite, gdy jest nienaruszona kopia aplikacyjna, albo (B) p
 
 1. Wybierz konkretny pełny plik z `backups` lub kopii ręcznych; pracuj na jego kopii. Ustal wydanie zgodne ze schematem w chwili wykonania snapshotu. Jeśli snapshot jest jedyną kopią na uszkodzonym woluminie, najpierw zabezpiecz go na niezależnym nośniku.
 2. W izolowanym środowisku przygotuj **pusty** wolumin i skopiuj wybrany snapshot pod nazwą `/data/SQLite.db`. Nie przenoś plików `SQLite.db-wal`/`SQLite.db-shm` z innej bazy. Nie nakładaj snapshotu na bazę otwartą przez aplikację.
-3. Przykład narzędzia woluminowego z runbooka (Bash, polecenia do uzupełnienia dopiero po kontroli celu):
+3. Przykład użycia kontenera pomocniczego do skopiowania snapshotu (Bash, polecenia do uzupełnienia dopiero po kontroli celu):
 
 ```bash
 docker volume inspect <WOLUMIN_TESTOWY>
@@ -207,7 +205,7 @@ docker run --rm -v "<KATALOG_ARCHIWUM>:/backup:ro" alpine tar tzf /backup/<ARCHI
 docker run --rm -v <WOLUMIN_TESTOWY>:/data -v "<KATALOG_ARCHIWUM>:/backup:ro" alpine tar xzf /backup/<ARCHIWUM>.tar.gz -C /data
 ```
 
-Rozpakowanie może nadpisać pliki: **destrukcyjne na niepustym celu — wymaga potwierdzenia celu i kopii stanu sprzed operacji**. Starszy runbook zawiera `rm -rf /data/*` przed restore; to destrukcyjne czyszczenie. Nie wykonuj go, dopóki operator nie potwierdzi właściwego woluminu, zatrzymania wszystkich zapisów i niezależnej kopii. Nie usuwaj innego woluminu ani nie używaj `down -v`. Procedura nie wymaga nowego skryptu/endpointu przywracania.
+Rozpakowanie może nadpisać pliki: **destrukcyjne na niepustym celu — wymaga potwierdzenia celu i kopii stanu sprzed operacji**. Polecenie `rm -rf /data/*` przed restore jest destrukcyjnym czyszczeniem. Nie wykonuj go, dopóki operator nie potwierdzi właściwego woluminu, zatrzymania wszystkich zapisów i niezależnej kopii. Nie usuwaj innego woluminu ani nie używaj `down -v`. Procedura nie wymaga nowego skryptu/endpointu przywracania.
 
 3. Sprawdź `/data/SQLite.db`, uprawnienia i quick_check jak w A. Przywróć pasującą wersję obrazu, konfigurację nginx i sekrety przez istniejące kanały administratora. Przy rollbacku wybierz kopię sprzed migracji pasującą do starego obrazu; sam rollback kodu nie odwraca EF migrations.
 4. Uruchom aplikację Compose, sprawdź jej health i logi; nginx rusza po zdrowiu app. Używaj HTTPS overlay tylko w wariancie HTTPS. Sprawdź web/PWA i role według poniższej listy, zanim otworzysz ruch produkcyjny.
@@ -243,8 +241,6 @@ Formularz do wypełnienia podczas rzeczywistej próby; pola wyników są celowo 
 | Decyzja o wznowieniu zapisów, osoba zatwierdzająca | |
 | Źródłowy backup i stan sprzed restore zabezpieczone | |
 
-## 5. Podstawa techniczna i pokrycie materialow
+## 5. Pokrycie materialow
 
-[Dockerfile](../../Dockerfile), [Compose HTTP](../../deploy/docker-compose.yml), [HTTPS](../../deploy/docker-compose.https.yml), [nginx](../../deploy/nginx/), [runbook](../deploy.md), [backup okresowy](../../GF3.WebApi/Infrastructure/DatabaseAutoBackupHostedService.cs), [workspace/kopie](../../DataAccessLayer/Administration/SqliteDatabaseWorkspace.cs), [migracje startup](../../GF3.WebApi/Infrastructure/DatabaseMigrationStartup.cs), [cache](../../GF3.WebApi/Infrastructure/StartupConfiguration.cs), [health](../../GF3.WebApi/Controllers/HealthController.cs).
-
-Prezentacja 3: s. 2 — warianty odbioru, protokół i harmonogram (§1); s. 3 — techniczne warunki/instalacja (§2); s. 4 — warunki biznesowe/start (§2); s. 5–6 — odpowiedzialność, typy, częstotliwość, retencja i miejsce backupu (§3); s. 7 — odtworzenie aplikacji i bazy, kolejność usług, kontrola wyniku (§4). Niepotwierdzone uzgodnienia handlowe, off-site, RPO/RTO oraz wyniki prób nie zostały zastąpione fikcyjnymi wartościami. Starsze szkice w docs/legal i docs/client-launch-package nie są dowodem podpisania umowy ani przyjęcia produktu.
+Prezentacja 3: s. 2 — warianty odbioru, protokół i harmonogram (§1); s. 3 — techniczne warunki/instalacja (§2); s. 4 — warunki biznesowe/start (§2); s. 5–6 — odpowiedzialność, typy, częstotliwość, retencja i miejsce backupu (§3); s. 7 — odtworzenie aplikacji i bazy, kolejność usług, kontrola wyniku (§4). Niepotwierdzone uzgodnienia handlowe, off-site, RPO/RTO oraz wyniki prób nie zostały zastąpione fikcyjnymi wartościami. Niniejsza dokumentacja nie jest dowodem podpisania umowy ani przyjęcia produktu.

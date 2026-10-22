@@ -32,6 +32,9 @@ jobs:
       - name: Restore backend
         run: dotnet restore GF3.Tests/GF3.Tests.csproj
 
+      - name: Install PDF fonts
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends fonts-crosextra-carlito
+
       - name: Test backend
         run: dotnet test GF3.Tests/GF3.Tests.csproj --configuration Release --no-restore --filter "Category!=LocalOnly"
 

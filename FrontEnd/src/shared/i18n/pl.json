@@ -1,4 +1,8 @@
 {
+  "Preparing PDF...": "Przygotowywanie PDF...",
+  "Share PDF": "Udostępnij PDF",
+  "Download PDF": "Pobierz PDF",
+  "PDF is ready. Tap PDF again to share, or download it.": "PDF jest gotowy. Dotknij ponownie PDF, aby go udostępnić, lub pobierz plik.",
   "Could not copy this link. Please try again.": "Nie udało się skopiować linku. Spróbuj ponownie.",
   "Copy swap link for {0}": "Kopiuj link do oferty {0}",
   "Not now": "Nie teraz",

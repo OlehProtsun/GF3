@@ -24,7 +24,9 @@ import { parseGraphNoteContent } from "@entities/containers/model/graphNote";
 import { ContainerGraphMatrix } from "@entities/containers/ui/ContainerGraphMatrix";
 import { getEmployeeFullName } from "@entities/employees/model/presentation";
 import { employeeUiStateApi, useEmployeeUiStateQuery } from "@entities/employee-ui-state";
-import { getErrorMessage } from "@shared/api/httpClient";
+import { getErrorMessage, isRequestCanceledError, type DownloadedFile } from "@shared/api/httpClient";
+import { downloadExportFile } from "@entities/exports/lib/download";
+import { employeeScheduleApi } from "@entities/employee-schedule/api/employeeScheduleApi";
 import { formatScheduleLastUpdate } from "@shared/lib/scheduleLastUpdate";
 import { ErrorBanner } from "@shared/ui/components/ErrorBanner";
 import { SearchableSelect, type SearchableSelectOption } from "@shared/ui/components/SearchableSelect";
@@ -76,11 +78,6 @@ function getDaysInMonth(year: number, month: number) {
 
 function getWeekdayIndex(year: number, month: number, dayOfMonth: number) {
   return new Date(Date.UTC(year, month - 1, dayOfMonth)).getUTCDay();
-}
-
-function isWeekendDay(year: number, month: number, dayOfMonth: number) {
-  const weekdayIndex = getWeekdayIndex(year, month, dayOfMonth);
-  return weekdayIndex === 0 || weekdayIndex === 6;
 }
 
 function parseTimeMinutes(value: string) {
@@ -598,223 +595,6 @@ function writeEmployeeScheduleColumnOrders(storageKey: string, scheduleOrders: R
     // Keep customization available for this session when browser storage is unavailable.
   }
 }
-const pdfTemplateEmployeeCapacity = 25;
-const pdfTemplateDayCount = 31;
-const pdfTemplateWeekdayLabels = ["niedz.", "pon.", "wt.", "\u015br.", "czw.", "pt.", "sob."];
-function escapeHtml(value: string | number | null | undefined) {
-  return String(value ?? "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
-}
-
-function buildPdfFileName(schedule: EmployeeSchedule) {
-  const normalizedName = `${schedule.name}-${schedule.month}-${schedule.year}`
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-
-  return `${normalizedName || "open-schedule"}.pdf`;
-}
-
-function formatTemplateDateCell(schedule: EmployeeSchedule, dayOfMonth: number) {
-  const weekdayLabel = pdfTemplateWeekdayLabels[getWeekdayIndex(schedule.year, schedule.month, dayOfMonth)];
-  const dayText = String(dayOfMonth).padStart(2, "0");
-  const monthText = String(schedule.month).padStart(2, "0");
-  return `${weekdayLabel}, ${dayText}/${monthText}`;
-}
-
-// eslint-disable-next-line react-refresh/only-export-components -- exported for focused PDF layout verification
-export function buildSchedulePdfHtml(
-  schedule: EmployeeSchedule,
-  columns: GraphMatrixColumn[],
-  cellMap: GraphMatrixCellMap,
-) {
-  const daysInMonth = getDaysInMonth(schedule.year, schedule.month);
-  const templateColumnCount = Math.max(pdfTemplateEmployeeCapacity, columns.length);
-  const templateColumns = Array.from({ length: templateColumnCount }, (_, index) => columns[index] ?? null);
-  const columnHeaders = templateColumns
-    .map(column => `
-          <td class="template-cell employee-header">
-            <span>${escapeHtml(column?.label ?? "0")}</span>
-          </td>`)
-    .join("");
-  const rows = Array.from({ length: pdfTemplateDayCount }, (_, index) => {
-    const dayOfMonth = index + 1;
-    const isRealMonthDay = dayOfMonth <= daysInMonth;
-    const rowClass = isRealMonthDay && isWeekendDay(schedule.year, schedule.month, dayOfMonth)
-      ? " template-weekend-row"
-      : "";
-    const dateCellValue = isRealMonthDay ? formatTemplateDateCell(schedule, dayOfMonth) : "";
-    const cells = templateColumns
-      .map(column => {
-        const cellValue = column && isRealMonthDay ? cellMap[getGraphCellKey(column.employeeId, dayOfMonth)] ?? "-" : "-";
-        return `<td class="template-cell matrix-cell">${escapeHtml(cellValue)}</td>`;
-      })
-      .join("");
-
-    return `
-        <tr class="template-row${rowClass}">
-          <td class="template-cell date-cell">${escapeHtml(dateCellValue)}</td>
-          ${cells}
-        </tr>`;
-  }).join("");
-  const shopName = schedule.shopName?.trim() || schedule.name;
-
-  return `<!doctype html>
-<html>
-  <head>
-    <meta charset="utf-8" />
-    <title>${escapeHtml(buildPdfFileName(schedule))}</title>
-    <style>
-      @page {
-        size: A4 landscape;
-        margin: 5mm;
-      }
-
-      * {
-        box-sizing: border-box;
-      }
-
-      body {
-        margin: 0;
-        color: #000000;
-        background: #ffffff;
-        font-family: Calibri, Arial, Helvetica, sans-serif;
-      }
-
-      .template-sheet {
-        width: auto;
-        border-collapse: collapse;
-        table-layout: auto;
-        font-size: 10pt;
-        line-height: 1.15;
-      }
-
-      .date-column {
-        width: 10.42578125ch;
-      }
-
-      .employee-column {
-        width: auto;
-      }
-
-      .template-cell {
-        height: 15pt;
-        padding: 0 3px;
-        border: 1px solid #d9d9d9;
-        background: #ffffff;
-        color: #000000;
-        font-weight: 400;
-        vertical-align: middle;
-        overflow: hidden;
-      }
-
-      .template-header-row .template-cell {
-        height: 104.45pt;
-      }
-
-      .shop-header {
-        position: relative;
-        text-align: center;
-      }
-
-      .shop-header span {
-        display: inline-block;
-        max-width: 24mm;
-        white-space: nowrap;
-        transform: rotate(-45deg);
-        transform-origin: center;
-      }
-
-      .employee-header {
-        padding: 0;
-        text-align: left;
-        vertical-align: bottom;
-      }
-
-      .employee-header span {
-        display: inline-block;
-        max-height: 26mm;
-        padding: 0 2px 3px;
-        white-space: nowrap;
-        writing-mode: vertical-rl;
-        transform: rotate(180deg);
-        text-align: left;
-      }
-
-      .date-cell {
-        text-align: right;
-        white-space: nowrap;
-      }
-
-      .matrix-cell {
-        padding: 0 1px;
-        text-align: center;
-        white-space: nowrap;
-        text-overflow: clip;
-      }
-
-      .template-weekend-row .template-cell {
-        background-color: #ffffff;
-        background-image: repeating-linear-gradient(
-          45deg,
-          rgba(0, 0, 0, 0.11) 0,
-          rgba(0, 0, 0, 0.11) 1px,
-          transparent 1px,
-          transparent 3px
-        );
-      }
-
-      @media print {
-        body {
-          print-color-adjust: exact;
-          -webkit-print-color-adjust: exact;
-        }
-      }
-    </style>
-  </head>
-  <body>
-    <table class="template-sheet" aria-label="${escapeHtml(schedule.name)}">
-      <colgroup>
-        <col class="date-column" />
-        ${templateColumns.map(() => "<col class=\"employee-column\" />").join("")}
-      </colgroup>
-      <tbody>
-        <tr class="template-header-row">
-          <td class="template-cell shop-header">
-            <span>${escapeHtml(shopName)}</span>
-          </td>
-          ${columnHeaders}
-        </tr>
-        ${rows}
-      </tbody>
-    </table>
-  </body>
-</html>`;
-}
-
-function printSchedulePdf(
-  schedule: EmployeeSchedule,
-  columns: GraphMatrixColumn[],
-  cellMap: GraphMatrixCellMap,
-) {
-  const printWindow = window.open("", "_blank", "width=1200,height=800");
-  if (!printWindow) {
-    throw new Error(t("Could not open the PDF export window."));
-  }
-
-  printWindow.document.open();
-  printWindow.document.write(buildSchedulePdfHtml(schedule, columns, cellMap));
-  printWindow.document.close();
-  printWindow.document.title = buildPdfFileName(schedule);
-  printWindow.focus();
-  printWindow.setTimeout(() => printWindow.print(), 250);
-}
-
 export function EmployeeSchedulePage() {
   const { session } = useAuth();
   const scheduleQuery = useEmployeeScheduleListQuery();
@@ -880,11 +660,24 @@ export function EmployeeSchedulePage() {
   }, [columnOrderStorageKey, refetchUiState, setPreferenceSaveError, uiState]);
   const [selectedSummaryPeriodKey, setSelectedSummaryPeriodKey] = useState<string | null>(null);
   const [pdfExportError, setPdfExportError] = useState<string | null>(null);
+  const [isPdfLoading, setIsPdfLoading] = useState(false);
+  const [pdfFile, setPdfFile] = useState<DownloadedFile | null>(null);
+  const pdfRequestAbortRef = useRef<AbortController | null>(null);
 
   const selectedSchedule = useMemo(
     () => schedules.find(schedule => schedule.id === selectedScheduleId) ?? schedules[0] ?? null,
     [schedules, selectedScheduleId],
   );
+
+  useEffect(() => {
+    setIsPdfLoading(false);
+    setPdfFile(null);
+    setPdfExportError(null);
+    return () => {
+      pdfRequestAbortRef.current?.abort();
+      pdfRequestAbortRef.current = null;
+    };
+  }, [selectedSchedule?.id, session?.employeeId, session?.userName]);
 
   useEffect(() => {
     setSelectedDayOfMonth(null);
@@ -1065,17 +858,49 @@ export function EmployeeSchedulePage() {
     setColumnOrderDialogEmployeeId(null);
   };
 
-  const handleExportPdf = () => {
-    if (!selectedSchedule) {
+  const handleExportPdf = async () => {
+    if (!selectedSchedule || pdfRequestAbortRef.current) {
       return;
     }
 
     setPdfExportError(null);
-
+    const scheduleId = selectedSchedule.id;
+    const controller = new AbortController();
+    pdfRequestAbortRef.current = controller;
+    setIsPdfLoading(true);
     try {
-      printSchedulePdf(selectedSchedule, scheduleMatrixColumns, scheduleMatrixDisplay.cellMap);
+      const file = pdfFile ?? await employeeScheduleApi.exportPdf(scheduleId, controller.signal);
+      if (controller.signal.aborted || pdfRequestAbortRef.current !== controller) return;
+      if (file.blob.size === 0 || !(file.contentType ?? file.blob.type).toLowerCase().includes("application/pdf")) {
+        throw new Error(t("Could not export this schedule to PDF."));
+      }
+      const preparedFile = { ...file, fileName: file.fileName?.trim() || `GF3_Graph_${scheduleId}.pdf` };
+      const shareFile = new File([file.blob], preparedFile.fileName, { type: "application/pdf" });
+      if (typeof navigator.share === "function" && navigator.canShare?.({ files: [shareFile] })) {
+        try {
+          await navigator.share({ files: [shareFile] });
+        } catch (error) {
+          if (controller.signal.aborted) return;
+          const name = typeof error === "object" && error !== null && "name" in error ? error.name : "";
+          if (name === "NotAllowedError") {
+            // A slow export can consume Safari's activation window; reuse the file on the next direct tap.
+            setPdfFile(preparedFile);
+            return;
+          }
+          if (name !== "AbortError") throw error;
+        }
+      } else {
+        downloadExportFile(preparedFile, preparedFile.fileName);
+      }
+      if (!controller.signal.aborted) setPdfFile(null);
     } catch (error) {
-      setPdfExportError(error instanceof Error ? error.message : t("Could not export this schedule to PDF."));
+      if (!controller.signal.aborted && !isRequestCanceledError(error))
+        setPdfExportError(getErrorMessage(error, t("Could not export this schedule to PDF.")));
+    } finally {
+      if (pdfRequestAbortRef.current === controller) {
+        pdfRequestAbortRef.current = null;
+        setIsPdfLoading(false);
+      }
     }
   };
 
@@ -1134,7 +959,9 @@ export function EmployeeSchedulePage() {
         <EyeIcon size={20} />
       </button>
       <button type="button" className={styles.openSchedulePdfButton} onClick={handleExportPdf}
-        title={t("Export schedule to PDF")} aria-label={t("Export schedule to PDF")}><NewsIcon size={14} />PDF</button>
+        disabled={isPdfLoading} aria-busy={isPdfLoading}
+        title={t(isPdfLoading ? "Preparing PDF..." : pdfFile ? "Share PDF" : "Export schedule to PDF")}
+        aria-label={t(isPdfLoading ? "Preparing PDF..." : pdfFile ? "Share PDF" : "Export schedule to PDF")}><NewsIcon size={14} />PDF</button>
     </div>
   );
 
@@ -1142,6 +969,13 @@ export function EmployeeSchedulePage() {
     <div className={workspaceStyles.page}>
       {queryErrorMessage ? <div data-employee-motion="schedule-content" data-motion-key={`queryErrorMessage:${queryErrorMessage}`}><ErrorBanner dismissible={false}>{queryErrorMessage}</ErrorBanner></div> : null}
       {pdfExportError ? <div data-employee-motion="schedule-content" data-motion-key={`pdfExportError:${pdfExportError}`}><ErrorBanner dismissible={false}>{pdfExportError}</ErrorBanner></div> : null}
+      {pdfFile ? <div className={styles.shiftCorrectionSuccess} role="status">
+        <p>{t("PDF is ready. Tap PDF again to share, or download it.")}</p>
+        <button type="button" className={styles.openSchedulePdfButton} disabled={isPdfLoading} onClick={() => {
+          downloadExportFile(pdfFile, pdfFile.fileName || "GF3_Graph.pdf");
+          setPdfFile(null);
+        }}>{t("Download PDF")}</button>
+      </div> : null}
       {preferenceSaveError ? <div data-employee-motion="schedule-content" data-motion-key={`preferenceSaveError:${preferenceSaveError}`}><ErrorBanner dismissible>{preferenceSaveError}</ErrorBanner></div> : null}
       {shiftCorrectionSuccess ? <div className={styles.shiftCorrectionSuccess} role="status" data-employee-motion="schedule-content" data-motion-key={shiftCorrectionSuccess}>{shiftCorrectionSuccess}</div> : null}
 

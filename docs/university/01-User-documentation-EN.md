@@ -2,19 +2,17 @@
 
 Technical project: GF3. Documented version: `DEV2 @ 06cb43083939fecab4c95bb27bfa094fec13055f`.
 
-[README](../../README.md) · [Polski](01-Dokumentacja-uzytkownika-PL.md)
-
 ## 1. Using this guide
 
-Open “Dokumentacja akademicka (IDEIS UDSW)” in README and select PL or EN. This guide covers employees, PC managers and managers in phone mode. The organization assigns accounts; self-registration is unavailable. Bold names identify interface controls; the organization supplies shop/schedule names and message content.
+This guide is a standalone document. Separate Polish and English versions are available; use the contents below. This guide covers employees, PC managers and managers in phone mode. The organization assigns accounts; self-registration is unavailable. Bold names identify interface controls; the organization supplies shop/schedule names and message content.
 
-- [Access](#2-access)
-- [PC manager](#3-pc-manager)
-- [Schedules](#4-schedules)
-- [Phone](#5-phone)
-- [Employee](#6-employee)
-- [Procedures](#7-procedures)
-- [Problems](#8-problems)
+- Access
+- PC manager
+- Schedules
+- Phone
+- Employee
+- Procedures
+- Problems
 
 ## 2. Access
 
@@ -55,8 +53,6 @@ Open the required area through navigation. Lists support search, clearing filter
 | News — developer access | **News settings**, **Developer password**, **Unlock** | Opens management after additional verification | Operator with host password only; ordinary manager access does not replace it |
 | News management | **New update**, **Title**, **Text**, **Visible to**, **Everyone**, **Managers only**, **Employees only**, **Image URL**, **Upload image**, **Remove**, **YouTube link**, **Clear**, **Save update**, **Delete** | Creates/edits content and audience, adds image/video, deletes after confirmation | Title/body required; media format/limits checked; never enter password in content |
 
-
-
 ### System functions
 
 `/information` and `/database` are system-manager-only. Knowing their addresses does not grant employees or ordinary managers access.
@@ -96,7 +92,6 @@ Within a container open `/container/:containerId/graphs/:graphId`, create at `/c
 | Manual columns | **Add Column**, matrix header/cells, delete column, **Choose shift**, **Everyone**, **Specific employee**, **Publish shift**, **Remove**, **Cancel** | Adds column, enters times, selects shift/recipient; removes pending proposal/cancels published offer | Enter interval such as 09:00-15:00, save schedule and enable swaps; check pending saves before publication |
 | Schedule history | **Schedule history**, commit selection, **Switch**, **Checkout**, **Delete** | Switches saved state or deletes snapshot after confirmation | Checkout may discard unsaved draft; next save creates a branch. Deleting version keeps child commits and reconnects them to parent |
 | Schedule corrections | **Current**, **Requested**, **Approve**, **Reject**, approval color | Compares hours and decides request | Save current schedule edits before approval; original shift may no longer match request |
-
 
 Generation/working preview does not guarantee feasibility for every constraint set. Saving persists state; publishing saved state exposes it to employees. Check staffing, hours and conflicts before publishing. Phone mode does not expose these write operations.
 
@@ -202,10 +197,6 @@ Push requires browser support, server configuration, HTTPS and system permission
 
 Report unresolved problems to the organization's operator/support contact. Include screen, time/error without passwords/codes/other people's data. This guide defines no SLA.
 
-## 9. Sources and presentation coverage
+## 9. Presentation coverage
 
-[Routing](../../FrontEnd/src/app/router/AppRouter.tsx), [screens](../../FrontEnd/src/pages/), [components](../../FrontEnd/src/entities/), [PL labels](../../FrontEnd/src/shared/i18n/pl.json), [mode picker](../../FrontEnd/src/features/manager-workspace-mode/ui/ManagerWorkspaceModePicker.tsx), [regulation](../../FrontEnd/src/entities/regulations/ui/RegulationAcceptanceGate.tsx).
-
-Presentation 1: p. 3 — README access (§1); p. 4 — roles/languages (§1–6); p. 5 — screens/fields/actions (§2–6); p. 6 — HOW-TO (§7); p. 7 — FAQ/navigation (§1, §8). Video/chatbot/separate help platform are course alternatives, not GF features.
-
-Additional controls: [notepad](../../FrontEnd/src/features/manager-notepad/ui/ManagerNotepad.tsx), [system news](../../FrontEnd/src/features/manager-system-news/ui/ManagerSystemNews.tsx), [exports](../../FrontEnd/src/entities/exports/ui/ProfileExportActions/ProfileExportActions.tsx).
+Presentation 1: p. 3 — standalone document and contents (§1); p. 4 — roles/languages (§1–6); p. 5 — screens/fields/actions (§2–6); p. 6 — HOW-TO (§7); p. 7 — FAQ/navigation (§1, §8). Video/chatbot/separate help platform are course alternatives, not GF features.

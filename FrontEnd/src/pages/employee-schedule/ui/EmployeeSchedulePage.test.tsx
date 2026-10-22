@@ -1,14 +1,16 @@
-import { render, screen, within } from "@testing-library/react";
+import { act, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { BrowserRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import type { EmployeeSchedule } from "@entities/employee-schedule";
-import { buildSchedulePdfHtml, EmployeeSchedulePage } from "./EmployeeSchedulePage";
+import { EmployeeSchedulePage } from "./EmployeeSchedulePage";
 import styles from "./EmployeeSchedulePage.module.css";
 
 const mocks = vi.hoisted(() => ({
   scheduleQuery: vi.fn(),
+  exportPdf: vi.fn(),
+  downloadPdf: vi.fn(),
   matrix: vi.fn(),
   scrollIntoView: vi.fn(),
   uiStateQuery: {
@@ -16,6 +18,11 @@ const mocks = vi.hoisted(() => ({
     refetch: vi.fn(),
   },
 }));
+
+vi.mock("@entities/employee-schedule/api/employeeScheduleApi", () => ({
+  employeeScheduleApi: { exportPdf: mocks.exportPdf },
+}));
+vi.mock("@entities/exports/lib/download", () => ({ downloadExportFile: mocks.downloadPdf }));
 
 vi.mock("@app/providers/AuthProvider", () => ({
   useAuth: () => ({
@@ -181,6 +188,10 @@ beforeEach(() => {
   mockReducedMotion();
   window.localStorage.clear();
   mocks.scheduleQuery.mockReset();
+  mocks.exportPdf.mockReset();
+  mocks.downloadPdf.mockReset();
+  Object.defineProperty(navigator, "share", { configurable: true, value: undefined });
+  Object.defineProperty(navigator, "canShare", { configurable: true, value: undefined });
   mocks.matrix.mockClear();
   mocks.scrollIntoView.mockClear();
   Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
@@ -190,6 +201,104 @@ beforeEach(() => {
 });
 
 describe("EmployeeSchedulePage", () => {
+  test("downloads one PDF directly without a preview and preserves matrix and scroll", async () => {
+    let resolve!: (value: unknown) => void;
+    mocks.exportPdf.mockImplementation(() => new Promise(done => { resolve = done; }));
+    mocks.scheduleQuery.mockReturnValue({ data: schedules, isLoading: false });
+    const open = vi.spyOn(window, "open");
+    const print = vi.spyOn(window, "print");
+    renderPage();
+    const matrix = screen.getByTestId("schedule-matrix");
+    matrix.scrollTop = 75;
+    const button = screen.getByRole("button", { name: "Export schedule to PDF" });
+    await userEvent.setup().dblClick(button);
+    expect(button).toBeDisabled();
+    expect(button).toHaveAttribute("aria-busy", "true");
+    expect(mocks.exportPdf).toHaveBeenCalledTimes(1);
+    expect(mocks.exportPdf).toHaveBeenCalledWith(1, expect.any(AbortSignal));
+    await act(async () => resolve({ blob: new Blob(["%PDF-"], { type: "application/pdf" }), fileName: "schedule.pdf" }));
+    expect(mocks.downloadPdf).toHaveBeenCalledWith(expect.objectContaining({ fileName: "schedule.pdf" }), "schedule.pdf");
+    expect(button).toBeEnabled();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(screen.getByTestId("schedule-matrix")).toBe(matrix);
+    expect(matrix.scrollTop).toBe(75);
+    expect(mocks.matrix.mock.calls.at(-1)?.[0].graph.id).toBe(1);
+    expect(open).not.toHaveBeenCalled();
+    expect(print).not.toHaveBeenCalled();
+  });
+
+  test.each(["success", "AbortError", "NotAllowedError", "DataError"])("shares PDF directly and handles %s", async result => {
+    const share = vi.fn();
+    if (result === "success") share.mockResolvedValue(undefined);
+    else share.mockRejectedValue(new DOMException("Share failed", result));
+    Object.defineProperty(navigator, "share", { configurable: true, value: share });
+    Object.defineProperty(navigator, "canShare", { configurable: true, value: () => true });
+    mocks.exportPdf.mockResolvedValue({ blob: new Blob(["%PDF-"], { type: "application/pdf" }), fileName: "schedule.pdf" });
+    mocks.scheduleQuery.mockReturnValue({ data: schedules, isLoading: false });
+    renderPage();
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "Export schedule to PDF" }));
+    expect(share).toHaveBeenCalledWith({ files: [expect.objectContaining({ name: "schedule.pdf", type: "application/pdf" })] });
+    expect(mocks.downloadPdf).not.toHaveBeenCalled();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    if (result === "NotAllowedError") {
+      expect(screen.getByText("PDF is ready. Tap PDF again to share, or download it.")).toBeVisible();
+      share.mockResolvedValueOnce(undefined);
+      await user.click(screen.getByRole("button", { name: "Share PDF" }));
+      expect(mocks.exportPdf).toHaveBeenCalledOnce();
+      expect(share).toHaveBeenCalledTimes(2);
+      expect(screen.queryByText("PDF is ready. Tap PDF again to share, or download it.")).not.toBeInTheDocument();
+    } else if (result === "DataError") {
+      expect(screen.getByText("Could not export this schedule to PDF.")).toBeVisible();
+    } else {
+      expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    }
+  });
+
+  test("offers a direct download when sharing is blocked, without another export request", async () => {
+    Object.defineProperty(navigator, "share", { configurable: true, value: vi.fn().mockRejectedValue(new DOMException("Gesture required", "NotAllowedError")) });
+    Object.defineProperty(navigator, "canShare", { configurable: true, value: () => true });
+    mocks.exportPdf.mockResolvedValue({ blob: new Blob(["%PDF-"], { type: "application/pdf" }), fileName: null });
+    mocks.scheduleQuery.mockReturnValue({ data: schedules, isLoading: false });
+    renderPage();
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "Export schedule to PDF" }));
+    await user.click(screen.getByRole("button", { name: "Download PDF" }));
+    expect(mocks.downloadPdf).toHaveBeenCalledWith(expect.objectContaining({ fileName: "GF3_Graph_1.pdf" }), "GF3_Graph_1.pdf");
+    expect(mocks.exportPdf).toHaveBeenCalledOnce();
+  });
+
+  test.each([401, 404, 500, "empty", "mime"])("keeps the schedule visible after PDF failure %s", async failure => {
+    if (typeof failure === "number") mocks.exportPdf.mockRejectedValue(new Error(`PDF ${failure}`));
+    else mocks.exportPdf.mockResolvedValue({ blob: new Blob(failure === "empty" ? [] : ["html"],
+      { type: failure === "mime" ? "text/html" : "application/pdf" }) });
+    mocks.scheduleQuery.mockReturnValue({ data: schedules, isLoading: false });
+    renderPage();
+    await userEvent.setup().click(screen.getByRole("button", { name: "Export schedule to PDF" }));
+    expect(await screen.findByText(typeof failure === "number" ? `PDF ${failure}` : "Could not export this schedule to PDF.")).toBeVisible();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(screen.getByTestId("schedule-matrix")).toHaveTextContent("May Schedule");
+  });
+
+  test("aborts stale exports when selecting another schedule or unmounting", async () => {
+    let resolve!: (value: unknown) => void;
+    mocks.exportPdf.mockImplementation(() => new Promise(done => { resolve = done; }));
+    mocks.scheduleQuery.mockReturnValue({ data: schedules, isLoading: false });
+    const view = renderPage();
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "Export schedule to PDF" }));
+    const signal = mocks.exportPdf.mock.calls[0][1] as AbortSignal;
+    await user.click(screen.getByRole("button", { name: "Select schedule. Current schedule: May Schedule" }));
+    await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: /Second May Schedule/ }));
+    expect(signal.aborted).toBe(true);
+    await act(async () => resolve({ blob: new Blob(["%PDF-"], { type: "application/pdf" }) }));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(mocks.downloadPdf).not.toHaveBeenCalled();
+    await user.click(screen.getByRole("button", { name: "Export schedule to PDF" }));
+    const secondSignal = mocks.exportPdf.mock.calls[1][1] as AbortSignal;
+    view.unmount();
+    expect(secondSignal.aborted).toBe(true);
+  });
   test.each([true, undefined])("centers the Daily day safely with reduced motion %s", async reduced => {
     if (reduced === undefined) vi.stubGlobal("matchMedia", undefined);
     else mockReducedMotion(reduced);
@@ -210,28 +319,6 @@ describe("EmployeeSchedulePage", () => {
     expect(screen.getByTestId("schedule-matrix").parentElement).toBe(stage);
     expect(stage).toHaveAttribute("data-motion-key", "2:matrix");
   });
-  test("uses intrinsic PDF column sizing with minimal cell padding", () => {
-    const html = buildSchedulePdfHtml(
-      schedules[0],
-      [
-        { employeeId: 12, kind: "employee", manualColumnId: null, graphEmployeeId: 10, label: "Zoe Young", minHoursMonth: 80, totalMinutes: 0, totalText: "" },
-        { employeeId: 7, kind: "employee", manualColumnId: null, graphEmployeeId: 11, label: "Adam Blue", minHoursMonth: 60, totalMinutes: 0, totalText: "" },
-      ],
-      {
-        "12:10": "08:00 - 12:00, Late May Schedule, Second May Schedule",
-        "7:12": "09:00 - 13:00",
-      },
-    );
-    const document = new DOMParser().parseFromString(html, "text/html");
-    const employeeColumns = document.querySelectorAll<HTMLTableColElement>("col.employee-column");
-    const styleText = document.querySelector("style")?.textContent ?? "";
-
-    expect(employeeColumns).toHaveLength(25);
-    expect([...employeeColumns].every(column => column.style.width === "")).toBe(true);
-    expect(styleText).toContain("table-layout: auto");
-    expect(styleText).toContain("padding: 0 1px");
-  });
-
   test("summarizes current employee work across public schedules and feeds selected schedule to the matrix", () => {
     mocks.scheduleQuery.mockReturnValue({
       data: schedules,

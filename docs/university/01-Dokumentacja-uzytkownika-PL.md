@@ -2,19 +2,17 @@
 
 Projekt techniczny: GF.
 
-[README](../../README.md) · [English](01-User-documentation-EN.md)
-
 ## 1. Jak korzystać z instrukcji
 
-W README otwórz „Dokumentacja akademicka (IDEIS UDSW)” i wybierz PL lub EN. Instrukcja obejmuje pracownika, menedżera PC i menedżera w trybie telefonu. Organizacja przydziela konto; samodzielnej rejestracji nie ma. Nazwy wytłuszczone odpowiadają kontrolkom interfejsu; nazwy sklepów, grafików i treści wiadomości wprowadza organizacja.
+Instrukcja jest samodzielnym dokumentem. Dostępne są oddzielne wersje polska i angielska; korzystaj ze spisu treści poniżej. Instrukcja obejmuje pracownika, menedżera PC i menedżera w trybie telefonu. Organizacja przydziela konto; samodzielnej rejestracji nie ma. Nazwy wytłuszczone odpowiadają kontrolkom interfejsu; nazwy sklepów, grafików i treści wiadomości wprowadza organizacja.
 
-- [Dostęp](#2-dostep)
-- [Menedżer PC](#3-menedzer-pc)
-- [Grafiki](#4-grafiki)
-- [Telefon](#5-telefon)
-- [Pracownik](#6-pracownik)
-- [Procedury](#7-procedury)
-- [Problemy](#8-problemy)
+- Dostęp
+- Menedżer PC
+- Grafiki
+- Telefon
+- Pracownik
+- Procedury
+- Problemy
 
 ## 2. Dostep
 
@@ -55,8 +53,6 @@ Z nawigacji otwórz wybrany obszar. Listy mają wyszukiwanie, czyszczenie filtra
 | Aktualności — dostęp deweloperski | **Ustawienia aktualności**, **Hasło programisty**, **Odblokuj** | Otwiera zarządzanie po dodatkowym sprawdzeniu | Tylko operator z hasłem hosta; zwykły dostęp menedżera go nie zastępuje |
 | Zarządzanie aktualnościami | **Nowa aktualność**, **Tytuł**, **Tekst**, **Widoczne do**, **Wszyscy**, **Tylko menedżerowie**, **Tylko pracownicy**, **Adres URL obrazu**, **Prześlij obraz**, **Usuń**, **Link do YouTube**, **Wyczyść**, **Zapisz aktualność**, **Usuń** | Tworzy/zmienia treść i grupę odbiorców, dodaje obraz/wideo; usuwa po potwierdzeniu | Wymagane tytuł/treść; limity i format mediów sprawdzane; nie wpisuj hasła do treści |
 
-
-
 ### Funkcje systemowe
 
 `/information` i `/database` są tylko dla menedżera systemowego. Zwykły menedżer i pracownik nie uzyskują tych uprawnień przez znajomość adresu.
@@ -96,7 +92,6 @@ W kontenerze otwórz `/container/:containerId/graphs/:graphId`, nowy grafik `/co
 | Kolumny ręczne | **Dodaj kolumnę**, nagłówek/komórki macierzy, usunięcie kolumny, **Wybierz zmianę**, **Wszyscy**, **Wybrany pracownik**, **Opublikuj zmianę**, **Usuń**, **Anuluj** | Dodaje kolumnę, wpisuje godziny, wybiera zmianę i odbiorcę; usuwa oczekującą propozycję/anuluje opublikowaną | Wpisz zakres, np. 09:00-15:00, zapisz grafik i włącz wymiany; sprawdź oczekujące zapisy przed publikacją |
 | Historia grafiku | **Historia grafiku**, wybór commitu, **Przełącz**, **Przywróć wersję**, **Usuń** | Przełącza zapisany stan lub usuwa snapshot po potwierdzeniu | Checkout może odrzucić niezapisany szkic; następny zapis tworzy gałąź. Usunięcie wersji zachowuje potomne commity, łącząc je z rodzicem |
 | Korekty grafiku | **Bieżący**, **Wnioskowane**, **Zatwierdź**, **Odrzuć**, kolor zatwierdzenia | Porównuje godziny i rozstrzyga wniosek | Przed zatwierdzeniem zapisz bieżące edycje grafiku; stara zmiana może już nie odpowiadać wnioskowi |
-
 
 Generator/podgląd roboczy nie gwarantuje wykonalności wszystkich ograniczeń. Zapis utrwala stan, a publikacja zapisanego stanu udostępnia go pracownikom. Sprawdź obsadę, godziny i konflikty przed publikacją. Telefon nie udostępnia tych operacji zapisu.
 
@@ -202,10 +197,6 @@ Push wymaga obsługi przeglądarki, konfiguracji serwera, HTTPS i zgody systemu.
 
 Nierozwiązane problemy zgłoś operatorowi/kontaktowi wskazanemu przez organizację. Podaj ekran, czas i błąd bez hasła/kodu/danych innych osób. Instrukcja nie ustala SLA.
 
-## 9. Podstawa i pokrycie prezentacji
+## 9. Pokrycie prezentacji
 
-[Routing](../../FrontEnd/src/app/router/AppRouter.tsx), [ekrany](../../FrontEnd/src/pages/), [komponenty](../../FrontEnd/src/entities/), [etykiety PL](../../FrontEnd/src/shared/i18n/pl.json), [wybór trybu](../../FrontEnd/src/features/manager-workspace-mode/ui/ManagerWorkspaceModePicker.tsx), [regulamin](../../FrontEnd/src/entities/regulations/ui/RegulationAcceptanceGate.tsx).
-
-Prezentacja 1: s. 3 — dostęp z README (§1); s. 4 — role/języki (§1–6); s. 5 — ekrany/pola/akcje (§2–6); s. 6 — HOW-TO (§7); s. 7 — FAQ/nawigacja (§1, §8). Wideo/chatbot/osobna platforma pomocy są alternatywami materiału, nie funkcjami GF.
-
-Dodatkowe kontrolki: [notepad](../../FrontEnd/src/features/manager-notepad/ui/ManagerNotepad.tsx), [system news](../../FrontEnd/src/features/manager-system-news/ui/ManagerSystemNews.tsx), [exports](../../FrontEnd/src/entities/exports/ui/ProfileExportActions/ProfileExportActions.tsx).
+Prezentacja 1: s. 3 — samodzielny dokument i spis treści (§1); s. 4 — role/języki (§1–6); s. 5 — ekrany/pola/akcje (§2–6); s. 6 — HOW-TO (§7); s. 7 — FAQ/nawigacja (§1, §8). Wideo/chatbot/osobna platforma pomocy są alternatywami materiału, nie funkcjami GF.

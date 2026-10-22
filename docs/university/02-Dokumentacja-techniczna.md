@@ -2,15 +2,13 @@
 
 Projekt techniczny: GF3. Źródło: `DEV2 @ 06cb43083939fecab4c95bb27bfa094fec13055f`. Odbiorcy: programista, administrator wdrożenia, kierownik projektu i dział IT klienta. Dokument opisuje implementację, nie potwierdza wdrożenia u klienta.
 
-[README](../../README.md) · [Instrukcja PL](01-Dokumentacja-uzytkownika-PL.md) · [Odbiór i eksploatacja](03-Procedury-odbioru-wdrozenia.md)
-
-- [Architektura](#1-architektura)
-- [API i schematy DTO](#2-api)
-- [Baza danych](#3-baza-danych)
-- [Biblioteki wewnętrzne](#4-biblioteki-wewnetrzne)
-- [Zależności](#5-oprogramowanie-zewnetrzne)
-- [Środowiska](#6-wymagania-srodowiskowe)
-- [DEV, TEST, PROD](#7-uruchamianie-i-proces-zmian)
+- Architektura
+- API i schematy DTO
+- Baza danych
+- Biblioteki wewnętrzne
+- Zależności
+- Środowiska
+- DEV, TEST, PROD
 
 ## 1. Architektura
 
@@ -34,8 +32,6 @@ Menedżer definiuje sklepy/pracowników, zbiera dyspozycyjność, konfiguruje i 
 
 SPA odpowiada za nawigację/formularze/prezentację, API za granicę HTTP i dostęp, BLL za reguły/orkiestrację, DAL za relacje i trwałość. SignalR obsługuje obecność, zmiany danych, synchronizację blokad i sesji; nie zastępuje SQLite. Blokady edycji są w pamięci procesu, bez udokumentowanej dystrybucji między replikami. Windows Forms `GF3.Launcher` to osobny lokalny bootstrap/tray uruchamiający aplikację przeglądarkową, nie wariant produkcyjnego nginx.
 
-Podstawa: [Program.cs](../../GF3.WebApi/Program.cs), [kompozycja WebApi](../../GF3.WebApi/Infrastructure/WebApiServiceCollectionExtensions.cs), [BLL DI](../../BusinessLogicLayer/Extensions.cs), [DAL DI](../../DataAccessLayer/Models/DataBaseContext/Extensions.cs), [routing SPA](../../FrontEnd/src/app/router/AppRouter.tsx).
-
 ## 2. API
 
 Kontrolery HTTP JSON pod `/api`; pliki eksportów/PDF mają własne MIME. W Development dostępne `/swagger` i `/swagger/v1/swagger.json`. SignalR `/api/realtime/presence` to osobny hub uwierzytelniony, nie dodatkowy kontroler HTTP z poniższej tabeli. Połączenie jest zamykane po wygaśnięciu uwierzytelnienia.
@@ -54,236 +50,199 @@ Parametry: `{...}` oznaczają path (ograniczenie `:int` jest regułą routingu, 
 
 Przykład bez poświadczeń: `GET /api/containers/1/graphs/2/export/excel?includeStyles=true&includeEmployees=true` z nagłówkiem Bearer własnej sesji manager PC. Sukces to plik XLSX, nie JSON.
 
-Podstawa bezpieczeństwa: [auth](../../GF3.WebApi/Auth/), [middleware](../../GF3.WebApi/Middleware/), [filtr błędów](../../GF3.WebApi/Infrastructure/ApiExceptionFilter.cs), [fabryka błędów](../../GF3.WebApi/Infrastructure/ApiProblemDetailsFactory.cs). Starsze [api-map](../api-map.md), [api-contracts](../api-contracts.md) i [api-usage](../api-usage.md) są pomocnicze: oznaczenie `none` przy Employees/Shops/Containers w starej mapie nie opisuje bieżącej autoryzacji.
-
 ### 2.1 Katalog akcji HTTP
 
 170 akcji w 29 plikach / 32 klasach kontrolerów. Ścieżki zachowują podstawienia `[controller]` ze źródła; routing ASP.NET akceptuje także używane przez SPA małe litery. Każdy wiersz odpowiada jednej akcji.
 
-
 #### AccountLanguageController
-
-[Źródło](../../GF3.WebApi/Controllers/AccountLanguageController.cs).
 
 | Metoda | Pełna ścieżka | Cel | Parametry path/query/body | Request DTO lub brak | Odpowiedź/status i response DTO | Dostęp/rola | Najważniejsze błędy |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| GET | `/api/account-language` | Odczyt | brak | brak | 200 — [LanguagePreference](#dto-webapi-controllers-languagepreference) | M/E | B; 401 |
-| PUT | `/api/account-language` | Aktualizacja | [LanguagePreference](#dto-webapi-controllers-languagepreference) preference | [LanguagePreference](#dto-webapi-controllers-languagepreference) preference | 200 — [LanguagePreference](#dto-webapi-controllers-languagepreference) | M/E | B; 400,401 |
+| GET | `/api/account-language` | Odczyt | brak | brak | 200 — LanguagePreference | M/E | B; 401 |
+| PUT | `/api/account-language` | Aktualizacja | LanguagePreference preference | LanguagePreference preference | 200 — LanguagePreference | M/E | B; 400,401 |
 
 #### AdminDbController
 
-[Źródło](../../GF3.WebApi/Controllers/AdminDbController.cs).
-
 | Metoda | Pełna ścieżka | Cel | Parametry path/query/body | Request DTO lub brak | Odpowiedź/status i response DTO | Dostęp/rola | Najważniejsze błędy |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| GET | `/api/admin/db/metadata` | Metadane SQLite i workspace | brak | brak | 200 — [AdminDbMetadataDto](#dto-businesslogiclayer-contracts-database-admindbmetadatadto) + allowWriteSql:bool, maxSqlLength:int, maxImportBytes:int; patrz projekcja administracji | S | B; 403,404,500 |
+| GET | `/api/admin/db/metadata` | Metadane SQLite i workspace | brak | brak | 200 — AdminDbMetadataDto + allowWriteSql:bool, maxSqlLength:int, maxImportBytes:int; patrz projekcja administracji | S | B; 403,404,500 |
 | GET | `/api/admin/db/hash` | Hash aktywnego pliku bazy | brak | brak | 200 — { hash: string } | S | B; 403,404,500 |
-| POST | `/api/admin/db/query` | Zapytanie odczytowe SQL | [`FromBody`] [AdminDbSqlRequest](#dto-webapi-contracts-admindb-admindbsqlrequest) request | [`FromBody`] [AdminDbSqlRequest](#dto-webapi-contracts-admindb-admindbsqlrequest) request | 200 — [AdminDbQueryResultDto](#dto-businesslogiclayer-contracts-database-admindbqueryresultdto) | S | B; 400,403,404,500 |
-| POST | `/api/admin/db/execute` | Wykonanie dozwolonego SQL zapisu | [`FromBody`] [AdminDbSqlRequest](#dto-webapi-contracts-admindb-admindbsqlrequest) request | [`FromBody`] [AdminDbSqlRequest](#dto-webapi-contracts-admindb-admindbsqlrequest) request | 200 — { affectedRows: int } | S | B; 400,403,404,500 |
-| POST | `/api/admin/db/import` | Import własnego skryptu SQL | `IFormFile` file | multipart: `IFormFile` file | 200 — [AdminDbImportResultDto](#dto-businesslogiclayer-contracts-database-admindbimportresultdto) | S | B; 400,403,404,500 |
-| POST | `/api/admin/db/manual-copy` | Ręczna kopia aktywnej bazy | brak | brak | 200 — [AdminDbFileEntryDto](#dto-businesslogiclayer-contracts-database-admindbfileentrydto) | S | B; 403,404,500 |
-| POST | `/api/admin/db/select` | Wybór aktywnej bazy workspace | [`FromBody`] [AdminDbSelectDatabaseRequest](#dto-webapi-contracts-admindb-admindbselectdatabaserequest) request | [`FromBody`] [AdminDbSelectDatabaseRequest](#dto-webapi-contracts-admindb-admindbselectdatabaserequest) request | 200 — [AdminDbFileEntryDto](#dto-businesslogiclayer-contracts-database-admindbfileentrydto) | S | B; 400,403,404,500 |
+| POST | `/api/admin/db/query` | Zapytanie odczytowe SQL | [`FromBody`] AdminDbSqlRequest request | [`FromBody`] AdminDbSqlRequest request | 200 — AdminDbQueryResultDto | S | B; 400,403,404,500 |
+| POST | `/api/admin/db/execute` | Wykonanie dozwolonego SQL zapisu | [`FromBody`] AdminDbSqlRequest request | [`FromBody`] AdminDbSqlRequest request | 200 — { affectedRows: int } | S | B; 400,403,404,500 |
+| POST | `/api/admin/db/import` | Import własnego skryptu SQL | `IFormFile` file | multipart: `IFormFile` file | 200 — AdminDbImportResultDto | S | B; 400,403,404,500 |
+| POST | `/api/admin/db/manual-copy` | Ręczna kopia aktywnej bazy | brak | brak | 200 — AdminDbFileEntryDto | S | B; 403,404,500 |
+| POST | `/api/admin/db/select` | Wybór aktywnej bazy workspace | [`FromBody`] AdminDbSelectDatabaseRequest request | [`FromBody`] AdminDbSelectDatabaseRequest request | 200 — AdminDbFileEntryDto | S | B; 400,403,404,500 |
 
 #### AdminRegulationsController
 
-[Źródło](../../GF3.WebApi/Controllers/AdminRegulationsController.cs).
-
 | Metoda | Pełna ścieżka | Cel | Parametry path/query/body | Request DTO lub brak | Odpowiedź/status i response DTO | Dostęp/rola | Najważniejsze błędy |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| GET | `/api/admin/regulations` | Lista dokumentów regulaminowych | brak | brak | 200 — `IReadOnlyList`&lt;[RegulationDocumentDto](#dto-businesslogiclayer-contracts-regulations-regulationdocumentdto)&gt; | S | B |
-| GET | `/api/admin/regulations/acceptances` | Lista potwierdzeń regulaminów | brak | brak | 200 — `IReadOnlyList`&lt;[RegulationAcceptanceDto](#dto-businesslogiclayer-contracts-regulations-regulationacceptancedto)&gt; | S | B |
+| GET | `/api/admin/regulations` | Lista dokumentów regulaminowych | brak | brak | 200 — `IReadOnlyList`&lt;RegulationDocumentDto&gt; | S | B |
+| GET | `/api/admin/regulations/acceptances` | Lista potwierdzeń regulaminów | brak | brak | 200 — `IReadOnlyList`&lt;RegulationAcceptanceDto&gt; | S | B |
 | GET | `/api/admin/regulations/{documentId:int}/pdf` | Pobranie PDF regulaminu | int documentId | brak | 200 — plik application/pdf | S | B |
-| POST | `/api/admin/regulations` | Utworzenie | [`FromForm`] [SaveRegulationRequest](#dto-webapi-contracts-regulations-saveregulationrequest) request | [`FromForm`] [SaveRegulationRequest](#dto-webapi-contracts-regulations-saveregulationrequest) request | 200 — [RegulationDocumentDto](#dto-businesslogiclayer-contracts-regulations-regulationdocumentdto) | S | B |
-| PUT | `/api/admin/regulations/{documentId:int}` | Aktualizacja | int documentId; [`FromForm`] [SaveRegulationRequest](#dto-webapi-contracts-regulations-saveregulationrequest) request | [`FromForm`] [SaveRegulationRequest](#dto-webapi-contracts-regulations-saveregulationrequest) request | 200 — [RegulationDocumentDto](#dto-businesslogiclayer-contracts-regulations-regulationdocumentdto) | S | B |
-| POST | `/api/admin/regulations/{documentId:int}/publish` | Publikacja dokumentu regulaminu | int documentId | brak | 200 — [RegulationDocumentDto](#dto-businesslogiclayer-contracts-regulations-regulationdocumentdto) | S | B |
+| POST | `/api/admin/regulations` | Utworzenie | [`FromForm`] SaveRegulationRequest request | [`FromForm`] SaveRegulationRequest request | 200 — RegulationDocumentDto | S | B |
+| PUT | `/api/admin/regulations/{documentId:int}` | Aktualizacja | int documentId; [`FromForm`] SaveRegulationRequest request | [`FromForm`] SaveRegulationRequest request | 200 — RegulationDocumentDto | S | B |
+| POST | `/api/admin/regulations/{documentId:int}/publish` | Publikacja dokumentu regulaminu | int documentId | brak | 200 — RegulationDocumentDto | S | B |
 | DELETE | `/api/admin/regulations/{documentId:int}` | Usunięcie | int documentId | brak | 204 — brak body | S | B |
 
 #### AuthController
 
-[Źródło](../../GF3.WebApi/Controllers/AuthController.cs).
-
 | Metoda | Pełna ścieżka | Cel | Parametry path/query/body | Request DTO lub brak | Odpowiedź/status i response DTO | Dostęp/rola | Najważniejsze błędy |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| POST | `/api/Auth/login` | Logowanie | [`FromBody`] [LoginRequest](#dto-webapi-contracts-auth-loginrequest) request | [`FromBody`] [LoginRequest](#dto-webapi-contracts-auth-loginrequest) request | 200 — [LoginResponseDto](#dto-webapi-contracts-auth-loginresponsedto) | anon | B; 401 |
-| GET | `/api/Auth/session` | Sesja | brak | brak | 200 — [SessionDto](#dto-webapi-contracts-auth-sessiondto) | A | B; 401 |
+| POST | `/api/Auth/login` | Logowanie | [`FromBody`] LoginRequest request | [`FromBody`] LoginRequest request | 200 — LoginResponseDto | anon | B; 401 |
+| GET | `/api/Auth/session` | Sesja | brak | brak | 200 — SessionDto | A | B; 401 |
 | POST | `/api/Auth/logout` | Wylogowanie | brak | brak | 204 — brak body | anon | B |
-| POST | `/api/Auth/manager-mode` | Wybór trybu menedżera | [`FromBody`] [ChangeManagerWorkspaceModeRequest](#dto-webapi-contracts-auth-changemanagerworkspacemoderequest) request | [`FromBody`] [ChangeManagerWorkspaceModeRequest](#dto-webapi-contracts-auth-changemanagerworkspacemoderequest) request | 200 — [LoginResponseDto](#dto-webapi-contracts-auth-loginresponsedto) | M | B; 400,403 |
-| POST | `/api/Auth/password/send-code` | Wysłanie kodu odzyskiwania hasła | [`FromBody`] [SendPasswordResetCodeRequest](#dto-webapi-contracts-auth-sendpasswordresetcoderequest) request | [`FromBody`] [SendPasswordResetCodeRequest](#dto-webapi-contracts-auth-sendpasswordresetcoderequest) request | 200 — [PasswordResetCodeDispatchDto](#dto-webapi-contracts-auth-passwordresetcodedispatchdto) | anon | B; 400 |
-| POST | `/api/Auth/password/confirm` | Potwierdzenie resetu hasła | [`FromBody`] [CompleteForgotPasswordResetRequest](#dto-webapi-contracts-auth-completeforgotpasswordresetrequest) request | [`FromBody`] [CompleteForgotPasswordResetRequest](#dto-webapi-contracts-auth-completeforgotpasswordresetrequest) request | 204 — brak body | anon | B; 400 |
+| POST | `/api/Auth/manager-mode` | Wybór trybu menedżera | [`FromBody`] ChangeManagerWorkspaceModeRequest request | [`FromBody`] ChangeManagerWorkspaceModeRequest request | 200 — LoginResponseDto | M | B; 400,403 |
+| POST | `/api/Auth/password/send-code` | Wysłanie kodu odzyskiwania hasła | [`FromBody`] SendPasswordResetCodeRequest request | [`FromBody`] SendPasswordResetCodeRequest request | 200 — PasswordResetCodeDispatchDto | anon | B; 400 |
+| POST | `/api/Auth/password/confirm` | Potwierdzenie resetu hasła | [`FromBody`] CompleteForgotPasswordResetRequest request | [`FromBody`] CompleteForgotPasswordResetRequest request | 204 — brak body | anon | B; 400 |
 
 #### AvailabilityBindsController
 
-[Źródło](../../GF3.WebApi/Controllers/AvailabilityBindsController.cs).
-
 | Metoda | Pełna ścieżka | Cel | Parametry path/query/body | Request DTO lub brak | Odpowiedź/status i response DTO | Dostęp/rola | Najważniejsze błędy |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| GET | `/api/availability-binds` | Lista | brak | brak | 200 — `IEnumerable`&lt;[AvailabilityBindDto](#dto-webapi-contracts-availabilitybinds-availabilitybinddto)&gt; | M | B; 500 |
-| GET | `/api/availability-binds/active` | Lista aktywnych skrótów | brak | brak | 200 — `IEnumerable`&lt;[AvailabilityBindDto](#dto-webapi-contracts-availabilitybinds-availabilitybinddto)&gt; | M | B; 500 |
-| GET | `/api/availability-binds/{id:int}` | Szczegóły | int id | brak | 200 — [AvailabilityBindDto](#dto-webapi-contracts-availabilitybinds-availabilitybinddto) | M | B; 404,500 |
-| POST | `/api/availability-binds` | Utworzenie | [`FromBody`] [CreateAvailabilityBindRequest](#dto-webapi-contracts-availabilitybinds-createavailabilitybindrequest) request | [`FromBody`] [CreateAvailabilityBindRequest](#dto-webapi-contracts-availabilitybinds-createavailabilitybindrequest) request | 201 — [AvailabilityBindDto](#dto-webapi-contracts-availabilitybinds-availabilitybinddto) | M | B; 400,500 |
-| PUT | `/api/availability-binds/{id:int}` | Aktualizacja | int id; [`FromBody`] [UpdateAvailabilityBindRequest](#dto-webapi-contracts-availabilitybinds-updateavailabilitybindrequest) request | [`FromBody`] [UpdateAvailabilityBindRequest](#dto-webapi-contracts-availabilitybinds-updateavailabilitybindrequest) request | 204 — brak body | M | B; 400,404,500 |
+| GET | `/api/availability-binds` | Lista | brak | brak | 200 — `IEnumerable`&lt;AvailabilityBindDto&gt; | M | B; 500 |
+| GET | `/api/availability-binds/active` | Lista aktywnych skrótów | brak | brak | 200 — `IEnumerable`&lt;AvailabilityBindDto&gt; | M | B; 500 |
+| GET | `/api/availability-binds/{id:int}` | Szczegóły | int id | brak | 200 — AvailabilityBindDto | M | B; 404,500 |
+| POST | `/api/availability-binds` | Utworzenie | [`FromBody`] CreateAvailabilityBindRequest request | [`FromBody`] CreateAvailabilityBindRequest request | 201 — AvailabilityBindDto | M | B; 400,500 |
+| PUT | `/api/availability-binds/{id:int}` | Aktualizacja | int id; [`FromBody`] UpdateAvailabilityBindRequest request | [`FromBody`] UpdateAvailabilityBindRequest request | 204 — brak body | M | B; 400,404,500 |
 | DELETE | `/api/availability-binds/{id:int}` | Usunięcie | int id | brak | 204 — brak body | M | B; 404,500 |
 
 #### AvailabilityGroupsController
 
-[Źródło](../../GF3.WebApi/Controllers/AvailabilityGroupsController.cs).
-
 | Metoda | Pełna ścieżka | Cel | Parametry path/query/body | Request DTO lub brak | Odpowiedź/status i response DTO | Dostęp/rola | Najważniejsze błędy |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| GET | `/api/availability-groups` | Lista | brak | brak | 200 — `IEnumerable`&lt;[AvailabilityGroupDto](#dto-webapi-contracts-availabilitygroups-availabilitygroupdto)&gt; | M | B; 500 |
-| GET | `/api/availability-groups/{id:int}` | Szczegóły | int id | brak | 200 — [AvailabilityGroupDto](#dto-webapi-contracts-availabilitygroups-availabilitygroupdto) | M | B; 404,500 |
-| GET | `/api/availability-groups/{id:int}/items` | Zbiorcze wpisy dyspozycyjności | int id | brak | 200 — `IEnumerable`&lt;[AvailabilityGroupItemDto](#dto-webapi-contracts-availabilitygroups-availabilitygroupitemdto)&gt; | M | B; 404,500 |
-| GET | `/api/availability-groups/{groupId:int}/members` | Uczestnicy grupy | int groupId | brak | 200 — `IEnumerable`&lt;[AvailabilityGroupMemberDto](#dto-webapi-contracts-availabilitygroups-members-availabilitygroupmemberdto)&gt; | M | B; 404,500 |
-| POST | `/api/availability-groups/{groupId:int}/members` | Dodanie uczestnika dyspozycyjności | int groupId; [`FromBody`] [CreateAvailabilityGroupMemberRequest](#dto-webapi-contracts-availabilitygroups-members-createavailabilitygroupmemberrequest) request | [`FromBody`] [CreateAvailabilityGroupMemberRequest](#dto-webapi-contracts-availabilitygroups-members-createavailabilitygroupmemberrequest) request | 201 — [AvailabilityGroupMemberDto](#dto-webapi-contracts-availabilitygroups-members-availabilitygroupmemberdto) | M | B; 400,404,409,500 |
-| PUT | `/api/availability-groups/{groupId:int}/members/{memberId:int}` | Zmiana uczestnika grupy | int groupId; int memberId; [`FromBody`] [UpdateAvailabilityGroupMemberRequest](#dto-webapi-contracts-availabilitygroups-members-updateavailabilitygroupmemberrequest) request | [`FromBody`] [UpdateAvailabilityGroupMemberRequest](#dto-webapi-contracts-availabilitygroups-members-updateavailabilitygroupmemberrequest) request | 204 — brak body | M | B; 400,404,409,500 |
+| GET | `/api/availability-groups` | Lista | brak | brak | 200 — `IEnumerable`&lt;AvailabilityGroupDto&gt; | M | B; 500 |
+| GET | `/api/availability-groups/{id:int}` | Szczegóły | int id | brak | 200 — AvailabilityGroupDto | M | B; 404,500 |
+| GET | `/api/availability-groups/{id:int}/items` | Zbiorcze wpisy dyspozycyjności | int id | brak | 200 — `IEnumerable`&lt;AvailabilityGroupItemDto&gt; | M | B; 404,500 |
+| GET | `/api/availability-groups/{groupId:int}/members` | Uczestnicy grupy | int groupId | brak | 200 — `IEnumerable`&lt;AvailabilityGroupMemberDto&gt; | M | B; 404,500 |
+| POST | `/api/availability-groups/{groupId:int}/members` | Dodanie uczestnika dyspozycyjności | int groupId; [`FromBody`] CreateAvailabilityGroupMemberRequest request | [`FromBody`] CreateAvailabilityGroupMemberRequest request | 201 — AvailabilityGroupMemberDto | M | B; 400,404,409,500 |
+| PUT | `/api/availability-groups/{groupId:int}/members/{memberId:int}` | Zmiana uczestnika grupy | int groupId; int memberId; [`FromBody`] UpdateAvailabilityGroupMemberRequest request | [`FromBody`] UpdateAvailabilityGroupMemberRequest request | 204 — brak body | M | B; 400,404,409,500 |
 | DELETE | `/api/availability-groups/{groupId:int}/members/{memberId:int}` | Usunięcie uczestnika grupy | int groupId; int memberId | brak | 204 — brak body | M | B; 404,409,500 |
-| GET | `/api/availability-groups/{groupId:int}/slots` | Wpisy dni grupy | int groupId | brak | 200 — `IEnumerable`&lt;[AvailabilitySlotDto](#dto-webapi-contracts-availabilitygroups-slots-availabilityslotdto)&gt; | M | B; 404,500 |
-| POST | `/api/availability-groups/{groupId:int}/slots` | Utworzenie wpisu dnia dyspozycyjności | int groupId; [`FromBody`] [CreateAvailabilitySlotRequest](#dto-webapi-contracts-availabilitygroups-slots-createavailabilityslotrequest) request | [`FromBody`] [CreateAvailabilitySlotRequest](#dto-webapi-contracts-availabilitygroups-slots-createavailabilityslotrequest) request | 201 — [AvailabilitySlotDto](#dto-webapi-contracts-availabilitygroups-slots-availabilityslotdto) | M | B; 400,404,409,500 |
-| PUT | `/api/availability-groups/{groupId:int}/slots/{slotId:int}` | Zmiana wpisu dnia grupy | int groupId; int slotId; [`FromBody`] [UpdateAvailabilitySlotRequest](#dto-webapi-contracts-availabilitygroups-slots-updateavailabilityslotrequest) request | [`FromBody`] [UpdateAvailabilitySlotRequest](#dto-webapi-contracts-availabilitygroups-slots-updateavailabilityslotrequest) request | 204 — brak body | M | B; 400,404,409,500 |
+| GET | `/api/availability-groups/{groupId:int}/slots` | Wpisy dni grupy | int groupId | brak | 200 — `IEnumerable`&lt;AvailabilitySlotDto&gt; | M | B; 404,500 |
+| POST | `/api/availability-groups/{groupId:int}/slots` | Utworzenie wpisu dnia dyspozycyjności | int groupId; [`FromBody`] CreateAvailabilitySlotRequest request | [`FromBody`] CreateAvailabilitySlotRequest request | 201 — AvailabilitySlotDto | M | B; 400,404,409,500 |
+| PUT | `/api/availability-groups/{groupId:int}/slots/{slotId:int}` | Zmiana wpisu dnia grupy | int groupId; int slotId; [`FromBody`] UpdateAvailabilitySlotRequest request | [`FromBody`] UpdateAvailabilitySlotRequest request | 204 — brak body | M | B; 400,404,409,500 |
 | DELETE | `/api/availability-groups/{groupId:int}/slots/{slotId:int}` | Usunięcie wpisu dnia | int groupId; int slotId | brak | 204 — brak body | M | B; 404,409,500 |
-| POST | `/api/availability-groups` | Utworzenie | [`FromBody`] [CreateAvailabilityGroupRequest](#dto-webapi-contracts-availabilitygroups-createavailabilitygrouprequest) request | [`FromBody`] [CreateAvailabilityGroupRequest](#dto-webapi-contracts-availabilitygroups-createavailabilitygrouprequest) request | 201 — [AvailabilityGroupDto](#dto-webapi-contracts-availabilitygroups-availabilitygroupdto) | M | B; 400,500 |
-| PUT | `/api/availability-groups/{id:int}` | Aktualizacja | int id; [`FromBody`] [UpdateAvailabilityGroupRequest](#dto-webapi-contracts-availabilitygroups-updateavailabilitygrouprequest) request | [`FromBody`] [UpdateAvailabilityGroupRequest](#dto-webapi-contracts-availabilitygroups-updateavailabilitygrouprequest) request | 204 — brak body | M | B; 400,404,409,500 |
+| POST | `/api/availability-groups` | Utworzenie | [`FromBody`] CreateAvailabilityGroupRequest request | [`FromBody`] CreateAvailabilityGroupRequest request | 201 — AvailabilityGroupDto | M | B; 400,500 |
+| PUT | `/api/availability-groups/{id:int}` | Aktualizacja | int id; [`FromBody`] UpdateAvailabilityGroupRequest request | [`FromBody`] UpdateAvailabilityGroupRequest request | 204 — brak body | M | B; 400,404,409,500 |
 | DELETE | `/api/availability-groups/{id:int}` | Usunięcie | int id | brak | 204 — brak body | M | B; 404,409,500 |
 
 #### AvailabilityGroupTransfersController
 
-[Źródło](../../GF3.WebApi/Controllers/AvailabilityGroupTransfersController.cs).
-
 | Metoda | Pełna ścieżka | Cel | Parametry path/query/body | Request DTO lub brak | Odpowiedź/status i response DTO | Dostęp/rola | Najważniejsze błędy |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| GET | `/api/availability-groups/{targetGroupId:int}/members/{targetMemberId:int}/transfer-sources` | Źródła transferu dni członka grupy | int targetGroupId; int targetMemberId | brak | 200 — `IEnumerable`&lt;[AvailabilityTransferSourceDto](#dto-webapi-contracts-availabilitygroups-transfers-availabilitytransfersourcedto)&gt; | M | B |
-| GET | `/api/availability-groups/transfer-preview` | Źródła transferu dla podglądu grupy | [`FromQuery`] string employeeIds; [`FromQuery`] int year; [`FromQuery`] int month; [`FromQuery`] int? targetGroupId | brak | 200 — `IEnumerable`&lt;[AvailabilityTransferSourceDto](#dto-webapi-contracts-availabilitygroups-transfers-availabilitytransfersourcedto)&gt; | M | B; 400 |
-| GET | `/api/availability-groups/{sourceGroupId:int}/transfer-hints` | Wskazania transferów dyspozycyjności | int sourceGroupId | brak | 200 — `IEnumerable`&lt;[AvailabilityTransferHintDto](#dto-webapi-contracts-availabilitygroups-transfers-availabilitytransferhintdto)&gt; | M | B |
-| POST | `/api/availability-groups/{targetGroupId:int}/members/{targetMemberId:int}/transfer-days` | Transfer wybranych dni dyspozycyjności | int targetGroupId; int targetMemberId; [`FromBody`] [TransferAvailabilityDaysRequest](#dto-webapi-contracts-availabilitygroups-transfers-transferavailabilitydaysrequest) request | [`FromBody`] [TransferAvailabilityDaysRequest](#dto-webapi-contracts-availabilitygroups-transfers-transferavailabilitydaysrequest) request | 200 — [AvailabilityTransferResultDto](#dto-webapi-contracts-availabilitygroups-transfers-availabilitytransferresultdto) | M | B; 400,409 |
+| GET | `/api/availability-groups/{targetGroupId:int}/members/{targetMemberId:int}/transfer-sources` | Źródła transferu dni członka grupy | int targetGroupId; int targetMemberId | brak | 200 — `IEnumerable`&lt;AvailabilityTransferSourceDto&gt; | M | B |
+| GET | `/api/availability-groups/transfer-preview` | Źródła transferu dla podglądu grupy | [`FromQuery`] string employeeIds; [`FromQuery`] int year; [`FromQuery`] int month; [`FromQuery`] int? targetGroupId | brak | 200 — `IEnumerable`&lt;AvailabilityTransferSourceDto&gt; | M | B; 400 |
+| GET | `/api/availability-groups/{sourceGroupId:int}/transfer-hints` | Wskazania transferów dyspozycyjności | int sourceGroupId | brak | 200 — `IEnumerable`&lt;AvailabilityTransferHintDto&gt; | M | B |
+| POST | `/api/availability-groups/{targetGroupId:int}/members/{targetMemberId:int}/transfer-days` | Transfer wybranych dni dyspozycyjności | int targetGroupId; int targetMemberId; [`FromBody`] TransferAvailabilityDaysRequest request | [`FromBody`] TransferAvailabilityDaysRequest request | 200 — AvailabilityTransferResultDto | M | B; 400,409 |
 
 #### CommunicationsController
 
-[Źródło](../../GF3.WebApi/Controllers/CommunicationsController.cs).
-
 | Metoda | Pełna ścieżka | Cel | Parametry path/query/body | Request DTO lub brak | Odpowiedź/status i response DTO | Dostęp/rola | Najważniejsze błędy |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| GET | `/api/communications` | Lista | brak | brak | 200 — `IReadOnlyList`&lt;[CommunicationMessageDto](#dto-webapi-contracts-communications-communicationmessagedto)&gt; | M | B |
-| POST | `/api/communications` | Utworzenie | [`FromBody`] [CreateCommunicationMessageRequest](#dto-webapi-contracts-communications-createcommunicationmessagerequest) request | [`FromBody`] [CreateCommunicationMessageRequest](#dto-webapi-contracts-communications-createcommunicationmessagerequest) request | 200 — [CommunicationMessageDto](#dto-webapi-contracts-communications-communicationmessagedto) | M | B; 400 |
-| PUT | `/api/communications/{communicationId:int}` | Aktualizacja | int communicationId; [`FromBody`] [UpdateCommunicationMessageRequest](#dto-webapi-contracts-communications-updatecommunicationmessagerequest) request | [`FromBody`] [UpdateCommunicationMessageRequest](#dto-webapi-contracts-communications-updatecommunicationmessagerequest) request | 200 — [CommunicationMessageDto](#dto-webapi-contracts-communications-communicationmessagedto) | M | B; 400,404 |
+| GET | `/api/communications` | Lista | brak | brak | 200 — `IReadOnlyList`&lt;CommunicationMessageDto&gt; | M | B |
+| POST | `/api/communications` | Utworzenie | [`FromBody`] CreateCommunicationMessageRequest request | [`FromBody`] CreateCommunicationMessageRequest request | 200 — CommunicationMessageDto | M | B; 400 |
+| PUT | `/api/communications/{communicationId:int}` | Aktualizacja | int communicationId; [`FromBody`] UpdateCommunicationMessageRequest request | [`FromBody`] UpdateCommunicationMessageRequest request | 200 — CommunicationMessageDto | M | B; 400,404 |
 | DELETE | `/api/communications/{communicationId:int}` | Usunięcie | int communicationId | brak | 204 — brak body | M | B; 404 |
-| GET | `/api/communications/pending` | Dokumenty lub komunikaty oczekujące dla konta | brak | brak | 200 — `IReadOnlyList`&lt;[CommunicationMessageDto](#dto-webapi-contracts-communications-communicationmessagedto)&gt; | E | B |
+| GET | `/api/communications/pending` | Dokumenty lub komunikaty oczekujące dla konta | brak | brak | 200 — `IReadOnlyList`&lt;CommunicationMessageDto&gt; | E | B |
 | POST | `/api/communications/{communicationId:int}/dismiss` | Potwierdzenie odczytu komunikatu | int communicationId | brak | 204 — brak body | E | B; 400 |
 
 #### ContainersController
 
-[Źródło](../../GF3.WebApi/Controllers/ContainersController.cs).
-
 | Metoda | Pełna ścieżka | Cel | Parametry path/query/body | Request DTO lub brak | Odpowiedź/status i response DTO | Dostęp/rola | Najważniejsze błędy |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| GET | `/api/Containers` | Lista | brak | brak | 200 — `IEnumerable`&lt;[ContainerDto](#dto-webapi-contracts-containers-containerdto)&gt; | M | B; 500 |
-| GET | `/api/Containers/{id:int}` | Szczegóły | int id | brak | 200 — [ContainerDto](#dto-webapi-contracts-containers-containerdto) | M | B; 404,500 |
-| GET | `/api/Containers/{containerId:int}/graphs` | Grafiki kontenera | int containerId | brak | 200 — `IEnumerable`&lt;[GraphDto](#dto-webapi-contracts-containers-graphs-graphdto)&gt; | M | B; 404,500 |
-| PUT | `/api/Containers/{containerId:int}/graphs/publication` | Publikacja/prywatyzacja grafików kontenera | int containerId; [`FromBody`] [UpdateGraphsPublicationRequest](#dto-webapi-contracts-containers-graphs-updategraphspublicationrequest) request | [`FromBody`] [UpdateGraphsPublicationRequest](#dto-webapi-contracts-containers-graphs-updategraphspublicationrequest) request | 204 — brak body | M | B; 400,404,409 |
-| GET | `/api/Containers/{containerId:int}/schedule-presets` | Presety aplikacji dostępne z kontenera | int containerId | brak | 200 — `IEnumerable`&lt;[SchedulePresetDto](#dto-webapi-contracts-containers-schedulepresets-schedulepresetdto)&gt; | M | B; 404,500 |
-| POST | `/api/Containers/{containerId:int}/schedule-presets` | Zapis presetu | int containerId; [`FromBody`] [CreateSchedulePresetRequest](#dto-webapi-contracts-containers-schedulepresets-createschedulepresetrequest) request | [`FromBody`] [CreateSchedulePresetRequest](#dto-webapi-contracts-containers-schedulepresets-createschedulepresetrequest) request | 201 — [SchedulePresetDto](#dto-webapi-contracts-containers-schedulepresets-schedulepresetdto) | M | B; 400,404,500 |
-| GET | `/api/Containers/{containerId:int}/graphs/{graphId:int}` | Szczegóły grafiku kontenera | int containerId; int graphId | brak | 200 — [GraphDto](#dto-webapi-contracts-containers-graphs-graphdto) | M | B; 404,500 |
-| POST | `/api/Containers/{containerId:int}/graphs` | Utworzenie grafiku | int containerId; [`FromBody`] [CreateGraphRequest](#dto-webapi-contracts-containers-graphs-creategraphrequest) request | [`FromBody`] [CreateGraphRequest](#dto-webapi-contracts-containers-graphs-creategraphrequest) request | 201 — [GraphDto](#dto-webapi-contracts-containers-graphs-graphdto) | M | B; 400,404,500 |
-| PUT | `/api/Containers/{containerId:int}/graphs/{graphId:int}` | Aktualizacja grafiku | int containerId; int graphId; [`FromBody`] [UpdateGraphRequest](#dto-webapi-contracts-containers-graphs-updategraphrequest) request | [`FromBody`] [UpdateGraphRequest](#dto-webapi-contracts-containers-graphs-updategraphrequest) request | 204 — brak body | M | B; 400,404,409,500 |
+| GET | `/api/Containers` | Lista | brak | brak | 200 — `IEnumerable`&lt;ContainerDto&gt; | M | B; 500 |
+| GET | `/api/Containers/{id:int}` | Szczegóły | int id | brak | 200 — ContainerDto | M | B; 404,500 |
+| GET | `/api/Containers/{containerId:int}/graphs` | Grafiki kontenera | int containerId | brak | 200 — `IEnumerable`&lt;GraphDto&gt; | M | B; 404,500 |
+| PUT | `/api/Containers/{containerId:int}/graphs/publication` | Publikacja/prywatyzacja grafików kontenera | int containerId; [`FromBody`] UpdateGraphsPublicationRequest request | [`FromBody`] UpdateGraphsPublicationRequest request | 204 — brak body | M | B; 400,404,409 |
+| GET | `/api/Containers/{containerId:int}/schedule-presets` | Presety aplikacji dostępne z kontenera | int containerId | brak | 200 — `IEnumerable`&lt;SchedulePresetDto&gt; | M | B; 404,500 |
+| POST | `/api/Containers/{containerId:int}/schedule-presets` | Zapis presetu | int containerId; [`FromBody`] CreateSchedulePresetRequest request | [`FromBody`] CreateSchedulePresetRequest request | 201 — SchedulePresetDto | M | B; 400,404,500 |
+| GET | `/api/Containers/{containerId:int}/graphs/{graphId:int}` | Szczegóły grafiku kontenera | int containerId; int graphId | brak | 200 — GraphDto | M | B; 404,500 |
+| POST | `/api/Containers/{containerId:int}/graphs` | Utworzenie grafiku | int containerId; [`FromBody`] CreateGraphRequest request | [`FromBody`] CreateGraphRequest request | 201 — GraphDto | M | B; 400,404,500 |
+| PUT | `/api/Containers/{containerId:int}/graphs/{graphId:int}` | Aktualizacja grafiku | int containerId; int graphId; [`FromBody`] UpdateGraphRequest request | [`FromBody`] UpdateGraphRequest request | 204 — brak body | M | B; 400,404,409,500 |
 | DELETE | `/api/Containers/{containerId:int}/graphs/{graphId:int}` | Usunięcie grafiku | int containerId; int graphId | brak | 204 — brak body | M | B; 404,409,500 |
-| POST | `/api/Containers/{containerId:int}/graphs/generate-preview` | Generowanie podglądu bez utrwalenia grafiku | int containerId; [`FromBody`] [GenerateGraphPreviewRequest](#dto-webapi-contracts-containers-graphs-generategraphpreviewrequest) request | [`FromBody`] [GenerateGraphPreviewRequest](#dto-webapi-contracts-containers-graphs-generategraphpreviewrequest) request | 200 — [GenerateGraphResponse](#dto-webapi-contracts-containers-graphs-generategraphresponse) | M | B; 400,404,500 |
-| POST | `/api/Containers/{containerId:int}/graphs/{graphId:int}/generate` | Generowanie zapisanego grafiku | int containerId; int graphId; [`FromBody`] [GenerateGraphRequest](#dto-webapi-contracts-containers-graphs-generategraphrequest) request | [`FromBody`] [GenerateGraphRequest](#dto-webapi-contracts-containers-graphs-generategraphrequest) request | 200 — [GenerateGraphResponse](#dto-webapi-contracts-containers-graphs-generategraphresponse) | M | B; 400,404,409,500 |
-| GET | `/api/Containers/{containerId:int}/graphs/{graphId:int}/slots` | Sloty grafiku | int containerId; int graphId | brak | 200 — `IEnumerable`&lt;[GraphSlotDto](#dto-webapi-contracts-containers-graphs-slots-graphslotdto)&gt; | M | B; 404 |
-| PUT | `/api/Containers/{containerId:int}/graphs/{graphId:int}/slots` | Zastąpienie slotów grafiku | int containerId; int graphId; [`FromBody`] [ReplaceGraphSlotsRequest](#dto-webapi-contracts-containers-graphs-slots-replacegraphslotsrequest) request | [`FromBody`] [ReplaceGraphSlotsRequest](#dto-webapi-contracts-containers-graphs-slots-replacegraphslotsrequest) request | 204 — brak body | M | B; 400,409 |
-| POST | `/api/Containers/{containerId:int}/graphs/{graphId:int}/slots` | Utworzenie slotu grafiku | int containerId; int graphId; [`FromBody`] [CreateGraphSlotRequest](#dto-webapi-contracts-containers-graphs-slots-creategraphslotrequest) request | [`FromBody`] [CreateGraphSlotRequest](#dto-webapi-contracts-containers-graphs-slots-creategraphslotrequest) request | 201 — [GraphSlotDto](#dto-webapi-contracts-containers-graphs-slots-graphslotdto) | M | B; 400,409 |
-| PUT | `/api/Containers/{containerId:int}/graphs/{graphId:int}/slots/{slotId:int}` | Zmiana slotu grafiku | int containerId; int graphId; int slotId; [`FromBody`] [UpdateGraphSlotRequest](#dto-webapi-contracts-containers-graphs-slots-updategraphslotrequest) request | [`FromBody`] [UpdateGraphSlotRequest](#dto-webapi-contracts-containers-graphs-slots-updategraphslotrequest) request | 204 — brak body | M | B; 400,409 |
+| POST | `/api/Containers/{containerId:int}/graphs/generate-preview` | Generowanie podglądu bez utrwalenia grafiku | int containerId; [`FromBody`] GenerateGraphPreviewRequest request | [`FromBody`] GenerateGraphPreviewRequest request | 200 — GenerateGraphResponse | M | B; 400,404,500 |
+| POST | `/api/Containers/{containerId:int}/graphs/{graphId:int}/generate` | Generowanie zapisanego grafiku | int containerId; int graphId; [`FromBody`] GenerateGraphRequest request | [`FromBody`] GenerateGraphRequest request | 200 — GenerateGraphResponse | M | B; 400,404,409,500 |
+| GET | `/api/Containers/{containerId:int}/graphs/{graphId:int}/slots` | Sloty grafiku | int containerId; int graphId | brak | 200 — `IEnumerable`&lt;GraphSlotDto&gt; | M | B; 404 |
+| PUT | `/api/Containers/{containerId:int}/graphs/{graphId:int}/slots` | Zastąpienie slotów grafiku | int containerId; int graphId; [`FromBody`] ReplaceGraphSlotsRequest request | [`FromBody`] ReplaceGraphSlotsRequest request | 204 — brak body | M | B; 400,409 |
+| POST | `/api/Containers/{containerId:int}/graphs/{graphId:int}/slots` | Utworzenie slotu grafiku | int containerId; int graphId; [`FromBody`] CreateGraphSlotRequest request | [`FromBody`] CreateGraphSlotRequest request | 201 — GraphSlotDto | M | B; 400,409 |
+| PUT | `/api/Containers/{containerId:int}/graphs/{graphId:int}/slots/{slotId:int}` | Zmiana slotu grafiku | int containerId; int graphId; int slotId; [`FromBody`] UpdateGraphSlotRequest request | [`FromBody`] UpdateGraphSlotRequest request | 204 — brak body | M | B; 400,409 |
 | DELETE | `/api/Containers/{containerId:int}/graphs/{graphId:int}/slots/{slotId:int}` | Usunięcie slotu | int containerId; int graphId; int slotId | brak | 204 — brak body | M | B; 409 |
-| GET | `/api/Containers/{containerId:int}/graphs/{graphId:int}/employees` | Uczestnicy grafiku | int containerId; int graphId | brak | 200 — `IEnumerable`&lt;[GraphEmployeeDto](#dto-webapi-contracts-containers-graphs-employees-graphemployeedto)&gt; | M | B; 404 |
-| POST | `/api/Containers/{containerId:int}/graphs/{graphId:int}/employees` | Dodanie uczestnika grafiku | int containerId; int graphId; [`FromBody`] [AddGraphEmployeeRequest](#dto-webapi-contracts-containers-graphs-employees-addgraphemployeerequest) request | [`FromBody`] [AddGraphEmployeeRequest](#dto-webapi-contracts-containers-graphs-employees-addgraphemployeerequest) request | 201 — [GraphEmployeeDto](#dto-webapi-contracts-containers-graphs-employees-graphemployeedto) | M | B; 409 |
-| PUT | `/api/Containers/{containerId:int}/graphs/{graphId:int}/employees/{graphEmployeeId:int}` | Zmiana ustawień uczestnika grafiku | int containerId; int graphId; int graphEmployeeId; [`FromBody`] [UpdateGraphEmployeeRequest](#dto-webapi-contracts-containers-graphs-employees-updategraphemployeerequest) request | [`FromBody`] [UpdateGraphEmployeeRequest](#dto-webapi-contracts-containers-graphs-employees-updategraphemployeerequest) request | 204 — brak body | M | B; 409 |
+| GET | `/api/Containers/{containerId:int}/graphs/{graphId:int}/employees` | Uczestnicy grafiku | int containerId; int graphId | brak | 200 — `IEnumerable`&lt;GraphEmployeeDto&gt; | M | B; 404 |
+| POST | `/api/Containers/{containerId:int}/graphs/{graphId:int}/employees` | Dodanie uczestnika grafiku | int containerId; int graphId; [`FromBody`] AddGraphEmployeeRequest request | [`FromBody`] AddGraphEmployeeRequest request | 201 — GraphEmployeeDto | M | B; 409 |
+| PUT | `/api/Containers/{containerId:int}/graphs/{graphId:int}/employees/{graphEmployeeId:int}` | Zmiana ustawień uczestnika grafiku | int containerId; int graphId; int graphEmployeeId; [`FromBody`] UpdateGraphEmployeeRequest request | [`FromBody`] UpdateGraphEmployeeRequest request | 204 — brak body | M | B; 409 |
 | DELETE | `/api/Containers/{containerId:int}/graphs/{graphId:int}/employees/{graphEmployeeId:int}` | Usunięcie uczestnika grafiku | int containerId; int graphId; int graphEmployeeId | brak | 204 — brak body | M | B; 409 |
-| GET | `/api/Containers/{containerId:int}/graphs/{graphId:int}/cell-styles` | Style komórek grafiku | int containerId; int graphId | brak | 200 — `IEnumerable`&lt;[GraphCellStyleDto](#dto-webapi-contracts-containers-graphs-cellstyles-graphcellstyledto)&gt; | M | B; 404 |
-| PUT | `/api/Containers/{containerId:int}/graphs/{graphId:int}/cell-styles` | Zapis stylu komórki grafiku | int containerId; int graphId; [`FromBody`] [UpsertGraphCellStyleRequest](#dto-webapi-contracts-containers-graphs-cellstyles-upsertgraphcellstylerequest) request | [`FromBody`] [UpsertGraphCellStyleRequest](#dto-webapi-contracts-containers-graphs-cellstyles-upsertgraphcellstylerequest) request | 200 — [GraphCellStyleDto](#dto-webapi-contracts-containers-graphs-cellstyles-graphcellstyledto) | M | B; 409 |
+| GET | `/api/Containers/{containerId:int}/graphs/{graphId:int}/cell-styles` | Style komórek grafiku | int containerId; int graphId | brak | 200 — `IEnumerable`&lt;GraphCellStyleDto&gt; | M | B; 404 |
+| PUT | `/api/Containers/{containerId:int}/graphs/{graphId:int}/cell-styles` | Zapis stylu komórki grafiku | int containerId; int graphId; [`FromBody`] UpsertGraphCellStyleRequest request | [`FromBody`] UpsertGraphCellStyleRequest request | 200 — GraphCellStyleDto | M | B; 409 |
 | DELETE | `/api/Containers/{containerId:int}/graphs/{graphId:int}/cell-styles/{styleId:int}` | Usunięcie stylu komórki | int containerId; int graphId; int styleId | brak | 204 — brak body | M | B; 409 |
-| POST | `/api/Containers` | Utworzenie | [`FromBody`] [CreateContainerRequest](#dto-webapi-contracts-containers-createcontainerrequest) request | [`FromBody`] [CreateContainerRequest](#dto-webapi-contracts-containers-createcontainerrequest) request | 201 — [ContainerDto](#dto-webapi-contracts-containers-containerdto) | M | B; 400,500 |
-| PUT | `/api/Containers/{id:int}` | Aktualizacja | int id; [`FromBody`] [UpdateContainerRequest](#dto-webapi-contracts-containers-updatecontainerrequest) request | [`FromBody`] [UpdateContainerRequest](#dto-webapi-contracts-containers-updatecontainerrequest) request | 204 — brak body | M | B; 400,404,409,500 |
+| POST | `/api/Containers` | Utworzenie | [`FromBody`] CreateContainerRequest request | [`FromBody`] CreateContainerRequest request | 201 — ContainerDto | M | B; 400,500 |
+| PUT | `/api/Containers/{id:int}` | Aktualizacja | int id; [`FromBody`] UpdateContainerRequest request | [`FromBody`] UpdateContainerRequest request | 204 — brak body | M | B; 400,404,409,500 |
 | DELETE | `/api/Containers/{id:int}` | Usunięcie | int id | brak | 204 — brak body | M | B; 400,404,409,500 |
 
 #### EmployeeAvailabilityController
 
-[Źródło](../../GF3.WebApi/Controllers/EmployeeAvailabilityController.cs).
-
 | Metoda | Pełna ścieżka | Cel | Parametry path/query/body | Request DTO lub brak | Odpowiedź/status i response DTO | Dostęp/rola | Najważniejsze błędy |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| GET | `/api/employee-availability` | Lista dostępna bieżącemu kontu | brak | brak | 200 — `IEnumerable`&lt;[EmployeeAvailabilityGroupDto](#dto-webapi-contracts-employeeavailability-employeeavailabilitygroupdto)&gt; | E | B |
-| GET | `/api/employee-availability/{groupId:int}` | Szczegóły | int groupId | brak | 200 — [EmployeeAvailabilityGroupDto](#dto-webapi-contracts-employeeavailability-employeeavailabilitygroupdto) | E | B; 404 |
-| PUT | `/api/employee-availability/{groupId:int}/slots` | Zapis własnych dni dyspozycyjności | int groupId; [`FromBody`] [UpdateEmployeeAvailabilityRequest](#dto-webapi-contracts-employeeavailability-updateemployeeavailabilityrequest) request | [`FromBody`] [UpdateEmployeeAvailabilityRequest](#dto-webapi-contracts-employeeavailability-updateemployeeavailabilityrequest) request | 200 — [EmployeeAvailabilityGroupDto](#dto-webapi-contracts-employeeavailability-employeeavailabilitygroupdto) | E | B; 400,404,409 |
+| GET | `/api/employee-availability` | Lista dostępna bieżącemu kontu | brak | brak | 200 — `IEnumerable`&lt;EmployeeAvailabilityGroupDto&gt; | E | B |
+| GET | `/api/employee-availability/{groupId:int}` | Szczegóły | int groupId | brak | 200 — EmployeeAvailabilityGroupDto | E | B; 404 |
+| PUT | `/api/employee-availability/{groupId:int}/slots` | Zapis własnych dni dyspozycyjności | int groupId; [`FromBody`] UpdateEmployeeAvailabilityRequest request | [`FromBody`] UpdateEmployeeAvailabilityRequest request | 200 — EmployeeAvailabilityGroupDto | E | B; 400,404,409 |
 
 #### EmployeeProfileController
 
-[Źródło](../../GF3.WebApi/Controllers/EmployeeProfileController.cs).
-
 | Metoda | Pełna ścieżka | Cel | Parametry path/query/body | Request DTO lub brak | Odpowiedź/status i response DTO | Dostęp/rola | Najważniejsze błędy |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| GET | `/api/employee-profile/me` | Stan własnego konta | brak | brak | 200 — [EmployeeProfileDto](#dto-webapi-contracts-employeeprofile-employeeprofiledto) | E | B |
-| PUT | `/api/employee-profile/me` | Aktualizacja własnego profilu | [`FromBody`] [UpdateEmployeeProfileRequest](#dto-webapi-contracts-employeeprofile-updateemployeeprofilerequest) request | [`FromBody`] [UpdateEmployeeProfileRequest](#dto-webapi-contracts-employeeprofile-updateemployeeprofilerequest) request | 200 — [EmployeeProfileDto](#dto-webapi-contracts-employeeprofile-employeeprofiledto) | E | B; 400 |
-| POST | `/api/employee-profile/me/password/send-code` | Wysłanie kodu odzyskiwania hasła | brak | brak | 200 — [PasswordResetCodeDispatchDto](#dto-webapi-contracts-employeeprofile-passwordresetcodedispatchdto) | E | B; 400 |
-| POST | `/api/employee-profile/me/password/confirm` | Potwierdzenie resetu hasła | [`FromBody`] [CompletePasswordResetRequest](#dto-webapi-contracts-employeeprofile-completepasswordresetrequest) request | [`FromBody`] [CompletePasswordResetRequest](#dto-webapi-contracts-employeeprofile-completepasswordresetrequest) request | 204 — brak body | E | B; 400 |
+| GET | `/api/employee-profile/me` | Stan własnego konta | brak | brak | 200 — EmployeeProfileDto | E | B |
+| PUT | `/api/employee-profile/me` | Aktualizacja własnego profilu | [`FromBody`] UpdateEmployeeProfileRequest request | [`FromBody`] UpdateEmployeeProfileRequest request | 200 — EmployeeProfileDto | E | B; 400 |
+| POST | `/api/employee-profile/me/password/send-code` | Wysłanie kodu odzyskiwania hasła | brak | brak | 200 — PasswordResetCodeDispatchDto | E | B; 400 |
+| POST | `/api/employee-profile/me/password/confirm` | Potwierdzenie resetu hasła | [`FromBody`] CompletePasswordResetRequest request | [`FromBody`] CompletePasswordResetRequest request | 204 — brak body | E | B; 400 |
 
 #### EmployeePushController
-
-[Źródło](../../GF3.WebApi/Controllers/EmployeePushController.cs).
 
 | Metoda | Pełna ścieżka | Cel | Parametry path/query/body | Request DTO lub brak | Odpowiedź/status i response DTO | Dostęp/rola | Najważniejsze błędy |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | GET | `/api/employee-push/config` | Dostępność push i publiczny klucz VAPID | brak | brak | 200 — { enabled: bool, publicKey: string? } | E | B |
-| PUT | `/api/employee-push/subscriptions` | Zapis subskrypcji push | [SubscriptionRequest](#dto-webapi-controllers-subscriptionrequest) request | [SubscriptionRequest](#dto-webapi-controllers-subscriptionrequest) request | 204 — brak body | E | B; 400,403,409,503 |
-| DELETE | `/api/employee-push/subscriptions` | Usunięcie | [DeleteRequest](#dto-webapi-controllers-deleterequest) request | [DeleteRequest](#dto-webapi-controllers-deleterequest) request | 204 — brak body | E | B; 400,403 |
+| PUT | `/api/employee-push/subscriptions` | Zapis subskrypcji push | SubscriptionRequest request | SubscriptionRequest request | 204 — brak body | E | B; 400,403,409,503 |
+| DELETE | `/api/employee-push/subscriptions` | Usunięcie | DeleteRequest request | DeleteRequest request | 204 — brak body | E | B; 400,403 |
 
 #### EmployeeSchedulesController
 
-[Źródło](../../GF3.WebApi/Controllers/EmployeeSchedulesController.cs).
-
 | Metoda | Pełna ścieżka | Cel | Parametry path/query/body | Request DTO lub brak | Odpowiedź/status i response DTO | Dostęp/rola | Najważniejsze błędy |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| GET | `/api/employee-schedules` | Lista dostępna bieżącemu kontu | brak | brak | 200 — `IEnumerable`&lt;[EmployeeScheduleDto](#dto-webapi-contracts-employeeschedules-employeescheduledto)&gt; | E | B |
+| GET | `/api/employee-schedules` | Lista dostępna bieżącemu kontu | brak | brak | 200 — `IEnumerable`&lt;EmployeeScheduleDto&gt; | E | B |
 
 #### EmployeesController
 
-[Źródło](../../GF3.WebApi/Controllers/EmployeesController.cs).
-
 | Metoda | Pełna ścieżka | Cel | Parametry path/query/body | Request DTO lub brak | Odpowiedź/status i response DTO | Dostęp/rola | Najważniejsze błędy |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| GET | `/api/Employees` | Lista | brak | brak | 200 — `IEnumerable`&lt;[EmployeeDto](#dto-webapi-contracts-employees-employeedto)&gt; | M | B; 500 |
-| GET | `/api/Employees/{id:int}` | Szczegóły | int id | brak | 200 — [EmployeeDto](#dto-webapi-contracts-employees-employeedto) | M | B; 404,500 |
-| POST | `/api/Employees` | Utworzenie | [`FromBody`] [CreateEmployeeRequest](#dto-webapi-contracts-employees-createemployeerequest) request | [`FromBody`] [CreateEmployeeRequest](#dto-webapi-contracts-employees-createemployeerequest) request | 201 — [EmployeeDto](#dto-webapi-contracts-employees-employeedto) | M | B; 400,500 |
-| PUT | `/api/Employees/{id:int}` | Aktualizacja | int id; [`FromBody`] [UpdateEmployeeRequest](#dto-webapi-contracts-employees-updateemployeerequest) request | [`FromBody`] [UpdateEmployeeRequest](#dto-webapi-contracts-employees-updateemployeerequest) request | 204 — brak body | M | B; 400,404,409,500 |
+| GET | `/api/Employees` | Lista | brak | brak | 200 — `IEnumerable`&lt;EmployeeDto&gt; | M | B; 500 |
+| GET | `/api/Employees/{id:int}` | Szczegóły | int id | brak | 200 — EmployeeDto | M | B; 404,500 |
+| POST | `/api/Employees` | Utworzenie | [`FromBody`] CreateEmployeeRequest request | [`FromBody`] CreateEmployeeRequest request | 201 — EmployeeDto | M | B; 400,500 |
+| PUT | `/api/Employees/{id:int}` | Aktualizacja | int id; [`FromBody`] UpdateEmployeeRequest request | [`FromBody`] UpdateEmployeeRequest request | 204 — brak body | M | B; 400,404,409,500 |
 | DELETE | `/api/Employees/{id:int}` | Usunięcie | int id | brak | 204 — brak body | M | B; 400,404,409,500 |
 | POST | `/api/Employees/{id:int}/kick` | Unieważnienie sesji pracownika | int id | brak | 204 — brak body | M | B; 404,500 |
 
 #### EmployeeShiftSwapsController
 
-[Źródło](../../GF3.WebApi/Controllers/EmployeeShiftSwapsController.cs).
-
 | Metoda | Pełna ścieżka | Cel | Parametry path/query/body | Request DTO lub brak | Odpowiedź/status i response DTO | Dostęp/rola | Najważniejsze błędy |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| GET | `/api/employee-shift-swaps/employees` | Pracownicy dostępni dla wymian | brak | brak | 200 — `IEnumerable`&lt;[ShiftSwapEmployeeDto](#dto-webapi-contracts-shiftswaps-shiftswapemployeedto)&gt; | E | B |
-| GET | `/api/employee-shift-swaps` | Lista dostępna bieżącemu kontu | brak | brak | 200 — `IEnumerable`&lt;[ShiftSwapDto](#dto-webapi-contracts-shiftswaps-shiftswapdto)&gt; | E | B |
-| POST | `/api/employee-shift-swaps` | Utworzenie | [`FromBody`] [CreateEmployeeShiftSwapRequest](#dto-webapi-contracts-shiftswaps-createemployeeshiftswaprequest) request | [`FromBody`] [CreateEmployeeShiftSwapRequest](#dto-webapi-contracts-shiftswaps-createemployeeshiftswaprequest) request | 201 — [ShiftSwapDto](#dto-webapi-contracts-shiftswaps-shiftswapdto) | E | B; 400 |
-| POST | `/api/employee-shift-swaps/{id:int}/accept` | Akceptacja | int id | brak | 200 — [ShiftSwapDto](#dto-webapi-contracts-shiftswaps-shiftswapdto) | E | B; 400,404 |
-| POST | `/api/employee-shift-swaps/{id:int}/cancel` | Anulowanie | int id | brak | 200 — [ShiftSwapDto](#dto-webapi-contracts-shiftswaps-shiftswapdto) | E | B; 400,404 |
-| GET | `/api/employee-shift-swaps/return-candidates` | Kandydaci wzajemnej wymiany | [`FromQuery`] int sourceScheduleId; [`FromQuery`] int sourceSlotId; [`FromQuery`] string fromTime; [`FromQuery`] string toTime; [`FromQuery`] int targetEmployeeId; [`FromQuery`] int page = 1; [`FromQuery`] int pageSize = 30 | brak | 200 — [ShiftSwapReturnCandidatePageDto](#dto-webapi-contracts-shiftswaps-shiftswapreturncandidatepagedto) | E | B; 400 |
-| POST | `/api/employee-shift-swaps/preview` | Podgląd oferty bez zapisu | [`FromBody`] [CreateEmployeeShiftSwapRequest](#dto-webapi-contracts-shiftswaps-createemployeeshiftswaprequest) request | [`FromBody`] [CreateEmployeeShiftSwapRequest](#dto-webapi-contracts-shiftswaps-createemployeeshiftswaprequest) request | 200 — [ShiftSwapOfferPreviewDto](#dto-webapi-contracts-shiftswaps-shiftswapofferpreviewdto) | E | B |
+| GET | `/api/employee-shift-swaps/employees` | Pracownicy dostępni dla wymian | brak | brak | 200 — `IEnumerable`&lt;ShiftSwapEmployeeDto&gt; | E | B |
+| GET | `/api/employee-shift-swaps` | Lista dostępna bieżącemu kontu | brak | brak | 200 — `IEnumerable`&lt;ShiftSwapDto&gt; | E | B |
+| POST | `/api/employee-shift-swaps` | Utworzenie | [`FromBody`] CreateEmployeeShiftSwapRequest request | [`FromBody`] CreateEmployeeShiftSwapRequest request | 201 — ShiftSwapDto | E | B; 400 |
+| POST | `/api/employee-shift-swaps/{id:int}/accept` | Akceptacja | int id | brak | 200 — ShiftSwapDto | E | B; 400,404 |
+| POST | `/api/employee-shift-swaps/{id:int}/cancel` | Anulowanie | int id | brak | 200 — ShiftSwapDto | E | B; 400,404 |
+| GET | `/api/employee-shift-swaps/return-candidates` | Kandydaci wzajemnej wymiany | [`FromQuery`] int sourceScheduleId; [`FromQuery`] int sourceSlotId; [`FromQuery`] string fromTime; [`FromQuery`] string toTime; [`FromQuery`] int targetEmployeeId; [`FromQuery`] int page = 1; [`FromQuery`] int pageSize = 30 | brak | 200 — ShiftSwapReturnCandidatePageDto | E | B; 400 |
+| POST | `/api/employee-shift-swaps/preview` | Podgląd oferty bez zapisu | [`FromBody`] CreateEmployeeShiftSwapRequest request | [`FromBody`] CreateEmployeeShiftSwapRequest request | 200 — ShiftSwapOfferPreviewDto | E | B |
 
 #### EmployeeUiStateController
 
-[Źródło](../../GF3.WebApi/Controllers/EmployeeUiStateController.cs).
-
 | Metoda | Pełna ścieżka | Cel | Parametry path/query/body | Request DTO lub brak | Odpowiedź/status i response DTO | Dostęp/rola | Najważniejsze błędy |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| GET | `/api/employee-ui-state` | Stan własnego konta | brak | brak | 200 — [EmployeeUiStateDto](#dto-webapi-controllers-employeeuistatedto) | E | B |
+| GET | `/api/employee-ui-state` | Stan własnego konta | brak | brak | 200 — EmployeeUiStateDto | E | B |
 | PUT | `/api/employee-ui-state/swap-pins/{swapId:int}` | Przypięcie widocznej wymiany | int swapId | brak | 204 — brak body | E | B; 404 |
 | DELETE | `/api/employee-ui-state/swap-pins/{swapId:int}` | Odpięcie wymiany | int swapId | brak | 204 — brak body | E | B |
-| PUT | `/api/employee-ui-state/schedule-columns/{scheduleId:int}` | Zapis kolejności kolumn grafiku pracownika | int scheduleId; [`FromBody`] [SaveEmployeeScheduleColumnOrderRequest](#dto-webapi-controllers-saveemployeeschedulecolumnorderrequest) request | [`FromBody`] [SaveEmployeeScheduleColumnOrderRequest](#dto-webapi-controllers-saveemployeeschedulecolumnorderrequest) request | 204 — brak body | E | B; 400,404 |
-| POST | `/api/employee-ui-state/notifications/read` | Zapis odczytu wskazanych powiadomień | [`FromBody`] [MarkEmployeeNotificationsReadRequest](#dto-webapi-controllers-markemployeenotificationsreadrequest) request | [`FromBody`] [MarkEmployeeNotificationsReadRequest](#dto-webapi-controllers-markemployeenotificationsreadrequest) request | 204 — brak body | E | B; 400 |
+| PUT | `/api/employee-ui-state/schedule-columns/{scheduleId:int}` | Zapis kolejności kolumn grafiku pracownika | int scheduleId; [`FromBody`] SaveEmployeeScheduleColumnOrderRequest request | [`FromBody`] SaveEmployeeScheduleColumnOrderRequest request | 204 — brak body | E | B; 400,404 |
+| POST | `/api/employee-ui-state/notifications/read` | Zapis odczytu wskazanych powiadomień | [`FromBody`] MarkEmployeeNotificationsReadRequest request | [`FromBody`] MarkEmployeeNotificationsReadRequest request | 204 — brak body | E | B; 400 |
 
 #### ExportsController
-
-[Źródło](../../GF3.WebApi/Controllers/ExportsController.cs).
 
 | Metoda | Pełna ścieżka | Cel | Parametry path/query/body | Request DTO lub brak | Odpowiedź/status i response DTO | Dostęp/rola | Najważniejsze błędy |
 | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -294,18 +253,14 @@ Podstawa bezpieczeństwa: [auth](../../GF3.WebApi/Auth/), [middleware](../../GF3
 
 #### GraphVersionsController
 
-[Źródło](../../GF3.WebApi/Controllers/GraphVersionsController.cs).
-
 | Metoda | Pełna ścieżka | Cel | Parametry path/query/body | Request DTO lub brak | Odpowiedź/status i response DTO | Dostęp/rola | Najważniejsze błędy |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| GET | `/api/containers/{containerId:int}/graphs/{graphId:int}/versions` | Drzewo wersji grafiku | int containerId; int graphId | brak | 200 — [GraphVersionTreeDto](#dto-webapi-controllers-graphversiontreedto) | M | B; 404 |
-| POST | `/api/containers/{containerId:int}/graphs/{graphId:int}/versions` | Commit grafiku (200 bez nowej wersji, 201 dla nowej) | int containerId; int graphId | brak | 200,201 — [GraphVersionTreeDto](#dto-webapi-controllers-graphversiontreedto) | M | B; 404,409 |
-| POST | `/api/containers/{containerId:int}/graphs/{graphId:int}/versions/{versionId:int}/checkout` | Przywrócenie wersji grafiku | int containerId; int graphId; int versionId | brak | 200 — [GraphVersionTreeDto](#dto-webapi-controllers-graphversiontreedto) | M | B; 404,409 |
+| GET | `/api/containers/{containerId:int}/graphs/{graphId:int}/versions` | Drzewo wersji grafiku | int containerId; int graphId | brak | 200 — GraphVersionTreeDto | M | B; 404 |
+| POST | `/api/containers/{containerId:int}/graphs/{graphId:int}/versions` | Commit grafiku (200 bez nowej wersji, 201 dla nowej) | int containerId; int graphId | brak | 200,201 — GraphVersionTreeDto | M | B; 404,409 |
+| POST | `/api/containers/{containerId:int}/graphs/{graphId:int}/versions/{versionId:int}/checkout` | Przywrócenie wersji grafiku | int containerId; int graphId; int versionId | brak | 200 — GraphVersionTreeDto | M | B; 404,409 |
 | DELETE | `/api/containers/{containerId:int}/graphs/{graphId:int}/versions/{versionId:int}` | Usunięcie | int containerId; int graphId; int versionId | brak | 204 — brak body | M | B; 404,409 |
 
 #### HealthController
-
-[Źródło](../../GF3.WebApi/Controllers/HealthController.cs).
 
 | Metoda | Pełna ścieżka | Cel | Parametry path/query/body | Request DTO lub brak | Odpowiedź/status i response DTO | Dostęp/rola | Najważniejsze błędy |
 | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -313,147 +268,121 @@ Podstawa bezpieczeństwa: [auth](../../GF3.WebApi/Auth/), [middleware](../../GF3
 
 #### ManagerGraphFillColorBindsController
 
-[Źródło](../../GF3.WebApi/Controllers/ManagerGraphFillColorBindsController.cs).
-
 | Metoda | Pełna ścieżka | Cel | Parametry path/query/body | Request DTO lub brak | Odpowiedź/status i response DTO | Dostęp/rola | Najważniejsze błędy |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| GET | `/api/manager-graph-fill-color-binds` | Stan własnego konta | brak | brak | 200 — `IReadOnlyList`&lt;[ManagerGraphFillColorBindDto](#dto-webapi-controllers-managergraphfillcolorbinddto)&gt; | M | B |
-| PUT | `/api/manager-graph-fill-color-binds` | Zapis skrótu koloru | [`FromBody`] [SaveManagerGraphFillColorBindRequest](#dto-webapi-controllers-savemanagergraphfillcolorbindrequest) request | [`FromBody`] [SaveManagerGraphFillColorBindRequest](#dto-webapi-controllers-savemanagergraphfillcolorbindrequest) request | 200 — [ManagerGraphFillColorBindDto](#dto-webapi-controllers-managergraphfillcolorbinddto) | M | B; 400 |
+| GET | `/api/manager-graph-fill-color-binds` | Stan własnego konta | brak | brak | 200 — `IReadOnlyList`&lt;ManagerGraphFillColorBindDto&gt; | M | B |
+| PUT | `/api/manager-graph-fill-color-binds` | Zapis skrótu koloru | [`FromBody`] SaveManagerGraphFillColorBindRequest request | [`FromBody`] SaveManagerGraphFillColorBindRequest request | 200 — ManagerGraphFillColorBindDto | M | B; 400 |
 | DELETE | `/api/manager-graph-fill-color-binds/{id:int}` | Usunięcie | int id | brak | 204 — brak body | M | B |
 
 #### ManagerGraphTextColorBindsController
 
-[Źródło](../../GF3.WebApi/Controllers/ManagerGraphTextColorBindsController.cs).
-
 | Metoda | Pełna ścieżka | Cel | Parametry path/query/body | Request DTO lub brak | Odpowiedź/status i response DTO | Dostęp/rola | Najważniejsze błędy |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| GET | `/api/manager-graph-text-color-binds` | Stan własnego konta | brak | brak | 200 — `IReadOnlyList`&lt;[ManagerGraphTextColorBindDto](#dto-webapi-controllers-managergraphtextcolorbinddto)&gt; | M | B |
-| PUT | `/api/manager-graph-text-color-binds` | Zapis skrótu koloru | [`FromBody`] [SaveManagerGraphTextColorBindRequest](#dto-webapi-controllers-savemanagergraphtextcolorbindrequest) request | [`FromBody`] [SaveManagerGraphTextColorBindRequest](#dto-webapi-controllers-savemanagergraphtextcolorbindrequest) request | 200 — [ManagerGraphTextColorBindDto](#dto-webapi-controllers-managergraphtextcolorbinddto) | M | B; 400 |
+| GET | `/api/manager-graph-text-color-binds` | Stan własnego konta | brak | brak | 200 — `IReadOnlyList`&lt;ManagerGraphTextColorBindDto&gt; | M | B |
+| PUT | `/api/manager-graph-text-color-binds` | Zapis skrótu koloru | [`FromBody`] SaveManagerGraphTextColorBindRequest request | [`FromBody`] SaveManagerGraphTextColorBindRequest request | 200 — ManagerGraphTextColorBindDto | M | B; 400 |
 | DELETE | `/api/manager-graph-text-color-binds/{id:int}` | Usunięcie | int id | brak | 204 — brak body | M | B |
 
 #### ManagerNotepadController
 
-[Źródło](../../GF3.WebApi/Controllers/ManagerNotepadController.cs).
-
 | Metoda | Pełna ścieżka | Cel | Parametry path/query/body | Request DTO lub brak | Odpowiedź/status i response DTO | Dostęp/rola | Najważniejsze błędy |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| GET | `/api/manager-notepad` | Stan własnego konta | brak | brak | 200 — [ManagerNotepadDto](#dto-webapi-controllers-managernotepaddto) | M | B |
-| POST | `/api/manager-notepad/notes` | Utworzenie notatki | [`FromBody`] [SaveManagerNoteRequest](#dto-webapi-controllers-savemanagernoterequest) request | [`FromBody`] [SaveManagerNoteRequest](#dto-webapi-controllers-savemanagernoterequest) request | 201 — [ManagerNoteDto](#dto-webapi-controllers-managernotedto) | M | B; 400 |
-| PUT | `/api/manager-notepad/notes/{noteId:int}` | Zapis notatki | int noteId; [`FromBody`] [SaveManagerNoteRequest](#dto-webapi-controllers-savemanagernoterequest) request | [`FromBody`] [SaveManagerNoteRequest](#dto-webapi-controllers-savemanagernoterequest) request | 200 — [ManagerNoteDto](#dto-webapi-controllers-managernotedto) | M | B; 400,404 |
+| GET | `/api/manager-notepad` | Stan własnego konta | brak | brak | 200 — ManagerNotepadDto | M | B |
+| POST | `/api/manager-notepad/notes` | Utworzenie notatki | [`FromBody`] SaveManagerNoteRequest request | [`FromBody`] SaveManagerNoteRequest request | 201 — ManagerNoteDto | M | B; 400 |
+| PUT | `/api/manager-notepad/notes/{noteId:int}` | Zapis notatki | int noteId; [`FromBody`] SaveManagerNoteRequest request | [`FromBody`] SaveManagerNoteRequest request | 200 — ManagerNoteDto | M | B; 400,404 |
 | DELETE | `/api/manager-notepad/notes/{noteId:int}` | Usunięcie notatki | int noteId | brak | 204 — brak body | M | B |
-| PUT | `/api/manager-notepad/state` | Zapis układu notatnika | [`FromBody`] [SaveManagerNotepadStateRequest](#dto-webapi-controllers-savemanagernotepadstaterequest) request | [`FromBody`] [SaveManagerNotepadStateRequest](#dto-webapi-controllers-savemanagernotepadstaterequest) request | 204 — brak body | M | B |
+| PUT | `/api/manager-notepad/state` | Zapis układu notatnika | [`FromBody`] SaveManagerNotepadStateRequest request | [`FromBody`] SaveManagerNotepadStateRequest request | 204 — brak body | M | B |
 
 #### ManagerProfileController
 
-[Źródło](../../GF3.WebApi/Controllers/ManagerProfileController.cs).
-
 | Metoda | Pełna ścieżka | Cel | Parametry path/query/body | Request DTO lub brak | Odpowiedź/status i response DTO | Dostęp/rola | Najważniejsze błędy |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| GET | `/api/manager-profile/me` | Stan własnego konta | brak | brak | 200 — [ManagerProfileDto](#dto-webapi-contracts-managerprofile-managerprofiledto) | M | B |
-| PUT | `/api/manager-profile/me` | Aktualizacja własnego profilu | [`FromBody`] [UpdateManagerProfileRequest](#dto-webapi-contracts-managerprofile-updatemanagerprofilerequest) request | [`FromBody`] [UpdateManagerProfileRequest](#dto-webapi-contracts-managerprofile-updatemanagerprofilerequest) request | 200 — [ManagerProfileUpdateResponseDto](#dto-webapi-contracts-managerprofile-managerprofileupdateresponsedto) | M | B; 400 |
-| GET | `/api/manager-profile/managers` | Lista kont menedżerów | brak | brak | 200 — `IReadOnlyList`&lt;[ManagerProfileDto](#dto-webapi-contracts-managerprofile-managerprofiledto)&gt; | M | B |
-| POST | `/api/manager-profile/managers` | Utworzenie konta menedżera | [`FromBody`] [CreateManagerRequest](#dto-webapi-contracts-managerprofile-createmanagerrequest) request | [`FromBody`] [CreateManagerRequest](#dto-webapi-contracts-managerprofile-createmanagerrequest) request | 200 — [ManagerProfileDto](#dto-webapi-contracts-managerprofile-managerprofiledto) | M | B; 400 |
+| GET | `/api/manager-profile/me` | Stan własnego konta | brak | brak | 200 — ManagerProfileDto | M | B |
+| PUT | `/api/manager-profile/me` | Aktualizacja własnego profilu | [`FromBody`] UpdateManagerProfileRequest request | [`FromBody`] UpdateManagerProfileRequest request | 200 — ManagerProfileUpdateResponseDto | M | B; 400 |
+| GET | `/api/manager-profile/managers` | Lista kont menedżerów | brak | brak | 200 — `IReadOnlyList`&lt;ManagerProfileDto&gt; | M | B |
+| POST | `/api/manager-profile/managers` | Utworzenie konta menedżera | [`FromBody`] CreateManagerRequest request | [`FromBody`] CreateManagerRequest request | 200 — ManagerProfileDto | M | B; 400 |
 | DELETE | `/api/manager-profile/managers/{managerId:int}` | Usunięcie dozwolonego konta menedżera | int managerId | brak | 204 — brak body | M | B; 400 |
 
 #### RegulationsController
 
-[Źródło](../../GF3.WebApi/Controllers/RegulationsController.cs).
-
 | Metoda | Pełna ścieżka | Cel | Parametry path/query/body | Request DTO lub brak | Odpowiedź/status i response DTO | Dostęp/rola | Najważniejsze błędy |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| GET | `/api/regulations/pending` | Dokumenty lub komunikaty oczekujące dla konta | brak | brak | 200 — `IReadOnlyList`&lt;[RegulationDocumentDto](#dto-businesslogiclayer-contracts-regulations-regulationdocumentdto)&gt; | A | B |
-| GET | `/api/regulations/history/me` | Własna historia akceptacji regulaminów | brak | brak | 200 — `IReadOnlyList`&lt;[RegulationAcceptanceDto](#dto-businesslogiclayer-contracts-regulations-regulationacceptancedto)&gt; | A | B |
-| GET | `/api/regulations/history/employees/{employeeId:int}` | Historia akceptacji wskazanego pracownika | int employeeId | brak | 200 — `IReadOnlyList`&lt;[RegulationAcceptanceDto](#dto-businesslogiclayer-contracts-regulations-regulationacceptancedto)&gt; | M | B |
+| GET | `/api/regulations/pending` | Dokumenty lub komunikaty oczekujące dla konta | brak | brak | 200 — `IReadOnlyList`&lt;RegulationDocumentDto&gt; | A | B |
+| GET | `/api/regulations/history/me` | Własna historia akceptacji regulaminów | brak | brak | 200 — `IReadOnlyList`&lt;RegulationAcceptanceDto&gt; | A | B |
+| GET | `/api/regulations/history/employees/{employeeId:int}` | Historia akceptacji wskazanego pracownika | int employeeId | brak | 200 — `IReadOnlyList`&lt;RegulationAcceptanceDto&gt; | M | B |
 | GET | `/api/regulations/{documentId:int}/pdf` | Pobranie PDF regulaminu | int documentId | brak | 200 — plik application/pdf | A | B |
-| POST | `/api/regulations/{documentId:int}/accept` | Akceptacja | int documentId | brak | 200 — [RegulationAcceptanceDto](#dto-businesslogiclayer-contracts-regulations-regulationacceptancedto) | A | B |
+| POST | `/api/regulations/{documentId:int}/accept` | Akceptacja | int documentId | brak | 200 — RegulationAcceptanceDto | A | B |
 
 #### EmployeeShiftCorrectionsController
 
-[Źródło](../../GF3.WebApi/Controllers/ShiftCorrectionsController.cs).
-
 | Metoda | Pełna ścieżka | Cel | Parametry path/query/body | Request DTO lub brak | Odpowiedź/status i response DTO | Dostęp/rola | Najważniejsze błędy |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| GET | `/api/employee-shift-corrections` | Własne wnioski korekt | brak | brak | 200 — `IReadOnlyList`&lt;[ShiftCorrectionRequestDto](#dto-webapi-contracts-shiftcorrections-shiftcorrectionrequestdto)&gt; | E | B |
-| POST | `/api/employee-shift-corrections` | Utworzenie | [`FromBody`] [CreateShiftCorrectionRequest](#dto-webapi-contracts-shiftcorrections-createshiftcorrectionrequest) request | [`FromBody`] [CreateShiftCorrectionRequest](#dto-webapi-contracts-shiftcorrections-createshiftcorrectionrequest) request | 201 — [ShiftCorrectionRequestDto](#dto-webapi-contracts-shiftcorrections-shiftcorrectionrequestdto) | E | B; 400 |
+| GET | `/api/employee-shift-corrections` | Własne wnioski korekt | brak | brak | 200 — `IReadOnlyList`&lt;ShiftCorrectionRequestDto&gt; | E | B |
+| POST | `/api/employee-shift-corrections` | Utworzenie | [`FromBody`] CreateShiftCorrectionRequest request | [`FromBody`] CreateShiftCorrectionRequest request | 201 — ShiftCorrectionRequestDto | E | B; 400 |
 
 #### ManagerShiftCorrectionSettingsController
 
-[Źródło](../../GF3.WebApi/Controllers/ShiftCorrectionsController.cs).
-
 | Metoda | Pełna ścieżka | Cel | Parametry path/query/body | Request DTO lub brak | Odpowiedź/status i response DTO | Dostęp/rola | Najważniejsze błędy |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| GET | `/api/manager-shift-correction-settings` | Stan własnego konta | brak | brak | 200 — [ShiftCorrectionSettingDto](#dto-webapi-contracts-shiftcorrections-shiftcorrectionsettingdto) | M | B |
-| PUT | `/api/manager-shift-correction-settings` | Zapis ustawienia korekt | [`FromBody`] [SaveShiftCorrectionSettingRequest](#dto-webapi-contracts-shiftcorrections-saveshiftcorrectionsettingrequest) request | [`FromBody`] [SaveShiftCorrectionSettingRequest](#dto-webapi-contracts-shiftcorrections-saveshiftcorrectionsettingrequest) request | 200 — [ShiftCorrectionSettingDto](#dto-webapi-contracts-shiftcorrections-shiftcorrectionsettingdto) | M | B |
+| GET | `/api/manager-shift-correction-settings` | Stan własnego konta | brak | brak | 200 — ShiftCorrectionSettingDto | M | B |
+| PUT | `/api/manager-shift-correction-settings` | Zapis ustawienia korekt | [`FromBody`] SaveShiftCorrectionSettingRequest request | [`FromBody`] SaveShiftCorrectionSettingRequest request | 200 — ShiftCorrectionSettingDto | M | B |
 
 #### ManagerShiftCorrectionsController
 
-[Źródło](../../GF3.WebApi/Controllers/ShiftCorrectionsController.cs).
-
 | Metoda | Pełna ścieżka | Cel | Parametry path/query/body | Request DTO lub brak | Odpowiedź/status i response DTO | Dostęp/rola | Najważniejsze błędy |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| GET | `/api/containers/{containerId:int}/graphs/{graphId:int}/shift-corrections` | Wnioski korekt danego grafiku | int containerId; int graphId | brak | 200 — `IReadOnlyList`&lt;[ShiftCorrectionRequestDto](#dto-webapi-contracts-shiftcorrections-shiftcorrectionrequestdto)&gt; | M | B; 404 |
-| POST | `/api/containers/{containerId:int}/graphs/{graphId:int}/shift-corrections/{id:int}/approve` | Zatwierdzenie korekty | int containerId; int graphId; int id; [`FromBody`] [ApproveShiftCorrectionRequest](#dto-webapi-contracts-shiftcorrections-approveshiftcorrectionrequest) request | [`FromBody`] [ApproveShiftCorrectionRequest](#dto-webapi-contracts-shiftcorrections-approveshiftcorrectionrequest) request | 200 — [ShiftCorrectionRequestDto](#dto-webapi-contracts-shiftcorrections-shiftcorrectionrequestdto) | M | B; 400,404,409 |
-| POST | `/api/containers/{containerId:int}/graphs/{graphId:int}/shift-corrections/{id:int}/reject` | Odrzucenie korekty | int containerId; int graphId; int id | brak | 200 — [ShiftCorrectionRequestDto](#dto-webapi-contracts-shiftcorrections-shiftcorrectionrequestdto) | M | B; 404,409 |
+| GET | `/api/containers/{containerId:int}/graphs/{graphId:int}/shift-corrections` | Wnioski korekt danego grafiku | int containerId; int graphId | brak | 200 — `IReadOnlyList`&lt;ShiftCorrectionRequestDto&gt; | M | B; 404 |
+| POST | `/api/containers/{containerId:int}/graphs/{graphId:int}/shift-corrections/{id:int}/approve` | Zatwierdzenie korekty | int containerId; int graphId; int id; [`FromBody`] ApproveShiftCorrectionRequest request | [`FromBody`] ApproveShiftCorrectionRequest request | 200 — ShiftCorrectionRequestDto | M | B; 400,404,409 |
+| POST | `/api/containers/{containerId:int}/graphs/{graphId:int}/shift-corrections/{id:int}/reject` | Odrzucenie korekty | int containerId; int graphId; int id | brak | 200 — ShiftCorrectionRequestDto | M | B; 404,409 |
 
 #### ShiftSwapLogsController
 
-[Źródło](../../GF3.WebApi/Controllers/ShiftSwapLogsController.cs).
-
 | Metoda | Pełna ścieżka | Cel | Parametry path/query/body | Request DTO lub brak | Odpowiedź/status i response DTO | Dostęp/rola | Najważniejsze błędy |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| GET | `/api/containers/{containerId:int}/graphs/{graphId:int}/shift-swaps/highlight-setting` | Kolor wyróżnienia zaakceptowanej wymiany | int containerId; int graphId | brak | 200 — [ShiftSwapHighlightSettingDto](#dto-webapi-contracts-shiftswaps-shiftswaphighlightsettingdto) | M | B; 404 |
-| PUT | `/api/containers/{containerId:int}/graphs/{graphId:int}/shift-swaps/highlight-setting` | Zapis koloru wyróżnienia wymian | int containerId; int graphId; [`FromBody`] [SaveShiftSwapHighlightSettingRequest](#dto-webapi-contracts-shiftswaps-saveshiftswaphighlightsettingrequest) request | [`FromBody`] [SaveShiftSwapHighlightSettingRequest](#dto-webapi-contracts-shiftswaps-saveshiftswaphighlightsettingrequest) request | 200 — [ShiftSwapHighlightSettingDto](#dto-webapi-contracts-shiftswaps-shiftswaphighlightsettingdto) | M | B; 404 |
-| GET | `/api/containers/{containerId:int}/shift-swaps` | Wymiany wszystkich grafików kontenera | int containerId | brak | 200 — `IEnumerable`&lt;[ShiftSwapDto](#dto-webapi-contracts-shiftswaps-shiftswapdto)&gt; | M | B; 404 |
-| POST | `/api/containers/{containerId:int}/shift-swaps/{id:int}/cancel` | Anulowanie oferty kontenera | int containerId; int id | brak | 200 — [ShiftSwapDto](#dto-webapi-contracts-shiftswaps-shiftswapdto) | M | B; 400,404,409 |
+| GET | `/api/containers/{containerId:int}/graphs/{graphId:int}/shift-swaps/highlight-setting` | Kolor wyróżnienia zaakceptowanej wymiany | int containerId; int graphId | brak | 200 — ShiftSwapHighlightSettingDto | M | B; 404 |
+| PUT | `/api/containers/{containerId:int}/graphs/{graphId:int}/shift-swaps/highlight-setting` | Zapis koloru wyróżnienia wymian | int containerId; int graphId; [`FromBody`] SaveShiftSwapHighlightSettingRequest request | [`FromBody`] SaveShiftSwapHighlightSettingRequest request | 200 — ShiftSwapHighlightSettingDto | M | B; 404 |
+| GET | `/api/containers/{containerId:int}/shift-swaps` | Wymiany wszystkich grafików kontenera | int containerId | brak | 200 — `IEnumerable`&lt;ShiftSwapDto&gt; | M | B; 404 |
+| POST | `/api/containers/{containerId:int}/shift-swaps/{id:int}/cancel` | Anulowanie oferty kontenera | int containerId; int id | brak | 200 — ShiftSwapDto | M | B; 400,404,409 |
 | DELETE | `/api/containers/{containerId:int}/shift-swaps/{id:int}` | Usunięcie zapisu wymiany (bez cofnięcia grafiku) | int containerId; int id | brak | 204 — brak body | M | B; 404,409 |
-| POST | `/api/containers/{containerId:int}/graphs/{graphId:int}/shift-swaps/manual` | Oferta z kolumny ręcznej | int containerId; int graphId; [`FromBody`] [CreateManagerShiftSwapRequest](#dto-webapi-contracts-shiftswaps-createmanagershiftswaprequest) request | [`FromBody`] [CreateManagerShiftSwapRequest](#dto-webapi-contracts-shiftswaps-createmanagershiftswaprequest) request | 201 — [ShiftSwapDto](#dto-webapi-contracts-shiftswaps-shiftswapdto) | M | B; 400,404,409 |
-| GET | `/api/containers/{containerId:int}/graphs/{graphId:int}/shift-swaps` | Log wymian grafiku | int containerId; int graphId | brak | 200 — `IEnumerable`&lt;[ShiftSwapDto](#dto-webapi-contracts-shiftswaps-shiftswapdto)&gt; | M | B; 404 |
+| POST | `/api/containers/{containerId:int}/graphs/{graphId:int}/shift-swaps/manual` | Oferta z kolumny ręcznej | int containerId; int graphId; [`FromBody`] CreateManagerShiftSwapRequest request | [`FromBody`] CreateManagerShiftSwapRequest request | 201 — ShiftSwapDto | M | B; 400,404,409 |
+| GET | `/api/containers/{containerId:int}/graphs/{graphId:int}/shift-swaps` | Log wymian grafiku | int containerId; int graphId | brak | 200 — `IEnumerable`&lt;ShiftSwapDto&gt; | M | B; 404 |
 | POST | `/api/containers/{containerId:int}/graphs/{graphId:int}/shift-swaps/{id:int}/cancel` | Anulowanie oferty ręcznej | int containerId; int graphId; int id | brak | 204 — brak body | M | B; 400,404,409 |
 
 #### ShopsController
 
-[Źródło](../../GF3.WebApi/Controllers/ShopsController.cs).
-
 | Metoda | Pełna ścieżka | Cel | Parametry path/query/body | Request DTO lub brak | Odpowiedź/status i response DTO | Dostęp/rola | Najważniejsze błędy |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| GET | `/api/Shops` | Lista | brak | brak | 200 — `IEnumerable`&lt;[ShopDto](#dto-webapi-contracts-shops-shopdto)&gt; | M | B; 500 |
-| GET | `/api/Shops/{id:int}` | Szczegóły | int id | brak | 200 — [ShopDto](#dto-webapi-contracts-shops-shopdto) | M | B; 404,500 |
-| POST | `/api/Shops` | Utworzenie | [`FromBody`] [CreateShopRequest](#dto-webapi-contracts-shops-createshoprequest) request | [`FromBody`] [CreateShopRequest](#dto-webapi-contracts-shops-createshoprequest) request | 201 — [ShopDto](#dto-webapi-contracts-shops-shopdto) | M | B; 400,500 |
-| PUT | `/api/Shops/{id:int}` | Aktualizacja | int id; [`FromBody`] [UpdateShopRequest](#dto-webapi-contracts-shops-updateshoprequest) request | [`FromBody`] [UpdateShopRequest](#dto-webapi-contracts-shops-updateshoprequest) request | 204 — brak body | M | B; 400,404,409,500 |
+| GET | `/api/Shops` | Lista | brak | brak | 200 — `IEnumerable`&lt;ShopDto&gt; | M | B; 500 |
+| GET | `/api/Shops/{id:int}` | Szczegóły | int id | brak | 200 — ShopDto | M | B; 404,500 |
+| POST | `/api/Shops` | Utworzenie | [`FromBody`] CreateShopRequest request | [`FromBody`] CreateShopRequest request | 201 — ShopDto | M | B; 400,500 |
+| PUT | `/api/Shops/{id:int}` | Aktualizacja | int id; [`FromBody`] UpdateShopRequest request | [`FromBody`] UpdateShopRequest request | 204 — brak body | M | B; 400,404,409,500 |
 | DELETE | `/api/Shops/{id:int}` | Usunięcie | int id | brak | 204 — brak body | M | B; 400,404,409,500 |
 
 #### SystemNewsController
 
-[Źródło](../../GF3.WebApi/Controllers/SystemNewsController.cs).
-
 | Metoda | Pełna ścieżka | Cel | Parametry path/query/body | Request DTO lub brak | Odpowiedź/status i response DTO | Dostęp/rola | Najważniejsze błędy |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| GET | `/api/system-news` | Lista dostępna bieżącemu kontu | brak | brak | 200 — `IReadOnlyList`&lt;[SystemNewsDto](#dto-webapi-controllers-systemnewsdto)&gt; | M/E | B |
+| GET | `/api/system-news` | Lista dostępna bieżącemu kontu | brak | brak | 200 — `IReadOnlyList`&lt;SystemNewsDto&gt; | M/E | B |
 | POST | `/api/system-news/{messageId:int}/read` | Zapis odczytu aktualności | int messageId | brak | 204 — brak body | M/E | B; 404 |
 | POST | `/api/system-news/read-all` | Zapis odczytu wszystkich widocznych aktualności | brak | brak | 204 — brak body | M/E | B |
 
 #### AdminSystemNewsController
 
-[Źródło](../../GF3.WebApi/Controllers/SystemNewsController.cs).
-
 | Metoda | Pełna ścieżka | Cel | Parametry path/query/body | Request DTO lub brak | Odpowiedź/status i response DTO | Dostęp/rola | Najważniejsze błędy |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| GET | `/api/admin/system-news` | Lista | brak | brak | 200 — `IReadOnlyList`&lt;[SystemNewsDto](#dto-webapi-controllers-systemnewsdto)&gt; | M | B |
-| POST | `/api/admin/system-news` | Utworzenie | [SaveSystemNewsRequest](#dto-webapi-controllers-savesystemnewsrequest) request | [SaveSystemNewsRequest](#dto-webapi-controllers-savesystemnewsrequest) request | 201 — [SystemNewsDto](#dto-webapi-controllers-systemnewsdto) | M | B; 400 |
-| PUT | `/api/admin/system-news/{messageId:int}` | Aktualizacja | int messageId; [SaveSystemNewsRequest](#dto-webapi-controllers-savesystemnewsrequest) request | [SaveSystemNewsRequest](#dto-webapi-controllers-savesystemnewsrequest) request | 200 — [SystemNewsDto](#dto-webapi-controllers-systemnewsdto) | M | B; 400,404 |
+| GET | `/api/admin/system-news` | Lista | brak | brak | 200 — `IReadOnlyList`&lt;SystemNewsDto&gt; | M | B |
+| POST | `/api/admin/system-news` | Utworzenie | SaveSystemNewsRequest request | SaveSystemNewsRequest request | 201 — SystemNewsDto | M | B; 400 |
+| PUT | `/api/admin/system-news/{messageId:int}` | Aktualizacja | int messageId; SaveSystemNewsRequest request | SaveSystemNewsRequest request | 200 — SystemNewsDto | M | B; 400,404 |
 | DELETE | `/api/admin/system-news/{messageId:int}` | Usunięcie | int messageId | brak | 204 — brak body | M | B |
 
 #### WorkflowLogsController
 
-[Źródło](../../GF3.WebApi/Controllers/WorkflowLogsController.cs).
-
 | Metoda | Pełna ścieżka | Cel | Parametry path/query/body | Request DTO lub brak | Odpowiedź/status i response DTO | Dostęp/rola | Najważniejsze błędy |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| GET | `/api/workflow-logs` | Ostatnia aktywność workflow | brak | brak | 200 — `IEnumerable`&lt;[WorkflowLogDto](#dto-webapi-contracts-workflowlogs-workflowlogdto)&gt; | S | B |
-| GET | `/api/workflow-logs/settings` | Ustawienia rejestrowania workflow | brak | brak | 200 — [WorkflowLogSettingsDto](#dto-webapi-contracts-workflowlogs-workflowlogsettingsdto) | S | B |
-| PUT | `/api/workflow-logs/settings` | Zapis ustawień logowania aktywności | [UpdateWorkflowLogSettingsRequest](#dto-webapi-contracts-workflowlogs-updateworkflowlogsettingsrequest) request | [UpdateWorkflowLogSettingsRequest](#dto-webapi-contracts-workflowlogs-updateworkflowlogsettingsrequest) request | 200 — [WorkflowLogSettingsDto](#dto-webapi-contracts-workflowlogs-workflowlogsettingsdto) | S | B; 400 |
+| GET | `/api/workflow-logs` | Ostatnia aktywność workflow | brak | brak | 200 — `IEnumerable`&lt;WorkflowLogDto&gt; | S | B |
+| GET | `/api/workflow-logs/settings` | Ustawienia rejestrowania workflow | brak | brak | 200 — WorkflowLogSettingsDto | S | B |
+| PUT | `/api/workflow-logs/settings` | Zapis ustawień logowania aktywności | UpdateWorkflowLogSettingsRequest request | UpdateWorkflowLogSettingsRequest request | 200 — WorkflowLogSettingsDto | S | B; 400 |
 | DELETE | `/api/workflow-logs/{id:int}` | Usunięcie | int id | brak | 204 — brak body | S | B; 404 |
-| POST | `/api/workflow-logs/bulk-delete` | Usunięcie logów według zakresu lub wszystkich | [DeleteWorkflowLogsRequest](#dto-webapi-contracts-workflowlogs-deleteworkflowlogsrequest) request | [DeleteWorkflowLogsRequest](#dto-webapi-contracts-workflowlogs-deleteworkflowlogsrequest) request | 200 — [WorkflowLogDeleteResultDto](#dto-webapi-contracts-workflowlogs-workflowlogdeleteresultdto) | S | B; 400 |
+| POST | `/api/workflow-logs/bulk-delete` | Usunięcie logów według zakresu lub wszystkich | DeleteWorkflowLogsRequest request | DeleteWorkflowLogsRequest request | 200 — WorkflowLogDeleteResultDto | S | B; 400 |
 
 Eksporty: XLSX `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`; SQL `text/plain; charset=utf-8`, nazwa `GF3_Graph_<ID>_<CZAS>.sql` / `GF3_Container_<ID>_<CZAS>.sql`. `includeStyles` i `includeEmployees` domyślnie true. Pobieranie regulaminu: `application/pdf`, nazwa pliku z dokumentu. Push PUT ma limit żądania 4096 bajtów, wymaga dozwolonego endpointu i poprawnych kluczy; wyłączona konfiguracja daje 503, konflikt 409. GET config zwraca enabled i publicKey (null, gdy wyłączony).
 
@@ -461,14 +390,9 @@ Projekcja administracji: Metadata zawiera pola AdminDbMetadataDto (sqliteVersion
 
 ### 2.2 Schematy modeli HTTP
 
-Każdy model podano raz; odsyłacze z katalogu akcji prowadzą do schematu. Kolumny pokazują deklarację typu i walidację/default ze źródła. Kolekcje to tablice JSON; słowniki to obiekty JSON. Atrybuty formatu, zakresu i długości oraz walidacja usług sumują się. Klasa dziedzicząca zawiera również pola bazowe. `string.Empty`/`[]` to wartości domyślne, nie przykładowe dane klienta.
-
-
-<a id="dto-businesslogiclayer-contracts-database-admindbfileentrydto"></a>
+Każdy model podano raz; jego pełna nazwa identyfikuje schemat używany w katalogu akcji. Kolumny pokazują deklarację typu i walidację/default ze źródła. Kolekcje to tablice JSON; słowniki to obiekty JSON. Atrybuty formatu, zakresu i długości oraz walidacja usług sumują się. Klasa dziedzicząca zawiera również pola bazowe. `string.Empty`/`[]` to wartości domyślne, nie przykładowe dane klienta.
 
 #### BusinessLogicLayer.Contracts.Database.AdminDbFileEntryDto
-
-[Definicja](../../BusinessLogicLayer/Contracts/Database/AdminDbDtos.cs).
 
 | Właściwość | Typ C# / nullable | Walidacja / default |
 | --- | --- | --- |
@@ -479,11 +403,7 @@ Każdy model podano raz; odsyłacze z katalogu akcji prowadzą do schematu. Kolu
 | `LastModifiedUtc` | `DateTime`? | brak atrybutu/default w deklaracji |
 | `IsActive` | bool | brak atrybutu/default w deklaracji |
 
-<a id="dto-businesslogiclayer-contracts-database-admindbimportresultdto"></a>
-
 #### BusinessLogicLayer.Contracts.Database.AdminDbImportResultDto
-
-[Definicja](../../BusinessLogicLayer/Contracts/Database/AdminDbDtos.cs).
 
 | Właściwość | Typ C# / nullable | Walidacja / default |
 | --- | --- | --- |
@@ -494,11 +414,7 @@ Każdy model podano raz; odsyłacze z katalogu akcji prowadzą do schematu. Kolu
 | `FailedStatementIndex` | int? | brak atrybutu/default w deklaracji |
 | `FailureReason` | string? | brak atrybutu/default w deklaracji |
 
-<a id="dto-businesslogiclayer-contracts-database-admindbmetadatadto"></a>
-
 #### BusinessLogicLayer.Contracts.Database.AdminDbMetadataDto
-
-[Definicja](../../BusinessLogicLayer/Contracts/Database/AdminDbDtos.cs).
 
 | Właściwość | Typ C# / nullable | Walidacja / default |
 | --- | --- | --- |
@@ -508,14 +424,10 @@ Każdy model podano raz; odsyłacze z katalogu akcji prowadzą do schematu. Kolu
 | `LastModifiedUtc` | `DateTime`? | brak atrybutu/default w deklaracji |
 | `UserVersion` | int | brak atrybutu/default w deklaracji |
 | `Tables` | `IReadOnlyList`&lt;string&gt; | ` default=Array.Empty<string>()` |
-| `Objects` | `IReadOnlyList`&lt;[AdminDbObjectDto](#dto-businesslogiclayer-contracts-database-admindbobjectdto)&gt; | ` default=Array.Empty<AdminDbObjectDto>()` |
-| `StorageWorkspace` | [AdminDbStorageWorkspaceDto](#dto-businesslogiclayer-contracts-database-admindbstorageworkspacedto) | ` default=new()` |
-
-<a id="dto-businesslogiclayer-contracts-database-admindbobjectdto"></a>
+| `Objects` | `IReadOnlyList`&lt;AdminDbObjectDto&gt; | ` default=Array.Empty<AdminDbObjectDto>()` |
+| `StorageWorkspace` | AdminDbStorageWorkspaceDto | ` default=new()` |
 
 #### BusinessLogicLayer.Contracts.Database.AdminDbObjectDto
-
-[Definicja](../../BusinessLogicLayer/Contracts/Database/AdminDbDtos.cs).
 
 | Właściwość | Typ C# / nullable | Walidacja / default |
 | --- | --- | --- |
@@ -523,11 +435,7 @@ Każdy model podano raz; odsyłacze z katalogu akcji prowadzą do schematu. Kolu
 | `Name` | string | ` default=string.Empty` |
 | `Sql` | string | ` default=string.Empty` |
 
-<a id="dto-businesslogiclayer-contracts-database-admindbqueryresultdto"></a>
-
 #### BusinessLogicLayer.Contracts.Database.AdminDbQueryResultDto
-
-[Definicja](../../BusinessLogicLayer/Contracts/Database/AdminDbDtos.cs).
 
 | Właściwość | Typ C# / nullable | Walidacja / default |
 | --- | --- | --- |
@@ -535,11 +443,7 @@ Każdy model podano raz; odsyłacze z katalogu akcji prowadzą do schematu. Kolu
 | `Rows` | `IReadOnlyList`&lt;`IReadOnlyList`&lt;object?&gt;&gt; | ` default=Array.Empty<IReadOnlyList<object?>>()` |
 | `RowCount` | int | brak atrybutu/default w deklaracji |
 
-<a id="dto-businesslogiclayer-contracts-database-admindbstorageworkspacedto"></a>
-
 #### BusinessLogicLayer.Contracts.Database.AdminDbStorageWorkspaceDto
-
-[Definicja](../../BusinessLogicLayer/Contracts/Database/AdminDbDtos.cs).
 
 | Właściwość | Typ C# / nullable | Walidacja / default |
 | --- | --- | --- |
@@ -547,15 +451,11 @@ Każdy model podano raz; odsyłacze z katalogu akcji prowadzą do schematu. Kolu
 | `AutomaticBackupDirectoryPath` | string | ` default=string.Empty` |
 | `ManualCopyDirectoryPath` | string | ` default=string.Empty` |
 | `AutomaticBackupRetentionLimit` | int | brak atrybutu/default w deklaracji |
-| `AvailableDatabases` | `IReadOnlyList`&lt;[AdminDbFileEntryDto](#dto-businesslogiclayer-contracts-database-admindbfileentrydto)&gt; | ` default=Array.Empty<AdminDbFileEntryDto>()` |
-| `AutomaticBackups` | `IReadOnlyList`&lt;[AdminDbFileEntryDto](#dto-businesslogiclayer-contracts-database-admindbfileentrydto)&gt; | ` default=Array.Empty<AdminDbFileEntryDto>()` |
-| `ManualCopies` | `IReadOnlyList`&lt;[AdminDbFileEntryDto](#dto-businesslogiclayer-contracts-database-admindbfileentrydto)&gt; | ` default=Array.Empty<AdminDbFileEntryDto>()` |
-
-<a id="dto-businesslogiclayer-contracts-enums-availabilitykind"></a>
+| `AvailableDatabases` | `IReadOnlyList`&lt;AdminDbFileEntryDto&gt; | ` default=Array.Empty<AdminDbFileEntryDto>()` |
+| `AutomaticBackups` | `IReadOnlyList`&lt;AdminDbFileEntryDto&gt; | ` default=Array.Empty<AdminDbFileEntryDto>()` |
+| `ManualCopies` | `IReadOnlyList`&lt;AdminDbFileEntryDto&gt; | ` default=Array.Empty<AdminDbFileEntryDto>()` |
 
 #### BusinessLogicLayer.Contracts.Enums.AvailabilityKind
-
-[Definicja](../../BusinessLogicLayer/Contracts/Enums/AvailabilityKind.cs).
 
 | Właściwość | Typ C# / nullable | Walidacja / default |
 | --- | --- | --- |
@@ -563,22 +463,14 @@ Każdy model podano raz; odsyłacze z katalogu akcji prowadzą do schematu. Kolu
 | `NONE` | enum / JSON 1 | niedostępny cały dzień |
 | `INT` | enum / JSON 2 | dostępny w podanym przedziale |
 
-<a id="dto-businesslogiclayer-contracts-enums-slotstatus"></a>
-
 #### BusinessLogicLayer.Contracts.Enums.SlotStatus
-
-[Definicja](../../BusinessLogicLayer/Contracts/Enums/SlotStatus.cs).
 
 | Właściwość | Typ C# / nullable | Walidacja / default |
 | --- | --- | --- |
 | `UNFURNISHED` | enum / JSON 0 | slot bez przypisanego pracownika |
 | `ASSIGNED` | enum / JSON 1 | slot przypisany pracownikowi |
 
-<a id="dto-businesslogiclayer-contracts-managers-managerprofiledto"></a>
-
 #### BusinessLogicLayer.Contracts.Managers.ManagerProfileDto
-
-[Definicja](../../BusinessLogicLayer/Contracts/Managers/ManagerProfileDto.cs).
 
 | Właściwość | Typ C# / nullable | Walidacja / default |
 | --- | --- | --- |
@@ -592,11 +484,7 @@ Każdy model podano raz; odsyłacze z katalogu akcji prowadzą do schematu. Kolu
 | `CreatedAtUtc` | `DateTimeOffset` | brak atrybutu/default w deklaracji |
 | `PasswordUpdatedAtUtc` | `DateTimeOffset` | brak atrybutu/default w deklaracji |
 
-<a id="dto-businesslogiclayer-contracts-regulations-regulationacceptancedto"></a>
-
 #### BusinessLogicLayer.Contracts.Regulations.RegulationAcceptanceDto
-
-[Definicja](../../BusinessLogicLayer/Contracts/Regulations/RegulationDtos.cs).
 
 | Właściwość | Typ C# / nullable | Walidacja / default |
 | --- | --- | --- |
@@ -611,11 +499,7 @@ Każdy model podano raz; odsyłacze z katalogu akcji prowadzą do schematu. Kolu
 | `DisplayName` | string | ` default=string.Empty` |
 | `AcceptedAtUtc` | `DateTimeOffset` | brak atrybutu/default w deklaracji |
 
-<a id="dto-businesslogiclayer-contracts-regulations-regulationdocumentdto"></a>
-
 #### BusinessLogicLayer.Contracts.Regulations.RegulationDocumentDto
-
-[Definicja](../../BusinessLogicLayer/Contracts/Regulations/RegulationDtos.cs).
 
 | Właściwość | Typ C# / nullable | Walidacja / default |
 | --- | --- | --- |
@@ -632,41 +516,25 @@ Każdy model podano raz; odsyłacze z katalogu akcji prowadzą do schematu. Kolu
 | `UpdatedAtUtc` | `DateTimeOffset` | brak atrybutu/default w deklaracji |
 | `AcceptanceCount` | int | brak atrybutu/default w deklaracji |
 
-<a id="dto-webapi-contracts-admindb-admindbselectdatabaserequest"></a>
-
 #### WebApi.Contracts.AdminDb.AdminDbSelectDatabaseRequest
-
-[Definicja](../../GF3.WebApi/Contracts/AdminDb/AdminDbRequests.cs).
 
 | Właściwość | Typ C# / nullable | Walidacja / default |
 | --- | --- | --- |
 | `DatabasePath` | string | ` default=string.Empty` |
 
-<a id="dto-webapi-contracts-admindb-admindbsqlrequest"></a>
-
 #### WebApi.Contracts.AdminDb.AdminDbSqlRequest
-
-[Definicja](../../GF3.WebApi/Contracts/AdminDb/AdminDbRequests.cs).
 
 | Właściwość | Typ C# / nullable | Walidacja / default |
 | --- | --- | --- |
 | `Sql` | string | ` default=string.Empty` |
 
-<a id="dto-webapi-contracts-auth-changemanagerworkspacemoderequest"></a>
-
 #### WebApi.Contracts.Auth.ChangeManagerWorkspaceModeRequest
-
-[Definicja](../../GF3.WebApi/Contracts/Auth/ChangeManagerWorkspaceModeRequest.cs).
 
 | Właściwość | Typ C# / nullable | Walidacja / default |
 | --- | --- | --- |
 | `Mode` | string | ` default=string.Empty` |
 
-<a id="dto-webapi-contracts-auth-completeforgotpasswordresetrequest"></a>
-
 #### WebApi.Contracts.Auth.CompleteForgotPasswordResetRequest
-
-[Definicja](../../GF3.WebApi/Contracts/Auth/CompleteForgotPasswordResetRequest.cs).
 
 | Właściwość | Typ C# / nullable | Walidacja / default |
 | --- | --- | --- |
@@ -674,55 +542,35 @@ Każdy model podano raz; odsyłacze z katalogu akcji prowadzą do schematu. Kolu
 | `Code` | string | `[Required] [MaxLength(6)] default=string.Empty` |
 | `NewPassword` | string | `[Required] [MaxLength(200)] default=string.Empty` |
 
-<a id="dto-webapi-contracts-auth-loginrequest"></a>
-
 #### WebApi.Contracts.Auth.LoginRequest
-
-[Definicja](../../GF3.WebApi/Contracts/Auth/LoginRequest.cs).
 
 | Właściwość | Typ C# / nullable | Walidacja / default |
 | --- | --- | --- |
 | `Username` | string | `[Required] [MaxLength(100)] default=string.Empty` |
 | `Password` | string | `[Required] [MaxLength(200)] default=string.Empty` |
 
-<a id="dto-webapi-contracts-auth-loginresponsedto"></a>
-
 #### WebApi.Contracts.Auth.LoginResponseDto
-
-[Definicja](../../GF3.WebApi/Contracts/Auth/LoginResponseDto.cs).
 
 | Właściwość | Typ C# / nullable | Walidacja / default |
 | --- | --- | --- |
 | `AccessToken` | string | ` default=string.Empty` |
 | `ExpiresAtUtc` | `DateTimeOffset` | brak atrybutu/default w deklaracji |
-| `Session` | [SessionDto](#dto-webapi-contracts-auth-sessiondto) | ` default=new()` |
-
-<a id="dto-webapi-contracts-auth-passwordresetcodedispatchdto"></a>
+| `Session` | SessionDto | ` default=new()` |
 
 #### WebApi.Contracts.Auth.PasswordResetCodeDispatchDto
-
-[Definicja](../../GF3.WebApi/Contracts/Auth/PasswordResetCodeDispatchDto.cs).
 
 | Właściwość | Typ C# / nullable | Walidacja / default |
 | --- | --- | --- |
 | `DeliveryHint` | string | ` default=string.Empty` |
 | `ExpiresAtUtc` | `DateTimeOffset` | brak atrybutu/default w deklaracji |
 
-<a id="dto-webapi-contracts-auth-sendpasswordresetcoderequest"></a>
-
 #### WebApi.Contracts.Auth.SendPasswordResetCodeRequest
-
-[Definicja](../../GF3.WebApi/Contracts/Auth/SendPasswordResetCodeRequest.cs).
 
 | Właściwość | Typ C# / nullable | Walidacja / default |
 | --- | --- | --- |
 | `Username` | string | `[Required] [MaxLength(100)] default=string.Empty` |
 
-<a id="dto-webapi-contracts-auth-sessiondto"></a>
-
 #### WebApi.Contracts.Auth.SessionDto
-
-[Definicja](../../GF3.WebApi/Contracts/Auth/SessionDto.cs).
 
 | Właściwość | Typ C# / nullable | Walidacja / default |
 | --- | --- | --- |
@@ -734,11 +582,7 @@ Każdy model podano raz; odsyłacze z katalogu akcji prowadzą do schematu. Kolu
 | `ManagerId` | int? | brak atrybutu/default w deklaracji |
 | `EmployeeId` | int? | brak atrybutu/default w deklaracji |
 
-<a id="dto-webapi-contracts-availabilitybinds-availabilitybinddto"></a>
-
 #### WebApi.Contracts.AvailabilityBinds.AvailabilityBindDto
-
-[Definicja](../../GF3.WebApi/Contracts/AvailabilityBinds/AvailabilityBindDto.cs).
 
 | Właściwość | Typ C# / nullable | Walidacja / default |
 | --- | --- | --- |
@@ -747,35 +591,23 @@ Każdy model podano raz; odsyłacze z katalogu akcji prowadzą do schematu. Kolu
 | `Value` | string | ` default=string.Empty` |
 | `IsActive` | bool | brak atrybutu/default w deklaracji |
 
-<a id="dto-webapi-contracts-availabilitybinds-createavailabilitybindrequest"></a>
-
 #### WebApi.Contracts.AvailabilityBinds.CreateAvailabilityBindRequest
-
-[Definicja](../../GF3.WebApi/Contracts/AvailabilityBinds/CreateAvailabilityBindRequest.cs).
 
 | Właściwość | Typ C# / nullable | Walidacja / default |
 | --- | --- | --- |
 | `Key` | string | `[Required(AllowEmptyStrings = false)] default=string.Empty` |
 | `Value` | string | `[Required(AllowEmptyStrings = false)] default=string.Empty` |
 | `IsActive` | bool | ` default=true` |
-
-<a id="dto-webapi-contracts-availabilitybinds-updateavailabilitybindrequest"></a>
 
 #### WebApi.Contracts.AvailabilityBinds.UpdateAvailabilityBindRequest
 
-[Definicja](../../GF3.WebApi/Contracts/AvailabilityBinds/UpdateAvailabilityBindRequest.cs).
-
 | Właściwość | Typ C# / nullable | Walidacja / default |
 | --- | --- | --- |
 | `Key` | string | `[Required(AllowEmptyStrings = false)] default=string.Empty` |
 | `Value` | string | `[Required(AllowEmptyStrings = false)] default=string.Empty` |
 | `IsActive` | bool | ` default=true` |
 
-<a id="dto-webapi-contracts-availabilitygroups-availabilitygroupdto"></a>
-
 #### WebApi.Contracts.AvailabilityGroups.AvailabilityGroupDto
-
-[Definicja](../../GF3.WebApi/Contracts/AvailabilityGroups/AvailabilityGroupDto.cs).
 
 | Właściwość | Typ C# / nullable | Walidacja / default |
 | --- | --- | --- |
@@ -787,11 +619,7 @@ Każdy model podano raz; odsyłacze z katalogu akcji prowadzą do schematu. Kolu
 | `VisibleFromUtc` | `DateTimeOffset`? | brak atrybutu/default w deklaracji |
 | `VisibleToUtc` | `DateTimeOffset`? | brak atrybutu/default w deklaracji |
 
-<a id="dto-webapi-contracts-availabilitygroups-availabilitygroupitemdto"></a>
-
 #### WebApi.Contracts.AvailabilityGroups.AvailabilityGroupItemDto
-
-[Definicja](../../GF3.WebApi/Contracts/AvailabilityGroups/AvailabilityGroupItemDto.cs).
 
 | Właściwość | Typ C# / nullable | Walidacja / default |
 | --- | --- | --- |
@@ -800,15 +628,11 @@ Każdy model podano raz; odsyłacze z katalogu akcji prowadzą do schematu. Kolu
 | `DisplayOrder` | int | brak atrybutu/default w deklaracji |
 | `DayId` | int | brak atrybutu/default w deklaracji |
 | `DayOfMonth` | int | brak atrybutu/default w deklaracji |
-| `Kind` | [AvailabilityKind](#dto-businesslogiclayer-contracts-enums-availabilitykind) | brak atrybutu/default w deklaracji |
+| `Kind` | AvailabilityKind | brak atrybutu/default w deklaracji |
 | `IntervalStr` | string? | brak atrybutu/default w deklaracji |
-
-<a id="dto-webapi-contracts-availabilitygroups-createavailabilitygrouprequest"></a>
 
 #### WebApi.Contracts.AvailabilityGroups.CreateAvailabilityGroupRequest
 
-[Definicja](../../GF3.WebApi/Contracts/AvailabilityGroups/CreateAvailabilityGroupRequest.cs).
-
 | Właściwość | Typ C# / nullable | Walidacja / default |
 | --- | --- | --- |
 | `Name` | string | `[Required] [MaxLength(200)] default=string.Empty` |
@@ -817,13 +641,9 @@ Każdy model podano raz; odsyłacze z katalogu akcji prowadzą do schematu. Kolu
 | `PublicationStatus` | string? | ` default="private"` |
 | `VisibleFromUtc` | `DateTimeOffset`? | brak atrybutu/default w deklaracji |
 | `VisibleToUtc` | `DateTimeOffset`? | brak atrybutu/default w deklaracji |
-
-<a id="dto-webapi-contracts-availabilitygroups-updateavailabilitygrouprequest"></a>
 
 #### WebApi.Contracts.AvailabilityGroups.UpdateAvailabilityGroupRequest
 
-[Definicja](../../GF3.WebApi/Contracts/AvailabilityGroups/UpdateAvailabilityGroupRequest.cs).
-
 | Właściwość | Typ C# / nullable | Walidacja / default |
 | --- | --- | --- |
 | `Name` | string | `[Required] [MaxLength(200)] default=string.Empty` |
@@ -833,11 +653,7 @@ Każdy model podano raz; odsyłacze z katalogu akcji prowadzą do schematu. Kolu
 | `VisibleFromUtc` | `DateTimeOffset`? | brak atrybutu/default w deklaracji |
 | `VisibleToUtc` | `DateTimeOffset`? | brak atrybutu/default w deklaracji |
 
-<a id="dto-webapi-contracts-availabilitygroups-members-availabilitygroupmemberdto"></a>
-
 #### WebApi.Contracts.AvailabilityGroups.Members.AvailabilityGroupMemberDto
-
-[Definicja](../../GF3.WebApi/Contracts/AvailabilityGroups/Members/AvailabilityGroupMemberDto.cs).
 
 | Właściwość | Typ C# / nullable | Walidacja / default |
 | --- | --- | --- |
@@ -847,73 +663,49 @@ Każdy model podano raz; odsyłacze z katalogu akcji prowadzą do schematu. Kolu
 | `DisplayOrder` | int | brak atrybutu/default w deklaracji |
 | `EmployeeLastModifiedAtUtc` | `DateTimeOffset`? | brak atrybutu/default w deklaracji |
 
-<a id="dto-webapi-contracts-availabilitygroups-members-createavailabilitygroupmemberrequest"></a>
-
 #### WebApi.Contracts.AvailabilityGroups.Members.CreateAvailabilityGroupMemberRequest
-
-[Definicja](../../GF3.WebApi/Contracts/AvailabilityGroups/Members/CreateAvailabilityGroupMemberRequest.cs).
 
 | Właściwość | Typ C# / nullable | Walidacja / default |
 | --- | --- | --- |
 | `EmployeeId` | int | `[Range(1, int.MaxValue)]` |
 | `DisplayOrder` | int | `[Range(0, int.MaxValue)]` |
-
-<a id="dto-webapi-contracts-availabilitygroups-members-updateavailabilitygroupmemberrequest"></a>
 
 #### WebApi.Contracts.AvailabilityGroups.Members.UpdateAvailabilityGroupMemberRequest
 
-[Definicja](../../GF3.WebApi/Contracts/AvailabilityGroups/Members/UpdateAvailabilityGroupMemberRequest.cs).
-
 | Właściwość | Typ C# / nullable | Walidacja / default |
 | --- | --- | --- |
 | `EmployeeId` | int | `[Range(1, int.MaxValue)]` |
 | `DisplayOrder` | int | `[Range(0, int.MaxValue)]` |
 
-<a id="dto-webapi-contracts-availabilitygroups-slots-availabilityslotdto"></a>
-
 #### WebApi.Contracts.AvailabilityGroups.Slots.AvailabilitySlotDto
-
-[Definicja](../../GF3.WebApi/Contracts/AvailabilityGroups/Slots/AvailabilitySlotDto.cs).
 
 | Właściwość | Typ C# / nullable | Walidacja / default |
 | --- | --- | --- |
 | `Id` | int | brak atrybutu/default w deklaracji |
 | `AvailabilityGroupMemberId` | int | brak atrybutu/default w deklaracji |
 | `DayOfMonth` | int | brak atrybutu/default w deklaracji |
-| `Kind` | [AvailabilityKind](#dto-businesslogiclayer-contracts-enums-availabilitykind) | brak atrybutu/default w deklaracji |
+| `Kind` | AvailabilityKind | brak atrybutu/default w deklaracji |
 | `IntervalStr` | string? | brak atrybutu/default w deklaracji |
-
-<a id="dto-webapi-contracts-availabilitygroups-slots-createavailabilityslotrequest"></a>
 
 #### WebApi.Contracts.AvailabilityGroups.Slots.CreateAvailabilitySlotRequest
 
-[Definicja](../../GF3.WebApi/Contracts/AvailabilityGroups/Slots/CreateAvailabilitySlotRequest.cs).
-
 | Właściwość | Typ C# / nullable | Walidacja / default |
 | --- | --- | --- |
 | `AvailabilityGroupMemberId` | int | `[Range(1, int.MaxValue)]` |
 | `DayOfMonth` | int | `[Range(1, 31)]` |
-| `Kind` | [AvailabilityKind](#dto-businesslogiclayer-contracts-enums-availabilitykind) | `[Required]` |
+| `Kind` | AvailabilityKind | `[Required]` |
 | `IntervalStr` | string? | `[StringLength(200)]` |
-
-<a id="dto-webapi-contracts-availabilitygroups-slots-updateavailabilityslotrequest"></a>
 
 #### WebApi.Contracts.AvailabilityGroups.Slots.UpdateAvailabilitySlotRequest
 
-[Definicja](../../GF3.WebApi/Contracts/AvailabilityGroups/Slots/UpdateAvailabilitySlotRequest.cs).
-
 | Właściwość | Typ C# / nullable | Walidacja / default |
 | --- | --- | --- |
 | `AvailabilityGroupMemberId` | int | `[Range(1, int.MaxValue)]` |
 | `DayOfMonth` | int | `[Range(1, 31)]` |
-| `Kind` | [AvailabilityKind](#dto-businesslogiclayer-contracts-enums-availabilitykind) | `[Required]` |
+| `Kind` | AvailabilityKind | `[Required]` |
 | `IntervalStr` | string? | `[StringLength(200)]` |
 
-<a id="dto-webapi-contracts-availabilitygroups-transfers-availabilitytransferhintdto"></a>
-
 #### WebApi.Contracts.AvailabilityGroups.Transfers.AvailabilityTransferHintDto
-
-[Definicja](../../GF3.WebApi/Contracts/AvailabilityGroups/Transfers/AvailabilityTransferDtos.cs).
 
 | Właściwość | Typ C# / nullable | Walidacja / default |
 | --- | --- | --- |
@@ -921,14 +713,10 @@ Każdy model podano raz; odsyłacze z katalogu akcji prowadzą do schematu. Kolu
 | `DayOfMonth` | int | brak atrybutu/default w deklaracji |
 | `TargetGroupId` | int | brak atrybutu/default w deklaracji |
 | `TargetGroupName` | string | ` default=string.Empty` |
-| `Kind` | [AvailabilityKind](#dto-businesslogiclayer-contracts-enums-availabilitykind) | brak atrybutu/default w deklaracji |
+| `Kind` | AvailabilityKind | brak atrybutu/default w deklaracji |
 | `IntervalStr` | string? | brak atrybutu/default w deklaracji |
 
-<a id="dto-webapi-contracts-availabilitygroups-transfers-availabilitytransferresultdto"></a>
-
 #### WebApi.Contracts.AvailabilityGroups.Transfers.AvailabilityTransferResultDto
-
-[Definicja](../../GF3.WebApi/Contracts/AvailabilityGroups/Transfers/AvailabilityTransferDtos.cs).
 
 | Właściwość | Typ C# / nullable | Walidacja / default |
 | --- | --- | --- |
@@ -939,24 +727,16 @@ Każdy model podano raz; odsyłacze z katalogu akcji prowadzą do schematu. Kolu
 | `EmployeeId` | int | brak atrybutu/default w deklaracji |
 | `DayOfMonths` | `List`&lt;int&gt; | ` default=[]` |
 
-<a id="dto-webapi-contracts-availabilitygroups-transfers-availabilitytransfersourcedaydto"></a>
-
 #### WebApi.Contracts.AvailabilityGroups.Transfers.AvailabilityTransferSourceDayDto
-
-[Definicja](../../GF3.WebApi/Contracts/AvailabilityGroups/Transfers/AvailabilityTransferDtos.cs).
 
 | Właściwość | Typ C# / nullable | Walidacja / default |
 | --- | --- | --- |
 | `DayOfMonth` | int | brak atrybutu/default w deklaracji |
-| `Kind` | [AvailabilityKind](#dto-businesslogiclayer-contracts-enums-availabilitykind) | brak atrybutu/default w deklaracji |
+| `Kind` | AvailabilityKind | brak atrybutu/default w deklaracji |
 | `IntervalStr` | string? | brak atrybutu/default w deklaracji |
 | `CanTransfer` | bool | brak atrybutu/default w deklaracji |
 
-<a id="dto-webapi-contracts-availabilitygroups-transfers-availabilitytransfersourcedto"></a>
-
 #### WebApi.Contracts.AvailabilityGroups.Transfers.AvailabilityTransferSourceDto
-
-[Definicja](../../GF3.WebApi/Contracts/AvailabilityGroups/Transfers/AvailabilityTransferDtos.cs).
 
 | Właściwość | Typ C# / nullable | Walidacja / default |
 | --- | --- | --- |
@@ -964,24 +744,16 @@ Każdy model podano raz; odsyłacze z katalogu akcji prowadzą do schematu. Kolu
 | `GroupName` | string | ` default=string.Empty` |
 | `MemberId` | int | brak atrybutu/default w deklaracji |
 | `EmployeeId` | int | brak atrybutu/default w deklaracji |
-| `Days` | `List`&lt;[AvailabilityTransferSourceDayDto](#dto-webapi-contracts-availabilitygroups-transfers-availabilitytransfersourcedaydto)&gt; | ` default=[]` |
-
-<a id="dto-webapi-contracts-availabilitygroups-transfers-transferavailabilitydaysrequest"></a>
+| `Days` | `List`&lt;AvailabilityTransferSourceDayDto&gt; | ` default=[]` |
 
 #### WebApi.Contracts.AvailabilityGroups.Transfers.TransferAvailabilityDaysRequest
-
-[Definicja](../../GF3.WebApi/Contracts/AvailabilityGroups/Transfers/AvailabilityTransferDtos.cs).
 
 | Właściwość | Typ C# / nullable | Walidacja / default |
 | --- | --- | --- |
 | `SourceGroupId` | int | brak atrybutu/default w deklaracji |
 | `DayOfMonths` | `List`&lt;int&gt; | ` default=[]` |
 
-<a id="dto-webapi-contracts-communications-communicationmessagedto"></a>
-
 #### WebApi.Contracts.Communications.CommunicationMessageDto
-
-[Definicja](../../GF3.WebApi/Contracts/Communications/CommunicationMessageDto.cs).
 
 | Właściwość | Typ C# / nullable | Walidacja / default |
 | --- | --- | --- |
@@ -995,11 +767,7 @@ Każdy model podano raz; odsyłacze z katalogu akcji prowadzą do schematu. Kolu
 | `CreatedByManagerName` | string | ` default=string.Empty` |
 | `IsActive` | bool | brak atrybutu/default w deklaracji |
 
-<a id="dto-webapi-contracts-communications-createcommunicationmessagerequest"></a>
-
 #### WebApi.Contracts.Communications.CreateCommunicationMessageRequest
-
-[Definicja](../../GF3.WebApi/Contracts/Communications/CreateCommunicationMessageRequest.cs).
 
 | Właściwość | Typ C# / nullable | Walidacja / default |
 | --- | --- | --- |
@@ -1007,13 +775,9 @@ Każdy model podano raz; odsyłacze z katalogu akcji prowadzą do schematu. Kolu
 | `Body` | string? | brak atrybutu/default w deklaracji |
 | `VisibleFromUtc` | `DateTimeOffset`? | brak atrybutu/default w deklaracji |
 | `DeadlineAtUtc` | `DateTimeOffset`? | brak atrybutu/default w deklaracji |
-
-<a id="dto-webapi-contracts-communications-updatecommunicationmessagerequest"></a>
 
 #### WebApi.Contracts.Communications.UpdateCommunicationMessageRequest
 
-[Definicja](../../GF3.WebApi/Contracts/Communications/UpdateCommunicationMessageRequest.cs).
-
 | Właściwość | Typ C# / nullable | Walidacja / default |
 | --- | --- | --- |
 | `Title` | string? | brak atrybutu/default w deklaracji |
@@ -1021,11 +785,7 @@ Każdy model podano raz; odsyłacze z katalogu akcji prowadzą do schematu. Kolu
 | `VisibleFromUtc` | `DateTimeOffset`? | brak atrybutu/default w deklaracji |
 | `DeadlineAtUtc` | `DateTimeOffset`? | brak atrybutu/default w deklaracji |
 
-<a id="dto-webapi-contracts-containers-containerdto"></a>
-
 #### WebApi.Contracts.Containers.ContainerDto
-
-[Definicja](../../GF3.WebApi/Contracts/Containers/ContainerDto.cs).
 
 | Właściwość | Typ C# / nullable | Walidacja / default |
 | --- | --- | --- |
@@ -1033,33 +793,21 @@ Każdy model podano raz; odsyłacze z katalogu akcji prowadzą do schematu. Kolu
 | `Name` | string | ` default=string.Empty` |
 | `Note` | string? | brak atrybutu/default w deklaracji |
 
-<a id="dto-webapi-contracts-containers-createcontainerrequest"></a>
-
 #### WebApi.Contracts.Containers.CreateContainerRequest
-
-[Definicja](../../GF3.WebApi/Contracts/Containers/CreateContainerRequest.cs).
 
 | Właściwość | Typ C# / nullable | Walidacja / default |
 | --- | --- | --- |
 | `Name` | string | `[Required] [MaxLength(200)] default=string.Empty` |
 | `Note` | string? | `[MaxLength(1000)]` |
-
-<a id="dto-webapi-contracts-containers-updatecontainerrequest"></a>
 
 #### WebApi.Contracts.Containers.UpdateContainerRequest
 
-[Definicja](../../GF3.WebApi/Contracts/Containers/UpdateContainerRequest.cs).
-
 | Właściwość | Typ C# / nullable | Walidacja / default |
 | --- | --- | --- |
 | `Name` | string | `[Required] [MaxLength(200)] default=string.Empty` |
 | `Note` | string? | `[MaxLength(1000)]` |
 
-<a id="dto-webapi-contracts-containers-graphs-containergraphdto"></a>
-
 #### WebApi.Contracts.Containers.Graphs.ContainerGraphDto
-
-[Definicja](../../GF3.WebApi/Contracts/Containers/Graphs/ContainerGraphDto.cs).
 
 | Właściwość | Typ C# / nullable | Walidacja / default |
 | --- | --- | --- |
@@ -1080,11 +828,7 @@ Każdy model podano raz; odsyłacze z katalogu akcji prowadzą do schematu. Kolu
 | `Note` | string? | brak atrybutu/default w deklaracji |
 | `AvailabilityGroupId` | int? | brak atrybutu/default w deklaracji |
 
-<a id="dto-webapi-contracts-containers-graphs-createcontainergraphrequest"></a>
-
 #### WebApi.Contracts.Containers.Graphs.CreateContainerGraphRequest
-
-[Definicja](../../GF3.WebApi/Contracts/Containers/Graphs/CreateContainerGraphRequest.cs).
 
 | Właściwość | Typ C# / nullable | Walidacja / default |
 | --- | --- | --- |
@@ -1103,11 +847,7 @@ Każdy model podano raz; odsyłacze z katalogu akcji prowadzą do schematu. Kolu
 | `Note` | string? | brak atrybutu/default w deklaracji |
 | `AvailabilityGroupId` | int? | `[Range(1, int.MaxValue)]` |
 
-<a id="dto-webapi-contracts-containers-graphs-creategraphrequest"></a>
-
 #### WebApi.Contracts.Containers.Graphs.CreateGraphRequest
-
-[Definicja](../../GF3.WebApi/Contracts/Containers/Graphs/CreateGraphRequest.cs).
 
 | Właściwość | Typ C# / nullable | Walidacja / default |
 | --- | --- | --- |
@@ -1127,11 +867,7 @@ Każdy model podano raz; odsyłacze z katalogu akcji prowadzą do schematu. Kolu
 | `Note` | string? | brak atrybutu/default w deklaracji |
 | `AvailabilityGroupId` | int? | `[Range(1, int.MaxValue)]` |
 
-<a id="dto-webapi-contracts-containers-graphs-generategraphpreviewemployeerequest"></a>
-
 #### WebApi.Contracts.Containers.Graphs.GenerateGraphPreviewEmployeeRequest
-
-[Definicja](../../GF3.WebApi/Contracts/Containers/Graphs/GenerateGraphPreviewRequest.cs).
 
 | Właściwość | Typ C# / nullable | Walidacja / default |
 | --- | --- | --- |
@@ -1139,23 +875,15 @@ Każdy model podano raz; odsyłacze z katalogu akcji prowadzą do schematu. Kolu
 | `MinHoursMonth` | int? | `[Range(0, int.MaxValue)]` |
 | `DisplayOrder` | int | `[Range(0, int.MaxValue)]` |
 
-<a id="dto-webapi-contracts-containers-graphs-generategraphpreviewrequest"></a>
-
 #### WebApi.Contracts.Containers.Graphs.GenerateGraphPreviewRequest
-
-[Definicja](../../GF3.WebApi/Contracts/Containers/Graphs/GenerateGraphPreviewRequest.cs).
 
 | Właściwość | Typ C# / nullable | Walidacja / default |
 | --- | --- | --- |
 | `GraphId` | int? | `[Range(1, int.MaxValue)]` |
-| `Graph` | [CreateGraphRequest](#dto-webapi-contracts-containers-graphs-creategraphrequest) | `[Required] default=new()` |
-| `Employees` | `List`&lt;[GenerateGraphPreviewEmployeeRequest](#dto-webapi-contracts-containers-graphs-generategraphpreviewemployeerequest)&gt; | `[Required] [MinLength(1)] default=new()` |
-
-<a id="dto-webapi-contracts-containers-graphs-generategraphrequest"></a>
+| `Graph` | CreateGraphRequest | `[Required] default=new()` |
+| `Employees` | `List`&lt;GenerateGraphPreviewEmployeeRequest&gt; | `[Required] [MinLength(1)] default=new()` |
 
 #### WebApi.Contracts.Containers.Graphs.GenerateGraphRequest
-
-[Definicja](../../GF3.WebApi/Contracts/Containers/Graphs/GenerateGraphRequest.cs).
 
 | Właściwość | Typ C# / nullable | Walidacja / default |
 | --- | --- | --- |
@@ -1163,11 +891,7 @@ Każdy model podano raz; odsyłacze z katalogu akcji prowadzą do schematu. Kolu
 | `DryRun` | bool | ` default=false` |
 | `ReturnSlots` | bool | ` default=true` |
 
-<a id="dto-webapi-contracts-containers-graphs-generategraphresponse"></a>
-
 #### WebApi.Contracts.Containers.Graphs.GenerateGraphResponse
-
-[Definicja](../../GF3.WebApi/Contracts/Containers/Graphs/GenerateGraphResponse.cs).
 
 | Właściwość | Typ C# / nullable | Walidacja / default |
 | --- | --- | --- |
@@ -1175,13 +899,9 @@ Każdy model podano raz; odsyłacze z katalogu akcji prowadzą do schematu. Kolu
 | `GraphId` | int | brak atrybutu/default w deklaracji |
 | `GeneratedSlotsCount` | int | brak atrybutu/default w deklaracji |
 | `WrittenSlotsCount` | int | brak atrybutu/default w deklaracji |
-| `Slots` | `IEnumerable`&lt;[GraphSlotDto](#dto-webapi-contracts-containers-graphs-slots-graphslotdto)&gt;? | brak atrybutu/default w deklaracji |
-
-<a id="dto-webapi-contracts-containers-graphs-graphdto"></a>
+| `Slots` | `IEnumerable`&lt;GraphSlotDto&gt;? | brak atrybutu/default w deklaracji |
 
 #### WebApi.Contracts.Containers.Graphs.GraphDto
-
-[Definicja](../../GF3.WebApi/Contracts/Containers/Graphs/GraphDto.cs).
 
 | Właściwość | Typ C# / nullable | Walidacja / default |
 | --- | --- | --- |
@@ -1204,11 +924,7 @@ Każdy model podano raz; odsyłacze z katalogu akcji prowadzą do schematu. Kolu
 | `AvailabilityGroupId` | int? | brak atrybutu/default w deklaracji |
 | `LastUpdatedAtUtc` | `DateTimeOffset`? | brak atrybutu/default w deklaracji |
 
-<a id="dto-webapi-contracts-containers-graphs-updatecontainergraphrequest"></a>
-
 #### WebApi.Contracts.Containers.Graphs.UpdateContainerGraphRequest
-
-[Definicja](../../GF3.WebApi/Contracts/Containers/Graphs/UpdateContainerGraphRequest.cs).
 
 | Właściwość | Typ C# / nullable | Walidacja / default |
 | --- | --- | --- |
@@ -1227,11 +943,7 @@ Każdy model podano raz; odsyłacze z katalogu akcji prowadzą do schematu. Kolu
 | `Note` | string? | brak atrybutu/default w deklaracji |
 | `AvailabilityGroupId` | int? | `[Range(1, int.MaxValue)]` |
 
-<a id="dto-webapi-contracts-containers-graphs-updategraphrequest"></a>
-
 #### WebApi.Contracts.Containers.Graphs.UpdateGraphRequest
-
-[Definicja](../../GF3.WebApi/Contracts/Containers/Graphs/UpdateGraphRequest.cs).
 
 | Właściwość | Typ C# / nullable | Walidacja / default |
 | --- | --- | --- |
@@ -1251,22 +963,14 @@ Każdy model podano raz; odsyłacze z katalogu akcji prowadzą do schematu. Kolu
 | `Note` | string? | brak atrybutu/default w deklaracji |
 | `AvailabilityGroupId` | int? | `[Range(1, int.MaxValue)]` |
 
-<a id="dto-webapi-contracts-containers-graphs-updategraphspublicationrequest"></a>
-
 #### WebApi.Contracts.Containers.Graphs.UpdateGraphsPublicationRequest
-
-[Definicja](../../GF3.WebApi/Contracts/Containers/Graphs/UpdateGraphsPublicationRequest.cs).
 
 | Właściwość | Typ C# / nullable | Walidacja / default |
 | --- | --- | --- |
 | `PublicationStatus` | string | ` default="private"` |
 | `AllowSwap` | bool? | brak atrybutu/default w deklaracji |
 
-<a id="dto-webapi-contracts-containers-graphs-cellstyles-graphcellstyledto"></a>
-
 #### WebApi.Contracts.Containers.Graphs.CellStyles.GraphCellStyleDto
-
-[Definicja](../../GF3.WebApi/Contracts/Containers/Graphs/CellStyles/GraphCellStyleDto.cs).
 
 | Właściwość | Typ C# / nullable | Walidacja / default |
 | --- | --- | --- |
@@ -1277,11 +981,7 @@ Każdy model podano raz; odsyłacze z katalogu akcji prowadzą do schematu. Kolu
 | `BackgroundColorArgb` | int? | brak atrybutu/default w deklaracji |
 | `TextColorArgb` | int? | brak atrybutu/default w deklaracji |
 
-<a id="dto-webapi-contracts-containers-graphs-cellstyles-upsertgraphcellstylerequest"></a>
-
 #### WebApi.Contracts.Containers.Graphs.CellStyles.UpsertGraphCellStyleRequest
-
-[Definicja](../../GF3.WebApi/Contracts/Containers/Graphs/CellStyles/UpsertGraphCellStyleRequest.cs).
 
 | Właściwość | Typ C# / nullable | Walidacja / default |
 | --- | --- | --- |
@@ -1290,11 +990,7 @@ Każdy model podano raz; odsyłacze z katalogu akcji prowadzą do schematu. Kolu
 | `BackgroundColorArgb` | int? | brak atrybutu/default w deklaracji |
 | `TextColorArgb` | int? | brak atrybutu/default w deklaracji |
 
-<a id="dto-webapi-contracts-containers-graphs-employees-addgraphemployeerequest"></a>
-
 #### WebApi.Contracts.Containers.Graphs.Employees.AddGraphEmployeeRequest
-
-[Definicja](../../GF3.WebApi/Contracts/Containers/Graphs/Employees/AddGraphEmployeeRequest.cs).
 
 | Właściwość | Typ C# / nullable | Walidacja / default |
 | --- | --- | --- |
@@ -1302,11 +998,7 @@ Każdy model podano raz; odsyłacze z katalogu akcji prowadzą do schematu. Kolu
 | `MinHoursMonth` | int? | brak atrybutu/default w deklaracji |
 | `DisplayOrder` | int | `[Range(0, int.MaxValue)]` |
 
-<a id="dto-webapi-contracts-containers-graphs-employees-graphemployeedto"></a>
-
 #### WebApi.Contracts.Containers.Graphs.Employees.GraphEmployeeDto
-
-[Definicja](../../GF3.WebApi/Contracts/Containers/Graphs/Employees/GraphEmployeeDto.cs).
 
 | Właściwość | Typ C# / nullable | Walidacja / default |
 | --- | --- | --- |
@@ -1316,11 +1008,7 @@ Każdy model podano raz; odsyłacze z katalogu akcji prowadzą do schematu. Kolu
 | `MinHoursMonth` | int? | brak atrybutu/default w deklaracji |
 | `DisplayOrder` | int | brak atrybutu/default w deklaracji |
 
-<a id="dto-webapi-contracts-containers-graphs-employees-updategraphemployeerequest"></a>
-
 #### WebApi.Contracts.Containers.Graphs.Employees.UpdateGraphEmployeeRequest
-
-[Definicja](../../GF3.WebApi/Contracts/Containers/Graphs/Employees/UpdateGraphEmployeeRequest.cs).
 
 | Właściwość | Typ C# / nullable | Walidacja / default |
 | --- | --- | --- |
@@ -1328,11 +1016,7 @@ Każdy model podano raz; odsyłacze z katalogu akcji prowadzą do schematu. Kolu
 | `MinHoursMonth` | int? | brak atrybutu/default w deklaracji |
 | `DisplayOrder` | int | `[Range(0, int.MaxValue)]` |
 
-<a id="dto-webapi-contracts-containers-graphs-slots-creategraphslotrequest"></a>
-
 #### WebApi.Contracts.Containers.Graphs.Slots.CreateGraphSlotRequest
-
-[Definicja](../../GF3.WebApi/Contracts/Containers/Graphs/Slots/CreateGraphSlotRequest.cs).
 
 | Właściwość | Typ C# / nullable | Walidacja / default |
 | --- | --- | --- |
@@ -1341,13 +1025,9 @@ Każdy model podano raz; odsyłacze z katalogu akcji prowadzą do schematu. Kolu
 | `FromTime` | string | ` default=string.Empty` |
 | `ToTime` | string | ` default=string.Empty` |
 | `EmployeeId` | int? | brak atrybutu/default w deklaracji |
-| `Status` | [SlotStatus](#dto-businesslogiclayer-contracts-enums-slotstatus) | `[Required]` |
-
-<a id="dto-webapi-contracts-containers-graphs-slots-graphslotdto"></a>
+| `Status` | SlotStatus | `[Required]` |
 
 #### WebApi.Contracts.Containers.Graphs.Slots.GraphSlotDto
-
-[Definicja](../../GF3.WebApi/Contracts/Containers/Graphs/Slots/GraphSlotDto.cs).
 
 | Właściwość | Typ C# / nullable | Walidacja / default |
 | --- | --- | --- |
@@ -1358,23 +1038,15 @@ Każdy model podano raz; odsyłacze z katalogu akcji prowadzą do schematu. Kolu
 | `FromTime` | string | ` default=string.Empty` |
 | `ToTime` | string | ` default=string.Empty` |
 | `EmployeeId` | int? | brak atrybutu/default w deklaracji |
-| `Status` | [SlotStatus](#dto-businesslogiclayer-contracts-enums-slotstatus) | brak atrybutu/default w deklaracji |
-
-<a id="dto-webapi-contracts-containers-graphs-slots-replacegraphslotsrequest"></a>
+| `Status` | SlotStatus | brak atrybutu/default w deklaracji |
 
 #### WebApi.Contracts.Containers.Graphs.Slots.ReplaceGraphSlotsRequest
 
-[Definicja](../../GF3.WebApi/Contracts/Containers/Graphs/Slots/ReplaceGraphSlotsRequest.cs).
-
 | Właściwość | Typ C# / nullable | Walidacja / default |
 | --- | --- | --- |
-| `Slots` | `List`&lt;[CreateGraphSlotRequest](#dto-webapi-contracts-containers-graphs-slots-creategraphslotrequest)&gt; | `[Required] default=[]` |
-
-<a id="dto-webapi-contracts-containers-graphs-slots-updategraphslotrequest"></a>
+| `Slots` | `List`&lt;CreateGraphSlotRequest&gt; | `[Required] default=[]` |
 
 #### WebApi.Contracts.Containers.Graphs.Slots.UpdateGraphSlotRequest
-
-[Definicja](../../GF3.WebApi/Contracts/Containers/Graphs/Slots/UpdateGraphSlotRequest.cs).
 
 | Właściwość | Typ C# / nullable | Walidacja / default |
 | --- | --- | --- |
@@ -1383,24 +1055,16 @@ Każdy model podano raz; odsyłacze z katalogu akcji prowadzą do schematu. Kolu
 | `FromTime` | string | ` default=string.Empty` |
 | `ToTime` | string | ` default=string.Empty` |
 | `EmployeeId` | int? | brak atrybutu/default w deklaracji |
-| `Status` | [SlotStatus](#dto-businesslogiclayer-contracts-enums-slotstatus) | `[Required]` |
-
-<a id="dto-webapi-contracts-containers-schedulepresets-createschedulepresetemployeerequest"></a>
+| `Status` | SlotStatus | `[Required]` |
 
 #### WebApi.Contracts.Containers.SchedulePresets.CreateSchedulePresetEmployeeRequest
-
-[Definicja](../../GF3.WebApi/Contracts/Containers/SchedulePresets/CreateSchedulePresetEmployeeRequest.cs).
 
 | Właściwość | Typ C# / nullable | Walidacja / default |
 | --- | --- | --- |
 | `EmployeeId` | int | `[Required] [Range(1, int.MaxValue)]` |
 | `MinHoursMonth` | int | `[Required] [Range(0, int.MaxValue)]` |
 
-<a id="dto-webapi-contracts-containers-schedulepresets-createschedulepresetrequest"></a>
-
 #### WebApi.Contracts.Containers.SchedulePresets.CreateSchedulePresetRequest
-
-[Definicja](../../GF3.WebApi/Contracts/Containers/SchedulePresets/CreateSchedulePresetRequest.cs).
 
 | Właściwość | Typ C# / nullable | Walidacja / default |
 | --- | --- | --- |
@@ -1417,13 +1081,9 @@ Każdy model podano raz; odsyłacze z katalogu akcji prowadzą do schematu. Kolu
 | `MaxConsecutiveFull` | int | `[Required] [Range(1, int.MaxValue)]` |
 | `MaxFullPerMonth` | int | `[Required] [Range(1, int.MaxValue)]` |
 | `AvailabilityGroupId` | int? | `[Range(1, int.MaxValue)]` |
-| `Employees` | `IReadOnlyList`&lt;[CreateSchedulePresetEmployeeRequest](#dto-webapi-contracts-containers-schedulepresets-createschedulepresetemployeerequest)&gt; | ` default=Array.Empty<CreateSchedulePresetEmployeeRequest>()` |
-
-<a id="dto-webapi-contracts-containers-schedulepresets-schedulepresetdto"></a>
+| `Employees` | `IReadOnlyList`&lt;CreateSchedulePresetEmployeeRequest&gt; | ` default=Array.Empty<CreateSchedulePresetEmployeeRequest>()` |
 
 #### WebApi.Contracts.Containers.SchedulePresets.SchedulePresetDto
-
-[Definicja](../../GF3.WebApi/Contracts/Containers/SchedulePresets/SchedulePresetDto.cs).
 
 | Właściwość | Typ C# / nullable | Walidacja / default |
 | --- | --- | --- |
@@ -1442,13 +1102,9 @@ Każdy model podano raz; odsyłacze z katalogu akcji prowadzą do schematu. Kolu
 | `MaxConsecutiveFull` | int | brak atrybutu/default w deklaracji |
 | `MaxFullPerMonth` | int | brak atrybutu/default w deklaracji |
 | `AvailabilityGroupId` | int? | brak atrybutu/default w deklaracji |
-| `Employees` | `IReadOnlyList`&lt;[SchedulePresetEmployeeDto](#dto-webapi-contracts-containers-schedulepresets-schedulepresetemployeedto)&gt; | ` default=Array.Empty<SchedulePresetEmployeeDto>()` |
-
-<a id="dto-webapi-contracts-containers-schedulepresets-schedulepresetemployeedto"></a>
+| `Employees` | `IReadOnlyList`&lt;SchedulePresetEmployeeDto&gt; | ` default=Array.Empty<SchedulePresetEmployeeDto>()` |
 
 #### WebApi.Contracts.Containers.SchedulePresets.SchedulePresetEmployeeDto
-
-[Definicja](../../GF3.WebApi/Contracts/Containers/SchedulePresets/SchedulePresetEmployeeDto.cs).
 
 | Właściwość | Typ C# / nullable | Walidacja / default |
 | --- | --- | --- |
@@ -1456,11 +1112,7 @@ Każdy model podano raz; odsyłacze z katalogu akcji prowadzą do schematu. Kolu
 | `EmployeeId` | int | brak atrybutu/default w deklaracji |
 | `MinHoursMonth` | int | brak atrybutu/default w deklaracji |
 
-<a id="dto-webapi-contracts-employeeavailability-employeeavailabilitygroupdto"></a>
-
 #### WebApi.Contracts.EmployeeAvailability.EmployeeAvailabilityGroupDto
-
-[Definicja](../../GF3.WebApi/Contracts/EmployeeAvailability/EmployeeAvailabilityGroupDto.cs).
 
 | Właściwość | Typ C# / nullable | Walidacja / default |
 | --- | --- | --- |
@@ -1477,46 +1129,30 @@ Każdy model podano raz; odsyłacze z katalogu akcji prowadzą do schematu. Kolu
 | `IsEditLocked` | bool | brak atrybutu/default w deklaracji |
 | `EditLockedBy` | string? | brak atrybutu/default w deklaracji |
 | `EmployeeLastModifiedAtUtc` | `DateTimeOffset`? | brak atrybutu/default w deklaracji |
-| `Slots` | `IReadOnlyList`&lt;[AvailabilitySlotDto](#dto-webapi-contracts-availabilitygroups-slots-availabilityslotdto)&gt; | ` default=Array.Empty<AvailabilitySlotDto>()` |
-
-<a id="dto-webapi-contracts-employeeavailability-updateemployeeavailabilityrequest"></a>
+| `Slots` | `IReadOnlyList`&lt;AvailabilitySlotDto&gt; | ` default=Array.Empty<AvailabilitySlotDto>()` |
 
 #### WebApi.Contracts.EmployeeAvailability.UpdateEmployeeAvailabilityRequest
 
-[Definicja](../../GF3.WebApi/Contracts/EmployeeAvailability/UpdateEmployeeAvailabilityRequest.cs).
-
 | Właściwość | Typ C# / nullable | Walidacja / default |
 | --- | --- | --- |
-| `Slots` | `List`&lt;[UpdateEmployeeAvailabilitySlotRequest](#dto-webapi-contracts-employeeavailability-updateemployeeavailabilityslotrequest)&gt; | `[Required] default=[]` |
-
-<a id="dto-webapi-contracts-employeeavailability-updateemployeeavailabilityslotrequest"></a>
+| `Slots` | `List`&lt;UpdateEmployeeAvailabilitySlotRequest&gt; | `[Required] default=[]` |
 
 #### WebApi.Contracts.EmployeeAvailability.UpdateEmployeeAvailabilitySlotRequest
-
-[Definicja](../../GF3.WebApi/Contracts/EmployeeAvailability/UpdateEmployeeAvailabilityRequest.cs).
 
 | Właściwość | Typ C# / nullable | Walidacja / default |
 | --- | --- | --- |
 | `DayOfMonth` | int | `[Range(1, 31)]` |
-| `Kind` | [AvailabilityKind](#dto-businesslogiclayer-contracts-enums-availabilitykind) | brak atrybutu/default w deklaracji |
+| `Kind` | AvailabilityKind | brak atrybutu/default w deklaracji |
 | `IntervalStr` | string? | brak atrybutu/default w deklaracji |
 
-<a id="dto-webapi-contracts-employeeprofile-completepasswordresetrequest"></a>
-
 #### WebApi.Contracts.EmployeeProfile.CompletePasswordResetRequest
-
-[Definicja](../../GF3.WebApi/Contracts/EmployeeProfile/CompletePasswordResetRequest.cs).
 
 | Właściwość | Typ C# / nullable | Walidacja / default |
 | --- | --- | --- |
 | `Code` | string | ` default=string.Empty` |
 | `NewPassword` | string | ` default=string.Empty` |
 
-<a id="dto-webapi-contracts-employeeprofile-employeeprofiledto"></a>
-
 #### WebApi.Contracts.EmployeeProfile.EmployeeProfileDto
-
-[Definicja](../../GF3.WebApi/Contracts/EmployeeProfile/EmployeeProfileDto.cs).
 
 | Właściwość | Typ C# / nullable | Walidacja / default |
 | --- | --- | --- |
@@ -1526,33 +1162,21 @@ Każdy model podano raz; odsyłacze z katalogu akcji prowadzą do schematu. Kolu
 | `RecoveryEmail` | string? | brak atrybutu/default w deklaracji |
 | `Phone` | string? | brak atrybutu/default w deklaracji |
 
-<a id="dto-webapi-contracts-employeeprofile-passwordresetcodedispatchdto"></a>
-
 #### WebApi.Contracts.EmployeeProfile.PasswordResetCodeDispatchDto
-
-[Definicja](../../GF3.WebApi/Contracts/EmployeeProfile/PasswordResetCodeDispatchDto.cs).
 
 | Właściwość | Typ C# / nullable | Walidacja / default |
 | --- | --- | --- |
 | `DeliveryHint` | string | ` default=string.Empty` |
 | `ExpiresAtUtc` | `DateTimeOffset` | brak atrybutu/default w deklaracji |
 
-<a id="dto-webapi-contracts-employeeprofile-updateemployeeprofilerequest"></a>
-
 #### WebApi.Contracts.EmployeeProfile.UpdateEmployeeProfileRequest
-
-[Definicja](../../GF3.WebApi/Contracts/EmployeeProfile/UpdateEmployeeProfileRequest.cs).
 
 | Właściwość | Typ C# / nullable | Walidacja / default |
 | --- | --- | --- |
 | `RecoveryEmail` | string? | brak atrybutu/default w deklaracji |
 | `Phone` | string? | brak atrybutu/default w deklaracji |
 
-<a id="dto-webapi-contracts-employeeschedules-employeescheduledto"></a>
-
 #### WebApi.Contracts.EmployeeSchedules.EmployeeScheduleDto
-
-[Definicja](../../GF3.WebApi/Contracts/EmployeeSchedules/EmployeeScheduleDto.cs).
 
 | Właściwość | Typ C# / nullable | Walidacja / default |
 | --- | --- | --- |
@@ -1569,15 +1193,11 @@ Każdy model podano raz; odsyłacze z katalogu akcji prowadzą do schematu. Kolu
 | `AllowSwap` | bool | ` default=true` |
 | `LastUpdatedAtUtc` | `DateTimeOffset`? | brak atrybutu/default w deklaracji |
 | `PublishedAtUtc` | `DateTimeOffset`? | brak atrybutu/default w deklaracji |
-| `Employees` | `IReadOnlyList`&lt;[EmployeeScheduleEmployeeDto](#dto-webapi-contracts-employeeschedules-employeescheduleemployeedto)&gt; | ` default=Array.Empty<EmployeeScheduleEmployeeDto>()` |
-| `Slots` | `IReadOnlyList`&lt;[EmployeeScheduleSlotDto](#dto-webapi-contracts-employeeschedules-employeescheduleslotdto)&gt; | ` default=Array.Empty<EmployeeScheduleSlotDto>()` |
-| `RelatedScheduleAssignments` | `IReadOnlyList`&lt;[EmployeeScheduleRelatedAssignmentDto](#dto-webapi-contracts-employeeschedules-employeeschedulerelatedassignmentdto)&gt; | ` default=Array.Empty<EmployeeScheduleRelatedAssignmentDto>()` |
-
-<a id="dto-webapi-contracts-employeeschedules-employeescheduleemployeedto"></a>
+| `Employees` | `IReadOnlyList`&lt;EmployeeScheduleEmployeeDto&gt; | ` default=Array.Empty<EmployeeScheduleEmployeeDto>()` |
+| `Slots` | `IReadOnlyList`&lt;EmployeeScheduleSlotDto&gt; | ` default=Array.Empty<EmployeeScheduleSlotDto>()` |
+| `RelatedScheduleAssignments` | `IReadOnlyList`&lt;EmployeeScheduleRelatedAssignmentDto&gt; | ` default=Array.Empty<EmployeeScheduleRelatedAssignmentDto>()` |
 
 #### WebApi.Contracts.EmployeeSchedules.EmployeeScheduleEmployeeDto
-
-[Definicja](../../GF3.WebApi/Contracts/EmployeeSchedules/EmployeeScheduleEmployeeDto.cs).
 
 | Właściwość | Typ C# / nullable | Walidacja / default |
 | --- | --- | --- |
@@ -1589,11 +1209,7 @@ Każdy model podano raz; odsyłacze z katalogu akcji prowadzą do schematu. Kolu
 | `MinHoursMonth` | int? | brak atrybutu/default w deklaracji |
 | `DisplayOrder` | int | brak atrybutu/default w deklaracji |
 
-<a id="dto-webapi-contracts-employeeschedules-employeeschedulerelatedassignmentdto"></a>
-
 #### WebApi.Contracts.EmployeeSchedules.EmployeeScheduleRelatedAssignmentDto
-
-[Definicja](../../GF3.WebApi/Contracts/EmployeeSchedules/EmployeeScheduleRelatedAssignmentDto.cs).
 
 | Właściwość | Typ C# / nullable | Walidacja / default |
 | --- | --- | --- |
@@ -1602,11 +1218,7 @@ Każdy model podano raz; odsyłacze z katalogu akcji prowadzą do schematu. Kolu
 | `ScheduleId` | int | brak atrybutu/default w deklaracji |
 | `ScheduleName` | string | ` default=string.Empty` |
 
-<a id="dto-webapi-contracts-employeeschedules-employeescheduleslotdto"></a>
-
 #### WebApi.Contracts.EmployeeSchedules.EmployeeScheduleSlotDto
-
-[Definicja](../../GF3.WebApi/Contracts/EmployeeSchedules/EmployeeScheduleSlotDto.cs).
 
 | Właściwość | Typ C# / nullable | Walidacja / default |
 | --- | --- | --- |
@@ -1618,11 +1230,7 @@ Każdy model podano raz; odsyłacze z katalogu akcji prowadzą do schematu. Kolu
 | `ToTime` | string | ` default=string.Empty` |
 | `Status` | string | ` default=string.Empty` |
 
-<a id="dto-webapi-contracts-employees-createemployeerequest"></a>
-
 #### WebApi.Contracts.Employees.CreateEmployeeRequest
-
-[Definicja](../../GF3.WebApi/Contracts/Employees/CreateEmployeeRequest.cs).
 
 | Właściwość | Typ C# / nullable | Walidacja / default |
 | --- | --- | --- |
@@ -1633,11 +1241,7 @@ Każdy model podano raz; odsyłacze z katalogu akcji prowadzą do schematu. Kolu
 | `Username` | string? | `[MaxLength(100)]` |
 | `Password` | string? | `[MaxLength(200)]` |
 
-<a id="dto-webapi-contracts-employees-employeedto"></a>
-
 #### WebApi.Contracts.Employees.EmployeeDto
-
-[Definicja](../../GF3.WebApi/Contracts/Employees/EmployeeDto.cs).
 
 | Właściwość | Typ C# / nullable | Walidacja / default |
 | --- | --- | --- |
@@ -1651,11 +1255,7 @@ Każdy model podano raz; odsyłacze z katalogu akcji prowadzą do schematu. Kolu
 | `IsOnline` | bool | brak atrybutu/default w deklaracji |
 | `LastLoginAtUtc` | `DateTimeOffset`? | brak atrybutu/default w deklaracji |
 
-<a id="dto-webapi-contracts-employees-updateemployeerequest"></a>
-
 #### WebApi.Contracts.Employees.UpdateEmployeeRequest
-
-[Definicja](../../GF3.WebApi/Contracts/Employees/UpdateEmployeeRequest.cs).
 
 | Właściwość | Typ C# / nullable | Walidacja / default |
 | --- | --- | --- |
@@ -1666,11 +1266,7 @@ Każdy model podano raz; odsyłacze z katalogu akcji prowadzą do schematu. Kolu
 | `Username` | string? | `[MaxLength(100)]` |
 | `Password` | string? | `[MaxLength(200)]` |
 
-<a id="dto-webapi-contracts-managerprofile-createmanagerrequest"></a>
-
 #### WebApi.Contracts.ManagerProfile.CreateManagerRequest
-
-[Definicja](../../GF3.WebApi/Contracts/ManagerProfile/CreateManagerRequest.cs).
 
 | Właściwość | Typ C# / nullable | Walidacja / default |
 | --- | --- | --- |
@@ -1679,11 +1275,7 @@ Każdy model podano raz; odsyłacze z katalogu akcji prowadzą do schematu. Kolu
 | `RecoveryEmail` | string? | brak atrybutu/default w deklaracji |
 | `Password` | string | ` default=string.Empty` |
 
-<a id="dto-webapi-contracts-managerprofile-managerprofiledto"></a>
-
 #### WebApi.Contracts.ManagerProfile.ManagerProfileDto
-
-[Definicja](../../GF3.WebApi/Contracts/ManagerProfile/ManagerProfileDto.cs).
 
 | Właściwość | Typ C# / nullable | Walidacja / default |
 | --- | --- | --- |
@@ -1696,24 +1288,16 @@ Każdy model podano raz; odsyłacze z katalogu akcji prowadzą do schematu. Kolu
 | `IsSystem` | bool | brak atrybutu/default w deklaracji |
 | `CreatedAtUtc` | `DateTimeOffset` | brak atrybutu/default w deklaracji |
 
-<a id="dto-webapi-contracts-managerprofile-managerprofileupdateresponsedto"></a>
-
 #### WebApi.Contracts.ManagerProfile.ManagerProfileUpdateResponseDto
-
-[Definicja](../../GF3.WebApi/Contracts/ManagerProfile/ManagerProfileUpdateResponseDto.cs).
 
 | Właściwość | Typ C# / nullable | Walidacja / default |
 | --- | --- | --- |
-| `Profile` | [ManagerProfileDto](#dto-businesslogiclayer-contracts-managers-managerprofiledto) | ` default=new()` |
+| `Profile` | ManagerProfileDto | ` default=new()` |
 | `AccessToken` | string | ` default=string.Empty` |
 | `ExpiresAtUtc` | `DateTimeOffset` | brak atrybutu/default w deklaracji |
-| `Session` | [SessionDto](#dto-webapi-contracts-auth-sessiondto) | ` default=new()` |
-
-<a id="dto-webapi-contracts-managerprofile-updatemanagerprofilerequest"></a>
+| `Session` | SessionDto | ` default=new()` |
 
 #### WebApi.Contracts.ManagerProfile.UpdateManagerProfileRequest
-
-[Definicja](../../GF3.WebApi/Contracts/ManagerProfile/UpdateManagerProfileRequest.cs).
 
 | Właściwość | Typ C# / nullable | Walidacja / default |
 | --- | --- | --- |
@@ -1722,11 +1306,7 @@ Każdy model podano raz; odsyłacze z katalogu akcji prowadzą do schematu. Kolu
 | `RecoveryEmail` | string? | brak atrybutu/default w deklaracji |
 | `NewPassword` | string? | brak atrybutu/default w deklaracji |
 
-<a id="dto-webapi-contracts-regulations-saveregulationrequest"></a>
-
 #### WebApi.Contracts.Regulations.SaveRegulationRequest
-
-[Definicja](../../GF3.WebApi/Contracts/Regulations/SaveRegulationRequest.cs).
 
 | Właściwość | Typ C# / nullable | Walidacja / default |
 | --- | --- | --- |
@@ -1735,21 +1315,13 @@ Każdy model podano raz; odsyłacze z katalogu akcji prowadzą do schematu. Kolu
 | `Message` | string | `[Required] [MaxLength(4000)] default=string.Empty` |
 | `Pdf` | `IFormFile`? | brak atrybutu/default w deklaracji |
 
-<a id="dto-webapi-contracts-shiftcorrections-approveshiftcorrectionrequest"></a>
-
 #### WebApi.Contracts.ShiftCorrections.ApproveShiftCorrectionRequest
-
-[Definicja](../../GF3.WebApi/Contracts/ShiftCorrections/ShiftCorrectionSettingDto.cs).
 
 | Właściwość | Typ C# / nullable | Walidacja / default |
 | --- | --- | --- |
 | `HighlightColor` | string? | brak atrybutu/default w deklaracji |
 
-<a id="dto-webapi-contracts-shiftcorrections-createshiftcorrectionrequest"></a>
-
 #### WebApi.Contracts.ShiftCorrections.CreateShiftCorrectionRequest
-
-[Definicja](../../GF3.WebApi/Contracts/ShiftCorrections/CreateShiftCorrectionRequest.cs).
 
 | Właściwość | Typ C# / nullable | Walidacja / default |
 | --- | --- | --- |
@@ -1758,21 +1330,13 @@ Każdy model podano raz; odsyłacze z katalogu akcji prowadzą do schematu. Kolu
 | `RequestedFromTime` | string | `[Required] default=string.Empty` |
 | `RequestedToTime` | string | `[Required] default=string.Empty` |
 
-<a id="dto-webapi-contracts-shiftcorrections-saveshiftcorrectionsettingrequest"></a>
-
 #### WebApi.Contracts.ShiftCorrections.SaveShiftCorrectionSettingRequest
-
-[Definicja](../../GF3.WebApi/Contracts/ShiftCorrections/ShiftCorrectionSettingDto.cs).
 
 | Właściwość | Typ C# / nullable | Walidacja / default |
 | --- | --- | --- |
 | `HighlightColor` | string? | brak atrybutu/default w deklaracji |
 
-<a id="dto-webapi-contracts-shiftcorrections-shiftcorrectionrequestdto"></a>
-
 #### WebApi.Contracts.ShiftCorrections.ShiftCorrectionRequestDto
-
-[Definicja](../../GF3.WebApi/Contracts/ShiftCorrections/ShiftCorrectionRequestDto.cs).
 
 | Właściwość | Typ C# / nullable | Walidacja / default |
 | --- | --- | --- |
@@ -1796,21 +1360,13 @@ Każdy model podano raz; odsyłacze z katalogu akcji prowadzą do schematu. Kolu
 | `ReviewedAtUtc` | `DateTimeOffset`? | brak atrybutu/default w deklaracji |
 | `ReviewedByManagerName` | string? | brak atrybutu/default w deklaracji |
 
-<a id="dto-webapi-contracts-shiftcorrections-shiftcorrectionsettingdto"></a>
-
 #### WebApi.Contracts.ShiftCorrections.ShiftCorrectionSettingDto
-
-[Definicja](../../GF3.WebApi/Contracts/ShiftCorrections/ShiftCorrectionSettingDto.cs).
 
 | Właściwość | Typ C# / nullable | Walidacja / default |
 | --- | --- | --- |
 | `HighlightColor` | string | ` default="#FDE68A"` |
 
-<a id="dto-webapi-contracts-shiftswaps-createemployeeshiftswaprequest"></a>
-
 #### WebApi.Contracts.ShiftSwaps.CreateEmployeeShiftSwapRequest
-
-[Definicja](../../GF3.WebApi/Contracts/ShiftSwaps/CreateEmployeeShiftSwapRequest.cs).
 
 | Właściwość | Typ C# / nullable | Walidacja / default |
 | --- | --- | --- |
@@ -1825,11 +1381,7 @@ Każdy model podano raz; odsyłacze z katalogu akcji prowadzą do schematu. Kolu
 | `ToTime` | string? | brak atrybutu/default w deklaracji |
 | `TargetEmployeeId` | int? | brak atrybutu/default w deklaracji |
 
-<a id="dto-webapi-contracts-shiftswaps-createmanagershiftswaprequest"></a>
-
 #### WebApi.Contracts.ShiftSwaps.CreateManagerShiftSwapRequest
-
-[Definicja](../../GF3.WebApi/Contracts/ShiftSwaps/CreateManagerShiftSwapRequest.cs).
 
 | Właściwość | Typ C# / nullable | Walidacja / default |
 | --- | --- | --- |
@@ -1839,21 +1391,13 @@ Każdy model podano raz; odsyłacze z katalogu akcji prowadzą do schematu. Kolu
 | `ToTime` | string | ` default=string.Empty` |
 | `TargetEmployeeId` | int? | brak atrybutu/default w deklaracji |
 
-<a id="dto-webapi-contracts-shiftswaps-saveshiftswaphighlightsettingrequest"></a>
-
 #### WebApi.Contracts.ShiftSwaps.SaveShiftSwapHighlightSettingRequest
-
-[Definicja](../../GF3.WebApi/Contracts/ShiftSwaps/ShiftSwapHighlightSettingDto.cs).
 
 | Właściwość | Typ C# / nullable | Walidacja / default |
 | --- | --- | --- |
 | `HighlightColor` | string? | brak atrybutu/default w deklaracji |
 
-<a id="dto-webapi-contracts-shiftswaps-shiftswapdto"></a>
-
 #### WebApi.Contracts.ShiftSwaps.ShiftSwapDto
-
-[Definicja](../../GF3.WebApi/Contracts/ShiftSwaps/ShiftSwapDto.cs).
 
 | Właściwość | Typ C# / nullable | Walidacja / default |
 | --- | --- | --- |
@@ -1868,9 +1412,9 @@ Każdy model podano raz; odsyłacze z katalogu akcji prowadzą do schematu. Kolu
 | `ReturnFromTime` | string? | brak atrybutu/default w deklaracji |
 | `ReturnToTime` | string? | brak atrybutu/default w deklaracji |
 | `ReturnShiftHours` | double? | brak atrybutu/default w deklaracji |
-| `ReturnBeforeSnapshot` | [ShiftSwapScheduleSnapshotDto](#dto-webapi-contracts-shiftswaps-shiftswapschedulesnapshotdto)? | brak atrybutu/default w deklaracji |
-| `ReturnAfterSnapshot` | [ShiftSwapScheduleSnapshotDto](#dto-webapi-contracts-shiftswaps-shiftswapschedulesnapshotdto)? | brak atrybutu/default w deklaracji |
-| `CurrentEmployeeProjectedMonths` | `List`&lt;[ShiftSwapPreviewMonthStatsDto](#dto-webapi-contracts-shiftswaps-shiftswappreviewmonthstatsdto)&gt;? | brak atrybutu/default w deklaracji |
+| `ReturnBeforeSnapshot` | ShiftSwapScheduleSnapshotDto? | brak atrybutu/default w deklaracji |
+| `ReturnAfterSnapshot` | ShiftSwapScheduleSnapshotDto? | brak atrybutu/default w deklaracji |
+| `CurrentEmployeeProjectedMonths` | `List`&lt;ShiftSwapPreviewMonthStatsDto&gt;? | brak atrybutu/default w deklaracji |
 | `Id` | int | brak atrybutu/default w deklaracji |
 | `ScheduleId` | int | brak atrybutu/default w deklaracji |
 | `ScheduleSlotId` | int | brak atrybutu/default w deklaracji |
@@ -1909,25 +1453,17 @@ Każdy model podano raz; odsyłacze z katalogu akcji prowadzą do schematu. Kolu
 | `CanAccept` | bool | brak atrybutu/default w deklaracji |
 | `AcceptanceUnavailableReason` | string? | brak atrybutu/default w deklaracji |
 | `CanCancel` | bool | brak atrybutu/default w deklaracji |
-| `BeforeSnapshot` | [ShiftSwapScheduleSnapshotDto](#dto-webapi-contracts-shiftswaps-shiftswapschedulesnapshotdto)? | brak atrybutu/default w deklaracji |
-| `AfterSnapshot` | [ShiftSwapScheduleSnapshotDto](#dto-webapi-contracts-shiftswaps-shiftswapschedulesnapshotdto)? | brak atrybutu/default w deklaracji |
-
-<a id="dto-webapi-contracts-shiftswaps-shiftswapeligiblewindowdto"></a>
+| `BeforeSnapshot` | ShiftSwapScheduleSnapshotDto? | brak atrybutu/default w deklaracji |
+| `AfterSnapshot` | ShiftSwapScheduleSnapshotDto? | brak atrybutu/default w deklaracji |
 
 #### WebApi.Contracts.ShiftSwaps.ShiftSwapEligibleWindowDto
-
-[Definicja](../../GF3.WebApi/Contracts/ShiftSwaps/ShiftSwapReturnCandidateDto.cs).
 
 | Właściwość | Typ C# / nullable | Walidacja / default |
 | --- | --- | --- |
 | `FromTime` | string | brak atrybutu/default w deklaracji |
 | `ToTime` | string | brak atrybutu/default w deklaracji |
 
-<a id="dto-webapi-contracts-shiftswaps-shiftswapemployeedto"></a>
-
 #### WebApi.Contracts.ShiftSwaps.ShiftSwapEmployeeDto
-
-[Definicja](../../GF3.WebApi/Contracts/ShiftSwaps/ShiftSwapEmployeeDto.cs).
 
 | Właściwość | Typ C# / nullable | Walidacja / default |
 | --- | --- | --- |
@@ -1936,38 +1472,26 @@ Każdy model podano raz; odsyłacze z katalogu akcji prowadzą do schematu. Kolu
 | `LastName` | string | ` default=string.Empty` |
 | `DisplayName` | string | ` default=string.Empty` |
 
-<a id="dto-webapi-contracts-shiftswaps-shiftswaphighlightsettingdto"></a>
-
 #### WebApi.Contracts.ShiftSwaps.ShiftSwapHighlightSettingDto
-
-[Definicja](../../GF3.WebApi/Contracts/ShiftSwaps/ShiftSwapHighlightSettingDto.cs).
 
 | Właściwość | Typ C# / nullable | Walidacja / default |
 | --- | --- | --- |
 | `HighlightColor` | string | ` default="#BBF7D0"` |
 
-<a id="dto-webapi-contracts-shiftswaps-shiftswapofferpreviewdto"></a>
-
 #### WebApi.Contracts.ShiftSwaps.ShiftSwapOfferPreviewDto
-
-[Definicja](../../GF3.WebApi/Contracts/ShiftSwaps/ShiftSwapOfferPreviewDto.cs).
 
 | Właściwość | Typ C# / nullable | Walidacja / default |
 | --- | --- | --- |
 | `RequestKind` | string | ` default="give"` |
 | `TargetEmployeeId` | int? | brak atrybutu/default w deklaracji |
 | `TargetEmployeeName` | string | ` default="Everyone"` |
-| `Source` | [ShiftSwapReturnCandidateDto](#dto-webapi-contracts-shiftswaps-shiftswapreturncandidatedto) | ` default=new()` |
-| `Return` | [ShiftSwapReturnCandidateDto](#dto-webapi-contracts-shiftswaps-shiftswapreturncandidatedto)? | brak atrybutu/default w deklaracji |
-| `ProjectedMonths` | `List`&lt;[ShiftSwapPreviewMonthStatsDto](#dto-webapi-contracts-shiftswaps-shiftswappreviewmonthstatsdto)&gt; | ` default=[]` |
+| `Source` | ShiftSwapReturnCandidateDto | ` default=new()` |
+| `Return` | ShiftSwapReturnCandidateDto? | brak atrybutu/default w deklaracji |
+| `ProjectedMonths` | `List`&lt;ShiftSwapPreviewMonthStatsDto&gt; | ` default=[]` |
 | `IsValid` | bool | brak atrybutu/default w deklaracji |
 | `UnavailableReason` | string? | brak atrybutu/default w deklaracji |
 
-<a id="dto-webapi-contracts-shiftswaps-shiftswappreviewmonthstatsdto"></a>
-
 #### WebApi.Contracts.ShiftSwaps.ShiftSwapPreviewMonthStatsDto
-
-[Definicja](../../GF3.WebApi/Contracts/ShiftSwaps/ShiftSwapOfferPreviewDto.cs).
 
 | Właściwość | Typ C# / nullable | Walidacja / default |
 | --- | --- | --- |
@@ -1980,11 +1504,7 @@ Każdy model podano raz; odsyłacze z katalogu akcji prowadzą do schematu. Kolu
 | `FreeDaysBefore` | int | brak atrybutu/default w deklaracji |
 | `FreeDaysAfter` | int | brak atrybutu/default w deklaracji |
 
-<a id="dto-webapi-contracts-shiftswaps-shiftswapreturncandidatedto"></a>
-
 #### WebApi.Contracts.ShiftSwaps.ShiftSwapReturnCandidateDto
-
-[Definicja](../../GF3.WebApi/Contracts/ShiftSwaps/ShiftSwapReturnCandidateDto.cs).
 
 | Właściwość | Typ C# / nullable | Walidacja / default |
 | --- | --- | --- |
@@ -2002,36 +1522,24 @@ Każdy model podano raz; odsyłacze z katalogu akcji prowadzą do schematu. Kolu
 | `UnavailableReason` | string? | brak atrybutu/default w deklaracji |
 | `SuggestedFromTime` | string? | brak atrybutu/default w deklaracji |
 | `SuggestedToTime` | string? | brak atrybutu/default w deklaracji |
-| `EligibleWindows` | `List`&lt;[ShiftSwapEligibleWindowDto](#dto-webapi-contracts-shiftswaps-shiftswapeligiblewindowdto)&gt; | ` default=[]` |
-
-<a id="dto-webapi-contracts-shiftswaps-shiftswapreturncandidatepagedto"></a>
+| `EligibleWindows` | `List`&lt;ShiftSwapEligibleWindowDto&gt; | ` default=[]` |
 
 #### WebApi.Contracts.ShiftSwaps.ShiftSwapReturnCandidatePageDto
 
-[Definicja](../../GF3.WebApi/Contracts/ShiftSwaps/ShiftSwapReturnCandidateDto.cs).
-
 | Właściwość | Typ C# / nullable | Walidacja / default |
 | --- | --- | --- |
-| `Items` | `List`&lt;[ShiftSwapReturnCandidateDto](#dto-webapi-contracts-shiftswaps-shiftswapreturncandidatedto)&gt; | ` default=[]` |
+| `Items` | `List`&lt;ShiftSwapReturnCandidateDto&gt; | ` default=[]` |
 | `Page` | int | brak atrybutu/default w deklaracji |
 | `PageSize` | int | brak atrybutu/default w deklaracji |
 | `HasMore` | bool | brak atrybutu/default w deklaracji |
 
-<a id="dto-webapi-contracts-shiftswaps-shiftswapschedulesnapshotdto"></a>
-
 #### WebApi.Contracts.ShiftSwaps.ShiftSwapScheduleSnapshotDto
-
-[Definicja](../../GF3.WebApi/Contracts/ShiftSwaps/ShiftSwapDto.cs).
 
 | Właściwość | Typ C# / nullable | Walidacja / default |
 | --- | --- | --- |
-| `Rows` | `List`&lt;[ShiftSwapScheduleSnapshotRowDto](#dto-webapi-contracts-shiftswaps-shiftswapschedulesnapshotrowdto)&gt; | ` default=[]` |
-
-<a id="dto-webapi-contracts-shiftswaps-shiftswapschedulesnapshotrowdto"></a>
+| `Rows` | `List`&lt;ShiftSwapScheduleSnapshotRowDto&gt; | ` default=[]` |
 
 #### WebApi.Contracts.ShiftSwaps.ShiftSwapScheduleSnapshotRowDto
-
-[Definicja](../../GF3.WebApi/Contracts/ShiftSwaps/ShiftSwapDto.cs).
 
 | Właściwość | Typ C# / nullable | Walidacja / default |
 | --- | --- | --- |
@@ -2040,11 +1548,7 @@ Każdy model podano raz; odsyłacze z katalogu akcji prowadzą do schematu. Kolu
 | `Kind` | string | ` default="employee"` |
 | `DayValues` | `Dictionary`&lt;int, string&gt; | ` default=[]` |
 
-<a id="dto-webapi-contracts-shops-createshoprequest"></a>
-
 #### WebApi.Contracts.Shops.CreateShopRequest
-
-[Definicja](../../GF3.WebApi/Contracts/Shops/CreateShopRequest.cs).
 
 | Właściwość | Typ C# / nullable | Walidacja / default |
 | --- | --- | --- |
@@ -2052,11 +1556,7 @@ Każdy model podano raz; odsyłacze z katalogu akcji prowadzą do schematu. Kolu
 | `Address` | string | `[Required] [MaxLength(200)] default=string.Empty` |
 | `Description` | string? | `[MaxLength(1000)]` |
 
-<a id="dto-webapi-contracts-shops-shopdto"></a>
-
 #### WebApi.Contracts.Shops.ShopDto
-
-[Definicja](../../GF3.WebApi/Contracts/Shops/ShopDto.cs).
 
 | Właściwość | Typ C# / nullable | Walidacja / default |
 | --- | --- | --- |
@@ -2065,11 +1565,7 @@ Każdy model podano raz; odsyłacze z katalogu akcji prowadzą do schematu. Kolu
 | `Address` | string | ` default=string.Empty` |
 | `Description` | string? | brak atrybutu/default w deklaracji |
 
-<a id="dto-webapi-contracts-shops-updateshoprequest"></a>
-
 #### WebApi.Contracts.Shops.UpdateShopRequest
-
-[Definicja](../../GF3.WebApi/Contracts/Shops/UpdateShopRequest.cs).
 
 | Właściwość | Typ C# / nullable | Walidacja / default |
 | --- | --- | --- |
@@ -2077,11 +1573,7 @@ Każdy model podano raz; odsyłacze z katalogu akcji prowadzą do schematu. Kolu
 | `Address` | string | `[Required] [MaxLength(200)] default=string.Empty` |
 | `Description` | string? | `[MaxLength(1000)]` |
 
-<a id="dto-webapi-contracts-workflowlogs-deleteworkflowlogsrequest"></a>
-
 #### WebApi.Contracts.WorkflowLogs.DeleteWorkflowLogsRequest
-
-[Definicja](../../GF3.WebApi/Contracts/WorkflowLogs/DeleteWorkflowLogsRequest.cs).
 
 | Właściwość | Typ C# / nullable | Walidacja / default |
 | --- | --- | --- |
@@ -2089,32 +1581,20 @@ Każdy model podano raz; odsyłacze z katalogu akcji prowadzą do schematu. Kolu
 | `FromUtc` | `DateTimeOffset`? | brak atrybutu/default w deklaracji |
 | `ToUtc` | `DateTimeOffset`? | brak atrybutu/default w deklaracji |
 
-<a id="dto-webapi-contracts-workflowlogs-updateworkflowlogsettingsrequest"></a>
-
 #### WebApi.Contracts.WorkflowLogs.UpdateWorkflowLogSettingsRequest
-
-[Definicja](../../GF3.WebApi/Contracts/WorkflowLogs/UpdateWorkflowLogSettingsRequest.cs).
 
 | Właściwość | Typ C# / nullable | Walidacja / default |
 | --- | --- | --- |
 | `IsEnabled` | bool | brak atrybutu/default w deklaracji |
 | `Audience` | string | `[Required] default=string.Empty` |
 
-<a id="dto-webapi-contracts-workflowlogs-workflowlogdeleteresultdto"></a>
-
 #### WebApi.Contracts.WorkflowLogs.WorkflowLogDeleteResultDto
-
-[Definicja](../../GF3.WebApi/Contracts/WorkflowLogs/DeleteWorkflowLogsRequest.cs).
 
 | Właściwość | Typ C# / nullable | Walidacja / default |
 | --- | --- | --- |
 | `DeletedCount` | int | brak atrybutu/default w deklaracji |
 
-<a id="dto-webapi-contracts-workflowlogs-workflowlogdto"></a>
-
 #### WebApi.Contracts.WorkflowLogs.WorkflowLogDto
-
-[Definicja](../../GF3.WebApi/Contracts/WorkflowLogs/WorkflowLogDto.cs).
 
 | Właściwość | Typ C# / nullable | Walidacja / default |
 | --- | --- | --- |
@@ -2125,43 +1605,27 @@ Każdy model podano raz; odsyłacze z katalogu akcji prowadzą do schematu. Kolu
 | `ActorName` | string | ` default=string.Empty` |
 | `Action` | string | ` default=string.Empty` |
 
-<a id="dto-webapi-contracts-workflowlogs-workflowlogsettingsdto"></a>
-
 #### WebApi.Contracts.WorkflowLogs.WorkflowLogSettingsDto
-
-[Definicja](../../GF3.WebApi/Contracts/WorkflowLogs/WorkflowLogSettingsDto.cs).
 
 | Właściwość | Typ C# / nullable | Walidacja / default |
 | --- | --- | --- |
 | `IsEnabled` | bool | brak atrybutu/default w deklaracji |
 | `Audience` | string | ` default=string.Empty` |
 
-<a id="dto-webapi-controllers-browserkeys"></a>
-
 #### WebApi.Controllers.BrowserKeys
-
-[Definicja](../../GF3.WebApi/Controllers/EmployeePushController.cs).
 
 | Właściwość | Typ C# / nullable | Walidacja / default |
 | --- | --- | --- |
 | `P256dh` | string | `[Required, MaxLength(512)]` |
 | `Auth` | string | `[Required, MaxLength(256)]` |
 
-<a id="dto-webapi-controllers-deleterequest"></a>
-
 #### WebApi.Controllers.DeleteRequest
-
-[Definicja](../../GF3.WebApi/Controllers/EmployeePushController.cs).
 
 | Właściwość | Typ C# / nullable | Walidacja / default |
 | --- | --- | --- |
 | `Endpoint` | string | `[Required, MaxLength(2048)]` |
 
-<a id="dto-webapi-controllers-employeeuistatedto"></a>
-
 #### WebApi.Controllers.EmployeeUiStateDto
-
-[Definicja](../../GF3.WebApi/Controllers/EmployeeUiStateController.cs).
 
 | Właściwość | Typ C# / nullable | Walidacja / default |
 | --- | --- | --- |
@@ -2169,11 +1633,7 @@ Każdy model podano raz; odsyłacze z katalogu akcji prowadzą do schematu. Kolu
 | `ReadNotificationIds` | `IReadOnlyList`&lt;string&gt; | ` default=[]` |
 | `PinnedSwapIds` | `IReadOnlyList`&lt;int&gt; | ` default=[]` |
 
-<a id="dto-webapi-controllers-graphversiondto"></a>
-
 #### WebApi.Controllers.GraphVersionDto
-
-[Definicja](../../GF3.WebApi/Controllers/GraphVersionsController.cs).
 
 | Właściwość | Typ C# / nullable | Walidacja / default |
 | --- | --- | --- |
@@ -2188,32 +1648,20 @@ Każdy model podano raz; odsyłacze z katalogu akcji prowadzą do schematu. Kolu
 | `CellStyleCount` | int | brak atrybutu/default w deklaracji |
 | `IsCurrent` | bool | brak atrybutu/default w deklaracji |
 
-<a id="dto-webapi-controllers-graphversiontreedto"></a>
-
 #### WebApi.Controllers.GraphVersionTreeDto
-
-[Definicja](../../GF3.WebApi/Controllers/GraphVersionsController.cs).
 
 | Właściwość | Typ C# / nullable | Walidacja / default |
 | --- | --- | --- |
 | `CurrentVersionId` | int? | brak atrybutu/default w deklaracji |
-| `Versions` | `IReadOnlyList`&lt;[GraphVersionDto](#dto-webapi-controllers-graphversiondto)&gt; | ` default=[]` |
-
-<a id="dto-webapi-controllers-languagepreference"></a>
+| `Versions` | `IReadOnlyList`&lt;GraphVersionDto&gt; | ` default=[]` |
 
 #### WebApi.Controllers.LanguagePreference
-
-[Definicja](../../GF3.WebApi/Controllers/AccountLanguageController.cs).
 
 | Właściwość | Typ C# / nullable | Walidacja / default |
 | --- | --- | --- |
 | `Language` | string | brak atrybutu/default w deklaracji |
 
-<a id="dto-webapi-controllers-managergraphfillcolorbinddto"></a>
-
 #### WebApi.Controllers.ManagerGraphFillColorBindDto
-
-[Definicja](../../GF3.WebApi/Controllers/ManagerGraphFillColorBindsController.cs).
 
 | Właściwość | Typ C# / nullable | Walidacja / default |
 | --- | --- | --- |
@@ -2221,11 +1669,7 @@ Każdy model podano raz; odsyłacze z katalogu akcji prowadzą do schematu. Kolu
 | `Key` | string | ` default=string.Empty` |
 | `FillColor` | string | ` default=string.Empty` |
 
-<a id="dto-webapi-controllers-managergraphtextcolorbinddto"></a>
-
 #### WebApi.Controllers.ManagerGraphTextColorBindDto
-
-[Definicja](../../GF3.WebApi/Controllers/ManagerGraphTextColorBindsController.cs).
 
 | Właściwość | Typ C# / nullable | Walidacja / default |
 | --- | --- | --- |
@@ -2233,11 +1677,7 @@ Każdy model podano raz; odsyłacze z katalogu akcji prowadzą do schematu. Kolu
 | `Key` | string | ` default=string.Empty` |
 | `TextColor` | string | ` default=string.Empty` |
 
-<a id="dto-webapi-controllers-managernotedto"></a>
-
 #### WebApi.Controllers.ManagerNoteDto
-
-[Definicja](../../GF3.WebApi/Controllers/ManagerNotepadController.cs).
 
 | Właściwość | Typ C# / nullable | Walidacja / default |
 | --- | --- | --- |
@@ -2248,22 +1688,14 @@ Każdy model podano raz; odsyłacze z katalogu akcji prowadzą do schematu. Kolu
 | `CreatedAtUtc` | `DateTimeOffset` | brak atrybutu/default w deklaracji |
 | `UpdatedAtUtc` | `DateTimeOffset` | brak atrybutu/default w deklaracji |
 
-<a id="dto-webapi-controllers-managernotepaddto"></a>
-
 #### WebApi.Controllers.ManagerNotepadDto
-
-[Definicja](../../GF3.WebApi/Controllers/ManagerNotepadController.cs).
 
 | Właściwość | Typ C# / nullable | Walidacja / default |
 | --- | --- | --- |
-| `Notes` | `IReadOnlyList`&lt;[ManagerNoteDto](#dto-webapi-controllers-managernotedto)&gt; | ` default=[]` |
-| `State` | [ManagerNotepadStateDto](#dto-webapi-controllers-managernotepadstatedto) | ` default=new()` |
-
-<a id="dto-webapi-controllers-managernotepadstatedto"></a>
+| `Notes` | `IReadOnlyList`&lt;ManagerNoteDto&gt; | ` default=[]` |
+| `State` | ManagerNotepadStateDto | ` default=new()` |
 
 #### WebApi.Controllers.ManagerNotepadStateDto
-
-[Definicja](../../GF3.WebApi/Controllers/ManagerNotepadController.cs).
 
 | Właściwość | Typ C# / nullable | Walidacja / default |
 | --- | --- | --- |
@@ -2271,53 +1703,33 @@ Każdy model podano raz; odsyłacze z katalogu akcji prowadzą do schematu. Kolu
 | `IsPinned` | bool | brak atrybutu/default w deklaracji |
 | `Height` | int | ` default=520` |
 
-<a id="dto-webapi-controllers-markemployeenotificationsreadrequest"></a>
-
 #### WebApi.Controllers.MarkEmployeeNotificationsReadRequest
-
-[Definicja](../../GF3.WebApi/Controllers/EmployeeUiStateController.cs).
 
 | Właściwość | Typ C# / nullable | Walidacja / default |
 | --- | --- | --- |
 | `NotificationIds` | `IReadOnlyList`&lt;string&gt;? | brak atrybutu/default w deklaracji |
 
-<a id="dto-webapi-controllers-saveemployeeschedulecolumnorderrequest"></a>
-
 #### WebApi.Controllers.SaveEmployeeScheduleColumnOrderRequest
-
-[Definicja](../../GF3.WebApi/Controllers/EmployeeUiStateController.cs).
 
 | Właściwość | Typ C# / nullable | Walidacja / default |
 | --- | --- | --- |
 | `ColumnOrder` | `IReadOnlyList`&lt;int&gt;? | brak atrybutu/default w deklaracji |
 
-<a id="dto-webapi-controllers-savemanagergraphfillcolorbindrequest"></a>
-
 #### WebApi.Controllers.SaveManagerGraphFillColorBindRequest
-
-[Definicja](../../GF3.WebApi/Controllers/ManagerGraphFillColorBindsController.cs).
 
 | Właściwość | Typ C# / nullable | Walidacja / default |
 | --- | --- | --- |
 | `Key` | string? | brak atrybutu/default w deklaracji |
 | `FillColor` | string? | brak atrybutu/default w deklaracji |
 
-<a id="dto-webapi-controllers-savemanagergraphtextcolorbindrequest"></a>
-
 #### WebApi.Controllers.SaveManagerGraphTextColorBindRequest
-
-[Definicja](../../GF3.WebApi/Controllers/ManagerGraphTextColorBindsController.cs).
 
 | Właściwość | Typ C# / nullable | Walidacja / default |
 | --- | --- | --- |
 | `Key` | string? | brak atrybutu/default w deklaracji |
 | `TextColor` | string? | brak atrybutu/default w deklaracji |
 
-<a id="dto-webapi-controllers-savemanagernoterequest"></a>
-
 #### WebApi.Controllers.SaveManagerNoteRequest
-
-[Definicja](../../GF3.WebApi/Controllers/ManagerNotepadController.cs).
 
 | Właściwość | Typ C# / nullable | Walidacja / default |
 | --- | --- | --- |
@@ -2325,11 +1737,7 @@ Każdy model podano raz; odsyłacze z katalogu akcji prowadzą do schematu. Kolu
 | `Content` | string? | brak atrybutu/default w deklaracji |
 | `Color` | string? | brak atrybutu/default w deklaracji |
 
-<a id="dto-webapi-controllers-savemanagernotepadstaterequest"></a>
-
 #### WebApi.Controllers.SaveManagerNotepadStateRequest
-
-[Definicja](../../GF3.WebApi/Controllers/ManagerNotepadController.cs).
 
 | Właściwość | Typ C# / nullable | Walidacja / default |
 | --- | --- | --- |
@@ -2337,11 +1745,7 @@ Każdy model podano raz; odsyłacze z katalogu akcji prowadzą do schematu. Kolu
 | `IsPinned` | bool | brak atrybutu/default w deklaracji |
 | `Height` | int | ` default=520` |
 
-<a id="dto-webapi-controllers-savesystemnewsrequest"></a>
-
 #### WebApi.Controllers.SaveSystemNewsRequest
-
-[Definicja](../../GF3.WebApi/Controllers/SystemNewsController.cs).
 
 | Właściwość | Typ C# / nullable | Walidacja / default |
 | --- | --- | --- |
@@ -2351,22 +1755,14 @@ Każdy model podano raz; odsyłacze z katalogu akcji prowadzą do schematu. Kolu
 | `ImageUrl` | string? | brak atrybutu/default w deklaracji |
 | `VideoUrl` | string? | brak atrybutu/default w deklaracji |
 
-<a id="dto-webapi-controllers-subscriptionrequest"></a>
-
 #### WebApi.Controllers.SubscriptionRequest
-
-[Definicja](../../GF3.WebApi/Controllers/EmployeePushController.cs).
 
 | Właściwość | Typ C# / nullable | Walidacja / default |
 | --- | --- | --- |
 | `Endpoint` | string | `[Required, MaxLength(2048)]` |
-| `Keys` | [BrowserKeys](#dto-webapi-controllers-browserkeys) | `[Required]` |
-
-<a id="dto-webapi-controllers-systemnewsdto"></a>
+| `Keys` | BrowserKeys | `[Required]` |
 
 #### WebApi.Controllers.SystemNewsDto
-
-[Definicja](../../GF3.WebApi/Controllers/SystemNewsController.cs).
 
 | Właściwość | Typ C# / nullable | Walidacja / default |
 | --- | --- | --- |
@@ -2388,15 +1784,11 @@ Startup sprawdza istnienie bazy przy `RequireExistingDatabase`, wykonuje quick_c
 
 Katalog obejmuje wszystkie **39 encji** z DbSet i mapowania AppDbContext. Nazwy fizyczne, typy SQLite, PK, FK, indeksy/check pochodzą z aktualnego snapshotu migracji i konfiguracji modelu; nie są wnioskowane z liczby mnogiej DbSet. W tabelach pól `NULL tak` oznacza dopuszczenie null przez EF; C# w kolumnie modelu może używać enum lub konwersji czasu zamiast typu magazynu. `INTEGER` obejmuje także bool/enum/ticks; `TEXT` m.in. tekst i część dat. Wszystkie kolumny fizyczne wymieniono poniżej. Nawigacje nie tworzą dodatkowych kolumn.
 
-[AppDbContext](../../DataAccessLayer/Models/DataBaseContext/AppDbContext.cs) · [snapshot](../../DataAccessLayer/Migrations/AppDbContextModelSnapshot.cs) · [migracje](../../DataAccessLayer/Migrations/).
-
-
 ### 3.1 Sklepy, pracownicy, konta i kontenery
-
 
 #### shop — ShopModel
 
-Model: [ShopModel](../../DataAccessLayer/Models/ShopModel.cs). PK: `"Id"`.
+Model: ShopModel. PK: `"Id"`.
 
 | Kolumna | Właściwość modelu / typ magazynu | NULL | Ograniczenia pola |
 | --- | --- | --- | --- |
@@ -2415,7 +1807,7 @@ Walidacja deklaracji modelu: `Name [Required]`; `Address [Required]`.
 
 #### employee — EmployeeModel
 
-Model: [EmployeeModel](../../DataAccessLayer/Models/EmployeeModel.cs). PK: `"Id"`.
+Model: EmployeeModel. PK: `"Id"`.
 
 | Kolumna | Właściwość modelu / typ magazynu | NULL | Ograniczenia pola |
 | --- | --- | --- | --- |
@@ -2436,7 +1828,7 @@ Walidacja deklaracji modelu: `FirstName [Required]`; `LastName [Required]`.
 
 #### employee_account — EmployeeAccountModel
 
-Model: [EmployeeAccountModel](../../DataAccessLayer/Models/EmployeeAccountModel.cs). PK: `"Id"`.
+Model: EmployeeAccountModel. PK: `"Id"`.
 
 | Kolumna | Właściwość modelu / typ magazynu | NULL | Ograniczenia pola |
 | --- | --- | --- | --- |
@@ -2463,7 +1855,7 @@ Walidacja deklaracji modelu: `Language [Required]`; `EmployeeId [Required]`; `Us
 
 #### manager_account — ManagerAccountModel
 
-Model: [ManagerAccountModel](../../DataAccessLayer/Models/ManagerAccountModel.cs). PK: `"Id"`.
+Model: ManagerAccountModel. PK: `"Id"`.
 
 | Kolumna | Właściwość modelu / typ magazynu | NULL | Ograniczenia pola |
 | --- | --- | --- | --- |
@@ -2492,7 +1884,7 @@ Walidacja deklaracji modelu: `Language [Required]`; `Username [Required]`; `Disp
 
 #### container — ContainerModel
 
-Model: [ContainerModel](../../DataAccessLayer/Models/ContainerModel.cs). PK: `"Id"`.
+Model: ContainerModel. PK: `"Id"`.
 
 | Kolumna | Właściwość modelu / typ magazynu | NULL | Ograniczenia pola |
 | --- | --- | --- | --- |
@@ -2510,10 +1902,9 @@ Walidacja deklaracji modelu: `Name [Required]`.
 
 ### 3.2 Grafiki, sloty, uczestnicy, presety i wersje
 
-
 #### schedule_cell_style — ScheduleCellStyleModel
 
-Model: [ScheduleCellStyleModel](../../DataAccessLayer/Models/ScheduleCellStyleModel.cs). PK: `"Id"`.
+Model: ScheduleCellStyleModel. PK: `"Id"`.
 
 | Kolumna | Właściwość modelu / typ magazynu | NULL | Ograniczenia pola |
 | --- | --- | --- | --- |
@@ -2534,7 +1925,7 @@ Walidacja deklaracji modelu: `ScheduleId [Required]`; `DayOfMonth [Required]`; `
 
 #### schedule_employee — ScheduleEmployeeModel
 
-Model: [ScheduleEmployeeModel](../../DataAccessLayer/Models/ScheduleEmployeeModel.cs). PK: `"Id"`.
+Model: ScheduleEmployeeModel. PK: `"Id"`.
 
 | Kolumna | Właściwość modelu / typ magazynu | NULL | Ograniczenia pola |
 | --- | --- | --- | --- |
@@ -2554,7 +1945,7 @@ Walidacja deklaracji modelu: `ScheduleId [Required]`; `EmployeeId [Required]`; `
 
 #### schedule — ScheduleModel
 
-Model: [ScheduleModel](../../DataAccessLayer/Models/ScheduleModel.cs). PK: `"Id"`.
+Model: ScheduleModel. PK: `"Id"`.
 
 | Kolumna | Właściwość modelu / typ magazynu | NULL | Ograniczenia pola |
 | --- | --- | --- | --- |
@@ -2588,7 +1979,7 @@ Walidacja deklaracji modelu: `ContainerId [Required]`; `ShopId [Required]`; `Nam
 
 #### schedule_preset_employee — SchedulePresetEmployeeModel
 
-Model: [SchedulePresetEmployeeModel](../../DataAccessLayer/Models/SchedulePresetEmployeeModel.cs). PK: `"Id"`.
+Model: SchedulePresetEmployeeModel. PK: `"Id"`.
 
 | Kolumna | Właściwość modelu / typ magazynu | NULL | Ograniczenia pola |
 | --- | --- | --- | --- |
@@ -2607,7 +1998,7 @@ Walidacja deklaracji modelu: `SchedulePresetId [Required]`; `EmployeeId [Require
 
 #### schedule_preset — SchedulePresetModel
 
-Model: [SchedulePresetModel](../../DataAccessLayer/Models/SchedulePresetModel.cs). PK: `"Id"`.
+Model: SchedulePresetModel. PK: `"Id"`.
 
 | Kolumna | Właściwość modelu / typ magazynu | NULL | Ograniczenia pola |
 | --- | --- | --- | --- |
@@ -2637,7 +2028,7 @@ Walidacja deklaracji modelu: `Name [Required]`; `ScheduleName [Required]`; `Shop
 
 #### schedule_slot — ScheduleSlotModel
 
-Model: [ScheduleSlotModel](../../DataAccessLayer/Models/ScheduleSlotModel.cs). PK: `"Id"`.
+Model: ScheduleSlotModel. PK: `"Id"`.
 
 | Kolumna | Właściwość modelu / typ magazynu | NULL | Ograniczenia pola |
 | --- | --- | --- | --- |
@@ -2660,7 +2051,7 @@ Walidacja deklaracji modelu: `ScheduleId [Required]`; `DayOfMonth [Required]`; `
 
 #### schedule_version — ScheduleVersionModel
 
-Model: [ScheduleVersionModel](../../DataAccessLayer/Models/ScheduleVersionModel.cs). PK: `"Id"`.
+Model: ScheduleVersionModel. PK: `"Id"`.
 
 | Kolumna | Właściwość modelu / typ magazynu | NULL | Ograniczenia pola |
 | --- | --- | --- | --- |
@@ -2687,7 +2078,7 @@ Walidacja deklaracji modelu: `BranchName [MaxLength(80)]`; `CreatedByManagerName
 
 #### schedule_version_state — ScheduleVersionStateModel
 
-Model: [ScheduleVersionStateModel](../../DataAccessLayer/Models/ScheduleVersionStateModel.cs). PK: `"ScheduleId"`.
+Model: ScheduleVersionStateModel. PK: `"ScheduleId"`.
 
 | Kolumna | Właściwość modelu / typ magazynu | NULL | Ograniczenia pola |
 | --- | --- | --- | --- |
@@ -2702,10 +2093,9 @@ CHECK: brak własnego CHECK.
 
 ### 3.3 Dyspozycyjnosc, skroty i transfery
 
-
 #### availability_group_day — AvailabilityGroupDayModel
 
-Model: [AvailabilityGroupDayModel](../../DataAccessLayer/Models/AvailabilityGroupDayModel.cs). PK: `"Id"`.
+Model: AvailabilityGroupDayModel. PK: `"Id"`.
 
 | Kolumna | Właściwość modelu / typ magazynu | NULL | Ograniczenia pola |
 | --- | --- | --- | --- |
@@ -2725,7 +2115,7 @@ Walidacja deklaracji modelu: `AvailabilityGroupMemberId [Required]`; `DayOfMonth
 
 #### availability_group_day_transfer — AvailabilityGroupDayTransferModel
 
-Model: [AvailabilityGroupDayTransferModel](../../DataAccessLayer/Models/AvailabilityGroupDayTransferModel.cs). PK: `"Id"`.
+Model: AvailabilityGroupDayTransferModel. PK: `"Id"`.
 
 | Kolumna | Właściwość modelu / typ magazynu | NULL | Ograniczenia pola |
 | --- | --- | --- | --- |
@@ -2745,7 +2135,7 @@ Walidacja deklaracji modelu: `SourceMemberId [Required]`; `TargetMemberId [Requi
 
 #### availability_group_member — AvailabilityGroupMemberModel
 
-Model: [AvailabilityGroupMemberModel](../../DataAccessLayer/Models/AvailabilityGroupMemberModel.cs). PK: `"Id"`.
+Model: AvailabilityGroupMemberModel. PK: `"Id"`.
 
 | Kolumna | Właściwość modelu / typ magazynu | NULL | Ograniczenia pola |
 | --- | --- | --- | --- |
@@ -2766,7 +2156,7 @@ Walidacja deklaracji modelu: `AvailabilityGroupId [Required]`; `EmployeeId [Requ
 
 #### availability_group — AvailabilityGroupModel
 
-Model: [AvailabilityGroupModel](../../DataAccessLayer/Models/AvailabilityGroupModel.cs). PK: `"Id"`.
+Model: AvailabilityGroupModel. PK: `"Id"`.
 
 | Kolumna | Właściwość modelu / typ magazynu | NULL | Ograniczenia pola |
 | --- | --- | --- | --- |
@@ -2791,7 +2181,7 @@ Walidacja deklaracji modelu: `Name [Required]`; `Year [Required]`; `Month [Requi
 
 #### AvailabilityBinds — BindModel
 
-Model: [BindModel](../../DataAccessLayer/Models/BindModel.cs). PK: `"Id"`.
+Model: BindModel. PK: `"Id"`.
 
 | Kolumna | Właściwość modelu / typ magazynu | NULL | Ograniczenia pola |
 | --- | --- | --- | --- |
@@ -2809,10 +2199,9 @@ CHECK: brak własnego CHECK.
 
 ### 3.4 Wymiany i korekty
 
-
 #### manager_shift_correction_setting — ManagerShiftCorrectionSettingModel
 
-Model: [ManagerShiftCorrectionSettingModel](../../DataAccessLayer/Models/ManagerShiftCorrectionSettingModel.cs). PK: `"ManagerAccountId"`.
+Model: ManagerShiftCorrectionSettingModel. PK: `"ManagerAccountId"`.
 
 | Kolumna | Właściwość modelu / typ magazynu | NULL | Ograniczenia pola |
 | --- | --- | --- | --- |
@@ -2827,7 +2216,7 @@ CHECK: brak własnego CHECK.
 
 #### shift_correction_request — ShiftCorrectionRequestModel
 
-Model: [ShiftCorrectionRequestModel](../../DataAccessLayer/Models/ShiftCorrectionRequestModel.cs). PK: `"Id"`.
+Model: ShiftCorrectionRequestModel. PK: `"Id"`.
 
 | Kolumna | Właściwość modelu / typ magazynu | NULL | Ograniczenia pola |
 | --- | --- | --- | --- |
@@ -2853,7 +2242,7 @@ CHECK: `HasCheckConstraint("ck_shift_correction_dom", "day_of_month BETWEEN 1 AN
 
 #### shift_swap_history — ShiftSwapHistoryModel
 
-Model: [ShiftSwapHistoryModel](../../DataAccessLayer/Models/ShiftSwapHistoryModel.cs). PK: `"Id"`.
+Model: ShiftSwapHistoryModel. PK: `"Id"`.
 
 | Kolumna | Właściwość modelu / typ magazynu | NULL | Ograniczenia pola |
 | --- | --- | --- | --- |
@@ -2904,7 +2293,7 @@ Walidacja deklaracji modelu: `ReturnScheduleName [MaxLength(200), Column("return
 
 #### shift_swap_request — ShiftSwapRequestModel
 
-Model: [ShiftSwapRequestModel](../../DataAccessLayer/Models/ShiftSwapRequestModel.cs). PK: `"Id"`.
+Model: ShiftSwapRequestModel. PK: `"Id"`.
 
 | Kolumna | Właściwość modelu / typ magazynu | NULL | Ograniczenia pola |
 | --- | --- | --- | --- |
@@ -2940,10 +2329,9 @@ Walidacja deklaracji modelu: `ReturnFromTime [MaxLength(5), Column("return_from_
 
 ### 3.5 Komunikacja, powiadomienia, push i ustawienia
 
-
 #### communication_message — CommunicationMessageModel
 
-Model: [CommunicationMessageModel](../../DataAccessLayer/Models/CommunicationMessageModel.cs). PK: `"Id"`.
+Model: CommunicationMessageModel. PK: `"Id"`.
 
 | Kolumna | Właściwość modelu / typ magazynu | NULL | Ograniczenia pola |
 | --- | --- | --- | --- |
@@ -2966,7 +2354,7 @@ Walidacja deklaracji modelu: `Title [Required]`; `Body [Required]`; `CreatedByMa
 
 #### employee_communication_dismissal — EmployeeCommunicationDismissalModel
 
-Model: [EmployeeCommunicationDismissalModel](../../DataAccessLayer/Models/EmployeeCommunicationDismissalModel.cs). PK: `"Id"`.
+Model: EmployeeCommunicationDismissalModel. PK: `"Id"`.
 
 | Kolumna | Właściwość modelu / typ magazynu | NULL | Ograniczenia pola |
 | --- | --- | --- | --- |
@@ -2983,7 +2371,7 @@ CHECK: brak własnego CHECK.
 
 #### employee_notification_read — EmployeeNotificationReadModel
 
-Model: [EmployeeNotificationReadModel](../../DataAccessLayer/Models/EmployeeNotificationReadModel.cs). PK: `"Id"`.
+Model: EmployeeNotificationReadModel. PK: `"Id"`.
 
 | Kolumna | Właściwość modelu / typ magazynu | NULL | Ograniczenia pola |
 | --- | --- | --- | --- |
@@ -3000,7 +2388,7 @@ CHECK: brak własnego CHECK.
 
 #### employee_pinned_swap — EmployeePinnedSwapModel
 
-Model: [EmployeePinnedSwapModel](../../DataAccessLayer/Models/EmployeePinnedSwapModel.cs). PK: `"Id"`.
+Model: EmployeePinnedSwapModel. PK: `"Id"`.
 
 | Kolumna | Właściwość modelu / typ magazynu | NULL | Ograniczenia pola |
 | --- | --- | --- | --- |
@@ -3017,7 +2405,7 @@ CHECK: brak własnego CHECK.
 
 #### employee_push_delivery — EmployeePushDeliveryModel
 
-Model: [EmployeePushDeliveryModel](../../DataAccessLayer/Models/EmployeePushDeliveryModel.cs). PK: `"Id"`.
+Model: EmployeePushDeliveryModel. PK: `"Id"`.
 
 | Kolumna | Właściwość modelu / typ magazynu | NULL | Ograniczenia pola |
 | --- | --- | --- | --- |
@@ -3040,7 +2428,7 @@ CHECK: brak własnego CHECK.
 
 #### employee_push_subscription — EmployeePushSubscriptionModel
 
-Model: [EmployeePushSubscriptionModel](../../DataAccessLayer/Models/EmployeePushSubscriptionModel.cs). PK: `"Id"`.
+Model: EmployeePushSubscriptionModel. PK: `"Id"`.
 
 | Kolumna | Właściwość modelu / typ magazynu | NULL | Ograniczenia pola |
 | --- | --- | --- | --- |
@@ -3060,7 +2448,7 @@ CHECK: brak własnego CHECK.
 
 #### employee_schedule_column_preference — EmployeeScheduleColumnPreferenceModel
 
-Model: [EmployeeScheduleColumnPreferenceModel](../../DataAccessLayer/Models/EmployeeScheduleColumnPreferenceModel.cs). PK: `"Id"`.
+Model: EmployeeScheduleColumnPreferenceModel. PK: `"Id"`.
 
 | Kolumna | Właściwość modelu / typ magazynu | NULL | Ograniczenia pola |
 | --- | --- | --- | --- |
@@ -3078,7 +2466,7 @@ CHECK: brak własnego CHECK.
 
 #### manager_graph_fill_color_bind — ManagerGraphFillColorBindModel
 
-Model: [ManagerGraphFillColorBindModel](../../DataAccessLayer/Models/ManagerGraphFillColorBindModel.cs). PK: `"Id"`.
+Model: ManagerGraphFillColorBindModel. PK: `"Id"`.
 
 | Kolumna | Właściwość modelu / typ magazynu | NULL | Ograniczenia pola |
 | --- | --- | --- | --- |
@@ -3095,7 +2483,7 @@ CHECK: brak własnego CHECK.
 
 #### manager_graph_text_color_bind — ManagerGraphTextColorBindModel
 
-Model: [ManagerGraphTextColorBindModel](../../DataAccessLayer/Models/ManagerGraphTextColorBindModel.cs). PK: `"Id"`.
+Model: ManagerGraphTextColorBindModel. PK: `"Id"`.
 
 | Kolumna | Właściwość modelu / typ magazynu | NULL | Ograniczenia pola |
 | --- | --- | --- | --- |
@@ -3112,7 +2500,7 @@ CHECK: brak własnego CHECK.
 
 #### manager_note — ManagerNoteModel
 
-Model: [ManagerNoteModel](../../DataAccessLayer/Models/ManagerNoteModel.cs). PK: `"Id"`.
+Model: ManagerNoteModel. PK: `"Id"`.
 
 | Kolumna | Właściwość modelu / typ magazynu | NULL | Ograniczenia pola |
 | --- | --- | --- | --- |
@@ -3134,7 +2522,7 @@ Walidacja deklaracji modelu: `Title [MaxLength(160)]`; `Color [MaxLength(16)]`.
 
 #### manager_notepad_state — ManagerNotepadStateModel
 
-Model: [ManagerNotepadStateModel](../../DataAccessLayer/Models/ManagerNotepadStateModel.cs). PK: `"ManagerAccountId"`.
+Model: ManagerNotepadStateModel. PK: `"ManagerAccountId"`.
 
 | Kolumna | Właściwość modelu / typ magazynu | NULL | Ograniczenia pola |
 | --- | --- | --- | --- |
@@ -3152,7 +2540,7 @@ CHECK: brak własnego CHECK.
 
 #### system_news_message — SystemNewsMessageModel
 
-Model: [SystemNewsMessageModel](../../DataAccessLayer/Models/SystemNewsMessageModel.cs). PK: `"Id"`.
+Model: SystemNewsMessageModel. PK: `"Id"`.
 
 | Kolumna | Właściwość modelu / typ magazynu | NULL | Ograniczenia pola |
 | --- | --- | --- | --- |
@@ -3175,7 +2563,7 @@ Walidacja deklaracji modelu: `Title [MaxLength(160), Column("title")]`; `Audienc
 
 #### system_news_read — SystemNewsReadModel
 
-Model: [SystemNewsReadModel](../../DataAccessLayer/Models/SystemNewsReadModel.cs). PK: `"Id"`.
+Model: SystemNewsReadModel. PK: `"Id"`.
 
 | Kolumna | Właściwość modelu / typ magazynu | NULL | Ograniczenia pola |
 | --- | --- | --- | --- |
@@ -3195,10 +2583,9 @@ Walidacja deklaracji modelu: `AccountRole [MaxLength(16), Column("account_role")
 
 ### 3.6 Regulaminy i logi
 
-
 #### regulation_acceptance — RegulationAcceptanceModel
 
-Model: [RegulationAcceptanceModel](../../DataAccessLayer/Models/RegulationAcceptanceModel.cs). PK: `"Id"`.
+Model: RegulationAcceptanceModel. PK: `"Id"`.
 
 | Kolumna | Właściwość modelu / typ magazynu | NULL | Ograniczenia pola |
 | --- | --- | --- | --- |
@@ -3220,7 +2607,7 @@ Walidacja deklaracji modelu: `AccountRole [Required]`; `UsernameSnapshot [Requir
 
 #### regulation_document — RegulationDocumentModel
 
-Model: [RegulationDocumentModel](../../DataAccessLayer/Models/RegulationDocumentModel.cs). PK: `"Id"`.
+Model: RegulationDocumentModel. PK: `"Id"`.
 
 | Kolumna | Właściwość modelu / typ magazynu | NULL | Ograniczenia pola |
 | --- | --- | --- | --- |
@@ -3248,7 +2635,7 @@ Walidacja deklaracji modelu: `Title [Required]`; `Version [Required]`; `Message 
 
 #### workflow_log_entry — WorkflowLogEntryModel
 
-Model: [WorkflowLogEntryModel](../../DataAccessLayer/Models/WorkflowLogEntryModel.cs). PK: `"Id"`.
+Model: WorkflowLogEntryModel. PK: `"Id"`.
 
 | Kolumna | Właściwość modelu / typ magazynu | NULL | Ograniczenia pola |
 | --- | --- | --- | --- |
@@ -3269,7 +2656,7 @@ Walidacja deklaracji modelu: `OccurredAtUtc [Required]`; `ActorRole [Required]`;
 
 #### workflow_log_settings — WorkflowLogSettingsModel
 
-Model: [WorkflowLogSettingsModel](../../DataAccessLayer/Models/WorkflowLogSettingsModel.cs). PK: `"Id"`.
+Model: WorkflowLogSettingsModel. PK: `"Id"`.
 
 | Kolumna | Właściwość modelu / typ magazynu | NULL | Ograniczenia pola |
 | --- | --- | --- | --- |
@@ -3291,12 +2678,11 @@ Walidacja deklaracji modelu: `Audience [Required]`.
 
 Pracownik ma `IsDeleted`; usuwanie może archiwizować osobę potrzebną historii zamiast kasować wszystkie dane. Nie ma globalnego filtra EF usuwającego historyczne osoby z każdego odczytu. Konta/poświadczenia są oddzielone od danych pracownika. Użytkownik nie podaje skrótów haseł, wersji sesji ani technicznych timestampów w zwykłym formularzu.
 
-Presety są wybieralne między kontenerami; `SchedulePresetModel.ContainerId` jest nullable, relacja nie wymusza już własności pojedynczego kontenera. Migracja [MakeSchedulePresetsApplicationWide](../../DataAccessLayer/Migrations/20261020131328_MakeSchedulePresetsApplicationWide.cs) jest obowiązująca. Nie oznacza to globalnej unikalności nazw: sprawdzanie nazwy w ContainerService nadal odnosi się do bieżącego kontenera. Wersje grafiku przechowują snapshot i stan bieżącej gałęzi; zmiana kodu bez zgodnej bazy nie jest rollbackiem danych.
+Presety są wybieralne między kontenerami; `SchedulePresetModel.ContainerId` jest nullable, relacja nie wymusza już własności pojedynczego kontenera. Migracja MakeSchedulePresetsApplicationWide jest obowiązująca. Nie oznacza to globalnej unikalności nazw: sprawdzanie nazwy w ContainerService nadal odnosi się do bieżącego kontenera. Wersje grafiku przechowują snapshot i stan bieżącej gałęzi; zmiana kodu bez zgodnej bazy nie jest rollbackiem danych.
 
 Walidacja ma trzy poziomy: adnotacje modeli/requestów, Fluent/indeksy/CHECK w EF oraz usługi domenowe (zakres dat i miesiąca, przedziały czasu, przypisania, publikacja, konflikt zmian/duplikatów, aktualność wniosku). MaxLength w modelu EF/SQLite nie zastępuje wszystkich reguł usług; SQLite nie zachowuje się jak serwer wymuszający każdy limit varchar. Zapis AppDbContext nadaje timestamp publikacji grafiku i tożsamość/czas dostępności powiadomienia o dyspozycyjności. Powiadomienia push mają unikalne dostarczenia i lease/retry, a nie osobny magazyn danych użytkownika w telefonie.
 
 Brak własnych procedur/wyzwalaczy potwierdzonych w źródłach migracji. Operacje generatora, walidacji i repozytoriów są kodem C#/EF, nie procedurami SQL. SQLite jest bazą plikową; źródła nie ustanawiają shardingu, rozproszonej bazy ani klastra. Dostęp/backup i wydajność wymagają weryfikacji dla rzeczywistego obciążenia.
-
 
 ## 4. Biblioteki wewnetrzne
 
@@ -3308,7 +2694,7 @@ Rejestracja `AddBusinessLogicLayer()` wymaga istniejących repozytoriów i konfi
 
 Walidacja domeny zgłasza `BusinessLogicLayer.Common.ValidationException` z mapą pól; operacje braku zasobu i bezpiecznego usuwania używają wyjątków lub DeleteOperationResult zgodnie z kontraktem konkretnej metody. API tłumaczy je mechanizmem §2. Komunikaty UI nie zastępują walidacji usług i bazy.
 
-Kontrakt generatora [IScheduleGenerator](../../BusinessLogicLayer/Generators/IScheduleGenerator.cs):
+Kontrakt generatora IScheduleGenerator:
 
 ```csharp
 Task<IList<ScheduleSlotModel>> GenerateAsync(
@@ -3319,11 +2705,11 @@ Task<IList<ScheduleSlotModel>> GenerateAsync(
     CancellationToken ct = default);
 ```
 
-Typy wejścia/wyjścia powyżej pochodzą z `BusinessLogicLayer.Contracts.Models`, nie bezpośrednio z modeli EF o podobnych nazwach. [ScheduleGenerator](../../BusinessLogicLayer/Generators/ScheduleGenerator.cs) normalizuje dane, buduje macierze dostępności, wybiera przydziały i emituje sloty. Uwzględnia okna ANY/NONE/INT, obsadę jednej/dwóch zmian, limity godzin, dni kolejnych/pełnych, cele minimalnych godzin i równoważenie obsady. Deduplikuje pracowników; przy duplikatach zachowuje większe minimum godzin. Null wejścia jest błędem; nieprawidłowy rok/miesiąc, brak obsady, szablonów zmian lub pracowników mogą dać pustą listę. Ma anulowanie i raportowanie postępu. Wynik wymaga kontroli konfliktów; algorytm nie daje gwarancji optymalnego/wykonalnego rozwiązania każdego zestawu reguł. Generowanie propozycji i jej utrwalenie są oddzielnymi operacjami warstwy wyższej.
+Typy wejścia/wyjścia powyżej pochodzą z `BusinessLogicLayer.Contracts.Models`, nie bezpośrednio z modeli EF o podobnych nazwach. ScheduleGenerator normalizuje dane, buduje macierze dostępności, wybiera przydziały i emituje sloty. Uwzględnia okna ANY/NONE/INT, obsadę jednej/dwóch zmian, limity godzin, dni kolejnych/pełnych, cele minimalnych godzin i równoważenie obsady. Deduplikuje pracowników; przy duplikatach zachowuje większe minimum godzin. Null wejścia jest błędem; nieprawidłowy rok/miesiąc, brak obsady, szablonów zmian lub pracowników mogą dać pustą listę. Ma anulowanie i raportowanie postępu. Wynik wymaga kontroli konfliktów; algorytm nie daje gwarancji optymalnego/wykonalnego rozwiązania każdego zestawu reguł. Generowanie propozycji i jej utrwalenie są oddzielnymi operacjami warstwy wyższej.
 
 ### DataAccessLayer
 
-Biblioteka .NET 10: AppDbContext, modele, migracje, repozytoria i administracja SQLite. `AddDataAccess()` rejestruje scoped repozytoria i kontekst z `ISqliteDatabaseWorkspace.ConnectionString`. Repozytoria utrwalają grafy/relacje, bez wiedzy o HTTP; kontekst aktualizuje timestampy publikacji. Ograniczenia SQL i błędy konkurencji mogą zgłosić DbUpdateException/DbUpdateConcurrencyException; należy zachować transakcje i obsługę błędów warstwy wyższej. SQL administracyjny nie jest zwykłym API domenowym. [Repozytoria](../../DataAccessLayer/Repositories/) i [interfejsy](../../DataAccessLayer/Repositories/Abstractions/) określają operacje trwałości; pełny model fizyczny w §3.
+Biblioteka .NET 10: AppDbContext, modele, migracje, repozytoria i administracja SQLite. `AddDataAccess()` rejestruje scoped repozytoria i kontekst z `ISqliteDatabaseWorkspace.ConnectionString`. Repozytoria utrwalają grafy/relacje, bez wiedzy o HTTP; kontekst aktualizuje timestampy publikacji. Ograniczenia SQL i błędy konkurencji mogą zgłosić DbUpdateException/DbUpdateConcurrencyException; należy zachować transakcje i obsługę błędów warstwy wyższej. SQL administracyjny nie jest zwykłym API domenowym. Repozytoria i interfejsy określają operacje trwałości; pełny model fizyczny w §3.
 
 ### GF3.WebApi i klient
 
@@ -3331,12 +2717,9 @@ WebApi to adapter/host: mapuje requesty na kontrakty BLL i wyniki na DTO HTTP, e
 
 ### Publiczne kontrakty uslug BLL
 
-Poniższy katalog wskazuje wejścia/wyjścia i dziedziczenie każdego publicznego interfejsu z Services/Abstractions. Typy kontraktów są podlinkowane przez plik interfejsu/importy; implementacje i DI: [usługi](../../BusinessLogicLayer/Services/), [Extensions](../../BusinessLogicLayer/Extensions.cs). Metody bazowe obowiązują również w interfejsach dziedziczących. Sygnatury są kontraktem C#, nie dodatkowymi endpointami HTTP.
-
+Poniższy katalog wskazuje wejścia/wyjścia i dziedziczenie każdego publicznego interfejsu z Services/Abstractions. Typy wejściowe i wynikowe podano w sygnaturach; zasady integracji i DI opisano powyżej. Metody bazowe obowiązują również w interfejsach dziedziczących. Sygnatury są kontraktem C#, nie dodatkowymi endpointami HTTP.
 
 #### IAdminDbService
-
-[Definicja](../../BusinessLogicLayer/Services/Abstractions/IAdminDbService.cs).
 
 | Operacja — typ wyniku, wejścia i wartości domyślne |
 | --- |
@@ -3350,8 +2733,6 @@ Poniższy katalog wskazuje wejścia/wyjścia i dziedziczenie każdego publiczneg
 
 #### IAuthService
 
-[Definicja](../../BusinessLogicLayer/Services/Abstractions/IAuthService.cs).
-
 | Operacja — typ wyniku, wejścia i wartości domyślne |
 | --- |
 | `Task<AuthenticatedSessionDto?> AuthenticateAsync(string username, string password, CancellationToken ct = default)` |
@@ -3359,8 +2740,6 @@ Poniższy katalog wskazuje wejścia/wyjścia i dziedziczenie każdego publiczneg
 | `Task ConfirmPasswordResetAsync(string username, string code, string newPassword, CancellationToken ct = default)` |
 
 #### `IAvailabilityGroupService : IBaseService<AvailabilityGroupModel>`
-
-[Definicja](../../BusinessLogicLayer/Services/Abstractions/IAvailabilityGroupService.cs).
 
 | Operacja — typ wyniku, wejścia i wartości domyślne |
 | --- |
@@ -3381,8 +2760,6 @@ Poniższy katalog wskazuje wejścia/wyjścia i dziedziczenie każdego publiczneg
 
 #### IAvailabilityGroupTransferService
 
-[Definicja](../../BusinessLogicLayer/Services/Abstractions/IAvailabilityGroupTransferService.cs).
-
 | Operacja — typ wyniku, wejścia i wartości domyślne |
 | --- |
 | `Task<List<AvailabilityTransferSourceModel>> GetSourcesAsync( int targetGroupId, int targetMemberId, CancellationToken ct = default)` |
@@ -3391,8 +2768,6 @@ Poniższy katalog wskazuje wejścia/wyjścia i dziedziczenie każdego publiczneg
 | `Task<AvailabilityTransferResultModel> TransferDaysAsync( int targetGroupId, int targetMemberId, int sourceGroupId, IReadOnlyCollection<int> dayOfMonths, CancellationToken ct = default)` |
 
 #### `IBaseService<TEntity> where TEntity : class`
-
-[Definicja](../../BusinessLogicLayer/Services/Abstractions/IBaseService.cs).
 
 | Operacja — typ wyniku, wejścia i wartości domyślne |
 | --- |
@@ -3403,8 +2778,6 @@ Poniższy katalog wskazuje wejścia/wyjścia i dziedziczenie każdego publiczneg
 | `Task DeleteAsync(int id, CancellationToken ct = default)` |
 
 #### `IBindService : IBaseService<BindModel>`
-
-[Definicja](../../BusinessLogicLayer/Services/Abstractions/IBindService.cs).
 
 | Operacja — typ wyniku, wejścia i wartości domyślne |
 | --- |
@@ -3420,8 +2793,6 @@ Poniższy katalog wskazuje wejścia/wyjścia i dziedziczenie każdego publiczneg
 
 #### ICommunicationService
 
-[Definicja](../../BusinessLogicLayer/Services/Abstractions/ICommunicationService.cs).
-
 | Operacja — typ wyniku, wejścia i wartości domyślne |
 | --- |
 | `Task<IReadOnlyList<CommunicationMessageDto>> ListForManagerAsync(CancellationToken ct = default)` |
@@ -3432,8 +2803,6 @@ Poniższy katalog wskazuje wejścia/wyjścia i dziedziczenie każdego publiczneg
 | `Task DismissForEmployeeAsync(int employeeId, int communicationId, CancellationToken ct = default)` |
 
 #### `IContainerService : IBaseService<ContainerModel>`
-
-[Definicja](../../BusinessLogicLayer/Services/Abstractions/IContainerService.cs).
 
 | Operacja — typ wyniku, wejścia i wartości domyślne |
 | --- |
@@ -3465,15 +2834,11 @@ Poniższy katalog wskazuje wejścia/wyjścia i dziedziczenie każdego publiczneg
 
 #### IEmailSender
 
-[Definicja](../../BusinessLogicLayer/Services/Abstractions/IEmailSender.cs).
-
 | Operacja — typ wyniku, wejścia i wartości domyślne |
 | --- |
 | `Task SendAsync( string toEmail, string? toName, string subject, string textBody, CancellationToken ct = default)` |
 
 #### IEmployeeAccountService
-
-[Definicja](../../BusinessLogicLayer/Services/Abstractions/IEmployeeAccountService.cs).
 
 | Operacja — typ wyniku, wejścia i wartości domyślne |
 | --- |
@@ -3490,8 +2855,6 @@ Poniższy katalog wskazuje wejścia/wyjścia i dziedziczenie każdego publiczneg
 
 #### IEmployeeFacade
 
-[Definicja](../../BusinessLogicLayer/Services/Abstractions/IEmployeeFacade.cs).
-
 | Operacja — typ wyniku, wejścia i wartości domyślne |
 | --- |
 | `Task<IReadOnlyList<EmployeeDto>> GetAllAsync(CancellationToken ct = default)` |
@@ -3504,8 +2867,6 @@ Poniższy katalog wskazuje wejścia/wyjścia i dziedziczenie każdego publiczneg
 
 #### IEmployeePresenceService
 
-[Definicja](../../BusinessLogicLayer/Services/Abstractions/IEmployeePresenceService.cs).
-
 | Operacja — typ wyniku, wejścia i wartości domyślne |
 | --- |
 | `bool IsEmployeeOnline(int employeeId)` |
@@ -3514,8 +2875,6 @@ Poniższy katalog wskazuje wejścia/wyjścia i dziedziczenie każdego publiczneg
 | `EmployeePresenceChange? DisconnectConnection(string connectionId, DateTimeOffset disconnectedAtUtc)` |
 
 #### IEmployeeProfileService
-
-[Definicja](../../BusinessLogicLayer/Services/Abstractions/IEmployeeProfileService.cs).
 
 | Operacja — typ wyniku, wejścia i wartości domyślne |
 | --- |
@@ -3526,8 +2885,6 @@ Poniższy katalog wskazuje wejścia/wyjścia i dziedziczenie każdego publiczneg
 
 #### `IEmployeeService : IBaseService<EmployeeModel>`
 
-[Definicja](../../BusinessLogicLayer/Services/Abstractions/IEmployeeService.cs).
-
 | Operacja — typ wyniku, wejścia i wartości domyślne |
 | --- |
 | `Task<List<EmployeeModel>> GetByValueAsync(string value, CancellationToken ct = default)` |
@@ -3536,16 +2893,12 @@ Poniższy katalog wskazuje wejścia/wyjścia i dziedziczenie każdego publiczneg
 
 #### IExcelTemplateLocator
 
-[Definicja](../../BusinessLogicLayer/Services/Abstractions/IExcelTemplateLocator.cs).
-
 | Operacja — typ wyniku, wejścia i wartości domyślne |
 | --- |
 | `string GetScheduleTemplatePath()` |
 | `string GetContainerTemplatePath()` |
 
 #### IGraphExportService
-
-[Definicja](../../BusinessLogicLayer/Services/Abstractions/IGraphExportService.cs).
 
 | Operacja — typ wyniku, wejścia i wartości domyślne |
 | --- |
@@ -3555,16 +2908,12 @@ Poniższy katalog wskazuje wejścia/wyjścia i dziedziczenie każdego publiczneg
 
 #### IGraphTemplateExportService
 
-[Definicja](../../BusinessLogicLayer/Services/Abstractions/IGraphTemplateExportService.cs).
-
 | Operacja — typ wyniku, wejścia i wartości domyślne |
 | --- |
 | `Task<(byte[] content, string fileName)> ExportGraphToXlsxAsync( int containerId, int graphId, bool includeStyles, bool includeEmployees, CancellationToken ct = default)` |
 | `Task<(byte[] content, string fileName)> ExportContainerToXlsxAsync( int containerId, bool includeStyles, bool includeEmployees, CancellationToken ct = default)` |
 
 #### IManagerAccountService
-
-[Definicja](../../BusinessLogicLayer/Services/Abstractions/IManagerAccountService.cs).
 
 | Operacja — typ wyniku, wejścia i wartości domyślne |
 | --- |
@@ -3581,8 +2930,6 @@ Poniższy katalog wskazuje wejścia/wyjścia i dziedziczenie każdego publiczneg
 
 #### IManagerPresenceService
 
-[Definicja](../../BusinessLogicLayer/Services/Abstractions/IManagerPresenceService.cs).
-
 | Operacja — typ wyniku, wejścia i wartości domyślne |
 | --- |
 | `bool IsManagerOnline(int managerId)` |
@@ -3591,8 +2938,6 @@ Poniższy katalog wskazuje wejścia/wyjścia i dziedziczenie każdego publiczneg
 | `ManagerPresenceChange? DisconnectConnection(string connectionId, DateTimeOffset disconnectedAtUtc)` |
 
 #### IRegulationService
-
-[Definicja](../../BusinessLogicLayer/Services/Abstractions/IRegulationService.cs).
 
 | Operacja — typ wyniku, wejścia i wartości domyślne |
 | --- |
@@ -3609,14 +2954,10 @@ Poniższy katalog wskazuje wejścia/wyjścia i dziedziczenie każdego publiczneg
 
 #### `IScheduleEmployeeService : IBaseService<ScheduleEmployeeModel>`
 
-[Definicja](../../BusinessLogicLayer/Services/Abstractions/IScheduleEmployeeService.cs).
-
 | Operacja — typ wyniku, wejścia i wartości domyślne |
 | --- |
 
 #### IScheduleExcelContextBuilder
-
-[Definicja](../../BusinessLogicLayer/Services/Abstractions/IScheduleExcelContextBuilder.cs).
 
 | Operacja — typ wyniku, wejścia i wartości domyślne |
 | --- |
@@ -3625,15 +2966,11 @@ Poniższy katalog wskazuje wejścia/wyjścia i dziedziczenie każdego publiczneg
 
 #### IScheduleExportDataBuilder
 
-[Definicja](../../BusinessLogicLayer/Services/Abstractions/IScheduleExportDataBuilder.cs).
-
 | Operacja — typ wyniku, wejścia i wartości domyślne |
 | --- |
 | `ScheduleSqlExportData BuildSqlData( ScheduleModel schedule, IReadOnlyList<ScheduleEmployeeModel> employees, IReadOnlyList<ScheduleSlotModel> slots, IReadOnlyList<ScheduleCellStyleModel> cellStyles, AvailabilityGroupModel? availabilityGroup, IReadOnlyList<AvailabilityGroupMemberModel>? availabilityMembers, IReadOnlyList<AvailabilityGroupDayModel>? availabilityDays)` |
 
 #### `IScheduleService : IBaseService<ScheduleModel>`
-
-[Definicja](../../BusinessLogicLayer/Services/Abstractions/IScheduleService.cs).
 
 | Operacja — typ wyniku, wejścia i wartości domyślne |
 | --- |
@@ -3644,14 +2981,10 @@ Poniższy katalog wskazuje wejścia/wyjścia i dziedziczenie każdego publiczneg
 
 #### `IScheduleSlotService : IBaseService<ScheduleSlotModel>`
 
-[Definicja](../../BusinessLogicLayer/Services/Abstractions/IScheduleSlotService.cs).
-
 | Operacja — typ wyniku, wejścia i wartości domyślne |
 | --- |
 
 #### IShopFacade
-
-[Definicja](../../BusinessLogicLayer/Services/Abstractions/IShopFacade.cs).
 
 | Operacja — typ wyniku, wejścia i wartości domyślne |
 | --- |
@@ -3665,16 +2998,12 @@ Poniższy katalog wskazuje wejścia/wyjścia i dziedziczenie każdego publiczneg
 
 #### `IShopService : IBaseService<ShopModel>`
 
-[Definicja](../../BusinessLogicLayer/Services/Abstractions/IShopService.cs).
-
 | Operacja — typ wyniku, wejścia i wartości domyślne |
 | --- |
 | `Task<List<ShopModel>> GetByValueAsync(string value, CancellationToken ct = default)` |
 | `Task<DeleteOperationResult> TryDeleteAsync(int id, CancellationToken ct = default)` |
 
 #### ISqliteAdminFacade
-
-[Definicja](../../BusinessLogicLayer/Services/Abstractions/ISqliteAdminFacade.cs).
 
 | Operacja — typ wyniku, wejścia i wartości domyślne |
 | --- |
@@ -3690,50 +3019,50 @@ Wersje/range to deklaracje manifestów przypiętego commitu, nie audyt wersji ws
 
 | Pakiet/usługa | Deklarowana wersja/range | Cel i wymaganie / ograniczenia |
 | --- | --- | --- |
-| `WebPush` | `1.0.13` | push opcjonalny; wymaga konfiguracji VAPID i obsługi przeglądarki; [manifest](../../GF3.WebApi/WebApi.csproj) |
-| `Microsoft.AspNetCore.OpenApi` | `10.0.9` | Swagger/OpenAPI; UI w Development; [manifest](../../GF3.WebApi/WebApi.csproj) |
-| `Microsoft.AspNetCore.SpaProxy` | `10.0.9` | SPA proxy w Development; [manifest](../../GF3.WebApi/WebApi.csproj) |
-| `Microsoft.AspNetCore.SpaServices.Extensions` | `10.0.9` | SPA proxy w Development; [manifest](../../GF3.WebApi/WebApi.csproj) |
-| `Microsoft.EntityFrameworkCore.Design` | `10.0.9` | SQLite / EF; narzędzia Design/Tools tylko build/dev; [manifest](../../GF3.WebApi/WebApi.csproj) |
-| `Swashbuckle.AspNetCore` | `10.2.3` | Swagger/OpenAPI; UI w Development; [manifest](../../GF3.WebApi/WebApi.csproj) |
-| `ClosedXML` | `0.105.0` | eksport XLSX; [manifest](../../BusinessLogicLayer/BusinessLogicLayer.csproj) |
-| `Microsoft.Extensions.Options.ConfigurationExtensions` | `10.0.0` | wiązanie opcji konfiguracji; [manifest](../../BusinessLogicLayer/BusinessLogicLayer.csproj) |
-| `Microsoft.EntityFrameworkCore` | `10.0.9` | SQLite / EF; narzędzia Design/Tools tylko build/dev; [manifest](../../DataAccessLayer/DataAccessLayer.csproj) |
-| `Microsoft.EntityFrameworkCore.Sqlite` | `10.0.9` | SQLite / EF; narzędzia Design/Tools tylko build/dev; [manifest](../../DataAccessLayer/DataAccessLayer.csproj) |
-| `Microsoft.EntityFrameworkCore.Tools` | `10.0.9` | SQLite / EF; narzędzia Design/Tools tylko build/dev; [manifest](../../DataAccessLayer/DataAccessLayer.csproj) |
-| `SQLitePCLRaw.bundle_e_sqlite3` | `3.0.3` | SQLite / EF; narzędzia Design/Tools tylko build/dev; [manifest](../../DataAccessLayer/DataAccessLayer.csproj) |
-| `@gsap/react` | `^2.1.2` | runtime klienta; animacje UI; [manifest](../../FrontEnd/package.json) |
-| `@microsoft/signalr` | `^10.0.0` | runtime klienta; realtime z WebApi; [manifest](../../FrontEnd/package.json) |
-| `gsap` | `^3.15.0` | runtime klienta; animacje UI; [manifest](../../FrontEnd/package.json) |
-| `react` | `^19.2.0` | runtime klienta; [manifest](../../FrontEnd/package.json) |
-| `react-dom` | `^19.2.0` | runtime klienta; [manifest](../../FrontEnd/package.json) |
-| `@eslint/js` | `^9.39.1` | narzędzie dev/build/test, nie usługa produkcyjna; [manifest](../../FrontEnd/package.json) |
-| `@playwright/test` | `^1.59.1` | narzędzie dev/build/test, nie usługa produkcyjna; [manifest](../../FrontEnd/package.json) |
-| `@testing-library/jest-dom` | `^6.9.1` | narzędzie dev/build/test, nie usługa produkcyjna; [manifest](../../FrontEnd/package.json) |
-| `@testing-library/react` | `^16.3.2` | narzędzie dev/build/test, nie usługa produkcyjna; [manifest](../../FrontEnd/package.json) |
-| `@testing-library/user-event` | `^14.6.1` | narzędzie dev/build/test, nie usługa produkcyjna; [manifest](../../FrontEnd/package.json) |
-| `@types/node` | `^24.10.1` | narzędzie dev/build/test, nie usługa produkcyjna; [manifest](../../FrontEnd/package.json) |
-| `@types/react` | `^19.2.7` | narzędzie dev/build/test, nie usługa produkcyjna; [manifest](../../FrontEnd/package.json) |
-| `@types/react-dom` | `^19.2.3` | narzędzie dev/build/test, nie usługa produkcyjna; [manifest](../../FrontEnd/package.json) |
-| `@vitejs/plugin-react` | `^5.1.1` | narzędzie dev/build/test, nie usługa produkcyjna; [manifest](../../FrontEnd/package.json) |
-| `eslint` | `^9.39.1` | narzędzie dev/build/test, nie usługa produkcyjna; [manifest](../../FrontEnd/package.json) |
-| `eslint-plugin-react-hooks` | `^7.0.1` | narzędzie dev/build/test, nie usługa produkcyjna; [manifest](../../FrontEnd/package.json) |
-| `eslint-plugin-react-refresh` | `^0.4.24` | narzędzie dev/build/test, nie usługa produkcyjna; [manifest](../../FrontEnd/package.json) |
-| `globals` | `^16.5.0` | narzędzie dev/build/test, nie usługa produkcyjna; [manifest](../../FrontEnd/package.json) |
-| `jsdom` | `^29.1.1` | narzędzie dev/build/test, nie usługa produkcyjna; [manifest](../../FrontEnd/package.json) |
-| `typescript` | `~5.9.3` | narzędzie dev/build/test, nie usługa produkcyjna; [manifest](../../FrontEnd/package.json) |
-| `typescript-eslint` | `^8.48.0` | narzędzie dev/build/test, nie usługa produkcyjna; [manifest](../../FrontEnd/package.json) |
-| `vite` | `^7.3.1` | narzędzie dev/build/test, nie usługa produkcyjna; [manifest](../../FrontEnd/package.json) |
-| `vite-plugin-svgr` | `^4.5.0` | narzędzie dev/build/test, nie usługa produkcyjna; [manifest](../../FrontEnd/package.json) |
-| `vitest` | `^4.1.5` | narzędzie dev/build/test, nie usługa produkcyjna; [manifest](../../FrontEnd/package.json) |
+| `WebPush` | `1.0.13` | push opcjonalny; wymaga konfiguracji VAPID i obsługi przeglądarki |
+| `Microsoft.AspNetCore.OpenApi` | `10.0.9` | Swagger/OpenAPI; UI w Development |
+| `Microsoft.AspNetCore.SpaProxy` | `10.0.9` | SPA proxy w Development |
+| `Microsoft.AspNetCore.SpaServices.Extensions` | `10.0.9` | SPA proxy w Development |
+| `Microsoft.EntityFrameworkCore.Design` | `10.0.9` | SQLite / EF; narzędzia Design/Tools tylko build/dev |
+| `Swashbuckle.AspNetCore` | `10.2.3` | Swagger/OpenAPI; UI w Development |
+| `ClosedXML` | `0.105.0` | eksport XLSX |
+| `Microsoft.Extensions.Options.ConfigurationExtensions` | `10.0.0` | wiązanie opcji konfiguracji |
+| `Microsoft.EntityFrameworkCore` | `10.0.9` | SQLite / EF; narzędzia Design/Tools tylko build/dev |
+| `Microsoft.EntityFrameworkCore.Sqlite` | `10.0.9` | SQLite / EF; narzędzia Design/Tools tylko build/dev |
+| `Microsoft.EntityFrameworkCore.Tools` | `10.0.9` | SQLite / EF; narzędzia Design/Tools tylko build/dev |
+| `SQLitePCLRaw.bundle_e_sqlite3` | `3.0.3` | SQLite / EF; narzędzia Design/Tools tylko build/dev |
+| `@gsap/react` | `^2.1.2` | runtime klienta; animacje UI |
+| `@microsoft/signalr` | `^10.0.0` | runtime klienta; realtime z WebApi |
+| `gsap` | `^3.15.0` | runtime klienta; animacje UI |
+| `react` | `^19.2.0` | runtime klienta |
+| `react-dom` | `^19.2.0` | runtime klienta |
+| `@eslint/js` | `^9.39.1` | narzędzie dev/build/test, nie usługa produkcyjna |
+| `@playwright/test` | `^1.59.1` | narzędzie dev/build/test, nie usługa produkcyjna |
+| `@testing-library/jest-dom` | `^6.9.1` | narzędzie dev/build/test, nie usługa produkcyjna |
+| `@testing-library/react` | `^16.3.2` | narzędzie dev/build/test, nie usługa produkcyjna |
+| `@testing-library/user-event` | `^14.6.1` | narzędzie dev/build/test, nie usługa produkcyjna |
+| `@types/node` | `^24.10.1` | narzędzie dev/build/test, nie usługa produkcyjna |
+| `@types/react` | `^19.2.7` | narzędzie dev/build/test, nie usługa produkcyjna |
+| `@types/react-dom` | `^19.2.3` | narzędzie dev/build/test, nie usługa produkcyjna |
+| `@vitejs/plugin-react` | `^5.1.1` | narzędzie dev/build/test, nie usługa produkcyjna |
+| `eslint` | `^9.39.1` | narzędzie dev/build/test, nie usługa produkcyjna |
+| `eslint-plugin-react-hooks` | `^7.0.1` | narzędzie dev/build/test, nie usługa produkcyjna |
+| `eslint-plugin-react-refresh` | `^0.4.24` | narzędzie dev/build/test, nie usługa produkcyjna |
+| `globals` | `^16.5.0` | narzędzie dev/build/test, nie usługa produkcyjna |
+| `jsdom` | `^29.1.1` | narzędzie dev/build/test, nie usługa produkcyjna |
+| `typescript` | `~5.9.3` | narzędzie dev/build/test, nie usługa produkcyjna |
+| `typescript-eslint` | `^8.48.0` | narzędzie dev/build/test, nie usługa produkcyjna |
+| `vite` | `^7.3.1` | narzędzie dev/build/test, nie usługa produkcyjna |
+| `vite-plugin-svgr` | `^4.5.0` | narzędzie dev/build/test, nie usługa produkcyjna |
+| `vitest` | `^4.1.5` | narzędzie dev/build/test, nie usługa produkcyjna |
 | .NET SDK / ASP.NET runtime | 10.0 (obrazy Docker), projekty net10.0 | SDK do budowy; runtime do uruchomienia |
-| Node.js / npm | README 20+; Docker/CI Node 22 | Budowa SPA, nie serwer produkcyjnego UI |
+| Node.js / npm | 20+ dla rozwoju; Docker/CI Node 22 | Budowa SPA, nie serwer produkcyjnego UI |
 | Docker Engine + Compose plugin | brak przypiętej wersji Engine/Compose | Produkcyjny wariant instalacji; trwały wolumin SQLite |
 | nginx | stable-alpine | Reverse proxy; HTTPS z osobnym overlay i certyfikatem |
 | SMTP | konfigurowalny, bez przypiętego dostawcy | Opcjonalne wysyłanie maili; konieczne dla działającego odzyskiwania hasła |
 | Usługa Web Push przeglądarki | zależna od urządzenia | Opcjonalna; opóźnienie/dostarczenie zależy od platformy |
 
-Podstawa obrazów/usług: [Dockerfile](../../Dockerfile), [Compose](../../deploy/docker-compose.yml), [HTTPS](../../deploy/docker-compose.https.yml). Baza SQLite jest osadzona; nie wymaga osobnego serwera SQL. Repo nie ustanawia płatnej chmury, kolejki ani zewnętrznego cache.
+Baza SQLite jest osadzona; nie wymaga osobnego serwera SQL. Repo nie ustanawia płatnej chmury, kolejki ani zewnętrznego cache.
 
 ## 6. Wymagania srodowiskowe
 
@@ -3753,7 +3082,7 @@ Podstawa obrazów/usług: [Dockerfile](../../Dockerfile), [Compose](../../deploy
 | Obszar | Minimum | Zalecane |
 | --- | --- | --- |
 | OS | Host zgodny z wybraną metodą .NET/Docker; Ubuntu 24.04 jest przykładem instrukcji | Wspierany system z aktualizacjami; wybór administratora, nie jedyna dozwolona dystrybucja |
-| Budowanie | .NET 10 SDK, Node.js 20+ wg README, npm | Node 22 zgodnie z CI/Docker; zgodność konkretnej wersji Node z Vite sprawdzić przy instalacji |
+| Budowanie | .NET 10 SDK, Node.js 20+, npm | Node 22 zgodnie z CI/Docker; zgodność konkretnej wersji Node z Vite sprawdzić przy instalacji |
 | Runtime produkcyjny | ASP.NET 10 w obrazie, Docker Engine + Compose plugin, nginx | Przypięty identyfikator przetestowanego wydania/obrazu |
 | Dane | Trwały zapisywalny wolumin, `/data/SQLite.db`; uprawnienia użytkownika obrazu | Osobna zweryfikowana kopia poza hostem/woluminem i kontrola miejsca |
 | Sieć / chmura | Dostępne porty, DNS i certyfikaty dla wariantu publicznego HTTPS | Monitoring health/logów i plan odtwarzania; dostawca/region do uzgodnienia |
@@ -3779,7 +3108,7 @@ cd FrontEnd
 npm ci
 ```
 
-README/run-local dopuszczają `npm install`; dla odtworzenia lockfile użyj `npm ci`. SpaProxy uruchamia `npm run dev` przy starcie backendu; Vite działa na `http://localhost:5173` (strictPort). Profil WebApi: `https://localhost:54294` i `http://localhost:54295`. Można uruchomić Vite osobno przez `npm run dev`, unikając dwóch procesów na tym samym porcie. Względne `/api` jest proxy do backendu, WebSocket włączony. Dev Swagger jest pod URL API. Aktualny ekran pracowników ma `/employee`; historyczne `/employees` w run-local nie jest trasą tego routera.
+Dopuszczalny jest również `npm install`; dla odtworzenia lockfile użyj `npm ci`. SpaProxy uruchamia `npm run dev` przy starcie backendu; Vite działa na `http://localhost:5173` (strictPort). Profil WebApi: `https://localhost:54294` i `http://localhost:54295`. Można uruchomić Vite osobno przez `npm run dev`, unikając dwóch procesów na tym samym porcie. Względne `/api` jest proxy do backendu, WebSocket włączony. Dev Swagger jest pod URL API. Ekran pracowników ma trasę `/employee`.
 
 Prywatne wartości ustaw przez środowisko/ignorowany plik: `ConnectionStrings__Default`, `Jwt__SigningKey`, `Smtp__Host`, `Smtp__UserName`, `Smtp__Password`, `Smtp__FromAddress` oraz wymagane opcje bootstrap/admin. Nie kopiuj przykładowych haseł profilu developerskiego do wdrożenia. Własne konta i baza testowa muszą być odseparowane od produkcji.
 
@@ -3813,15 +3142,12 @@ Konfiguracja nie ma `webServer`: nie uruchamia aplikacji sama. Bazowy URL to `PL
 
 ### PROD i proces zmian
 
-Docker: Node 22 buduje React, SDK .NET 10 publikuje backend z `SkipFrontendBuild=true`, bundle trafia do `wwwroot`, obraz ASP.NET 10 uruchamia aplikację jako użytkownik `app` na 8080. Nginx jest publicznym proxy; HTTPS wymaga overlay/certyfikatów. Health `/api/health` sprawdza możliwość połączenia z bazą. Pełna instalacja/backup/rollback: [procedury](03-Procedury-odbioru-wdrozenia.md) oraz istniejący [runbook](../deploy.md).
+Docker: Node 22 buduje React, SDK .NET 10 publikuje backend z `SkipFrontendBuild=true`, bundle trafia do `wwwroot`, obraz ASP.NET 10 uruchamia aplikację jako użytkownik `app` na 8080. Nginx jest publicznym proxy; HTTPS wymaga overlay/certyfikatów. Health `/api/health` sprawdza możliwość połączenia z bazą. Pełną instalację, kopie zapasowe i rollback opisano w dokumencie „GF — Procedury odbioru, wdrożenia i odtworzenia”.
 
 CI: push do main/master, pull_request i workflow_dispatch uruchamiają backend Release, lint/test/build frontend; zależny job buduje `gf3-web:ci`. Publikacja GHCR jest osobnym ręcznym workflow_dispatch z tagiem, zapisuje wskazany tag i latest. To nie jest automatyczne wdrożenie na produkcję. PR → przegląd → merge jest zalecanym procesem zespołu; repozytorium nie jest dowodem wymuszonej polityki zatwierdzeń. Przed produkcyjną aktualizacją operator wykonuje backup i kontroluje zgodność bazy/obrazu.
 
-Podstawa: [README](../../README.md), [run-local](../run-local.md), [launchSettings](../../GF3.WebApi/Properties/launchSettings.json), [Vite](../../FrontEnd/vite.config.ts), [Playwright](../../FrontEnd/playwright.config.ts), [testy backendu](../../GF3.Tests/GF3.Tests.csproj), [CI](../../.github/workflows/ci.yml), [GHCR](../../.github/workflows/docker-publish.yml).
-
 ## 8. Pokrycie prezentacji i status weryfikacji
 
-Prezentacja 2: s. 2 — odbiorcy/cel (wstęp, §1); s. 3 — dokumentacja API (§2); s. 4 — baza (§3); s. 5 — własne biblioteki (§4); s. 6 — oprogramowanie zewnętrzne (§5); s. 7–8 — środowisko frontend/backend (§6); s. 9–10 — DEV/PROD/TEST, budowanie i proces zespołu (§7). Każdy obszar mapy Plan.md jest pokryty; przykłady narzędzi/platform dokumentacji nie są zależnościami GF.
+Prezentacja 2: s. 2 — odbiorcy/cel (wstęp, §1); s. 3 — dokumentacja API (§2); s. 4 — baza (§3); s. 5 — własne biblioteki (§4); s. 6 — oprogramowanie zewnętrzne (§5); s. 7–8 — środowisko frontend/backend (§6); s. 9–10 — DEV/PROD/TEST, budowanie i proces zespołu (§7). Wymagane obszary dokumentacji są pokryte; przykłady narzędzi/platform dokumentacji nie są zależnościami GF.
 
-To dokumentacja źródeł na wskazanym commicie. Zestawiono akcje kontrolerów i schematy encji; nie wykonano opisanych wyżej testów aplikacji, odbioru, migracji ani odtwarzania. Warunki infrastruktury klienta pozostają do uzgodnienia. Wersje i stare mapy opisujące b4a08ad nie nadpisują tej podstawy.
-
+To dokumentacja źródeł na wskazanym commicie. Zestawiono akcje kontrolerów i schematy encji; nie wykonano opisanych wyżej testów aplikacji, odbioru, migracji ani odtwarzania. Warunki infrastruktury klienta pozostają do uzgodnienia.

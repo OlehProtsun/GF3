@@ -39,6 +39,7 @@ public static class WebApiServiceCollectionExtensions
         var jwtOptions = JwtAuthOptions.FromConfiguration(configuration, requireExplicitJwtSigningKey);
 
         services.AddSingleton(TimeProvider.System);
+        services.AddSingleton<IScheduleWorksheetPdfRenderer, ScheduleWorksheetPdfRenderer>();
         services.AddOptions<PushOptions>().Bind(configuration.GetSection("Push"))
             .Validate(options => options.IsValid(), "Push configuration is invalid; check VAPID settings.").ValidateOnStart();
         services.AddSingleton<AuthAttemptLimiter>();

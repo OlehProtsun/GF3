@@ -1004,6 +1004,9 @@ public sealed class DeepBusinessAndControllerCoverageTests
 
     private sealed class GraphTemplateExportServiceStub : IGraphTemplateExportService
     {
+        public Task<(byte[] content, string fileName)> ExportPublishedGraphToXlsxAsync(int employeeId, int graphId, CancellationToken ct = default)
+            => throw new NotSupportedException();
+
         public (byte[] content, string fileName) GraphExcel { get; init; }
         public (byte[] content, string fileName) ContainerExcel { get; init; }
 
