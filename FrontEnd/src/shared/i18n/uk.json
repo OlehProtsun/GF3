@@ -2023,5 +2023,10 @@
   "Schedule matrix has invalid column widths.": "Таблиця графіка має некоректну ширину стовпців.",
   "Schedule matrix has invalid row heights.": "Таблиця графіка має некоректну висоту рядків.",
   "Schedule column is wider than the printable page.": "Стовпець графіка ширший за область друку сторінки.",
-  "Choose English, Polish or Ukrainian.": "Виберіть англійську, польську або українську."
+  "Choose English, Polish or Ukrainian.": "Виберіть англійську, польську або українську.",
+  "Account details": "Дані акаунту",
+  "Edit account details": "Редагувати дані акаунту",
+  "Enable notifications to receive important updates.": "Увімкніть сповіщення, щоб отримувати важливі оновлення.",
+  "Creating PDF...": "Створюється PDF…",
+  "Please wait while we prepare your schedule for sharing.": "Зачекайте, поки підготуємо графік для поширення."
 }

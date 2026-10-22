@@ -23,3 +23,13 @@
   .card { padding: 16px; border-radius: 20px; }
   .item { align-items: flex-start; flex-direction: column; gap: 8px; }
 }
+
+.card.profile { min-width: 0; padding: 16px; border-radius: 24px; border-color: #e2e8f0; box-shadow: 0 10px 28px rgb(15 23 42 / 4%); }
+.profile .header { gap: 12px; }
+.profile .header > div { flex: 1; min-width: 0; }
+.profile .icon { display: grid; place-items: center; flex-shrink: 0; width: 44px; height: 44px; border-radius: 16px; color: #246bff; background: #e8f1ff; }
+.profile .count { flex-shrink: 0; }
+.profile .empty { background: #f4f7fb; overflow-wrap: anywhere; }
+.profile .item { flex-wrap: wrap; }
+.profile .item strong { white-space: normal; overflow-wrap: anywhere; }
+.profile .item:focus-visible { outline: 2px solid #246bff; outline-offset: 3px; }

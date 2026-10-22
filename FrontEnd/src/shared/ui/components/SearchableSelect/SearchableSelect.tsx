@@ -27,6 +27,7 @@ type SearchableSelectProps = {
   invalid?: boolean;
   disabled?: boolean;
   dropdownPlacement?: "down" | "up";
+  dropdownWidth?: number;
   shadow?: "default" | "soft";
   ariaDescribedBy?: string;
   ariaLabel?: string;
@@ -54,6 +55,7 @@ export function SearchableSelect({
   invalid = false,
   disabled = false,
   dropdownPlacement = "down",
+  dropdownWidth,
   shadow = "default",
   ariaDescribedBy,
   ariaLabel,
@@ -66,7 +68,7 @@ export function SearchableSelect({
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   const [isOpen, setIsOpen] = useState(false);
   const [searchText, setSearchText] = useState("");
-  const dropdownStyle = useDropdownPosition(isOpen, triggerRef, dropdownRef, dropdownPlacement);
+  const dropdownStyle = useDropdownPosition(isOpen, triggerRef, dropdownRef, dropdownPlacement, dropdownWidth);
 
   const selectedOption = options.find(option => option.value === value) ?? null;
   const filteredOptions = useMemo(() => {

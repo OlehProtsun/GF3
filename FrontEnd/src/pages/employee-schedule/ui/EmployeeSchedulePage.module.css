@@ -474,3 +474,5 @@
   .scheduleSelectTrigger:hover, .openSchedulePdfButton:hover, .scheduleViewToggle:hover, .dailyScheduleDay:hover, .dailyScheduleDaySelected { transform: none; }
   .shiftCorrectionSuccess { animation: none; }
 }
+
+.pdfLoadingOverlay { pointer-events: none; }

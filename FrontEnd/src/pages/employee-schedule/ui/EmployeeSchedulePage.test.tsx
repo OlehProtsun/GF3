@@ -218,17 +218,36 @@ describe("EmployeeSchedulePage", () => {
     await userEvent.setup().dblClick(button);
     expect(button).toBeDisabled();
     expect(button).toHaveAttribute("aria-busy", "true");
+    expect(screen.getByRole("status", { name: "Creating PDF..." })).toBeVisible();
     expect(mocks.exportPdf).toHaveBeenCalledTimes(1);
     expect(mocks.exportPdf).toHaveBeenCalledWith(1, expect.any(AbortSignal));
     await act(async () => resolve({ blob: new Blob(["%PDF-"], { type: "application/pdf" }), fileName: "schedule.pdf" }));
     expect(mocks.downloadPdf).toHaveBeenCalledWith(expect.objectContaining({ fileName: "schedule.pdf" }), "schedule.pdf");
     expect(button).toBeEnabled();
+    expect(screen.queryByRole("status", { name: "Creating PDF..." })).not.toBeInTheDocument();
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     expect(screen.getByTestId("schedule-matrix")).toBe(matrix);
     expect(matrix.scrollTop).toBe(75);
     expect(mocks.matrix.mock.calls.at(-1)?.[0].graph.id).toBe(1);
     expect(open).not.toHaveBeenCalled();
     expect(print).not.toHaveBeenCalled();
+  });
+
+  test("hides the PDF generation indicator before native sharing completes", async () => {
+    let resolvePdf!: (value: unknown) => void;
+    let resolveShare!: () => void;
+    mocks.exportPdf.mockImplementation(() => new Promise(resolve => { resolvePdf = resolve; }));
+    const share = vi.fn(() => new Promise<void>(resolve => { resolveShare = resolve; }));
+    Object.defineProperty(navigator, "share", { configurable: true, value: share });
+    Object.defineProperty(navigator, "canShare", { configurable: true, value: () => true });
+    mocks.scheduleQuery.mockReturnValue({ data: schedules, isLoading: false });
+    renderPage();
+    await userEvent.setup().click(screen.getByRole("button", { name: "Export schedule to PDF" }));
+    expect(screen.getByRole("status", { name: "Creating PDF..." })).toBeVisible();
+    await act(async () => resolvePdf({ blob: new Blob(["%PDF-"], { type: "application/pdf" }), fileName: "schedule.pdf" }));
+    expect(share).toHaveBeenCalledOnce();
+    expect(screen.queryByRole("status", { name: "Creating PDF..." })).not.toBeInTheDocument();
+    await act(async () => resolveShare());
   });
 
   test.each(["success", "AbortError", "NotAllowedError", "DataError"])("shares PDF directly and handles %s", async result => {
@@ -282,6 +301,7 @@ describe("EmployeeSchedulePage", () => {
     expect(await screen.findByText(typeof failure === "number" ? `PDF ${failure}` : "Could not export this schedule to PDF.")).toBeVisible();
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     expect(screen.getByTestId("schedule-matrix")).toHaveTextContent("May Schedule");
+    expect(screen.queryByRole("status", { name: "Creating PDF..." })).not.toBeInTheDocument();
   });
 
   test("aborts stale exports when selecting another schedule or unmounting", async () => {
@@ -295,6 +315,7 @@ describe("EmployeeSchedulePage", () => {
     await user.click(screen.getByRole("button", { name: "Select schedule. Current schedule: May Schedule" }));
     await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: /Second May Schedule/ }));
     expect(signal.aborted).toBe(true);
+    expect(screen.queryByRole("status", { name: "Creating PDF..." })).not.toBeInTheDocument();
     await act(async () => resolve({ blob: new Blob(["%PDF-"], { type: "application/pdf" }) }));
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     expect(mocks.downloadPdf).not.toHaveBeenCalled();

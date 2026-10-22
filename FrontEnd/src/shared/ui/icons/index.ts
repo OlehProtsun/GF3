@@ -41,3 +41,4 @@ export { ChevronRightIcon } from "./ChevronRightIcon";
 export { PinIcon } from "./PinIcon";
 export { NewsIcon } from "./NewsIcon";
 export { SettingsIcon } from "./SettingsIcon";
+export { AccountSettingsIcon } from "./AccountSettingsIcon";

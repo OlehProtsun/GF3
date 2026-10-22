@@ -33,6 +33,15 @@ test("account language defaults to Polish, persists English and Ukrainian and st
     const collapse = page.getByRole("button", { name: collapseLabels[current], exact: true });
     if (await collapse.isVisible()) await collapse.click();
     await page.getByRole("button", { name: languageLabels[current], exact: true }).click();
+    if (new URL(page.url()).pathname === "/profile") {
+      const listbox = page.getByRole("listbox", { name: languageLabels[current], exact: true });
+      await expect(listbox).toBeVisible();
+      expect(await listbox.evaluate(element => {
+        const dropdown = element.parentElement!;
+        const bounds = dropdown.getBoundingClientRect();
+        return dropdown.scrollWidth <= dropdown.clientWidth && bounds.left >= 0 && bounds.right <= innerWidth;
+      })).toBe(true);
+    }
     await page.getByRole("option", { name: next, exact: true }).click();
     await expect(page.locator("html")).toHaveAttribute("lang", languageCodes[next]);
   };
@@ -67,14 +76,14 @@ test("account language defaults to Polish, persists English and Ukrainian and st
   identity = { ...identity, role: "employee", managerId: null, employeeId: 1, userName: "worker" };
   await page.goto("/profile");
   await expect(page.getByRole("button", { name: "Język aplikacji", exact: true })).toHaveText("Polski");
-  await expect(page.getByRole("heading", { name: "Dane osobowe" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Dane konta" })).toBeVisible();
   await choose("pl", "English");
   await page.reload();
   await expect(page.getByRole("button", { name: "Application language", exact: true })).toHaveText("English");
   await choose("en", "Українська");
   await page.reload();
   await expect(page.getByRole("button", { name: "Мова застосунку", exact: true })).toHaveText("Українська");
-  await expect(page.getByRole("heading", { name: "Особисті дані", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Дані акаунту", exact: true })).toBeVisible();
   await choose("uk", "Polski");
   await page.reload();
   await expect(page.getByRole("button", { name: "Język aplikacji", exact: true })).toHaveText("Polski");
