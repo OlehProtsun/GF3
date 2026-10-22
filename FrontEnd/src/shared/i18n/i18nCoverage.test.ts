@@ -3,10 +3,11 @@ import { join, relative, resolve } from "node:path";
 import ts from "typescript";
 import { expect, it } from "vitest";
 import pl from "./pl.json";
+import uk from "./uk.json";
 import serverMessages from "./serverMessages.json";
 
 const root = resolve("src");
-const catalog: Record<string, string> = pl;
+const catalogs: Record<string, Record<string, string>> = { pl, uk };
 function sourceFiles(directory: string): string[] {
   return readdirSync(directory, { withFileTypes: true }).flatMap(entry => {
     const path = join(directory, entry.name);
@@ -74,7 +75,9 @@ it("covers literal and reviewed finite translation calls in application source",
       expect(values, `${name}: finite label declaration changed`).toEqual(Object.values(mappings[name])[0]);
     }
     const checkKey = (key: string, location: string) => {
-      if (!Object.hasOwn(catalog, key)) failures.push(`${location}: missing Polish key ${JSON.stringify(key)}`);
+      for (const [language, catalog] of Object.entries(catalogs)) {
+        if (!Object.hasOwn(catalog, key)) failures.push(`${location}: missing ${language} key ${JSON.stringify(key)}`);
+      }
     };
     const checkArgument = (argument: ts.Expression, location: string) => {
       if (ts.isStringLiteral(argument) || ts.isNoSubstitutionTemplateLiteral(argument)) checkKey(argument.text, location);
@@ -119,18 +122,19 @@ it("covers literal and reviewed finite translation calls in application source",
   expect(failures, failures.join("\n")).toEqual([]);
 });
 
-it("covers every server template and preserves nonblank Polish placeholder sets", () => {
+it.each(Object.entries(catalogs))("covers server templates and placeholder sets for %s", (language, catalog) => {
+  expect(Object.keys(catalog).sort()).toEqual(Object.keys(pl).sort());
   const failures: string[] = [];
   const serverLines = readFileSync(resolve("src/shared/i18n/serverMessages.json"), "utf8").split("\n");
   for (const message of serverMessages) {
     const line = serverLines.findIndex(value => value.trimStart().startsWith(JSON.stringify(message))) + 1;
     if (!Object.hasOwn(catalog, message)) failures.push(`serverMessages.json:${line}: missing ${JSON.stringify(message)}`);
   }
-  const lines = readFileSync(resolve("src/shared/i18n/pl.json"), "utf8").split("\n");
-  for (const [english, polish] of Object.entries(catalog)) {
-    const location = `pl.json:${lines.findIndex(line => line.trimStart().startsWith(JSON.stringify(english) + ":")) + 1}: ${JSON.stringify(english)}`;
-    if (!polish.trim() || /[\u0400-\u04ff]/.test(polish)) failures.push(`${location}: blank or Cyrillic translation`);
-    if (JSON.stringify(placeholders(english)) !== JSON.stringify(placeholders(polish))) failures.push(`${location}: placeholder mismatch`);
+  const lines = readFileSync(resolve(`src/shared/i18n/${language}.json`), "utf8").split("\n");
+  for (const [english, translation] of Object.entries(catalog)) {
+    const location = `${language}.json:${lines.findIndex(line => line.trimStart().startsWith(JSON.stringify(english) + ":")) + 1}: ${JSON.stringify(english)}`;
+    if (!translation.trim() || (language === "pl" ? /[\u0400-\u04ff]/ : /[ыэъЫЭЪёЁ]/).test(translation)) failures.push(`${location}: blank or invalid translation script`);
+    if (JSON.stringify(placeholders(english)) !== JSON.stringify(placeholders(translation))) failures.push(`${location}: placeholder mismatch`);
   }
   expect(failures, failures.join("\n")).toEqual([]);
 });

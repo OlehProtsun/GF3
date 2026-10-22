@@ -98,3 +98,26 @@ it("shows a Polish load error and retries the saved English preference", async (
   await screen.findByText("Profile access");
   expect(getLanguage()).toBe("en");
 });
+
+it("loads and saves Ukrainian while preserving the draft and the last confirmed language on failure", async () => {
+  mocks.request.mockResolvedValueOnce({ language: "uk" }).mockRejectedValueOnce(new Error("offline")).mockResolvedValueOnce({ language: "en" }).mockResolvedValueOnce({ language: "uk" });
+  const first = render(view());
+  await screen.findByText("Доступ до профілю");
+  fireEvent.change(screen.getByLabelText("Draft"), { target: { value: "Незбережені дані" } });
+  expect(screen.getByLabelText("Мова застосунку")).toHaveValue("uk");
+  fireEvent.change(screen.getByLabelText("Мова застосунку"), { target: { value: "en" } });
+  await screen.findByRole("alert");
+  expect(getLanguage()).toBe("uk");
+  expect(screen.getByLabelText("Draft")).toHaveValue("Незбережені дані");
+  fireEvent.change(screen.getByLabelText("Мова застосунку"), { target: { value: "en" } });
+  await screen.findByText("Profile access");
+  fireEvent.change(screen.getByLabelText("Application language"), { target: { value: "uk" } });
+  await screen.findByText("Доступ до профілю");
+  expect(screen.getByLabelText("Draft")).toHaveValue("Незбережені дані");
+  expect(mocks.request).toHaveBeenLastCalledWith("account-language", expect.objectContaining({ method: "PUT", body: { language: "uk" } }));
+  first.unmount();
+  mocks.request.mockResolvedValueOnce({ language: "uk" });
+  render(view());
+  await screen.findByText("Доступ до профілю");
+  expect(getLanguage()).toBe("uk");
+});

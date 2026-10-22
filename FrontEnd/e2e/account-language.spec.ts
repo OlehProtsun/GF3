@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 
 test.use({ reducedMotion: "reduce" });
 
-test("account language defaults to Polish, persists explicit English and stays isolated", async ({ page }) => {
+test("account language defaults to Polish, persists English and Ukrainian and stays isolated", async ({ page }) => {
   test.setTimeout(90_000);
   let identity = { role: "manager", workspaceMode: "pc", managerId: 1 as number | null, employeeId: null as number | null, userName: "chief", displayName: "Home" };
   const languages = new Map<string, string>();
@@ -26,12 +26,15 @@ test("account language defaults to Polish, persists explicit English and stays i
     else if (path.includes("notepad")) body = { notes: [], state: { isExpanded: false, isPinned: false, height: 400 } };
     await route.fulfill({ contentType: "application/json", body: JSON.stringify(body) });
   });
-  const choose = async (current: "pl" | "en", next: "Polski" | "English") => {
-    const collapse = page.getByRole("button", { name: current === "pl" ? "Zwiń pasek boczny" : "Collapse sidebar", exact: true });
+  const languageCodes = { Polski: "pl", English: "en", Українська: "uk" } as const;
+  const languageLabels = { pl: "Język aplikacji", en: "Application language", uk: "Мова застосунку" };
+  const collapseLabels = { pl: "Zwiń pasek boczny", en: "Collapse sidebar", uk: "Згорнути бічну панель" };
+  const choose = async (current: "pl" | "en" | "uk", next: keyof typeof languageCodes) => {
+    const collapse = page.getByRole("button", { name: collapseLabels[current], exact: true });
     if (await collapse.isVisible()) await collapse.click();
-    await page.getByRole("button", { name: current === "pl" ? "Język aplikacji" : "Application language", exact: true }).click();
+    await page.getByRole("button", { name: languageLabels[current], exact: true }).click();
     await page.getByRole("option", { name: next, exact: true }).click();
-    await expect(page.locator("html")).toHaveAttribute("lang", next === "Polski" ? "pl" : "en");
+    await expect(page.locator("html")).toHaveAttribute("lang", languageCodes[next]);
   };
   await page.goto("/manager-profile");
   await expect(page.getByRole("heading", { name: "Profil menedżera", exact: true })).toBeVisible();
@@ -41,7 +44,11 @@ test("account language defaults to Polish, persists explicit English and stays i
   await choose("pl", "English");
   await expect(page.getByLabel("Display name", { exact: true }).first()).toHaveValue("Unsaved draft");
   await expect(page.getByRole("status")).toHaveText("Saved");
-  await choose("en", "Polski");
+  await choose("en", "Українська");
+  await expect(page.getByRole("heading", { name: "Профіль менеджера", exact: true })).toBeVisible();
+  await expect(page.getByLabel("Відображуване ім'я", { exact: true }).first()).toHaveValue("Unsaved draft");
+  await expect(page.getByRole("status")).toHaveText("Збережено");
+  await choose("uk", "Polski");
   await expect(page.getByLabel("Nazwa wyświetlana", { exact: true }).first()).toHaveValue("Unsaved draft");
   await expect(page.getByRole("status")).toHaveText("Zapisano");
   await choose("pl", "English");
@@ -49,6 +56,11 @@ test("account language defaults to Polish, persists explicit English and stays i
   await expect(page.getByRole("button", { name: "Application language", exact: true })).toHaveText("English");
   await expect(page.locator("html")).toHaveAttribute("lang", "en");
   await expect(page.getByLabel("Display name", { exact: true }).first()).toHaveValue("Home");
+  await choose("en", "Українська");
+  await page.reload();
+  await expect(page.getByRole("button", { name: "Мова застосунку", exact: true })).toHaveText("Українська");
+  await expect(page.locator("html")).toHaveAttribute("lang", "uk");
+  await choose("uk", "English");
   identity = { ...identity, managerId: 2, userName: "second" };
   await page.reload();
   await expect(page.getByRole("button", { name: "Język aplikacji", exact: true })).toHaveText("Polski");
@@ -59,7 +71,11 @@ test("account language defaults to Polish, persists explicit English and stays i
   await choose("pl", "English");
   await page.reload();
   await expect(page.getByRole("button", { name: "Application language", exact: true })).toHaveText("English");
-  await choose("en", "Polski");
+  await choose("en", "Українська");
+  await page.reload();
+  await expect(page.getByRole("button", { name: "Мова застосунку", exact: true })).toHaveText("Українська");
+  await expect(page.getByRole("heading", { name: "Особисті дані", exact: true })).toBeVisible();
+  await choose("uk", "Polski");
   await page.reload();
   await expect(page.getByRole("button", { name: "Język aplikacji", exact: true })).toHaveText("Polski");
   identity = { ...identity, role: "manager", managerId: 1, employeeId: null, userName: "chief" };

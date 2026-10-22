@@ -44,9 +44,32 @@ public sealed class AccountLanguageControllerTests
         Assert.False(fresh.Database.HasPendingModelChanges());
     }
 
+    [Fact]
+    public async Task Ukrainian_IsPersistedForBothRolesWithoutChangingOtherAccounts()
+    {
+        await using var database = await SqliteTestDatabase.CreateAsync();
+        await using var context = database.CreateContext();
+        var employee = TestDataFactory.CreateDalEmployee();
+        var manager = new ManagerAccountModel { Username = "uk-manager", DisplayName = "Manager", PasswordHash = "hash" };
+        var other = new ManagerAccountModel { Username = "other", DisplayName = "Other", PasswordHash = "hash", Language = "en" };
+        context.AddRange(employee, manager, other);
+        await context.SaveChangesAsync();
+        context.EmployeeAccounts.Add(new EmployeeAccountModel { EmployeeId = employee.Id, Username = "uk-worker", PasswordHash = "hash" });
+        await context.SaveChangesAsync();
+        Assert.Equal("uk", Preference(await Controller(context, "manager", "manager_id", manager.Id).Update(new("uk"), default)));
+        Assert.Equal("uk", Preference(await Controller(context, "employee", "employee_id", employee.Id).Update(new("uk"), default)));
+        await using var fresh = database.CreateContext();
+        Assert.Equal("uk", Preference(await Controller(fresh, "manager", "manager_id", manager.Id).Get(default)));
+        Assert.Equal("uk", Preference(await Controller(fresh, "employee", "employee_id", employee.Id).Get(default)));
+        Assert.Equal("en", Preference(await Controller(fresh, "manager", "manager_id", other.Id).Get(default)));
+        Assert.False(fresh.Database.HasPendingModelChanges());
+    }
+
     [Theory]
     [InlineData("de")]
     [InlineData("PL")]
+    [InlineData("ua")]
+    [InlineData("UK")]
     [InlineData("")]
     [InlineData(null)]
     public async Task UnsupportedLanguage_IsRejected(string? language)

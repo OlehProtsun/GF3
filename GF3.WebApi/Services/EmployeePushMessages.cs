@@ -7,7 +7,7 @@ internal enum EmployeePushMessageKind { Schedule, Availability, Swap, OpenShift,
 internal sealed class EmployeePushMessages(string? language)
 {
     private readonly bool polish = language == "pl";
-    private readonly CultureInfo culture = CultureInfo.GetCultureInfo(language == "pl" ? "pl-PL" : "en-GB");
+    private readonly CultureInfo culture = CultureInfo.GetCultureInfo(language == "uk" ? "uk-UA" : language == "pl" ? "pl-PL" : "en-GB");
     private static readonly TimeZoneInfo Warsaw = TimeZoneInfo.FindSystemTimeZoneById("Europe/Warsaw");
 
     public (string Title, string Body) Format(EmployeePushMessageKind kind, string name, int year, int month,
@@ -20,6 +20,16 @@ internal sealed class EmployeePushMessages(string? language)
         var shift = day is { } d ? new DateOnly(year, month, d).ToString("d MMM yyyy", culture) : period;
         if (from is not null && to is not null) shift += $" · {from}–{to}";
         var due = deadline is { } end ? TimeZoneInfo.ConvertTime(end, Warsaw).ToString("d MMM HH:mm zzz", culture) : null;
+        if (language == "uk") return kind switch
+        {
+            EmployeePushMessageKind.Schedule => ("Опубліковано новий графік", $"{context}. Ваш робочий графік уже доступний."),
+            EmployeePushMessageKind.Availability => ("Опубліковано нову доступність", closed
+                ? $"{context}. Подання завершено. Відкрийте GF, щоб переглянути форму."
+                : $"{context}. Уже можна вказати доступність.{(due is null ? "" : $" Подайте до {due}.")}"),
+            EmployeePushMessageKind.OpenShift => ("Опубліковано вільну зміну", $"„{name}” · {shift}. Відкрийте GF, щоб переглянути подробиці."),
+            EmployeePushMessageKind.AcceptedSwap => ("Вашу зміну прийнято", $"„{name}” · {shift}. Вашу пропозицію заміни прийнято."),
+            _ => ("Доступна заміна зміни", $"„{name}” · {shift}. З'явилася нова пропозиція заміни. Відкрийте GF, щоб переглянути подробиці.")
+        };
         return (kind, polish) switch
         {
             (EmployeePushMessageKind.Schedule, true) => ("Opublikowano nowy grafik", $"{context}. Grafik pracy jest już dostępny."),

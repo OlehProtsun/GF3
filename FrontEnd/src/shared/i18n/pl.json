@@ -2022,5 +2022,6 @@
   "First worksheet must be the schedule matrix with print area B1:AA32.": "Pierwszy arkusz musi zawierać macierz grafiku z obszarem wydruku B1:AA32.",
   "Schedule matrix has invalid column widths.": "Macierz grafiku ma nieprawidłowe szerokości kolumn.",
   "Schedule matrix has invalid row heights.": "Macierz grafiku ma nieprawidłowe wysokości wierszy.",
-  "Schedule column is wider than the printable page.": "Kolumna grafiku jest szersza niż obszar wydruku strony."
+  "Schedule column is wider than the printable page.": "Kolumna grafiku jest szersza niż obszar wydruku strony.",
+  "Choose English, Polish or Ukrainian.": "Wybierz angielski, polski lub ukraiński."
 }

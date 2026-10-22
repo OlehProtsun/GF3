@@ -1,7 +1,8 @@
 import { formatHoursMinutes } from "@entities/containers/model/statistics";
 import { afterEach, vi, describe, expect, it } from "vitest";
-import { dateTimeFormat, getLanguage, numberFormat, setLanguage, t, translateServerMessage } from "./index";
+import { dateTimeFormat, getLanguage, getLocale, numberFormat, setLanguage, t, translateServerMessage } from "./index";
 import pl from "./pl.json";
+import { getAvailabilityWeekdayLabel } from "@entities/availability-groups/model/matrix";
 import { normalizeBindKey } from "@entities/availability-binds/model/hotkeys";
 import { getGraphWeekdayLabel, parseGraphCellContent } from "@entities/containers/model/graphWorkspace";
 import { availabilityMonthOptions, getAvailabilityKindLabel } from "@entities/availability-groups/model/presentation";
@@ -47,6 +48,34 @@ describe("account language", () => {
     expect(t("Profile access")).toBe("Profile access");
     expect(formatter.format(date)).toBe("September");
     expect(availabilityMonthOptions[8].label).toBe("September");
+  });
+
+  it("switches Ukrainian labels, formatters, weekdays and known errors without changing user values", () => {
+    const month = dateTimeFormat("en-GB", { month: "long", timeZone: "UTC" });
+    const date = new Date("2026-09-01T00:00:00Z");
+    const cell = parseGraphCellContent("09:00 - 15:00");
+    setLanguage("uk");
+    expect(getLocale()).toBe("uk-UA");
+    expect(document.documentElement.lang).toBe("uk");
+    expect(t("Application language")).toBe("Мова застосунку");
+    expect(t("Choose a shift")).toBe("Виберіть зміну");
+    expect(t("New schedule published")).toBe("Опубліковано новий графік");
+    expect(t("{0}h", "7,5")).toBe("7,5 год");
+    expect(formatHoursMinutes(450)).toBe("7 год 30 хв");
+    expect(month.format(date)).toBe("вересень");
+    expect(availabilityMonthOptions[8].label).toBe("вересень");
+    expect(numberFormat("en-GB", { minimumFractionDigits: 2 }).format(12.5)).toBe("12,50");
+    expect(getGraphWeekdayLabel(2026, 9, 17)).toBe("чт.");
+    expect(getAvailabilityWeekdayLabel(2026, 9, 17)).toBe("чт.");
+    expect(translateServerMessage("Created manager account Home.")).toBe("Створено акаунт менеджера Home.");
+    expect(translateServerMessage("Unrecognized technical detail")).toBe("Unrecognized technical detail");
+    expect(t("Manager account created for {0}.", "Home {1} & <b>")).toBe("Акаунт менеджера для Home {1} & <b> створено.");
+    expect(parseGraphCellContent("09:00 - 15:00")).toEqual(cell);
+    setLanguage("en");
+    expect(t("Application language")).toBe("Application language");
+    expect(month.format(date)).toBe("September");
+    setLanguage("pl");
+    expect(month.format(date)).toBe("wrzesień");
   });
 
   it("preserves keyboard shortcuts and schedule values in Polish", () => {
