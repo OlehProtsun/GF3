@@ -78,5 +78,6 @@
   "First worksheet must be the schedule matrix with print area B1:AA32.",
   "Schedule matrix has invalid column widths.",
   "Schedule matrix has invalid row heights.",
-  "Schedule column is wider than the printable page."
+  "Schedule column is wider than the printable page.",
+  "Choose English, Polish or Ukrainian."
 ]

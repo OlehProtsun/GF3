@@ -69,6 +69,7 @@ public sealed class EmployeePushNotificationSourceTests
 
     [Theory]
     [InlineData("pl")]
+    [InlineData("uk")]
     [InlineData("en")]
     [InlineData("xx")]
     public async Task FourInboxClasses_HaveCanonicalIdsAndSecureRecipients(string language)
@@ -91,11 +92,12 @@ public sealed class EmployeePushNotificationSourceTests
         var timestamp = scheduleDto.RootElement.GetProperty("publishedAtUtc").GetString();
         var visible = JsonSerializer.Serialize(group.PublishedAtUtc, new JsonSerializerOptions(JsonSerializerDefaults.Web)).Trim('"');
         Assert.Equal(5, candidates.Count);
-        Assert.Contains(candidates, x => x.Title == (language == "pl" ? "Opublikowano nowy grafik" : "New schedule published"));
-        Assert.Contains(candidates, x => x.Title == (language == "pl" ? "Udostępniono nową dostępność" : "New availability published"));
-        Assert.Contains(candidates, x => x.Title == (language == "pl" ? "Dostępna nowa zamiana" : "Shift swap available"));
-        Assert.Contains(candidates, x => x.Title == (language == "pl" ? "Opublikowano wolną zmianę" : "Open shift posted"));
-        Assert.Contains(candidates, x => x.Title == (language == "pl" ? "Twoja zamiana została zaakceptowana" : "Your shift was accepted"));
+        if (language == "uk") Assert.Contains(candidates, x => x.Body.Contains("Ваш робочий графік уже доступний."));
+        Assert.Contains(candidates, x => x.Title == (language == "uk" ? "Опубліковано новий графік" : language == "pl" ? "Opublikowano nowy grafik" : "New schedule published"));
+        Assert.Contains(candidates, x => x.Title == (language == "uk" ? "Опубліковано нову доступність" : language == "pl" ? "Udostępniono nową dostępność" : "New availability published"));
+        Assert.Contains(candidates, x => x.Title == (language == "uk" ? "Доступна заміна зміни" : language == "pl" ? "Dostępna nowa zamiana" : "Shift swap available"));
+        Assert.Contains(candidates, x => x.Title == (language == "uk" ? "Опубліковано вільну зміну" : language == "pl" ? "Opublikowano wolną zmianę" : "Open shift posted"));
+        Assert.Contains(candidates, x => x.Title == (language == "uk" ? "Вашу зміну прийнято" : language == "pl" ? "Twoja zamiana została zaakceptowana" : "Your shift was accepted"));
         Assert.Contains(candidates, x => x.NotificationId == $"schedule-public:{schedule.Id}:{timestamp}");
         Assert.Contains(candidates, x => x.NotificationId == $"availability-public:{group.Id}:published:{visible}");
         Assert.Contains(candidates, x => x.NotificationId == $"swap-public:{ordinary.Id}" && x.Url == $"/swap?swapId={ordinary.Id}");

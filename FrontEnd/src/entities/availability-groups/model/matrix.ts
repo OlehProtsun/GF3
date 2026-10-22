@@ -87,7 +87,7 @@ function getAvailabilityDate(year: number, month: number, dayOfMonth: number) {
 
 export function getAvailabilityWeekdayLabel(year: number, month: number, dayOfMonth: number) {
   const weekdayIndex = getAvailabilityDate(year, month, dayOfMonth).getDay();
-  const weekdayLabels = getLanguage() === "pl" ? ["nd", "pn", "wt", "śr", "cz", "pt", "so"] : ["su", "mo", "tu", "we", "th", "fr", "sa"];
+  const weekdayLabels = getLanguage() === "uk" ? ["нд", "пн", "вт", "ср", "чт", "пт", "сб"] : getLanguage() === "pl" ? ["nd", "pn", "wt", "śr", "cz", "pt", "so"] : ["su", "mo", "tu", "we", "th", "fr", "sa"];
 
   return `${weekdayLabels[weekdayIndex]}.`;
 }

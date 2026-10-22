@@ -29,7 +29,7 @@ export function LanguageProvider({ children }: PropsWithChildren) {
     void request<{ language: Language }>("account-language", { signal: controller.signal })
       .then(result => {
         if (!controller.signal.aborted) {
-          setLanguage(result?.language === "en" ? "en" : "pl");
+          setLanguage(result?.language === "en" || result?.language === "uk" ? result.language : "pl");
           setLoadedAccount(accountKey);
         }
       })
@@ -48,7 +48,7 @@ export function LanguageProvider({ children }: PropsWithChildren) {
       method: "PUT", body: { language: next }, signal: controller?.signal,
     });
     if (!controller?.signal.aborted) {
-      setLanguage(result?.language === "en" ? "en" : "pl");
+      setLanguage(result?.language === "en" || result?.language === "uk" ? result.language : "pl");
       setLoadError(false);
     }
   };

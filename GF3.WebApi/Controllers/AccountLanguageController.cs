@@ -30,9 +30,9 @@ public sealed class AccountLanguageController(AppDbContext db) : ControllerBase
     public async Task<ActionResult<LanguagePreference>> Update(
         LanguagePreference preference, CancellationToken cancellationToken)
     {
-        if (preference.Language is not ("en" or "pl"))
+        if (preference.Language is not ("en" or "pl" or "uk"))
         {
-            ModelState.AddModelError("language", "Choose English or Polish.");
+            ModelState.AddModelError("language", "Choose English, Polish or Ukrainian.");
             return ValidationProblem(ModelState);
         }
 

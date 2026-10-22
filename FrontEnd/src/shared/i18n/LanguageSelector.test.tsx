@@ -1,4 +1,4 @@
-import { setLanguage, getLanguage } from "./index";
+import { setLanguage, getLanguage, type Language } from "./index";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { LanguageSelector } from "./LanguageSelector";
@@ -62,7 +62,7 @@ it("does not save the already selected language and cancels feedback timers on u
 });
 
 it("localizes successful feedback in Polish and English with the existing choices", async () => {
-  context.save.mockImplementation(async (language: "pl" | "en") => {
+  context.save.mockImplementation(async (language: Language) => {
     context.language = language;
     setLanguage(language);
   });
@@ -79,4 +79,22 @@ it("localizes successful feedback in Polish and English with the existing choice
   view.rerender(<LanguageSelector appearance="rounded" />);
   expect(getLanguage()).toBe("en");
   expect(screen.getByRole("status")).toHaveTextContent("Saved");
+});
+
+it("offers Ukrainian in the rounded and native selectors and localizes saved feedback", async () => {
+  context.save.mockImplementation(async (language: Language) => {
+    context.language = language;
+    setLanguage(language);
+  });
+  const view = render(<LanguageSelector appearance="rounded" />);
+  fireEvent.click(screen.getByRole("button", { name: "Application language" }));
+  fireEvent.click(screen.getByRole("option", { name: "Українська", exact: true }));
+  await act(async () => {});
+  view.rerender(<LanguageSelector appearance="rounded" />);
+  expect(context.save).toHaveBeenCalledWith("uk");
+  expect(screen.getByRole("button", { name: "Мова застосунку" })).toHaveTextContent("Українська");
+  expect(screen.getByRole("status")).toHaveTextContent("Збережено");
+  view.rerender(<LanguageSelector />);
+  expect(screen.getByRole("combobox", { name: "Мова застосунку" })).toHaveValue("uk");
+  expect(screen.getByRole("option", { name: "Українська" })).toHaveAttribute("lang", "uk");
 });
