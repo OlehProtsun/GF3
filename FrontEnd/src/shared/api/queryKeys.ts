@@ -3,6 +3,7 @@ export const queryKeys = {
     dashboard: () => ["home", "dashboard"] as const,
   },
   employeeUiState: {
+    availabilityTimePresets: (employeeId: number) => ["employeeUiState", "availabilityTimePresets", employeeId] as const,
     current: () => ["employeeUiState", "current"] as const,
   },
   employeeProfile: {

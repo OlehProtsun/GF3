@@ -15,7 +15,7 @@ async function fixture(page: Page, role = "employee") {
     else if (path === "/api/employee-profile/me") body = { employeeId: 12, username: "worker", displayName: "Worker with a long account name", recoveryEmail: "worker@example.com" };
     else if (path === "/api/employee-ui-state") body = { scheduleColumnOrders: {}, readNotificationIds: [], pinnedSwapIds: [] };
     else if (path.includes("notepad")) body = { notes: [], state: { isExpanded: false, isPinned: false, height: 700 } };
-    else if (path === "/api/employee-availability") body = [{ id: 5, name: "Availability", year: 2026, month: 9, canSubmit: true, isEditLocked: false, visibleFromUtc: "2026-09-01T08:00:00Z", visibleToUtc: "2026-10-01T18:00:00Z", slots: [] }];
+    else if (path === "/api/employee-availability") body = [{ id: 5, name: "Availability", year: 2026, month: 9, canSubmit: true, isEditLocked: false, visibleFromUtc: "2026-09-01T08:00:00Z", visibleToUtc: "2026-10-01T18:00:00Z", slots: [], members: [{ employeeId: 12, firstName: "Worker", lastName: "Bee", displayOrder: 2, slots: [] }, { employeeId: 13, firstName: "Anna", lastName: "First", displayOrder: 1, slots: [] }] }];
     else if (path === "/api/employee-schedules") body = [{
       id: 10, containerId: 2, containerName: "Team", shopId: 4, shopName: "Central", name: "September", year: 2026, month: 9, publicationStatus: "public", allowSwap: true, publishedAtUtc: new Date().toISOString(),
       employees: [{ id: 1, employeeId: 12, firstName: "Test", lastName: "Worker", displayName: "Test Worker", minHoursMonth: 0, displayOrder: 1 }],
@@ -153,13 +153,14 @@ async function oneColumn(page: Page, selector: string) {
 
 async function responsiveContent(page: Page, route: string) {
   if (route === "/availability") {
-    await expect(page.getByRole("button", { name: /Availability/ }).first()).toBeVisible();
+    await page.getByRole("button", { name: /^Availability / }).click();
+    await expect(page.getByRole("button", { name: /your availability/i }).first()).toBeVisible();
     await oneColumn(page, 'main [class*="shell_"]');
-    await expect.poll(() => page.locator('[class*="dayGrid_"]').evaluate(element => getComputedStyle(element).gridTemplateColumns.split(" ").length)).toBe(4);
+    await expect(page.getByRole("table").getByRole("row")).toHaveCount(31);
   } else if (route === "/profile") {
     await expect(page.getByText("Recovery email", { exact: true })).toBeVisible();
     await oneColumn(page, '[class*="contentGrid_"]');
-    await page.getByRole("button", { name: "Edit", exact: true }).click();
+    await page.getByRole("button", { name: "Change password", exact: true }).click();
     await oneColumn(page, '[class*="passwordFormGrid_"]');
   } else if (route === "/" || route === "/notifications") {
     await expect(page.getByRole("tab", { name: /^Inbox/ })).toBeVisible();
@@ -365,7 +366,7 @@ test("manager desktop navigation and public login remain isolated", async ({ pag
   await page.evaluate(() => localStorage.removeItem("gf3.auth.access-token"));
   await page.route("**/api/auth/session", route => route.fulfill({ status: 401, contentType: "application/json", body: JSON.stringify({ message: "Unauthenticated" }) }));
   await page.goto("/login");
-  await expect(page.getByRole("button", { name: /Sign in|Log in/ }).first()).toBeVisible();
+  await expect(page.getByRole("button", { name: /Sign in|Log in|Zaloguj się/ }).first()).toBeVisible();
   await expect(page.locator('[data-employee-nav]')).toHaveCount(0);
   expect(await page.evaluate(() => [...document.querySelectorAll("*")].some(element => getComputedStyle(element).containerName === "employee-workspace"))).toBe(false);
 });

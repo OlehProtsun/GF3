@@ -99,6 +99,62 @@ public sealed class EmployeeUiStateControllerTests
         }
     }
 
+    [Fact]
+    public async Task AvailabilityPresets_PersistAcrossDevices_StayAccountScoped_AndImportNeverOverwritesServer()
+    {
+        await using var database = await SqliteTestDatabase.CreateAsync();
+        int employeeId, colleagueId;
+        await using (var seed = database.CreateContext())
+        {
+            var employee = TestDataFactory.CreateDalEmployee("Presets", "Owner");
+            var colleague = TestDataFactory.CreateDalEmployee("Other", "Owner");
+            seed.Employees.AddRange(employee, colleague);
+            await seed.SaveChangesAsync();
+            employeeId = employee.Id; colleagueId = colleague.Id;
+            seed.EmployeeAccounts.AddRange(
+                new EmployeeAccountModel { EmployeeId = employeeId, Username = "preset-owner", PasswordHash = "test", PasswordUpdatedAtUtc = DateTimeOffset.UtcNow },
+                new EmployeeAccountModel { EmployeeId = colleagueId, Username = "other-owner", PasswordHash = "test", PasswordUpdatedAtUtc = DateTimeOffset.UtcNow });
+            await seed.SaveChangesAsync();
+        }
+        string[] presets = ["08:30 - 16:30", "15:00 - 21:00", "09:00 - 21:00", "10:00 - 18:00"];
+        await using (var firstDevice = database.CreateContext())
+        {
+            var controller = CreateController(firstDevice, employeeId);
+            var initial = await controller.GetAvailabilityTimePresets(CancellationToken.None);
+            Assert.Null(Assert.IsType<EmployeeAvailabilityTimePresetsDto>(Assert.IsType<OkObjectResult>(initial.Result).Value).Presets);
+            var saved = await controller.SaveAvailabilityTimePresets(new SaveEmployeeAvailabilityTimePresetsRequest { Presets = presets }, CancellationToken.None);
+            Assert.Equal(presets, Assert.IsType<EmployeeAvailabilityTimePresetsDto>(Assert.IsType<OkObjectResult>(saved.Result).Value).Presets);
+        }
+        await using (var secondDevice = database.CreateContext())
+        {
+            var controller = CreateController(secondDevice, employeeId);
+            var restored = await controller.GetAvailabilityTimePresets(CancellationToken.None);
+            Assert.Equal(presets, Assert.IsType<EmployeeAvailabilityTimePresetsDto>(Assert.IsType<OkObjectResult>(restored.Result).Value).Presets);
+            var imported = await controller.SaveAvailabilityTimePresets(new SaveEmployeeAvailabilityTimePresetsRequest { Presets = ["09:00 - 15:00", "15:00 - 21:00", "09:00 - 21:00"], OnlyIfUnset = true }, CancellationToken.None);
+            Assert.Equal(presets, Assert.IsType<EmployeeAvailabilityTimePresetsDto>(Assert.IsType<OkObjectResult>(imported.Result).Value).Presets);
+            var other = await CreateController(secondDevice, colleagueId).GetAvailabilityTimePresets(CancellationToken.None);
+            Assert.Null(Assert.IsType<EmployeeAvailabilityTimePresetsDto>(Assert.IsType<OkObjectResult>(other.Result).Value).Presets);
+            var firstImport = await CreateController(secondDevice, colleagueId).SaveAvailabilityTimePresets(new SaveEmployeeAvailabilityTimePresetsRequest { Presets = presets, OnlyIfUnset = true }, CancellationToken.None);
+            Assert.Equal(presets, Assert.IsType<EmployeeAvailabilityTimePresetsDto>(Assert.IsType<OkObjectResult>(firstImport.Result).Value).Presets);
+        }
+        await using (var verification = database.CreateContext())
+        {
+            var controller = CreateController(verification, employeeId);
+            foreach (var invalid in new string[]?[] { null, [], ["09:00 - 15:00"], ["21:00 - 09:00", "15:00 - 21:00", "09:00 - 21:00"], ["day off", "15:00 - 21:00", "09:00 - 21:00"], ["25:00 - 26:00", "15:00 - 21:00", "09:00 - 21:00"], Enumerable.Repeat("09:00 - 15:00", 101).ToArray() })
+            {
+                var rejected = await controller.SaveAvailabilityTimePresets(new SaveEmployeeAvailabilityTimePresetsRequest { Presets = invalid }, CancellationToken.None);
+                var problem = Assert.IsType<ValidationProblemDetails>(Assert.IsType<BadRequestObjectResult>(rejected.Result).Value);
+                Assert.Equal(400, problem.Status);
+                Assert.NotEmpty(problem.Errors);
+            }
+            var unchanged = await controller.GetAvailabilityTimePresets(CancellationToken.None);
+            Assert.Equal(presets, Assert.IsType<EmployeeAvailabilityTimePresetsDto>(Assert.IsType<OkObjectResult>(unchanged.Result).Value).Presets);
+            Assert.IsType<UnauthorizedResult>((await CreateController(verification, 999999).GetAvailabilityTimePresets(CancellationToken.None)).Result);
+            Assert.Equal(["OnlyIfUnset", "Presets"], typeof(SaveEmployeeAvailabilityTimePresetsRequest).GetProperties().Select(property => property.Name).Order().ToArray());
+            Assert.Equal(AuthRoles.Employee, Assert.Single(typeof(EmployeeUiStateController).GetCustomAttributes(typeof(Microsoft.AspNetCore.Authorization.AuthorizeAttribute), true).Cast<Microsoft.AspNetCore.Authorization.AuthorizeAttribute>()).Roles);
+        }
+    }
+
     private static EmployeeUiStateController CreateController(
         DataAccessLayer.Models.DataBaseContext.AppDbContext context,
         int employeeId)

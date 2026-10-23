@@ -33,6 +33,8 @@ describe("employee availability api", () => {
     };
 
     employeeAvailabilityApi.saveSlots(12, payload);
+    expect(Object.keys(payload)).toEqual(["slots"]);
+    expect(payload.slots.every(slot => !Object.hasOwn(slot, "employeeId") && !Object.hasOwn(slot, "memberId"))).toBe(true);
 
     expect(requestMock).toHaveBeenCalledWith("employee-availability/12/slots", {
       method: "PUT",

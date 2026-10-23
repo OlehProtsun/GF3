@@ -17,3 +17,12 @@ describe("notification read synchronization", () => {
     await expect(employeeUiStateApi.markNotificationsRead(["swap-public:1"])).rejects.toThrow("offline");
   });
 });
+
+it("loads and saves presets without accepting another employee identifier", async () => {
+  const signal = new AbortController().signal;
+  const presets = ["09:00 - 15:00", "15:00 - 21:00", "09:00 - 21:00"];
+  await employeeUiStateApi.getAvailabilityTimePresets(signal);
+  await employeeUiStateApi.saveAvailabilityTimePresets(presets, true);
+  expect(request).toHaveBeenNthCalledWith(1, "employee-ui-state/availability-time-presets", { signal });
+  expect(request).toHaveBeenNthCalledWith(2, "employee-ui-state/availability-time-presets", { method: "PUT", body: { presets, onlyIfUnset: true } });
+});

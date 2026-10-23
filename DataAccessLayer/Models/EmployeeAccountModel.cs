@@ -11,6 +11,9 @@ namespace DataAccessLayer.Models;
 [Table("employee_account")]
 public class EmployeeAccountModel
 {
+    [Column("availability_time_presets_json")]
+    public string? AvailabilityTimePresetsJson { get; set; }
+
     [Required]
     [MaxLength(2)]
     [Column("language")]

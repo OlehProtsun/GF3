@@ -341,6 +341,10 @@ namespace DataAccessLayer.Migrations
                         .HasColumnType("INTEGER")
                         .HasColumnName("id");
 
+                    b.Property<string>("AvailabilityTimePresetsJson")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("availability_time_presets_json");
+
                     b.Property<int>("EmployeeId")
                         .HasColumnType("INTEGER")
                         .HasColumnName("employee_id");

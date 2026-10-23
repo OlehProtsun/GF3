@@ -1,9 +1,13 @@
 import { request } from "@shared/api/httpClient";
-import type { EmployeeUiState } from "../model/types";
+import type { EmployeeUiState, EmployeeAvailabilityTimePresets } from "../model/types";
 
 const endpoint = "employee-ui-state";
 
 export const employeeUiStateApi = {
+  getAvailabilityTimePresets: (signal?: AbortSignal) => request<EmployeeAvailabilityTimePresets>(`${endpoint}/availability-time-presets`, { signal }),
+  saveAvailabilityTimePresets: (presets: string[], onlyIfUnset = false) => request<EmployeeAvailabilityTimePresets>(`${endpoint}/availability-time-presets`, {
+    method: "PUT", body: { presets, onlyIfUnset },
+  }),
   get: (signal?: AbortSignal) => request<EmployeeUiState>(endpoint, { signal }),
   saveScheduleColumnOrder: (scheduleId: number, columnOrder: number[]) =>
     request<void>(`${endpoint}/schedule-columns/${scheduleId}`, {

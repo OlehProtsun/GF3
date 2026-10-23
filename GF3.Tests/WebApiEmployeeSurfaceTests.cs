@@ -470,6 +470,22 @@ public sealed class WebApiEmployeeSurfaceTests
                 },
             ],
         };
+        member.Employee = new EmployeeModel { Id = 12, FirstName = "Worker", LastName = "Bee", Email = "private-worker@example.com", Phone = "private-phone-12" };
+        member.DisplayOrder = 5;
+        member.Days = model.Days.ToList();
+        group.Members = [
+            member,
+            new AvailabilityGroupMemberModel {
+                EmployeeId = 14, DisplayOrder = 2,
+                Employee = new EmployeeModel { FirstName = "Zoe", LastName = "Last", Email = "private-zoe@example.com", Phone = "private-phone-14" },
+                Days = [new AvailabilityGroupDayModel { DayOfMonth = 7, Kind = AvailabilityKind.NONE }],
+            },
+            new AvailabilityGroupMemberModel {
+                EmployeeId = 13, DisplayOrder = 1,
+                Employee = new EmployeeModel { FirstName = "Anna", LastName = "First", Email = "private-anna@example.com", Phone = "private-phone-13" },
+                Days = [new AvailabilityGroupDayModel { DayOfMonth = 8, Kind = AvailabilityKind.ANY }, new AvailabilityGroupDayModel { DayOfMonth = 2, Kind = AvailabilityKind.INT, IntervalStr = "10:00 - 14:00" }],
+            },
+        ];
         var service = new RecordingAvailabilityGroupService
         {
             PublishedAvailability = [model],
@@ -513,10 +529,38 @@ public sealed class WebApiEmployeeSurfaceTests
         Assert.False(byIdDto.IsEditLocked);
         Assert.Equal(3, Assert.Single(byIdDto.Slots).DayOfMonth);
         Assert.Equal(4, Assert.Single(updatedDto.Slots).DayOfMonth);
+        foreach (var dto in new[] { visibleDto, byIdDto, updatedDto })
+        {
+            Assert.Equal([13, 14, 12], dto.Members.Select(item => item.EmployeeId).ToArray());
+            Assert.Equal([2, 8], dto.Members[0].Slots.Select(slot => slot.DayOfMonth).ToArray());
+            Assert.Equal("10:00 - 14:00", dto.Members[0].Slots[0].IntervalStr);
+            Assert.Equal(7, Assert.Single(dto.Members[1].Slots).DayOfMonth);
+            var json = System.Text.Json.JsonSerializer.Serialize(dto, new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web));
+            Assert.DoesNotContain("private-", json);
+            using var document = System.Text.Json.JsonDocument.Parse(json);
+            Assert.Equal(["displayOrder", "employeeId", "firstName", "lastName", "slots"], document.RootElement.GetProperty("members")[0].EnumerateObject().Select(property => property.Name).Order().ToArray());
+        }
+        Assert.Equal(["Slots"], typeof(UpdateEmployeeAvailabilityRequest).GetProperties().Select(property => property.Name).ToArray());
+        Assert.Equal(AuthRoles.Employee, Assert.Single(typeof(EmployeeAvailabilityController).GetCustomAttributes(typeof(Microsoft.AspNetCore.Authorization.AuthorizeAttribute), true).Cast<Microsoft.AspNetCore.Authorization.AuthorizeAttribute>()).Roles);
         var managerDataChange = Assert.Single(notifier.ManagerDataChanges);
         Assert.Equal(ManagerEditResourceTypes.AvailabilityGroup, managerDataChange.ResourceType);
         Assert.Equal(group.Id.ToString(System.Globalization.CultureInfo.InvariantCulture), managerDataChange.ResourceId);
         Assert.Equal("employee-availability-updated", managerDataChange.Reason);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task EmployeeAvailabilityController_MapsAbsentMembers(bool missing)
+    {
+        var model = new EmployeeAvailabilityModel {
+            Group = new AvailabilityGroupModel { Id = 5, Members = missing ? null! : [] },
+            Member = new AvailabilityGroupMemberModel { EmployeeId = 12 },
+        };
+        var controller = new EmployeeAvailabilityController(new RecordingAvailabilityGroupService { AvailabilityById = model }, new NoopWorkflowLogService());
+        SetEmployeeUser(controller, 12);
+        var result = await controller.GetById(5, CancellationToken.None);
+        Assert.Empty(Assert.IsType<EmployeeAvailabilityGroupDto>(Assert.IsType<OkObjectResult>(result.Result).Value).Members);
     }
 
     [Fact]

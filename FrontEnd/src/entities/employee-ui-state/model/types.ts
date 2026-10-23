@@ -3,3 +3,5 @@ export type EmployeeUiState = {
   readNotificationIds: string[];
   pinnedSwapIds?: number[];
 };
+
+export type EmployeeAvailabilityTimePresets = { presets: string[] | null };

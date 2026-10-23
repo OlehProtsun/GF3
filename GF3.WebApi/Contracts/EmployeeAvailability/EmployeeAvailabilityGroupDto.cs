@@ -32,4 +32,5 @@ public sealed class EmployeeAvailabilityGroupDto
     public DateTimeOffset? EmployeeLastModifiedAtUtc { get; set; }
 
     public IReadOnlyList<AvailabilitySlotDto> Slots { get; set; } = Array.Empty<AvailabilitySlotDto>();
+    public IReadOnlyList<EmployeeAvailabilityMemberDto> Members { get; set; } = Array.Empty<EmployeeAvailabilityMemberDto>();
 }
