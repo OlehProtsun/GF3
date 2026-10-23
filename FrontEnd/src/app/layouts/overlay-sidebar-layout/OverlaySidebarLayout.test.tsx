@@ -103,12 +103,13 @@ describe("OverlaySidebarLayout", () => {
     expect(container.querySelector("aside")?.getAttribute("aria-hidden")).toBe("false");
   });
 
-  it("shows system tools and Settings only for a system manager", () => {
+  it("keeps the system Settings heading and DataBase restricted", () => {
     authMock.session.isSystemManager = true;
     renderManagerLayout();
     expect(screen.getByRole("link", { name: "Information" })).toHaveAttribute("href", "/information");
     expect(screen.getByRole("link", { name: "DataBase" })).toHaveAttribute("href", "/database");
-    expect(screen.getByText("Settings")).toBeInTheDocument();
+    expect(screen.getAllByText("Settings")).toHaveLength(2);
+    expect(screen.getByRole("link", { name: "Settings" })).toHaveAttribute("href", "/settings");
   });
 
   it.each([false, undefined])("keeps ordinary manager navigation with privilege %s", async privilege => {
@@ -117,7 +118,7 @@ describe("OverlaySidebarLayout", () => {
     renderManagerLayout();
     expect(screen.queryByRole("link", { name: "Information" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "DataBase" })).not.toBeInTheDocument();
-    expect(screen.queryByText("Settings")).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Settings" })).toHaveAttribute("href", "/settings");
     for (const name of ["Home", "Employee", "Shop", "Availability", "Container", "Message", "Open manager profile"]) {
       expect(screen.getByRole("link", { name })).toBeInTheDocument();
     }

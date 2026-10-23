@@ -2,8 +2,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { queryKeys } from "@shared/api/queryKeys";
 import { regulationsApi } from "./regulationsApi";
 
-export function usePendingRegulationsQuery(accountKey: string) {
-  return useQuery({ queryKey: queryKeys.regulations.pending(accountKey), queryFn: ({ signal }) => regulationsApi.pending({ signal }) });
+export function usePendingRegulationsQuery(accountKey: string, enabled = true) {
+  return useQuery({ queryKey: queryKeys.regulations.pending(accountKey), queryFn: ({ signal }) => regulationsApi.pending({ signal }), enabled });
 }
 
 export function useMyRegulationHistoryQuery(accountKey: string) {

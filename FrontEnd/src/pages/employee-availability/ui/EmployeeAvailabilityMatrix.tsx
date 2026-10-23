@@ -4,6 +4,7 @@ import { getAvailabilityCellKey, getAvailabilityWeekdayLabel, getDaysInMonth, is
 import { getAvailabilityMonthLabel } from "@entities/availability-groups/model/presentation";
 import { t } from "@shared/i18n";
 import { getPolishPublicHoliday } from "@shared/lib/polishPublicHolidays";
+import { usePublicHolidayVisibility } from "@app/providers/PublicHolidayVisibilityProvider";
 import { buildEmployeeAvailabilityCells, buildEmployeeAvailabilityColumns, getContiguousAvailabilityDays, type DayDraftMap } from "../model/employeeAvailabilityMatrix";
 import styles from "./EmployeeAvailabilityPage.module.css";
 
@@ -18,6 +19,7 @@ type Props = {
 };
 
 export function EmployeeAvailabilityMatrix(props: Props) {
+  const showPublicHolidays = usePublicHolidayVisibility();
   const { group, currentEmployeeId, ownDraft, canEdit, selectedDays } = props;
   const viewportRef = useRef<HTMLDivElement>(null);
   const callbacks = useRef(props);
@@ -138,7 +140,7 @@ export function EmployeeAvailabilityMatrix(props: Props) {
         })}
       </tr></thead>
       <tbody>{Array.from({ length: daysInMonth }, (_, index) => index + 1).map(day => {
-        const holiday = getPolishPublicHoliday(group.year, group.month, day);
+        const holiday = showPublicHolidays ? getPolishPublicHoliday(group.year, group.month, day) : null;
         return <tr key={day} data-availability-day={day} className={isAvailabilityWeekend(group.year, group.month, day) ? styles.weekend : undefined}>
         <th scope="row" className={[styles.dateColumn, holiday ? styles.holidayDay : ""].join(" ")} title={holiday ? t(holiday.name) : undefined}>
           <strong>{day}</strong><small>{getAvailabilityWeekdayLabel(group.year, group.month, day)}</small>

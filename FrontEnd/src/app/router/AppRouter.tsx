@@ -71,6 +71,7 @@ const InformationPage = lazyPage(() => import("@pages/information"), (module) =>
 const CommunicationsPage = lazyPage(() => import("@pages/communications"), (module) => module.CommunicationsPage);
 const DataBasePage = lazyPage(() => import("@pages/database"), (module) => module.DataBasePage);
 const ManagerAccountPage = lazyPage(() => import("@pages/manager-account"), (module) => module.ManagerAccountPage);
+const ManagerSettingsPage = lazyPage(() => import("@pages/manager-settings"), module => module.ManagerSettingsPage);
 const EmployeeListPage = lazyPage(() => import("@pages/employee-list"), (module) => module.EmployeeListPage);
 const EmployeeProfilePage = lazyPage(() => import("@pages/employee-profile"), (module) => module.EmployeeProfilePage);
 const EmployeeEditPage = lazyPage(() => import("@pages/employee-edit"), (module) => module.EmployeeEditPage);
@@ -90,6 +91,7 @@ const ManagerPhoneLayout = lazy(() => import("@app/layouts/manager-phone-layout"
 const ManagerWorkspaceModePicker = lazyPage(() => import("@features/manager-workspace-mode/ui/ManagerWorkspaceModePicker"), module => module.ManagerWorkspaceModePicker);
 
 const managerRoutes = [
+  { path: "/settings", element: <ManagerSettingsPage /> },
   { path: "/shop/new", element: <ShopEditPage /> },
   { path: "/shop/:shopId/edit", element: <ShopEditPage /> },
   { path: "/shop/:shopId", element: <ShopProfilePage /> },

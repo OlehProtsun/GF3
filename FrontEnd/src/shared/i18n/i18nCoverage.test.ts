@@ -16,10 +16,15 @@ function sourceFiles(directory: string): string[] {
   });
 }
 const placeholders = (value: string) => [...new Set(value.match(/\{\d+\}/g) ?? [])].sort();
+const holidayNames = ["New Year's Day", "Epiphany", "Labour Day", "Constitution Day", "Assumption of Mary", "All Saints' Day", "National Independence Day", "Christmas Eve", "Christmas Day", "Second Day of Christmas", "Easter Sunday", "Easter Monday", "Pentecost", "Corpus Christi"];
 
 // Each mapping is finite application text, reviewed at its declaration/callers.
 // API reasons use translateServerMessage instead, preserving unknown record content.
 const mappings: Record<string, Record<string, readonly string[]>> = {
+  "entities/containers/ui/ContainerGraphMatrix.tsx": { "day.holiday.name": holidayNames },
+  "pages/employee-availability/ui/EmployeeAvailabilityMatrix.tsx": { "holiday.name": holidayNames },
+  "pages/employee-schedule/ui/EmployeeSchedulePage.tsx": { "holiday.name": holidayNames },
+  "pages/manager-settings/ui/PublicHolidayListDialog.tsx": { "holiday.name": holidayNames },
   "app/layouts/manager-phone-layout/ManagerPhoneLayout.tsx": { label: ["Home", "Containers", "Dispo", "Employees", "More"] },
   "entities/availability-groups/ui/AvailabilityPublicationCard.tsx": { value: ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"] },
   "entities/containers/ui/ContainerGraphPresetSelect.tsx": {

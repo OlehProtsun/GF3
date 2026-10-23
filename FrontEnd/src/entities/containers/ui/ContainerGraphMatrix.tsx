@@ -1,4 +1,6 @@
 import { useLanguageRevision } from "@shared/i18n/useLanguageRevision";
+import { usePublicHolidayVisibility } from "@app/providers/PublicHolidayVisibilityProvider";
+import { getPolishPublicHoliday, type PolishPublicHoliday } from "@shared/lib/polishPublicHolidays";
 import { t } from "@shared/i18n";
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties, ClipboardEvent, DragEvent, FocusEvent, KeyboardEvent, MouseEvent, ReactNode } from "react";
@@ -92,6 +94,7 @@ type ContainerGraphMatrixProps = {
 };
 
 type MatrixDay = {
+  holiday: PolishPublicHoliday | null;
   dayOfMonth: number;
   label: string;
   isWeekend: boolean;
@@ -355,12 +358,15 @@ const MatrixDayCell = memo(function MatrixDayCell({
         isSelected && styles.dayCellSelected,
       )}
       style={inlineStyle}
+      title={day.holiday ? t(day.holiday.name) : undefined}
+      aria-label={day.holiday ? `${day.label}: ${t("Holiday")}, ${t(day.holiday.name)}` : undefined}
       data-matrix-target={selectionEnabled ? "day" : undefined}
       data-day-of-month={selectionEnabled ? day.dayOfMonth : undefined}
     >
       <span
         className={joinClassNames(
           styles.dayButton,
+          Boolean(day.holiday) && styles.dayButtonHoliday,
           shiftStaffingCounts && styles.dayButtonWithStaffing,
           isSelected && styles.dayButtonSelected,
         )}
@@ -371,6 +377,7 @@ const MatrixDayCell = memo(function MatrixDayCell({
           </span>
         ) : null}
         <span className={styles.dayLabel}>{day.label}</span>
+        {day.holiday ? <small className={styles.holidayCompactLabel}>{t("Holiday short")}</small> : null}
       </span>
     </th>
   );
@@ -692,6 +699,7 @@ export function ContainerGraphMatrix({
   onVisualHintCellClick,
 }: ContainerGraphMatrixProps) {
   const language = useLanguageRevision();
+  const showPublicHolidays = usePublicHolidayVisibility();
   const [editingCellKey, setEditingCellKey] = useState<string | null>(null);
   const [editingValue, setEditingValue] = useState(GRAPH_EMPTY_MARK);
   const [editingSelectionBehavior, setEditingSelectionBehavior] = useState<MatrixEditorSelectionBehavior>("select-all");
@@ -721,13 +729,14 @@ export function ContainerGraphMatrix({
         const dayOfMonth = index + 1;
         return {
           dayOfMonth,
+          holiday: showPublicHolidays ? getPolishPublicHoliday(graph.year, graph.month, dayOfMonth) : null,
           label: `${getGraphWeekdayLabel(graph.year, graph.month, dayOfMonth)}/${String(dayOfMonth).padStart(2, "0")}.${String(graph.month).padStart(2, "0")}`,
           isWeekend: isGraphWeekend(graph.year, graph.month, dayOfMonth),
           hasConflict: Boolean(dayConflictMap[dayOfMonth]),
         };
       }),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- Translation helpers read the current language internally.
-    [dayConflictMap, graph.month, graph.year, language],
+    [dayConflictMap, graph.month, graph.year, language, showPublicHolidays],
   );
   const shiftStaffingCountsByDay = useMemo(
     () => showShiftStaffingCounts

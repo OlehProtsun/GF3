@@ -20,7 +20,7 @@ test("profile shows zero count, empty and loading states", () => {
   expect(screen.getByText("Loading history...")).toBeVisible();
 });
 
-test.each(["default", "profile"] as const)("%s retains history metadata and PDF download lifecycle", async appearance => {
+test.each(["default", "profile", "manager-profile"] as const)("%s retains history metadata and PDF download lifecycle", async appearance => {
   const blob = new Blob(["pdf"]);
   vi.mocked(regulationsApi.downloadPdf).mockResolvedValue({ blob, fileName: "rules.pdf" });
   const create = vi.fn().mockReturnValue("blob:rules");
@@ -29,7 +29,7 @@ test.each(["default", "profile"] as const)("%s retains history metadata and PDF 
   const open = vi.spyOn(window, "open").mockReturnValue(null);
   const timeout = vi.spyOn(window, "setTimeout");
   render(<RegulationHistoryCard appearance={appearance} acceptances={[acceptance]} isLoading={false} />);
-  expect(screen.getByRole("region").classList.contains(styles.profile)).toBe(appearance === "profile");
+  expect(screen.getByRole("region").classList.contains(styles.profile)).toBe(appearance !== "default");
   expect(screen.getByText("1")).toBeVisible();
   const button = screen.getByRole("button", { name: /Employee rules/ });
   expect(button).toHaveTextContent("v2");

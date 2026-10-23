@@ -3,6 +3,26 @@ export type PolishPublicHoliday = {
   readonly name: string;
 };
 
+export type PolishPublicHolidayDate = PolishPublicHoliday & {
+  readonly year: number;
+  readonly month: number;
+  readonly day: number;
+};
+
+export function getPolishPublicHolidaysForYear(year: number): readonly PolishPublicHolidayDate[] {
+  if (!Number.isInteger(year) || year < 1 || year > 9999) return [];
+  const leap = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
+  const lengths = [31, leap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  const holidays: PolishPublicHolidayDate[] = [];
+  for (let month = 1; month <= 12; month++) {
+    for (let day = 1; day <= lengths[month - 1]; day++) {
+      const holiday = getPolishPublicHoliday(year, month, day);
+      if (holiday) holidays.push({ ...holiday, year, month, day });
+    }
+  }
+  return holidays;
+}
+
 const fixedHolidays: Record<string, PolishPublicHoliday> = {
   "1-1": { id: "new-year", name: "New Year's Day" },
   "1-6": { id: "epiphany", name: "Epiphany" },

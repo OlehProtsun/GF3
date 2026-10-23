@@ -232,6 +232,7 @@ test.each([ManagerPhoneAvailabilityPage, ManagerPhoneEmployeesPage])("lists reta
 
 test("More shows account, PC switch and functional logout without Shops shortcut", () => {
  mount(<ManagerPhoneMorePage />, "/more"); expect(screen.getByText("Real Manager")).toBeInTheDocument();
+ expect(screen.queryByRole("link", { name: "Settings" })).not.toBeInTheDocument();
  expect(screen.queryByRole("link", { name: /Shops/ })).not.toBeInTheDocument(); expect(screen.getByRole("button", { name: /Switch to Desktop/ })).toBeInTheDocument();
  fireEvent.click(screen.getByRole("button", { name: "Log out" })); expect(auth.logout).toHaveBeenCalledOnce();
 });

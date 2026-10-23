@@ -43,6 +43,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, TimeProvider? 
     public DbSet<ShiftCorrectionRequestModel> ShiftCorrectionRequests => Set<ShiftCorrectionRequestModel>();
     public DbSet<WorkflowLogEntryModel> WorkflowLogEntries => Set<WorkflowLogEntryModel>();
     public DbSet<WorkflowLogSettingsModel> WorkflowLogSettings => Set<WorkflowLogSettingsModel>();
+    public DbSet<PublicHolidaySettingsModel> PublicHolidaySettings => Set<PublicHolidaySettingsModel>();
     public DbSet<RegulationDocumentModel> RegulationDocuments => Set<RegulationDocumentModel>();
     public DbSet<RegulationAcceptanceModel> RegulationAcceptances => Set<RegulationAcceptanceModel>();
     public DbSet<BindModel> AvailabilityBinds => Set<BindModel>();
@@ -179,6 +180,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, TimeProvider? 
         ConfigureShiftCorrectionRequest(modelBuilder);
         ConfigureWorkflowLogEntry(modelBuilder);
         ConfigureWorkflowLogSettings(modelBuilder);
+        ConfigurePublicHolidaySettings(modelBuilder);
         ConfigureRegulationDocument(modelBuilder);
         ConfigureRegulationAcceptance(modelBuilder);
         ConfigureAvailabilityBind(modelBuilder);
@@ -957,6 +959,16 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, TimeProvider? 
 
             entity.HasIndex(log => new { log.ActorRole, log.OccurredAtUtc })
                 .HasDatabaseName("ix_workflow_log_role_time");
+        });
+    }
+
+    private static void ConfigurePublicHolidaySettings(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<PublicHolidaySettingsModel>(entity =>
+        {
+            entity.Property(settings => settings.ShowPublicHolidays).IsRequired().HasDefaultValue(true);
+            entity.ToTable(table => table.HasCheckConstraint("ck_public_holiday_settings_singleton", "id = 1"));
+            entity.HasData(new PublicHolidaySettingsModel());
         });
     }
 

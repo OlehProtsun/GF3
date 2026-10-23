@@ -1,4 +1,7 @@
 export const queryKeys = {
+  publicHolidaySettings: {
+    current: () => ["publicHolidaySettings", "current"] as const,
+  },
   home: {
     dashboard: () => ["home", "dashboard"] as const,
   },

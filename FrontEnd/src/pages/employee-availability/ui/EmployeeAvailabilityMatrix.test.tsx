@@ -5,6 +5,9 @@ import { EmployeeAvailabilityMatrix } from "./EmployeeAvailabilityMatrix";
 import { buildDraftFromAvailability } from "../model/employeeAvailabilityMatrix";
 import type { EmployeeAvailabilityGroup } from "@entities/employee-availability";
 import styles from "./EmployeeAvailabilityPage.module.css";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { PublicHolidayVisibilityProvider } from "@app/providers/PublicHolidayVisibilityProvider";
+import { publicHolidaySettingsApi } from "@entities/public-holidays/api/publicHolidaySettingsApi";
 class TestPointerEvent extends MouseEvent {
   pointerId: number; isPrimary: boolean;
   constructor(type: string, options: PointerEventInit = {}) { super(type, options); this.pointerId = options.pointerId ?? 1; this.isPrimary = options.isPrimary ?? true; }
@@ -24,6 +27,21 @@ function setup(canEdit = true, g = group) {
 beforeEach(() => { setLanguage("en"); vi.stubGlobal("PointerEvent", TestPointerEvent); vi.useFakeTimers(); });
 afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });
 describe("EmployeeAvailabilityMatrix", () => {
+  test("OFF removes holiday labels and titles but keeps weekends and editing", async () => {
+    vi.spyOn(publicHolidaySettingsApi, "get").mockResolvedValue({ showPublicHolidays: false });
+    const edit = vi.fn();
+    let view!: ReturnType<typeof render>;
+    await act(async () => { view = render(<QueryClientProvider client={new QueryClient()}><PublicHolidayVisibilityProvider enabled>
+      <EmployeeAvailabilityMatrix group={group} currentEmployeeId={12} ownDraft={{}} canEdit selectedDays={[]}
+        onSelectedDaysChange={vi.fn()} onRequestEdit={edit} />
+    </PublicHolidayVisibilityProvider></QueryClientProvider>); });
+    const date = view.container.querySelector('[data-availability-day="1"] th');
+    expect(date).not.toHaveClass(styles.holidayDay); expect(date).not.toHaveAttribute("title");
+    expect(screen.queryByText("Holiday")).toBeNull();
+    expect(view.container.querySelector('[data-availability-day="3"]')).toHaveClass(styles.weekend);
+    fireEvent.click(view.container.querySelector('[data-own-availability-cell="1"]')!);
+    expect(edit).toHaveBeenCalledWith([1]);
+  });
   test.each([
     ["en", "Holiday", "Labour Day", "Constitution Day"],
     ["pl", "Święto", "Święto Pracy", "Święto Konstytucji 3 Maja"],

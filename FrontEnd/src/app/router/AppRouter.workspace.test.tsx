@@ -35,6 +35,7 @@ vi.mock("@pages/information", () => ({ InformationPage: () => { auth.protectedMo
 vi.mock("@pages/communications", () => ({ CommunicationsPage: () => { return <div>CommunicationsPage</div>; } }));
 vi.mock("@pages/database", () => ({ DataBasePage: () => { auth.protectedMount(); return <div>DataBasePage</div>; } }));
 vi.mock("@pages/manager-account", () => ({ ManagerAccountPage: () => { return <div>ManagerAccountPage</div>; } }));
+vi.mock("@pages/manager-settings", () => ({ ManagerSettingsPage: () => <div>ManagerSettingsPage</div> }));
 vi.mock("@pages/employee-list", () => ({ EmployeeListPage: () => { return <div>EmployeeListPage</div>; } }));
 vi.mock("@pages/employee-profile", () => ({ EmployeeProfilePage: () => { return <div>EmployeeProfilePage</div>; } }));
 vi.mock("@pages/employee-edit", () => ({ EmployeeEditPage: () => { return <div>EmployeeEditPage</div>; } }));
@@ -64,11 +65,22 @@ vi.mock("@pages/manager-phone", () => ({
   ManagerPhoneMorePage: () => <div>PhoneMore</div>,
 }));
 describe("workspace routing", () => {
+  it("ordinary PC manager can open settings", async () => {
+    auth.session = { ...manager(false), workspaceMode: "pc" };
+    mount("/settings");
+    expect(await screen.findByText("ManagerSettingsPage")).toBeInTheDocument();
+  });
+  it("employee settings route redirects to the employee default", async () => {
+    auth.session = employee;
+    mount("/settings");
+    expect(await screen.findByText("EmployeeNotificationsPage")).toBeInTheDocument();
+    expect(screen.queryByText("ManagerSettingsPage")).not.toBeInTheDocument();
+  });
   beforeEach(() => { auth.status = "authenticated"; auth.session = { ...manager(true), workspaceMode: "phone" }; auth.protectedMount.mockClear(); });
   it.each([["/", "Home"], ["/container/1", "ContainerDetail"], ["/container/1/graphs/2", "Graph"], ["/availability/1", "AvailabilityDetail"], ["/employee/1", "EmployeeDetail"], ["/shop/1", "ShopDetail"]])("phone direct route %s mounts only read-only page", async (path, page) => {
     mount(path); expect(await screen.findByText(`Phone${page}`)).toBeInTheDocument(); expect(screen.getByTestId("phone-shell")).toBeInTheDocument(); expect(screen.getByText("LegalGate")).toBeInTheDocument();
   });
-  it.each(["/employee/new", "/container/1/graphs/2/edit", "/database", "/information", "/manager-profile"])('phone refuses desktop URL %s', async path => {
+  it.each(["/employee/new", "/container/1/graphs/2/edit", "/database", "/information", "/manager-profile", "/settings"])('phone refuses desktop URL %s', async path => {
     mount(path); await screen.findByText("PhoneHome"); expect(window.location.pathname).toBe("/"); expect(auth.protectedMount).not.toHaveBeenCalled();
   });
   it("choose shows picker with legal gate irrespective of business URL", async () => {

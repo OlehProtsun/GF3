@@ -934,6 +934,34 @@ namespace DataAccessLayer.Migrations
                     b.ToTable("manager_shift_correction_setting");
                 });
 
+            modelBuilder.Entity("DataAccessLayer.Models.PublicHolidaySettingsModel", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("id");
+
+                    b.Property<bool>("ShowPublicHolidays")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER")
+                        .HasDefaultValue(true)
+                        .HasColumnName("show_public_holidays");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("public_holiday_settings", t =>
+                        {
+                            t.HasCheckConstraint("ck_public_holiday_settings_singleton", "id = 1");
+                        });
+
+                    b.HasData(
+                        new
+                        {
+                            Id = 1,
+                            ShowPublicHolidays = true
+                        });
+                });
+
             modelBuilder.Entity("DataAccessLayer.Models.RegulationAcceptanceModel", b =>
                 {
                     b.Property<int>("Id")

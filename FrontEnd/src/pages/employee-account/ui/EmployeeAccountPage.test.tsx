@@ -38,6 +38,8 @@ beforeEach(() => {
   storedEmail = "worker@example.com";
   fetchMock.mockReset().mockImplementation(async (url: string, options?: RequestInit) => {
     if (url.endsWith("auth/session")) return Response.json(session);
+    if (url.endsWith("public-holiday-settings")) return Response.json({ showPublicHolidays: true });
+    if (url.endsWith("regulations/pending")) return Response.json([]);
     if (url.endsWith("employee-push/config")) return Response.json({ enabled: false, publicKey: null });
     if (url.endsWith("password/send-code")) return sendStatus === 200 ? Response.json({ deliveryHint: "w***@example.com" }) : Response.json({ detail: "Could not send code." }, { status: sendStatus });
     if (url.endsWith("employee-profile/me") && options?.method === "PUT") {
@@ -75,9 +77,9 @@ test("successful reset clears the revoked session, shows success at login and al
   expect(getAuthAccessToken()).toBeNull();
   expect(window.localStorage.getItem("gf3.auth.access-token")).toBeNull();
   expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([
-    "/api/auth/session", "/api/employee-profile/me", "/api/employee-push/config", "/api/employee-profile/me/password/confirm",
+    "/api/auth/session", "/api/employee-profile/me", "/api/regulations/pending", "/api/employee-push/config", "/api/public-holiday-settings", "/api/employee-profile/me/password/confirm",
   ]);
-  expect(JSON.parse(fetchMock.mock.calls[3][1].body)).toEqual({ code: "123456", newPassword: "654321" });
+  expect(JSON.parse(fetchMock.mock.calls[5][1].body)).toEqual({ code: "123456", newPassword: "654321" });
   fireEvent.change(screen.getByLabelText("Username"), { target: { value: "worker" } });
   fireEvent.change(screen.getByLabelText("Password"), { target: { value: "654321" } });
   fireEvent.click(screen.getByRole("button", { name: "Sign in" }));

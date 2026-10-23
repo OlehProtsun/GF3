@@ -1,5 +1,27 @@
 import { describe, expect, test } from "vitest";
-import { getPolishPublicHoliday } from "./polishPublicHolidays";
+import { getPolishPublicHoliday, getPolishPublicHolidaysForYear } from "./polishPublicHolidays";
+
+describe("getPolishPublicHolidaysForYear", () => {
+  test("enumerates exactly 14 ordered, unique named dates in 2026", () => {
+    const holidays = getPolishPublicHolidaysForYear(2026);
+    expect(holidays.map(({ month, day }) => `${month}/${day}`)).toEqual([
+      "1/1", "1/6", "4/5", "4/6", "5/1", "5/3", "5/24", "6/4", "8/15", "11/1", "11/11", "12/24", "12/25", "12/26",
+    ]);
+    expect(new Set(holidays.map(h => h.id)).size).toBe(14);
+    expect(holidays.every(h => h.year === 2026)).toBe(true);
+  });
+  test("preserves the Christmas Eve cutover and year boundaries", () => {
+    expect(getPolishPublicHolidaysForYear(2024).some(h => h.id === "christmas-eve")).toBe(false);
+    expect(getPolishPublicHolidaysForYear(2025).some(h => h.id === "christmas-eve")).toBe(true);
+    for (const year of [1, 9999]) {
+      expect(getPolishPublicHolidaysForYear(year).every(h => h.year === year)).toBe(true);
+      expect(getPolishPublicHolidaysForYear(year)[0]).toMatchObject({ month: 1, day: 1 });
+    }
+  });
+  test.each([0, -1, 10000, 2026.5, NaN, Infinity])("rejects invalid year %s", year => {
+    expect(getPolishPublicHolidaysForYear(year)).toEqual([]);
+  });
+});
 
 describe("getPolishPublicHoliday", () => {
   test.each([

@@ -8,6 +8,9 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import type { EmployeeSchedule } from "@entities/employee-schedule";
 import { EmployeeSchedulePage } from "./EmployeeSchedulePage";
 import styles from "./EmployeeSchedulePage.module.css";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { PublicHolidayVisibilityProvider } from "@app/providers/PublicHolidayVisibilityProvider";
+import { publicHolidaySettingsApi } from "@entities/public-holidays/api/publicHolidaySettingsApi";
 
 beforeEnglishTest(() => setTestLanguage("en"));
 
@@ -205,6 +208,27 @@ beforeEach(() => {
 });
 
 describe("EmployeeSchedulePage", () => {
+  test.each([true, false])("daily and summary dates respect holiday visibility %s without changing worked shifts", async enabled => {
+    const spy = vi.spyOn(publicHolidaySettingsApi, "get").mockResolvedValue({ showPublicHolidays: enabled });
+    mocks.scheduleQuery.mockReturnValue({ data: [{ ...schedules[0], slots: [
+      { id: 501, dayOfMonth: 1, slotNo: 1, employeeId: 12, fromTime: "09:00", toTime: "15:00", status: "ASSIGNED" },
+    ] }], isLoading: false });
+    await act(async () => { render(<QueryClientProvider client={new QueryClient()}><PublicHolidayVisibilityProvider enabled>
+      <BrowserRouter><EmployeeSchedulePage /></BrowserRouter>
+    </PublicHolidayVisibilityProvider></QueryClientProvider>); });
+    const summary = screen.getByRole("table", { name: "Schedule hours summary" });
+    const date = within(summary).getByText("fr./01");
+    expect(date.classList.contains(styles.hoursSummaryDateHoliday)).toBe(enabled);
+    expect(date.getAttribute("title")).toBe(enabled ? "Labour Day" : null);
+    expect(date.parentElement).toHaveTextContent("6h");
+    await userEvent.click(screen.getByRole("button", { name: "Show daily schedule view" }));
+    const day = screen.getByRole("tab", { name: /^Friday 1, working day/ });
+    expect(day).toHaveClass(styles.dailyScheduleDayWorking);
+    expect(day.classList.contains(styles.dailyScheduleDayHoliday)).toBe(enabled);
+    expect(day.getAttribute("title")).toBe(enabled ? "Labour Day" : null);
+    expect(day.getAttribute("aria-label")?.includes("Labour Day")).toBe(enabled);
+    spy.mockRestore();
+  });
   test("downloads one PDF directly without a preview and preserves matrix and scroll", async () => {
     let resolve!: (value: unknown) => void;
     mocks.exportPdf.mockImplementation(() => new Promise(done => { resolve = done; }));

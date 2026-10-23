@@ -16,6 +16,7 @@ import {
   LogoutIcon,
   ArrowIcon,
   NoteIcon,
+  SettingsIcon,
 } from "@shared/ui/icons";
 import { matchPath } from "@shared/lib/react-router-dom";
 import { ManagerNotepad } from "@features/manager-notepad/ui/ManagerNotepad";
@@ -111,6 +112,7 @@ export function OverlaySidebarLayout({ children }: OverlaySidebarLayoutProps) {
         { label: t("Container"), to: "/container", icon: <ContainerIcon size={25} /> },
         ...(isSystemManager ? [{ label: t("Information"), to: "/information", icon: <InfoIcon size={26} /> }] : []),
         { label: t("Message"), to: "/communications", icon: <NoteIcon size={24} /> },
+        { label: t("Settings"), to: "/settings", icon: <SettingsIcon size={22} /> },
       ]
     : [
         {

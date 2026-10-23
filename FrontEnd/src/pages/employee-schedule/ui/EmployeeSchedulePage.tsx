@@ -1,4 +1,6 @@
 import { useLanguageRevision } from "@shared/i18n/useLanguageRevision";
+import { usePublicHolidayVisibility } from "@app/providers/PublicHolidayVisibilityProvider";
+import { getPolishPublicHoliday } from "@shared/lib/polishPublicHolidays";
 import { t, numberFormat, dateTimeFormat } from "@shared/i18n";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -600,6 +602,7 @@ function writeEmployeeScheduleColumnOrders(storageKey: string, scheduleOrders: R
 }
 export function EmployeeSchedulePage() {
   const language = useLanguageRevision();
+  const showPublicHolidays = usePublicHolidayVisibility();
   const { session } = useAuth();
   const scheduleQuery = useEmployeeScheduleListQuery();
   const shiftCorrectionsQuery = useEmployeeShiftCorrectionsQuery(Boolean(session?.employeeId));
@@ -1080,6 +1083,8 @@ export function EmployeeSchedulePage() {
                 <div className={styles.dailyScheduleDays} role="tablist" aria-label={t("Schedule days")}>
                   {dailyScheduleDays.map(day => {
                     const isSelected = day.dayOfMonth === activeDailyScheduleDay;
+                    const holiday = showPublicHolidays && selectedSchedule
+                      ? getPolishPublicHoliday(selectedSchedule.year, selectedSchedule.month, day.dayOfMonth) : null;
                     return (
                       <button
                         key={day.dayOfMonth}
@@ -1088,9 +1093,11 @@ export function EmployeeSchedulePage() {
                         role="tab"
                         aria-selected={isSelected}
                         aria-controls="daily-schedule-content"
-                        aria-label={`${day.weekdayLong} ${day.dayOfMonth}, ${day.isWorkingDay ? t("working day") : t("day off")}`}
+                        aria-label={`${day.weekdayLong} ${day.dayOfMonth}, ${day.isWorkingDay ? t("working day") : t("day off")}${holiday ? `, ${t("Holiday")}: ${t(holiday.name)}` : ""}`}
+                        title={holiday ? t(holiday.name) : undefined}
                         className={[
                           styles.dailyScheduleDay,
+                          holiday ? styles.dailyScheduleDayHoliday : "",
                           day.isWorkingDay ? styles.dailyScheduleDayWorking : styles.dailyScheduleDayOff,
                           isSelected ? styles.dailyScheduleDaySelected : "",
                         ].filter(Boolean).join(" ")}
@@ -1222,13 +1229,19 @@ export function EmployeeSchedulePage() {
                 <span role="columnheader">{t("Schedule")}</span>
               </div>
 
-              {scheduleHoursSummary.rows.map(row => (
-                <div key={row.key} className={styles.hoursSummaryGridRow} role="row">
-                  <span role="cell">{row.dayLabel}</span>
-                  <strong role="cell">{row.hoursText}</strong>
-                  <span role="cell">{row.scheduleName}</span>
-                </div>
-              ))}
+              {scheduleHoursSummary.rows.map(row => {
+                const holiday = showPublicHolidays && activeSummaryPeriod
+                  ? getPolishPublicHoliday(activeSummaryPeriod.year, activeSummaryPeriod.month, row.dayOfMonth) : null;
+                return (
+                  <div key={row.key} className={styles.hoursSummaryGridRow} role="row">
+                    <span role="cell" className={holiday ? styles.hoursSummaryDateHoliday : undefined}
+                      title={holiday ? t(holiday.name) : undefined}
+                      aria-label={holiday ? `${row.dayLabel}, ${t("Holiday")}: ${t(holiday.name)}` : undefined}>{row.dayLabel}</span>
+                    <strong role="cell">{row.hoursText}</strong>
+                    <span role="cell">{row.scheduleName}</span>
+                  </div>
+                );
+              })}
 
               <div className={styles.hoursSummaryTotalRow} role="row">
                 <span role="cell" className={styles.hoursSummaryTotalLabel}><span aria-hidden="true">Σ</span> {t("Total")}</span>
