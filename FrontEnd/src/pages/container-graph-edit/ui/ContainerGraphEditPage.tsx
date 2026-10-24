@@ -1,6 +1,7 @@
 import { useLanguageRevision } from "@shared/i18n/useLanguageRevision";
 import { dateTimeFormat, t } from "@shared/i18n";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { deriveGeneratedVacancies, reconcileGeneratedManualColumns } from "@entities/containers/model/generatedManualShifts";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import {
   buildManagerEditLockMessage,
@@ -222,12 +223,14 @@ function createDraftAvailabilityBind(): EditableAvailabilityBind {
 }
 
 function toEditableScheduleManualColumn(column: {
+  source?: "generated-unfilled";
   id: number;
   label: string;
   cells: Record<string, string>;
 }): EditableScheduleManualColumn {
   return {
     columnId: column.id,
+    ...(column.source === "generated-unfilled" ? { source: column.source } : {}),
     label: column.label,
     cells: column.cells,
   };
@@ -271,6 +274,7 @@ function sanitizeManualColumnsForNote(
 
   return manualColumns.map(column => ({
     id: column.columnId,
+    ...(column.source === "generated-unfilled" ? { source: column.source } : {}),
     label: column.label,
     cells: Object.entries(column.cells).reduce<Record<string, string>>((accumulator, [dayKey, value]) => {
       const dayOfMonth = Number(dayKey);
@@ -958,6 +962,14 @@ export function ContainerGraphEditPage() {
   const sessionDraftsRef = useRef<Record<number, GraphEditorSessionDraft>>({});
   const savedGraphSnapshotByIdRef = useRef<Record<number, string>>({});
   const undoHistoryRef = useRef<GraphEditorUndoEntry[]>([]);
+  const generationSessionRef = useRef({ containerId, graphId, token: 0 });
+  const generationEditorRef = useRef({ manualColumns, scheduleColumnOrder, pendingManualShiftPublishes, offers: shiftSwapLogQuery.data });
+  useLayoutEffect(() => {
+    generationSessionRef.current = { containerId, graphId, token: generationSessionRef.current.token + 1 };
+  }, [containerId, graphId]);
+  useLayoutEffect(() => {
+    generationEditorRef.current = { manualColumns, scheduleColumnOrder, pendingManualShiftPublishes, offers: shiftSwapLogQuery.data };
+  }, [manualColumns, scheduleColumnOrder, pendingManualShiftPublishes, shiftSwapLogQuery.data]);
 
   const resetUndoHistory = useCallback(() => {
     undoHistoryRef.current = [];
@@ -2263,7 +2275,6 @@ export function ContainerGraphEditPage() {
     }
 
     setFormErrors(nextFormErrors);
-    setCellErrors({});
 
     if (generationRows.length === 0) {
       setSubmitError(t("No employees found for selected availability group."));
@@ -2412,6 +2423,10 @@ export function ContainerGraphEditPage() {
     }
 
     setSubmitError(undefined);
+    const requestedForm = { ...form };
+    const requestToken = ++generationSessionRef.current.token;
+    const isCurrentRequest = () => generationSessionRef.current.containerId === containerId &&
+      generationSessionRef.current.graphId === graphId && generationSessionRef.current.token === requestToken;
 
     try {
       const generated = await runMutation(generateMutation.mutate, {
@@ -2435,7 +2450,29 @@ export function ContainerGraphEditPage() {
         },
       });
 
+      if (!isCurrentRequest()) return;
+      if (!Array.isArray(generated.slots) || generated.slots.length === 0) {
+        setSubmitError(t("The generated schedule returned no slots. Please try again."));
+        return;
+      }
       if (generated.slots) {
+        const latest = generationEditorRef.current;
+        const protectedCells = new Set((latest.offers ?? [])
+          .filter(shift => shift.isManagerCreated && shift.status === "open" && shift.manualColumnId != null && shift.scheduleId === graphId)
+          .map(shift => `${shift.manualColumnId}:${shift.dayOfMonth}`));
+        latest.pendingManualShiftPublishes.forEach(shift => protectedCells.add(`${shift.manualColumnId}:${shift.dayOfMonth}`));
+        const reconciled = reconcileGeneratedManualColumns({
+          vacancies: deriveGeneratedVacancies({ slots: generated.slots, year: Number(requestedForm.year), month: Number(requestedForm.month),
+            shift1Time: requestedForm.shift1Time, shift2Time: requestedForm.shift2Time, peoplePerShift: Number(requestedForm.peoplePerShift) }),
+          columns: latest.manualColumns, columnOrder: latest.scheduleColumnOrder, protectedCells,
+        });
+        setManualColumns(reconciled.columns);
+        setScheduleColumnOrder(reconciled.columnOrder);
+        const removedEmployeeIds = new Set(reconciled.removedColumnIds.map(id => -id));
+        if (removedEmployeeIds.size) {
+          setSelectedCellKeys(keys => keys.filter(key => !removedEmployeeIds.has(Number(key.split(":")[0]))));
+          syncStyleRecords(styleRecordsRef.current.filter(style => !removedEmployeeIds.has(style.employeeId)));
+        }
         setCellMap({
           ...buildGraphCellMap(generated.slots),
           ...rehydrateGraphNoteTextCells(
@@ -2450,6 +2487,7 @@ export function ContainerGraphEditPage() {
         setCellErrors({});
       }
     } catch (error) {
+      if (!isCurrentRequest()) return;
       if (error instanceof ApiError) {
         setFormErrors(currentErrors => ({ ...currentErrors, ...applyGraphApiErrors(error.validationErrors) }));
         setSubmitError(error.message);

@@ -11,6 +11,40 @@ import {
 import type { GraphCellStyle } from "./types";
 
 describe("container graph note metadata model", () => {
+  test("generated provenance round-trips alongside all compact metadata without extending m tuples", () => {
+    const content = buildGraphNoteContent("Visible", [
+      { id: 1, label: "Do obsadzenia", cells: { "1": "08:00 - 12:00" }, source: "generated-unfilled" },
+      { id: 2, label: "Do obsadzenia", cells: { "2": "Custom" } },
+      { id: 3, label: "Empty auto", cells: {}, source: "generated-unfilled" },
+    ], [-3, 12, -2, -1], [{ employeeId: -1, dayOfMonth: 1, backgroundColorArgb: 123, textColorArgb: null }],
+    [{ employeeId: 12, dayOfMonth: 3, value: "Text" }], { "1": ["12:3"] });
+    const parsed = parseGraphNoteContent(content);
+    expect(parsed.manualColumns.map(c => c.source)).toEqual(["generated-unfilled", undefined, "generated-unfilled"]);
+    expect(buildGraphNoteContent(parsed.note, parsed.manualColumns, parsed.columnOrder, parsed.cellStyles, parsed.textCells,
+      parsed.autoAvailabilityStyleSuppressions)).toBe(content);
+    const payload = content.match(/b64:(.*?)\]\]/)![1];
+    const meta = JSON.parse(atob(payload));
+    expect(meta.g).toEqual([3, 1]);
+    expect(meta.m.map((tuple: unknown[]) => tuple.length)).toEqual([3, 3, 2]);
+    meta.m[0] = meta.m[0].slice(0, 2);
+    const removed = parseGraphNoteContent(`Visible\n\n[[GF3_GRAPH_META:b64:${btoa(JSON.stringify(meta))}]]`);
+    expect(removed.manualColumns[0]).toEqual({ id: 1, label: "Do obsadzenia", cells: {}, source: "generated-unfilled" });
+    expect(removed.cellStyles).toEqual(parsed.cellStyles);
+    expect(removed.textCells).toEqual(parsed.textCells);
+    expect(removed.autoAvailabilityStyleSuppressions).toEqual(parsed.autoAvailabilityStyleSuppressions);
+  });
+
+  test.each([null, "1", {}, [0, -1, "1", 1.5, 99]])("ignores malformed generated IDs %j", g => {
+    const meta = JSON.stringify({ m: [[1, "Do obsadzenia", { "1": "Custom" }]], g });
+    expect(parseGraphNoteContent(`[[GF3_GRAPH_META:${meta}]]`).manualColumns)
+      .toEqual([{ id: 1, label: "Do obsadzenia", cells: { "1": "Custom" } }]);
+  });
+
+  test("legacy columns can read valid unique generated IDs", () => {
+    const meta = JSON.stringify({ manualColumns: [{ id: 1, label: "Auto", cells: {} }], g: [1, 1, 99] });
+    expect(parseGraphNoteContent(`[[GF3_GRAPH_META:${meta}]]`).manualColumns)
+      .toEqual([{ id: 1, label: "Auto", cells: {}, source: "generated-unfilled" }]);
+  });
   test("round-trips compact graph metadata while sanitizing invalid entries", () => {
     const content = buildGraphNoteContent(
       "Visible note  ",

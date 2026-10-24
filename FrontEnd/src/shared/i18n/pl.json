@@ -2095,5 +2095,21 @@
   "Currently online and recently active managers.": "Menedżerowie online i ostatnio aktywni.",
   "Accounts in database with manager role.": "Konta w bazie danych z rolą menedżera.",
   "Add new manager": "Dodaj nowego menedżera",
-  "Create a new manager account.": "Utwórz nowe konto menedżera."
+  "Create a new manager account.": "Utwórz nowe konto menedżera.",
+  "Manual shifts": "Zmiany ręczne",
+  "Columns": "Kolumny",
+  "Available shifts": "Dostępne zmiany",
+  "Select a shift and publish it for employees to claim.": "Wybierz zmianę i opublikuj ją, aby pracownicy mogli ją przyjąć.",
+  "Auto": "Auto",
+  "Pending save": "Oczekuje na zapis",
+  "Offered": "Oferowane",
+  "Show all ({0})": "Pokaż wszystkie ({0})",
+  "Show less": "Pokaż mniej",
+  "Publish the schedule first.": "Najpierw opublikuj grafik.",
+  "No manual columns yet.": "Brak kolumn ręcznych.",
+  "No available shifts. Enter a time range in the matrix.": "Brak dostępnych zmian. Wpisz zakres godzin w tabeli.",
+  "No offered shifts.": "Brak oferowanych zmian.",
+  "Remove shift on {0}": "Usuń zmianę w dniu {0}",
+  "Cancel shift on {0}": "Anuluj zmianę w dniu {0}",
+  "The generated schedule returned no slots. Please try again.": "Wygenerowany grafik nie zawiera zmian. Spróbuj ponownie."
 }

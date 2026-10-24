@@ -89,6 +89,7 @@ export type EditableGraphBindRow = {
 };
 
 export type EditableGraphManualColumn = {
+  source?: "generated-unfilled";
   columnId: number;
   label: string;
   cells: Record<string, string>;
@@ -1058,10 +1059,11 @@ export function ContainerGraphEditor({
             <ContainerGraphManualColumnsCard
               columns={manualColumns}
               allowSwap={form.allowSwap}
+              isSchedulePublished={form.publicationStatus === "public"}
               year={displayGraphYear}
               month={displayGraphMonth}
               employees={employees}
-              isPublishingShift={isPublishingManualShift}
+              isPublishingShift={isPublishingManualShift || isGenerating || isSaving}
               isCancellingPublishedShift={isCancellingManualShift}
               publishError={manualShiftPublishError}
               publishedShifts={openManagerManualShifts}

@@ -20,6 +20,7 @@ import {
   formatGraphMonthYear,
   getGraphCellKey,
   getGraphDaysInMonth,
+  getGraphShiftMinimumStaffing,
   getGraphWeekdayLabel,
   isGraphWeekend,
   mergeGraphIntervalsForDisplay,
@@ -61,6 +62,17 @@ const employeesById = new Map<number, Employee>([
 ]);
 
 describe("container graph workspace model", () => {
+  test("minimum staffing counts distinct employees across every segment", () => {
+    const slot = (employeeId: number, fromTime: string, toTime: string): GraphSlot => ({
+      id: 1, scheduleId: 1, dayOfMonth: 1, slotNo: 1, employeeId, fromTime, toTime, status: 1,
+    });
+    const slots = [slot(1, "08:00", "10:00"), slot(2, "10:00", "12:00")];
+    expect(getGraphShiftMinimumStaffing(slots, 1, "08:00", "12:00")).toBe(1);
+    expect(getGraphShiftMinimumStaffing([...slots, slot(1, "08:00", "10:00")], 1, "08:00", "12:00")).toBe(1);
+    expect(getGraphShiftMinimumStaffing([slot(1, "08:00", "09:00"), slot(2, "10:00", "12:00")], 1, "08:00", "12:00")).toBe(0);
+    expect(getGraphShiftMinimumStaffing([slot(1, "22:00", "02:00")], 1, "22:00", "02:00")).toBe(1);
+    expect(getGraphShiftMinimumStaffing([slot(1, "bad", "12:00")], 1, "08:00", "12:00")).toBe(0);
+  });
   test("clamps graph dates and formats month and weekday metadata", () => {
     expect(clampGraphMonth(Number.NaN)).toBe(1);
     expect(clampGraphMonth(13.8)).toBe(12);

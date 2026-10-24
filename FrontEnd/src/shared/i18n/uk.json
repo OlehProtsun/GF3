@@ -2095,5 +2095,21 @@
   "Currently online and recently active managers.": "Менеджери онлайн та нещодавно активні.",
   "Accounts in database with manager role.": "Облікові записи в базі даних із роллю менеджера.",
   "Add new manager": "Додати нового менеджера",
-  "Create a new manager account.": "Створіть новий обліковий запис менеджера."
+  "Create a new manager account.": "Створіть новий обліковий запис менеджера.",
+  "Manual shifts": "Ручні зміни",
+  "Columns": "Стовпці",
+  "Available shifts": "Доступні зміни",
+  "Select a shift and publish it for employees to claim.": "Виберіть зміну й опублікуйте її, щоб працівники могли її прийняти.",
+  "Auto": "Авто",
+  "Pending save": "Очікує збереження",
+  "Offered": "Запропоновані",
+  "Show all ({0})": "Показати всі ({0})",
+  "Show less": "Показати менше",
+  "Publish the schedule first.": "Спочатку опублікуйте графік.",
+  "No manual columns yet.": "Ручних стовпців поки немає.",
+  "No available shifts. Enter a time range in the matrix.": "Немає доступних змін. Введіть часовий проміжок у таблиці.",
+  "No offered shifts.": "Немає запропонованих змін.",
+  "Remove shift on {0}": "Видалити зміну на {0}",
+  "Cancel shift on {0}": "Скасувати зміну на {0}",
+  "The generated schedule returned no slots. Please try again.": "Згенерований графік не містить змін. Спробуйте ще раз."
 }
