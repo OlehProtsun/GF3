@@ -1,0 +1,387 @@
+.card {
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding-bottom: 18px;
+  box-shadow:
+    0 7px 17px rgba(0, 0, 0, 0.046),
+    0 1px 0 rgba(255, 255, 255, 0.35) inset;
+}
+
+.layout {
+  display: grid;
+  gap: 14px;
+}
+
+.segmentedControl {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px;
+  padding: 4px;
+  border-radius: 18px;
+  background: rgba(229, 231, 235, 0.72);
+  border: 1px solid rgba(148, 163, 184, 0.18);
+}
+
+.segmentButton {
+  min-height: 38px;
+  border: 0;
+  border-radius: 14px;
+  background: transparent;
+  color: rgba(17, 24, 39, 0.68);
+  font: inherit;
+  font-size: 0.84rem;
+  font-weight: 800;
+  cursor: pointer;
+  transition:
+    background 140ms ease,
+    color 140ms ease,
+    box-shadow 140ms ease;
+}
+
+.segmentButtonActive {
+  background: rgba(255, 255, 255, 0.95);
+  color: #111827;
+  box-shadow:
+    0 8px 18px rgba(15, 23, 42, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.78);
+}
+
+.hint {
+  margin: 0;
+  color: rgba(17, 24, 39, 0.62);
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+.field {
+  position: relative;
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.label {
+  color: rgba(17, 24, 39, 0.74);
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.dateButton {
+  min-height: 46px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 12px 0 14px;
+  border-radius: 17px;
+  border: 1px solid rgba(229, 229, 234, 0.96);
+  background:
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.38), rgba(255, 255, 255, 0)),
+    #f4f4f4;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.72),
+    0 1px 0 rgba(15, 23, 42, 0.02);
+  color: #111827;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  box-sizing: border-box;
+  transition:
+    background 140ms ease,
+    border-color 140ms ease,
+    box-shadow 140ms ease,
+    transform 140ms ease;
+}
+
+.dateButton:hover,
+.dateButtonOpen {
+  background: #ffffff;
+  border-color: rgba(0, 47, 255, 0.35);
+  box-shadow:
+    0 0 0 1px rgba(0, 47, 255, 0.12),
+    0 10px 24px rgba(15, 23, 42, 0.07);
+}
+
+.dateButton:active {
+  transform: translateY(1px);
+}
+
+.dateButtonInvalid {
+  background: rgba(255, 59, 48, 0.06);
+  border-color: rgba(255, 59, 48, 0.45);
+  box-shadow: 0 0 0 1px rgba(255, 59, 48, 0.14);
+}
+
+.dateButtonValue {
+  min-width: 0;
+  color: #111827;
+  font-size: 0.9rem;
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+
+.dateButtonHint {
+  flex-shrink: 0;
+  padding: 6px 9px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.86);
+  color: rgba(17, 24, 39, 0.62);
+  font-size: 0.72rem;
+  font-weight: 900;
+}
+
+.dateDialog {
+  position: relative;
+  z-index: 4;
+  display: grid;
+  gap: 12px;
+  padding: 13px;
+  border-radius: 24px;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(248, 250, 252, 0.94));
+  box-shadow:
+    0 20px 44px rgba(15, 23, 42, 0.14),
+    inset 0 1px 0 rgba(255, 255, 255, 0.82);
+  backdrop-filter: blur(18px);
+}
+
+.calendarHeader {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr) 36px;
+  align-items: center;
+  gap: 8px;
+}
+
+.calendarHeader strong {
+  color: #111827;
+  font-size: 0.94rem;
+  font-weight: 900;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+
+.calendarNavButton {
+  width: 36px;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.88);
+  color: #111827;
+  font: inherit;
+  font-size: 1rem;
+  font-weight: 900;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.05);
+}
+
+.calendarNavButton:hover {
+  background: #ffffff;
+  border-color: rgba(37, 99, 235, 0.18);
+}
+
+.weekdayGrid,
+.calendarGrid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+}
+
+.weekdayGrid {
+  gap: 4px;
+}
+
+.weekdayGrid span {
+  color: rgba(17, 24, 39, 0.44);
+  font-size: 0.68rem;
+  font-weight: 900;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.calendarGrid {
+  gap: 5px;
+}
+
+.calendarDay {
+  aspect-ratio: 1;
+  min-width: 0;
+  border: 1px solid transparent;
+  border-radius: 13px;
+  background: rgba(244, 244, 245, 0.72);
+  color: #111827;
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 900;
+  cursor: pointer;
+  transition:
+    background 140ms ease,
+    border-color 140ms ease,
+    color 140ms ease,
+    transform 140ms ease,
+    box-shadow 140ms ease;
+}
+
+.calendarDay:hover {
+  transform: translateY(-1px);
+  background: #ffffff;
+  border-color: rgba(37, 99, 235, 0.18);
+  box-shadow: 0 8px 16px rgba(15, 23, 42, 0.07);
+}
+
+.calendarDayMuted {
+  color: rgba(17, 24, 39, 0.28);
+  background: rgba(244, 244, 245, 0.38);
+}
+
+.calendarDayToday {
+  border-color: rgba(37, 99, 235, 0.2);
+  color: #1d4ed8;
+}
+
+.calendarDaySelected {
+  background: #2563eb;
+  border-color: #2563eb;
+  color: #ffffff;
+  box-shadow: 0 10px 22px rgba(37, 99, 235, 0.22);
+}
+
+.calendarDaySelected:hover {
+  background: #1d4ed8;
+  color: #ffffff;
+}
+
+.timePanel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  padding: 10px;
+  border-radius: 20px;
+  border: 1px solid rgba(148, 163, 184, 0.12);
+  background: rgba(244, 244, 245, 0.74);
+}
+
+.timeStepper {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr) 30px;
+  align-items: center;
+  gap: 6px;
+}
+
+.timeStepper button {
+  width: 30px;
+  height: 30px;
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.88);
+  color: #111827;
+  font: inherit;
+  font-size: 1rem;
+  font-weight: 900;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.timeStepper span {
+  display: grid;
+  gap: 2px;
+  justify-items: center;
+  min-width: 0;
+}
+
+.timeStepper strong {
+  color: #111827;
+  font-size: 1.08rem;
+  line-height: 1;
+  font-weight: 950;
+}
+
+.timeStepper small {
+  color: rgba(17, 24, 39, 0.48);
+  font-size: 0.62rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.timeColon {
+  color: rgba(17, 24, 39, 0.42);
+  font-size: 1rem;
+  font-weight: 900;
+}
+
+.quickTimeGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.quickTimeButton {
+  min-height: 32px;
+  padding: 0 8px;
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  border-radius: 999px;
+  background: rgba(244, 244, 245, 0.82);
+  color: rgba(17, 24, 39, 0.68);
+  font: inherit;
+  font-size: 0.74rem;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.quickTimeButtonActive {
+  border-color: rgba(37, 99, 235, 0.18);
+  background: rgba(219, 234, 254, 0.86);
+  color: #1d4ed8;
+}
+
+.dateDialogActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.dateDialogAction,
+.dateDialogActionPrimary {
+  min-height: 36px;
+  padding: 0 13px;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  background: rgba(244, 244, 245, 0.92);
+  color: #475569;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.dateDialogActionPrimary {
+  border-color: rgba(37, 99, 235, 0.2);
+  background: #2563eb;
+  color: #ffffff;
+  box-shadow: 0 10px 22px rgba(37, 99, 235, 0.18);
+}
+
+.dateDialogDateOnly .timePanel,
+.dateDialogDateOnly .quickTimeGrid {
+  display: none;
+}
+
+.dateDialogDateOnly {
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  box-sizing: border-box;
+}
+
+.datePortal {
+  position: fixed;
+  z-index: 1900;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr);
+}

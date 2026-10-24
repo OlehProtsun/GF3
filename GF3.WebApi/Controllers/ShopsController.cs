@@ -1,9 +1,12 @@
 using BusinessLogicLayer.Common;
 using BusinessLogicLayer.Services.Abstractions;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using WebApi.Auth;
 using WebApi.Contracts.Shops;
 using WebApi.Infrastructure;
 using WebApi.Mappers;
+using WebApi.Realtime;
 
 namespace WebApi.Controllers;
 
@@ -14,7 +17,11 @@ namespace WebApi.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/[controller]")]
-public class ShopsController(IShopFacade shopFacade) : ControllerBase
+[Authorize(Roles = AuthRoles.Manager)]
+public class ShopsController(
+    IShopFacade shopFacade,
+    IRealtimeNotifier? realtimeNotifier = null,
+    IManagerEditLockService? editLockService = null) : ControllerBase
 {
     /// <summary>
     /// Returns all shops as API DTOs.
@@ -52,6 +59,7 @@ public class ShopsController(IShopFacade shopFacade) : ControllerBase
     {
         var created = await shopFacade.CreateAsync(request.ToSaveRequest(), cancellationToken).ConfigureAwait(false);
         var dto = created.ToApiDto();
+        await NotifyShopChangedAsync(dto.Id, "manager-shop-created").ConfigureAwait(false);
         return CreatedAtAction(nameof(GetById), new { id = dto.Id }, dto);
     }
 
@@ -67,8 +75,14 @@ public class ShopsController(IShopFacade shopFacade) : ControllerBase
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> Update(int id, [FromBody] UpdateShopRequest request, CancellationToken cancellationToken)
     {
+        if (CreateEditLockConflictResult(id) is { } conflict)
+        {
+            return conflict;
+        }
+
         await EnsureShopExistsAsync(id, cancellationToken).ConfigureAwait(false);
         await shopFacade.UpdateAsync(request.ToSaveRequest(id), cancellationToken).ConfigureAwait(false);
+        await NotifyShopChangedAsync(id, "manager-shop-updated").ConfigureAwait(false);
         return NoContent();
     }
 
@@ -84,6 +98,11 @@ public class ShopsController(IShopFacade shopFacade) : ControllerBase
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> Delete(int id, CancellationToken cancellationToken)
     {
+        if (CreateEditLockConflictResult(id) is { } conflict)
+        {
+            return conflict;
+        }
+
         await EnsureShopExistsAsync(id, cancellationToken).ConfigureAwait(false);
 
         var result = await shopFacade.TryDeleteAsync(id, cancellationToken).ConfigureAwait(false);
@@ -92,8 +111,22 @@ public class ShopsController(IShopFacade shopFacade) : ControllerBase
             return CreateDeleteValidationResult(result);
         }
 
+        await NotifyShopChangedAsync(id, "manager-shop-deleted").ConfigureAwait(false);
         return NoContent();
     }
+
+    private ActionResult? CreateEditLockConflictResult(int shopId)
+        => ManagerEditLockHttp.CreateConflictResult(
+            this,
+            editLockService,
+            ManagerEditLockTargets.Shop(shopId),
+            "This shop");
+
+    private Task NotifyShopChangedAsync(int shopId, string reason)
+        => realtimeNotifier?.NotifyManagerDataChangedAsync(
+            ManagerEditResourceTypes.Shop,
+            shopId.ToString(),
+            reason) ?? Task.CompletedTask;
 
     private async Task EnsureShopExistsAsync(int id, CancellationToken cancellationToken)
         => _ = await GetRequiredShopAsync(id, cancellationToken).ConfigureAwait(false);

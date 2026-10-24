@@ -1,0 +1,159 @@
+{
+  "dataSet": "gf3-film-october-2026",
+  "shots": [
+    {
+      "id": "manager",
+      "acquisition": "production-component",
+      "sourceRoute": "/container",
+      "sourcePaths": [
+        {
+          "path": "src/entities/containers/ui/ContainerGraphMatrix.tsx",
+          "sha256": "e7a5593d285bada8f16eb86638f11392d023360fd0b2c5ef5b84c563f8505254"
+        },
+        {
+          "path": "src/entities/containers/ui/ContainerGraphMatrix.module.css",
+          "sha256": "50b9d590d4d0f009058be7deb33e5d13a3fe4f65f32d856cc7059787417bcafa"
+        }
+      ],
+      "dataSet": "gf3-film-october-2026",
+      "assets": [
+        {
+          "file": "manager/beginning.png",
+          "sha256": "5e1ed2a16bf660e5ae4cfe66f63cb934938d1d34643cc0ba58488e1e6ed6e12f"
+        },
+        {
+          "file": "manager/interaction.png",
+          "sha256": "ff8f767db423d92cff93a065055b1aba6f25958b01e04a2ce228cb20a0cde0ec"
+        },
+        {
+          "file": "manager/outcome.png",
+          "sha256": "13517c2bf9c6877c33d1abaed331ca00f96e075b14b015992a82702f5761754e"
+        }
+      ],
+      "synthetic": true,
+      "mechanism": "production DOM + repository E2E interception, all API requests fulfilled locally",
+      "capturedAt": "2026-10-08T14:56:33.501Z"
+    },
+    {
+      "id": "availability",
+      "acquisition": "actual-app-capture",
+      "sourceRoute": "/availability",
+      "sourcePaths": [
+        {
+          "path": "src/pages/employee-availability/ui/EmployeeAvailabilityPage.tsx",
+          "sha256": "3aa73919d403b71e5ab217dcaa385b00f8212174b5b3df94e0da6afb2a140b89"
+        }
+      ],
+      "dataSet": "gf3-film-october-2026",
+      "assets": [
+        {
+          "file": "availability/beginning.png",
+          "sha256": "4f94adbbabd210dd40e854289fef2a69ee028b47e4f511228d04c164669ccbe9"
+        },
+        {
+          "file": "availability/interaction.png",
+          "sha256": "2cae42bdc8552c783f90224d4422295849d7bed6d30ea8ba11cd65c93d5bc4b3"
+        },
+        {
+          "file": "availability/outcome.png",
+          "sha256": "da7167dc1f4fdad0bd0ca78f4d4f0460fd230f5d4d1f22336894f1ffd7885be0"
+        }
+      ],
+      "synthetic": true,
+      "mechanism": "production DOM + repository E2E interception, all API requests fulfilled locally",
+      "capturedAt": "2026-10-08T14:56:37.431Z"
+    },
+    {
+      "id": "schedule",
+      "acquisition": "actual-app-capture",
+      "sourceRoute": "/schedule",
+      "sourcePaths": [
+        {
+          "path": "src/pages/employee-schedule/ui/EmployeeSchedulePage.tsx",
+          "sha256": "9b2ee740217c0d7d620d9b5e6b0e7a9451be7c0f8794af090503566020a5737d"
+        }
+      ],
+      "dataSet": "gf3-film-october-2026",
+      "assets": [
+        {
+          "file": "schedule/beginning.png",
+          "sha256": "b70145384b3f5f2facc3e164054d4f2c19d37cdfb6c5b854bfa8cfcb2e0db148"
+        },
+        {
+          "file": "schedule/interaction.png",
+          "sha256": "53a50225c2943017ebf12b2535acacc4ce723fbfad8d56e14b3604646e800e46"
+        },
+        {
+          "file": "schedule/outcome.png",
+          "sha256": "10e34e648043f4fcee6c5c7c47acb1fce0e8802b0312e4f6f13d653042314cf8"
+        }
+      ],
+      "synthetic": true,
+      "mechanism": "production DOM + repository E2E interception, all API requests fulfilled locally",
+      "capturedAt": "2026-10-08T14:56:41.584Z"
+    },
+    {
+      "id": "swap",
+      "acquisition": "actual-app-capture",
+      "sourceRoute": "/swap",
+      "sourcePaths": [
+        {
+          "path": "src/pages/employee-swap/ui/EmployeeSwapPage.tsx",
+          "sha256": "df2afe8fdad9d190450acc8992ccbfc39a9c192127abaefa54223ed7235a14b6"
+        },
+        {
+          "path": "src/entities/shift-swaps/api/shiftSwapsApi.ts",
+          "sha256": "be28fa1ca7fdffdeb1e1c402b2a51ba3abf54d1ff66b3009454d66395c394fa9"
+        }
+      ],
+      "dataSet": "gf3-film-october-2026",
+      "assets": [
+        {
+          "file": "swap/beginning.png",
+          "sha256": "164e173f20986c712168eee29b34ca94d4b006cb703aebd8f0e57f5cb5b88728"
+        },
+        {
+          "file": "swap/interaction.png",
+          "sha256": "1d9afb80519d849fd1a18d82a98ab4656e33cba1ebf24d219d057124877f3959"
+        },
+        {
+          "file": "swap/outcome.png",
+          "sha256": "59943062351771c6c342d252087e530d49845aba1cebc40db8e34db0ce64b3b5"
+        }
+      ],
+      "synthetic": true,
+      "mechanism": "production DOM + repository E2E interception, all API requests fulfilled locally",
+      "capturedAt": "2026-10-08T14:56:45.576Z"
+    },
+    {
+      "id": "more",
+      "acquisition": "actual-app-capture",
+      "sourceRoute": "/schedule",
+      "sourcePaths": [
+        {
+          "path": "src/pages/employee-schedule/ui/EmployeeSchedulePage.tsx",
+          "sha256": "9b2ee740217c0d7d620d9b5e6b0e7a9451be7c0f8794af090503566020a5737d"
+        }
+      ],
+      "dataSet": "gf3-film-october-2026",
+      "assets": [
+        {
+          "file": "more/beginning.png",
+          "sha256": "5bd313a917c7ec78590e5ce7001243860249bd7d1b216534488992620a820f46"
+        },
+        {
+          "file": "more/interaction.png",
+          "sha256": "5063f2f142a1f21d759e9edb3bee6f7d06472300c8990a6501a3bbb1dd69686a"
+        },
+        {
+          "file": "more/outcome.png",
+          "sha256": "5063f2f142a1f21d759e9edb3bee6f7d06472300c8990a6501a3bbb1dd69686a"
+        }
+      ],
+      "synthetic": true,
+      "mechanism": "production DOM + repository E2E interception, all API requests fulfilled locally",
+      "capturedAt": "2026-10-08T14:56:49.446Z"
+    }
+  ],
+  "blocked": []
+}

@@ -6,6 +6,25 @@ export type AdminDbObject = {
   sql: string;
 };
 
+export type AdminDbFileEntry = {
+  name: string;
+  path: string;
+  category: string;
+  fileSizeBytes: number;
+  lastModifiedUtc: string | null;
+  isActive: boolean;
+};
+
+export type AdminDbStorageWorkspace = {
+  workspaceRootPath: string;
+  automaticBackupDirectoryPath: string;
+  manualCopyDirectoryPath: string;
+  automaticBackupRetentionLimit: number;
+  availableDatabases: AdminDbFileEntry[];
+  automaticBackups: AdminDbFileEntry[];
+  manualCopies: AdminDbFileEntry[];
+};
+
 export type AdminDbMetadataResponse = {
   sqliteVersion: string;
   databasePath: string;
@@ -14,6 +33,7 @@ export type AdminDbMetadataResponse = {
   userVersion: number;
   tables: string[];
   objects: AdminDbObject[];
+  storageWorkspace: AdminDbStorageWorkspace;
   allowWriteSql: boolean;
   maxSqlLength: number;
   maxImportBytes: number;
@@ -21,6 +41,10 @@ export type AdminDbMetadataResponse = {
 
 export type AdminDbHashResponse = {
   hash: string;
+};
+
+export type AdminDbSelectDatabaseRequest = {
+  databasePath: string;
 };
 
 export type AdminDbExecuteResponse = {

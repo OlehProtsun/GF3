@@ -35,6 +35,11 @@ public sealed class CreateContainerGraphRequest
     public int Month { get; set; }
 
     /// <summary>
+    /// Publication state exposed to assigned employees.
+    /// </summary>
+    public string? PublicationStatus { get; set; } = "private";
+
+    /// <summary>
     /// Number of employees required in each shift interval.
     /// </summary>
     [Range(1, int.MaxValue)]

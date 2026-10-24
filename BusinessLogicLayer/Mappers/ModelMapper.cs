@@ -29,6 +29,7 @@ internal static class ModelMapper
 
     internal static EmployeeModel ToContract(this Dal.EmployeeModel model) => new()
     {
+        IsDeleted = model.IsDeleted,
         Id = model.Id,
         FirstName = model.FirstName,
         LastName = model.LastName,
@@ -38,11 +39,62 @@ internal static class ModelMapper
 
     internal static Dal.EmployeeModel ToDal(this EmployeeModel model) => new()
     {
+        IsDeleted = model.IsDeleted,
         Id = model.Id,
         FirstName = model.FirstName,
         LastName = model.LastName,
         Phone = model.Phone,
         Email = model.Email,
+    };
+
+    internal static Contracts.Employees.EmployeeAccountModel ToContract(this Dal.EmployeeAccountModel model) => new()
+    {
+        Id = model.Id,
+        EmployeeId = model.EmployeeId,
+        Username = model.Username,
+        PasswordHash = model.PasswordHash,
+        PasswordUpdatedAtUtc = model.PasswordUpdatedAtUtc,
+        LastLoginAtUtc = model.LastLoginAtUtc,
+        LastSeenAtUtc = model.LastSeenAtUtc,
+        SessionVersion = model.SessionVersion,
+    };
+
+    internal static Dal.EmployeeAccountModel ToDal(this Contracts.Employees.EmployeeAccountModel model) => new()
+    {
+        Id = model.Id,
+        EmployeeId = model.EmployeeId,
+        Username = model.Username,
+        PasswordHash = model.PasswordHash,
+        PasswordUpdatedAtUtc = model.PasswordUpdatedAtUtc,
+        LastLoginAtUtc = model.LastLoginAtUtc,
+        LastSeenAtUtc = model.LastSeenAtUtc,
+        SessionVersion = model.SessionVersion,
+    };
+
+    internal static Contracts.Managers.ManagerAccountModel ToContract(this Dal.ManagerAccountModel model) => new()
+    {
+        Id = model.Id,
+        UserName = model.Username,
+        DisplayName = model.DisplayName,
+        PasswordHash = model.PasswordHash,
+        IsSystem = model.IsSystem,
+        RecoveryEmail = model.RecoveryEmail,
+        PasswordUpdatedAtUtc = model.PasswordUpdatedAtUtc,
+        LastLoginAtUtc = model.LastLoginAtUtc,
+        CreatedAtUtc = model.CreatedAtUtc,
+        UpdatedAtUtc = model.UpdatedAtUtc,
+    };
+
+    internal static Contracts.Managers.ManagerProfileDto ToProfileDto(this Dal.ManagerAccountModel model) => new()
+    {
+        Id = model.Id,
+        UserName = model.Username,
+        DisplayName = model.DisplayName,
+        RecoveryEmail = model.RecoveryEmail,
+        PasswordUpdatedAtUtc = model.PasswordUpdatedAtUtc,
+        LastLoginAtUtc = model.LastLoginAtUtc,
+        IsSystem = model.IsSystem,
+        CreatedAtUtc = model.CreatedAtUtc,
     };
 
     internal static ShopModel ToContract(this Dal.ShopModel model) => new()
@@ -64,6 +116,7 @@ internal static class ModelMapper
     internal static BindModel ToContract(this Dal.BindModel model) => new()
     {
         Id = model.Id,
+        ManagerAccountId = model.ManagerAccountId,
         Key = model.Key,
         Value = model.Value,
         IsActive = model.IsActive,
@@ -72,6 +125,7 @@ internal static class ModelMapper
     internal static Dal.BindModel ToDal(this BindModel model) => new()
     {
         Id = model.Id,
+        ManagerAccountId = model.ManagerAccountId,
         Key = model.Key,
         Value = model.Value,
         IsActive = model.IsActive,
@@ -80,6 +134,10 @@ internal static class ModelMapper
     // Enum bridges
     internal static AvailabilityKind ToContract(this DalEnums.AvailabilityKind value) => (AvailabilityKind)(int)value;
     internal static DalEnums.AvailabilityKind ToDal(this AvailabilityKind value) => (DalEnums.AvailabilityKind)(int)value;
+    internal static AvailabilityPublicationStatus ToContract(this DalEnums.AvailabilityPublicationStatus value) => (AvailabilityPublicationStatus)(int)value;
+    internal static DalEnums.AvailabilityPublicationStatus ToDal(this AvailabilityPublicationStatus value) => (DalEnums.AvailabilityPublicationStatus)(int)value;
+    internal static SchedulePublicationStatus ToContract(this DalEnums.SchedulePublicationStatus value) => (SchedulePublicationStatus)(int)value;
+    internal static DalEnums.SchedulePublicationStatus ToDal(this SchedulePublicationStatus value) => (DalEnums.SchedulePublicationStatus)(int)value;
     internal static SlotStatus ToContract(this DalEnums.SlotStatus value) => (SlotStatus)(int)value;
     internal static DalEnums.SlotStatus ToDal(this SlotStatus value) => (DalEnums.SlotStatus)(int)value;
 
@@ -108,6 +166,7 @@ internal static class ModelMapper
         AvailabilityGroupId = model.AvailabilityGroupId,
         EmployeeId = model.EmployeeId,
         DisplayOrder = model.DisplayOrder,
+        EmployeeLastModifiedAtUtc = model.EmployeeLastModifiedAtUtc,
         Employee = model.Employee is null ? null : model.Employee.ToContract(),
         Days = model.Days?.Select(ToContract).ToList() ?? [],
     };
@@ -118,6 +177,7 @@ internal static class ModelMapper
         AvailabilityGroupId = model.AvailabilityGroupId,
         EmployeeId = model.EmployeeId,
         DisplayOrder = model.DisplayOrder,
+        EmployeeLastModifiedAtUtc = model.EmployeeLastModifiedAtUtc,
     };
 
     internal static AvailabilityGroupModel ToContract(this Dal.AvailabilityGroupModel model) => new()
@@ -126,6 +186,9 @@ internal static class ModelMapper
         Name = model.Name,
         Year = model.Year,
         Month = model.Month,
+        PublicationStatus = model.PublicationStatus.ToContract(),
+        VisibleFromUtc = model.VisibleFromUtc,
+        VisibleToUtc = model.VisibleToUtc,
         Members = model.Members?.Select(ToContract).ToList() ?? [],
     };
 
@@ -135,6 +198,9 @@ internal static class ModelMapper
         Name = model.Name,
         Year = model.Year,
         Month = model.Month,
+        PublicationStatus = model.PublicationStatus.ToDal(),
+        VisibleFromUtc = model.VisibleFromUtc,
+        VisibleToUtc = model.VisibleToUtc,
     };
 
     // Schedule employees and slots
@@ -270,6 +336,9 @@ internal static class ModelMapper
         Name = model.Name,
         Year = model.Year,
         Month = model.Month,
+        PublicationStatus = model.PublicationStatus.ToContract(),
+        AllowSwap = model.AllowSwap,
+        PublishedAtUtc = model.PublishedAtUtc,
         PeoplePerShift = model.PeoplePerShift,
         Shift1Time = model.Shift1Time,
         Shift2Time = model.Shift2Time,
@@ -293,6 +362,9 @@ internal static class ModelMapper
         Name = model.Name,
         Year = model.Year,
         Month = model.Month,
+        PublicationStatus = model.PublicationStatus.ToDal(),
+        AllowSwap = model.AllowSwap,
+        PublishedAtUtc = model.PublishedAtUtc,
         PeoplePerShift = model.PeoplePerShift,
         Shift1Time = model.Shift1Time,
         Shift2Time = model.Shift2Time,

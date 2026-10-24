@@ -31,4 +31,14 @@ public interface IAdminDbService
     /// Imports a SQL script while enforcing the configured upload-size limit.
     /// </summary>
     Task<AdminDbImportResultDto> ImportSqlAsync(byte[] fileBytes, int maxImportBytes, CancellationToken ct = default);
+
+    /// <summary>
+    /// Creates a manual copy of the active database in the workspace manual-copy folder.
+    /// </summary>
+    Task<AdminDbFileEntryDto> CreateManualCopyAsync(CancellationToken ct = default);
+
+    /// <summary>
+    /// Switches the running application to another SQLite database file.
+    /// </summary>
+    Task<AdminDbFileEntryDto> SelectDatabaseAsync(string databasePath, CancellationToken ct = default);
 }

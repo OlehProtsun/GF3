@@ -29,4 +29,24 @@ public sealed class EmployeeDto
     /// Optional contact email address.
     /// </summary>
     public string? Email { get; set; }
+
+    /// <summary>
+    /// Optional username used for application login.
+    /// </summary>
+    public string? Username { get; set; }
+
+    /// <summary>
+    /// Whether a login account already exists for this employee.
+    /// </summary>
+    public bool HasLoginAccount { get; set; }
+
+    /// <summary>
+    /// Whether the employee was active recently enough to be considered online.
+    /// </summary>
+    public bool IsOnline { get; set; }
+
+    /// <summary>
+    /// Most recent successful sign-in timestamp in UTC.
+    /// </summary>
+    public DateTimeOffset? LastLoginAtUtc { get; set; }
 }

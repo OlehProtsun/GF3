@@ -1,0 +1,21 @@
+.dialog { width: min(430px, calc(100vw - 24px)); max-width: none; max-height: calc(var(--swap-visual-height, 100dvh) - 24px); padding: 0; border: 0; border-radius: 24px; background: #fff; color: #101a30; overflow: hidden; position: fixed; inset: var(--swap-visual-top, 0px) 0 auto; margin: 12px auto; box-shadow: 0 24px 80px #14274333; }
+.dialog::backdrop { background: #101a3066; }
+.shell { display: flex; flex-direction: column; max-height: calc(var(--swap-visual-height, 100dvh) - 24px); min-height: 0; }
+.header { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 18px; flex: none; }
+.header h2 { font-size: 18px; margin: 0; overflow-wrap: anywhere; }
+.header button { display: grid; place-items: center; flex: none; width: 36px; height: 36px; border: 0; border-radius: 50%; font-size: 25px; background: #f1f4f9; color: #526079; cursor: pointer; }
+.body { overflow: auto; overscroll-behavior: contain; min-height: 0; padding: 0 16px 16px; overflow-wrap: anywhere; }
+.body h3 { margin: 0; font-size: 14px; font-weight: 700; color: #101a30; line-height: 1.4; }
+.body section header { flex-wrap: wrap; }
+.body section header > div { flex-basis: 130px; }
+.body section strong, .body section span { overflow-wrap: anywhere; }
+.body .metadata { display: grid; align-items: stretch; gap: 10px; margin: 16px 0 0; }
+.body .metadata > div { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr); gap: 12px; margin: 0; }
+.metadata dt { color: #7b879b; }
+.metadata dd { margin: 0; text-align: right; min-width: 0; }
+.footer { display: flex; flex-direction: column; gap: 8px; padding: 12px 16px max(16px, env(safe-area-inset-bottom)); border-top: 1px solid #e1e7f1; flex: none; }
+.footer button { min-height: 44px; border: 1px solid #e1e7f1; border-radius: 14px; padding: 10px 12px; background: #f5f7fb; color: #526079; font: inherit; font-weight: 600; cursor: pointer; overflow-wrap: anywhere; }
+.footer .primary { background: #246bff; border-color: #246bff; color: white; }
+.footer button:disabled { opacity: .5; cursor: default; }
+.dialog button:focus-visible { outline: 3px solid #729dff; outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) { .dialog, .dialog * { scroll-behavior: auto; animation: none; transition: none; } }

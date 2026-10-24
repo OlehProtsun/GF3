@@ -1,3 +1,4 @@
+import { t } from "@shared/i18n";
 import { useEffect, useId, useMemo, useState, type MouseEvent } from "react";
 import {
   GRAPH_EMPTY_MARK,
@@ -43,12 +44,12 @@ function parseTimeLabelMinutes(value: string) {
 function getDayValueSummary(dayValues: GraphRelatedScheduleHintDayValue[], dayOfMonth: number) {
   const selectedDay = dayValues.find(dayValue => dayValue.dayOfMonth === dayOfMonth);
   if (!selectedDay) {
-    return "Selected day: no shift";
+    return t("Selected day: no shift");
   }
 
   return selectedDay.value.trim() === GRAPH_EMPTY_MARK
-    ? "Selected day: no shift"
-    : `Selected day: ${selectedDay.value}`;
+    ? t("Selected day: no shift")
+    : t("Selected day: {0}", selectedDay.value);
 }
 
 function buildPreviewCellMap(employeeId: number, dayValues: GraphRelatedScheduleHintDayValue[]) {
@@ -238,15 +239,14 @@ export function ContainerGraphRelatedHintDialog({
           <div className={styles.titleBlock}>
             <div className={styles.eyebrow}>
               <ScheduleDetailsIcon size={16} />
-              <span>Related schedule</span>
+              <span>{t("Related schedule")}</span>
             </div>
 
             <h3 id={titleId} className={styles.title}>{employeeName}</h3>
             <p id={descriptionId} className={styles.description}>
               {dayLabel}
               {" | "}
-              Compare the current and related schedule in the same matrix style as the profile view.
-            </p>
+              {t("Compare the current and related schedule in the same matrix style as the profile view.")}</p>
           </div>
 
           <div className={styles.headerActions}>
@@ -258,7 +258,7 @@ export function ContainerGraphRelatedHintDialog({
             <button
               type="button"
               className={styles.closeButton}
-              aria-label="Close related schedule"
+              aria-label={t("Close related schedule")}
               onClick={onCancel}
             >
               <CloseIcon size={18} />
@@ -275,14 +275,14 @@ export function ContainerGraphRelatedHintDialog({
                 graph={{ year, month }}
                 columns={currentMatrixColumns}
                 cellMap={currentCellMap}
-                title="Current"
+                title={t("Current")}
                 helperText={`${graphName} | ${getDayValueSummary(currentDayValues, detail.dayOfMonth)}`}
                 readOnly
                 compactSize
                 selectedCellKeys={selectedCellKeys}
                 enableSelectionWhenReadOnly
                 onSelectedCellKeysChange={NOOP}
-                emptyMessage="No schedule data for this employee in the current graph."
+                emptyMessage={t("No schedule data for this employee in the current graph.")}
                 headerRightSlot={(
                   <span className={styles.graphPill}>
                     {graphName}
@@ -298,21 +298,21 @@ export function ContainerGraphRelatedHintDialog({
                 graph={{ year, month }}
                 columns={relatedMatrixColumns}
                 cellMap={relatedCellMap}
-                title="Related"
+                title={t("Related")}
                 helperText={
                   activeRelatedGraph
                     ? `${activeRelatedGraph.graphName} | ${getDayValueSummary(activeRelatedGraph.dayValues, detail.dayOfMonth)}`
-                    : "No related schedule data available."
+                    : t("No related schedule data available.")
                 }
                 readOnly
                 compactSize
                 selectedCellKeys={selectedCellKeys}
                 enableSelectionWhenReadOnly
                 onSelectedCellKeysChange={NOOP}
-                emptyMessage="No related schedule data for this employee."
+                emptyMessage={t("No related schedule data for this employee.")}
                 headerRightSlot={(
                   detail.relatedGraphs.length > 1 ? (
-                    <div className={styles.graphSelector} role="tablist" aria-label="Related schedules">
+                    <div className={styles.graphSelector} role="tablist" aria-label={t("Related schedules")}>
                       {detail.relatedGraphs.map(relatedGraph => {
                         const isActive = relatedGraph.graphId === activeRelatedGraph?.graphId;
 
@@ -332,7 +332,7 @@ export function ContainerGraphRelatedHintDialog({
                     </div>
                   ) : (
                     <span className={styles.graphPill}>
-                      {activeRelatedGraph?.graphName ?? "Related"}
+                      {activeRelatedGraph?.graphName ?? t("Related")}
                     </span>
                   )
                 )}

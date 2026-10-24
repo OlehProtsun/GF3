@@ -15,6 +15,7 @@ const GRAPH_NOTE_STYLE_ID_BASE = 1_000_000;
 export const GRAPH_DAY_STYLE_EMPLOYEE_ID = 0;
 
 export type GraphManualColumnData = {
+  source?: "generated-unfilled";
   id: number;
   label: string;
   cells: Record<string, string>;
@@ -35,15 +36,20 @@ export type GraphNoteTextCellData = {
   value: string;
 };
 
+export type GraphAutoAvailabilityStyleSuppressionMap = Record<string, string[]>;
+
 type ParsedGraphNoteMeta = {
+  g?: unknown;
   manualColumns?: unknown;
   columnOrder?: unknown;
   cellStyles?: unknown;
   textCells?: unknown;
+  autoAvailabilityStyleSuppressions?: unknown;
   m?: unknown;
   o?: unknown;
   s?: unknown;
   t?: unknown;
+  u?: unknown;
 };
 
 function sanitizeGraphManualColumnCells(rawCells: unknown) {
@@ -77,6 +83,66 @@ function sanitizeGraphColumnOrder(rawColumnOrder: unknown) {
     accumulator.push(entry);
     return accumulator;
   }, []);
+}
+
+function sanitizeGraphAutoAvailabilityStyleSuppressionKey(rawCellKey: unknown) {
+  if (typeof rawCellKey !== "string") {
+    return null;
+  }
+
+  const [employeeIdValue, dayOfMonthValue, ...rest] = rawCellKey.trim().split(":");
+  if (rest.length > 0) {
+    return null;
+  }
+
+  const employeeId = Number(employeeIdValue);
+  const dayOfMonth = Number(dayOfMonthValue);
+
+  if (!Number.isInteger(employeeId) || employeeId <= 0) {
+    return null;
+  }
+
+  if (!Number.isInteger(dayOfMonth) || dayOfMonth < 1 || dayOfMonth > 31) {
+    return null;
+  }
+
+  return `${employeeId}:${dayOfMonth}`;
+}
+
+function sanitizeGraphAutoAvailabilityStyleSuppressions(rawSuppressions: unknown) {
+  const rawEntries = Array.isArray(rawSuppressions)
+    ? rawSuppressions
+      .filter((entry): entry is [unknown, unknown] => Array.isArray(entry) && entry.length >= 2)
+      .map(entry => [entry[0], entry[1]] as const)
+    : rawSuppressions && typeof rawSuppressions === "object"
+      ? Object.entries(rawSuppressions)
+      : [];
+
+  return rawEntries.reduce<GraphAutoAvailabilityStyleSuppressionMap>((accumulator, [rawGroupId, rawCellKeys]) => {
+    const groupId = Number(rawGroupId);
+    if (!Number.isInteger(groupId) || groupId <= 0 || !Array.isArray(rawCellKeys)) {
+      return accumulator;
+    }
+
+    const seenCellKeys = new Set<string>();
+    const cellKeys = rawCellKeys.reduce<string[]>((keysAccumulator, rawCellKey) => {
+      const normalizedCellKey = sanitizeGraphAutoAvailabilityStyleSuppressionKey(rawCellKey);
+      if (!normalizedCellKey || seenCellKeys.has(normalizedCellKey)) {
+        return keysAccumulator;
+      }
+
+      seenCellKeys.add(normalizedCellKey);
+      keysAccumulator.push(normalizedCellKey);
+      return keysAccumulator;
+    }, []);
+
+    if (cellKeys.length === 0) {
+      return accumulator;
+    }
+
+    accumulator[String(groupId)] = cellKeys;
+    return accumulator;
+  }, {});
 }
 
 function sanitizeLegacyGraphManualColumns(rawManualColumns: unknown) {
@@ -371,6 +437,7 @@ export function parseGraphNoteContent(rawNote?: string | null) {
       columnOrder: [] as GraphColumnOrderEntry[],
       cellStyles: [] as GraphNoteCellStyleData[],
       textCells: [] as GraphNoteTextCellData[],
+      autoAvailabilityStyleSuppressions: {} as GraphAutoAvailabilityStyleSuppressionMap,
     };
   }
 
@@ -383,6 +450,7 @@ export function parseGraphNoteContent(rawNote?: string | null) {
       columnOrder: [] as GraphColumnOrderEntry[],
       cellStyles: [] as GraphNoteCellStyleData[],
       textCells: [] as GraphNoteTextCellData[],
+      autoAvailabilityStyleSuppressions: {} as GraphAutoAvailabilityStyleSuppressionMap,
     };
   }
 
@@ -390,9 +458,13 @@ export function parseGraphNoteContent(rawNote?: string | null) {
     note: source.slice(0, match.index).trimEnd(),
     manualColumns: (() => {
       const nextLegacyManualColumns = sanitizeLegacyGraphManualColumns(parsed.manualColumns);
-      return nextLegacyManualColumns.length > 0
+      const columns = nextLegacyManualColumns.length > 0
         ? nextLegacyManualColumns
         : sanitizeCompactGraphManualColumns(parsed.m);
+      const generatedIds = new Set(Array.isArray(parsed.g)
+        ? parsed.g.filter(id => Number.isInteger(id) && id > 0) : []);
+      return columns.map(column => generatedIds.has(column.id)
+        ? { ...column, source: "generated-unfilled" as const } : column);
     })(),
     columnOrder: (() => {
       const nextLegacyColumnOrder = sanitizeGraphColumnOrder(parsed.columnOrder);
@@ -405,6 +477,12 @@ export function parseGraphNoteContent(rawNote?: string | null) {
     textCells: (() => {
       const nextLegacyTextCells = sanitizeLegacyGraphNoteTextCells(parsed.textCells);
       return nextLegacyTextCells.length > 0 ? nextLegacyTextCells : sanitizeCompactGraphNoteTextCells(parsed.t);
+    })(),
+    autoAvailabilityStyleSuppressions: (() => {
+      const nextLegacySuppressions = sanitizeGraphAutoAvailabilityStyleSuppressions(parsed.autoAvailabilityStyleSuppressions);
+      return Object.keys(nextLegacySuppressions).length > 0
+        ? nextLegacySuppressions
+        : sanitizeGraphAutoAvailabilityStyleSuppressions(parsed.u);
     })(),
   };
 }
@@ -419,6 +497,7 @@ export function buildGraphNoteContent(
   columnOrder: GraphColumnOrderEntry[] = [],
   cellStyles: GraphNoteCellStyleData[] = [],
   textCells: GraphNoteTextCellData[] = [],
+  autoAvailabilityStyleSuppressions: GraphAutoAvailabilityStyleSuppressionMap = {},
 ) {
   const trimmedVisibleNote = visibleNote.trimEnd();
   const sanitizedManualColumns = manualColumns.reduce<GraphManualColumnData[]>((accumulator, column) => {
@@ -431,23 +510,36 @@ export function buildGraphNoteContent(
       id,
       label: typeof column.label === "string" ? column.label : "",
       cells: sanitizeGraphManualColumnCells(column.cells),
+      ...(column.source === "generated-unfilled" ? { source: column.source } : {}),
     });
     return accumulator;
   }, []);
   const sanitizedColumnOrder = sanitizeGraphColumnOrder(columnOrder);
+  const generatedIds = sanitizedManualColumns.filter(column => column.source === "generated-unfilled")
+    .sort((a, b) => {
+      const rank = (id: number) => {
+        const index = sanitizedColumnOrder.indexOf(-id);
+        return index < 0 ? sanitizedColumnOrder.length + sanitizedManualColumns.findIndex(column => column.id === id) : index;
+      };
+      return rank(a.id) - rank(b.id);
+    }).map(column => column.id);
   const sanitizedCellStyles = sanitizeGraphNoteCellStyles(cellStyles);
   const sanitizedTextCells = sanitizeLegacyGraphNoteTextCells(textCells);
+  const sanitizedAutoAvailabilityStyleSuppressions =
+    sanitizeGraphAutoAvailabilityStyleSuppressions(autoAvailabilityStyleSuppressions);
 
   if (
     sanitizedManualColumns.length === 0 &&
     sanitizedColumnOrder.length === 0 &&
     sanitizedCellStyles.length === 0 &&
-    sanitizedTextCells.length === 0
+    sanitizedTextCells.length === 0 &&
+    Object.keys(sanitizedAutoAvailabilityStyleSuppressions).length === 0
   ) {
     return trimmedVisibleNote;
   }
 
   const encodedMeta = `b64:${encodeGraphNoteMetaValue(JSON.stringify({
+    ...(generatedIds.length > 0 ? { g: generatedIds } : {}),
     ...(sanitizedManualColumns.length > 0
       ? {
         m: sanitizedManualColumns.map(column => (
@@ -470,6 +562,13 @@ export function buildGraphNoteContent(
     ...(sanitizedTextCells.length > 0
       ? {
         t: sanitizedTextCells.map(textCell => [textCell.employeeId, textCell.dayOfMonth, textCell.value]),
+      }
+      : {}),
+    ...(Object.keys(sanitizedAutoAvailabilityStyleSuppressions).length > 0
+      ? {
+        u: Object.entries(sanitizedAutoAvailabilityStyleSuppressions)
+          .sort((left, right) => Number(left[0]) - Number(right[0]))
+          .map(([groupId, cellKeys]) => [Number(groupId), cellKeys]),
       }
       : {}),
   }))}`;

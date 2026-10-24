@@ -28,11 +28,20 @@ public class EmployeeModel
     [Column("last_name")]
     public string LastName { get; set; } = null!;
 
+    [Column("is_deleted")]
+    public bool IsDeleted { get; set; }
+
     [Column("phone")]
     public string? Phone { get; set; }
 
     [Column("email")]
     public string? Email { get; set; }
+
+    /// <summary>
+    /// Optional login account that lets the employee sign into the application.
+    /// Authentication data is kept in a separate table so scheduling/profile data stays isolated.
+    /// </summary>
+    public EmployeeAccountModel? Account { get; set; }
 
     /// <summary>
     /// Assignments that enroll the employee into concrete schedules.

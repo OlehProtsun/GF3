@@ -84,4 +84,22 @@
   .mainBlock {
     min-height: auto;
   }
+
+  .layoutPreserveSideLayout {
+    flex-direction: row;
+    gap: var(--availability-workspace-gap-narrow, 10px);
+  }
+
+  .layoutPreserveSideLayout .sidebarColumn {
+    flex: 0 0 auto;
+  }
+
+  .layoutPreserveSideLayout .sidebarContent > *,
+  .layoutPreserveSideLayout .mainBlock > * {
+    width: auto;
+  }
+
+  .layoutPreserveSideLayout .mainBlock {
+    min-height: 0;
+  }
 }

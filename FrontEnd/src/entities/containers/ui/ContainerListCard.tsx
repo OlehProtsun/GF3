@@ -1,4 +1,5 @@
-﻿import type { Container } from "@entities/containers/model/types";
+import { t } from "@shared/i18n";
+import type { Container } from "@entities/containers/model/types";
 import { getContainerDisplayName } from "@entities/containers/model/presentation";
 import { usePinnedRecords } from "@shared/lib/records/usePinnedRecords";
 import { IosButton } from "@shared/ui/components/IosButton";
@@ -14,7 +15,7 @@ type ContainerListCardProps = {
   isLoading: boolean;
   searchQuery: string;
   onClearSearch: () => void;
-  onAddContainer: () => void;
+  onAddContainer?: () => void;
   onContainerOpen: (containerId: Container["id"]) => void;
 };
 
@@ -32,9 +33,9 @@ export function ContainerListCard({
     containers,
   );
 
-  const addContainerAction = (
-    <IosButton label="Add New" icon={<PlusIcon size={18} />} onClick={onAddContainer} />
-  );
+  const addContainerAction = onAddContainer ? (
+    <IosButton label={t("Add New")} icon={<PlusIcon size={18} />} onClick={onAddContainer} />
+  ) : undefined;
 
   return (
     <ListCardSection
@@ -42,15 +43,15 @@ export function ContainerListCard({
       isFetching={isLoading}
       hasData={containers.length > 0}
       searchQuery={searchQuery}
-      loadingMessage="Loading containers..."
-      errorMessage="Could not load containers."
-      emptyTitle="No containers yet"
-      emptyDescription="Start by creating your first container workspace."
+      loadingMessage={t("Loading containers...")}
+      errorMessage={t("Could not load containers.")}
+      emptyTitle={t("No containers yet")}
+      emptyDescription={onAddContainer ? t("Start by creating your first container workspace.") : t("No results")}
       emptyAction={addContainerAction}
-      searchEmptyTitle="Nothing found"
-      searchEmptyDescription={`No container matches "${searchQuery}".`}
+      searchEmptyTitle={t("Nothing found")}
+      searchEmptyDescription={t("No container matches \"{0}\".", searchQuery)}
       searchEmptyAction={
-        <IosButton label="Clear Search" variant="secondary" onClick={onClearSearch} />
+        <IosButton label={t("Clear Search")} variant="secondary" onClick={onClearSearch} />
       }
     >
       <RecordGrid>
@@ -61,8 +62,8 @@ export function ContainerListCard({
           const metaItems: RecordTileMetaItem[] = [
             {
               key: "noteState",
-              label: "State",
-              value: note ? "Note available" : "No note yet",
+              label: t("State"),
+              value: note ? t("Note available") : t("No note yet"),
             },
           ];
 
@@ -70,14 +71,14 @@ export function ContainerListCard({
             <RecordTile
               key={container.id}
               title={displayName}
-              description={note || "Schedule workspace for container planning and statistics."}
+              description={note || t("Schedule workspace for container planning and statistics.")}
               badge={`ID ${container.id}`}
               metaItems={metaItems}
               isPinned={isPinned}
               onTogglePin={() => togglePin(container.id)}
-              pinLabel={isPinned ? `Unpin ${displayName}` : `Pin ${displayName}`}
+              pinLabel={isPinned ? t("Unpin {0}", displayName) : t("Pin {0}", displayName)}
               onClick={() => onContainerOpen(container.id)}
-              ariaLabel={`Open ${displayName} profile`}
+              ariaLabel={t("Open {0} profile", displayName)}
             />
           );
         })}

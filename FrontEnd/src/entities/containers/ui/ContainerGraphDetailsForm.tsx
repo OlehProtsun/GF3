@@ -1,3 +1,4 @@
+import { t } from "@shared/i18n";
 import type { ChangeEvent, FormEvent } from "react";
 import type { AvailabilityGroup } from "@entities/availability-groups";
 import type { Shop } from "@entities/shops";
@@ -13,18 +14,18 @@ import { FormRow } from "@shared/ui/forms/FormLayout";
 import styles from "./ContainerGraphDetailsForm.module.css";
 
 const MONTH_OPTIONS = [
-  { value: "1", label: "January" },
-  { value: "2", label: "February" },
-  { value: "3", label: "March" },
-  { value: "4", label: "April" },
-  { value: "5", label: "May" },
-  { value: "6", label: "June" },
-  { value: "7", label: "July" },
-  { value: "8", label: "August" },
-  { value: "9", label: "September" },
-  { value: "10", label: "October" },
-  { value: "11", label: "November" },
-  { value: "12", label: "December" },
+  { value: "1", get label() { return t("January"); } },
+  { value: "2", get label() { return t("February"); } },
+  { value: "3", get label() { return t("March"); } },
+  { value: "4", get label() { return t("April"); } },
+  { value: "5", get label() { return t("May"); } },
+  { value: "6", get label() { return t("June"); } },
+  { value: "7", get label() { return t("July"); } },
+  { value: "8", get label() { return t("August"); } },
+  { value: "9", get label() { return t("September"); } },
+  { value: "10", get label() { return t("October"); } },
+  { value: "11", get label() { return t("November"); } },
+  { value: "12", get label() { return t("December"); } },
 ] as const;
 
 type ContainerGraphDetailsFormProps = {
@@ -59,8 +60,8 @@ export function ContainerGraphDetailsForm({
       isLoading={false}
       hasLoadError={false}
       isSaving={isSaving}
-      loadingMessage="Preparing schedule form..."
-      errorMessage="Could not open the schedule form."
+      loadingMessage={t("Preparing schedule form...")}
+      errorMessage={t("Could not open the schedule form.")}
       onCancel={onCancel}
       onSubmit={onSubmit}
     >
@@ -68,18 +69,18 @@ export function ContainerGraphDetailsForm({
       {submitError ? <ErrorBanner>{submitError}</ErrorBanner> : null}
 
       <FormRow>
-        <LabeledField id="schedule-name" label="Name" error={errors.name}>
+        <LabeledField id="schedule-name" label={t("Name")} error={errors.name}>
           <TextInput
             id="schedule-name"
             value={form.name}
-            placeholder="Example: March 2026 Main Shop"
+            placeholder={t("Example: March 2026 Main Shop")}
             onChange={onFieldChange("name")}
             aria-invalid={Boolean(errors.name)}
             aria-describedby={errors.name ? "schedule-name-error" : undefined}
           />
         </LabeledField>
 
-        <LabeledField id="schedule-shop" label="Shop" error={errors.shopId}>
+        <LabeledField id="schedule-shop" label={t("Shop")} error={errors.shopId}>
           <select
             id="schedule-shop"
             className={styles.select}
@@ -89,7 +90,7 @@ export function ContainerGraphDetailsForm({
             aria-describedby={errors.shopId ? "schedule-shop-error" : undefined}
           >
             <option value="">
-              {isOptionsLoading && shops.length === 0 ? "Loading shops..." : shops.length > 0 ? "Select shop" : "No shops available"}
+              {isOptionsLoading && shops.length === 0 ? t("Loading shops...") : shops.length > 0 ? t("Select shop") : t("No shops available")}
             </option>
             {shops.map(shop => (
               <option key={shop.id} value={shop.id}>
@@ -101,7 +102,7 @@ export function ContainerGraphDetailsForm({
       </FormRow>
 
       <FormRow>
-        <LabeledField id="schedule-month" label="Month" error={errors.month}>
+        <LabeledField id="schedule-month" label={t("Month")} error={errors.month}>
           <select
             id="schedule-month"
             className={styles.select}
@@ -118,7 +119,7 @@ export function ContainerGraphDetailsForm({
           </select>
         </LabeledField>
 
-        <LabeledField id="schedule-year" label="Year" error={errors.year}>
+        <LabeledField id="schedule-year" label={t("Year")} error={errors.year}>
           <TextInput
             id="schedule-year"
             type="number"
@@ -133,7 +134,7 @@ export function ContainerGraphDetailsForm({
       </FormRow>
 
       <FormRow>
-        <LabeledField id="schedule-people-per-shift" label="People per shift" error={errors.peoplePerShift}>
+        <LabeledField id="schedule-people-per-shift" label={t("People per shift")} error={errors.peoplePerShift}>
           <TextInput
             id="schedule-people-per-shift"
             type="number"
@@ -145,7 +146,7 @@ export function ContainerGraphDetailsForm({
           />
         </LabeledField>
 
-        <LabeledField id="schedule-max-hours" label="Max hours / employee" error={errors.maxHoursPerEmpMonth}>
+        <LabeledField id="schedule-max-hours" label={t("Max hours / employee")} error={errors.maxHoursPerEmpMonth}>
           <TextInput
             id="schedule-max-hours"
             type="number"
@@ -159,7 +160,7 @@ export function ContainerGraphDetailsForm({
       </FormRow>
 
       <FormRow>
-        <LabeledField id="schedule-shift-1" label="Shift 1" error={errors.shift1Time}>
+        <LabeledField id="schedule-shift-1" label={t("Shift 1")} error={errors.shift1Time}>
           <TextInput
             id="schedule-shift-1"
             value={form.shift1Time}
@@ -170,7 +171,7 @@ export function ContainerGraphDetailsForm({
           />
         </LabeledField>
 
-        <LabeledField id="schedule-shift-2" label="Shift 2" error={errors.shift2Time}>
+        <LabeledField id="schedule-shift-2" label={t("Shift 2")} error={errors.shift2Time}>
           <TextInput
             id="schedule-shift-2"
             value={form.shift2Time}
@@ -183,7 +184,7 @@ export function ContainerGraphDetailsForm({
       </FormRow>
 
       <FormRow>
-        <LabeledField id="schedule-max-consecutive-days" label="Max consecutive days" error={errors.maxConsecutiveDays}>
+        <LabeledField id="schedule-max-consecutive-days" label={t("Max consecutive days")} error={errors.maxConsecutiveDays}>
           <TextInput
             id="schedule-max-consecutive-days"
             type="number"
@@ -195,7 +196,7 @@ export function ContainerGraphDetailsForm({
           />
         </LabeledField>
 
-        <LabeledField id="schedule-max-consecutive-full" label="Max consecutive full" error={errors.maxConsecutiveFull}>
+        <LabeledField id="schedule-max-consecutive-full" label={t("Max consecutive full")} error={errors.maxConsecutiveFull}>
           <TextInput
             id="schedule-max-consecutive-full"
             type="number"
@@ -209,7 +210,7 @@ export function ContainerGraphDetailsForm({
       </FormRow>
 
       <FormRow>
-        <LabeledField id="schedule-max-full-per-month" label="Max full / month" error={errors.maxFullPerMonth}>
+        <LabeledField id="schedule-max-full-per-month" label={t("Max full / month")} error={errors.maxFullPerMonth}>
           <TextInput
             id="schedule-max-full-per-month"
             type="number"
@@ -221,7 +222,7 @@ export function ContainerGraphDetailsForm({
           />
         </LabeledField>
 
-        <LabeledField id="schedule-availability-group" label="Availability group" error={errors.availabilityGroupId}>
+        <LabeledField id="schedule-availability-group" label={t("Availability group")} error={errors.availabilityGroupId}>
           <select
             id="schedule-availability-group"
             className={styles.select}
@@ -231,7 +232,7 @@ export function ContainerGraphDetailsForm({
             aria-describedby={errors.availabilityGroupId ? "schedule-availability-group-error" : undefined}
           >
             <option value="">
-              {availabilityGroups.length > 0 ? "No availability group" : "No matching groups"}
+              {availabilityGroups.length > 0 ? t("No availability group") : t("No matching groups")}
             </option>
             {availabilityGroups.map(group => (
               <option key={group.id} value={group.id}>
@@ -240,16 +241,16 @@ export function ContainerGraphDetailsForm({
             ))}
           </select>
           {availabilityGroups.length === 0 ? (
-            <div className={styles.helperText}>No availability groups match the selected month and year yet.</div>
+            <div className={styles.helperText}>{t("No availability groups match the selected month and year yet.")}</div>
           ) : null}
         </LabeledField>
       </FormRow>
 
-      <LabeledField id="schedule-note" label="Note" error={errors.note}>
+      <LabeledField id="schedule-note" label={t("Note")} error={errors.note}>
         <TextArea
           id="schedule-note"
           rows={6}
-          placeholder="Optional note for this schedule"
+          placeholder={t("Optional note for this schedule")}
           value={form.note}
           onChange={onFieldChange("note")}
           aria-invalid={Boolean(errors.note)}

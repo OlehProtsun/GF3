@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using DataAccessLayer.Models.Enums;
 
 namespace DataAccessLayer.Models;
 
@@ -47,6 +48,22 @@ public class ScheduleModel
     [Required]
     [Column("month")]
     public int Month { get; set; }
+
+    [Required]
+    [Column("publication_status")]
+    public SchedulePublicationStatus PublicationStatus { get; set; } = SchedulePublicationStatus.Private;
+
+    [Column("published_at_utc")]
+    public DateTimeOffset? PublishedAtUtc { get; set; }
+
+    [Required]
+    [Column("allow_swap")]
+    public bool AllowSwap { get; set; } = true;
+
+    [Required]
+    [Column("accepted_swap_highlight_color")]
+    [MaxLength(7)]
+    public string AcceptedSwapHighlightColor { get; set; } = "#BBF7D0";
 
     [Required]
     [Column("people_per_shift")]
@@ -107,4 +124,10 @@ public class ScheduleModel
     /// Optional cell-level formatting used by the planner UI and exports.
     /// </summary>
     public ICollection<ScheduleCellStyleModel> CellStyles { get; set; } = new List<ScheduleCellStyleModel>();
+
+    public ICollection<ScheduleVersionModel> Versions { get; set; } = new List<ScheduleVersionModel>();
+
+    public ScheduleVersionStateModel? VersionState { get; set; }
+
+    public ICollection<ShiftCorrectionRequestModel> ShiftCorrectionRequests { get; set; } = new List<ShiftCorrectionRequestModel>();
 }
