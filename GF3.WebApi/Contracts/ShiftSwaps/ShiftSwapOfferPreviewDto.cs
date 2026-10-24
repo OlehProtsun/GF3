@@ -2,6 +2,7 @@ namespace WebApi.Contracts.ShiftSwaps;
 
 public sealed class ShiftSwapOfferPreviewDto
 {
+    public bool AllowPartialAcceptance { get; set; } = false;
     public string RequestKind { get; set; } = "give";
     public int? TargetEmployeeId { get; set; }
     public string TargetEmployeeName { get; set; } = "Everyone";

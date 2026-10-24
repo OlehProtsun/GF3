@@ -1,3 +1,4 @@
+import { manualShiftCapacity, intervalsFromCapacity, formatManualShiftIntervals, type ManualShiftReservation } from "./manualShiftIntervals";
 import type { EditableGraphManualColumn } from "../ui/ContainerGraphEditor";
 import type { GraphSlot } from "./types";
 import { clampGraphYear, getGraphDaysInMonth, getGraphShiftMinimumStaffing, tryParseGraphShiftRange } from "./graphWorkspace";
@@ -48,49 +49,48 @@ export function deriveGeneratedVacancies(input: {
 }
 
 export function reconcileGeneratedManualColumns(input: {
-  vacancies: GeneratedVacancy[]; columns: EditableGraphManualColumn[]; columnOrder: number[]; protectedCells: ReadonlySet<string>;
+  vacancies: GeneratedVacancy[]; columns: EditableGraphManualColumn[]; columnOrder: number[]; reservations: ManualShiftReservation[];
 }): { columns: EditableGraphManualColumn[]; columnOrder: number[]; removedColumnIds: number[] } {
-  const { columns, columnOrder, protectedCells } = input;
-  const generated = columns.filter(column => column.source === "generated-unfilled")
-    .sort((a, b) => {
-      const rank = (id: number) => {
-        const index = columnOrder.indexOf(-id);
-        return index < 0 ? columnOrder.length + columns.findIndex(column => column.columnId === id) : index;
-      };
-      return rank(a.columnId) - rank(b.columnId);
-    }).map(column => ({ ...column, cells: Object.fromEntries(Object.entries(column.cells)
-      .filter(([day]) => protectedCells.has(`${column.columnId}:${day}`))) }));
-  const remaining = [...input.vacancies].sort((a, b) => a.dayOfMonth - b.dayOfMonth || a.shiftIndex - b.shiftIndex ||
-    a.fromTime.localeCompare(b.fromTime) || a.toTime.localeCompare(b.toTime) || a.position - b.position);
-  for (const column of generated) {
-    for (const [day, value] of Object.entries(column.cells)) {
-      const range = tryParseGraphShiftRange(value);
-      const index = remaining.findIndex(vacancy => vacancy.dayOfMonth === Number(day) && range &&
-        vacancy.fromTime === formatTime(range.fromMinutes) && vacancy.toTime === formatTime(range.toMinutes));
-      if (index >= 0) remaining.splice(index, 1);
+  const { columns, columnOrder, reservations } = input;
+  const rank = (id: number) => { const index = columnOrder.indexOf(-id); return index < 0 ? columnOrder.length + columns.findIndex(c => c.columnId === id) : index; };
+  const generated = columns.filter(c => c.source === "generated-unfilled").sort((a, b) => rank(a.columnId) - rank(b.columnId));
+  const canonicalId = generated[0]?.columnId ?? Math.max(0, ...columns.map(c => c.columnId)) + 1;
+  const protectedIds = new Set(reservations.map(r => r.manualColumnId));
+  const keep = generated.filter(c => c.columnId === canonicalId || protectedIds.has(c.columnId))
+    .map(c => ({ ...c, label: c.columnId === canonicalId ? "do obstawienia" : c.label, cells: {} as Record<string, string> }));
+  if (!keep.length && input.vacancies.length) keep.push({ columnId: canonicalId, label: "do obstawienia", source: "generated-unfilled", cells: {} });
+  const canonical = keep.find(c => c.columnId === canonicalId);
+  const days = new Set([...input.vacancies.map(v => v.dayOfMonth), ...reservations.map(r => r.dayOfMonth)]);
+  for (const day of days) {
+    const demand = manualShiftCapacity(input.vacancies.filter(v => v.dayOfMonth === day));
+    const protectedCapacity = Array<number>(1440).fill(0);
+    for (const column of keep) {
+      const reserved = reservations.filter(r => r.manualColumnId === column.columnId && r.dayOfMonth === day);
+      if (reserved.length) column.cells[String(day)] = formatManualShiftIntervals(reserved);
+      const capacity = manualShiftCapacity(reserved);
+      capacity.forEach((value, m) => { protectedCapacity[m] += value; });
+    }
+    if (canonical) {
+      const own = manualShiftCapacity(reservations.filter(r => r.manualColumnId === canonicalId && r.dayOfMonth === day));
+      const free = demand.map((value, m) => Math.max(0, value - protectedCapacity[m]));
+      // Preserve original vacancy units when unreserved, including touching intervals and duplicates.
+      const remaining = [...free];
+      const units: GeneratedVacancy[] = [];
+      for (const vacancy of input.vacancies.filter(v => v.dayOfMonth === day)) {
+        const coverage = manualShiftCapacity([vacancy]);
+        if (coverage.every((value, m) => !value || remaining[m] > 0)) {
+          units.push(vacancy); coverage.forEach((value, m) => { remaining[m] -= value; });
+        }
+      }
+      const ownIntervals = reservations.filter(r => r.manualColumnId === canonicalId && r.dayOfMonth === day);
+      const all = [...ownIntervals, ...units, ...intervalsFromCapacity(remaining)];
+      if (all.length || own.some(Boolean)) canonical.cells[String(day)] = formatManualShiftIntervals(all);
     }
   }
-  let nextId = Math.max(0, ...columns.map(column => column.columnId)) + 1;
-  const added: EditableGraphManualColumn[] = [];
-  for (const vacancy of remaining) {
-    let column = generated.find(candidate => !(String(vacancy.dayOfMonth) in candidate.cells));
-    if (!column) {
-      const ordinal = generated.length + 1;
-      column = { columnId: nextId++, label: ordinal === 1 ? "Do obsadzenia" : `Do obsadzenia ${ordinal}`,
-        source: "generated-unfilled", cells: {} };
-      generated.push(column);
-      added.push(column);
-    }
-    column.cells[String(vacancy.dayOfMonth)] = `${vacancy.fromTime} - ${vacancy.toTime}`;
-  }
-  const surviving = new Map(generated.filter(column => Object.keys(column.cells).length > 0).map(column => [column.columnId, column]));
-  const removedColumnIds = columns.filter(column => column.source === "generated-unfilled" && !surviving.has(column.columnId))
-    .map(column => column.columnId);
+  const surviving = new Map(keep.filter(c => Object.keys(c.cells).length || protectedIds.has(c.columnId)).map(c => [c.columnId, c]));
+  const removedColumnIds = generated.filter(c => !surviving.has(c.columnId)).map(c => c.columnId);
   const removed = new Set(removedColumnIds.map(id => -id));
-  return {
-    columns: [...columns.flatMap(column => column.source !== "generated-unfilled" ? [column] :
-      surviving.has(column.columnId) ? [surviving.get(column.columnId)!] : []), ...added],
-    columnOrder: [...columnOrder.filter(id => !removed.has(id)), ...added.map(column => -column.columnId)],
-    removedColumnIds,
-  };
+  const added = [...surviving.values()].filter(c => !columns.some(old => old.columnId === c.columnId));
+  return { columns: [...columns.flatMap(c => c.source !== "generated-unfilled" ? [c] : surviving.has(c.columnId) ? [surviving.get(c.columnId)!] : []), ...added],
+    columnOrder: [...columnOrder.filter(id => !removed.has(id)), ...added.map(c => -c.columnId)], removedColumnIds };
 }

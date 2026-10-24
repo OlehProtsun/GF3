@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
+import { useEffect, useId, useMemo, useRef, useState, type RefObject } from "react";
 import { createPortal } from "react-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import type { EmployeeSchedule } from "@entities/employee-schedule";
@@ -32,6 +32,8 @@ export function SwapCreateWizard({ schedules, employees, employeeId, employeeNam
   const [recipientMode, setRecipientMode] = useState<"everyone" | "specific">("everyone");
   const [recipient, setRecipient] = useState<Recipient>({ mode: "everyone" });
   const [typeEmployee, setTypeEmployee] = useState<ShiftSwapEmployee | null>(null);
+  const [allowPartialAcceptance, setAllowPartialAcceptance] = useState(false);
+  const acceptanceId = useId();
   const [requestKind, setRequestKind] = useState<"give" | "exchange">("give");
   const [returnSelection, setReturnSelection] = useState<SwapShiftSelection | null>(null);
   const [search, setSearch] = useState("");
@@ -67,15 +69,15 @@ export function SwapCreateWizard({ schedules, employees, employeeId, employeeNam
   const payload = useMemo<SwapWizardRequest | null>(() => {
     if (!source || (recipientMode === "specific" && recipient.mode !== "specific")) return null;
     const base = { scheduleId: source.shift.scheduleId, scheduleSlotId: source.shift.slotId,
-      fromTime: source.period.fromTime, toTime: source.period.toTime };
+      fromTime: source.period.fromTime, toTime: source.period.toTime, allowPartialAcceptance: recipientMode === "everyone" && allowPartialAcceptance };
     if (recipientMode === "specific" && recipient.mode === "specific") {
-      if (recipient.kind === "exchange") return { ...base, requestKind: "exchange", targetEmployeeId: recipient.employee.id,
+      if (recipient.kind === "exchange") return { ...base, allowPartialAcceptance: false, requestKind: "exchange", targetEmployeeId: recipient.employee.id,
         returnScheduleId: recipient.selection.shift.scheduleId, returnScheduleSlotId: recipient.selection.shift.slotId,
         returnFromTime: recipient.selection.period.fromTime, returnToTime: recipient.selection.period.toTime };
       return { ...base, requestKind: "give", targetEmployeeId: recipient.employee.id };
     }
     return { ...base, requestKind: "give", targetEmployeeId: null };
-  }, [source, recipient, recipientMode]);
+  }, [source, recipient, recipientMode, allowPartialAcceptance]);
   const previewQuery = useShiftSwapPreviewQuery(step === 3 && view === "wizard" ? payload : null);
   const candidatesQuery = useShiftSwapReturnCandidatesQuery((view === "return" || view === "returnSchedule") && source && typeEmployee ? {
     sourceScheduleId: source.shift.scheduleId, sourceSlotId: source.shift.slotId,
@@ -103,6 +105,7 @@ export function SwapCreateWizard({ schedules, employees, employeeId, employeeNam
   const preview = previewQuery.data;
   const previewMatches = Boolean(preview && payload && preview.source.scheduleId === payload.scheduleId &&
     preview.source.slotId === payload.scheduleSlotId && preview.source.fromTime === payload.fromTime && preview.source.toTime === payload.toTime &&
+    (preview.allowPartialAcceptance ?? false) === Boolean(payload.allowPartialAcceptance) &&
     preview.targetEmployeeId === payload.targetEmployeeId && preview.requestKind === payload.requestKind &&
     (payload.requestKind === "give" || (preview.return?.slotId === payload.returnScheduleSlotId &&
       preview.return?.scheduleId === payload.returnScheduleId && preview.return?.fromTime === payload.returnFromTime && preview.return?.toTime === payload.returnToTime)));
@@ -132,7 +135,7 @@ export function SwapCreateWizard({ schedules, employees, employeeId, employeeNam
             setReturnSelection(null); setReturnScheduleId(null); setView("wizard");
           }} />}
         {view === "type" && typeEmployee && <SwapRequestTypeDialog employee={typeEmployee} kind={requestKind} selection={returnSelection}
-          onKindChange={kind => setRequestKind(kind)}
+          onKindChange={setRequestKind}
           onChooseShift={() => { void client.invalidateQueries({ queryKey: ["shiftSwaps", "returnCandidates"] }); setView("returnSchedule"); }}
           onBack={() => setView("wizard")} onSave={() => {
             if (requestKind === "exchange" && returnSelection) setRecipient({ mode: "specific", employee: typeEmployee, kind: "exchange", selection: returnSelection });
@@ -181,7 +184,21 @@ export function SwapCreateWizard({ schedules, employees, employeeId, employeeNam
           </SwapScrollRegion>}
           {step === 2 && <><p className={styles.description}>{t("Choose who can take this shift.")}</p><SwapScrollRegion key="recipient" className={styles.recipientContent}>
             <div className={styles.recipientModes}>
-              <button type="button" aria-pressed={recipientMode === "everyone"} onClick={() => { setRecipientMode("everyone"); setRecipient({ mode: "everyone" }); setReturnSelection(null); }} aria-label={t("Everyone")}><span className={styles.optionIcon} aria-hidden="true"><PeopleIcon group /></span><span className={styles.optionCopy}><strong>{t("Everyone")}</strong><small>{t("All employees can see and take this shift.")}</small></span><span className={styles.radioMark} aria-hidden="true" /></button>
+              <div className={styles.recipientCard} data-selected={recipientMode === "everyone"}>
+                <button type="button" aria-pressed={recipientMode === "everyone"} aria-expanded={recipientMode === "everyone"} aria-controls={acceptanceId} onClick={() => { setRecipientMode("everyone"); setRecipient({ mode: "everyone" }); setReturnSelection(null); }} aria-label={t("Everyone")}><span className={styles.optionIcon} aria-hidden="true"><PeopleIcon group /></span><span className={styles.optionCopy}><strong>{t("Everyone")}</strong><small>{t("All employees can see and take this shift.")}</small></span><span className={styles.radioMark} aria-hidden="true" /></button>
+                <div id={acceptanceId} className={styles.acceptanceExpansion} data-expanded={recipientMode === "everyone"} aria-hidden={recipientMode !== "everyone"} inert={recipientMode !== "everyone"}>
+                  <div className={styles.acceptanceInner}>
+                    <div className={styles.acceptancePanel}>
+                    <fieldset className={styles.acceptanceMode} disabled={recipientMode !== "everyone"}>
+                      <legend>{t("Acceptance mode")}</legend>
+                      <label><input type="radio" name="acceptance-mode" checked={!allowPartialAcceptance} onChange={() => setAllowPartialAcceptance(false)} />{t("Only the exact shift")}</label>
+                      <label><input type="radio" name="acceptance-mode" checked={allowPartialAcceptance} onChange={() => setAllowPartialAcceptance(true)} />{t("Allow custom time")}</label>
+                      {allowPartialAcceptance && <p>{t("Unclaimed time will remain available as a new offer.")}</p>}
+                    </fieldset>
+                    </div>
+                  </div>
+                </div>
+              </div>
               <button type="button" aria-pressed={recipientMode === "specific"} onClick={() => setRecipientMode("specific")} aria-label={t("Specific employee")}><span className={styles.optionIcon} aria-hidden="true"><PeopleIcon /></span><span className={styles.optionCopy}><strong>{t("Specific employee")}</strong><small>{t("Choose one employee to give this shift to.")}</small></span><span className={styles.radioMark} aria-hidden="true" /></button>
             </div>
             {recipientMode === "specific" && <>
@@ -216,6 +233,7 @@ export function SwapCreateWizard({ schedules, employees, employeeId, employeeNam
                     : preview.targetEmployeeId ? t("You give your selected shift to {0}.", preview.targetEmployeeName) : t("Your shift will be available to eligible employees.")}</p>
                 </div>
               </div>
+              {preview.requestKind === "give" && <p>{t(preview.allowPartialAcceptance ? "Allow custom time" : "Only the exact shift")}</p>}
               <div className={styles.reviewInfo}><span aria-hidden="true">ⓘ</span><p>{preview.requestKind === "exchange"
                 ? t("Both shifts will transfer only after {0} accepts the request.", preview.targetEmployeeName)
                 : preview.targetEmployeeId ? t("After sending, {0} will receive a request and must confirm it.", preview.targetEmployeeName)

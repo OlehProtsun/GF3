@@ -2,6 +2,9 @@ namespace WebApi.Contracts.ShiftSwaps;
 
 public sealed class ShiftSwapDto
 {
+    public bool CanAcceptFull { get; set; }
+    public List<ShiftSwapEligibleWindowDto> EligibleClaimWindows { get; set; } = [];
+    public bool AllowPartialAcceptance { get; set; } = false;
     public string RequestKind { get; set; } = "give";
     public int? ReturnScheduleId { get; set; }
     public int? ReturnScheduleSlotId { get; set; }

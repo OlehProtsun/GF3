@@ -13,6 +13,9 @@ export type ShiftSwapScheduleSnapshot = {
 };
 
 export type ShiftSwap = {
+  allowPartialAcceptance: boolean;
+  canAcceptFull: boolean;
+  eligibleClaimWindows: Array<{ fromTime: string; toTime: string }>;
   requestKind?: "give" | "exchange";
   returnScheduleId?: number | null;
   returnScheduleSlotId?: number | null;
@@ -77,6 +80,7 @@ export type ShiftSwapEmployee = {
 };
 
 export type CreateShiftSwapInput = {
+  allowPartialAcceptance?: boolean;
   requestKind?: "give" | "exchange";
   returnScheduleId?: number;
   returnScheduleSlotId?: number;
@@ -114,12 +118,14 @@ export type ShiftSwapPreviewMonthStats = {
   workDaysBefore: number; workDaysAfter: number; freeDaysBefore: number; freeDaysAfter: number;
 };
 export type ShiftSwapOfferPreview = {
+  allowPartialAcceptance: boolean;
   requestKind: "give" | "exchange"; targetEmployeeId?: number | null; targetEmployeeName: string;
   source: ShiftSwapReturnCandidate; return?: ShiftSwapReturnCandidate | null;
   projectedMonths: ShiftSwapPreviewMonthStats[]; isValid: boolean; unavailableReason?: string | null;
 };
 
 export type CreateManagerShiftSwapInput = {
+  allowPartialAcceptance: boolean;
   containerId: number;
   graphId: number;
   manualColumnId: number;
@@ -132,3 +138,5 @@ export type CreateManagerShiftSwapInput = {
 export type ShiftSwapHighlightSetting = {
   highlightColor: string;
 };
+
+export type AcceptShiftSwapInput = { id: number; fromTime?: string; toTime?: string };

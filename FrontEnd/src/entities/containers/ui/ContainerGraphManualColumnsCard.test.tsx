@@ -10,7 +10,7 @@ const employees = [{ id: 2, firstName: "Ada", lastName: "Lovelace", hasLoginAcco
 const base = { columns: [], employees, year: 2026, month: 2, onAddColumn: vi.fn(), onDeleteColumn: vi.fn(), onPublishShift: vi.fn() };
 const column = { columnId: 4, label: "Do obsadzenia", cells: { "1": "08:00 - 12:00", "3": "Notes", "31": "08:00 - 12:00" } };
 const offer = { id: 20, manualColumnId: 4, dayOfMonth: 1, year: 2026, month: 2, fromTime: "08:00:00", toTime: "12:00:00", status: "open", isManagerCreated: true, visibility: "public" } as ShiftSwap;
-const pending = { clientId: "pending-1", manualColumnId: 4, dayOfMonth: 2, fromTime: "08:00", toTime: "12:00" };
+const pending = { allowPartialAcceptance: false, clientId: "pending-1", manualColumnId: 4, dayOfMonth: 2, fromTime: "08:00", toTime: "12:00" };
 
 describe("manual shifts card", () => {
   test("empty, add, delete and provenance uses source rather than name", () => {
@@ -33,11 +33,11 @@ describe("manual shifts card", () => {
     expect(screen.getByRole("button", { name: /07 Feb/ })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Show all|Show less/ })).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Publish shift" }));
-    expect(onPublishShift).toHaveBeenLastCalledWith({ manualColumnId: 4, dayOfMonth: 1, fromTime: "08:00", toTime: "12:00", targetEmployeeId: null });
+    expect(onPublishShift).toHaveBeenLastCalledWith({ manualColumnId: 4, dayOfMonth: 1, fromTime: "08:00", toTime: "12:00", targetEmployeeId: null, allowPartialAcceptance: false });
     fireEvent.scroll(screen.getByRole("region", { name: "Available shifts" }), { target: { scrollTop: 200 } });
     fireEvent.click(screen.getByRole("button", { name: /07 Feb/ }));
     fireEvent.click(screen.getByRole("button", { name: "Publish shift" }));
-    expect(onPublishShift).toHaveBeenLastCalledWith({ manualColumnId: 7, dayOfMonth: 7, fromTime: "09:00", toTime: "13:00", targetEmployeeId: null });
+    expect(onPublishShift).toHaveBeenLastCalledWith({ manualColumnId: 7, dayOfMonth: 7, fromTime: "09:00", toTime: "13:00", targetEmployeeId: null, allowPartialAcceptance: false });
     fireEvent.scroll(screen.getByRole("region", { name: "Available shifts" }), { target: { scrollTop: 0 } });
     expect(screen.getByRole("button", { name: /07 Feb/ })).toHaveAttribute("aria-pressed", "true");
   });
@@ -63,7 +63,7 @@ describe("manual shifts card", () => {
     await user.click(screen.getByRole("button", { name: "employee list" }));
     await user.click(screen.getByRole("option", { name: /Ada Lovelace/ }));
     await user.click(screen.getByRole("button", { name: "Publish shift" }));
-    expect(onPublishShift).toHaveBeenCalledWith({ manualColumnId: 4, dayOfMonth: 1, fromTime: "08:00", toTime: "12:00", targetEmployeeId: 2 });
+    expect(onPublishShift).toHaveBeenCalledWith({ manualColumnId: 4, dayOfMonth: 1, fromTime: "08:00", toTime: "12:00", targetEmployeeId: 2, allowPartialAcceptance: false });
   });
   test.each([{ allowSwap: false }, { isSchedulePublished: false }, { isPublishingShift: true }])("publication blocked %j", patch => {
     const onPublishShift = vi.fn();
@@ -100,4 +100,18 @@ describe("manual shifts card", () => {
     expect(screen.queryByText("Pending save", { exact: false })).toBeNull();
     expect(within(screen.getByRole("button", { name: /03 Feb/ })).getByText("Do obsadzenia")).toBeVisible();
   });
+});
+
+test("duplicate demand and combined selection respect capacity and send partial mode", () => {
+  const publish = vi.fn(); const props = { ...base, columns: [{ ...column, cells: { "1": "09:00-15:00,09:00-15:00,15:00-21:00" } }], onPublishShift: publish };
+  const view = render(<ContainerGraphManualColumnsCard {...props} />);
+  const list = screen.getByRole("region", { name: "Available shifts" });
+  expect(within(list).getAllByRole("button")).toHaveLength(4);
+  fireEvent.click(within(list).getByRole("button", { name: /09:00–21:00/ }));
+  fireEvent.click(screen.getByRole("button", { name: "Allow custom time" }));
+  fireEvent.click(screen.getByRole("button", { name: "Publish shift" }));
+  expect(publish).toHaveBeenCalledWith({ manualColumnId:4, dayOfMonth:1, fromTime:"09:00", toTime:"21:00", targetEmployeeId:null, allowPartialAcceptance:true });
+  view.rerender(<ContainerGraphManualColumnsCard {...props} pendingPublishedShifts={[{ clientId:"reserved", manualColumnId:4, dayOfMonth:1, fromTime:"09:00", toTime:"21:00", allowPartialAcceptance:true }]} />);
+  expect(within(list).getAllByRole("button")).toHaveLength(1);
+  expect(within(list).getByRole("button")).toHaveTextContent("09:00–15:00");
 });

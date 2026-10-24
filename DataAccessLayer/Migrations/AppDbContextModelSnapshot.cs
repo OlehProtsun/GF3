@@ -1890,6 +1890,12 @@ namespace DataAccessLayer.Migrations
                         .HasColumnType("INTEGER")
                         .HasColumnName("accepted_by_employee_id");
 
+                    b.Property<bool>("AllowPartialAcceptance")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER")
+                        .HasDefaultValue(false)
+                        .HasColumnName("allow_partial_acceptance");
+
                     b.Property<string>("ArchivedViewsJson")
                         .HasColumnType("TEXT")
                         .HasColumnName("archived_views_json");

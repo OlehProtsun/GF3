@@ -100,7 +100,7 @@ const generate = async () => { fireEvent.click(screen.getByText("Generate")); aw
 test("preview displays generated matrix cell, repeats stably, saves provenance and reloads", async () => {
   const view = render(<ContainerGraphEditPage />);
   await generate();
-  expect(columns()).toHaveLength(1); expect(columns()[0].label).toBe("Do obsadzenia");
+  expect(columns()).toHaveLength(1); expect(columns()[0].label).toBe("do obstawienia");
   expect(mocks.editor!.hasUnsavedChanges).toBe(true);
   expect(mocks.editor!.cellMap["-1:1"]).toBe("08:00 - 12:00");
   const original = structuredClone(columns());
@@ -124,7 +124,7 @@ test.each(["error", "missing", "empty"])("failed or malformed %s preview keeps c
 
 test("open and queued offers survive regeneration without duplicating seats; undo restores generated state", async () => {
   mocks.graphs[0].note = buildGraphNoteContent("", [{ id: 4, label: "Auto", cells: { "1": "08:00 - 12:00", "2": "08:00 - 12:00" }, source: "generated-unfilled" }]);
-  mocks.offers = [{ scheduleId: 1, manualColumnId: 4, dayOfMonth: 1, isManagerCreated: true, status: "open" } as ShiftSwap];
+  mocks.offers = [{ scheduleId: 1, manualColumnId: 4, dayOfMonth: 1, fromTime: "08:00", toTime: "12:00", isManagerCreated: true, status: "open" } as ShiftSwap];
   render(<ContainerGraphEditPage />);
   act(() => mocks.editor!.onPublishManualShift({ manualColumnId: 4, dayOfMonth: 2, fromTime: "08:00", toTime: "12:00", targetEmployeeId: null }));
   await generate();
@@ -196,4 +196,29 @@ test("stale response cannot update a newly opened create-mode session", async ()
   mocks.params = { containerId: "1", graphId: undefined }; view.rerender(<ContainerGraphEditPage />);
   await act(async () => resolve({ slots: preview() }));
   expect(columns()).toEqual([]); expect(screen.getByTestId("errors")).toBeEmptyDOMElement();
+});
+
+test("same-day pending offers keep partial mode through edits, undo and save", async () => {
+  mocks.graphs[0].note=buildGraphNoteContent("old text",[{id:7,label:"Manual",cells:{"1":"09:00-15:00,15:00-21:00"}}]);
+  render(<ContainerGraphEditPage />);
+  act(()=>mocks.editor!.onPublishManualShift({manualColumnId:7,dayOfMonth:1,fromTime:"09:00",toTime:"15:00",allowPartialAcceptance:true}));
+  act(()=>mocks.editor!.onPublishManualShift({manualColumnId:7,dayOfMonth:1,fromTime:"15:00",toTime:"21:00",allowPartialAcceptance:false}));
+  expect(mocks.editor!.pendingManualShiftPublishes).toHaveLength(2);
+  act(()=>mocks.editor!.onCellChange(-7,1,"09:00-15:00"));
+  expect(mocks.editor!.pendingManualShiftPublishes).toEqual([expect.objectContaining({allowPartialAcceptance:true,fromTime:"09:00",toTime:"15:00"})]);
+  fireEvent.click(screen.getByText("Undo"));expect(mocks.editor!.pendingManualShiftPublishes).toHaveLength(2);
+  fireEvent.click(screen.getByText("Save editor"));fireEvent.click(screen.getByText("Confirm save"));
+  await waitFor(()=>expect(mocks.publish).toHaveBeenCalledTimes(2));
+  expect(mocks.publish.mock.calls[0][0]).toEqual(expect.objectContaining({allowPartialAcceptance:true}));
+  expect(parseGraphNoteContent(mocks.save.mock.calls[0][0].payload.note).note).toBe("old text");
+});
+
+test("persisted manual demand requires cancellation before destructive edits", () => {
+  mocks.graphs[0].note=buildGraphNoteContent("old text",[{id:7,label:"Manual",cells:{"1":"09:00-21:00"}}]);
+  mocks.offers=[{scheduleId:1,id:1,manualColumnId:7,dayOfMonth:1,fromTime:"09:00",toTime:"21:00",isManagerCreated:true,status:"open"} as ShiftSwap];
+  render(<ContainerGraphEditPage />);
+  act(()=>mocks.editor!.onCellChange(-7,1,"09:00-15:00"));
+  expect(columns()[0].cells["1"]).toBe("09:00-21:00");
+  expect(mocks.editor!.manualShiftPublishError).toBe("Cancel open manual offers before changing their demand.");
+  act(()=>mocks.editor!.onDeleteManualColumn(7));expect(columns()).toHaveLength(1);
 });

@@ -50,8 +50,9 @@ public sealed class PublicHolidaySettingsControllerTests
         await using var database = await SqliteTestDatabase.CreateAsync();
         await using var db = database.CreateContext();
         var migrations = (await db.Database.GetAppliedMigrationsAsync()).ToArray();
-        Assert.EndsWith("_AddPublicHolidayDisplaySettings", migrations[^1]);
-        await db.GetService<IMigrator>().MigrateAsync(migrations[^2]);
+        var holidayMigrationIndex = Array.FindIndex(migrations, migration => migration.EndsWith("_AddPublicHolidayDisplaySettings", StringComparison.Ordinal));
+        Assert.True(holidayMigrationIndex > 0);
+        await db.GetService<IMigrator>().MigrateAsync(migrations[holidayMigrationIndex - 1]);
         db.Employees.Add(new EmployeeModel { FirstName = "Retained", LastName = "Employee" });
         await db.SaveChangesAsync();
         await db.Database.MigrateAsync();

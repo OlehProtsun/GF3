@@ -139,8 +139,8 @@ public sealed class EmployeeShiftSwapVersionTests
         Assert.Equal(2, versions.Count);
         using var before = JsonDocument.Parse(versions[0].SnapshotJson);
         using var after = JsonDocument.Parse(versions[1].SnapshotJson);
-        Assert.Contains("Reserve", before.RootElement.GetProperty("note").GetString());
-        Assert.DoesNotContain("Reserve", after.RootElement.GetProperty("note").GetString() ?? "");
+        Assert.Equal("09:00 - 22:00", WebApi.ShiftSwaps.GraphManualColumnLabelResolver.ResolveCell(before.RootElement.GetProperty("note").GetString(), 1, 23));
+        Assert.Null(WebApi.ShiftSwaps.GraphManualColumnLabelResolver.ResolveCell(after.RootElement.GetProperty("note").GetString(), 1, 23));
         var slot = Assert.Single(after.RootElement.GetProperty("slots").EnumerateArray());
         Assert.Equal(f.Target, slot.GetProperty("employeeId").GetInt32());
         Assert.Equal("ASSIGNED", slot.GetProperty("status").GetString());
@@ -275,7 +275,7 @@ public sealed class EmployeeShiftSwapVersionTests
         var schedule = TestDataFactory.CreateDalSchedule(container.Id, shop.Id, "Swap versions", 2026, 10);
         schedule.PublicationStatus = SchedulePublicationStatus.Public;
         schedule.AllowSwap = true;
-        if (manual) schedule.Note = "[[GF3_GRAPH_META:{\"manualColumns\":[{\"id\":1,\"label\":\"Coverage\",\"cells\":{\"23\":\"Reserve\"}}]}]]";
+        if (manual) schedule.Note = "[[GF3_GRAPH_META:{\"manualColumns\":[{\"id\":1,\"label\":\"Coverage\",\"cells\":{\"23\":\"09:00 - 22:00\"}}]}]]";
         var eligibility = TestDataFactory.CreateDalSchedule(container.Id, shop.Id, "Eligibility", 2026, 10);
         eligibility.PublicationStatus = SchedulePublicationStatus.Public;
         db.AddRange(schedule, eligibility);

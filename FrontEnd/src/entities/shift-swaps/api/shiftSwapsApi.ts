@@ -1,6 +1,6 @@
 import { request } from "@shared/api/httpClient";
 import type { ShiftSwapCandidateParams, ShiftSwapReturnCandidatePage, ShiftSwapOfferPreview } from "../model/types";
-import type { CreateManagerShiftSwapInput, CreateShiftSwapInput, ShiftSwap, ShiftSwapEmployee, ShiftSwapHighlightSetting } from "../model/types";
+import type { AcceptShiftSwapInput, CreateManagerShiftSwapInput, CreateShiftSwapInput, ShiftSwap, ShiftSwapEmployee, ShiftSwapHighlightSetting } from "../model/types";
 
 const employeeEndpoint = "employee-shift-swaps";
 const containerEndpoint = "containers";
@@ -16,8 +16,8 @@ export const shiftSwapsApi = {
   listEmployees: (signal?: AbortSignal) => request<ShiftSwapEmployee[]>(`${employeeEndpoint}/employees`, { signal }),
   createEmployee: (payload: CreateShiftSwapInput) =>
     request<ShiftSwap>(employeeEndpoint, { method: "POST", body: payload }),
-  acceptEmployee: (id: number) =>
-    request<ShiftSwap>(`${employeeEndpoint}/${id}/accept`, { method: "POST" }),
+  acceptEmployee: ({ id, ...period }: AcceptShiftSwapInput) =>
+    request<ShiftSwap>(`${employeeEndpoint}/${id}/accept`, { method: "POST", ...(period.fromTime !== undefined || period.toTime !== undefined ? { body: period } : {}) }),
   cancelEmployee: (id: number) =>
     request<ShiftSwap>(`${employeeEndpoint}/${id}/cancel`, { method: "POST" }),
   createManagerManual: ({ containerId, graphId, ...payload }: CreateManagerShiftSwapInput) =>

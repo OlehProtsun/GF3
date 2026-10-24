@@ -45,7 +45,7 @@ describe("shift swaps api", () => {
     };
 
     shiftSwapsApi.createEmployee(payload);
-    shiftSwapsApi.acceptEmployee(5);
+    shiftSwapsApi.acceptEmployee({ id: 5 });
     shiftSwapsApi.cancelEmployee(6);
 
     expect(requestMock).toHaveBeenNthCalledWith(1, "employee-shift-swaps", {
@@ -117,4 +117,9 @@ describe("shift swaps api", () => {
     expect(requestMock).toHaveBeenNthCalledWith(2, "containers/2/shift-swaps/41/cancel", { method: "POST" });
     expect(requestMock).toHaveBeenNthCalledWith(3, "containers/2/shift-swaps/42", { method: "DELETE" });
   });
+});
+
+test("custom acceptance sends the selected window", () => {
+  shiftSwapsApi.acceptEmployee({ id: 5, fromTime: "09:00", toTime: "15:00" });
+  expect(requestMock).toHaveBeenCalledWith("employee-shift-swaps/5/accept", { method: "POST", body: { fromTime: "09:00", toTime: "15:00" } });
 });

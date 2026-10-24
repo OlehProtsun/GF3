@@ -859,6 +859,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, TimeProvider? 
 
             entity.Property(request => request.OfferedFromTime).IsRequired(false);
             entity.Property(request => request.OfferedToTime).IsRequired(false);
+            entity.Property(request => request.AllowPartialAcceptance).IsRequired().HasDefaultValue(false);
             entity.Property(request => request.IsManagerCreated)
                 .HasDefaultValue(false);
             entity.Property(request => request.ManualColumnId).IsRequired(false);

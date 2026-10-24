@@ -2,7 +2,7 @@ import { expect, test, type Page } from "@playwright/test";
 
 test.use({ actionTimeout: 10_000, launchOptions: process.platform === "win32" ? { ignoreDefaultArgs: ["--disable-accelerated-compositing"] } : {} });
 
-async function fixture(page: Page, language: string, availableShiftCount?: number) {
+async function fixture(page: Page, language: string, availableShiftCount?: number, claimFlow = false) {
   page.on("pageerror", error => console.error(error.message));
   const employees = [1, 2].map(id => ({ id, firstName: "Worker", lastName: `Test ${id}`, hasLoginAccount: true, isOnline: false }));
   const group = { id: 1, name: "February", year: 2026, month: 2 };
@@ -16,6 +16,9 @@ async function fixture(page: Page, language: string, availableShiftCount?: numbe
     ]);
     graph.note = `Visible note\n\n[[GF3_GRAPH_META:${JSON.stringify({ m: columns, g: columns.map(column => column[0]) })}]]`;
   }
+  if (claimFlow) graph = { ...graph, peoplePerShift: 1, shift1Time: "09:00 - 15:00", shift2Time: "15:00 - 21:00" };
+  let actor = 0;
+  const claims: unknown[] = [];
   const slots: unknown[] = [];
   const offers: Record<string, unknown>[] = [];
   const publications: unknown[] = [];
@@ -25,14 +28,14 @@ async function fixture(page: Page, language: string, availableShiftCount?: numbe
     const request = route.request(); const path = new URL(request.url()).pathname; const method = request.method();
     if (!path.startsWith("/api/")) return route.continue();
     const json = (body: unknown, status = 200) => route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) });
-    if (path === "/api/auth/session") return json({ role: "manager", workspaceMode: "pc", managerId: 1, userName: "manager", displayName: "Manager", isSystemManager: true });
+    if (path === "/api/auth/session") return json(actor ? { role:"employee", employeeId:actor, userName:`employee${actor}`,displayName:`Worker ${actor}` } : { role: "manager", workspaceMode: "pc", managerId: 1, userName: "manager", displayName: "Manager", isSystemManager: true });
     if (path === "/api/account-language") return json({ language });
     if (path.includes("negotiate")) return route.fulfill({ status: 503 });
     if (path === "/api/containers/1/graphs/generate-preview") {
       const generated = Array.from({ length: 28 }, (_, i) => [0, 1].flatMap(shift => [1, 2].map(employeeId => ({
         id: i * 4 + shift * 2 + employeeId, scheduleId: 1, dayOfMonth: i + 1, slotNo: employeeId,
-        employeeId: i === 0 && shift === 0 ? null : employeeId, status: i === 0 && shift === 0 ? 0 : 1,
-        fromTime: shift ? "12:00" : "08:00", toTime: shift ? "16:00" : "12:00",
+        employeeId: i === 0 && (claimFlow ? employeeId === 1 : shift === 0) ? null : employeeId, status: i === 0 && (claimFlow ? employeeId === 1 : shift === 0) ? 0 : 1,
+        fromTime: claimFlow ? shift ? "15:00" : "09:00" : shift ? "12:00" : "08:00", toTime: claimFlow ? shift ? "21:00" : "15:00" : shift ? "16:00" : "12:00",
       })))).flat();
       return json({ slots: generated });
     }
@@ -44,6 +47,32 @@ async function fixture(page: Page, language: string, availableShiftCount?: numbe
       const input = request.postDataJSON(); publications.push(input);
       const offer = { ...input, id: offers.length + 1, scheduleId: 1, isManagerCreated: true, status: "open", visibility: input.targetEmployeeId ? "private" : "public", year: 2026, month: 2 };
       offers.push(offer); return json(offer, 201);
+    }
+    const employeeDto = (offer: Record<string, unknown>) => {
+      const partialFree = actor === 2 && offer.fromTime === "09:00" && offer.toTime === "21:00";
+      const canAcceptFull = !partialFree && !(actor === 2 && offer.fromTime === "15:00");
+      const canAccept = offer.status === "open" && (canAcceptFull || Boolean(offer.allowPartialAcceptance) && partialFree);
+      return { scheduleSlotId: 100, scheduleName: graph.name, containerName: "Container",shopName:"Shop",fromEmployeeId:null,fromEmployeeName:"do obstawienia",manualColumnName:"do obstawienia",
+        createdAtUtc:"2026-02-01T00:00:00Z", shiftHours:offer.fromTime === "09:00" && offer.toTime === "21:00" ? 12 : 6,
+        currentEmployeeHoursBefore:actor===2?6:0,currentEmployeeHoursAfter:12,currentEmployeeWorkDaysBefore:1,currentEmployeeWorkDaysAfter:1,
+        currentEmployeeFreeDaysBefore:27,currentEmployeeFreeDaysAfter:27,fromEmployeeHoursBefore:0,fromEmployeeHoursAfter:0,
+        isCreatedByCurrentEmployee:false,isScheduleLocked:false,canCancel:false,...offer,canAccept,canAcceptFull,
+        eligibleClaimWindows:canAccept ? [{fromTime:String(offer.fromTime),toTime:partialFree?"15:00":String(offer.toTime)}] : [],
+        acceptanceUnavailableReason:canAccept?null:"You already work during this time." };
+    };
+    if (path === "/api/employee-schedules") return json([{...graph,containerName:"Container",shopName:"Shop",employees:[],slots:actor===2?[{id:90,scheduleId:1,dayOfMonth:1,slotNo:1,employeeId:2,status:"ASSIGNED",fromTime:"15:00",toTime:"21:00"}]:[]}]);
+    if (path === "/api/employee-shift-swaps") return json(offers.map(employeeDto));
+    if (path === "/api/employee-ui-state") return json({scheduleColumnOrders:{},readNotificationIds:[],pinnedSwapIds:[]});
+    if (/^\/api\/employee-shift-swaps\/\d+\/accept$/.test(path)) {
+      const input=request.postData()?request.postDataJSON():null; claims.push(input);
+      const offer=offers.find(item=>item.id===Number(path.split("/").at(-2)))!;
+      if (offer.fromTime==="09:00" && offer.toTime==="21:00") {
+        expect(input).toEqual({fromTime:"09:00",toTime:"15:00"});
+        offers.push({...offer,id:2,fromTime:"15:00",toTime:"21:00",status:"open"});
+        offer.toTime="15:00";
+      }
+      offer.status="accepted";offer.acceptedByEmployeeId=actor;offer.acceptedByEmployeeName=`Worker ${actor}`;
+      return json(employeeDto(offer));
     }
     if (path === "/api/containers/1/graphs/1/shift-swaps") return json(offers);
     if (/\/shift-swaps\/\d+\/cancel$/.test(path)) {
@@ -66,7 +95,7 @@ async function fixture(page: Page, language: string, availableShiftCount?: numbe
     if (path.includes("notepad")) return json({ notes: [], state: { isExpanded: false, isPinned: false, height: 700 } });
     return json([]);
   });
-  return { publications };
+  return { publications, claims, offers, useEmployee: (id: number) => { actor = id; } };
 }
 
 for (const count of [0, 1, 5, 30, 62]) {
@@ -74,9 +103,12 @@ for (const count of [0, 1, 5, 30, 62]) {
     test.setTimeout(60_000);
     await fixture(page, "en", count);
     await page.goto("/container/1/graphs/1/edit");
-    const expand = page.getByRole("button", { name: "Expand Manual Columns", exact: true });
+    const expand = page.getByRole("button", { name: "Expand Manual shifts", exact: true });
     await expect(expand).toBeVisible({ timeout: 20_000 });
     await page.getByRole("button", { name: "Collapse sidebar", exact: true }).click();
+    const labels = await page.locator('button[aria-label^="Expand "]').evaluateAll(buttons => buttons.map(button => button.getAttribute("aria-label")));
+    expect(labels.filter(label => label !== "Expand header")).toEqual(["Expand Schedule Details", "Expand Employees", "Expand Publication", "Expand Manual shifts", "Expand Shift Corrections", "Expand Bind Information"]);
+    await expect(page.locator("#graph-note")).toHaveCount(0);
     await expand.click();
     const card = page.locator("section").filter({ has: page.getByText(/^Manual shifts/) }).last();
     const list = card.getByRole("region", { name: "Available shifts", exact: true });
@@ -136,9 +168,9 @@ for (const language of ["en", "pl", "uk"]) {
     await page.getByRole("button", { name: /Collapse sidebar|Zwiń pasek boczny|Згорнути бічну панель/, exact: true }).click();
     await expandDetails.click();
     await expect(generate).toBeVisible(); await generate.click();
-    await expect(page.getByText("Do obsadzenia 2", { exact: true }).first()).toBeVisible();
+    await expect(page.getByText("do obstawienia", { exact: true }).first()).toBeVisible();
     const card = page.locator("section").filter({ has: page.getByText(new RegExp(`^${titles[language as keyof typeof titles]}`)) }).last();
-    await page.getByRole("button", { name: /Expand Manual Columns|Rozwiń Kolumny ręczne|Розгорнути Ручні стовпці/, exact: true }).click();
+    await page.getByRole("button", { name: /Expand Manual shifts|Rozwiń Zmiany ręczne|Розгорнути Ручні зміни/, exact: true }).click();
     await expect(card).toBeVisible();
     const rows = card.locator('button[aria-pressed]').filter({ hasText: "08:00–12:00" });
     await expect(rows).toHaveCount(2);
@@ -167,18 +199,64 @@ for (const language of ["en", "pl", "uk"]) {
       await page.getByRole("dialog", { name: "Save schedule", exact: true }).getByRole("button", { name: "Save", exact: true }).click();
       await expect.poll(() => fixtureState.publications.length).toBe(2);
       expect(fixtureState.publications).toEqual([
-        { manualColumnId: 1, dayOfMonth: 1, fromTime: "08:00", toTime: "12:00", targetEmployeeId: null },
-        { manualColumnId: 2, dayOfMonth: 1, fromTime: "08:00", toTime: "12:00", targetEmployeeId: 2 },
+        { manualColumnId: 1, dayOfMonth: 1, fromTime: "08:00", toTime: "12:00", targetEmployeeId: null, allowPartialAcceptance: false },
+        { manualColumnId: 1, dayOfMonth: 1, fromTime: "08:00", toTime: "12:00", targetEmployeeId: 2, allowPartialAcceptance: false },
       ]);
       await page.waitForURL(/\/container\/1\/graphs\/1$/);
       await page.goto("/container/1/graphs/1/edit");
       await page.getByRole("button", { name: "Collapse sidebar", exact: true }).click();
-      await page.getByRole("button", { name: "Expand Manual Columns", exact: true }).click({ timeout: 20_000 });
-      await expect(card.getByText("Do obsadzenia 2", { exact: true })).toBeVisible();
+      await page.getByRole("button", { name: "Expand Manual shifts", exact: true }).click({ timeout: 20_000 });
+      await expect(card.getByText("do obstawienia", { exact: true })).toBeVisible();
       await expect(rows).toHaveCount(0);
       await card.getByRole("button", { name: /Offered \(2\)/ }).click();
       await card.getByRole("button", { name: "Cancel shift on 01 Feb", exact: true }).first().click();
       await expect(rows).toHaveCount(1);
     }
+  });
+}
+
+for (const flexible of [true, false]) {
+  test(`manager combined offer and occupied recipient ${flexible ? "partial and final claim" : "strict overlap"}`, async ({ page }, testInfo) => {
+    test.setTimeout(90_000);
+    const employeeViewport = page.viewportSize();
+    await page.setViewportSize({ width: 1280, height: 900 });
+    const state = await fixture(page, "en", undefined, true);
+    await page.goto("/container/1/graphs/1/edit");
+    await page.getByRole("button", {name:"Collapse sidebar",exact:true}).click();
+    await page.getByRole("button", {name:"Expand Schedule Details",exact:true}).click();
+    await page.getByRole("button", {name:"Generate",exact:true}).click();
+    await expect(page.getByText("do obstawienia",{exact:true}).first()).toBeVisible();
+    await page.getByRole("button", {name:"Expand Manual shifts",exact:true}).click();
+    const card=page.locator("section").filter({has:page.getByText(/^Manual shifts/)}).last();
+    await card.getByRole("region",{name:"Available shifts",exact:true}).getByRole("button",{name:/09:00–21:00/}).click();
+    if(flexible) await card.getByRole("button",{name:"Allow custom time",exact:true}).click();
+    await card.getByRole("button",{name:"Publish shift",exact:true}).click();
+    await page.getByRole("button",{name:"Save",exact:true}).first().click();
+    await page.getByRole("dialog",{name:"Save schedule",exact:true}).getByRole("button",{name:"Save",exact:true}).click();
+    await expect.poll(()=>state.publications.length).toBe(1);
+    expect(state.publications[0]).toEqual({manualColumnId:1,dayOfMonth:1,fromTime:"09:00",toTime:"21:00",targetEmployeeId:null,allowPartialAcceptance:flexible});
+    await page.waitForURL(/\/container\/1\/graphs\/1$/);
+    if (employeeViewport) await page.setViewportSize(employeeViewport);
+    state.useEmployee(2); await page.goto("/swap");
+    await page.getByRole("button",{name:"View offer details for Generated shifts"}).click();
+    const details=page.getByRole("dialog",{name:"Offer details"});
+    if(!flexible) {
+      await expect(details).toContainText("You already work during this time.");
+      await expect(details.getByRole("button",{name:"Accept shift",exact:true})).toBeDisabled();return;
+    }
+    await expect(details).toContainText("you can claim 09:00–15:00");
+    await details.screenshot({ path: testInfo.outputPath("claim-period.png") });
+    await expect(details.getByRole("button",{name:"Full shift",exact:true})).toHaveCount(0);
+    await details.getByRole("button",{name:"Accept shift",exact:true}).click();
+    const confirm=page.getByRole("dialog",{name:"Accept this shift?"});await expect(confirm).toContainText("09:00–15:00 (6h)");
+    await confirm.getByRole("button",{name:"Accept shift",exact:true}).click();
+    await expect(confirm).toHaveCount(0);await expect.poll(()=>state.claims.length).toBe(1);
+    await expect(page.getByRole("button",{name:"View offer details for Generated shifts"})).toHaveCount(1);
+    state.useEmployee(3);await page.goto("/swap");
+    await page.getByRole("button",{name:"View offer details for Generated shifts"}).click();
+    await expect(details).toContainText("15:00–21:00");
+    await details.getByRole("button",{name:"Accept shift",exact:true}).click();
+    await confirm.getByRole("button",{name:"Accept shift",exact:true}).click();
+    await expect.poll(()=>state.claims.length).toBe(2);expect(state.offers.every(offer=>offer.status==="accepted")).toBe(true);
   });
 }

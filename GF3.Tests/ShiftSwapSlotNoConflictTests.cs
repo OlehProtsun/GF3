@@ -231,6 +231,9 @@ public sealed class ShiftSwapSlotNoConflictTests
         var request = await context.ShiftSwapRequests.SingleAsync();
         request.FromEmployeeId = null;
         request.IsManagerCreated = true;
+        request.ManualColumnId = 7;
+        (await context.Schedules.SingleAsync(schedule => schedule.Id == source.ScheduleId)).Note =
+            "[[GF3_GRAPH_META:{\"m\":[[7,\"Manual\",{\"23\":\"15:00 - 22:00\"}]]}]]";
         await context.SaveChangesAsync();
         context.ChangeTracker.Clear();
         var before = await ReadSlotsAsync(context);

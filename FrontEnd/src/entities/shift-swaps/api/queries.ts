@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { queryKeys } from "@shared/api/queryKeys";
-import type { CreateManagerShiftSwapInput, CreateShiftSwapInput } from "../model/types";
+import type { AcceptShiftSwapInput, CreateManagerShiftSwapInput, CreateShiftSwapInput } from "../model/types";
 import { shiftSwapsApi } from "./shiftSwapsApi";
 import type { ShiftSwapCandidateParams, SwapWizardRequest } from "../model/types";
 
@@ -146,12 +146,13 @@ export function useAcceptEmployeeShiftSwapMutation() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (id: number) => shiftSwapsApi.acceptEmployee(id),
+    mutationFn: (input: AcceptShiftSwapInput) => shiftSwapsApi.acceptEmployee(input),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.shiftSwaps.employee() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.shiftSwaps.all });
       queryClient.invalidateQueries({ queryKey: ["shiftSwaps", "returnCandidates"] });
       queryClient.invalidateQueries({ queryKey: ["shiftSwaps", "preview"] });
       queryClient.invalidateQueries({ queryKey: queryKeys.employeeSchedules.all });
+      queryClient.invalidateQueries({ queryKey: queryKeys.containers.all });
     },
   });
 }

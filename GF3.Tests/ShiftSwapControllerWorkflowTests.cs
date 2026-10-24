@@ -1093,7 +1093,7 @@ public sealed class ShiftSwapControllerWorkflowTests
     {
         await using var database = await SqliteTestDatabase.CreateAsync();
         await using var context = database.CreateContext();
-        var fixture = await SeedPublishedScheduleAsync(context, note: "Planner note\n\n<!--GF3_GRAPH_META:{\"m\":[[2,\"Open counter\",{\"5\":\"09:00\"}]]}-->");
+        var fixture = await SeedPublishedScheduleAsync(context, note: "Planner note\n\n<!--GF3_GRAPH_META:{\"m\":[[2,\"Open counter\",{\"5\":\"09:00 - 13:30\"}]]}-->");
         var controller = new ShiftSwapLogsController(
             context,
             new NoopWorkflowLogService(),
@@ -1142,7 +1142,7 @@ public sealed class ShiftSwapControllerWorkflowTests
     {
         await using var database = await SqliteTestDatabase.CreateAsync();
         await using var context = database.CreateContext();
-        var fixture = await SeedPublishedScheduleAsync(context, note: "Planner note\n\n<!--GF3_GRAPH_META:{\"m\":[[2,\"Open counter\",{\"5\":\"09:00\",\"6\":\"10:00\"}]]}-->");
+        var fixture = await SeedPublishedScheduleAsync(context, note: "Planner note\n\n<!--GF3_GRAPH_META:{\"m\":[[2,\"Open counter\",{\"5\":\"09:00 - 13:00\",\"6\":\"10:00 - 14:00\"}]]}-->");
         var controller = new ShiftSwapLogsController(
             context,
             new NoopWorkflowLogService(),
@@ -1199,7 +1199,7 @@ public sealed class ShiftSwapControllerWorkflowTests
         await using var context = database.CreateContext();
         var fixture = await SeedPublishedScheduleAsync(
             context,
-            note: "Planner note\n\n<!--GF3_GRAPH_META:{\"m\":[[2,\"Open counter\",{\"5\":\"09:00\"}]]}-->");
+            note: "Planner note\n\n<!--GF3_GRAPH_META:{\"m\":[[2,\"Open counter\",{\"5\":\"09:00 - 13:00\"}]]}-->");
         var managerController = new ShiftSwapLogsController(
             context,
             new NoopWorkflowLogService(),
@@ -1407,7 +1407,7 @@ public sealed class ShiftSwapControllerWorkflowTests
     {
         await using var database = await SqliteTestDatabase.CreateAsync();
         await using var context = database.CreateContext();
-        var fixture = await SeedPublishedScheduleAsync(context, note: "Planner note\n\n<!--GF3_GRAPH_META:{\"m\":[[2,\"Open counter\",{\"5\":\"09:00\"}]]}-->");
+        var fixture = await SeedPublishedScheduleAsync(context, note: "Planner note\n\n<!--GF3_GRAPH_META:{\"m\":[[2,\"Open counter\",{\"5\":\"09:00 - 13:00\"}]]}-->");
         var controller = new ShiftSwapLogsController(
             context,
             new NoopWorkflowLogService(),

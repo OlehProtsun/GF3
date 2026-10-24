@@ -11,6 +11,9 @@ namespace DataAccessLayer.Models;
 [Index(nameof(FromEmployeeId), nameof(Status), Name = "ix_shift_swap_from_status")]
 public class ShiftSwapRequestModel
 {
+    [Column("allow_partial_acceptance")]
+    public bool AllowPartialAcceptance { get; set; } = false;
+
     [Column("request_kind")]
     public ShiftSwapRequestKind RequestKind { get; set; } = ShiftSwapRequestKind.Give;
 

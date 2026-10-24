@@ -36,7 +36,6 @@ import { getErrorMessage } from "@shared/api/httpClient";
 import { ErrorBanner } from "@shared/ui/components/ErrorBanner";
 import { IosButton } from "@shared/ui/components/IosButton";
 import { SearchableSelect, type SearchableSelectOption } from "@shared/ui/components/SearchableSelect";
-import { LabeledField, TextArea } from "@shared/ui/forms/Field";
 import {
   BackIcon,
   BindIcon,
@@ -46,7 +45,6 @@ import {
   EmployeeIcon,
   EyeIcon,
   InformationIcon,
-  NoteIcon,
   PlusIcon,
   SaveIcon,
   ScheduleIcon,
@@ -95,7 +93,7 @@ export type EditableGraphManualColumn = {
   cells: Record<string, string>;
 };
 
-type SidebarSectionKey = "details" | "publication" | "corrections" | "employees" | "bind" | "manualColumns" | "note";
+type SidebarSectionKey = "details" | "publication" | "corrections" | "employees" | "bind" | "manualColumns";
 type ColorDialogMode = "fill" | "text";
 type PreviewLayoutMode = "side" | "stacked";
 type ToolbarActionButtonProps = {
@@ -466,7 +464,6 @@ export function ContainerGraphEditor({
     employees: true,
     bind: true,
     manualColumns: true,
-    note: true,
   });
   const [pendingCorrectionCount, setPendingCorrectionCount] = useState(0);
   const [swapHighlightColor, setSwapHighlightColor] = useState("#BBF7D0");
@@ -774,6 +771,97 @@ export function ContainerGraphEditor({
               </CardSection>
             </AvailabilitySidebarSection>
 
+          <AvailabilitySidebarSection
+            label={t("Employees")}
+            preserveCollapsedOnMobile
+            collapsed={collapsedSections.employees}
+            collapsedIcon={<EmployeeIcon size={18} />}
+            collapsedOffset={allSectionsCollapsed ? "flush" : "default"}
+            onExpand={() => setSectionCollapsed("employees", false)}
+          >
+            <CardSection
+              className={styles.sidebarCard}
+              title={t("Employees")}
+              icon={<EmployeeIcon size={18} />}
+              headerRightSlot={renderCollapseButton(t("Employees"), "employees")}
+            >
+              <div className={styles.employeeSection}>
+                <div className={styles.employeeControls}>
+                  <div className={styles.employeeActionRow}>
+                    <SearchableSelect
+                      id="graph-employee-select"
+                      className={styles.controlFull}
+                      size="compact"
+                      value={selectedEmployeeId !== null ? String(selectedEmployeeId) : ""}
+                      options={employeeOptions}
+                      placeholder={availableEmployees.length > 0 ? t("Select employee...") : t("No employees available")}
+                      dropdownTitle={t("Employees")}
+                      searchPlaceholder={t("Search employee...")}
+                      emptyMessage={t("No employees match your search.")}
+                      fallbackHint=""
+                      ariaLabel={t("employee list")}
+                      onChange={value => onSelectedEmployeeIdChange(value ? Number(value) : null)}
+                    />
+
+                    <IosButton
+                      label={t("Add")}
+                      icon={<PlusIcon size={16} />}
+                      disabled={selectedEmployeeId === null}
+                      onClick={onAddEmployee}
+                    />
+                  </div>
+                </div>
+
+                {graphEmployeeRows.length === 0 ? (
+                  <div className={joinClassNames(styles.detailsMinHoursBlock, styles.employeeRosterBlock)}>
+                    <div className={styles.detailsMinHoursHeader}>
+                      <span className={styles.detailsMinHoursTitle}>{t("Employees in schedule")}</span>
+                      <span className={styles.detailsMinHoursMeta}>{t("{0} assigned", graphEmployeeRows.length)}</span>
+                    </div>
+                    <div className={joinClassNames(styles.detailsMinHoursEmpty, styles.employeeEmpty)}>
+                      {t("No employees added yet.")}</div>
+                  </div>
+                ) : (
+                  <div className={joinClassNames(styles.detailsMinHoursBlock, styles.employeeRosterBlock)}>
+                    <div className={styles.detailsMinHoursHeader}>
+                      <span className={styles.detailsMinHoursTitle}>{t("Employees in schedule")}</span>
+                      <span className={styles.detailsMinHoursMeta}>{t("{0} assigned", graphEmployeeRows.length)}</span>
+                    </div>
+                    <div
+                      className={joinClassNames(
+                        styles.employeeList,
+                        hasScrollableEmployeeList && styles.employeeListScrollable,
+                      )}
+                    >
+                      {graphEmployeeRows.map(row => {
+                        const employee = employeeById.get(row.employeeId);
+                        const employeeLabel = getEmployeeFullName(employee, t("Employee {0}", row.employeeId));
+
+                        return (
+                          <div key={row.employeeId} className={styles.employeeRow}>
+                            <span className={styles.employeeName}>{employeeLabel}</span>
+
+                            <div className={styles.employeeRowActions}>
+                              <button
+                                type="button"
+                                className={styles.removeEmployeeButton}
+                                aria-label={t("Remove {0} from schedule", employeeLabel)}
+                                title={t("Remove employee")}
+                                onClick={() => onRemoveEmployee(row.employeeId)}
+                              >
+                                <CloseIcon size={15} />
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </CardSection>
+          </AvailabilitySidebarSection>
+
             <AvailabilitySidebarSection
               label={t("Publication")}
               preserveCollapsedOnMobile
@@ -908,6 +996,35 @@ export function ContainerGraphEditor({
               </CardSection>
             </AvailabilitySidebarSection>
 
+          <AvailabilitySidebarSection
+            label={t("Manual shifts")}
+            preserveCollapsedOnMobile
+            collapsed={collapsedSections.manualColumns}
+            collapsedIcon={<InformationIcon size={18} />}
+            collapsedOffset={allSectionsCollapsed ? "flush" : "default"}
+            onExpand={() => setSectionCollapsed("manualColumns", false)}
+          >
+            <ContainerGraphManualColumnsCard
+              columns={manualColumns}
+              allowSwap={form.allowSwap}
+              isSchedulePublished={form.publicationStatus === "public"}
+              year={displayGraphYear}
+              month={displayGraphMonth}
+              employees={employees}
+              isPublishingShift={isPublishingManualShift || isGenerating || isSaving}
+              isCancellingPublishedShift={isCancellingManualShift}
+              publishError={manualShiftPublishError}
+              publishedShifts={openManagerManualShifts}
+              pendingPublishedShifts={pendingManualShiftPublishes}
+              headerRightSlot={renderCollapseButton(t("Manual shifts"), "manualColumns")}
+              onAddColumn={onAddManualColumn}
+              onDeleteColumn={onDeleteManualColumn}
+              onPublishShift={onPublishManualShift}
+              onCancelPublishedShift={onCancelManualShift}
+              onCancelPendingPublishedShift={onCancelPendingManualShift}
+            />
+          </AvailabilitySidebarSection>
+
             <AvailabilitySidebarSection
               label={t("Shift Corrections")}
               preserveCollapsedOnMobile
@@ -935,97 +1052,6 @@ export function ContainerGraphEditor({
             </AvailabilitySidebarSection>
 
           <AvailabilitySidebarSection
-            label={t("Employees")}
-            preserveCollapsedOnMobile
-            collapsed={collapsedSections.employees}
-            collapsedIcon={<EmployeeIcon size={18} />}
-            collapsedOffset={allSectionsCollapsed ? "flush" : "default"}
-            onExpand={() => setSectionCollapsed("employees", false)}
-          >
-            <CardSection
-              className={styles.sidebarCard}
-              title={t("Employees")}
-              icon={<EmployeeIcon size={18} />}
-              headerRightSlot={renderCollapseButton(t("Employees"), "employees")}
-            >
-              <div className={styles.employeeSection}>
-                <div className={styles.employeeControls}>
-                  <div className={styles.employeeActionRow}>
-                    <SearchableSelect
-                      id="graph-employee-select"
-                      className={styles.controlFull}
-                      size="compact"
-                      value={selectedEmployeeId !== null ? String(selectedEmployeeId) : ""}
-                      options={employeeOptions}
-                      placeholder={availableEmployees.length > 0 ? t("Select employee...") : t("No employees available")}
-                      dropdownTitle={t("Employees")}
-                      searchPlaceholder={t("Search employee...")}
-                      emptyMessage={t("No employees match your search.")}
-                      fallbackHint=""
-                      ariaLabel={t("employee list")}
-                      onChange={value => onSelectedEmployeeIdChange(value ? Number(value) : null)}
-                    />
-
-                    <IosButton
-                      label={t("Add")}
-                      icon={<PlusIcon size={16} />}
-                      disabled={selectedEmployeeId === null}
-                      onClick={onAddEmployee}
-                    />
-                  </div>
-                </div>
-
-                {graphEmployeeRows.length === 0 ? (
-                  <div className={joinClassNames(styles.detailsMinHoursBlock, styles.employeeRosterBlock)}>
-                    <div className={styles.detailsMinHoursHeader}>
-                      <span className={styles.detailsMinHoursTitle}>{t("Employees in schedule")}</span>
-                      <span className={styles.detailsMinHoursMeta}>{t("{0} assigned", graphEmployeeRows.length)}</span>
-                    </div>
-                    <div className={joinClassNames(styles.detailsMinHoursEmpty, styles.employeeEmpty)}>
-                      {t("No employees added yet.")}</div>
-                  </div>
-                ) : (
-                  <div className={joinClassNames(styles.detailsMinHoursBlock, styles.employeeRosterBlock)}>
-                    <div className={styles.detailsMinHoursHeader}>
-                      <span className={styles.detailsMinHoursTitle}>{t("Employees in schedule")}</span>
-                      <span className={styles.detailsMinHoursMeta}>{t("{0} assigned", graphEmployeeRows.length)}</span>
-                    </div>
-                    <div
-                      className={joinClassNames(
-                        styles.employeeList,
-                        hasScrollableEmployeeList && styles.employeeListScrollable,
-                      )}
-                    >
-                      {graphEmployeeRows.map(row => {
-                        const employee = employeeById.get(row.employeeId);
-                        const employeeLabel = getEmployeeFullName(employee, t("Employee {0}", row.employeeId));
-
-                        return (
-                          <div key={row.employeeId} className={styles.employeeRow}>
-                            <span className={styles.employeeName}>{employeeLabel}</span>
-
-                            <div className={styles.employeeRowActions}>
-                              <button
-                                type="button"
-                                className={styles.removeEmployeeButton}
-                                aria-label={t("Remove {0} from schedule", employeeLabel)}
-                                title={t("Remove employee")}
-                                onClick={() => onRemoveEmployee(row.employeeId)}
-                              >
-                                <CloseIcon size={15} />
-                              </button>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </CardSection>
-          </AvailabilitySidebarSection>
-
-          <AvailabilitySidebarSection
             label={t("Bind Information")}
             preserveCollapsedOnMobile
             collapsed={collapsedSections.bind}
@@ -1047,62 +1073,6 @@ export function ContainerGraphEditor({
               onDeleteBind={onDeleteBind}
             />
           </AvailabilitySidebarSection>
-
-          <AvailabilitySidebarSection
-            label={t("Manual Columns")}
-            preserveCollapsedOnMobile
-            collapsed={collapsedSections.manualColumns}
-            collapsedIcon={<InformationIcon size={18} />}
-            collapsedOffset={allSectionsCollapsed ? "flush" : "default"}
-            onExpand={() => setSectionCollapsed("manualColumns", false)}
-          >
-            <ContainerGraphManualColumnsCard
-              columns={manualColumns}
-              allowSwap={form.allowSwap}
-              isSchedulePublished={form.publicationStatus === "public"}
-              year={displayGraphYear}
-              month={displayGraphMonth}
-              employees={employees}
-              isPublishingShift={isPublishingManualShift || isGenerating || isSaving}
-              isCancellingPublishedShift={isCancellingManualShift}
-              publishError={manualShiftPublishError}
-              publishedShifts={openManagerManualShifts}
-              pendingPublishedShifts={pendingManualShiftPublishes}
-              headerRightSlot={renderCollapseButton(t("Manual Columns"), "manualColumns")}
-              onAddColumn={onAddManualColumn}
-              onDeleteColumn={onDeleteManualColumn}
-              onPublishShift={onPublishManualShift}
-              onCancelPublishedShift={onCancelManualShift}
-              onCancelPendingPublishedShift={onCancelPendingManualShift}
-            />
-          </AvailabilitySidebarSection>
-
-          <AvailabilitySidebarSection
-            label={t("Note")}
-            preserveCollapsedOnMobile
-            collapsed={collapsedSections.note}
-            collapsedIcon={<NoteIcon size={18} />}
-            collapsedOffset={allSectionsCollapsed ? "flush" : "default"}
-            onExpand={() => setSectionCollapsed("note", false)}
-          >
-            <CardSection
-              className={styles.sidebarCard}
-              title={t("Note")}
-              icon={<NoteIcon size={18} />}
-              headerRightSlot={renderCollapseButton(t("Note"), "note")}
-            >
-              <LabeledField id="graph-note" label={t("Schedule note")} error={formErrors.note} className={styles.noteField}>
-                <TextArea
-                  id="graph-note"
-                  rows={12}
-                  className={styles.noteInput}
-                  placeholder={t("Add scheduling notes, constraints, or handoff details...")}
-                  value={form.note}
-                  onChange={event => onFieldChange("note")(event.target.value)}
-                />
-              </LabeledField>
-            </CardSection>
-            </AvailabilitySidebarSection>
           </>
         }
         main={

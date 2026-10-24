@@ -51,7 +51,7 @@ function MutationHarness() {
       >
         create employee
       </button>
-      <button type="button" onClick={() => acceptEmployee.mutate(5)}>
+      <button type="button" onClick={() => acceptEmployee.mutate({ id: 5 })}>
         accept employee
       </button>
       <button type="button" onClick={() => cancelEmployee.mutate(6)}>
@@ -123,6 +123,7 @@ describe("shift swap query mutations", () => {
   test("invalidates employee swap and schedule caches after employee actions", async () => {
     const user = userEvent.setup();
     const client = new QueryClient();
+    const invalidateSpy = vi.spyOn(client, "invalidateQueries");
     const events: string[] = [];
     client.subscribe(event => events.push(`${event.type}:${event.key}`));
     renderHarness(client);
@@ -135,7 +136,7 @@ describe("shift swap query mutations", () => {
 
     await user.click(screen.getByRole("button", { name: "accept employee" }));
     await waitFor(() => {
-      expect(apiMocks.acceptEmployee).toHaveBeenCalledWith(5);
+      expect(apiMocks.acceptEmployee).toHaveBeenCalledWith({ id: 5 });
       expect(events).toContain(`invalidate:${JSON.stringify(queryKeys.employeeSchedules.all)}`);
     });
 
@@ -146,6 +147,8 @@ describe("shift swap query mutations", () => {
 
     expect(events.filter(event => event === `invalidate:${JSON.stringify(queryKeys.shiftSwaps.employee())}`))
       .toHaveLength(3);
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.shiftSwaps.all });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.containers.all });
   });
 
   test("invalidates graph logs and graph slots after manager manual swap actions", async () => {

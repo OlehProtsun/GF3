@@ -1407,6 +1407,7 @@
 .offersSection .badgePublic { background: #e9f1ff; color: #246bff; }
 .offersSection .badgePrivate { background: #fff5e2; color: #b17d1b; }
 .offersSection .badgeCan { background: #e7f8f0; color: #24a477; }
+.badgePartial { background: #f3e8ff; color: #8b5cf6; }
 .offersSection .badgeMine { background: #e9f1ff; color: #246bff; }
 .offersSection .badgeCant, .offersSection .badgeLocked { background: #ffedf0; color: #d9425d; }
 .offersSection .offerOpenButton .offerUnavailableReason {

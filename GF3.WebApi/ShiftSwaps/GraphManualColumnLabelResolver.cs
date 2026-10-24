@@ -42,6 +42,9 @@ internal static class GraphManualColumnLabelResolver
         return string.IsNullOrWhiteSpace(label) ? fallback : label.Trim();
     }
 
+    internal static string? ResolveCell(string? rawNote, int manualColumnId, int day)
+        => ResolveCells(rawNote, manualColumnId).GetValueOrDefault(day);
+
     public static Dictionary<int, string> ResolveCells(string? rawNote, int? manualColumnId)
     {
         if (manualColumnId is not > 0 || string.IsNullOrWhiteSpace(rawNote))

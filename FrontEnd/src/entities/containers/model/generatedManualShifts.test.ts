@@ -14,7 +14,7 @@ const vacancy = (dayOfMonth = 1, fromTime = "08:00", toTime = "12:00"): Generate
   dayOfMonth, fromTime, toTime, shiftIndex: 1, position: 1,
 });
 function reconcile(vacancies: GeneratedVacancy[], columns: EditableGraphManualColumn[] = [], protectedCells = new Set<string>(), columnOrder = [10, ...columns.map(c => -c.columnId)]) {
-  return reconcileGeneratedManualColumns({ vacancies, columns, columnOrder, protectedCells });
+  return reconcileGeneratedManualColumns({ vacancies, columns, columnOrder, reservations: columns.flatMap(c => Object.entries(c.cells).flatMap(([day, value]) => protectedCells.has(`${c.columnId}:${day}`) ? [{ manualColumnId: c.columnId, dayOfMonth: Number(day), fromTime: value.slice(0, 5), toTime: value.slice(-5) }] : [])) });
 }
 
 describe("generated vacancies", () => {
@@ -65,18 +65,19 @@ describe("generated column reconciliation", () => {
     const custom = { columnId: 5, label: "Do obsadzenia", cells: { "1": "free text" } };
     const first = reconcile([vacancy(), vacancy()], [custom]);
     expect(first.columns[0]).toBe(custom);
-    expect(first.columns.map(c => c.label)).toEqual(["Do obsadzenia", "Do obsadzenia", "Do obsadzenia 2"]);
-    expect(first.columns.map(c => c.columnId)).toEqual([5, 6, 7]);
+    expect(first.columns.map(c => c.label)).toEqual(["Do obsadzenia", "do obstawienia"]);
+    expect(first.columns.map(c => c.columnId)).toEqual([5, 6]);
     expect(reconcile([vacancy(), vacancy()], first.columns, new Set(), first.columnOrder)).toEqual(first);
     expect(custom.cells).toEqual({ "1": "free text" });
   });
   test("changed deficits clear stale cells and remove unused columns/order", () => {
-    const first = reconcile([vacancy(), vacancy()]);
+    const first = reconcile([vacancy(), vacancy()], [1, 2].map(columnId => ({ columnId, source: "generated-unfilled", label: "Old", cells: {} })));
     const next = reconcile([vacancy(2)], first.columns);
     expect(next.columns).toHaveLength(1);
     expect(next.columns[0].columnId).toBe(first.columns[0].columnId);
     expect(next.columns[0].cells).toEqual({ "2": "08:00 - 12:00" });
-    expect(next.removedColumnIds).toEqual([first.columns[1].columnId]);
+    expect(first.removedColumnIds).toEqual([2]);
+    expect(next.removedColumnIds).toEqual([]);
     expect(next.columnOrder).toEqual([10, -first.columns[0].columnId]);
   });
   test("protected offers reserve a single demand, keep edited values and allow another shortage", () => {
@@ -84,13 +85,13 @@ describe("generated column reconciliation", () => {
     const id = first.columns[0].columnId;
     const protectedCells = new Set([`${id}:1`]);
     expect(reconcile([vacancy()], first.columns, protectedCells).columns).toEqual(first.columns);
-    expect(reconcile([vacancy(), vacancy()], first.columns, protectedCells).columns).toHaveLength(2);
+    expect(reconcile([vacancy(), vacancy()], first.columns, protectedCells).columns[0].cells["1"]).toBe("08:00 - 12:00, 08:00 - 12:00");
     expect(reconcile([], first.columns, protectedCells).columns).toEqual(first.columns);
     expect(reconcile([], first.columns).columns).toEqual([]);
     const edited = [{ ...first.columns[0], cells: { "1": "10:00 - 14:00" } }];
     const changed = reconcile([vacancy()], edited, protectedCells);
-    expect(changed.columns[0].cells).toEqual({ "1": "10:00 - 14:00" });
-    expect(changed.columns[1].cells).toEqual({ "1": "08:00 - 12:00" });
+    expect(changed.columns).toHaveLength(1);
+    expect(changed.columns[0].cells).toEqual({ "1": "08:00 - 10:00, 10:00 - 14:00" });
   });
   test("uses existing displayed column order without mutating input", () => {
     const columns: EditableGraphManualColumn[] = [1, 2].map(columnId => ({ columnId, source: "generated-unfilled", label: "Renamed", cells: {} }));
@@ -99,4 +100,16 @@ describe("generated column reconciliation", () => {
     expect(columns[1].cells).toEqual({});
     expect(result.columnOrder).toEqual([10, -2]);
   });
+});
+
+test("legacy generated IDs with open offers survive; unreferenced IDs merge safely", () => {
+  const columns: EditableGraphManualColumn[] = [1, 2, 3].map(columnId => ({ columnId, source:"generated-unfilled",label:"Old",cells:{"1":"08:00 - 12:00"} }));
+  const input = { vacancies:[vacancy(),vacancy(),vacancy()],columns,columnOrder:[-1,-2,-3],
+    reservations:[{ manualColumnId:2,dayOfMonth:1,fromTime:"08:00",toTime:"12:00" }] };
+  const result=reconcileGeneratedManualColumns(input);
+  expect(result.columns.map(c=>c.columnId)).toEqual([1,2]); expect(result.removedColumnIds).toEqual([3]);
+  expect(result.columns[0].cells["1"]).toBe("08:00 - 12:00, 08:00 - 12:00");
+  expect(result.columns[1].cells).toEqual(columns[1].cells);
+  const closed=reconcileGeneratedManualColumns({...input,columns:result.columns,reservations:[]});
+  expect(closed.columns).toHaveLength(1); expect(closed.columns[0].cells["1"]).toBe("08:00 - 12:00, 08:00 - 12:00, 08:00 - 12:00");
 });
