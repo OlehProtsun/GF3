@@ -7,6 +7,7 @@ import { beforeEach, describe, expect, test, vi } from "vitest";
 import type { EmployeeSchedule } from "@entities/employee-schedule";
 import type { ShiftSwap, ShiftSwapEmployee } from "@entities/shift-swaps";
 import { EmployeeSwapPage } from "./EmployeeSwapPage";
+import { SwapOfferDetailsDialog } from "./SwapOfferDetailsDialog";
 import styles from "./EmployeeSwapPage.module.css";
 import { BrowserRouter } from "react-router-dom";
 
@@ -180,6 +181,9 @@ function createSwap(overrides: Partial<ShiftSwap> = {}): ShiftSwap {
     isCreatedByCurrentEmployee: false,
     isScheduleLocked: false,
     canAccept: true,
+    canAcceptFull: true,
+    allowPartialAcceptance: false,
+    eligibleClaimWindows: [],
     canCancel: false,
     ...overrides,
   };
@@ -225,6 +229,59 @@ beforeEach(() => {
 });
 
 describe("EmployeeSwapPage", () => {
+  test.each([false, true].flatMap(isManagerCreated => [false, true].flatMap(canAccept =>
+    (["public", "private"] as const).map(visibility => ({ isManagerCreated, canAccept, visibility }))))) (
+  "shows Partial after $visibility and eligibility for manager=$isManagerCreated, canAccept=$canAccept", ({ isManagerCreated, canAccept, visibility }) => {
+    mocks.initialPinnedSwapIds = [5];
+    mocks.swapsQuery.mockReturnValue({ data: [createSwap({
+      requestKind: "give", allowPartialAcceptance: true, isManagerCreated, canAccept, visibility,
+      manualColumnId: isManagerCreated ? 3 : null,
+    })], error: null });
+    renderPage();
+    const card = screen.getByRole("button", { name: "View offer details for May Schedule" }).closest("article")!;
+    const badges = card.querySelector(`.${styles.offerBadges}`)!;
+    expect(Array.from(badges.children, badge => badge.textContent)).toEqual([
+      visibility === "private" ? "Private" : "Public", canAccept ? "Can" : "Can’t", "Partial",
+    ]);
+    expect(within(card).getByText("Partial").parentElement).toHaveClass(styles.badge, styles.badgePartial);
+    expect(card).toHaveClass(styles.offerCardPinned);
+    expect(within(card).getByRole("button", { name: "Unpin May Schedule swap" })).toHaveAttribute("aria-pressed", "true");
+  });
+
+  test.each([
+    { allowPartialAcceptance: false, requestKind: "give" as const },
+    { allowPartialAcceptance: undefined, requestKind: undefined },
+    { allowPartialAcceptance: true, requestKind: "exchange" as const },
+  ])("hides Partial without explicit supported configuration: %j", configuration => {
+    mocks.swapsQuery.mockReturnValue({ data: [createSwap({
+      ...configuration, fromTime: "10:00", toTime: "12:00",
+      eligibleClaimWindows: [{ fromTime: "10:30", toTime: "11:30" }],
+    })], error: null });
+    renderPage();
+    expect(screen.queryByText("Partial")).not.toBeInTheDocument();
+    expect(screen.getByText("Public")).toBeInTheDocument();
+    expect(within(screen.getByRole("button", { name: "View offer details for May Schedule" })).getByText("Can")).toBeInTheDocument();
+  });
+
+  test("keeps Partial visible on a locked own offer", () => {
+    mocks.swapsQuery.mockReturnValue({ data: [createSwap({
+      allowPartialAcceptance: true, isCreatedByCurrentEmployee: true, isScheduleLocked: true, canAccept: false,
+    })], error: null });
+    renderPage();
+    expect(screen.getByText("Partial")).toBeInTheDocument();
+    expect(screen.getByText("My offer")).toBeInTheDocument();
+    expect(screen.getByText("Locked")).toBeInTheDocument();
+  });
+
+  test.each([
+    ["en", "Partial"], ["pl", "Częściowo"], ["uk", "Частково"],
+  ] as const)("localizes Partial in %s", (language, label) => {
+    setLanguage(language);
+    mocks.swapsQuery.mockReturnValue({ data: [createSwap({ allowPartialAcceptance: true })], error: null });
+    renderPage();
+    expect(screen.getByText(label)).toBeInTheDocument();
+  });
+
   test("query navigation clears obstructing filters, scrolls the app list and cancels old highlights", async () => {
     const user = userEvent.setup();
     mocks.swapsQuery.mockReturnValue({ data: [createSwap({ id: 5 }), createSwap({ id: 6, scheduleName: "Other schedule" })], error: null });
@@ -360,6 +417,7 @@ describe("EmployeeSwapPage", () => {
     expect(mocks.createMutate).toHaveBeenCalledWith(
       {
         requestKind: "give",
+        allowPartialAcceptance: false,
         scheduleId: 10,
         scheduleSlotId: 100,
         fromTime: "08:15",
@@ -403,6 +461,7 @@ describe("EmployeeSwapPage", () => {
     expect(mocks.createMutate).toHaveBeenCalledWith(
       {
         requestKind: "give",
+        allowPartialAcceptance: false,
         scheduleId: 10,
         scheduleSlotId: 111,
         fromTime: "11:15",
@@ -622,7 +681,7 @@ describe("EmployeeSwapPage", () => {
     await user.click(within(overlapCard).getByText("Overlap offer"));
     expect(within(overlapCard).queryByRole("button", { name: "Accept shift" })).not.toBeInTheDocument();
 
-    expect(mocks.acceptMutate).toHaveBeenCalledWith(5, expect.objectContaining({
+    expect(mocks.acceptMutate).toHaveBeenCalledWith({ id: 5 }, expect.objectContaining({
       onError: expect.any(Function),
     }));
     expect(mocks.cancelMutate).toHaveBeenCalledWith(6, expect.objectContaining({
@@ -699,7 +758,7 @@ describe("EmployeeSwapPage", () => {
     await user.click(screen.getByRole("button", { name: "Accept shift" }));
     act(() => mocks.acceptMutate.mock.calls[0][1].onError(new Error("Server conflict")));
     expect(screen.getByText("Server conflict")).toBeInTheDocument();
-    expect(invalidate).toHaveBeenCalledWith({ queryKey: queryKeys.shiftSwaps.employee() });
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: queryKeys.shiftSwaps.all });
     expect(invalidate).toHaveBeenCalledWith({ queryKey: queryKeys.employeeSchedules.all });
     await user.click(screen.getByRole("button", { name: "View offer details for May Schedule" }));
     await user.click(screen.getByRole("button", { name: "Accept shift" }));
@@ -720,7 +779,7 @@ describe("EmployeeSwapPage", () => {
     await user.click(screen.getByRole("button", { name: "Accept shift" }));
     expect(mocks.acceptMutate).not.toHaveBeenCalled();
     expect(screen.getByText("This offer is no longer available. The swap list has been refreshed.")).toBeInTheDocument();
-    expect(invalidate).toHaveBeenCalledWith({ queryKey: queryKeys.shiftSwaps.employee() });
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: queryKeys.shiftSwaps.all });
   });
 
   test("localizes acceptance confirmation in Polish", async () => {
@@ -867,4 +926,95 @@ describe("EmployeeSwapPage", () => {
     expect(history).toHaveAttribute("open");
   });
 
+});
+
+test.each(["en", "pl", "uk"] as const)("flexible overlap claims server free window with exact summary and payload (%s)", async language => {
+  setLanguage(language); const user = userEvent.setup();
+  mocks.swapsQuery.mockReturnValue({ data: [createSwap({ allowPartialAcceptance: true, canAcceptFull: false,
+    fromTime: "09:00", toTime: "21:00", shiftHours: 12, eligibleClaimWindows: [{ fromTime: "09:00", toTime: "15:00" }] })], error: null });
+  renderPage(); await user.click(screen.getByText("May Schedule"));
+  expect(screen.queryByRole("button", { name: t("Full shift"), exact: true })).toBeNull();
+  expect(screen.getByText(t("You already work during part of this shift; you can claim {0}.", "09:00–15:00"))).toBeVisible();
+  fireEvent.change(screen.getByDisplayValue("15:00"), { target: { value: "18:00" } });
+  expect(screen.getByRole("button", { name: t("Accept shift") })).toBeDisabled();
+  fireEvent.change(screen.getByDisplayValue("18:00"), { target: { value: "15:00" } });
+  await user.click(screen.getByRole("button", { name: t("Accept shift") }));
+  expect(screen.getByRole("dialog", { name: t("Accept this shift?") })).toHaveTextContent("09:00–15:00");
+  await user.dblClick(screen.getByRole("button", { name: t("Accept shift") }));
+  expect(mocks.acceptMutate).toHaveBeenCalledTimes(1);
+  expect(mocks.acceptMutate).toHaveBeenCalledWith({ id: 5, fromTime: "09:00", toTime: "15:00" }, expect.anything());
+});
+
+test.each(["en", "pl", "uk"] as const)("details switches full/custom modes with live time controls (%s)", async language => {
+  setLanguage(language);
+  const user = userEvent.setup();
+  mocks.swapsQuery.mockReturnValue({ data: [createSwap({ allowPartialAcceptance: true,
+    eligibleClaimWindows: [{ fromTime: "08:00", toTime: "16:00" }] })], error: null });
+  renderPage();
+  await user.click(screen.getByText("May Schedule"));
+  const dialog = within(screen.getByRole("dialog", { name: t("Offer details") }));
+  expect(dialog.getByText(t("Allow custom time"))).toBeVisible();
+  expect(dialog.getByRole("button", { name: t("Full shift"), exact: true })).toHaveAttribute("aria-pressed", "true");
+  expect(dialog.queryByLabelText(t("From"), { selector: "input" })).not.toBeInTheDocument();
+  await user.click(dialog.getByRole("button", { name: t("Custom period"), exact: true }));
+  expect(dialog.getByRole("status", { name: t("Claim period") })).toHaveTextContent("08:00–16:00");
+  const from = dialog.getByLabelText(t("From"), { selector: "input" });
+  expect(from).toHaveAttribute("type", "time");
+  expect(from).toHaveAttribute("min", "08:00");
+  expect(from).toHaveAttribute("max", "16:00");
+  expect(from).toHaveAttribute("step", "900");
+  expect(dialog.getByRole("button", { name: t("Decrease {0}", t("From")) })).toBeDisabled();
+  expect(dialog.getByRole("button", { name: t("Increase {0}", t("To")) })).toBeDisabled();
+  await user.click(dialog.getByRole("button", { name: t("Increase {0}", t("From")) }));
+  expect(from).toHaveValue("08:15");
+  expect(dialog.getByRole("status", { name: t("Claim period") })).toHaveTextContent("08:15–16:00");
+  await user.click(dialog.getByRole("button", { name: t("Decrease {0}", t("To")) }));
+  expect(dialog.getByRole("status", { name: t("Claim period") })).toHaveTextContent("08:15–15:45");
+  fireEvent.change(from, { target: { value: "17:00" } });
+  expect(dialog.getByRole("alert")).toHaveTextContent(t("Choose one continuous period inside an available claim window."));
+  expect(dialog.getByRole("button", { name: t("Accept shift") })).toBeDisabled();
+  await user.click(dialog.getByRole("button", { name: t("Full shift"), exact: true }));
+  expect(dialog.queryByLabelText(t("From"), { selector: "input" })).not.toBeInTheDocument();
+  await user.click(dialog.getByRole("button", { name: t("Accept shift") }));
+  const confirmation = within(screen.getByRole("dialog", { name: t("Accept this shift?") }));
+  await user.click(confirmation.getByRole("button", { name: t("Accept shift") }));
+  expect(mocks.acceptMutate).toHaveBeenCalledWith({ id: 5 }, expect.anything());
+});
+
+test("strict details omits custom banner, modes and controls", async () => {
+  const user = userEvent.setup();
+  mocks.swapsQuery.mockReturnValue({ data: [createSwap()], error: null });
+  renderPage(); await user.click(screen.getByText("May Schedule"));
+  const dialog = within(screen.getByRole("dialog", { name: "Offer details" }));
+  expect(dialog.queryByText("Allow custom time")).not.toBeInTheDocument();
+  expect(dialog.queryByRole("button", { name: "Custom period" })).not.toBeInTheDocument();
+  expect(dialog.queryByLabelText("From", { selector: "input" })).not.toBeInTheDocument();
+  expect(dialog.getByRole("button", { name: "Accept shift" })).toBeEnabled();
+});
+
+test("details retains errors and blocks footer and close actions while busy", () => {
+  const onAccept = vi.fn(), onClose = vi.fn(), onCancel = vi.fn();
+  render(<SwapOfferDetailsDialog swap={createSwap({ canCancel: true })} currentEmployeeId={12}
+    busy error="Server conflict" onAccept={onAccept} onClose={onClose} onCancel={onCancel} />);
+  const dialog = within(screen.getByRole("dialog", { name: "Offer details" }));
+  expect(dialog.getByText("Server conflict")).toBeVisible();
+  const accept = dialog.getByRole("button", { name: "Accept shift" });
+  expect(accept).toBeDisabled(); expect(accept).toHaveAttribute("aria-busy", "true");
+  expect(dialog.getByRole("button", { name: "Cancel offer" })).toBeDisabled();
+  expect(dialog.getByRole("button", { name: "Close" })).toBeDisabled();
+  fireEvent.click(accept);
+  expect(onAccept).not.toHaveBeenCalled();
+});
+
+test("flexible claim cannot span disjoint free windows", async () => {
+  const user = userEvent.setup(); mocks.swapsQuery.mockReturnValue({ data: [createSwap({ allowPartialAcceptance: true, canAcceptFull: false,
+    fromTime: "09:00", toTime: "21:00", eligibleClaimWindows: [{ fromTime: "09:00", toTime: "12:00" }, { fromTime: "15:00", toTime: "21:00" }] })], error: null });
+  renderPage(); await user.click(screen.getByText("May Schedule"));
+  fireEvent.change(screen.getByDisplayValue("12:00"), { target: { value: "18:00" } });
+  expect(screen.getByRole("button", { name: "Accept shift" })).toBeDisabled();
+  await user.click(screen.getByRole("button", { name: "15:00–21:00", exact: true }));
+  expect(screen.getByDisplayValue("15:00")).toBeVisible();
+  await user.click(screen.getByRole("button", { name: "Accept shift" }));
+  await user.click(screen.getByRole("button", { name: "Accept shift" }));
+  expect(mocks.acceptMutate).toHaveBeenCalledWith({ id: 5, fromTime: "15:00", toTime: "21:00" }, expect.anything());
 });

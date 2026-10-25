@@ -2,6 +2,7 @@ namespace WebApi.Contracts.ShiftSwaps;
 
 public sealed class CreateEmployeeShiftSwapRequest
 {
+    public bool AllowPartialAcceptance { get; set; } = false;
     public string? RequestKind { get; set; }
     public int? ReturnScheduleId { get; set; }
     public int? ReturnScheduleSlotId { get; set; }

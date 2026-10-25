@@ -14,7 +14,7 @@ import { getErrorMessage } from "@shared/api/httpClient";
 import { ErrorBanner } from "@shared/ui/components/ErrorBanner";
 import { IosButton } from "@shared/ui/components/IosButton";
 import { pushErrorAlertFromError } from "@shared/ui/feedback/error-alerts/errorAlerts";
-import { CodeIcon, EmployeeIcon, LogoutIcon, SaveIcon } from "@shared/ui/icons";
+import { AccountSettingsIcon, CheckIcon, ChevronRightIcon, EmployeeIcon, LogoutIcon, SaveIcon } from "@shared/ui/icons";
 import sharedStyles from "@pages/shared/EmployeeWorkspacePage.module.css";
 import styles from "./EmployeeAccountPage.module.css";
 import { useMyRegulationHistoryQuery } from "@entities/regulations";
@@ -61,7 +61,9 @@ export function EmployeeAccountPage() {
   const userName = profile?.username ?? session?.userName ?? "employee";
   const initials = getFallbackInitials(displayName);
 
-  const [isEditing, setIsEditing] = useState(false);
+  const [activeEditor, setActiveEditor] = useState<"account" | "password" | null>(null);
+  const isEditingAccount = activeEditor === "account";
+  const isChangingPassword = activeEditor === "password";
   const [recoveryEmail, setRecoveryEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [passwordCode, setPasswordCode] = useState("");
@@ -71,78 +73,67 @@ export function EmployeeAccountPage() {
   const [codeDeliveryHint, setCodeDeliveryHint] = useState<string | null>(null);
 
   useEffect(() => {
-    if (isEditing) {
+    if (isEditingAccount) {
       return;
     }
 
     setRecoveryEmail(profile?.recoveryEmail ?? "");
     setPhone(profile?.phone ?? "");
-  }, [profile?.phone, profile?.recoveryEmail, isEditing]);
+  }, [profile?.phone, profile?.recoveryEmail, isEditingAccount]);
 
   const normalizedStoredEmail = normalizeEditableValue(profile?.recoveryEmail);
   const normalizedStoredPhone = normalizeEditableValue(profile?.phone);
   const normalizedDraftEmail = normalizeEditableValue(recoveryEmail);
   const normalizedDraftPhone = normalizeEditableValue(phone);
   const hasUnsavedChanges = normalizedStoredEmail !== normalizedDraftEmail || normalizedStoredPhone !== normalizedDraftPhone;
-  const hasRecoveryEmailForPassword = isEditing ? Boolean(normalizedDraftEmail) : Boolean(normalizedStoredEmail);
+  const hasRecoveryEmailForPassword = Boolean(normalizedStoredEmail);
   const isBusy =
     updateProfileMutation.isPending ||
     sendPasswordCodeMutation.isPending ||
     confirmPasswordMutation.isPending;
-  const panelFooterClassName = [
-    styles.panelFooter,
-    isEditing ? styles.panelFooterEditing : "",
-  ]
-    .filter(Boolean)
-    .join(" ");
 
-  const handleOpenEdit = () => {
+  const handleOpenAccountEdit = () => {
+    if (isBusy || activeEditor) return;
     setRecoveryEmail(profile?.recoveryEmail ?? "");
     setPhone(profile?.phone ?? "");
+    setInlineError(null);
+    setInlineSuccess(null);
+    setActiveEditor("account");
+  };
+
+  const handleCancelAccountEdit = () => {
+    setRecoveryEmail(profile?.recoveryEmail ?? "");
+    setPhone(profile?.phone ?? "");
+    setInlineError(null);
+    setInlineSuccess(null);
+    setActiveEditor(null);
+  };
+
+  const handleOpenPasswordEditor = () => {
+    if (!hasRecoveryEmailForPassword || isBusy || activeEditor) return;
     setPasswordCode("");
     setNewPassword("");
     setCodeDeliveryHint(null);
     setInlineError(null);
     setInlineSuccess(null);
-    setIsEditing(true);
+    setActiveEditor("password");
   };
 
-  const handleCancelEdit = () => {
-    setRecoveryEmail(profile?.recoveryEmail ?? "");
-    setPhone(profile?.phone ?? "");
+  const handleCancelPasswordEditor = () => {
     setPasswordCode("");
     setNewPassword("");
     setCodeDeliveryHint(null);
     setInlineError(null);
     setInlineSuccess(null);
-    setIsEditing(false);
-  };
-
-  const persistProfileChanges = async (closeOnSuccess: boolean) => {
-    const updatedProfile = await runMutation(updateProfileMutation.mutate, {
-      recoveryEmail,
-      phone,
-    });
-
-    if (normalizeEditableValue(updatedProfile.recoveryEmail) !== normalizedStoredEmail) {
-      setPasswordCode("");
-      setNewPassword("");
-      setCodeDeliveryHint(null);
-    }
-
-    setInlineError(null);
-    setInlineSuccess(t("Profile updated."));
-
-    if (closeOnSuccess) {
-      setIsEditing(false);
-    }
-
-    return updatedProfile;
+    setActiveEditor(null);
   };
 
   const handleSaveProfile = async () => {
     try {
-      await persistProfileChanges(true);
+      await runMutation(updateProfileMutation.mutate, { recoveryEmail, phone });
+      setInlineError(null);
+      setInlineSuccess(t("Profile updated."));
+      setActiveEditor(null);
     } catch (error) {
       const message = getErrorMessage(error, t("Could not update your profile."));
       setInlineError(message);
@@ -157,10 +148,6 @@ export function EmployeeAccountPage() {
         setInlineError(t("Add a recovery email before requesting a password code."));
         setInlineSuccess(null);
         return;
-      }
-
-      if (hasUnsavedChanges) {
-        await persistProfileChanges(false);
       }
 
       const result = await runMutation(sendPasswordCodeMutation.mutate, undefined);
@@ -240,25 +227,28 @@ export function EmployeeAccountPage() {
                   <EmployeeIcon size={20} />
                 </span>
                 <div>
-                  <h2 id="personal-details-heading" className={styles.sectionTitle}>{t("Personal details")}</h2>
+                  <h2 id="personal-details-heading" className={styles.sectionTitle}>{t("Account details")}</h2>
                   <p className={styles.sectionText}>{t("Your account and recovery contacts.")}</p>
                 </div>
               </div>
 
               <div className={styles.detailsList}>
-                <div className={styles.detailRow}><LanguageSelector disabled={isBusy} appearance="rounded" /></div>
+                <div className={styles.languageRow}>
+                  <AccountSettingsIcon name="globe" />
+                  <LanguageSelector disabled={isBusy} appearance="rounded" dropdownWidth={240} />
+                </div>
                 <div className={styles.detailRow}>
-                  <span className={styles.cardLabel}>{t("Login")}</span>
+                  <AccountSettingsIcon name="at" /><span className={styles.cardLabel}>{t("Login")}</span>
                   <span className={styles.cardValue}>@{profile.username}</span>
                 </div>
 
                 <div className={styles.detailRow}>
-                  <span className={styles.cardLabel}>{t("Display name")}</span>
+                  <AccountSettingsIcon name="user" /><span className={styles.cardLabel}>{t("Display name")}</span>
                   <span className={styles.cardValue}>{profile.displayName}</span>
                 </div>
 
-                <div className={`${styles.detailRow} ${isEditing ? styles.detailRowEditing : ""}`}>
-                  {isEditing ? (
+                <div className={`${styles.detailRow} ${isEditingAccount ? styles.detailRowEditing : ""}`}>
+                  {isEditingAccount ? (
                     <label className={styles.field}>
                       <span className={styles.fieldLabel}>{t("Recovery email")}</span>
                       <span className={styles.fieldHint}>{t("Used for secure password recovery.")}</span>
@@ -273,14 +263,14 @@ export function EmployeeAccountPage() {
                     </label>
                   ) : (
                     <>
-                      <span className={styles.cardLabel}>{t("Recovery email")}</span>
-                      <span className={styles.cardValue}>{profile.recoveryEmail ?? t("Not added yet")}</span>
+                      <AccountSettingsIcon name="mail" /><span className={styles.cardLabel}>{t("Recovery email")}</span>
+                      <span className={styles.cardValue}>{normalizedStoredEmail ?? t("Not added yet")}</span>
                     </>
                   )}
                 </div>
 
-                <div className={`${styles.detailRow} ${isEditing ? styles.detailRowEditing : ""}`}>
-                  {isEditing ? (
+                <div className={`${styles.detailRow} ${isEditingAccount ? styles.detailRowEditing : ""}`}>
+                  {isEditingAccount ? (
                     <label className={styles.field}>
                       <span className={styles.fieldLabel}>{t("Phone")}</span>
                       <span className={styles.fieldHint}>{t("Optional contact number for your manager.")}</span>
@@ -295,30 +285,37 @@ export function EmployeeAccountPage() {
                     </label>
                   ) : (
                     <>
-                      <span className={styles.cardLabel}>{t("Phone")}</span>
-                      <span className={styles.cardValue}>{profile.phone ?? t("Not added yet")}</span>
+                      <AccountSettingsIcon name="phone" /><span className={styles.cardLabel}>{t("Phone")}</span>
+                      <span className={styles.cardValue}>{normalizedStoredPhone ?? t("Not added yet")}</span>
                     </>
                   )}
                 </div>
               </div>
 
-              {!isEditing ? (
-                <div className={styles.detailsActions}>
-                  <IosButton
-                    label={t("Edit")}
-                    size="compact"
-                    className={styles.profileButton}
-                    onClick={handleOpenEdit}
-                    disabled={profileQuery.isLoading || !profile}
-                  />
-                </div>
-              ) : null}
+              <div className={styles.detailsActions}>
+                {isEditingAccount ? (
+                  <>
+                    <button type="button" className={styles.secondaryButton} onClick={handleCancelAccountEdit} disabled={isBusy}>
+                      {t("Cancel")}
+                    </button>
+                    <button type="button" className={styles.primaryButton} onClick={() => void handleSaveProfile()} disabled={isBusy || !hasUnsavedChanges}>
+                      <SaveIcon size={17} />
+                      {updateProfileMutation.isPending ? t("Saving...") : t("Save profile")}
+                    </button>
+                  </>
+                ) : (
+                  <button type="button" className={styles.primaryButton} onClick={handleOpenAccountEdit} disabled={isBusy || isChangingPassword}>
+                    <AccountSettingsIcon name="edit" />
+                    {t("Edit account details")}
+                  </button>
+                )}
+              </div>
             </section>
 
             <section className={styles.securitySection} data-employee-motion aria-labelledby="security-heading">
               <div className={styles.sectionHeader}>
                 <span className={`${styles.sectionIcon} ${styles.sectionIconSecurity}`} aria-hidden="true">
-                  <CodeIcon size={20} />
+                  <AccountSettingsIcon name="lock" />
                 </span>
                 <div>
                   <h2 id="security-heading" className={styles.sectionTitle}>{t("Password & security")}</h2>
@@ -327,13 +324,13 @@ export function EmployeeAccountPage() {
               </div>
 
               <div className={`${styles.securityStatus} ${!hasRecoveryEmailForPassword ? styles.securityStatusMissing : ""}`}>
-                <span className={styles.statusDot} aria-hidden="true" />
+                {hasRecoveryEmailForPassword ? <CheckIcon size={20} /> : <AccountSettingsIcon name="mail" />}
                 <span>{hasRecoveryEmailForPassword ? t("Recovery email connected") : t("Recovery email required")}</span>
               </div>
 
               {codeDeliveryHint ? <div className={styles.passwordNotice}>{t("Last code sent to")} {codeDeliveryHint}.</div> : null}
 
-              {isEditing ? (
+              {isChangingPassword ? (
                 <div className={styles.securityEditor}>
                   <div className={styles.passwordActions}>
                     <IosButton
@@ -343,11 +340,6 @@ export function EmployeeAccountPage() {
                       onClick={() => void handleSendPasswordCode()}
                       disabled={isBusy || !hasRecoveryEmailForPassword}
                     />
-                    {!hasRecoveryEmailForPassword ? (
-                      <span className={styles.passwordMeta}>{t("Add a recovery email first.")}</span>
-                    ) : hasUnsavedChanges ? (
-                      <span className={styles.passwordMeta}>{t("Contact changes will be saved first.")}</span>
-                    ) : null}
                   </div>
 
                   <div className={styles.passwordFormGrid}>
@@ -389,10 +381,17 @@ export function EmployeeAccountPage() {
                     onClick={() => void handleConfirmPasswordReset()}
                     disabled={isBusy || !passwordCode.trim() || !/^\d{6}$/.test(newPassword)}
                   />
+                  <button type="button" className={styles.secondaryButton} onClick={handleCancelPasswordEditor} disabled={isBusy}>{t("Cancel")}</button>
                 </div>
               ) : (
-                <p className={styles.passwordReadonly}>
-                  {t("Choose Edit to update your recovery details or change your password.")}</p>
+                <>
+                  {!hasRecoveryEmailForPassword ? <p className={styles.passwordMeta}>{t("Add a recovery email first.")}</p> : null}
+                  <button type="button" className={styles.passwordTrigger} onClick={handleOpenPasswordEditor} disabled={isBusy || isEditingAccount || !hasRecoveryEmailForPassword}>
+                    <AccountSettingsIcon name="key" />
+                    <span>{t("Change password")}</span>
+                    <ChevronRightIcon size={18} />
+                  </button>
+                </>
               )}
             </section>
           </div>
@@ -400,40 +399,23 @@ export function EmployeeAccountPage() {
           <div className={styles.loadingState}>{t("Your profile is not available yet.")}</div>
         )}
 
-        {profile ? <EmployeePushSettings employeeId={profile.employeeId} /> : null}
+        {profile ? <EmployeePushSettings employeeId={profile.employeeId} appearance="profile" /> : null}
 
         {profile ? (
           <RegulationHistoryCard
+            appearance="profile"
             acceptances={regulationHistoryQuery.data ?? []}
             isLoading={regulationHistoryQuery.isLoading}
           />
         ) : null}
 
         {profile ? (
-          <div className={panelFooterClassName}>
-            {isEditing ? (
-              <div className={styles.footerPrimaryActions}>
-                <IosButton label={t("Cancel")} variant="secondary" size="compact" className={styles.profileButton} onClick={handleCancelEdit} disabled={isBusy} />
-                <IosButton
-                  label={updateProfileMutation.isPending ? t("Saving...") : t("Save profile")}
-                  icon={<SaveIcon size={17} />}
-                  size="compact"
-                  className={styles.profileButton}
-                  onClick={() => void handleSaveProfile()}
-                  disabled={isBusy || !hasUnsavedChanges}
-                />
-              </div>
-            ) : null}
-
-            <IosButton
-              label={t("Log out")}
-              icon={<LogoutIcon size={17} />}
-              variant="secondary"
-              size="compact"
-              className={[styles.profileButton, styles.logoutButton].join(" ")}
-              onClick={() => void logout()}
-              disabled={isBusy}
-            />
+          <div className={styles.panelFooter}>
+            <button type="button" className={styles.logoutButton} onClick={() => void logout()} disabled={isBusy}>
+              <span className={styles.logoutIcon}><LogoutIcon size={22} /></span>
+              <span>{t("Log out")}</span>
+              <ChevronRightIcon size={18} />
+            </button>
           </div>
         ) : null}
       </section>

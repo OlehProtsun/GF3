@@ -20,6 +20,7 @@ import {
   formatGraphMonthYear,
   getGraphCellKey,
   getGraphDaysInMonth,
+  getGraphShiftMinimumStaffing,
   getGraphWeekdayLabel,
   isGraphWeekend,
   mergeGraphIntervalsForDisplay,
@@ -61,6 +62,17 @@ const employeesById = new Map<number, Employee>([
 ]);
 
 describe("container graph workspace model", () => {
+  test("minimum staffing counts distinct employees across every segment", () => {
+    const slot = (employeeId: number, fromTime: string, toTime: string): GraphSlot => ({
+      id: 1, scheduleId: 1, dayOfMonth: 1, slotNo: 1, employeeId, fromTime, toTime, status: 1,
+    });
+    const slots = [slot(1, "08:00", "10:00"), slot(2, "10:00", "12:00")];
+    expect(getGraphShiftMinimumStaffing(slots, 1, "08:00", "12:00")).toBe(1);
+    expect(getGraphShiftMinimumStaffing([...slots, slot(1, "08:00", "10:00")], 1, "08:00", "12:00")).toBe(1);
+    expect(getGraphShiftMinimumStaffing([slot(1, "08:00", "09:00"), slot(2, "10:00", "12:00")], 1, "08:00", "12:00")).toBe(0);
+    expect(getGraphShiftMinimumStaffing([slot(1, "22:00", "02:00")], 1, "22:00", "02:00")).toBe(1);
+    expect(getGraphShiftMinimumStaffing([slot(1, "bad", "12:00")], 1, "08:00", "12:00")).toBe(0);
+  });
   test("clamps graph dates and formats month and weekday metadata", () => {
     expect(clampGraphMonth(Number.NaN)).toBe(1);
     expect(clampGraphMonth(13.8)).toBe(12);
@@ -399,6 +411,7 @@ describe("container graph workspace model", () => {
       employee: "Ada Lovelace",
       workDays: 1,
       freeDays: 30,
+      holidayDays: 1,
       sum: "7h 30m",
     });
     expect(rows[0].dayRows).toHaveLength(2);
@@ -408,8 +421,33 @@ describe("container graph workspace model", () => {
     expect(rows[1]).toMatchObject({
       employeeId: 2,
       workDays: 1,
+      holidayDays: 0,
       sum: "4",
     });
+    rows.forEach(row => expect(row.holidayDays).toBeLessThanOrEqual(row.workDays));
     expect(rows[1].days[1]).toEqual({ from: "22:00", to: "02:00", hours: "4" });
   });
+});
+
+
+test.each([
+  [2026, 5, [1, 1, 3, 4], 2],
+  [2024, 12, [24], 0],
+  [2025, 12, [24], 1],
+  [2026, 4, [6], 1],
+  [2026, 5, [2, 32], 0],
+  [2026, 5, [], 0],
+])("holiday days for %i/%i with assigned dates %j", (year, month, days, expected) => {
+  const assigned = days.map((dayOfMonth, index): GraphSlot => ({
+    id: index + 1, scheduleId: 1, employeeId: 1, dayOfMonth, slotNo: index + 1,
+    fromTime: "22:00", toTime: "02:00", status: "Working",
+  }));
+  const rows = buildGraphSummaryRows({ year, month }, [
+    { id: 1, scheduleId: 1, employeeId: 1, displayOrder: 0 },
+    { id: 2, scheduleId: 1, employeeId: 2, displayOrder: 1 },
+  ], employeesById, [...assigned, { id: 99, scheduleId: 1, employeeId: null,
+    dayOfMonth: 1, slotNo: 1, fromTime: "08:00", toTime: "16:00", status: "Free" }]);
+  expect(rows[0].holidayDays).toBe(expected);
+  expect(rows[1].holidayDays).toBe(0);
+  rows.forEach(row => expect(row.holidayDays).toBeLessThanOrEqual(row.workDays));
 });

@@ -341,6 +341,10 @@ namespace DataAccessLayer.Migrations
                         .HasColumnType("INTEGER")
                         .HasColumnName("id");
 
+                    b.Property<string>("AvailabilityTimePresetsJson")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("availability_time_presets_json");
+
                     b.Property<int>("EmployeeId")
                         .HasColumnType("INTEGER")
                         .HasColumnName("employee_id");
@@ -930,6 +934,34 @@ namespace DataAccessLayer.Migrations
                     b.ToTable("manager_shift_correction_setting");
                 });
 
+            modelBuilder.Entity("DataAccessLayer.Models.PublicHolidaySettingsModel", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("id");
+
+                    b.Property<bool>("ShowPublicHolidays")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER")
+                        .HasDefaultValue(true)
+                        .HasColumnName("show_public_holidays");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("public_holiday_settings", t =>
+                        {
+                            t.HasCheckConstraint("ck_public_holiday_settings_singleton", "id = 1");
+                        });
+
+                    b.HasData(
+                        new
+                        {
+                            Id = 1,
+                            ShowPublicHolidays = true
+                        });
+                });
+
             modelBuilder.Entity("DataAccessLayer.Models.RegulationAcceptanceModel", b =>
                 {
                     b.Property<int>("Id")
@@ -1147,6 +1179,14 @@ namespace DataAccessLayer.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER")
                         .HasColumnName("id");
+
+                    b.Property<string>("AcceptedManualShiftHighlightColor")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(7)
+                        .HasColumnType("TEXT")
+                        .HasDefaultValue("#BAE6FD")
+                        .HasColumnName("accepted_manual_shift_highlight_color");
 
                     b.Property<string>("AcceptedSwapHighlightColor")
                         .IsRequired()
@@ -1857,6 +1897,12 @@ namespace DataAccessLayer.Migrations
                     b.Property<int?>("AcceptedByEmployeeId")
                         .HasColumnType("INTEGER")
                         .HasColumnName("accepted_by_employee_id");
+
+                    b.Property<bool>("AllowPartialAcceptance")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER")
+                        .HasDefaultValue(false)
+                        .HasColumnName("allow_partial_acceptance");
 
                     b.Property<string>("ArchivedViewsJson")
                         .HasColumnType("TEXT")

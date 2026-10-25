@@ -10,6 +10,12 @@ import { availabilityMonthOptions, getAvailabilityKindLabel } from "@entities/av
 afterEach(() => setLanguage("pl"));
 
 describe("account language", () => {
+  it("uses a compact localized holiday marker", () => {
+    for (const [language, label] of [["en", "Hol."], ["pl", "Św."], ["uk", "Св."]] as const) {
+      setLanguage(language);
+      expect(t("Holiday short")).toBe(label);
+    }
+  });
   it("starts a fresh module in Polish and synchronizes HTML even for the same language", async () => {
     vi.resetModules();
     const fresh = await import("./index");

@@ -24,10 +24,12 @@ for (const language of ['en','pl']) {
   for(const width of [320,390,768]) {
     await page.setViewportSize({width,height:844});
     await expect(hero).toBeVisible();
+    await hero.evaluate(element=>Promise.all(element.getAnimations({subtree:true}).map(animation=>animation.finished)));
     expect(await hero.evaluate(el=>el.scrollWidth<=el.clientWidth)).toBe(true);
     const headings=hero.getByRole('heading',{level:2});
-    const first=await headings.nth(0).boundingBox(); const second=await headings.nth(1).boundingBox();
-    expect(Math.abs(first!.y-second!.y)).toBeLessThan(2);
+    await expect(headings).toHaveCount(2);
+    const difference=await headings.evaluateAll(elements=>Math.abs(elements[0].getBoundingClientRect().y-elements[1].getBoundingClientRect().y));
+    expect(difference).toBeLessThan(2);
     if(width===390) await page.screenshot({path:test.info().outputPath('schedule-hero-'+language+'.png'),fullPage:false});
   }
   await page.clock.fastForward(60_000);

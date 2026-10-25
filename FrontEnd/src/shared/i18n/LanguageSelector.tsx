@@ -4,10 +4,11 @@ import { t, type Language } from "@shared/i18n";
 import { SearchableSelect } from "@shared/ui/components/SearchableSelect/SearchableSelect";
 import styles from "./LanguageSelector.module.css";
 
-export function LanguageSelector({ disabled = false, selectClassName, appearance = "native" }: {
+export function LanguageSelector({ disabled = false, selectClassName, appearance = "native", dropdownWidth }: {
   disabled?: boolean;
   selectClassName?: string;
   appearance?: "native" | "rounded";
+  dropdownWidth?: number;
 }) {
   const { language, ready, save } = useLanguage();
   const id = useId();
@@ -46,6 +47,7 @@ export function LanguageSelector({ disabled = false, selectClassName, appearance
         options={[{ value: "en", label: "English" }, { value: "pl", label: "Polski" }, { value: "uk", label: "Українська" }]}
         placeholder={t("Application language")}
         dropdownTitle={t("Application language")}
+        dropdownWidth={dropdownWidth}
         ariaLabel={t("Application language")}
         ariaDescribedBy={error ? `${id}-error` : undefined}
         searchEnabled={false}

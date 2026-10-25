@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { queryKeys } from "@shared/api/queryKeys";
-import type { CreateManagerShiftSwapInput, CreateShiftSwapInput } from "../model/types";
+import type { AcceptShiftSwapInput, CreateManagerShiftSwapInput, CreateShiftSwapInput } from "../model/types";
 import { shiftSwapsApi } from "./shiftSwapsApi";
 import type { ShiftSwapCandidateParams, SwapWizardRequest } from "../model/types";
 
@@ -64,6 +64,24 @@ export function useSaveGraphShiftSwapHighlightSettingMutation() {
       shiftSwapsApi.saveHighlightSetting(containerId, graphId, highlightColor),
     onSuccess: (data, payload) =>
       queryClient.setQueryData(queryKeys.shiftSwaps.graphHighlightSetting(payload.containerId, payload.graphId), data),
+  });
+}
+
+export const useGraphManualShiftHighlightSettingQuery = (containerId: number | null, graphId: number | null) =>
+  useQuery({
+    queryKey: queryKeys.shiftSwaps.graphManualHighlightSetting(containerId ?? 0, graphId ?? 0),
+    enabled: Number.isInteger(containerId) && containerId !== null && containerId > 0 && Number.isInteger(graphId) && graphId !== null && graphId > 0,
+    staleTime: 300_000,
+    queryFn: ({ signal }) => shiftSwapsApi.getManualHighlightSetting(containerId as number, graphId as number, signal),
+  });
+
+export function useSaveGraphManualShiftHighlightSettingMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ containerId, graphId, highlightColor }: { containerId: number; graphId: number; highlightColor: string }) =>
+      shiftSwapsApi.saveManualHighlightSetting(containerId, graphId, highlightColor),
+    onSuccess: (data, payload) =>
+      queryClient.setQueryData(queryKeys.shiftSwaps.graphManualHighlightSetting(payload.containerId, payload.graphId), data),
   });
 }
 
@@ -146,12 +164,13 @@ export function useAcceptEmployeeShiftSwapMutation() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (id: number) => shiftSwapsApi.acceptEmployee(id),
+    mutationFn: (input: AcceptShiftSwapInput) => shiftSwapsApi.acceptEmployee(input),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.shiftSwaps.employee() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.shiftSwaps.all });
       queryClient.invalidateQueries({ queryKey: ["shiftSwaps", "returnCandidates"] });
       queryClient.invalidateQueries({ queryKey: ["shiftSwaps", "preview"] });
       queryClient.invalidateQueries({ queryKey: queryKeys.employeeSchedules.all });
+      queryClient.invalidateQueries({ queryKey: queryKeys.containers.all });
     },
   });
 }

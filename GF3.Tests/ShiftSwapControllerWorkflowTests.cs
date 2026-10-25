@@ -166,7 +166,9 @@ public sealed class ShiftSwapControllerWorkflowTests
         var repository = new ScheduleSlotRepository(context);
         await repository.ReplaceForScheduleAsync(fixture.ScheduleId, replacementSlots, overwrite: true);
 
-        Assert.False(await context.ShiftSwapRequests.AnyAsync());
+        var retainedSwap = await context.ShiftSwapRequests.AsNoTracking().SingleAsync();
+        Assert.Equal(createdDto.Id, retainedSwap.Id);
+        Assert.Equal(ShiftSwapStatus.Accepted, retainedSwap.Status);
         Assert.Single(await context.ShiftSwapHistories.ToListAsync());
 
         var logController = new ShiftSwapLogsController(
@@ -1093,7 +1095,7 @@ public sealed class ShiftSwapControllerWorkflowTests
     {
         await using var database = await SqliteTestDatabase.CreateAsync();
         await using var context = database.CreateContext();
-        var fixture = await SeedPublishedScheduleAsync(context, note: "Planner note\n\n<!--GF3_GRAPH_META:{\"m\":[[2,\"Open counter\",{\"5\":\"09:00\"}]]}-->");
+        var fixture = await SeedPublishedScheduleAsync(context, note: "Planner note\n\n<!--GF3_GRAPH_META:{\"m\":[[2,\"Open counter\",{\"5\":\"09:00 - 13:30\"}]]}-->");
         var controller = new ShiftSwapLogsController(
             context,
             new NoopWorkflowLogService(),
@@ -1142,7 +1144,7 @@ public sealed class ShiftSwapControllerWorkflowTests
     {
         await using var database = await SqliteTestDatabase.CreateAsync();
         await using var context = database.CreateContext();
-        var fixture = await SeedPublishedScheduleAsync(context, note: "Planner note\n\n<!--GF3_GRAPH_META:{\"m\":[[2,\"Open counter\",{\"5\":\"09:00\",\"6\":\"10:00\"}]]}-->");
+        var fixture = await SeedPublishedScheduleAsync(context, note: "Planner note\n\n<!--GF3_GRAPH_META:{\"m\":[[2,\"Open counter\",{\"5\":\"09:00 - 13:00\",\"6\":\"10:00 - 14:00\"}]]}-->");
         var controller = new ShiftSwapLogsController(
             context,
             new NoopWorkflowLogService(),
@@ -1199,7 +1201,7 @@ public sealed class ShiftSwapControllerWorkflowTests
         await using var context = database.CreateContext();
         var fixture = await SeedPublishedScheduleAsync(
             context,
-            note: "Planner note\n\n<!--GF3_GRAPH_META:{\"m\":[[2,\"Open counter\",{\"5\":\"09:00\"}]]}-->");
+            note: "Planner note\n\n<!--GF3_GRAPH_META:{\"m\":[[2,\"Open counter\",{\"5\":\"09:00 - 13:00\"}]]}-->");
         var managerController = new ShiftSwapLogsController(
             context,
             new NoopWorkflowLogService(),
@@ -1237,9 +1239,75 @@ public sealed class ShiftSwapControllerWorkflowTests
             style.ScheduleId == fixture.ScheduleId &&
             style.EmployeeId == fixture.TargetEmployeeId &&
             style.DayOfMonth == 5);
-        Assert.Equal(-4458544, swapCellStyle.BackgroundColorArgb);
+        Assert.Equal(-4528387, swapCellStyle.BackgroundColorArgb);
         Assert.Contains("b64:", schedule.Note, StringComparison.Ordinal);
         Assert.DoesNotContain("\"5\"", DecodeGraphMetaSuffix(schedule.Note!));
+    }
+
+    [Fact]
+    public async Task EmployeeShiftSwaps_AcceptGeneratedManualOffer_PreservesProvenanceAndOtherMetadata()
+    {
+        await using var database = await SqliteTestDatabase.CreateAsync();
+        await using var context = database.CreateContext();
+        const string metadata = """
+            {"m":[[2,"Do obsadzenia",{"5":"09:00 - 13:00"}],[3,"Custom",{"6":"Keep me"}]],"g":[2],"o":[1,-2,-3],"s":[[-2,5,123]],"t":[[1,8,"Note"]],"u":[[1,["1:8"]]],"extra":{"keep":true}}
+            """;
+        var note = "Planner note\n\n[[GF3_GRAPH_META:b64:" + Convert.ToBase64String(Encoding.UTF8.GetBytes(metadata)) + "]]";
+        var fixture = await SeedPublishedScheduleAsync(context, note: note);
+        var managerController = new ShiftSwapLogsController(
+            context,
+            new NoopWorkflowLogService(),
+            new NoopRealtimeNotifier());
+        SetManagerUser(managerController, managerId: 3);
+        var createResult = await managerController.CreateManualOffer(
+            fixture.ContainerId,
+            fixture.ScheduleId,
+            new CreateManagerShiftSwapRequest
+            {
+                ManualColumnId = 2,
+                DayOfMonth = 5,
+                FromTime = "09:00",
+                ToTime = "13:00",
+            },
+            CancellationToken.None);
+        var createdDto = Assert.IsType<ShiftSwapDto>(Assert.IsType<CreatedAtActionResult>(createResult.Result).Value);
+
+        var employeeController = new EmployeeShiftSwapsController(
+            context,
+            new ManagerEditLockService(),
+            new NoopWorkflowLogService(),
+            new NoopRealtimeNotifier(), new WebApi.Services.ScheduleVersionCommitService(context));
+        SetEmployeeUser(employeeController, fixture.TargetEmployeeId);
+        var acceptResult = await employeeController.Accept(createdDto.Id, CancellationToken.None);
+
+        var acceptedDto = Assert.IsType<ShiftSwapDto>(Assert.IsType<OkObjectResult>(acceptResult.Result).Value);
+        var slot = await context.ScheduleSlots.SingleAsync(item => item.Id == createdDto.ScheduleSlotId);
+        var schedule = await context.Schedules.SingleAsync(item => item.Id == fixture.ScheduleId);
+
+        Assert.Equal("accepted", acceptedDto.Status);
+        Assert.Equal(fixture.TargetEmployeeId, slot.EmployeeId);
+        Assert.Equal(SlotStatus.ASSIGNED, slot.Status);
+        var swapCellStyle = await context.ScheduleCellStyles.SingleAsync(style =>
+            style.ScheduleId == fixture.ScheduleId &&
+            style.EmployeeId == fixture.TargetEmployeeId &&
+            style.DayOfMonth == 5);
+        Assert.Equal(-4528387, swapCellStyle.BackgroundColorArgb);
+        Assert.Contains("b64:", schedule.Note, StringComparison.Ordinal);
+        Assert.StartsWith("Planner note", schedule.Note);
+        using var before = System.Text.Json.JsonDocument.Parse(metadata);
+        using var after = System.Text.Json.JsonDocument.Parse(DecodeGraphMetaSuffix(schedule.Note!));
+        var manual = after.RootElement.GetProperty("m");
+        Assert.Equal(2, manual.GetArrayLength());
+        Assert.Equal(2, manual[0].GetArrayLength());
+        Assert.Equal(before.RootElement.GetProperty("m")[1].GetRawText(), manual[1].GetRawText());
+        foreach (var key in new[] { "g", "o", "t", "u", "extra" })
+        {
+            Assert.Equal(before.RootElement.GetProperty(key).GetRawText(), after.RootElement.GetProperty(key).GetRawText());
+        }
+        var manualStyle = Assert.Single(after.RootElement.GetProperty("s").EnumerateArray());
+        Assert.Equal(-2, manualStyle[0].GetInt32());
+        Assert.Equal(5, manualStyle[1].GetInt32());
+        Assert.Equal(-4528387, manualStyle[2].GetInt32());
     }
 
     [Fact]
@@ -1345,7 +1413,7 @@ public sealed class ShiftSwapControllerWorkflowTests
     {
         await using var database = await SqliteTestDatabase.CreateAsync();
         await using var context = database.CreateContext();
-        var fixture = await SeedPublishedScheduleAsync(context, note: "Planner note\n\n<!--GF3_GRAPH_META:{\"m\":[[2,\"Open counter\",{\"5\":\"09:00\"}]]}-->");
+        var fixture = await SeedPublishedScheduleAsync(context, note: "Planner note\n\n<!--GF3_GRAPH_META:{\"m\":[[2,\"Open counter\",{\"5\":\"09:00 - 13:00\"}]]}-->");
         var controller = new ShiftSwapLogsController(
             context,
             new NoopWorkflowLogService(),

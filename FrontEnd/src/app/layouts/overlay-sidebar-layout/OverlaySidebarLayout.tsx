@@ -16,11 +16,11 @@ import {
   LogoutIcon,
   ArrowIcon,
   NoteIcon,
+  SettingsIcon,
 } from "@shared/ui/icons";
 import { matchPath } from "@shared/lib/react-router-dom";
 import { ManagerNotepad } from "@features/manager-notepad/ui/ManagerNotepad";
 import { ManagerSystemNews } from "@features/manager-system-news/ui/ManagerSystemNews";
-import { ManagerWorkspaceModeSwitch } from "@features/manager-workspace-mode/ui/ManagerWorkspaceModeSwitch";
 
 type OverlaySidebarLayoutProps = {
   children: ReactNode;
@@ -111,6 +111,7 @@ export function OverlaySidebarLayout({ children }: OverlaySidebarLayoutProps) {
         { label: t("Container"), to: "/container", icon: <ContainerIcon size={25} /> },
         ...(isSystemManager ? [{ label: t("Information"), to: "/information", icon: <InfoIcon size={26} /> }] : []),
         { label: t("Message"), to: "/communications", icon: <NoteIcon size={24} /> },
+        { label: t("Settings"), to: "/settings", icon: <SettingsIcon size={22} /> },
       ]
     : [
         {
@@ -163,7 +164,6 @@ export function OverlaySidebarLayout({ children }: OverlaySidebarLayoutProps) {
         </div>
 
         <div className={styles.sidebarFooter}>
-          {isManager ? <div className={styles.modeSwitch}><ManagerWorkspaceModeSwitch targetMode="phone" compact itemClassName={styles.navItem} buttonClassName={styles.navButton} labelClassName={styles.navLabel} /></div> : null}
           <div className={styles.navItem}>
             <NavLink
               to={accountPath}
@@ -178,20 +178,22 @@ export function OverlaySidebarLayout({ children }: OverlaySidebarLayoutProps) {
             </div>
           </div>
 
-          <div className={styles.navItem}>
-            <button
-              type="button"
-              className={styles.navButton}
-              onClick={() => {
-                void logout();
-              }}
-              aria-label={t("Log out")}
-            >
-              <LogoutIcon size={22} />
-            </button>
-            <div className={styles.navLabel} aria-hidden="true">
-              {t("Log out")}</div>
-          </div>
+          {!isManager ? (
+            <div className={styles.navItem}>
+              <button
+                type="button"
+                className={styles.navButton}
+                onClick={() => {
+                  void logout();
+                }}
+                aria-label={t("Log out")}
+              >
+                <LogoutIcon size={22} />
+              </button>
+              <div className={styles.navLabel} aria-hidden="true">
+                {t("Log out")}</div>
+            </div>
+          ) : null}
 
           <button
             type="button"

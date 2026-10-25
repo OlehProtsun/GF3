@@ -1,4 +1,5 @@
 export type { IconProps } from "./createIcon";
+export { ExternalLinkIcon } from "./ExternalLinkIcon";
 export { CopyLinkIcon } from "./CopyLinkIcon";
 export { ShareIcon } from "./ShareIcon";
 export { InfoIcon } from "./InfoIcon";
@@ -41,3 +42,9 @@ export { ChevronRightIcon } from "./ChevronRightIcon";
 export { PinIcon } from "./PinIcon";
 export { NewsIcon } from "./NewsIcon";
 export { SettingsIcon } from "./SettingsIcon";
+export { AccountSettingsIcon } from "./AccountSettingsIcon";
+
+export { ClockIcon } from "./ClockIcon";
+export { LockIcon } from "./LockIcon";
+export { GroupIcon } from "./GroupIcon";
+export { ArrowRightIcon } from "./ArrowRightIcon";

@@ -1,6 +1,6 @@
+import { ManagerWorkspaceModeSwitch } from "@features/manager-workspace-mode/ui/ManagerWorkspaceModeSwitch";
 import { dateTimeFormat, t } from "@shared/i18n";
 import { useLanguageRevision } from "@shared/i18n/useLanguageRevision";
-import { LanguageSelector } from "@shared/i18n/LanguageSelector";
 import { useEffect, useMemo, useState } from "react";
 import type { ChangeEvent } from "react";
 import { useAuth } from "@app/providers/AuthProvider";
@@ -18,6 +18,7 @@ import { IosButton } from "@shared/ui/components/IosButton";
 import { ConfirmDialog } from "@shared/ui/ConfirmDialog";
 import { pushErrorAlertFromError } from "@shared/ui/feedback/error-alerts/errorAlerts";
 import { PageHeader } from "@shared/ui/PageHeader";
+import { AccountSettingsIcon, CheckIcon, PlusIcon, LogoutIcon } from "@shared/ui/icons";
 import styles from "./ManagerAccountPage.module.css";
 import { useMyRegulationHistoryQuery } from "@entities/regulations";
 import { RegulationHistoryCard } from "@entities/regulations/ui/RegulationHistoryCard";
@@ -75,8 +76,8 @@ function runMutation<TData, TVariables>(
   });
 }
 
-function getInitials(value?: string | null) {
-  const initials = value
+function getInitials(value?: string | null, userName?: string | null) {
+  const initials = (value?.trim() || userName)
     ?.trim()
     .split(/\s+/)
     .filter(Boolean)
@@ -122,7 +123,7 @@ function getLastOnlineTime(value?: string | null) {
 
 export function ManagerAccountPage() {
   useLanguageRevision();
-  const { session } = useAuth();
+  const { session, logout } = useAuth();
   const profileQuery = useManagerProfileQuery();
   const managerListQuery = useManagerListQuery();
   const updateProfileMutation = useUpdateManagerProfileMutation();
@@ -139,7 +140,7 @@ export function ManagerAccountPage() {
   const [deleteTarget, setDeleteTarget] = useState<ManagerProfileDto | null>(null);
   const [inlineError, setInlineError] = useState<string | null>(null);
   const [inlineSuccess, setInlineSuccess] = useState<string | null>(null);
-  const initials = getInitials(profile?.displayName ?? session?.displayName);
+  const initials = getInitials(profile?.displayName ?? session?.displayName, currentUserName);
   const isSystemManager = profile?.isSystem ?? false;
   const hasPasswordDraft = !isSystemManager && Boolean(normalize(form.newPassword));
   const isBusy = updateProfileMutation.isPending || createManagerMutation.isPending || deleteManagerMutation.isPending;
@@ -294,11 +295,25 @@ export function ManagerAccountPage() {
             <strong>{profile?.displayName ?? session?.displayName ?? t("Manager")}</strong>
             <span>@{profile?.userName ?? session?.userName ?? "manager"}</span>
           </div>
+          <span className={styles.roleBadge}>{t("Manager")}</span>
         </div>
 
         {inlineError ? <ErrorBanner>{inlineError}</ErrorBanner> : null}
         {profileQuery.error ? <ErrorBanner>{t("Could not load manager profile.")}</ErrorBanner> : null}
         {inlineSuccess ? <div className={styles.successBanner}>{inlineSuccess}</div> : null}
+
+        <section className={`${styles.card} ${styles.sessionActionsCard}`} aria-labelledby="manager-account-actions-heading">
+          <div className={styles.cardHeader}>
+            <span className={styles.sectionIcon}><AccountSettingsIcon name="lock" /></span>
+            <h2 id="manager-account-actions-heading">{t("Account actions")}</h2>
+          </div>
+          <div className={styles.sessionActionList}>
+            <div className={styles.sessionModeAction}><ManagerWorkspaceModeSwitch targetMode="phone" /></div>
+            <button type="button" className={styles.sessionLogout} onClick={() => void logout()}>
+              <LogoutIcon size={20} /><span>{t("Log out")}</span>
+            </button>
+          </div>
+        </section>
 
         {profileQuery.isLoading && !profile ? (
           <p className={styles.stateText}>{t("Loading manager profile...")}</p>
@@ -307,16 +322,17 @@ export function ManagerAccountPage() {
             <div className={styles.profileColumn}>
               <div className={styles.card}>
                 <div className={styles.cardHeader}>
+                  <span className={`${styles.sectionIcon} ${styles.greenIcon}`}><AccountSettingsIcon name="user" /></span>
                   <div>
-                    <span className={styles.eyebrow}>{t("Profile access")}</span>
-                    <h2>{t("Sign-in details")}</h2>
+                    <h2>{t("Account details")}</h2>
+                    <p>{t("Your sign-in information and account settings.")}</p>
                   </div>
-                  <span className={styles.badge}>{isSystemManager ? t("System account") : t("Editable")}</span>
+                  {isSystemManager ? <span className={styles.badge}>{t("System account")}</span> : null}
                 </div>
 
                 <div className={styles.formGrid}>
-                  <div className={styles.field}><LanguageSelector disabled={isBusy} appearance="rounded" /></div>
                   <label className={styles.field}>
+                    <AccountSettingsIcon name="user" className={styles.fieldIcon} />
                     <span>{t("Display name")}</span>
                     <input
                       type="text"
@@ -328,6 +344,7 @@ export function ManagerAccountPage() {
                   </label>
 
                   <label className={styles.field}>
+                    <AccountSettingsIcon name="at" className={styles.fieldIcon} />
                     <span>{t("Username")}</span>
                     <input
                       type="text"
@@ -340,6 +357,7 @@ export function ManagerAccountPage() {
                   </label>
 
                   <label className={styles.field}>
+                    <AccountSettingsIcon name="mail" className={styles.fieldIcon} />
                     <span>{t("Recovery email")}</span>
                     <input
                       type="email"
@@ -351,6 +369,7 @@ export function ManagerAccountPage() {
                   </label>
 
                   <label className={styles.field}>
+                    <AccountSettingsIcon name="lock" className={styles.fieldIcon} />
                     <span>{t("New password")}</span>
                     <input
                       type="password"
@@ -370,6 +389,7 @@ export function ManagerAccountPage() {
                 <div className={styles.actions}>
                   <IosButton
                     label={updateProfileMutation.isPending ? t("Saving...") : t("Save changes")}
+                    icon={<CheckIcon size={16} />}
                     onClick={() => void handleSaveProfile()}
                     disabled={isBusy || !profile || !hasProfileChanges}
                     className={styles.primaryButton}
@@ -379,9 +399,10 @@ export function ManagerAccountPage() {
 
               <div className={styles.card}>
                 <div className={styles.cardHeader}>
+                  <span className={`${styles.sectionIcon} ${styles.greenIcon}`}><AccountSettingsIcon name="team" /></span>
                   <div>
-                    <span className={styles.eyebrow}>{t("Manager online")}</span>
                     <h2>{t("Active managers")}</h2>
+                    <p>{t("Currently online and recently active managers.")}</p>
                   </div>
                   <span className={styles.badge}>{onlineManagerCount}  {t("online")}</span>
                 </div>
@@ -394,6 +415,7 @@ export function ManagerAccountPage() {
                   ) : (
                     managerPresenceItems.map(({ manager, isOnline }) => (
                       <article key={manager.id} className={styles.onlineItem}>
+                        <span className={styles.managerInitials} aria-hidden="true">{getInitials(manager.displayName, manager.userName)}</span>
                         <span
                           className={`${styles.onlineDot} ${isOnline ? styles.onlineDotActive : styles.onlineDotIdle}`}
                           aria-hidden="true"
@@ -414,9 +436,10 @@ export function ManagerAccountPage() {
 
             <div className={styles.card}>
               <div className={styles.cardHeader}>
+                <span className={styles.sectionIcon}><AccountSettingsIcon name="team" /></span>
                 <div>
-                  <span className={styles.eyebrow}>{t("Manager team")}</span>
-                  <h2>{t("Accounts in database")}</h2>
+                  <h2>{t("Manager team")}</h2>
+                  <p>{t("Accounts in database with manager role.")}</p>
                 </div>
                 <span className={styles.badge}>{managers.length}</span>
               </div>
@@ -432,7 +455,7 @@ export function ManagerAccountPage() {
 
                     return (
                       <article key={manager.id} className={styles.managerItem}>
-                        <span className={styles.managerInitials}>{getInitials(manager.displayName)}</span>
+                        <span className={styles.managerInitials} aria-hidden="true">{getInitials(manager.displayName, manager.userName)}</span>
                         <div className={styles.managerDetails}>
                           <strong>{manager.displayName}</strong>
                           <span>@{manager.userName}</span>
@@ -440,7 +463,7 @@ export function ManagerAccountPage() {
                         </div>
                         <div className={styles.managerActions}>
                           {manager.isSystem ? (
-                            <span className={styles.currentPill}>{isCurrent ? t("You / System") : t("System")}</span>
+                            <span className={styles.systemPill}>{isCurrent ? t("You / System") : t("System")}</span>
                           ) : isCurrent ? (
                             <span className={styles.currentPill}>{t("You")}</span>
                           ) : (
@@ -460,10 +483,17 @@ export function ManagerAccountPage() {
               </div>
 
               <div className={styles.createPanel}>
-                <span className={styles.eyebrow}>{t("Add manager")}</span>
+                <div className={styles.cardHeader}>
+                  <span className={styles.sectionIcon}><PlusIcon size={20} /></span>
+                  <div>
+                    <h3>{t("Add new manager")}</h3>
+                    <p>{t("Create a new manager account.")}</p>
+                  </div>
+                </div>
                 <div className={styles.formGrid}>
 
                   <label className={styles.field}>
+                    <AccountSettingsIcon name="user" className={styles.fieldIcon} />
                     <span>{t("Display name")}</span>
                     <input
                       type="text"
@@ -475,6 +505,7 @@ export function ManagerAccountPage() {
                   </label>
 
                   <label className={styles.field}>
+                    <AccountSettingsIcon name="at" className={styles.fieldIcon} />
                     <span>{t("Username")}</span>
                     <input
                       type="text"
@@ -486,6 +517,7 @@ export function ManagerAccountPage() {
                   </label>
 
                   <label className={styles.field}>
+                    <AccountSettingsIcon name="mail" className={styles.fieldIcon} />
                     <span>{t("Recovery email")}</span>
                     <input
                       type="email"
@@ -497,6 +529,7 @@ export function ManagerAccountPage() {
                   </label>
 
                   <label className={styles.field}>
+                    <AccountSettingsIcon name="lock" className={styles.fieldIcon} />
                     <span>{t("Temporary password")}</span>
                     <input
                       type="password"
@@ -515,7 +548,7 @@ export function ManagerAccountPage() {
                 <div className={styles.actions}>
                   <IosButton
                     label={createManagerMutation.isPending ? t("Creating...") : t("Create manager")}
-                    variant="secondary"
+                    icon={<PlusIcon size={16} />}
                     onClick={() => void handleCreateManager()}
                     disabled={isBusy}
                     className={styles.primaryButton}
@@ -531,6 +564,7 @@ export function ManagerAccountPage() {
           isLoading={regulationHistoryQuery.isLoading}
           title={t("My regulation history")}
           className={styles.regulationHistory}
+          appearance="manager-profile"
         />
       </section>
 

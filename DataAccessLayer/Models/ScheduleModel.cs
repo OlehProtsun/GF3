@@ -66,6 +66,11 @@ public class ScheduleModel
     public string AcceptedSwapHighlightColor { get; set; } = "#BBF7D0";
 
     [Required]
+    [Column("accepted_manual_shift_highlight_color")]
+    [MaxLength(7)]
+    public string AcceptedManualShiftHighlightColor { get; set; } = "#BAE6FD";
+
+    [Required]
     [Column("people_per_shift")]
     public int PeoplePerShift { get; set; }
 

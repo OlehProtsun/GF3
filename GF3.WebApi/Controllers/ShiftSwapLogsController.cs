@@ -24,6 +24,36 @@ public sealed class ShiftSwapLogsController(
     IRealtimeNotifier realtimeNotifier,
     IManagerEditLockService? editLockService = null) : ControllerBase
 {
+    [HttpGet("manual-highlight-setting")]
+    [ProducesResponseType(typeof(ShiftSwapHighlightSettingDto), StatusCodes.Status200OK)]
+    public async Task<ActionResult<ShiftSwapHighlightSettingDto>> GetManualHighlightSetting(
+        int containerId, int graphId, CancellationToken cancellationToken)
+    {
+        var color = await db.Schedules.AsNoTracking()
+            .Where(schedule => schedule.Id == graphId && schedule.ContainerId == containerId)
+            .Select(schedule => schedule.AcceptedManualShiftHighlightColor)
+            .SingleOrDefaultAsync(cancellationToken).ConfigureAwait(false)
+            ?? throw new KeyNotFoundException($"Graph with id {graphId} was not found.");
+        return Ok(new ShiftSwapHighlightSettingDto { HighlightColor = color });
+    }
+
+    [HttpPut("manual-highlight-setting")]
+    [ProducesResponseType(typeof(ShiftSwapHighlightSettingDto), StatusCodes.Status200OK)]
+    public async Task<ActionResult<ShiftSwapHighlightSettingDto>> SaveManualHighlightSetting(
+        int containerId, int graphId, [FromBody] SaveShiftSwapHighlightSettingRequest request,
+        CancellationToken cancellationToken)
+    {
+        var color = ShiftSwapHighlightRules.NormalizeColor(request.HighlightColor, nameof(request.HighlightColor));
+        var schedule = await db.Schedules
+            .SingleOrDefaultAsync(item => item.Id == graphId && item.ContainerId == containerId, cancellationToken)
+            .ConfigureAwait(false)
+            ?? throw new KeyNotFoundException($"Graph with id {graphId} was not found.");
+        if (CreateEditLockConflictResult(containerId, graphId) is { } conflict) return conflict;
+        schedule.AcceptedManualShiftHighlightColor = color;
+        await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        return Ok(new ShiftSwapHighlightSettingDto { HighlightColor = color });
+    }
+
     [HttpGet("highlight-setting")]
     [ProducesResponseType(typeof(ShiftSwapHighlightSettingDto), StatusCodes.Status200OK)]
     public async Task<ActionResult<ShiftSwapHighlightSettingDto>> GetHighlightSetting(
@@ -294,131 +324,138 @@ public sealed class ShiftSwapLogsController(
             return conflict;
         }
 
-        var schedule = await db.Schedules
-            .Include(schedule => schedule.Container)
-            .Include(schedule => schedule.Shop)
-            .Include(schedule => schedule.Employees)
-                .ThenInclude(employee => employee.Employee)
-            .Include(schedule => schedule.Slots)
-            .FirstOrDefaultAsync(schedule => schedule.Id == graphId && schedule.ContainerId == containerId, cancellationToken)
-            .ConfigureAwait(false)
-            ?? throw new KeyNotFoundException($"Graph with id {graphId} was not found.");
-
-        if (schedule.PublicationStatus != SchedulePublicationStatus.Public)
+        try
         {
-            throw new ValidationException("Publish this schedule before publishing manual shifts to swap.");
-        }
+            await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
+            var schedule = await db.Schedules
+                .Include(schedule => schedule.Container)
+                .Include(schedule => schedule.Shop)
+                .Include(schedule => schedule.Employees)
+                    .ThenInclude(employee => employee.Employee)
+                .Include(schedule => schedule.Slots)
+                .FirstOrDefaultAsync(schedule => schedule.Id == graphId && schedule.ContainerId == containerId, cancellationToken)
+                .ConfigureAwait(false)
+                ?? throw new KeyNotFoundException($"Graph with id {graphId} was not found.");
 
-        if (!schedule.AllowSwap)
-        {
-            throw new ValidationException("Swaps are not allowed for this schedule.");
-        }
-
-        if (request.ManualColumnId <= 0)
-        {
-            throw ValidationException.ForField(nameof(request.ManualColumnId), "Choose a manual column shift.");
-        }
-
-        var daysInMonth = DateTime.DaysInMonth(schedule.Year, schedule.Month);
-        if (request.DayOfMonth < 1 || request.DayOfMonth > daysInMonth)
-        {
-            throw ValidationException.ForField(nameof(request.DayOfMonth), "Choose a valid day in this schedule month.");
-        }
-
-        var period = NormalizePeriod(request.FromTime, request.ToTime, nameof(request.FromTime), nameof(request.ToTime));
-        var targetEmployeeId = request.TargetEmployeeId is > 0 ? request.TargetEmployeeId.Value : (int?)null;
-        if (targetEmployeeId.HasValue)
-        {
-            var targetExists = await db.Employees
-                .AnyAsync(employee => employee.Id == targetEmployeeId.Value, cancellationToken)
-                .ConfigureAwait(false);
-            if (!targetExists)
+            if (schedule.PublicationStatus != SchedulePublicationStatus.Public)
             {
-                throw ValidationException.ForField(nameof(request.TargetEmployeeId), "The selected employee was not found.");
+                throw new ValidationException("Publish this schedule before publishing manual shifts to swap.");
             }
+
+            if (!schedule.AllowSwap)
+            {
+                throw new ValidationException("Swaps are not allowed for this schedule.");
+            }
+
+            if (request.ManualColumnId <= 0)
+            {
+                throw ValidationException.ForField(nameof(request.ManualColumnId), "Choose a manual column shift.");
+            }
+
+            var daysInMonth = DateTime.DaysInMonth(schedule.Year, schedule.Month);
+            if (request.DayOfMonth < 1 || request.DayOfMonth > daysInMonth)
+            {
+                throw ValidationException.ForField(nameof(request.DayOfMonth), "Choose a valid day in this schedule month.");
+            }
+
+            var normalizedPeriod = NormalizePeriod(request.FromTime, request.ToTime, nameof(request.FromTime), nameof(request.ToTime));
+            var period = new ShiftSwapRules.ShiftSwapPeriod(normalizedPeriod.FromTime, normalizedPeriod.ToTime);
+            var targetEmployeeId = request.TargetEmployeeId is > 0 ? request.TargetEmployeeId.Value : (int?)null;
+            if (targetEmployeeId.HasValue)
+            {
+                var targetExists = await db.Employees
+                    .AnyAsync(employee => employee.Id == targetEmployeeId.Value, cancellationToken)
+                    .ConfigureAwait(false);
+                if (!targetExists)
+                {
+                    throw ValidationException.ForField(nameof(request.TargetEmployeeId), "The selected employee was not found.");
+                }
+            }
+
+            var rawCell = GraphManualColumnLabelResolver.ResolveCell(schedule.Note, request.ManualColumnId, request.DayOfMonth)
+                ?? throw new ValidationException("The manual shift metadata is invalid or the cell is missing.");
+            var open = await db.ShiftSwapRequests.Include(swap => swap.ScheduleSlot)
+                .Where(swap => swap.ScheduleId == graphId && swap.IsManagerCreated && swap.Status == ShiftSwapStatus.Open &&
+                    swap.ManualColumnId == request.ManualColumnId && swap.ScheduleSlot!.DayOfMonth == request.DayOfMonth).ToListAsync(cancellationToken);
+            if (!ManualShiftDemandRules.CanReserve(rawCell, open.Select(swap => ShiftSwapRules.GetSwapPeriod(swap, swap.ScheduleSlot!)).ToList(), period))
+                throw ValidationException.ForField(nameof(request.DayOfMonth), "This manual shift already has an open swap offer.");
+
+            var nextSlotNo = schedule.Slots
+                .Where(slot =>
+                    slot.DayOfMonth == request.DayOfMonth &&
+                    slot.FromTime == period.FromTime &&
+                    slot.ToTime == period.ToTime)
+                .Select(slot => slot.SlotNo)
+                .DefaultIfEmpty(0)
+                .Max() + 1;
+
+            var slotModel = new ScheduleSlotModel
+            {
+                ScheduleId = schedule.Id,
+                DayOfMonth = request.DayOfMonth,
+                SlotNo = nextSlotNo,
+                EmployeeId = null,
+                Status = SlotStatus.UNFURNISHED,
+                FromTime = period.FromTime,
+                ToTime = period.ToTime,
+            };
+
+            var swapModel = new ShiftSwapRequestModel
+            {
+                Schedule = schedule,
+                ScheduleSlot = slotModel,
+                OfferedFromTime = period.FromTime,
+                OfferedToTime = period.ToTime,
+                FromEmployeeId = null,
+                TargetEmployeeId = targetEmployeeId,
+                Visibility = targetEmployeeId.HasValue ? ShiftSwapVisibility.Private : ShiftSwapVisibility.Public,
+                Status = ShiftSwapStatus.Open,
+                IsManagerCreated = true,
+                AllowPartialAcceptance = request.AllowPartialAcceptance,
+                ManualColumnId = request.ManualColumnId,
+                CreatedAtUtc = DateTimeOffset.UtcNow,
+            };
+
+            db.ScheduleSlots.Add(slotModel);
+            db.ShiftSwapRequests.Add(swapModel);
+            if (CreateEditLockConflictResult(containerId, graphId) is { } writingConflict) return writingConflict;
+            await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+
+            var created = await db.ShiftSwapRequests
+                .Include(swap => swap.Schedule)
+                    .ThenInclude(item => item.Container)
+                .Include(swap => swap.Schedule)
+                    .ThenInclude(item => item.Shop)
+                .Include(swap => swap.ScheduleSlot)
+                .Include(swap => swap.TargetEmployee)
+                .Include(swap => swap.AcceptedByEmployee)
+                .FirstAsync(swap => swap.Id == swapModel.Id, cancellationToken)
+                .ConfigureAwait(false);
+
+            await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
+
+            await PostCommitActions.RunAsync(HttpContext, () => workflowLogService
+                .LogAsync(
+                    User,
+                    $"Published an open shift from \"{GraphManualColumnLabelResolver.Resolve(schedule.Note, request.ManualColumnId)}\" in schedule \"{schedule.Name}\" at {schedule.Shop?.Name ?? "the assigned shop"} for {schedule.Year}-{schedule.Month:00}-{request.DayOfMonth:00}, {period.FromTime}-{period.ToTime}; offered to {(created.TargetEmployeeId.HasValue ? GetEmployeeName(created.TargetEmployee, created.TargetEmployeeId.Value) : "all eligible employees")}.",
+                    cancellationToken))
+                .ConfigureAwait(false);
+            await PostCommitActions.RunAsync(HttpContext, () => realtimeNotifier
+                .NotifyScheduleChangedAsync(containerId, graphId, "manager-manual-shift-offer-created"))
+                .ConfigureAwait(false);
+            await PostCommitActions.RunAsync(HttpContext, () => realtimeNotifier
+                .NotifyManagerDataChangedAsync(ManagerEditResourceTypes.Schedule, $"{containerId}:{graphId}", "manager-manual-shift-offer-created", containerId, graphId))
+                .ConfigureAwait(false);
+            await PostCommitActions.RunAsync(HttpContext, () => realtimeNotifier
+                .NotifyShiftSwapsChangedAsync(containerId, graphId, graphId, "manager-manual-shift-offer-created", created.Id))
+                .ConfigureAwait(false);
+
+            return CreatedAtAction(nameof(GetGraphLog), new { containerId, graphId }, ToLogDto(created));
         }
-
-        var hasOpenManualOffer = await db.ShiftSwapRequests
-            .Include(swap => swap.ScheduleSlot)
-            .AnyAsync(swap =>
-                swap.ScheduleId == graphId &&
-                swap.Status == ShiftSwapStatus.Open &&
-                swap.ManualColumnId == request.ManualColumnId &&
-                swap.ScheduleSlot!.DayOfMonth == request.DayOfMonth,
-                cancellationToken)
-            .ConfigureAwait(false);
-        if (hasOpenManualOffer)
+        catch (Exception exception) when (ShiftSwapRules.IsSqliteWriterConflict(exception) || exception.InnerException is Microsoft.Data.Sqlite.SqliteException { SqliteErrorCode: 19 })
         {
-            throw ValidationException.ForField(nameof(request.DayOfMonth), "This manual shift already has an open swap offer.");
+            throw new ValidationException("This swap changed during another request. Refresh and try again.");
         }
-
-        var nextSlotNo = schedule.Slots
-            .Where(slot =>
-                slot.DayOfMonth == request.DayOfMonth &&
-                slot.FromTime == period.FromTime &&
-                slot.ToTime == period.ToTime)
-            .Select(slot => slot.SlotNo)
-            .DefaultIfEmpty(0)
-            .Max() + 1;
-
-        var slotModel = new ScheduleSlotModel
-        {
-            ScheduleId = schedule.Id,
-            DayOfMonth = request.DayOfMonth,
-            SlotNo = nextSlotNo,
-            EmployeeId = null,
-            Status = SlotStatus.UNFURNISHED,
-            FromTime = period.FromTime,
-            ToTime = period.ToTime,
-        };
-
-        var swapModel = new ShiftSwapRequestModel
-        {
-            Schedule = schedule,
-            ScheduleSlot = slotModel,
-            OfferedFromTime = period.FromTime,
-            OfferedToTime = period.ToTime,
-            FromEmployeeId = null,
-            TargetEmployeeId = targetEmployeeId,
-            Visibility = targetEmployeeId.HasValue ? ShiftSwapVisibility.Private : ShiftSwapVisibility.Public,
-            Status = ShiftSwapStatus.Open,
-            IsManagerCreated = true,
-            ManualColumnId = request.ManualColumnId,
-            CreatedAtUtc = DateTimeOffset.UtcNow,
-        };
-
-        db.ScheduleSlots.Add(slotModel);
-        db.ShiftSwapRequests.Add(swapModel);
-        await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
-
-        var created = await db.ShiftSwapRequests
-            .Include(swap => swap.Schedule)
-                .ThenInclude(item => item.Container)
-            .Include(swap => swap.Schedule)
-                .ThenInclude(item => item.Shop)
-            .Include(swap => swap.ScheduleSlot)
-            .Include(swap => swap.TargetEmployee)
-            .Include(swap => swap.AcceptedByEmployee)
-            .FirstAsync(swap => swap.Id == swapModel.Id, cancellationToken)
-            .ConfigureAwait(false);
-
-        await workflowLogService
-            .LogAsync(
-                User,
-                $"Published an open shift from \"{GraphManualColumnLabelResolver.Resolve(schedule.Note, request.ManualColumnId)}\" in schedule \"{schedule.Name}\" at {schedule.Shop?.Name ?? "the assigned shop"} for {schedule.Year}-{schedule.Month:00}-{request.DayOfMonth:00}, {period.FromTime}-{period.ToTime}; offered to {(created.TargetEmployeeId.HasValue ? GetEmployeeName(created.TargetEmployee, created.TargetEmployeeId.Value) : "all eligible employees")}.",
-                cancellationToken)
-            .ConfigureAwait(false);
-        await realtimeNotifier
-            .NotifyScheduleChangedAsync(containerId, graphId, "manager-manual-shift-offer-created")
-            .ConfigureAwait(false);
-        await realtimeNotifier
-            .NotifyManagerDataChangedAsync(ManagerEditResourceTypes.Schedule, $"{containerId}:{graphId}", "manager-manual-shift-offer-created", containerId, graphId)
-            .ConfigureAwait(false);
-        await realtimeNotifier
-            .NotifyShiftSwapsChangedAsync(containerId, graphId, graphId, "manager-manual-shift-offer-created", created.Id)
-            .ConfigureAwait(false);
-
-        return CreatedAtAction(nameof(GetGraphLog), new { containerId, graphId }, ToLogDto(created));
     }
 
     [HttpGet]
@@ -637,6 +674,7 @@ public sealed class ShiftSwapLogsController(
             CurrentEmployeeHoursAfter = 0,
             FromEmployeeHoursBefore = 0,
             FromEmployeeHoursAfter = 0,
+            AllowPartialAcceptance = model.AllowPartialAcceptance,
             IsManagerCreated = model.IsManagerCreated,
             ManualColumnId = model.ManualColumnId,
             ManualColumnName = manualColumnName,

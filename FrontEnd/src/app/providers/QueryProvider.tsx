@@ -12,6 +12,8 @@ import { isRequestCanceledError } from "@shared/api/httpClient";
 import { isDev } from "@shared/lib/isDev";
 import { pushErrorAlertFromError } from "@shared/ui/feedback/error-alerts/errorAlerts";
 import { useAuth } from "./AuthProvider";
+import { PublicHolidayVisibilityProvider } from "./PublicHolidayVisibilityProvider";
+import { usePendingRegulationsQuery } from "@entities/regulations/api/queries";
 
 function createQueryClient() {
   return new QueryClient({
@@ -58,17 +60,27 @@ export function QueryProvider({ children }: PropsWithChildren) {
   const { session } = useAuth();
   const accountKey = session ? `${session.role}:${session.managerId ?? session.employeeId}` : "guest";
 
-  return <AccountQueryProvider key={accountKey}>{children}</AccountQueryProvider>;
+  const holidaySettingsEnabled = Boolean(session) && !(session?.role === "manager" && session.workspaceMode === "choose");
+  return <AccountQueryProvider key={accountKey} accountKey={accountKey} enabled={holidaySettingsEnabled}>{children}</AccountQueryProvider>;
 }
 
-function AccountQueryProvider({ children }: PropsWithChildren) {
+function AccountQueryProvider({ children, accountKey, enabled }: PropsWithChildren<{ accountKey: string; enabled: boolean }>) {
   const [queryClient] = useState(createQueryClient);
   useEffect(() => () => queryClient.clear(), [queryClient]);
 
   return (
     <QueryClientProvider client={queryClient}>
-      {children}
+      <AccountHolidayVisibility accountKey={accountKey} enabled={enabled}>{children}</AccountHolidayVisibility>
       {isDev ? <ReactQueryDevtools /> : null}
     </QueryClientProvider>
+  );
+}
+
+function AccountHolidayVisibility({ children, accountKey, enabled }: PropsWithChildren<{ accountKey: string; enabled: boolean }>) {
+  const pending = usePendingRegulationsQuery(accountKey, enabled);
+  return (
+    <PublicHolidayVisibilityProvider enabled={enabled && pending.data?.length === 0 && !pending.isError}>
+      {children}
+    </PublicHolidayVisibilityProvider>
   );
 }

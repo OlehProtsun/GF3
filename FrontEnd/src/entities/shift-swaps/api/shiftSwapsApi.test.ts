@@ -13,6 +13,13 @@ beforeEach(() => {
 });
 
 describe("shift swaps api", () => {
+  test("manual setting has its own persisted endpoint", () => {
+    const signal = new AbortController().signal;
+    shiftSwapsApi.getManualHighlightSetting(1, 2, signal);
+    expect(requestMock).toHaveBeenLastCalledWith("containers/1/graphs/2/shift-swaps/manual-highlight-setting", { signal });
+    shiftSwapsApi.saveManualHighlightSetting(1, 2, "#AABBCC");
+    expect(requestMock).toHaveBeenLastCalledWith("containers/1/graphs/2/shift-swaps/manual-highlight-setting", { method: "PUT", body: { highlightColor: "#AABBCC" } });
+  });
   test("encodes candidate query times and posts the complete exchange preview unchanged", () => {
     const controller = new AbortController();
     shiftSwapsApi.listReturnCandidates({ sourceScheduleId: 1, sourceSlotId: 2, fromTime: "09:00", toTime: "16:30", targetEmployeeId: 3, page: 2 }, controller.signal);
@@ -45,7 +52,7 @@ describe("shift swaps api", () => {
     };
 
     shiftSwapsApi.createEmployee(payload);
-    shiftSwapsApi.acceptEmployee(5);
+    shiftSwapsApi.acceptEmployee({ id: 5 });
     shiftSwapsApi.cancelEmployee(6);
 
     expect(requestMock).toHaveBeenNthCalledWith(1, "employee-shift-swaps", {
@@ -117,4 +124,9 @@ describe("shift swaps api", () => {
     expect(requestMock).toHaveBeenNthCalledWith(2, "containers/2/shift-swaps/41/cancel", { method: "POST" });
     expect(requestMock).toHaveBeenNthCalledWith(3, "containers/2/shift-swaps/42", { method: "DELETE" });
   });
+});
+
+test("custom acceptance sends the selected window", () => {
+  shiftSwapsApi.acceptEmployee({ id: 5, fromTime: "09:00", toTime: "15:00" });
+  expect(requestMock).toHaveBeenCalledWith("employee-shift-swaps/5/accept", { method: "POST", body: { fromTime: "09:00", toTime: "15:00" } });
 });

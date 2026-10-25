@@ -1,22 +1,31 @@
-import { useId, useRef, type RefObject } from "react";
+import { useId, useRef, useState, type RefObject } from "react";
 import { createPortal } from "react-dom";
 import type { ShiftSwap } from "@entities/shift-swaps";
 import { getLocale, translateServerMessage, t } from "@shared/i18n";
 import { ErrorBanner } from "@shared/ui/components/ErrorBanner";
-import { CloseIcon } from "@shared/ui/icons";
+import { CloseIcon, EmployeeIcon, EyeIcon, InfoIcon, NoteIcon, ShopIcon, SwapOffersIcon } from "@shared/ui/icons";
 import { useSwapModalEnvironment } from "./useSwapModalEnvironment";
-import review from "./SwapCreateWizard.module.css";
+import { swapMinutes, swapTime, type SwapPeriod } from "./SwapShiftPickerDialog";
 import styles from "./SwapOfferDetailsDialog.module.css";
 
 export function SwapOfferDetailsDialog({ swap, currentEmployeeId, busy, error, onClose, onAccept, onCancel, returnFocusRef }: {
   swap: ShiftSwap; currentEmployeeId: number | null; busy: boolean; error?: string | null;
-  onClose: () => void; onAccept: (swap: ShiftSwap) => void; onCancel: (swap: ShiftSwap) => void;
+  onClose: () => void; onAccept: (swap: ShiftSwap, claimedPeriod?: SwapPeriod) => void; onCancel: (swap: ShiftSwap) => void;
   returnFocusRef?: RefObject<HTMLElement | null>;
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const headingId = useId();
   useSwapModalEnvironment(dialogRef, returnFocusRef);
   const exchange = swap.requestKind === "exchange";
+  const flexible = !exchange && swap.allowPartialAcceptance;
+  const windows = swap.eligibleClaimWindows ?? [];
+  const fullAllowed = swap.canAcceptFull ?? swap.canAccept;
+  const [custom, setCustom] = useState(Boolean(flexible && !fullAllowed));
+  const [period, setPeriod] = useState<SwapPeriod>(flexible && !fullAllowed && windows[0] ? windows[0] : { fromTime: swap.fromTime, toTime: swap.toTime });
+  const allowed = (value: SwapPeriod) => /^([01]\d|2[0-3]):[0-5]\d$/.test(value.fromTime) && /^([01]\d|2[0-3]):[0-5]\d$/.test(value.toTime) &&
+    value.fromTime < value.toTime && windows.some(window => value.fromTime >= window.fromTime && value.toTime <= window.toTime);
+  const valid = swap.canAccept && (!flexible || (custom ? allowed(period) : fullAllowed));
+  const selectedWindow = windows.find(window => period.fromTime >= window.fromTime && period.toTime <= window.toTime);
   const creator = swap.isCreatedByCurrentEmployee || (currentEmployeeId !== null && currentEmployeeId === swap.fromEmployeeId);
   const recipient = !creator && currentEmployeeId !== null && (currentEmployeeId === swap.targetEmployeeId ||
     currentEmployeeId === swap.acceptedByEmployeeId || (!exchange && swap.status === "open" && swap.visibility === "public"));
@@ -44,40 +53,76 @@ export function SwapOfferDetailsDialog({ swap, currentEmployeeId, busy, error, o
         {panels.map((panel, index) => {
           const date = panel.year && panel.month && panel.day ? new Date(Date.UTC(panel.year, panel.month - 1, panel.day)) : null;
           return <div key={index}>
-            {index > 0 && <div className={review.exchangeArrows} aria-label={t("Reciprocal exchange")}>⇅</div>}
-            <section className={review.transferCard} aria-label={panel.heading}>
+            {index > 0 && <div className={styles.exchangeArrows} aria-label={t("Reciprocal exchange")}>⇅</div>}
+            <section className={styles.transferCard} aria-label={panel.heading}>
               <header><div><h3>{panel.heading}</h3><p>{panel.employee || t("Not available")}</p></div>
-                {panel.role && <span className={panel.role === "receive" ? review.receiveBadge : review.giveBadge}>{t(panel.role === "receive" ? "Receive" : "Give")}</span>}
+                {panel.role && <span className={panel.role === "receive" ? styles.receiveBadge : styles.giveBadge}>{t(panel.role === "receive" ? "Receive" : "Give")}</span>}
               </header>
-              <div className={review.transferPeriod}>
-                <div className={review.dateBadge}>{date ? <><strong>{String(panel.day).padStart(2, "0")}</strong>
+              <div className={styles.transferPeriod}>
+                <div className={styles.dateBadge}>{date ? <><strong>{String(panel.day).padStart(2, "0")}</strong>
                   <span>{new Intl.DateTimeFormat(getLocale(), { month: "short", timeZone: "UTC" }).format(date)}</span><small>{panel.year}</small></> : t("Not available")}</div>
-                <div className={review.transferMeta}><strong>{panel.schedule || t("Not available")}</strong>
-                  {panel.location && <span>{panel.location}</span>}
-                  <strong>{panel.from && panel.to ? `${panel.from}–${panel.to}` : t("Not available")}</strong>
-                  {typeof panel.hours === "number" && Number.isFinite(panel.hours) && <span>{t("Shift hours")}: {t("{0}h", new Intl.NumberFormat(getLocale(), { maximumFractionDigits: 2 }).format(panel.hours))}</span>}
+                <div className={styles.transferMeta}><strong>{panel.schedule || t("Not available")}</strong>
+                  {panel.location && <span className={styles.detailLine}><ShopIcon size={16} className={styles.shopIcon} />{panel.location}</span>}
+                  <strong className={styles.detailLine}><ClockIcon />{panel.from && panel.to ? `${panel.from}–${panel.to}` : t("Not available")}</strong>
+                  {typeof panel.hours === "number" && Number.isFinite(panel.hours) && <small>{t("Shift hours")}: {t("{0}h", new Intl.NumberFormat(getLocale(), { maximumFractionDigits: 2 }).format(panel.hours))}</small>}
                 </div>
               </div>
             </section>
           </div>;
         })}
-        <dl className={`${review.requestSummary} ${styles.metadata}`}>
-          {[[t("Request type"), t(exchange ? "Swap shifts" : "Give shift")], [t("From"), giver],
-            [t("Target"), swap.targetEmployeeName || t("Everyone")], [t("Location"), swap.shopName || swap.containerName],
-            [t("Visibility"), t(swap.visibility === "private" ? "Private" : "Public")], [t("Status"), status],
-            ...(swap.acceptedByEmployeeName ? [[t("Accepted by"), swap.acceptedByEmployeeName]] : [])].map(([label, value]) =>
-            <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}
+        {flexible && swap.status === "open" && <p className={styles.info}><InfoIcon size={20} />{t("Allow custom time")}</p>}
+        {swap.status === "open" && flexible && swap.canAccept && <section className={styles.claim} aria-label={t("Claim period")}>
+          {!fullAllowed && <p>{t("You already work during part of this shift; you can claim {0}.", windows.map(window => `${window.fromTime}–${window.toTime}`).join(", "))}</p>}
+          <div className={styles.claimModes}>
+            {fullAllowed && <button type="button" aria-pressed={!custom} onClick={() => setCustom(false)}>{t("Full shift")}</button>}
+            <button type="button" aria-pressed={custom} onClick={() => { setCustom(true); if (!allowed(period) && windows[0]) setPeriod(windows[0]); }}>{t("Custom period")}</button>
+          </div>
+          {custom && <>
+            <output className={styles.selectedPeriod} aria-label={t("Claim period")}>{period.fromTime}–{period.toTime}</output>
+            {windows.length > 1 && <div className={styles.claimWindows} role="group" aria-label={t("Available claim windows")}>
+              {windows.map(window => <button type="button" key={`${window.fromTime}:${window.toTime}`} aria-pressed={selectedWindow === window} onClick={() => setPeriod(window)}>{window.fromTime}–{window.toTime}</button>)}
+            </div>}
+            <div className={styles.timeControls}>
+              <div className={styles.timeCards}>
+              {(["fromTime", "toTime"] as const).map(edge => <div className={styles.timeCard} key={edge}>
+                <label htmlFor={`${headingId}-${edge}`}>{t(edge === "fromTime" ? "From" : "To")}</label>
+                <div className={styles.timeValue}>
+                  <input id={`${headingId}-${edge}`} type="time" step={900} min={selectedWindow?.fromTime} max={selectedWindow?.toTime} value={period[edge]} onChange={event => setPeriod({ ...period, [edge]: event.target.value })} />
+                  <ClockIcon />
+                </div>
+                <div className={styles.timeButtons}>
+                  <button type="button" aria-label={t("Decrease {0}", t(edge === "fromTime" ? "From" : "To"))} disabled={!allowed({ ...period, [edge]: swapTime(swapMinutes(period[edge]) - 15) })} onClick={() => setPeriod({ ...period, [edge]: swapTime(swapMinutes(period[edge]) - 15) })}>−</button>
+                  <span aria-hidden="true" />
+                  <button type="button" aria-label={t("Increase {0}", t(edge === "fromTime" ? "From" : "To"))} disabled={!allowed({ ...period, [edge]: swapTime(swapMinutes(period[edge]) + 15) })} onClick={() => setPeriod({ ...period, [edge]: swapTime(swapMinutes(period[edge]) + 15) })}>+</button>
+                </div>
+              </div>)}
+              </div>
+              <p className={styles.helper}>{t("Unclaimed time will remain available as a new offer.")}</p>
+            </div>
+            {!allowed(period) && <p role="alert">{t("Choose one continuous period inside an available claim window.")}</p>}
+          </>}
+        </section>}
+        <dl className={styles.metadata}>
+          {([[t("Request type"), t(exchange ? "Swap shifts" : "Give shift"), SwapOffersIcon], [t("From"), giver, EmployeeIcon],
+            [t("Target"), swap.targetEmployeeName || t("Everyone"), EmployeeIcon], [t("Location"), swap.shopName || swap.containerName, ShopIcon],
+            [t("Visibility"), t(swap.visibility === "private" ? "Private" : "Public"), EyeIcon], [t("Status"), status, NoteIcon],
+            ...(swap.acceptedByEmployeeName ? [[t("Accepted by"), swap.acceptedByEmployeeName, EmployeeIcon] as const] : [])] as const).map(([label, value, Icon]) =>
+            <div key={label}><dt><Icon size={17} className={Icon === ShopIcon ? styles.shopIcon : undefined} /><span>{label}</span></dt><dd>{value}</dd></div>)}
         </dl>
-        {swap.status === "open" && !swap.canAccept && <p className={review.reviewInfo}>{translateServerMessage(unavailable)}</p>}
+        {swap.status === "open" && !swap.canAccept && <p className={styles.info}>{translateServerMessage(unavailable)}</p>}
       </div>
       <footer className={styles.footer}>
         {swap.status === "open" ? <>
-          <button type="button" className={styles.primary} disabled={!swap.canAccept || busy} onClick={() => onAccept(swap)}>{t("Accept shift")}</button>
+          <button type="button" className={styles.primary} aria-busy={busy} disabled={!valid || busy} onClick={() => onAccept(swap, flexible && custom ? period : undefined)}>{t("Accept shift")}<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="M4 12h16m-6-6 6 6-6 6" /></svg></button>
           {swap.canCancel && <button type="button" disabled={busy} onClick={() => onCancel(swap)}>{t("Cancel offer")}</button>}
         </> : <span>{status}</span>}
       </footer>
     </div>
   </dialog>, document.body);
+}
+
+function ClockIcon() {
+  return <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 6v6l4 2" /></svg>;
 }
 
 function hoursFromBounds(from?: string | null, to?: string | null): number | null {

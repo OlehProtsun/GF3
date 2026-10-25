@@ -39,28 +39,42 @@ public class ScheduleSlotRepository : GenericRepository<ScheduleSlotModel>, ISch
         if (overwrite)
         {
             var protectedSlots = await GetProtectedManagerManualOfferSlotsAsync(scheduleId, ct).ConfigureAwait(false);
-            if (protectedSlots.Count > 0)
+            incomingSlots = ExcludeProtectedOpenOfferSlots(incomingSlots, protectedSlots);
+            var slotList = PrepareSlotBatch(scheduleId, incomingSlots);
+            ReserveProtectedSlotNumbers(slotList, protectedSlots);
+            var protectedIds = protectedSlots.Select(slot => slot.Id).ToHashSet();
+            var existing = await _set.AsNoTracking()
+                .Where(slot => slot.ScheduleId == scheduleId)
+                .ToListAsync(ct).ConfigureAwait(false);
+            var available = existing.Where(slot => !protectedIds.Contains(slot.Id))
+                .GroupBy(slot => (slot.ScheduleId, slot.DayOfMonth, slot.SlotNo, slot.EmployeeId,
+                    slot.Status, slot.FromTime, slot.ToTime))
+                .ToDictionary(group => group.Key, group => new Queue<ScheduleSlotModel>(group));
+            var retainedIds = new HashSet<int>(protectedIds);
+            var additions = new List<ScheduleSlotModel>();
+            foreach (var slot in slotList)
             {
-                incomingSlots = ExcludeProtectedOpenOfferSlots(incomingSlots, protectedSlots);
-                var slotList = PrepareSlotBatch(scheduleId, incomingSlots);
-                ReserveProtectedSlotNumbers(slotList, protectedSlots);
-                await DeleteExistingScheduleSlotsAsync(scheduleId, protectedSlots.Select(slot => slot.Id).ToList(), ct)
-                    .ConfigureAwait(false);
-
-                if (slotList.Count > 0)
+                var key = (slot.ScheduleId, slot.DayOfMonth, slot.SlotNo, slot.EmployeeId,
+                    slot.Status, slot.FromTime, slot.ToTime);
+                if (available.TryGetValue(key, out var matches) && matches.TryDequeue(out var match))
                 {
-                    await _set.AddRangeAsync(slotList, ct).ConfigureAwait(false);
+                    retainedIds.Add(match.Id);
+                }
+                else
+                {
+                    additions.Add(slot);
                 }
             }
-            else
-            {
-                var slotList = PrepareSlotBatch(scheduleId, incomingSlots);
-                await DeleteExistingScheduleSlotsAsync(scheduleId, ct).ConfigureAwait(false);
 
-                if (slotList.Count > 0)
-                {
-                    await _set.AddRangeAsync(slotList, ct).ConfigureAwait(false);
-                }
+            foreach (var batch in existing.Where(slot => !retainedIds.Contains(slot.Id))
+                .Select(slot => slot.Id).Chunk(500))
+            {
+                await _set.Where(slot => slot.ScheduleId == scheduleId && batch.Contains(slot.Id))
+                    .ExecuteDeleteAsync(ct).ConfigureAwait(false);
+            }
+            if (additions.Count > 0)
+            {
+                await _set.AddRangeAsync(additions, ct).ConfigureAwait(false);
             }
         }
         else
@@ -79,22 +93,6 @@ public class ScheduleSlotRepository : GenericRepository<ScheduleSlotModel>, ISch
         // Clearing the tracker keeps the context lightweight for subsequent operations.
         _db.ChangeTracker.Clear();
         return written;
-    }
-
-    private async Task DeleteExistingScheduleSlotsAsync(int scheduleId, CancellationToken ct)
-    {
-        await _set
-            .Where(slot => slot.ScheduleId == scheduleId)
-            .ExecuteDeleteAsync(ct)
-            .ConfigureAwait(false);
-    }
-
-    private async Task DeleteExistingScheduleSlotsAsync(int scheduleId, IReadOnlyCollection<int> protectedSlotIds, CancellationToken ct)
-    {
-        await _set
-            .Where(slot => slot.ScheduleId == scheduleId && !protectedSlotIds.Contains(slot.Id))
-            .ExecuteDeleteAsync(ct)
-            .ConfigureAwait(false);
     }
 
     private async Task<List<ScheduleSlotModel>> GetProtectedManagerManualOfferSlotsAsync(int scheduleId, CancellationToken ct)

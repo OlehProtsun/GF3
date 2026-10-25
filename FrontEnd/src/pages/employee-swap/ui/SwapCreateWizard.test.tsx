@@ -2,7 +2,7 @@ import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, expect, test, vi } from "vitest";
-import { setLanguage } from "@shared/i18n";
+import { setLanguage, t } from "@shared/i18n";
 import { useRef, useState } from "react";
 import type { EmployeeSchedule } from "@entities/employee-schedule";
 import type { ShiftSwapOfferPreview, ShiftSwapReturnCandidate, SwapWizardRequest } from "@entities/shift-swaps";
@@ -117,7 +117,7 @@ test("custom source and private Give survive edits with long names in the same m
   await user.click(screen.getByRole("button", { name: "Continue" }));
   await user.click(screen.getByRole("button", { name: "Continue" }));
   await user.click(screen.getByRole("button", { name: "Send request" }));
-  expect(result.onSubmit).toHaveBeenCalledWith({ requestKind: "give", scheduleId: 10, scheduleSlotId: 100, fromTime: "09:15", toTime: "16:30", targetEmployeeId: 2 });
+  expect(result.onSubmit).toHaveBeenCalledWith({ allowPartialAcceptance: false, requestKind: "give", scheduleId: 10, scheduleSlotId: 100, fromTime: "09:15", toTime: "16:30", targetEmployeeId: 2 });
 });
 
 const mocks = vi.hoisted(() => ({ candidates: vi.fn(), preview: vi.fn() }));
@@ -144,7 +144,7 @@ beforeEach(() => {
   });
   mocks.candidates.mockImplementation(() => ({ data: { items: [candidate, { ...candidate, slotId: 201, canSelect: false, unavailableReason: "Not enough hours." }], hasMore: false }, isFetching: false }));
   mocks.preview.mockImplementation((payload: SwapWizardRequest | null) => ({ data: payload ? {
-    requestKind: payload.requestKind, targetEmployeeId: payload.targetEmployeeId, targetEmployeeName: payload.targetEmployeeId ? "Target Worker" : "Everyone",
+    requestKind: payload.requestKind, allowPartialAcceptance: payload.allowPartialAcceptance ?? false, targetEmployeeId: payload.targetEmployeeId, targetEmployeeName: payload.targetEmployeeId ? "Target Worker" : "Everyone",
     source: { ...source, fromTime: payload.fromTime, toTime: payload.toTime }, return: payload.requestKind === "exchange" ? { ...candidate, fromTime: payload.returnFromTime, toTime: payload.returnToTime } : null,
     isValid: true, projectedMonths: [{ year: 2026, month: 10, hoursBefore: 7.5, hoursAfter: payload.requestKind === "exchange" ? 7.5 : 0, workDaysBefore: 1, workDaysAfter: 1, freeDaysBefore: 30, freeDaysAfter: 30 }],
   } satisfies ShiftSwapOfferPreview : undefined, isFetching: false }));
@@ -209,8 +209,8 @@ test("restores the explicit launcher even when it was not focused before opening
 async function chooseSource(user: ReturnType<typeof userEvent.setup>) {
   await user.click(screen.getByRole("button", { name: /F27/ }));
   await user.click(screen.getByRole("radio", { name: /09:00.*16:30/ }));
-  await user.click(screen.getByRole("button", { name: "Confirm shift" }));
-  await user.click(screen.getByRole("button", { name: "Continue" }));
+  await user.click(screen.getByRole("button", { name: t("Confirm shift") }));
+  await user.click(screen.getByRole("button", { name: t("Continue") }));
 }
 
 test.each([
@@ -235,7 +235,7 @@ test.each([
   expect(screen.getByRole("region", { name: "Your shift (you give)" })).toHaveTextContent(`${fromTime} – ${toTime}`);
   await user.dblClick(screen.getByRole("button", { name: "Send request" }));
   expect(result.onSubmit).toHaveBeenCalledTimes(1);
-  expect(result.onSubmit).toHaveBeenCalledWith({ requestKind: "give", scheduleId: 10, scheduleSlotId: 100, fromTime, toTime, targetEmployeeId });
+  expect(result.onSubmit).toHaveBeenCalledWith({ allowPartialAcceptance: false, requestKind: "give", scheduleId: 10, scheduleSlotId: 100, fromTime, toTime, targetEmployeeId });
 });
 
 test("public Give has three steps, authoritative review and submits once", async () => {
@@ -255,11 +255,12 @@ test("public Give has three steps, authoritative review and submits once", async
   await user.click(screen.getByRole("button", { name: "Continue" }));
   await user.dblClick(screen.getByRole("button", { name: "Send request" }));
   expect(result.onSubmit).toHaveBeenCalledTimes(1);
-  expect(result.onSubmit).toHaveBeenCalledWith({ requestKind: "give", scheduleId: 10, scheduleSlotId: 100, fromTime: "09:00", toTime: "16:30", targetEmployeeId: null });
+  expect(result.onSubmit).toHaveBeenCalledWith({ allowPartialAcceptance: false, requestKind: "give", scheduleId: 10, scheduleSlotId: 100, fromTime: "09:00", toTime: "16:30", targetEmployeeId: null });
 });
 
 test("specific Exchange edits return bounds independently in a single modal", async () => {
   const user = userEvent.setup(); const result = setup(); const modal = screen.getByRole("dialog"); await chooseSource(user);
+  await user.click(screen.getByRole("radio", { name: "Allow custom time" }));
   await user.click(screen.getByRole("button", { name: "Specific employee" }));
   expect(screen.getByRole("button", { name: "Continue" })).toBeDisabled();
   await user.type(screen.getByRole("searchbox"), "Target");
@@ -290,7 +291,11 @@ test("specific Exchange edits return bounds independently in a single modal", as
   await user.click(screen.getByRole("button", { name: "Continue" }));
   expect(screen.getByLabelText("Reciprocal exchange")).toBeInTheDocument();
   await user.click(screen.getByRole("button", { name: "Send request" }));
-  expect(result.onSubmit).toHaveBeenCalledWith(expect.objectContaining({ requestKind: "exchange", targetEmployeeId: 2, returnScheduleId: 20, returnScheduleSlotId: 200, returnFromTime: "09:15", returnToTime: "16:30" }));
+  expect(result.onSubmit).toHaveBeenCalledWith(expect.objectContaining({ requestKind: "exchange", allowPartialAcceptance: false, targetEmployeeId: 2, returnScheduleId: 20, returnScheduleSlotId: 200, returnFromTime: "09:15", returnToTime: "16:30" }));
+  await user.click(screen.getByRole("button", { name: "Edit recipient" }));
+  expect(screen.queryByRole("group", { name: "Acceptance mode" })).not.toBeInTheDocument();
+  await user.click(screen.getByRole("button", { name: "Everyone", exact: true }));
+  expect(screen.getByRole("radio", { name: "Allow custom time" })).toBeChecked();
 });
 
 test("Escape restores the parent heading and Close invokes dismissal", async () => {
@@ -467,4 +472,44 @@ test.each(["en", "pl"] as const)("contextual names and Back/Close semantics are 
   expect(result.onClose).not.toHaveBeenCalled();
   await user.click(screen.getByRole("button", { name: close }));
   expect(result.onClose).toHaveBeenCalledOnce();
+});
+
+test("give mode defaults strict and custom permission survives review and payload", async () => {
+  const user = userEvent.setup(); const result = setup(); await chooseSource(user);
+  const everyone = screen.getByRole("button", { name: "Everyone", exact: true });
+  expect(everyone).toHaveAttribute("aria-expanded", "true");
+  expect(everyone.parentElement).toContainElement(screen.getByRole("group", { name: "Acceptance mode" }));
+  expect(screen.queryByText("Unclaimed time will remain available as a new offer.")).not.toBeInTheDocument();
+  expect(screen.getByRole("radio", { name: "Only the exact shift" })).toBeChecked();
+  await user.click(screen.getByRole("radio", { name: "Allow custom time" }));
+  expect(screen.getByText("Unclaimed time will remain available as a new offer.")).toBeVisible();
+  await user.click(screen.getByRole("button", { name: "Continue" }));
+  await user.click(screen.getByRole("button", { name: "Send request" }));
+  expect(result.onSubmit).toHaveBeenCalledWith(expect.objectContaining({ requestKind: "give", allowPartialAcceptance: true }));
+});
+
+test.each(["en", "pl", "uk"] as const)("private Give is strict and public acceptance mode survives recipient switches (%s)", async language => {
+  setLanguage(language);
+  const user = userEvent.setup(); const result = setup(); await chooseSource(user);
+  await user.click(screen.getByRole("radio", { name: t("Allow custom time") }));
+  await user.click(screen.getByRole("button", { name: t("Specific employee"), exact: true }));
+  expect(screen.queryByRole("group", { name: t("Acceptance mode") })).not.toBeInTheDocument();
+  expect(screen.getByRole("button", { name: t("Everyone"), exact: true })).toHaveAttribute("aria-expanded", "false");
+  expect(screen.getByRole("button", { name: t("Continue") })).toBeDisabled();
+  await user.click(screen.getByRole("button", { name: "Target Worker" }));
+  await user.click(screen.getByRole("button", { name: t("Save selection") }));
+  await user.click(screen.getByRole("button", { name: t("Continue") }));
+  await user.click(screen.getByRole("button", { name: t("Send request") }));
+  expect(result.onSubmit).toHaveBeenCalledWith(expect.objectContaining({
+    requestKind: "give", targetEmployeeId: 2, allowPartialAcceptance: false,
+    scheduleSlotId: 100, fromTime: "09:00", toTime: "16:30",
+  }));
+  await user.click(screen.getByRole("button", { name: t("Edit recipient") }));
+  await user.click(screen.getByRole("button", { name: t("Everyone"), exact: true }));
+  expect(screen.getByRole("radio", { name: t("Allow custom time") })).toBeChecked();
+  await user.click(screen.getByRole("button", { name: t("Continue") }));
+  expect(mocks.preview).toHaveBeenLastCalledWith(expect.objectContaining({
+    requestKind: "give", targetEmployeeId: null, allowPartialAcceptance: true,
+    scheduleSlotId: 100, fromTime: "09:00", toTime: "16:30",
+  }));
 });

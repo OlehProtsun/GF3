@@ -8,6 +8,9 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import type { EmployeeSchedule } from "@entities/employee-schedule";
 import { EmployeeSchedulePage } from "./EmployeeSchedulePage";
 import styles from "./EmployeeSchedulePage.module.css";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { PublicHolidayVisibilityProvider } from "@app/providers/PublicHolidayVisibilityProvider";
+import { publicHolidaySettingsApi } from "@entities/public-holidays/api/publicHolidaySettingsApi";
 
 beforeEnglishTest(() => setTestLanguage("en"));
 
@@ -205,6 +208,27 @@ beforeEach(() => {
 });
 
 describe("EmployeeSchedulePage", () => {
+  test.each([true, false])("daily and summary dates respect holiday visibility %s without changing worked shifts", async enabled => {
+    const spy = vi.spyOn(publicHolidaySettingsApi, "get").mockResolvedValue({ showPublicHolidays: enabled });
+    mocks.scheduleQuery.mockReturnValue({ data: [{ ...schedules[0], slots: [
+      { id: 501, dayOfMonth: 1, slotNo: 1, employeeId: 12, fromTime: "09:00", toTime: "15:00", status: "ASSIGNED" },
+    ] }], isLoading: false });
+    await act(async () => { render(<QueryClientProvider client={new QueryClient()}><PublicHolidayVisibilityProvider enabled>
+      <BrowserRouter><EmployeeSchedulePage /></BrowserRouter>
+    </PublicHolidayVisibilityProvider></QueryClientProvider>); });
+    const summary = screen.getByRole("table", { name: "Schedule hours summary" });
+    const date = within(summary).getByText("fr./01");
+    expect(date.classList.contains(styles.hoursSummaryDateHoliday)).toBe(enabled);
+    expect(date.getAttribute("title")).toBe(enabled ? "Labour Day" : null);
+    expect(date.parentElement).toHaveTextContent("6h");
+    await userEvent.click(screen.getByRole("button", { name: "Show daily schedule view" }));
+    const day = screen.getByRole("tab", { name: /^Friday 1, working day/ });
+    expect(day).toHaveClass(styles.dailyScheduleDayWorking);
+    expect(day.classList.contains(styles.dailyScheduleDayHoliday)).toBe(enabled);
+    expect(day.getAttribute("title")).toBe(enabled ? "Labour Day" : null);
+    expect(day.getAttribute("aria-label")?.includes("Labour Day")).toBe(enabled);
+    spy.mockRestore();
+  });
   test("downloads one PDF directly without a preview and preserves matrix and scroll", async () => {
     let resolve!: (value: unknown) => void;
     mocks.exportPdf.mockImplementation(() => new Promise(done => { resolve = done; }));
@@ -218,17 +242,36 @@ describe("EmployeeSchedulePage", () => {
     await userEvent.setup().dblClick(button);
     expect(button).toBeDisabled();
     expect(button).toHaveAttribute("aria-busy", "true");
+    expect(screen.getByRole("status", { name: "Creating PDF..." })).toBeVisible();
     expect(mocks.exportPdf).toHaveBeenCalledTimes(1);
     expect(mocks.exportPdf).toHaveBeenCalledWith(1, expect.any(AbortSignal));
     await act(async () => resolve({ blob: new Blob(["%PDF-"], { type: "application/pdf" }), fileName: "schedule.pdf" }));
     expect(mocks.downloadPdf).toHaveBeenCalledWith(expect.objectContaining({ fileName: "schedule.pdf" }), "schedule.pdf");
     expect(button).toBeEnabled();
+    expect(screen.queryByRole("status", { name: "Creating PDF..." })).not.toBeInTheDocument();
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     expect(screen.getByTestId("schedule-matrix")).toBe(matrix);
     expect(matrix.scrollTop).toBe(75);
     expect(mocks.matrix.mock.calls.at(-1)?.[0].graph.id).toBe(1);
     expect(open).not.toHaveBeenCalled();
     expect(print).not.toHaveBeenCalled();
+  });
+
+  test("hides the PDF generation indicator before native sharing completes", async () => {
+    let resolvePdf!: (value: unknown) => void;
+    let resolveShare!: () => void;
+    mocks.exportPdf.mockImplementation(() => new Promise(resolve => { resolvePdf = resolve; }));
+    const share = vi.fn(() => new Promise<void>(resolve => { resolveShare = resolve; }));
+    Object.defineProperty(navigator, "share", { configurable: true, value: share });
+    Object.defineProperty(navigator, "canShare", { configurable: true, value: () => true });
+    mocks.scheduleQuery.mockReturnValue({ data: schedules, isLoading: false });
+    renderPage();
+    await userEvent.setup().click(screen.getByRole("button", { name: "Export schedule to PDF" }));
+    expect(screen.getByRole("status", { name: "Creating PDF..." })).toBeVisible();
+    await act(async () => resolvePdf({ blob: new Blob(["%PDF-"], { type: "application/pdf" }), fileName: "schedule.pdf" }));
+    expect(share).toHaveBeenCalledOnce();
+    expect(screen.queryByRole("status", { name: "Creating PDF..." })).not.toBeInTheDocument();
+    await act(async () => resolveShare());
   });
 
   test.each(["success", "AbortError", "NotAllowedError", "DataError"])("shares PDF directly and handles %s", async result => {
@@ -282,6 +325,7 @@ describe("EmployeeSchedulePage", () => {
     expect(await screen.findByText(typeof failure === "number" ? `PDF ${failure}` : "Could not export this schedule to PDF.")).toBeVisible();
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     expect(screen.getByTestId("schedule-matrix")).toHaveTextContent("May Schedule");
+    expect(screen.queryByRole("status", { name: "Creating PDF..." })).not.toBeInTheDocument();
   });
 
   test("aborts stale exports when selecting another schedule or unmounting", async () => {
@@ -295,6 +339,7 @@ describe("EmployeeSchedulePage", () => {
     await user.click(screen.getByRole("button", { name: "Select schedule. Current schedule: May Schedule" }));
     await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: /Second May Schedule/ }));
     expect(signal.aborted).toBe(true);
+    expect(screen.queryByRole("status", { name: "Creating PDF..." })).not.toBeInTheDocument();
     await act(async () => resolve({ blob: new Blob(["%PDF-"], { type: "application/pdf" }) }));
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     expect(mocks.downloadPdf).not.toHaveBeenCalled();

@@ -5,8 +5,59 @@ import { describe, expect, test, vi } from "vitest";
 import type { GraphRelatedScheduleHintDetail } from "@entities/containers/model/graphWorkspace";
 import { ContainerGraphMatrix } from "./ContainerGraphMatrix";
 import styles from "./ContainerGraphMatrix.module.css";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { PublicHolidayVisibilityProvider } from "@app/providers/PublicHolidayVisibilityProvider";
+import { publicHolidaySettingsApi } from "@entities/public-holidays/api/publicHolidaySettingsApi";
 
 beforeEnglishTest(() => setTestLanguage("en"));
+
+test("pinned generated headers cannot be dragged or receive a column drop", () => {
+  const onColumnMove = vi.fn();
+  const columns = [-7, 1, -8].map(employeeId => ({ employeeId, kind: employeeId < 0 ? "manual" as const : "employee" as const,
+    manualColumnId: employeeId < 0 ? -employeeId : null, graphEmployeeId: null, label: String(employeeId), minHoursMonth: null, totalMinutes: 0, totalText: "" }));
+  render(<ContainerGraphMatrix graph={{ year: 2026, month: 1 }} columns={columns} cellMap={{}}
+    pinnedColumnIds={new Set([-7])} onColumnMove={onColumnMove} />);
+  const pinned = screen.getByRole("columnheader", { name: "-7" });
+  const employee = screen.getByRole("columnheader", { name: "1" });
+  expect(pinned).toHaveAttribute("draggable", "false");
+  expect(employee).toHaveAttribute("draggable", "true");
+  fireEvent.dragStart(employee, { dataTransfer: { setData: vi.fn() } });
+  fireEvent.drop(pinned);
+  expect(onColumnMove).not.toHaveBeenCalled();
+});
+
+describe("public holiday dates", () => {
+  test.each([1, 5])("marks named dates in month %s without changing explicit styles or selection", month => {
+    const { container } = render(<ContainerGraphMatrix graph={{ year: 2026, month }}
+      columns={[{ employeeId: 7, kind: "employee", manualColumnId: null, graphEmployeeId: 70, label: "Ada", minHoursMonth: null, totalMinutes: 0, totalText: "" }]}
+      cellMap={{ "7:1": "09:00 - 15:00" }} selectedCellKeys={["7:1"]} dayConflictMap={{ 1: true }}
+      styleMap={{ "7:1": { id: 1, backgroundColor: "#ff0000", textColor: "#ffffff", backgroundColorArgb: null, textColorArgb: null },
+        "0:1": { id: 2, backgroundColor: "#00ff00", textColor: "#000000", backgroundColorArgb: null, textColorArgb: null } }} />);
+    const day = screen.getByTitle(month === 1 ? "New Year's Day" : "Labour Day");
+    expect(day).toHaveAttribute("aria-label", expect.stringContaining("Holiday"));
+    expect(day).toHaveClass(styles.dayCellConflict, styles.dayCellSelected);
+    expect(day).toHaveStyle({ backgroundColor: "#00ff00" });
+    expect(day.querySelector(`.${styles.dayButtonHoliday}`)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Ada day 1" }).closest("td")).toHaveStyle({ backgroundColor: "#ff0000" });
+    expect(container.querySelectorAll("tbody th")[1]).not.toHaveAttribute("title");
+    if (month === 5) {
+      const sunday = screen.getByTitle("Constitution Day");
+      expect(sunday.parentElement).toHaveClass(styles.weekendRow);
+      expect(sunday.querySelector(`.${styles.dayButtonHoliday}`)).toBeInTheDocument();
+    }
+    expect(container.querySelector("td[class*='Holiday']")).toBeNull();
+  });
+  test("OFF removes holiday semantics through the real query context", async () => {
+    const spy = vi.spyOn(publicHolidaySettingsApi, "get").mockResolvedValue({ showPublicHolidays: false });
+    const client = new QueryClient();
+    await act(async () => { render(<QueryClientProvider client={client}><PublicHolidayVisibilityProvider enabled>
+      <ContainerGraphMatrix graph={{ year: 2026, month: 5 }} columns={[]} cellMap={{}} />
+    </PublicHolidayVisibilityProvider></QueryClientProvider>); });
+    expect(screen.queryByTitle("Labour Day")).toBeNull();
+    expect(screen.queryByText("Hol.")).toBeNull();
+    spy.mockRestore();
+  });
+});
 
 describe("ContainerGraphMatrix related schedule hints", () => {
   test("marks an invalid styled cell for the visible error pulse", () => {

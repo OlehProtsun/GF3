@@ -79,5 +79,10 @@
   "Schedule matrix has invalid column widths.",
   "Schedule matrix has invalid row heights.",
   "Schedule column is wider than the printable page.",
-  "Choose English, Polish or Ukrainian."
+  "Choose English, Polish or Ukrainian.",
+  "The manual shift cell must contain valid time ranges.",
+  "The manual shift demand is no longer available.",
+  "The claimed period must stay inside the offered shift.",
+  "This offer must be accepted for the whole published period.",
+  "Exchange offers cannot allow partial acceptance."
 ]

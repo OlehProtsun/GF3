@@ -89,6 +89,161 @@ public sealed class ShiftCorrectionControllerTests
         Assert.Equal("12:30", (await db.ScheduleSlots.SingleAsync(slot => slot.Id == fixture.MorningSlotId)).ToTime);
     }
 
+    [Theory]
+    [InlineData("legacy", null)]
+    [InlineData("missing", "no longer exists")]
+    [InlineData("ambiguous", "cannot be uniquely identified")]
+    [InlineData("hours", "changed after")]
+    [InlineData("employee", "changed after")]
+    [InlineData("day", "changed after")]
+    [InlineData("collision", "conflicts with another shift position")]
+    [InlineData("color", "color")]
+    public async Task Approve_ResolvesOnlyUniqueUnchangedSnapshot(string scenario, string? error)
+    {
+        await using var database = await SqliteTestDatabase.CreateAsync();
+        await using var db = database.CreateContext();
+        var fixture = await SeedAsync(db);
+        var employee = new EmployeeShiftCorrectionsController(db, new ManagerEditLockService(), new NoopWorkflowLogService(), new NoopRealtimeNotifier());
+        SetEmployeeUser(employee, fixture.EmployeeId);
+        var created = Assert.IsType<ShiftCorrectionRequestDto>(Assert.IsType<CreatedAtActionResult>((await employee.Create(new CreateShiftCorrectionRequest
+        {
+            ScheduleId = fixture.ScheduleId, ScheduleSlotId = fixture.MorningSlotId,
+            RequestedFromTime = "08:00", RequestedToTime = "12:30",
+        }, CancellationToken.None)).Result).Value);
+        var correction = await db.ShiftCorrectionRequests.SingleAsync();
+        correction.CreatedAtUtc = DateTimeOffset.UtcNow.AddDays(-2);
+        await db.SaveChangesAsync();
+        db.ChangeTracker.Clear();
+        var original = await db.ScheduleSlots.SingleAsync(slot => slot.Id == fixture.MorningSlotId);
+        if (scenario is "hours" or "employee" or "day")
+        {
+            if (scenario == "hours") original.ToTime = "11:30";
+            if (scenario == "employee")
+            {
+                original.EmployeeId = null;
+                original.Status = SlotStatus.UNFURNISHED;
+            }
+            if (scenario == "day") original.DayOfMonth = 11;
+            // A matching alternative must never rescue an existing but modified original ID.
+            db.ScheduleSlots.Add(TestDataFactory.CreateDalSlot(fixture.ScheduleId, 12, 3, fixture.EmployeeId, "08:00", "12:00"));
+        }
+        else
+        {
+            db.ScheduleSlots.Remove(original);
+            await db.SaveChangesAsync();
+            if (scenario != "missing")
+                db.ScheduleSlots.Add(TestDataFactory.CreateDalSlot(fixture.ScheduleId, 12, 1, fixture.EmployeeId, "08:00", "12:00"));
+            if (scenario == "ambiguous")
+            {
+                // Simulate legacy inconsistent data; the current schema forbids this duplicate.
+                await db.Database.ExecuteSqlRawAsync("DROP INDEX ux_slot_unique_emp_per_time");
+                db.ScheduleSlots.Add(TestDataFactory.CreateDalSlot(fixture.ScheduleId, 12, 3, fixture.EmployeeId, "08:00", "12:00"));
+            }
+            if (scenario == "collision")
+                db.ScheduleSlots.Add(TestDataFactory.CreateDalSlot(fixture.ScheduleId, 12, 1, null, "08:00", "12:30"));
+        }
+        await db.SaveChangesAsync();
+        db.ChangeTracker.Clear();
+        var before = await db.ScheduleSlots.AsNoTracking().OrderBy(slot => slot.Id)
+            .Select(slot => new { slot.Id, slot.EmployeeId, slot.DayOfMonth, slot.FromTime, slot.ToTime }).ToListAsync();
+        var manager = new ManagerShiftCorrectionsController(db, new NoopWorkflowLogService(), new NoopRealtimeNotifier());
+        SetManagerUser(manager, fixture.ManagerId);
+        var approval = new ApproveShiftCorrectionRequest { HighlightColor = scenario == "color" ? "invalid" : "#DBEAFE" };
+        if (error is not null)
+        {
+            var failure = await Assert.ThrowsAsync<ValidationException>(() => manager.Approve(fixture.ContainerId, fixture.ScheduleId, created.Id, approval, CancellationToken.None));
+            Assert.Contains(error, failure.Message, StringComparison.OrdinalIgnoreCase);
+            db.ChangeTracker.Clear();
+            var pending = await db.ShiftCorrectionRequests.AsNoTracking().SingleAsync();
+            Assert.Equal(ShiftCorrectionStatus.Pending, pending.Status);
+            Assert.Equal(fixture.MorningSlotId, pending.ScheduleSlotId);
+            Assert.Null(pending.ReviewedAtUtc);
+            Assert.Equal(before, await db.ScheduleSlots.AsNoTracking().OrderBy(slot => slot.Id)
+                .Select(slot => new { slot.Id, slot.EmployeeId, slot.DayOfMonth, slot.FromTime, slot.ToTime }).ToListAsync());
+            Assert.Null((await db.ScheduleCellStyles.AsNoTracking().SingleAsync()).BackgroundColorArgb);
+            Assert.False(await db.ManagerShiftCorrectionSettings.AnyAsync());
+        }
+        else
+        {
+            await manager.Approve(fixture.ContainerId, fixture.ScheduleId, created.Id, approval, CancellationToken.None);
+            db.ChangeTracker.Clear();
+            var approved = await db.ShiftCorrectionRequests.AsNoTracking().SingleAsync();
+            Assert.Equal(ShiftCorrectionStatus.Approved, approved.Status);
+            Assert.NotEqual(fixture.MorningSlotId, approved.ScheduleSlotId);
+            Assert.NotNull(approved.ReviewedAtUtc);
+            Assert.Equal(fixture.ManagerId, approved.ReviewedByManagerId);
+            Assert.Equal("12:30", (await db.ScheduleSlots.AsNoTracking().SingleAsync(slot => slot.Id == approved.ScheduleSlotId)).ToTime);
+            Assert.Equal("19:00", (await db.ScheduleSlots.AsNoTracking().SingleAsync(slot => slot.Id == fixture.AfternoonSlotId)).ToTime);
+            Assert.Equal(unchecked((int)0xFFDBEAFE), (await db.ScheduleCellStyles.AsNoTracking().SingleAsync()).BackgroundColorArgb);
+        }
+    }
+
+    [Fact]
+    public async Task Create_BlocksLogicalDuplicateWithStaleId_ButAllowsDifferentShifts()
+    {
+        await using var database = await SqliteTestDatabase.CreateAsync();
+        await using var db = database.CreateContext();
+        var fixture = await SeedAsync(db);
+        var employee = new EmployeeShiftCorrectionsController(db, new ManagerEditLockService(), new NoopWorkflowLogService(), new NoopRealtimeNotifier());
+        SetEmployeeUser(employee, fixture.EmployeeId);
+        var request = new CreateShiftCorrectionRequest
+        {
+            ScheduleId = fixture.ScheduleId, ScheduleSlotId = fixture.MorningSlotId,
+            RequestedFromTime = "08:00", RequestedToTime = "12:30",
+        };
+        await employee.Create(request, CancellationToken.None);
+        db.ChangeTracker.Clear();
+        await db.ScheduleSlots.Where(slot => slot.Id == fixture.MorningSlotId).ExecuteDeleteAsync();
+        var replacement = TestDataFactory.CreateDalSlot(fixture.ScheduleId, 12, 1, fixture.EmployeeId, "08:00", "12:00");
+        var anotherDay = TestDataFactory.CreateDalSlot(fixture.ScheduleId, 13, 1, fixture.EmployeeId, "08:00", "12:00");
+        db.ScheduleSlots.AddRange(replacement, anotherDay);
+        await db.SaveChangesAsync();
+        await Assert.ThrowsAsync<ValidationException>(() => employee.Create(new CreateShiftCorrectionRequest
+        {
+            ScheduleId = fixture.ScheduleId, ScheduleSlotId = replacement.Id,
+            RequestedFromTime = "08:00", RequestedToTime = "12:30",
+        }, CancellationToken.None));
+        await employee.Create(new CreateShiftCorrectionRequest
+        {
+            ScheduleId = fixture.ScheduleId, ScheduleSlotId = fixture.AfternoonSlotId,
+            RequestedFromTime = "15:00", RequestedToTime = "19:30",
+        }, CancellationToken.None);
+        await employee.Create(new CreateShiftCorrectionRequest
+        {
+            ScheduleId = fixture.ScheduleId, ScheduleSlotId = anotherDay.Id,
+            RequestedFromTime = "08:00", RequestedToTime = "12:30",
+        }, CancellationToken.None);
+        db.ChangeTracker.Clear();
+        Assert.Equal(3, await db.ShiftCorrectionRequests.AsNoTracking().CountAsync());
+    }
+
+    [Fact]
+    public async Task Approve_RejectsResolvedRequestsInvalidManagerAndWrongSchedule()
+    {
+        await using var database = await SqliteTestDatabase.CreateAsync();
+        await using var db = database.CreateContext();
+        var fixture = await SeedAsync(db);
+        var employee = new EmployeeShiftCorrectionsController(db, new ManagerEditLockService(), new NoopWorkflowLogService(), new NoopRealtimeNotifier());
+        SetEmployeeUser(employee, fixture.EmployeeId);
+        var created = Assert.IsType<ShiftCorrectionRequestDto>(Assert.IsType<CreatedAtActionResult>((await employee.Create(new CreateShiftCorrectionRequest
+        {
+            ScheduleId = fixture.ScheduleId, ScheduleSlotId = fixture.MorningSlotId,
+            RequestedFromTime = "08:00", RequestedToTime = "12:30",
+        }, CancellationToken.None)).Result).Value);
+        var manager = new ManagerShiftCorrectionsController(db, new NoopWorkflowLogService(), new NoopRealtimeNotifier());
+        SetManagerUser(manager, 0);
+        await Assert.ThrowsAsync<BadHttpRequestException>(() => manager.Approve(fixture.ContainerId, fixture.ScheduleId, created.Id, new(), CancellationToken.None));
+        db.ChangeTracker.Clear();
+        SetManagerUser(manager, fixture.ManagerId);
+        await Assert.ThrowsAsync<KeyNotFoundException>(() => manager.Approve(fixture.ContainerId + 1, fixture.ScheduleId, created.Id, new(), CancellationToken.None));
+        await Assert.ThrowsAsync<KeyNotFoundException>(() => manager.Approve(fixture.ContainerId, fixture.ScheduleId + 1, created.Id, new(), CancellationToken.None));
+        await manager.Reject(fixture.ContainerId, fixture.ScheduleId, created.Id, CancellationToken.None);
+        await Assert.ThrowsAsync<ValidationException>(() => manager.Approve(fixture.ContainerId, fixture.ScheduleId, created.Id, new(), CancellationToken.None));
+        db.ChangeTracker.Clear();
+        Assert.Equal("12:00", (await db.ScheduleSlots.AsNoTracking().SingleAsync(slot => slot.Id == fixture.MorningSlotId)).ToTime);
+        Assert.Equal(ShiftCorrectionStatus.Rejected, (await db.ShiftCorrectionRequests.AsNoTracking().SingleAsync()).Status);
+    }
+
     public class FailingPostCommitProxy : System.Reflection.DispatchProxy
     {
         protected override object? Invoke(System.Reflection.MethodInfo? targetMethod, object?[]? args)
@@ -128,6 +283,12 @@ public sealed class ShiftCorrectionControllerTests
         var created = Assert.IsType<ShiftCorrectionRequestDto>(
             Assert.IsType<CreatedAtActionResult>(createResult.Result).Value);
         Assert.Equal("pending", created.Status);
+
+        var repository = new DataAccessLayer.Repositories.ScheduleSlotRepository(db);
+        var unchangedSlots = await repository.GetByScheduleAsync(fixture.ScheduleId);
+        await repository.ReplaceForScheduleAsync(fixture.ScheduleId, unchangedSlots, overwrite: true);
+        Assert.Equal(new[] { fixture.MorningSlotId, fixture.AfternoonSlotId },
+            (await repository.GetByScheduleAsync(fixture.ScheduleId)).Select(slot => slot.Id));
 
         var employeeListResult = await employeeController.GetMine(CancellationToken.None);
         Assert.Equal(created.Id, Assert.Single(Assert.IsAssignableFrom<IEnumerable<ShiftCorrectionRequestDto>>(

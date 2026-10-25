@@ -1,6 +1,9 @@
 import { useLanguageRevision } from "@shared/i18n/useLanguageRevision";
+import { usePublicHolidayVisibility } from "@app/providers/PublicHolidayVisibilityProvider";
+import { getPolishPublicHoliday } from "@shared/lib/polishPublicHolidays";
 import { t, numberFormat, dateTimeFormat } from "@shared/i18n";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { NavLink } from "react-router-dom";
 import { useAuth } from "@app/providers/AuthProvider";
 import {
@@ -34,6 +37,7 @@ import { SearchableSelect, type SearchableSelectOption } from "@shared/ui/compon
 import { AvailabilityIcon, EyeIcon, NewsIcon, ScheduleIcon, StatisticsIcon } from "@shared/ui/icons";
 import { CardSection } from "@shared/ui/sections";
 import workspaceStyles from "@pages/shared/EmployeeWorkspacePage.module.css";
+import loadingStyles from "@shared/ui/SavingOverlay/SavingOverlay.module.css";
 import { EmployeeScheduleColumnOrderDialog } from "./EmployeeScheduleColumnOrderDialog";
 import { EmployeeScheduleSelectDialog } from "./EmployeeScheduleSelectDialog";
 import { EmployeeShiftCorrectionDialog } from "./EmployeeShiftCorrectionDialog";
@@ -598,6 +602,7 @@ function writeEmployeeScheduleColumnOrders(storageKey: string, scheduleOrders: R
 }
 export function EmployeeSchedulePage() {
   const language = useLanguageRevision();
+  const showPublicHolidays = usePublicHolidayVisibility();
   const { session } = useAuth();
   const scheduleQuery = useEmployeeScheduleListQuery();
   const shiftCorrectionsQuery = useEmployeeShiftCorrectionsQuery(Boolean(session?.employeeId));
@@ -663,6 +668,7 @@ export function EmployeeSchedulePage() {
   const [selectedSummaryPeriodKey, setSelectedSummaryPeriodKey] = useState<string | null>(null);
   const [pdfExportError, setPdfExportError] = useState<string | null>(null);
   const [isPdfLoading, setIsPdfLoading] = useState(false);
+  const [isPdfPreparing, setIsPdfPreparing] = useState(false);
   const [pdfFile, setPdfFile] = useState<DownloadedFile | null>(null);
   const pdfRequestAbortRef = useRef<AbortController | null>(null);
 
@@ -673,6 +679,7 @@ export function EmployeeSchedulePage() {
 
   useEffect(() => {
     setIsPdfLoading(false);
+    setIsPdfPreparing(false);
     setPdfFile(null);
     setPdfExportError(null);
     return () => {
@@ -875,6 +882,7 @@ export function EmployeeSchedulePage() {
     const controller = new AbortController();
     pdfRequestAbortRef.current = controller;
     setIsPdfLoading(true);
+    setIsPdfPreparing(!pdfFile);
     try {
       const file = pdfFile ?? await employeeScheduleApi.exportPdf(scheduleId, controller.signal);
       if (controller.signal.aborted || pdfRequestAbortRef.current !== controller) return;
@@ -882,6 +890,7 @@ export function EmployeeSchedulePage() {
         throw new Error(t("Could not export this schedule to PDF."));
       }
       const preparedFile = { ...file, fileName: file.fileName?.trim() || `GF3_Graph_${scheduleId}.pdf` };
+      setIsPdfPreparing(false);
       const shareFile = new File([file.blob], preparedFile.fileName, { type: "application/pdf" });
       if (typeof navigator.share === "function" && navigator.canShare?.({ files: [shareFile] })) {
         try {
@@ -907,6 +916,7 @@ export function EmployeeSchedulePage() {
       if (pdfRequestAbortRef.current === controller) {
         pdfRequestAbortRef.current = null;
         setIsPdfLoading(false);
+        setIsPdfPreparing(false);
       }
     }
   };
@@ -974,6 +984,22 @@ export function EmployeeSchedulePage() {
 
   return (
     <div className={workspaceStyles.page}>
+      {isPdfPreparing ? createPortal(
+        <div className={`${loadingStyles.overlay} ${styles.pdfLoadingOverlay}`} role="status" aria-live="polite" aria-label={t("Creating PDF...")} aria-busy="true">
+          <div className={loadingStyles.panel}>
+            <div className={loadingStyles.hero}>
+              <div className={loadingStyles.spinnerShell} aria-hidden="true">
+                <span className={loadingStyles.spinnerRing} />
+                <span className={loadingStyles.spinnerCore}><NewsIcon size={22} /></span>
+              </div>
+              <div className={loadingStyles.copy}>
+                <h3>{t("Creating PDF...")}</h3>
+                <p>{t("Please wait while we prepare your schedule for sharing.")}</p>
+              </div>
+            </div>
+          </div>
+        </div>, document.body,
+      ) : null}
       {queryErrorMessage ? <div data-employee-motion="schedule-content" data-motion-key={`queryErrorMessage:${queryErrorMessage}`}><ErrorBanner dismissible={false}>{queryErrorMessage}</ErrorBanner></div> : null}
       {pdfExportError ? <div data-employee-motion="schedule-content" data-motion-key={`pdfExportError:${pdfExportError}`}><ErrorBanner dismissible={false}>{pdfExportError}</ErrorBanner></div> : null}
       {pdfFile ? <div className={styles.shiftCorrectionSuccess} role="status">
@@ -1057,6 +1083,8 @@ export function EmployeeSchedulePage() {
                 <div className={styles.dailyScheduleDays} role="tablist" aria-label={t("Schedule days")}>
                   {dailyScheduleDays.map(day => {
                     const isSelected = day.dayOfMonth === activeDailyScheduleDay;
+                    const holiday = showPublicHolidays && selectedSchedule
+                      ? getPolishPublicHoliday(selectedSchedule.year, selectedSchedule.month, day.dayOfMonth) : null;
                     return (
                       <button
                         key={day.dayOfMonth}
@@ -1065,9 +1093,11 @@ export function EmployeeSchedulePage() {
                         role="tab"
                         aria-selected={isSelected}
                         aria-controls="daily-schedule-content"
-                        aria-label={`${day.weekdayLong} ${day.dayOfMonth}, ${day.isWorkingDay ? t("working day") : t("day off")}`}
+                        aria-label={`${day.weekdayLong} ${day.dayOfMonth}, ${day.isWorkingDay ? t("working day") : t("day off")}${holiday ? `, ${t("Holiday")}: ${t(holiday.name)}` : ""}`}
+                        title={holiday ? t(holiday.name) : undefined}
                         className={[
                           styles.dailyScheduleDay,
+                          holiday ? styles.dailyScheduleDayHoliday : "",
                           day.isWorkingDay ? styles.dailyScheduleDayWorking : styles.dailyScheduleDayOff,
                           isSelected ? styles.dailyScheduleDaySelected : "",
                         ].filter(Boolean).join(" ")}
@@ -1199,13 +1229,19 @@ export function EmployeeSchedulePage() {
                 <span role="columnheader">{t("Schedule")}</span>
               </div>
 
-              {scheduleHoursSummary.rows.map(row => (
-                <div key={row.key} className={styles.hoursSummaryGridRow} role="row">
-                  <span role="cell">{row.dayLabel}</span>
-                  <strong role="cell">{row.hoursText}</strong>
-                  <span role="cell">{row.scheduleName}</span>
-                </div>
-              ))}
+              {scheduleHoursSummary.rows.map(row => {
+                const holiday = showPublicHolidays && activeSummaryPeriod
+                  ? getPolishPublicHoliday(activeSummaryPeriod.year, activeSummaryPeriod.month, row.dayOfMonth) : null;
+                return (
+                  <div key={row.key} className={styles.hoursSummaryGridRow} role="row">
+                    <span role="cell" className={holiday ? styles.hoursSummaryDateHoliday : undefined}
+                      title={holiday ? t(holiday.name) : undefined}
+                      aria-label={holiday ? `${row.dayLabel}, ${t("Holiday")}: ${t(holiday.name)}` : undefined}>{row.dayLabel}</span>
+                    <strong role="cell">{row.hoursText}</strong>
+                    <span role="cell">{row.scheduleName}</span>
+                  </div>
+                );
+              })}
 
               <div className={styles.hoursSummaryTotalRow} role="row">
                 <span role="cell" className={styles.hoursSummaryTotalLabel}><span aria-hidden="true">Σ</span> {t("Total")}</span>

@@ -1,4 +1,6 @@
+import { usePublicHolidayVisibility } from "@app/providers/PublicHolidayVisibilityProvider";
 import { dateTimeFormat, t } from "@shared/i18n";
+import { pinGeneratedColumnsFirst } from "../model/graphColumnOrder";
 import { Fragment, useEffect, useState } from "react";
 import type { CSSProperties } from "react";
 import type { AvailabilityGroup } from "@entities/availability-groups/model/types";
@@ -123,7 +125,7 @@ function buildDefaultScheduleColumnOrder(
 function sanitizeScheduleColumnOrder(
   columnOrder: number[],
   graphEmployees: GraphEmployee[],
-  manualColumns: Array<{ id: number }>,
+  manualColumns: Array<{ id: number; source?: "generated-unfilled" }>,
 ) {
   const fallbackOrder = buildDefaultScheduleColumnOrder(graphEmployees, manualColumns);
   const validIds = new Set(fallbackOrder);
@@ -143,7 +145,7 @@ function sanitizeScheduleColumnOrder(
     }
   });
 
-  return nextOrder;
+  return pinGeneratedColumnsFirst(nextOrder, manualColumns.filter(column => column.source === "generated-unfilled").map(column => -column.id));
 }
 
 export function ContainerGraphProfileWorkspace({
@@ -166,6 +168,7 @@ export function ContainerGraphProfileWorkspace({
   onEdit,
   onDelete,
 }: ContainerGraphProfileWorkspaceProps) {
+  const showPublicHolidays = usePublicHolidayVisibility();
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(true);
   const [activeRelatedHintCellKey, setActiveRelatedHintCellKey] = useState<string | null>(null);
   const [selectedCellKeys, setSelectedCellKeys] = useState<string[]>([]);
@@ -474,10 +477,11 @@ export function ContainerGraphProfileWorkspace({
               <span className={joinClassNames(styles.phoneEmployeeAvatar, styles[`phoneAvatar${Math.abs(row.employeeId) % 6}`])} aria-hidden="true">{getEmployeeInitials(row.employee)}</span>
               <h3 className={styles.phoneEmployeeName}>{row.employee}</h3>
               <span className={styles.phoneEmployeeChevron} aria-hidden="true"><ChevronRightIcon size={18} /></span>
-              <dl className={styles.phoneSummaryMetrics}>
+              <dl className={joinClassNames(styles.phoneSummaryMetrics, showPublicHolidays && styles.phoneSummaryMetricsWithHolidays)}>
                 <div><dt>{t("Work Days")}</dt><dd>{row.workDays}</dd></div>
                 <div><dt>{t("Free Days")}</dt><dd>{row.freeDays}</dd></div>
                 <div><dt>{t("Hours")}</dt><dd>{row.sum || "0"}</dd></div>
+                {showPublicHolidays && <div><dt>{t("Holiday Days")}</dt><dd>{row.holidayDays}</dd></div>}
               </dl>
             </summary>
             <dl className={styles.phoneSummaryDays}>{summaryHeaders.map((header, dayIndex) => <div key={header.dayOfMonth}>
@@ -499,6 +503,7 @@ export function ContainerGraphProfileWorkspace({
                 <th rowSpan={2} className={joinClassNames(styles.stickyColumnSecondary, styles.statColumn)}>{t("Work Days")}</th>
                 <th rowSpan={2} className={joinClassNames(styles.stickyColumnTertiary, styles.statColumn)}>{t("Free Days")}</th>
                 <th rowSpan={2} className={joinClassNames(styles.stickyColumnQuaternary, styles.statColumn)}>{t("Sum")}</th>
+                {showPublicHolidays && <th rowSpan={2} className={joinClassNames(styles.stickyColumnQuinary, styles.statColumn, styles.holidayStatColumn)}>{t("Holiday Days")}</th>}
                 {summaryHeaders.map(header => (
                   <th key={header.dayOfMonth} colSpan={3}>{header.label}</th>
                 ))}
@@ -525,6 +530,7 @@ export function ContainerGraphProfileWorkspace({
                           <td rowSpan={row.dayRows.length} className={joinClassNames(styles.stickyColumnSecondary, styles.statValue)}>{row.workDays}</td>
                           <td rowSpan={row.dayRows.length} className={joinClassNames(styles.stickyColumnTertiary, styles.statValue)}>{row.freeDays}</td>
                           <td rowSpan={row.dayRows.length} className={joinClassNames(styles.stickyColumnQuaternary, styles.statValue)}>{row.sum || "0"}</td>
+                          {showPublicHolidays && <td rowSpan={row.dayRows.length} className={joinClassNames(styles.stickyColumnQuinary, styles.statColumn, styles.statValue)}>{row.holidayDays}</td>}
                         </>
                       ) : null}
                       {days.map((day, index) => (

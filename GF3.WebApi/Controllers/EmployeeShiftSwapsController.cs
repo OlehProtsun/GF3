@@ -11,6 +11,7 @@ using DataAccessLayer.Models.DataBaseContext;
 using DataAccessLayer.Models.Enums;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.ModelBinding;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Data.Sqlite;
@@ -128,6 +129,7 @@ public sealed class EmployeeShiftSwapsController(
         var model = new ShiftSwapRequestModel
         {
             RequestKind = validated.Kind,
+            AllowPartialAcceptance = request.AllowPartialAcceptance,
             ArchivedViewsJson = validated.Return is null ? null : ShiftSwapArchive.CaptureReservation(validated.Source, validated.Return),
             ReturnScheduleId = validated.Return?.ScheduleId,
             ReturnScheduleSlotId = validated.Return?.Id,
@@ -198,7 +200,7 @@ public sealed class EmployeeShiftSwapsController(
 
     [HttpPost("{id:int}/accept")]
     [ProducesResponseType(typeof(ShiftSwapDto), StatusCodes.Status200OK)]
-    public async Task<ActionResult<ShiftSwapDto>> Accept(int id, CancellationToken cancellationToken)
+    public async Task<ActionResult<ShiftSwapDto>> Accept(int id, CancellationToken cancellationToken, [FromBody(EmptyBodyBehavior = EmptyBodyBehavior.Allow)] AcceptEmployeeShiftSwapRequest? request = null)
     {
         var employeeId = GetRequiredEmployeeId();
         IDbContextTransaction transaction;
@@ -216,8 +218,12 @@ public sealed class EmployeeShiftSwapsController(
             .ConfigureAwait(false)
             ?? throw new KeyNotFoundException($"Shift swap with id {id} was not found.");
 
-        if (swap.RequestKind == ShiftSwapRequestKind.Exchange)
+        if (swap.RequestKind == ShiftSwapRequestKind.Exchange) {
+            if ((request?.FromTime is null) != (request?.ToTime is null)) throw ValidationException.ForField("FromTime", "Supply both start and end times.");
+            if (request?.FromTime is not null && NormalizePeriod(request.FromTime, request.ToTime!, "FromTime", "ToTime") != GetSwapPeriod(swap, swap.ScheduleSlot!))
+                throw new ValidationException("This offer must be accepted for the whole published period.");
             return await AcceptExchangeAsync(swap, employeeId, transaction, cancellationToken).ConfigureAwait(false);
+        }
 
         if (swap.Schedule.PublicationStatus != SchedulePublicationStatus.Public)
         {
@@ -263,6 +269,7 @@ public sealed class EmployeeShiftSwapsController(
         {
             throw new ValidationException(acceptanceUnavailableReason);
         }
+        var claimedPeriod = ValidateClaimedPeriod(swap, offeredPeriod, request, employeeMonthSlots, employeeId);
         var acceptingEmployee = await db.Employees
             .AsNoTracking()
             .FirstAsync(employee => employee.Id == employeeId, cancellationToken)
@@ -278,10 +285,14 @@ public sealed class EmployeeShiftSwapsController(
             employeeId,
             acceptingEmployeeName);
 
+        var residualOffers = new List<ShiftSwapRequestModel>();
         var acceptedAtUtc = DateTimeOffset.UtcNow;
         var writingVersion = false;
         try
         {
+            EnsureScheduleIsNotLocked(swap.Schedule);
+            EnsurePeriodWithinSlot(slot, offeredPeriod);
+            ValidateClaimedPeriod(swap, offeredPeriod, request, employeeMonthSlots, employeeId);
             writingVersion = true;
             await versionCommitService.CommitAsync(swap.ScheduleId, null, "System (before accepted swap)", cancellationToken).ConfigureAwait(false);
             writingVersion = false;
@@ -299,24 +310,43 @@ public sealed class EmployeeShiftSwapsController(
             swap.AcceptedByEmployeeId = employeeId;
             swap.AcceptedAtUtc = acceptedAtUtc;
 
-            if (swap.IsManagerCreated)
-            {
-                slot.EmployeeId = employeeId;
-                slot.Status = SlotStatus.ASSIGNED;
-                if (swap.ManualColumnId.HasValue)
-                {
-                    swap.Schedule.Note = RemoveManualColumnCellFromNote(
-                        swap.Schedule.Note,
-                        swap.ManualColumnId.Value,
-                        slot.DayOfMonth);
+            if (swap.IsManagerCreated) {
+                if (swap.ManualColumnId is not { } columnId) throw new ValidationException("The manual shift metadata is invalid or the cell is missing.");
+                var rawCell = GraphManualColumnLabelResolver.ResolveCell(swap.Schedule.Note, columnId, slot.DayOfMonth)
+                    ?? throw new ValidationException("The manual shift metadata is invalid or the cell is missing.");
+                var open = await db.ShiftSwapRequests.Include(r => r.ScheduleSlot).Where(r => r.ScheduleId == swap.ScheduleId && r.IsManagerCreated &&
+                    r.ManualColumnId == columnId && r.Status == ShiftSwapStatus.Open && r.ScheduleSlot!.DayOfMonth == slot.DayOfMonth).ToListAsync(cancellationToken);
+                var reserved = new List<ShiftSwapPeriod> { offeredPeriod };
+                if (!ManualShiftDemandRules.CanReserve(rawCell, [], offeredPeriod)) throw new ValidationException("The manual shift demand is no longer available.");
+                foreach (var other in open.Where(r => r.Id != swap.Id)) {
+                    var period = GetSwapPeriod(other, other.ScheduleSlot!);
+                    if (!ManualShiftDemandRules.CanReserve(rawCell, reserved, period)) throw new ValidationException("The manual shift demand is no longer available.");
+                    reserved.Add(period);
                 }
+                swap.Schedule.Note = ConsumeManualColumnPeriodFromNote(swap.Schedule.Note, columnId, slot.DayOfMonth, claimedPeriod);
+                swap.Schedule.Note = UpsertManualColumnBackgroundColorInNote(swap.Schedule.Note, columnId,
+                    slot.DayOfMonth, ShiftSwapHighlightRules.ToArgb(swap.Schedule.AcceptedManualShiftHighlightColor));
             }
-            else
-            {
-                foreach (var remainingSlot in ApplyAcceptedSwapPeriod(slot, swap.FromEmployeeId!.Value, employeeId, offeredPeriod, swap.Schedule.Slots.ToList()))
-                {
-                    db.ScheduleSlots.Add(remainingSlot);
-                }
+            var remainingSlots = ApplyAcceptedSwapPeriod(slot, swap.IsManagerCreated ? null : swap.FromEmployeeId, employeeId, claimedPeriod, swap.Schedule.Slots.ToList());
+            foreach (var remainderSlot in remainingSlots) db.ScheduleSlots.Add(remainderSlot);
+            swap.OfferedFromTime = claimedPeriod.FromTime;
+            swap.OfferedToTime = claimedPeriod.ToTime;
+            await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+            var residualPeriods = new List<ShiftSwapPeriod>();
+            if (string.CompareOrdinal(offeredPeriod.FromTime, claimedPeriod.FromTime) < 0) residualPeriods.Add(new(offeredPeriod.FromTime, claimedPeriod.FromTime));
+            if (string.CompareOrdinal(claimedPeriod.ToTime, offeredPeriod.ToTime) < 0) residualPeriods.Add(new(claimedPeriod.ToTime, offeredPeriod.ToTime));
+            foreach (var residual in residualPeriods) {
+                var source = remainingSlots.Single(s => string.CompareOrdinal(s.FromTime, residual.FromTime) <= 0 && string.CompareOrdinal(s.ToTime, residual.ToTime) >= 0);
+                var residualOffer = new ShiftSwapRequestModel {
+                    ScheduleId = swap.ScheduleId, ScheduleSlotId = source.Id, FromEmployeeId = swap.FromEmployeeId,
+                    IsManagerCreated = swap.IsManagerCreated, ManualColumnId = swap.ManualColumnId,
+                    TargetEmployeeId = swap.TargetEmployeeId, Visibility = swap.Visibility,
+                    AllowPartialAcceptance = swap.AllowPartialAcceptance, RequestKind = ShiftSwapRequestKind.Give,
+                    OfferedFromTime = residual.FromTime, OfferedToTime = residual.ToTime,
+                    CreatedAtUtc = acceptedAtUtc, Status = ShiftSwapStatus.Open,
+                };
+                db.ShiftSwapRequests.Add(residualOffer);
+                residualOffers.Add(residualOffer);
             }
 
             EnsureScheduleEmployee(swap.Schedule, employeeId);
@@ -346,8 +376,8 @@ public sealed class EmployeeShiftSwapsController(
                 Year = swap.Schedule.Year,
                 Month = swap.Schedule.Month,
                 DayOfMonth = slot.DayOfMonth,
-                FromTime = offeredPeriod.FromTime,
-                ToTime = offeredPeriod.ToTime,
+                FromTime = claimedPeriod.FromTime,
+                ToTime = claimedPeriod.ToTime,
                 FromEmployeeId = swap.FromEmployeeId,
                 FromEmployeeName = manualColumnName ?? GetEmployeeName(swap.FromEmployee, swap.FromEmployeeId),
                 TargetEmployeeId = swap.TargetEmployeeId,
@@ -395,12 +425,17 @@ public sealed class EmployeeShiftSwapsController(
         await PostCommitActions.RunAsync(HttpContext, () => workflowLogService
             .LogAsync(
                 User,
-                $"Accepted {(accepted.FromEmployeeId.HasValue ? $"{GetEmployeeName(accepted.FromEmployee, accepted.FromEmployeeId.Value)}'s shift" : "an open shift")} from schedule \"{accepted.Schedule.Name}\" for {accepted.Schedule.Year}-{accepted.Schedule.Month:00}-{accepted.ScheduleSlot!.DayOfMonth:00}, {offeredPeriod.FromTime}-{offeredPeriod.ToTime}.",
+                $"Accepted {(accepted.FromEmployeeId.HasValue ? $"{GetEmployeeName(accepted.FromEmployee, accepted.FromEmployeeId.Value)}'s shift" : "an open shift")} from schedule \"{accepted.Schedule.Name}\" for {accepted.Schedule.Year}-{accepted.Schedule.Month:00}-{accepted.ScheduleSlot!.DayOfMonth:00}, {claimedPeriod.FromTime}-{claimedPeriod.ToTime}.",
                 cancellationToken)).ConfigureAwait(false);
         await PostCommitActions.RunAsync(HttpContext, () => realtimeNotifier
             .NotifyScheduleChangedAsync(accepted.Schedule.ContainerId, accepted.ScheduleId, "employee-swap-accepted")).ConfigureAwait(false);
         await PostCommitActions.RunAsync(HttpContext, () => realtimeNotifier
             .NotifyShiftSwapsChangedAsync(accepted.Schedule.ContainerId, accepted.ScheduleId, accepted.ScheduleId, "employee-swap-accepted", accepted.Id)).ConfigureAwait(false);
+
+        foreach (var residual in residualOffers)
+            await PostCommitActions.RunAsync(HttpContext, () => realtimeNotifier.NotifyShiftSwapsChangedAsync(
+                accepted.Schedule.ContainerId, accepted.ScheduleId, accepted.ScheduleId,
+                residual.IsManagerCreated ? "manager-manual-shift-offer-created" : "employee-swap-created", residual.Id)).ConfigureAwait(false);
 
         var updatedEmployeeMonthSlots = await LoadPublishedEmployeeMonthSlotsAsync(
             employeeId,
@@ -532,6 +567,7 @@ public sealed class EmployeeShiftSwapsController(
         var target = request.TargetEmployeeId is { } id ? await db.Employees.AsNoTracking().SingleAsync(e => e.Id == id, cancellationToken) : null;
         return Ok(new ShiftSwapOfferPreviewDto
         {
+            AllowPartialAcceptance = request.AllowPartialAcceptance,
             RequestKind = valid.Kind == ShiftSwapRequestKind.Exchange ? "exchange" : "give",
             TargetEmployeeId = request.TargetEmployeeId,
             TargetEmployeeName = target is null ? "Everyone" : GetEmployeeName(target, target.Id),
@@ -555,6 +591,8 @@ public sealed class EmployeeShiftSwapsController(
             "exchange" => ShiftSwapRequestKind.Exchange,
             _ => throw ValidationException.ForField(nameof(request.RequestKind), "Invalid request kind."),
         };
+        if (kind == ShiftSwapRequestKind.Exchange && request.AllowPartialAcceptance)
+            throw ValidationException.ForField(nameof(request.AllowPartialAcceptance), "Exchange offers cannot allow partial acceptance.");
         var hasReturn = request.ReturnScheduleId.HasValue || request.ReturnScheduleSlotId.HasValue ||
             request.ReturnFromTime is not null || request.ReturnToTime is not null;
         if (kind == ShiftSwapRequestKind.Give && hasReturn)
@@ -662,6 +700,8 @@ public sealed class EmployeeShiftSwapsController(
         var history = context.Histories.FirstOrDefault(h => h.SourceShiftSwapRequestId == swap.Id);
         ShiftSwapRules.PopulateReturnSummary(dto, swap, back, history);
         dto.CanAccept = false;
+        dto.CanAcceptFull = false;
+        dto.EligibleClaimWindows = [];
         var canProject = true;
         if (swap.Status == ShiftSwapStatus.Open)
         {
@@ -674,6 +714,7 @@ public sealed class EmployeeShiftSwapsController(
             if (reason is null && employeeId != swap.TargetEmployeeId)
                 reason = employeeId == swap.FromEmployeeId ? "This is your own swap offer." : "This private swap offer is for another employee.";
             dto.CanAccept = reason is null;
+            dto.CanAcceptFull = dto.CanAccept;
             dto.AcceptanceUnavailableReason = reason;
         }
         if (canProject) ShiftSwapExchangeRules.PopulateProjectedStats(dto, swap, employeeId, back, context.Assignments);
@@ -811,7 +852,8 @@ public sealed class EmployeeShiftSwapsController(
         int acceptingEmployeeId,
         CancellationToken cancellationToken)
     {
-        var highlightColorArgb = ShiftSwapHighlightRules.ToArgb(swap.Schedule.AcceptedSwapHighlightColor);
+        var highlightColorArgb = ShiftSwapHighlightRules.ToArgb(swap.IsManagerCreated
+            ? swap.Schedule.AcceptedManualShiftHighlightColor : swap.Schedule.AcceptedSwapHighlightColor);
         var affectedEmployeeIds = new HashSet<int> { acceptingEmployeeId };
         if (swap.FromEmployeeId.HasValue)
         {

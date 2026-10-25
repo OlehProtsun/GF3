@@ -1,5 +1,13 @@
 import type { AvailabilityKind, AvailabilitySlot } from "@entities/availability-groups/model/types";
 
+export type EmployeeAvailabilityMember = {
+  employeeId: number;
+  firstName: string;
+  lastName: string;
+  displayOrder: number;
+  slots: AvailabilitySlot[];
+};
+
 export type EmployeeAvailabilityGroup = {
   id: number;
   name: string;
@@ -15,6 +23,7 @@ export type EmployeeAvailabilityGroup = {
   editLockedBy?: string | null;
   employeeLastModifiedAtUtc?: string | null;
   slots: AvailabilitySlot[];
+  members?: EmployeeAvailabilityMember[];
 };
 
 export type SaveEmployeeAvailabilitySlot = {

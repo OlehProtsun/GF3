@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using System.Globalization;
 using System.Text.Json;
 using DataAccessLayer.Models;
 using DataAccessLayer.Models.DataBaseContext;
@@ -72,6 +73,58 @@ public sealed class EmployeeUiStateController(AppDbContext db) : ControllerBase
             ReadNotificationIds = readNotificationIds,
             PinnedSwapIds = pinnedSwapIds,
         });
+    }
+
+    [HttpGet("availability-time-presets")]
+    public async Task<ActionResult<EmployeeAvailabilityTimePresetsDto>> GetAvailabilityTimePresets(CancellationToken cancellationToken)
+    {
+        var employeeId = GetRequiredEmployeeId();
+        var account = await db.EmployeeAccounts.AsNoTracking()
+            .Where(item => item.EmployeeId == employeeId)
+            .Select(item => new { item.AvailabilityTimePresetsJson })
+            .SingleOrDefaultAsync(cancellationToken).ConfigureAwait(false);
+        if (account is null) return Unauthorized();
+        IReadOnlyList<string>? presets = null;
+        if (account.AvailabilityTimePresetsJson is not null)
+        {
+            try { presets = JsonSerializer.Deserialize<string[]>(account.AvailabilityTimePresetsJson); }
+            catch (JsonException) { presets = null; }
+        }
+        return Ok(new EmployeeAvailabilityTimePresetsDto { Presets = presets });
+    }
+
+    [HttpPut("availability-time-presets")]
+    public async Task<ActionResult<EmployeeAvailabilityTimePresetsDto>> SaveAvailabilityTimePresets(
+        SaveEmployeeAvailabilityTimePresetsRequest request, CancellationToken cancellationToken)
+    {
+        var employeeId = GetRequiredEmployeeId();
+        var normalized = new List<string>();
+        if (request.Presets is null || request.Presets.Count is < 3 or > 100)
+        {
+            ModelState.AddModelError(nameof(request.Presets), "Store between 3 and 100 time presets.");
+            return ValidationProblem(statusCode: StatusCodes.Status400BadRequest, modelStateDictionary: ModelState);
+        }
+        foreach (var preset in request.Presets)
+        {
+            var parts = preset?.Split('-', StringSplitOptions.TrimEntries);
+            if (parts is not { Length: 2 } ||
+                !TimeOnly.TryParseExact(parts[0], "HH:mm", CultureInfo.InvariantCulture, DateTimeStyles.None, out var from) ||
+                !TimeOnly.TryParseExact(parts[1], "HH:mm", CultureInfo.InvariantCulture, DateTimeStyles.None, out var to) || to <= from)
+            {
+                ModelState.AddModelError(nameof(request.Presets), "Use a valid time range like 09:00 - 15:00.");
+                return ValidationProblem(statusCode: StatusCodes.Status400BadRequest, modelStateDictionary: ModelState);
+            }
+            normalized.Add($"{from.ToString("HH:mm", CultureInfo.InvariantCulture)} - {to.ToString("HH:mm", CultureInfo.InvariantCulture)}");
+        }
+        var json = JsonSerializer.Serialize(normalized);
+        // Import an older device's local values only if no device has saved a server preference yet.
+        var updated = request.OnlyIfUnset
+            ? await db.Database.ExecuteSqlInterpolatedAsync(
+                $"UPDATE employee_account SET availability_time_presets_json = COALESCE(availability_time_presets_json, {json}) WHERE employee_id = {employeeId}", cancellationToken).ConfigureAwait(false)
+            : await db.EmployeeAccounts.Where(account => account.EmployeeId == employeeId)
+                .ExecuteUpdateAsync(setters => setters.SetProperty(account => account.AvailabilityTimePresetsJson, json), cancellationToken).ConfigureAwait(false);
+        if (updated == 0) return Unauthorized();
+        return await GetAvailabilityTimePresets(cancellationToken).ConfigureAwait(false);
     }
 
     [HttpPut("swap-pins/{swapId:int}")]
@@ -281,4 +334,15 @@ public sealed class SaveEmployeeScheduleColumnOrderRequest
 public sealed class MarkEmployeeNotificationsReadRequest
 {
     public IReadOnlyList<string>? NotificationIds { get; init; }
+}
+
+public sealed class EmployeeAvailabilityTimePresetsDto
+{
+    public IReadOnlyList<string>? Presets { get; init; }
+}
+
+public sealed class SaveEmployeeAvailabilityTimePresetsRequest
+{
+    public IReadOnlyList<string>? Presets { get; init; }
+    public bool OnlyIfUnset { get; init; }
 }

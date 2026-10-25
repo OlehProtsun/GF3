@@ -1,3 +1,4 @@
+import { swapMinutes, type SwapPeriod } from "./SwapShiftPickerDialog";
 import { createPortal, flushSync } from "react-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { queryKeys } from "@shared/api/queryKeys";
@@ -155,6 +156,10 @@ function SwapOfferCard({ swap, isPinned, highlighted, onTogglePin, onViewDetails
             {isOpen && swap.isCreatedByCurrentEmployee ? <EmployeeIcon size={12} /> : (isOpen ? swap.canAccept : swap.status === "accepted") ? <CheckIcon size={13} /> : <WarnIcon size={13} />}
             <span>{availabilityLabel}</span>
           </span>
+          {swap.allowPartialAcceptance === true && swap.requestKind !== "exchange" && <span className={`${styles.badge} ${styles.badgePartial}`}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg>
+            <span>{t("Partial")}</span>
+          </span>}
           {isOpen && swap.isScheduleLocked && <span className={`${styles.badge} ${styles.badgeLocked}`}><WarnIcon size={13} /><span>{t("Locked")}</span></span>}
         </span>
         {unavailableReason && <span className={styles.offerUnavailableReason}><WarnIcon size={13} /><span className={styles.unavailableText}>{translateServerMessage(unavailableReason)}</span></span>}
@@ -227,7 +232,8 @@ export function EmployeeSwapPage() {
   const [swapSearchQuery, setSwapSearchQuery] = useState("");
   const [swapFilter, setSwapFilter] = useState<SwapFilter>("all");
   const [pendingUnpinSwapId, setPendingUnpinSwapId] = useState<number | null>(null);
-  const [pendingAcceptSwap, setPendingAcceptSwap] = useState<ShiftSwap | null>(null);
+  const [pendingAcceptance, setPendingAcceptSwap] = useState<{ swap: ShiftSwap; claimedPeriod?: SwapPeriod } | null>(null);
+  const pendingAcceptSwap = pendingAcceptance?.swap ?? null;
   const [isAcceptSubmitting, setIsAcceptSubmitting] = useState(false);
   const acceptInFlightRef = useRef(false);
   const cancelInFlightRef = useRef(false);
@@ -345,11 +351,11 @@ export function EmployeeSwapPage() {
     if (!detailsLauncherRef.current?.isConnected) detailsLauncherRef.current = createOfferTriggerRef.current;
   };
 
-  const handleAccept = (swap: ShiftSwap) => {
+  const handleAccept = (swap: ShiftSwap, claimedPeriod?: SwapPeriod) => {
     if (swap.status !== "open" || !swap.canAccept || isActionBusy || acceptInFlightRef.current) return;
     setActionError(null);
     flushSync(() => { closeDetails(); setIsHistoryExpanded(false); });
-    setPendingAcceptSwap(swap);
+    setPendingAcceptSwap({ swap, claimedPeriod });
   };
 
   const handleConfirmAccept = () => {
@@ -358,7 +364,7 @@ export function EmployeeSwapPage() {
     if (!currentSwap || currentSwap.status !== "open" || !currentSwap.canAccept) {
       setPendingAcceptSwap(null);
       setActionError(t("This offer is no longer available. The swap list has been refreshed."));
-      void queryClient.invalidateQueries({ queryKey: queryKeys.shiftSwaps.employee() });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.shiftSwaps.all });
       return;
     }
     acceptInFlightRef.current = true;
@@ -369,13 +375,14 @@ export function EmployeeSwapPage() {
       setIsAcceptSubmitting(false);
       setPendingAcceptSwap(null);
     };
-    acceptSwapMutation.mutate(currentSwap.id, {
+    acceptSwapMutation.mutate({ id: currentSwap.id, ...pendingAcceptance?.claimedPeriod }, {
       onSuccess: finish,
       onError: error => {
         finish();
         setActionError(getErrorMessage(error, t("Could not accept this swap offer.")));
-        void queryClient.invalidateQueries({ queryKey: queryKeys.shiftSwaps.employee() });
+        void queryClient.invalidateQueries({ queryKey: queryKeys.shiftSwaps.all });
         void queryClient.invalidateQueries({ queryKey: queryKeys.employeeSchedules.all });
+        void queryClient.invalidateQueries({ queryKey: queryKeys.containers.all });
       },
     });
   };
@@ -554,7 +561,7 @@ export function EmployeeSwapPage() {
       ) : null}
 
       </dialog>, document.body)}
-      {selectedDetailsSwap && <SwapOfferDetailsDialog swap={selectedDetailsSwap} currentEmployeeId={employeeId}
+      {selectedDetailsSwap && <SwapOfferDetailsDialog key={selectedDetailsSwap.id} swap={selectedDetailsSwap} currentEmployeeId={employeeId}
         busy={isActionBusy} error={detailsError} onClose={closeDetails} onAccept={handleAccept} onCancel={handleCancel}
         returnFocusRef={detailsLauncherRef} />}
       {isGiveAwayExpanded && employeeId && <SwapCreateWizard
@@ -586,8 +593,8 @@ export function EmployeeSwapPage() {
           pendingAcceptSwap.isManagerCreated ? pendingAcceptSwap.manualColumnName || t("Open shift") : pendingAcceptSwap.fromEmployeeName,
           pendingAcceptSwap.scheduleName,
           pendingAcceptSwap.shopName ? ` · ${pendingAcceptSwap.shopName}` : "",
-          formatSwapDate(pendingAcceptSwap), pendingAcceptSwap.fromTime, pendingAcceptSwap.toTime,
-          formatHours(pendingAcceptSwap.shiftHours),
+          formatSwapDate(pendingAcceptSwap), pendingAcceptance?.claimedPeriod?.fromTime ?? pendingAcceptSwap.fromTime, pendingAcceptance?.claimedPeriod?.toTime ?? pendingAcceptSwap.toTime,
+          formatHours(pendingAcceptance?.claimedPeriod ? (swapMinutes(pendingAcceptance.claimedPeriod.toTime) - swapMinutes(pendingAcceptance.claimedPeriod.fromTime)) / 60 : pendingAcceptSwap.shiftHours),
         ) : ""}
         confirmText={t("Accept shift")}
         cancelText={t("Back")}

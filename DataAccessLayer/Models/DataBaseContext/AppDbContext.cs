@@ -43,6 +43,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, TimeProvider? 
     public DbSet<ShiftCorrectionRequestModel> ShiftCorrectionRequests => Set<ShiftCorrectionRequestModel>();
     public DbSet<WorkflowLogEntryModel> WorkflowLogEntries => Set<WorkflowLogEntryModel>();
     public DbSet<WorkflowLogSettingsModel> WorkflowLogSettings => Set<WorkflowLogSettingsModel>();
+    public DbSet<PublicHolidaySettingsModel> PublicHolidaySettings => Set<PublicHolidaySettingsModel>();
     public DbSet<RegulationDocumentModel> RegulationDocuments => Set<RegulationDocumentModel>();
     public DbSet<RegulationAcceptanceModel> RegulationAcceptances => Set<RegulationAcceptanceModel>();
     public DbSet<BindModel> AvailabilityBinds => Set<BindModel>();
@@ -179,6 +180,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, TimeProvider? 
         ConfigureShiftCorrectionRequest(modelBuilder);
         ConfigureWorkflowLogEntry(modelBuilder);
         ConfigureWorkflowLogSettings(modelBuilder);
+        ConfigurePublicHolidaySettings(modelBuilder);
         ConfigureRegulationDocument(modelBuilder);
         ConfigureRegulationAcceptance(modelBuilder);
         ConfigureAvailabilityBind(modelBuilder);
@@ -593,6 +595,9 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, TimeProvider? 
             entity.Property(schedule => schedule.AcceptedSwapHighlightColor)
                 .HasMaxLength(7)
                 .HasDefaultValue("#BBF7D0");
+            entity.Property(schedule => schedule.AcceptedManualShiftHighlightColor)
+                .HasMaxLength(7)
+                .HasDefaultValue("#BAE6FD");
 
             entity.ToTable(table =>
             {
@@ -857,6 +862,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, TimeProvider? 
 
             entity.Property(request => request.OfferedFromTime).IsRequired(false);
             entity.Property(request => request.OfferedToTime).IsRequired(false);
+            entity.Property(request => request.AllowPartialAcceptance).IsRequired().HasDefaultValue(false);
             entity.Property(request => request.IsManagerCreated)
                 .HasDefaultValue(false);
             entity.Property(request => request.ManualColumnId).IsRequired(false);
@@ -957,6 +963,16 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, TimeProvider? 
 
             entity.HasIndex(log => new { log.ActorRole, log.OccurredAtUtc })
                 .HasDatabaseName("ix_workflow_log_role_time");
+        });
+    }
+
+    private static void ConfigurePublicHolidaySettings(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<PublicHolidaySettingsModel>(entity =>
+        {
+            entity.Property(settings => settings.ShowPublicHolidays).IsRequired().HasDefaultValue(true);
+            entity.ToTable(table => table.HasCheckConstraint("ck_public_holiday_settings_singleton", "id = 1"));
+            entity.HasData(new PublicHolidaySettingsModel());
         });
     }
 

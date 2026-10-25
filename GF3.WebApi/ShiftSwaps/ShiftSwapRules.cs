@@ -89,12 +89,16 @@ internal static class ShiftSwapRules
             slot,
             offeredPeriod);
         var canAccept = isOpen && acceptanceUnavailableReason is null;
+        var eligibleWindows = canAccept ? FindEligibleClaimWindows(model, offeredPeriod, currentEmployeeMonthSlots, currentEmployeeId) : [];
+        var canAcceptFull = eligibleWindows.Contains(offeredPeriod);
+        var projectedClaimHours = model.AllowPartialAcceptance && canAccept && !canAcceptFull
+            ? GetTimeRangeDurationHours(eligibleWindows[0].FromTime, eligibleWindows[0].ToTime) : shiftHours;
         var currentEmployeeStats = GetCurrentEmployeeSwapStats(
             model,
             currentEmployeeId,
             currentEmployeeMonthSlots,
             slot,
-            shiftHours,
+            projectedClaimHours,
             canAccept);
         var fromHoursAfter = fromHoursBefore;
 
@@ -106,7 +110,7 @@ internal static class ShiftSwapRules
             }
             else if (canAccept)
             {
-                fromHoursAfter = model.IsManagerCreated ? fromHoursBefore : Math.Max(0, fromHoursBefore - shiftHours);
+                fromHoursAfter = model.IsManagerCreated ? fromHoursBefore : Math.Max(0, fromHoursBefore - projectedClaimHours);
             }
         }
 
@@ -116,6 +120,9 @@ internal static class ShiftSwapRules
 
         return new ShiftSwapDto
         {
+            AllowPartialAcceptance = model.RequestKind == ShiftSwapRequestKind.Give && model.AllowPartialAcceptance,
+            CanAcceptFull = canAcceptFull,
+            EligibleClaimWindows = eligibleWindows.Select(p => new ShiftSwapEligibleWindowDto(p.FromTime, p.ToTime)).ToList(),
             RequestKind = model.RequestKind == ShiftSwapRequestKind.Exchange ? "exchange" : "give",
             ReturnScheduleId = model.ReturnScheduleId,
             ReturnScheduleSlotId = model.ReturnScheduleSlotId,
@@ -197,7 +204,7 @@ internal static class ShiftSwapRules
             NormalizePeriod(offeredPeriod.FromTime, offeredPeriod.ToTime, "FromTime", "ToTime");
             EnsurePeriodWithinSlot(slot, offeredPeriod);
             if (swap.IsManagerCreated && swap.ManualColumnId.HasValue)
-                RemoveManualColumnCellFromNote(swap.Schedule.Note, swap.ManualColumnId.Value, slot.DayOfMonth);
+                ConsumeManualColumnPeriodFromNote(swap.Schedule.Note, swap.ManualColumnId.Value, slot.DayOfMonth, offeredPeriod);
         }
         catch (ValidationException exception)
         {
@@ -224,16 +231,9 @@ internal static class ShiftSwapRules
             return "This private swap offer is for another employee.";
         }
 
-        if (HasOverlappingShift(
-            employeeMonthSlots,
-            slot.DayOfMonth,
-            offeredPeriod.FromTime,
-            offeredPeriod.ToTime,
-            employeeId,
-            slot.Id))
-        {
+        var windows = FindEligibleClaimWindows(swap, offeredPeriod, employeeMonthSlots, employeeId);
+        if (swap.RequestKind == ShiftSwapRequestKind.Exchange || !swap.AllowPartialAcceptance ? !windows.Contains(offeredPeriod) : windows.Count == 0)
             return "You already work during this time.";
-        }
 
         return null;
     }
@@ -328,6 +328,44 @@ internal static class ShiftSwapRules
             .Where(slot => slot.EmployeeId == employeeId)
             .Sum(GetSlotDurationHours);
 
+    internal static IReadOnlyList<ShiftSwapPeriod> FindEligibleClaimWindows(ShiftSwapRequestModel swap, ShiftSwapPeriod offered,
+        IReadOnlyList<ScheduleSlotModel> employeeMonthSlots, int acceptingEmployeeId)
+    {
+        var source = swap.Schedule.Slots.FirstOrDefault(s => s.Id == swap.ScheduleSlotId) ?? swap.ScheduleSlot;
+        if (source is null) return [];
+        var normalized = NormalizePeriod(offered.FromTime, offered.ToTime, "FromTime", "ToTime");
+        var windows = new List<ShiftSwapPeriod> { normalized };
+        foreach (var occupied in employeeMonthSlots.Where(s => s.EmployeeId == acceptingEmployeeId && s.Id != source.Id &&
+            s.DayOfMonth == source.DayOfMonth && s.Schedule.Year == swap.Schedule.Year && s.Schedule.Month == swap.Schedule.Month &&
+            s.Schedule.PublicationStatus == SchedulePublicationStatus.Public)) {
+            var busy = NormalizePeriod(occupied.FromTime, occupied.ToTime, "FromTime", "ToTime");
+            windows = windows.SelectMany(free => {
+                if (string.CompareOrdinal(busy.ToTime, free.FromTime) <= 0 || string.CompareOrdinal(busy.FromTime, free.ToTime) >= 0) return new[] { free };
+                var remaining = new List<ShiftSwapPeriod>();
+                if (string.CompareOrdinal(busy.FromTime, free.FromTime) > 0) remaining.Add(new(free.FromTime, busy.FromTime));
+                if (string.CompareOrdinal(busy.ToTime, free.ToTime) < 0) remaining.Add(new(busy.ToTime, free.ToTime));
+                return remaining.ToArray();
+            }).ToList();
+        }
+        return windows.OrderBy(p => p.FromTime, StringComparer.Ordinal).ToList();
+    }
+
+    internal static ShiftSwapPeriod ValidateClaimedPeriod(ShiftSwapRequestModel swap, ShiftSwapPeriod offered,
+        AcceptEmployeeShiftSwapRequest? request, IReadOnlyList<ScheduleSlotModel> employeeMonthSlots, int employeeId)
+    {
+        if ((request?.FromTime is null) != (request?.ToTime is null))
+            throw ValidationException.ForField("FromTime", "Supply both start and end times.");
+        var claimed = request?.FromTime is null ? offered : NormalizePeriod(request.FromTime, request.ToTime!, "FromTime", "ToTime");
+        if (string.CompareOrdinal(claimed.FromTime, offered.FromTime) < 0 || string.CompareOrdinal(claimed.ToTime, offered.ToTime) > 0)
+            throw new ValidationException("The claimed period must stay inside the offered shift.");
+        if ((swap.RequestKind == ShiftSwapRequestKind.Exchange || !swap.AllowPartialAcceptance) && claimed != offered)
+            throw new ValidationException("This offer must be accepted for the whole published period.");
+        if (!FindEligibleClaimWindows(swap, offered, employeeMonthSlots, employeeId).Any(free =>
+            string.CompareOrdinal(claimed.FromTime, free.FromTime) >= 0 && string.CompareOrdinal(claimed.ToTime, free.ToTime) <= 0))
+            throw new ValidationException("You already work during this time.");
+        return claimed;
+    }
+
     internal readonly record struct ShiftSwapPeriod(string FromTime, string ToTime);
 
     internal static ShiftSwapPeriod ResolveRequestedPeriod(CreateEmployeeShiftSwapRequest request, ScheduleSlotModel slot)
@@ -396,7 +434,7 @@ internal static class ShiftSwapRules
 
     internal static IReadOnlyList<ScheduleSlotModel> ApplyAcceptedSwapPeriod(
         ScheduleSlotModel slot,
-        int originalEmployeeId,
+        int? originalEmployeeId,
         int acceptingEmployeeId,
         ShiftSwapPeriod period,
         IReadOnlyCollection<ScheduleSlotModel> scheduleSlots)
@@ -448,14 +486,14 @@ internal static class ShiftSwapRules
         return remainingSlots;
     }
 
-    internal static ScheduleSlotModel CreateRemainingSlot(ScheduleSlotModel sourceSlot, int employeeId, string fromTime, string toTime, int slotNo)
+    internal static ScheduleSlotModel CreateRemainingSlot(ScheduleSlotModel sourceSlot, int? employeeId, string fromTime, string toTime, int slotNo)
         => new()
         {
             ScheduleId = sourceSlot.ScheduleId,
             DayOfMonth = sourceSlot.DayOfMonth,
             SlotNo = slotNo,
             EmployeeId = employeeId,
-            Status = SlotStatus.ASSIGNED,
+            Status = employeeId.HasValue ? SlotStatus.ASSIGNED : SlotStatus.UNFURNISHED,
             FromTime = fromTime,
             ToTime = toTime,
         };
@@ -527,6 +565,77 @@ internal static class ShiftSwapRules
         }
 
         return leftStart.Value < rightEnd.Value && rightStart.Value < leftEnd.Value;
+    }
+
+    internal static string? ConsumeManualColumnPeriodFromNote(string? rawNote, int manualColumnId, int dayOfMonth, ShiftSwapPeriod claimed)
+    {
+        const string invalid = "The manual shift metadata is invalid or the cell is missing.";
+        if (string.IsNullOrWhiteSpace(rawNote)) throw new ValidationException(invalid);
+        var match = GraphNoteMetaRegex.Match(rawNote);
+        if (!match.Success) throw new ValidationException(invalid);
+        var meta = ParseGraphNoteMeta(match.Groups[2].Success ? match.Groups[2].Value : match.Groups[1].Value)
+            ?? throw new ValidationException(invalid);
+        var day = dayOfMonth.ToString(CultureInfo.InvariantCulture);
+        JsonObject? cells = null;
+        if (meta["m"] is JsonArray compact)
+            cells = compact.OfType<JsonArray>().FirstOrDefault(c => GetJsonInt(c.ElementAtOrDefault(0)) == manualColumnId)?.ElementAtOrDefault(2) as JsonObject;
+        if (cells is null && meta["manualColumns"] is JsonArray legacy)
+            cells = legacy.OfType<JsonObject>().FirstOrDefault(c => GetJsonInt(c["id"]) == manualColumnId)?["cells"] as JsonObject;
+        if (cells?[day] is not JsonValue value || !value.TryGetValue<string>(out var raw)) throw new ValidationException(invalid);
+        var remaining = ManualShiftDemandRules.Consume(raw, claimed);
+        if (remaining is null) cells.Remove(day); else cells[day] = remaining;
+        if (cells.Count == 0 && meta["m"] is JsonArray columns) {
+            var column = columns.OfType<JsonArray>().FirstOrDefault(c => c.Count > 2 && ReferenceEquals(c[2], cells));
+            column?.RemoveAt(2);
+        }
+        var prefix = rawNote[..match.Index].TrimEnd();
+        var suffix = $"[[GF3_GRAPH_META:b64:{EncodeGraphNoteMetaValue(meta.ToJsonString())}]]";
+        return string.IsNullOrEmpty(prefix) ? suffix : $"{prefix}\n\n{suffix}";
+    }
+
+    internal static string UpsertManualColumnBackgroundColorInNote(string? rawNote, int manualColumnId, int dayOfMonth, int backgroundColorArgb)
+    {
+        const string invalid = "The manual shift metadata is invalid or the cell is missing.";
+        if (manualColumnId <= 0 || dayOfMonth is < 1 or > 31 || string.IsNullOrWhiteSpace(rawNote))
+            throw new ValidationException(invalid);
+        var match = GraphNoteMetaRegex.Match(rawNote);
+        if (!match.Success) throw new ValidationException(invalid);
+        var meta = ParseGraphNoteMeta(match.Groups[2].Success ? match.Groups[2].Value : match.Groups[1].Value)
+            ?? throw new ValidationException(invalid);
+        var columnExists = (meta["m"] as JsonArray)?.OfType<JsonArray>()
+            .Any(c => GetJsonInt(c.ElementAtOrDefault(0)) == manualColumnId) == true
+            || (meta["manualColumns"] as JsonArray)?.OfType<JsonObject>()
+                .Any(c => GetJsonInt(c["id"]) == manualColumnId) == true;
+        if (!columnExists) throw new ValidationException(invalid);
+
+        // Match graphNote.ts: valid legacy styles take precedence over compact styles.
+        var legacy = meta["cellStyles"] as JsonArray;
+        var useLegacy = legacy?.OfType<JsonObject>().Any(s =>
+            GetJsonInt(s["employeeId"]) is <= 0 && GetJsonInt(s["dayOfMonth"]) is >= 1 and <= 31
+            && (s["backgroundColorArgb"] is JsonValue bg && bg.TryGetValue<int>(out _)
+                || s["textColorArgb"] is JsonValue fg && fg.TryGetValue<int>(out _))) == true;
+        var key = useLegacy ? "cellStyles" : "s";
+        var styles = meta[key] as JsonArray;
+        if (styles is null) { styles = new JsonArray(); meta[key] = styles; }
+        bool Matches(JsonNode? s) => useLegacy
+            ? s is JsonObject obj && GetJsonInt(obj["employeeId"]) == -manualColumnId && GetJsonInt(obj["dayOfMonth"]) == dayOfMonth
+            : s is JsonArray arr && GetJsonInt(arr.ElementAtOrDefault(0)) == -manualColumnId && GetJsonInt(arr.ElementAtOrDefault(1)) == dayOfMonth;
+        var matching = styles.Where(Matches).ToList();
+        var textColor = matching.Select(s => useLegacy ? s!["textColorArgb"] : ((JsonArray)s!).ElementAtOrDefault(3))
+            .FirstOrDefault(value => value is JsonValue number && number.TryGetValue<int>(out _))?.DeepClone();
+        foreach (var entry in matching) styles.Remove(entry);
+        if (useLegacy)
+            styles.Add(new JsonObject { ["employeeId"] = -manualColumnId, ["dayOfMonth"] = dayOfMonth,
+                ["backgroundColorArgb"] = backgroundColorArgb, ["textColorArgb"] = textColor });
+        else
+        {
+            var entry = new JsonArray(-manualColumnId, dayOfMonth, backgroundColorArgb);
+            if (textColor is not null) entry.Add(textColor);
+            styles.Add(entry);
+        }
+        var visibleNote = rawNote[..match.Index].TrimEnd();
+        var suffix = $"[[GF3_GRAPH_META:b64:{EncodeGraphNoteMetaValue(meta.ToJsonString())}]]";
+        return string.IsNullOrEmpty(visibleNote) ? suffix : $"{visibleNote}\n\n{suffix}";
     }
 
     internal static string? RemoveManualColumnCellFromNote(string? rawNote, int manualColumnId, int dayOfMonth)

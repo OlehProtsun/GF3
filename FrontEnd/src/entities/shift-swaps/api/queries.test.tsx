@@ -6,6 +6,8 @@ import { queryKeys } from "@shared/api/queryKeys";
 import { useState } from "react";
 import {
   useGraphShiftSwapHighlightSettingQuery,
+  useGraphManualShiftHighlightSettingQuery,
+  useSaveGraphManualShiftHighlightSettingMutation,
   useAcceptEmployeeShiftSwapMutation,
   useCancelEmployeeShiftSwapMutation,
   useCancelManagerManualShiftSwapMutation,
@@ -17,6 +19,8 @@ import {
 
 const apiMocks = vi.hoisted(() => ({
   getHighlightSetting: vi.fn(),
+  getManualHighlightSetting: vi.fn(),
+  saveManualHighlightSetting: vi.fn(),
   createEmployee: vi.fn(),
   acceptEmployee: vi.fn(),
   cancelEmployee: vi.fn(),
@@ -51,7 +55,7 @@ function MutationHarness() {
       >
         create employee
       </button>
-      <button type="button" onClick={() => acceptEmployee.mutate(5)}>
+      <button type="button" onClick={() => acceptEmployee.mutate({ id: 5 })}>
         accept employee
       </button>
       <button type="button" onClick={() => cancelEmployee.mutate(6)}>
@@ -103,6 +107,21 @@ beforeEach(() => {
 });
 
 describe("shift swap query mutations", () => {
+  test("manual setting caches confirmed values independently and preserves them on failed save", async () => {
+    const client = new QueryClient();
+    apiMocks.getManualHighlightSetting.mockResolvedValue({ highlightColor: "#BAE6FD" });
+    apiMocks.saveManualHighlightSetting.mockResolvedValue({ highlightColor: "#AABBCC" });
+    const wrapper = ({ children }: { children: React.ReactNode }) => <QueryClientProvider client={client}>{children}</QueryClientProvider>;
+    const { result } = renderHook(() => ({ query: useGraphManualShiftHighlightSettingQuery(1, 2), mutation: useSaveGraphManualShiftHighlightSettingMutation() }), { wrapper });
+    await waitFor(() => expect(result.current.query.data?.highlightColor).toBe("#BAE6FD"));
+    result.current.mutation.mutate({ containerId: 1, graphId: 2, highlightColor: "#AABBCC" });
+    await waitFor(() => expect(result.current.query.data?.highlightColor).toBe("#AABBCC"));
+    expect(client.getQueryState(queryKeys.shiftSwaps.graphHighlightSetting(1, 2)).data).toBeUndefined();
+    apiMocks.saveManualHighlightSetting.mockRejectedValue(new Error("Conflict"));
+    result.current.mutation.mutate({ containerId: 1, graphId: 2, highlightColor: "#112233" });
+    await waitFor(() => expect(result.current.mutation.error).toBeTruthy());
+    expect(result.current.query.data?.highlightColor).toBe("#AABBCC");
+  });
   test("keeps candidate reads disabled without a draft and follows candidate pagination", async () => {
     apiMocks.listReturnCandidates.mockImplementation(async ({ page }: { page: number }) => ({ items: [{ slotId: page }], page, pageSize: 1, hasMore: page < 2 }));
     apiMocks.previewEmployee.mockResolvedValue({ isValid: true });
@@ -123,6 +142,7 @@ describe("shift swap query mutations", () => {
   test("invalidates employee swap and schedule caches after employee actions", async () => {
     const user = userEvent.setup();
     const client = new QueryClient();
+    const invalidateSpy = vi.spyOn(client, "invalidateQueries");
     const events: string[] = [];
     client.subscribe(event => events.push(`${event.type}:${event.key}`));
     renderHarness(client);
@@ -135,7 +155,7 @@ describe("shift swap query mutations", () => {
 
     await user.click(screen.getByRole("button", { name: "accept employee" }));
     await waitFor(() => {
-      expect(apiMocks.acceptEmployee).toHaveBeenCalledWith(5);
+      expect(apiMocks.acceptEmployee).toHaveBeenCalledWith({ id: 5 });
       expect(events).toContain(`invalidate:${JSON.stringify(queryKeys.employeeSchedules.all)}`);
     });
 
@@ -146,6 +166,8 @@ describe("shift swap query mutations", () => {
 
     expect(events.filter(event => event === `invalidate:${JSON.stringify(queryKeys.shiftSwaps.employee())}`))
       .toHaveLength(3);
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.shiftSwaps.all });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.containers.all });
   });
 
   test("invalidates graph logs and graph slots after manager manual swap actions", async () => {

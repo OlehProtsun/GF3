@@ -567,7 +567,7 @@ export function ContainerPage() {
 
   const contentClassName = [
     styles.content,
-    mode === "profile" ? styles.contentWide : styles.contentNarrow,
+    mode === "profile" ? styles.contentWide : mode === "list" ? styles.contentFolders : styles.contentNarrow,
   ].join(" ");
 
   return (
@@ -584,6 +584,7 @@ export function ContainerPage() {
             onClearSearch={() => setListSearchQuery("")}
             onAddContainer={handleStartCreate}
             onContainerOpen={handleOpenProfile}
+            onGraphOpen={(containerId, graphId) => navigate(`/container/${containerId}/graphs/${graphId}`)}
           />
         ) : null}
 

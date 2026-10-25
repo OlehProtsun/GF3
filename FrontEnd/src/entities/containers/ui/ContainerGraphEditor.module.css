@@ -737,15 +737,6 @@
   font: inherit;
 }
 
-.noteInput {
-  min-height: 280px;
-  resize: vertical;
-}
-
-.noteField {
-  padding-bottom: 18px;
-}
-
 .employeeControls {
   display: grid;
   gap: 10px;

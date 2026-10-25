@@ -22,8 +22,8 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe("push Profile settings", () => {
-  test("requests permission only on click and enables only after server acknowledgement", async () => {
-    render(<EmployeePushSettings employeeId={7} />);
+  test.each(["default", "profile"] as const)("%s requests permission only on click and enables only after server acknowledgement", async appearance => {
+    render(<EmployeePushSettings employeeId={7} appearance={appearance} />);
     const button = await screen.findByRole("button", { name: "Enable notifications" }); await waitFor(() => expect(button).toBeEnabled());
     expect(Notification.requestPermission).not.toHaveBeenCalled();
     let acknowledge!: () => void; mocks.upsertSubscription.mockReturnValue(new Promise<void>(resolve => { acknowledge = resolve; }));
@@ -35,9 +35,9 @@ describe("push Profile settings", () => {
     fireEvent.click(screen.getByRole("button", { name: "Disable notifications" }));
     await waitFor(() => expect(mocks.disable).toHaveBeenCalledOnce());
   });
-  test("server rejection is retryable and never claims enabled", async () => {
+  test.each(["default", "profile"] as const)("%s server rejection is retryable and never claims enabled", async appearance => {
     mocks.upsertSubscription.mockRejectedValue(new Error("Offline"));
-    render(<EmployeePushSettings employeeId={7} />);
+    render(<EmployeePushSettings employeeId={7} appearance={appearance} />);
     const button = await screen.findByRole("button", { name: "Enable notifications" }); await waitFor(() => expect(button).toBeEnabled()); fireEvent.click(button);
     expect(await screen.findByRole("alert")).toHaveTextContent("Could not update notifications");
     expect(screen.queryByText("Enabled on this device")).not.toBeInTheDocument(); expect(button).toBeEnabled();
@@ -71,4 +71,16 @@ describe("push Profile settings", () => {
     expect(await screen.findByRole("button", { name: "Disable notifications" })).toBeEnabled();
     expect(screen.getByText("Enabled on this device")).toBeVisible();
   });
+});
+
+test("profile header and config retry retain existing supported actions", async () => {
+  mocks.getConfig.mockRejectedValueOnce(new Error("Offline"));
+  render(<EmployeePushSettings employeeId={7} appearance="profile" />);
+  expect(screen.getByRole("heading", { name: "Push notifications" })).toBeVisible();
+  expect(screen.getByText("Enable notifications to receive important updates.")).toBeVisible();
+  expect(await screen.findByRole("alert")).toBeVisible();
+  fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+  const enable = await screen.findByRole("button", { name: "Enable notifications" });
+  await waitFor(() => expect(enable).toBeEnabled());
+  expect(Notification.requestPermission).not.toHaveBeenCalled();
 });

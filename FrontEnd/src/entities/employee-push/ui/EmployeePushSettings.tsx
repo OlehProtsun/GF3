@@ -3,9 +3,10 @@ import { t } from "@shared/i18n";
 import { employeePushApi, type PushConfig } from "../api/employeePushApi";
 import { disableForDevice, employeePushStateChanged, getBrowserSubscription, pushAccount, pushSupport, registerWorker } from "../lib/pushSubscription";
 import { enableEmployeePush } from "../lib/enablePush";
+import { AccountSettingsIcon } from "@shared/ui/icons";
 import styles from "./EmployeePushSettings.module.css";
 
-export function EmployeePushSettings({ employeeId }: { employeeId: number }) {
+export function EmployeePushSettings({ employeeId, appearance = "default" }: { employeeId: number; appearance?: "default" | "profile" }) {
   const [config, setConfig] = useState<PushConfig | null>(null);
   const [enabled, setEnabled] = useState(false);
   const [busy, setBusy] = useState(true);
@@ -66,8 +67,8 @@ export function EmployeePushSettings({ employeeId }: { employeeId: number }) {
     : permission === "denied" ? t("Notifications blocked — change system/browser settings")
     : config && !config.enabled ? t("Push is not configured on the server")
     : enabled ? t("Enabled on this device") : t("Enable notifications");
-  return <section className={styles.settings} aria-label={t("Push notifications")}>
-    <div><strong>{t("Push notifications")}</strong><p>{message}</p><small>{t("iPhone and iPad require iOS 16.4 or later, Add to Home Screen, HTTPS and system permission. Delivery may be delayed by the system.")}</small></div>
+  return <section className={[styles.settings, appearance === "profile" ? styles.profile : ""].filter(Boolean).join(" ")} aria-label={t("Push notifications")}>
+    <div>{appearance === "profile" ? <div className={styles.profileHeader}><span className={styles.icon}><AccountSettingsIcon name="bell" /></span><div><h2>{t("Push notifications")}</h2><p>{t("Enable notifications to receive important updates.")}</p></div></div> : <strong>{t("Push notifications")}</strong>}<p>{message}</p><small>{t("iPhone and iPad require iOS 16.4 or later, Add to Home Screen, HTTPS and system permission. Delivery may be delayed by the system.")}</small></div>
     {error && <p role="alert">{t("Could not update notifications. Please try again.")}</p>}
     {error && !config && <button type="button" disabled={busy} onClick={() => setRevision(value => value + 1)}>{t("Retry")}</button>}
     {(enabled || support === "supported" && config?.enabled && permission !== "denied") && <button type="button" disabled={busy} onClick={enabled ? () => void disable() : enable}>{t(enabled ? "Disable notifications" : "Enable notifications")}</button>}

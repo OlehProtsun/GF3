@@ -138,6 +138,20 @@ public sealed class EmployeeAvailabilityController(
             EditLockedBy = editLockState?.LockedBy,
             EmployeeLastModifiedAtUtc = model.Member.EmployeeLastModifiedAtUtc,
             Slots = model.Days.Select(ToSlotDto).ToList(),
+            Members = (model.Group.Members ?? [])
+                .Select(member => new EmployeeAvailabilityMemberDto
+                {
+                    EmployeeId = member.EmployeeId,
+                    FirstName = member.Employee?.FirstName ?? string.Empty,
+                    LastName = member.Employee?.LastName ?? string.Empty,
+                    DisplayOrder = member.DisplayOrder,
+                    Slots = (member.Days ?? []).OrderBy(day => day.DayOfMonth).Select(ToSlotDto).ToList(),
+                })
+                .OrderBy(member => member.DisplayOrder)
+                .ThenBy(member => member.FirstName)
+                .ThenBy(member => member.LastName)
+                .ThenBy(member => member.EmployeeId)
+                .ToList(),
         };
     }
 

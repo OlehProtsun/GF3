@@ -59,3 +59,24 @@ export function useSetEmployeeSwapPinMutation() {
     },
   });
 }
+
+export function useEmployeeAvailabilityTimePresetsQuery(employeeId: number, enabled: boolean) {
+  return useQuery({
+    queryKey: queryKeys.employeeUiState.availabilityTimePresets(employeeId),
+    queryFn: ({ signal }) => employeeUiStateApi.getAvailabilityTimePresets(signal),
+    enabled: enabled && employeeId > 0,
+    staleTime: 0,
+  });
+}
+
+export function useSaveEmployeeAvailabilityTimePresetsMutation(employeeId: number) {
+  const queryClient = useQueryClient();
+  const queryKey = queryKeys.employeeUiState.availabilityTimePresets(employeeId);
+  return useMutation({
+    mutationFn: async ({ presets, onlyIfUnset = false }: { presets: string[]; onlyIfUnset?: boolean }) => {
+      queryClient.cancelQuery(queryKey);
+      return employeeUiStateApi.saveAvailabilityTimePresets(presets, onlyIfUnset);
+    },
+    onSuccess: result => queryClient.setQueryData(queryKey, result),
+  });
+}

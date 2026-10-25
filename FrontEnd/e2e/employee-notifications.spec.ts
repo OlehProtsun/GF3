@@ -40,12 +40,17 @@ for (const language of ['en', 'pl']) {
     await expect(recent).toBeVisible();
     await expect(expiring).toBeVisible();
     await expect(page.locator('article').filter({hasText: 'EXPIRED-SCHEDULE'})).toHaveCount(0);
+    const synchronized = page.waitForResponse(async response =>
+      new URL(response.url()).pathname === '/api/employee-ui-state'
+      && response.request().method() === 'GET'
+      && (await response.json()).readNotificationIds.length === 1);
     await recent.locator('button').click();
     await expect(recent.locator('button')).toBeDisabled();
     await expect.poll(() => readIds.size).toBe(1);
+    await (await synchronized).finished();
     await page.reload();
     await expect(recent.locator('button')).toBeDisabled();
-    await page.clock.fastForward(90_000);
+    await page.clock.runFor(90_000);
     await expect(expiring).toHaveCount(0);
     await expect(recent).toBeVisible();
     expect(errors).toEqual([]);

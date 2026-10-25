@@ -157,6 +157,9 @@ public sealed class AvailabilityGroupServiceTests
         await service.CreateSlotAsync(openGroup.Id, TestDataFactory.CreateAvailabilityDayModel(9, AvailabilityKind.NONE, memberId: openMember.Id));
         await service.CreateSlotAsync(openGroup.Id, TestDataFactory.CreateAvailabilityDayModel(2, AvailabilityKind.ANY, memberId: openMember.Id));
 
+        var colleague = await service.CreateMemberAsync(openGroup.Id, new AvailabilityGroupMemberModel { EmployeeId = otherEmployee.Id, DisplayOrder = 7 });
+        await service.CreateSlotAsync(openGroup.Id, TestDataFactory.CreateAvailabilityDayModel(11, AvailabilityKind.INT, "10:00 - 14:00", memberId: colleague.Id));
+
         var expiredGroup = await CreatePublishedGroupAsync(service, "Expired April", now.AddDays(-10), now.AddDays(-1));
         await service.CreateMemberAsync(expiredGroup.Id, new AvailabilityGroupMemberModel { EmployeeId = employee.Id });
 
@@ -182,6 +185,14 @@ public sealed class AvailabilityGroupServiceTests
         Assert.False(published[1].CanSubmit);
         Assert.Equal(employee.Id, published[0].Member.EmployeeId);
         Assert.Equal([2, 9], published[0].Days.Select(day => day.DayOfMonth).ToArray());
+
+        Assert.Equal(2, published[0].Group.Members.Count);
+        var visibleColleague = Assert.Single(published[0].Group.Members, member => member.EmployeeId == otherEmployee.Id);
+        Assert.Equal("Bob", visibleColleague.Employee!.FirstName);
+        Assert.Equal(11, Assert.Single(visibleColleague.Days).DayOfMonth);
+        Assert.Equal("10:00 - 14:00", Assert.Single(visibleColleague.Days).IntervalStr);
+        foreach (var hiddenId in new[] { otherOnlyGroup.Id, privateGroup.Id })
+            await Assert.ThrowsAsync<KeyNotFoundException>(() => service.GetPublishedForEmployeeByIdAsync(employee.Id, hiddenId, now));
 
         var missingFuture = await Assert.ThrowsAsync<KeyNotFoundException>(() =>
             service.GetPublishedForEmployeeByIdAsync(employee.Id, futureGroup.Id, now));

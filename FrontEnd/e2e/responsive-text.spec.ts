@@ -32,6 +32,23 @@ for (const role of ["manager", "employee"]) {
         return box.width > 0 && (box.right > parent.right + 2 || box.left < parent.left - 2);
       }).map(element => element.className));
       expect(overflow, `Sections at ${width}px`).toEqual([]);
+      if (role === "employee" && width <= 375) {
+        const row = page.locator('[class*="languageRow_"]');
+        const label = row.locator("label");
+        await expect(label).toHaveCSS("white-space", "nowrap");
+        await expect(label).toHaveCSS("text-overflow", "ellipsis");
+        await expect(label).toHaveCSS("overflow", "hidden");
+        await expect.poll(() => row.evaluate(element => {
+          const row = element.getBoundingClientRect();
+          const label = element.querySelector("label")!.getBoundingClientRect();
+          const button = element.querySelector("button")!.getBoundingClientRect();
+          const icon = element.querySelector("svg")!.getBoundingClientRect();
+          return Math.abs(label.y + label.height / 2 - button.y - button.height / 2) <= 2
+            && Math.abs(icon.y + icon.height / 2 - button.y - button.height / 2) <= 2
+            && label.right <= button.left + 1 && label.left >= row.left && button.right <= row.right + 1
+            && row.left >= 0 && row.right <= innerWidth + 1 && button.height >= 44;
+        })).toBe(true);
+      }
       await page.screenshot({ path: test.info().outputPath(`${role}-${width}.png`) });
     }
   });

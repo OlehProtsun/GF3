@@ -40,7 +40,15 @@
 .chooseHint { display: block; margin: -5px 12px 12px 74px; color: #7b879b; font-size: 12px; }
 .recipientContent { padding: 2px; }
 .recipientModes { display: grid; gap: 12px; margin-bottom: 14px; }
-.recipientModes > button { display: flex; align-items: center; gap: 12px; padding: 12px; text-align: left; min-width: 0; }
+.recipientModes > button, .recipientCard > button { display: flex; align-items: center; gap: 12px; padding: 12px; text-align: left; min-width: 0; }
+.recipientModes > button { border-radius: 20px; }
+.recipientCard { min-width: 0; border: 1px solid #e5eaf1; border-radius: 20px; background: white; transition: border-color 220ms, background-color 220ms; }
+.recipientCard[data-selected="true"] { border-color: #2f6df5; background: #f1f6ff; }
+.dialog .recipientCard > button { box-sizing: border-box; width: 100%; border: 0; border-radius: 20px; background: transparent; }
+.recipientCard[data-selected="true"] .optionIcon { background: #e2edff; color: #246bff; }
+.acceptanceExpansion { display: grid; grid-template-rows: 0fr; opacity: 0; visibility: hidden; transition: grid-template-rows 220ms ease, opacity 180ms ease, visibility 220ms; }
+.acceptanceExpansion[data-expanded="true"] { grid-template-rows: 1fr; opacity: 1; visibility: visible; }
+.acceptanceInner { min-height: 0; overflow: hidden; }
 .optionIcon { flex: none; display: grid; place-items: center; width: 36px; height: 36px; border-radius: 12px; color: #66758c; background: #f5f7fa; }
 .optionIcon svg { width: 24px; height: 24px; }
 .optionCopy { flex: 1; min-width: 0; display: grid; gap: 4px; overflow-wrap: anywhere; }
@@ -105,8 +113,15 @@
   .steps { gap: 2px; }
   .header { gap: 4px; padding-left: 8px; padding-right: 8px; }
   .steps li { font-size: 10px; }
-  .recipientModes > button { gap: 8px; padding: 10px; }
+  .recipientModes > button, .recipientCard > button { gap: 8px; padding: 10px; }
   .optionIcon { width: 32px; height: 34px; }
   .optionCopy strong { font-size: 15px; }
 }
 @media (prefers-reduced-motion: reduce) { .dialog *, .dialog { scroll-behavior: auto; transition: none; animation: none; } }
+
+.acceptancePanel { margin: 0 12px 12px; padding: 12px; border: 1px solid #dce6f5; border-radius: 16px; background: #f8faff; }
+.acceptanceMode { display: grid; gap: 10px; min-width: 0; margin: 0; padding: 0; border: 0; }
+.acceptanceMode legend { padding: 0; margin-bottom: 8px; color: #101a30; font-size: 14px; font-weight: 700; }
+.acceptanceMode label { display: flex; align-items: center; gap: 9px; min-height: 32px; color: #394c69; font-size: 13px; line-height: 1.4; cursor: pointer; }
+.acceptanceMode input { flex: none; width: 18px; height: 18px; margin: 0; accent-color: #246bff; }
+.acceptanceMode p { margin: 0; padding-top: 10px; border-top: 1px solid #e0e8f4; color: #75829a; font-size: 12px; line-height: 1.5; }

@@ -15,6 +15,7 @@ const GRAPH_NOTE_STYLE_ID_BASE = 1_000_000;
 export const GRAPH_DAY_STYLE_EMPLOYEE_ID = 0;
 
 export type GraphManualColumnData = {
+  source?: "generated-unfilled";
   id: number;
   label: string;
   cells: Record<string, string>;
@@ -38,6 +39,7 @@ export type GraphNoteTextCellData = {
 export type GraphAutoAvailabilityStyleSuppressionMap = Record<string, string[]>;
 
 type ParsedGraphNoteMeta = {
+  g?: unknown;
   manualColumns?: unknown;
   columnOrder?: unknown;
   cellStyles?: unknown;
@@ -456,9 +458,13 @@ export function parseGraphNoteContent(rawNote?: string | null) {
     note: source.slice(0, match.index).trimEnd(),
     manualColumns: (() => {
       const nextLegacyManualColumns = sanitizeLegacyGraphManualColumns(parsed.manualColumns);
-      return nextLegacyManualColumns.length > 0
+      const columns = nextLegacyManualColumns.length > 0
         ? nextLegacyManualColumns
         : sanitizeCompactGraphManualColumns(parsed.m);
+      const generatedIds = new Set(Array.isArray(parsed.g)
+        ? parsed.g.filter(id => Number.isInteger(id) && id > 0) : []);
+      return columns.map(column => generatedIds.has(column.id)
+        ? { ...column, source: "generated-unfilled" as const } : column);
     })(),
     columnOrder: (() => {
       const nextLegacyColumnOrder = sanitizeGraphColumnOrder(parsed.columnOrder);
@@ -504,10 +510,19 @@ export function buildGraphNoteContent(
       id,
       label: typeof column.label === "string" ? column.label : "",
       cells: sanitizeGraphManualColumnCells(column.cells),
+      ...(column.source === "generated-unfilled" ? { source: column.source } : {}),
     });
     return accumulator;
   }, []);
   const sanitizedColumnOrder = sanitizeGraphColumnOrder(columnOrder);
+  const generatedIds = sanitizedManualColumns.filter(column => column.source === "generated-unfilled")
+    .sort((a, b) => {
+      const rank = (id: number) => {
+        const index = sanitizedColumnOrder.indexOf(-id);
+        return index < 0 ? sanitizedColumnOrder.length + sanitizedManualColumns.findIndex(column => column.id === id) : index;
+      };
+      return rank(a.id) - rank(b.id);
+    }).map(column => column.id);
   const sanitizedCellStyles = sanitizeGraphNoteCellStyles(cellStyles);
   const sanitizedTextCells = sanitizeLegacyGraphNoteTextCells(textCells);
   const sanitizedAutoAvailabilityStyleSuppressions =
@@ -524,6 +539,7 @@ export function buildGraphNoteContent(
   }
 
   const encodedMeta = `b64:${encodeGraphNoteMetaValue(JSON.stringify({
+    ...(generatedIds.length > 0 ? { g: generatedIds } : {}),
     ...(sanitizedManualColumns.length > 0
       ? {
         m: sanitizedManualColumns.map(column => (

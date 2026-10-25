@@ -1,8 +1,12 @@
 export const queryKeys = {
+  publicHolidaySettings: {
+    current: () => ["publicHolidaySettings", "current"] as const,
+  },
   home: {
     dashboard: () => ["home", "dashboard"] as const,
   },
   employeeUiState: {
+    availabilityTimePresets: (employeeId: number) => ["employeeUiState", "availabilityTimePresets", employeeId] as const,
     current: () => ["employeeUiState", "current"] as const,
   },
   employeeProfile: {
@@ -47,6 +51,7 @@ export const queryKeys = {
     correctionSettings: () => ["shiftSwaps", "correctionSettings"] as const,
     graphLog: (containerId: number, graphId: number) => ["shiftSwaps", "graphLog", containerId, graphId] as const,
     graphHighlightSetting: (containerId: number, graphId: number) => ["shiftSwaps", "graphHighlightSetting", containerId, graphId] as const,
+    graphManualHighlightSetting: (containerId: number, graphId: number) => ["shiftSwaps", "graphManualHighlightSetting", containerId, graphId] as const,
     container: (containerId: number) => ["shiftSwaps", "container", containerId] as const,
   },
   workflowLogs: {

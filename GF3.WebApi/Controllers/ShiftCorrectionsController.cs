@@ -87,7 +87,10 @@ public sealed class EmployeeShiftCorrectionsController(
 
         var hasPendingRequest = await db.ShiftCorrectionRequests
             .AnyAsync(item =>
-                item.ScheduleSlotId == slot.Id &&
+                (item.ScheduleSlotId == slot.Id ||
+                    (item.ScheduleId == schedule.Id && item.EmployeeId == slot.EmployeeId &&
+                     item.DayOfMonth == slot.DayOfMonth && item.OriginalFromTime == slot.FromTime &&
+                     item.OriginalToTime == slot.ToTime)) &&
                 item.Status == ShiftCorrectionStatus.Pending,
                 cancellationToken)
             .ConfigureAwait(false);
@@ -233,8 +236,24 @@ public sealed class ManagerShiftCorrectionsController(
 
         var slot = await db.ScheduleSlots
             .SingleOrDefaultAsync(item => item.Id == correction.ScheduleSlotId && item.ScheduleId == graphId, cancellationToken)
-            .ConfigureAwait(false)
-            ?? throw new ValidationException("The original shift no longer exists. Reject this request and ask the employee to submit a new one.");
+            .ConfigureAwait(false);
+        if (slot is null)
+        {
+            var candidates = await db.ScheduleSlots
+                .Where(item => item.ScheduleId == correction.ScheduleId &&
+                    item.EmployeeId == correction.EmployeeId && item.DayOfMonth == correction.DayOfMonth &&
+                    item.FromTime == correction.OriginalFromTime && item.ToTime == correction.OriginalToTime)
+                .Take(2).ToListAsync(cancellationToken).ConfigureAwait(false);
+            if (candidates.Count == 0)
+            {
+                throw new ValidationException("The original shift no longer exists. Reject this request and ask the employee to submit a new one.");
+            }
+            if (candidates.Count > 1)
+            {
+                throw new ValidationException("The original shift cannot be uniquely identified. Reject this request and ask the employee to submit a new one.");
+            }
+            slot = candidates[0];
+        }
         if (slot.EmployeeId != correction.EmployeeId ||
             slot.DayOfMonth != correction.DayOfMonth ||
             slot.FromTime != correction.OriginalFromTime ||
@@ -266,6 +285,7 @@ public sealed class ManagerShiftCorrectionsController(
             ? await ShiftCorrectionRules.GetSettingColorAsync(db, managerId, cancellationToken).ConfigureAwait(false)
             : ShiftCorrectionRules.NormalizeColor(request.HighlightColor, nameof(request.HighlightColor));
 
+        correction.ScheduleSlotId = slot.Id;
         slot.FromTime = correction.RequestedFromTime;
         slot.ToTime = correction.RequestedToTime;
 

@@ -232,6 +232,7 @@ test.each([ManagerPhoneAvailabilityPage, ManagerPhoneEmployeesPage])("lists reta
 
 test("More shows account, PC switch and functional logout without Shops shortcut", () => {
  mount(<ManagerPhoneMorePage />, "/more"); expect(screen.getByText("Real Manager")).toBeInTheDocument();
+ expect(screen.queryByRole("link", { name: "Settings" })).not.toBeInTheDocument();
  expect(screen.queryByRole("link", { name: /Shops/ })).not.toBeInTheDocument(); expect(screen.getByRole("button", { name: /Switch to Desktop/ })).toBeInTheDocument();
  fireEvent.click(screen.getByRole("button", { name: "Log out" })); expect(auth.logout).toHaveBeenCalledOnce();
 });
@@ -246,10 +247,10 @@ test("phone schedule summary keeps metrics and every split shift in compact sear
  const summary = view.container.querySelector("[data-phone-schedule-summary]")!;
  expect(within(summary as HTMLElement).queryByRole("table")).not.toBeInTheDocument();
  expect(within(summary as HTMLElement).getByRole("heading", { name: "Other Worker" })).toBeInTheDocument();
- const metrics = summary.querySelector("dl")!; expect(Array.from(metrics.querySelectorAll("dd")).map(node => node.textContent)).toEqual(["1", "29", "7"]);
+ const metrics = summary.querySelector("dl")!; expect(Array.from(metrics.querySelectorAll("dd")).map(node => node.textContent)).toEqual(["1", "29", "7", "0"]);
  await userEvent.click(summary.querySelector("summary")!);
  for (const value of ["08:00", "12:00", "13:00", "16:00", "4", "3"]) expect(within(summary as HTMLElement).getByText(value)).toBeInTheDocument();
- expect(summary.querySelectorAll("dl > div > dt")).toHaveLength(33);
+ expect(summary.querySelectorAll("dl > div > dt")).toHaveLength(34);
  const search = screen.getByRole("searchbox", { name: "Search schedule summary by employee name or surname" });
  fireEvent.change(search, { target: { value: "missing" } }); expect(screen.getByRole("status")).toHaveTextContent('No employees found');
  fireEvent.change(search, { target: { value: "worker" } }); expect(view.container.querySelector("[data-phone-schedule-summary] > details")).toBeInTheDocument();

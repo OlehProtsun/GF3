@@ -1,5 +1,7 @@
 import { writeFile } from "node:fs/promises";
 import { expect, test, type Page } from "@playwright/test";
+import pl from "../src/shared/i18n/pl.json" with { type: "json" };
+import uk from "../src/shared/i18n/uk.json" with { type: "json" };
 
 test.setTimeout(60_000);
 
@@ -21,10 +23,10 @@ function offer(payload: Record<string, unknown>) {
     fromTime: "09:00", toTime: "16:30", fromEmployeeId: 1, fromEmployeeName: "Owner Worker", targetEmployeeName: "Target Worker", visibility: payload.targetEmployeeId ? "private" : "public",
     status: "open", createdAtUtc: "2026-10-01T00:00:00Z", shiftHours: 7.5, currentEmployeeHoursBefore: 7.5, currentEmployeeHoursAfter: 7.5,
     currentEmployeeWorkDaysBefore: 1, currentEmployeeWorkDaysAfter: 1, currentEmployeeFreeDaysBefore: 30, currentEmployeeFreeDaysAfter: 30,
-    fromEmployeeHoursBefore: 7.5, fromEmployeeHoursAfter: 7.5, canAccept: false, canCancel: true, isCreatedByCurrentEmployee: true, isManagerCreated: false, isScheduleLocked: false, acceptanceUnavailableReason: "",
+    fromEmployeeHoursBefore: 7.5, fromEmployeeHoursAfter: 7.5, allowPartialAcceptance: false, canAcceptFull: true, eligibleClaimWindows: [] as {fromTime:string;toTime:string}[], canAccept: false, canCancel: true, isCreatedByCurrentEmployee: true, isManagerCreated: false, isScheduleLocked: false, acceptanceUnavailableReason: "",
     ...(payload.requestKind === "exchange" ? { returnScheduleName: "F35", returnShopName: "Central", returnYear: 2026, returnMonth: 10, returnDayOfMonth: 3, returnShiftHours: 7.5 } : {}), ...payload };
 }
-async function mockApi(page: Page, actor: number, state: { offers: Offer[]; stale?: boolean; scheduleCount?: number; shiftCount?: number; employeeCount?: number; multipleReturnSchedules?: boolean; previewState?: "loading" | "error" | "invalid" | "stale"; ownerName?: string; targetName?: string; language?: "en" | "pl" }) {
+async function mockApi(page: Page, actor: number, state: { offers: Offer[]; stale?: boolean; scheduleCount?: number; shiftCount?: number; employeeCount?: number; multipleReturnSchedules?: boolean; previewState?: "loading" | "error" | "invalid" | "stale"; ownerName?: string; targetName?: string; language?: "en" | "pl" | "uk" }) {
   await page.addInitScript(() => localStorage.setItem("gf3.auth.access-token", "swap-test"));
   await page.route("**/*", async route => {
     const path = new URL(route.request().url()).pathname;
@@ -43,7 +45,7 @@ async function mockApi(page: Page, actor: number, state: { offers: Offer[]; stal
       if (state.previewState === "loading") return;
       if (state.previewState === "error") return route.fulfill({ status: 503, contentType: "application/json", body: JSON.stringify({ title: "Preview unavailable." }) });
       const payload = route.request().postDataJSON();
-      body = { requestKind: payload.requestKind, targetEmployeeId: payload.targetEmployeeId, targetEmployeeName: payload.targetEmployeeId ? "Target Worker" : "Everyone",
+      body = { requestKind: payload.requestKind, allowPartialAcceptance: payload.allowPartialAcceptance ?? false, targetEmployeeId: payload.targetEmployeeId, targetEmployeeName: payload.targetEmployeeId ? "Target Worker" : "Everyone",
         source: { ...source, slotId: state.previewState === "stale" ? 9999 : source.slotId, fromTime: payload.fromTime, toTime: payload.toTime, durationMinutes: (Number(payload.toTime.slice(0, 2)) * 60 + Number(payload.toTime.slice(3))) - (Number(payload.fromTime.slice(0, 2)) * 60 + Number(payload.fromTime.slice(3))) },
         return: payload.requestKind === "exchange" ? { ...returned, scheduleId: payload.returnScheduleId, durationMinutes: (Number(payload.returnToTime.slice(0, 2)) * 60 + Number(payload.returnToTime.slice(3))) - (Number(payload.returnFromTime.slice(0, 2)) * 60 + Number(payload.returnFromTime.slice(3))), slotId: payload.returnScheduleSlotId, fromTime: payload.returnFromTime, toTime: payload.returnToTime } : null,
         projectedMonths: [{ year: 2026, month: 10, hoursBefore: 7.5, hoursAfter: payload.requestKind === "exchange" ? 7.5 : 0, workDaysBefore: 1, workDaysAfter: 1, freeDaysBefore: 30, freeDaysAfter: 30 }], isValid: state.previewState !== "invalid" };
@@ -61,6 +63,152 @@ async function mockApi(page: Page, actor: number, state: { offers: Offer[]; stal
     } else if (path.includes("negotiate")) return route.fulfill({ status: 503 });
     await route.fulfill({ contentType: "application/json", body: JSON.stringify(body) });
   });
+}
+
+for (const [language, label] of [["en", "Partial"], ["pl", "Częściowo"], ["uk", "Частково"]] as const) {
+  for (const width of [320, 375]) {
+    test(`partial badge stays visible and compact at ${width}px (${language})`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 812 });
+      await mockApi(page, 2, { language, offers: [
+        offer({ id: 1, requestKind: "give", allowPartialAcceptance: true }),
+        offer({ id: 2, requestKind: "give", allowPartialAcceptance: true, isManagerCreated: true,
+          manualColumnId: 3, manualColumnName: "Manual counter", targetEmployeeId: 2,
+          acceptanceUnavailableReason: "Not enough hours." }),
+        offer({ id: 3, requestKind: "give", fromTime: "10:00", toTime: "12:00" }),
+        offer({ id: 4, requestKind: "exchange", allowPartialAcceptance: true }),
+      ] });
+      await page.goto("/swap");
+      for (const id of [1, 2]) {
+        const card = page.locator(`article[data-swap-id="${id}"]`);
+        const partial = card.getByText(label, { exact: true });
+        await partial.scrollIntoViewIfNeeded();
+        await expect(partial).toBeVisible();
+        await expect(partial).toBeInViewport({ ratio: 1 });
+        const badge = partial.locator("..");
+        await expect(badge).toHaveCSS("background-color", "rgb(243, 232, 255)");
+        await expect(badge).toHaveCSS("color", "rgb(139, 92, 246)");
+        await expect(badge.locator("svg")).toHaveAttribute("aria-hidden", "true");
+        expect(await badge.evaluate(element => {
+          const row = element.parentElement!;
+          const visibility = row.children[0] as HTMLElement;
+          const status = row.children[1] as HTMLElement;
+          const box = element.getBoundingClientRect();
+          const card = element.closest("article")!.getBoundingClientRect();
+          const style = getComputedStyle(element);
+          return row.children[2] === element && box.left >= card.left && box.right <= card.right &&
+            element.scrollWidth <= element.clientWidth &&
+            Math.abs(box.height - visibility.getBoundingClientRect().height) < 1 &&
+            style.fontSize === getComputedStyle(status).fontSize &&
+            style.padding === getComputedStyle(status).padding && parseFloat(style.borderRadius) >= box.height / 2;
+        })).toBeTruthy();
+      }
+      for (const id of [3, 4]) {
+        await expect(page.locator(`article[data-swap-id="${id}"]`).getByText(label, { exact: true })).toHaveCount(0);
+      }
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBeTruthy();
+    });
+  }
+}
+
+for (const locale of [
+  { language: "en", title: "Offer details", custom: "Custom period", full: "Full shift", accept: "Accept shift", close: "Close", from: "From", increase: "Increase From" },
+  { language: "pl", title: "Szczegóły oferty", custom: "Własny okres", full: "Cała zmiana", accept: "Przejmij zmianę", close: "Zamknij", from: "Od", increase: "Zwiększ Od" },
+  { language: "uk", title: "Подробиці пропозиції", custom: "Власний період", full: "Уся зміна", accept: "Прийняти зміну", close: "Закрити", from: "Від", increase: "Збільшити Від" },
+] as const) {
+  for (const viewport of [{ width: 320, height: 640 }, { width: 375, height: 667 }, { width: 390, height: 844 },
+    { width: 430, height: 932 }, { width: 667, height: 375 }, { width: 1280, height: 800 }]) {
+    test(`redesigned details ${locale.language} ${viewport.width}x${viewport.height}`, async ({ page }) => {
+      await page.setViewportSize(viewport);
+      await mockApi(page, 2, { language: locale.language, offers: [offer({ requestKind: "give", allowPartialAcceptance: true,
+        isManagerCreated: true, manualColumnId: 3, manualColumnName: "do obstawienia",
+        eligibleClaimWindows: [{ fromTime: "09:00", toTime: "16:30" }] })] });
+      await page.goto("/swap");
+      await page.locator('article[data-swap-id="1"] > button').first().press("Enter");
+      const dialog = page.getByRole("dialog", { name: locale.title });
+      const close = dialog.getByRole("button", { name: locale.close, exact: true });
+      const accept = dialog.getByRole("button", { name: locale.accept, exact: true });
+      await expect(dialog).toBeVisible();
+      await expect(dialog.getByRole("button", { name: locale.full, exact: true })).toHaveAttribute("aria-pressed", "true");
+      await dialog.getByRole("button", { name: locale.custom, exact: true }).click();
+      const from = dialog.getByLabel(locale.from, { exact: true });
+      await expect(from).toHaveValue("09:00");
+      await dialog.getByRole("button", { name: locale.increase, exact: true }).click();
+      await expect(from).toHaveValue("09:15");
+      await expect(dialog.locator("output")).toHaveText("09:15–16:30");
+      const headerBox = await dialog.locator("header").first().boundingBox();
+      const footerBox = await dialog.locator("footer").boundingBox();
+      const body = dialog.locator('[class*="body_"]');
+      await body.evaluate(element => { element.scrollTop = element.scrollHeight; });
+      await expect(close).toBeInViewport({ ratio: 1 });
+      await expect(accept).toBeInViewport({ ratio: 1 });
+      expect(await dialog.locator("header").first().boundingBox()).toEqual(headerBox);
+      expect(await dialog.locator("footer").boundingBox()).toEqual(footerBox);
+      expect(await dialog.evaluate(element => {
+        const box = element.getBoundingClientRect();
+        return box.left >= 0 && box.right <= innerWidth && box.top >= 0 && box.bottom <= innerHeight &&
+          element.scrollWidth <= element.clientWidth && [...element.querySelectorAll<HTMLElement>("input, button, dl, section")].every(node => {
+            const rect = node.getBoundingClientRect();
+            return node.scrollWidth <= node.clientWidth + 1 && rect.left >= box.left && rect.right <= box.right;
+          });
+      })).toBeTruthy();
+      await body.evaluate(element => { element.scrollTop = 0; });
+      await page.screenshot({ path: test.info().outputPath("redesigned-details.png") });
+      await close.click();
+      await expect(dialog).toHaveCount(0);
+    });
+  }
+}
+
+for (const language of ["en", "pl", "uk"] as const) {
+  for (const width of [320, 375, 390, 430, 1280]) {
+    test(`embedded acceptance ${language} ${width}px`, async ({ page }) => {
+      const dictionary: Record<string, string> = language === "pl" ? pl : language === "uk" ? uk : {};
+      const text = (key: string) => dictionary[key] ?? key;
+      await page.setViewportSize({ width, height: width === 320 ? 640 : 800 });
+      await mockApi(page, 1, { language, offers: [] });
+      await page.goto("/swap");
+      await page.getByRole("button", { name: text("Create offer"), exact: true }).click();
+      await page.getByRole("button", { name: /F27/ }).click();
+      await page.getByRole("radio").click();
+      await page.getByRole("button", { name: text("Confirm shift"), exact: true }).click();
+      await page.getByRole("button", { name: text("Continue"), exact: true }).click();
+      const dialog = page.locator("dialog:modal");
+      const everyone = dialog.getByRole("button", { name: text("Everyone"), exact: true });
+      const card = everyone.locator("..");
+      const expansion = card.locator('[data-expanded]');
+      const mode = card.getByRole("group", { name: text("Acceptance mode"), exact: true });
+      await expect(mode).toBeVisible();
+      await expect(mode.getByRole("radio", { name: text("Only the exact shift"), exact: true })).toBeChecked();
+      await mode.getByRole("radio", { name: text("Allow custom time"), exact: true }).check();
+      await expect(mode.getByText(text("Unclaimed time will remain available as a new offer."), { exact: true })).toBeVisible();
+      await expect(expansion).toHaveCSS("transition-duration", "0.22s, 0.18s, 0.22s");
+      const continueButton = dialog.getByRole("button", { name: text("Continue"), exact: true });
+      await expect(continueButton).toBeInViewport({ ratio: 1 });
+      await expect.poll(() => mode.evaluate(element => {
+        const panel = element.getBoundingClientRect(), card = element.closest('[data-selected]')!.getBoundingClientRect();
+        return panel.left >= card.left && panel.right <= card.right && panel.bottom <= card.bottom;
+      })).toBeTruthy();
+      await dialog.getByRole("button", { name: text("Specific employee"), exact: true }).click();
+      await expect(mode).toHaveCount(0);
+      await expect(expansion).toHaveCSS("grid-template-rows", "0px");
+      await expect(continueButton).toBeDisabled();
+      await everyone.click();
+      await expect(mode.getByRole("radio", { name: text("Allow custom time"), exact: true })).toBeChecked();
+      await expect.poll(() => dialog.evaluate(element => {
+        const box = element.getBoundingClientRect();
+        return element.scrollWidth <= element.clientWidth && [...element.querySelectorAll<HTMLElement>('button, fieldset, input[type="radio"]')].every(node => {
+          const rect = node.getBoundingClientRect();
+          return node.scrollWidth <= node.clientWidth + 1 && rect.left >= box.left && rect.right <= box.right;
+        });
+      })).toBeTruthy();
+      await expect(continueButton).toBeInViewport({ ratio: 1 });
+      await page.screenshot({ path: test.info().outputPath("embedded-acceptance.png") });
+      await page.emulateMedia({ reducedMotion: "reduce" });
+      await expect(expansion).toHaveCSS("transition-duration", "0s");
+      await continueButton.click();
+      await expect(dialog.getByRole("button", { name: text("Send request"), exact: true })).toBeEnabled();
+    });
+  }
 }
 
 async function sourceSteps(page: Page) {
@@ -91,7 +239,7 @@ test("custom private Give sends exact payload and cancellation appears in Histor
   await page.getByRole("button", { name: "Continue", exact: true }).click();
   const sent = page.waitForRequest(r => new URL(r.url()).pathname === "/api/employee-shift-swaps" && r.method() === "POST");
   await page.getByRole("button", { name: "Send request" }).click();
-  expect((await sent).postDataJSON()).toEqual({ requestKind: "give", scheduleId: 10, scheduleSlotId: 100, fromTime: "09:15", toTime: "16:15", targetEmployeeId: 2 });
+  expect((await sent).postDataJSON()).toEqual({ allowPartialAcceptance: false, requestKind: "give", scheduleId: 10, scheduleSlotId: 100, fromTime: "09:15", toTime: "16:15", targetEmployeeId: 2 });
   await page.getByRole("button", { name: "View offer details for F27" }).click();
   await page.getByRole("button", { name: "Cancel offer", exact: true }).click();
   await expect(page.getByRole("dialog", { name: "Offer details" })).toHaveCount(0);
@@ -870,9 +1018,11 @@ for (const viewport of [{ width: 320, height: 568 }, { width: 375, height: 667 }
     await cards.nth(1).getByRole("button", { name: "View offer details for F27" }).click();
     const sourceCard = details.getByRole("region", { name: "Shift you receive" });
     const returnCard = details.getByRole("region", { name: "Your shift (you give)" });
-    await expect(sourceCard).toContainText("7.5h"); await expect(sourceCard.getByText("Receive", { exact: true })).toHaveCSS("color", "rgb(19, 128, 90)");
+    await expect(sourceCard).toContainText("7.5h"); await expect(sourceCard.getByText("Receive", { exact: true })).toHaveCSS("color", "rgb(0, 132, 95)");
+    await expect(sourceCard.getByText("Receive", { exact: true })).toHaveCSS("background-color", "rgb(221, 246, 236)");
     await expect(returnCard).toContainText("F35"); await expect(returnCard).toContainText("North Store");
-    await expect(returnCard).toContainText("4.25h"); await expect(returnCard.getByText("Give", { exact: true })).toHaveCSS("color", "rgb(36, 107, 255)");
+    await expect(returnCard).toContainText("4.25h"); await expect(returnCard.getByText("Give", { exact: true })).toHaveCSS("color", "rgb(102, 85, 182)");
+    await expect(returnCard.getByText("Give", { exact: true })).toHaveCSS("background-color", "rgb(238, 240, 255)");
     await expect(details.getByRole("button", { name: "Accept shift" })).toBeInViewport({ ratio: 1 });
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBeTruthy();
     await page.screenshot({ path: test.info().outputPath("exchange-details.png") });
@@ -903,7 +1053,8 @@ test("details lock eligibility, restore History and show creator transfer direct
   await page.getByRole("button", { name: "Swap history", exact: true }).click();
   const history = page.getByRole("dialog", { name: "Recent swap activity" });
   const historyLauncher = history.getByRole("button", { name: "View offer details for F27" });
-  await historyLauncher.click(); await expect(page.locator("dialog:modal")).toHaveCount(2);
+  await historyLauncher.click(); await expect(page.locator("dialog:modal")).toHaveCount(1);
+  await expect(history).not.toBeVisible();
   await expect(details.getByRole("button", { name: "Accept shift" })).toHaveCount(0);
   await expect(details.getByRole("button", { name: "Cancel offer" })).toHaveCount(0);
   await page.keyboard.press("Escape"); await expect(details).toHaveCount(0);
@@ -1026,6 +1177,7 @@ for (const viewport of [{ width: 320, height: 640 }, { width: 375, height: 812 }
     expect(box.height).toBeGreaterThanOrEqual(viewport.height - 80);
     const close = history.getByRole("button", { name: "Close", exact: true });
     await close.click({ trial: true });
+    await history.evaluate(element => Promise.all(element.getAnimations({ subtree: true }).map(animation => animation.finished)));
     const closeBefore = (await close.boundingBox())!;
     const cards = list.locator("article"); await expect(cards).toHaveCount(15);
     expect(await cards.evaluateAll(nodes => nodes.every(node => {
@@ -1040,8 +1192,10 @@ for (const viewport of [{ width: 320, height: 640 }, { width: 375, height: 812 }
     await page.screenshot({ path: test.info().outputPath("history-top.png") });
     const first = cards.first().getByRole("button", { name: /^View offer details for/ }); await first.click();
     const details = page.getByRole("dialog", { name: "Offer details" }); await expect(details).toBeVisible();
-    await expect(page.locator("dialog:modal")).toHaveCount(2); await page.keyboard.press("Escape");
+    await expect(page.locator("dialog:modal")).toHaveCount(1); await expect(history).not.toBeVisible(); await page.keyboard.press("Escape");
     await expect(details).toHaveCount(0); await expect(first).toBeFocused();
+    await expect(history).toBeVisible();
+    await history.evaluate(element => Promise.all(element.getAnimations({ subtree: true }).map(animation => animation.finished)));
     await expect(background).toHaveCSS("overflow-y", "hidden");
     await list.evaluate(el => { el.scrollTop = el.scrollHeight; });
     await expect(cards.last()).toBeInViewport(); await expect(close).toBeInViewport({ ratio: 1 });
