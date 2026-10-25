@@ -35,6 +35,8 @@ async function fixture(page: Page, initialMode: "choose" | "pc" | "phone" | "gue
     if (mode === "choose" && !path.startsWith("/api/regulations/")) return json({ code: "manager_workspace_mode_required" }, 403);
     let data: unknown = [];
     if (path === "/api/account-language") data = { language: options.language ?? "en" };
+    else if (path === "/api/manager-profile/me") data = { id: 1, displayName: "Manager Workspace", userName: "manager", recoveryEmail: "manager@example.com", isSystem: true };
+    else if (path === "/api/manager-profile/managers") data = [];
     else if (path === "/api/employees") data = employees;
     else if (path.startsWith("/api/employees/") && !path.includes("regulation")) data = employees.find(item => String(item.id) === path.split("/")[3]);
     else if (path === "/api/containers") data = [{ id: 1, name: "All manager container", note: "Full manager records" }];
@@ -255,7 +257,7 @@ test("Phone switches both ways, refresh persists and back never exposes an edito
   const f = await fixture(page); await login(page); await page.getByRole("button", { name: "Phone Read only", exact: true }).click();
   await expect(page.locator("[data-manager-phone]")).toBeVisible(); await page.waitForLoadState("networkidle"); await page.reload(); await expect(page.locator("[data-manager-phone]")).toBeVisible();
   await page.waitForLoadState("networkidle"); await page.getByRole("link", { name: "More", exact: true }).click(); await page.waitForLoadState("networkidle"); await page.getByRole("button", { name: /Switch to Desktop/ }).click(); await expect(page.locator("[data-manager-phone]")).toHaveCount(0); await page.waitForLoadState("networkidle");
-  await page.evaluate(() => { history.pushState({}, "", "/employee/2/edit"); dispatchEvent(new PopStateEvent("popstate")); }); await expect(page.getByRole("heading", { name: "Edit Employee", exact: true })).toBeVisible(); await page.waitForLoadState("networkidle"); await expect(page.getByRole("button", { name: /Switch to Phone/ })).toBeVisible(); await page.getByRole("button", { name: /Switch to Phone/ }).click();
+  await page.evaluate(() => { history.pushState({}, "", "/employee/2/edit"); dispatchEvent(new PopStateEvent("popstate")); }); await expect(page.getByRole("heading", { name: "Edit Employee", exact: true })).toBeVisible(); await page.waitForLoadState("networkidle"); await page.goto("/manager-profile"); await page.getByRole("button", { name: "Collapse sidebar" }).click(); await expect(page.getByRole("button", { name: /Switch to Phone/ })).toBeVisible(); await page.getByRole("button", { name: /Switch to Phone/ }).click();
   await expect(page.locator("[data-manager-phone]")).toBeVisible(); await page.waitForLoadState("networkidle"); await page.goBack(); await expect(page.locator("[data-manager-phone]")).toBeVisible(); expect(new URL(page.url()).pathname).not.toContain("/edit"); await noManagement(page); expect(f.errors).toEqual([]);
 });
 for (const width of [320, 375, 390, 430, 768, 1440]) {
@@ -547,18 +549,18 @@ for (const width of [320, 375, 390, 430]) test(`Home Coming Soon centered in Pho
  await noOverflow(page); await page.getByRole("link", { name: "Containers", exact: true }).click(); await expect(page).toHaveURL(/\/container$/);
  await page.getByRole("link", { name: "Home", exact: true }).click(); await expect(title).toBeVisible(); expect(f.errors).toEqual([]); expect(f.unsafe).toEqual([]);
 });
-for (const height of [720, 1000]) test(`Desktop sidebar switch matches navigation and reaches phone Home at ${height}px`, async ({ page }) => {
+for (const height of [720, 1000]) test(`Desktop profile switch is accessible and reaches phone Home at ${height}px`, async ({ page }) => {
  await page.setViewportSize({ width: 1440, height }); const f = await fixture(page, "pc"); await page.goto("/");
  const title = page.getByRole("heading", { name: "Home", exact: true }); await expect(title).toBeVisible();
- const mode = page.getByRole("button", { name: "Switch to Phone", exact: true }); const employee = page.getByRole("link", { name: "Employee", exact: true });
- const design = (element: Element) => { const style = getComputedStyle(element); return [style.width, style.height, style.borderRadius, style.backgroundColor, style.border, style.padding, style.display]; };
- const baseline = await employee.evaluate(design); expect(await mode.evaluate(design)).toEqual(baseline);
- expect(await mode.textContent()).toBe("");
- const label = page.getByText("Switch to Phone", { exact: true }); const buttonBox = (await mode.boundingBox())!; const labelBox = (await label.boundingBox())!;
- expect(labelBox.y).toBeGreaterThanOrEqual(buttonBox.y + buttonBox.height); expect(Math.abs(labelBox.x + labelBox.width / 2 - buttonBox.x - buttonBox.width / 2)).toBeLessThanOrEqual(2);
- const iconBox = (await mode.locator("svg").boundingBox())!; expect(Math.abs(iconBox.x + iconBox.width / 2 - buttonBox.x - buttonBox.width / 2)).toBeLessThanOrEqual(2); expect(Math.abs(iconBox.y + iconBox.height / 2 - buttonBox.y - buttonBox.height / 2)).toBeLessThanOrEqual(2);
- await employee.hover(); await expect.poll(() => employee.evaluate(element => element.getAnimations().length)).toBe(0); const hoverBackground = await employee.evaluate(element => getComputedStyle(element).backgroundColor);
- await mode.hover(); await expect.poll(() => mode.evaluate(element => getComputedStyle(element).backgroundColor)).toBe(hoverBackground);
+ await page.goto("/manager-profile");
+ await expect(page.locator("aside").getByRole("button", { name: /Switch to Phone|Log out/ })).toHaveCount(0);
+ await page.getByRole("button", { name: "Collapse sidebar" }).click();
+ const card = page.locator('section[aria-labelledby="manager-account-actions-heading"]');
+ const mode = card.getByRole("button", { name: "Switch to Phone", exact: true });
+ await expect(mode).toBeVisible();
+ await expect(mode).toContainText("Read only");
+ expect((await mode.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+ await expect(mode.locator("svg")).toBeVisible();
  await page.keyboard.press("Tab"); await mode.focus(); await expect(mode).toBeFocused(); expect(await mode.evaluate(element => element.matches(":focus-visible"))).toBe(true);
  await mode.click(); await expect(page.locator("[data-manager-phone]")).toBeVisible(); await expect(page.getByRole("heading", { name: "Coming Soon", exact: true })).toBeVisible();
  await page.getByRole("link", { name: "More", exact: true }).click(); await page.getByRole("button", { name: "Switch to Desktop", exact: true }).click();
@@ -598,6 +600,8 @@ test("PC Home restores data and interactions through PC Phone PC without login",
  await page.goto("/");
  await expect(page.getByText("Who Works Today?", { exact: true })).toBeVisible();
  await page.waitForLoadState("networkidle");
+ await page.goto("/manager-profile");
+ await page.getByRole("button", { name: "Collapse sidebar" }).click();
  await page.getByRole("button", { name: "Switch to Phone", exact: true }).click();
  await expect(page.getByRole("heading", { name: "Coming Soon", exact: true })).toBeVisible();
  await expect(page.getByText("Who Works Today?", { exact: true })).toHaveCount(0);
@@ -615,4 +619,48 @@ test("PC Home restores data and interactions through PC Phone PC without login",
  expect(requests.filter(path => path === "/api/auth/login")).toEqual([]);
  expect(f.errors).toEqual([]);
  expect(f.unsafe).toEqual([]);
+});
+
+test("PC profile actions preserve exchange failure, retry and phone More", async ({ page }) => {
+  const f = await fixture(page, "pc");
+  await page.goto("/manager-profile");
+  const card = page.locator('section[aria-labelledby="manager-account-actions-heading"]');
+  await expect(page.locator("aside").getByRole("button", { name: /Switch to Phone|Log out/ })).toHaveCount(0);
+  await page.getByRole("button", { name: "Collapse sidebar" }).click();
+  await expect(card.getByRole("button", { name: "Log out", exact: true })).toBeVisible();
+  for (const width of [320, 390, 768, 1440]) {
+    await page.setViewportSize({ width, height: 900 });
+    await expect(card).toBeVisible();
+    for (const button of await card.getByRole("button").all()) {
+      expect((await button.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+      expect(await button.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true);
+    }
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    await page.screenshot({ path: test.info().outputPath(`profile-actions-${width}.png`) });
+  }
+  f.failExchange(true);
+  await card.getByRole("button", { name: "Switch to Phone", exact: true }).click();
+  await expect(card).toContainText("Mode change failed. Please try again.");
+  await expect(page).toHaveURL(/\/manager-profile$/);
+  await expect(page.locator("[data-manager-phone]")).toHaveCount(0);
+  f.failExchange(false);
+  await card.getByRole("button", { name: "Switch to Phone", exact: true }).click();
+  await expect(page.locator("[data-manager-phone]")).toBeVisible();
+  await page.getByRole("link", { name: "More", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Switch to Desktop", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Log out", exact: true })).toBeVisible();
+  expect(f.errors).toEqual([]);
+});
+
+test("PC profile failure keeps actions and local logout available", async ({ page }) => {
+  await fixture(page, "pc");
+  await page.route("**/api/manager-profile/me", route => route.fulfill({ status: 503, json: {} }));
+  await page.route("**/api/auth/logout", route => route.fulfill({ status: 503, json: {} }));
+  await page.goto("/manager-profile");
+  await expect(page.getByText("Could not load manager profile.", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Collapse sidebar" }).click();
+  const card = page.locator('section[aria-labelledby="manager-account-actions-heading"]');
+  await expect(card.getByRole("button", { name: "Switch to Phone", exact: true })).toBeVisible();
+  await card.getByRole("button", { name: "Log out", exact: true }).click();
+  await expect(page).toHaveURL(/\/login$/);
 });

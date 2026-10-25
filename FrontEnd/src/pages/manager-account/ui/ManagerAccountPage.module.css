@@ -145,3 +145,22 @@
 @media (prefers-reduced-motion: reduce) {
   .field, .deleteManagerButton, .primaryButton { transition: none; }
 }
+
+.sessionActionsCard { margin-top: 14px; }
+.sessionActionList { display: grid; gap: 10px; min-width: 0; }
+.sessionModeAction, .sessionModeAction > div { min-width: 0; max-width: 100%; }
+.sessionModeAction > div > button, .sessionLogout {
+  display: flex; align-items: center; justify-content: flex-start; gap: 12px; width: 100%; min-width: 0; max-width: 100%; min-height: 56px;
+  padding: 12px 14px; border: 1px solid #e2e8f0; border-radius: 16px;
+  background: #f7faff; color: #18233b; font: inherit; font-size: .86rem; font-weight: 700; text-align: left;
+  white-space: normal; overflow-wrap: anywhere; cursor: pointer;
+}
+.sessionModeAction > div > button > svg, .sessionLogout > svg { flex-shrink: 0; box-sizing: content-box; padding: 9px; border-radius: 12px; background: #e8f0ff; color: #246bff; }
+.sessionModeAction > div > button > span, .sessionLogout > span { min-width: 0; max-width: 100%; }
+.sessionModeAction > div > button small { display: block; color: #64748b; font-size: .75rem; font-weight: 500; white-space: normal; }
+.sessionLogout { background: #fffafa; }
+.sessionLogout > svg { background: #fff0ee; color: #b94b4b; }
+.sessionModeAction > div > button:hover:not(:disabled), .sessionLogout:hover { border-color: #bacce7; background: #f0f5fc; }
+.sessionModeAction > div > button:focus-visible, .sessionLogout:focus-visible { outline: 2px solid #246bff; outline-offset: 3px; }
+.sessionModeAction > div > button:disabled { opacity: .55; cursor: default; }
+@media (max-width: 600px) { .sessionActionsCard { margin-top: 12px; } }

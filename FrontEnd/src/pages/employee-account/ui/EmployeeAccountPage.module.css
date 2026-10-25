@@ -473,6 +473,11 @@
 
 .languageRow > svg { width: 18px; height: 18px; align-self: center; }
 .languageRow > label {
+  display: block;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
   color: #52647c;
   text-transform: none;
   letter-spacing: normal;
@@ -481,12 +486,13 @@
   white-space: nowrap;
 }
 .languageRow > div {
+  max-width: 100%;
   display: grid;
   align-items: center;
   justify-items: end;
   min-width: 0;
 }
-.languageRow > div > div:first-child { width: auto; }
+.languageRow > div > div:first-child { width: auto; min-width: 0; max-width: 100%; }
 .languageRow [role="status"] {
   position: static;
   width: 24px;
@@ -507,12 +513,6 @@
   box-shadow: none;
 }
 .languageRow button span { font-size: .84rem; white-space: nowrap; text-align: right; }
-
-@container profile-language (max-width: 280px) {
-  .languageRow > svg { grid-row: 1 / 3; }
-  .languageRow > label { grid-column: 2 / -1; padding-top: 8px; }
-  .languageRow > div { grid-column: 2 / -1; }
-}
 
 .detailsActions { display: flex; gap: 8px; flex-wrap: wrap; }
 .primaryButton, .secondaryButton, .passwordTrigger, .logoutButton { display: flex; align-items: center; justify-content: center; gap: 10px; min-width: 0; min-height: 46px; padding: 12px 14px; border: 1px solid #dce5f1; border-radius: 17px; font: inherit; font-size: .86rem; font-weight: 750; cursor: pointer; overflow-wrap: anywhere; }

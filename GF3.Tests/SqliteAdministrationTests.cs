@@ -13,6 +13,27 @@ namespace GF3.Tests;
 public sealed class SqliteAdministrationTests
 {
     [Fact]
+    public async Task ParallelEmployeeAccountReads_UseIndependentPooledConnections()
+    {
+        await using var database = await SqliteTestDatabase.CreateAsync();
+        var start = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var workers = Enumerable.Range(0, 16).Select(_ => Task.Run(async () =>
+        {
+            await start.Task;
+            for (var attempt = 0; attempt < 100; attempt++)
+            {
+                await using var context = database.CreateContext();
+                var account = await context.EmployeeAccounts.AsNoTracking()
+                    .FirstOrDefaultAsync(account => account.EmployeeId == 1);
+                Assert.Null(account);
+            }
+        })).ToArray();
+
+        start.SetResult();
+        await Task.WhenAll(workers);
+    }
+
+    [Fact]
     public void SqliteDatabaseSelectionStore_SaveTryReadAndResolve_Work()
     {
         var root = Path.Combine(Path.GetTempPath(), "GF3.Tests", Guid.NewGuid().ToString("N"));

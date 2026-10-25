@@ -1,3 +1,4 @@
+import { ManagerWorkspaceModeSwitch } from "@features/manager-workspace-mode/ui/ManagerWorkspaceModeSwitch";
 import { dateTimeFormat, t } from "@shared/i18n";
 import { useLanguageRevision } from "@shared/i18n/useLanguageRevision";
 import { useEffect, useMemo, useState } from "react";
@@ -17,7 +18,7 @@ import { IosButton } from "@shared/ui/components/IosButton";
 import { ConfirmDialog } from "@shared/ui/ConfirmDialog";
 import { pushErrorAlertFromError } from "@shared/ui/feedback/error-alerts/errorAlerts";
 import { PageHeader } from "@shared/ui/PageHeader";
-import { AccountSettingsIcon, CheckIcon, PlusIcon } from "@shared/ui/icons";
+import { AccountSettingsIcon, CheckIcon, PlusIcon, LogoutIcon } from "@shared/ui/icons";
 import styles from "./ManagerAccountPage.module.css";
 import { useMyRegulationHistoryQuery } from "@entities/regulations";
 import { RegulationHistoryCard } from "@entities/regulations/ui/RegulationHistoryCard";
@@ -122,7 +123,7 @@ function getLastOnlineTime(value?: string | null) {
 
 export function ManagerAccountPage() {
   useLanguageRevision();
-  const { session } = useAuth();
+  const { session, logout } = useAuth();
   const profileQuery = useManagerProfileQuery();
   const managerListQuery = useManagerListQuery();
   const updateProfileMutation = useUpdateManagerProfileMutation();
@@ -300,6 +301,19 @@ export function ManagerAccountPage() {
         {inlineError ? <ErrorBanner>{inlineError}</ErrorBanner> : null}
         {profileQuery.error ? <ErrorBanner>{t("Could not load manager profile.")}</ErrorBanner> : null}
         {inlineSuccess ? <div className={styles.successBanner}>{inlineSuccess}</div> : null}
+
+        <section className={`${styles.card} ${styles.sessionActionsCard}`} aria-labelledby="manager-account-actions-heading">
+          <div className={styles.cardHeader}>
+            <span className={styles.sectionIcon}><AccountSettingsIcon name="lock" /></span>
+            <h2 id="manager-account-actions-heading">{t("Account actions")}</h2>
+          </div>
+          <div className={styles.sessionActionList}>
+            <div className={styles.sessionModeAction}><ManagerWorkspaceModeSwitch targetMode="phone" /></div>
+            <button type="button" className={styles.sessionLogout} onClick={() => void logout()}>
+              <LogoutIcon size={20} /><span>{t("Log out")}</span>
+            </button>
+          </div>
+        </section>
 
         {profileQuery.isLoading && !profile ? (
           <p className={styles.stateText}>{t("Loading manager profile...")}</p>

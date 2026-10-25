@@ -52,26 +52,18 @@ describe("OverlaySidebarLayout", () => {
     window.history.replaceState({}, "", "/");
   });
 
-  it("renders manager footer actions with the same nav button contract as top nav items", async () => {
+  it("keeps manager profile and collapse without sidebar session actions", async () => {
     const user = userEvent.setup();
     const { container } = renderManagerLayout();
 
     const homeLink = screen.getByRole("link", { name: "Home" });
     const managerLink = screen.getByRole("link", { name: "Open manager profile" });
-    const logoutButton = screen.getByRole("button", { name: "Log out" });
-
     expect(homeLink.className).toContain("navButton");
-    const modeButton = screen.getByRole("button", { name: "Switch to Phone", exact: true });
-    expect(modeButton.className).toBe(homeLink.className.split(" ")[0]);
-    expect(modeButton.textContent).toBe("");
-    expect(modeButton.querySelector("svg")).toBeInTheDocument();
-    expect(screen.getByText("Switch to Phone").className).toContain("navLabel");
-    expect(screen.getByText("Switch to Phone").previousElementSibling).toBe(modeButton);
     expect(managerLink.className).toContain("navButton");
-    expect(logoutButton.className).toContain("navButton");
     expect(container.querySelector("main")?.className).toContain("contentManager");
-    expect(screen.getByText("Manager")).toBeInTheDocument();
-    expect(screen.getByText("Log out")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Collapse sidebar" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Switch to Phone" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Log out" })).not.toBeInTheDocument();
 
     await user.click(managerLink);
 
@@ -142,7 +134,8 @@ describe("OverlaySidebarLayout", () => {
     expect(screen.getByRole("link", { name: "Legal documents" })).toHaveAttribute("href", "/legal/index.html");
   });
 
-  it("logs out through the shared nav-style action button", async () => {
+  it("logs out through the nonmanager fallback action", async () => {
+    authMock.session.role = "employee";
     const user = userEvent.setup();
     renderManagerLayout();
 

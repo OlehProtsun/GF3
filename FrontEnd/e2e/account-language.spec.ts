@@ -92,8 +92,9 @@ test("account language defaults to Polish, persists English and Ukrainian and st
   await expect(page.getByRole("button", { name: "Мова Українська", exact: true })).toBeVisible();
   await expect(page.locator("html")).toHaveAttribute("lang", "uk");
   await choose("uk", "English");
-  await page.getByRole("button", { name: "Open sidebar", exact: true }).click();
-  await page.getByRole("button", { name: "Log out", exact: true }).click();
+  await page.goto("/manager-profile");
+  await page.getByRole("button", { name: "Collapse sidebar", exact: true }).click();
+  await page.locator('section[aria-labelledby="manager-account-actions-heading"]').getByRole("button", { name: "Log out", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Zaloguj się", exact: true })).toBeVisible();
   await page.getByRole("textbox", { name: "Nazwa użytkownika", exact: true }).fill("chief");
   await page.getByRole("textbox", { name: "Hasło", exact: true }).fill("123456");
@@ -107,19 +108,75 @@ test("account language defaults to Polish, persists English and Ukrainian and st
   await expect(page.getByRole("button", { name: "Język Polski", exact: true })).toBeVisible();
   await expect(page.getByRole("switch")).not.toBeChecked();
   identity = { ...identity, role: "employee", managerId: null, employeeId: 1, userName: "worker" };
+  await page.setViewportSize({ width: 320, height: 900 });
   await page.goto("/profile");
   await expect(page.getByRole("button", { name: "Język aplikacji", exact: true })).toHaveText("Polski");
   await expect(page.getByRole("heading", { name: "Dane konta" })).toBeVisible();
+  {
+    const row = page.locator('[class*="languageRow_"]');
+    const label = row.locator("label");
+    await expect(label).toHaveCSS("white-space", "nowrap");
+    await expect(label).toHaveCSS("text-overflow", "ellipsis");
+    await expect(label).toHaveCSS("overflow", "hidden");
+    await expect.poll(() => row.evaluate(element => {
+      const row = element.getBoundingClientRect();
+      const label = element.querySelector("label")!.getBoundingClientRect();
+      const button = element.querySelector("button")!.getBoundingClientRect();
+      const icon = element.querySelector("svg")!.getBoundingClientRect();
+      return Math.abs(label.y + label.height / 2 - button.y - button.height / 2) <= 2
+        && Math.abs(icon.y + icon.height / 2 - button.y - button.height / 2) <= 2
+        && label.right <= button.left + 1 && label.left >= row.left && button.right <= row.right + 1
+        && row.left >= 0 && row.right <= innerWidth + 1 && button.height >= 44;
+    })).toBe(true);
+  }
+
   await choose("pl", "English");
   await page.reload();
   await expect(page.getByRole("button", { name: "Application language", exact: true })).toHaveText("English");
+  {
+    const row = page.locator('[class*="languageRow_"]');
+    const label = row.locator("label");
+    await expect(label).toHaveCSS("white-space", "nowrap");
+    await expect(label).toHaveCSS("text-overflow", "ellipsis");
+    await expect(label).toHaveCSS("overflow", "hidden");
+    await expect.poll(() => row.evaluate(element => {
+      const row = element.getBoundingClientRect();
+      const label = element.querySelector("label")!.getBoundingClientRect();
+      const button = element.querySelector("button")!.getBoundingClientRect();
+      const icon = element.querySelector("svg")!.getBoundingClientRect();
+      return Math.abs(label.y + label.height / 2 - button.y - button.height / 2) <= 2
+        && Math.abs(icon.y + icon.height / 2 - button.y - button.height / 2) <= 2
+        && label.right <= button.left + 1 && label.left >= row.left && button.right <= row.right + 1
+        && row.left >= 0 && row.right <= innerWidth + 1 && button.height >= 44;
+    })).toBe(true);
+  }
+
   await choose("en", "Українська");
   await page.reload();
   await expect(page.getByRole("button", { name: "Мова застосунку", exact: true })).toHaveText("Українська");
   await expect(page.getByRole("heading", { name: "Дані акаунту", exact: true })).toBeVisible();
+  {
+    const row = page.locator('[class*="languageRow_"]');
+    const label = row.locator("label");
+    await expect(label).toHaveCSS("white-space", "nowrap");
+    await expect(label).toHaveCSS("text-overflow", "ellipsis");
+    await expect(label).toHaveCSS("overflow", "hidden");
+    await expect.poll(() => row.evaluate(element => {
+      const row = element.getBoundingClientRect();
+      const label = element.querySelector("label")!.getBoundingClientRect();
+      const button = element.querySelector("button")!.getBoundingClientRect();
+      const icon = element.querySelector("svg")!.getBoundingClientRect();
+      return Math.abs(label.y + label.height / 2 - button.y - button.height / 2) <= 2
+        && Math.abs(icon.y + icon.height / 2 - button.y - button.height / 2) <= 2
+        && label.right <= button.left + 1 && label.left >= row.left && button.right <= row.right + 1
+        && row.left >= 0 && row.right <= innerWidth + 1 && button.height >= 44;
+    })).toBe(true);
+  }
+
   await choose("uk", "Polski");
   await page.reload();
   await expect(page.getByRole("button", { name: "Język aplikacji", exact: true })).toHaveText("Polski");
+  await page.setViewportSize({ width: 1280, height: 900 });
   identity = { ...identity, role: "manager", managerId: 1, employeeId: null, userName: "chief" };
   await page.goto("/settings");
   await expect(page.getByRole("button", { name: "Language English", exact: true })).toBeVisible();
