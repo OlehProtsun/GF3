@@ -355,6 +355,7 @@ public sealed class DataAccessRepositoryTests
             schedule.Id,
             [TestDataFactory.CreateDalSlot(schedule.Id, 1, 1, employee.Id, "08:00", "12:00")],
             overwrite: true);
+        var originalId = (await repository.GetByScheduleAsync(schedule.Id)).Single().Id;
 
         var secondWritten = await repository.ReplaceForScheduleAsync(
             schedule.Id,
@@ -366,7 +367,53 @@ public sealed class DataAccessRepositoryTests
         Assert.Equal(1, firstWritten);
         Assert.Equal(1, secondWritten);
         Assert.Equal(2, all.Count);
+        Assert.Equal(originalId, all.Single(slot => slot.DayOfMonth == 1).Id);
         Assert.Equal([1, 2], all.Select(slot => slot.DayOfMonth).ToArray());
+    }
+
+    [Fact]
+    public async Task ScheduleSlotRepository_ReplaceForSchedule_RetainsOnlyExactMatchesAcrossRepeatedSaves()
+    {
+        await using var database = await SqliteTestDatabase.CreateAsync();
+        await using var context = database.CreateContext();
+        var container = TestDataFactory.CreateDalContainer();
+        var shop = TestDataFactory.CreateDalShop();
+        var employee = TestDataFactory.CreateDalEmployee();
+        context.AddRange(container, shop, employee);
+        await context.SaveChangesAsync();
+        var schedule = TestDataFactory.CreateDalSchedule(container.Id, shop.Id);
+        context.Schedules.Add(schedule);
+        await context.SaveChangesAsync();
+        var first = TestDataFactory.CreateDalSlot(schedule.Id, 1, 1, employee.Id, "08:00", "12:00");
+        var second = TestDataFactory.CreateDalSlot(schedule.Id, 2, 1, employee.Id, "12:00", "16:00");
+        context.ScheduleSlots.AddRange(first, second);
+        await context.SaveChangesAsync();
+        var originalIds = new[] { first.Id, second.Id };
+        context.ChangeTracker.Clear();
+        var repository = new ScheduleSlotRepository(context);
+        for (var attempt = 0; attempt < 2; attempt++)
+        {
+            var written = await repository.ReplaceForScheduleAsync(schedule.Id,
+            [
+                TestDataFactory.CreateDalSlot(schedule.Id, 1, 1, employee.Id, "08:00", "12:00"),
+                TestDataFactory.CreateDalSlot(schedule.Id, 2, 1, employee.Id, "12:00", "16:00"),
+            ], overwrite: true);
+            var saved = await repository.GetByScheduleAsync(schedule.Id);
+            Assert.Equal(0, written);
+            Assert.Equal(originalIds, saved.Select(slot => slot.Id));
+            Assert.All(saved, slot => Assert.Equal(employee.Id, slot.EmployeeId));
+        }
+        await repository.ReplaceForScheduleAsync(schedule.Id,
+        [
+            TestDataFactory.CreateDalSlot(schedule.Id, 1, 1, employee.Id, "08:00", "12:00"),
+            TestDataFactory.CreateDalSlot(schedule.Id, 2, 1, employee.Id, "13:00", "16:00"),
+        ], overwrite: true);
+        var changed = await repository.GetByScheduleAsync(schedule.Id);
+        Assert.Equal(2, changed.Count);
+        Assert.Equal(first.Id, changed[0].Id);
+        Assert.NotEqual(second.Id, changed[1].Id);
+        Assert.Equal(("13:00", "16:00"), (changed[1].FromTime, changed[1].ToTime));
+        Assert.Equal(employee.Id, changed[1].EmployeeId);
     }
 
     [Fact]

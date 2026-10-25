@@ -14,9 +14,8 @@ import { ConfirmDialog } from "@shared/ui/ConfirmDialog";
 import { ErrorBanner } from "@shared/ui/components/ErrorBanner";
 import { IosButton } from "@shared/ui/components/IosButton";
 import { RecordGrid } from "@shared/ui/components/RecordGrid";
-import { RecordTile } from "@shared/ui/components/RecordTile";
-import { CheckIcon, EyeIcon, SearchIcon, ContainerInfoIcon, InformationIcon, PlusIcon, ScheduleIcon, SwapOffersIcon } from "@shared/ui/icons";
-import { formatScheduleLastUpdate } from "@shared/lib/scheduleLastUpdate";
+import { EyeIcon, SearchIcon, ContainerInfoIcon, InformationIcon, PlusIcon, ScheduleIcon, SwapOffersIcon } from "@shared/ui/icons";
+import { ScheduleSummaryTile } from "./ScheduleSummaryTile";
 import { CardSection } from "@shared/ui/sections/CardSection";
 import type { Container } from "@entities/containers/model/types";
 import {
@@ -549,70 +548,18 @@ export function ContainerProfileWorkspace({
                   {!showGraphsEmpty && !showSearchEmpty && graphs.length > 0 ? (
                     <RecordGrid className={styles.scheduleGrid}>
                       {graphs.map(summary => (
-                        <RecordTile
+                        <ScheduleSummaryTile
                           key={summary.graph.id}
-                          title={summary.graph.name}
-                          headerSlot={
-                            null
-                          }
-                          cornerSlot={
-                            isMultiOpenEnabled ? (
-                              <span
-                                className={joinClassNames(
-                                  styles.selectionMark,
-                                  selectedGraphIdSet.has(summary.graph.id) && styles.selectionMarkActive,
-                                )}
-                                aria-hidden="true"
-                              >
-                                {selectedGraphIdSet.has(summary.graph.id) ? <CheckIcon size={14} /> : null}
-                              </span>
-                            ) : null
-                          }
-                          isSelected={isMultiOpenEnabled && selectedGraphIdSet.has(summary.graph.id)}
-                          onClick={() => {
+                          summary={summary}
+                          isMultiOpenEnabled={isMultiOpenEnabled}
+                          isSelected={selectedGraphIdSet.has(summary.graph.id)}
+                          onActivate={() => {
                             if (isMultiOpenEnabled) {
                               onToggleGraphSelection(summary.graph.id);
                               return;
                             }
-
                             onOpenGraph(summary.graph.id);
                           }}
-                          ariaLabel={
-                            isMultiOpenEnabled
-                              ? t("{0} schedule {1}", selectedGraphIdSet.has(summary.graph.id) ? "Deselect" : "Select", summary.graph.name)
-                              : t("Open schedule {0}", summary.graph.name)
-                          }
-                          metaItems={[
-                            { key: "shop", label: t("Shop"), value: summary.shopName },
-                            { key: "employees", label: t("Employees"), value: String(summary.employeeCount) },
-                            { key: "hours", label: t("Hours"), value: summary.assignedHoursText },
-                            { key: "month-year", label: t("Month Year"), value: summary.monthYearLabel },
-                            {
-                              key: "status",
-                              label: t("Status"),
-                              value: (
-                                <span
-                                  className={joinClassNames(
-                                    styles.scheduleStatusValue,
-                                    summary.graph.publicationStatus === "public"
-                                      ? styles.scheduleStatusPublic
-                                      : styles.scheduleStatusPrivate,
-                                  )}
-                                >
-                                  {summary.graph.publicationStatus === "public" ? t("Public") : t("Private")}
-                                </span>
-                              ),
-                            },
-                            {
-                              key: "last-update",
-                              label: t("Last Update"),
-                              value: (
-                                <span className={styles.scheduleLastUpdateValue}>
-                                  {formatScheduleLastUpdate(summary.graph.lastUpdatedAtUtc)}
-                                </span>
-                              ),
-                            },
-                          ]}
                         />
                       ))}
                     </RecordGrid>

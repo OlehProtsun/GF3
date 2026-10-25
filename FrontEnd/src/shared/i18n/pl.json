@@ -1741,6 +1741,7 @@
   "Start": "Początek",
   "Duration": "Czas trwania",
   "Save your current schedule edits before approving.": "Zapisz bieżące zmiany grafiku przed zatwierdzeniem.",
+  "Reviewed by {0}": "Rozpatrzono przez: {0}",
   "Reviewed": "Rozpatrzono",
   "Approved correction highlight color": "Kolor wyróżnienia zatwierdzonej korekty",
   "Shift corrections": "Korekty zmian",
@@ -2134,5 +2135,6 @@
   "Accepted manual shift highlight hex color": "Kolor HEX wyróżnienia przyjętej ręcznej zmiany",
   "Could not save the accepted manual shift highlight color.": "Nie udało się zapisać koloru przyjętej ręcznej zmiany.",
   "Could not load the accepted manual shift highlight color.": "Nie udało się wczytać koloru przyjętej ręcznej zmiany.",
-  "This schedule changed during another request. Refresh before saving.": "Ten grafik został zmieniony w innym żądaniu. Odśwież przed zapisaniem."
+  "This schedule changed during another request. Refresh before saving.": "Ten grafik został zmieniony w innym żądaniu. Odśwież przed zapisaniem.",
+  "The original shift cannot be uniquely identified. Reject this request and ask the employee to submit a new one.": "Nie można jednoznacznie zidentyfikować pierwotnej zmiany. Odrzuć ten wniosek i poproś pracownika o przesłanie nowego."
 }

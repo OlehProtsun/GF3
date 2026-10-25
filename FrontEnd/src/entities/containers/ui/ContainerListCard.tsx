@@ -1,12 +1,11 @@
 import { t } from "@shared/i18n";
-import type { Container } from "@entities/containers/model/types";
-import { getContainerDisplayName } from "@entities/containers/model/presentation";
+import type { Container, Graph } from "@entities/containers/model/types";
 import { usePinnedRecords } from "@shared/lib/records/usePinnedRecords";
 import { IosButton } from "@shared/ui/components/IosButton";
 import { ListCardSection } from "@shared/ui/components/ListCardSection";
 import { RecordGrid } from "@shared/ui/components/RecordGrid";
-import type { RecordTileMetaItem } from "@shared/ui/components/RecordTile";
-import { RecordTile } from "@shared/ui/components/RecordTile";
+import { ContainerFolderTile } from "./ContainerFolderTile";
+import styles from "./ContainerListCard.module.css";
 import { PlusIcon } from "@shared/ui/icons";
 
 type ContainerListCardProps = {
@@ -17,6 +16,7 @@ type ContainerListCardProps = {
   onClearSearch: () => void;
   onAddContainer?: () => void;
   onContainerOpen: (containerId: Container["id"]) => void;
+  onGraphOpen: (containerId: Container["id"], graphId: Graph["id"]) => void;
 };
 
 export function ContainerListCard({
@@ -27,6 +27,7 @@ export function ContainerListCard({
   onClearSearch,
   onAddContainer,
   onContainerOpen,
+  onGraphOpen,
 }: ContainerListCardProps) {
   const { sortedItems: sortedContainers, pinnedIdSet, togglePin } = usePinnedRecords(
     "containers:list:pinned",
@@ -54,34 +55,17 @@ export function ContainerListCard({
         <IosButton label={t("Clear Search")} variant="secondary" onClick={onClearSearch} />
       }
     >
-      <RecordGrid>
-        {sortedContainers.map(container => {
-          const displayName = getContainerDisplayName(container);
-          const note = container.note?.trim();
-          const isPinned = pinnedIdSet.has(String(container.id));
-          const metaItems: RecordTileMetaItem[] = [
-            {
-              key: "noteState",
-              label: t("State"),
-              value: note ? t("Note available") : t("No note yet"),
-            },
-          ];
-
-          return (
-            <RecordTile
-              key={container.id}
-              title={displayName}
-              description={note || t("Schedule workspace for container planning and statistics.")}
-              badge={`ID ${container.id}`}
-              metaItems={metaItems}
-              isPinned={isPinned}
-              onTogglePin={() => togglePin(container.id)}
-              pinLabel={isPinned ? t("Unpin {0}", displayName) : t("Pin {0}", displayName)}
-              onClick={() => onContainerOpen(container.id)}
-              ariaLabel={t("Open {0} profile", displayName)}
-            />
-          );
-        })}
+      <RecordGrid className={styles.folderGrid}>
+        {sortedContainers.map(container => (
+          <ContainerFolderTile
+            key={container.id}
+            container={container}
+            isPinned={pinnedIdSet.has(String(container.id))}
+            onTogglePin={togglePin}
+            onContainerOpen={onContainerOpen}
+            onGraphOpen={onGraphOpen}
+          />
+        ))}
       </RecordGrid>
     </ListCardSection>
   );

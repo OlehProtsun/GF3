@@ -1063,7 +1063,7 @@ export function ContainerGraphEditor({
               <CardSection
                 className={styles.sidebarCard}
                 title={t("Shift Corrections")}
-                icon={<ScheduleIcon size={18} />}
+                icon={<ScheduleDetailsIcon size={18} />}
                 headerRightSlot={renderCollapseButton(t("Shift Corrections"), "corrections")}
               >
                 <ContainerGraphShiftCorrectionsCard

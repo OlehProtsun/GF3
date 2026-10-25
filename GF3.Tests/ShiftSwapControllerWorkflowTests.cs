@@ -166,7 +166,9 @@ public sealed class ShiftSwapControllerWorkflowTests
         var repository = new ScheduleSlotRepository(context);
         await repository.ReplaceForScheduleAsync(fixture.ScheduleId, replacementSlots, overwrite: true);
 
-        Assert.False(await context.ShiftSwapRequests.AnyAsync());
+        var retainedSwap = await context.ShiftSwapRequests.AsNoTracking().SingleAsync();
+        Assert.Equal(createdDto.Id, retainedSwap.Id);
+        Assert.Equal(ShiftSwapStatus.Accepted, retainedSwap.Status);
         Assert.Single(await context.ShiftSwapHistories.ToListAsync());
 
         var logController = new ShiftSwapLogsController(

@@ -1741,6 +1741,7 @@
   "Start": "Початок",
   "Duration": "Тривалість",
   "Save your current schedule edits before approving.": "Збережіть поточні зміни графіка перед схваленням.",
+  "Reviewed by {0}": "Розглянуто: {0}",
   "Reviewed": "Розглянуто",
   "Approved correction highlight color": "Колір виділення схвалених коригувань",
   "Shift corrections": "Коригування змін",
@@ -2134,5 +2135,6 @@
   "Accepted manual shift highlight hex color": "HEX-колір виділення прийнятої ручної зміни",
   "Could not save the accepted manual shift highlight color.": "Не вдалося зберегти колір прийнятої ручної зміни.",
   "Could not load the accepted manual shift highlight color.": "Не вдалося завантажити колір прийнятої ручної зміни.",
-  "This schedule changed during another request. Refresh before saving.": "Цей графік було змінено під час іншого запиту. Оновіть перед збереженням."
+  "This schedule changed during another request. Refresh before saving.": "Цей графік було змінено під час іншого запиту. Оновіть перед збереженням.",
+  "The original shift cannot be uniquely identified. Reject this request and ask the employee to submit a new one.": "Неможливо однозначно визначити початкову зміну. Відхиліть цей запит і попросіть працівника подати новий."
 }

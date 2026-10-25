@@ -64,6 +64,62 @@ async function login(page: Page) {
   await expect(page.getByRole("heading", { name: "Choose workspace" })).toBeVisible();
 }
 
+test("PC container schedule tiles preserve open and MultiOpen selection", async ({ page }) => {
+  test.setTimeout(60_000);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await fixture(page, "pc");
+  const openContainer = async () => {
+    await page.goto("/container?openContainerId=1");
+    await page.waitForLoadState("networkidle");
+    const collapseSidebar = page.getByRole("button", { name: "Collapse sidebar", exact: true });
+    if (await collapseSidebar.isVisible()) await collapseSidebar.click();
+    const profileButton = page.getByRole("button", { name: "Open All manager container profile", exact: true });
+    if (await profileButton.isVisible()) await profileButton.click();
+  };
+  await openContainer();
+  const first = page.locator('[data-schedule-graph-id="3"]');
+  const second = page.locator('[data-schedule-graph-id="6"]');
+  const indicators = page.locator("[data-schedule-selection-indicator]");
+  const multiOpen = page.getByRole("button", { name: "MultiOpen", exact: true });
+  for (const card of [first, second]) {
+    await expect(card).toBeVisible();
+    for (const label of ["Shop", "Employees", "Hours", "Month Year", "Status", "Last Update"]) {
+      await expect(card.getByText(label, { exact: true })).toBeVisible();
+    }
+  }
+  await expect(indicators).toHaveCount(0);
+  await first.click();
+  await expect(page).toHaveURL(/\/container\/1\/graphs\/3$/);
+  await openContainer();
+  await multiOpen.click();
+  await expect(indicators).toHaveCount(2);
+  await first.click();
+  await second.click();
+  await expect(page).toHaveURL(/\/container\?openContainerId=1$/);
+  await expect(first).toHaveAttribute("aria-pressed", "true");
+  await expect(second).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByRole("button", { name: "Open (2)", exact: true })).toBeVisible();
+  await first.click();
+  await expect(first).toHaveAttribute("aria-pressed", "false");
+  await expect(second).toHaveAttribute("aria-pressed", "true");
+  await page.getByRole("button", { name: "Open (1)", exact: true }).click();
+  await expect(page).toHaveURL(/\/container\/1\/graphs\/6\?openGraphIds=6$/);
+  await openContainer();
+  await multiOpen.click();
+  await first.click();
+  await multiOpen.click();
+  await expect(indicators).toHaveCount(0);
+  await expect(first).not.toHaveAttribute("aria-pressed");
+  await multiOpen.click();
+  await expect(first).toHaveAttribute("aria-pressed", "false");
+  await expect(second).toHaveAttribute("aria-pressed", "false");
+  await multiOpen.click();
+  await page.setViewportSize({ width: 375, height: 812 });
+  await expect(first).toBeVisible();
+  await expect(second).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
+});
+
 const legalDestinations = ["/legal/index.html", "/legal/regulamin.html", "/legal/polityka-prywatnosci.html"];
 async function legalFooter(page: Page, destinations: string[]) {
   const nav = page.getByRole("navigation", { name: "Legal documents", exact: true });

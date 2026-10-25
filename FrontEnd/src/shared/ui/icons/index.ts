@@ -43,3 +43,8 @@ export { PinIcon } from "./PinIcon";
 export { NewsIcon } from "./NewsIcon";
 export { SettingsIcon } from "./SettingsIcon";
 export { AccountSettingsIcon } from "./AccountSettingsIcon";
+
+export { ClockIcon } from "./ClockIcon";
+export { LockIcon } from "./LockIcon";
+export { GroupIcon } from "./GroupIcon";
+export { ArrowRightIcon } from "./ArrowRightIcon";
