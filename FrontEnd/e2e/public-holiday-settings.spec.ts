@@ -35,6 +35,7 @@ async function fixture(page: Page, state: { enabled: boolean; required?: boolean
     }
     else if (path === "/api/employee-availability") data = [group];
     else if (path === "/api/employees") data = [{ id: 12, firstName: "Worker", lastName: "Bee" }];
+    else if (path === "/api/containers") data = [{ id: 1, name: "Main" }];
     else if (path === "/api/containers/1") data = { id: 1, name: "Main" };
     else if (path === "/api/containers/1/graphs") data = [graph];
     else if (path === "/api/containers/1/graphs/3") data = graph;
@@ -223,4 +224,103 @@ test("PC global toggle updates employee availability and schedule matrix, daily 
   await expect(employee.getByRole("tab", { name: /Friday 1, working day.*Labour Day/ })).toHaveCSS("background-color", "rgb(255, 247, 214)");
   expect(writes).toEqual([false, true]);
   await employee.close();
+});
+
+for (const [language, label, summaryTitle, statisticsTitle] of [
+  ["en", "Holiday Days", "Schedule Summary", "Container Statistics"],
+  ["pl", "Dni świąteczne", "Podsumowanie grafiku", "Statystyki kontenera"],
+  ["uk", "Святкові дні", "Підсумок графіка", "Статистика контейнера"],
+] as const) {
+  for (const mode of ["pc", "phone"]) {
+    test(`${mode} manager holiday statistics toggle and fit in ${language}`, async ({ page }) => {
+      await page.setViewportSize({ width: mode === "phone" ? 375 : 1440, height: 900 });
+      const state = { enabled: true };
+      await fixture(page, state, "manager", mode, language);
+      await page.goto("/container/1/graphs/3");
+      const section = page.locator("section").filter({ has: page.getByText(summaryTitle, { exact: true }) });
+      const metric = mode === "phone" ? section.locator("summary dt").filter({ hasText: label }) : section.getByRole("columnheader", { name: label, exact: true });
+      await expect(metric).toBeVisible();
+      if (mode === "phone") {
+        const summary = section.locator("summary");
+        await expect(summary.locator("dd")).toHaveText(["1", "30", "8", "1"]);
+        for (const width of [320, 375, 430]) {
+          await page.setViewportSize({ width, height: 900 });
+          expect(await summary.evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true);
+          expect(await summary.locator("dl").evaluate(el => {
+            const items = [...el.children].map(item => item.getBoundingClientRect());
+            return items[0].top === items[1].top && items[2].top === items[3].top
+              && items[2].top > items[0].top && items[0].left === items[2].left;
+          })).toBe(true);
+        }
+        await page.setViewportSize({ width: 375, height: 900 });
+        await summary.click();
+        await expect(section.locator("details")).toHaveAttribute("open", "");
+        await summary.click();
+      } else {
+        await expect(section.locator("tbody tr").first().locator("td").nth(4)).toHaveText("1");
+        const scroll = section.locator("table").locator("..");
+        const before = await metric.boundingBox();
+        await scroll.evaluate(el => { el.scrollLeft = 900; });
+        const after = await metric.boundingBox();
+        expect(Math.abs(after!.x - before!.x)).toBeLessThan(2);
+        expect(await scroll.evaluate(el => el.scrollLeft)).toBeGreaterThan(0);
+        const cell = await section.locator("tbody tr").first().locator("td").nth(4).boundingBox();
+        expect(Math.abs(cell!.x - after!.x)).toBeLessThan(2);
+        expect(Math.abs(cell!.width - after!.width)).toBeLessThan(2);
+        expect(await metric.evaluate(el => el.scrollHeight <= el.clientHeight && el.scrollWidth <= el.clientWidth)).toBe(true);
+      }
+      await page.screenshot({ path: test.info().outputPath(`statistics-${mode}-${language}.png`), fullPage: true });
+      state.enabled = false;
+      await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+      await expect(metric).toHaveCount(0);
+      if (mode === "phone") await expect(section.locator("summary dd")).toHaveText(["1", "30", "8"]);
+      else await expect(section.locator("tbody tr").first().locator("td").nth(4)).toHaveText("08:00");
+      state.enabled = true;
+      await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+      await expect(metric).toBeVisible();
+    });
+  }
+
+  test(`container holiday statistics include employee and TOTAL in ${language}`, async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 900 });
+    const state = { enabled: true };
+    await fixture(page, state, "manager", "pc", language);
+    await page.goto("/container?openContainerId=1");
+    const section = page.locator("section").filter({ has: page.getByText(statisticsTitle, { exact: true }) });
+    const heading = section.getByRole("columnheader", { name: label, exact: true });
+    await expect(heading).toBeVisible();
+    await expect(section.locator("tbody tr td:nth-child(4)")).toHaveText(["1", "1"]);
+    expect(await heading.evaluate(el => el.scrollWidth <= el.clientWidth && el.scrollHeight <= el.clientHeight)).toBe(true);
+    state.enabled = false;
+    await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+    await expect(heading).toHaveCount(0);
+    await expect(section.locator("tbody tr td:nth-child(4)")).toHaveText(["8", "8"]);
+    state.enabled = true;
+    await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+    await expect(heading).toBeVisible();
+    await page.screenshot({ path: test.info().outputPath(`container-statistics-${language}.png`), fullPage: true });
+  });
+}
+
+test("Settings persists holiday visibility across navigation back to manager statistics", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  const state = { enabled: true };
+  const writes = await fixture(page, state);
+  await page.goto("/container/1/graphs/3");
+  const heading = page.getByRole("columnheader", { name: "Holiday Days", exact: true });
+  await expect(heading).toBeVisible();
+  await page.goto("/settings");
+  await page.getByRole("button", { name: "Collapse sidebar" }).click();
+  await page.getByRole("switch").click();
+  await expect(page.getByRole("switch")).not.toBeChecked();
+  await page.goBack();
+  await expect(page.getByText("Schedule Summary", { exact: true })).toBeVisible();
+  await expect(heading).toHaveCount(0);
+  await page.goForward();
+  await page.getByRole("button", { name: "Collapse sidebar" }).click();
+  await page.getByRole("switch").click();
+  await expect(page.getByRole("switch")).toBeChecked();
+  await page.goBack();
+  await expect(heading).toBeVisible();
+  expect(writes).toEqual([false, true]);
 });

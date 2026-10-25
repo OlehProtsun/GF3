@@ -903,3 +903,5 @@
     padding: 12px 14px;
   }
 }
+
+.table .holidayColumn { min-width: 110px; max-width: 150px; white-space: normal; overflow-wrap: anywhere; }

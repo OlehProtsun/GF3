@@ -8,7 +8,10 @@ import { buildGraphNoteContent } from "../model/graphNote";
 import type { Employee } from "@entities/employees/model/types";
 import { ContainerGraphProfileWorkspace } from "./ContainerGraphProfileWorkspace";
 
-beforeEnglishTest(() => setTestLanguage("en"));
+vi.mock("@app/providers/PublicHolidayVisibilityProvider", () => ({ usePublicHolidayVisibility: vi.fn(() => true) }));
+import { usePublicHolidayVisibility } from "@app/providers/PublicHolidayVisibilityProvider";
+
+beforeEnglishTest(() => { setTestLanguage("en"); vi.mocked(usePublicHolidayVisibility).mockReturnValue(true); });
 
 const graph: Graph = { id: 3, containerId: 1, shopId: 4, name: "July Schedule", year: 2026, month: 7, publicationStatus: "public", peoplePerShift: 1, shift1Time: "08:00 - 12:00", shift2Time: "14:00 - 18:00", maxHoursPerEmpMonth: 160, maxConsecutiveDays: 5, maxConsecutiveFull: 3, maxFullPerMonth: 10, lastUpdatedAtUtc: "2026-07-01T10:00:00Z" };
 const employees: Employee[] = [
@@ -45,8 +48,8 @@ test("phone sections have reading order, real metrics and a preserved read-only 
   const rows = cards(container);
   expect(rows).toHaveLength(2);
   expect(within(rows[0]).getByText("AK")).toHaveAttribute("aria-hidden", "true");
-  expect(Array.from(rows[0].querySelectorAll("summary dd")).map(node => node.textContent)).toEqual(["1", "30", "8"]);
-  expect(Array.from(rows[1].querySelectorAll("summary dd")).map(node => node.textContent)).toEqual(["1", "30", "6"]);
+  expect(Array.from(rows[0].querySelectorAll("summary dd")).map(node => node.textContent)).toEqual(["1", "30", "8", "0"]);
+  expect(Array.from(rows[1].querySelectorAll("summary dd")).map(node => node.textContent)).toEqual(["1", "30", "6", "0"]);
   const matrix = container.querySelector("[data-phone-matrix-scroll]")!;
   expect(matrix).toHaveAttribute("tabindex", "0");
   expect(within(matrix as HTMLElement).getByText("Anna Kowalska")).toBeInTheDocument();
@@ -124,4 +127,17 @@ test("empty and optional data use existing fallbacks", () => {
   expect(screen.getByText("No notes yet.")).toBeInTheDocument();
   expect(screen.queryByRole("searchbox")).not.toBeInTheDocument();
   expect(document.body.textContent).not.toMatch(/undefined|NaN/);
+});
+
+
+test("phone holiday metric follows visibility while preserving original metrics and disclosure", () => {
+  const { container, rerender } = render(<ContainerGraphProfileWorkspace {...props} graph={{ ...graph, month: 5 }} />);
+  const summary = cards(container)[0].querySelector("summary")!;
+  expect(within(summary).getByText("Holiday Days").nextElementSibling).toHaveTextContent("1");
+  expect(Array.from(summary.querySelectorAll("dd")).map(node => node.textContent)).toEqual(["1", "30", "8", "1"]);
+  vi.mocked(usePublicHolidayVisibility).mockReturnValue(false);
+  rerender(<ContainerGraphProfileWorkspace {...props} graph={{ ...graph, month: 5 }} />);
+  expect(within(summary).queryByText("Holiday Days")).not.toBeInTheDocument();
+  expect(Array.from(summary.querySelectorAll("dd")).map(node => node.textContent)).toEqual(["1", "30", "8"]);
+  expect(cards(container)[0].firstElementChild).toBe(summary);
 });

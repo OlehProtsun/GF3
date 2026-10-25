@@ -1,3 +1,4 @@
+import { usePublicHolidayVisibility } from "@app/providers/PublicHolidayVisibilityProvider";
 import { dateTimeFormat, t } from "@shared/i18n";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { AvailabilitySidebarCollapseButton, AvailabilitySidebarSection } from "@entities/availability-groups/ui/AvailabilitySidebarSection";
@@ -129,6 +130,7 @@ export function ContainerProfileWorkspace({
   onEditContainer,
   onDeleteContainer,
 }: ContainerProfileWorkspaceProps) {
+  const showPublicHolidays = usePublicHolidayVisibility();
   const sidebarRef = useRef<HTMLElement | null>(null);
   const [isDesktopLayout, setIsDesktopLayout] = useState(() => {
     if (typeof window === "undefined") {
@@ -635,6 +637,7 @@ export function ContainerProfileWorkspace({
                     <th>{t("Employee")}</th>
                     <th>{t("Work Days")}</th>
                     <th>{t("Free Days")}</th>
+                    {showPublicHolidays && <th className={styles.holidayColumn}>{t("Holiday Days")}</th>}
                     <th>{t("Hours Sum")}</th>
                     {statistics.shopHeaders.map(shopHeader => (
                       <th key={shopHeader.key}>{shopHeader.name}</th>
@@ -647,6 +650,7 @@ export function ContainerProfileWorkspace({
                       <td>{row.employee}</td>
                       <td>{row.workDays}</td>
                       <td>{row.freeDays}</td>
+                      {showPublicHolidays && <td className={styles.holidayColumn}>{row.holidayDays}</td>}
                       <td>{row.hoursSum}</td>
                       {statistics.shopHeaders.map(shopHeader => (
                         <td key={`${row.employee}-${shopHeader.key}`}>{row.hoursByShop[shopHeader.key] ?? "0"}</td>

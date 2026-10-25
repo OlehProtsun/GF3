@@ -102,10 +102,11 @@ describe("container statistics model", () => {
     expect(statistics.totalEmployeesListText).toBe("Ada Lovelace, Grace Hopper");
     expect(statistics.shopHeaders).toEqual([{ key: "2", name: "Central Shop" }]);
     expect(statistics.pivotRows).toEqual([
-      { employee: "Ada Lovelace", workDays: 1, freeDays: 30, hoursSum: "4h 30m", hoursByShop: { "2": "4h 30m" } },
-      { employee: "Grace Hopper", workDays: 1, freeDays: 30, hoursSum: "4", hoursByShop: { "2": "4" } },
-      { employee: "TOTAL", workDays: 2, freeDays: 60, hoursSum: "8h 30m", hoursByShop: { "2": "8h 30m" }, isTotal: true },
+      { employee: "Ada Lovelace", workDays: 1, freeDays: 30, holidayDays: 1, hoursSum: "4h 30m", hoursByShop: { "2": "4h 30m" } },
+      { employee: "Grace Hopper", workDays: 1, freeDays: 30, holidayDays: 0, hoursSum: "4", hoursByShop: { "2": "4" } },
+      { employee: "TOTAL", workDays: 2, freeDays: 60, holidayDays: 1, hoursSum: "8h 30m", hoursByShop: { "2": "8h 30m" }, isTotal: true },
     ]);
+    statistics.pivotRows.forEach(row => expect(row.holidayDays).toBeLessThanOrEqual(row.workDays));
     expect(statistics.workFreeRows).toEqual([
       { employee: "Ada Lovelace", workDays: 1, freeDays: 30 },
       { employee: "Grace Hopper", workDays: 1, freeDays: 30 },
@@ -124,7 +125,7 @@ describe("container statistics model", () => {
     ];
     const secondGraphSlots: GraphSlot[] = [
       { id: 4, scheduleId: 11, dayOfMonth: 1, slotNo: 1, fromTime: "13:00", toTime: "17:00", employeeId: 1, status: "Working" },
-      { id: 5, scheduleId: 11, dayOfMonth: 3, slotNo: 1, fromTime: "09:00", toTime: "13:00", employeeId: 1, status: "Working" },
+      { id: 5, scheduleId: 11, dayOfMonth: 4, slotNo: 1, fromTime: "09:00", toTime: "13:00", employeeId: 1, status: "Working" },
     ];
 
     const statistics = buildContainerStatistics({
@@ -138,12 +139,46 @@ describe("container statistics model", () => {
     });
 
     expect(statistics.pivotRows).toEqual(expect.arrayContaining([
-      expect.objectContaining({ employee: "Ada Lovelace", workDays: 2, freeDays: 29 }),
+      expect.objectContaining({ employee: "Ada Lovelace", workDays: 2, freeDays: 29, holidayDays: 1 }),
       expect.objectContaining({ employee: "Grace Hopper", workDays: 1, freeDays: 30 }),
     ]));
+    statistics.pivotRows.forEach(row => expect(row.holidayDays).toBeLessThanOrEqual(row.workDays));
     expect(statistics.workFreeRows).toEqual([
       { employee: "Ada Lovelace", workDays: 2, freeDays: 29 },
       { employee: "Grace Hopper", workDays: 1, freeDays: 30 },
     ]);
+  });
+});
+
+
+test("two employees on one holiday contribute two employee-days", () => {
+  const statistics = buildContainerStatistics({ graphs: [graph], employeesById,
+    graphRecordsById: { [graph.id]: { employees: graphEmployees,
+      slots: [slots[0], { ...slots[1], dayOfMonth: 1 }] } } });
+  expect(statistics.pivotRows.map(row => row.holidayDays)).toEqual([1, 1, 2]);
+  statistics.pivotRows.forEach(row => expect(row.holidayDays).toBeLessThanOrEqual(row.workDays));
+});
+
+test("holiday dates add across months and years without counting weekends or vacancies", () => {
+  const graphs = [graph, { ...graph, id: 11, month: 4 }, { ...graph, id: 12, year: 2025 }];
+  const statistics = buildContainerStatistics({ graphs, employeesById,
+    graphRecordsById: {
+      10: { employees: graphEmployees, slots },
+      11: { employees: [], slots: [{ ...slots[0], scheduleId: 11, dayOfMonth: 6 }] },
+      12: { employees: [], slots: [{ ...slots[0], scheduleId: 12 }] },
+    } });
+  expect(statistics.pivotRows.map(row => row.holidayDays)).toEqual([3, 0, 3]);
+  statistics.pivotRows.forEach(row => expect(row.holidayDays).toBeLessThanOrEqual(row.workDays));
+});
+
+test("empty and registered unscheduled employees retain zero counts and row structure", () => {
+  expect(buildContainerStatistics({ graphs: [], graphRecordsById: {} }).pivotRows).toEqual([]);
+  const statistics = buildContainerStatistics({ graphs: [graph], employeesById,
+    graphRecordsById: { 10: { employees: [graphEmployees[0]], slots: [slots[2]] } } });
+  expect(statistics.pivotRows).toHaveLength(2);
+  expect(statistics.pivotRows.map(row => row.holidayDays)).toEqual([0, 0]);
+  statistics.pivotRows.forEach(row => {
+    expect(row.holidayDays).toBeLessThanOrEqual(row.workDays);
+    expect(Number.isFinite(row.holidayDays)).toBe(true);
   });
 });

@@ -475,7 +475,8 @@
 .stickyColumn,
 .stickyColumnSecondary,
 .stickyColumnTertiary,
-.stickyColumnQuaternary {
+.stickyColumnQuaternary,
+.stickyColumnQuinary {
   position: sticky;
   background-clip: padding-box;
   box-shadow: inset -1px 0 0 rgba(113, 113, 122, 0.12);
@@ -532,7 +533,8 @@
 .summaryTable tbody .stickyColumn,
 .summaryTable tbody .stickyColumnSecondary,
 .summaryTable tbody .stickyColumnTertiary,
-.summaryTable tbody .stickyColumnQuaternary {
+.summaryTable tbody .stickyColumnQuaternary,
+.summaryTable tbody .stickyColumnQuinary {
   background: #ffffff;
 }
 
@@ -544,7 +546,8 @@
 
 .summaryTable tbody .stickyColumnSecondary,
 .summaryTable tbody .stickyColumnTertiary,
-.summaryTable tbody .stickyColumnQuaternary {
+.summaryTable tbody .stickyColumnQuaternary,
+.summaryTable tbody .stickyColumnQuinary {
   width: var(--summary-stat-cell-width);
   min-width: var(--summary-stat-cell-width);
   max-width: var(--summary-stat-cell-width);
@@ -746,3 +749,13 @@
 .workspacePhone .lastUpdateValue { min-width: 0; overflow-wrap: anywhere; }
 .workspacePhone .emptyState { min-height: 100px; color: var(--text-secondary, #64748b); }
 @media (max-width: 350px) { .workspacePhone .scheduleInfoLabels { grid-template-columns: minmax(0, 1fr); } }
+
+.summaryTable thead .stickyColumnQuinary { z-index: 5; }
+.summaryTable tbody .stickyColumnQuinary { z-index: 4; }
+.stickyColumnQuinary {
+  left: calc(var(--summary-sticky-employee-offset) + (var(--summary-sticky-stat-offset) * 3));
+}
+.summaryTable .holidayStatColumn { white-space: normal; overflow-wrap: anywhere; }
+.workspacePhone .phoneSummaryMetricsWithHolidays { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.workspacePhone .phoneSummaryMetricsWithHolidays > div:nth-child(3) { border-left: 0; padding-left: 0; }
+.workspacePhone .phoneSummaryMetricsWithHolidays dt { overflow-wrap: anywhere; }

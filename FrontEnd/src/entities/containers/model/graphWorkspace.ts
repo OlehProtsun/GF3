@@ -2,6 +2,7 @@ import { getLanguage, dateTimeFormat, t } from "@shared/i18n";
 import type { Employee } from "@entities/employees/model/types";
 import { getEmployeeFullName } from "@entities/employees/model/presentation";
 import { parseFlexibleTimeSegment } from "@shared/lib/timeRange";
+import { getPolishPublicHoliday } from "@shared/lib/polishPublicHolidays";
 import { buildPreviewList, formatHoursMinutes, getSlotDurationMinutes } from "./statistics";
 import type { Graph, GraphCellStyle, GraphEmployee, GraphSlot, SlotStatus } from "./types";
 
@@ -73,6 +74,7 @@ export type GraphSummaryRow = {
   employee: string;
   workDays: number;
   freeDays: number;
+  holidayDays: number;
   sum: string;
   days: GraphSummaryDayCell[];
   dayRows: GraphSummaryDayCell[][];
@@ -806,6 +808,9 @@ export function buildGraphSummaryRows(
       dayCells.map(cells => cells[rowIndex] ?? createEmptyGraphSummaryDayCell()),
     );
     const workDays = dayCells.filter(cells => cells.length > 0).length;
+    const holidayDays = dayCells.filter((cells, index) =>
+      cells.length > 0 && getPolishPublicHoliday(graph.year, graph.month, index + 1) !== null,
+    ).length;
     const freeDays = Math.max(0, daysInMonth - workDays);
 
     return {
@@ -813,6 +818,7 @@ export function buildGraphSummaryRows(
       employee: column.label,
       workDays,
       freeDays,
+      holidayDays,
       sum: formatSummaryMinutes(column.totalMinutes),
       days: dayRows[0],
       dayRows,
