@@ -595,6 +595,9 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, TimeProvider? 
             entity.Property(schedule => schedule.AcceptedSwapHighlightColor)
                 .HasMaxLength(7)
                 .HasDefaultValue("#BBF7D0");
+            entity.Property(schedule => schedule.AcceptedManualShiftHighlightColor)
+                .HasMaxLength(7)
+                .HasDefaultValue("#BAE6FD");
 
             entity.ToTable(table =>
             {

@@ -34,9 +34,9 @@ for (const language of ['en', 'pl']) {
     await expect(dialog).toBeVisible();
     expect(await dialog.evaluate(element => element.matches(':modal'))).toBeTruthy();
     await expect(page.locator('dialog:modal')).toHaveCount(1);
-    if (language === 'en') {
+    {
       await dialog.getByRole('button', { name: /Test schedule/ }).click();
-      const picker = page.getByRole('region', { name: 'Select a shift', exact: true });
+      const picker = page.getByRole('region', { name: language === 'en' ? 'Select your shift' : 'Wybierz swoją zmianę', exact: true });
       await expect(picker).toBeVisible();
       await expect(page.locator('dialog:modal')).toHaveCount(1);
       await page.keyboard.press('Escape');
@@ -44,10 +44,10 @@ for (const language of ['en', 'pl']) {
       await expect(dialog).toBeVisible();
       await dialog.getByRole('button', { name: /Test schedule/ }).click();
       await picker.getByRole('radio', { name: /08:00.*16:00/ }).click();
-      await picker.getByRole('button', { name: 'Confirm shift', exact: true }).click();
+      await picker.getByRole('button', { name: language === 'en' ? 'Confirm shift' : 'Potwierdź zmianę', exact: true }).click();
       await expect(picker).not.toBeVisible();
-      await expect(dialog.getByText('Selected shift', { exact: true })).toBeVisible();
-      await expect(dialog.getByRole('button', { name: 'Continue', exact: true })).toBeEnabled();
+      await expect(dialog.getByText(language === 'en' ? 'Selected shift' : 'Wybrana zmiana', { exact: true })).toBeVisible();
+      await expect(dialog.getByRole('button', { name: language === 'en' ? 'Continue' : 'Kontynuuj', exact: true })).toBeEnabled();
     }
     await page.keyboard.press('Escape');
     await expect(dialog).not.toBeVisible();
@@ -60,7 +60,9 @@ for (const language of ['en', 'pl']) {
     for (const size of [{ width: 408, height: 873 }, { width: 320, height: 568 }, { width: 390, height: 844 }, { width: 844, height: 390 }]) {
       await page.setViewportSize(size);
       const stage = page.locator('[class*="swapStage"]').first();
-      await expect.poll(async () => (await stage.boundingBox())?.width ?? 0).toBeGreaterThanOrEqual(size.width - 12);
+      const expectedWidth = Math.min(size.width, 430) - 8;
+      await expect.poll(async () => (await stage.boundingBox())?.width ?? 0).toBeGreaterThanOrEqual(expectedWidth - 1);
+      expect((await stage.boundingBox())!.width).toBeLessThanOrEqual(expectedWidth + 1);
       if (language === 'en' && size.width === 408) {
         const expandedHeight = (await stage.boundingBox())!.height;
         await page.getByRole('button', { name: 'Collapse navigation', exact: true }).click();

@@ -2,6 +2,8 @@ import { defineConfig, devices } from "@playwright/test";
 
 export default defineConfig({
   testDir: "./e2e",
+  outputDir: "../GF3.Tests/TestResults/playwright",
+  workers: 2,
   timeout: 30_000,
   expect: {
     timeout: 5_000,

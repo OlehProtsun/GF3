@@ -85,6 +85,7 @@ type ContainerGraphMatrixProps = {
   onSelectedCellKeysChange?: (keys: string[]) => void;
   onColumnHeaderClick?: (column: GraphMatrixColumn) => void;
   onColumnMove?: (employeeId: number, targetEmployeeId: number) => void;
+  pinnedColumnIds?: ReadonlySet<number>;
   onColumnLabelChange?: (columnId: number, value: string) => void;
   onCellChange?: (employeeId: number, dayOfMonth: number, value: string) => void;
   onFillColorShortcut?: (fillColor: string, cellKeys: string[]) => void;
@@ -691,6 +692,7 @@ export function ContainerGraphMatrix({
   onSelectedCellKeysChange,
   onColumnHeaderClick,
   onColumnMove,
+  pinnedColumnIds,
   onColumnLabelChange,
   onCellChange,
   onFillColorShortcut,
@@ -773,8 +775,8 @@ export function ContainerGraphMatrix({
   );
   const orderedEmployeeIds = useMemo(() => columns.map(column => column.employeeId), [columns]);
   const reorderableColumnIds = useMemo(
-    () => new Set(columns.map(column => column.employeeId)),
-    [columns],
+    () => new Set(columns.filter(column => !pinnedColumnIds?.has(column.employeeId)).map(column => column.employeeId)),
+    [columns, pinnedColumnIds],
   );
   const automaticColumnWidths = useMemo(
     () => {
@@ -1653,7 +1655,7 @@ export function ContainerGraphMatrix({
                         column.kind === "manual" &&
                         column.manualColumnId !== null &&
                         typeof onColumnLabelChange === "function";
-                      const isReorderableColumn = canReorderColumns;
+                      const isReorderableColumn = canReorderColumns && reorderableColumnIds.has(column.employeeId);
                       const isDragSource = draggedEmployeeId === column.employeeId;
                       const isDropTarget =
                         dropTargetEmployeeId === column.employeeId &&

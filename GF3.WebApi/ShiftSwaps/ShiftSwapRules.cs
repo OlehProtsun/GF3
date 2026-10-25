@@ -588,9 +588,54 @@ internal static class ShiftSwapRules
             var column = columns.OfType<JsonArray>().FirstOrDefault(c => c.Count > 2 && ReferenceEquals(c[2], cells));
             column?.RemoveAt(2);
         }
-        var prefix = rawNote[..match.Index];
+        var prefix = rawNote[..match.Index].TrimEnd();
         var suffix = $"[[GF3_GRAPH_META:b64:{EncodeGraphNoteMetaValue(meta.ToJsonString())}]]";
         return string.IsNullOrEmpty(prefix) ? suffix : $"{prefix}\n\n{suffix}";
+    }
+
+    internal static string UpsertManualColumnBackgroundColorInNote(string? rawNote, int manualColumnId, int dayOfMonth, int backgroundColorArgb)
+    {
+        const string invalid = "The manual shift metadata is invalid or the cell is missing.";
+        if (manualColumnId <= 0 || dayOfMonth is < 1 or > 31 || string.IsNullOrWhiteSpace(rawNote))
+            throw new ValidationException(invalid);
+        var match = GraphNoteMetaRegex.Match(rawNote);
+        if (!match.Success) throw new ValidationException(invalid);
+        var meta = ParseGraphNoteMeta(match.Groups[2].Success ? match.Groups[2].Value : match.Groups[1].Value)
+            ?? throw new ValidationException(invalid);
+        var columnExists = (meta["m"] as JsonArray)?.OfType<JsonArray>()
+            .Any(c => GetJsonInt(c.ElementAtOrDefault(0)) == manualColumnId) == true
+            || (meta["manualColumns"] as JsonArray)?.OfType<JsonObject>()
+                .Any(c => GetJsonInt(c["id"]) == manualColumnId) == true;
+        if (!columnExists) throw new ValidationException(invalid);
+
+        // Match graphNote.ts: valid legacy styles take precedence over compact styles.
+        var legacy = meta["cellStyles"] as JsonArray;
+        var useLegacy = legacy?.OfType<JsonObject>().Any(s =>
+            GetJsonInt(s["employeeId"]) is <= 0 && GetJsonInt(s["dayOfMonth"]) is >= 1 and <= 31
+            && (s["backgroundColorArgb"] is JsonValue bg && bg.TryGetValue<int>(out _)
+                || s["textColorArgb"] is JsonValue fg && fg.TryGetValue<int>(out _))) == true;
+        var key = useLegacy ? "cellStyles" : "s";
+        var styles = meta[key] as JsonArray;
+        if (styles is null) { styles = new JsonArray(); meta[key] = styles; }
+        bool Matches(JsonNode? s) => useLegacy
+            ? s is JsonObject obj && GetJsonInt(obj["employeeId"]) == -manualColumnId && GetJsonInt(obj["dayOfMonth"]) == dayOfMonth
+            : s is JsonArray arr && GetJsonInt(arr.ElementAtOrDefault(0)) == -manualColumnId && GetJsonInt(arr.ElementAtOrDefault(1)) == dayOfMonth;
+        var matching = styles.Where(Matches).ToList();
+        var textColor = matching.Select(s => useLegacy ? s!["textColorArgb"] : ((JsonArray)s!).ElementAtOrDefault(3))
+            .FirstOrDefault(value => value is JsonValue number && number.TryGetValue<int>(out _))?.DeepClone();
+        foreach (var entry in matching) styles.Remove(entry);
+        if (useLegacy)
+            styles.Add(new JsonObject { ["employeeId"] = -manualColumnId, ["dayOfMonth"] = dayOfMonth,
+                ["backgroundColorArgb"] = backgroundColorArgb, ["textColorArgb"] = textColor });
+        else
+        {
+            var entry = new JsonArray(-manualColumnId, dayOfMonth, backgroundColorArgb);
+            if (textColor is not null) entry.Add(textColor);
+            styles.Add(entry);
+        }
+        var visibleNote = rawNote[..match.Index].TrimEnd();
+        var suffix = $"[[GF3_GRAPH_META:b64:{EncodeGraphNoteMetaValue(meta.ToJsonString())}]]";
+        return string.IsNullOrEmpty(visibleNote) ? suffix : $"{visibleNote}\n\n{suffix}";
     }
 
     internal static string? RemoveManualColumnCellFromNote(string? rawNote, int manualColumnId, int dayOfMonth)

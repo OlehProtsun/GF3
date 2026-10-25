@@ -19,7 +19,7 @@ test.describe("manager sidebar layout", () => {
     await loginAsManager(page);
     await page.setViewportSize({ width: 390, height: 720 });
 
-    const sidebar = page.locator("aside");
+    const sidebar = page.locator("aside").filter({ has: page.getByRole("button", { name: "Collapse sidebar", exact: true }) });
     await expect(sidebar).toBeVisible();
 
     await sidebar.hover();

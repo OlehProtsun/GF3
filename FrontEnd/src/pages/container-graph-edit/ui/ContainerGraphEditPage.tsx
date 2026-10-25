@@ -3,6 +3,7 @@ import { useLanguageRevision } from "@shared/i18n/useLanguageRevision";
 import { dateTimeFormat, t } from "@shared/i18n";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { deriveGeneratedVacancies, reconcileGeneratedManualColumns } from "@entities/containers/model/generatedManualShifts";
+import { pinGeneratedColumnsFirst } from "@entities/containers/model/graphColumnOrder";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import {
   buildManagerEditLockMessage,
@@ -324,7 +325,7 @@ function sanitizeScheduleColumnOrder(
     }
   });
 
-  return nextOrder;
+  return pinGeneratedColumnsFirst(nextOrder, manualColumns.filter(column => column.source === "generated-unfilled").map(column => -column.columnId));
 }
 
 function moveScheduleColumnOrder(columnOrder: number[], sourceColumnId: number, targetColumnId: number) {
@@ -965,6 +966,7 @@ export function ContainerGraphEditPage() {
   const syncedAvailabilityGroupIdRef = useRef<number | null>(null);
   const sessionDraftsRef = useRef<Record<number, GraphEditorSessionDraft>>({});
   const savedGraphSnapshotByIdRef = useRef<Record<number, string>>({});
+  const savedGraphRevisionByIdRef = useRef<Record<number, { note: string | null; updatedAt: string | null }>>({});
   const undoHistoryRef = useRef<GraphEditorUndoEntry[]>([]);
   const generationSessionRef = useRef({ containerId, graphId, token: 0 });
   const generationEditorRef = useRef({ manualColumns, scheduleColumnOrder, pendingManualShiftPublishes, offers: shiftSwapLogQuery.data });
@@ -1060,6 +1062,9 @@ export function ContainerGraphEditPage() {
     if (hydratedKey === nextHydratedKey) {
       return;
     }
+    savedGraphRevisionByIdRef.current[graphQuery.data.id] = {
+      note: graphQuery.data.note ?? null, updatedAt: graphQuery.data.lastUpdatedAtUtc ?? null,
+    };
 
     const parsedGraphNote = parseGraphNoteContent(graphQuery.data.note);
     const editableEmployeeRows = createEditableEmployeeRows(graphEmployeesQuery.data, employeesById);
@@ -1553,6 +1558,9 @@ export function ContainerGraphEditPage() {
     resetUndoHistory();
     delete sessionDraftsRef.current[graphId];
     savedGraphSnapshotByIdRef.current[graphId] = persistedGraphSnapshot;
+    savedGraphRevisionByIdRef.current[graphId] = {
+      note: graphQuery.data.note ?? null, updatedAt: graphQuery.data.lastUpdatedAtUtc ?? null,
+    };
   }, [
     cellStylesQuery.data,
     currentGraphBaselineSnapshot,
@@ -2156,6 +2164,8 @@ export function ContainerGraphEditPage() {
     setEmployeeRemoveTargetId(null);
   };
   const handleColumnMove = (columnId: number, targetColumnId: number) => {
+    if (manualColumns.some(column => column.source === "generated-unfilled" &&
+      (-column.columnId === columnId || -column.columnId === targetColumnId))) return;
     const currentColumnOrder = sanitizeScheduleColumnOrder(scheduleColumnOrder, graphEmployeeRows, manualColumns);
     const nextColumnOrder = moveScheduleColumnOrder(currentColumnOrder, columnId, targetColumnId);
 
@@ -2208,6 +2218,13 @@ export function ContainerGraphEditPage() {
   const saveGraphDraft = async (draft: GraphEditorSessionDraft) => {
     if (!containerId) {
       throw new Error(t("Container is missing."));
+    }
+
+    const latestGraph = await containersApi.graphById(containerId, draft.graphId);
+    const revision = savedGraphRevisionByIdRef.current[draft.graphId];
+    if (!revision || revision.note !== (latestGraph.note ?? null) || revision.updatedAt !== (latestGraph.lastUpdatedAtUtc ?? null)) {
+      queryClient.invalidateQueries({ queryKey: queryKeys.containers.all });
+      throw new Error(t("This schedule changed during another request. Refresh before saving."));
     }
 
     const orderedDraftRows = sortGraphEmployeeRowsByColumnOrder(draft.graphEmployeeRows, draft.scheduleColumnOrder);
@@ -2472,6 +2489,11 @@ export function ContainerGraphEditPage() {
           vacancies: deriveGeneratedVacancies({ slots: generated.slots, year: Number(requestedForm.year), month: Number(requestedForm.month),
             shift1Time: requestedForm.shift1Time, shift2Time: requestedForm.shift2Time, peoplePerShift: Number(requestedForm.peoplePerShift) }),
           columns: latest.manualColumns, columnOrder: latest.scheduleColumnOrder, reservations,
+          retainedGeneratedColumnIds: new Set(styleRecordsRef.current.filter(style =>
+            style.employeeId < 0 && Number.isInteger(style.dayOfMonth) && style.dayOfMonth >= 1 &&
+            style.dayOfMonth <= getGraphDaysInMonth(Number(requestedForm.year), Number(requestedForm.month)) &&
+            latest.manualColumns.some(column => column.columnId === -style.employeeId && column.source === "generated-unfilled"))
+            .map(style => -style.employeeId)),
         });
         setManualColumns(reconciled.columns);
         setScheduleColumnOrder(reconciled.columnOrder);

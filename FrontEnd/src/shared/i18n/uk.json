@@ -2127,5 +2127,12 @@
   "No offered shifts.": "Немає запропонованих змін.",
   "Remove shift on {0}": "Видалити зміну на {0}",
   "Cancel shift on {0}": "Скасувати зміну на {0}",
-  "The generated schedule returned no slots. Please try again.": "Згенерований графік не містить змін. Спробуйте ще раз."
+  "The generated schedule returned no slots. Please try again.": "Згенерований графік не містить змін. Спробуйте ще раз.",
+  "Accepted shift color": "Колір прийнятої зміни",
+  "Accepted manual shift highlight color": "Колір виділення прийнятої ручної зміни",
+  "Choose accepted shift color": "Виберіть колір прийнятої зміни",
+  "Accepted manual shift highlight hex color": "HEX-колір виділення прийнятої ручної зміни",
+  "Could not save the accepted manual shift highlight color.": "Не вдалося зберегти колір прийнятої ручної зміни.",
+  "Could not load the accepted manual shift highlight color.": "Не вдалося завантажити колір прийнятої ручної зміни.",
+  "This schedule changed during another request. Refresh before saving.": "Цей графік було змінено під час іншого запиту. Оновіть перед збереженням."
 }

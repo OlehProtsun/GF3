@@ -11,25 +11,36 @@ type EmployeeResponse = {
 export async function loginWithCredentials(page: Page, username: string, password: string) {
   await page.goto("/");
 
-  const signInHeading = page.getByRole("heading", { name: "Sign in" });
-  const signInButton = page.getByRole("button", { name: "Sign in" });
-  const appShell = page.locator("aside:visible, nav[aria-label='Employee sections']:visible").first();
+  const signInHeading = page.getByRole("heading", { name: /^(Sign in|Zaloguj się)$/ });
+  const signInButton = page.getByRole("button", { name: /^(Sign in|Zaloguj się)$/ });
+  const appShell = page.locator("aside:visible, [data-employee-nav]:visible").first();
   const initialScreen = await Promise.race([
     appShell.waitFor({ state: "visible", timeout: 10000 }).then(() => "app"),
     signInHeading.waitFor({ state: "visible", timeout: 10000 }).then(() => "login"),
   ]);
 
   if (initialScreen === "login") {
-    await page.getByRole("textbox", { name: "Username" }).fill(username);
-    await page.getByRole("textbox", { name: "Password" }).fill(password);
+    await page.getByRole("textbox", { name: /^(Username|Nazwa użytkownika)$/ }).fill(username);
+    await page.getByRole("button", { name: "PC", exact: true }).click();
+    await page.getByLabel(/^(Password|Hasło)$/).fill(password);
     await expect(signInButton).toBeEnabled();
     await signInButton.click();
   }
 
-  const picker = page.getByRole("heading", { name: "Choose workspace" });
+  const picker = page.getByRole("heading", { name: /^(Choose workspace|Wybierz tryb pracy)$/ });
   const next = await Promise.race([picker.waitFor({ state: "visible", timeout: 10000 }).then(() => "choose"), appShell.waitFor({ state: "visible", timeout: 10000 }).then(() => "app")]);
-  if (next === "choose") await page.getByRole("button", { name: "PC Full access", exact: true }).click();
+  if (next === "choose") await page.getByRole("button").filter({ has: page.getByText("PC", { exact: true }) }).click();
   await expect(appShell).toBeVisible({ timeout: 10000 });
+
+  // These legacy fixtures assert English UI; persist that preference through the real API.
+  const accessToken = await page.evaluate(() => localStorage.getItem("gf3.auth.access-token"));
+  const preference = await page.request.put("/api/account-language", {
+    headers: { Authorization: `Bearer ${accessToken}` }, data: { language: "en" },
+  });
+  expect(preference.ok()).toBe(true);
+  await page.reload();
+  await expect(page.locator("html")).toHaveAttribute("lang", "en");
+  await expect(appShell).toBeVisible();
 }
 
 export async function loginAsManager(page: Page) {

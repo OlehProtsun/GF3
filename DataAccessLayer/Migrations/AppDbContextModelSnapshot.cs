@@ -1180,6 +1180,14 @@ namespace DataAccessLayer.Migrations
                         .HasColumnType("INTEGER")
                         .HasColumnName("id");
 
+                    b.Property<string>("AcceptedManualShiftHighlightColor")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(7)
+                        .HasColumnType("TEXT")
+                        .HasDefaultValue("#BAE6FD")
+                        .HasColumnName("accepted_manual_shift_highlight_color");
+
                     b.Property<string>("AcceptedSwapHighlightColor")
                         .IsRequired()
                         .ValueGeneratedOnAdd()

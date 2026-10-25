@@ -125,12 +125,21 @@ public sealed class ShiftSwapPartialClaimTests
         Assert.Equal("text", GraphManualColumnLabelResolver.ResolveCell(note,7,2));
         var meta = ShiftSwapRules.ParseGraphNoteMeta(note!.Split("[[GF3_GRAPH_META:")[1][..^2]);
         Assert.All(new[]{"g","o","s","t","u"}, key=>Assert.NotNull(meta![key]));
+        Assert.Equal(ShiftSwapHighlightRules.ToArgb("#BAE6FD"), (await fresh.ScheduleCellStyles.SingleAsync()).BackgroundColorArgb);
+        (await fresh.Schedules.SingleAsync(s => s.Id == f.SourceSchedule)).AcceptedManualShiftHighlightColor = "#FED7AA";
+        await fresh.SaveChangesAsync();
         await EmployeeController(fresh,f.Third).Accept(residual.Id,default);
         await using var final = database.CreateContext();
         Assert.Null(GraphManualColumnLabelResolver.ResolveCell((await final.Schedules.SingleAsync(s=>s.Id==f.SourceSchedule)).Note,7,1));
         Assert.Equal(0,await final.ShiftSwapRequests.CountAsync(r=>r.Status==ShiftSwapStatus.Open));
         Assert.Equal(2,await final.ShiftSwapHistories.CountAsync()); Assert.Equal(3,await final.ScheduleVersions.CountAsync()); // The second before-state reuses the identical first after-state.
         Assert.Equal(2,await final.ScheduleSlots.CountAsync(s=>s.ScheduleId==f.SourceSchedule && (s.EmployeeId==f.Target||s.EmployeeId==f.Third)));
+        Assert.Equal(ShiftSwapHighlightRules.ToArgb("#BAE6FD"), (await final.ScheduleCellStyles.SingleAsync(s => s.EmployeeId == f.Target)).BackgroundColorArgb);
+        Assert.Equal(ShiftSwapHighlightRules.ToArgb("#FED7AA"), (await final.ScheduleCellStyles.SingleAsync(s => s.EmployeeId == f.Third)).BackgroundColorArgb);
+        var finalNote = (await final.Schedules.SingleAsync(s => s.Id == f.SourceSchedule)).Note!;
+        var finalMeta = ShiftSwapRules.ParseGraphNoteMeta(finalNote.Split("[[GF3_GRAPH_META:")[1][..^2])!;
+        var manualStyle = Assert.Single(((System.Text.Json.Nodes.JsonArray)finalMeta["s"]!).OfType<System.Text.Json.Nodes.JsonArray>(), s => (int)s[0]! == -7);
+        Assert.Equal(ShiftSwapHighlightRules.ToArgb("#FED7AA"), (int)manualStyle[2]!);
     }
 
     [Fact]

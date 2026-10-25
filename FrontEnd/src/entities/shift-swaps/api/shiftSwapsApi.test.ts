@@ -13,6 +13,13 @@ beforeEach(() => {
 });
 
 describe("shift swaps api", () => {
+  test("manual setting has its own persisted endpoint", () => {
+    const signal = new AbortController().signal;
+    shiftSwapsApi.getManualHighlightSetting(1, 2, signal);
+    expect(requestMock).toHaveBeenLastCalledWith("containers/1/graphs/2/shift-swaps/manual-highlight-setting", { signal });
+    shiftSwapsApi.saveManualHighlightSetting(1, 2, "#AABBCC");
+    expect(requestMock).toHaveBeenLastCalledWith("containers/1/graphs/2/shift-swaps/manual-highlight-setting", { method: "PUT", body: { highlightColor: "#AABBCC" } });
+  });
   test("encodes candidate query times and posts the complete exchange preview unchanged", () => {
     const controller = new AbortController();
     shiftSwapsApi.listReturnCandidates({ sourceScheduleId: 1, sourceSlotId: 2, fromTime: "09:00", toTime: "16:30", targetEmployeeId: 3, page: 2 }, controller.signal);

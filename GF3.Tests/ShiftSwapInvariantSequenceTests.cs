@@ -6,11 +6,114 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using WebApi.Contracts.ShiftSwaps;
 using static GF3.Tests.Infrastructure.ShiftSwapScenarioFactory;
+using System.Data.Common;
+using System.Diagnostics;
+using DataAccessLayer.Models.DataBaseContext;
+using Microsoft.EntityFrameworkCore.Diagnostics;
+using Xunit.Abstractions;
 
 namespace GF3.Tests;
 
-public sealed class ShiftSwapInvariantSequenceTests
+public sealed class ShiftSwapInvariantSequenceTests(ITestOutputHelper output)
 {
+    [Fact]
+    public async Task ListQueryCount_DoesNotGrowWithOpenOfferCount()
+    {
+        await using var database = await SqliteTestDatabase.CreateAsync();
+        await using var setup = database.CreateContext();
+        var f = await SeedAsync(setup, new());
+        var cells = System.Text.Json.JsonSerializer.Serialize(Enumerable.Range(3, 20).ToDictionary(day => day.ToString(), _ => "09:00-17:00"));
+        (await setup.Schedules.SingleAsync(s => s.Id == f.SourceSchedule)).Note = "[[GF3_GRAPH_META:{\"m\":[[7,\"Manual\"," + cells + "]]}]]";
+        await setup.SaveChangesAsync();
+        var counter = new BenchmarkCommands();
+        await using var db = new AppDbContext(new DbContextOptionsBuilder<AppDbContext>().UseSqlite(database.ConnectionString).AddInterceptors(counter).Options);
+        async Task Publish(int day)
+        {
+            await ManagerController(db).CreateManualOffer(f.Container, f.SourceSchedule,
+                new() { ManualColumnId = 7, DayOfMonth = day, FromTime = "09:00", ToTime = "17:00" }, default);
+        }
+        await Publish(3);
+        counter.Count = 0;
+        var one = await EmployeeController(db, f.Target).GetVisible(default);
+        var initialQueries = counter.Count;
+        Assert.Single(Assert.IsAssignableFrom<IEnumerable<ShiftSwapDto>>(Assert.IsType<OkObjectResult>(one.Result).Value));
+        for (var day = 4; day <= 22; day++) await Publish(day);
+        var before = await SnapshotAsync(db);
+        counter.Count = 0;
+        var many = await EmployeeController(db, f.Target).GetVisible(default);
+        var finalQueries = counter.Count;
+        Assert.Equal(20, Assert.IsAssignableFrom<IEnumerable<ShiftSwapDto>>(Assert.IsType<OkObjectResult>(many.Result).Value).Count());
+        Assert.Equal(initialQueries, finalQueries);
+        Assert.Equal(before, await SnapshotAsync(db));
+        output.WriteLine($"Visible offers 1 -> 20; SQL statements {initialQueries} -> {finalQueries}; persisted tables unchanged.");
+    }
+
+    [Theory]
+    [InlineData(10)][InlineData(50)]
+    public async Task SwapRegressionBenchmark_RecordsEquivalentSqliteFixtures(int employeeCount)
+    {
+        var samples = new Dictionary<string, List<(double Ms, int Queries)>>();
+        for (var repeat = 0; repeat < 6; repeat++)
+        {
+            await using var database = await SqliteTestDatabase.CreateAsync();
+            await using var setup = database.CreateContext();
+            var f = await SeedAsync(setup, new());
+            for (var index = 4; index <= employeeCount; index++)
+            {
+                var employee = TestDataFactory.CreateDalEmployee($"Bench{index}", "Worker", email: $"bench{index}@example.invalid");
+                setup.Add(employee); await setup.SaveChangesAsync();
+                setup.ScheduleEmployees.Add(new() { ScheduleId = f.SourceSchedule, EmployeeId = employee.Id });
+                for (var day = 1; day <= 31; day++)
+                    setup.ScheduleSlots.Add(TestDataFactory.CreateDalSlot(f.SourceSchedule, day, index, employee.Id, "09:00", "17:00"));
+            }
+            (await setup.Schedules.SingleAsync(s => s.Id == f.SourceSchedule)).Note =
+                "[[GF3_GRAPH_META:{\"m\":[[7,\"Manual\",{\"3\":\"09:00-17:00\",\"4\":\"09:00-17:00\"}]]}]]";
+            setup.ScheduleSlots.Add(TestDataFactory.CreateDalSlot(f.SourceSchedule, 5, 1, f.Owner, "09:00", "17:00"));
+            await setup.SaveChangesAsync();
+            var counter = new BenchmarkCommands();
+            await using var db = new AppDbContext(new DbContextOptionsBuilder<AppDbContext>().UseSqlite(database.ConnectionString).AddInterceptors(counter).Options);
+            async Task Measure(string name, Func<Task> run)
+            {
+                counter.Count = 0; var watch = Stopwatch.StartNew();
+                await run(); watch.Stop();
+                if (repeat == 0) return;
+                if (!samples.TryGetValue(name, out var values)) samples[name] = values = [];
+                values.Add((watch.Elapsed.TotalMilliseconds, counter.Count));
+            }
+            await Measure("manual-post", async () => { await ManagerController(db).CreateManualOffer(f.Container, f.SourceSchedule,
+                new() { ManualColumnId = 7, DayOfMonth = 3, FromTime = "09:00", ToTime = "17:00" }, default); });
+            var full = await db.ShiftSwapRequests.SingleAsync();
+            await Measure("employee-list", async () => { await EmployeeController(db, f.Target).GetVisible(default); });
+            await Measure("graph-log", async () => { await ManagerController(db).GetGraphLog(f.Container, f.SourceSchedule, default); });
+            await Measure("manual-full-accept", async () => { await EmployeeController(db, f.Target).Accept(full.Id, default); });
+            await ManagerController(db).CreateManualOffer(f.Container, f.SourceSchedule,
+                new() { ManualColumnId = 7, DayOfMonth = 4, FromTime = "09:00", ToTime = "17:00", AllowPartialAcceptance = true }, default);
+            var partial = await db.ShiftSwapRequests.SingleAsync(r => r.Status == ShiftSwapStatus.Open);
+            await Measure("manual-partial-accept", async () => { await EmployeeController(db, f.Target).Accept(partial.Id, default, new() { FromTime = "11:00", ToTime = "15:00" }); });
+            var exchange = await EmployeeController(db, f.Owner).Create(Request(f, new(Kind: SwapKind.Exchange)), default);
+            var offer = Assert.IsType<ShiftSwapDto>(Assert.IsType<CreatedAtActionResult>(exchange.Result).Value);
+            await Measure("exchange-accept", async () => { await EmployeeController(db, f.Target).Accept(offer.Id, default); });
+            await AssertNoOverlaps(db);
+        }
+        foreach (var (name, values) in samples)
+        {
+            var sorted = values.Select(v => v.Ms).Order().ToArray();
+            output.WriteLine(System.Text.Json.JsonSerializer.Serialize(new { scenario = name, employees = employeeCount,
+                days = 31, warmup = 1, repeats = 5, medianMs = sorted[2], maxMs = sorted[^1], queries = values.Select(v => v.Queries).ToArray() }));
+        }
+    }
+
+    private sealed class BenchmarkCommands : DbCommandInterceptor
+    {
+        public int Count;
+        public override ValueTask<InterceptionResult<DbDataReader>> ReaderExecutingAsync(DbCommand command, CommandEventData eventData, InterceptionResult<DbDataReader> result, CancellationToken cancellationToken = default)
+        { Count++; return ValueTask.FromResult(result); }
+        public override ValueTask<InterceptionResult<int>> NonQueryExecutingAsync(DbCommand command, CommandEventData eventData, InterceptionResult<int> result, CancellationToken cancellationToken = default)
+        { Count++; return ValueTask.FromResult(result); }
+        public override ValueTask<InterceptionResult<object>> ScalarExecutingAsync(DbCommand command, CommandEventData eventData, InterceptionResult<object> result, CancellationToken cancellationToken = default)
+        { Count++; return ValueTask.FromResult(result); }
+    }
+
     [Theory]
     [InlineData(1729)]
     [InlineData(104729)]

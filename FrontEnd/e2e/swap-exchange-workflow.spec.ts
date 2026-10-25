@@ -1018,9 +1018,11 @@ for (const viewport of [{ width: 320, height: 568 }, { width: 375, height: 667 }
     await cards.nth(1).getByRole("button", { name: "View offer details for F27" }).click();
     const sourceCard = details.getByRole("region", { name: "Shift you receive" });
     const returnCard = details.getByRole("region", { name: "Your shift (you give)" });
-    await expect(sourceCard).toContainText("7.5h"); await expect(sourceCard.getByText("Receive", { exact: true })).toHaveCSS("color", "rgb(19, 128, 90)");
+    await expect(sourceCard).toContainText("7.5h"); await expect(sourceCard.getByText("Receive", { exact: true })).toHaveCSS("color", "rgb(0, 132, 95)");
+    await expect(sourceCard.getByText("Receive", { exact: true })).toHaveCSS("background-color", "rgb(221, 246, 236)");
     await expect(returnCard).toContainText("F35"); await expect(returnCard).toContainText("North Store");
-    await expect(returnCard).toContainText("4.25h"); await expect(returnCard.getByText("Give", { exact: true })).toHaveCSS("color", "rgb(36, 107, 255)");
+    await expect(returnCard).toContainText("4.25h"); await expect(returnCard.getByText("Give", { exact: true })).toHaveCSS("color", "rgb(102, 85, 182)");
+    await expect(returnCard.getByText("Give", { exact: true })).toHaveCSS("background-color", "rgb(238, 240, 255)");
     await expect(details.getByRole("button", { name: "Accept shift" })).toBeInViewport({ ratio: 1 });
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBeTruthy();
     await page.screenshot({ path: test.info().outputPath("exchange-details.png") });
@@ -1051,7 +1053,8 @@ test("details lock eligibility, restore History and show creator transfer direct
   await page.getByRole("button", { name: "Swap history", exact: true }).click();
   const history = page.getByRole("dialog", { name: "Recent swap activity" });
   const historyLauncher = history.getByRole("button", { name: "View offer details for F27" });
-  await historyLauncher.click(); await expect(page.locator("dialog:modal")).toHaveCount(2);
+  await historyLauncher.click(); await expect(page.locator("dialog:modal")).toHaveCount(1);
+  await expect(history).not.toBeVisible();
   await expect(details.getByRole("button", { name: "Accept shift" })).toHaveCount(0);
   await expect(details.getByRole("button", { name: "Cancel offer" })).toHaveCount(0);
   await page.keyboard.press("Escape"); await expect(details).toHaveCount(0);
@@ -1174,6 +1177,7 @@ for (const viewport of [{ width: 320, height: 640 }, { width: 375, height: 812 }
     expect(box.height).toBeGreaterThanOrEqual(viewport.height - 80);
     const close = history.getByRole("button", { name: "Close", exact: true });
     await close.click({ trial: true });
+    await history.evaluate(element => Promise.all(element.getAnimations({ subtree: true }).map(animation => animation.finished)));
     const closeBefore = (await close.boundingBox())!;
     const cards = list.locator("article"); await expect(cards).toHaveCount(15);
     expect(await cards.evaluateAll(nodes => nodes.every(node => {
@@ -1188,8 +1192,10 @@ for (const viewport of [{ width: 320, height: 640 }, { width: 375, height: 812 }
     await page.screenshot({ path: test.info().outputPath("history-top.png") });
     const first = cards.first().getByRole("button", { name: /^View offer details for/ }); await first.click();
     const details = page.getByRole("dialog", { name: "Offer details" }); await expect(details).toBeVisible();
-    await expect(page.locator("dialog:modal")).toHaveCount(2); await page.keyboard.press("Escape");
+    await expect(page.locator("dialog:modal")).toHaveCount(1); await expect(history).not.toBeVisible(); await page.keyboard.press("Escape");
     await expect(details).toHaveCount(0); await expect(first).toBeFocused();
+    await expect(history).toBeVisible();
+    await history.evaluate(element => Promise.all(element.getAnimations({ subtree: true }).map(animation => animation.finished)));
     await expect(background).toHaveCSS("overflow-y", "hidden");
     await list.evaluate(el => { el.scrollTop = el.scrollHeight; });
     await expect(cards.last()).toBeInViewport(); await expect(close).toBeInViewport({ ratio: 1 });

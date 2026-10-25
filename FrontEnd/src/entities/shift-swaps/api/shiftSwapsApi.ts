@@ -33,6 +33,12 @@ export const shiftSwapsApi = {
     request<ShiftSwap[]>(`${containerEndpoint}/${containerId}/graphs/${graphId}/shift-swaps`, { signal }),
   getHighlightSetting: (containerId: number, graphId: number, signal?: AbortSignal) =>
     request<ShiftSwapHighlightSetting>(`${containerEndpoint}/${containerId}/graphs/${graphId}/shift-swaps/highlight-setting`, { signal }),
+  getManualHighlightSetting: (containerId: number, graphId: number, signal?: AbortSignal) =>
+    request<ShiftSwapHighlightSetting>(`${containerEndpoint}/${containerId}/graphs/${graphId}/shift-swaps/manual-highlight-setting`, { signal }),
+  saveManualHighlightSetting: (containerId: number, graphId: number, highlightColor: string) =>
+    request<ShiftSwapHighlightSetting>(`${containerEndpoint}/${containerId}/graphs/${graphId}/shift-swaps/manual-highlight-setting`, {
+      method: "PUT", body: { highlightColor },
+    }),
   saveHighlightSetting: (containerId: number, graphId: number, highlightColor: string) =>
     request<ShiftSwapHighlightSetting>(`${containerEndpoint}/${containerId}/graphs/${graphId}/shift-swaps/highlight-setting`, {
       method: "PUT",

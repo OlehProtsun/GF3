@@ -28,6 +28,8 @@ import type { Graph, SchedulePreset } from "@entities/containers/model/types";
 import type { Shop } from "@entities/shops/model/types";
 import {
   useGraphShiftSwapHighlightSettingQuery,
+  useGraphManualShiftHighlightSettingQuery,
+  useSaveGraphManualShiftHighlightSettingMutation,
   useSaveGraphShiftSwapHighlightSettingMutation,
   type ShiftSwap,
 } from "@entities/shift-swaps";
@@ -469,6 +471,8 @@ export function ContainerGraphEditor({
   const [swapHighlightColor, setSwapHighlightColor] = useState("#BBF7D0");
   const [isSwapColorDialogOpen, setIsSwapColorDialogOpen] = useState(false);
   const [swapColorError, setSwapColorError] = useState<string | null>(null);
+  const [isManualColorDialogOpen, setIsManualColorDialogOpen] = useState(false);
+  const [manualColorError, setManualColorError] = useState<string | null>(null);
   const [colorDialogMode, setColorDialogMode] = useState<ColorDialogMode | null>(null);
   const [isPresetDialogOpen, setIsPresetDialogOpen] = useState(false);
   const [isVersionsDialogOpen, setIsVersionsDialogOpen] = useState(false);
@@ -495,6 +499,17 @@ export function ContainerGraphEditor({
   const persistedGraphId = graph && Number.isInteger(graph.id) && graph.id > 0 ? graph.id : null;
   const swapHighlightSettingQuery = useGraphShiftSwapHighlightSettingQuery(graphContainerId, persistedGraphId);
   const saveSwapHighlightSettingMutation = useSaveGraphShiftSwapHighlightSettingMutation();
+  const manualHighlightSettingQuery = useGraphManualShiftHighlightSettingQuery(graphContainerId, persistedGraphId);
+  const saveManualHighlightSettingMutation = useSaveGraphManualShiftHighlightSettingMutation();
+  const manualHighlightColor = manualHighlightSettingQuery.data?.highlightColor ?? "#BAE6FD";
+  const handleManualHighlightColorChange = (highlightColor: string) => {
+    if (graphContainerId === null || persistedGraphId === null) return;
+    setManualColorError(null);
+    saveManualHighlightSettingMutation.mutate({ containerId: graphContainerId, graphId: persistedGraphId, highlightColor }, {
+      onSuccess: () => setIsManualColorDialogOpen(false),
+      onError: error => setManualColorError(getErrorMessage(error, t("Could not save the accepted manual shift highlight color."))),
+    });
+  };
 
   const allSectionsCollapsed = Object.values(collapsedSections).every(Boolean);
 
@@ -1005,6 +1020,9 @@ export function ContainerGraphEditor({
             onExpand={() => setSectionCollapsed("manualColumns", false)}
           >
             <ContainerGraphManualColumnsCard
+              highlightColor={manualHighlightColor}
+              highlightSettingDisabled={persistedGraphId === null || saveManualHighlightSettingMutation.isPending}
+              onOpenHighlightColorPicker={() => { setManualColorError(null); setIsManualColorDialogOpen(true); }}
               columns={manualColumns}
               allowSwap={form.allowSwap}
               isSchedulePublished={form.publicationStatus === "public"}
@@ -1023,6 +1041,14 @@ export function ContainerGraphEditor({
               onCancelPublishedShift={onCancelManualShift}
               onCancelPendingPublishedShift={onCancelPendingManualShift}
             />
+            <ContainerGraphHighlightColorDialog open={isManualColorDialogOpen} value={manualHighlightColor}
+              eyebrow={t("Manual shifts")} title={t("Choose accepted shift color")}
+              inputLabel={t("Accepted manual shift highlight hex color")}
+              isSaving={saveManualHighlightSettingMutation.isPending}
+              onCancel={() => setIsManualColorDialogOpen(false)} onSave={handleManualHighlightColorChange} />
+            {manualColorError || manualHighlightSettingQuery.error
+              ? <ErrorBanner>{manualColorError ?? getErrorMessage(manualHighlightSettingQuery.error, t("Could not load the accepted manual shift highlight color."))}</ErrorBanner>
+              : null}
           </AvailabilitySidebarSection>
 
             <AvailabilitySidebarSection
@@ -1113,6 +1139,7 @@ export function ContainerGraphEditor({
                   styleMap={styleMap}
                   dayConflictMap={dayConflictMap}
                   onColumnMove={onColumnMove}
+                  pinnedColumnIds={new Set(manualColumns.filter(column => column.source === "generated-unfilled").map(column => -column.columnId))}
                   onColumnLabelChange={onManualColumnLabelChange}
                   selectedCellKeys={selectedCellKeys}
                   bindValueByKey={bindValueByKey}

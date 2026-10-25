@@ -146,11 +146,14 @@ public class ContainerService : IContainerService
 
     public async Task UpdateGraphAsync(int containerId, int graphId, ScheduleModel model, CancellationToken ct = default)
     {
-        await EnsureGraphOwnershipAsync(containerId, graphId, ct).ConfigureAwait(false);
+        var existing = await EnsureGraphOwnershipAsync(containerId, graphId, ct).ConfigureAwait(false);
 
         model.Id = graphId;
         model.ContainerId = containerId;
-        await _scheduleRepo.UpdateAsync(model.ToDal(), ct).ConfigureAwait(false);
+        var updated = model.ToDal();
+        updated.AcceptedManualShiftHighlightColor = existing.AcceptedManualShiftHighlightColor;
+        updated.AcceptedSwapHighlightColor = existing.AcceptedSwapHighlightColor;
+        await _scheduleRepo.UpdateAsync(updated, ct).ConfigureAwait(false);
     }
 
     public async Task<int> UpdateGraphPublicationAsync(

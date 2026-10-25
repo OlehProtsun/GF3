@@ -24,6 +24,36 @@ public sealed class ShiftSwapLogsController(
     IRealtimeNotifier realtimeNotifier,
     IManagerEditLockService? editLockService = null) : ControllerBase
 {
+    [HttpGet("manual-highlight-setting")]
+    [ProducesResponseType(typeof(ShiftSwapHighlightSettingDto), StatusCodes.Status200OK)]
+    public async Task<ActionResult<ShiftSwapHighlightSettingDto>> GetManualHighlightSetting(
+        int containerId, int graphId, CancellationToken cancellationToken)
+    {
+        var color = await db.Schedules.AsNoTracking()
+            .Where(schedule => schedule.Id == graphId && schedule.ContainerId == containerId)
+            .Select(schedule => schedule.AcceptedManualShiftHighlightColor)
+            .SingleOrDefaultAsync(cancellationToken).ConfigureAwait(false)
+            ?? throw new KeyNotFoundException($"Graph with id {graphId} was not found.");
+        return Ok(new ShiftSwapHighlightSettingDto { HighlightColor = color });
+    }
+
+    [HttpPut("manual-highlight-setting")]
+    [ProducesResponseType(typeof(ShiftSwapHighlightSettingDto), StatusCodes.Status200OK)]
+    public async Task<ActionResult<ShiftSwapHighlightSettingDto>> SaveManualHighlightSetting(
+        int containerId, int graphId, [FromBody] SaveShiftSwapHighlightSettingRequest request,
+        CancellationToken cancellationToken)
+    {
+        var color = ShiftSwapHighlightRules.NormalizeColor(request.HighlightColor, nameof(request.HighlightColor));
+        var schedule = await db.Schedules
+            .SingleOrDefaultAsync(item => item.Id == graphId && item.ContainerId == containerId, cancellationToken)
+            .ConfigureAwait(false)
+            ?? throw new KeyNotFoundException($"Graph with id {graphId} was not found.");
+        if (CreateEditLockConflictResult(containerId, graphId) is { } conflict) return conflict;
+        schedule.AcceptedManualShiftHighlightColor = color;
+        await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        return Ok(new ShiftSwapHighlightSettingDto { HighlightColor = color });
+    }
+
     [HttpGet("highlight-setting")]
     [ProducesResponseType(typeof(ShiftSwapHighlightSettingDto), StatusCodes.Status200OK)]
     public async Task<ActionResult<ShiftSwapHighlightSettingDto>> GetHighlightSetting(

@@ -1,4 +1,5 @@
 import { dateTimeFormat, t } from "@shared/i18n";
+import { pinGeneratedColumnsFirst } from "../model/graphColumnOrder";
 import { Fragment, useEffect, useState } from "react";
 import type { CSSProperties } from "react";
 import type { AvailabilityGroup } from "@entities/availability-groups/model/types";
@@ -123,7 +124,7 @@ function buildDefaultScheduleColumnOrder(
 function sanitizeScheduleColumnOrder(
   columnOrder: number[],
   graphEmployees: GraphEmployee[],
-  manualColumns: Array<{ id: number }>,
+  manualColumns: Array<{ id: number; source?: "generated-unfilled" }>,
 ) {
   const fallbackOrder = buildDefaultScheduleColumnOrder(graphEmployees, manualColumns);
   const validIds = new Set(fallbackOrder);
@@ -143,7 +144,7 @@ function sanitizeScheduleColumnOrder(
     }
   });
 
-  return nextOrder;
+  return pinGeneratedColumnsFirst(nextOrder, manualColumns.filter(column => column.source === "generated-unfilled").map(column => -column.id));
 }
 
 export function ContainerGraphProfileWorkspace({

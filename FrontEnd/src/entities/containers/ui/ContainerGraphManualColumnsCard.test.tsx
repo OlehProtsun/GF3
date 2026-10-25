@@ -7,12 +7,22 @@ import { ContainerGraphManualColumnsCard } from "./ContainerGraphManualColumnsCa
 
 beforeEach(() => setLanguage("en"));
 const employees = [{ id: 2, firstName: "Ada", lastName: "Lovelace", hasLoginAccount: true, isOnline: false }];
-const base = { columns: [], employees, year: 2026, month: 2, onAddColumn: vi.fn(), onDeleteColumn: vi.fn(), onPublishShift: vi.fn() };
+const base = { highlightColor: "#BAE6FD", highlightSettingDisabled: false, onOpenHighlightColorPicker: vi.fn(), columns: [], employees, year: 2026, month: 2, onAddColumn: vi.fn(), onDeleteColumn: vi.fn(), onPublishShift: vi.fn() };
 const column = { columnId: 4, label: "Do obsadzenia", cells: { "1": "08:00 - 12:00", "3": "Notes", "31": "08:00 - 12:00" } };
 const offer = { id: 20, manualColumnId: 4, dayOfMonth: 1, year: 2026, month: 2, fromTime: "08:00:00", toTime: "12:00:00", status: "open", isManagerCreated: true, visibility: "public" } as ShiftSwap;
 const pending = { allowPartialAcceptance: false, clientId: "pending-1", manualColumnId: 4, dayOfMonth: 2, fromTime: "08:00", toTime: "12:00" };
 
 describe("manual shifts card", () => {
+  test("color swatch supports keyboard and disabled unsaved graphs", async () => {
+    const open = vi.fn();
+    const view = render(<ContainerGraphManualColumnsCard {...base} onOpenHighlightColorPicker={open} />);
+    const swatch = screen.getByRole("button", { name: "Accepted manual shift highlight color" });
+    swatch.focus(); await userEvent.setup().keyboard("{Enter}");
+    expect(open).toHaveBeenCalledOnce();
+    expect(swatch.firstElementChild).toHaveStyle({ backgroundColor: "#BAE6FD" });
+    view.rerender(<ContainerGraphManualColumnsCard {...base} highlightSettingDisabled onOpenHighlightColorPicker={open} />);
+    expect(swatch).toBeDisabled();
+  });
   test("empty, add, delete and provenance uses source rather than name", () => {
     const onAddColumn = vi.fn(); const onDeleteColumn = vi.fn();
     const { rerender } = render(<ContainerGraphManualColumnsCard {...base} onAddColumn={onAddColumn} />);

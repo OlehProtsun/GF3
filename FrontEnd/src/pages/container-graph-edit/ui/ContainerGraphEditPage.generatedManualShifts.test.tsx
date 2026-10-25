@@ -20,7 +20,7 @@ const mocks = vi.hoisted(() => ({
   members: [{ id: 1, employeeId: 1, displayOrder: 0 }], empty: [],
   container: { id: 1, name: "Container" },
   generate: vi.fn(), save: vi.fn(), publish: vi.fn(), navigate: vi.fn(),
-  commit: vi.fn(), listStyles: vi.fn(),
+  commit: vi.fn(), listStyles: vi.fn(), graphById: vi.fn(),
   editor: null as EditorProps | null, queryClient: null as QueryClient | null,
 }));
 
@@ -50,7 +50,7 @@ vi.mock("@entities/containers", async importOriginal => {
     useGraphCellStylesQuery: () => query(mocks.styles),
     useGenerateGraphPreviewMutation: () => ({ mutate: mocks.generate, isPending: false }),
     useSaveGraphWorkspaceMutation: () => ({ mutate: mocks.save, isPending: false }),
-    containersApi: { ...actual.containersApi as object, listGraphCellStyles: mocks.listStyles, commitGraphVersion: mocks.commit },
+    containersApi: { ...actual.containersApi as object, graphById: mocks.graphById, listGraphCellStyles: mocks.listStyles, commitGraphVersion: mocks.commit },
     ContainerGraphEditor: (props: EditorProps) => {
       mocks.editor = props;
       return <div>
@@ -93,6 +93,7 @@ beforeEach(() => {
   mocks.save.mockImplementation((variables, callbacks) => callbacks.onSuccess({ graphId: variables.graphId ?? 1 }));
   mocks.publish.mockImplementation((_variables, callbacks) => callbacks.onSuccess({}));
   mocks.listStyles.mockResolvedValue([]); mocks.commit.mockResolvedValue({});
+  mocks.graphById.mockImplementation((_containerId, id) => Promise.resolve(mocks.graphs.find(graph => graph.id === id)));
 });
 const columns = () => mocks.editor!.manualColumns;
 const generate = async () => { fireEvent.click(screen.getByText("Generate")); await waitFor(() => expect(mocks.generate).toHaveBeenCalled()); };
@@ -103,6 +104,9 @@ test("preview displays generated matrix cell, repeats stably, saves provenance a
   expect(columns()).toHaveLength(1); expect(columns()[0].label).toBe("do obstawienia");
   expect(mocks.editor!.hasUnsavedChanges).toBe(true);
   expect(mocks.editor!.cellMap["-1:1"]).toBe("08:00 - 12:00");
+  expect(mocks.editor!.scheduleColumns[0].employeeId).toBe(-1);
+  act(() => mocks.editor!.onColumnMove?.(-1, 1));
+  expect(mocks.editor!.scheduleColumns[0].employeeId).toBe(-1);
   const original = structuredClone(columns());
   await generate(); expect(columns()).toEqual(original);
   expect(mocks.publish).not.toHaveBeenCalled();
@@ -112,6 +116,23 @@ test("preview displays generated matrix cell, repeats stably, saves provenance a
   expect(parseGraphNoteContent(savedNote).manualColumns[0].source).toBe("generated-unfilled");
   view.unmount(); mocks.graphs = [{ ...graph, note: savedNote }];
   render(<ContainerGraphEditPage />); expect(columns()).toEqual(original);
+});
+
+test("externally accepted shift refreshes clean editor and blocks a stale dirty save", async () => {
+  mocks.graphs[0].note = buildGraphNoteContent("", [{ id: 4, label: "Auto", source: "generated-unfilled", cells: { "1": "08:00 - 12:00" } }], [1, -4]);
+  const view = render(<ContainerGraphEditPage />);
+  const accepted = buildGraphNoteContent("", [{ id: 4, label: "Auto", source: "generated-unfilled", cells: {} }], [1, -4], [
+    { employeeId: -4, dayOfMonth: 1, backgroundColorArgb: -4528387, textColorArgb: null },
+  ]);
+  mocks.graphs = [{ ...mocks.graphs[0], note: accepted }];
+  view.rerender(<ContainerGraphEditPage />);
+  await waitFor(() => expect(mocks.editor!.styleMap["-4:1"].backgroundColorArgb).toBe(-4528387));
+  expect(columns()[0].cells).toEqual({});
+  act(() => mocks.editor!.onFieldChange("name", "Dirty name"));
+  mocks.graphById.mockResolvedValue({ ...mocks.graphs[0], lastUpdatedAtUtc: "2026-10-24T22:00:00Z" });
+  fireEvent.click(screen.getByText("Save editor")); fireEvent.click(screen.getByText("Confirm save"));
+  await waitFor(() => expect(screen.getByTestId("errors")).toHaveTextContent("Refresh before saving"));
+  expect(mocks.save).not.toHaveBeenCalled();
 });
 
 test.each(["error", "missing", "empty"])("failed or malformed %s preview keeps columns", async kind => {
@@ -171,7 +192,7 @@ test("only latest preview applies, with request form values and latest custom co
   expect(columns()).toEqual(current); expect(screen.getByTestId("errors")).toBeEmptyDOMElement();
 });
 
-test("removed generated columns clean only their selection and styles", async () => {
+test("styled generated columns retain empty cells, selection and custom columns", async () => {
   mocks.graphs[0].note = buildGraphNoteContent("", [
     { id: 4, label: "Auto", cells: { "1": "08:00 - 12:00" }, source: "generated-unfilled" },
     { id: 5, label: "Custom", cells: { "1": "Keep me" } },
@@ -183,9 +204,11 @@ test("removed generated columns clean only their selection and styles", async ()
   render(<ContainerGraphEditPage />);
   act(() => mocks.editor!.onSelectedCellKeysChange(["-4:1", "-5:1"]));
   await generate();
-  expect(columns().map(column => column.columnId)).toEqual([5]);
-  expect(mocks.editor!.selectedCellKeys).toEqual(["-5:1"]);
-  expect(mocks.editor!.styleMap["-4:1"]).toBeUndefined();
+  expect(columns().map(column => column.columnId)).toEqual([4, 5]);
+  expect(columns()[0].cells).toEqual({});
+  expect(mocks.editor!.scheduleColumns[0].employeeId).toBe(-4);
+  expect(mocks.editor!.selectedCellKeys).toEqual(["-4:1", "-5:1"]);
+  expect(mocks.editor!.styleMap["-4:1"].backgroundColorArgb).toBe(123);
   expect(mocks.editor!.styleMap["-5:1"].backgroundColorArgb).toBe(456);
 });
 

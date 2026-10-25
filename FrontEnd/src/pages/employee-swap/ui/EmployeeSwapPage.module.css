@@ -1579,4 +1579,14 @@
 }
 .offerCard .offerOpenButton:focus-visible { outline: 1px solid #729dff; outline-offset: -3px; border-radius: inherit; }
 .deepLinkedOffer .offerOpenButton:focus-visible { outline: none; }
-.offersSection .offerMeta, .historyPanel .offerMeta { padding-right: 32px; }
+.offersSection .offerMeta, .historyPanel .offerMeta { box-sizing: border-box; padding-right: 32px; }
+
+@media (max-height: 430px) and (min-width: 560px) {
+  .swapBody { top: 100px; bottom: 100px; padding-top: 0; }
+  .offersSection .offerToolbar { display: flex; align-items: center; gap: 6px; padding: 0 10px 4px; }
+  .offersSection .swapSearchField { flex: 1; min-width: 0; padding-inline: 8px; }
+  .offersSection .filterRow { flex-wrap: nowrap; gap: 3px; padding: 0; }
+  .offersSection .filterButton { padding-inline: 6px; }
+  .offersSection .searchResultText { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  .offersSection > .offerList { mask-image: none; -webkit-mask-image: none; }
+}

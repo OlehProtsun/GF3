@@ -4,6 +4,7 @@ import { fireEvent, render, screen, within } from "@testing-library/react";
 import { expect, test, vi } from "vitest";
 import userEvent from "@testing-library/user-event";
 import type { Graph, GraphEmployee, GraphSlot } from "../model/types";
+import { buildGraphNoteContent } from "../model/graphNote";
 import type { Employee } from "@entities/employees/model/types";
 import { ContainerGraphProfileWorkspace } from "./ContainerGraphProfileWorkspace";
 
@@ -22,6 +23,18 @@ const slots: GraphSlot[] = [
 ];
 const props = { graph, graphEmployees, slots, cellStyles: [], employeesById: new Map(employees.map(employee => [employee.id, employee])), compactSize: true, showManagementActions: false, isLoading: false, hasLoadError: false, isDeleting: false, onEdit: vi.fn(), onDelete: vi.fn() };
 function cards(container: HTMLElement) { return Array.from(container.querySelectorAll<HTMLDetailsElement>("[data-phone-schedule-summary] > details")); }
+
+test("legacy order pins a tagged empty generated column and displays accepted manual color", () => {
+  const note = buildGraphNoteContent("", [{ id: 7, label: "Generated", source: "generated-unfilled", cells: {} },
+    { id: 8, label: "do obstawienia", cells: { "1": "Text" } }], [2, -8, 5, -7], [
+    { employeeId: -7, dayOfMonth: 1, backgroundColorArgb: -4528387, textColorArgb: null },
+  ]);
+  render(<ContainerGraphProfileWorkspace {...props} graph={{ ...graph, note }} />);
+  const headers = screen.getAllByRole("columnheader");
+  expect(headers[0]).toHaveTextContent("Day"); expect(headers[1]).toHaveTextContent("Generated");
+  expect(headers[2]).toHaveTextContent("Anna Kowalska"); expect(headers[3]).toHaveTextContent("do obstawienia");
+  expect(screen.getByRole("button", { name: "Generated day 1" }).closest("td")).toHaveStyle({ backgroundColor: "#BAE6FD" });
+});
 
 test("phone sections have reading order, real metrics and a preserved read-only matrix", () => {
   const { container } = render(<ContainerGraphProfileWorkspace {...props} cellStyles={[{ id: 9, scheduleId: 3, dayOfMonth: 1, employeeId: 2, backgroundColorArgb: -65536 }]} />);

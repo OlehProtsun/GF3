@@ -89,9 +89,10 @@ for (const history of [false, true]) {
 test("logged-out direct link returns to the card after login", async ({ page }) => {
   await fixture(page, { authenticated: false }); await page.goto("/swap?swapId=25");
   await expect(page).toHaveURL(/\/login\?returnTo=%2Fswap%3FswapId%3D25$/);
-  await page.getByLabel("Username", { exact: true }).fill("target");
-  await page.getByLabel("Password", { exact: true }).fill("123456");
-  await page.getByRole("button", { name: "Sign in", exact: true }).click();
+  await page.getByLabel(/^(Username|Nazwa użytkownika)$/).fill("target");
+  await page.getByRole("button", { name: "PC", exact: true }).click();
+  await page.getByLabel(/^(Password|Hasło)$/).fill("123456");
+  await page.getByRole("button", { name: /^(Sign in|Zaloguj się)$/ }).click();
   await expect(page).toHaveURL(/\/swap\?swapId=25$/);
   await expect(page.getByRole("button", { name: "View offer details for Offer 25", exact: true })).toBeFocused();
 });

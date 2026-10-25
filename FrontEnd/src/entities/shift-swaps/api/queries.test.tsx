@@ -6,6 +6,8 @@ import { queryKeys } from "@shared/api/queryKeys";
 import { useState } from "react";
 import {
   useGraphShiftSwapHighlightSettingQuery,
+  useGraphManualShiftHighlightSettingQuery,
+  useSaveGraphManualShiftHighlightSettingMutation,
   useAcceptEmployeeShiftSwapMutation,
   useCancelEmployeeShiftSwapMutation,
   useCancelManagerManualShiftSwapMutation,
@@ -17,6 +19,8 @@ import {
 
 const apiMocks = vi.hoisted(() => ({
   getHighlightSetting: vi.fn(),
+  getManualHighlightSetting: vi.fn(),
+  saveManualHighlightSetting: vi.fn(),
   createEmployee: vi.fn(),
   acceptEmployee: vi.fn(),
   cancelEmployee: vi.fn(),
@@ -103,6 +107,21 @@ beforeEach(() => {
 });
 
 describe("shift swap query mutations", () => {
+  test("manual setting caches confirmed values independently and preserves them on failed save", async () => {
+    const client = new QueryClient();
+    apiMocks.getManualHighlightSetting.mockResolvedValue({ highlightColor: "#BAE6FD" });
+    apiMocks.saveManualHighlightSetting.mockResolvedValue({ highlightColor: "#AABBCC" });
+    const wrapper = ({ children }: { children: React.ReactNode }) => <QueryClientProvider client={client}>{children}</QueryClientProvider>;
+    const { result } = renderHook(() => ({ query: useGraphManualShiftHighlightSettingQuery(1, 2), mutation: useSaveGraphManualShiftHighlightSettingMutation() }), { wrapper });
+    await waitFor(() => expect(result.current.query.data?.highlightColor).toBe("#BAE6FD"));
+    result.current.mutation.mutate({ containerId: 1, graphId: 2, highlightColor: "#AABBCC" });
+    await waitFor(() => expect(result.current.query.data?.highlightColor).toBe("#AABBCC"));
+    expect(client.getQueryState(queryKeys.shiftSwaps.graphHighlightSetting(1, 2)).data).toBeUndefined();
+    apiMocks.saveManualHighlightSetting.mockRejectedValue(new Error("Conflict"));
+    result.current.mutation.mutate({ containerId: 1, graphId: 2, highlightColor: "#112233" });
+    await waitFor(() => expect(result.current.mutation.error).toBeTruthy());
+    expect(result.current.query.data?.highlightColor).toBe("#AABBCC");
+  });
   test("keeps candidate reads disabled without a draft and follows candidate pagination", async () => {
     apiMocks.listReturnCandidates.mockImplementation(async ({ page }: { page: number }) => ({ items: [{ slotId: page }], page, pageSize: 1, hasMore: page < 2 }));
     apiMocks.previewEmployee.mockResolvedValue({ isValid: true });

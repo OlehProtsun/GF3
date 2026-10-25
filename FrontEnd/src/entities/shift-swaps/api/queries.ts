@@ -67,6 +67,24 @@ export function useSaveGraphShiftSwapHighlightSettingMutation() {
   });
 }
 
+export const useGraphManualShiftHighlightSettingQuery = (containerId: number | null, graphId: number | null) =>
+  useQuery({
+    queryKey: queryKeys.shiftSwaps.graphManualHighlightSetting(containerId ?? 0, graphId ?? 0),
+    enabled: Number.isInteger(containerId) && containerId !== null && containerId > 0 && Number.isInteger(graphId) && graphId !== null && graphId > 0,
+    staleTime: 300_000,
+    queryFn: ({ signal }) => shiftSwapsApi.getManualHighlightSetting(containerId as number, graphId as number, signal),
+  });
+
+export function useSaveGraphManualShiftHighlightSettingMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ containerId, graphId, highlightColor }: { containerId: number; graphId: number; highlightColor: string }) =>
+      shiftSwapsApi.saveManualHighlightSetting(containerId, graphId, highlightColor),
+    onSuccess: (data, payload) =>
+      queryClient.setQueryData(queryKeys.shiftSwaps.graphManualHighlightSetting(payload.containerId, payload.graphId), data),
+  });
+}
+
 export const useContainerShiftSwapsQuery = (
   containerId: number | null,
   enabled = true,

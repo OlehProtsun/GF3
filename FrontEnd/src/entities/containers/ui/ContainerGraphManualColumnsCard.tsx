@@ -31,6 +31,9 @@ export type PendingManualColumnShiftPublication = ManualColumnShiftPublicationIn
 };
 
 type ContainerGraphManualColumnsCardProps = {
+  highlightColor: string;
+  highlightSettingDisabled: boolean;
+  onOpenHighlightColorPicker: () => void;
   columns: ManualColumnSummary[];
   allowSwap?: boolean;
   isSchedulePublished?: boolean;
@@ -76,6 +79,7 @@ function getEmployeeLabel(employee: Employee) {
 }
 
 export function ContainerGraphManualColumnsCard({
+  highlightColor, highlightSettingDisabled, onOpenHighlightColorPicker,
   columns, allowSwap = true, isSchedulePublished = true, year, month, employees,
   isPublishingShift = false, isCancellingPublishedShift = false, publishError = null,
   publishedShifts = [], pendingPublishedShifts = [], headerRightSlot,
@@ -119,6 +123,13 @@ export function ContainerGraphManualColumnsCard({
       icon={<span className={styles.calendarIcon}><InformationIcon size={18} /></span>}
       headerRightSlot={headerRightSlot}>
       <div className={styles.layout}>
+        <div className={styles.colorSetting}>
+          <span>{t("Accepted shift color")}</span>
+          <button type="button" className={styles.colorButton} aria-label={t("Accepted manual shift highlight color")}
+            disabled={highlightSettingDisabled} onClick={onOpenHighlightColorPicker}>
+            <span style={{ backgroundColor: highlightColor }} aria-hidden="true" />
+          </button>
+        </div>
         <p className={styles.muted}>{t("Select a shift and publish it for employees to claim.")}</p>
         <section className={styles.panel} aria-label={t("Columns")}>
           <div className={styles.heading}><span>{t("Columns")} <span className={styles.badge}>{columns.length}</span></span>

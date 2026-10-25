@@ -1237,7 +1237,7 @@ public sealed class ShiftSwapControllerWorkflowTests
             style.ScheduleId == fixture.ScheduleId &&
             style.EmployeeId == fixture.TargetEmployeeId &&
             style.DayOfMonth == 5);
-        Assert.Equal(-4458544, swapCellStyle.BackgroundColorArgb);
+        Assert.Equal(-4528387, swapCellStyle.BackgroundColorArgb);
         Assert.Contains("b64:", schedule.Note, StringComparison.Ordinal);
         Assert.DoesNotContain("\"5\"", DecodeGraphMetaSuffix(schedule.Note!));
     }
@@ -1289,7 +1289,7 @@ public sealed class ShiftSwapControllerWorkflowTests
             style.ScheduleId == fixture.ScheduleId &&
             style.EmployeeId == fixture.TargetEmployeeId &&
             style.DayOfMonth == 5);
-        Assert.Equal(-4458544, swapCellStyle.BackgroundColorArgb);
+        Assert.Equal(-4528387, swapCellStyle.BackgroundColorArgb);
         Assert.Contains("b64:", schedule.Note, StringComparison.Ordinal);
         Assert.StartsWith("Planner note", schedule.Note);
         using var before = System.Text.Json.JsonDocument.Parse(metadata);
@@ -1298,10 +1298,14 @@ public sealed class ShiftSwapControllerWorkflowTests
         Assert.Equal(2, manual.GetArrayLength());
         Assert.Equal(2, manual[0].GetArrayLength());
         Assert.Equal(before.RootElement.GetProperty("m")[1].GetRawText(), manual[1].GetRawText());
-        foreach (var key in new[] { "g", "o", "s", "t", "u", "extra" })
+        foreach (var key in new[] { "g", "o", "t", "u", "extra" })
         {
             Assert.Equal(before.RootElement.GetProperty(key).GetRawText(), after.RootElement.GetProperty(key).GetRawText());
         }
+        var manualStyle = Assert.Single(after.RootElement.GetProperty("s").EnumerateArray());
+        Assert.Equal(-2, manualStyle[0].GetInt32());
+        Assert.Equal(5, manualStyle[1].GetInt32());
+        Assert.Equal(-4528387, manualStyle[2].GetInt32());
     }
 
     [Fact]

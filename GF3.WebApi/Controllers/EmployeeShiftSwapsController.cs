@@ -324,6 +324,8 @@ public sealed class EmployeeShiftSwapsController(
                     reserved.Add(period);
                 }
                 swap.Schedule.Note = ConsumeManualColumnPeriodFromNote(swap.Schedule.Note, columnId, slot.DayOfMonth, claimedPeriod);
+                swap.Schedule.Note = UpsertManualColumnBackgroundColorInNote(swap.Schedule.Note, columnId,
+                    slot.DayOfMonth, ShiftSwapHighlightRules.ToArgb(swap.Schedule.AcceptedManualShiftHighlightColor));
             }
             var remainingSlots = ApplyAcceptedSwapPeriod(slot, swap.IsManagerCreated ? null : swap.FromEmployeeId, employeeId, claimedPeriod, swap.Schedule.Slots.ToList());
             foreach (var remainderSlot in remainingSlots) db.ScheduleSlots.Add(remainderSlot);
@@ -850,7 +852,8 @@ public sealed class EmployeeShiftSwapsController(
         int acceptingEmployeeId,
         CancellationToken cancellationToken)
     {
-        var highlightColorArgb = ShiftSwapHighlightRules.ToArgb(swap.Schedule.AcceptedSwapHighlightColor);
+        var highlightColorArgb = ShiftSwapHighlightRules.ToArgb(swap.IsManagerCreated
+            ? swap.Schedule.AcceptedManualShiftHighlightColor : swap.Schedule.AcceptedSwapHighlightColor);
         var affectedEmployeeIds = new HashSet<int> { acceptingEmployeeId };
         if (swap.FromEmployeeId.HasValue)
         {

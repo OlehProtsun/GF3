@@ -1,4 +1,5 @@
 import { manualShiftCapacity, intervalsFromCapacity, formatManualShiftIntervals, type ManualShiftReservation } from "./manualShiftIntervals";
+import { pinGeneratedColumnsFirst } from "./graphColumnOrder";
 import type { EditableGraphManualColumn } from "../ui/ContainerGraphEditor";
 import type { GraphSlot } from "./types";
 import { clampGraphYear, getGraphDaysInMonth, getGraphShiftMinimumStaffing, tryParseGraphShiftRange } from "./graphWorkspace";
@@ -50,12 +51,13 @@ export function deriveGeneratedVacancies(input: {
 
 export function reconcileGeneratedManualColumns(input: {
   vacancies: GeneratedVacancy[]; columns: EditableGraphManualColumn[]; columnOrder: number[]; reservations: ManualShiftReservation[];
+  retainedGeneratedColumnIds: ReadonlySet<number>;
 }): { columns: EditableGraphManualColumn[]; columnOrder: number[]; removedColumnIds: number[] } {
   const { columns, columnOrder, reservations } = input;
   const rank = (id: number) => { const index = columnOrder.indexOf(-id); return index < 0 ? columnOrder.length + columns.findIndex(c => c.columnId === id) : index; };
   const generated = columns.filter(c => c.source === "generated-unfilled").sort((a, b) => rank(a.columnId) - rank(b.columnId));
   const canonicalId = generated[0]?.columnId ?? Math.max(0, ...columns.map(c => c.columnId)) + 1;
-  const protectedIds = new Set(reservations.map(r => r.manualColumnId));
+  const protectedIds = new Set([...reservations.map(r => r.manualColumnId), ...input.retainedGeneratedColumnIds]);
   const keep = generated.filter(c => c.columnId === canonicalId || protectedIds.has(c.columnId))
     .map(c => ({ ...c, label: c.columnId === canonicalId ? "do obstawienia" : c.label, cells: {} as Record<string, string> }));
   if (!keep.length && input.vacancies.length) keep.push({ columnId: canonicalId, label: "do obstawienia", source: "generated-unfilled", cells: {} });
@@ -88,9 +90,12 @@ export function reconcileGeneratedManualColumns(input: {
     }
   }
   const surviving = new Map(keep.filter(c => Object.keys(c.cells).length || protectedIds.has(c.columnId)).map(c => [c.columnId, c]));
+  const survivingCanonical = keep.find(c => surviving.has(c.columnId));
+  if (survivingCanonical) survivingCanonical.label = "do obstawienia";
   const removedColumnIds = generated.filter(c => !surviving.has(c.columnId)).map(c => c.columnId);
   const removed = new Set(removedColumnIds.map(id => -id));
   const added = [...surviving.values()].filter(c => !columns.some(old => old.columnId === c.columnId));
   return { columns: [...columns.flatMap(c => c.source !== "generated-unfilled" ? [c] : surviving.has(c.columnId) ? [surviving.get(c.columnId)!] : []), ...added],
-    columnOrder: [...columnOrder.filter(id => !removed.has(id)), ...added.map(c => -c.columnId)], removedColumnIds };
+    columnOrder: pinGeneratedColumnsFirst([...columnOrder.filter(id => !removed.has(id)), ...added.map(c => -c.columnId)],
+      [...surviving.keys()].map(id => -id)), removedColumnIds };
 }

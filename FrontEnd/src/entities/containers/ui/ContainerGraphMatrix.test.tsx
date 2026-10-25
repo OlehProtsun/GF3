@@ -11,6 +11,21 @@ import { publicHolidaySettingsApi } from "@entities/public-holidays/api/publicHo
 
 beforeEnglishTest(() => setTestLanguage("en"));
 
+test("pinned generated headers cannot be dragged or receive a column drop", () => {
+  const onColumnMove = vi.fn();
+  const columns = [-7, 1, -8].map(employeeId => ({ employeeId, kind: employeeId < 0 ? "manual" as const : "employee" as const,
+    manualColumnId: employeeId < 0 ? -employeeId : null, graphEmployeeId: null, label: String(employeeId), minHoursMonth: null, totalMinutes: 0, totalText: "" }));
+  render(<ContainerGraphMatrix graph={{ year: 2026, month: 1 }} columns={columns} cellMap={{}}
+    pinnedColumnIds={new Set([-7])} onColumnMove={onColumnMove} />);
+  const pinned = screen.getByRole("columnheader", { name: "-7" });
+  const employee = screen.getByRole("columnheader", { name: "1" });
+  expect(pinned).toHaveAttribute("draggable", "false");
+  expect(employee).toHaveAttribute("draggable", "true");
+  fireEvent.dragStart(employee, { dataTransfer: { setData: vi.fn() } });
+  fireEvent.drop(pinned);
+  expect(onColumnMove).not.toHaveBeenCalled();
+});
+
 describe("public holiday dates", () => {
   test.each([1, 5])("marks named dates in month %s without changing explicit styles or selection", month => {
     const { container } = render(<ContainerGraphMatrix graph={{ year: 2026, month }}

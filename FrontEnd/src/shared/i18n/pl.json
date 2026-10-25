@@ -2127,5 +2127,12 @@
   "No offered shifts.": "Brak oferowanych zmian.",
   "Remove shift on {0}": "Usuń zmianę w dniu {0}",
   "Cancel shift on {0}": "Anuluj zmianę w dniu {0}",
-  "The generated schedule returned no slots. Please try again.": "Wygenerowany grafik nie zawiera zmian. Spróbuj ponownie."
+  "The generated schedule returned no slots. Please try again.": "Wygenerowany grafik nie zawiera zmian. Spróbuj ponownie.",
+  "Accepted shift color": "Kolor przyjętej zmiany",
+  "Accepted manual shift highlight color": "Kolor wyróżnienia przyjętej ręcznej zmiany",
+  "Choose accepted shift color": "Wybierz kolor przyjętej zmiany",
+  "Accepted manual shift highlight hex color": "Kolor HEX wyróżnienia przyjętej ręcznej zmiany",
+  "Could not save the accepted manual shift highlight color.": "Nie udało się zapisać koloru przyjętej ręcznej zmiany.",
+  "Could not load the accepted manual shift highlight color.": "Nie udało się wczytać koloru przyjętej ręcznej zmiany.",
+  "This schedule changed during another request. Refresh before saving.": "Ten grafik został zmieniony w innym żądaniu. Odśwież przed zapisaniem."
 }

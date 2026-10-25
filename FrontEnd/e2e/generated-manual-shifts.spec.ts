@@ -2,6 +2,58 @@ import { expect, test, type Page } from "@playwright/test";
 
 test.use({ actionTimeout: 10_000, launchOptions: process.platform === "win32" ? { ignoreDefaultArgs: ["--disable-accelerated-compositing"] } : {} });
 
+test("real backend manual acceptance persists and refreshes both colored cells", async ({ browser }, testInfo) => {
+  test.skip(!process.env.GF3_LIVE_URL, "Run through ManualShiftHighlightTests with GF3_RUN_LIVE_BROWSER=1 for an isolated authenticated SQLite backend.");
+  test.setTimeout(90_000);
+  const url = process.env.GF3_LIVE_URL!;
+  const graphId = Number(process.env.GF3_LIVE_GRAPH);
+  const containerId = Number(process.env.GF3_LIVE_CONTAINER);
+  const day = testInfo.project.name === "chromium" ? 10 : 11;
+  const graphPath = `/api/containers/${containerId}/graphs/${graphId}`;
+  const manager = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+  const employee = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  try {
+    for (const [context, token] of [[manager, process.env.GF3_LIVE_MANAGER_TOKEN!], [employee, process.env.GF3_LIVE_EMPLOYEE_TOKEN!]] as const) {
+      await context.addInitScript(value => localStorage.setItem("gf3.auth.access-token", value), token);
+    }
+    const managerPage = await manager.newPage();
+    await managerPage.goto(`${url}/container/${containerId}/graphs/${graphId}/edit`);
+    await managerPage.getByRole("button", { name: "Collapse sidebar", exact: true }).click();
+    await managerPage.getByRole("button", { name: "Expand Manual shifts", exact: true }).click();
+    const swatch = managerPage.getByRole("button", { name: "Accepted manual shift highlight color", exact: true });
+    await swatch.click();
+    await managerPage.getByRole("textbox", { name: "Accepted manual shift highlight hex color" }).fill("#99F6E4");
+    await managerPage.getByRole("button", { name: "Use color", exact: true }).click();
+    await expect(managerPage.getByRole("dialog", { name: "Choose accepted shift color" })).toHaveCount(0);
+    const headers = managerPage.locator('table thead th');
+    await expect(headers.nth(1).locator("input")).toHaveValue("Generated");
+    await expect(headers.nth(1)).toHaveAttribute("draggable", "false");
+    // The editor holds the edit lock; publish through the same authenticated manager session after leaving it.
+    await managerPage.goto(`${url}/container/${containerId}/graphs/${graphId}`);
+    const auth = { Authorization: `Bearer ${process.env.GF3_LIVE_MANAGER_TOKEN}` };
+    const offered = await manager.request.post(`${url}${graphPath}/shift-swaps/manual`, { headers: auth,
+      data: { manualColumnId: 7, dayOfMonth: day, fromTime: "09:00", toTime: "17:00" } });
+    expect(offered.ok(), await offered.text()).toBe(true);
+    const employeePage = await employee.newPage();
+    await employeePage.goto(`${url}/swap`);
+    await employeePage.getByRole("button", { name: "View offer details for Source" }).click();
+    await employeePage.getByRole("dialog", { name: "Offer details" }).getByRole("button", { name: "Accept shift", exact: true }).click();
+    await employeePage.getByRole("dialog", { name: "Accept this shift?" }).getByRole("button", { name: "Accept shift", exact: true }).click();
+    await expect(employeePage.getByRole("dialog", { name: "Accept this shift?" })).toHaveCount(0);
+    const cell = managerPage.getByRole("button", { name: `Generated day ${day}`, exact: true });
+    await expect(cell.locator("xpath=ancestor::td")).toHaveCSS("background-color", "rgb(153, 246, 228)", { timeout: 15_000 });
+    const recipient = managerPage.getByRole("button", { name: `Worker2 Test day ${day}`, exact: true });
+    await expect(recipient.locator("xpath=ancestor::td")).toHaveCSS("background-color", "rgb(153, 246, 228)");
+    await managerPage.reload();
+    await expect(cell.locator("xpath=ancestor::td")).toHaveCSS("background-color", "rgb(153, 246, 228)");
+    const detail = await manager.request.get(`${url}${graphPath}`, { headers: auth });
+    const graph = await detail.json();
+    const encoded = graph.note.split("[[GF3_GRAPH_META:b64:")[1].slice(0, -2);
+    const meta = JSON.parse(Buffer.from(encoded, "base64url").toString("utf8"));
+    expect(meta.s.find((entry: number[]) => entry[0] === -7 && entry[1] === day)[2]).toBe(-6687004);
+  } finally { await manager.close(); await employee.close(); }
+});
+
 async function fixture(page: Page, language: string, availableShiftCount?: number, claimFlow = false) {
   page.on("pageerror", error => console.error(error.message));
   const employees = [1, 2].map(id => ({ id, firstName: "Worker", lastName: `Test ${id}`, hasLoginAccount: true, isOnline: false }));
@@ -22,6 +74,7 @@ async function fixture(page: Page, language: string, availableShiftCount?: numbe
   const slots: unknown[] = [];
   const offers: Record<string, unknown>[] = [];
   const publications: unknown[] = [];
+  let manualHighlightColor = "#BAE6FD";
   const assignments = employees.map(employee => ({ id: employee.id, scheduleId: 1, employeeId: employee.id, displayOrder: employee.id - 1 }));
   await page.addInitScript(() => localStorage.setItem("gf3.auth.access-token", "fixture-token"));
   await page.route("**/api/**", async route => {
@@ -91,12 +144,35 @@ async function fixture(page: Page, language: string, availableShiftCount?: numbe
     if (path === "/api/availability-groups/1/members") return json(employees.map(employee => ({ id: employee.id, employeeId: employee.id, displayOrder: employee.id - 1 })));
     if (path === "/api/containers/1/graphs/1/employees") return json(assignments);
     if (path === "/api/containers/1/graphs/1/slots") return json(slots);
-    if (path.endsWith("highlight-setting")) return json({ acceptedSwapHighlightColor: "#DBEAFE" });
+    if (path.endsWith("/shift-swaps/manual-highlight-setting")) {
+      if (method === "PUT") manualHighlightColor = request.postDataJSON().highlightColor;
+      return json({ highlightColor: manualHighlightColor });
+    }
+    if (path.endsWith("highlight-setting")) return json({ highlightColor: "#DBEAFE" });
     if (path.includes("notepad")) return json({ notes: [], state: { isExpanded: false, isPinned: false, height: 700 } });
     return json([]);
   });
   return { publications, claims, offers, useEmployee: (id: number) => { actor = id; } };
 }
+
+test("manual color retains confirmed value when the server rejects saving", async ({ page }) => {
+  await fixture(page, "en", 0);
+  await page.route("**/shift-swaps/manual-highlight-setting", route => route.request().method() === "PUT"
+    ? route.fulfill({ status: 409, contentType: "application/problem+json", body: JSON.stringify({ title: "Color conflict", detail: "Color conflict" }) })
+    : route.fallback());
+  await page.goto("/container/1/graphs/1/edit");
+  await page.getByRole("button", { name: "Collapse sidebar", exact: true }).click();
+  await page.getByRole("button", { name: "Expand Manual shifts", exact: true }).click();
+  const swatch = page.getByRole("button", { name: "Accepted manual shift highlight color", exact: true });
+  await swatch.click();
+  await page.getByRole("textbox", { name: "Accepted manual shift highlight hex color" }).fill("#AABBCC");
+  await page.getByRole("button", { name: "Use color", exact: true }).click();
+  await expect(page.getByRole("main").getByText("Color conflict", { exact: true })).toBeVisible();
+  await expect(page.getByRole("dialog", { name: "Choose accepted shift color" })).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("dialog", { name: "Choose accepted shift color" })).toHaveCount(0);
+  await expect(swatch.locator("span")).toHaveCSS("background-color", "rgb(186, 230, 253)");
+});
 
 for (const count of [0, 1, 5, 30, 62]) {
   test(`manual shifts bounded list with ${count} shifts`, async ({ page, browserName }, testInfo) => {
@@ -172,6 +248,15 @@ for (const language of ["en", "pl", "uk"]) {
     const card = page.locator("section").filter({ has: page.getByText(new RegExp(`^${titles[language as keyof typeof titles]}`)) }).last();
     await page.getByRole("button", { name: /Expand Manual shifts|Rozwiń Zmiany ręczne|Розгорнути Ручні зміни/, exact: true }).click();
     await expect(card).toBeVisible();
+    const colorLabels = {
+      en: { swatch: "Accepted manual shift highlight color", input: "Accepted manual shift highlight hex color", use: "Use color" },
+      pl: { swatch: "Kolor wyróżnienia przyjętej ręcznej zmiany", input: "Kolor HEX wyróżnienia przyjętej ręcznej zmiany", use: "Zastosuj kolor" },
+      uk: { swatch: "Колір виділення прийнятої ручної зміни", input: "HEX-колір виділення прийнятої ручної зміни", use: "Застосувати колір" },
+    }[language as "en" | "pl" | "uk"];
+    await card.getByRole("button", { name: colorLabels.swatch }).click();
+    await page.getByRole("textbox", { name: colorLabels.input }).fill("#99F6E4");
+    await page.getByRole("button", { name: colorLabels.use, exact: true }).click();
+    await expect(card.getByRole("button", { name: colorLabels.swatch }).locator("span")).toHaveCSS("background-color", "rgb(153, 246, 228)");
     const rows = card.locator('button[aria-pressed]').filter({ hasText: "08:00–12:00" });
     await expect(rows).toHaveCount(2);
     for (const width of [1280, 375, 390, 430, 320]) {

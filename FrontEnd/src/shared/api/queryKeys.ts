@@ -51,6 +51,7 @@ export const queryKeys = {
     correctionSettings: () => ["shiftSwaps", "correctionSettings"] as const,
     graphLog: (containerId: number, graphId: number) => ["shiftSwaps", "graphLog", containerId, graphId] as const,
     graphHighlightSetting: (containerId: number, graphId: number) => ["shiftSwaps", "graphHighlightSetting", containerId, graphId] as const,
+    graphManualHighlightSetting: (containerId: number, graphId: number) => ["shiftSwaps", "graphManualHighlightSetting", containerId, graphId] as const,
     container: (containerId: number) => ["shiftSwaps", "container", containerId] as const,
   },
   workflowLogs: {
