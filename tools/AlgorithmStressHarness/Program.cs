@@ -9,6 +9,12 @@ using BusinessLogicLayer.Contracts.Enums;
 using BusinessLogicLayer.Contracts.Models;
 using BusinessLogicLayer.Generators;
 
+if (args.Any(argument => argument.StartsWith("--", StringComparison.Ordinal)))
+{
+    Environment.ExitCode = await SqliteReplaySource.RunAsync(args);
+    return;
+}
+
 var apiBase = args.Length > 0 ? args[0] : "http://localhost:54295";
 var containerId = args.Length > 1 && int.TryParse(args[1], out var parsedContainerId) ? parsedContainerId : 2;
 var graphId = args.Length > 2 && int.TryParse(args[2], out var parsedGraphId) ? parsedGraphId : 5;

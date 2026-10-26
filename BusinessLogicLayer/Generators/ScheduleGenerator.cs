@@ -1029,6 +1029,10 @@ namespace BusinessLogicLayer.Generators
                 }
             }
 
+            ImproveMinimumHoursWithFixedIntervals(schedule, minHours, unavailable, explicitFullDayAvailability,
+                availStartMin, availEndMin, assigned, slotFromMin, slotToMin, slotHours, totalHours,
+                shiftsPerDay, fullDaysCount, daysInMonth, shiftCount, pps, stride, ct);
+
             progress?.Report(100);
 
             // Convert to ScheduleSlotModel list
@@ -1064,6 +1068,114 @@ namespace BusinessLogicLayer.Generators
             }
 
             return result;
+        }
+
+        private static void ImproveMinimumHoursWithFixedIntervals(
+            ScheduleModel schedule, double[] minHours, bool[] unavailable, bool[] explicitFullDayAvailability,
+            int[] availStartMin, int[] availEndMin, int[] assigned, int[] slotFromMin, int[] slotToMin,
+            double[] slotHours, double[] totalHours, int[] shiftsPerDay, int[] fullDaysCount,
+            int daysInMonth, int shiftCount, int pps, int stride, CancellationToken ct)
+        {
+            var n = minHours.Length;
+            var positionsPerDay = shiftCount * pps;
+            // Coverage is already optimized. Reassign only fixed worked intervals, accepting
+            // a strict improvement in the existing minimum-deficit/squared-deficit priorities.
+            // This also permits fairer distribution when all minimum targets are infeasible.
+            for (var pass = 0; pass < daysInMonth * 2; pass++)
+            {
+                ct.ThrowIfCancellationRequested();
+                var hasDeficit = false;
+                for (var emp = 0; emp < n; emp++) hasDeficit |= minHours[emp] > totalHours[emp] + EPS;
+                if (!hasDeficit) return;
+                var changed = false;
+                for (var pos = 0; pos < assigned.Length; pos++)
+                {
+                    ct.ThrowIfCancellationRequested();
+                    var donor = assigned[pos];
+                    if (donor < 0 || slotHours[pos] <= EPS) continue;
+                    for (var receiver = 0; receiver < n; receiver++)
+                    {
+                        if (receiver == donor || !Improves(donor, receiver, -slotHours[pos])) continue;
+                        SetEmployee(pos, -1);
+                        if (CanReceive(receiver, pos))
+                        {
+                            SetEmployee(pos, receiver);
+                            changed = true;
+                            break;
+                        }
+                        SetEmployee(pos, donor);
+                    }
+                }
+                if (changed) continue;
+                for (var first = 0; first < assigned.Length && !changed; first++)
+                {
+                    ct.ThrowIfCancellationRequested();
+                    var firstEmp = assigned[first];
+                    if (firstEmp < 0 || slotHours[first] <= EPS) continue;
+                    for (var second = first + 1; second < assigned.Length; second++)
+                    {
+                        var secondEmp = assigned[second];
+                        if (secondEmp < 0 || firstEmp == secondEmp || slotHours[second] <= EPS
+                            || !Improves(firstEmp, secondEmp, slotHours[second] - slotHours[first])) continue;
+                        SetEmployee(first, -1);
+                        SetEmployee(second, -1);
+                        if (CanReceive(secondEmp, first) && CanReceive(firstEmp, second))
+                        {
+                            SetEmployee(first, secondEmp);
+                            SetEmployee(second, firstEmp);
+                            changed = true;
+                            break;
+                        }
+                        SetEmployee(first, firstEmp);
+                        SetEmployee(second, secondEmp);
+                    }
+                }
+                if (!changed) return;
+            }
+
+            bool Improves(int first, int second, double firstDelta)
+            {
+                var beforeFirst = Math.Max(0, minHours[first] - totalHours[first]);
+                var beforeSecond = Math.Max(0, minHours[second] - totalHours[second]);
+                var afterFirst = Math.Max(0, minHours[first] - totalHours[first] - firstDelta);
+                var afterSecond = Math.Max(0, minHours[second] - totalHours[second] + firstDelta);
+                var before = beforeFirst + beforeSecond;
+                var after = afterFirst + afterSecond;
+                return after < before - EPS || Math.Abs(after - before) <= EPS
+                    && afterFirst * afterFirst + afterSecond * afterSecond < beforeFirst * beforeFirst + beforeSecond * beforeSecond - EPS;
+            }
+
+            bool CanReceive(int emp, int pos)
+            {
+                var day = pos / positionsPerDay + 1;
+                var shift = pos % positionsPerDay / pps;
+                var availability = day * n + emp;
+                if (unavailable[availability] || slotFromMin[pos] < availStartMin[availability]
+                    || slotToMin[pos] > availEndMin[availability]
+                    || IsEmployeeInShift(assigned, day, shift, pps, shiftCount, emp)) return false;
+                var dayBase = (day - 1) * positionsPerDay;
+                for (var other = dayBase; other < dayBase + positionsPerDay; other++)
+                    if (assigned[other] == emp && slotFromMin[pos] < slotToMin[other] && slotFromMin[other] < slotToMin[pos]) return false;
+                return CanAddShiftOrderIndependent(schedule, emp, day, slotHours[pos], minHours, totalHours,
+                    shiftsPerDay, fullDaysCount, explicitFullDayAvailability, daysInMonth, shiftCount, stride);
+            }
+
+            void SetEmployee(int pos, int employee)
+            {
+                var day = pos / positionsPerDay + 1;
+                var previous = assigned[pos];
+                if (previous >= 0)
+                {
+                    totalHours[previous] -= slotHours[pos];
+                    if (shiftsPerDay[previous * stride + day]-- == 2) fullDaysCount[previous]--;
+                }
+                assigned[pos] = employee;
+                if (employee >= 0)
+                {
+                    totalHours[employee] += slotHours[pos];
+                    if (shiftsPerDay[employee * stride + day]++ == 1 && shiftCount >= 2) fullDaysCount[employee]++;
+                }
+            }
         }
 
         // =========================
@@ -3790,7 +3902,11 @@ namespace BusinessLogicLayer.Generators
                 pps,
                 n);
 
-            if (optimizedMetrics.IsBetterThan(currentMetrics))
+            // Pair materialization can extend a single-shift option past its template boundary.
+            // Check actual hours before accepting the plan rather than trusting option estimates.
+            if (optimizedMetrics.IsBetterThan(currentMetrics)
+                && (schedule.MaxHoursPerEmpMonth <= 0
+                    || Array.TrueForAll(totalHours, hours => hours <= schedule.MaxHoursPerEmpMonth + EPS)))
                 return true;
 
             Array.Copy(assignedBackup, assigned, assigned.Length);
@@ -6383,7 +6499,16 @@ namespace BusinessLogicLayer.Generators
             var lowerBoundary = Math.Max(sh1.StartMin, a2Start);
             var upperBoundary = Math.Min(sh2.EndMin, a1End);
             if (upperBoundary < lowerBoundary)
-                return false;
+            {
+                // A real gap between workers' windows is valid partial coverage. Keeping their
+                // clipped intervals also prevents exact-day materialization from emitting templates
+                // for an unresolved pair while recording zero internal hours.
+                from1 = Math.Max(sh1.StartMin, a1Start);
+                to1 = Math.Min(sh1.EndMin, a1End);
+                from2 = Math.Max(sh2.StartMin, a2Start);
+                to2 = Math.Min(sh2.EndMin, a2End);
+                return to1 > from1 && to2 > from2 && (to1 <= from2 || to2 <= from1);
+            }
 
             var boundary = Clamp(sh2.StartMin, lowerBoundary, upperBoundary);
 

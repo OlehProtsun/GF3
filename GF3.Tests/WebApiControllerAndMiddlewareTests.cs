@@ -32,6 +32,57 @@ namespace GF3.Tests;
 public sealed class WebApiControllerAndMiddlewareTests
 {
     [Fact]
+    public async Task GenerationController_PreservesRoutesDefaultsCountersAndEditLocks()
+    {
+        var defaults = new WebApi.Contracts.Containers.Graphs.GenerateGraphRequest();
+        Assert.True(defaults.Overwrite);
+        Assert.True(defaults.ReturnSlots);
+        Assert.False(defaults.DryRun);
+        var auth = Assert.Single(typeof(ContainersController).GetCustomAttributes(typeof(Microsoft.AspNetCore.Authorization.AuthorizeAttribute), true)
+            .Cast<Microsoft.AspNetCore.Authorization.AuthorizeAttribute>());
+        Assert.Equal(AuthRoles.Manager, auth.Roles);
+        Assert.Equal("{containerId:int}/graphs/generate-preview", typeof(ContainersController).GetMethod(nameof(ContainersController.GenerateGraphPreview))!
+            .GetCustomAttributes(typeof(HttpPostAttribute), true).Cast<HttpPostAttribute>().Single().Template);
+        Assert.Equal("{containerId:int}/graphs/{graphId:int}/generate", typeof(ContainersController).GetMethod(nameof(ContainersController.GenerateGraph))!
+            .GetCustomAttributes(typeof(HttpPostAttribute), true).Cast<HttpPostAttribute>().Single().Template);
+        await using var database = await SqliteTestDatabase.CreateAsync();
+        var (containerId, graphId, employeeId) = await ContainerServiceTests.SeedGenerationAsync(database);
+        await using var context = database.CreateContext();
+        var service = ContainerServiceTests.CreateService(context, new BusinessLogicLayer.Generators.ScheduleGenerator());
+        var locks = new WebApi.Realtime.ManagerEditLockService();
+        var controller = new ContainersController(service, new NoopWorkflowLogService(), new NoopRealtimeNotifier(), locks);
+        SetManagerHttpContext(controller, 1);
+        locks.SetLocks("other", 2, "synthetic", [WebApi.Realtime.ManagerEditLockTargets.Schedule(containerId, graphId)]);
+        var before = await ContainerServiceTests.GenerationSnapshotAsync(database);
+        var conflict = await controller.GenerateGraph(containerId, graphId, defaults, default);
+        Assert.Equal(409, Assert.IsType<ConflictObjectResult>(conflict.Result).StatusCode);
+        var dry = await controller.GenerateGraph(containerId, graphId,
+            new WebApi.Contracts.Containers.Graphs.GenerateGraphRequest { DryRun = true, ReturnSlots = false }, default);
+        var result = Assert.IsType<WebApi.Contracts.Containers.Graphs.GenerateGraphResponse>(Assert.IsType<OkObjectResult>(dry.Result).Value);
+        Assert.Equal(56, result.GeneratedSlotsCount);
+        Assert.Equal(0, result.WrittenSlotsCount);
+        Assert.Equal(56, result.Slots!.Count());
+        var preview = await controller.GenerateGraphPreview(containerId, new()
+        {
+            GraphId = graphId,
+            Graph = new()
+            {
+                ShopId = (await service.GetGraphByIdAsync(containerId, graphId))!.ShopId, Name = "synthetic", Year = 2026, Month = 2,
+                PeoplePerShift = 1, Shift1Time = "08:00 - 16:00", Shift2Time = "16:00 - 20:00",
+                MaxHoursPerEmpMonth = 400, MaxConsecutiveDays = 31, MaxConsecutiveFull = 31, MaxFullPerMonth = 31
+            },
+            Employees = [new() { EmployeeId = employeeId }]
+        }, default);
+        Assert.Equal(0, Assert.IsType<WebApi.Contracts.Containers.Graphs.GenerateGraphResponse>(Assert.IsType<OkObjectResult>(preview.Result).Value).WrittenSlotsCount);
+        Assert.Equal(before, await ContainerServiceTests.GenerationSnapshotAsync(database));
+        locks.ReleaseConnection("other");
+        var saved = await controller.GenerateGraph(containerId, graphId, new() { ReturnSlots = false }, default);
+        var savedResult = Assert.IsType<WebApi.Contracts.Containers.Graphs.GenerateGraphResponse>(Assert.IsType<OkObjectResult>(saved.Result).Value);
+        Assert.Null(savedResult.Slots);
+        Assert.True(savedResult.WrittenSlotsCount > 0);
+    }
+
+    [Fact]
     public async Task ApiExceptionFilter_MapsValidationExceptions_ToBadRequestProblem()
     {
         var httpContext = CreateHttpContext();

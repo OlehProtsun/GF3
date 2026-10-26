@@ -2,7 +2,9 @@ import { useLanguageRevision } from "@shared/i18n/useLanguageRevision";
 import { usePublicHolidayVisibility } from "@app/providers/PublicHolidayVisibilityProvider";
 import { getPolishPublicHoliday, type PolishPublicHoliday } from "@shared/lib/polishPublicHolidays";
 import { t } from "@shared/i18n";
-import { memo, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useEffect, useId, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { getManualShiftCellPreview } from "../model/manualShiftIntervals";
 import type { CSSProperties, ClipboardEvent, DragEvent, FocusEvent, KeyboardEvent, MouseEvent, ReactNode } from "react";
 import {
   GRAPH_EMPTY_MARK,
@@ -129,6 +131,7 @@ type MatrixColumnResizeSession = {
 type MatrixEditorSelectionBehavior = "select-all" | "caret-end";
 
 type MatrixValueCellProps = {
+  isManualColumn: boolean;
   cellKey: string;
   employeeId: number;
   dayOfMonth: number;
@@ -385,6 +388,7 @@ const MatrixDayCell = memo(function MatrixDayCell({
 });
 
 const MatrixValueCell = memo(function MatrixValueCell({
+  isManualColumn,
   cellKey,
   employeeId,
   dayOfMonth,
@@ -444,6 +448,65 @@ const MatrixValueCell = memo(function MatrixValueCell({
       ? t("{0}. Click for details.", cellTitle)
       : cellTitle;
   const isInlineEditing = !readOnly && editMode === "inline";
+  const preview = isManualColumn && !isEmpty && !isEditing && !isInlineEditing && !hasVisualHint && !trimmedMutedSuffix
+    ? getManualShiftCellPreview(value) : null;
+  const moreRef = useRef<HTMLButtonElement>(null);
+  const tooltipRef = useRef<HTMLDivElement>(null);
+  const closeTimer = useRef<number | null>(null);
+  const tooltipId = useId();
+  const [popup, setPopup] = useState<{ value: string; mode: "hover" | "click"; left: number; top: number; width: number; maxHeight: number } | null>(null);
+  const popupOpen = Boolean(popup && popup.value === value && preview);
+  const cancelClose = () => {
+    if (closeTimer.current !== null) window.clearTimeout(closeTimer.current);
+    closeTimer.current = null;
+  };
+  const closePopup = () => { cancelClose(); setPopup(null); };
+  const scheduleClose = () => {
+    cancelClose();
+    closeTimer.current = window.setTimeout(() => setPopup(null), 150);
+  };
+  const openPopup = (mode: "hover" | "click" = "hover") => {
+    cancelClose();
+    const trigger = moreRef.current;
+    if (!trigger?.isConnected || !preview) return closePopup();
+    const rect = trigger.getBoundingClientRect();
+    if (!rect.width || !rect.height || !Number.isFinite(rect.left + rect.top)) return closePopup();
+    const width = Math.min(220, window.innerWidth - 16);
+    const below = window.innerHeight - rect.bottom - 14;
+    const above = rect.top - 14;
+    const preferBelow = below >= Math.min(320, preview.remaining.length * 28 + 16) || below >= above;
+    const maxHeight = Math.max(1, Math.min(320, preferBelow ? below : above));
+    const height = Math.min(maxHeight, preview.remaining.length * 28 + 16);
+    setPopup({ value, mode, width, maxHeight,
+      left: Math.max(8, Math.min(rect.left, window.innerWidth - width - 8)),
+      top: preferBelow ? rect.bottom + 6 : Math.max(8, rect.top - height - 6),
+    });
+  };
+  useEffect(() => {
+    if (!popupOpen) return;
+    const close = () => setPopup(null);
+    const outside = (event: globalThis.PointerEvent) => {
+      if (!moreRef.current?.contains(event.target as Node) && !tooltipRef.current?.contains(event.target as Node)) close();
+    };
+    const scroll = (event: Event) => {
+      if (!(event.target instanceof Node) || !tooltipRef.current?.contains(event.target)) close();
+    };
+    const escape = (event: globalThis.KeyboardEvent) => { if (event.key === "Escape") close(); };
+    document.addEventListener("pointerdown", outside);
+    document.addEventListener("keydown", escape);
+    window.addEventListener("scroll", scroll, true);
+    window.addEventListener("resize", close);
+    return () => {
+      document.removeEventListener("pointerdown", outside);
+      document.removeEventListener("keydown", escape);
+      window.removeEventListener("scroll", scroll, true);
+      window.removeEventListener("resize", close);
+    };
+  }, [popupOpen]);
+  useEffect(() => () => {
+    if (closeTimer.current !== null) window.clearTimeout(closeTimer.current);
+    setPopup(null);
+  }, [value, isEditing]);
   const isSelectionOnlyReadOnlyCell = readOnly && selectionEnabled;
   const isDangerEmpty = isEmpty && emptyCellVariant === "danger";
   const isInteractiveVisualHint = hasVisualHint && Boolean(onVisualHintClick);
@@ -542,7 +605,42 @@ const MatrixValueCell = memo(function MatrixValueCell({
       data-cell-key={interactionEnabled ? cellKey : undefined}
     >
       <div className={styles.cellSurface}>
-        {readOnly && !isSelectionOnlyReadOnlyCell ? (
+        {preview ? (
+          <div className={styles.manualShiftValue}>
+            {readOnly && !isSelectionOnlyReadOnlyCell ? (
+              <span className={joinClassNames(styles.manualShiftPrimary, styles.manualShiftPrimaryTarget)} title={value}>{preview.first}</span>
+            ) : (
+              <button type="button" ref={onFocusTargetRef}
+                className={joinClassNames(styles.cellButton, styles.manualShiftPrimary, styles.manualShiftPrimaryTarget)}
+                aria-label={t("{0} day {1}", columnLabel, dayOfMonth)} aria-invalid={Boolean(error)} title={value}>
+                {preview.first}
+              </button>
+            )}
+            <span>, </span>
+            <button type="button" ref={moreRef} className={styles.manualShiftMoreButton}
+              aria-label={`${t("More")}: ${t("Shifts")}`} aria-expanded={popupOpen}
+              aria-controls={popupOpen ? tooltipId : undefined}
+              onPointerEnter={event => { if (event.pointerType === "mouse") { if (popupOpen) cancelClose(); else openPopup(); } }}
+              onPointerLeave={event => { if (event.pointerType === "mouse") scheduleClose(); }}
+              onPointerDown={event => event.stopPropagation()} onMouseDown={event => event.stopPropagation()}
+              onDoubleClick={event => event.stopPropagation()}
+              onClick={event => { event.stopPropagation(); if (popupOpen && popup?.mode === "click") closePopup(); else openPopup("click"); }}
+              onKeyDown={event => { event.stopPropagation(); if (event.key === "Escape") closePopup(); }}
+              onKeyUp={event => event.stopPropagation()}>
+              {t("More")}
+            </button>
+            {popupOpen && popup && createPortal(
+              <div ref={tooltipRef} id={tooltipId} role="tooltip" className={styles.manualShiftTooltip}
+                style={{ left: popup.left, top: popup.top, width: popup.width, maxHeight: popup.maxHeight }}
+                onPointerEnter={cancelClose} onPointerLeave={event => { if (event.pointerType === "mouse") scheduleClose(); }}
+                onPointerDown={event => event.stopPropagation()} onMouseDown={event => event.stopPropagation()}
+                onClick={event => event.stopPropagation()} onDoubleClick={event => event.stopPropagation()}
+                onKeyDown={event => { event.stopPropagation(); if (event.key === "Escape") closePopup(); }}>
+                {preview.remaining.map((interval, index) => <div key={index} className={styles.manualShiftTooltipItem}>{interval}</div>)}
+              </div>, document.body,
+            )}
+          </div>
+        ) : readOnly && !isSelectionOnlyReadOnlyCell ? (
           isInteractiveVisualHint ? (
             <div
               className={joinClassNames(
@@ -778,16 +876,28 @@ export function ContainerGraphMatrix({
     () => new Set(columns.filter(column => !pinnedColumnIds?.has(column.employeeId)).map(column => column.employeeId)),
     [columns, pinnedColumnIds],
   );
+  const moreLabel = t("More");
   const automaticColumnWidths = useMemo(
     () => {
-      const widths = buildMatrixAutoColumnWidths({ columns, cellMap, visualHintMap });
+      const manualIds = new Set(columns.filter(column => column.kind === "manual").map(column => column.employeeId));
+      const previewCells: GraphMatrixCellMap = {};
+      const displayCellMap = Object.fromEntries(Object.entries(cellMap).map(([key, raw]) => {
+        const preview = manualIds.has(Number(key.split(":", 1)[0])) ? getManualShiftCellPreview(raw) : null;
+        const label = preview ? `${preview.first}, ${moreLabel}` : raw;
+        if (preview) previewCells[key] = label;
+        return [key, label];
+      }));
+      const widths = buildMatrixAutoColumnWidths({ columns, cellMap: displayCellMap, visualHintMap });
+      const previewWidths = buildMatrixAutoColumnWidths({ columns: columns.filter(column => manualIds.has(column.employeeId)), cellMap: previewCells });
+      const compactColumnIds = new Set(Object.keys(previewCells).map(key => Number(key.split(":", 1)[0])));
       if (maxAutoColumnWidth === undefined) return widths;
       return Object.fromEntries(Object.entries(widths).map(([id, width]) => [
         id,
-        Math.min(width, Math.max(MATRIX_COLUMN_MIN_WIDTH_PX, maxAutoColumnWidth)),
+        Math.max(compactColumnIds.has(Number(id)) ? previewWidths[Number(id)] : MATRIX_COLUMN_MIN_WIDTH_PX,
+          Math.min(width, Math.max(MATRIX_COLUMN_MIN_WIDTH_PX, maxAutoColumnWidth))),
       ]));
     },
-    [cellMap, columns, maxAutoColumnWidth, visualHintMap],
+    [cellMap, columns, maxAutoColumnWidth, visualHintMap, moreLabel],
   );
   const fixedWidthSum = useMemo(
     () => columns.reduce((totalWidth, column) => totalWidth + (columnWidthOverrides[column.employeeId] ?? 0), 0),
@@ -1758,6 +1868,7 @@ export function ContainerGraphMatrix({
 
                         return (
                           <MatrixValueCell
+                            isManualColumn={column.kind === "manual"}
                             key={`${cellKey}:${error && !isEditing ? validationSignal : 0}`}
                             cellKey={cellKey}
                             employeeId={column.employeeId}

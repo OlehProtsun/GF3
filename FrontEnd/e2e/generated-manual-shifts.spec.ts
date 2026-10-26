@@ -54,7 +54,7 @@ test("real backend manual acceptance persists and refreshes both colored cells",
   } finally { await manager.close(); await employee.close(); }
 });
 
-async function fixture(page: Page, language: string, availableShiftCount?: number, claimFlow = false) {
+async function fixture(page: Page, language: string, availableShiftCount?: number, claimFlow = false, previewRaw?: string, workspaceMode = "pc") {
   page.on("pageerror", error => console.error(error.message));
   const employees = [1, 2].map(id => ({ id, firstName: "Worker", lastName: `Test ${id}`, hasLoginAccount: true, isOnline: false }));
   const group = { id: 1, name: "February", year: 2026, month: 2 };
@@ -69,6 +69,7 @@ async function fixture(page: Page, language: string, availableShiftCount?: numbe
     graph.note = `Visible note\n\n[[GF3_GRAPH_META:${JSON.stringify({ m: columns, g: columns.map(column => column[0]) })}]]`;
   }
   if (claimFlow) graph = { ...graph, peoplePerShift: 1, shift1Time: "09:00 - 15:00", shift2Time: "15:00 - 21:00" };
+  if (previewRaw) graph.note = `Visible note\n\n[[GF3_GRAPH_META:${JSON.stringify({ m: [[1, "do obstawienia", { "1": previewRaw }]], g: [1] })}]]`;
   let actor = 0;
   const claims: unknown[] = [];
   const slots: unknown[] = [];
@@ -81,7 +82,7 @@ async function fixture(page: Page, language: string, availableShiftCount?: numbe
     const request = route.request(); const path = new URL(request.url()).pathname; const method = request.method();
     if (!path.startsWith("/api/")) return route.continue();
     const json = (body: unknown, status = 200) => route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) });
-    if (path === "/api/auth/session") return json(actor ? { role:"employee", employeeId:actor, userName:`employee${actor}`,displayName:`Worker ${actor}` } : { role: "manager", workspaceMode: "pc", managerId: 1, userName: "manager", displayName: "Manager", isSystemManager: true });
+    if (path === "/api/auth/session") return json(actor ? { role:"employee", employeeId:actor, userName:`employee${actor}`,displayName:`Worker ${actor}` } : { role: "manager", workspaceMode, managerId: 1, userName: "manager", displayName: "Manager", isSystemManager: true });
     if (path === "/api/account-language") return json({ language });
     if (path.includes("negotiate")) return route.fulfill({ status: 503 });
     if (path === "/api/containers/1/graphs/generate-preview") {
@@ -152,8 +153,75 @@ async function fixture(page: Page, language: string, availableShiftCount?: numbe
     if (path.includes("notepad")) return json({ notes: [], state: { isExpanded: false, isPinned: false, height: 700 } });
     return json([]);
   });
-  return { publications, claims, offers, useEmployee: (id: number) => { actor = id; } };
+  return { publications, claims, offers, getNote: () => graph.note, useEmployee: (id: number) => { actor = id; } };
 }
+
+test("compact manual demand survives editor, profile and employee phone", async ({ page }, testInfo) => {
+  test.setTimeout(60_000);
+  const raw = "09:00 - 15:00, 15:00 - 21:00, 09:00 - 15:00";
+  const state = await fixture(page, "en", undefined, false, raw);
+  const originalNote = state.getNote();
+  await page.setViewportSize({ width: 1280, height: 900 });
+  for (const path of ["/container/1/graphs/1/edit", "/container/1/graphs/1"]) {
+    await page.goto(path);
+    await page.getByRole("button", { name: "Collapse sidebar", exact: true }).click();
+    const more = page.getByRole("button", { name: "More: Shifts", exact: true });
+    await expect(more).toHaveCount(1, { timeout: 20_000 });
+    await expect(more).toHaveCSS("color", "rgb(37, 99, 235)");
+    const cell = more.locator("xpath=ancestor::td");
+    await expect(cell).toHaveText("09:00 - 15:00, More");
+    // The table may distribute spare space; verify the automatic content width before stretching.
+    expect(await page.locator("col").nth(1).evaluate(el => Number((el as HTMLElement).style.getPropertyValue("--matrix-column-width").match(/\d+/)?.[0]))).toBeLessThan(300);
+    await more.hover();
+    const popup = page.getByRole("tooltip");
+    await expect(popup).toBeVisible();
+    await expect(popup.locator(":scope > div")).toHaveText(["09:00 - 15:00", "15:00 - 21:00"]);
+    await popup.hover(); await expect(popup).toBeVisible();
+    await page.keyboard.press("Escape"); await expect(popup).toHaveCount(0);
+  }
+  state.useEmployee(2);
+  await page.goto("/schedule");
+  for (const width of [320, 375, 390]) {
+    await page.setViewportSize({ width, height: 740 });
+    const more = page.getByRole("button", { name: "More: Shifts", exact: true });
+    await more.scrollIntoViewIfNeeded();
+    if (testInfo.project.use.hasTouch) await more.tap(); else await more.click();
+    const popup = page.getByRole("tooltip");
+    await expect(popup).toBeVisible();
+    await expect(popup.locator(":scope > div")).toHaveText(["09:00 - 15:00", "15:00 - 21:00"]);
+    expect(await popup.evaluate(el => {
+      const r = el.getBoundingClientRect();
+      return el.parentElement === document.body && r.left >= 0 && r.right <= innerWidth && r.top >= 0 && r.bottom <= innerHeight && el.scrollWidth <= el.clientWidth;
+    })).toBe(true);
+    expect(await more.evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true);
+    await page.screenshot({ path: testInfo.outputPath(`manual-preview-${width}.png`) });
+    const scroll = more.locator("xpath=ancestor::table/..");
+    await scroll.evaluate(el => { el.scrollLeft = 0; el.dispatchEvent(new Event("scroll")); });
+    await expect(popup).toHaveCount(0);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  }
+  expect(state.publications).toEqual([]); expect(state.claims).toEqual([]);
+  expect(state.getNote()).toBe(originalNote);
+});
+
+test("manager phone keeps compact More visible under automatic width cap", async ({ page }) => {
+  await fixture(page, "en", undefined, false, Array(30).fill("09:00 - 15:00").join(", "), "phone");
+  await page.setViewportSize({ width: 375, height: 740 });
+  await page.goto("/container/1/graphs/1");
+  const more = page.getByRole("button", { name: "More: Shifts", exact: true });
+  await expect(more).toBeVisible({ timeout: 20_000 });
+  await more.scrollIntoViewIfNeeded();
+  await expect(more).toBeVisible();
+  expect(await more.evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true);
+  await more.click();
+  const popup = page.getByRole("tooltip");
+  await expect(popup).toBeVisible();
+  await expect(popup.locator(":scope > div")).toHaveCount(29);
+  expect(await popup.evaluate(el => el.scrollHeight > el.clientHeight && el.getBoundingClientRect().bottom <= innerHeight)).toBe(true);
+  await popup.evaluate(el => { el.scrollTop = 200; });
+  await expect(popup).toBeVisible();
+  await page.keyboard.press("Escape"); await expect(popup).toHaveCount(0);
+});
 
 test("manual color retains confirmed value when the server rejects saving", async ({ page }) => {
   await fixture(page, "en", 0);

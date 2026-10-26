@@ -39,6 +39,7 @@ public class ContainerService : IContainerService
     /// concurrent generate requests cannot interleave and leave the graph in a partial state.
     /// </summary>
     private static readonly ConcurrentDictionary<int, SemaphoreSlim> GenerateLocks = new();
+    private static readonly ConcurrentDictionary<(int Year, int Month), SemaphoreSlim> GenerateMonthLocks = new();
 
     public ContainerService(
         IContainerRepository repo,
@@ -212,22 +213,55 @@ public class ContainerService : IContainerService
             async lockToken =>
             {
                 var graph = await EnsureGraphOwnershipAsync(containerId, graphId, lockToken).ConfigureAwait(false);
-                var schedule = graph.ToContract();
-                var employees = await LoadGraphEmployeesAsync(graphId, lockToken).ConfigureAwait(false);
-                var generatedSlots = await GenerateSlotsAsync(schedule, employees, progress, lockToken).ConfigureAwait(false);
-
-                var writtenSlotsCount = dryRun
-                    ? 0
-                    : await ReplaceGeneratedSlotsAsync(graphId, generatedSlots, overwrite, lockToken).ConfigureAwait(false);
-
-                return new GenerateGraphResult
+                SemaphoreSlim? monthLock = null;
+                if (!dryRun)
                 {
-                    ContainerId = containerId,
-                    GraphId = graphId,
-                    GeneratedSlotsCount = generatedSlots.Count,
-                    WrittenSlotsCount = writtenSlotsCount,
-                    Slots = generatedSlots
-                };
+                    // Other graphs supply availability constraints. Serialize their reload through
+                    // persistence so another writer cannot generate from the same stale snapshot.
+                    while (true)
+                    {
+                        var month = (graph.Year, graph.Month);
+                        var candidate = GenerateMonthLocks.GetOrAdd(month, _ => new SemaphoreSlim(1, 1));
+                        await candidate.WaitAsync(lockToken).ConfigureAwait(false);
+                        try
+                        {
+                            graph = await EnsureGraphOwnershipAsync(containerId, graphId, lockToken).ConfigureAwait(false);
+                            if ((graph.Year, graph.Month) == month)
+                            {
+                                monthLock = candidate;
+                                break;
+                            }
+                        }
+                        finally
+                        {
+                            if (monthLock is null) candidate.Release();
+                        }
+                    }
+                }
+
+                try
+                {
+                    var schedule = graph.ToContract();
+                    var employees = await LoadGraphEmployeesAsync(graphId, lockToken).ConfigureAwait(false);
+                    var generatedSlots = await GenerateSlotsAsync(schedule, employees, progress, lockToken).ConfigureAwait(false);
+
+                    var writtenSlotsCount = dryRun
+                        ? 0
+                        : await ReplaceGeneratedSlotsAsync(graphId, generatedSlots, overwrite, lockToken).ConfigureAwait(false);
+
+                    return new GenerateGraphResult
+                    {
+                        ContainerId = containerId,
+                        GraphId = graphId,
+                        GeneratedSlotsCount = generatedSlots.Count,
+                        WrittenSlotsCount = writtenSlotsCount,
+                        Slots = generatedSlots
+                    };
+                }
+                finally
+                {
+                    monthLock?.Release();
+                }
             }).ConfigureAwait(false);
     }
 

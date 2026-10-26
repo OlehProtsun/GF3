@@ -428,7 +428,280 @@ public sealed class ContainerServiceTests
         Assert.Equal(30, style.TextColorArgb);
     }
 
-    private static ContainerService CreateService(
+    [Fact]
+    public async Task RealGeneration_PreviewDryRunOverwriteAndFailure_PreserveDatabaseContracts()
+    {
+        await using var database = await SqliteTestDatabase.CreateAsync();
+        var (containerId, graphId, employeeId) = await SeedGenerationAsync(database);
+        await using var context = database.CreateContext();
+        var service = CreateService(context, new ScheduleGenerator());
+        var graph = (await service.GetGraphByIdAsync(containerId, graphId))!;
+        var employees = (await service.GetGraphEmployeesAsync(containerId, graphId))!;
+        var before = await GenerationSnapshotAsync(database);
+        var preview = await service.GenerateGraphPreviewAsync(containerId, graph, employees, null);
+        var dryRun = await service.GenerateGraphAsync(containerId, graphId, true, true, null);
+        Assert.Equal(56, preview.GeneratedSlotsCount);
+        Assert.Equal(0, preview.WrittenSlotsCount);
+        Assert.Equal(0, dryRun.WrittenSlotsCount);
+        Assert.Equal(ScheduleGenerationScenarioMatrixTests.Normalize(preview.Slots), ScheduleGenerationScenarioMatrixTests.Normalize(dryRun.Slots));
+        Assert.Equal(before, await GenerationSnapshotAsync(database));
+        Assert.All(preview.Slots.Where(s => s.DayOfMonth == 1), s => Assert.Null(s.EmployeeId));
+
+        var saved = await service.GenerateGraphAsync(containerId, graphId, true, false, null);
+        Assert.Equal(56, saved.GeneratedSlotsCount);
+        Assert.True(saved.WrittenSlotsCount > 0);
+        var persisted = await GenerationSnapshotAsync(database);
+        var repeat = await service.GenerateGraphAsync(containerId, graphId, true, false, null);
+        Assert.Equal(0, repeat.WrittenSlotsCount);
+        Assert.Equal(persisted, await GenerationSnapshotAsync(database));
+        await Assert.ThrowsAsync<ValidationException>(() => service.GenerateGraphAsync(containerId, graphId, false, false, null));
+        Assert.Equal(persisted, await GenerationSnapshotAsync(database));
+
+        await using var fresh = database.CreateContext();
+        Assert.Equal(56, await fresh.ScheduleSlots.CountAsync(s => s.ScheduleId == graphId));
+        Assert.All(await fresh.ScheduleSlots.Where(s => s.EmployeeId != null).ToListAsync(), s => Assert.Equal(employeeId, s.EmployeeId));
+        var failingService = CreateService(fresh, new ThrowingScheduleGenerator());
+        await Assert.ThrowsAsync<InvalidOperationException>(() => failingService.GenerateGraphAsync(containerId, graphId, true, false, null));
+        using var canceled = new CancellationTokenSource();
+        canceled.Cancel();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => failingService.GenerateGraphAsync(containerId, graphId, true, false, null, canceled.Token));
+        Assert.Equal(persisted, await GenerationSnapshotAsync(database));
+        using var during = new CancellationTokenSource();
+        var real = CreateService(fresh, new ScheduleGenerator());
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => real.GenerateGraphAsync(containerId, graphId, true, false,
+            new CancelGenerationProgress(during), during.Token));
+        Assert.Equal(persisted, await GenerationSnapshotAsync(database));
+        var afterFailure = await real.GenerateGraphAsync(containerId, graphId, true, false, null);
+        Assert.Equal(0, afterFailure.WrittenSlotsCount);
+    }
+
+    [Fact]
+    public async Task RealGeneration_OverwritePreservesProtectedManualOfferAndReservedNumber()
+    {
+        await using var database = await SqliteTestDatabase.CreateAsync();
+        var (containerId, graphId, _) = await SeedGenerationAsync(database);
+        int slotId;
+        await using (var seed = database.CreateContext())
+        {
+            var manual = TestDataFactory.CreateDalSlot(graphId, 2, 1, null, "08:00", "16:00");
+            seed.ScheduleSlots.Add(manual);
+            await seed.SaveChangesAsync();
+            slotId = manual.Id;
+            seed.ShiftSwapRequests.Add(new DataAccessLayer.Models.ShiftSwapRequestModel
+            {
+                ScheduleId = graphId, ScheduleSlotId = slotId, IsManagerCreated = true,
+                Status = DalEnums.ShiftSwapStatus.Open, CreatedAtUtc = DateTimeOffset.UtcNow
+            });
+            await seed.SaveChangesAsync();
+        }
+        await using (var context = database.CreateContext())
+        {
+            var service = CreateService(context, new ScheduleGenerator());
+            await service.GenerateGraphAsync(containerId, graphId, true, false, null);
+            var before = await GenerationSnapshotAsync(database);
+            await service.GenerateGraphAsync(containerId, graphId, true, false, null);
+            Assert.Equal(before, await GenerationSnapshotAsync(database));
+        }
+        await using var fresh = database.CreateContext();
+        var original = await fresh.ScheduleSlots.SingleAsync(s => s.Id == slotId);
+        Assert.Null(original.EmployeeId);
+        Assert.Equal("08:00", original.FromTime);
+        Assert.Equal("16:00", original.ToTime);
+        Assert.Equal(slotId, (await fresh.ShiftSwapRequests.SingleAsync()).ScheduleSlotId);
+        var rows = await fresh.ScheduleSlots.ToListAsync();
+        Assert.Equal(rows.Count, rows.Select(s => (s.DayOfMonth, s.SlotNo, s.FromTime, s.ToTime)).Distinct().Count());
+    }
+
+    internal static async Task<(int ContainerId, int GraphId, int EmployeeId)> SeedGenerationAsync(SqliteTestDatabase database)
+    {
+        await using var context = database.CreateContext();
+        var container = TestDataFactory.CreateDalContainer();
+        var shop = TestDataFactory.CreateDalShop();
+        var employee = TestDataFactory.CreateDalEmployee();
+        var group = new DataAccessLayer.Models.AvailabilityGroupModel { Name = "synthetic", Year = 2026, Month = 2 };
+        context.AddRange(container, shop, employee, group);
+        await context.SaveChangesAsync();
+        group.Members.Add(new DataAccessLayer.Models.AvailabilityGroupMemberModel
+        {
+            EmployeeId = employee.Id,
+            Days = [new DataAccessLayer.Models.AvailabilityGroupDayModel { DayOfMonth = 1, Kind = DalEnums.AvailabilityKind.NONE }]
+        });
+        var graph = TestDataFactory.CreateDalSchedule(container.Id, shop.Id, year: 2026, month: 2, availabilityGroupId: group.Id);
+        graph.MaxHoursPerEmpMonth = 400;
+        graph.MaxConsecutiveDays = graph.MaxConsecutiveFull = graph.MaxFullPerMonth = 31;
+        graph.Employees.Add(new DataAccessLayer.Models.ScheduleEmployeeModel { EmployeeId = employee.Id, MinHoursMonth = 0 });
+        context.Schedules.Add(graph);
+        await context.SaveChangesAsync();
+        return (container.Id, graph.Id, employee.Id);
+    }
+
+    [Fact]
+    public async Task RealGeneration_DatabaseFailureAfterDelete_RollsBackReplacement()
+    {
+        await using var database = await SqliteTestDatabase.CreateAsync();
+        var (containerId, graphId, employeeId) = await SeedGenerationAsync(database);
+        await using (var seed = database.CreateContext())
+        {
+            seed.ScheduleSlots.Add(TestDataFactory.CreateDalSlot(graphId, 2, 9, employeeId, "08:00", "09:00"));
+            await seed.SaveChangesAsync();
+            await seed.Database.ExecuteSqlRawAsync("CREATE TRIGGER reject_synthetic_generation BEFORE INSERT ON schedule_slot BEGIN SELECT RAISE(ABORT, 'synthetic insert failure'); END;");
+        }
+        var before = await GenerationSnapshotAsync(database);
+        await using var context = database.CreateContext();
+        var service = CreateService(context, new ScheduleGenerator());
+        await Assert.ThrowsAsync<ValidationException>(() => service.GenerateGraphAsync(containerId, graphId, true, false, null));
+        Assert.Equal(before, await GenerationSnapshotAsync(database));
+    }
+
+    [Fact]
+    public async Task OfflineReplay_SyntheticDiskFixture_IsReadOnlyRedactedAndAgreesWithOracle()
+    {
+        await using var database = await SqliteTestDatabase.CreateAsync();
+        var (containerId, graphId, employeeId) = await SeedGenerationAsync(database);
+        var repository = new DirectoryInfo(AppContext.BaseDirectory);
+        while (repository is not null && !File.Exists(Path.Combine(repository.FullName, "GF3.sln"))) repository = repository.Parent;
+        Assert.NotNull(repository);
+        var project = Path.Combine(repository.FullName, "tools", "AlgorithmStressHarness", "AlgorithmStressHarness.csproj");
+        var build = await RunReplayProcessAsync(repository.FullName, "build", project, "--disable-build-servers", "-m:1", "-p:UseSharedCompilation=false", "-p:OutputPath=bin/ReplayVerification/");
+        Assert.True(build.Code == 0, "Replay harness build failed: " + build.Output);
+        var dll = Path.Combine(repository.FullName, "tools", "AlgorithmStressHarness", "bin", "ReplayVerification", "AlgorithmStressHarness.dll");
+        var output = Path.Combine(Path.GetTempPath(), "GF3.ReplayReports", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(output);
+        try
+        {
+            var before = await GenerationSnapshotAsync(database);
+            var hash = await HashDatabaseFileAsync(database.DatabasePath);
+            var replay = await RunReplayProcessAsync(repository.FullName, dll, "--db", database.DatabasePath, "--graph", graphId.ToString(), "--output", output);
+            Assert.True(replay.Code == 0, replay.Output);
+            Assert.Equal(before, await GenerationSnapshotAsync(database));
+            Assert.Equal(hash, await HashDatabaseFileAsync(database.DatabasePath));
+            var summaryText = await File.ReadAllTextAsync(Path.Combine(output, "summary.json"));
+            using var summary = System.Text.Json.JsonDocument.Parse(summaryText);
+            var report = summary.RootElement.GetProperty("Cases")[0];
+            Assert.True(report.GetProperty("RepeatStable").GetBoolean());
+            Assert.Equal(3, report.GetProperty("DurationsMilliseconds").GetArrayLength());
+            Assert.Empty(report.GetProperty("HardViolations").EnumerateObject());
+            await using var context = database.CreateContext();
+            var service = CreateService(context, new ScheduleGenerator());
+            var schedule = (await service.GetGraphByIdAsync(containerId, graphId))!;
+            var employees = (await service.GetGraphEmployeesAsync(containerId, graphId))!;
+            var group = TestDataFactory.CreateAvailabilityGroupModel(year: 2026, month: 2);
+            group.Members.Add(new AvailabilityGroupMemberModel { EmployeeId = employeeId, Days = [TestDataFactory.CreateAvailabilityDayModel(1, AvailabilityKind.NONE)] });
+            var preview = await service.GenerateGraphPreviewAsync(containerId, schedule, employees, null);
+            var expected = ScheduleGenerationOracle.Check(new("disk-fixture", schedule, employees, [group]), preview.Slots.ToArray());
+            Assert.Empty(expected.HardViolations);
+            var generated = report.GetProperty("Generated");
+            var quality = report.GetProperty("Quality");
+            Assert.True(quality.GetProperty("CapacityBoundsApplicable").GetBoolean());
+            Assert.Equal(28 * 12 * 60, quality.GetProperty("DemandMinutes").GetInt32());
+            Assert.Equal(27 * 12 * 60, quality.GetProperty("OptimisticCapacityMinutes").GetInt32());
+            Assert.Equal(12 * 60, quality.GetProperty("CoverageGapLowerBoundMinutes").GetInt32());
+            Assert.Equal(0, quality.GetProperty("CoverageGapAboveLowerBoundMinutes").GetInt32());
+            Assert.Equal(0, quality.GetProperty("MinimumDeficitLowerBoundMinutes").GetInt32());
+            Assert.Equal(expected.Metrics.CoverageGapMinutes, generated.GetProperty("CoverageGapMinutes").GetInt32());
+            Assert.Equal(expected.Metrics.TotalAssignedMinutes, generated.GetProperty("TotalAssignedMinutes").GetInt32());
+            Assert.Equal(expected.Metrics.TotalMinHourDeficitMinutes, generated.GetProperty("TotalMinHourDeficitMinutes").GetInt32());
+            foreach (var file in new[] { "summary.json", "cases.csv", "failures.json" })
+            {
+                var text = await File.ReadAllTextAsync(Path.Combine(output, file));
+                foreach (var forbidden in new[] { "John", "Smith", "john.smith@example.com", "123456789", database.DatabasePath, "EmployeeId", "GraphId", "ContainerId", "IntervalStr" })
+                    Assert.DoesNotContain(forbidden, text, StringComparison.OrdinalIgnoreCase);
+            }
+            Assert.Equal("[]", (await File.ReadAllTextAsync(Path.Combine(output, "failures.json"))).Trim());
+            var help = await RunReplayProcessAsync(repository.FullName, dll, "--help");
+            Assert.Equal(0, help.Code);
+            var missing = await RunReplayProcessAsync(repository.FullName, dll, "--db", Path.Combine(database.RootPath, "absent.db"), "--all-graphs", "--output", output);
+            Assert.NotEqual(0, missing.Code);
+            Assert.False(File.Exists(Path.Combine(database.RootPath, "absent.db")));
+            var relative = await RunReplayProcessAsync(repository.FullName, dll, "--db", "relative.db", "--all-graphs", "--output", output);
+            Assert.NotEqual(0, relative.Code);
+            var invalidOutput = await RunReplayProcessAsync(repository.FullName, dll, "--db", database.DatabasePath, "--all-graphs", "--output", repository.FullName);
+            Assert.NotEqual(0, invalidOutput.Code);
+            var sourceOutput = await RunReplayProcessAsync(repository.FullName, dll, "--db", database.DatabasePath, "--all-graphs", "--output", database.RootPath);
+            Assert.NotEqual(0, sourceOutput.Code);
+            var invalidRepeat = await RunReplayProcessAsync(repository.FullName, dll, "--db", database.DatabasePath, "--all-graphs", "--repeat", "11", "--output", output);
+            Assert.NotEqual(0, invalidRepeat.Code);
+            var unsupported = Path.Combine(database.RootPath, "unsupported.db");
+            await File.WriteAllBytesAsync(unsupported, []);
+            var schema = await RunReplayProcessAsync(repository.FullName, dll, "--db", unsupported, "--all-graphs", "--output", output);
+            Assert.NotEqual(0, schema.Code);
+            Assert.Equal(0, new FileInfo(unsupported).Length);
+            Assert.Equal(before, await GenerationSnapshotAsync(database));
+        }
+        finally
+        {
+            // This directory was created above, under the fixed test report root.
+            var parent = Path.GetFullPath(Path.Combine(Path.GetTempPath(), "GF3.ReplayReports")) + Path.DirectorySeparatorChar;
+            Assert.StartsWith(parent, Path.GetFullPath(output));
+            Directory.Delete(output, true);
+        }
+    }
+
+    private static async Task<(int Code, string Output)> RunReplayProcessAsync(string workingDirectory, params string[] args)
+    {
+        var start = new System.Diagnostics.ProcessStartInfo("dotnet")
+        {
+            WorkingDirectory = workingDirectory, UseShellExecute = false, CreateNoWindow = true,
+            RedirectStandardOutput = true, RedirectStandardError = true
+        };
+        foreach (var argument in args) start.ArgumentList.Add(argument);
+        using var process = System.Diagnostics.Process.Start(start)!;
+        var stdout = process.StandardOutput.ReadToEndAsync();
+        var stderr = process.StandardError.ReadToEndAsync();
+        using var timeout = new CancellationTokenSource(TimeSpan.FromMinutes(2));
+        try { await process.WaitForExitAsync(timeout.Token); }
+        catch { process.Kill(entireProcessTree: true); throw; }
+        return (process.ExitCode, await stdout + await stderr);
+    }
+
+    private static async Task<string> HashDatabaseFileAsync(string path)
+    {
+        await using var file = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+        return Convert.ToHexString(await System.Security.Cryptography.SHA256.HashDataAsync(file));
+    }
+
+    internal static async Task<string> GenerationSnapshotAsync(SqliteTestDatabase database)
+    {
+        await using var context = database.CreateContext();
+        var connection = context.Database.GetDbConnection();
+        await connection.OpenAsync();
+        var tables = new List<string>();
+        await using (var command = connection.CreateCommand())
+        {
+            command.CommandText = "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name";
+            await using var reader = await command.ExecuteReaderAsync();
+            while (await reader.ReadAsync()) tables.Add(reader.GetString(0));
+        }
+        var rows = new List<string>();
+        foreach (var table in tables)
+        {
+            await using var command = connection.CreateCommand();
+            command.CommandText = $"SELECT * FROM \"{table.Replace("\"", "\"\"")}\"";
+            await using var reader = await command.ExecuteReaderAsync();
+            while (await reader.ReadAsync())
+            {
+                var values = new object[reader.FieldCount];
+                reader.GetValues(values);
+                rows.Add(table + System.Text.Json.JsonSerializer.Serialize(values));
+            }
+        }
+        var bytes = System.Text.Encoding.UTF8.GetBytes(string.Join("\n", rows.Order(StringComparer.Ordinal)));
+        return Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(bytes));
+    }
+
+    private sealed class ThrowingScheduleGenerator : IScheduleGenerator
+    {
+        public Task<IList<ScheduleSlotModel>> GenerateAsync(ScheduleModel schedule, IEnumerable<AvailabilityGroupModel> availabilities,
+            IEnumerable<ScheduleEmployeeModel> employees, IProgress<int>? progress = null, CancellationToken ct = default)
+            => throw new InvalidOperationException("Injected generator failure.");
+    }
+
+    private sealed class CancelGenerationProgress(CancellationTokenSource source) : IProgress<int>
+    {
+        public void Report(int value) { if (value >= 35) source.Cancel(); }
+    }
+
+    internal static ContainerService CreateService(
         DataAccessLayer.Models.DataBaseContext.AppDbContext context,
         IScheduleGenerator generator)
         => new(
