@@ -1,6 +1,7 @@
 import { beforeEach as beforeEnglishTest } from "vitest";
 import { setLanguage as setTestLanguage, t } from "@shared/i18n";
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen, within, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { describe, expect, test, vi } from "vitest";
 import type { GraphRelatedScheduleHintDetail } from "@entities/containers/model/graphWorkspace";
 import { ContainerGraphMatrix } from "./ContainerGraphMatrix";
@@ -10,6 +11,121 @@ import { PublicHolidayVisibilityProvider } from "@app/providers/PublicHolidayVis
 import { publicHolidaySettingsApi } from "@entities/public-holidays/api/publicHolidaySettingsApi";
 
 beforeEnglishTest(() => setTestLanguage("en"));
+
+describe("compact manual demand", () => {
+  const raw = "09:00 - 15:00, 15:00 - 21:00, 09:00 - 15:00";
+  const column = { employeeId: -1, kind: "manual" as const, manualColumnId: 1, graphEmployeeId: null, label: "Demand", minHoursMonth: null, totalMinutes: 0, totalText: "" };
+  const rect = { left: 50, right: 100, top: 50, bottom: 78, width: 50, height: 28, x: 50, y: 50, toJSON: () => ({}) };
+  const prepare = () => {
+    const more = screen.getByRole("button", { name: "More: Shifts" });
+    vi.spyOn(more, "getBoundingClientRect").mockReturnValue(rect);
+    return more;
+  };
+  test("portal preserves duplicate demand, hover bridge, outside, Escape and scrolling", async () => {
+    const { unmount } = render(<ContainerGraphMatrix graph={{ year: 2026, month: 5 }} columns={[column]} cellMap={{ "-1:1": raw }} readOnly />);
+    const more = prepare();
+    expect(more.closest("td")).toHaveTextContent("09:00 - 15:00, More");
+    expect(more.closest("td")).not.toHaveTextContent("15:00 - 21:00");
+    fireEvent.pointerEnter(more, { pointerType: "mouse" });
+    const tooltip = screen.getByRole("tooltip");
+    expect(tooltip.parentElement).toBe(document.body);
+    expect(within(tooltip).getAllByText(/\d\d:\d\d/).map(node => node.textContent)).toEqual(["09:00 - 15:00", "15:00 - 21:00"]);
+    fireEvent.pointerLeave(more, { pointerType: "mouse" });
+    fireEvent.pointerEnter(tooltip, { pointerType: "mouse" });
+    fireEvent.scroll(tooltip);
+    expect(tooltip).toBeInTheDocument();
+    fireEvent.pointerLeave(tooltip, { pointerType: "mouse" });
+    await waitFor(() => expect(screen.queryByRole("tooltip")).toBeNull());
+    fireEvent.click(more); fireEvent.keyDown(more, { key: "Escape" });
+    expect(screen.queryByRole("tooltip")).toBeNull();
+    fireEvent.click(more); fireEvent.pointerDown(document.body);
+    expect(screen.queryByRole("tooltip")).toBeNull();
+    fireEvent.click(more); fireEvent.scroll(window);
+    expect(screen.queryByRole("tooltip")).toBeNull();
+    fireEvent.click(more); fireEvent.resize(window);
+    expect(screen.queryByRole("tooltip")).toBeNull();
+    fireEvent.click(more); unmount();
+    expect(screen.queryByRole("tooltip")).toBeNull();
+  });
+  test("More isolates selection and editing; primary edits full raw data", async () => {
+    const selected = vi.fn(), changed = vi.fn(), hint = vi.fn();
+    render(<ContainerGraphMatrix graph={{ year: 2026, month: 5 }} columns={[column]} cellMap={{ "-1:1": raw }}
+      onSelectedCellKeysChange={selected} onCellChange={changed} onVisualHintClick={hint} />);
+    const more = prepare();
+    const user = userEvent.setup();
+    await user.dblClick(more);
+    expect(selected).not.toHaveBeenCalled(); expect(changed).not.toHaveBeenCalled(); expect(hint).not.toHaveBeenCalled();
+    expect(screen.queryByRole("textbox")).toBeNull();
+    more.focus(); await user.keyboard("{Enter}"); await user.keyboard("{Escape}");
+    expect(screen.queryByRole("tooltip")).toBeNull();
+    await user.keyboard(" "); expect(screen.getByRole("tooltip")).toBeInTheDocument();
+    await user.keyboard(" "); expect(screen.queryByRole("tooltip")).toBeNull();
+    const primary = screen.getByRole("button", { name: "Demand day 1" });
+    expect(primary.parentElement).toBe(more.parentElement);
+    expect(primary).toHaveAttribute("title", raw);
+    await user.click(primary); expect(selected).toHaveBeenCalled();
+    await user.dblClick(primary);
+    const editor = screen.getByRole("textbox", { name: "Demand day 1" });
+    expect(editor).toHaveValue(raw);
+    fireEvent.change(editor, { target: { value: `${raw}, 16:00 - 20:00` } });
+    fireEvent.blur(editor);
+    expect(changed).toHaveBeenCalledWith(-1, 1, `${raw}, 16:00 - 20:00`);
+  });
+  test.each(["", "09:00 - 15:00", "free text", "09:00 - 15:00, invalid"])("fallback retains %s", value => {
+    render(<ContainerGraphMatrix graph={{ year: 2026, month: 5 }} columns={[column]} cellMap={{ "-1:1": value }} readOnly />);
+    expect(screen.queryByRole("button", { name: "More: Shifts" })).toBeNull();
+  });
+  test("two intervals expose only the remaining interval, retaining custom colors", () => {
+    render(<ContainerGraphMatrix graph={{ year: 2026, month: 5 }} columns={[column]}
+      cellMap={{ "-1:1": "09:00 - 15:00, 15:00 - 21:00" }} readOnly
+      styleMap={{ "-1:1": { id: 1, backgroundColor: "#ff0000", textColor: "#ffffff", backgroundColorArgb: null, textColorArgb: null } }} />);
+    const more = prepare();
+    expect(more.closest("td")).toHaveStyle({ backgroundColor: "#ff0000", color: "#ffffff" });
+    fireEvent.click(more);
+    expect(screen.getByRole("tooltip").children).toHaveLength(1);
+    expect(screen.getByRole("tooltip")).toHaveTextContent("15:00 - 21:00");
+  });
+  test("employee width remains raw and a resized manual width survives source updates", () => {
+    const props = { graph: { year: 2026, month: 5 }, columns: [column, { ...column, employeeId: 2, kind: "employee" as const, label: "Worker" }],
+      cellMap: { "-1:1": raw, "2:1": raw }, allowColumnResize: true };
+    const { container, rerender } = render(<ContainerGraphMatrix {...props} />);
+    const widths = () => Array.from(container.querySelectorAll("col")).slice(1).map(el => (el as HTMLElement).style.getPropertyValue("--matrix-column-width"));
+    expect(Number(widths()[0].match(/\d+/)?.[0])).toBeLessThan(Number(widths()[1].match(/\d+/)?.[0]));
+    const handle = container.querySelector(`.${styles.columnResizeHandle}`)!;
+    fireEvent.mouseDown(handle, { clientX: 100 });
+    fireEvent.mouseMove(window, { clientX: 100 });
+    fireEvent.mouseUp(window);
+    expect(widths()[0]).toBe("135px");
+    rerender(<ContainerGraphMatrix {...props} cellMap={{ ...props.cellMap, "-1:1": `${raw}, ${raw}` }} />);
+    expect(widths()[0]).toBe("135px");
+    expect(screen.getByRole("button", { name: "More: Shifts" })).toBeInTheDocument();
+  });
+  test("employee, inline and related hints retain their normal rendering", () => {
+    const props = { graph: { year: 2026, month: 5 }, columns: [column], cellMap: { "-1:1": raw } };
+    const { rerender } = render(<ContainerGraphMatrix {...props} columns={[{ ...column, kind: "employee" }]} />);
+    expect(screen.queryByText("More")).toBeNull();
+    rerender(<ContainerGraphMatrix {...props} editMode="inline" />);
+    expect(screen.getByRole("textbox", { name: "Demand day 1" })).toHaveValue(raw);
+    rerender(<ContainerGraphMatrix {...props} visualHintMap={{ "-1:1": "Related schedule" }} onVisualHintClick={vi.fn()} />);
+    expect(screen.queryByText("More")).toBeNull();
+    rerender(<ContainerGraphMatrix {...props} mutedSuffixMap={{ "-1:1": "Related schedule" }} />);
+    expect(screen.queryByText("More")).toBeNull();
+  });
+  test("read-only toggle closes on changed source; compact width survives phone cap and language", async () => {
+    const props = { graph: { year: 2026, month: 5 }, columns: [column], cellMap: { "-1:1": raw }, readOnly: true, maxAutoColumnWidth: 156 };
+    const { container, rerender } = render(<ContainerGraphMatrix {...props} />);
+    const more = prepare(); fireEvent.click(more); expect(screen.getByRole("tooltip")).toBeInTheDocument();
+    fireEvent.click(more); expect(screen.queryByRole("tooltip")).toBeNull();
+    fireEvent.click(more);
+    const width = Number((container.querySelectorAll("col")[1] as HTMLElement).style.getPropertyValue("--matrix-column-width").match(/\d+/)?.[0]);
+    expect(width).toBeGreaterThan(156); expect(width).toBeLessThan(300);
+    rerender(<ContainerGraphMatrix {...props} cellMap={{ "-1:1": "10:00 - 14:00" }} />);
+    expect(screen.queryByRole("tooltip")).toBeNull();
+    act(() => setTestLanguage("pl"));
+    rerender(<ContainerGraphMatrix {...props} />);
+    expect(screen.getByRole("button", { name: `${t("More")}: ${t("Shifts")}` })).toHaveTextContent(t("More"));
+  });
+});
 
 test("pinned generated headers cannot be dragged or receive a column drop", () => {
   const onColumnMove = vi.fn();

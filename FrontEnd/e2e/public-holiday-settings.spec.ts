@@ -222,7 +222,26 @@ test("PC global toggle updates employee availability and schedule matrix, daily 
   await employee.screenshot({ path: test.info().outputPath("schedule-holiday.png") });
   await employee.getByRole("button", { name: "Show daily schedule view" }).click();
   await expect(employee.getByRole("tab", { name: /Friday 1, working day.*Labour Day/ })).toHaveCSS("background-color", "rgb(255, 247, 214)");
-  expect(writes).toEqual([false, true]);
+  for (const name of [/Friday 1, working day.*Labour Day/, /Sunday 3, day off.*Constitution Day/]) {
+    const tab = employee.getByRole("tab", { name });
+    await expect(tab).toHaveCSS("background-color", "rgb(255, 247, 214)");
+    await tab.click();
+    await expect(tab).toHaveAttribute("aria-selected", "true");
+    await expect(tab).toHaveCSS("background-color", "rgb(255, 247, 214)");
+    await expect(tab).toHaveCSS("border-top-color", "rgb(124, 58, 237)");
+  }
+  await toggle.click();
+  await expect(toggle).not.toBeChecked();
+  await employee.bringToFront();
+  await employee.evaluate(() => window.dispatchEvent(new Event("focus")));
+  for (const name of [/^Friday 1, working day/, /^Sunday 3, day off/]) {
+    const tab = employee.getByRole("tab", { name });
+    await expect(tab).not.toHaveAttribute("title");
+    await expect(tab).not.toHaveCSS("background-color", "rgb(255, 247, 214)");
+  }
+  await employee.getByRole("button", { name: "Show schedule matrix view" }).click();
+  await expect(employee.getByRole("table", { name: "Schedule hours summary" })).toBeVisible();
+  expect(writes).toEqual([false, true, false]);
   await employee.close();
 });
 

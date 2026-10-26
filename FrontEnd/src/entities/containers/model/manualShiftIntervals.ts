@@ -20,6 +20,14 @@ export function formatManualShiftIntervals(intervals: ManualShiftInterval[]): st
   return [...intervals].sort((a, b) => a.fromTime.localeCompare(b.fromTime) || a.toTime.localeCompare(b.toTime))
     .map(p => `${p.fromTime} - ${p.toTime}`).join(", ");
 }
+export function getManualShiftCellPreview(raw: string): { first: string; remaining: string[] } | null {
+  const parsed = parseManualShiftIntervals(raw);
+  if (!parsed || parsed.length < 2) return null;
+  return {
+    first: formatManualShiftIntervals([parsed[0]]),
+    remaining: parsed.slice(1).map(interval => formatManualShiftIntervals([interval])),
+  };
+}
 export function manualShiftCapacity(intervals: ManualShiftInterval[]): number[] {
   const capacity = Array<number>(1440).fill(0);
   for (const interval of intervals) for (let m = minutes(interval.fromTime); m < minutes(interval.toTime); m++) capacity[m]++;
