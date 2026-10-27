@@ -77,8 +77,9 @@ public sealed class PriorityGenerationSettingsControllerTests
         Assert.Equal(new(10, false), await host.Client.GetFromJsonAsync<PriorityGenerationSettingsDto>(endpoint));
     }
 
-    [Fact]
-    public async Task GraphFlagsRoundTripAndOmittedUpdateRetainsPriority()
+    [Theory]
+    [InlineData(null)] [InlineData(1)]
+    public async Task GraphFlagsRoundTripAndOmittedUpdateRetainsPriority(int? graphId)
     {
         await using var host = await ManagerWorkspaceTestHost.CreateAsync();
         await host.Login("manager"); await host.Exchange("pc");
@@ -93,7 +94,7 @@ public sealed class PriorityGenerationSettingsControllerTests
         Assert.Equal(HttpStatusCode.NoContent, (await host.Client.PutAsJsonAsync(update, new { employeeId = 1, minHoursMonth = 70, displayOrder = 0, isPriority = false })).StatusCode);
         Assert.False((await host.Client.GetFromJsonAsync<WebApi.Contracts.Containers.Graphs.Employees.GraphEmployeeDto[]>(endpoint))!.Single().IsPriority);
         var preview = await host.Client.PostAsJsonAsync("/api/containers/1/graphs/generate-preview", new {
-            graphId = 1,
+            graphId,
             graph = new { name = "Synthetic", shopId = 1, year = 2026, month = 4, peoplePerShift = 1,
                 shift1Time = "09:00 - 15:00", shift2Time = "15:00 - 21:00", maxHoursPerEmpMonth = 160,
                 maxConsecutiveDays = 5, maxConsecutiveFull = 3, maxFullPerMonth = 10 },
@@ -106,6 +107,30 @@ public sealed class PriorityGenerationSettingsControllerTests
         await using var db = host.Database.CreateContext();
         Assert.False((await db.ScheduleEmployees.SingleAsync()).IsPriority);
         Assert.Empty(await db.ScheduleSlots.ToListAsync());
+    }
+
+    [Fact]
+    public async Task FreshHttpPreviewDistinguishesInfeasibleMalformedAndMissingAvailability()
+    {
+        await using var host = await ManagerWorkspaceTestHost.CreateAsync();
+        await host.Login("manager"); await host.Exchange("pc");
+        const string endpoint = "/api/containers/1/graphs/generate-preview";
+        var request = new WebApi.Contracts.Containers.Graphs.GenerateGraphPreviewRequest {
+            Graph = new() { Name = "Fresh synthetic", ShopId = 1, Year = 2026, Month = 11, PeoplePerShift = 4,
+                Shift1Time = "09:00 - 15:00", Shift2Time = "15:00 - 22:00", MaxHoursPerEmpMonth = 80,
+                MaxConsecutiveDays = 31, MaxConsecutiveFull = 31, MaxFullPerMonth = 31 },
+            Employees = [new() { EmployeeId = 1, IsPriority = true, MinHoursMonth = 180 }] };
+        var before = await ContainerServiceTests.GenerationSnapshotAsync(host.Database);
+        var response = await host.Client.PostAsJsonAsync(endpoint, request);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var result = (await response.Content.ReadFromJsonAsync<WebApi.Contracts.Containers.Graphs.GenerateGraphResponse>())!;
+        Assert.Contains(result.Slots!, s => s.EmployeeId == 1);
+        Assert.Contains(result.Slots!, s => s.EmployeeId is null);
+        request.Graph.Month = 13;
+        Assert.Equal(HttpStatusCode.BadRequest, (await host.Client.PostAsJsonAsync(endpoint, request)).StatusCode);
+        request.Graph.Month = 11; request.Graph.AvailabilityGroupId = int.MaxValue;
+        Assert.Equal(HttpStatusCode.NotFound, (await host.Client.PostAsJsonAsync(endpoint, request)).StatusCode);
+        Assert.Equal(before, await ContainerServiceTests.GenerationSnapshotAsync(host.Database));
     }
 
     private static PriorityGenerationSettingsDto Value(ActionResult<PriorityGenerationSettingsDto> result) =>

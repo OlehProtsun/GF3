@@ -7,7 +7,7 @@ using BusinessLogicLayer.Contracts.Models;
 
 internal sealed record ReplayMetrics(int GeneratedCount, int AssignedCount, int UnfurnishedCount, int ConflictDays,
     int CoverageGapMinutes, int TotalAssignedMinutes, int TotalMinHourDeficitMinutes, long TotalMinHourDeficitSquared,
-    IReadOnlyDictionary<string, int> Violations);
+    IReadOnlyDictionary<string, int> Violations, int PriorityDeficitMinutes, int RegularDeficitMinutes);
 
 internal sealed record ReplayQualityMetrics(int DemandMinutes, int EnrolledMinimumMinutes, bool CapacityBoundsApplicable,
     int OptimisticCapacityMinutes, int CoverageGapLowerBoundMinutes, int MinimumDeficitLowerBoundMinutes,
@@ -15,14 +15,23 @@ internal sealed record ReplayQualityMetrics(int DemandMinutes, int EnrolledMinim
     bool SelectedAvailabilityConfigured, int EmployeesWithoutSelectedAvailability, int MissingAvailabilityDays,
     int RelevantExternalAssignedSlots, int RelevantExternalEmployeeDays,
     int MinimumAssignedMinutes, int MaximumAssignedMinutes, double AssignedMinutesStandardDeviation,
-    double? LowestMinimumAttainment, double? HighestMinimumAttainment, int FullDayOverrideReviews);
+    double? LowestMinimumAttainment, double? HighestMinimumAttainment, int FullDayOverrideReviews,
+    int PriorityOptimisticCapacityMinutes, int PriorityUnavoidableDeficitMinutes,
+    double? LowestCapacityAttainment, double? HighestCapacityAttainment);
 
 internal sealed record ReplayLocalQualityResult(bool ImprovementFound, int StatesChecked, bool SearchLimited,
-    int ChangedSlots, int MinimumDeficitMinutes, long MinimumDeficitSquared);
+    int ChangedSlots, int MinimumDeficitMinutes, long MinimumDeficitSquared,
+    string Objective = "minimum-deficit/squared-deficit", double[]? BaselineObjective = null, double[]? WitnessObjective = null);
 
 internal sealed class ReplayCase
 {
     public required string CaseId { get; init; }
+    public string Engine { get; init; } = "legacy";
+    public string Variant { get; init; } = "stored";
+    public int PriorityCount { get; init; }
+    public int? PriorityShiftHours { get; init; }
+    public bool? PriorityWeekendsOff { get; init; }
+    public string? OrderedOutputSha256 { get; init; }
     public string? SkipReason { get; init; }
     public int EmployeeCount { get; init; }
     public int AvailabilityEntryCount { get; init; }
@@ -38,11 +47,16 @@ internal sealed class ReplayCase
     public bool RepeatStable { get; set; } = true;
     public IReadOnlyDictionary<string, int> HardViolations { get; set; } = new Dictionary<string, int>();
     public bool Failed => SkipReason is not null || !RepeatStable || HardViolations.Count > 0;
-    public string Classification => SkipReason is not null ? "input/schema error" : HardViolations.Count > 0 ? "hard invariant"
+    public string Classification => SkipReason == "generation-time-limit" ? "timeout" : SkipReason == "generation-runtime-error" ? "runtime error"
+        : SkipReason is not null ? "input/schema error" : HardViolations.Count > 0 ? "hard invariant"
         : !RepeatStable ? "nondeterminism" : Generated?.CoverageGapMinutes > 0 || Generated?.TotalMinHourDeficitMinutes > 0 ? "PARTIAL" : "complete";
 
-    internal static ReplayCase Create(string id, ReplayInput input, ReplayMetrics generated, IReadOnlyCollection<ScheduleSlotModel> slots) => new()
+    internal static ReplayCase Create(string id, ReplayInput input, ReplayMetrics generated, IReadOnlyCollection<ScheduleSlotModel> slots, string engine = "legacy", string variant = "stored") => new()
     {
+        Engine = engine, Variant = variant, PriorityCount = input.Employees.Count(e => e.IsPriority),
+        PriorityShiftHours = input.PriorityShiftHours, PriorityWeekendsOff = input.PriorityShiftHours.HasValue ? input.PriorityWeekendsOff : null,
+        OrderedOutputSha256 = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
+            Encoding.UTF8.GetBytes(string.Join('\n', ReplayChecks.Normalize(slots))))),
         CaseId = id, EmployeeCount = input.Employees.Count,
         AvailabilityEntryCount = input.Groups.SelectMany(g => g.Members).Sum(m => m.Days.Count),
         Settings = new
@@ -56,12 +70,13 @@ internal sealed class ReplayCase
         LocalQuality = generated.Violations.Count == 0 ? ReplayChecks.FindLocalMinimumImprovement(input, slots, generated) : null
     };
 
-    internal static ReplayCase Skipped(string id, string reason) => new() { CaseId = id, SkipReason = reason };
+    internal static ReplayCase Skipped(string id, string reason, string engine = "legacy", string variant = "stored") => new() { CaseId = id, SkipReason = reason, Engine = engine, Variant = variant };
 }
 
 internal static class ReplayReportWriter
 {
-    internal static async Task WriteAsync(string output, IReadOnlyList<ReplayCase> cases, double elapsed, CancellationToken ct)
+    internal static async Task WriteAsync(string output, IReadOnlyList<ReplayCase> cases, double elapsed, CancellationToken ct,
+        string engine = "legacy", string variant = "stored", string? sourceFingerprint = null, string? quickCheck = null)
     {
         foreach (var name in new[] { "summary.json", "failures.json", "cases.csv" })
         {
@@ -70,9 +85,16 @@ internal static class ReplayReportWriter
                 throw new ReplayInputException("linked-report-file-refused");
         }
         var options = new JsonSerializerOptions { WriteIndented = true };
+        var checkout = await GitAsync("rev-parse", "HEAD");
+        var workingTree = await GitAsync("status", "--porcelain");
         var summary = new
         {
-            PinnedCommit = SqliteReplaySource.PinnedCommit, Mode = "offline-read-only-preview", RunUtc = DateTimeOffset.UtcNow,
+            BaselineSourceCommit = SqliteReplaySource.PinnedCommit, ExecutedCheckout = checkout,
+            ExecutedGeneratorAssemblySha256 = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
+                await File.ReadAllBytesAsync(typeof(BusinessLogicLayer.Generators.PriorityScheduleGenerator).Assembly.Location, ct))),
+            WorkingTreeModified = workingTree is null ? (bool?)null : workingTree.Length > 0,
+            Mode = "offline-read-only-preview", Engine = engine, Variant = variant, SourceFingerprint = sourceFingerprint,
+            QuickCheckBefore = quickCheck, QuickCheckAfter = quickCheck, FingerprintUnchanged = sourceFingerprint is not null, RunUtc = DateTimeOffset.UtcNow,
             SchemaCompatibility = "compatible", SourceReadOnly = true, EndToEndMilliseconds = elapsed,
             PeakWorkingSetBytes = Process.GetCurrentProcess().PeakWorkingSet64, CaseCount = cases.Count,
             SkippedCount = cases.Count(c => c.SkipReason is not null), FailureCount = cases.Count(c => c.Failed), Cases = cases
@@ -81,19 +103,37 @@ internal static class ReplayReportWriter
         await File.WriteAllTextAsync(Path.Combine(output, "summary.json"), JsonSerializer.Serialize(summary, options), ct);
         await File.WriteAllTextAsync(Path.Combine(output, "failures.json"), JsonSerializer.Serialize(cases.Where(c => c.Failed).Select(c => new
         {
-            c.CaseId, c.Classification, c.SkipReason, c.RepeatStable, c.HardViolations
+            c.CaseId, c.Engine, c.Variant, c.Classification, c.SkipReason, c.RepeatStable, c.HardViolations
         }), options), ct);
-        var csv = new StringBuilder("case,classification,employees,availabilityEntries,generated,assigned,unfurnished,conflictDays,coverageGapMinutes,minDeficitMinutes,minDeficitSquared,medianMilliseconds,maxMilliseconds,stable,hardViolations\n");
+        var csv = new StringBuilder("case,engine,variant,classification,employees,priorities,shiftHours,weekendsOff,availabilityEntries,generated,assigned,unfurnished,conflictDays,coverageGapMinutes,minDeficitMinutes,priorityDeficitMinutes,regularDeficitMinutes,minDeficitSquared,medianMilliseconds,maxMilliseconds,stable,hardViolations,orderedOutputSha256\n");
         foreach (var c in cases)
             csv.AppendLine(string.Join(",", new object?[]
             {
-                c.CaseId, c.Classification, c.EmployeeCount, c.AvailabilityEntryCount, c.Generated?.GeneratedCount,
+                c.CaseId, c.Engine, c.Variant, c.Classification, c.EmployeeCount, c.PriorityCount, c.PriorityShiftHours, c.PriorityWeekendsOff, c.AvailabilityEntryCount, c.Generated?.GeneratedCount,
                 c.Generated?.AssignedCount, c.Generated?.UnfurnishedCount, c.Generated?.ConflictDays, c.Generated?.CoverageGapMinutes,
-                c.Generated?.TotalMinHourDeficitMinutes, c.Generated?.TotalMinHourDeficitSquared,
+                c.Generated?.TotalMinHourDeficitMinutes, c.Generated?.PriorityDeficitMinutes, c.Generated?.RegularDeficitMinutes, c.Generated?.TotalMinHourDeficitSquared,
                 c.MedianMilliseconds.ToString("F3", CultureInfo.InvariantCulture), c.MaxMilliseconds.ToString("F3", CultureInfo.InvariantCulture),
-                c.RepeatStable, c.HardViolations.Values.Sum()
+                c.RepeatStable, c.HardViolations.Values.Sum(), c.OrderedOutputSha256
             }));
         await File.WriteAllTextAsync(Path.Combine(output, "cases.csv"), csv.ToString(), ct);
+    }
+
+    private static async Task<string?> GitAsync(params string[] arguments)
+    {
+        try
+        {
+            var start = new ProcessStartInfo("git") { UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true };
+            foreach (var argument in arguments) start.ArgumentList.Add(argument);
+            using var process = Process.Start(start)!;
+            var text = process.StandardOutput.ReadToEndAsync();
+            var error = process.StandardError.ReadToEndAsync();
+            using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+            try { await process.WaitForExitAsync(timeout.Token); }
+            catch (OperationCanceledException) { process.Kill(entireProcessTree: true); return null; }
+            await error;
+            return process.ExitCode == 0 ? (await text).Trim() : null;
+        }
+        catch (Exception exception) when (exception is System.ComponentModel.Win32Exception or InvalidOperationException) { return null; }
     }
 }
 
@@ -106,6 +146,7 @@ internal static class ReplayChecks
         var shifts = new[] { schedule.Shift1Time, schedule.Shift2Time }.Select(s => Range(s, out var from, out var to) ? (from, to) : (-1, -1)).Where(s => s.Item1 >= 0).ToArray();
         var employees = input.Employees.Where(e => e.EmployeeId > 0).GroupBy(e => e.EmployeeId).Select(g => g.First()).ToArray();
         var ids = employees.Select(e => e.EmployeeId).ToHashSet();
+        var priorityIds = input.PriorityShiftHours.HasValue ? employees.Where(e => e.IsPriority).Select(e => e.EmployeeId).ToHashSet() : [];
         var violations = new Dictionary<string, int>();
         void Fail(string code) => violations[code] = violations.GetValueOrDefault(code) + 1;
         if (checkPositions && slots.Count != (employees.Length == 0 ? 0 : days * schedule.PeoplePerShift * shifts.Length)) Fail("PositionCount");
@@ -138,7 +179,17 @@ internal static class ReplayChecks
             var employee = slot.EmployeeId.Value;
             if (checkPositions && !shiftEmployees.Add((slot.DayOfMonth, shift, employee))) Fail("DuplicateEmployeeInShift");
             var window = Window(input, employee, slot.DayOfMonth);
-            if (from < window.From || to > window.To || window.To <= window.From) Fail("Availability");
+            if (priorityIds.Contains(employee))
+            {
+                if (to - from != input.PriorityShiftHours * 60) Fail("PriorityDuration");
+                if (input.PriorityWeekendsOff && slot.DayOfMonth >= 1 && slot.DayOfMonth <= days &&
+                    new DateOnly(schedule.Year, schedule.Month, slot.DayOfMonth).DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday) Fail("PriorityWeekend");
+                if (window.To <= window.From || from >= window.To || to <= window.From) Fail("Availability");
+                if (worked.Any(w => w.Employee == employee && w.Day == slot.DayOfMonth)) Fail("PriorityDuplicateDay");
+                for (var minute = from; minute < to; minute++)
+                    if (!shifts.Any(s => s.Item1 <= minute && minute < s.Item2)) { Fail("TemplateGap"); break; }
+            }
+            else if (from < window.From || to > window.To || window.To <= window.From) Fail("Availability");
             foreach (var external in input.ExternalSlots)
                 if (external.EmployeeId == employee && external.Status == SlotStatus.ASSIGNED && external.DayOfMonth == slot.DayOfMonth
                     && Time(external.FromTime, out var start) && Time(external.ToTime, out var end) && from < end && start < to)
@@ -158,6 +209,7 @@ internal static class ReplayChecks
             }
         }
         var deficits = new List<int>();
+        var priorityDeficit = 0;
         foreach (var employee in employees)
         {
             var assignments = worked.Where(w => w.Employee == employee.EmployeeId).ToArray();
@@ -168,22 +220,36 @@ internal static class ReplayChecks
             var strict = full.Where(day => (employee.MinHoursMonth ?? 0) <= 0 || !ExplicitFullDay(input, employee.EmployeeId, day, shifts)).ToArray();
             if (schedule.MaxFullPerMonth > 0 && strict.Length > schedule.MaxFullPerMonth) Fail("MaxFullDays");
             if (schedule.MaxConsecutiveFull > 0 && LongestRun(strict) > schedule.MaxConsecutiveFull) Fail("FullStreak");
-            deficits.Add(Math.Max(0, (employee.MinHoursMonth ?? 0) * 60 - total));
+            var deficit = Math.Max(0, (employee.MinHoursMonth ?? 0) * 60 - total);
+            deficits.Add(deficit);
+            if (priorityIds.Contains(employee.EmployeeId)) priorityDeficit += deficit;
         }
         var gap = 0;
         for (var day = 1; day <= days; day++)
         {
             var dayWork = worked.Where(w => w.Day == day).ToArray();
-            foreach (var shift in shifts)
+            foreach (var shift in priorityIds.Count > 0 ? Union(shifts) : shifts)
                 for (var minute = shift.Item1; minute < shift.Item2; minute++)
                 {
-                    var missing = Math.Max(0, schedule.PeoplePerShift - dayWork.Where(w => w.From <= minute && w.To > minute).Select(w => w.Employee).Distinct().Count());
+                    var count = dayWork.Where(w => w.From <= minute && w.To > minute).Select(w => w.Employee).Distinct().Count();
+                    if (priorityIds.Count > 0 && count > schedule.PeoplePerShift) Fail("Overstaffing");
+                    var missing = Math.Max(0, schedule.PeoplePerShift - count);
                     gap += missing;
                     if (missing > 0) overlapDays.Add(day);
                 }
         }
         return new(slots.Count, slots.Count(s => s.Status == SlotStatus.ASSIGNED), slots.Count(s => s.Status == SlotStatus.UNFURNISHED),
-            overlapDays.Count, gap, worked.Sum(w => w.To - w.From), deficits.Sum(), deficits.Sum(d => (long)d * d), violations);
+            overlapDays.Count, gap, worked.Sum(w => w.To - w.From), deficits.Sum(), deficits.Sum(d => (long)d * d), violations,
+            priorityDeficit, deficits.Sum() - priorityDeficit);
+    }
+
+    private static (int, int)[] Union((int, int)[] shifts)
+    {
+        var result = new List<(int From, int To)>();
+        foreach (var shift in shifts.OrderBy(s => s.Item1))
+            if (result.Count == 0 || shift.Item1 > result[^1].To) result.Add(shift);
+            else result[^1] = (result[^1].From, Math.Max(result[^1].To, shift.Item2));
+        return result.ToArray();
     }
 
     private static (int From, int To) Window(ReplayInput input, int employee, int day)
@@ -216,15 +282,20 @@ internal static class ReplayChecks
         var occupied = external.GroupBy(s => (Employee: s.EmployeeId!.Value, Day: s.DayOfMonth)).ToDictionary(g => g.Key,
             g => g.Select(s => { Time(s.FromTime, out var from); Time(s.ToTime, out var to); return (From: from, To: to); }).ToArray());
         var availableCounts = Enumerable.Range(0, days + 1).Select(_ => new int[1440]).ToArray();
-        var demand = shifts.Sum(s => s.Item2 - s.Item1) * days * schedule.PeoplePerShift;
-        var boundsApplicable = shifts.Length == 1 || shifts.Length == 2 && shifts[0].Item2 == shifts[1].Item1;
+        var priorityEnabled = input.PriorityShiftHours.HasValue && employees.Any(e => e.IsPriority);
+        var demandShifts = priorityEnabled ? Union(shifts) : shifts;
+        var demand = demandShifts.Sum(s => s.Item2 - s.Item1) * days * schedule.PeoplePerShift;
+        var boundsApplicable = priorityEnabled || shifts.Length == 1 || shifts.Length == 2 && shifts[0].Item2 == shifts[1].Item1;
         var capacity = 0;
+        var priorityCapacity = 0;
+        var priorityUnavoidableDeficit = 0;
         var individualMinimumDeficits = 0;
         var minimumTargets = 0;
         var missingMembers = 0;
         var missingDays = 0;
         var totals = new List<int>();
         var attainments = new List<double>();
+        var capacityAttainments = new List<double>();
         var reviews = 0;
         foreach (var employee in employees)
         {
@@ -236,6 +307,26 @@ internal static class ReplayChecks
             {
                 var window = Window(input, employee.EmployeeId, day);
                 occupied.TryGetValue((employee.EmployeeId, day), out var blocked);
+                if (priorityEnabled && employee.IsPriority)
+                {
+                    var duration = input.PriorityShiftHours!.Value * 60;
+                    if (window.To <= window.From || input.PriorityWeekendsOff &&
+                        new DateOnly(schedule.Year, schedule.Month, day).DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday) continue;
+                    var free = Union(shifts).ToList();
+                    foreach (var block in blocked ?? [])
+                        free = free.SelectMany(w => w.Item1 >= block.To || w.Item2 <= block.From ? new[] { w } :
+                            new[] { (w.Item1, Math.Min(w.Item2, block.From)), (Math.Max(w.Item1, block.To), w.Item2) }
+                                .Where(p => p.Item2 > p.Item1)).ToList();
+                    foreach (var interval in free)
+                    {
+                        var earliest = Math.Max(interval.Item1, window.From - duration + 1);
+                        var latest = Math.Min(interval.Item2 - duration, window.To - 1);
+                        if (earliest > latest) continue;
+                        dayPotential[day] = duration;
+                        for (var minute = earliest; minute < latest + duration; minute++) availableCounts[day][minute]++;
+                    }
+                    continue;
+                }
                 for (var minute = Math.Max(window.From, shifts.Min(s => s.Item1)); minute < Math.Min(window.To, shifts.Max(s => s.Item2)); minute++)
                 {
                     if (blocked is not null && blocked.Any(b => minute >= b.From && minute < b.To)) continue;
@@ -261,11 +352,17 @@ internal static class ReplayChecks
             if (schedule.MaxHoursPerEmpMonth > 0) cap = Math.Min(cap, schedule.MaxHoursPerEmpMonth * 60);
             capacity += cap;
             var target = Math.Max(0, employee.MinHoursMonth ?? 0) * 60;
+            if (priorityEnabled && employee.IsPriority)
+            {
+                priorityCapacity += cap;
+                priorityUnavoidableDeficit += Math.Max(0, target - cap);
+            }
             minimumTargets += target;
             individualMinimumDeficits += Math.Max(0, target - cap);
             var assignments = slots.Where(s => s.Status == SlotStatus.ASSIGNED && s.EmployeeId == employee.EmployeeId).ToArray();
             var total = assignments.Sum(s => { Time(s.FromTime, out var from); Time(s.ToTime, out var to); return Math.Max(0, to - from); });
             totals.Add(total);
+            if (cap > 0) capacityAttainments.Add(total / (double)cap);
             if (target > 0) attainments.Add((double)total / target);
             var full = assignments.GroupBy(s => s.DayOfMonth).Where(g => g.Count() >= 2).Select(g => g.Key).Order().ToArray();
             var strict = full.Where(day => target <= 0 || !ExplicitFullDay(input, employee.EmployeeId, day, shifts)).ToArray();
@@ -274,7 +371,7 @@ internal static class ReplayChecks
         }
         var headcountGap = 0;
         for (var day = 1; day <= days; day++)
-            foreach (var shift in shifts)
+            foreach (var shift in demandShifts)
                 for (var minute = shift.Item1; minute < shift.Item2; minute++)
                     headcountGap += Math.Max(0, schedule.PeoplePerShift - availableCounts[day][minute]);
         var coverageBound = Math.Max(headcountGap, boundsApplicable ? demand - capacity : 0);
@@ -285,14 +382,17 @@ internal static class ReplayChecks
             schedule.AvailabilityGroupId is > 0, missingMembers, missingDays, external.Length, occupied.Count,
             totals.DefaultIfEmpty().Min(), totals.DefaultIfEmpty().Max(),
             Math.Sqrt(totals.Select(t => (t - mean) * (t - mean)).DefaultIfEmpty().Average()),
-            attainments.Count == 0 ? null : attainments.Min(), attainments.Count == 0 ? null : attainments.Max(), reviews);
+            attainments.Count == 0 ? null : attainments.Min(), attainments.Count == 0 ? null : attainments.Max(), reviews,
+            priorityCapacity, priorityUnavoidableDeficit,
+            capacityAttainments.Count == 0 ? null : capacityAttainments.Min(), capacityAttainments.Count == 0 ? null : capacityAttainments.Max());
     }
 
     internal static ReplayLocalQualityResult FindLocalMinimumImprovement(ReplayInput input, IReadOnlyCollection<ScheduleSlotModel> slots, ReplayMetrics baseline)
     {
         if (baseline.TotalMinHourDeficitMinutes == 0) return new(false, 0, false, 0, 0, 0);
         var items = slots.ToArray();
-        var employees = input.Employees.Where(e => e.EmployeeId > 0).GroupBy(e => e.EmployeeId).Select(g => g.First()).ToArray();
+        var employees = input.Employees.Where(e => e.EmployeeId > 0).GroupBy(e => e.EmployeeId).Select(g => g.First()).OrderBy(e => e.EmployeeId).ToArray();
+        var locked = input.PriorityShiftHours.HasValue ? employees.Where(e => e.IsPriority).Select(e => e.EmployeeId).ToHashSet() : [];
         var targets = employees.ToDictionary(e => e.EmployeeId, e => Math.Max(0, e.MinHoursMonth ?? 0) * 60);
         var windows = employees.SelectMany(e => Enumerable.Range(1, DateTime.DaysInMonth(input.Schedule.Year, input.Schedule.Month))
             .Select(day => (Key: (e.EmployeeId, day), Value: Window(input, e.EmployeeId, day)))).ToDictionary(x => x.Key, x => x.Value);
@@ -305,6 +405,58 @@ internal static class ReplayChecks
             .GroupBy(s => (s.EmployeeId!.Value, s.DayOfMonth)).ToDictionary(g => g.Key,
                 g => g.Select(s => { Time(s.FromTime, out var from); Time(s.ToTime, out var to); return (From: from, To: to); }).ToArray());
         var totals = employees.ToDictionary(e => e.EmployeeId, e => items.Select((s, index) => (s, index)).Where(x => x.s.EmployeeId == e.EmployeeId && x.s.Status == SlotStatus.ASSIGNED).Sum(x => durations[x.index]));
+        var appObjective = locked.Count > 0;
+        var templates = new[] { input.Schedule.Shift1Time, input.Schedule.Shift2Time }
+            .Select(s => Range(s, out var from, out var to) ? (from, to) : (-1, -1)).Where(s => s.Item1 >= 0).ToArray();
+        var potential = appObjective ? employees.ToDictionary(e => e.EmployeeId, Potential) : new Dictionary<int, int>();
+        var baselineVector = appObjective ? Vector() : null;
+        const string priorityObjective = "priority-deficit/coverage-gap/regular-deficit/normalized-deficit/fairness/rest/vacancies";
+        int Potential(ScheduleEmployeeModel employee)
+        {
+            var capacity = 0;
+            for (var day = 1; day <= DateTime.DaysInMonth(input.Schedule.Year, input.Schedule.Month); day++)
+            {
+                var window = windows[(employee.EmployeeId, day)];
+                var free = new List<(int From, int To)> { (templates.Min(t => t.Item1), templates.Max(t => t.Item2)) };
+                if (external.TryGetValue((employee.EmployeeId, day), out var blocked))
+                    foreach (var block in blocked.Where(b => templates.Any(t => b.From < t.Item2 && t.Item1 < b.To)))
+                        free = free.SelectMany(w => w.From >= block.To || w.To <= block.From ? new[] { w } :
+                            new[] { (w.From, Math.Min(w.To, block.From)), (Math.Max(w.From, block.To), w.To) }
+                                .Where(p => p.Item2 > p.Item1)).ToList();
+                if (free.Count == 0) continue;
+                var allowed = free.OrderByDescending(w => templates.Sum(t => Math.Max(0, Math.Min(w.To, t.Item2) - Math.Max(w.From, t.Item1))))
+                    .ThenByDescending(w => w.To - w.From).ThenBy(w => w.From).First();
+                if (!employee.IsPriority)
+                    capacity += Union(templates).Sum(t => Math.Max(0, Math.Min(Math.Min(t.Item2, allowed.To), window.To) - Math.Max(Math.Max(t.Item1, allowed.From), window.From)));
+                else if (window.To > window.From && !(input.PriorityWeekendsOff && new DateOnly(input.Schedule.Year, input.Schedule.Month, day).DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday))
+                {
+                    var duration = input.PriorityShiftHours!.Value * 60;
+                    if (Union(templates).Any(t => Math.Max(Math.Max(t.Item1, allowed.From), window.From - duration + 1) <=
+                        Math.Min(Math.Min(t.Item2, allowed.To) - duration, window.To - 1))) capacity += duration;
+                }
+            }
+            return Math.Max(1, input.Schedule.MaxHoursPerEmpMonth > 0 ? Math.Min(capacity, input.Schedule.MaxHoursPerEmpMonth * 60) : capacity);
+        }
+        double[] Vector()
+        {
+            double priority = 0, regular = 0, normalized = 0, fairness = 0, rest = 0;
+            foreach (var employee in employees)
+            {
+                var id = employee.EmployeeId;
+                var deficit = Math.Max(0, targets[id] - totals[id]);
+                if (employee.IsPriority) priority += deficit;
+                else { regular += deficit; fairness += Math.Pow(totals[id] / (double)potential[id], 2); }
+                normalized += Math.Pow(deficit / (double)Math.Max(1, Math.Min(potential[id], targets[id])), 2);
+                var run = LongestRun(items.Where(s => s.EmployeeId == id && s.Status == SlotStatus.ASSIGNED).Select(s => s.DayOfMonth));
+                rest += run * run;
+            }
+            return [priority, baseline.CoverageGapMinutes, regular, normalized, fairness, rest, items.Count(s => s.Status == SlotStatus.UNFURNISHED)];
+        }
+        static int Compare(double[] first, double[] second)
+        {
+            for (var index = 0; index < first.Length; index++) { var difference = first[index].CompareTo(second[index]); if (difference != 0) return difference; }
+            return 0;
+        }
         var watch = Stopwatch.StartNew();
         var states = 0;
         bool Limited() => states >= 20000 || watch.Elapsed > TimeSpan.FromSeconds(1);
@@ -339,16 +491,17 @@ internal static class ReplayChecks
             var deficits = totals.Select(t => Math.Max(0, targets[t.Key] - t.Value)).ToArray();
             var sum = deficits.Sum();
             var square = deficits.Sum(d => (long)d * d);
-            if (sum > baseline.TotalMinHourDeficitMinutes || sum == baseline.TotalMinHourDeficitMinutes && square >= baseline.TotalMinHourDeficitSquared) return null;
+            var vector = appObjective ? Vector() : null;
+            if (appObjective ? Compare(vector!, baselineVector!) >= 0 : sum > baseline.TotalMinHourDeficitMinutes || sum == baseline.TotalMinHourDeficitMinutes && square >= baseline.TotalMinHourDeficitSquared) return null;
             var check = Check(input, items);
             if (check.Violations.Count != 0 || check.CoverageGapMinutes != baseline.CoverageGapMinutes || check.ConflictDays != baseline.ConflictDays)
                 throw new ReplayInputException("local-quality-witness-validation-disagreement");
-            return new(true, states, false, changed, sum, square);
+            return new(true, states, false, changed, sum, square, appObjective ? priorityObjective : "minimum-deficit/squared-deficit", baselineVector, vector);
         }
         for (var i = 0; i < items.Length && !Limited(); i++)
         {
-            if (items[i].Status != SlotStatus.ASSIGNED || items[i].EmployeeId is not int donor) continue;
-            foreach (var receiver in targets.Keys.Where(id => id != donor))
+            if (items[i].Status != SlotStatus.ASSIGNED || items[i].EmployeeId is not int donor || locked.Contains(donor)) continue;
+            foreach (var receiver in targets.Keys.Where(id => id != donor && !locked.Contains(id)))
             {
                 items[i].EmployeeId = receiver;
                 totals[donor] -= durations[i]; totals[receiver] += durations[i];
@@ -363,7 +516,8 @@ internal static class ReplayChecks
             for (var j = i + 1; j < items.Length && !Limited(); j++)
             {
                 if (items[i].Status != SlotStatus.ASSIGNED || items[j].Status != SlotStatus.ASSIGNED
-                    || items[i].EmployeeId is not int first || items[j].EmployeeId is not int second || first == second) continue;
+                    || items[i].EmployeeId is not int first || items[j].EmployeeId is not int second || first == second
+                    || locked.Contains(first) || locked.Contains(second)) continue;
                 items[i].EmployeeId = second; items[j].EmployeeId = first;
                 var delta = durations[j] - durations[i]; totals[first] += delta; totals[second] -= delta;
                 ReplayLocalQualityResult? result;
@@ -371,7 +525,8 @@ internal static class ReplayChecks
                 finally { items[i].EmployeeId = first; items[j].EmployeeId = second; totals[first] -= delta; totals[second] += delta; }
                 if (result is not null) return result;
             }
-        return new(false, states, Limited(), 0, baseline.TotalMinHourDeficitMinutes, baseline.TotalMinHourDeficitSquared);
+        return new(false, states, Limited(), 0, baseline.TotalMinHourDeficitMinutes, baseline.TotalMinHourDeficitSquared,
+            appObjective ? priorityObjective : "minimum-deficit/squared-deficit", baselineVector);
     }
 
     private static int LongestRun(IEnumerable<int> days)
@@ -399,5 +554,5 @@ internal static class ReplayChecks
     }
 
     internal static string[] Normalize(IEnumerable<ScheduleSlotModel> slots) => slots.Select(s =>
-        $"{s.DayOfMonth:D2}|{s.SlotNo}|{s.EmployeeId}|{s.Status}|{s.FromTime}|{s.ToTime}").Order(StringComparer.Ordinal).ToArray();
+        $"{s.DayOfMonth:D2}|{s.SlotNo}|{s.EmployeeId}|{s.Status}|{s.FromTime}|{s.ToTime}").ToArray();
 }

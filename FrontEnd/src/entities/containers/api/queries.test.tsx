@@ -387,3 +387,20 @@ test("priority-only changes use employee PUT even when hours and order are uncha
   await waitFor(() => expect(apiMocks.updateGraphEmployee).toHaveBeenCalledWith(2, 66, 70, { employeeId: 7, minHoursMonth: 80, displayOrder: 0, isPriority: true }));
   expect(apiMocks.updateGraphEmployee).toHaveBeenCalledTimes(1);
 });
+
+test("failed priority save clears pending state and retries the same flags", async () => {
+  const client = new QueryClient();
+  const { result } = renderHook(() => useSaveGraphWorkspaceMutation(), { wrapper: ({ children }) => <QueryClientProvider client={client}>{children}</QueryClientProvider> });
+  const input = updateWorkspaceInput();
+  input.employeeAssignments = input.existingEmployees.map(employee => ({ id: employee.id, employeeId: employee.employeeId,
+    minHoursMonth: employee.minHoursMonth ?? null, isPriority: employee.employeeId === 7 }));
+  const failed = vi.fn(); const saved = vi.fn();
+  apiMocks.updateGraphEmployee.mockRejectedValueOnce(new Error("Synthetic save failure"));
+  act(() => result.current.mutate(input, { onError: failed }));
+  await waitFor(() => expect(failed).toHaveBeenCalled());
+  expect(result.current.isPending).toBe(false);
+  act(() => result.current.mutate(input, { onSuccess: saved }));
+  await waitFor(() => expect(saved).toHaveBeenCalled());
+  expect(result.current.isPending).toBe(false);
+  expect(apiMocks.updateGraphEmployee).toHaveBeenLastCalledWith(2, 66, 70, { employeeId: 7, minHoursMonth: 80, displayOrder: 0, isPriority: true });
+});

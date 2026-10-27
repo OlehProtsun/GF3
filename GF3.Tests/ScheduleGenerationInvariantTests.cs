@@ -6,6 +6,20 @@ namespace GF3.Tests;
 
 public sealed class ScheduleGenerationInvariantTests
 {
+    [Fact]
+    public void PriorityOracleCountsOverlappingTemplateDemandOnce()
+    {
+        var scenario = ScheduleGenerationScenarioFactory.CreateAllAvailable(2026, 4, 1, 1, 49);
+        scenario.Schedule.Shift1Time = "09:00 - 16:00"; scenario.Schedule.Shift2Time = "15:00 - 22:00";
+        scenario.Employees[0].IsPriority = true;
+        var slots = Enumerable.Range(1, 30).SelectMany(day => new[] {
+            TestDataFactory.CreateScheduleSlotModel(day, 1, null, "09:00", "16:00"),
+            TestDataFactory.CreateScheduleSlotModel(day, 1, null, "15:00", "22:00") }).ToArray();
+        var result = ScheduleGenerationOracle.Check(scenario, slots, 8, true);
+        Assert.Empty(result.HardViolations);
+        Assert.Equal(30 * 13 * 60, result.Metrics.CoverageGapMinutes);
+    }
+
     [Theory]
     [InlineData("Enrollment")]
     [InlineData("Overlap")]

@@ -64,15 +64,18 @@ public sealed class ScheduleCrossGraphConflictTests
         }
     }
 
-    [Fact]
-    public async Task SameGraphConcurrentGeneration_AndOwnPreview_RetainSingleConsistentSet()
+    [Theory]
+    [InlineData(false)] [InlineData(true)]
+    public async Task SameGraphConcurrentGeneration_AndOwnPreview_RetainSingleConsistentSet(bool priority)
     {
         await using var database = await SqliteTestDatabase.CreateAsync();
         var (containerId, graphId, _) = await ContainerServiceTests.SeedGenerationAsync(database);
         await using var firstContext = database.CreateContext();
         await using var secondContext = database.CreateContext();
-        var first = ContainerServiceTests.CreateService(firstContext, new ScheduleGenerator());
-        var second = ContainerServiceTests.CreateService(secondContext, new ScheduleGenerator());
+        if (priority) await firstContext.ScheduleEmployees.ExecuteUpdateAsync(s => s.SetProperty(e => e.IsPriority, true));
+        var firstLegacy = new ScheduleGenerator(); var secondLegacy = new ScheduleGenerator();
+        var first = ContainerServiceTests.CreateService(firstContext, priority ? new PriorityAwareScheduleGenerator(firstLegacy, new(firstLegacy), firstContext) : firstLegacy);
+        var second = ContainerServiceTests.CreateService(secondContext, priority ? new PriorityAwareScheduleGenerator(secondLegacy, new(secondLegacy), secondContext) : secondLegacy);
         var results = await Task.WhenAll(first.GenerateGraphAsync(containerId, graphId, true, false, null),
             second.GenerateGraphAsync(containerId, graphId, true, false, null));
         Assert.Equal(ScheduleGenerationScenarioMatrixTests.Normalize(results[0].Slots), ScheduleGenerationScenarioMatrixTests.Normalize(results[1].Slots));

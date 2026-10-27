@@ -107,8 +107,9 @@ internal static class PriorityScheduleRules
             var starts = morning ? new[] { positive.Start } : evening ? new[] { positive.End - duration }
                 : new[] { Math.Max(free.Start, positive.Start), Math.Min(free.End, positive.End) - duration,
                     free.Start, free.End - duration };
-            foreach (var start in starts)
+            foreach (var anchor in starts)
             {
+                var start = Math.Clamp(anchor, free.Start, free.End - duration);
                 var candidate = new Interval(start, start + duration);
                 if (free.Contains(candidate) && candidate.Overlaps(positive)) candidates.Add(candidate);
             }

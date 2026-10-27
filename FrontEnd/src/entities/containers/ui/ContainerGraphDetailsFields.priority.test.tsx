@@ -3,7 +3,7 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, expect, test, vi } from "vitest";
 import { createInitialGraphForm } from "../model/graphForm";
-import { setLanguage } from "@shared/i18n";
+import { setLanguage, t } from "@shared/i18n";
 import { ContainerGraphDetailsFields } from "./ContainerGraphDetailsFields";
 
 beforeEach(() => setLanguage("en"));
@@ -30,4 +30,15 @@ test("independent circular priority checkboxes support keyboard and retain minim
   await userEvent.click(screen.getByRole("button", { name: "Increase Ada One min hours per month" }));
   expect(changed).toHaveBeenCalledWith(1, "71");
   expect(ada.closest("label")!.querySelectorAll("input")).toHaveLength(1);
+});
+
+test.each(["en", "pl", "uk"] as const)("priority labels and descriptions are localized in %s", language => {
+  setLanguage(language);
+  render(<ContainerGraphDetailsFields form={{ ...createInitialGraphForm(), availabilityGroupId: "1" }} formErrors={{}}
+    employees={[{ id: 1, firstName: "Ada", lastName: "Synthetic", hasLoginAccount: false, isOnline: false }]}
+    shops={[]} availabilityGroups={[]} graphEmployeeRows={[{ employeeId: 1, minHoursMonth: "180", isPriority: true }]}
+    onFieldChange={() => () => undefined} onEmployeeMinHoursChange={() => undefined} onEmployeePriorityChange={() => undefined} />);
+  const checkbox = screen.getByRole("checkbox", { name: t("Priority: {0}", "Ada Synthetic") });
+  expect(checkbox).toBeChecked();
+  expect(checkbox).toHaveAccessibleDescription(t("Schedule this employee first using the priority shift duration and weekend settings."));
 });

@@ -42,7 +42,13 @@ public sealed class ScheduleGenerationScenarioMatrixTests(ITestOutputHelper outp
             1 + seed % 3, (AvailabilityPattern)(seed % 9), seed);
         scenario = ScheduleGenerationScenarioFactory.WithLimits(scenario, 80 + seed % 5 * 40,
             1 + seed % 5, 1 + seed % 3, 2 + seed % 8, seed % 4 * 40);
-        await GenerateAndCheck(scenario);
+        string[]? reference = null;
+        for (var repeat = 0; repeat < 3; repeat++)
+        {
+            var slots = await GenerateAndCheck(scenario);
+            if (reference is not null) Assert.Equal(reference, Normalize(slots));
+            reference = Normalize(slots);
+        }
     }
 
     [Theory]

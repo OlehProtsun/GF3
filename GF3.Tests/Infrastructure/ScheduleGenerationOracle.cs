@@ -127,11 +127,13 @@ internal static class ScheduleGenerationOracle
         if (minutes.Values.Sum() != worked.Sum(w => w.To - w.From)) Fail("DurationSum");
         var gap = 0;
         var conflictDays = new HashSet<int>(violations.Where(v => v.Code is "Overlap" or "ExternalOverlap").Select(v => v.DayOfMonth));
+        var coverageMinutes = templates.SelectMany(template => Enumerable.Range(template.Item1, template.Item2 - template.Item1));
+        if (priorityShiftHours.HasValue && employees.Any(e => e.IsPriority)) coverageMinutes = coverageMinutes.Distinct();
+        var demandMinutes = coverageMinutes.ToArray();
         for (var day = 1; day <= days; day++)
         {
             var dayWork = worked.Where(w => w.Day == day).ToArray();
-            foreach (var template in templates)
-                for (var minute = template.Item1; minute < template.Item2; minute++)
+            foreach (var minute in demandMinutes)
                 {
                     var count = dayWork.Where(w => w.From <= minute && w.To > minute).Select(w => w.Employee).Distinct().Count();
                     var missing = Math.Max(0, schedule.PeoplePerShift - count);

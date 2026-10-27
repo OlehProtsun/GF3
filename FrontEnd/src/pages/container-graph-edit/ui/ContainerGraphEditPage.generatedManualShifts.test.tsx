@@ -5,7 +5,8 @@ import type { ContainerGraphEditor } from "@entities/containers/ui/ContainerGrap
 import type { Graph, GraphSlot, GraphCellStyle } from "@entities/containers/model/types";
 import type { ShiftSwap } from "@entities/shift-swaps/model/types";
 import { buildGraphNoteContent, parseGraphNoteContent } from "@entities/containers/model/graphNote";
-import { setLanguage } from "@shared/i18n";
+import { setLanguage, t } from "@shared/i18n";
+import { ApiError, RequestCanceledError } from "@shared/api/httpClient";
 import { QueryClient } from "@tanstack/react-query";
 import { ContainerGraphEditPage } from "./ContainerGraphEditPage";
 
@@ -88,6 +89,7 @@ beforeEach(() => {
   setLanguage("en"); vi.clearAllMocks();
   mocks.graphEmployees = [{ id: 1, scheduleId: 1, employeeId: 1, displayOrder: 0 }];
   mocks.members = [{ id: 1, employeeId: 1, displayOrder: 0 }];
+  mocks.groups = [{ id: 1, name: "Availability", year: 2026, month: 2 }];
   mocks.params = { containerId: "1", graphId: "1" };
   mocks.graphs = [{ ...graph }, { ...graph, id: 2, name: "Graph two" }];
   mocks.slots = []; mocks.offers = []; mocks.styles = []; mocks.editor = null; mocks.queryClient = new QueryClient();
@@ -276,4 +278,38 @@ test("removing an availability member drops the flag instead of transferring it"
   mocks.members = [{ id: 2, employeeId: 2, displayOrder: 0 }];
   view.rerender(<ContainerGraphEditPage />);
   expect(mocks.editor!.graphEmployeeRows).toEqual([{ id: null, employeeId: 2, minHoursMonth: "", isPriority: false }]);
+});
+
+test.each(["success", "error"])("ignores stale %s after selecting different availability", async outcome => {
+  let callbacks: { onSuccess: (value: { slots: GraphSlot[] }) => void; onError: (error: Error) => void };
+  mocks.generate.mockImplementation((_variables, value) => { callbacks = value; });
+  mocks.groups.push({ id: 2, name: "Other", year: 2026, month: 2 });
+  render(<ContainerGraphEditPage />);
+  act(() => mocks.editor!.onEmployeePriorityChange(1, true));
+  await generate();
+  act(() => mocks.editor!.onFieldChange("availabilityGroupId")("2"));
+  await act(async () => outcome === "success" ? callbacks.onSuccess({ slots: preview() }) : callbacks.onError(new Error("Obsolete availability")));
+  expect(columns()).toEqual([]);
+  expect(screen.getByTestId("errors")).toBeEmptyDOMElement();
+  expect(mocks.editor!.graphEmployeeRows[0].isPriority).toBe(true);
+});
+
+test.each(["en", "pl", "uk"] as const)("priority survives error feedback and retry in %s", async language => {
+  setLanguage(language);
+  render(<ContainerGraphEditPage />);
+  act(() => mocks.editor!.onEmployeePriorityChange(1, true));
+  const message = t("Could not generate this schedule.");
+  const errors: Error[] = [400, 404, 500].map(status => new ApiError({ status, message }));
+  errors.push(new TypeError("Failed to fetch"), new RequestCanceledError());
+  for (const error of errors) {
+    mocks.generate.mockImplementationOnce((_variables, callbacks) => callbacks.onError(error));
+    await generate();
+    await waitFor(() => expect(screen.getByTestId("errors")).toHaveTextContent(error instanceof TypeError ? message : error.message));
+    expect(mocks.editor!.graphEmployeeRows[0].isPriority).toBe(true);
+    expect(mocks.editor!.isGenerating).toBe(false);
+  }
+  await generate();
+  await waitFor(() => expect(columns()).toHaveLength(1));
+  expect(screen.getByTestId("errors")).toBeEmptyDOMElement();
+  expect(mocks.generate.mock.calls.at(-1)![0].payload.employees[0].isPriority).toBe(true);
 });

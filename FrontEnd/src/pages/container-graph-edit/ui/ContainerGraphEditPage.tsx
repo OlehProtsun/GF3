@@ -976,7 +976,7 @@ export function ContainerGraphEditPage() {
   const generationEditorRef = useRef({ manualColumns, scheduleColumnOrder, pendingManualShiftPublishes, offers: shiftSwapLogQuery.data });
   useLayoutEffect(() => {
     generationSessionRef.current = { containerId, graphId, token: generationSessionRef.current.token + 1 };
-  }, [containerId, graphId]);
+  }, [containerId, graphId, form.availabilityGroupId]);
   useLayoutEffect(() => {
     generationEditorRef.current = { manualColumns, scheduleColumnOrder, pendingManualShiftPublishes, offers: shiftSwapLogQuery.data };
   }, [manualColumns, scheduleColumnOrder, pendingManualShiftPublishes, shiftSwapLogQuery.data]);
@@ -2533,7 +2533,7 @@ export function ContainerGraphEditPage() {
         return;
       }
 
-      setSubmitError(error instanceof Error ? error.message : t("Could not generate this schedule."));
+      setSubmitError(error instanceof Error && !(error instanceof TypeError) ? error.message : t("Could not generate this schedule."));
     }
   };
 
