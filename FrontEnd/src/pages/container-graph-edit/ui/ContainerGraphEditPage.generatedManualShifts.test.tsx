@@ -86,6 +86,8 @@ const preview = () => Array.from({ length: 28 }, (_, i): GraphSlot[] => ([{
 }, { id: i + 100, scheduleId: 1, dayOfMonth: i + 1, slotNo: 1, employeeId: 1, status: 1, fromTime: "12:00", toTime: "16:00" }])).flat();
 beforeEach(() => {
   setLanguage("en"); vi.clearAllMocks();
+  mocks.graphEmployees = [{ id: 1, scheduleId: 1, employeeId: 1, displayOrder: 0 }];
+  mocks.members = [{ id: 1, employeeId: 1, displayOrder: 0 }];
   mocks.params = { containerId: "1", graphId: "1" };
   mocks.graphs = [{ ...graph }, { ...graph, id: 2, name: "Graph two" }];
   mocks.slots = []; mocks.offers = []; mocks.styles = []; mocks.editor = null; mocks.queryClient = new QueryClient();
@@ -244,4 +246,34 @@ test("persisted manual demand requires cancellation before destructive edits", (
   expect(columns()[0].cells["1"]).toBe("09:00-21:00");
   expect(mocks.editor!.manualShiftPublishError).toBe("Cancel open manual offers before changing their demand.");
   act(()=>mocks.editor!.onDeleteManualColumn(7));expect(columns()).toHaveLength(1);
+});
+
+test("priority follows employee IDs through unsaved preview, undo, open graphs and save", async () => {
+  const view = render(<ContainerGraphEditPage />);
+  expect(mocks.editor!.graphEmployeeRows[0].isPriority).toBe(false);
+  act(() => mocks.editor!.onEmployeePriorityChange(1, true));
+  expect(mocks.editor!.hasUnsavedChanges).toBe(true);
+  await generate();
+  expect(mocks.generate.mock.calls.at(-1)![0].payload.employees[0].isPriority).toBe(true);
+  expect(mocks.save).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole("tab", { name: "Graph two" }));
+  mocks.params = { containerId: "1", graphId: "2" }; view.rerender(<ContainerGraphEditPage />);
+  expect(mocks.editor!.graphEmployeeRows[0].isPriority).toBe(false);
+  fireEvent.click(screen.getByRole("tab", { name: "Graph one" }));
+  mocks.params = { containerId: "1", graphId: "1" }; view.rerender(<ContainerGraphEditPage />);
+  expect(mocks.editor!.graphEmployeeRows[0].isPriority).toBe(true);
+  act(() => mocks.editor!.onEmployeePriorityChange(1, false));
+  fireEvent.click(screen.getByText("Undo"));
+  expect(mocks.editor!.graphEmployeeRows[0].isPriority).toBe(true);
+  fireEvent.click(screen.getByText("Save editor")); fireEvent.click(screen.getByText("Confirm save"));
+  await waitFor(() => expect(mocks.save).toHaveBeenCalled());
+  expect(mocks.save.mock.calls.at(-1)![0].employeeAssignments[0].isPriority).toBe(true);
+});
+
+test("removing an availability member drops the flag instead of transferring it", () => {
+  const view = render(<ContainerGraphEditPage />);
+  act(() => mocks.editor!.onEmployeePriorityChange(1, true));
+  mocks.members = [{ id: 2, employeeId: 2, displayOrder: 0 }];
+  view.rerender(<ContainerGraphEditPage />);
+  expect(mocks.editor!.graphEmployeeRows).toEqual([{ id: null, employeeId: 2, minHoursMonth: "", isPriority: false }]);
 });

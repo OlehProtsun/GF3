@@ -1,4 +1,7 @@
 export const queryKeys = {
+  priorityGenerationSettings: {
+    current: () => ["priorityGenerationSettings", "current"] as const,
+  },
   publicHolidaySettings: {
     current: () => ["publicHolidaySettings", "current"] as const,
   },

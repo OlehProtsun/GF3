@@ -91,3 +91,9 @@
 }
 @media(max-width:350px) { .cardDetails { margin-left:0; } .cardRow { gap:10px; } .card { padding-inline:14px; } .dialog { padding:16px; } .holidayList li { gap:10px; font-size:.82rem; } }
 @media(prefers-reduced-motion:reduce) { .switchTrack,.switchThumb,.actionButton,.languageOption,.dialogClose,.yearControls button { transition:none; } }
+
+.prioritySettings { display:grid; gap:14px; margin-top:18px; }
+.prioritySettingRow { display:flex; align-items:center; justify-content:space-between; gap:16px; min-width:0; color:#63748e; font-size:.87rem; line-height:1.5; }
+.prioritySettingRow > :first-child { min-width:0; overflow-wrap:anywhere; }
+.prioritySettingRow > :last-child { flex-shrink:0; }
+@media(max-width:540px) { .prioritySettings { margin-left:0; } .prioritySettingRow { flex-wrap:wrap; } }

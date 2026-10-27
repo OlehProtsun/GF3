@@ -134,10 +134,10 @@ function createWorkspaceInput() {
     graphId: null,
     payload: graphPayload,
     employeeAssignments: [
-      { id: null, employeeId: 7, minHoursMonth: 80 },
-      { id: null, employeeId: 0, minHoursMonth: 90 },
-      { id: null, employeeId: 5, minHoursMonth: null },
-      { id: null, employeeId: 7, minHoursMonth: 120 },
+      { id: null, employeeId: 7, minHoursMonth: 80, isPriority: false },
+      { id: null, employeeId: 0, minHoursMonth: 90, isPriority: false },
+      { id: null, employeeId: 5, minHoursMonth: null, isPriority: false },
+      { id: null, employeeId: 7, minHoursMonth: 120, isPriority: false },
     ],
     cellMap: {
       [getGraphCellKey(7, 1)]: "9:00-13:00",
@@ -148,8 +148,8 @@ function createWorkspaceInput() {
 
 function updateWorkspaceInput() {
   const existingEmployees: GraphEmployee[] = [
-    { id: 70, scheduleId: 66, employeeId: 7, minHoursMonth: 80, displayOrder: 0 },
-    { id: 50, scheduleId: 66, employeeId: 5, minHoursMonth: 120, displayOrder: 1 },
+    { id: 70, scheduleId: 66, employeeId: 7, minHoursMonth: 80, isPriority: false, displayOrder: 0 },
+    { id: 50, scheduleId: 66, employeeId: 5, minHoursMonth: 120, isPriority: false, displayOrder: 1 },
     { id: 90, scheduleId: 66, employeeId: 9, minHoursMonth: 60, displayOrder: 2 },
   ];
   const existingSlots: GraphSlot[] = [
@@ -166,8 +166,8 @@ function updateWorkspaceInput() {
       name: "Updated rota",
     },
     employeeAssignments: [
-      { id: 50, employeeId: 5, minHoursMonth: 130 },
-      { id: 70, employeeId: 7, minHoursMonth: 80 },
+      { id: 50, employeeId: 5, minHoursMonth: 130, isPriority: false },
+      { id: 70, employeeId: 7, minHoursMonth: 80, isPriority: false },
     ],
     cellMap: {
       [getGraphCellKey(7, 1)]: "09:00 - 13:00",
@@ -187,11 +187,12 @@ beforeEach(() => {
   apiMocks.updateGraph.mockResolvedValue(undefined);
   apiMocks.removeGraph.mockResolvedValue(undefined);
   apiMocks.createGraphEmployee.mockImplementation(
-    async (_containerId: number, graphId: number, payload: { employeeId: number; minHoursMonth?: number | null; displayOrder: number }) => ({
+    async (_containerId: number, graphId: number, payload: { employeeId: number; minHoursMonth?: number | null; isPriority: boolean; displayOrder: number }) => ({
       id: payload.employeeId === 7 ? 70 : 50,
       scheduleId: graphId,
       employeeId: payload.employeeId,
       minHoursMonth: payload.minHoursMonth ?? null,
+      isPriority: payload.isPriority,
       displayOrder: payload.displayOrder,
     }),
   );
@@ -271,12 +272,12 @@ describe("container graph workspace query mutation", () => {
 
     expect(apiMocks.createGraphEmployee).toHaveBeenNthCalledWith(1, 2, 66, {
       employeeId: 7,
-      minHoursMonth: 80,
+      minHoursMonth: 80, isPriority: false,
       displayOrder: 0,
     });
     expect(apiMocks.createGraphEmployee).toHaveBeenNthCalledWith(2, 2, 66, {
       employeeId: 5,
-      minHoursMonth: null,
+      minHoursMonth: null, isPriority: false,
       displayOrder: 1,
     });
     expect(apiMocks.replaceGraphSlots).toHaveBeenCalledWith(2, 66, {
@@ -317,12 +318,12 @@ describe("container graph workspace query mutation", () => {
     expect(apiMocks.createGraphEmployee).not.toHaveBeenCalled();
     expect(apiMocks.updateGraphEmployee).toHaveBeenCalledWith(2, 66, 50, {
       employeeId: 5,
-      minHoursMonth: 130,
+      minHoursMonth: 130, isPriority: false,
       displayOrder: 0,
     });
     expect(apiMocks.updateGraphEmployee).toHaveBeenCalledWith(2, 66, 70, {
       employeeId: 7,
-      minHoursMonth: 80,
+      minHoursMonth: 80, isPriority: false,
       displayOrder: 1,
     });
     expect(apiMocks.replaceGraphSlots).toHaveBeenCalledWith(2, 66, {
@@ -375,4 +376,14 @@ describe("global schedule presets", () => {
       <QueryClientProvider client={client}>{children}</QueryClientProvider> });
     expect(apiMocks.listSchedulePresets).not.toHaveBeenCalled();
   });
+});
+
+test("priority-only changes use employee PUT even when hours and order are unchanged", async () => {
+  const client = new QueryClient();
+  const { result } = renderHook(() => useSaveGraphWorkspaceMutation(), { wrapper: ({ children }) => <QueryClientProvider client={client}>{children}</QueryClientProvider> });
+  const input = updateWorkspaceInput();
+  input.employeeAssignments = input.existingEmployees.map(employee => ({ id: employee.id, employeeId: employee.employeeId, minHoursMonth: employee.minHoursMonth ?? null, isPriority: employee.employeeId === 7 }));
+  act(() => result.current.mutate(input));
+  await waitFor(() => expect(apiMocks.updateGraphEmployee).toHaveBeenCalledWith(2, 66, 70, { employeeId: 7, minHoursMonth: 80, displayOrder: 0, isPriority: true }));
+  expect(apiMocks.updateGraphEmployee).toHaveBeenCalledTimes(1);
 });

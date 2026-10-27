@@ -153,7 +153,7 @@ public sealed class ScheduleGenerationScenarioMatrixTests(ITestOutputHelper outp
     internal static string[] Normalize(IEnumerable<ScheduleSlotModel> slots) => slots
         .Select(s => $"{s.DayOfMonth:D2}|{s.SlotNo}|{s.EmployeeId}|{s.Status}|{s.FromTime}|{s.ToTime}").Order(StringComparer.Ordinal).ToArray();
 
-    private static GenerationScenario Build(string id, int year, int month, AvailabilityPattern pattern, int count, int staffing, int seed, string mode)
+    internal static GenerationScenario Build(string id, int year, int month, AvailabilityPattern pattern, int count, int staffing, int seed, string mode)
     {
         if (mode == "empty") count = 0;
         if (mode == "one") count = 1;

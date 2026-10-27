@@ -8,6 +8,20 @@ namespace GF3.Tests;
 public sealed class ScheduleGenerationDisplayTests
 {
     [Theory]
+    [InlineData("17:00", "17:00", false)]
+    [InlineData("13:00", "13:00", false)]
+    [InlineData("17:00", "17:01", true)]
+    [InlineData("17:01", "17:00", true)]
+    public void StaffingUsesActualHandoverBreakpoints(string end, string start, bool conflict)
+    {
+        var slots = new[] {
+            TestDataFactory.CreateScheduleSlotModel(1, 1, 1, "09:00", end),
+            TestDataFactory.CreateScheduleSlotModel(1, 1, 2, start, "21:00"),
+        };
+        Assert.Equal(conflict, ScheduleMatrixEngine.ComputeConflictForDayWithStaffing(slots, 1, 1, "09:00 - 15:00", "15:00 - 21:00"));
+    }
+
+    [Theory]
     [InlineData(2026, 2, 1, "15:00", "09:00 - 21:00")]
     [InlineData(2028, 2, 2, "15:00", "09:00 - 21:00")]
     [InlineData(2026, 4, 2, "15:00", "09:00 - 21:00")]

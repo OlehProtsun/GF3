@@ -50,7 +50,9 @@ public static class Extensions
         serviceCollection.AddSingleton<IExcelTemplateLocator, ExcelTemplateLocator>();
         serviceCollection.AddScoped<ISqliteAdminFacade, SqliteAdminFacade>();
         serviceCollection.AddScoped<IAdminDbService, AdminDbService>();
-        serviceCollection.AddTransient<IScheduleGenerator, ScheduleGenerator>();
+        serviceCollection.AddTransient<ScheduleGenerator>();
+        serviceCollection.AddTransient<PriorityScheduleGenerator>();
+        serviceCollection.AddTransient<IScheduleGenerator, PriorityAwareScheduleGenerator>();
         serviceCollection.AddSingleton<IPasswordHasher, PasswordHasher>();
 
         return serviceCollection;

@@ -2138,5 +2138,21 @@
   "Could not save the accepted manual shift highlight color.": "Nie udało się zapisać koloru przyjętej ręcznej zmiany.",
   "Could not load the accepted manual shift highlight color.": "Nie udało się wczytać koloru przyjętej ręcznej zmiany.",
   "This schedule changed during another request. Refresh before saving.": "Ten grafik został zmieniony w innym żądaniu. Odśwież przed zapisaniem.",
-  "The original shift cannot be uniquely identified. Reject this request and ask the employee to submit a new one.": "Nie można jednoznacznie zidentyfikować pierwotnej zmiany. Odrzuć ten wniosek i poproś pracownika o przesłanie nowego."
+  "The original shift cannot be uniquely identified. Reject this request and ask the employee to submit a new one.": "Nie można jednoznacznie zidentyfikować pierwotnej zmiany. Odrzuć ten wniosek i poproś pracownika o przesłanie nowego.",
+  "Priority": "Priorytet",
+  "Priority: {0}": "Priorytet: {0}",
+  "Priority shift duration": "Długość zmiany priorytetowej",
+  "Priority shift duration (hours)": "Długość zmiany priorytetowej (godziny)",
+  "Weekends off for priority employees": "Wolne weekendy dla pracowników priorytetowych",
+  "Could not load priority settings.": "Nie udało się wczytać ustawień priorytetu.",
+  "Could not save priority settings.": "Nie udało się zapisać ustawień priorytetu.",
+  "Schedule this employee first using the priority shift duration and weekend settings.": "Zaplanuj tego pracownika najpierw, zgodnie z długością zmiany i ustawieniami weekendów dla priorytetu.",
+  "Priority employees are scheduled first; positive availability may extend to the exact configured duration within graph hours and all other hard restrictions.": "Pracownicy priorytetowi są planowani najpierw; ich przedział dostępności może zostać wydłużony do ustawionej długości zmiany w godzinach grafiku i z zachowaniem pozostałych ograniczeń.",
+  "Shift hours must be an integer between 1 and 12.": "Długość zmiany musi być liczbą całkowitą od 1 do 12.",
+  "The ShiftHours field is required.": "Długość zmiany jest wymagana.",
+  "The WeekendsOff field is required.": "Ustawienie wolnych weekendów jest wymagane.",
+  "The field ShiftHours must be between 1 and 12.": "Długość zmiany musi wynosić od 1 do 12 godzin.",
+  "Invalid shift interval.": "Nieprawidłowy przedział zmiany.",
+  "Invalid schedule configuration.": "Nieprawidłowa konfiguracja grafiku.",
+  "Generated schedule violates scheduling constraints.": "Wygenerowany grafik narusza ograniczenia planowania."
 }

@@ -2138,5 +2138,21 @@
   "Could not save the accepted manual shift highlight color.": "Не вдалося зберегти колір прийнятої ручної зміни.",
   "Could not load the accepted manual shift highlight color.": "Не вдалося завантажити колір прийнятої ручної зміни.",
   "This schedule changed during another request. Refresh before saving.": "Цей графік було змінено під час іншого запиту. Оновіть перед збереженням.",
-  "The original shift cannot be uniquely identified. Reject this request and ask the employee to submit a new one.": "Неможливо однозначно визначити початкову зміну. Відхиліть цей запит і попросіть працівника подати новий."
+  "The original shift cannot be uniquely identified. Reject this request and ask the employee to submit a new one.": "Неможливо однозначно визначити початкову зміну. Відхиліть цей запит і попросіть працівника подати новий.",
+  "Priority": "Пріоритет",
+  "Priority: {0}": "Пріоритет: {0}",
+  "Priority shift duration": "Тривалість пріоритетної зміни",
+  "Priority shift duration (hours)": "Тривалість пріоритетної зміни (години)",
+  "Weekends off for priority employees": "Вихідні для пріоритетних працівників",
+  "Could not load priority settings.": "Не вдалося завантажити налаштування пріоритету.",
+  "Could not save priority settings.": "Не вдалося зберегти налаштування пріоритету.",
+  "Schedule this employee first using the priority shift duration and weekend settings.": "Планувати цього працівника першим відповідно до тривалості пріоритетної зміни та налаштувань вихідних.",
+  "Priority employees are scheduled first; positive availability may extend to the exact configured duration within graph hours and all other hard restrictions.": "Пріоритетні працівники плануються першими; їхній інтервал доступності може бути розширений до заданої тривалості в межах годин графіка та всіх інших обов’язкових обмежень.",
+  "Shift hours must be an integer between 1 and 12.": "Тривалість зміни має бути цілим числом від 1 до 12.",
+  "The ShiftHours field is required.": "Тривалість зміни обов’язкова.",
+  "The WeekendsOff field is required.": "Налаштування вихідних обов’язкове.",
+  "The field ShiftHours must be between 1 and 12.": "Тривалість зміни має бути від 1 до 12 годин.",
+  "Invalid shift interval.": "Неправильний інтервал зміни.",
+  "Invalid schedule configuration.": "Неправильна конфігурація графіка.",
+  "Generated schedule violates scheduling constraints.": "Згенерований графік порушує обмеження планування."
 }

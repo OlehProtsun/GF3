@@ -65,6 +65,7 @@ export type GraphSlot = {
 };
 
 export type GraphEmployee = {
+  isPriority: boolean;
   id: number;
   scheduleId: number;
   employeeId: number;

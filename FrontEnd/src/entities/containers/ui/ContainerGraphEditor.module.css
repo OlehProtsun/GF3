@@ -1453,3 +1453,17 @@
     padding-left: var(--schedule-matrix-shadow-gutter);
   }
 }
+.detailsMinHoursItem:has(.priorityToggle) { grid-template-columns:minmax(0,1fr) auto auto; }
+.priorityToggle { position:relative; display:flex; align-items:center; justify-content:center; gap:5px; min-width:44px; min-height:44px; cursor:pointer; color:#64748b; font-size:.72rem; }
+.priorityToggle input { position:absolute; inset:0; width:100%; height:100%; margin:0; opacity:0; cursor:inherit; }
+.priorityCircle { width:20px; height:20px; flex-shrink:0; box-sizing:border-box; border:1.5px solid #b8c4d4; border-radius:50%; background:#f8fafc; box-shadow:inset 0 1px 3px #3341550a; }
+.priorityToggle:hover .priorityCircle { border-color:#7b98c2; background:#eff4fb; }
+.priorityToggle input:checked + .priorityCircle { border-color:#487fd1; background:#487fd1; box-shadow:inset 0 0 0 4px #fff; }
+.priorityToggle input:focus-visible + .priorityCircle { outline:3px solid #93b4ff; outline-offset:3px; }
+.priorityToggle:has(input:disabled) { opacity:.5; cursor:default; }
+.priorityDescription { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap; }
+@media(max-width:600px) {
+  .detailsMinHoursItem:has(.priorityToggle) { grid-template-columns:minmax(0,1fr) auto; }
+  .detailsMinHoursItem:has(.priorityToggle) .detailsMinHoursName { grid-column:1 / -1; }
+  .detailsMinHoursItem:has(.priorityToggle) .detailsMinHoursInput { width:var(--schedule-details-min-hours-input-width); min-width:0; }
+}

@@ -11,9 +11,11 @@ namespace GF3.Tests;
 public sealed class ScheduleCrossGraphConflictTests
 {
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task PersistedGenerations_WithSharedEmployee_NeverOverlapAcrossGraphs(bool parallel)
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [InlineData(true, true)]
+    public async Task PersistedGenerations_WithSharedEmployee_NeverOverlapAcrossGraphs(bool parallel, bool priority)
     {
         await using var database = await SqliteTestDatabase.CreateAsync();
         var (containerId, graphId, employeeId) = await ContainerServiceTests.SeedGenerationAsync(database);
@@ -21,6 +23,7 @@ public sealed class ScheduleCrossGraphConflictTests
         int secondContainerId;
         await using (var seed = database.CreateContext())
         {
+            if (priority) await seed.ScheduleEmployees.Where(e => e.ScheduleId == graphId).ExecuteUpdateAsync(s => s.SetProperty(e => e.IsPriority, true));
             var original = await seed.Schedules.SingleAsync(s => s.Id == graphId);
             var secondContainer = TestDataFactory.CreateDalContainer("second");
             var secondShop = TestDataFactory.CreateDalShop("second");
@@ -30,7 +33,7 @@ public sealed class ScheduleCrossGraphConflictTests
             var second = TestDataFactory.CreateDalSchedule(secondContainer.Id, secondShop.Id, "second", 2026, 2, original.AvailabilityGroupId);
             second.MaxHoursPerEmpMonth = 400;
             second.MaxConsecutiveDays = second.MaxConsecutiveFull = second.MaxFullPerMonth = 31;
-            second.Employees.Add(new DataAccessLayer.Models.ScheduleEmployeeModel { EmployeeId = employeeId });
+            second.Employees.Add(new DataAccessLayer.Models.ScheduleEmployeeModel { EmployeeId = employeeId, IsPriority = priority });
             seed.Schedules.Add(second);
             await seed.SaveChangesAsync();
             secondId = second.Id;
@@ -38,8 +41,9 @@ public sealed class ScheduleCrossGraphConflictTests
         var gate = new GenerationRendezvous();
         await using var firstContext = database.CreateContext();
         await using var secondContext = database.CreateContext();
-        var firstService = ContainerServiceTests.CreateService(firstContext, parallel ? gate : new ScheduleGenerator());
-        var secondService = ContainerServiceTests.CreateService(secondContext, parallel ? gate : new ScheduleGenerator());
+        var firstLegacy = new ScheduleGenerator(); var secondLegacy = new ScheduleGenerator();
+        var firstService = ContainerServiceTests.CreateService(firstContext, priority ? new PriorityAwareScheduleGenerator(firstLegacy, new(firstLegacy), firstContext) : parallel ? gate : firstLegacy);
+        var secondService = ContainerServiceTests.CreateService(secondContext, priority ? new PriorityAwareScheduleGenerator(secondLegacy, new(secondLegacy), secondContext) : parallel ? gate : secondLegacy);
         if (parallel)
             await Task.WhenAll(firstService.GenerateGraphAsync(containerId, graphId, true, false, null),
                 secondService.GenerateGraphAsync(secondContainerId, secondId, true, false, null));

@@ -428,13 +428,18 @@ public sealed class ContainerServiceTests
         Assert.Equal(30, style.TextColorArgb);
     }
 
-    [Fact]
-    public async Task RealGeneration_PreviewDryRunOverwriteAndFailure_PreserveDatabaseContracts()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task RealGeneration_PreviewDryRunOverwriteAndFailure_PreserveDatabaseContracts(bool priority)
     {
         await using var database = await SqliteTestDatabase.CreateAsync();
         var (containerId, graphId, employeeId) = await SeedGenerationAsync(database);
         await using var context = database.CreateContext();
-        var service = CreateService(context, new ScheduleGenerator());
+        if (priority) await context.ScheduleEmployees.Where(e => e.ScheduleId == graphId).ExecuteUpdateAsync(s => s.SetProperty(e => e.IsPriority, true));
+        var legacy = new ScheduleGenerator();
+        IScheduleGenerator engine = priority ? new PriorityAwareScheduleGenerator(legacy, new(legacy), context) : legacy;
+        var service = CreateService(context, engine);
         var graph = (await service.GetGraphByIdAsync(containerId, graphId))!;
         var employees = (await service.GetGraphEmployeesAsync(containerId, graphId))!;
         var before = await GenerationSnapshotAsync(database);
@@ -467,7 +472,8 @@ public sealed class ContainerServiceTests
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => failingService.GenerateGraphAsync(containerId, graphId, true, false, null, canceled.Token));
         Assert.Equal(persisted, await GenerationSnapshotAsync(database));
         using var during = new CancellationTokenSource();
-        var real = CreateService(fresh, new ScheduleGenerator());
+        var freshLegacy = new ScheduleGenerator();
+        var real = CreateService(fresh, priority ? new PriorityAwareScheduleGenerator(freshLegacy, new(freshLegacy), fresh) : freshLegacy);
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => real.GenerateGraphAsync(containerId, graphId, true, false,
             new CancelGenerationProgress(during), during.Token));
         Assert.Equal(persisted, await GenerationSnapshotAsync(database));

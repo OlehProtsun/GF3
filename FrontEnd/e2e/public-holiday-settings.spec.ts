@@ -27,6 +27,7 @@ async function fixture(page: Page, state: { enabled: boolean; required?: boolean
       ? [{ id: 9, title: "Required rules", version: "1", message: "Read these rules", pdfFileName: "rules.pdf" }] : [];
     else if (path === "/api/regulations/9/accept") { state.required = false; data = { id: 1 }; }
     else if (path === "/api/account-language") data = { language };
+    else if (path === "/api/priority-generation-settings") data = { shiftHours: 8, weekendsOff: true };
     else if (path === "/api/public-holiday-settings") {
       state.reads = (state.reads ?? 0) + Number(route.request().method() === "GET");
       if (state.required) return route.fulfill({ status: 428, contentType: "application/problem+json", body: JSON.stringify({ detail: "Accept the currently published required documents to continue." }) });
@@ -84,8 +85,8 @@ for (const [width, language, viewLabel, closeLabel] of [
     await page.setViewportSize({ width, height: 700 });
     const writes = await fixture(page, { enabled: false }, "manager", "pc", language);
     await page.goto("/settings");
-    await expect(page.getByRole("switch")).toBeEnabled();
-    await expect(page.getByRole("switch")).not.toBeChecked();
+    await expect(page.locator('section[aria-labelledby="public-holiday-heading"]').getByRole("switch")).toBeEnabled();
+    await expect(page.locator('section[aria-labelledby="public-holiday-heading"]').getByRole("switch")).not.toBeChecked();
     await page.getByRole("button", { name: language === "pl" ? "Zwiń pasek boczny" : language === "uk" ? "Згорнути бічну панель" : "Collapse sidebar" }).click();
     await expect.poll(() => page.locator("aside").first().evaluate(element => element.getBoundingClientRect().bottom)).toBeLessThanOrEqual(0);
     await page.screenshot({ path: test.info().outputPath(`settings-${width}-${language}.png`), fullPage: true });
@@ -135,7 +136,7 @@ for (const width of [768, 1280]) {
   });
 }
 
-test("desktop Settings contains two compact cards and persists the iOS switch", async ({ page }) => {
+test("desktop Settings contains three compact cards and persists the iOS switch", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   const state = { enabled: true };
   await fixture(page, state);
@@ -144,7 +145,8 @@ test("desktop Settings contains two compact cards and persists the iOS switch", 
   await expect.poll(() => page.locator("aside").first().evaluate(element => element.getBoundingClientRect().bottom)).toBeLessThanOrEqual(0);
   await expect(page.getByRole("region", { name: "Public holidays", exact: true })).toBeVisible();
   await expect(page.getByRole("region", { name: "Language", exact: true })).toBeVisible();
-  const toggle = page.getByRole("switch");
+  await expect(page.getByRole("region", { name: "Priority", exact: true })).toBeVisible();
+  const toggle = page.locator('section[aria-labelledby="public-holiday-heading"]').getByRole("switch");
   const track = toggle.locator("..").locator("span").first();
   await expect(track).toHaveCSS("background-color", "rgb(36, 99, 255)");
   await page.screenshot({ path: test.info().outputPath("settings-desktop.png"), fullPage: true });
@@ -152,7 +154,7 @@ test("desktop Settings contains two compact cards and persists the iOS switch", 
   await expect(toggle).not.toBeChecked();
   await expect(track).toHaveCSS("background-color", "rgb(226, 229, 235)");
   await page.reload();
-  await expect(page.getByRole("switch")).not.toBeChecked();
+  await expect(page.locator('section[aria-labelledby="public-holiday-heading"]').getByRole("switch")).not.toBeChecked();
   await expect(page.getByRole("button", { name: "Language English" })).toBeVisible();
 });
 
@@ -163,7 +165,7 @@ test("Phone manager has no Settings entry or route", async ({ page }) => {
   await expect(page.getByRole("link", { name: "Settings", exact: true })).toHaveCount(0);
   await page.goto("/settings");
   await expect(page).toHaveURL(/\/$/);
-  await expect(page.getByRole("switch")).toHaveCount(0);
+  await expect(page.locator('section[aria-labelledby="public-holiday-heading"]').getByRole("switch")).toHaveCount(0);
 });
 
 for (const mode of ["pc", "phone"]) {
@@ -194,7 +196,7 @@ test("PC global toggle updates employee availability and schedule matrix, daily 
   await expect(availabilityDate).toHaveAttribute("title", "Labour Day");
   await page.goto("/settings");
   await page.getByRole("button", { name: "Collapse sidebar" }).click();
-  const toggle = page.getByRole("switch");
+  const toggle = page.locator('section[aria-labelledby="public-holiday-heading"]').getByRole("switch");
   await expect(toggle).toBeEnabled();
   await toggle.click();
   await expect(toggle).not.toBeChecked();
@@ -330,15 +332,15 @@ test("Settings persists holiday visibility across navigation back to manager sta
   await expect(heading).toBeVisible();
   await page.goto("/settings");
   await page.getByRole("button", { name: "Collapse sidebar" }).click();
-  await page.getByRole("switch").click();
-  await expect(page.getByRole("switch")).not.toBeChecked();
+  await page.locator('section[aria-labelledby="public-holiday-heading"]').getByRole("switch").click();
+  await expect(page.locator('section[aria-labelledby="public-holiday-heading"]').getByRole("switch")).not.toBeChecked();
   await page.goBack();
   await expect(page.getByText("Schedule Summary", { exact: true })).toBeVisible();
   await expect(heading).toHaveCount(0);
   await page.goForward();
   await page.getByRole("button", { name: "Collapse sidebar" }).click();
-  await page.getByRole("switch").click();
-  await expect(page.getByRole("switch")).toBeChecked();
+  await page.locator('section[aria-labelledby="public-holiday-heading"]').getByRole("switch").click();
+  await expect(page.locator('section[aria-labelledby="public-holiday-heading"]').getByRole("switch")).toBeChecked();
   await page.goBack();
   await expect(heading).toBeVisible();
   expect(writes).toEqual([false, true]);

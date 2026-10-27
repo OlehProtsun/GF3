@@ -471,7 +471,13 @@ public class ContainersController(
             return conflict;
         }
 
-        await containerService.UpdateGraphEmployeeAsync(containerId, graphId, graphEmployeeId, request.ToUpdateModel(graphId, graphEmployeeId), cancellationToken).ConfigureAwait(false);
+        var existing = (await containerService.GetGraphEmployeesAsync(containerId, graphId, cancellationToken).ConfigureAwait(false))
+            ?.FirstOrDefault(employee => employee.Id == graphEmployeeId);
+        if (existing is null)
+        {
+            return NotFound(CreateNotFoundProblem($"Graph employee with id {graphEmployeeId} was not found."));
+        }
+        await containerService.UpdateGraphEmployeeAsync(containerId, graphId, graphEmployeeId, request.ToUpdateModel(graphId, graphEmployeeId, existing.IsPriority), cancellationToken).ConfigureAwait(false);
         var graph = await containerService.GetGraphByIdAsync(containerId, graphId, cancellationToken).ConfigureAwait(false);
         var assignment = graph?.Employees.FirstOrDefault(employee => employee.Id == graphEmployeeId);
         await LogManagerActionAsync(

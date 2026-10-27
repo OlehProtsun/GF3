@@ -1,3 +1,5 @@
+import { usePriorityGenerationSettingsQuery, useUpdatePriorityGenerationSettingsMutation } from "@entities/priority-generation/api/queries";
+import { NumberStepperInput } from "@shared/ui/components/NumberStepperInput";
 import { useState } from "react";
 import { useAuth } from "@app/providers/AuthProvider";
 import { useLanguage } from "@app/providers/LanguageProvider";
@@ -22,6 +24,9 @@ export function ManagerSettingsPage() {
   const pending = usePendingRegulationsQuery(accountKey, Boolean(session));
   const query = usePublicHolidaySettingsQuery(pending.data?.length === 0 && !pending.isError);
   const mutation = useUpdatePublicHolidaySettingsMutation();
+  const priorityQuery = usePriorityGenerationSettingsQuery(pending.data?.length === 0 && !pending.isError);
+  const priorityMutation = useUpdatePriorityGenerationSettingsMutation();
+  const priorityDisabled = session?.workspaceMode === "phone" || !priorityQuery.data || priorityQuery.isError || priorityQuery.isFetching || priorityMutation.isPending;
   const [open, setOpen] = useState(false);
   const [languageOpen, setLanguageOpen] = useState(false);
   const readOnly = session?.workspaceMode === "phone";
@@ -55,6 +60,35 @@ export function ManagerSettingsPage() {
                 {t("View public holidays")}<span aria-hidden="true">→</span>
               </button>
             </div>
+          </div>
+        </section>
+        <section className={styles.card} aria-labelledby="priority-heading">
+          <div className={styles.cardRow}>
+            <span className={styles.iconTile}><SettingsSymbol kind="calendar" /></span>
+            <div className={styles.cardCopy}>
+              <h2 id="priority-heading" className={styles.cardTitle}>{t("Priority")}</h2>
+              <p className={styles.description}>{t("Priority employees are scheduled first; positive availability may extend to the exact configured duration within graph hours and all other hard restrictions.")}</p>
+            </div>
+          </div>
+          <div className={`${styles.cardDetails} ${styles.prioritySettings}`}>
+            <div className={styles.prioritySettingRow}>
+              <label htmlFor="priority-shift-hours">{t("Priority shift duration (hours)")}</label>
+              <NumberStepperInput key={`${priorityQuery.data?.shiftHours ?? 8}:${priorityMutation.isPending}`} id="priority-shift-hours" ariaLabel={t("Priority shift duration")}
+                value={priorityQuery.data?.shiftHours ?? 8} min={1} max={12} disabled={priorityDisabled}
+                onChange={shiftHours => priorityMutation.mutate({ shiftHours, weekendsOff: priorityQuery.data?.weekendsOff ?? true })} />
+            </div>
+            <div className={styles.prioritySettingRow}>
+              <span id="priority-weekends-label">{t("Weekends off for priority employees")}</span>
+              <label className={styles.switch} aria-busy={priorityMutation.isPending}>
+                <input type="checkbox" role="switch" aria-labelledby="priority-weekends-label" checked={priorityQuery.data?.weekendsOff ?? true}
+                  disabled={priorityDisabled} onChange={event => priorityMutation.mutate({ shiftHours: priorityQuery.data?.shiftHours ?? 8, weekendsOff: event.target.checked })} />
+                <span className={styles.switchTrack} aria-hidden="true"><span className={styles.switchThumb} /></span>
+              </label>
+            </div>
+            {priorityQuery.isError ? <ErrorBanner dismissible={false}>{getErrorMessage(priorityQuery.error, t("Could not load priority settings."))}</ErrorBanner> : null}
+            {priorityQuery.isError ? <button className={styles.actionButton} type="button" onClick={() => priorityQuery.refetch()}>{t("Retry")}</button> : null}
+            {priorityMutation.error ? <ErrorBanner dismissible={false}>{getErrorMessage(priorityMutation.error, t("Could not save priority settings."))}</ErrorBanner> : null}
+            {readOnly ? <p>{t("Switch to PC mode to change this setting.")}</p> : null}
           </div>
         </section>
         <section className={styles.card} aria-labelledby="language-heading">

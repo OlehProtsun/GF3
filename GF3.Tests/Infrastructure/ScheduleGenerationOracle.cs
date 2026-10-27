@@ -13,7 +13,8 @@ internal sealed record GenerationCheckResult(IReadOnlyList<GenerationViolation> 
 
 internal static class ScheduleGenerationOracle
 {
-    public static GenerationCheckResult Check(GenerationScenario scenario, IReadOnlyCollection<ScheduleSlotModel> slots)
+    public static GenerationCheckResult Check(GenerationScenario scenario, IReadOnlyCollection<ScheduleSlotModel> slots,
+        int? priorityShiftHours = null, bool priorityWeekendsOff = true)
     {
         var schedule = scenario.Schedule;
         var violations = new List<GenerationViolation>();
@@ -62,7 +63,22 @@ internal static class ScheduleGenerationOracle
             var id = slot.EmployeeId.Value;
             if (!shiftEmployees.Add((slot.DayOfMonth, shift, id))) Fail("DuplicateEmployeeInShift", slot.DayOfMonth, id);
             var window = Window(scenario, id, slot.DayOfMonth);
-            if (from < window.From || to > window.To || window.To <= window.From) Fail("Availability", slot.DayOfMonth, id);
+            var priority = priorityShiftHours.HasValue && employees.Single(e => e.EmployeeId == id).IsPriority;
+            if (priority)
+            {
+                if (to - from != priorityShiftHours!.Value * 60) Fail("PriorityDuration", slot.DayOfMonth, id);
+                if (priorityWeekendsOff && new DateOnly(schedule.Year, schedule.Month, slot.DayOfMonth).DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday)
+                    Fail("PriorityWeekend", slot.DayOfMonth, id);
+                if (window.To <= window.From || from >= window.To || to <= window.From) Fail("Availability", slot.DayOfMonth, id);
+                foreach (var group in scenario.AvailabilityGroups.Where(g => g.Id == 0 && g.Name == "Saved schedule commitments" && g.Year == schedule.Year && g.Month == schedule.Month))
+                foreach (var entry in group.Members.Where(m => m.EmployeeId == id).SelectMany(m => m.Days).Where(d => d.DayOfMonth == slot.DayOfMonth))
+                    if (entry.Kind == AvailabilityKind.NONE || entry.Kind == AvailabilityKind.INT &&
+                        (!ReadRange(entry.IntervalStr, out var freeFrom, out var freeTo) || from < freeFrom || to > freeTo)) Fail("ExternalOverlap", slot.DayOfMonth, id);
+                for (var minute = from; minute < to; minute++)
+                    if (!templates.Any(t => t.Item1 <= minute && t.Item2 > minute)) { Fail("TemplateGap", slot.DayOfMonth, id); break; }
+                if (worked.Any(w => w.Day == slot.DayOfMonth && w.Employee == id)) Fail("PriorityDuplicateDay", slot.DayOfMonth, id);
+            }
+            else if (from < window.From || to > window.To || window.To <= window.From) Fail("Availability", slot.DayOfMonth, id);
             foreach (var external in scenario.ExternalSlots ?? [])
                 if (external.EmployeeId == id && external.Status == SlotStatus.ASSIGNED && external.DayOfMonth == slot.DayOfMonth
                     && ReadTime(external.FromTime, out var externalFrom) && ReadTime(external.ToTime, out var externalTo)
@@ -119,6 +135,7 @@ internal static class ScheduleGenerationOracle
                 {
                     var count = dayWork.Where(w => w.From <= minute && w.To > minute).Select(w => w.Employee).Distinct().Count();
                     var missing = Math.Max(0, schedule.PeoplePerShift - count);
+                    if (priorityShiftHours.HasValue && count > schedule.PeoplePerShift) Fail("Overstaffing", day);
                     gap += missing;
                     if (missing > 0) conflictDays.Add(day);
                 }

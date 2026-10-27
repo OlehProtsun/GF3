@@ -451,3 +451,11 @@ test.each([
   expect(rows[1].holidayDays).toBe(0);
   rows.forEach(row => expect(row.holidayDays).toBeLessThanOrEqual(row.workDays));
 });
+
+test.each([["17:00", "17:00", false], ["13:00", "13:00", false], ["17:00", "17:01", true]] as const)("priority handover %s/%s has accurate staffing", (end, start, conflict) => {
+  const slots: GraphSlot[] = [
+    { id: 1, scheduleId: 1, dayOfMonth: 1, slotNo: 1, employeeId: 1, status: 1, fromTime: "09:00", toTime: end },
+    { id: 2, scheduleId: 1, dayOfMonth: 1, slotNo: 1, employeeId: 2, status: 1, fromTime: start, toTime: "21:00" },
+  ];
+  expect(buildGraphConflictDayMap({ ...graph, peoplePerShift: 1, shift1Time: "09:00 - 15:00", shift2Time: "15:00 - 21:00" }, slots)[1]).toBe(conflict);
+});

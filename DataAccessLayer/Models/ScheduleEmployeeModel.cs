@@ -12,6 +12,10 @@ namespace DataAccessLayer.Models;
 [Index(nameof(ScheduleId), nameof(EmployeeId), IsUnique = true)]
 public class ScheduleEmployeeModel
 {
+    [Required]
+    [Column("is_priority")]
+    public bool IsPriority { get; set; } = false;
+
     [Key]
     [Column("id")]
     public int Id { get; set; }

@@ -59,6 +59,7 @@ export type SaveGraphDto = {
 
 export type GenerateGraphRequestDto = { overwrite?: boolean; dryRun?: boolean; returnSlots?: boolean };
 export type GenerateGraphPreviewEmployeeDto = {
+  isPriority?: boolean;
   employeeId: number;
   minHoursMonth?: number | null;
   displayOrder: number;
@@ -90,6 +91,7 @@ export type ReplaceGraphSlotsDto = {
 };
 
 export type SaveGraphEmployeeDto = {
+  isPriority?: boolean;
   employeeId: number;
   minHoursMonth?: number | null;
   displayOrder: number;

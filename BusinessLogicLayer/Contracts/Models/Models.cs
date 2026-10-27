@@ -465,6 +465,8 @@ public class SchedulePresetEmployeeModel
 /// </summary>
 public class ScheduleEmployeeModel
 {
+    public bool IsPriority { get; set; }
+
     /// <summary>
     /// Persistent graph-employee identifier.
     /// </summary>

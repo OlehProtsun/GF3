@@ -44,6 +44,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, TimeProvider? 
     public DbSet<WorkflowLogEntryModel> WorkflowLogEntries => Set<WorkflowLogEntryModel>();
     public DbSet<WorkflowLogSettingsModel> WorkflowLogSettings => Set<WorkflowLogSettingsModel>();
     public DbSet<PublicHolidaySettingsModel> PublicHolidaySettings => Set<PublicHolidaySettingsModel>();
+    public DbSet<PriorityGenerationSettingsModel> PriorityGenerationSettings => Set<PriorityGenerationSettingsModel>();
     public DbSet<RegulationDocumentModel> RegulationDocuments => Set<RegulationDocumentModel>();
     public DbSet<RegulationAcceptanceModel> RegulationAcceptances => Set<RegulationAcceptanceModel>();
     public DbSet<BindModel> AvailabilityBinds => Set<BindModel>();
@@ -181,6 +182,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, TimeProvider? 
         ConfigureWorkflowLogEntry(modelBuilder);
         ConfigureWorkflowLogSettings(modelBuilder);
         ConfigurePublicHolidaySettings(modelBuilder);
+        ConfigurePriorityGenerationSettings(modelBuilder);
         ConfigureRegulationDocument(modelBuilder);
         ConfigureRegulationAcceptance(modelBuilder);
         ConfigureAvailabilityBind(modelBuilder);
@@ -689,6 +691,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, TimeProvider? 
     {
         modelBuilder.Entity<ScheduleEmployeeModel>(entity =>
         {
+            entity.Property(x => x.IsPriority).IsRequired().HasDefaultValue(false);
             entity.HasOne(scheduleEmployee => scheduleEmployee.Schedule)
                 .WithMany(schedule => schedule.Employees)
                 .HasForeignKey(scheduleEmployee => scheduleEmployee.ScheduleId)
@@ -973,6 +976,21 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, TimeProvider? 
             entity.Property(settings => settings.ShowPublicHolidays).IsRequired().HasDefaultValue(true);
             entity.ToTable(table => table.HasCheckConstraint("ck_public_holiday_settings_singleton", "id = 1"));
             entity.HasData(new PublicHolidaySettingsModel());
+        });
+    }
+
+    private static void ConfigurePriorityGenerationSettings(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<PriorityGenerationSettingsModel>(entity =>
+        {
+            entity.ToTable("priority_generation_settings", table =>
+            {
+                table.HasCheckConstraint("CK_priority_generation_settings_singleton", "id = 1");
+                table.HasCheckConstraint("CK_priority_generation_settings_shift_hours", "shift_hours BETWEEN 1 AND 12");
+            });
+            entity.Property(x => x.ShiftHours).IsRequired().HasDefaultValue(8);
+            entity.Property(x => x.WeekendsOff).IsRequired().HasDefaultValue(true);
+            entity.HasData(new PriorityGenerationSettingsModel());
         });
     }
 

@@ -934,6 +934,43 @@ namespace DataAccessLayer.Migrations
                     b.ToTable("manager_shift_correction_setting");
                 });
 
+            modelBuilder.Entity("DataAccessLayer.Models.PriorityGenerationSettingsModel", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("id");
+
+                    b.Property<int>("ShiftHours")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER")
+                        .HasDefaultValue(8)
+                        .HasColumnName("shift_hours");
+
+                    b.Property<bool>("WeekendsOff")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER")
+                        .HasDefaultValue(true)
+                        .HasColumnName("weekends_off");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("priority_generation_settings", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_priority_generation_settings_shift_hours", "shift_hours BETWEEN 1 AND 12");
+
+                            t.HasCheckConstraint("CK_priority_generation_settings_singleton", "id = 1");
+                        });
+
+                    b.HasData(
+                        new
+                        {
+                            Id = 1,
+                            ShiftHours = 8,
+                            WeekendsOff = true
+                        });
+                });
+
             modelBuilder.Entity("DataAccessLayer.Models.PublicHolidaySettingsModel", b =>
                 {
                     b.Property<int>("Id")
@@ -1154,6 +1191,12 @@ namespace DataAccessLayer.Migrations
                     b.Property<int>("EmployeeId")
                         .HasColumnType("INTEGER")
                         .HasColumnName("employee_id");
+
+                    b.Property<bool>("IsPriority")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER")
+                        .HasDefaultValue(false)
+                        .HasColumnName("is_priority");
 
                     b.Property<int?>("MinHoursMonth")
                         .HasColumnType("INTEGER")

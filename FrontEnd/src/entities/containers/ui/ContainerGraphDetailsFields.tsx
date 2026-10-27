@@ -32,6 +32,7 @@ const MONTH_OPTIONS = [
 type ScheduleDetailsEmployeeRow = {
   employeeId: number;
   minHoursMonth: string;
+  isPriority?: boolean;
 };
 
 type ContainerGraphDetailsFieldsProps = {
@@ -49,6 +50,7 @@ type ContainerGraphDetailsFieldsProps = {
   selectDropdownPlacement?: "down" | "up";
   shopSelectShadow?: "default" | "soft";
   onFieldChange: (field: keyof ContainerGraphFormState) => (value: string) => void;
+  onEmployeePriorityChange?: (employeeId: number, checked: boolean) => void;
   onEmployeeMinHoursChange: (employeeId: number, value: string) => void;
 };
 
@@ -81,6 +83,7 @@ export function ContainerGraphDetailsFields({
   shopSelectShadow = "default",
   onFieldChange,
   onEmployeeMinHoursChange,
+  onEmployeePriorityChange,
 }: ContainerGraphDetailsFieldsProps) {
   const language = useLanguageRevision();
   const hasScrollableMinHoursList = graphEmployeeRows.length > 5;
@@ -349,6 +352,7 @@ export function ContainerGraphDetailsFields({
             <span className={styles.detailsMinHoursMeta}>{t("{0} assigned", graphEmployeeRows.length)}</span>
           </div>
 
+          <span id={`${idPrefix}-priority-description`} className={styles.priorityDescription}>{t("Schedule this employee first using the priority shift duration and weekend settings.")}</span>
           {graphEmployeeRows.length === 0 ? (
             <div className={styles.detailsMinHoursEmpty}>{t("Add employees first to set monthly minimum hours.")}</div>
           ) : (
@@ -363,8 +367,18 @@ export function ContainerGraphDetailsFields({
                 const employeeName = getEmployeeFullName(employee, t("Employee {0}", row.employeeId));
 
                 return (
-                  <label key={`${idPrefix}-details-min-hours-${row.employeeId}`} className={styles.detailsMinHoursItem}>
+                  <div key={`${idPrefix}-details-min-hours-${row.employeeId}`} className={styles.detailsMinHoursItem}>
                     <span className={styles.detailsMinHoursName}>{employeeName}</span>
+                    {form.availabilityGroupId && onEmployeePriorityChange ? (
+                      <label className={styles.priorityToggle}>
+                        <input type="checkbox" checked={row.isPriority ?? false}
+                          aria-label={t("Priority: {0}", employeeName)}
+                          aria-describedby={`${idPrefix}-priority-description`}
+                          onChange={event => onEmployeePriorityChange(row.employeeId, event.target.checked)} />
+                        <span className={styles.priorityCircle} aria-hidden="true" />
+                        <span className={styles.priorityLabel}>{t("Priority")}</span>
+                      </label>
+                    ) : null}
                     <NumberStepperInput
                       className={joinClassNames(styles.numberInput, styles.detailsMinHoursInput)}
                       value={getStepperValue(row.minHoursMonth, 0)}
@@ -372,7 +386,7 @@ export function ContainerGraphDetailsFields({
                       onChange={value => onEmployeeMinHoursChange(row.employeeId, String(value))}
                       ariaLabel={t("{0} min hours per month", employeeName)}
                     />
-                  </label>
+                  </div>
                 );
               })}
             </div>

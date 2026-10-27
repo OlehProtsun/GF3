@@ -26,6 +26,7 @@ test("account language defaults to Polish, persists English and Ukrainian and st
       identity.workspaceMode = route.request().postDataJSON().mode;
       body = { session: identity, accessToken: "language-mode-token", expiresAtUtc: "2099-01-01T00:00:00Z" };
     }
+    else if (path === "/api/priority-generation-settings") body = { shiftHours: 8, weekendsOff: true };
     else if (path === "/api/public-holiday-settings") {
       if (route.request().method() === "PUT") showPublicHolidays = route.request().postDataJSON().showPublicHolidays;
       body = { showPublicHolidays };
@@ -76,8 +77,8 @@ test("account language defaults to Polish, persists English and Ukrainian and st
   await expect(page.getByRole("button", { name: "Język Polski", exact: true })).toBeVisible();
   await choose("pl", "English");
   await expect(page.getByRole("heading", { name: "Settings", exact: true })).toBeVisible();
-  await page.getByRole("switch").click();
-  await expect(page.getByRole("switch")).not.toBeChecked();
+  await page.locator('section[aria-labelledby="public-holiday-heading"]').getByRole("switch").click();
+  await expect(page.locator('section[aria-labelledby="public-holiday-heading"]').getByRole("switch")).not.toBeChecked();
   await choose("en", "Українська");
   await expect(page.getByRole("heading", { name: "Налаштування", exact: true })).toBeVisible();
   await choose("uk", "Polski");
@@ -86,7 +87,7 @@ test("account language defaults to Polish, persists English and Ukrainian and st
   await page.reload();
   await expect(page.getByRole("button", { name: "Language English", exact: true })).toBeVisible();
   await expect(page.locator("html")).toHaveAttribute("lang", "en");
-  await expect(page.getByRole("switch")).not.toBeChecked();
+  await expect(page.locator('section[aria-labelledby="public-holiday-heading"]').getByRole("switch")).not.toBeChecked();
   await choose("en", "Українська");
   await page.reload();
   await expect(page.getByRole("button", { name: "Мова Українська", exact: true })).toBeVisible();
@@ -102,11 +103,11 @@ test("account language defaults to Polish, persists English and Ukrainian and st
   await page.getByRole("button", { name: /^PC/ }).click();
   await page.goto("/settings");
   await expect(page.getByRole("button", { name: "Language English", exact: true })).toBeVisible();
-  await expect(page.getByRole("switch")).not.toBeChecked();
+  await expect(page.locator('section[aria-labelledby="public-holiday-heading"]').getByRole("switch")).not.toBeChecked();
   identity = { ...identity, managerId: 2, userName: "second" };
   await page.reload();
   await expect(page.getByRole("button", { name: "Język Polski", exact: true })).toBeVisible();
-  await expect(page.getByRole("switch")).not.toBeChecked();
+  await expect(page.locator('section[aria-labelledby="public-holiday-heading"]').getByRole("switch")).not.toBeChecked();
   identity = { ...identity, role: "employee", managerId: null, employeeId: 1, userName: "worker" };
   await page.setViewportSize({ width: 320, height: 900 });
   await page.goto("/profile");

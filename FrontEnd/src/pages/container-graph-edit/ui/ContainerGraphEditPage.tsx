@@ -127,7 +127,7 @@ type EditableScheduleManualColumn = EditableGraphManualColumn;
 type GraphEditorSessionDraft = {
   graphId: number;
   form: ContainerGraphFormState;
-  graphEmployeeRows: Array<{ id: number | null; employeeId: number; minHoursMonth: string }>;
+  graphEmployeeRows: Array<{ id: number | null; employeeId: number; minHoursMonth: string; isPriority: boolean }>;
   selectedSchedulePresetId: number | null;
   selectedEmployeeId: number | null;
   cellMap: Record<string, string>;
@@ -145,7 +145,7 @@ type GraphEditorSessionDraft = {
 
 type GraphEditorUndoSnapshot = {
   form: ContainerGraphFormState;
-  graphEmployeeRows: Array<{ id: number | null; employeeId: number; minHoursMonth: string }>;
+  graphEmployeeRows: Array<{ id: number | null; employeeId: number; minHoursMonth: string; isPriority: boolean }>;
   selectedSchedulePresetId: number | null;
   selectedEmployeeId: number | null;
   cellMap: Record<string, string>;
@@ -348,7 +348,7 @@ function moveScheduleColumnOrder(columnOrder: number[], sourceColumnId: number, 
 }
 
 function sortGraphEmployeeRowsByColumnOrder(
-  rows: Array<{ id: number | null; employeeId: number; minHoursMonth: string }>,
+  rows: Array<{ id: number | null; employeeId: number; minHoursMonth: string; isPriority: boolean }>,
   columnOrder: number[],
 ) {
   const indexByEmployeeId = new Map(
@@ -406,7 +406,7 @@ function cloneGraphEditorSessionDraft(draft: GraphEditorSessionDraft): GraphEdit
   return {
     ...draft,
     form: { ...draft.form },
-    graphEmployeeRows: draft.graphEmployeeRows.map(row => ({ ...row })),
+    graphEmployeeRows: draft.graphEmployeeRows.map(row => ({ ...row, isPriority: row.isPriority ?? false })),
     cellMap: { ...draft.cellMap },
     autoAvailabilityStyleSuppressions: cloneAutoAvailabilityStyleSuppressions(draft.autoAvailabilityStyleSuppressions ?? {}),
     manualColumns: draft.manualColumns.map(column => ({
@@ -424,7 +424,7 @@ function cloneGraphEditorUndoSnapshot(snapshot: GraphEditorUndoSnapshot): GraphE
   return {
     ...snapshot,
     form: { ...snapshot.form },
-    graphEmployeeRows: snapshot.graphEmployeeRows.map(row => ({ ...row })),
+    graphEmployeeRows: snapshot.graphEmployeeRows.map(row => ({ ...row, isPriority: row.isPriority ?? false })),
     cellMap: { ...snapshot.cellMap },
     manualColumns: snapshot.manualColumns.map(column => ({
       ...column,
@@ -481,7 +481,7 @@ function toPayload(
 
 function buildGraphWorkspaceSnapshot(params: {
   form: ContainerGraphFormState;
-  graphEmployeeRows: Array<{ id: number | null; employeeId: number; minHoursMonth: string }>;
+  graphEmployeeRows: Array<{ id: number | null; employeeId: number; minHoursMonth: string; isPriority: boolean }>;
   manualColumns: EditableScheduleManualColumn[];
   pendingManualShiftPublishes?: PendingManualColumnShiftPublication[];
   scheduleColumnOrder: number[];
@@ -508,6 +508,7 @@ function buildGraphWorkspaceSnapshot(params: {
     employeeAssignments: orderedEmployeeRows.map(row => ({
       employeeId: row.employeeId,
       minHoursMonth: row.minHoursMonth.trim(),
+      isPriority: row.isPriority,
     })),
     pendingManualShiftPublishes: (params.pendingManualShiftPublishes ?? [])
       .map(shift => ({
@@ -542,7 +543,7 @@ function buildGraphDraftSnapshot(draft: GraphEditorSessionDraft) {
 }
 
 function createEditableEmployeeRows(
-  graphEmployees: Array<{ id: number; employeeId: number; minHoursMonth?: number | null; displayOrder?: number | null }>,
+  graphEmployees: Array<{ id: number; employeeId: number; minHoursMonth?: number | null; displayOrder?: number | null; isPriority?: boolean }>,
   employeesById: Map<number, { firstName: string; lastName: string }>,
 ) {
   return sortGraphItemsByDisplayOrder(
@@ -551,12 +552,14 @@ function createEditableEmployeeRows(
       employeeId: graphEmployee.employeeId,
       displayOrder: graphEmployee.displayOrder,
       minHoursMonth: graphEmployee.minHoursMonth != null ? String(graphEmployee.minHoursMonth) : "",
+      isPriority: graphEmployee.isPriority ?? false,
       label: getEmployeeFullName(employeesById.get(graphEmployee.employeeId), t("Employee {0}", graphEmployee.employeeId)),
     })),
   ).map(item => ({
       id: item.id,
       employeeId: item.employeeId,
       minHoursMonth: item.minHoursMonth,
+      isPriority: item.isPriority,
     }));
 }
 
@@ -573,7 +576,7 @@ function sortAvailabilityMembersByDisplayOrder(
 }
 
 function buildEmployeeRowsFromAvailabilityMembers(
-  currentRows: Array<{ id: number | null; employeeId: number; minHoursMonth: string }>,
+  currentRows: Array<{ id: number | null; employeeId: number; minHoursMonth: string; isPriority: boolean }>,
   members: Array<{ id: number; employeeId: number; displayOrder: number }>,
 ) {
   const currentRowByEmployeeId = new Map(currentRows.map(row => [row.employeeId, row] as const));
@@ -585,6 +588,7 @@ function buildEmployeeRowsFromAvailabilityMembers(
       id: currentRow?.id ?? null,
       employeeId: member.employeeId,
       minHoursMonth: currentRow?.minHoursMonth ?? "",
+      isPriority: currentRow?.isPriority ?? false,
     };
   });
 }
@@ -608,8 +612,8 @@ function hasPendingBindDraftChanges(bindRows: EditableAvailabilityBind[]) {
 }
 
 function graphEmployeeRowsEqual(
-  left: Array<{ id: number | null; employeeId: number; minHoursMonth: string }>,
-  right: Array<{ id: number | null; employeeId: number; minHoursMonth: string }>,
+  left: Array<{ id: number | null; employeeId: number; minHoursMonth: string; isPriority: boolean }>,
+  right: Array<{ id: number | null; employeeId: number; minHoursMonth: string; isPriority: boolean }>,
 ) {
   return left.length === right.length && left.every((row, index) => {
     const otherRow = right[index];
@@ -618,7 +622,7 @@ function graphEmployeeRowsEqual(
       otherRow &&
       row.id === otherRow.id &&
       row.employeeId === otherRow.employeeId &&
-      row.minHoursMonth === otherRow.minHoursMonth,
+      row.minHoursMonth === otherRow.minHoursMonth && row.isPriority === otherRow.isPriority,
     );
   });
 }
@@ -930,7 +934,7 @@ export function ContainerGraphEditPage() {
 
   const [form, setForm] = useState<ContainerGraphFormState>(() => createInitialGraphForm());
   const [formErrors, setFormErrors] = useState<ContainerGraphFormErrors>({});
-  const [graphEmployeeRows, setGraphEmployeeRows] = useState<Array<{ id: number | null; employeeId: number; minHoursMonth: string }>>([]);
+  const [graphEmployeeRows, setGraphEmployeeRows] = useState<Array<{ id: number | null; employeeId: number; minHoursMonth: string; isPriority: boolean }>>([]);
   const [selectedSchedulePresetId, setSelectedSchedulePresetId] = useState<number | null>(null);
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<number | null>(null);
   const [isCompactMatrix, setIsCompactMatrix] = useState(false);
@@ -1229,6 +1233,7 @@ export function ContainerGraphEditPage() {
         scheduleId: graphId ?? 0,
         employeeId: row.employeeId,
         minHoursMonth: row.minHoursMonth ? Number(row.minHoursMonth) : null,
+        isPriority: row.isPriority,
         displayOrder: index,
       })),
     [graphId, orderedGraphEmployeeRows],
@@ -1833,7 +1838,9 @@ export function ContainerGraphEditPage() {
     }
 
     const availabilityGroupId = Number(form.availabilityGroupId);
-    if (!Number.isInteger(availabilityGroupId) || syncedAvailabilityGroupIdRef.current === availabilityGroupId) {
+    const memberIds = new Set(scheduleAvailabilityMembersQuery.data.map(member => member.employeeId));
+    const sameEmployees = graphEmployeeRows.length === memberIds.size && graphEmployeeRows.every(row => memberIds.has(row.employeeId));
+    if (!Number.isInteger(availabilityGroupId) || syncedAvailabilityGroupIdRef.current === availabilityGroupId && sameEmployees) {
       return;
     }
 
@@ -1845,7 +1852,7 @@ export function ContainerGraphEditPage() {
     setSelectedSchedulePresetId(null);
     setSubmitError(undefined);
     syncedAvailabilityGroupIdRef.current = availabilityGroupId;
-  }, [form.availabilityGroupId, scheduleAvailabilityMembersQuery.data]);
+  }, [form.availabilityGroupId, scheduleAvailabilityMembersQuery.data, graphEmployeeRows]);
 
   useEffect(() => {
     if (autoAvailabilityUnavailableCellKeys.length === 0) {
@@ -2137,7 +2144,7 @@ export function ContainerGraphEditPage() {
     }
 
     captureUndoSnapshot();
-    setGraphEmployeeRows(current => [...current, { id: null, employeeId: selectedEmployeeId, minHoursMonth: "" }]);
+    setGraphEmployeeRows(current => [...current, { id: null, employeeId: selectedEmployeeId, minHoursMonth: "", isPriority: false }]);
     setScheduleColumnOrder(current => [...current, selectedEmployeeId]);
     setSelectedEmployeeId(null);
   };
@@ -2252,6 +2259,7 @@ export function ContainerGraphEditPage() {
         id: row.id,
         employeeId: row.employeeId,
         minHoursMonth: row.minHoursMonth ? Number(row.minHoursMonth) : null,
+        isPriority: row.isPriority,
       })),
       cellMap: draft.cellMap,
       existingEmployees,
@@ -2290,7 +2298,7 @@ export function ContainerGraphEditPage() {
   };
 
   const handleGenerateValidate = (
-    generationRows: Array<{ id: number | null; employeeId: number; minHoursMonth: string }>,
+    generationRows: Array<{ id: number | null; employeeId: number; minHoursMonth: string; isPriority: boolean }>,
   ) => {
     const nextFormErrors = buildGraphFormErrors(form, shopIdSet, availabilityGroupIdSet);
 
@@ -2360,6 +2368,7 @@ export function ContainerGraphEditPage() {
             id: row.id,
             employeeId: row.employeeId,
             minHoursMonth: row.minHoursMonth ? Number(row.minHoursMonth) : null,
+            isPriority: row.isPriority,
           })),
           cellMap,
           existingEmployees: graphEmployeesQuery.data ?? [],
@@ -2469,6 +2478,7 @@ export function ContainerGraphEditPage() {
           employees: generationRows.map((row, index) => ({
             employeeId: row.employeeId,
             minHoursMonth: row.minHoursMonth ? Number(row.minHoursMonth) : null,
+            isPriority: row.isPriority,
             displayOrder: index,
           })),
         },
@@ -3030,6 +3040,14 @@ export function ContainerGraphEditPage() {
         onPublishManualShift={handlePublishManualShift}
         onCancelManualShift={handleCancelManualShift}
         onCancelPendingManualShift={handleCancelPendingManualShift}
+        onEmployeePriorityChange={(employeeId, checked) => {
+          if (graphEmployeeRows.find(row => row.employeeId === employeeId)?.isPriority !== checked) {
+            captureUndoSnapshot(`employee-priority:${employeeId}`);
+          }
+          setGraphEmployeeRows(current => current.map(row => row.employeeId === employeeId ? { ...row, isPriority: checked } : row));
+          setSelectedSchedulePresetId(null);
+          setSubmitError(undefined);
+        }}
         onEmployeeMinHoursChange={(employeeId, value) => {
           if (graphEmployeeRows.find(row => row.employeeId === employeeId)?.minHoursMonth !== value) {
             captureUndoSnapshot(`employee-min-hours:${employeeId}`);

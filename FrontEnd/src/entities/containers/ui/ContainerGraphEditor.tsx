@@ -78,6 +78,7 @@ export type EditableGraphEmployeeRow = {
   id: number | null;
   employeeId: number;
   minHoursMonth: string;
+  isPriority: boolean;
 };
 
 export type EditableGraphBindRow = {
@@ -184,6 +185,7 @@ type ContainerGraphEditorProps = {
   onPublishManualShift: (input: ManualColumnShiftPublicationInput) => void;
   onCancelManualShift: (shiftId: number) => void;
   onCancelPendingManualShift: (clientId: string) => void;
+  onEmployeePriorityChange: (employeeId: number, checked: boolean) => void;
   onEmployeeMinHoursChange: (employeeId: number, value: string) => void;
   onColumnMove: (employeeId: number, targetEmployeeId: number) => void;
   onCellChange: (employeeId: number, dayOfMonth: number, value: string) => void;
@@ -437,6 +439,7 @@ export function ContainerGraphEditor({
   onCancelManualShift,
   onCancelPendingManualShift,
   onEmployeeMinHoursChange,
+  onEmployeePriorityChange,
   onColumnMove,
   onCellChange,
   onSelectedCellKeysChange,
@@ -773,6 +776,7 @@ export function ContainerGraphEditor({
                   )}
                   onFieldChange={onFieldChange}
                   onEmployeeMinHoursChange={onEmployeeMinHoursChange}
+                  onEmployeePriorityChange={onEmployeePriorityChange}
                 />
 
                 <div className={styles.detailsActions}>
