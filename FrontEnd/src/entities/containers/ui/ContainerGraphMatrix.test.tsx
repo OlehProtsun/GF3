@@ -1,6 +1,6 @@
 import { beforeEach as beforeEnglishTest } from "vitest";
 import { setLanguage as setTestLanguage, t } from "@shared/i18n";
-import { act, fireEvent, render, screen, within, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, test, vi } from "vitest";
 import type { GraphRelatedScheduleHintDetail } from "@entities/containers/model/graphWorkspace";
@@ -21,31 +21,142 @@ describe("compact manual demand", () => {
     vi.spyOn(more, "getBoundingClientRect").mockReturnValue(rect);
     return more;
   };
-  test("portal preserves duplicate demand, hover bridge, outside, Escape and scrolling", async () => {
-    const { unmount } = render(<ContainerGraphMatrix graph={{ year: 2026, month: 5 }} columns={[column]} cellMap={{ "-1:1": raw }} readOnly />);
-    const more = prepare();
-    expect(more.closest("td")).toHaveTextContent("09:00 - 15:00, More");
-    expect(more.closest("td")).not.toHaveTextContent("15:00 - 21:00");
-    fireEvent.pointerEnter(more, { pointerType: "mouse" });
-    const tooltip = screen.getByRole("tooltip");
-    expect(tooltip.parentElement).toBe(document.body);
-    expect(within(tooltip).getAllByText(/\d\d:\d\d/).map(node => node.textContent)).toEqual(["09:00 - 15:00", "15:00 - 21:00"]);
-    fireEvent.pointerLeave(more, { pointerType: "mouse" });
-    fireEvent.pointerEnter(tooltip, { pointerType: "mouse" });
-    fireEvent.scroll(tooltip);
-    expect(tooltip).toBeInTheDocument();
-    fireEvent.pointerLeave(tooltip, { pointerType: "mouse" });
-    await waitFor(() => expect(screen.queryByRole("tooltip")).toBeNull());
-    fireEvent.click(more); fireEvent.keyDown(more, { key: "Escape" });
-    expect(screen.queryByRole("tooltip")).toBeNull();
-    fireEvent.click(more); fireEvent.pointerDown(document.body);
-    expect(screen.queryByRole("tooltip")).toBeNull();
-    fireEvent.click(more); fireEvent.scroll(window);
-    expect(screen.queryByRole("tooltip")).toBeNull();
-    fireEvent.click(more); fireEvent.resize(window);
-    expect(screen.queryByRole("tooltip")).toBeNull();
-    fireEvent.click(more); unmount();
-    expect(screen.queryByRole("tooltip")).toBeNull();
+  test("portal preserves duplicate demand, hover bridge, outside, Escape and scrolling", () => {
+    vi.useFakeTimers();
+    try {
+      const { unmount } = render(<ContainerGraphMatrix graph={{ year: 2026, month: 5 }} columns={[column]} cellMap={{ "-1:1": raw }} readOnly />);
+      const more = prepare();
+      expect(more.closest("td")).toHaveTextContent("09:00 - 15:00, More");
+      expect(more.closest("td")).not.toHaveTextContent("15:00 - 21:00");
+      fireEvent.pointerEnter(more, { pointerType: "mouse" });
+      act(() => vi.advanceTimersByTime(159));
+      expect(screen.queryByRole("tooltip")).toBeNull();
+      act(() => vi.advanceTimersByTime(1));
+      const tooltip = screen.getByRole("tooltip");
+      expect(tooltip.parentElement).toBe(document.body);
+      expect(within(tooltip).getAllByText(/\d\d:\d\d/).map(node => node.textContent)).toEqual(["09:00 - 15:00", "15:00 - 21:00"]);
+      fireEvent.pointerLeave(more, { pointerType: "mouse" });
+      fireEvent.pointerEnter(tooltip, { pointerType: "mouse" });
+      fireEvent.scroll(tooltip);
+      act(() => vi.advanceTimersByTime(150));
+      expect(tooltip).toBeInTheDocument();
+      fireEvent.pointerLeave(tooltip, { pointerType: "mouse" });
+      act(() => vi.advanceTimersByTime(150));
+      expect(screen.queryByRole("tooltip")).toBeNull();
+      fireEvent.click(more); fireEvent.keyDown(more, { key: "Escape" });
+      expect(screen.queryByRole("tooltip")).toBeNull();
+      fireEvent.click(more); fireEvent.pointerDown(document.body);
+      expect(screen.queryByRole("tooltip")).toBeNull();
+      fireEvent.click(more); fireEvent.scroll(window);
+      expect(screen.queryByRole("tooltip")).toBeNull();
+      fireEvent.click(more); fireEvent.resize(window);
+      expect(screen.queryByRole("tooltip")).toBeNull();
+      fireEvent.click(more); unmount();
+      expect(screen.queryByRole("tooltip")).toBeNull();
+    } finally { vi.useRealTimers(); }
+  });
+  const adjacentValues = ["09:00 - 15:00, 15:00 - 21:00", "10:00 - 14:00, 16:00 - 20:00", "11:00 - 15:00, 17:00 - 21:00"];
+  const adjacentProps = { graph: { year: 2026, month: 5 }, columns: [column],
+    cellMap: Object.fromEntries(adjacentValues.map((value, index) => [`-1:${index + 1}`, value])), readOnly: true };
+  const prepareAdjacent = () => screen.getAllByRole("button", { name: "More: Shifts" }).map(more => {
+    vi.spyOn(more, "getBoundingClientRect").mockReturnValue(rect);
+    return more;
+  });
+  const enter = (element: HTMLElement) => fireEvent.pointerEnter(element, { pointerType: "mouse" });
+  const leave = (element: HTMLElement) => fireEvent.pointerLeave(element, { pointerType: "mouse" });
+  const advance = (ms: number) => act(() => vi.advanceTimersByTime(ms));
+  const expectActive = (text?: string) => {
+    const popups = screen.queryAllByRole("tooltip");
+    expect(popups).toHaveLength(text ? 1 : 0);
+    if (text) expect(popups[0]).toHaveTextContent(text);
+  };
+  test("rapid adjacent traversal cancels stale opens and late closes cannot hide another cell", () => {
+    vi.useFakeTimers();
+    try {
+      render(<ContainerGraphMatrix {...adjacentProps} />);
+      const [a, b, c] = prepareAdjacent();
+      enter(a); advance(50); expectActive(); leave(a);
+      enter(b); advance(50); expectActive(); leave(b);
+      enter(c); advance(159); expectActive(); advance(1); expectActive("17:00 - 21:00");
+      fireEvent.click(a); expectActive("15:00 - 21:00");
+      enter(b); advance(100); leave(a); advance(60); expectActive("16:00 - 20:00");
+      advance(90); expectActive("16:00 - 20:00");
+      enter(c); advance(50); leave(c); enter(b); advance(200); expectActive("16:00 - 20:00");
+    } finally { vi.useRealTimers(); }
+  });
+  test("click overrides another pending hover, toggles and promotes hover without stacking", () => {
+    vi.useFakeTimers();
+    try {
+      render(<ContainerGraphMatrix {...adjacentProps} />);
+      const [a, b] = prepareAdjacent();
+      enter(a); advance(50); fireEvent.click(b); expectActive("16:00 - 20:00");
+      advance(200); expectActive("16:00 - 20:00");
+      fireEvent.click(b); expectActive();
+      enter(b); advance(160); expectActive("16:00 - 20:00");
+      fireEvent.click(b); expectActive("16:00 - 20:00");
+      fireEvent.click(b); expectActive();
+    } finally { vi.useRealTimers(); }
+  });
+  test.each(["source", "inline", "edit", "hint", "unmount"])("pending hover cannot reopen after %s change", change => {
+    vi.useFakeTimers();
+    try {
+      const { rerender, unmount } = render(<ContainerGraphMatrix {...adjacentProps} readOnly={change !== "edit"} />);
+      const [a] = prepareAdjacent(); enter(a); advance(80);
+      if (change === "source") rerender(<ContainerGraphMatrix {...adjacentProps} cellMap={{ "-1:1": raw }} />);
+      if (change === "inline") rerender(<ContainerGraphMatrix {...adjacentProps} readOnly={false} editMode="inline" />);
+      if (change === "edit") fireEvent.doubleClick(screen.getByRole("button", { name: "Demand day 1" }));
+      if (change === "hint") rerender(<ContainerGraphMatrix {...adjacentProps} visualHintMap={{ "-1:1": "Related" }} />);
+      if (change === "unmount") unmount();
+      advance(300); expectActive();
+    } finally { vi.useRealTimers(); }
+  });
+  test("touch and pen do not arm hover; matrix scrolling dismisses and disconnected anchors cannot open", () => {
+    vi.useFakeTimers();
+    try {
+      render(<ContainerGraphMatrix {...adjacentProps} />);
+      const [a] = prepareAdjacent();
+      for (const pointerType of ["touch", "pen"]) {
+        fireEvent.pointerEnter(a, { pointerType }); advance(200); expectActive();
+      }
+      fireEvent.click(a); expectActive("15:00 - 21:00");
+      fireEvent.scroll(a.closest("table")!.parentElement!); expectActive();
+      vi.spyOn(a, "getBoundingClientRect").mockReturnValue({ ...rect, width: 0 });
+      enter(a); advance(160); expectActive();
+      vi.spyOn(a, "isConnected", "get").mockReturnValue(false);
+      fireEvent.click(a); expectActive();
+    } finally { vi.useRealTimers(); }
+  });
+  test("preview ownership is independent between matrices", () => {
+    render(<><ContainerGraphMatrix {...adjacentProps} /><ContainerGraphMatrix {...adjacentProps} /></>);
+    const buttons = prepareAdjacent();
+    fireEvent.click(buttons[0]);
+    // Native outside pointerdown dismisses normally; a synthetic click tests independent ownership.
+    fireEvent.click(buttons[3]);
+    expect(screen.getAllByRole("tooltip")).toHaveLength(2);
+  });
+  test.each([
+    { width: 1000, height: 700, left: 50, top: 100, count: 2, expectedLeft: 108, expectedTop: 91, maxHeight: 320 },
+    { width: 1000, height: 700, left: 900, top: 100, count: 2, expectedLeft: 672, expectedTop: 91, maxHeight: 320 },
+    { width: 320, height: 700, left: 130, top: 20, count: 2, expectedLeft: 92, expectedTop: 56, maxHeight: 320 },
+    { width: 320, height: 700, left: 130, top: 640, count: 2, expectedLeft: 92, expectedTop: 586, maxHeight: 320 },
+    { width: 320, height: 400, left: 130, top: 170, count: 30, expectedLeft: 92, expectedTop: 206, maxHeight: 186 },
+    { width: 10, height: 10, left: 1, top: 1, count: 30, expectedLeft: 8, expectedTop: 8, maxHeight: 1 },
+  ])("adaptive placement $width/$left/$top with $count intervals", data => {
+    vi.stubGlobal("innerWidth", data.width); vi.stubGlobal("innerHeight", data.height);
+    try {
+      render(<ContainerGraphMatrix graph={{ year: 2026, month: 5 }} columns={[column]} readOnly
+        cellMap={{ "-1:1": Array(data.count).fill("09:00 - 15:00").join(", ") }} />);
+      const more = prepare();
+      vi.mocked(more.getBoundingClientRect).mockReturnValue({ ...rect, left: data.left, right: data.left + 50, top: data.top, bottom: data.top + 28 });
+      fireEvent.click(more);
+      const popup = screen.getByRole("tooltip");
+      const numbers = [popup.style.left, popup.style.top, popup.style.width, popup.style.maxHeight].map(parseFloat);
+      expect(numbers.every(Number.isFinite)).toBe(true);
+      expect(numbers).toEqual([data.expectedLeft, data.expectedTop, Math.min(220, Math.max(1, data.width - 16)), data.maxHeight]);
+      expect(numbers[0]).toBeGreaterThanOrEqual(0); expect(numbers[0] + numbers[2]).toBeLessThanOrEqual(data.width);
+      expect(numbers[1]).toBeGreaterThanOrEqual(0);
+      expect(numbers[1] + Math.min((data.count - 1) * 28 + 18, numbers[3])).toBeLessThanOrEqual(data.height);
+    } finally { vi.unstubAllGlobals(); }
   });
   test("More isolates selection and editing; primary edits full raw data", async () => {
     const selected = vi.fn(), changed = vi.fn(), hint = vi.fn();
