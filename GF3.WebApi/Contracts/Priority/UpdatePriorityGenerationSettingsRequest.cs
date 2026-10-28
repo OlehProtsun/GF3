@@ -10,4 +10,6 @@ public sealed class UpdatePriorityGenerationSettingsRequest
 
     [Required]
     public bool? WeekendsOff { get; set; }
+
+    public bool? RespectAvailability { get; set; }
 }

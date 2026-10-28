@@ -990,6 +990,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, TimeProvider? 
             });
             entity.Property(x => x.ShiftHours).IsRequired().HasDefaultValue(8);
             entity.Property(x => x.WeekendsOff).IsRequired().HasDefaultValue(true);
+            entity.Property(x => x.RespectAvailability).IsRequired().HasDefaultValue(true);
             entity.HasData(new PriorityGenerationSettingsModel());
         });
     }

@@ -2,9 +2,10 @@ import { expect, test } from "@playwright/test";
 
 test.use({ reducedMotion: "reduce" });
 
-test("fresh graph priority settings and flags survive preview, save and reload at 320px", async ({ page }) => {
+test("mocked API: fresh graph priority settings and flags survive preview, save and reload at 320px", async ({ page }) => {
   test.setTimeout(60_000); // Both editor visits include the existing eight-second edit-lock fallback.
-  let settings = { shiftHours: 8, weekendsOff: true };
+  let settings = { shiftHours: 8, weekendsOff: true, respectAvailability: true };
+  const settingsWrites: typeof settings[] = [];
   const employees = [1, 2].map(id => ({ id, firstName: id === 1 ? "Ada" : "Grace", lastName: "Synthetic", hasLoginAccount: false, isOnline: false }));
   let assignments = employees.map((employee, index) => ({ id: employee.id, scheduleId: 1, employeeId: employee.id, displayOrder: index, minHoursMonth: 70, isPriority: false }));
   let graph = { id: 1, containerId: 1, shopId: 1, name: "Priority fixture", year: 2026, month: 4, publicationStatus: "private", allowSwap: true,
@@ -27,7 +28,7 @@ test("fresh graph priority settings and flags survive preview, save and reload a
     else if (path === "/api/account-language") body = { language: "en" };
     else if (path === "/api/public-holiday-settings") body = { showPublicHolidays: true };
     else if (path === "/api/priority-generation-settings") {
-      if (method === "PUT") settings = route.request().postDataJSON();
+      if (method === "PUT") { settings = route.request().postDataJSON(); settingsWrites.push(settings); }
       body = settings;
     }
     else if (path === "/api/employees") body = employees;
@@ -81,19 +82,37 @@ test("fresh graph priority settings and flags survive preview, save and reload a
   expect(errors).toEqual([]);
   await expect(duration).toBeEnabled();
   if (await collapse.isVisible()) await collapse.click();
+  const respect = page.getByRole("switch", { name: "Respect priority employee availability", exact: true });
+  await expect(respect).toBeChecked();
+  const availabilityRefetch = page.waitForResponse(response => response.url().endsWith("/api/priority-generation-settings") && response.request().method() === "GET");
+  await respect.focus(); await respect.press("Space");
+  await (await availabilityRefetch).finished();
+  await expect(respect).not.toBeChecked();
+  await expect(respect).toHaveAccessibleDescription(/Monday–Friday.*Weekends stay off/);
+  await expect(respect).toBeEnabled();
+  const durationRefetch = page.waitForResponse(response => response.url().endsWith("/api/priority-generation-settings") && response.request().method() === "GET");
   await duration.fill("10"); await duration.press("Enter");
+  await (await durationRefetch).finished();
   await expect.poll(() => settings.shiftHours).toBe(10);
   await expect(duration).toHaveValue("10");
   await expect(duration).toBeEnabled();
   expect(errors, "duration save").toEqual([]);
+  const weekendsRefetch = page.waitForResponse(response => response.url().endsWith("/api/priority-generation-settings") && response.request().method() === "GET");
   await page.getByRole("switch", { name: "Weekends off for priority employees" }).click();
+  await (await weekendsRefetch).finished();
   await expect.poll(() => settings.weekendsOff).toBe(false);
   await expect(page.getByRole("switch", { name: "Weekends off for priority employees" })).not.toBeChecked();
   await expect(page.getByRole("switch", { name: "Weekends off for priority employees" })).toBeEnabled();
+  expect(settingsWrites).toEqual([
+    { shiftHours: 8, weekendsOff: true, respectAvailability: false },
+    { shiftHours: 10, weekendsOff: true, respectAvailability: false },
+    { shiftHours: 10, weekendsOff: false, respectAvailability: false },
+  ]);
   expect(errors, "weekend save").toEqual([]);
   await page.waitForLoadState("networkidle");
   await page.reload();
   await expect(duration).toHaveValue("10");
+  await expect(respect).not.toBeChecked();
   if (await collapse.isVisible()) await collapse.click();
   await expect(page.getByRole("switch", { name: "Weekends off for priority employees" })).not.toBeChecked();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
@@ -169,7 +188,7 @@ test("fresh graph priority settings and flags survive preview, save and reload a
   expect(errors).toEqual([]);
 });
 
-test("phone workspace exposes no priority write controls", async ({ page }) => {
+test("mocked API: phone workspace exposes no priority write controls", async ({ page }) => {
   let writes = 0;
   await page.addInitScript(() => localStorage.setItem("gf3.auth.access-token", "synthetic-phone-token"));
   await page.route("**/api/**", async route => {
@@ -185,5 +204,6 @@ test("phone workspace exposes no priority write controls", async ({ page }) => {
   await page.goto("/settings");
   await expect(page.getByRole("heading", { name: "Coming Soon", exact: true })).toBeVisible();
   await expect(page.getByRole("textbox", { name: "Priority shift duration", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("switch", { name: "Respect priority employee availability", exact: true })).toHaveCount(0);
   expect(writes).toBe(0);
 });

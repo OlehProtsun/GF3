@@ -1,6 +1,7 @@
 import { usePriorityGenerationSettingsQuery, useUpdatePriorityGenerationSettingsMutation } from "@entities/priority-generation/api/queries";
 import { NumberStepperInput } from "@shared/ui/components/NumberStepperInput";
-import { useState } from "react";
+import { useRef, useState } from "react";
+import type { PriorityGenerationSettings } from "@entities/priority-generation/model/types";
 import { useAuth } from "@app/providers/AuthProvider";
 import { useLanguage } from "@app/providers/LanguageProvider";
 import { useLanguageRevision } from "@shared/i18n/useLanguageRevision";
@@ -27,6 +28,15 @@ export function ManagerSettingsPage() {
   const priorityQuery = usePriorityGenerationSettingsQuery(pending.data?.length === 0 && !pending.isError);
   const priorityMutation = useUpdatePriorityGenerationSettingsMutation();
   const priorityDisabled = session?.workspaceMode === "phone" || !priorityQuery.data || priorityQuery.isError || priorityQuery.isFetching || priorityMutation.isPending;
+  const prioritySaving = useRef(false);
+  const savePriority = (settings: PriorityGenerationSettings) => {
+    if (priorityDisabled || prioritySaving.current) return;
+    prioritySaving.current = true;
+    priorityMutation.mutate(settings, {
+      onSuccess: () => { prioritySaving.current = false; },
+      onError: () => { prioritySaving.current = false; },
+    });
+  };
   const [open, setOpen] = useState(false);
   const [languageOpen, setLanguageOpen] = useState(false);
   const readOnly = session?.workspaceMode === "phone";
@@ -75,16 +85,30 @@ export function ManagerSettingsPage() {
               <label htmlFor="priority-shift-hours">{t("Priority shift duration (hours)")}</label>
               <NumberStepperInput key={`${priorityQuery.data?.shiftHours ?? 8}:${priorityMutation.isPending}`} id="priority-shift-hours" ariaLabel={t("Priority shift duration")}
                 value={priorityQuery.data?.shiftHours ?? 8} min={1} max={12} disabled={priorityDisabled}
-                onChange={shiftHours => priorityMutation.mutate({ shiftHours, weekendsOff: priorityQuery.data?.weekendsOff ?? true })} />
+                onChange={shiftHours => savePriority({ shiftHours, weekendsOff: priorityQuery.data?.weekendsOff ?? true,
+                  respectAvailability: priorityQuery.data?.respectAvailability ?? true })} />
             </div>
             <div className={styles.prioritySettingRow}>
               <span id="priority-weekends-label">{t("Weekends off for priority employees")}</span>
               <label className={styles.switch} aria-busy={priorityMutation.isPending}>
                 <input type="checkbox" role="switch" aria-labelledby="priority-weekends-label" checked={priorityQuery.data?.weekendsOff ?? true}
-                  disabled={priorityDisabled} onChange={event => priorityMutation.mutate({ shiftHours: priorityQuery.data?.shiftHours ?? 8, weekendsOff: event.target.checked })} />
+                  disabled={priorityDisabled} onChange={event => savePriority({ shiftHours: priorityQuery.data?.shiftHours ?? 8,
+                    weekendsOff: event.target.checked, respectAvailability: priorityQuery.data?.respectAvailability ?? true })} />
                 <span className={styles.switchTrack} aria-hidden="true"><span className={styles.switchThumb} /></span>
               </label>
             </div>
+            <div className={styles.prioritySettingRow}>
+              <label htmlFor="priority-respect-availability">{t("Respect priority employee availability")}</label>
+              <label className={styles.switch} aria-busy={priorityMutation.isPending}>
+                <input id="priority-respect-availability" type="checkbox" role="switch"
+                  aria-label={t("Respect priority employee availability")} aria-describedby="priority-availability-description"
+                  checked={priorityQuery.data?.respectAvailability ?? true} disabled={priorityDisabled}
+                  onChange={event => savePriority({ shiftHours: priorityQuery.data?.shiftHours ?? 8,
+                    weekendsOff: priorityQuery.data?.weekendsOff ?? true, respectAvailability: event.target.checked })} />
+                <span className={styles.switchTrack} aria-hidden="true"><span className={styles.switchThumb} /></span>
+              </label>
+            </div>
+            <p id="priority-availability-description" className={styles.description}>{t("When off, priority employees can work Monday–Friday across schedule hours, while saved work in other schedules remains protected. Weekends stay off even when the separate weekends setting is off.")}</p>
             {priorityQuery.isError ? <ErrorBanner dismissible={false}>{getErrorMessage(priorityQuery.error, t("Could not load priority settings."))}</ErrorBanner> : null}
             {priorityQuery.isError ? <button className={styles.actionButton} type="button" onClick={() => priorityQuery.refetch()}>{t("Retry")}</button> : null}
             {priorityMutation.error ? <ErrorBanner dismissible={false}>{getErrorMessage(priorityMutation.error, t("Could not save priority settings."))}</ErrorBanner> : null}

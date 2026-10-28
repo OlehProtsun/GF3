@@ -46,7 +46,8 @@ internal static class PriorityScheduleRules
     }
 
     internal static Dictionary<(int Employee, int Day), DayConstraint> BuildDayConstraints(ScheduleModel schedule,
-        IReadOnlyList<AvailabilityGroupModel> groups, IReadOnlyList<ScheduleEmployeeModel> employees, bool weekendsOff)
+        IReadOnlyList<AvailabilityGroupModel> groups, IReadOnlyList<ScheduleEmployeeModel> employees, bool weekendsOff,
+        bool respectAvailability = true)
     {
         var result = new Dictionary<(int, int), DayConstraint>();
         var days = DateTime.DaysInMonth(schedule.Year, schedule.Month);
@@ -61,18 +62,20 @@ internal static class PriorityScheduleRules
             foreach (var entry in group.Members.Where(m => m.EmployeeId == employee.EmployeeId)
                          .SelectMany(m => m.Days).Where(d => d.DayOfMonth == day))
             {
+                var isExternal = group.Id == 0 && group.Name == "Saved schedule commitments";
+                if (!isExternal && employee.IsPriority && !respectAvailability) continue;
                 var window = new Interval(0, 1440);
                 if (entry.Kind == AvailabilityKind.NONE) window = default;
                 else if (entry.Kind == AvailabilityKind.INT)
                 {
                     if (entry.IntervalStr is null || !AvailabilityCodeParser.TryNormalizeInterval(entry.IntervalStr, out var normalized) ||
                         !TryInterval(normalized, out window)) window = default;
-                    else if (window.Start <= shifts.Min(s => s.Start) && window.End >= shifts.Max(s => s.End)) explicitFull = true;
+                    else if ((!employee.IsPriority || respectAvailability) && window.Start <= shifts.Min(s => s.Start) && window.End >= shifts.Max(s => s.End)) explicitFull = true;
                 }
-                if (group.Id == 0 && group.Name == "Saved schedule commitments") external = external.Intersect(window);
+                if (isExternal) external = external.Intersect(window);
                 else original = original.Intersect(window);
             }
-            if (employee.IsPriority && weekendsOff && new DateOnly(schedule.Year, schedule.Month, day).DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday)
+            if (employee.IsPriority && (weekendsOff || !respectAvailability) && new DateOnly(schedule.Year, schedule.Month, day).DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday)
                 original = default;
             result[(employee.EmployeeId, day)] = new(original, external, explicitFull);
         }

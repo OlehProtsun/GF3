@@ -18,6 +18,7 @@ public sealed class PriorityAwareScheduleGenerator(
         var settings = await db.PriorityGenerationSettings.AsNoTracking()
             .SingleOrDefaultAsync(x => x.Id == 1, ct).ConfigureAwait(false);
         return await priority.GenerateAsync(schedule, availabilities.ToList(), employeeList,
-            settings?.ShiftHours ?? 8, settings?.WeekendsOff ?? true, progress, ct).ConfigureAwait(false);
+            settings?.ShiftHours ?? 8, settings?.WeekendsOff ?? true, progress, ct,
+            respectAvailability: settings?.RespectAvailability ?? true).ConfigureAwait(false);
     }
 }

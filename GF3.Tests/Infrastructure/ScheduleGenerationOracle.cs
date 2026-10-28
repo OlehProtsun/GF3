@@ -13,8 +13,52 @@ internal sealed record GenerationCheckResult(IReadOnlyList<GenerationViolation> 
 
 internal static class ScheduleGenerationOracle
 {
+    internal static double[] CanonicalQuality(GenerationScenario scenario, IReadOnlyCollection<ScheduleSlotModel> slots,
+        int hours = 8, bool weekendsOff = true, bool respectAvailability = true)
+    {
+        var checkedOutput = Check(scenario, slots, hours, weekendsOff, respectAvailability);
+        Assert.Empty(checkedOutput.HardViolations);
+        var employees = scenario.Employees.OrderBy(e => e.EmployeeId).ToArray();
+        var shifts = new[] { scenario.Schedule.Shift1Time, scenario.Schedule.Shift2Time }
+            .Where(s => ReadRange(s, out _, out _)).Select(s => { ReadRange(s, out var from, out var to); return (From: from, To: to); }).ToArray();
+        var templates = shifts.OrderBy(s => s.From).Aggregate(new List<(int From, int To)>(), (union, shift) =>
+        {
+            if (union.Count == 0 || union[^1].To < shift.From) union.Add(shift);
+            else union[^1] = (union[^1].From, Math.Max(union[^1].To, shift.To));
+            return union;
+        });
+        var days = DateTime.DaysInMonth(scenario.Schedule.Year, scenario.Schedule.Month);
+        double priorityDeficit = 0, regularDeficit = 0, normalized = 0, fairness = 0, rest = 0;
+        foreach (var employee in employees)
+        {
+            var own = slots.Where(s => s.EmployeeId == employee.EmployeeId && s.Status == SlotStatus.ASSIGNED).ToArray();
+            var worked = own.Sum(s => { ReadTime(s.FromTime, out var from); ReadTime(s.ToTime, out var to); return to - from; });
+            var target = Math.Max(0, employee.MinHoursMonth ?? 0) * 60d;
+            var deficit = Math.Max(0, target - worked);
+            var capacity = Enumerable.Range(1, days).Sum(day =>
+            {
+                if (employee.IsPriority && (weekendsOff || !respectAvailability) &&
+                    new DateOnly(scenario.Schedule.Year, scenario.Schedule.Month, day).DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday) return 0;
+                var window = Window(scenario, employee.EmployeeId, day, employee.IsPriority && !respectAvailability);
+                if (!employee.IsPriority) return templates.Sum(t => Math.Max(0, Math.Min(t.To, window.To) - Math.Max(t.From, window.From)));
+                var externalScenario = scenario with { AvailabilityGroups = scenario.AvailabilityGroups
+                    .Where(g => g.Id == 0 && g.Name == "Saved schedule commitments").ToArray() };
+                var external = Window(externalScenario, employee.EmployeeId, day);
+                return templates.Any(t => Math.Min(t.To, external.To) - Math.Max(t.From, external.From) >= hours * 60 &&
+                    Math.Min(Math.Min(t.To, external.To), window.To) > Math.Max(Math.Max(t.From, external.From), window.From)) ? hours * 60 : 0;
+            });
+            var potential = Math.Max(1, scenario.Schedule.MaxHoursPerEmpMonth > 0 ? Math.Min(capacity, scenario.Schedule.MaxHoursPerEmpMonth * 60) : capacity);
+            if (employee.IsPriority) priorityDeficit += deficit;
+            else { regularDeficit += deficit; fairness += Math.Pow(worked / (double)potential, 2); }
+            normalized += Math.Pow(deficit / Math.Max(1, Math.Min(potential, target)), 2);
+            rest += Math.Pow(LongestRun(own.Select(s => s.DayOfMonth)), 2);
+        }
+        return [priorityDeficit, checkedOutput.Metrics.CoverageGapMinutes, regularDeficit, normalized, fairness, rest,
+            slots.Count(s => s.Status == SlotStatus.UNFURNISHED)];
+    }
+
     public static GenerationCheckResult Check(GenerationScenario scenario, IReadOnlyCollection<ScheduleSlotModel> slots,
-        int? priorityShiftHours = null, bool priorityWeekendsOff = true)
+        int? priorityShiftHours = null, bool priorityWeekendsOff = true, bool priorityRespectAvailability = true)
     {
         var schedule = scenario.Schedule;
         var violations = new List<GenerationViolation>();
@@ -28,6 +72,10 @@ internal static class ScheduleGenerationOracle
         var templates = new[] { schedule.Shift1Time, schedule.Shift2Time }
             .Select(text => ReadRange(text, out var from, out var to) ? (from, to) : (-1, -1))
             .Where(t => t.Item1 >= 0).ToArray();
+        var operating=new List<(int From,int To)>();
+        foreach(var t in templates.OrderBy(t=>t.Item1))
+            if(operating.Count==0||operating[^1].To<t.Item1)operating.Add(t);
+            else operating[^1]=(operating[^1].From,Math.Max(operating[^1].To,t.Item2));
         var expected = employees.Length == 0 ? 0 : days * templates.Length * Math.Max(0, schedule.PeoplePerShift);
         if (slots.Count != expected) Fail("PositionCount");
         var worked = new List<(int Day, int Employee, int From, int To)>();
@@ -58,6 +106,7 @@ internal static class ScheduleGenerationOracle
             if (slot.Status != SlotStatus.ASSIGNED) { Fail("Status", slot.DayOfMonth); continue; }
             if (templates.Length > 0 && (from < templates.Min(t => t.Item1) || to > templates.Max(t => t.Item2)))
                 Fail("TemplateBounds", slot.DayOfMonth, slot.EmployeeId);
+            else if(templates.Length>0&&!operating.Any(t=>from>=t.From&&to<=t.To)) Fail("TemplateGap",slot.DayOfMonth,slot.EmployeeId);
             if (!slot.EmployeeId.HasValue || !ordinals.ContainsKey(slot.EmployeeId.Value))
             { Fail("Enrollment", slot.DayOfMonth); continue; }
             var id = slot.EmployeeId.Value;
@@ -67,15 +116,13 @@ internal static class ScheduleGenerationOracle
             if (priority)
             {
                 if (to - from != priorityShiftHours!.Value * 60) Fail("PriorityDuration", slot.DayOfMonth, id);
-                if (priorityWeekendsOff && new DateOnly(schedule.Year, schedule.Month, slot.DayOfMonth).DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday)
+                if ((priorityWeekendsOff || !priorityRespectAvailability) && new DateOnly(schedule.Year, schedule.Month, slot.DayOfMonth).DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday)
                     Fail("PriorityWeekend", slot.DayOfMonth, id);
-                if (window.To <= window.From || from >= window.To || to <= window.From) Fail("Availability", slot.DayOfMonth, id);
+                if (priorityRespectAvailability && (window.To <= window.From || from >= window.To || to <= window.From)) Fail("Availability", slot.DayOfMonth, id);
                 foreach (var group in scenario.AvailabilityGroups.Where(g => g.Id == 0 && g.Name == "Saved schedule commitments" && g.Year == schedule.Year && g.Month == schedule.Month))
                 foreach (var entry in group.Members.Where(m => m.EmployeeId == id).SelectMany(m => m.Days).Where(d => d.DayOfMonth == slot.DayOfMonth))
                     if (entry.Kind == AvailabilityKind.NONE || entry.Kind == AvailabilityKind.INT &&
                         (!ReadRange(entry.IntervalStr, out var freeFrom, out var freeTo) || from < freeFrom || to > freeTo)) Fail("ExternalOverlap", slot.DayOfMonth, id);
-                for (var minute = from; minute < to; minute++)
-                    if (!templates.Any(t => t.Item1 <= minute && t.Item2 > minute)) { Fail("TemplateGap", slot.DayOfMonth, id); break; }
                 if (worked.Any(w => w.Day == slot.DayOfMonth && w.Employee == id)) Fail("PriorityDuplicateDay", slot.DayOfMonth, id);
             }
             else if (from < window.From || to > window.To || window.To <= window.From) Fail("Availability", slot.DayOfMonth, id);
@@ -145,15 +192,18 @@ internal static class ScheduleGenerationOracle
         return new(violations, new(slots.Count, slots.Count(s => s.Status == SlotStatus.ASSIGNED),
             slots.Count(s => s.Status == SlotStatus.UNFURNISHED), conflictDays.Count, gap,
             minutes.Values.Sum(), minutes, deficits.Sum(), deficits.Sum(d => (long)d * d),
-            DesiredDeficit(scenario, employees, templates, days, minutes, ordinals), null, 0,
+            DesiredDeficit(scenario, employees, templates, days, minutes, ordinals, priorityShiftHours, priorityWeekendsOff, priorityRespectAvailability), null, 0,
             violations.GroupBy(v => v.Code).ToDictionary(g => g.Key, g => g.Count()), reviews));
     }
 
-    internal static (int From, int To) Window(GenerationScenario scenario, int employee, int day)
+    internal static (int From, int To) Window(GenerationScenario scenario, int employee, int day, bool ignoreSelected = false)
     {
         var from = 0;
         var to = 1440;
-        foreach (var entry in scenario.AvailabilityGroups.Where(g => g.Year == scenario.Schedule.Year && g.Month == scenario.Schedule.Month)
+        if (ignoreSelected && new DateOnly(scenario.Schedule.Year, scenario.Schedule.Month, day).DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday)
+            return (1440, 0);
+        foreach (var entry in scenario.AvailabilityGroups.Where(g => g.Year == scenario.Schedule.Year && g.Month == scenario.Schedule.Month &&
+                         (!ignoreSelected || g.Id == 0 && g.Name == "Saved schedule commitments"))
                      .SelectMany(g => g.Members).Where(m => m.EmployeeId == employee).SelectMany(m => m.Days).Where(d => d.DayOfMonth == day))
         {
             if (entry.Kind == AvailabilityKind.NONE) return (1440, 0);
@@ -164,14 +214,17 @@ internal static class ScheduleGenerationOracle
     }
 
     private static double DesiredDeficit(GenerationScenario scenario, ScheduleEmployeeModel[] employees,
-        (int, int)[] templates, int days, IReadOnlyDictionary<int, int> minutes, Dictionary<int, int> ordinals)
+        (int, int)[] templates, int days, IReadOnlyDictionary<int, int> minutes, Dictionary<int, int> ordinals,
+        int? priorityShiftHours, bool priorityWeekendsOff, bool priorityRespectAvailability)
     {
         if (employees.Length == 0) return 0;
         var capacities = employees.Select(employee =>
         {
             var potential = Enumerable.Range(1, days).Sum(day =>
             {
-                var window = Window(scenario, employee.EmployeeId, day);
+                if (priorityShiftHours.HasValue && employee.IsPriority && (priorityWeekendsOff || !priorityRespectAvailability) &&
+                    new DateOnly(scenario.Schedule.Year, scenario.Schedule.Month, day).DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday) return 0;
+                var window = Window(scenario, employee.EmployeeId, day, priorityShiftHours.HasValue && employee.IsPriority && !priorityRespectAvailability);
                 return templates.Sum(t => Math.Max(0, Math.Min(t.Item2, window.To) - Math.Max(t.Item1, window.From)));
             });
             return scenario.Schedule.MaxHoursPerEmpMonth > 0 ? Math.Min(potential, scenario.Schedule.MaxHoursPerEmpMonth * 60d) : potential;

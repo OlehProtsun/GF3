@@ -17,4 +17,7 @@ public sealed class PriorityGenerationSettingsModel
 
     [Column("weekends_off")]
     public bool WeekendsOff { get; set; } = true;
+
+    [Column("respect_availability")]
+    public bool RespectAvailability { get; set; } = true;
 }

@@ -18,7 +18,8 @@ public sealed class PriorityGenerationSettingsController(AppDbContext db) : Cont
     {
         var settings = await db.PriorityGenerationSettings.AsNoTracking()
             .SingleOrDefaultAsync(x => x.Id == PriorityGenerationSettingsModel.SingletonId, cancellationToken);
-        return Ok(new PriorityGenerationSettingsDto(settings?.ShiftHours ?? 8, settings?.WeekendsOff ?? true));
+        return Ok(new PriorityGenerationSettingsDto(settings?.ShiftHours ?? 8, settings?.WeekendsOff ?? true,
+            settings?.RespectAvailability ?? true));
     }
 
     [HttpPut]
@@ -33,11 +34,13 @@ public sealed class PriorityGenerationSettingsController(AppDbContext db) : Cont
 
         var hours = request.ShiftHours!.Value;
         var weekendsOff = request.WeekendsOff!.Value;
+        var respectAvailability = request.RespectAvailability;
         await db.Database.ExecuteSqlInterpolatedAsync($"""
-            INSERT INTO priority_generation_settings (id, shift_hours, weekends_off)
-            VALUES ({PriorityGenerationSettingsModel.SingletonId}, {hours}, {weekendsOff})
-            ON CONFLICT(id) DO UPDATE SET shift_hours=excluded.shift_hours, weekends_off=excluded.weekends_off
+            INSERT INTO priority_generation_settings (id, shift_hours, weekends_off, respect_availability)
+            VALUES ({PriorityGenerationSettingsModel.SingletonId}, {hours}, {weekendsOff}, COALESCE({respectAvailability}, 1))
+            ON CONFLICT(id) DO UPDATE SET shift_hours=excluded.shift_hours, weekends_off=excluded.weekends_off,
+                respect_availability=COALESCE({respectAvailability}, priority_generation_settings.respect_availability)
             """, cancellationToken);
-        return Ok(new PriorityGenerationSettingsDto(hours, weekendsOff));
+        return await Get(cancellationToken);
     }
 }

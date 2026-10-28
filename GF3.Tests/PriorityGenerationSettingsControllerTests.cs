@@ -21,12 +21,14 @@ public sealed class PriorityGenerationSettingsControllerTests
         await using var db = database.CreateContext();
         Assert.False(db.Database.HasPendingModelChanges());
         var controller = new PriorityGenerationSettingsController(db);
-        Assert.Equal(new(8, true), Value(await controller.Get(default)));
+        Assert.Equal(new(8, true, true), Value(await controller.Get(default)));
         foreach (var hours in new[] { 1, 12, 6, 6 })
-            Assert.Equal(new(hours, false), Value(await controller.Update(new() { ShiftHours = hours, WeekendsOff = false }, default)));
+            Assert.Equal(new(hours, false, true), Value(await controller.Update(new() { ShiftHours = hours, WeekendsOff = false }, default)));
+        Assert.Equal(new(6, false, false), Value(await controller.Update(new() { ShiftHours = 6, WeekendsOff = false, RespectAvailability = false }, default)));
+        Assert.Equal(new(10, true, false), Value(await controller.Update(new() { ShiftHours = 10, WeekendsOff = true }, default)));
         Assert.Equal(1, await db.PriorityGenerationSettings.CountAsync());
         await db.PriorityGenerationSettings.ExecuteDeleteAsync();
-        Assert.Equal(new(8, true), Value(await controller.Get(default)));
+        Assert.Equal(new(8, true, true), Value(await controller.Get(default)));
         Assert.Empty(await db.PriorityGenerationSettings.ToListAsync());
         await controller.Update(new() { ShiftHours = 8, WeekendsOff = true }, default);
         Assert.Equal(1, await db.PriorityGenerationSettings.CountAsync());
@@ -43,15 +45,59 @@ public sealed class PriorityGenerationSettingsControllerTests
         await using var db = database.CreateContext();
         var (containerId, graphId, employeeId) = await ContainerServiceTests.SeedGenerationAsync(database);
         var migrations = (await db.Database.GetAppliedMigrationsAsync()).ToArray();
-        await db.GetService<IMigrator>().MigrateAsync(migrations[^2]);
+        await db.GetService<IMigrator>().MigrateAsync(migrations[^3]);
         await db.Database.MigrateAsync();
         Assert.Equal(employeeId, (await db.Employees.SingleAsync()).Id);
         var assignment = await db.ScheduleEmployees.SingleAsync();
         Assert.Equal(graphId, assignment.ScheduleId);
         Assert.False(assignment.IsPriority);
         Assert.Equal(containerId, (await db.Schedules.SingleAsync()).ContainerId);
-        Assert.Equal(new(8, true), Value(await new PriorityGenerationSettingsController(db).Get(default)));
+        Assert.Equal(new(8, true, true), Value(await new PriorityGenerationSettingsController(db).Get(default)));
         Assert.False(db.Database.HasPendingModelChanges());
+    }
+
+    [Fact]
+    public async Task RespectAvailabilityMigrationPreservesSettingsEnrollmentAndReversesOnlyItsColumn()
+    {
+        await using var database = await SqliteTestDatabase.CreateAsync();
+        var (_, graphId, _) = await ContainerServiceTests.SeedGenerationAsync(database);
+        await using var db = database.CreateContext();
+        await db.ScheduleEmployees.Where(e => e.ScheduleId == graphId).ExecuteUpdateAsync(s => s.SetProperty(e => e.IsPriority, true));
+        await db.PriorityGenerationSettings.ExecuteUpdateAsync(s => s.SetProperty(x => x.ShiftHours, 10)
+            .SetProperty(x => x.WeekendsOff, false).SetProperty(x => x.RespectAvailability, false));
+        var migrator = db.GetService<IMigrator>();
+        const string previous = "20261027160625_AddPriorityGeneration";
+        await migrator.MigrateAsync(previous);
+        await db.Database.OpenConnectionAsync();
+        await using var command = db.Database.GetDbConnection().CreateCommand();
+        command.CommandText = "SELECT COUNT(*) FROM pragma_table_info('priority_generation_settings') WHERE name='respect_availability'";
+        Assert.Equal(0L, await command.ExecuteScalarAsync());
+        command.CommandText = "SELECT shift_hours || ':' || weekends_off FROM priority_generation_settings WHERE id=1";
+        Assert.Equal("10:0", await command.ExecuteScalarAsync());
+        Assert.True((await db.ScheduleEmployees.SingleAsync()).IsPriority);
+        await migrator.MigrateAsync();
+        Assert.Equal(new(10, false, true), Value(await new PriorityGenerationSettingsController(db).Get(default)));
+        Assert.True((await db.ScheduleEmployees.SingleAsync()).IsPriority);
+        command.CommandText = "PRAGMA quick_check";
+        Assert.Equal("ok", await command.ExecuteScalarAsync());
+        Assert.False(db.Database.HasPendingModelChanges());
+    }
+
+    [Fact]
+    public async Task ConcurrentOldAndNewClientWritesRetainOneSingleton()
+    {
+        await using var database = await SqliteTestDatabase.CreateAsync();
+        async Task Write(bool? respect)
+        {
+            await using var db = database.CreateContext();
+            var result = await new PriorityGenerationSettingsController(db).Update(new() {
+                ShiftHours = 8, WeekendsOff = true, RespectAvailability = respect }, default);
+            Assert.False(Value(result).RespectAvailability);
+        }
+        await Write(false);
+        await Task.WhenAll(Enumerable.Range(0, 8).Select(i => Task.Run(() => Write(i % 2 == 0 ? null : false))));
+        await using var verify = database.CreateContext();
+        Assert.False((await verify.PriorityGenerationSettings.SingleAsync()).RespectAvailability);
     }
 
     [Fact]
@@ -73,8 +119,13 @@ public sealed class PriorityGenerationSettingsControllerTests
             "{\"shiftHours\":13,\"weekendsOff\":true}", "{\"shiftHours\":-1,\"weekendsOff\":true}", "{\"shiftHours\":8.5,\"weekendsOff\":true}",
             "{\"shiftHours\":\"x\",\"weekendsOff\":true}", "{\"shiftHours\":8}", "{\"shiftHours\":8,\"weekendsOff\":null}" })
             Assert.Equal(HttpStatusCode.BadRequest, (await host.Client.PutAsync(endpoint, new StringContent(json, Encoding.UTF8, "application/json"))).StatusCode);
-        Assert.Equal(new(10, false), await (await host.Client.PutAsJsonAsync(endpoint, new { shiftHours = 10, weekendsOff = false })).Content.ReadFromJsonAsync<PriorityGenerationSettingsDto>());
-        Assert.Equal(new(10, false), await host.Client.GetFromJsonAsync<PriorityGenerationSettingsDto>(endpoint));
+        Assert.Equal(new(10, false, true), await (await host.Client.PutAsJsonAsync(endpoint, new { shiftHours = 10, weekendsOff = false })).Content.ReadFromJsonAsync<PriorityGenerationSettingsDto>());
+        Assert.Equal(new(10, false, false), await (await host.Client.PutAsJsonAsync(endpoint, new { shiftHours = 10, weekendsOff = false, respectAvailability = false })).Content.ReadFromJsonAsync<PriorityGenerationSettingsDto>());
+        Assert.Equal(new(10, false, false), await (await host.Client.PutAsJsonAsync(endpoint, new { shiftHours = 10, weekendsOff = false })).Content.ReadFromJsonAsync<PriorityGenerationSettingsDto>());
+        Assert.Equal(new(10, false, false), await host.Client.GetFromJsonAsync<PriorityGenerationSettingsDto>(endpoint));
+        using var settingsJson = System.Text.Json.JsonDocument.Parse(await host.Client.GetStringAsync(endpoint));
+        Assert.Equal(3, settingsJson.RootElement.EnumerateObject().Count());
+        Assert.False(settingsJson.RootElement.GetProperty("respectAvailability").GetBoolean());
     }
 
     [Theory]

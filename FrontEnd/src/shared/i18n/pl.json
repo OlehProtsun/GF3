@@ -2154,5 +2154,7 @@
   "The field ShiftHours must be between 1 and 12.": "Długość zmiany musi wynosić od 1 do 12 godzin.",
   "Invalid shift interval.": "Nieprawidłowy przedział zmiany.",
   "Invalid schedule configuration.": "Nieprawidłowa konfiguracja grafiku.",
-  "Generated schedule violates scheduling constraints.": "Wygenerowany grafik narusza ograniczenia planowania."
+  "Generated schedule violates scheduling constraints.": "Wygenerowany grafik narusza ograniczenia planowania.",
+  "Respect priority employee availability": "Uwzględniaj dostępność pracowników priorytetowych",
+  "When off, priority employees can work Monday–Friday across schedule hours, while saved work in other schedules remains protected. Weekends stay off even when the separate weekends setting is off.": "Po wyłączeniu pracownicy priorytetowi mogą pracować od poniedziałku do piątku w godzinach grafiku, z uwzględnieniem pracy zapisanej w innych grafikach. Weekendy pozostają wolne, nawet gdy osobne ustawienie wolnych weekendów jest wyłączone."
 }

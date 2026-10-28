@@ -7,6 +7,8 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Include="../../GF3.Tests/Infrastructure/PriorityAuditScenarios.cs" Link="PriorityAuditScenarios.cs" />
+    <Compile Include="../../GF3.Tests/Infrastructure/LegacyScheduleReference.cs" Link="LegacyScheduleReference.cs" />
     <ProjectReference Include="..\..\BusinessLogicLayer\BusinessLogicLayer.csproj" />
     <ProjectReference Include="..\..\DataAccessLayer\DataAccessLayer.csproj" />
   </ItemGroup>

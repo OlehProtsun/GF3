@@ -2154,5 +2154,7 @@
   "The field ShiftHours must be between 1 and 12.": "Тривалість зміни має бути від 1 до 12 годин.",
   "Invalid shift interval.": "Неправильний інтервал зміни.",
   "Invalid schedule configuration.": "Неправильна конфігурація графіка.",
-  "Generated schedule violates scheduling constraints.": "Згенерований графік порушує обмеження планування."
+  "Generated schedule violates scheduling constraints.": "Згенерований графік порушує обмеження планування.",
+  "Respect priority employee availability": "Враховувати доступність пріоритетних працівників",
+  "When off, priority employees can work Monday–Friday across schedule hours, while saved work in other schedules remains protected. Weekends stay off even when the separate weekends setting is off.": "Якщо вимкнено, пріоритетні працівники можуть працювати з понеділка до п’ятниці в межах годин графіка з урахуванням роботи, збереженої в інших графіках. Субота й неділя залишаються вихідними, навіть якщо окреме налаштування вихідних вимкнено."
 }

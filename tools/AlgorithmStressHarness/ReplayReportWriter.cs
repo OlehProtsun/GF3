@@ -31,6 +31,13 @@ internal sealed class ReplayCase
     public int PriorityCount { get; init; }
     public int? PriorityShiftHours { get; init; }
     public bool? PriorityWeekendsOff { get; init; }
+    public bool? PriorityRespectAvailability { get; init; }
+    public int PriorityEarlyIntervals { get; init; }
+    public int PriorityLateIntervals { get; init; }
+    public double[]? ObjectiveVector { get; init; }
+    public List<int> ReorientationEvaluations { get; } = [];
+    public List<int> ReorientationTrials { get; } = [];
+    public List<int> AcceptedAnchorChanges { get; } = [];
     public string? OrderedOutputSha256 { get; init; }
     public string? SkipReason { get; init; }
     public int EmployeeCount { get; init; }
@@ -51,10 +58,22 @@ internal sealed class ReplayCase
         : SkipReason is not null ? "input/schema error" : HardViolations.Count > 0 ? "hard invariant"
         : !RepeatStable ? "nondeterminism" : Generated?.CoverageGapMinutes > 0 || Generated?.TotalMinHourDeficitMinutes > 0 ? "PARTIAL" : "complete";
 
-    internal static ReplayCase Create(string id, ReplayInput input, ReplayMetrics generated, IReadOnlyCollection<ScheduleSlotModel> slots, string engine = "legacy", string variant = "stored") => new()
+    internal static ReplayCase Create(string id, ReplayInput input, ReplayMetrics generated, IReadOnlyCollection<ScheduleSlotModel> slots, string engine = "legacy", string variant = "stored")
+    {
+        var local = generated.Violations.Count == 0 ? ReplayChecks.FindLocalMinimumImprovement(input, slots, generated) : null;
+        var templates = new[] { input.Schedule.Shift1Time, input.Schedule.Shift2Time }
+            .Where(s => ReplayChecks.Range(s, out _, out _)).Select(s => { ReplayChecks.Range(s, out var from, out var to); return (from, to); }).ToArray();
+        var priorityIds = input.Employees.Where(e => e.IsPriority && input.PriorityShiftHours.HasValue).Select(e => e.EmployeeId).ToHashSet();
+        var prioritySlots = slots.Where(s => s.Status == SlotStatus.ASSIGNED && s.EmployeeId.HasValue && priorityIds.Contains(s.EmployeeId.Value)).ToArray();
+        return new()
     {
         Engine = engine, Variant = variant, PriorityCount = input.Employees.Count(e => e.IsPriority),
         PriorityShiftHours = input.PriorityShiftHours, PriorityWeekendsOff = input.PriorityShiftHours.HasValue ? input.PriorityWeekendsOff : null,
+        PriorityRespectAvailability = input.PriorityShiftHours.HasValue ? input.PriorityRespectAvailability : null,
+        PriorityEarlyIntervals = prioritySlots.Count(s => ReplayChecks.Time(s.FromTime, out var start) && start == templates.Min(t => t.from)),
+        PriorityLateIntervals = prioritySlots.Count(s => ReplayChecks.Time(s.ToTime, out var end) && end == templates.Max(t => t.to) &&
+            ReplayChecks.Time(s.FromTime, out var start) && start > templates.Min(t => t.from)),
+        ObjectiveVector = local?.BaselineObjective,
         OrderedOutputSha256 = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
             Encoding.UTF8.GetBytes(string.Join('\n', ReplayChecks.Normalize(slots))))),
         CaseId = id, EmployeeCount = input.Employees.Count,
@@ -67,8 +86,9 @@ internal sealed class ReplayCase
         },
         Generated = generated, SavedComparison = ReplayChecks.Check(input, input.BaselineSlots, checkPositions: false),
         Quality = ReplayChecks.Quality(input, slots, generated),
-        LocalQuality = generated.Violations.Count == 0 ? ReplayChecks.FindLocalMinimumImprovement(input, slots, generated) : null
+        LocalQuality = local
     };
+    }
 
     internal static ReplayCase Skipped(string id, string reason, string engine = "legacy", string variant = "stored") => new() { CaseId = id, SkipReason = reason, Engine = engine, Variant = variant };
 }
@@ -76,7 +96,8 @@ internal sealed class ReplayCase
 internal static class ReplayReportWriter
 {
     internal static async Task WriteAsync(string output, IReadOnlyList<ReplayCase> cases, double elapsed, CancellationToken ct,
-        string engine = "legacy", string variant = "stored", string? sourceFingerprint = null, string? quickCheck = null)
+        string engine = "legacy", string variant = "stored", string? sourceFingerprint = null, string? quickCheck = null,
+        string priorityAvailability = "stored")
     {
         foreach (var name in new[] { "summary.json", "failures.json", "cases.csv" })
         {
@@ -93,7 +114,7 @@ internal static class ReplayReportWriter
             ExecutedGeneratorAssemblySha256 = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
                 await File.ReadAllBytesAsync(typeof(BusinessLogicLayer.Generators.PriorityScheduleGenerator).Assembly.Location, ct))),
             WorkingTreeModified = workingTree is null ? (bool?)null : workingTree.Length > 0,
-            Mode = "offline-read-only-preview", Engine = engine, Variant = variant, SourceFingerprint = sourceFingerprint,
+            Mode = "offline-read-only-preview", Engine = engine, Variant = variant, PriorityAvailability = priorityAvailability, SourceFingerprint = sourceFingerprint,
             QuickCheckBefore = quickCheck, QuickCheckAfter = quickCheck, FingerprintUnchanged = sourceFingerprint is not null, RunUtc = DateTimeOffset.UtcNow,
             SchemaCompatibility = "compatible", SourceReadOnly = true, EndToEndMilliseconds = elapsed,
             PeakWorkingSetBytes = Process.GetCurrentProcess().PeakWorkingSet64, CaseCount = cases.Count,
@@ -105,7 +126,7 @@ internal static class ReplayReportWriter
         {
             c.CaseId, c.Engine, c.Variant, c.Classification, c.SkipReason, c.RepeatStable, c.HardViolations
         }), options), ct);
-        var csv = new StringBuilder("case,engine,variant,classification,employees,priorities,shiftHours,weekendsOff,availabilityEntries,generated,assigned,unfurnished,conflictDays,coverageGapMinutes,minDeficitMinutes,priorityDeficitMinutes,regularDeficitMinutes,minDeficitSquared,medianMilliseconds,maxMilliseconds,stable,hardViolations,orderedOutputSha256\n");
+        var csv = new StringBuilder("case,engine,variant,classification,employees,priorities,shiftHours,weekendsOff,availabilityEntries,generated,assigned,unfurnished,conflictDays,coverageGapMinutes,minDeficitMinutes,priorityDeficitMinutes,regularDeficitMinutes,minDeficitSquared,medianMilliseconds,maxMilliseconds,stable,hardViolations,orderedOutputSha256,respectAvailability,earlyIntervals,lateIntervals,reorientationEvaluations,reorientationTrials,acceptedAnchorChanges\n");
         foreach (var c in cases)
             csv.AppendLine(string.Join(",", new object?[]
             {
@@ -113,7 +134,9 @@ internal static class ReplayReportWriter
                 c.Generated?.AssignedCount, c.Generated?.UnfurnishedCount, c.Generated?.ConflictDays, c.Generated?.CoverageGapMinutes,
                 c.Generated?.TotalMinHourDeficitMinutes, c.Generated?.PriorityDeficitMinutes, c.Generated?.RegularDeficitMinutes, c.Generated?.TotalMinHourDeficitSquared,
                 c.MedianMilliseconds.ToString("F3", CultureInfo.InvariantCulture), c.MaxMilliseconds.ToString("F3", CultureInfo.InvariantCulture),
-                c.RepeatStable, c.HardViolations.Values.Sum(), c.OrderedOutputSha256
+                c.RepeatStable, c.HardViolations.Values.Sum(), c.OrderedOutputSha256, c.PriorityRespectAvailability,
+                c.PriorityEarlyIntervals, c.PriorityLateIntervals, c.ReorientationEvaluations.DefaultIfEmpty().Max(),
+                c.ReorientationTrials.DefaultIfEmpty().Max(), c.AcceptedAnchorChanges.DefaultIfEmpty().Max()
             }));
         await File.WriteAllTextAsync(Path.Combine(output, "cases.csv"), csv.ToString(), ct);
     }
@@ -144,6 +167,7 @@ internal static class ReplayChecks
         var schedule = input.Schedule;
         var days = DateTime.DaysInMonth(schedule.Year, schedule.Month);
         var shifts = new[] { schedule.Shift1Time, schedule.Shift2Time }.Select(s => Range(s, out var from, out var to) ? (from, to) : (-1, -1)).Where(s => s.Item1 >= 0).ToArray();
+        var operating=Union(shifts).ToArray();
         var employees = input.Employees.Where(e => e.EmployeeId > 0).GroupBy(e => e.EmployeeId).Select(g => g.First()).ToArray();
         var ids = employees.Select(e => e.EmployeeId).ToHashSet();
         var priorityIds = input.PriorityShiftHours.HasValue ? employees.Where(e => e.IsPriority).Select(e => e.EmployeeId).ToHashSet() : [];
@@ -175,6 +199,7 @@ internal static class ReplayChecks
             }
             if (slot.Status != SlotStatus.ASSIGNED) { Fail("Status"); continue; }
             if (shifts.Length > 0 && (from < shifts.Min(s => s.Item1) || to > shifts.Max(s => s.Item2))) Fail("TemplateBounds");
+            else if(shifts.Length>0&&!operating.Any(t=>from>=t.Item1&&to<=t.Item2))Fail("TemplateGap");
             if (!slot.EmployeeId.HasValue || !ids.Contains(slot.EmployeeId.Value)) { Fail("Enrollment"); continue; }
             var employee = slot.EmployeeId.Value;
             if (checkPositions && !shiftEmployees.Add((slot.DayOfMonth, shift, employee))) Fail("DuplicateEmployeeInShift");
@@ -182,12 +207,10 @@ internal static class ReplayChecks
             if (priorityIds.Contains(employee))
             {
                 if (to - from != input.PriorityShiftHours * 60) Fail("PriorityDuration");
-                if (input.PriorityWeekendsOff && slot.DayOfMonth >= 1 && slot.DayOfMonth <= days &&
+                if ((input.PriorityWeekendsOff || !input.PriorityRespectAvailability) && slot.DayOfMonth >= 1 && slot.DayOfMonth <= days &&
                     new DateOnly(schedule.Year, schedule.Month, slot.DayOfMonth).DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday) Fail("PriorityWeekend");
                 if (window.To <= window.From || from >= window.To || to <= window.From) Fail("Availability");
                 if (worked.Any(w => w.Employee == employee && w.Day == slot.DayOfMonth)) Fail("PriorityDuplicateDay");
-                for (var minute = from; minute < to; minute++)
-                    if (!shifts.Any(s => s.Item1 <= minute && minute < s.Item2)) { Fail("TemplateGap"); break; }
             }
             else if (from < window.From || to > window.To || window.To <= window.From) Fail("Availability");
             foreach (var external in input.ExternalSlots)
@@ -255,7 +278,11 @@ internal static class ReplayChecks
     private static (int From, int To) Window(ReplayInput input, int employee, int day)
     {
         var from = 0; var to = 1440;
-        foreach (var entry in input.Groups.Where(g => g.Year == input.Schedule.Year && g.Month == input.Schedule.Month)
+        var ignoreSelected = input.PriorityShiftHours.HasValue && !input.PriorityRespectAvailability && input.Employees.Any(e => e.EmployeeId == employee && e.IsPriority);
+        if (ignoreSelected && new DateOnly(input.Schedule.Year, input.Schedule.Month, day).DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday)
+            return (1440, 0);
+        foreach (var entry in input.Groups.Where(g => g.Year == input.Schedule.Year && g.Month == input.Schedule.Month &&
+                         (!ignoreSelected || g.Id == 0 && g.Name == "Saved schedule commitments"))
                      .SelectMany(g => g.Members).Where(m => m.EmployeeId == employee).SelectMany(m => m.Days).Where(d => d.DayOfMonth == day))
         {
             if (entry.Kind == AvailabilityKind.NONE) return (1440, 0);
@@ -310,7 +337,7 @@ internal static class ReplayChecks
                 if (priorityEnabled && employee.IsPriority)
                 {
                     var duration = input.PriorityShiftHours!.Value * 60;
-                    if (window.To <= window.From || input.PriorityWeekendsOff &&
+                    if (window.To <= window.From || (input.PriorityWeekendsOff || !input.PriorityRespectAvailability) &&
                         new DateOnly(schedule.Year, schedule.Month, day).DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday) continue;
                     var free = Union(shifts).ToList();
                     foreach (var block in blocked ?? [])
@@ -389,7 +416,6 @@ internal static class ReplayChecks
 
     internal static ReplayLocalQualityResult FindLocalMinimumImprovement(ReplayInput input, IReadOnlyCollection<ScheduleSlotModel> slots, ReplayMetrics baseline)
     {
-        if (baseline.TotalMinHourDeficitMinutes == 0) return new(false, 0, false, 0, 0, 0);
         var items = slots.ToArray();
         var employees = input.Employees.Where(e => e.EmployeeId > 0).GroupBy(e => e.EmployeeId).Select(g => g.First()).OrderBy(e => e.EmployeeId).ToArray();
         var locked = input.PriorityShiftHours.HasValue ? employees.Where(e => e.IsPriority).Select(e => e.EmployeeId).ToHashSet() : [];
@@ -411,6 +437,8 @@ internal static class ReplayChecks
         var potential = appObjective ? employees.ToDictionary(e => e.EmployeeId, Potential) : new Dictionary<int, int>();
         var baselineVector = appObjective ? Vector() : null;
         const string priorityObjective = "priority-deficit/coverage-gap/regular-deficit/normalized-deficit/fairness/rest/vacancies";
+        if (baseline.TotalMinHourDeficitMinutes == 0) return new(false, 0, false, 0, 0, 0,
+            appObjective ? priorityObjective : "minimum-deficit/squared-deficit", baselineVector);
         int Potential(ScheduleEmployeeModel employee)
         {
             var capacity = 0;
@@ -428,7 +456,7 @@ internal static class ReplayChecks
                     .ThenByDescending(w => w.To - w.From).ThenBy(w => w.From).First();
                 if (!employee.IsPriority)
                     capacity += Union(templates).Sum(t => Math.Max(0, Math.Min(Math.Min(t.Item2, allowed.To), window.To) - Math.Max(Math.Max(t.Item1, allowed.From), window.From)));
-                else if (window.To > window.From && !(input.PriorityWeekendsOff && new DateOnly(input.Schedule.Year, input.Schedule.Month, day).DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday))
+                else if (window.To > window.From && !((input.PriorityWeekendsOff || !input.PriorityRespectAvailability) && new DateOnly(input.Schedule.Year, input.Schedule.Month, day).DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday))
                 {
                     var duration = input.PriorityShiftHours!.Value * 60;
                     if (Union(templates).Any(t => Math.Max(Math.Max(t.Item1, allowed.From), window.From - duration + 1) <=

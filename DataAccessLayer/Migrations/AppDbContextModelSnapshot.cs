@@ -941,6 +941,12 @@ namespace DataAccessLayer.Migrations
                         .HasColumnType("INTEGER")
                         .HasColumnName("id");
 
+                    b.Property<bool>("RespectAvailability")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER")
+                        .HasDefaultValue(true)
+                        .HasColumnName("respect_availability");
+
                     b.Property<int>("ShiftHours")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER")
@@ -966,6 +972,7 @@ namespace DataAccessLayer.Migrations
                         new
                         {
                             Id = 1,
+                            RespectAvailability = true,
                             ShiftHours = 8,
                             WeekendsOff = true
                         });

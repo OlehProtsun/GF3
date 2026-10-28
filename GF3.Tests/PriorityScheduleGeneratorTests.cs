@@ -11,6 +11,219 @@ namespace GF3.Tests;
 
 public sealed class PriorityScheduleGeneratorTests(ITestOutputHelper output)
 {
+    [Theory]
+    [InlineData("09:00 - 13:00", "13:00", "21:00")]
+    [InlineData("17:00 - 21:00", "09:00", "17:00")]
+    public async Task ReorientationChoosesConstructivelyBetterEarlyOrLateCoverage(string ordinaryWindow, string start, string end)
+    {
+        var scenario = AnchorWitness(ordinaryWindow);
+        var slots = await Generate(scenario, 8, true);
+        Check(scenario, slots, 8, true);
+        var priority = Assert.Single(slots, s => s.EmployeeId == 1);
+        Assert.Equal((start, end), (priority.FromTime, priority.ToTime));
+        Assert.Equal(720, slots.Where(s => s.EmployeeId.HasValue).Sum(Duration));
+        var baseline = slots.Select(s => new ScheduleSlotModel { DayOfMonth = s.DayOfMonth, SlotNo = s.SlotNo,
+            FromTime = s.FromTime, ToTime = s.ToTime, EmployeeId = s.EmployeeId, Status = s.Status }).ToArray();
+        if (start == "13:00")
+        {
+            foreach (var (slot, index) in baseline.Where(s => s.DayOfMonth == 1).Select((s, i) => (s, i)))
+            {
+                if (index == 0) { slot.EmployeeId = 1; slot.Status = SlotStatus.ASSIGNED; slot.FromTime = "09:00"; slot.ToTime = "17:00"; }
+                else { slot.EmployeeId = null; slot.Status = SlotStatus.UNFURNISHED; slot.FromTime = "15:00"; slot.ToTime = "21:00"; }
+            }
+            var actualQuality = ScheduleGenerationOracle.CanonicalQuality(scenario, slots.ToArray());
+            var baselineQuality = ScheduleGenerationOracle.CanonicalQuality(scenario, baseline);
+            Assert.True(LexCompare(actualQuality, baselineQuality) < 0);
+            output.WriteLine($"LATE witness baseline=[{string.Join(',', baselineQuality)}],candidate=[{string.Join(',', actualQuality)}]");
+        }
+    }
+
+    [Fact]
+    public async Task ReorientationImprovesOrdinaryDeficitWithEqualCoverage()
+    {
+        var scenario = AnchorWitness("09:00 - 13:00");
+        scenario.Employees[1].MinHoursMonth = 4;
+        var late = new ScheduleEmployeeModel { EmployeeId = 3, MinHoursMonth = 0 };
+        scenario = scenario with { Employees = scenario.Employees.Append(late).ToArray() };
+        scenario.AvailabilityGroups[0].Members.Add(new() { EmployeeId = 3, Days = Enumerable.Range(1, 30)
+            .Select(day => new AvailabilityGroupDayModel { DayOfMonth = day, Kind = day == 1 ? AvailabilityKind.INT : AvailabilityKind.NONE,
+                IntervalStr = day == 1 ? "17:00 - 21:00" : null }).ToList() });
+        var slots = await Generate(scenario, 8, true);
+        var priority = Assert.Single(slots, s => s.EmployeeId == 1);
+        Assert.Equal(("13:00", "21:00"), (priority.FromTime, priority.ToTime));
+        var baseline = slots.Select(s => new ScheduleSlotModel { DayOfMonth = s.DayOfMonth, SlotNo = s.SlotNo,
+            FromTime = s.FromTime, ToTime = s.ToTime, EmployeeId = s.EmployeeId, Status = s.Status }).ToArray();
+        foreach (var (slot, index) in baseline.Where(s => s.DayOfMonth == 1).Select((s, i) => (s, i)))
+            if (index == 0) { slot.EmployeeId = 1; slot.FromTime = "09:00"; slot.ToTime = "17:00"; }
+            else { slot.EmployeeId = 3; slot.FromTime = "17:00"; slot.ToTime = "21:00"; }
+        var actual = ScheduleGenerationOracle.CanonicalQuality(scenario, slots.ToArray());
+        var control = ScheduleGenerationOracle.CanonicalQuality(scenario, baseline);
+        Assert.Equal(control[0], actual[0]); Assert.Equal(control[1], actual[1]);
+        Assert.True(LexCompare(actual, control) < 0);
+    }
+
+    [Theory]
+    [InlineData("NONE", true)] [InlineData("NONE", false)]
+    [InlineData("invalid", true)] [InlineData("09:00 - 10:00", false)]
+    [InlineData(null, false)] [InlineData("ANY", false)]
+    public async Task IgnoringPriorityAvailabilityKeepsWeekdaysExternalWorkAndOrdinaryWindowsHard(string? source, bool weekendsOff)
+    {
+        var scenario = Fixture(2026, 4, source, 80);
+        foreach (var employee in scenario.Employees.Skip(1))
+            scenario.AvailabilityGroups[0].Members.Add(new() { EmployeeId = employee.EmployeeId, Days = Enumerable.Range(1, 30)
+                .Select(day => new AvailabilityGroupDayModel { DayOfMonth = day, Kind = AvailabilityKind.NONE }).ToList() });
+        var external = new AvailabilityGroupModel { Id = 0, Name = "Saved schedule commitments", Year = 2026, Month = 4,
+            Members = [new() { EmployeeId = 1, Days = [new() { DayOfMonth = 1, Kind = AvailabilityKind.INT, IntervalStr = "17:00 - 21:00" },
+                new() { DayOfMonth = 2, Kind = AvailabilityKind.NONE }] }] };
+        scenario = scenario with { AvailabilityGroups = scenario.AvailabilityGroups.Append(external).ToArray() };
+        var slots = await Generate(scenario, 8, weekendsOff, false);
+        Check(scenario, slots, 8, weekendsOff, false);
+        Assert.Contains(slots, s => s.EmployeeId == 1);
+        Assert.DoesNotContain(slots, s => s.EmployeeId == 1 && s.DayOfMonth is 1 or 2);
+        Assert.DoesNotContain(slots, s => s.EmployeeId is 2 or 3);
+        Assert.All(slots.Where(s => s.EmployeeId == 1), s => Assert.DoesNotContain(
+            new DateOnly(2026, 4, s.DayOfMonth).DayOfWeek, new[] { DayOfWeek.Saturday, DayOfWeek.Sunday }));
+    }
+
+    [Theory]
+    [InlineData(true, 5, 1)] [InlineData(false, 5, 1)]
+    [InlineData(true, 10, 2)] [InlineData(false, 10, 2)]
+    [InlineData(true, 20, 4)] [InlineData(false, 20, 4)]
+    public async Task BothPoliciesHaveBoundedMeasuredReorientation(bool respectAvailability, int count, int staffing)
+    {
+        var scenario = ScheduleGenerationScenarioFactory.CreateAllAvailable(2026, 4, count, staffing, 1139);
+        scenario.Schedule.Shift1Time = "09:00 - 15:00"; scenario.Schedule.Shift2Time = "15:00 - 21:00";
+        foreach (var employee in scenario.Employees) { employee.IsPriority = employee.EmployeeId <= 2; employee.MinHoursMonth = 70; }
+        string[]? reference = null;
+        for (var repeat = 0; repeat < 3; repeat++)
+        {
+            using var bounded = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+            using var activity = new Activity("GF3.PriorityPolicyBenchmark").Start();
+            var watch = Stopwatch.StartNew(); var before = GC.GetTotalAllocatedBytes();
+            var slots = await new PriorityScheduleGenerator(new()).GenerateAsync(scenario.Schedule, scenario.AvailabilityGroups,
+                scenario.Employees, 8, false, null, bounded.Token, respectAvailability);
+            Check(scenario, slots, 8, false, respectAvailability);
+            var evaluations = Assert.IsType<int>(activity.GetTagItem("gf3.priority.reorientation.evaluations"));
+            var trials = Assert.IsType<int>(activity.GetTagItem("gf3.priority.reorientation.trials"));
+            Assert.InRange(evaluations, 0, 20_000); Assert.InRange(trials, 0, 64);
+            Assert.True(watch.Elapsed < TimeSpan.FromSeconds(30));
+            if (reference is not null) Assert.Equal(reference, Tuples(slots)); reference = Tuples(slots);
+            var quality = ScheduleGenerationOracle.CanonicalQuality(scenario, slots.ToArray(), 8, false, respectAvailability);
+            output.WriteLine($"POLICY n={count},staff={staffing},respect={respectAvailability},repeat={repeat},ms={watch.Elapsed.TotalMilliseconds:F1},bytes={GC.GetTotalAllocatedBytes() - before},evals={evaluations},trials={trials},accepted={activity.GetTagItem("gf3.priority.reorientation.accepted")},quality=[{string.Join(',', quality)}]");
+        }
+    }
+
+    [Theory]
+    [InlineData("09:00 - 15:00", "15:00 - 22:00", "14:00", "22:00", true)]
+    [InlineData("09:00 - 13:00", "15:00 - 22:00", "", "", false)]
+    [InlineData("09:00 - 15:00", "", "", "", false)]
+    [InlineData("09:00 - 16:00", "15:00 - 22:00", "14:00", "22:00", true)]
+    public async Task IgnoredSourceStillUsesContiguousTemplatesAndExternalFreeWindows(string first, string second, string start, string end, bool feasible)
+    {
+        var scenario = Fixture(2026, 4, "NONE", 8);
+        scenario = scenario with { Employees = scenario.Employees.Take(1).ToArray() };
+        scenario.Schedule.Shift1Time = first; scenario.Schedule.Shift2Time = second; scenario.Schedule.MaxHoursPerEmpMonth = 8;
+        scenario = scenario with { AvailabilityGroups = scenario.AvailabilityGroups.Append(new AvailabilityGroupModel {
+            Id = 0, Name = "Saved schedule commitments", Year = 2026, Month = 4,
+            Members = [new() { EmployeeId = 1, Days = Enumerable.Range(1, 30).Select(day => new AvailabilityGroupDayModel {
+                DayOfMonth = day, Kind = day == 1 ? AvailabilityKind.INT : AvailabilityKind.NONE, IntervalStr = day == 1 ? "14:00 - 22:00" : null }).ToList() }] }).ToArray() };
+        var slots = await Generate(scenario, 8, false, false);
+        Check(scenario, slots, 8, false, false);
+        if (feasible)
+        {
+            var assigned = Assert.Single(slots, s => s.EmployeeId == 1);
+            Assert.Equal((start, end), (assigned.FromTime, assigned.ToTime));
+        }
+        else Assert.DoesNotContain(slots, s => s.EmployeeId.HasValue);
+    }
+
+    [Fact]
+    public async Task ExhaustedReorientationQuotaLeavesCompleteValidConstruction()
+    {
+        var scenario = ScheduleGenerationScenarioFactory.CreateAllAvailable(2026, 4, 200, 4, 1139);
+        scenario.Schedule.Shift1Time = "09:00 - 15:00"; scenario.Schedule.Shift2Time = "15:00 - 21:00";
+        foreach (var employee in scenario.Employees) { employee.IsPriority = employee.EmployeeId == 1; employee.MinHoursMonth = 70; }
+        using var bounded = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        using var activity = new Activity("GF3.ExhaustedReorientation").Start();
+        var slots = await new PriorityScheduleGenerator(new()).GenerateAsync(scenario.Schedule, [], scenario.Employees, 8, true, null, bounded.Token);
+        Check(scenario, slots, 8, true);
+        Assert.Equal(20_000, activity.GetTagItem("gf3.priority.reorientation.evaluations"));
+        Assert.InRange(Assert.IsType<int>(activity.GetTagItem("gf3.priority.reorientation.trials")), 1, 64);
+        Assert.Equal(0, ScheduleGenerationOracle.Check(scenario, slots.ToArray(), 8).Metrics.CoverageGapMinutes);
+    }
+
+    [Theory]
+    [InlineData(true, false)] [InlineData(false, false)] [InlineData(true, true)] [InlineData(false, true)]
+    public async Task BothPoliciesAreDeterministicUnderInputPermutationsAndCancellation(bool respectAvailability, bool allPriority)
+    {
+        var scenario = Fixture(2026, 4, "NONE", 80);
+        scenario.Schedule.MaxHoursPerEmpMonth = 80; scenario.Schedule.MaxConsecutiveDays = 2;
+        foreach (var employee in scenario.Employees) employee.IsPriority = allPriority || employee.EmployeeId == 1;
+        var before = System.Text.Json.JsonSerializer.Serialize(scenario);
+        string[]? reference = null;
+        for (var repeat = 0; repeat < 3; repeat++)
+        {
+            var slots = await Generate(scenario, 8, false, respectAvailability);
+            Check(scenario, slots, 8, false, respectAvailability);
+            if (reference is not null) Assert.Equal(reference, Tuples(slots));
+            reference = Tuples(slots);
+        }
+        var permuted = scenario with { Employees = scenario.Employees.Reverse().ToArray(), AvailabilityGroups = scenario.AvailabilityGroups.Reverse().ToArray() };
+        Assert.Equal(reference, Tuples(await Generate(permuted, 8, false, respectAvailability)));
+        using var canceled = new CancellationTokenSource(); canceled.Cancel();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => new PriorityScheduleGenerator(new()).GenerateAsync(
+            scenario.Schedule, scenario.AvailabilityGroups, scenario.Employees, 8, false, null, canceled.Token, respectAvailability));
+        Assert.Equal(before, System.Text.Json.JsonSerializer.Serialize(scenario));
+    }
+
+    [Theory]
+    [InlineData(true)] [InlineData(false)]
+    public async Task PolicySeparatesConflictingSelectedGroupsFromExactExternalSentinel(bool respectAvailability)
+    {
+        var scenario = Fixture(2026, 4, "NONE", 8);
+        scenario = scenario with { Employees = scenario.Employees.Take(2).ToArray() };
+        scenario.Schedule.MaxHoursPerEmpMonth = 8;
+        scenario.AvailabilityGroups[0].Members.Add(new() { EmployeeId = 2, Days = Enumerable.Range(1, 30)
+            .Select(day => new AvailabilityGroupDayModel { DayOfMonth = day, Kind = AvailabilityKind.NONE }).ToList() });
+        var second = new AvailabilityGroupModel { Id = 2, Name = "Saved schedule commitments", Year = 2026, Month = 4,
+            Members = [new() { EmployeeId = 1, Days = [new() { DayOfMonth = 1, Kind = AvailabilityKind.INT, IntervalStr = "invalid" },
+                new() { DayOfMonth = 1, Kind = AvailabilityKind.INT, IntervalStr = "09:00 - 10:00" }] }] };
+        var external = new AvailabilityGroupModel { Id = 0, Name = "Saved schedule commitments", Year = 2026, Month = 4,
+            Members = [new() { EmployeeId = 1, Days = Enumerable.Range(1, 30).Select(day => new AvailabilityGroupDayModel {
+                DayOfMonth = day, Kind = day == 1 ? AvailabilityKind.INT : AvailabilityKind.NONE, IntervalStr = day == 1 ? "13:00 - 21:00" : null }).ToList() }] };
+        scenario = scenario with { AvailabilityGroups = [scenario.AvailabilityGroups[0], second, external] };
+        var slots = await Generate(scenario, 8, false, respectAvailability);
+        Check(scenario, slots, 8, false, respectAvailability);
+        Assert.DoesNotContain(slots, s => s.EmployeeId == 2);
+        if (respectAvailability) Assert.DoesNotContain(slots, s => s.EmployeeId == 1);
+        else
+        {
+            var priority = Assert.Single(slots, s => s.EmployeeId == 1);
+            Assert.Equal((1, "13:00", "21:00"), (priority.DayOfMonth, priority.FromTime, priority.ToTime));
+        }
+        Assert.Equal(Tuples(slots), Tuples(await Generate(scenario with {
+            AvailabilityGroups = scenario.AvailabilityGroups.Reverse().ToArray() }, 8, false, respectAvailability)));
+    }
+
+    private static GenerationScenario AnchorWitness(string ordinaryWindow)
+    {
+        var scenario = Fixture(2026, 4, null, 8);
+        scenario = scenario with { Employees = scenario.Employees.Take(2).ToArray() };
+        scenario.Schedule.MaxHoursPerEmpMonth = 8;
+        foreach (var employee in scenario.Employees)
+            scenario.AvailabilityGroups[0].Members.Add(new() { EmployeeId = employee.EmployeeId, Days = Enumerable.Range(1, 30)
+                .Select(day => new AvailabilityGroupDayModel { DayOfMonth = day,
+                    Kind = day != 1 ? AvailabilityKind.NONE : employee.IsPriority ? AvailabilityKind.ANY : AvailabilityKind.INT,
+                    IntervalStr = day == 1 && !employee.IsPriority ? ordinaryWindow : null }).ToList() });
+        return scenario;
+    }
+
+    private static int LexCompare(double[] left, double[] right)
+    {
+        for (var i = 0; i < left.Length; i++) if (left[i] != right[i]) return left[i].CompareTo(right[i]);
+        return 0;
+    }
+
     public static IEnumerable<object[]> LegacyCases() => ScheduleGenerationScenarioMatrixTests.DefaultCases();
 
     [Theory]
@@ -31,7 +244,8 @@ public sealed class PriorityScheduleGeneratorTests(ITestOutputHelper output)
         var configuredWrapper = new PriorityAwareScheduleGenerator(legacy, new(legacy), configured);
         foreach (var hours in new[] { 8, 12 })
         {
-            await configured.PriorityGenerationSettings.ExecuteUpdateAsync(s => s.SetProperty(x => x.ShiftHours, hours).SetProperty(x => x.WeekendsOff, hours == 8));
+            await configured.PriorityGenerationSettings.ExecuteUpdateAsync(s => s.SetProperty(x => x.ShiftHours, hours)
+                .SetProperty(x => x.WeekendsOff, hours == 8).SetProperty(x => x.RespectAvailability, hours == 8));
             for (var repeat = 0; repeat < 3; repeat++)
                 Assert.Equal(Tuples(expected), Tuples(await configuredWrapper.GenerateAsync(scenario.Schedule, scenario.AvailabilityGroups, scenario.Employees)));
         }
@@ -348,12 +562,14 @@ public sealed class PriorityScheduleGeneratorTests(ITestOutputHelper output)
     [InlineData(11)] [InlineData(29)] [InlineData(47)]
     public async Task OptionalBudgetDoesNotWasteValidationOnNonImprovingMoves(int seed)
     {
+        using var activity = new Activity("GF3.OptionalQualityRegression").Start();
         var scenario = ScheduleGenerationScenarioFactory.CreateAvailabilityPattern(2026, 11, 12, 4, AvailabilityPattern.MixedPartial, seed);
         scenario.Schedule.Shift1Time = "09:00 - 15:00"; scenario.Schedule.Shift2Time = "15:00 - 22:00";
         scenario.Schedule.MaxHoursPerEmpMonth = 200; scenario.Schedule.MaxConsecutiveDays = 5;
         scenario.Schedule.MaxConsecutiveFull = 2; scenario.Schedule.MaxFullPerMonth = 5;
         foreach (var employee in scenario.Employees) { employee.IsPriority = employee.EmployeeId <= 2; employee.MinHoursMonth = 180; }
         var slots = (await Generate(scenario, 8, true)).ToArray();
+        output.WriteLine($"REGULAR seed={seed},evals={activity.GetTagItem("gf3.priority.improvement.evaluations")},passes={activity.GetTagItem("gf3.priority.improvement.passes")},anchors={activity.GetTagItem("gf3.priority.reorientation.accepted")}");
         Check(scenario, slots, 8, true);
         var potential = scenario.Employees.ToDictionary(e => e.EmployeeId, e => Math.Max(1, Math.Min(200 * 60,
             Enumerable.Range(1, 30).Sum(day => { var w = ScheduleGenerationOracle.Window(scenario, e.EmployeeId, day);
@@ -658,16 +874,16 @@ public sealed class PriorityScheduleGeneratorTests(ITestOutputHelper output)
         return scenario with { AvailabilityGroups = [group] };
     }
 
-    private static async Task<IList<ScheduleSlotModel>> Generate(GenerationScenario scenario, int hours, bool weekendsOff) =>
-        await new PriorityScheduleGenerator(new()).GenerateAsync(scenario.Schedule, scenario.AvailabilityGroups, scenario.Employees, hours, weekendsOff, null, default);
+    private static async Task<IList<ScheduleSlotModel>> Generate(GenerationScenario scenario, int hours, bool weekendsOff, bool respectAvailability = true) =>
+        await new PriorityScheduleGenerator(new()).GenerateAsync(scenario.Schedule, scenario.AvailabilityGroups, scenario.Employees, hours, weekendsOff, null, default, respectAvailability);
 
     private static int Duration(ScheduleSlotModel slot) => (int)(TimeSpan.Parse(slot.ToTime) - TimeSpan.Parse(slot.FromTime)).TotalMinutes;
     private static string[] Tuples(IEnumerable<ScheduleSlotModel> slots) => slots.Select(s => $"{s.DayOfMonth}:{s.SlotNo}:{s.FromTime}:{s.ToTime}:{s.Status}:{s.EmployeeId}").ToArray();
 
-    private static void Check(GenerationScenario scenario, IEnumerable<ScheduleSlotModel> slots, int hours, bool weekendsOff)
+    private static void Check(GenerationScenario scenario, IEnumerable<ScheduleSlotModel> slots, int hours, bool weekendsOff, bool respectAvailability = true)
     {
         var array = slots.ToArray();
-        var result = ScheduleGenerationOracle.Check(scenario, array, hours, weekendsOff);
+        var result = ScheduleGenerationOracle.Check(scenario, array, hours, weekendsOff, respectAvailability);
         Assert.True(result.HardViolations.Count == 0, string.Join(",", result.HardViolations.Select(v => $"{v.Code}:day{v.DayOfMonth}:emp{v.EmployeeOrdinal}")));
     }
 }
