@@ -5,6 +5,8 @@ namespace BusinessLogicLayer.Contracts.Employees;
 /// </summary>
 public sealed class SaveEmployeeRequest
 {
+    public string? ContractType { get; set; }
+
     /// <summary>
     /// <c>0</c> means create; a positive value means update the existing employee with that identifier.
     /// </summary>

@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using BusinessLogicLayer.Common;
+using BusinessLogicLayer.Availability;
 using BusinessLogicLayer.Contracts.Enums;
 using BusinessLogicLayer.Contracts.Models;
 using BusinessLogicLayer.Generators;
@@ -33,6 +34,7 @@ public class ContainerService : IContainerService
     private readonly IScheduleCellStyleRepository _cellStyleRepo;
     private readonly IAvailabilityGroupRepository _availabilityGroupRepo;
     private readonly IScheduleGenerator _scheduleGenerator;
+    private readonly IEmploymentContractPolicyService? _contractPolicy;
 
     /// <summary>
     /// Graph generation rewrites a whole slot set. The per-graph semaphore makes sure that two
@@ -49,7 +51,8 @@ public class ContainerService : IContainerService
         IScheduleEmployeeRepository employeeRepo,
         IScheduleCellStyleRepository cellStyleRepo,
         IAvailabilityGroupRepository availabilityGroupRepo,
-        IScheduleGenerator scheduleGenerator)
+        IScheduleGenerator scheduleGenerator,
+        IEmploymentContractPolicyService? contractPolicy = null)
     {
         _repo = repo;
         _scheduleRepo = scheduleRepo;
@@ -59,6 +62,7 @@ public class ContainerService : IContainerService
         _cellStyleRepo = cellStyleRepo;
         _availabilityGroupRepo = availabilityGroupRepo;
         _scheduleGenerator = scheduleGenerator;
+        _contractPolicy = contractPolicy;
     }
 
     public async Task<ContainerModel?> GetAsync(int id, CancellationToken ct = default)
@@ -518,6 +522,19 @@ public class ContainerService : IContainerService
                 ?? throw new KeyNotFoundException($"Availability group with id {availabilityGroupId} was not found.");
 
             availabilities.Add(group.ToContract());
+        }
+
+        if (_contractPolicy is not null)
+        {
+            var automaticIds = await _contractPolicy.GetAutomaticAvailabilityEmployeeIdsAsync(
+                employees.Select(x => x.EmployeeId).Distinct().ToArray(), ct).ConfigureAwait(false);
+            if (automaticIds.Count > 0)
+            {
+                foreach (var group in availabilities)
+                foreach (var member in group.Members.Where(x => automaticIds.Contains(x.EmployeeId)))
+                    member.Days = new List<AvailabilityGroupDayModel>();
+                availabilities.Add(EmploymentWeekdayAvailabilityBuilder.Build(schedule.Year, schedule.Month, automaticIds, _contractPolicy));
+            }
         }
 
         var otherSchedules = await _scheduleRepo

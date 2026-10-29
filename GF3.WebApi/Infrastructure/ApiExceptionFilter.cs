@@ -62,11 +62,13 @@ public sealed class ApiExceptionFilter : IAsyncExceptionFilter
     {
         return context.Exception switch
         {
+            WebApi.ShiftSwaps.ContractShiftConflictException conflict => CreateContractConflictResult(context.HttpContext, conflict),
             ValidationException validationException => CreateValidationResult(context.HttpContext, validationException),
             BusinessLogicValidationException validationException => CreateValidationResult(context.HttpContext, validationException),
             KeyNotFoundException notFoundException => CreateNotFoundResult(context.HttpContext, notFoundException),
             InvalidOperationException invalidOperationException => CreateNotFoundResult(context.HttpContext, invalidOperationException),
             BadHttpRequestException badHttpRequestException => CreateBadRequestResult(context.HttpContext, badHttpRequestException),
+            Microsoft.Data.Sqlite.SqliteException { SqliteErrorCode: 5 or 6 } busy => CreateDatabaseConflictResult(context.HttpContext, busy, "This request changed during another operation. Refresh and try again."),
             DbUpdateConcurrencyException dbUpdateConcurrencyException => CreateDatabaseConflictResult(
                 context.HttpContext,
                 dbUpdateConcurrencyException,
@@ -77,6 +79,14 @@ public sealed class ApiExceptionFilter : IAsyncExceptionFilter
                 "The requested change could not be completed because related data still exists or the database rejected the operation."),
             _ => CreateServerErrorResult(context.HttpContext, context.Exception),
         };
+    }
+
+    private static ObjectResult CreateContractConflictResult(HttpContext context, WebApi.ShiftSwaps.ContractShiftConflictException exception)
+    {
+        var problem = ApiProblemDetailsFactory.CreateProblem(context, StatusCodes.Status409Conflict,
+            "Contract approval conflict", exception.Message, exception.Code);
+        problem.Extensions["code"] = exception.Code;
+        return CreateResult(StatusCodes.Status409Conflict, problem);
     }
 
     private ObjectResult CreateValidationResult(HttpContext httpContext, Exception exception)

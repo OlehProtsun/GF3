@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using BusinessLogicLayer.Contracts.Availability;
+using BusinessLogicLayer.Contracts.Employees;
 using BusinessLogicLayer.Contracts.Models;
 using BusinessLogicLayer.Services.Abstractions;
 using Microsoft.AspNetCore.Authorization;
@@ -22,18 +23,20 @@ public sealed class EmployeeAvailabilityController(
     IAvailabilityGroupService availabilityGroupService,
     IWorkflowLogService workflowLogService,
     IManagerEditLockService? editLockService = null,
-    IRealtimeNotifier? realtimeNotifier = null) : ControllerBase
+    IRealtimeNotifier? realtimeNotifier = null,
+    IEmploymentContractPolicyService? contractPolicy = null) : ControllerBase
 {
     [HttpGet]
     [ProducesResponseType(typeof(IEnumerable<EmployeeAvailabilityGroupDto>), StatusCodes.Status200OK)]
     public async Task<ActionResult<IEnumerable<EmployeeAvailabilityGroupDto>>> GetVisible(CancellationToken cancellationToken)
     {
+        var automatic = await IsAutomaticAsync(cancellationToken);
         var nowUtc = DateTimeOffset.UtcNow;
         var groups = await availabilityGroupService
             .GetPublishedForEmployeeAsync(GetRequiredEmployeeId(), nowUtc, cancellationToken)
             .ConfigureAwait(false);
 
-        return Ok(groups.Select(ToApiDto));
+        return Ok(groups.Select(group => ToApiDto(group, automatic)));
     }
 
     [HttpGet("{groupId:int}")]
@@ -46,7 +49,7 @@ public sealed class EmployeeAvailabilityController(
             .GetPublishedForEmployeeByIdAsync(GetRequiredEmployeeId(), groupId, nowUtc, cancellationToken)
             .ConfigureAwait(false);
 
-        return Ok(ToApiDto(group));
+        return Ok(ToApiDto(group, await IsAutomaticAsync(cancellationToken)));
     }
 
     [HttpPut("{groupId:int}/slots")]
@@ -69,6 +72,10 @@ public sealed class EmployeeAvailabilityController(
         {
             return conflict;
         }
+
+        if (await IsAutomaticAsync(cancellationToken))
+            return Problem(statusCode: StatusCodes.Status403Forbidden, type: "CONTRACT_AUTOMATIC_AVAILABILITY",
+                detail: "Availability is set automatically by your employment contract and cannot be edited.");
 
         var slots = request.Slots ?? [];
         var updated = await availabilityGroupService
@@ -118,9 +125,14 @@ public sealed class EmployeeAvailabilityController(
         return state?.IsLocked == true ? state : null;
     }
 
-    private EmployeeAvailabilityGroupDto ToApiDto(EmployeeAvailabilityModel model)
+    private Task<bool> IsAutomaticAsync(CancellationToken ct)
+        => contractPolicy?.IsRuleActiveAsync(GetRequiredEmployeeId(), EmploymentContractRule.AutomaticWeekdayAvailability, ct)
+            ?? Task.FromResult(false);
+
+    private EmployeeAvailabilityGroupDto ToApiDto(EmployeeAvailabilityModel model, bool automatic = false)
     {
         var editLockState = GetAvailabilityEditLockState(model.Group.Id);
+        var effectiveDays = automatic ? contractPolicy!.BuildAutomaticWeekdayDays(model.Group.Year, model.Group.Month) : null;
 
         return new EmployeeAvailabilityGroupDto
         {
@@ -133,11 +145,12 @@ public sealed class EmployeeAvailabilityController(
             PublishedAtUtc = model.PublishedAtUtc,
             NotificationId = model.NotificationId,
             NotificationOccurredAtUtc = model.NotificationOccurredAtUtc,
-            CanSubmit = model.CanSubmit && editLockState is null,
+            IsAutomatic = automatic,
+            CanSubmit = model.CanSubmit && editLockState is null && !automatic,
             IsEditLocked = editLockState is not null,
             EditLockedBy = editLockState?.LockedBy,
             EmployeeLastModifiedAtUtc = model.Member.EmployeeLastModifiedAtUtc,
-            Slots = model.Days.Select(ToSlotDto).ToList(),
+            Slots = (effectiveDays ?? model.Days).Select(ToSlotDto).ToList(),
             Members = (model.Group.Members ?? [])
                 .Select(member => new EmployeeAvailabilityMemberDto
                 {
@@ -145,7 +158,8 @@ public sealed class EmployeeAvailabilityController(
                     FirstName = member.Employee?.FirstName ?? string.Empty,
                     LastName = member.Employee?.LastName ?? string.Empty,
                     DisplayOrder = member.DisplayOrder,
-                    Slots = (member.Days ?? []).OrderBy(day => day.DayOfMonth).Select(ToSlotDto).ToList(),
+                    Slots = (automatic && member.EmployeeId == model.Member.EmployeeId ? effectiveDays!.AsEnumerable() : member.Days ?? [])
+                        .OrderBy(day => day.DayOfMonth).Select(ToSlotDto).ToList(),
                 })
                 .OrderBy(member => member.DisplayOrder)
                 .ThenBy(member => member.FirstName)

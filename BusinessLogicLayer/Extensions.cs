@@ -26,6 +26,7 @@ public static class Extensions
     {
         serviceCollection.AddScoped<IContainerService, ContainerService>();
         serviceCollection.AddScoped<IEmployeeService, EmployeeService>();
+        serviceCollection.AddScoped<IEmploymentContractPolicyService, EmploymentContractPolicyService>();
         serviceCollection.AddScoped<IEmployeeAccountService, EmployeeAccountService>();
         serviceCollection.AddScoped<IEmployeeProfileService, EmployeeProfileService>();
         serviceCollection.AddScoped<IManagerAccountService, ManagerAccountService>();

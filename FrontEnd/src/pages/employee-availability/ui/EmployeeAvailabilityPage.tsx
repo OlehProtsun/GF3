@@ -125,10 +125,11 @@ function getAvailabilityEditLockedMessage(group: Pick<EmployeeAvailabilityGroup,
 }
 
 function isAvailabilityOpen(group?: EmployeeAvailabilityGroup | null) {
-  return Boolean(group?.canSubmit) && group?.isEditLocked !== true;
+  return Boolean(group?.canSubmit) && !group?.isAutomatic && group?.isEditLocked !== true;
 }
 
 function getAvailabilityStatusLabel(group: EmployeeAvailabilityGroup) {
+  if (group.isAutomatic) return t("Automatic");
   if (group.isEditLocked) {
     return t("Locked");
   }
@@ -589,6 +590,7 @@ export function EmployeeAvailabilityPage() {
               <div id={contentId} className={styles.cardBody} data-expanded={isExpanded} aria-hidden={!isExpanded} inert={!isExpanded}>
                 <div className={styles.cardBodyInner}>
                   {group.id === selectedId && selectedAvailability ? <div className={styles.cardContent}>
+                    {selectedAvailability.isAutomatic ? <p role="status">{t("Availability set automatically by contract: + Mon–Fri, − Sat–Sun")}</p> : null}
                     <div className={styles.editorMeta}>{getAvailabilityMonthLabel(selectedAvailability.month)} {selectedAvailability.year} · 1–{dayNumbers.length}</div>
                     <div className={styles.detailsGrid}>
                       <div className={styles.detailItem}>
@@ -609,7 +611,7 @@ export function EmployeeAvailabilityPage() {
                       </div>
                     ) : null}
 
-                    {!isAvailabilityOpen(selectedAvailability) ? <p className={styles.closedMessage} role="status">{selectedEditLockedMessage ?? t("The time for editing this availability has expired.")}</p> : null}
+                    {!isAvailabilityOpen(selectedAvailability) ? <p className={styles.closedMessage} role="status">{selectedEditLockedMessage ?? (selectedAvailability.isAutomatic ? t("Automatic availability cannot be edited.") : t("The time for editing this availability has expired."))}</p> : null}
                     <div className={styles.teamNotice}>
                       <strong>{t("Team availability")}</strong><span>{t("{0} employees", new Set((selectedAvailability.members ?? []).map(member => member.employeeId)).size)}</span>
                       <small>{t("You can edit only your availability")}</small>

@@ -63,7 +63,7 @@ internal static class PriorityScheduleRules
                          .SelectMany(m => m.Days).Where(d => d.DayOfMonth == day))
             {
                 var isExternal = group.Id == 0 && group.Name == "Saved schedule commitments";
-                if (!isExternal && employee.IsPriority && !respectAvailability) continue;
+                if (!isExternal && !group.IsEmploymentCalendar && employee.IsPriority && !respectAvailability) continue;
                 var window = new Interval(0, 1440);
                 if (entry.Kind == AvailabilityKind.NONE) window = default;
                 else if (entry.Kind == AvailabilityKind.INT)

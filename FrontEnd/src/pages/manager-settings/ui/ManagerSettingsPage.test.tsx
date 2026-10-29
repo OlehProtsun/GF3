@@ -1,3 +1,7 @@
+vi.mock("@entities/employment-contracts/api/employmentContractSettingsApi", () => ({ employmentContractSettingsApi: {
+  get: vi.fn().mockResolvedValue({ restrictSwapsToEightHours:true,requirePickupApproval:true,requireBelowMinimumGiveApproval:true,automaticWeekdayAvailability:true }),
+  update: vi.fn(),
+} }));
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";

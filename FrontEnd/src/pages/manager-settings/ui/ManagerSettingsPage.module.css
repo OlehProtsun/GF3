@@ -97,3 +97,5 @@
 .prioritySettingRow > :first-child { min-width:0; overflow-wrap:anywhere; }
 .prioritySettingRow > :last-child { flex-shrink:0; }
 @media(max-width:540px) { .prioritySettings { margin-left:0; } .prioritySettingRow { flex-wrap:wrap; } }
+
+.employmentSettings { display:grid; gap:20px; margin-top:20px; }

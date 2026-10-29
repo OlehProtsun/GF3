@@ -53,8 +53,7 @@ public sealed class PublicHolidaySettingsControllerTests
         var holidayMigrationIndex = Array.FindIndex(migrations, migration => migration.EndsWith("_AddPublicHolidayDisplaySettings", StringComparison.Ordinal));
         Assert.True(holidayMigrationIndex > 0);
         await db.GetService<IMigrator>().MigrateAsync(migrations[holidayMigrationIndex - 1]);
-        db.Employees.Add(new EmployeeModel { FirstName = "Retained", LastName = "Employee" });
-        await db.SaveChangesAsync();
+        await db.Database.ExecuteSqlRawAsync("INSERT INTO employee (first_name,last_name,is_deleted) VALUES ('Retained','Employee',0)");
         await db.Database.MigrateAsync();
         Assert.Equal("Retained", (await db.Employees.SingleAsync()).FirstName);
         Assert.True((await db.PublicHolidaySettings.SingleAsync()).ShowPublicHolidays);

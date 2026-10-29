@@ -56,6 +56,8 @@ public class ContainerModel
 /// </summary>
 public class EmployeeModel
 {
+    public string ContractType { get; set; } = DataAccessLayer.Models.EmploymentContractTypes.Zlecenie;
+
     public bool IsDeleted { get; set; }
 
     /// <summary>
@@ -115,6 +117,8 @@ public class ShopModel
 /// </summary>
 public class AvailabilityGroupModel
 {
+    public bool IsEmploymentCalendar { get; set; }
+
     /// <summary>
     /// Persistent group identifier.
     /// </summary>

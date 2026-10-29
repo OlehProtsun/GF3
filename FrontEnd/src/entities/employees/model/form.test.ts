@@ -8,6 +8,7 @@ beforeEnglishTest(() => setTestLanguage("en"));
 describe("employee form model", () => {
   test("creates empty and populated form state", () => {
     expect(createEmployeeFormState()).toEqual({
+      contractType: "zlecenie",
       firstName: "",
       lastName: "",
       email: "",
@@ -16,6 +17,7 @@ describe("employee form model", () => {
       password: "",
     });
     expect(createEmployeeFormState({
+      contractType: "zlecenie",
       firstName: "Amy",
       lastName: "Jones",
       email: null,
@@ -23,6 +25,7 @@ describe("employee form model", () => {
       username: "amy",
       hasLoginAccount: true,
     })).toEqual({
+      contractType: "zlecenie",
       firstName: "Amy",
       lastName: "Jones",
       email: "",
@@ -34,6 +37,7 @@ describe("employee form model", () => {
 
   test("validates identity and email fields", () => {
     expect(validateEmployeeForm({
+      contractType: "zlecenie",
       firstName: "",
       lastName: " ",
       email: "invalid",
@@ -49,6 +53,7 @@ describe("employee form model", () => {
 
   test("validates login account creation and updates", () => {
     expect(validateEmployeeForm({
+      contractType: "zlecenie",
       firstName: "Amy",
       lastName: "Jones",
       email: "amy@example.com",
@@ -61,6 +66,7 @@ describe("employee form model", () => {
     });
 
     expect(validateEmployeeForm({
+      contractType: "zlecenie",
       firstName: "Amy",
       lastName: "Jones",
       email: "",
@@ -73,6 +79,7 @@ describe("employee form model", () => {
     });
 
     expect(validateEmployeeForm({
+      contractType: "zlecenie",
       firstName: "Amy",
       lastName: "Jones",
       email: "",
@@ -84,6 +91,7 @@ describe("employee form model", () => {
     });
 
     expect(validateEmployeeForm({
+      contractType: "zlecenie",
       firstName: "Amy",
       lastName: "Jones",
       email: "",
@@ -97,6 +105,7 @@ describe("employee form model", () => {
 
   test("requires username for existing login accounts but allows blank password", () => {
     expect(validateEmployeeForm({
+      contractType: "zlecenie",
       firstName: "Amy",
       lastName: "Jones",
       email: "",
@@ -108,6 +117,7 @@ describe("employee form model", () => {
     });
 
     expect(validateEmployeeForm({
+      contractType: "zlecenie",
       firstName: "Amy",
       lastName: "Jones",
       email: "",

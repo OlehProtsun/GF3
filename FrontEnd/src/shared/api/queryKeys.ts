@@ -1,4 +1,5 @@
 export const queryKeys = {
+  employmentContracts: { settings: () => ["employmentContracts", "settings"] as const },
   priorityGenerationSettings: {
     current: () => ["priorityGenerationSettings", "current"] as const,
   },
@@ -44,6 +45,8 @@ export const queryKeys = {
     list: () => ["employeeSchedules", "list"] as const,
   },
   shiftSwaps: {
+    employeeApprovals: () => ["shiftSwaps", "employeeApprovals"] as const,
+    graphApprovals: (containerId: number, graphId: number) => ["shiftSwaps", "graphApprovals", containerId, graphId] as const,
     candidates: (params: object | null) => ["shiftSwaps", "returnCandidates", params] as const,
     preview: (payload: object | null) => ["shiftSwaps", "preview", payload] as const,
     all: ["shiftSwaps"] as const,

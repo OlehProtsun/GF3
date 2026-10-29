@@ -1,4 +1,5 @@
 export type EmployeeProfileDto = {
+  contractType?: "zlecenie" | "o_prace";
   employeeId: number;
   username: string;
   displayName: string;

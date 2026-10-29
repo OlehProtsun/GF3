@@ -74,6 +74,13 @@ public sealed class EmployeeFacade : IEmployeeFacade
 
     public async Task UpdateAsync(SaveEmployeeRequest request, CancellationToken ct = default)
     {
+        if (request.ContractType is null)
+        {
+            var existing = await _employeeService.GetAsync(request.Id, ct).ConfigureAwait(false);
+            if (existing is null || existing.IsDeleted)
+                throw new ValidationException("The employee profile is deleted or could not be found.");
+            request.ContractType = existing.ContractType;
+        }
         await _employeeService.UpdateAsync(MapToModel(request), ct).ConfigureAwait(false);
         await _employeeAccountService
             .UpsertForEmployeeAsync(request.Id, request.Username, request.Password, ct)
@@ -98,6 +105,7 @@ public sealed class EmployeeFacade : IEmployeeFacade
     private static EmployeeDto MapToDto(EmployeeModel model, EmployeeAccountModel? account, bool isOnline) => new()
     {
         Id = model.Id,
+        ContractType = model.ContractType,
         FirstName = model.FirstName,
         LastName = model.LastName,
         Phone = model.Phone,
@@ -111,6 +119,7 @@ public sealed class EmployeeFacade : IEmployeeFacade
     private static EmployeeModel MapToModel(SaveEmployeeRequest request) => new()
     {
         Id = request.Id,
+        ContractType = request.ContractType ?? DataAccessLayer.Models.EmploymentContractTypes.Zlecenie,
         FirstName = request.FirstName,
         LastName = request.LastName,
         Phone = request.Phone,

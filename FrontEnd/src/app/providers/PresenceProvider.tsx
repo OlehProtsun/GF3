@@ -381,6 +381,11 @@ export function PresenceProvider({ children }: PropsWithChildren) {
     const resourceId = Number.isFinite(parsedResourceId) ? parsedResourceId : null;
 
     switch (update.resourceType) {
+      case "employment-contract-settings":
+        invalidateRealtimeQuery(queryClient, queryKeys.employmentContracts.settings());
+        invalidateRealtimeQuery(queryClient, queryKeys.employeeAvailability.all);
+        invalidateRealtimeQuery(queryClient, queryKeys.shiftSwaps.all);
+        break;
       case managerEditResourceTypes.schedule:
         if (update.containerId != null && update.graphId != null) {
           invalidateGraphRealtimeQueries(queryClient, update.containerId, update.graphId);
@@ -425,6 +430,8 @@ export function PresenceProvider({ children }: PropsWithChildren) {
         break;
 
       case managerEditResourceTypes.employee:
+        invalidateRealtimeQuery(queryClient, queryKeys.employeeProfile.me());
+        invalidateRealtimeQuery(queryClient, queryKeys.employeeAvailability.all);
         invalidateRealtimeQuery(queryClient, queryKeys.employees.all);
         invalidateRealtimeQuery(queryClient, queryKeys.availabilityGroups.all);
         invalidateRealtimeQuery(queryClient, queryKeys.containers.all);

@@ -1103,6 +1103,7 @@ export function AvailabilityEditPage() {
 
   return (
     <div className={styles.page}>
+      <p>{t("Employment contract availability is derived automatically for employees and generation. This editor retains the saved availability used when the rule is disabled.")}</p>
       <PageHeader
         title={isCreate ? t("Add Availability") : t("Availability Edit")}
         subtitle={isCreate ? t("Create a new monthly availability schedule") : t("Update availability information, employees and day codes")}

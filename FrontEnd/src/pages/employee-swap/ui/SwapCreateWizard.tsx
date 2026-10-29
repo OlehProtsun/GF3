@@ -5,7 +5,7 @@ import type { EmployeeSchedule } from "@entities/employee-schedule";
 import { useShiftSwapPreviewQuery, useShiftSwapReturnCandidatesQuery, type ShiftSwap, type ShiftSwapEmployee, type SwapWizardRequest } from "@entities/shift-swaps";
 import { queryKeys } from "@shared/api/queryKeys";
 import { getErrorMessage } from "@shared/api/httpClient";
-import { getLocale, t } from "@shared/i18n";
+import { getLocale, translateServerMessage, t } from "@shared/i18n";
 import { ChevronLeftIcon } from "@shared/ui/icons";
 import { SwapSelectionContext } from "./SwapSelectionContext";
 import { ErrorBanner } from "@shared/ui/components/ErrorBanner";
@@ -17,8 +17,9 @@ import styles from "./SwapCreateWizard.module.css";
 type Recipient = { mode: "everyone" } | { mode: "specific"; employee: ShiftSwapEmployee; kind: "give" }
   | { mode: "specific"; employee: ShiftSwapEmployee; kind: "exchange"; selection: SwapShiftSelection };
 type View = "wizard" | "source" | "type" | "returnSchedule" | "return";
-export function SwapCreateWizard({ schedules, employees, employeeId, employeeName, swaps, busy, error, onClose, onSubmit, returnFocusRef }: {
+export function SwapCreateWizard({ schedules, employees, employeeId, employeeName, swaps, busy, error, onClose, onSubmit, onRequestException, restrictToEightHours = false, returnFocusRef }: {
   schedules: EmployeeSchedule[]; employees: ShiftSwapEmployee[]; employeeId: number; employeeName: string; swaps: ShiftSwap[];
+  restrictToEightHours?: boolean; onRequestException?: (payload: SwapWizardRequest) => void;
   busy: boolean; error?: string | null; onClose: () => void; onSubmit: (payload: SwapWizardRequest) => void;
   returnFocusRef?: RefObject<HTMLElement | null>;
 }) {
@@ -66,10 +67,11 @@ export function SwapCreateWizard({ schedules, employees, employeeId, employeeNam
       }
     }
   }, [view, step, source]);
+  const wholeShiftOnly = restrictToEightHours || (recipient.mode === "specific" && recipient.employee.requiresWholeEightHourShifts === true);
   const payload = useMemo<SwapWizardRequest | null>(() => {
     if (!source || (recipientMode === "specific" && recipient.mode !== "specific")) return null;
     const base = { scheduleId: source.shift.scheduleId, scheduleSlotId: source.shift.slotId,
-      fromTime: source.period.fromTime, toTime: source.period.toTime, allowPartialAcceptance: recipientMode === "everyone" && allowPartialAcceptance };
+      fromTime: source.period.fromTime, toTime: source.period.toTime, allowPartialAcceptance: !wholeShiftOnly && recipientMode === "everyone" && allowPartialAcceptance };
     if (recipientMode === "specific" && recipient.mode === "specific") {
       if (recipient.kind === "exchange") return { ...base, allowPartialAcceptance: false, requestKind: "exchange", targetEmployeeId: recipient.employee.id,
         returnScheduleId: recipient.selection.shift.scheduleId, returnScheduleSlotId: recipient.selection.shift.slotId,
@@ -77,7 +79,7 @@ export function SwapCreateWizard({ schedules, employees, employeeId, employeeNam
       return { ...base, requestKind: "give", targetEmployeeId: recipient.employee.id };
     }
     return { ...base, requestKind: "give", targetEmployeeId: null };
-  }, [source, recipient, recipientMode, allowPartialAcceptance]);
+  }, [source, recipient, recipientMode, allowPartialAcceptance, wholeShiftOnly]);
   const previewQuery = useShiftSwapPreviewQuery(step === 3 && view === "wizard" ? payload : null);
   const candidatesQuery = useShiftSwapReturnCandidatesQuery((view === "return" || view === "returnSchedule") && source && typeEmployee ? {
     sourceScheduleId: source.shift.scheduleId, sourceSlotId: source.shift.slotId,
@@ -92,7 +94,9 @@ export function SwapCreateWizard({ schedules, employees, employeeId, employeeNam
       return { scheduleId: schedule.id, scheduleName: schedule.name, shopName: schedule.shopName,
         year: schedule.year, month: schedule.month, dayOfMonth: slot.dayOfMonth, slotId: slot.id,
         fromTime: slot.fromTime, toTime: slot.toTime, durationMinutes: swapMinutes(slot.toTime) - swapMinutes(slot.fromTime),
-        canSelect: !reserved, unavailableReason: reserved ? "This shift already has an open swap offer." : null };
+        requiresWholeShift: wholeShiftOnly,
+        canSelect: !reserved && (!wholeShiftOnly || swapMinutes(slot.toTime) - swapMinutes(slot.fromTime) === 480),
+        unavailableReason: reserved ? "This shift already has an open swap offer." : wholeShiftOnly && swapMinutes(slot.toTime) - swapMinutes(slot.fromTime) !== 480 ? "Employment contract requires a whole shift of exactly eight hours." : null };
     }) ?? [];
   const selectEmployee = (employee: ShiftSwapEmployee) => {
     setTypeEmployee(employee);
@@ -126,8 +130,9 @@ export function SwapCreateWizard({ schedules, employees, employeeId, employeeNam
             <li key={label} aria-current={step === index + 1 ? "step" : undefined} data-complete={step > index + 1}>{step === 3 && index < 2 ? <button type="button" disabled={busy} aria-label={index === 0 ? t("Edit schedule") : t("Edit recipient")} onClick={() => setStep(index === 0 ? 1 : 2)}><span>✓</span>{t(label)}</button> : <><span>{step > index + 1 ? "✓" : index + 1}</span>{t(label)}</>}</li>)}</ol>}
         <button type="button" aria-label={t(view === "wizard" ? "Close" : "Back")} disabled={busy} onClick={() => view !== "wizard" ? back() : onClose()}>{view === "wizard" ? "×" : <ChevronLeftIcon size={22} />}</button></header>
       <div ref={bodyRef} className={styles.body}>
+        {wholeShiftOnly ? <p>{t("Employment contract requires a whole shift of exactly eight hours.")}</p> : null}
         {displayError && <ErrorBanner dismissible={false}>{displayError}</ErrorBanner>}
-        {view === "source" && <SwapShiftPickerDialog key={sourceScheduleId} employeeName={employeeName} shifts={ownShifts} selection={source?.shift.scheduleId === sourceScheduleId ? source : null}
+        {view === "source" && <SwapShiftPickerDialog wholeShiftOnly={wholeShiftOnly} key={sourceScheduleId} employeeName={employeeName} shifts={ownShifts} selection={source?.shift.scheduleId === sourceScheduleId ? source : null}
           onBack={() => setView("wizard")} onConfirm={selection => {
             const changed = source?.shift.slotId !== selection.shift.slotId || source?.period.fromTime !== selection.period.fromTime || source?.period.toTime !== selection.period.toTime;
             setSource(selection);
@@ -161,7 +166,7 @@ export function SwapCreateWizard({ schedules, employees, employeeId, employeeNam
           </SwapScrollRegion>
         </>}
         {view === "return" && source && typeEmployee && <SwapShiftPickerDialog key={returnScheduleId} shifts={candidates.filter(item => item.scheduleId === returnScheduleId)} selection={returnSelection}
-          returnMode employeeName={typeEmployee.displayName} outgoing={source}
+          returnMode wholeShiftOnly={wholeShiftOnly || typeEmployee.requiresWholeEightHourShifts === true} employeeName={typeEmployee.displayName} outgoing={source}
           loading={candidatesQuery.isFetching}
           onBack={() => setView("returnSchedule")} onConfirm={selection => { setReturnSelection(selection); setView("type"); }} />}
         {view === "wizard" && <>
@@ -192,7 +197,7 @@ export function SwapCreateWizard({ schedules, employees, employeeId, employeeNam
                     <fieldset className={styles.acceptanceMode} disabled={recipientMode !== "everyone"}>
                       <legend>{t("Acceptance mode")}</legend>
                       <label><input type="radio" name="acceptance-mode" checked={!allowPartialAcceptance} onChange={() => setAllowPartialAcceptance(false)} />{t("Only the exact shift")}</label>
-                      <label><input type="radio" name="acceptance-mode" checked={allowPartialAcceptance} onChange={() => setAllowPartialAcceptance(true)} />{t("Allow custom time")}</label>
+                      <label><input type="radio" name="acceptance-mode" checked={allowPartialAcceptance && !wholeShiftOnly} disabled={wholeShiftOnly} onChange={() => setAllowPartialAcceptance(true)} />{t("Allow custom time")}</label>
                       {allowPartialAcceptance && <p>{t("Unclaimed time will remain available as a new offer.")}</p>}
                     </fieldset>
                     </div>
@@ -225,6 +230,12 @@ export function SwapCreateWizard({ schedules, employees, employeeId, employeeNam
                   initials={recipient.mode === "specific" ? `${recipient.employee.firstName[0] ?? ""}${recipient.employee.lastName[0] ?? ""}` : ""}
                   selection={recipient.mode === "specific" && recipient.kind === "exchange" ? recipient.selection : null} />
               </>}
+              {preview.requiresManagerException ? <div role="status">
+                <strong>{t("Manager exception required")}</strong>
+                <p>{translateServerMessage(preview.managerExceptionReason ?? "Monthly minimum exception required.")}</p>
+                <p>{t("Monthly minimum: {0} h; after transfer: {1} h.", preview.minimumMinutes == null ? t("Not configured") : preview.minimumMinutes / 60, (preview.projectedMinutes ?? 0) / 60)}</p>
+                <p>{t("Approval publishes this offer; hours change only when it is accepted.")}</p>
+              </div> : null}
               <div className={styles.requestSummary}>
                 <span className={styles.requestIcon} aria-hidden="true">{preview.requestKind === "exchange" ? <ExchangeIcon /> : <span>→</span>}</span>
                 <div><span>{t("Type of request")}</span><strong>{preview.requestKind === "exchange" ? t("Swap shifts") : t("Give shift")}</strong>
@@ -244,9 +255,12 @@ export function SwapCreateWizard({ schedules, employees, employeeId, employeeNam
           <footer className={styles.footer}>
             {step < 3 ? <button type="button" className={styles.primary} disabled={step === 1 ? !source : !payload}
               onClick={() => step === 1 ? setStep(2) : enterReview()}>{t("Continue")}{step < 3 && <span aria-hidden="true" className={styles.arrow}>→</span>}</button>
-              : <button type="button" className={styles.primary} disabled={busy || !payload || !previewMatches || !preview?.isValid || previewQuery.isFetching || Boolean(previewQuery.error)} onClick={() => {
+              : <button type="button" className={styles.primary} disabled={busy || Boolean(preview?.requiresManagerException) || !payload || !previewMatches || !preview?.isValid || previewQuery.isFetching || Boolean(previewQuery.error)} onClick={() => {
                 if (!payload || submitGuard.current) return; submitGuard.current = true; onSubmit(payload);
               }}>{busy ? t("Sending...") : t("Send request")}<span className={styles.arrow} aria-hidden="true">→</span></button>}
+            {step === 3 && preview?.requiresManagerException ? <button type="button" className={styles.primary}
+              disabled={busy || !payload || !previewMatches || !preview.isValid || previewQuery.isFetching || !onRequestException}
+              onClick={() => { if (!payload || submitGuard.current) return; submitGuard.current = true; onRequestException?.(payload); }}>{t("Request exception")}</button> : null}
           </footer>
         </>}
       </div>

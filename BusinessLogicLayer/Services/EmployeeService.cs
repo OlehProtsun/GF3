@@ -126,6 +126,8 @@ public class EmployeeService : IEmployeeService
     /// </summary>
     private async Task ValidateEmployeeAsync(EmployeeModel entity, int? excludeId, CancellationToken ct)
     {
+        if (!DataAccessLayer.Models.EmploymentContractTypes.IsValid(entity.ContractType))
+            throw ValidationException.ForField("contractType", "Select a valid employment contract type.");
         if (string.IsNullOrWhiteSpace(entity.FirstName))
             throw new ValidationException("First name is required.");
         if (string.IsNullOrWhiteSpace(entity.LastName))

@@ -334,6 +334,195 @@ namespace DataAccessLayer.Migrations
                     b.ToTable("container");
                 });
 
+            modelBuilder.Entity("DataAccessLayer.Models.ContractShiftApprovalRequestModel", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("id");
+
+                    b.Property<bool>("AllowPartialAcceptance")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("allow_partial_acceptance");
+
+                    b.Property<DateTimeOffset?>("CancelledAtUtc")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("cancelled_at_utc");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<int>("EmployeeId")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("employee_id");
+
+                    b.Property<string>("FailureReason")
+                        .HasMaxLength(250)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("failure_reason");
+
+                    b.Property<string>("FromTime")
+                        .IsRequired()
+                        .HasMaxLength(5)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("from_time");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(24)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("kind");
+
+                    b.Property<int>("Month")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("month");
+
+                    b.Property<int>("OriginalDayOfMonth")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("original_day_of_month");
+
+                    b.Property<string>("OriginalFromTime")
+                        .IsRequired()
+                        .HasMaxLength(5)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("original_from_time");
+
+                    b.Property<string>("OriginalToTime")
+                        .IsRequired()
+                        .HasMaxLength(5)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("original_to_time");
+
+                    b.Property<string>("RequestKind")
+                        .HasMaxLength(16)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("request_kind");
+
+                    b.Property<int?>("ResultingShiftSwapRequestId")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("resulting_shift_swap_request_id");
+
+                    b.Property<string>("ReturnFromTime")
+                        .HasMaxLength(5)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("return_from_time");
+
+                    b.Property<int?>("ReturnMonth")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("return_month");
+
+                    b.Property<int?>("ReturnOriginalDayOfMonth")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("return_original_day_of_month");
+
+                    b.Property<string>("ReturnOriginalFromTime")
+                        .HasMaxLength(5)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("return_original_from_time");
+
+                    b.Property<string>("ReturnOriginalToTime")
+                        .HasMaxLength(5)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("return_original_to_time");
+
+                    b.Property<int?>("ReturnScheduleId")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("return_schedule_id");
+
+                    b.Property<int?>("ReturnScheduleSlotId")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("return_schedule_slot_id");
+
+                    b.Property<int?>("ReturnShopId")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("return_shop_id");
+
+                    b.Property<string>("ReturnToTime")
+                        .HasMaxLength(5)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("return_to_time");
+
+                    b.Property<int?>("ReturnYear")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("return_year");
+
+                    b.Property<DateTimeOffset?>("ReviewedAtUtc")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("reviewed_at_utc");
+
+                    b.Property<int?>("ReviewedByManagerId")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("reviewed_by_manager_id");
+
+                    b.Property<int>("ScheduleId")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("schedule_id");
+
+                    b.Property<int>("ScheduleSlotId")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("schedule_slot_id");
+
+                    b.Property<int?>("ShiftSwapRequestId")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("shift_swap_request_id");
+
+                    b.Property<int>("ShopId")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("shop_id");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("status");
+
+                    b.Property<int?>("TargetEmployeeId")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("target_employee_id");
+
+                    b.Property<string>("ToTime")
+                        .IsRequired()
+                        .HasMaxLength(5)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("to_time");
+
+                    b.Property<int>("Year")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("year");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ResultingShiftSwapRequestId");
+
+                    b.HasIndex("ReviewedByManagerId");
+
+                    b.HasIndex("EmployeeId", "ScheduleSlotId")
+                        .IsUnique()
+                        .HasFilter("kind='below_minimum_give' AND status='pending'");
+
+                    b.HasIndex("ShiftSwapRequestId", "Status");
+
+                    b.HasIndex("EmployeeId", "Status", "CreatedAtUtc");
+
+                    b.HasIndex("ScheduleId", "Status", "CreatedAtUtc");
+
+                    b.HasIndex("EmployeeId", "ShiftSwapRequestId", "FromTime", "ToTime")
+                        .IsUnique()
+                        .HasFilter("kind='claim' AND status='pending'");
+
+                    b.ToTable("contract_shift_approval_request", t =>
+                        {
+                            t.HasCheckConstraint("ck_contract_approval_kind", "kind IN ('claim','below_minimum_give')");
+
+                            t.HasCheckConstraint("ck_contract_approval_period", "from_time LIKE '__:__' AND to_time LIKE '__:__' AND from_time < to_time");
+
+                            t.HasCheckConstraint("ck_contract_approval_review", "status NOT IN ('approved','rejected') OR (reviewed_by_manager_id IS NOT NULL AND reviewed_at_utc IS NOT NULL)");
+
+                            t.HasCheckConstraint("ck_contract_approval_status", "status IN ('pending','approved','rejected','cancelled','expired')");
+                        });
+                });
+
             modelBuilder.Entity("DataAccessLayer.Models.EmployeeAccountModel", b =>
                 {
                     b.Property<int>("Id")
@@ -448,6 +637,14 @@ namespace DataAccessLayer.Migrations
                         .HasColumnType("INTEGER")
                         .HasColumnName("id");
 
+                    b.Property<string>("ContractType")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(16)
+                        .HasColumnType("TEXT")
+                        .HasDefaultValue("zlecenie")
+                        .HasColumnName("contract_type");
+
                     b.Property<string>("Email")
                         .HasColumnType("TEXT")
                         .HasColumnName("email");
@@ -479,7 +676,10 @@ namespace DataAccessLayer.Migrations
                         .HasDatabaseName("ux_employee_full_name")
                         .HasFilter("\"is_deleted\" = 0");
 
-                    b.ToTable("employee");
+                    b.ToTable("employee", t =>
+                        {
+                            t.HasCheckConstraint("ck_employee_contract_type", "contract_type IN ('zlecenie','o_prace')");
+                        });
                 });
 
             modelBuilder.Entity("DataAccessLayer.Models.EmployeeNotificationReadModel", b =>
@@ -687,6 +887,55 @@ namespace DataAccessLayer.Migrations
                         .HasDatabaseName("ux_emp_schedule_column_pref_emp_schedule");
 
                     b.ToTable("employee_schedule_column_preference");
+                });
+
+            modelBuilder.Entity("DataAccessLayer.Models.EmploymentContractSettingsModel", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("id");
+
+                    b.Property<bool>("AutomaticWeekdayAvailability")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER")
+                        .HasDefaultValue(true)
+                        .HasColumnName("automatic_weekday_availability");
+
+                    b.Property<bool>("RequireBelowMinimumGiveApproval")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER")
+                        .HasDefaultValue(true)
+                        .HasColumnName("require_below_minimum_give_approval");
+
+                    b.Property<bool>("RequirePickupApproval")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER")
+                        .HasDefaultValue(true)
+                        .HasColumnName("require_pickup_approval");
+
+                    b.Property<bool>("RestrictSwapsToEightHours")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER")
+                        .HasDefaultValue(true)
+                        .HasColumnName("restrict_swaps_to_eight_hours");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("employment_contract_settings", t =>
+                        {
+                            t.HasCheckConstraint("ck_employment_contract_settings_singleton", "id = 1");
+                        });
+
+                    b.HasData(
+                        new
+                        {
+                            Id = 1,
+                            AutomaticWeekdayAvailability = true,
+                            RequireBelowMinimumGiveApproval = true,
+                            RequirePickupApproval = true,
+                            RestrictSwapsToEightHours = true
+                        });
                 });
 
             modelBuilder.Entity("DataAccessLayer.Models.ManagerAccountModel", b =>
@@ -1954,6 +2203,10 @@ namespace DataAccessLayer.Migrations
                         .HasDefaultValue(false)
                         .HasColumnName("allow_partial_acceptance");
 
+                    b.Property<int?>("ApprovedEmploymentExceptionApprovalId")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("approved_employment_exception_approval_id");
+
                     b.Property<string>("ArchivedViewsJson")
                         .HasColumnType("TEXT")
                         .HasColumnName("archived_views_json");
@@ -2042,6 +2295,8 @@ namespace DataAccessLayer.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("AcceptedByEmployeeId");
+
+                    b.HasIndex("ApprovedEmploymentExceptionApprovalId");
 
                     b.HasIndex("ReturnScheduleId", "Status")
                         .HasDatabaseName("ix_shift_swap_return_schedule_status");
@@ -2337,6 +2592,36 @@ namespace DataAccessLayer.Migrations
                         .OnDelete(DeleteBehavior.SetNull);
 
                     b.Navigation("CreatedByManager");
+                });
+
+            modelBuilder.Entity("DataAccessLayer.Models.ContractShiftApprovalRequestModel", b =>
+                {
+                    b.HasOne("DataAccessLayer.Models.EmployeeModel", null)
+                        .WithMany()
+                        .HasForeignKey("EmployeeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("DataAccessLayer.Models.ShiftSwapRequestModel", null)
+                        .WithMany()
+                        .HasForeignKey("ResultingShiftSwapRequestId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("DataAccessLayer.Models.ManagerAccountModel", null)
+                        .WithMany()
+                        .HasForeignKey("ReviewedByManagerId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("DataAccessLayer.Models.ScheduleModel", null)
+                        .WithMany()
+                        .HasForeignKey("ScheduleId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("DataAccessLayer.Models.ShiftSwapRequestModel", null)
+                        .WithMany()
+                        .HasForeignKey("ShiftSwapRequestId")
+                        .OnDelete(DeleteBehavior.SetNull);
                 });
 
             modelBuilder.Entity("DataAccessLayer.Models.EmployeeAccountModel", b =>
@@ -2702,6 +2987,11 @@ namespace DataAccessLayer.Migrations
                     b.HasOne("DataAccessLayer.Models.EmployeeModel", "AcceptedByEmployee")
                         .WithMany()
                         .HasForeignKey("AcceptedByEmployeeId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("DataAccessLayer.Models.ContractShiftApprovalRequestModel", null)
+                        .WithMany()
+                        .HasForeignKey("ApprovedEmploymentExceptionApprovalId")
                         .OnDelete(DeleteBehavior.Restrict);
 
                     b.HasOne("DataAccessLayer.Models.EmployeeModel", "FromEmployee")

@@ -37,6 +37,15 @@ export function EmployeeDetailsForm({
       onSubmit={onSubmit}
     >
       <div className={styles.fields}>
+        <fieldset disabled={isSaving} className={styles.contractSelector}>
+          <legend>{t("Contract type")}</legend>
+          {(["zlecenie", "o_prace"] as const).map(value => <label key={value}>
+            <input type="radio" name="contractType" value={value} checked={form.contractType === value}
+              onChange={onFieldChange("contractType")} />
+            {t(value === "zlecenie" ? "Umowa zlecenie" : "Umowa o pracę")}
+          </label>)}
+          {errors.contractType ? <p role="alert">{errors.contractType}</p> : null}
+        </fieldset>
         <div className={styles.compactRow}>
           <LabeledField id="firstName" label={t("First Name")} error={errors.firstName}>
             <TextInput

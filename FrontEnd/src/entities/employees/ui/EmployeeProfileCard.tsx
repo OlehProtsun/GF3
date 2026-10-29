@@ -51,6 +51,8 @@ export function EmployeeProfileCard({
       }))
     : [];
 
+  if (employee) details.push({ key: "contractType", label: t("Contract type"), value: t(employee.contractType === "o_prace" ? "Umowa o pracę" : "Umowa zlecenie") });
+
   return (
     <RecordProfileCard
       sectionTitle={t("Employee Profile")}

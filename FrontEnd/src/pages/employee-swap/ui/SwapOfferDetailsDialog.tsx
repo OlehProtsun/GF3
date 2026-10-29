@@ -24,7 +24,7 @@ export function SwapOfferDetailsDialog({ swap, currentEmployeeId, busy, error, o
   const [period, setPeriod] = useState<SwapPeriod>(flexible && !fullAllowed && windows[0] ? windows[0] : { fromTime: swap.fromTime, toTime: swap.toTime });
   const allowed = (value: SwapPeriod) => /^([01]\d|2[0-3]):[0-5]\d$/.test(value.fromTime) && /^([01]\d|2[0-3]):[0-5]\d$/.test(value.toTime) &&
     value.fromTime < value.toTime && windows.some(window => value.fromTime >= window.fromTime && value.toTime <= window.toTime);
-  const valid = swap.canAccept && (!flexible || (custom ? allowed(period) : fullAllowed));
+  const valid = !swap.approvalPendingForCurrentEmployee && swap.canAccept && (!flexible || (custom ? allowed(period) : fullAllowed));
   const selectedWindow = windows.find(window => period.fromTime >= window.fromTime && period.toTime <= window.toTime);
   const creator = swap.isCreatedByCurrentEmployee || (currentEmployeeId !== null && currentEmployeeId === swap.fromEmployeeId);
   const recipient = !creator && currentEmployeeId !== null && (currentEmployeeId === swap.targetEmployeeId ||
@@ -111,9 +111,11 @@ export function SwapOfferDetailsDialog({ swap, currentEmployeeId, busy, error, o
         </dl>
         {swap.status === "open" && !swap.canAccept && <p className={styles.info}>{translateServerMessage(unavailable)}</p>}
       </div>
+      {swap.approvalPendingForCurrentEmployee ? <p role="status">{t("Manager approval pending")}</p> : null}
+      {swap.requiresManagerApproval ? <p>{t("Pending requests do not reserve offers. Schedules change only after approval.")}</p> : null}
       <footer className={styles.footer}>
         {swap.status === "open" ? <>
-          <button type="button" className={styles.primary} aria-busy={busy} disabled={!valid || busy} onClick={() => onAccept(swap, flexible && custom ? period : undefined)}>{t("Accept shift")}<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="M4 12h16m-6-6 6 6-6 6" /></svg></button>
+          <button type="button" className={styles.primary} aria-busy={busy} disabled={!valid || busy} onClick={() => onAccept(swap, flexible && custom ? period : undefined)}>{t(swap.approvalPendingForCurrentEmployee ? "Manager approval pending" : swap.requiresManagerApproval ? "Request manager approval" : "Accept shift")}<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="M4 12h16m-6-6 6 6-6 6" /></svg></button>
           {swap.canCancel && <button type="button" disabled={busy} onClick={() => onCancel(swap)}>{t("Cancel offer")}</button>}
         </> : <span>{status}</span>}
       </footer>

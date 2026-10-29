@@ -1,3 +1,5 @@
+import { useEmploymentContractSettingsQuery, useUpdateEmploymentContractSettingsMutation } from "@entities/employment-contracts";
+import type { EmploymentContractSettings } from "@entities/employment-contracts";
 import { usePriorityGenerationSettingsQuery, useUpdatePriorityGenerationSettingsMutation } from "@entities/priority-generation/api/queries";
 import { NumberStepperInput } from "@shared/ui/components/NumberStepperInput";
 import { useRef, useState } from "react";
@@ -37,6 +39,14 @@ export function ManagerSettingsPage() {
       onError: () => { prioritySaving.current = false; },
     });
   };
+  const contractsQuery = useEmploymentContractSettingsQuery(pending.data?.length === 0 && !pending.isError);
+  const contractsMutation = useUpdateEmploymentContractSettingsMutation();
+  const contractRules: { key: keyof EmploymentContractSettings; label: string; description: string }[] = [
+    { key: "restrictSwapsToEightHours", label: t("Whole eight-hour shifts only"), description: t("Give, receive and exchange only complete eight-hour shifts.") },
+    { key: "requirePickupApproval", label: t("Manager approval for pickups"), description: t("Requested pickups change the schedule only after manager approval.") },
+    { key: "requireBelowMinimumGiveApproval", label: t("Protect the monthly minimum"), description: t("Giving below the shop/month minimum requires a manager exception. Configure MinHoursMonth for the graph/shop.") },
+    { key: "automaticWeekdayAvailability", label: t("Automatic weekday availability"), description: t("Weekdays available, weekends unavailable; employee editing is disabled.") },
+  ];
   const [open, setOpen] = useState(false);
   const [languageOpen, setLanguageOpen] = useState(false);
   const readOnly = session?.workspaceMode === "phone";
@@ -114,6 +124,25 @@ export function ManagerSettingsPage() {
             {priorityMutation.error ? <ErrorBanner dismissible={false}>{getErrorMessage(priorityMutation.error, t("Could not save priority settings."))}</ErrorBanner> : null}
             {readOnly ? <p>{t("Switch to PC mode to change this setting.")}</p> : null}
           </div>
+        </section>
+        <section className={styles.card} aria-labelledby="employment-contract-heading">
+          <h2 id="employment-contract-heading" className={styles.cardTitle}>{t("Employment contracts")}</h2>
+          <p className={styles.description}>{t("These global rules apply only to Umowa o pracę employees.")}</p>
+          <div className={styles.employmentSettings}>
+            {contractRules.map(rule => <div key={rule.key} className={styles.prioritySettingRow}>
+              <div><label htmlFor={`contract-${rule.key}`}>{rule.label}</label><p className={styles.description}>{rule.description}</p></div>
+              <label className={styles.switch} aria-busy={contractsMutation.isPending}>
+                <input id={`contract-${rule.key}`} type="checkbox" role="switch" checked={contractsQuery.data?.[rule.key] ?? true}
+                  disabled={readOnly || !contractsQuery.data || contractsQuery.isError || contractsQuery.isFetching || contractsMutation.isPending}
+                  onChange={event => { if (contractsQuery.data) contractsMutation.mutate({ ...contractsQuery.data, [rule.key]: event.target.checked }); }} />
+                <span className={styles.switchTrack} aria-hidden="true"><span className={styles.switchThumb} /></span>
+              </label>
+            </div>)}
+          </div>
+          {contractsQuery.isError ? <><ErrorBanner dismissible={false}>{getErrorMessage(contractsQuery.error, t("Could not load contract settings."))}</ErrorBanner>
+            <button type="button" className={styles.actionButton} onClick={() => contractsQuery.refetch()}>{t("Retry")}</button></> : null}
+          {contractsMutation.error ? <ErrorBanner dismissible={false}>{getErrorMessage(contractsMutation.error, t("Could not save contract settings."))}</ErrorBanner> : null}
+          {readOnly ? <p>{t("Switch to PC mode to change this setting.")}</p> : null}
         </section>
         <section className={styles.card} aria-labelledby="language-heading">
           <button type="button" className={`${styles.cardRow} ${styles.languageButton}`} disabled={readOnly || !ready}

@@ -13,6 +13,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, TimeProvider? 
 {
     public DbSet<ContainerModel> Containers => Set<ContainerModel>();
     public DbSet<EmployeeModel> Employees => Set<EmployeeModel>();
+    public DbSet<EmploymentContractSettingsModel> EmploymentContractSettings => Set<EmploymentContractSettingsModel>();
+    public DbSet<ContractShiftApprovalRequestModel> ContractShiftApprovalRequests => Set<ContractShiftApprovalRequestModel>();
     public DbSet<EmployeeAccountModel> EmployeeAccounts => Set<EmployeeAccountModel>();
     public DbSet<ManagerAccountModel> ManagerAccounts => Set<ManagerAccountModel>();
     public DbSet<ManagerNoteModel> ManagerNotes => Set<ManagerNoteModel>();
@@ -203,8 +205,19 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, TimeProvider? 
 
     private static void ConfigureEmployee(ModelBuilder modelBuilder)
     {
+        modelBuilder.Entity<EmploymentContractSettingsModel>(entity =>
+        {
+            entity.ToTable(table => table.HasCheckConstraint("ck_employment_contract_settings_singleton", "id = 1"));
+            entity.Property(x => x.RestrictSwapsToEightHours).HasDefaultValue(true);
+            entity.Property(x => x.RequirePickupApproval).HasDefaultValue(true);
+            entity.Property(x => x.RequireBelowMinimumGiveApproval).HasDefaultValue(true);
+            entity.Property(x => x.AutomaticWeekdayAvailability).HasDefaultValue(true);
+            entity.HasData(new EmploymentContractSettingsModel());
+        });
         modelBuilder.Entity<EmployeeModel>(entity =>
         {
+            entity.Property(x => x.ContractType).IsRequired().HasMaxLength(16).HasDefaultValue(EmploymentContractTypes.Zlecenie);
+            entity.ToTable(table => table.HasCheckConstraint("ck_employee_contract_type", "contract_type IN ('zlecenie','o_prace')"));
             entity.Property(property => property.FirstName).IsRequired();
             entity.Property(property => property.LastName).IsRequired();
             entity.Property(property => property.Email).IsRequired(false);
@@ -822,8 +835,32 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, TimeProvider? 
 
     private static void ConfigureShiftSwapRequest(ModelBuilder modelBuilder)
     {
+        modelBuilder.Entity<ContractShiftApprovalRequestModel>(entity =>
+        {
+            entity.HasOne<EmployeeModel>().WithMany().HasForeignKey(x => x.EmployeeId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<ScheduleModel>().WithMany().HasForeignKey(x => x.ScheduleId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<ManagerAccountModel>().WithMany().HasForeignKey(x => x.ReviewedByManagerId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<ShiftSwapRequestModel>().WithMany().HasForeignKey(x => x.ShiftSwapRequestId).OnDelete(DeleteBehavior.SetNull);
+            entity.HasOne<ShiftSwapRequestModel>().WithMany().HasForeignKey(x => x.ResultingShiftSwapRequestId).OnDelete(DeleteBehavior.SetNull);
+            entity.HasIndex(x => new { x.ScheduleId, x.Status, x.CreatedAtUtc });
+            entity.HasIndex(x => new { x.EmployeeId, x.Status, x.CreatedAtUtc });
+            entity.HasIndex(x => new { x.ShiftSwapRequestId, x.Status });
+            entity.HasIndex(x => new { x.EmployeeId, x.ShiftSwapRequestId, x.FromTime, x.ToTime }).IsUnique()
+                .HasFilter("kind='claim' AND status='pending'");
+            entity.HasIndex(x => new { x.EmployeeId, x.ScheduleSlotId }).IsUnique()
+                .HasFilter("kind='below_minimum_give' AND status='pending'");
+            entity.ToTable(table =>
+            {
+                table.HasCheckConstraint("ck_contract_approval_kind", "kind IN ('claim','below_minimum_give')");
+                table.HasCheckConstraint("ck_contract_approval_status", "status IN ('pending','approved','rejected','cancelled','expired')");
+                table.HasCheckConstraint("ck_contract_approval_period", "from_time LIKE '__:__' AND to_time LIKE '__:__' AND from_time < to_time");
+                table.HasCheckConstraint("ck_contract_approval_review", "status NOT IN ('approved','rejected') OR (reviewed_by_manager_id IS NOT NULL AND reviewed_at_utc IS NOT NULL)");
+            });
+        });
         modelBuilder.Entity<ShiftSwapRequestModel>(entity =>
         {
+            entity.HasOne<ContractShiftApprovalRequestModel>().WithMany()
+                .HasForeignKey(x => x.ApprovedEmploymentExceptionApprovalId).OnDelete(DeleteBehavior.Restrict);
             entity.Property(request => request.RequestKind).HasConversion<string>().HasDefaultValue(ShiftSwapRequestKind.Give);
             entity.HasIndex(request => new { request.ReturnScheduleId, request.Status })
                 .HasDatabaseName("ix_shift_swap_return_schedule_status");

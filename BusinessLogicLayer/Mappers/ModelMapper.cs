@@ -29,6 +29,7 @@ internal static class ModelMapper
 
     internal static EmployeeModel ToContract(this Dal.EmployeeModel model) => new()
     {
+        ContractType = model.ContractType,
         IsDeleted = model.IsDeleted,
         Id = model.Id,
         FirstName = model.FirstName,
@@ -39,6 +40,7 @@ internal static class ModelMapper
 
     internal static Dal.EmployeeModel ToDal(this EmployeeModel model) => new()
     {
+        ContractType = model.ContractType,
         IsDeleted = model.IsDeleted,
         Id = model.Id,
         FirstName = model.FirstName,

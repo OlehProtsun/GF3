@@ -5,6 +5,8 @@ namespace BusinessLogicLayer.Contracts.Employees;
 /// </summary>
 public sealed class EmployeeDto
 {
+    public string ContractType { get; set; } = DataAccessLayer.Models.EmploymentContractTypes.Zlecenie;
+
     /// <summary>
     /// Persistent employee identifier.
     /// </summary>

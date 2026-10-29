@@ -1,0 +1,8 @@
+.root { min-width:0; margin-block:16px; color:#64748b; font-size:.78rem; overflow-wrap:anywhere; }
+.summary { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:8px; }
+.summary span,.status { border-radius:999px; padding:4px 8px; background:#edf4ff; color:#2563eb; font-size:.7rem; }
+.list { display:grid; gap:12px; max-height:460px; overflow:auto; }
+.request { display:grid; gap:7px; padding:14px; border-radius:17px; background:#f5f8fc; box-shadow:inset 2px 2px 5px #e1e8f1,inset -2px -2px 5px #fff; }
+.request strong { color:#334155; }.status { justify-self:start; }.actions { display:flex; flex-wrap:wrap; gap:8px; }
+.root button { border:1px solid #dce5f3; border-radius:12px; padding:8px 12px; background:#fff; color:#2563eb; cursor:pointer; }
+.root button:disabled { opacity:.5; cursor:default; }.root button:focus-visible { outline:2px solid #2563eb; outline-offset:2px; }

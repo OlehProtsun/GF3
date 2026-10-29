@@ -6,6 +6,7 @@ const endpoint = "employees";
 
 function toSaveDto(input: SaveEmployeeInput): SaveEmployeeDto {
   return {
+    contractType: input.contractType,
     firstName: input.firstName.trim(),
     lastName: input.lastName.trim(),
     phone: input.phone?.trim() || undefined,

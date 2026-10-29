@@ -58,6 +58,8 @@ public static class WebApiServiceCollectionExtensions
         services.AddScoped<IRealtimeNotifier, RealtimeNotifier>();
         services.AddScoped<IWorkflowLogService, WorkflowLogService>();
         services.AddScoped<ScheduleVersionCommitService>();
+        services.AddScoped<WebApi.ShiftSwaps.ShiftSwapExecutionService>();
+        services.AddScoped<WebApi.ShiftSwaps.ContractShiftApprovalService>();
         services.AddScoped<IEmployeePushNotificationSource, EmployeePushNotificationSource>();
         services.AddHttpClient<IEmployeeWebPushSender, EmployeeWebPushSender>(client => client.Timeout = TimeSpan.FromSeconds(30))
             .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
