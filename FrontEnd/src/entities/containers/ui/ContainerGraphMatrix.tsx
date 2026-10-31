@@ -52,6 +52,7 @@ type ContainerGraphMatrixProps = {
   title?: ReactNode;
   helperText?: string;
   readOnly?: boolean;
+  readOnlyCellKeys?: ReadonlySet<string>;
   highlightReadOnlyEmpty?: boolean;
   emptyMessage?: string;
   className?: string;
@@ -816,6 +817,7 @@ export function ContainerGraphMatrix({
   title = t("Schedule Matrix"),
   helperText,
   readOnly = false,
+  readOnlyCellKeys,
   highlightReadOnlyEmpty = false,
   emptyMessage,
   className,
@@ -1281,9 +1283,12 @@ export function ContainerGraphMatrix({
     });
   };
 
+  const isEffectiveCellReadOnly = (cellKey: string) => readOnly || Boolean(readOnlyCellKeys?.has(cellKey));
+
   const commitCellValue = (employeeId: number, dayOfMonth: number, value: string) => {
-    const nextValue = normalizeCellValueRef.current?.(employeeId, value) ?? value;
     const cellKey = getGraphCellKey(employeeId, dayOfMonth);
+    if (isEffectiveCellReadOnly(cellKey)) return;
+    const nextValue = normalizeCellValueRef.current?.(employeeId, value) ?? value;
     const currentValue = cellMapRef.current[cellKey] ?? GRAPH_EMPTY_MARK;
 
     if (nextValue !== currentValue) {
@@ -1327,6 +1332,7 @@ export function ContainerGraphMatrix({
       selectionBehavior?: MatrixEditorSelectionBehavior;
     },
   ) => {
+    if (isEffectiveCellReadOnly(cellKey)) return;
     flushEditingCell();
     editingCellKeyRef.current = cellKey;
     const currentValue = cellMapRef.current[cellKey] ?? GRAPH_EMPTY_MARK;
@@ -1340,7 +1346,7 @@ export function ContainerGraphMatrix({
     target: Extract<MatrixSelectionTarget, { type: "cell" }>,
     isEditorTarget: boolean,
   ) => {
-    if (readOnly || !onCellChangeRef.current || !bindValueByKey || bindValueByKey.size === 0) {
+    if (isEffectiveCellReadOnly(target.cellKey) || !onCellChangeRef.current || !bindValueByKey || bindValueByKey.size === 0) {
       return false;
     }
 
@@ -1952,7 +1958,7 @@ export function ContainerGraphMatrix({
                             isSelected={isSelected}
                             hasRowGuide={partiallySelectedDaySet.has(day.dayOfMonth)}
                             isEditing={isEditing}
-                            readOnly={readOnly}
+                            readOnly={isEffectiveCellReadOnly(cellKey)}
                             isWeekend={day.isWeekend}
                             editMode={effectiveEditMode}
                             emptyCellVariant={emptyCellVariant}
@@ -1968,7 +1974,7 @@ export function ContainerGraphMatrix({
                             }}
                             onEditorValueChange={setEditingValue}
                             onEditorBlur={isEditing ? flushEditingCell : NOOP}
-                            onInlineValueChange={nextValue => onCellChange?.(column.employeeId, day.dayOfMonth, nextValue)}
+                            onInlineValueChange={nextValue => { if (!isEffectiveCellReadOnly(cellKey)) onCellChange?.(column.employeeId, day.dayOfMonth, nextValue); }}
                             onInlineValueCommit={nextValue => commitCellValue(column.employeeId, day.dayOfMonth, nextValue)}
                             onVisualHintClick={onVisualHintCellClick
                               ? () => onVisualHintCellClick(column.employeeId, day.dayOfMonth)

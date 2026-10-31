@@ -1,3 +1,5 @@
+import { buildEffectiveManagerAvailabilityCellMap, getAutomaticManagerEmployeeIds } from "@entities/availability-groups/model/automaticAvailability";
+import { useEmploymentContractSettingsQuery } from "@entities/employment-contracts";
 import { canReserveManualShift } from "@entities/containers/model/manualShiftIntervals";
 import { useLanguageRevision } from "@shared/i18n/useLanguageRevision";
 import { dateTimeFormat, t } from "@shared/i18n";
@@ -917,6 +919,7 @@ export function ContainerGraphEditPage() {
   const bindsQuery = useAvailabilityBindsListQuery();
   const fillColorBindsQuery = useManagerGraphFillColorBindsQuery();
   const textColorBindsQuery = useManagerGraphTextColorBindsQuery();
+  const contractSettingsQuery = useEmploymentContractSettingsQuery();
   const employeesQuery = useEmployeesListQuery({ refreshKey: location.key });
   const shopsQuery = useShopsListQuery({ refreshKey: location.key });
   const saveWorkspaceMutation = useSaveGraphWorkspaceMutation();
@@ -1730,8 +1733,15 @@ export function ContainerGraphEditPage() {
     () => buildAvailabilityColumns(previewMembersQuery.data ?? [], employeeNameById),
     [employeeNameById, previewMembersQuery.data],
   );
+  const policyEmployeeIds = useMemo(() => [...new Set([
+    ...(previewMembersQuery.data ?? []).map(member => member.employeeId),
+    ...(scheduleAvailabilityMembersQuery.data ?? []).map(member => member.employeeId),
+  ])], [previewMembersQuery.data, scheduleAvailabilityMembersQuery.data]);
+  const hasUnresolvedPolicyEmployees = Boolean(employeesQuery.data) && policyEmployeeIds.some(id => !employeesQuery.data?.some(employee => employee.id === id));
+  const hasAvailabilityPolicyError = contractSettingsQuery.isError || hasUnresolvedPolicyEmployees;
+  const isAvailabilityPolicyLoading = !hasAvailabilityPolicyError && (!contractSettingsQuery.data || !employeesQuery.data);
   const autoAvailabilityUnavailableCellKeys = useMemo(() => {
-    if (!scheduleAvailabilityGroupId || !scheduleAvailabilityMembersQuery.data || !scheduleAvailabilitySlotsQuery.data) {
+    if (!yearValue || !monthValue || isAvailabilityPolicyLoading || hasAvailabilityPolicyError || !scheduleAvailabilityGroupId || !scheduleAvailabilityMembersQuery.data || !scheduleAvailabilitySlotsQuery.data) {
       return [] as string[];
     }
 
@@ -1741,7 +1751,11 @@ export function ContainerGraphEditPage() {
     }
 
     return Object.entries(
-      buildAvailabilityCellMap(scheduleAvailabilityMembersQuery.data, scheduleAvailabilitySlotsQuery.data),
+      buildEffectiveManagerAvailabilityCellMap(
+        buildAvailabilityCellMap(scheduleAvailabilityMembersQuery.data, scheduleAvailabilitySlotsQuery.data),
+        getAutomaticManagerEmployeeIds(scheduleAvailabilityMembersQuery.data.map(member => member.employeeId), employeesQuery.data ?? [], contractSettingsQuery.data?.automaticWeekdayAvailability === true),
+        yearValue, monthValue,
+      ),
     )
       .filter(([cellKey, value]) => {
         if (value !== AVAILABILITY_NONE_MARK) {
@@ -1763,6 +1777,7 @@ export function ContainerGraphEditPage() {
         return leftCell.dayOfMonth - rightCell.dayOfMonth;
       });
   }, [
+    isAvailabilityPolicyLoading, hasAvailabilityPolicyError, employeesQuery.data, contractSettingsQuery.data, yearValue, monthValue,
     graphEmployeeRows,
     scheduleAvailabilityGroupId,
     scheduleAvailabilityMembersQuery.data,
@@ -1780,16 +1795,20 @@ export function ContainerGraphEditPage() {
     () => new Set(autoAvailabilityUnavailableCellKeys),
     [autoAvailabilityUnavailableCellKeys],
   );
-  const previewCellMap = useMemo<AvailabilityMatrixCellMap>(
-    () => buildAvailabilityCellMap(previewMembersQuery.data ?? [], previewSlotsQuery.data ?? []),
-    [previewMembersQuery.data, previewSlotsQuery.data],
-  );
   const selectedPreviewAvailabilityGroup = useMemo(
     () => matchingAvailabilityGroups.find(group => group.id === previewAvailabilityGroupId) ?? null,
     [matchingAvailabilityGroups, previewAvailabilityGroupId],
   );
   const previewYear = selectedPreviewAvailabilityGroup?.year ?? yearValue ?? new Date().getFullYear();
   const previewMonth = selectedPreviewAvailabilityGroup?.month ?? monthValue ?? 1;
+  const previewCellMap = useMemo<AvailabilityMatrixCellMap>(
+    () => buildEffectiveManagerAvailabilityCellMap(
+      buildAvailabilityCellMap(previewMembersQuery.data ?? [], previewSlotsQuery.data ?? []),
+      getAutomaticManagerEmployeeIds(previewColumns.map(column => column.employeeId), employeesQuery.data ?? [], contractSettingsQuery.data?.automaticWeekdayAvailability === true),
+      previewYear, previewMonth,
+    ),
+    [previewMembersQuery.data, previewSlotsQuery.data, previewColumns, employeesQuery.data, contractSettingsQuery.data, previewYear, previewMonth],
+  );
   const isSaving = saveWorkspaceMutation.isPending || isSessionSaving;
   const {
     dialog: unsavedChangesDialog,
@@ -1881,6 +1900,8 @@ export function ContainerGraphEditPage() {
   const isLoading =
     containerId !== null &&
     (
+      isAvailabilityPolicyLoading ||
+      (Boolean(previewAvailabilityGroupId) && (previewMembersQuery.isLoading || previewSlotsQuery.isLoading)) ||
       containerQuery.isLoading ||
       shopsQuery.isLoading ||
       employeesQuery.isLoading ||
@@ -1889,6 +1910,8 @@ export function ContainerGraphEditPage() {
     );
   const hasLoadError =
     containerId === null ||
+    hasAvailabilityPolicyError ||
+    (Boolean(previewAvailabilityGroupId) && (previewMembersQuery.isError || previewSlotsQuery.isError)) ||
     containerQuery.isError ||
     shopsQuery.isError ||
     employeesQuery.isError ||

@@ -497,6 +497,11 @@ namespace DataAccessLayer.Migrations
 
                     b.HasIndex("ReviewedByManagerId");
 
+                    b.HasIndex("ShiftSwapRequestId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_contract_approval_one_pending_claim_per_offer")
+                        .HasFilter("kind='claim' AND status='pending' AND shift_swap_request_id IS NOT NULL");
+
                     b.HasIndex("EmployeeId", "ScheduleSlotId")
                         .IsUnique()
                         .HasFilter("kind='below_minimum_give' AND status='pending'");

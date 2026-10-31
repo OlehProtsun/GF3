@@ -15,6 +15,13 @@ internal static class EmploymentSwapRules
 {
     internal const string EightHourReason = "Employment contract requires a whole shift of exactly eight hours.";
 
+    internal static bool RequiresPickupApproval(ShiftSwapRequestModel offer, int? recipientId,
+        EmploymentContractSettingsSnapshot settings, IReadOnlyDictionary<int, string> contractTypes)
+        => settings.RequirePickupApproval &&
+            ((!offer.IsManagerCreated && offer.FromEmployeeId is { } ownerId &&
+                contractTypes.GetValueOrDefault(ownerId) == EmploymentContractTypes.OPrace) ||
+             (recipientId is { } employeeId && contractTypes.GetValueOrDefault(employeeId) == EmploymentContractTypes.OPrace));
+
     internal static bool IsWholeEightHourShift(ScheduleSlotModel slot, ShiftSwapPeriod period)
         => GetTimeRangeDurationHours(slot.FromTime, slot.ToTime) == 8 &&
             GetTimeRangeDurationHours(period.FromTime, period.ToTime) == 8 &&

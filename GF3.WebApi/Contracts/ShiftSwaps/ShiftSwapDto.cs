@@ -2,6 +2,8 @@ namespace WebApi.Contracts.ShiftSwaps;
 
 public sealed class ShiftSwapDto
 {
+    public bool IsAwaitingManagerApproval { get; set; }
+    public bool PickupApprovalPolicyApplies { get; set; }
     public bool RequiresManagerApproval { get; set; }
     public bool CanRequestManagerApproval { get; set; }
     public bool ApprovalPendingForCurrentEmployee { get; set; }

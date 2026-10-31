@@ -12,6 +12,46 @@ import { publicHolidaySettingsApi } from "@entities/public-holidays/api/publicHo
 
 beforeEnglishTest(() => setTestLanguage("en"));
 
+describe("per-cell read-only availability", () => {
+  const columns = [7, 8].map(employeeId => ({ employeeId, kind: "employee" as const, manualColumnId: null,
+    graphEmployeeId: employeeId, label: employeeId === 7 ? "Ada" : "Grace", minHoursMonth: null, totalMinutes: 0, totalText: "" }));
+  test("blocks pointer, direct input, F2, paste and binds while bulk erase skips only locked cells", () => {
+    const changed = vi.fn();
+    const { rerender } = render(<ContainerGraphMatrix graph={{ year: 2026, month: 12 }} columns={columns}
+      cellMap={{ "7:1": "+", "8:1": "manual" }} readOnlyCellKeys={new Set(["7:1"])}
+      selectedCellKeys={["7:1", "8:1"]} onSelectedCellKeysChange={vi.fn()} bindValueByKey={new Map([["F4", "bound"]])} onCellChange={changed} />);
+    const locked = screen.getByRole("button", { name: "Ada day 1", exact: true });
+    fireEvent.doubleClick(locked);
+    for (const key of ["F2", "F4", "x"]) fireEvent.keyDown(locked, { key });
+    fireEvent.paste(locked, { clipboardData: { getData: () => "pasted" } });
+    expect(screen.queryByRole("textbox", { name: "Ada day 1", exact: true })).toBeNull();
+    expect(changed).not.toHaveBeenCalled();
+    fireEvent.keyDown(locked, { key: "Delete" });
+    expect(changed.mock.calls).toEqual([[8, 1, ""]]);
+    changed.mockClear();
+    fireEvent.keyDown(locked, { key: "Backspace" });
+    expect(changed.mock.calls).toEqual([[8, 1, ""]]);
+    changed.mockClear();
+    rerender(<ContainerGraphMatrix graph={{ year: 2026, month: 12 }} columns={columns} cellMap={{ "7:1": "+" }} onCellChange={changed} />);
+    fireEvent.doubleClick(screen.getByRole("button", { name: "Ada day 1", exact: true }));
+    const input = screen.getByRole("textbox", { name: "Ada day 1", exact: true });
+    fireEvent.change(input, { target: { value: "09:00 - 17:00" } }); fireEvent.blur(input);
+    expect(changed).toHaveBeenCalledWith(7, 1, "09:00 - 17:00");
+  });
+  test("inline inputs remain editable only for ordinary keys and policy changes guard an already focused editor", () => {
+    const changed = vi.fn();
+    const props = { graph: { year: 2026, month: 12 }, columns, cellMap: { "7:1": "+", "8:1": "-" }, onCellChange: changed, editMode: "inline" as const };
+    const view = render(<ContainerGraphMatrix {...props} />);
+    const oldInput = screen.getByRole("textbox", { name: "Ada day 1", exact: true });
+    view.rerender(<ContainerGraphMatrix {...props} readOnlyCellKeys={new Set(["7:1"])} />);
+    expect(oldInput).not.toBeInTheDocument();
+    expect(screen.queryByRole("textbox", { name: "Ada day 1", exact: true })).toBeNull();
+    fireEvent.change(screen.getByRole("textbox", { name: "Grace day 1", exact: true }), { target: { value: "+" } });
+    expect(changed).toHaveBeenCalledWith(8, 1, "+");
+    expect(changed).not.toHaveBeenCalledWith(7, 1, expect.anything());
+  });
+});
+
 describe("compact manual demand", () => {
   const raw = "09:00 - 15:00, 15:00 - 21:00, 09:00 - 15:00";
   const column = { employeeId: -1, kind: "manual" as const, manualColumnId: 1, graphEmployeeId: null, label: "Demand", minHoursMonth: null, totalMinutes: 0, totalText: "" };

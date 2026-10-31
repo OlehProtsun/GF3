@@ -24,7 +24,8 @@ export function SwapOfferDetailsDialog({ swap, currentEmployeeId, busy, error, o
   const [period, setPeriod] = useState<SwapPeriod>(flexible && !fullAllowed && windows[0] ? windows[0] : { fromTime: swap.fromTime, toTime: swap.toTime });
   const allowed = (value: SwapPeriod) => /^([01]\d|2[0-3]):[0-5]\d$/.test(value.fromTime) && /^([01]\d|2[0-3]):[0-5]\d$/.test(value.toTime) &&
     value.fromTime < value.toTime && windows.some(window => value.fromTime >= window.fromTime && value.toTime <= window.toTime);
-  const valid = !swap.approvalPendingForCurrentEmployee && swap.canAccept && (!flexible || (custom ? allowed(period) : fullAllowed));
+  const held = swap.isAwaitingManagerApproval || swap.approvalPendingForCurrentEmployee;
+  const valid = !held && (!swap.requiresManagerApproval || swap.canRequestManagerApproval === true) && swap.canAccept && (!flexible || (custom ? allowed(period) : fullAllowed));
   const selectedWindow = windows.find(window => period.fromTime >= window.fromTime && period.toTime <= window.toTime);
   const creator = swap.isCreatedByCurrentEmployee || (currentEmployeeId !== null && currentEmployeeId === swap.fromEmployeeId);
   const recipient = !creator && currentEmployeeId !== null && (currentEmployeeId === swap.targetEmployeeId ||
@@ -32,7 +33,7 @@ export function SwapOfferDetailsDialog({ swap, currentEmployeeId, busy, error, o
   const giver = swap.isManagerCreated ? swap.manualColumnName || t("Open shift") : swap.fromEmployeeName;
   const unavailable = swap.acceptanceUnavailableReason || (creator ? "This is your own swap offer." :
     swap.isScheduleLocked ? "Schedule is locked while a manager is editing it." : "Not available");
-  const status = swap.status === "open" ? t("Open offer") : swap.status === "accepted" ? t("Accepted") : t("Cancelled");
+  const status = swap.status === "open" ? t(held ? "Awaiting manager approval" : "Open offer") : swap.status === "accepted" ? t("Accepted") : t("Cancelled");
   const panels = [{ schedule: swap.scheduleName, location: swap.shopName || swap.containerName, employee: giver,
     year: swap.year, month: swap.month, day: swap.dayOfMonth, from: swap.fromTime, to: swap.toTime, hours: swap.shiftHours,
     heading: creator ? t("Your shift (you give)") : recipient ? t("Shift you receive") : t("Offered shift"),
@@ -111,11 +112,11 @@ export function SwapOfferDetailsDialog({ swap, currentEmployeeId, busy, error, o
         </dl>
         {swap.status === "open" && !swap.canAccept && <p className={styles.info}>{translateServerMessage(unavailable)}</p>}
       </div>
-      {swap.approvalPendingForCurrentEmployee ? <p role="status">{t("Manager approval pending")}</p> : null}
-      {swap.requiresManagerApproval ? <p>{t("Pending requests do not reserve offers. Schedules change only after approval.")}</p> : null}
+      {held ? <p role="status">{t(swap.approvalPendingForCurrentEmployee ? "Awaiting manager approval" : "This offer is awaiting manager approval.")}</p> : null}
+      {held || swap.requiresManagerApproval ? <p>{t("This offer is unavailable to others while manager approval is pending.")}</p> : null}
       <footer className={styles.footer}>
         {swap.status === "open" ? <>
-          <button type="button" className={styles.primary} aria-busy={busy} disabled={!valid || busy} onClick={() => onAccept(swap, flexible && custom ? period : undefined)}>{t(swap.approvalPendingForCurrentEmployee ? "Manager approval pending" : swap.requiresManagerApproval ? "Request manager approval" : "Accept shift")}<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="M4 12h16m-6-6 6 6-6 6" /></svg></button>
+          <button type="button" className={styles.primary} aria-busy={busy} disabled={!valid || busy} onClick={() => onAccept(swap, flexible && custom ? period : undefined)}>{t(held ? "Awaiting manager approval" : swap.requiresManagerApproval ? swap.canRequestManagerApproval ? "Request manager approval" : "Not available" : "Accept shift")}<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="M4 12h16m-6-6 6 6-6 6" /></svg></button>
           {swap.canCancel && <button type="button" disabled={busy} onClick={() => onCancel(swap)}>{t("Cancel offer")}</button>}
         </> : <span>{status}</span>}
       </footer>

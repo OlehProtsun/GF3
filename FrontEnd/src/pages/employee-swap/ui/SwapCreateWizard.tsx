@@ -17,8 +17,9 @@ import styles from "./SwapCreateWizard.module.css";
 type Recipient = { mode: "everyone" } | { mode: "specific"; employee: ShiftSwapEmployee; kind: "give" }
   | { mode: "specific"; employee: ShiftSwapEmployee; kind: "exchange"; selection: SwapShiftSelection };
 type View = "wizard" | "source" | "type" | "returnSchedule" | "return";
-export function SwapCreateWizard({ schedules, employees, employeeId, employeeName, swaps, busy, error, onClose, onSubmit, onRequestException, restrictToEightHours = false, returnFocusRef }: {
+export function SwapCreateWizard({ schedules, employees, employeeId, employeeName, swaps, busy, error, onClose, onSubmit, onRequestException, restrictToEightHours = false, requirePickupApproval = false, returnFocusRef }: {
   schedules: EmployeeSchedule[]; employees: ShiftSwapEmployee[]; employeeId: number; employeeName: string; swaps: ShiftSwap[];
+  requirePickupApproval?: boolean;
   restrictToEightHours?: boolean; onRequestException?: (payload: SwapWizardRequest) => void;
   busy: boolean; error?: string | null; onClose: () => void; onSubmit: (payload: SwapWizardRequest) => void;
   returnFocusRef?: RefObject<HTMLElement | null>;
@@ -223,6 +224,7 @@ export function SwapCreateWizard({ schedules, employees, employeeId, employeeNam
             <SwapScrollRegion key="review" className={styles.reviewContent} tabIndex={0} role="region" aria-label={t("Review details")}>
             {previewQuery.isFetching && <p role="status">{t("Loading...")}</p>}
             {preview && previewMatches && !previewQuery.error && <>
+              {requirePickupApproval ? <p role="note">{t("Manager approval is required when the shift owner or recipient has an employment contract.")}</p> : null}
               <ReviewShiftCard shift={preview.source} selection={source} />
               {preview.requestKind === "exchange" && preview.return && <>
                 <div className={styles.exchangeArrows} aria-label={t("Reciprocal exchange")}><ExchangeIcon /></div>

@@ -845,6 +845,9 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, TimeProvider? 
             entity.HasIndex(x => new { x.ScheduleId, x.Status, x.CreatedAtUtc });
             entity.HasIndex(x => new { x.EmployeeId, x.Status, x.CreatedAtUtc });
             entity.HasIndex(x => new { x.ShiftSwapRequestId, x.Status });
+            entity.HasIndex(x => x.ShiftSwapRequestId).IsUnique()
+                .HasDatabaseName("ux_contract_approval_one_pending_claim_per_offer")
+                .HasFilter("kind='claim' AND status='pending' AND shift_swap_request_id IS NOT NULL");
             entity.HasIndex(x => new { x.EmployeeId, x.ShiftSwapRequestId, x.FromTime, x.ToTime }).IsUnique()
                 .HasFilter("kind='claim' AND status='pending'");
             entity.HasIndex(x => new { x.EmployeeId, x.ScheduleSlotId }).IsUnique()

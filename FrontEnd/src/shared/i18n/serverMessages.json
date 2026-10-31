@@ -127,5 +127,10 @@
   "Availability is set automatically by your employment contract and cannot be edited.",
   "Manager approval required; pending requests do not reserve the offer.",
   "Monthly minimum exception required.",
-  "Only the reviewing manager can execute an approval."
+  "Only the reviewing manager can execute an approval.",
+  "Awaiting manager approval",
+  "This offer is awaiting manager approval.",
+  "The offer is reserved while this pickup request awaits manager approval.",
+  "The offer was cancelled by its owner.",
+  "Superseded by exclusive pending pickup request."
 ]

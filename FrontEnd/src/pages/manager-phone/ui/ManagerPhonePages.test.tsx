@@ -40,7 +40,8 @@ beforeEach(() => {
   if (mode === "error") return Response.json({ detail: "offline" }, { status: 503 });
   if (mode === "empty") return Response.json([]);
   let data: unknown = [];
-  if (path === "/api/containers") data = [container];
+  if (path === "/api/employment-contract-settings") data = { automaticWeekdayAvailability: false };
+  else if (path === "/api/containers") data = [container];
   else if (path === "/api/containers/1") data = container;
   else if (path === "/api/containers/1/graphs") data = [graph, { ...graph, id: 6, name: "Public schedule", publicationStatus: "public" }];
   else if (path === "/api/containers/1/graphs/3") data = graph;

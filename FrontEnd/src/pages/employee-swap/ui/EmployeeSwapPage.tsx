@@ -159,6 +159,12 @@ function SwapOfferCard({ swap, isPinned, highlighted, onTogglePin, onViewDetails
             {isOpen && swap.isCreatedByCurrentEmployee ? <EmployeeIcon size={12} /> : (isOpen ? swap.canAccept : swap.status === "accepted") ? <CheckIcon size={13} /> : <WarnIcon size={13} />}
             <span>{availabilityLabel}</span>
           </span>
+          {swap.pickupApprovalPolicyApplies && <span className={`${styles.badge} ${styles.badgeApproval}`} title={t("Manager approval is required when the shift owner or recipient has an employment contract.")}>
+            {t("Manager approval")}
+          </span>}
+          {isOpen && swap.isAwaitingManagerApproval && <span className={`${styles.badge} ${styles.badgeApproval}`}>
+            {t("Awaiting approval")}
+          </span>}
           {swap.allowPartialAcceptance === true && swap.requestKind !== "exchange" && <span className={`${styles.badge} ${styles.badgePartial}`}>
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg>
             <span>{t("Partial")}</span>
@@ -362,7 +368,7 @@ export function EmployeeSwapPage() {
   };
 
   const handleAccept = (swap: ShiftSwap, claimedPeriod?: SwapPeriod) => {
-    if (swap.status !== "open" || !swap.canAccept || swap.approvalPendingForCurrentEmployee || isActionBusy || acceptInFlightRef.current) return;
+    if (swap.status !== "open" || !swap.canAccept || swap.isAwaitingManagerApproval || (swap.requiresManagerApproval && !swap.canRequestManagerApproval) || swap.approvalPendingForCurrentEmployee || isActionBusy || acceptInFlightRef.current) return;
     setActionError(null);
     flushSync(() => { closeDetails(); setIsHistoryExpanded(false); });
     setPendingAcceptSwap({ swap, claimedPeriod });
@@ -371,7 +377,7 @@ export function EmployeeSwapPage() {
   const handleConfirmAccept = () => {
     if (!pendingAcceptSwap || isActionBusy || acceptInFlightRef.current) return;
     const currentSwap = swaps.find(swap => swap.id === pendingAcceptSwap.id);
-    if (!currentSwap || currentSwap.status !== "open" || !currentSwap.canAccept) {
+    if (!currentSwap || currentSwap.status !== "open" || !currentSwap.canAccept || currentSwap.isAwaitingManagerApproval || currentSwap.approvalPendingForCurrentEmployee || (currentSwap.requiresManagerApproval && !currentSwap.canRequestManagerApproval)) {
       setPendingAcceptSwap(null);
       setActionError(t("This offer is no longer available. The swap list has been refreshed."));
       void queryClient.invalidateQueries({ queryKey: queryKeys.shiftSwaps.all });
@@ -562,7 +568,7 @@ export function EmployeeSwapPage() {
               <p>{item.scheduleName} · {item.dayOfMonth}.{item.month}.{item.year} · {item.fromTime}–{item.toTime}</p>
               <span>{({ pending: t("Pending"), approved: t("Approved"), rejected: t("Rejected"), cancelled: t("Cancelled"), expired: t("Expired") } as const)[item.status]}</span>
               {item.failureReason ? <p>{translateServerMessage(item.failureReason)}</p> : null}
-              {item.status === "pending" ? <><p>{t("Pending requests do not reserve offers. Schedules change only after approval.")}</p>
+              {item.status === "pending" ? <><p>{t(item.kind === "claim" ? "The offer is reserved while this pickup request awaits manager approval." : "Monthly minimum exception required.")}</p>
                 <button type="button" disabled={cancelApprovalMutation.isPending} onClick={() => cancelApprovalMutation.mutate(item.id, {
                   onError: error => setActionError(getErrorMessage(error, t("Could not cancel this request."))),
                 })}>{t("Cancel request")}</button></> : null}
@@ -592,6 +598,7 @@ export function EmployeeSwapPage() {
       {isGiveAwayExpanded && employeeId && <SwapCreateWizard
         returnFocusRef={createOfferTriggerRef}
         schedules={schedules} employees={targetEmployees} employeeId={employeeId} employeeName={session?.displayName ?? ""} swaps={swaps}
+        requirePickupApproval={contractSettingsQuery.data?.requirePickupApproval}
         restrictToEightHours={restrictToEightHours}
         busy={createSwapMutation.isPending || exceptionMutation.isPending} error={actionError || (loadError ? getErrorMessage(loadError, t("Could not load swap data.")) : null)}
         onClose={() => { setIsGiveAwayExpanded(false); createOfferTriggerRef.current?.focus({ preventScroll: true }); }}
@@ -614,7 +621,7 @@ export function EmployeeSwapPage() {
         open={pendingAcceptSwap !== null}
         variant="confirm"
         title={t(pendingAcceptSwap?.requiresManagerApproval ? "Request manager approval?" : "Accept this shift?")}
-        message={pendingAcceptSwap?.requiresManagerApproval ? t("Pending requests do not reserve offers. Schedules change only after approval.") : pendingAcceptSwap?.requestKind === "exchange" ? t(
+        message={pendingAcceptSwap?.requiresManagerApproval ? t("Send request to manager? The offer will be reserved until a decision.") : pendingAcceptSwap?.requestKind === "exchange" ? t(
           "Accept exchange: you receive {0} on {1}, {2}–{3}, and give {4} on {5}, {6}–{7}, to {8}? Both schedules update together.",
           pendingAcceptSwap.scheduleName, formatSwapDate(pendingAcceptSwap), pendingAcceptSwap.fromTime, pendingAcceptSwap.toTime,
           pendingAcceptSwap.returnScheduleName ?? "", `${String(pendingAcceptSwap.returnDayOfMonth).padStart(2, "0")}.${String(pendingAcceptSwap.returnMonth).padStart(2, "0")}.${pendingAcceptSwap.returnYear}`,

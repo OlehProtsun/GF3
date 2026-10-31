@@ -13,6 +13,8 @@ export type ShiftSwapScheduleSnapshot = {
 };
 
 export type ShiftSwap = {
+  isAwaitingManagerApproval?: boolean;
+  pickupApprovalPolicyApplies?: boolean;
   requiresManagerApproval?: boolean;
   canRequestManagerApproval?: boolean;
   approvalPendingForCurrentEmployee?: boolean;

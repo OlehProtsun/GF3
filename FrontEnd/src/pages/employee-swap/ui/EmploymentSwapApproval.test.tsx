@@ -3,21 +3,28 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { setLanguage } from "@shared/i18n";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, expect, test, vi } from "vitest";
+import { shiftSwapApprovalsApi as approvalApi } from "@entities/shift-swap-approvals/api/shiftSwapApprovalsApi";
+import type { ContractShiftApproval } from "@entities/shift-swap-approvals";
+import { queryKeys } from "@shared/api/queryKeys";
 import type { EmployeeSchedule } from "@entities/employee-schedule";
 import type { ShiftSwap, ShiftSwapEmployee } from "@entities/shift-swaps";
 import { EmployeeSwapPage } from "./EmployeeSwapPage";
 import { SwapOfferDetailsDialog } from "./SwapOfferDetailsDialog";
 import { BrowserRouter } from "react-router-dom";
 
-const contract = vi.hoisted(() => ({ claim: vi.fn(), exception: vi.fn(), pending: false }));
-vi.mock("@features/employee-profile/api/queries", () => ({ useEmployeeProfileQuery: () => ({ data: { contractType: "o_prace" } }) }));
-vi.mock("@entities/employment-contracts", () => ({ useEmploymentContractSettingsQuery: () => ({ data: { restrictSwapsToEightHours: true } }) }));
-vi.mock("@entities/shift-swap-approvals", () => ({
-  useEmployeeContractApprovalsQuery: () => ({ data: [], error: null }),
-  useCreateContractClaimMutation: () => ({ mutate: contract.claim, isPending: contract.pending }),
-  useCreateGiveawayExceptionMutation: () => ({ mutate: contract.exception, isPending: false }),
-  useCancelContractApprovalMutation: () => ({ mutate: vi.fn(), isPending: false }),
-}));
+const contract = vi.hoisted(() => ({ claim: vi.fn(), exception: vi.fn(), pending: false, actual: false, profileContract: "o_prace" }));
+vi.mock("@features/employee-profile/api/queries", () => ({ useEmployeeProfileQuery: () => ({ data: { contractType: contract.profileContract } }) }));
+vi.mock("@entities/employment-contracts", () => ({ useEmploymentContractSettingsQuery: () => ({ data: { restrictSwapsToEightHours: true, requirePickupApproval: true } }) }));
+vi.mock("@entities/shift-swap-approvals/api/shiftSwapApprovalsApi", () => ({ shiftSwapApprovalsApi: { mine: vi.fn(), claim: vi.fn(), cancel: vi.fn() } }));
+vi.mock("@entities/shift-swap-approvals", async original => {
+  const actual = await original<typeof import("@entities/shift-swap-approvals")>();
+  return {
+    useEmployeeContractApprovalsQuery: () => contract.actual ? actual.useEmployeeContractApprovalsQuery() : ({ data: [], error: null }),
+    useCreateContractClaimMutation: () => contract.actual ? actual.useCreateContractClaimMutation() : ({ mutate: contract.claim, isPending: contract.pending }),
+    useCreateGiveawayExceptionMutation: () => ({ mutate: contract.exception, isPending: false }),
+    useCancelContractApprovalMutation: actual.useCancelContractApprovalMutation,
+  };
+});
 const mocks = vi.hoisted(() => ({
   schedulesQuery: vi.fn(),
   swapsQuery: vi.fn(),
@@ -235,20 +242,20 @@ beforeEach(() => {
   mocks.employeesQuery.mockReturnValue({ data: targetEmployees, isLoading: false, error: null });
 });
 
-beforeEach(() => { contract.claim.mockReset(); contract.exception.mockReset(); contract.pending = false; });
+beforeEach(() => { contract.claim.mockReset(); contract.exception.mockReset(); contract.pending = false; contract.actual = false; contract.profileContract = "o_prace"; vi.mocked(approvalApi.mine).mockReset().mockResolvedValue([]); vi.mocked(approvalApi.cancel).mockReset(); vi.mocked(approvalApi.claim).mockReset(); });
 test("approval-required claim invokes only the pending route, without an instant transfer", async () => {
   mocks.swapsQuery.mockReturnValue({ data: [createSwap({requiresManagerApproval:true,canRequestManagerApproval:true})],error:null });
   renderPage(); const user = userEvent.setup();
   await user.click(screen.getByRole("button",{name:"View offer details for May Schedule"}));
   await user.click(screen.getByRole("button",{name:"Request manager approval"}));
-  expect(screen.getByRole("dialog",{name:"Request manager approval?"})).toHaveTextContent("do not reserve offers");
+  expect(screen.getByRole("dialog",{name:"Request manager approval?"})).toHaveTextContent("The offer will be reserved until a decision.");
   await user.click(screen.getByRole("button",{name:"Request manager approval"}));
   expect(contract.claim).toHaveBeenCalledWith({id:5},expect.anything()); expect(mocks.acceptMutate).not.toHaveBeenCalled();
 });
 test("pending requests prevent duplicate claim actions", () => {
   const onAccept = vi.fn(); render(<SwapOfferDetailsDialog swap={createSwap({requiresManagerApproval:true,approvalPendingForCurrentEmployee:true})}
     currentEmployeeId={12} busy={false} onClose={vi.fn()} onAccept={onAccept} onCancel={vi.fn()} />);
-  expect(screen.getByRole("button",{name:"Manager approval pending"})).toBeDisabled(); expect(onAccept).not.toHaveBeenCalled();
+  expect(screen.getByRole("button",{name:"Awaiting manager approval"})).toBeDisabled(); expect(onAccept).not.toHaveBeenCalled();
 });
 test("whole-shift contract disables shortened source controls", async () => {
   renderPage(); const user = userEvent.setup(); await user.click(screen.getByRole("button",{name:"Create offer"}));
@@ -270,4 +277,86 @@ test("below-minimum preview offers an explicit exception action and blocks publi
   const dialog = screen.getByRole("dialog"); await waitFor(() => expect(within(dialog).getByRole("button",{name:"Request exception"})).toBeEnabled());
   expect(within(dialog).getByRole("button",{name:"Send request"})).toBeDisabled();
   await user.click(within(dialog).getByRole("button",{name:"Request exception"})); expect(contract.exception).toHaveBeenCalledTimes(1); expect(mocks.createMutate).not.toHaveBeenCalled();
+});
+
+
+test("public offers show a contract-specific policy badge and held offers disable other recipients", async () => {
+  const held = createSwap({ pickupApprovalPolicyApplies: true, isAwaitingManagerApproval: true, canAccept: false, requiresManagerApproval: false });
+  mocks.swapsQuery.mockReturnValue({ data: [held], error: null }); renderPage();
+  expect(screen.getByText("Manager approval").closest("[title]")).toHaveAttribute("title", "Manager approval is required when the shift owner or recipient has an employment contract.");
+  expect(screen.getByText("Awaiting approval")).toBeInTheDocument();
+  await userEvent.setup().click(screen.getByRole("button", { name: "View offer details for May Schedule" }));
+  expect(screen.getByRole("button", { name: "Awaiting manager approval" })).toBeDisabled();
+  expect(screen.getByRole("status")).toHaveTextContent("This offer is awaiting manager approval.");
+  expect(screen.getByText("This offer is unavailable to others while manager approval is pending.")).toBeInTheDocument();
+  expect(mocks.acceptMutate).not.toHaveBeenCalled();
+});
+
+test("a live reservation arriving during confirmation prevents the stale acceptance", async () => {
+  mocks.swapsQuery.mockReturnValue({ data: [createSwap({ requiresManagerApproval: true, canRequestManagerApproval: true })], error: null });
+  const view = renderPage(); const user = userEvent.setup();
+  await user.click(screen.getByRole("button", { name: "View offer details for May Schedule" }));
+  await user.click(screen.getByRole("button", { name: "Request manager approval" }));
+  mocks.swapsQuery.mockReturnValue({ data: [createSwap({ isAwaitingManagerApproval: true, canAccept: false })], error: null });
+  view.rerender(<QueryClientProvider client={queryClient}><BrowserRouter><EmployeeSwapPage /></BrowserRouter></QueryClientProvider>);
+  await user.click(screen.getByRole("button", { name: "Request manager approval" }));
+  expect(contract.claim).not.toHaveBeenCalled(); expect(mocks.acceptMutate).not.toHaveBeenCalled();
+  expect(screen.getByText("This offer is no longer available. The swap list has been refreshed.")).toBeInTheDocument();
+});
+
+test("successful request and requester cancellation invalidate the offer lists", async () => {
+  contract.actual = true;
+  const pending: ContractShiftApproval = { id: 1, kind: "claim", status: "pending", employeeId: 12, employeeName: "Owner Worker", scheduleId: 10,
+    scheduleSlotId: 100, scheduleName: "May Schedule", shopId: 4, shopName: "Central Shop", year: 2026, month: 5, dayOfMonth: 1,
+    fromTime: "08:00", toTime: "16:00", shiftSwapRequestId: 5, createdAtUtc: "2026-05-01T00:00:00Z", isStale: false };
+  vi.mocked(approvalApi.claim).mockImplementation(async () => { vi.mocked(approvalApi.mine).mockResolvedValue([pending]); return pending; });
+  vi.mocked(approvalApi.cancel).mockImplementation(async () => { const cancelled = { ...pending, status: "cancelled" as const }; vi.mocked(approvalApi.mine).mockResolvedValue([cancelled]); return cancelled; });
+  const invalidate = vi.spyOn(queryClient, "invalidateQueries");
+  mocks.swapsQuery.mockReturnValue({ data: [createSwap({ requiresManagerApproval: true, canRequestManagerApproval: true })], error: null });
+  renderPage(); const user = userEvent.setup();
+  await user.click(screen.getByRole("button", { name: "View offer details for May Schedule" }));
+  await user.click(screen.getByRole("button", { name: "Request manager approval" }));
+  await user.click(screen.getByRole("button", { name: "Request manager approval" }));
+  await waitFor(() => expect(approvalApi.claim).toHaveBeenCalledWith({ id: 5 }));
+  await waitFor(() => expect(invalidate).toHaveBeenCalledWith({ queryKey: queryKeys.shiftSwaps.all }));
+  await user.click(screen.getByRole("button", { name: "Swap history" }));
+  await user.click(await screen.findByRole("button", { name: "Cancel request" }));
+  await waitFor(() => expect(approvalApi.cancel).toHaveBeenCalledWith(1));
+  await waitFor(() => expect(screen.getByRole("region", { name: "My approval requests" })).toHaveTextContent("Cancelled"));
+  expect(invalidate.mock.calls.filter(([input]) => input.queryKey === queryKeys.shiftSwaps.all).length).toBeGreaterThanOrEqual(2);
+});
+
+test("publication review shows the employment-contract pickup notice before sending", async () => {
+  mocks.preview.mockImplementation((payload: { fromTime: string; toTime: string; scheduleSlotId: number; targetEmployeeId?: number } | null) => ({ data: payload ? {
+    requestKind: "give", targetEmployeeId: payload.targetEmployeeId, targetEmployeeName: "Everyone", isValid: true, allowPartialAcceptance: false,
+    source: { slotId: payload.scheduleSlotId, scheduleId: 10, scheduleName: "May Schedule", shopName: "Central Shop", year: 2026, month: 5, dayOfMonth: 1,
+      fromTime: payload.fromTime, toTime: payload.toTime, durationMinutes: 480 }, projectedMonths: [],
+  } : undefined, isFetching: false }));
+  renderPage(); const user = userEvent.setup(); await user.click(screen.getByRole("button", { name: "Create offer" }));
+  await user.click(screen.getByRole("button", { name: /May Schedule/ })); await user.click(screen.getByRole("radio", { name: /08:00.*16:00/ }));
+  await user.click(screen.getByRole("button", { name: "Confirm shift" }));
+  await user.click(screen.getByRole("button", { name: "Continue" })); await user.click(screen.getByRole("button", { name: "Continue" }));
+  expect(screen.getByRole("note")).toHaveTextContent("Manager approval is required when the shift owner or recipient has an employment contract.");
+  expect(mocks.createMutate).not.toHaveBeenCalled();
+});
+
+
+test("an ineligible approval recipient has no request action", () => {
+  render(<SwapOfferDetailsDialog swap={createSwap({ requiresManagerApproval: true, canRequestManagerApproval: false, canAccept: false })}
+    currentEmployeeId={12} busy={false} onClose={vi.fn()} onAccept={vi.fn()} onCancel={vi.fn()} />);
+  expect(screen.queryByRole("button", { name: "Request manager approval" })).toBeNull();
+  expect(screen.getByRole("button", { name: "Not available" })).toBeDisabled();
+});
+
+
+test("an owner's contract approval flag routes a zlecenie recipient through claims even on repeated confirmation", async () => {
+  contract.profileContract = "zlecenie";
+  mocks.swapsQuery.mockReturnValue({ data: [createSwap({ requiresManagerApproval: true, canRequestManagerApproval: true, pickupApprovalPolicyApplies: true })], error: null });
+  renderPage(); const user = userEvent.setup();
+  await user.click(screen.getByRole("button", { name: "View offer details for May Schedule" }));
+  expect(screen.queryByRole("button", { name: "Accept shift" })).toBeNull();
+  await user.click(screen.getByRole("button", { name: "Request manager approval" }));
+  await user.dblClick(screen.getByRole("button", { name: "Request manager approval" }));
+  expect(contract.claim).toHaveBeenCalledTimes(1);
+  expect(mocks.acceptMutate).not.toHaveBeenCalled();
 });

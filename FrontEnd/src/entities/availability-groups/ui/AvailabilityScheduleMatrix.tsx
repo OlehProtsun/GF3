@@ -6,6 +6,7 @@ import { ContainerGraphMatrix } from "@entities/containers";
 import {
   AVAILABILITY_ANY_MARK,
   AVAILABILITY_NONE_MARK,
+  getAvailabilityCellKey,
   normalizeAvailabilityCellValue,
   parseAvailabilityCode,
   type AvailabilityMatrixCellMap,
@@ -23,6 +24,7 @@ type AvailabilityScheduleMatrixProps = {
   title?: string;
   helperText?: string;
   readOnly?: boolean;
+  readOnlyCellKeys?: ReadonlySet<string>;
   emptyMessage?: string;
   cellErrors?: Record<string, string>;
   className?: string;
@@ -50,6 +52,7 @@ export function AvailabilityScheduleMatrix({
   title = t("Availability Schedule"),
   helperText = t("Use {0} for any shift, {1} for unavailable, a time interval like 08:00 - 16:00, or any text note. Text notes stay visible but are treated as unavailable during schedule generation.", AVAILABILITY_ANY_MARK, AVAILABILITY_NONE_MARK),
   readOnly = false,
+  readOnlyCellKeys,
   emptyMessage,
   cellErrors = {},
   className,
@@ -78,10 +81,13 @@ export function AvailabilityScheduleMatrix({
         label: column.label,
         minHoursMonth: null,
         totalMinutes: 0,
-        totalText: getAvailabilityMemberLastModifiedLabel(column.employeeLastModifiedAtUtc),
+        totalText: [
+          getAvailabilityMemberLastModifiedLabel(column.employeeLastModifiedAtUtc),
+          readOnlyCellKeys?.has(getAvailabilityCellKey(column.employeeId, 1)) ? t("Automatic availability (read-only)") : null,
+        ].filter(Boolean).join(" · "),
       })),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- Translation helpers read the current language internally.
-    [columns, language],
+    [columns, readOnlyCellKeys, language],
   );
   const normalizedBindValueByKey = useMemo(() => {
     if (!bindValueByKey || bindValueByKey.size === 0) {
@@ -110,6 +116,7 @@ export function AvailabilityScheduleMatrix({
       visualHintMap={visualHintMap}
       lockVisualHintCells
       readOnly={readOnly}
+      readOnlyCellKeys={readOnlyCellKeys}
       emptyMessage={
         emptyMessage ??
         (readOnly

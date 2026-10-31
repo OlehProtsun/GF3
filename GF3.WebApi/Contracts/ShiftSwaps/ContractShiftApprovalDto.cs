@@ -7,6 +7,14 @@ public sealed class ContractShiftApprovalDto
     public string Status { get; set; } = "pending";
     public int EmployeeId { get; set; }
     public string EmployeeName { get; set; } = "";
+    public int? FromEmployeeId { get; set; }
+    public string? FromEmployeeName { get; set; }
+    public int? ToEmployeeId { get; set; }
+    public string? ToEmployeeName { get; set; }
+    public bool? IsManagerCreated { get; set; }
+    public int? ReturnDayOfMonth { get; set; }
+    public int? ReturnYear { get; set; }
+    public int? ReturnMonth { get; set; }
     public int ScheduleId { get; set; }
     public int ScheduleSlotId { get; set; }
     public string ScheduleName { get; set; } = "";

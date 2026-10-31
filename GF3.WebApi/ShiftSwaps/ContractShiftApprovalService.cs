@@ -33,6 +33,12 @@ public sealed class ContractShiftApprovalService(AppDbContext db, ShiftSwapExecu
             catch (DbUpdateException exception) when (exception.InnerException is SqliteException { SqliteExtendedErrorCode: 2067 })
             {
                 await transaction.RollbackAsync(ct);
+                await transaction.DisposeAsync();
+                db.Entry(draft).State = EntityState.Detached;
+                if (draft.Kind == "claim" && !await db.ContractShiftApprovalRequests.AsNoTracking().AnyAsync(x =>
+                    x.Kind == "claim" && x.Status == "pending" && x.EmployeeId == employeeId &&
+                    x.ShiftSwapRequestId == draft.ShiftSwapRequestId && x.FromTime == draft.FromTime && x.ToTime == draft.ToTime, ct))
+                    throw new ContractShiftConflictException("CONTRACT_OFFER_PENDING_APPROVAL", "This offer is awaiting manager approval.");
                 throw new ContractShiftConflictException("CONTRACT_DUPLICATE_PENDING", "An equivalent approval request is already pending.");
             }
         }
@@ -109,18 +115,35 @@ public sealed class ContractShiftApprovalService(AppDbContext db, ShiftSwapExecu
     {
         var scheduleIds = approvals.Select(x => x.ScheduleId).ToArray();
         var schedules = await db.Schedules.AsNoTracking().Include(x => x.Shop).Where(x => scheduleIds.Contains(x.Id)).ToDictionaryAsync(x => x.Id, ct);
-        var employeeIds = approvals.Select(x => x.EmployeeId).ToArray();
+        var offerIds = approvals.Where(x => x.ShiftSwapRequestId.HasValue).Select(x => x.ShiftSwapRequestId!.Value).Distinct().ToArray();
+        var offers = await db.ShiftSwapRequests.AsNoTracking().Where(x => offerIds.Contains(x.Id)).ToDictionaryAsync(x => x.Id, ct);
+        var histories = await db.ShiftSwapHistories.AsNoTracking().Where(x => offerIds.Contains(x.SourceShiftSwapRequestId))
+            .ToDictionaryAsync(x => x.SourceShiftSwapRequestId, ct);
+        var employeeIds = approvals.SelectMany(x => new int?[] { x.EmployeeId, x.TargetEmployeeId })
+            .Concat(offers.Values.Select(x => x.FromEmployeeId)).Where(x => x.HasValue).Select(x => x!.Value).Distinct().ToArray();
         var employees = await db.Employees.AsNoTracking().Where(x => employeeIds.Contains(x.Id)).ToDictionaryAsync(x => x.Id, ct);
+        string? Name(int? id) => id is { } value && employees.TryGetValue(value, out var person) ? $"{person.FirstName} {person.LastName}" : null;
         var result = new List<ContractShiftApprovalDto>();
         foreach (var approval in approvals)
         {
-            var schedule = schedules[approval.ScheduleId];
+            schedules.TryGetValue(approval.ScheduleId, out var schedule);
+            var offer = approval.ShiftSwapRequestId is { } offerId ? offers.GetValueOrDefault(offerId) : null;
+            var archived = offer is not null && ShiftSwapArchive.IsArchived(offer) ? ShiftSwapArchive.ReadView(offer.ArchivedViewsJson!, 0) : null;
+            var isClaim = approval.Kind == "claim";
+            var history = isClaim && approval.Status == "approved" && approval.ShiftSwapRequestId is { } historyOfferId
+                && histories.TryGetValue(historyOfferId, out var completed) && completed.AcceptedByEmployeeId == approval.EmployeeId ? completed : null;
+            var fromId = isClaim ? history is not null ? history.FromEmployeeId : archived is not null ? archived.FromEmployeeId : offer?.FromEmployeeId : approval.EmployeeId;
+            var toId = isClaim ? approval.EmployeeId : approval.TargetEmployeeId;
             var dto = new ContractShiftApprovalDto
             {
                 Id = approval.Id, Kind = approval.Kind, Status = approval.Status, EmployeeId = approval.EmployeeId,
-                EmployeeName = employees.TryGetValue(approval.EmployeeId, out var employee) ? $"{employee.FirstName} {employee.LastName}" : "",
-                ScheduleId = approval.ScheduleId, ScheduleSlotId = approval.ScheduleSlotId, ScheduleName = schedule.Name,
-                ShopId = approval.ShopId, ShopName = schedule.Shop.Name, Year = approval.Year, Month = approval.Month,
+                EmployeeName = Name(approval.EmployeeId) ?? "",
+                FromEmployeeId = fromId, FromEmployeeName = isClaim ? history?.FromEmployeeName ?? archived?.FromEmployeeName ?? Name(fromId) : Name(fromId),
+                ToEmployeeId = toId, ToEmployeeName = history?.AcceptedByEmployeeName ?? Name(toId),
+                IsManagerCreated = isClaim ? history?.IsManagerCreated ?? archived?.IsManagerCreated ?? offer?.IsManagerCreated : false,
+                ReturnDayOfMonth = approval.ReturnOriginalDayOfMonth, ReturnYear = approval.ReturnYear, ReturnMonth = approval.ReturnMonth,
+                ScheduleId = approval.ScheduleId, ScheduleSlotId = approval.ScheduleSlotId, ScheduleName = schedule?.Name ?? "",
+                ShopId = approval.ShopId, ShopName = schedule?.Shop.Name ?? "", Year = approval.Year, Month = approval.Month,
                 DayOfMonth = approval.OriginalDayOfMonth,
                 FromTime = approval.FromTime, ToTime = approval.ToTime, ShiftSwapRequestId = approval.ShiftSwapRequestId,
                 ResultingShiftSwapRequestId = approval.ResultingShiftSwapRequestId, TargetEmployeeId = approval.TargetEmployeeId,
@@ -128,9 +151,9 @@ public sealed class ContractShiftApprovalService(AppDbContext db, ShiftSwapExecu
                 ReturnFromTime = approval.ReturnFromTime, ReturnToTime = approval.ReturnToTime, CreatedAtUtc = approval.CreatedAtUtc,
                 ReviewedAtUtc = approval.ReviewedAtUtc, ReviewedByManagerId = approval.ReviewedByManagerId, CancelledAtUtc = approval.CancelledAtUtc,
                 IsStale = approval.Status == "expired", FailureReason = approval.FailureReason,
-                ApprovalReason = approval.Kind == "claim" ? "Manager approval required; pending requests do not reserve the offer." : "Monthly minimum exception required.",
+                ApprovalReason = approval.Kind == "claim" ? "The offer is reserved while this pickup request awaits manager approval." : "Monthly minimum exception required.",
             };
-            if (approval.Status == "pending" && employees[approval.EmployeeId].IsDeleted == false)
+            if (approval.Status == "pending" && employees.TryGetValue(approval.EmployeeId, out var employee) && !employee.IsDeleted)
             {
                 var outgoing = approval.Kind == "below_minimum_give" ? schedule : approval.RequestKind == "exchange" && approval.ReturnScheduleId is { } returnId
                     ? await db.Schedules.AsNoTracking().Include(x => x.Shop).SingleOrDefaultAsync(x => x.Id == returnId, ct) : null;

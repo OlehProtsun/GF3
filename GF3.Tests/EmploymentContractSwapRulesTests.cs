@@ -1,4 +1,5 @@
 using BusinessLogicLayer.Common;
+using BusinessLogicLayer.Contracts.Employees;
 using BusinessLogicLayer.Services;
 using DataAccessLayer.Models;
 using DataAccessLayer.Models.Enums;
@@ -10,6 +11,25 @@ namespace GF3.Tests;
 
 public sealed class EmploymentContractSwapRulesTests
 {
+    [Theory]
+    [InlineData("o_prace", "zlecenie", true, false, true)]
+    [InlineData("o_prace", "o_prace", true, false, true)]
+    [InlineData("zlecenie", "o_prace", true, false, true)]
+    [InlineData("zlecenie", "zlecenie", true, false, false)]
+    [InlineData("o_prace", "zlecenie", false, false, false)]
+    [InlineData("o_prace", "o_prace", false, false, false)]
+    [InlineData("zlecenie", "o_prace", false, false, false)]
+    [InlineData("zlecenie", "zlecenie", false, false, false)]
+    [InlineData("o_prace", "zlecenie", true, true, false)]
+    [InlineData("o_prace", "o_prace", true, true, true)]
+    public void PickupApprovalUsesEitherParticipantAndIgnoresAStoredOwnerForManagerOffers(
+        string owner, string recipient, bool enabled, bool manual, bool expected)
+    {
+        var offer = new ShiftSwapRequestModel { FromEmployeeId = 1, IsManagerCreated = manual };
+        Assert.Equal(expected, EmploymentSwapRules.RequiresPickupApproval(offer, 2,
+            new EmploymentContractSettingsSnapshot(RequirePickupApproval: enabled), new Dictionary<int, string> { [1] = owner, [2] = recipient }));
+    }
+
     [Theory]
     [InlineData("09:00","17:00","09:00","17:00",true)]
     [InlineData("09:00","16:59","09:00","16:59",false)]

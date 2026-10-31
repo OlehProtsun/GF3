@@ -1,3 +1,7 @@
+import { useQueryClient } from "@tanstack/react-query";
+import { queryKeys } from "@shared/api/queryKeys";
+import { buildEffectiveManagerAvailabilityCellMap, getAutomaticManagerEmployeeIds, getAutomaticManagerAvailabilityCellKeys } from "@entities/availability-groups/model/automaticAvailability";
+import { useEmploymentContractSettingsQuery } from "@entities/employment-contracts";
 import { useLanguageRevision } from "@shared/i18n/useLanguageRevision";
 import { t } from "@shared/i18n";
 import { useMemo, useState } from "react";
@@ -443,6 +447,8 @@ export function AvailabilityEditPage() {
     : null;
   const canEdit = !editLockMessage && !isCheckingLocks;
 
+  const queryClient = useQueryClient();
+  const contractSettingsQuery = useEmploymentContractSettingsQuery();
   const groupQuery = useAvailabilityGroupByIdQuery(groupId);
   const membersQuery = useAvailabilityGroupMembersQuery(groupId);
   const slotsQuery = useAvailabilityGroupSlotsQuery(groupId);
@@ -511,6 +517,21 @@ export function AvailabilityEditPage() {
   const [activeRelatedHintCellKey, setActiveRelatedHintCellKey] = useState<string | null>(null);
 
   const employees = useMemo(() => employeesQuery.data ?? [], [employeesQuery.data]);
+  const automaticEmployeeIds = useMemo(
+    () => getAutomaticManagerEmployeeIds(selectedEmployeeIds, employees, contractSettingsQuery.data?.automaticWeekdayAvailability === true),
+    [selectedEmployeeIds, employees, contractSettingsQuery.data],
+  );
+  const effectiveCellMap = useMemo(
+    () => buildEffectiveManagerAvailabilityCellMap(cellMap, automaticEmployeeIds, year, month),
+    [cellMap, automaticEmployeeIds, year, month],
+  );
+  const readOnlyCellKeys = useMemo(
+    () => getAutomaticManagerAvailabilityCellKeys(automaticEmployeeIds, year, month),
+    [automaticEmployeeIds, year, month],
+  );
+  const hasUnresolvedEmployees = Boolean(employeesQuery.data) && selectedEmployeeIds.some(id => !employees.some(employee => employee.id === id));
+  const hasPolicyError = contractSettingsQuery.isError || employeesQuery.isError || hasUnresolvedEmployees;
+  const isPolicyLoading = !hasPolicyError && (!contractSettingsQuery.data || !employeesQuery.data);
   const employeeNameById = useMemo(() => {
     return new Map(employees.map(employee => [employee.id, getEmployeeFullName(employee)]));
   }, [employees]);
@@ -561,7 +582,10 @@ export function AvailabilityEditPage() {
     () => buildAvailabilityTransferSourceHintData(transferPreviewQuery.data ?? []),
     [transferPreviewQuery.data],
   );
-  const transferVisualHintMap = transferVisualHintData.visualHintMap;
+  const transferVisualHintMap = useMemo(
+    () => Object.fromEntries(Object.entries(transferVisualHintData.visualHintMap).filter(([key]) => !readOnlyCellKeys.has(key))),
+    [transferVisualHintData.visualHintMap, readOnlyCellKeys],
+  );
   const activeRelatedHint = activeRelatedHintCellKey
     ? transferVisualHintData.detailMap[activeRelatedHintCellKey] ?? null
     : null;
@@ -610,8 +634,8 @@ export function AvailabilityEditPage() {
   const assignedEmployees = useMemo(() => {
     return columns.map(column => ({
       id: column.employeeId,
-      label: column.label,
-      canChooseFromAnother: (transferPreviewQuery.data ?? []).some(source =>
+      label: automaticEmployeeIds.has(column.employeeId) ? `${column.label} — ${t("Automatic availability (read-only)")}` : column.label,
+      canChooseFromAnother: !automaticEmployeeIds.has(column.employeeId) && (transferPreviewQuery.data ?? []).some(source =>
         source.employeeId === column.employeeId && source.days.some(day => {
           const cellKey = getAvailabilityCellKey(column.employeeId, day.dayOfMonth);
           const parsedTarget = parseAvailabilityCode(cellMap[cellKey] ?? "-");
@@ -621,7 +645,7 @@ export function AvailabilityEditPage() {
             !stagedTransferCellKeys.has(cellKey);
         })),
     }));
-  }, [cellMap, columns, stagedTransferCellKeys, transferPreviewQuery.data]);
+  }, [automaticEmployeeIds, cellMap, columns, stagedTransferCellKeys, transferPreviewQuery.data]);
 
   const selectedBindRow = useMemo(
     () => bindRows.find(bind => bind.clientId === resolvedSelectedBindClientId) ?? null,
@@ -638,10 +662,10 @@ export function AvailabilityEditPage() {
   const hasGroupLoadError = (groupQuery.isError || Boolean(groupQuery.error)) && !groupQuery.data;
   const hasMembersLoadError = (membersQuery.isError || Boolean(membersQuery.error)) && !membersQuery.data;
   const hasSlotsLoadError = (slotsQuery.isError || Boolean(slotsQuery.error)) && !slotsQuery.data;
-  const isLoading = !isCreate && (!groupQuery.data || !membersQuery.data || !slotsQuery.data) && (
+  const isLoading = isPolicyLoading || !isCreate && (!groupQuery.data || !membersQuery.data || !slotsQuery.data) && (
     groupQuery.isLoading || membersQuery.isLoading || slotsQuery.isLoading || groupQuery.isFetching || membersQuery.isFetching || slotsQuery.isFetching
   );
-  const hasLoadError =
+  const hasLoadError = hasPolicyError ||
     !isCreate &&
     (!Number.isFinite(parsedId) || (!isLoading && (hasGroupLoadError || hasMembersLoadError || hasSlotsLoadError)));
   const initialEditorSnapshot = useMemo(
@@ -798,6 +822,7 @@ export function AvailabilityEditPage() {
   };
 
   const handleChooseFromAnother = (employeeId: number) => {
+    if (isPolicyLoading || hasPolicyError || automaticEmployeeIds.has(employeeId)) return;
     setEditorState(current => ({
       ...current,
       editorError: undefined,
@@ -806,7 +831,7 @@ export function AvailabilityEditPage() {
   };
 
   const handleTransferConfirm = (sourceGroupId: number, dayOfMonths: number[]) => {
-    if (transferEmployeeId === null) {
+    if (transferEmployeeId === null || isPolicyLoading || hasPolicyError || automaticEmployeeIds.has(transferEmployeeId)) {
       return;
     }
 
@@ -836,6 +861,7 @@ export function AvailabilityEditPage() {
   };
 
   const handleCellChange = (employeeId: number, dayOfMonth: number, value: string) => {
+    if (isPolicyLoading || hasPolicyError || automaticEmployeeIds.has(employeeId)) return;
     const cellKey = getAvailabilityCellKey(employeeId, dayOfMonth);
 
     setEditorState((current) => {
@@ -1000,6 +1026,7 @@ export function AvailabilityEditPage() {
   };
 
   const handleSave = () => {
+    if (isPolicyLoading || hasPolicyError) return;
     if (editLockMessage) {
       setEditorState((current) => ({
         ...current,
@@ -1103,7 +1130,8 @@ export function AvailabilityEditPage() {
 
   return (
     <div className={styles.page}>
-      <p>{t("Employment contract availability is derived automatically for employees and generation. This editor retains the saved availability used when the rule is disabled.")}</p>
+      <p>{t("Automatic employment contract availability is read-only. Saved availability is restored when the rule is disabled.")}</p>
+      {hasPolicyError ? <button type="button" onClick={() => { void contractSettingsQuery.refetch(); void queryClient.invalidateQueries({ queryKey: queryKeys.employees.all }); }}>{t("Retry")}</button> : null}
       <PageHeader
         title={isCreate ? t("Add Availability") : t("Availability Edit")}
         subtitle={isCreate ? t("Create a new monthly availability schedule") : t("Update availability information, employees and day codes")}
@@ -1151,7 +1179,8 @@ export function AvailabilityEditPage() {
         selectedEmployeeId={selectedEmployeeId}
         assignedEmployees={assignedEmployees}
         columns={columns}
-        cellMap={cellMap}
+        cellMap={effectiveCellMap}
+        readOnlyCellKeys={readOnlyCellKeys}
         visualHintMap={transferVisualHintMap}
         cellErrors={cellErrors}
         binds={bindRows}

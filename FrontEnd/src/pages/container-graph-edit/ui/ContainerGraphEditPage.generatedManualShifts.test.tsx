@@ -3,6 +3,8 @@ import { beforeEach, expect, test, vi } from "vitest";
 import type { ComponentProps } from "react";
 import type { ContainerGraphEditor } from "@entities/containers/ui/ContainerGraphEditor";
 import type { Graph, GraphSlot, GraphCellStyle } from "@entities/containers/model/types";
+import type { Employee } from "@entities/employees/model/types";
+import type { AvailabilitySlot } from "@entities/availability-groups/model/types";
 import type { ShiftSwap } from "@entities/shift-swaps/model/types";
 import { buildGraphNoteContent, parseGraphNoteContent } from "@entities/containers/model/graphNote";
 import { setLanguage, t } from "@shared/i18n";
@@ -16,7 +18,9 @@ const mocks = vi.hoisted(() => ({
   location: { key: "test", pathname: "/container/1/graphs/1/edit", search: "?openGraphIds=1,2" },
   graphs: [] as Graph[], slots: [] as GraphSlot[], offers: [] as ShiftSwap[], styles: [] as GraphCellStyle[],
   graphEmployees: [{ id: 1, scheduleId: 1, employeeId: 1, displayOrder: 0 }],
-  employees: [{ id: 1, firstName: "Ada", lastName: "Lovelace", hasLoginAccount: true, isOnline: false }],
+  employees: [{ id: 1, firstName: "Ada", lastName: "Lovelace", hasLoginAccount: true, isOnline: false }] as Employee[],
+  contractSettings: { data: { automaticWeekdayAvailability: false } as { automaticWeekdayAvailability: boolean } | undefined, isError: false },
+  availabilitySlots: [] as AvailabilitySlot[],
   shops: [{ id: 1, name: "Shop" }], groups: [{ id: 1, name: "Availability", year: 2026, month: 2 }],
   members: [{ id: 1, employeeId: 1, displayOrder: 0 }], empty: [],
   container: { id: 1, name: "Container" },
@@ -64,11 +68,12 @@ vi.mock("@entities/containers", async importOriginal => {
     },
   };
 });
+vi.mock("@entities/employment-contracts", () => ({ useEmploymentContractSettingsQuery: () => mocks.contractSettings }));
 vi.mock("@entities/employees/api/queries", () => ({ useEmployeesListQuery: () => ({ data: mocks.employees }) }));
 vi.mock("@entities/shops/api/queries", () => ({ useShopsListQuery: () => ({ data: mocks.shops }) }));
 vi.mock("@entities/availability-groups", async importOriginal => ({ ...await importOriginal<object>(),
   useAvailabilityGroupsListQuery: () => ({ data: mocks.groups }), useAvailabilityGroupMembersQuery: () => ({ data: mocks.members }),
-  useAvailabilityGroupSlotsQuery: () => ({ data: mocks.empty }),
+  useAvailabilityGroupSlotsQuery: () => ({ data: mocks.availabilitySlots }),
 }));
 vi.mock("@entities/availability-binds", async importOriginal => ({ ...await importOriginal<object>(),
   useAvailabilityBindsListQuery: () => ({ data: mocks.empty }),
@@ -87,6 +92,9 @@ const preview = () => Array.from({ length: 28 }, (_, i): GraphSlot[] => ([{
 }, { id: i + 100, scheduleId: 1, dayOfMonth: i + 1, slotNo: 1, employeeId: 1, status: 1, fromTime: "12:00", toTime: "16:00" }])).flat();
 beforeEach(() => {
   setLanguage("en"); vi.clearAllMocks();
+  mocks.contractSettings = { data: { automaticWeekdayAvailability: false }, isError: false };
+  mocks.employees = [{ id: 1, firstName: "Ada", lastName: "Lovelace", contractType: "zlecenie", hasLoginAccount: true, isOnline: false }];
+  mocks.availabilitySlots = [];
   mocks.graphEmployees = [{ id: 1, scheduleId: 1, employeeId: 1, displayOrder: 0 }];
   mocks.members = [{ id: 1, employeeId: 1, displayOrder: 0 }];
   mocks.groups = [{ id: 1, name: "Availability", year: 2026, month: 2 }];
@@ -312,4 +320,31 @@ test.each(["en", "pl", "uk"] as const)("priority survives error feedback and ret
   await waitFor(() => expect(columns()).toHaveLength(1));
   expect(screen.getByTestId("errors")).toBeEmptyDOMElement();
   expect(mocks.generate.mock.calls.at(-1)![0].payload.employees[0].isPriority).toBe(true);
+});
+
+
+test("availability preview overlays the same calendar as profiles and red hints follow effective weekends", () => {
+  mocks.employees[0].contractType = "o_prace";
+  mocks.contractSettings.data = { automaticWeekdayAvailability: true };
+  mocks.availabilitySlots = [{ id: 90, availabilityGroupMemberId: 1, dayOfMonth: 2, kind: 1, intervalStr: null }];
+  const view = render(<ContainerGraphEditPage />);
+  expect(mocks.editor!.previewCellMap["1:2"]).toBe("+");
+  expect(mocks.editor!.previewCellMap["1:1"]).toBe("-");
+  expect(mocks.editor!.previewCellMap["1:28"]).toBe("-");
+  expect(mocks.editor!.styleMap["1:2"]).toBeUndefined();
+  expect(mocks.editor!.styleMap["1:1"]).toBeDefined();
+  expect(mocks.availabilitySlots).toHaveLength(1);
+  mocks.contractSettings.data = { automaticWeekdayAvailability: false };
+  view.rerender(<ContainerGraphEditPage />);
+  expect(mocks.editor!.previewCellMap).toEqual({ "1:2": "-" });
+  expect(mocks.editor!.styleMap["1:2"]).toBeDefined();
+});
+
+test("graph availability policy loading and errors block preview presentation", () => {
+  mocks.contractSettings.data = undefined;
+  const view = render(<ContainerGraphEditPage />);
+  expect(mocks.editor!.isLoading).toBe(true);
+  mocks.contractSettings.isError = true;
+  view.rerender(<ContainerGraphEditPage />);
+  expect(mocks.editor!.hasLoadError).toBe(true);
 });

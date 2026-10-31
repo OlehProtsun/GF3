@@ -46,12 +46,21 @@ public sealed class EmploymentContractAvailabilityTests
         Assert.Equal(BllKind.ANY, automatic.Slots[0].Kind);
         Assert.Equal(automatic.Slots.Select(x => x.Kind), Assert.Single(automatic.Members).Slots.Select(x => x.Kind));
         Assert.Equal(HttpStatusCode.Forbidden, (await host.Client.PutAsJsonAsync("/api/employee-availability/1/slots", new { slots = Array.Empty<object>() })).StatusCode);
+        await host.Login("manager");
+        await host.Exchange("pc");
+        using (var managerItems = await host.Client.GetFromJsonAsync<System.Text.Json.JsonDocument>("/api/availability-groups/1/items"))
+        {
+            var item = Assert.Single(managerItems!.RootElement.EnumerateArray());
+            Assert.Equal((int)DalKind.NONE, item.GetProperty("kind").GetInt32());
+            Assert.Equal(1, item.GetProperty("employeeId").GetInt32());
+        }
         await using (var db = host.Database.CreateContext())
         {
             Assert.Equal(DalKind.NONE, (await db.AvailabilityGroupDays.SingleAsync()).Kind);
             Assert.Null((await db.AvailabilityGroupMembers.SingleAsync()).EmployeeLastModifiedAtUtc);
             await db.EmploymentContractSettings.ExecuteUpdateAsync(x => x.SetProperty(v => v.AutomaticWeekdayAvailability, false));
         }
+        await host.Login("employee");
         var manual = (await host.Client.GetFromJsonAsync<EmployeeAvailabilityGroupDto>("/api/employee-availability/1"))!;
         Assert.False(manual.IsAutomatic); Assert.True(manual.CanSubmit); Assert.Equal(BllKind.NONE, Assert.Single(manual.Slots).Kind);
     }

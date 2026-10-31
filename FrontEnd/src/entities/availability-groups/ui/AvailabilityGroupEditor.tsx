@@ -43,6 +43,7 @@ type AvailabilityGroupEditorProps = {
   assignedEmployees: { id: number; label: string; canChooseFromAnother: boolean }[];
   columns: AvailabilityMatrixColumn[];
   cellMap: AvailabilityMatrixCellMap;
+  readOnlyCellKeys?: ReadonlySet<string>;
   visualHintMap?: AvailabilityMatrixCellMap;
   cellErrors?: Record<string, string>;
   binds: AvailabilityGroupEditorBindRow[];
@@ -122,6 +123,7 @@ export function AvailabilityGroupEditor({
   assignedEmployees,
   columns,
   cellMap,
+  readOnlyCellKeys,
   visualHintMap,
   cellErrors = {},
   binds,
@@ -431,6 +433,7 @@ export function AvailabilityGroupEditor({
             month={month}
             columns={columns}
             cellMap={cellMap}
+            readOnlyCellKeys={readOnlyCellKeys}
             visualHintMap={visualHintMap}
             cellErrors={cellErrors}
             headerCenterSlot={

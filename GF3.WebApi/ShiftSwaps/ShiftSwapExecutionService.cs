@@ -236,6 +236,7 @@ public sealed class ShiftSwapExecutionService(
 
         if (swap.Status != ShiftSwapStatus.Open)
             throw new ValidationException("This swap offer is no longer open.");
+        if (await HasOtherPendingClaimAsync(swap.Id, review?.Approval.Id, cancellationToken)) throw OfferPendingApproval();
         EnsureSwapAllowed(swap.Schedule);
 
         if (swap.Visibility == ShiftSwapVisibility.Public)
@@ -275,7 +276,7 @@ public sealed class ShiftSwapExecutionService(
         }
         var claimedPeriod = ValidateClaimedPeriod(swap, offeredPeriod, request, employeeMonthSlots, employeeId);
         await ValidateEmploymentPeriodsAsync(slot, claimedPeriod, swap.IsManagerCreated ? null : swap.FromEmployeeId, employeeId, cancellationToken);
-        if (review is null && await policy.IsRuleActiveAsync(employeeId, EmploymentContractRule.RequirePickupApproval, cancellationToken))
+        if (review is null && await RequiresPickupApprovalAsync(swap, employeeId, cancellationToken))
             throw EmploymentSwapRules.ClaimApprovalRequired();
         if (!swap.IsManagerCreated && swap.FromEmployeeId is { } giver &&
             (await EmploymentSwapRules.CheckOutgoingMinimumAsync(giver, swap.Schedule, claimedPeriod, null, null, policy, cancellationToken))?.RequiresException == true &&
@@ -475,8 +476,16 @@ public sealed class ShiftSwapExecutionService(
             throw new ValidationException("Only open swap offers can be cancelled.");
         }
 
-        await using var cancelTransaction = swap.RequestKind == ShiftSwapRequestKind.Exchange
-            ? await db.Database.BeginTransactionAsync(cancellationToken) : null;
+        IDbContextTransaction cancelTransaction;
+        try
+        {
+            cancelTransaction = await db.Database.BeginTransactionAsync(cancellationToken);
+        }
+        catch (Exception exception) when (IsSqliteWriterConflict(exception))
+        {
+            throw new ValidationException("This swap changed during another request. Refresh and try again.");
+        }
+        await using var cancelTransactionLifetime = cancelTransaction;
         var cancelledSlot = swap.ScheduleSlot;
         var cancelledAtUtc = DateTimeOffset.UtcNow;
         try
@@ -489,18 +498,22 @@ public sealed class ShiftSwapExecutionService(
                 .ConfigureAwait(false);
             if (affectedRows != 1)
                 throw new ValidationException("Only open swap offers can be cancelled.");
+            await db.ContractShiftApprovalRequests.Where(x => x.ShiftSwapRequestId == id && x.Kind == "claim" && x.Status == "pending")
+                .ExecuteUpdateAsync(update => update.SetProperty(x => x.Status, "expired")
+                    .SetProperty(x => x.FailureReason, "The offer was cancelled by its owner."), cancellationToken);
+            swap.Status = ShiftSwapStatus.Cancelled;
+            swap.CancelledAtUtc = cancelledAtUtc;
+            if (swap.RequestKind == ShiftSwapRequestKind.Exchange)
+                await ShiftSwapArchive.PreserveCompletedAsync(db, swap.ScheduleId, cancellationToken, swap.Id);
+            await cancelTransaction.CommitAsync(cancellationToken);
         }
         catch (Exception exception) when (IsSqliteWriterConflict(exception))
         {
             throw new ValidationException("This swap changed during another request. Refresh and try again.");
         }
-        swap.Status = ShiftSwapStatus.Cancelled;
-        swap.CancelledAtUtc = cancelledAtUtc;
-        if (cancelTransaction is not null)
-        {
-            await ShiftSwapArchive.PreserveCompletedAsync(db, swap.ScheduleId, cancellationToken, swap.Id);
-            await cancelTransaction.CommitAsync(cancellationToken);
-        }
+        await cancelTransaction.DisposeAsync();
+        await PostCommitActions.RunAsync(context, () => realtimeNotifier.NotifyManagerDataChangedAsync(
+            "schedule", $"{swap.Schedule.ContainerId}:{swap.ScheduleId}", "employee-swap-cancelled", swap.Schedule.ContainerId, swap.ScheduleId));
 
         await PostCommitActions.RunAsync(context, () => workflowLogService
             .LogAsync(
@@ -762,6 +775,7 @@ public sealed class ShiftSwapExecutionService(
         IDbContextTransaction transaction, CancellationToken ct, ReviewExecution? review = null)
     {
         if (swap.Status != ShiftSwapStatus.Open) throw new ValidationException("This swap offer is no longer open.");
+        if (await HasOtherPendingClaimAsync(swap.Id, review?.Approval.Id, ct)) throw OfferPendingApproval();
         if (swap.IsManagerCreated || swap.Visibility != ShiftSwapVisibility.Private || swap.TargetEmployeeId != employeeId || swap.FromEmployeeId is not > 0)
             throw new ValidationException("This private exchange is for another employee.");
         var valid = await ValidateOfferAsync(new CreateEmployeeShiftSwapRequest
@@ -773,7 +787,7 @@ public sealed class ShiftSwapExecutionService(
         }, swap.FromEmployeeId.Value, ct, swap.Id, ShiftSwapArchive.ReadReservation(swap));
         var source = valid.Source;
         var back = valid.Return!;
-        if (review is null && await policy.IsRuleActiveAsync(employeeId, EmploymentContractRule.RequirePickupApproval, ct))
+        if (review is null && await RequiresPickupApprovalAsync(swap, employeeId, ct))
             throw EmploymentSwapRules.ClaimApprovalRequired();
         var returnPeriod = valid.ReturnPeriod!.Value;
         var ownerId = swap.FromEmployeeId.Value;
@@ -997,8 +1011,11 @@ public sealed class ShiftSwapExecutionService(
         var ids = offers.SelectMany(x => new[] { x.FromEmployeeId, x.TargetEmployeeId, employeeId })
             .Where(x => x.HasValue).Select(x => x!.Value).Distinct().ToArray();
         var types = await policy.GetContractTypesAsync(ids, ct);
-        var pending = await db.ContractShiftApprovalRequests.AsNoTracking().Where(x => x.EmployeeId == employeeId &&
-            x.Status == "pending" && x.Kind == "claim").Select(x => x.ShiftSwapRequestId).ToListAsync(ct);
+        var offerIds = offers.Select(x => x.Id).ToArray();
+        var pending = await db.ContractShiftApprovalRequests.AsNoTracking().Where(x => x.ShiftSwapRequestId.HasValue &&
+            offerIds.Contains(x.ShiftSwapRequestId.Value) && x.Status == "pending" && x.Kind == "claim")
+            .Select(x => new { x.ShiftSwapRequestId, x.EmployeeId }).ToListAsync(ct);
+        var pendingByOffer = pending.ToLookup(x => x.ShiftSwapRequestId!.Value);
         for (var index = 0; index < offers.Count; index++)
         {
             var offer = offers[index]; var dto = dtos[index];
@@ -1027,7 +1044,7 @@ public sealed class ShiftSwapExecutionService(
                     dto.EligibleClaimWindows = dto.EligibleClaimWindows.Where(x => x.FromTime == slot!.FromTime && x.ToTime == slot.ToTime).ToList();
                 }
             }
-            dto.RequiresManagerApproval = types.GetValueOrDefault(employeeId) == EmploymentContractTypes.OPrace && settings.RequirePickupApproval;
+            dto.RequiresManagerApproval = EmploymentSwapRules.RequiresPickupApproval(offer, employeeId, settings, types);
             if (types.GetValueOrDefault(employeeId) == EmploymentContractTypes.OPrace && settings.RequireBelowMinimumGiveApproval &&
                 offer.RequestKind == ShiftSwapRequestKind.Exchange && offer.TargetEmployeeId == employeeId && offer.ReturnScheduleId is { } returnScheduleId)
             {
@@ -1037,8 +1054,20 @@ public sealed class ShiftSwapExecutionService(
                         new(offer.ReturnFromTime!, offer.ReturnToTime!), offer.Schedule,
                         new(dto.FromTime, dto.ToTime), policy, ct))?.RequiresException == true;
             }
-            dto.ApprovalPendingForCurrentEmployee = pending.Contains(offer.Id);
-            dto.CanRequestManagerApproval = dto.CanAccept && dto.RequiresManagerApproval && !dto.ApprovalPendingForCurrentEmployee;
+            dto.PickupApprovalPolicyApplies = offer.Visibility == ShiftSwapVisibility.Public
+                ? settings.RequirePickupApproval
+                : EmploymentSwapRules.RequiresPickupApproval(offer, offer.TargetEmployeeId, settings, types);
+            dto.IsAwaitingManagerApproval = pendingByOffer.Contains(offer.Id);
+            dto.ApprovalPendingForCurrentEmployee = pendingByOffer[offer.Id].Any(x => x.EmployeeId == employeeId);
+            dto.CanRequestManagerApproval = dto.CanAccept && dto.RequiresManagerApproval && !dto.IsAwaitingManagerApproval;
+            if (dto.IsAwaitingManagerApproval)
+            {
+                dto.CanAccept = false;
+                dto.CanAcceptFull = false;
+                dto.EligibleClaimWindows = [];
+                dto.AcceptanceUnavailableReason = dto.ApprovalPendingForCurrentEmployee
+                    ? "Awaiting manager approval" : "This offer is awaiting manager approval.";
+            }
         }
     }
 
@@ -1076,13 +1105,39 @@ public sealed class ShiftSwapExecutionService(
         return SnapshotApproval("below_minimum_give", employeeId, valid.Source, valid.Period, command, valid.Return, valid.ReturnPeriod);
     }
 
+    private async Task<bool> RequiresPickupApprovalAsync(ShiftSwapRequestModel offer, int employeeId, CancellationToken ct)
+    {
+        var settings = await policy.GetSettingsAsync(ct);
+        var ids = new[] { offer.FromEmployeeId, employeeId }.Where(id => id.HasValue).Select(id => id!.Value).Distinct().ToArray();
+        var types = await policy.GetContractTypesAsync(ids, ct);
+        if (!types.ContainsKey(employeeId)) throw new KeyNotFoundException("The employee profile could not be found.");
+        return EmploymentSwapRules.RequiresPickupApproval(offer, employeeId, settings, types);
+    }
+
+    private Task<bool> HasOtherPendingClaimAsync(int offerId, int? permittedApprovalId, CancellationToken ct)
+        => db.ContractShiftApprovalRequests.AsNoTracking().AnyAsync(x => x.Kind == "claim" && x.Status == "pending" &&
+            x.ShiftSwapRequestId == offerId && (!permittedApprovalId.HasValue || x.Id != permittedApprovalId.Value), ct);
+
+    private static ContractShiftConflictException OfferPendingApproval()
+        => new("CONTRACT_OFFER_PENDING_APPROVAL", "This offer is awaiting manager approval.");
+
     internal async Task<ContractShiftApprovalRequestModel> BuildClaimDraftAsync(int employeeId, int offerId,
-        AcceptEmployeeShiftSwapRequest? command, CancellationToken ct)
+        AcceptEmployeeShiftSwapRequest? command, CancellationToken ct, int? permittedApprovalId = null)
     {
         var swap = await BuildSwapRequestQuery().SingleOrDefaultAsync(x => x.Id == offerId, ct)
             ?? throw new KeyNotFoundException("The swap offer was not found.");
         if (swap.Status != ShiftSwapStatus.Open || swap.Schedule.PublicationStatus != SchedulePublicationStatus.Public)
             throw new ContractShiftConflictException("CONTRACT_OFFER_STALE", "This swap offer is no longer open.");
+        if (await HasOtherPendingClaimAsync(offerId, permittedApprovalId, ct))
+        {
+            var from = command?.FromTime ?? swap.OfferedFromTime ?? swap.ScheduleSlot?.FromTime;
+            var to = command?.ToTime ?? swap.OfferedToTime ?? swap.ScheduleSlot?.ToTime;
+            if (!permittedApprovalId.HasValue && await db.ContractShiftApprovalRequests.AsNoTracking().AnyAsync(x =>
+                x.Kind == "claim" && x.Status == "pending" && x.ShiftSwapRequestId == offerId &&
+                x.EmployeeId == employeeId && x.FromTime == from && x.ToTime == to, ct))
+                throw new ContractShiftConflictException("CONTRACT_DUPLICATE_PENDING", "An equivalent approval request is already pending.");
+            throw OfferPendingApproval();
+        }
         EnsureSwapAllowed(swap.Schedule);
         EnsureScheduleIsNotLocked(swap.Schedule, forApproval: true);
         var slot = swap.ScheduleSlot ?? throw new ContractShiftConflictException("CONTRACT_OFFER_STALE", "This shift is no longer available.");
@@ -1091,7 +1146,7 @@ public sealed class ShiftSwapExecutionService(
         ShiftSwapPeriod selected;
         ScheduleSlotModel? returned = null;
         ShiftSwapPeriod? returnPeriodSnapshot = null;
-        var requiresApproval = await policy.IsRuleActiveAsync(employeeId, EmploymentContractRule.RequirePickupApproval, ct);
+        var requiresApproval = await RequiresPickupApprovalAsync(swap, employeeId, ct);
         if (swap.RequestKind == ShiftSwapRequestKind.Exchange)
         {
             if (swap.TargetEmployeeId != employeeId || swap.FromEmployeeId is not > 0)
@@ -1181,7 +1236,7 @@ public sealed class ShiftSwapExecutionService(
         {
             var selected = new AcceptEmployeeShiftSwapRequest { FromTime = approval.FromTime, ToTime = approval.ToTime };
             var fresh = approval.Kind == "claim"
-                ? await BuildClaimDraftAsync(approval.EmployeeId, approval.ShiftSwapRequestId ?? 0, selected, ct)
+                ? await BuildClaimDraftAsync(approval.EmployeeId, approval.ShiftSwapRequestId ?? 0, selected, ct, approval.Id)
                 : await BuildGiveExceptionDraftAsync(approval.EmployeeId, CommandFor(approval), ct);
             if (fresh.ScheduleId != approval.ScheduleId || fresh.ScheduleSlotId != approval.ScheduleSlotId ||
                 fresh.ShopId != approval.ShopId || fresh.Year != approval.Year || fresh.Month != approval.Month ||

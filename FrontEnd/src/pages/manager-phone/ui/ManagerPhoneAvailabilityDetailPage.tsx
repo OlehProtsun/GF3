@@ -1,3 +1,5 @@
+import { buildEffectiveManagerAvailabilityCellMap, getAutomaticManagerEmployeeIds } from "@entities/availability-groups/model/automaticAvailability";
+import { useEmploymentContractSettingsQuery } from "@entities/employment-contracts";
 import { parsePhoneId } from "./parsePhoneId";
 import { t } from "@shared/i18n";
 import { useMemo, useState } from "react";
@@ -32,6 +34,7 @@ export function ManagerPhoneAvailabilityDetailPage() {
   const groupId = parsePhoneId(availabilityId);
   const [activeRelatedHintCellKey, setActiveRelatedHintCellKey] = useState<string | null>(null);
 
+  const contractSettingsQuery = useEmploymentContractSettingsQuery();
   const groupQuery = useAvailabilityGroupByIdQuery(groupId);
   const itemsQuery = useAvailabilityGroupItemsQuery(groupId);
   const membersQuery = useAvailabilityGroupMembersQuery(groupId);
@@ -92,6 +95,18 @@ export function ManagerPhoneAvailabilityDetailPage() {
     return {};
   }, [canUseItemsData, canUseNestedData, itemsQuery.data, membersQuery.data, slotsQuery.data]);
 
+  const automaticEmployeeIds = useMemo(
+    () => getAutomaticManagerEmployeeIds(profileEmployeeIds, employeesQuery.data ?? [], contractSettingsQuery.data?.automaticWeekdayAvailability === true),
+    [profileEmployeeIds, employeesQuery.data, contractSettingsQuery.data],
+  );
+  const effectiveCellMap = useMemo(
+    () => groupQuery.data ? buildEffectiveManagerAvailabilityCellMap(cellMap, automaticEmployeeIds, groupQuery.data.year, groupQuery.data.month) : cellMap,
+    [cellMap, automaticEmployeeIds, groupQuery.data],
+  );
+  const hasUnresolvedEmployees = Boolean(employeesQuery.data) && profileEmployeeIds.some(id => !employeesQuery.data?.some(employee => employee.id === id));
+  const hasPolicyError = contractSettingsQuery.isError || employeesQuery.isError || hasUnresolvedEmployees;
+  const isPolicyLoading = !hasPolicyError && (!contractSettingsQuery.data || !employeesQuery.data);
+
   const transferredAwayVisualHintMap = useMemo(
     () => buildAvailabilityTransferHintMap(transferHintsQuery.data ?? []),
     [transferHintsQuery.data],
@@ -102,6 +117,10 @@ export function ManagerPhoneAvailabilityDetailPage() {
       transferHintsQuery.data ?? [],
     ),
     [transferHintsQuery.data, transferPreviewQuery.data],
+  );
+  const effectiveVisualHintMap = useMemo(
+    () => Object.fromEntries(Object.entries(visualHintMap).filter(([key]) => !automaticEmployeeIds.has(Number(key.split(":")[0])))),
+    [visualHintMap, automaticEmployeeIds],
   );
   const activeTransferredAwayHint = useMemo(() => {
     if (!activeRelatedHintCellKey) {
@@ -202,19 +221,19 @@ export function ManagerPhoneAvailabilityDetailPage() {
     !(hasMembersError || hasSlotsError) &&
     (membersQuery.isLoading || membersQuery.isFetching || slotsQuery.isLoading || slotsQuery.isFetching);
 
-  const isLoading =
+  const isLoading = isPolicyLoading ||
     isGroupPending ||
     (hasValidId && Boolean(groupQuery.data) && !hasResolvedMatrix && (isItemsPending || isNestedPending));
 
-  const hasLoadError =
+  const hasLoadError = hasPolicyError ||
     !hasValidId ||
     (!isLoading && !groupQuery.data) ||
     (!isLoading && Boolean(groupQuery.data) && !hasResolvedMatrix);
 
   return <ManagerPhonePage title={t("Availability Profile")} backTo="/availability" valid={hasValidId} missing={!groupQuery.data}
-    queries={[{ isLoading, isError: hasLoadError, error: hasLoadError ? groupQuery.error ?? itemsQuery.error ?? membersQuery.error ?? slotsQuery.error : undefined }, employeesQuery]}
-    queryKeys={[queryKeys.availabilityGroups.all, queryKeys.employees.all]}>
-    <AvailabilityGroupProfileCard group={groupQuery.data} columns={columns} cellMap={cellMap} visualHintMap={visualHintMap}
+    queries={[{ isLoading, isError: hasLoadError, error: hasLoadError ? groupQuery.error ?? itemsQuery.error ?? membersQuery.error ?? slotsQuery.error : undefined }, employeesQuery, contractSettingsQuery]}
+    queryKeys={[queryKeys.availabilityGroups.all, queryKeys.employees.all, queryKeys.employmentContracts.settings()]}>
+    <AvailabilityGroupProfileCard group={groupQuery.data} columns={columns} cellMap={effectiveCellMap} visualHintMap={effectiveVisualHintMap}
       showManagementActions={false} isLoading={false} hasLoadError={false} isDeleting={false} onEdit={() => {}} onDelete={() => {}}
       onVisualHintClick={(employeeId, dayOfMonth) => {
         const cellKey = getAvailabilityCellKey(employeeId, dayOfMonth);
